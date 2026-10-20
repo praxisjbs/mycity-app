@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { usePhoto } from "@/api/download";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { Employee360 as Record360, ManagerRef } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
@@ -96,14 +97,13 @@ export function Employee360({ id }: { id: string }) {
       body: (close) => <ArchiveForm id={id} name={e.display_name} close={close} onDone={reload} />,
     });
 
-  /* Download Their Data: the CEO only, emailed to them; the person's one a day (docs/guides/ess.md §6). */
+  /* Download Their Data: the CEO only, downloaded here; the person's one a day (docs/guides/ess.md §6). */
   const downloadData = async () => {
     try {
-      await exportData.run({ params: { id }, body: {} });
-      toast("We'll email it to you");
+      if (await saveExport(exportData.run({ params: { id }, body: {} }))) toast("Their data downloaded");
     } catch (err) {
       if (!(err instanceof ApiError)) throw err;
-      toast(err.message);
+      toast.error(err.message);
     }
   };
 

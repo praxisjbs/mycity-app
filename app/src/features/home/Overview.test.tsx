@@ -430,19 +430,33 @@ describe("the records behind a card", () => {
 describe("Export", () => {
   // The toasts, on their own: the Overview's other cases read the page without them.
   const toasts = () => render(<Toaster />);
+  // The clock is held still here, and the mock makes a run's file a few seconds after it is asked
+  // for: each look moves it on a second until the file is saved (the mock holds no bytes, and says so).
+  const savedMeanwhile = () =>
+    waitFor(
+      () => {
+        vi.setSystemTime(new Date(Date.now() + 1_000));
+        expect(screen.getByText("Files download once the API is connected")).toBeTruthy();
+      },
+      { timeout: 12000, interval: 250 },
+    );
 
-  it("makes a file of the reader's own Overview in the format they choose, toasted with its run's number", async () => {
+  it("makes a file of the reader's own Overview in the format they choose, waits for it and downloads it here", async () => {
     toasts();
     await overviewAs("cynthia@mycityapp.io");
+    const before = reports.HomeReportRunPage.parse(await api.call("GET /api/v1/home/report-runs")).page.total;
     fireEvent.keyDown(screen.getByRole("button", { name: "Export" }), { key: "Enter" });
     const menu = await screen.findByRole("menu");
     expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Export PDF", "Export XLSX"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Export XLSX" }));
-    const toast = await screen.findByText(/^RPT-\d{4} queued\. It arrives by email\.$/, {}, { timeout: 5000 });
-    const number = toast.textContent!.split(" ")[0];
-    // A run of the reader's own Overview, for them alone, Pending until its file is there.
-    const runs = reports.HomeReportRunPage.parse(await api.call("GET /api/v1/home/report-runs")).data;
-    expect(runs.find((r) => r.number === number)).toMatchObject({ report_key: "overview", format: "xlsx", recipient_name: "Cynthia Osakunih", report_schedule_id: null });
+    // Busy while the file is made, then saved on this device (the in-browser mock holds no bytes, and says so).
+    await waitFor(() => expect(screen.getByRole("button", { name: "Export" }).getAttribute("aria-busy")).toBe("true"));
+    await savedMeanwhile();
+    // A run of the reader's own Overview, for them alone, done and never emailed.
+    const runs = reports.HomeReportRunPage.parse(await api.call("GET /api/v1/home/report-runs"));
+    expect(runs.page.total).toBe(before + 1);
+    const run = runs.data.reduce((a, b) => (b.number > a.number ? b : a));
+    expect(run).toMatchObject({ report_key: "overview", format: "xlsx", recipient_name: "Cynthia Osakunih", report_schedule_id: null, status: "done", emailed_at: null });
     // The Overview's own report is not one of the reports Reports lists.
     const listed = reports.HomeReportPage.parse(await api.call("GET /api/v1/home/reports")).data;
     expect(listed.some((r) => r.report_key === "overview")).toBe(false);
@@ -453,7 +467,9 @@ describe("Export", () => {
     await overviewAs("chidera@mycityapp.io");
     fireEvent.keyDown(screen.getByRole("button", { name: "Export" }), { key: "Enter" });
     fireEvent.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Export PDF" }));
-    expect(await screen.findByText(/^RPT-\d{4} queued\. It arrives by email\.$/, {}, { timeout: 5000 })).toBeTruthy();
+    // Staff hold no `home.reports`: the screen waits on its own run through the Overview's own read.
+    await savedMeanwhile();
+    expect(screen.queryByText("Export failed. Try again.")).toBeNull();
     cleanup();
     setViewport(390);
     await overviewAs("chidera@mycityapp.io");

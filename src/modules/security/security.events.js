@@ -43,7 +43,7 @@ const notYou = "If this was not you, tell People now.";
 
 /** Tell the owner, high priority, whoever did it. */
 function tell(key, title, body) {
-  defineNotification(key, { to: [{ users: self }], title, body, priority: "high", include_actor: true });
+  defineNotification(key, { to: [{ users: self }], title, body, priority: "high", include_actor: true, who: "The account holder" });
 }
 
 const HOW_OFTEN = {

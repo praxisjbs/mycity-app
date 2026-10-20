@@ -11,7 +11,7 @@
  *   GET   /me/exceptions                 my exceptions
  *   POST  /me/exceptions/:id/explanation say why
  *   POST  /me/events/:id/explanation     say why an automatic clock-out's time is wrong
- *   POST  /me/export                     my month, emailed as a workbook
+ *   POST  /me/export                     my month as a workbook, downloaded where I asked (202)
  *   GET   /me/records/:id                the day a link to my day or exception opens
  *   GET   /me/home, POST /me/home        my home location, and a new one for People (remote)
  *   GET   /me/requests, POST /me/requests  my work location requests, and a new one (approval)
@@ -40,7 +40,8 @@
  *   POST  /field-assignments/:id/remove  take one person off (approve, as cancel)
  *   GET   /schedules/:employee_id        a person's week, office and home state (view)
  *   POST  /schedules/:employee_id        set a hybrid employee's office days (edit; never your own)
- *   POST  /export                        the register over up to 31 days, emailed (export)
+ *   POST  /export                        the register over up to 31 days as a workbook, downloaded
+ *                                        where it was asked for (export; 202)
  *
  * The attendance policy, on Settings (the `settings` grant):
  *   GET   /policy                        the rules in force, the versions in force and waiting, the
@@ -97,7 +98,7 @@ route(router, "post", "/me/events/:id/explanation",
   controller.explainAutomatic);
 
 route(router, "post", "/me/export",
-  { body: a.MyExportRequest, response: a.AttendanceExportQueued, self: true, summary: "Email me my month" },
+  { body: a.MyExportRequest, response: c.documents.ExportFile, self: true, summary: "Export my month" },
   controller.myExport);
 
 route(router, "get", "/me/records/:id",
@@ -221,7 +222,7 @@ route(router, "post", "/schedules/:employee_id",
   requirePermission("people", "edit"), controller.setSchedule);
 
 route(router, "post", "/export",
-  { body: a.RegisterExportRequest, response: a.AttendanceExportQueued, summary: "Email the register" },
+  { body: a.RegisterExportRequest, response: c.documents.ExportFile, summary: "Export the register" },
   requirePermission("people", "export"), controller.export);
 
 route(router, "get", "/me/policy",

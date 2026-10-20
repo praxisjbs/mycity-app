@@ -13,6 +13,8 @@ export type {
   Channel,
   ChannelCreate,
   Conversation,
+  LinkPreview,
+  MediaRef,
   Member,
   Message,
   MessageCreate,

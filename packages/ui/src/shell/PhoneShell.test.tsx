@@ -37,6 +37,17 @@ describe("PhoneShell", () => {
     expect(screen.getByRole("navigation", { name: "Main" })).toHaveAttribute("data-ui", "phone-nav");
   });
 
+  it("draws the urgent bar under the header, outside the page", () => {
+    setViewport(390);
+    render(
+      <PhoneShell header={<PhoneHeader title="Home" homeHref="/home" />} bottomBar={<BottomBar items={BOTTOM_ITEMS(() => undefined)} current="home" />} alert={<div role="alert">Fire drill at 11</div>}>
+        <h1>Home</h1>
+      </PhoneShell>,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Fire drill at 11");
+    expect(screen.getByRole("main")).not.toContainElement(screen.getByRole("alert"));
+  });
+
   it("keeps clear space under the page for the floating button, and none without one", () => {
     setViewport(390);
     const { rerender } = render(frame());

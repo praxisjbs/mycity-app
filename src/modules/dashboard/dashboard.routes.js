@@ -7,6 +7,9 @@
  *   GET    /overview                `home` view: the reader's Overview, resolved for them
  *   POST   /overview/export         `home` view: a file of it for the reader, through the reports
  *                                   engine (reports.service exportOverview), answered pending
+ *   GET    /overview/export/:id     `home` view: one of the reader's own Overview exports, which
+ *                                   their screen waits on to download it (Staff hold no
+ *                                   `home.reports` for GET /report-runs/:id)
  *   GET    /kpi-picker              `home` view: the cards they may choose, and their own
  *   PUT    /kpi-picks               `home` view: choose up to four, locks kept
  *   DELETE /kpi-picks               `home` view: back to their roles' cards
@@ -42,6 +45,10 @@ route(router, "get", "/overview",
 route(router, "post", "/overview/export",
   { body: c.reports.HomeReportRunNow, response: c.reports.HomeReportRun, summary: "Export my Overview" },
   view, controller.exportOverview);
+
+route(router, "get", "/overview/export/:id",
+  { params: c.common.IdParams, response: c.reports.HomeReportRun, summary: "One of my Overview exports" },
+  view, controller.overviewExport);
 
 route(router, "get", "/kpi-picker",
   { response: d.HomeKpiPicker, summary: "The cards a person may choose, and the ones they chose" },

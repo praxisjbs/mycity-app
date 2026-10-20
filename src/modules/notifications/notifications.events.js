@@ -22,11 +22,15 @@ const realtime = require("../../services/realtime/emitter");
 const EVENTS = defineEvents("settings", {
   "notification.read": { summary: "A notification was marked read" },
   "notification.read_all": { summary: "Every notification was marked read" },
+  "notification.acknowledged": { summary: "An urgent notification was acknowledged" },
   "notification.preference_changed": { summary: "A person changed where a kind of notice reaches them" },
   "push_subscription.saved": { summary: "Notifications were turned on for a device" },
   "push_subscription.removed": { summary: "Notifications were turned off for one or more devices" },
   "push_subscription.renewed": { summary: "A device's browser renewed its push subscription" },
   "push.test_requested": { summary: "A test notification was sent to a person's devices" },
+  "notification_setting.changed": { summary: "A person changed their quiet hours or daily digest" },
+  "notification_rule.changed": { summary: "A notice's company rule was changed in Settings" },
+  "notification_reminder.changed": { summary: "The company's reminders were changed in Settings" },
 });
 
 /** The realtime event the bell reloads on, besides a new `notification`. */
@@ -39,6 +43,10 @@ function tellTheirTabs(event) {
 
 outbox.register(EVENTS.NOTIFICATION_READ, "notifications.sync_read", async (event) => tellTheirTabs(event));
 outbox.register(EVENTS.NOTIFICATION_READ_ALL, "notifications.sync_read_all", async (event) => tellTheirTabs(event));
+// Acknowledge closes the urgent bar on every other tab and device too.
+outbox.register(EVENTS.NOTIFICATION_ACKNOWLEDGED, "notifications.sync_acknowledged", async (event) =>
+  tellTheirTabs(event),
+);
 
 /** Send Test: the worker pushes to the device asked for, or every device of the person. */
 outbox.register(EVENTS.PUSH_TEST_REQUESTED, "notifications.send_test_push", (event) =>
@@ -80,3 +88,6 @@ outbox.register("auth.session_ended", "notifications.stop_push_signed_out", asyn
 });
 
 module.exports = { EVENTS, READ_EVENT };
+
+// The reminder engine and the company's reminders, declared in the API and the worker alike.
+require("./notifications.reminders");

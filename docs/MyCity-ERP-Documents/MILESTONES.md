@@ -903,7 +903,13 @@ invoices, and sensitive operational actions.
 after the session has ended, and a tap opens the record through sign-in), the in-app banner, the
 bell's pane on both shells and each person's Notification Settings (In App, Email and Push per
 category) are built in M0 (`docs/guides/notifications.md`, `docs/runbooks/push-notifications.md`).
-M6 keeps the configurable reminders above (Settings · Notifications, #74) and the definition of
+**Added to M0 by TB on the same day:** every device alerted at once, every channel post alerting,
+and urgency (Normal, Important, Urgent) with Acknowledge, a red bar on every screen and urgent
+repeats every 30 minutes of the working day; then Settings · Notifications (#74) with the
+configurable reminders above: who each notice reaches and how, approvals waiting, employees due
+for confirmation, a daily digest and each person's quiet hours, on one reminder engine that M2's
+tasks and calendars use (`docs/handoff/notifications-everywhere.md`). Due invoices join the
+reminders with the module that owns them. M6 keeps payroll's own notices and the definition of
 done below.
 
 ### Definition of done
@@ -1305,7 +1311,8 @@ staff never navigates to it to do their job.
 Two of the above span a milestone boundary. **Recruitment** gets Vacancies through Interviews in M4 and
 Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
-in M6 with the notification engine, not in M9 with the rest of the module.
+with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
+M0 by TB on 19/10/2026).
 
 ### 18.1 Naming rules
 

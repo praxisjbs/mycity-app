@@ -4,13 +4,14 @@ import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
 import { saveFile, useFileUrls } from "@/api/download";
+import { useFileViewer, viewableFile } from "@/features/shared/files";
 import { useRealtime } from "@/api/realtime";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, type ComposeInit } from "./Composer";
 import { ApiError } from "@/api/client";
-import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
+import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, fileTypeOf, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
 import { MailSignature } from "./MailSignature";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
@@ -259,6 +260,7 @@ function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m:
   const body = useMemo(() => (m.body_html == null ? null : prepareEmail(m.body_html, { showRemote, inline })), [m.body_html, showRemote, inline]);
   const split = useMemo(() => (body ? splitQuoted(body.html) : null), [body]);
   const [history, setHistory] = useState(false);
+  const files = useFileViewer();
   return (
     <div className={cn(head && "border-b border-dashed border-border")}>
       {head && <p className="pt-3 text-2xs font-semibold text-subtle-foreground">{who(m.from)} · {formatWhen(m.sent_at)}</p>}
@@ -288,13 +290,19 @@ function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m:
       )}
       {m.attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-dashed border-border pt-3 pb-1">
-          {m.attachments.map((a) => (
-            <button key={a.mail_attachment_id} type="button" onClick={() => void saveFile(`/api/v1/documents/${a.document_id}/content`, a.file_name)} className="flex cursor-pointer items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">
-              <Icon name="doc" />{a.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
-            </button>
-          ))}
+          {m.attachments.map((a) => {
+            const url = `/api/v1/documents/${a.document_id}/content`;
+            /* A photo, a video or a PDF opens in the file viewer; anything else downloads. */
+            const openIt = () => (viewableFile(a.mime_type) ? files.view(url, { name: a.file_name, mime: a.mime_type, by: who(m.from), at: formatWhen(m.sent_at) }) : saveFile(url, a.file_name));
+            return (
+              <button key={a.mail_attachment_id} type="button" onClick={openIt} className="flex cursor-pointer items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">
+                <Icon name={fileTypeOf(a.mime_type, a.file_name).glyph} />{a.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
+              </button>
+            );
+          })}
         </div>
       )}
+      {files.viewer}
     </div>
   );
 }

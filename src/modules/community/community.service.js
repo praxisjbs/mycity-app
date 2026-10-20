@@ -7,6 +7,8 @@
  * - Who may post is the channel's post_policy, fixed at creation: everyone, its admins,
  *   or holders of the announcements.post capability (#announcements).
  * - A recognition always posts to #general (MILESTONES A19), wherever it was started.
+ * - Files sent together share an album key; a caption rides on the first. A text's first
+ *   link gets its card from community.links.js, at once when one is kept, else after commit.
  * - #general and #announcements are made the first time they are needed, and every
  *   person who opens Community is a member of both.
  *
@@ -24,6 +26,7 @@ const transcription = require("../../services/ai/transcription");
 const repo = require("./community.repo");
 const { EVENTS } = require("./community.events");
 const { noteFor } = require("./community.recognition");
+const links = require("./community.links");
 const { wishFor } = require("./community.celebrations");
 
 async function tx(fn) {
@@ -52,17 +55,21 @@ function mayPost(channel) {
   return true;
 }
 
+/** The kinds of message that carry a file, and so may share an album key and a caption. */
+const FILE_TYPES = new Set(["image", "video", "file"]);
+
 /** One line for a list row, from a message's kind and body. */
 function lineOf(type, body) {
+  const caption = body ? String(body).replace(/\s+/g, " ").trim().slice(0, 120) : null;
   switch (type) {
     case "audio":
       return "Voice note";
     case "image":
-      return "Photo";
+      return caption ? `Photo: ${caption}` : "Photo";
     case "video":
-      return "Video";
+      return caption ? `Video: ${caption}` : "Video";
     case "file":
-      return "File";
+      return caption ? `File: ${caption}` : "File";
     case "poll":
       return body ? `Poll: ${body}` : "Poll";
     case "recognition":
@@ -454,13 +461,23 @@ async function present(
       sent_at: iso(r.sent_at),
       body: deleted ? null : r.body,
       document: deleted ? null : r.document,
+      album_key: m.album_key ?? null,
+      link: deleted ? null : (r.link ?? null),
       duration_s: r.message_type === "audio" ? (m.duration_s ?? null) : null,
       transcript: deleted ? null : (r.transcript ?? null),
       celebration,
       recognition,
       poll,
       announcement: r.announcement_id
-        ? { announcement_id: r.announcement_id, title: r.announcement_title }
+        ? {
+            announcement_id: r.announcement_id,
+            title: r.announcement_title,
+            urgency: r.announcement_urgency || "normal",
+            in_audience: Boolean(r.announcement_in_audience),
+            acknowledged_at: r.announcement_acknowledged_at
+              ? new Date(r.announcement_acknowledged_at).toISOString()
+              : null,
+          }
         : null,
       status: direct && mine && other ? statusOf(r, other) : null,
       deleted,
@@ -525,7 +542,7 @@ function kindOfFile(mime) {
   return "file";
 }
 
-/** A file uploaded for a channel, held in the vault against it; only its members read it. */
+/** A file uploaded for a channel, held in the vault against it; only its members read it. Answers its MediaRef. */
 async function storeMedia(channelId, upload, user) {
   return tx(async (client) => {
     const m = await member(client, channelId, user);
@@ -539,12 +556,8 @@ async function storeMedia(channelId, upload, user) {
       entity: { type: "community_channel", id: channelId },
       actor: user,
     });
-    return {
-      document_id: doc.document_id,
-      file_name: doc.original_name || "file",
-      size_bytes: Number(doc.bytes),
-      mime_type: doc.mime,
-    };
+    // With its shape and the sizes made at upload, so Send Files draws it at once.
+    return repo.mediaRef(client, doc.document_id);
   });
 }
 
@@ -592,7 +605,13 @@ async function postMessage(channelId, body, user) {
       }
       if (type !== "audio") type = kindOfFile(doc.mime);
       if (type === "audio") metadata.duration_s = body.duration_s ?? 1;
+      if (body.album_key && FILE_TYPES.has(type)) metadata.album_key = body.album_key;
     }
+    if (type === "text" && body.no_link_preview) metadata.no_link_preview = true;
+    const card =
+      type === "text"
+        ? await links.linkFor(client, body.body, metadata)
+        : { community_link_preview_id: null, fetch: null };
     if (type === "poll") metadata.options = body.options;
     if (type === "birthday" || type === "anniversary") {
       const persons = await repo.people(client, [body.subject_employee_id]);
@@ -617,6 +636,7 @@ async function postMessage(channelId, body, user) {
           : body.body,
       document_id: body.document_id,
       metadata,
+      community_link_preview_id: card.community_link_preview_id,
     });
     // Sending is reading: the sender's own pointer moves past what they sent.
     await repo.markRead(client, channelId, user.user_id);
@@ -638,11 +658,17 @@ async function postMessage(channelId, body, user) {
         sender_name: user.display_name || null,
         channel_name: m.channel_type === "direct" ? null : m.name || null,
         preview: lineOf(type, message.body),
+        ...(card.fetch ? { link_url: card.fetch } : {}),
       },
     });
     return message;
   });
   return messageView(pool, posted.community_message_id, user);
+}
+
+/** The composer's card for one link (§3 step 18): kept, else fetched now; null when there is none. */
+async function linkPreview(body, user) {
+  return { preview: await links.cardFor(body.url, user) };
 }
 
 /** A thumbs up for a colleague, posted to #general whatever channel it came from (A19). */
@@ -833,11 +859,23 @@ async function editMessage(messageId, body, user) {
         422,
       );
     }
+    // An edited text follows its new first link; a poll carries no card.
+    const card =
+      row.message_type === "text"
+        ? await links.linkFor(client, body.body, metadata)
+        : { community_link_preview_id: null, fetch: null };
     const after = await repo.editMessage(client, messageId, {
       body: body.body,
       metadata,
+      community_link_preview_id: card.community_link_preview_id,
     });
-    await changed(client, EVENTS.CHANNEL_MESSAGE_EDITED, after, user);
+    await changed(
+      client,
+      EVENTS.CHANNEL_MESSAGE_EDITED,
+      after,
+      user,
+      card.fetch ? { link_url: card.fetch } : {},
+    );
   });
   return messageView(pool, messageId, user);
 }
@@ -1076,6 +1114,7 @@ module.exports = {
   listMessages,
   storeMedia,
   postMessage,
+  linkPreview,
   recognise,
   react,
   vote,

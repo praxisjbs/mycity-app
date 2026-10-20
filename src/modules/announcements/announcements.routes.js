@@ -103,6 +103,19 @@ route(
   poster(),
   controller.remind,
 );
+// Anyone in an urgent announcement's audience acknowledges it; the service checks they are.
+route(
+  router,
+  "post",
+  "/:id/acknowledge",
+  {
+    body: c.common.EmptyBody,
+    no_content: true,
+    summary: "Acknowledge an urgent announcement",
+  },
+  requirePermission("community", "view"),
+  controller.acknowledge,
+);
 
 module.exports = {
   basePath: "/community/announcements",

@@ -32,6 +32,8 @@ export interface RailItem {
   group?: string;
   /** Things waiting in it; nothing is drawn for 0. */
   count?: number;
+  /** Something urgent waits in it: its count shows red, at least 1. */
+  urgent?: boolean;
 }
 
 /** The person at the foot of the rail, and what their menu holds. */
@@ -125,9 +127,16 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
                   <span data-ui="nav-label" className={cn(collapsed && "sr-only")}>
                     {item.label}
                   </span>
-                  {!!item.count && (
-                    <span className={cn("ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums", on ? "bg-on-primary-badge" : "bg-sidebar-badge", collapsed && "sr-only")}>
-                      {item.count}
+                  {(!!item.count || item.urgent) && (
+                    <span
+                      data-urgent={item.urgent ? "" : undefined}
+                      className={cn(
+                        "ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums",
+                        item.urgent ? "bg-destructive text-background" : on ? "bg-on-primary-badge" : "bg-sidebar-badge",
+                        collapsed && "sr-only",
+                      )}
+                    >
+                      {Math.max(item.count ?? 0, item.urgent ? 1 : 0)}
                     </span>
                   )}
                 </a>

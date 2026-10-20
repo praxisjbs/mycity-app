@@ -79,6 +79,8 @@
   --animate-rise: rise .22s ease-out;
   --animate-buzz: buzz .26s;
   --animate-pulse-dot: pulse-dot 1s infinite;
+  /* An urgent notice's slow red halo, every 2 s (UrgentBar, Card urgency): never a flash; off with reduced motion. */
+  --animate-urgent: urgent 2s ease-in-out infinite;
   --animate-slide-in: slide-in .2s ease-out;
   --animate-celeb-in: celeb-in .55s cubic-bezier(.2, .9, .3, 1.25) both;
   --animate-spin-slow: spin 8s linear infinite;
@@ -215,6 +217,7 @@
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 @keyframes buzz { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
 @keyframes pulse-dot { 50% { opacity: .25; } }
+@keyframes urgent { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--destructive) 28%, transparent); } }
 @keyframes slide-in { from { transform: translateX(-100%); } }
 @keyframes celeb-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
 @keyframes bob { 50% { transform: translateY(-4px) rotate(-8deg); } }

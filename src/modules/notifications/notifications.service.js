@@ -17,9 +17,13 @@ const { AppError } = require("../../shared/errors");
 const routeMap = require("../../shared/route-map");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const categories = require("../../shared/notifications/categories");
+const lagos = require("../../shared/time/lagos");
 const vapid = require("../../services/push/vapid");
+const realtime = require("../../services/realtime/emitter");
+const queues = require("../../jobs/queues");
 const { deviceLabel, platformOf } = require("../identity/identity.device-label");
 const { EVENTS } = require("./notifications.events");
+const reminders = require("./notifications.reminders");
 const repo = require("./notifications.repo");
 
 async function tx(fn) {
@@ -57,6 +61,40 @@ async function present(rows, canOpen) {
 
 async function list(user, query) {
   const page = await repo.list(pool, user.user_id, query);
+  return { ...page, data: await present(page.data, opener(user)) };
+}
+
+const iso = (v) => (v ? new Date(v).toISOString() : null);
+
+/**
+ * A row as a socket carries it to the bell, the banner and the urgent bar: the contract's
+ * Notification, its link only when its person may open the record's module.
+ */
+async function asNotice(row) {
+  const user = await grantsCache.getAuthUser(pool, row.user_id);
+  const canOpen = user ? opener(user) : async () => false;
+  const [shown] = await present([row], canOpen);
+  return {
+    notification_id: row.notification_id,
+    category: row.category,
+    priority: row.priority,
+    urgency: row.urgency || "normal",
+    acknowledge_required: Boolean(row.acknowledge_required),
+    acknowledged_at: iso(row.acknowledged_at),
+    repeat_count: Number(row.repeat_count || 0),
+    title: row.title,
+    body: row.body || null,
+    entity_type: row.entity_type ?? null,
+    entity_id: row.entity_id ?? null,
+    link: shown.link,
+    read_at: iso(row.read_at),
+    created_at: iso(row.created_at || Date.now()),
+  };
+}
+
+/** The caller's open urgent notices, newest first: the urgent bar. */
+async function urgent(user, query) {
+  const page = await repo.urgentOpen(pool, user.user_id, query);
   return { ...page, data: await present(page.data, opener(user)) };
 }
 
@@ -137,10 +175,115 @@ async function markReadForRecord(client, user, entityType, entityId) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Acknowledge and the urgent repeats
+ * ------------------------------------------------------------------ */
+
+/**
+ * Acknowledge on the urgent bar: one of the caller's notices that only Acknowledge closes,
+ * acknowledged and read. Already acknowledged is a quiet no-op. The record's module hears
+ * `notification.acknowledged` (an announcement records who acknowledged it).
+ */
+async function acknowledge(user, notificationId) {
+  const row = await tx(async (client) => {
+    const before = await repo.findOwnForUpdate(client, user.user_id, notificationId);
+    if (!before) throw new AppError("NOT_FOUND", "There is no such notification.", 404);
+    if (!before.acknowledge_required)
+      throw new AppError("NOT_ACKNOWLEDGEABLE", "This notice needs no acknowledgement.", 422);
+    if (before.acknowledged_at) return before;
+    const after = await repo.acknowledge(client, notificationId);
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_ACKNOWLEDGED,
+      entity: { type: "notification", id: notificationId },
+      actor: user,
+      before,
+      after,
+      payload: {
+        user_id: user.user_id,
+        notification_id: notificationId,
+        entity_type: before.entity_type,
+        entity_id: before.entity_id,
+      },
+    });
+    return after;
+  });
+  const [shown] = await present([row], opener(user));
+  return shown;
+}
+
+/**
+ * Closes the person's notices about one record inside the caller's transaction: acknowledged
+ * where Acknowledge closes them, read everywhere (an urgent announcement acknowledged on its
+ * card, announcements.service acknowledge). Their other tabs and devices are told.
+ */
+async function acknowledgeForRecord(client, user, entityType, entityId) {
+  const ids = await repo.acknowledgeForRecord(client, user.user_id, entityType, entityId);
+  for (const id of ids) {
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_READ,
+      entity: { type: "notification", id },
+      actor: user,
+      payload: { user_id: user.user_id, notification_id: id },
+      metadata: { by_record: `${entityType}:${entityId}`, acknowledged: true },
+    });
+  }
+  return ids.length;
+}
+
+/** The urgent repeats' pace (TB, 19/10/2026; docs/guides/notifications.md §6). */
+const REPEAT = Object.freeze({ every: 30, perDay: 8, from: "08:00", until: "18:00" });
+/** A push job retries for about 20 minutes: 10 s, doubling, eight tries. */
+const PUSH_RETRY = Object.freeze({ attempts: 8, backoff: { type: "exponential", delay: 10_000 } });
+
+/**
+ * The `urgent-repeats` sweep: each open urgent notice whose last alert is 30 minutes old, between
+ * 08:00 and 18:00 Lagos time and fewer than 8 times that day, alerted again: the banner and the
+ * bar over the person's sockets, and a push to every device as the next round.
+ * @param {Date} [now]
+ * @returns {Promise<{repeated: number, outside_hours?: boolean}>}
+ */
+async function repeatUrgent(now = new Date()) {
+  const time = lagos.timeOf(now);
+  if (time < REPEAT.from || time >= REPEAT.until) return { repeated: 0, outside_hours: true };
+  const pace = { day: lagos.today(now), every: REPEAT.every, perDay: REPEAT.perDay };
+  let repeated = 0;
+  for (const id of await repo.dueRepeats(pool, pace)) {
+    const row = await repo.markRepeated(pool, id, pace);
+    if (!row) continue;
+    repeated += 1;
+    realtime.toUser(row.user_id, "notification", await asNotice(row));
+    if ((row.channels || []).includes("push")) {
+      await queues.enqueue(
+        "notification-push",
+        "send",
+        { notification_id: id, push: null, round: row.repeat_count },
+        { ...PUSH_RETRY, jobId: `push-${id}-r${row.repeat_count}` },
+      );
+    }
+  }
+  return { repeated };
+}
+
+/* ------------------------------------------------------------------ *
  * Preferences
  * ------------------------------------------------------------------ */
 
-/** Every category with its channels as they are for this person, defaults applied. */
+/** Quiet hours as they first read when a person turns them on. */
+const QUIET = Object.freeze({ from: "21:00", to: "07:00" });
+
+/** The person's quiet hours and digest switch, defaults applied, with the company's digest. */
+async function settingsOf(userId) {
+  const [mine, company] = await Promise.all([repo.settingOf(pool, userId), reminders.rules(pool)]);
+  return {
+    quiet_enabled: mine ? mine.quiet_enabled : false,
+    quiet_from: mine ? mine.quiet_from : QUIET.from,
+    quiet_to: mine ? mine.quiet_to : QUIET.to,
+    digest: mine ? mine.digest : true,
+    digest_offered: company.digest.enabled,
+    digest_at: company.digest.at_time,
+  };
+}
+
+/** Every category with its channels as they are for this person, defaults applied, and their settings. */
 async function preferences(user) {
   const stored = new Map();
   for (const r of await repo.preferenceRows(pool, user.user_id)) {
@@ -149,6 +292,7 @@ async function preferences(user) {
   }
   const three = (fn) => ({ in_app: fn("in_app"), email: fn("email"), push: fn("push") });
   return {
+    settings: await settingsOf(user.user_id),
     categories: categories.CATEGORIES.map((c) => {
       const mine = stored.get(c.key) || {};
       return {
@@ -185,6 +329,62 @@ async function setPreference(user, body) {
   });
   return preferences(user);
 }
+
+/** Quiet hours on or off, and when (docs/guides/notifications.md §6). */
+async function setQuietHours(user, body) {
+  await tx(async (client) => {
+    const after = await repo.saveQuietHours(client, user.user_id, body);
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_SETTING_CHANGED,
+      entity: { type: "account", id: user.user_id },
+      actor: user,
+      after,
+      payload: { user_id: user.user_id, quiet_enabled: after.quiet_enabled, quiet_from: after.quiet_from, quiet_to: after.quiet_to },
+    });
+  });
+  return preferences(user);
+}
+
+/** The person's own daily digest on or off. */
+async function setDigest(user, body) {
+  await tx(async (client) => {
+    const after = await repo.saveDigest(client, user.user_id, body.digest);
+    await emit(client, {
+      key: EVENTS.NOTIFICATION_SETTING_CHANGED,
+      entity: { type: "account", id: user.user_id },
+      actor: user,
+      after,
+      payload: { user_id: user.user_id, digest: after.digest },
+    });
+  });
+  return preferences(user);
+}
+
+/**
+ * When quiet hours that hold `now` end, or null when `now` is outside them. Lagos time; a window
+ * whose end is before its start runs across midnight (21:00 to 07:00).
+ */
+function quietEnd(now, from, to) {
+  const time = lagos.timeOf(now);
+  const day = lagos.dateOf(now);
+  if (from < to) return time >= from && time < to ? lagos.instant(day, to) : null;
+  if (time >= from) return lagos.instant(lagos.addDays(day, 1), to);
+  if (time < to) return lagos.instant(day, to);
+  return null;
+}
+
+/** Per person in quiet hours now, when their pushes may go. */
+async function quietUntil(userIds, now = new Date()) {
+  const out = new Map();
+  for (const r of await repo.quietHoursOf(pool, [...new Set(userIds)])) {
+    const end = quietEnd(now, r.quiet_from, r.quiet_to);
+    if (end) out.set(r.user_id, end);
+  }
+  return out;
+}
+
+/** Urgent notices and Security come through quiet hours (assumption A). */
+const passesQuiet = (row) => row.urgency === "urgent" || row.category === "security";
 
 /* ------------------------------------------------------------------ *
  * Web push: devices
@@ -387,6 +587,8 @@ async function markReadFromDevice(body) {
 
 module.exports = {
   list,
+  asNotice,
+  urgent,
   unreadCount,
   badges,
   markRead,
@@ -395,8 +597,18 @@ module.exports = {
   present,
   readState,
   markReadForRecord,
+  acknowledge,
+  acknowledgeForRecord,
+  repeatUrgent,
+  REPEAT,
+  PUSH_RETRY,
   preferences,
   setPreference,
+  setQuietHours,
+  setDigest,
+  quietEnd,
+  quietUntil,
+  passesQuiet,
   pushConfig,
   savePushSubscription,
   pushDevices,

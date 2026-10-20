@@ -29,6 +29,15 @@ jest.mock("../../src/jobs/queues", () => ({
 }));
 const queues = require("../../src/jobs/queues");
 
+// Link cards never reach the internet in a test: the page's card is the test's own.
+jest.mock("../../src/services/web/page-card", () => ({
+  ...jest.requireActual("../../src/services/web/page-card"),
+  fetchCard: jest.fn(),
+}));
+const pageCard = require("../../src/services/web/page-card");
+const links = require("../../src/modules/community/community.links");
+const mediaDerive = require("../../src/jobs/handlers/media-derive");
+
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
 const q = (sql, params) => pool.query(sql, params);
@@ -59,6 +68,30 @@ const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==",
   "base64",
 );
+
+/** A small PDF of `pages` A4 pages, each with a line of text in the standard Helvetica. */
+function pdfOf(pages) {
+  const objs = ["<< /Type /Catalog /Pages 2 0 R >>", null, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"];
+  const kids = [];
+  for (let i = 0; i < pages; i += 1) {
+    const text = `BT /F1 24 Tf 72 760 Td (Page ${i + 1}) Tj ET`;
+    objs.push(`<< /Length ${text.length} >>\nstream\n${text}\nendstream`);
+    const content = objs.length;
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${content} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`);
+    kids.push(`${objs.length} 0 R`);
+  }
+  objs[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages} >>`;
+  let out = "%PDF-1.4\n";
+  const offsets = [];
+  objs.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, "latin1");
+}
 
 describeDb("Staff Community against the real migrations", () => {
   let app;
@@ -232,6 +265,18 @@ describeDb("Staff Community against the real migrations", () => {
 
     const img = await as("bola").post(`/community/channels/${id}/media`).attach("file", PNG, "set.png");
     expect(img.status).toBe(201);
+    // The file as a bubble draws it (MediaRef): its shape, and the sizes made so far (none for a photo this small).
+    expect(img.body).toEqual({
+      document_id: expect.any(String),
+      file_name: "set.png",
+      size_bytes: expect.any(Number),
+      mime_type: "image/png",
+      width: 1,
+      height: 1,
+      page_count: null,
+      duration_ms: null,
+      variants: [],
+    });
     const posted = await as("bola").post(`/community/channels/${id}/messages`).send({ message_type: "file", document_id: img.body.document_id });
     expect(posted.status).toBe(201);
     expect(posted.body.message_type).toBe("image");
@@ -500,7 +545,8 @@ describeDb("Staff Community against the real migrations", () => {
 
     const made = await as("ceo").post("/community/announcements").send({ title: "Saturday hours", body: "Saturdays are 09:00 to 15:00." });
     expect(made.status).toBe(201);
-    expect(made.body).toMatchObject({ status: "published", audience: { kind: "all" }, audience_size: 3, reads: 0 });
+    // The poster, never told of their own post, has read it.
+    expect(made.body).toMatchObject({ status: "published", audience: { kind: "all" }, audience_size: 3, reads: 1, urgency: "normal" });
     await drain();
     const told = await one("SELECT title FROM notification WHERE user_id = $1 AND event_key = 'announcement.published' AND title = 'Saturday hours'", [people.bola.user.user_id]);
     expect(told).toBeTruthy();
@@ -521,9 +567,9 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("bola").get("/community/announcements/stats")).status).toBe(403);
 
     const reads = await as("ceo").get(`/community/announcements/${made.body.announcement_id}/reads?read=read`);
-    expect(reads.body.data.map((r) => r.person.display_name)).toEqual(["Bola Ade"]);
+    expect(reads.body.data.map((r) => r.person.display_name)).toEqual(["Bola Ade", "Amaka Eze"]);
     const remind = await as("ceo").post(`/community/announcements/${made.body.announcement_id}/remind`).send({});
-    expect(remind.body).toEqual({ reminded: 2 });
+    expect(remind.body).toEqual({ reminded: 1 });
     expect((await as("ceo").post(`/community/announcements/${made.body.announcement_id}/remind`).send({})).status).toBe(429);
 
     const later = new Date(Date.now() + 3600_000).toISOString();
@@ -543,6 +589,81 @@ describeDb("Staff Community against the real migrations", () => {
     expect(done.released).toBe(1);
     const list = await as("ceo").get("/community/announcements");
     expect(list.body.data.find((a) => a.title === "Q4 reviews").status).toBe("published");
+  });
+
+  test("an urgent announcement: red to its audience, open until each person acknowledges, on the card or the urgent bar", async () => {
+    const made = await as("ceo").post("/community/announcements").send({ title: "Fire drill at 11", body: "Leave by the east stairs.", urgency: "urgent" });
+    expect(made.status).toBe(201);
+    expect(made.body).toMatchObject({ urgency: "urgent", reads: 1, audience_size: 3 });
+    const id = made.body.announcement_id;
+    await drain();
+    const noticeOf = (who) =>
+      one("SELECT * FROM notification WHERE user_id = $1 AND event_key = 'announcement.published' AND entity_id = $2", [people[who].user.user_id, id]);
+    const bola = await noticeOf("bola");
+    expect(bola).toMatchObject({ urgency: "urgent", acknowledge_required: true, body: "Urgent. Acknowledge it in #announcements." });
+    expect(await noticeOf("ceo")).toBeUndefined(); // never told of their own post
+
+    // Opening #announcements is not enough: the card still asks, and the notice stays in the bar.
+    const ann = (await channelsOf("bola")).find((c) => c.name === "announcements");
+    const msgs = await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`);
+    expect(msgs.body.data.find((m) => m.announcement && m.announcement.announcement_id === id).announcement).toEqual({
+      announcement_id: id,
+      title: "Fire drill at 11",
+      urgency: "urgent",
+      in_audience: true,
+      acknowledged_at: null,
+    });
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).toContain(bola.notification_id);
+    expect((await as("ceo").get(`/community/announcements/${id}/reads?read=not_read`)).body.data.map((r) => r.person.display_name).sort()).toEqual(["Bola Ade", "Tunde Ola"]);
+
+    // Bola presses Acknowledge on the card: the reads row and the notice close together.
+    expect((await as("bola").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
+    expect((await as("bola").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
+    expect((await noticeOf("bola")).acknowledged_at).not.toBeNull();
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).not.toContain(bola.notification_id);
+    const after = await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`);
+    expect(after.body.data.find((m) => m.announcement && m.announcement.announcement_id === id).announcement.acknowledged_at).not.toBeNull();
+
+    // Tunde presses it on the urgent bar instead: the announcement records it once the event is handled.
+    const tunde = await noticeOf("tunde");
+    const pressed = await as("tunde").post(`/notifications/${tunde.notification_id}/acknowledge`).send({});
+    expect(pressed.status).toBe(200);
+    expect(pressed.body).toMatchObject({ notification_id: tunde.notification_id, urgency: "urgent", acknowledge_required: true });
+    expect(pressed.body.acknowledged_at).not.toBeNull();
+    await drain();
+    const reads = await as("ceo").get(`/community/announcements/${id}/reads`);
+    expect(reads.body.data.every((r) => r.acknowledged_at)).toBe(true);
+    expect((await as("ceo").get("/community/announcements")).body.data.find((a) => a.announcement_id === id)).toMatchObject({ reads: 3 });
+
+    // Only an urgent announcement takes Acknowledge, and only from its audience.
+    const plain = await as("ceo").post("/community/announcements").send({ title: "Lunch", body: "On us." });
+    expect((await as("bola").post(`/community/announcements/${plain.body.announcement_id}/acknowledge`).send({})).status).toBe(422);
+  });
+
+  test("an important announcement is amber and reminds whoever has not opened it once, 4 hours later", async () => {
+    const svc = require("../../src/modules/announcements/announcements.service");
+    queues.enqueue.mockClear();
+    const made = await as("ceo").post("/community/announcements").send({ title: "New leave form", body: "Use it from Monday.", urgency: "important" });
+    const id = made.body.announcement_id;
+    await drain();
+    expect(queues.enqueue).toHaveBeenCalledWith(
+      "announcement-publish",
+      "remind",
+      { announcement_id: id },
+      expect.objectContaining({ delay: 4 * 60 * 60 * 1000, jobId: `announcement-remind-${id}` }),
+    );
+    const told = await one("SELECT urgency, acknowledge_required FROM notification WHERE user_id = $1 AND entity_id = $2", [people.bola.user.user_id, id]);
+    expect(told).toEqual({ urgency: "important", acknowledge_required: false });
+
+    const ann = (await channelsOf("bola")).find((c) => c.name === "announcements");
+    await as("bola").get(`/community/channels/${ann.community_channel_id}/messages`); // Bola opens it
+    const job = require("../../src/jobs/handlers/announcement-publish");
+    expect(await job({ name: "remind", data: { announcement_id: id } })).toEqual({ announcement_id: id, reminded: 1 });
+    await drain();
+    expect(await one("SELECT count(*)::int AS n FROM notification WHERE event_key = 'announcement.reminded' AND entity_id = $1", [id])).toEqual({ n: 1 });
+    // A normal one has no reminder of its own.
+    const plain = await as("ceo").post("/community/announcements").send({ title: "Cake", body: "In the kitchen." });
+    expect(await svc.remindUnread(plain.body.announcement_id)).toEqual({ reminded: 0 });
   });
 
   test("a scheduled announcement is edited or cancelled until it goes out; a stale release does nothing", async () => {
@@ -601,5 +722,139 @@ describeDb("Staff Community against the real migrations", () => {
     expect(typeof t.body.transcript).toBe("string");
     const stored = await one("SELECT transcript FROM community_message WHERE community_message_id = $1", [note.community_message_id]);
     expect(stored.transcript).toBe(t.body.transcript);
+  });
+
+  describe("media and links (community.md §3 steps 17 and 18)", () => {
+    const READY = { status: "ready", title: "Nfelia: Fashion in Lagos", description: "Shop the latest.", site_name: "Nfelia" };
+    beforeEach(() => {
+      pageCard.fetchCard.mockReset();
+      queues.enqueue.mockClear();
+    });
+
+    test("the composer's card: fetched once, kept for everyone, its picture readable by any colleague", async () => {
+      pageCard.fetchCard.mockResolvedValue({ ...READY, url: "https://nfelia.com/", image: { buffer: PNG, name: "preview.png" } });
+      const first = await as("bola").post("/community/link-previews").send({ url: "Nfelia.com#top" });
+      expect(first.status).toBe(200);
+      expect(first.body.preview).toMatchObject({ url: "https://nfelia.com/", title: "Nfelia: Fashion in Lagos", site_name: "Nfelia", description: "Shop the latest." });
+      expect(first.body.preview.image).toMatchObject({ mime_type: "image/png" });
+      expect(pageCard.fetchCard).toHaveBeenCalledWith("https://nfelia.com/");
+
+      // Kept: the next person asking gets it without a fetch.
+      const again = await as("tunde").post("/community/link-previews").send({ url: "https://nfelia.com" });
+      expect(again.body.preview.community_link_preview_id).toBe(first.body.preview.community_link_preview_id);
+      expect(pageCard.fetchCard).toHaveBeenCalledTimes(1);
+      expect((await as("ceo").get(`/documents/${first.body.preview.image.document_id}/content`)).status).toBe(200);
+
+      // Nothing to fetch for an address that is not on the web, and no card for a page with no title.
+      expect((await as("bola").post("/community/link-previews").send({ url: "http://intranet:8080" })).body).toEqual({ preview: null });
+      pageCard.fetchCard.mockResolvedValue({ status: "empty" });
+      expect((await as("bola").post("/community/link-previews").send({ url: "https://blank.example.com" })).body).toEqual({ preview: null });
+      expect(pageCard.fetchCard).toHaveBeenCalledTimes(2);
+      const audit = await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'link_preview.fetched'");
+      expect(audit.n).toBe(2);
+    });
+
+    test("a text gets its first link's card at once when kept, after the post otherwise, and none when removed", async () => {
+      const g = await general("bola");
+      const post = (body) => as("bola").post(`/community/channels/${g.community_channel_id}/messages`).send(body);
+
+      const kept = await post({ message_type: "text", body: "New arrivals at https://nfelia.com/ today" });
+      expect(kept.status).toBe(201);
+      expect(kept.body.link).toMatchObject({ url: "https://nfelia.com/", title: "Nfelia: Fashion in Lagos" });
+
+      pageCard.fetchCard.mockResolvedValue({ ...READY, title: "MyCity App", site_name: "MyCity", url: "https://mycityapp.io/", image: null });
+      const fresh = await post({ message_type: "text", body: "Our site: mycityapp.io" });
+      expect(fresh.body.link).toBeNull();
+      await drain();
+      expect(queues.enqueue).toHaveBeenCalledWith(
+        "link-preview",
+        "card",
+        { community_message_id: fresh.body.community_message_id, url: "https://mycityapp.io/" },
+        expect.objectContaining({ jobId: expect.stringMatching(/^link-preview-/) }),
+      );
+      expect(await links.attach(fresh.body.community_message_id, "https://mycityapp.io/")).toMatchObject({ attached: true });
+      await drain();
+      expect(realtime.toUser).toHaveBeenCalledWith(
+        people.tunde.user.user_id,
+        "community.message_updated",
+        expect.objectContaining({ community_message_id: fresh.body.community_message_id }),
+      );
+      const page = await as("tunde").get(`/community/channels/${g.community_channel_id}/messages`);
+      expect(page.body.data.find((m) => m.community_message_id === fresh.body.community_message_id).link).toMatchObject({
+        title: "MyCity App",
+        image: null,
+      });
+      // The job running twice changes nothing.
+      expect(await links.attach(fresh.body.community_message_id, "https://mycityapp.io/")).toMatchObject({ attached: false });
+
+      queues.enqueue.mockClear();
+      const removed = await post({ message_type: "text", body: "See https://other.example.com", no_link_preview: true });
+      expect(removed.body.link).toBeNull();
+      await drain();
+      expect(queues.enqueue).not.toHaveBeenCalledWith("link-preview", expect.anything(), expect.anything(), expect.anything());
+
+      // Edited within its 15 minutes, a text follows its new first link.
+      const edited = await as("bola").put(`/community/messages/${kept.body.community_message_id}`).send({ body: "Moved to mycityapp.io" });
+      expect(edited.body.link).toMatchObject({ url: "https://mycityapp.io/" });
+      const plain = await as("bola").put(`/community/messages/${kept.body.community_message_id}`).send({ body: "No link now" });
+      expect(plain.body.link).toBeNull();
+    });
+
+    test("files sent together share an album key, the caption rides on the first, and the list line says it", async () => {
+      const ch = (await channelsOf("bola")).find((c) => c.name === "studio-crew");
+      const id = ch.community_channel_id;
+      const album = "7f8e2a3c-1b2d-4e5f-8a9b-0c1d2e3f4a5b";
+      const sent = [];
+      for (const [i, name] of ["a.png", "b.png"].entries()) {
+        const up = await as("bola").post(`/community/channels/${id}/media`).attach("file", PNG, name);
+        const res = await as("bola").post(`/community/channels/${id}/messages`).send({
+          message_type: "file",
+          document_id: up.body.document_id,
+          album_key: album,
+          ...(i === 0 ? { body: "Set for Friday" } : {}),
+        });
+        expect(res.status).toBe(201);
+        sent.push(res.body);
+      }
+      expect(sent.map((m) => [m.message_type, m.album_key, m.body])).toEqual([
+        ["image", album, "Set for Friday"],
+        ["image", album, null],
+      ]);
+      expect(sent[0].document).toMatchObject({ width: 1, height: 1, page_count: null, mime_type: "image/png" });
+      expect(Array.isArray(sent[0].document.variants)).toBe(true);
+      // A caption is searchable, and the list shows the last file's line.
+      expect((await as("tunde").get(`/community/channels/${id}/messages?q=friday`)).body.data).toHaveLength(1);
+      expect((await channelsOf("tunde")).find((c) => c.name === "studio-crew").last_text).toBe("Photo");
+    });
+
+    test("a PDF: queued for its first page, drawn with its pages counted, and its conversation told", async () => {
+      const ch = (await channelsOf("bola")).find((c) => c.name === "studio-crew");
+      const id = ch.community_channel_id;
+      const up = await as("bola").post(`/community/channels/${id}/media`).attach("file", pdfOf(3), "Call sheet.pdf");
+      expect(up.status).toBe(201);
+      const stored = await one("SELECT payload FROM event_log WHERE event_key = 'document.stored' AND entity_id = $1", [up.body.document_id]);
+      expect(stored.payload.needs).toEqual(["pdf"]);
+      const posted = await as("bola").post(`/community/channels/${id}/messages`).send({ message_type: "file", document_id: up.body.document_id });
+      expect(posted.body).toMatchObject({ message_type: "file", document: { page_count: null, variants: [] } });
+
+      const done = await mediaDerive({ data: { document_id: up.body.document_id } });
+      expect(done).toMatchObject({ page_count: 3, variants: ["webp-960", "webp-320"] });
+      await drain();
+      expect(realtime.toUser).toHaveBeenCalledWith(
+        people.tunde.user.user_id,
+        "community.message_updated",
+        expect.objectContaining({ community_message_id: posted.body.community_message_id }),
+      );
+      const page = await as("tunde").get(`/community/channels/${id}/messages`);
+      const card = page.body.data.find((m) => m.community_message_id === posted.body.community_message_id).document;
+      expect(card).toMatchObject({ file_name: "Call sheet.pdf", page_count: 3, width: 595, height: 842, variants: ["webp-320", "webp-960"] });
+      const picture = await as("tunde").get(`/documents/${up.body.document_id}/variant/webp-960`);
+      expect(picture.status).toBe(200);
+      expect(picture.headers["content-type"]).toBe("image/webp");
+
+      // A broken PDF fails at once and keeps its plain card.
+      const broken = await as("bola").post(`/community/channels/${id}/media`).attach("file", Buffer.from("%PDF-1.4\nnot really"), "broken.pdf");
+      await expect(mediaDerive({ data: { document_id: broken.body.document_id } })).rejects.toThrow(/could not be drawn/);
+    });
   });
 });

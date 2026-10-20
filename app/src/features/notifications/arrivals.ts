@@ -15,16 +15,18 @@ import { setPaneOpen } from "./state";
  *
  *   arrival   over the socket (`notification`) or from the service worker (`mycity:push`, when
  *             a push reaches a device whose app is on screen): the banner at the top for 3 s, the
- *             chime or the buzz, the bell reloaded. Each notice once, whichever way it came; none
- *             for the record already on screen. The worker is answered `{ ok: true }`, so it
- *             shows no notification of its own; a locked or signed-out app answers no.
+ *             chime or the buzz, the bell and the urgent bar reloaded. Each notice once, whichever
+ *             way it came, and again on each urgent repeat; none for the record already on screen.
+ *             Red for urgent, amber for important. The device shows its own notification too
+ *             (TB, 19/10/2026); the worker's question is still answered, for an older worker.
  *   open      a tap on a notification while the app runs (`mycity:open`): the app goes there
  *   n=        a link from a notification marks its notices read, then leaves the address
  *   pane=     `pane=notifications` opens the pane (a notice with no screen of its own)
  *   shade     when the app comes to the front, notifications it still shows that are read are
  *             closed, and the app icon's count follows the unread count
  */
-type Arrival = Pick<Notification, "notification_id" | "title" | "body" | "category" | "priority" | "entity_type"> & { path: string | null };
+/** `repeat` counts the urgent repeats: each shows the banner again. */
+type Arrival = Pick<Notification, "notification_id" | "title" | "body" | "category" | "priority" | "urgency" | "entity_type"> & { path: string | null; repeat: number };
 
 /** A category's glyph (src/shared/notifications/categories.js). */
 export const CATEGORY_ICONS: Record<string, IconName> = {
@@ -48,16 +50,22 @@ export const CATEGORY_ICONS: Record<string, IconName> = {
 export const personOf = (entityType: string | null | undefined, title: string) =>
   entityType === "mail_thread" || entityType === "direct_message" ? title : null;
 
-const fromSocket = (n: Notification): Arrival => ({ ...n, path: n.link?.path ?? null });
+const fromSocket = (n: Notification): Arrival => ({ ...n, path: n.link?.path ?? null, repeat: n.repeat_count });
 const fromWorker = (p: PushPayload): Arrival => ({
   notification_id: p.id ?? `push-${p.ts}`,
   title: p.title,
   body: p.body || null,
   category: p.category,
   priority: p.priority,
+  urgency: p.urgency,
   entity_type: p.tag.split(":")[0] || null,
   path: p.path,
+  repeat: p.round,
 });
+
+/** A banner's tone: red for urgent, amber for important or high priority. */
+export const toneOf = (n: Pick<Notification, "urgency" | "priority">) =>
+  n.urgency === "urgent" ? ("err" as const) : n.urgency === "important" || n.priority === "high" ? ("warn" as const) : ("info" as const);
 
 /** Is this link the screen and record already showing? */
 function showing(path: string | null, here: { path: string; id: string | null }): boolean {
@@ -103,14 +111,15 @@ export function useArrivals(unread: number | undefined): void {
   const arrive = useCallback(
     (a: Arrival): boolean => {
       if (!live.current) return false;
-      if (seen.current.has(a.notification_id)) return true;
+      const key = `${a.notification_id}:${a.repeat}`;
+      if (seen.current.has(key)) return true;
       // A window behind other windows or tabs only reloads its bell: the device's own
       // notification is the one that shows and sounds (docs/guides/notifications.md §11).
       if (document.visibilityState !== "visible") {
         reloadBell();
         return false;
       }
-      seen.current.add(a.notification_id);
+      seen.current.add(key);
       if (seen.current.size > 200) seen.current = new Set([...seen.current].slice(-100));
       reloadBell();
       if (showing(a.path, here.current)) return true;
@@ -120,10 +129,10 @@ export function useArrivals(unread: number | undefined): void {
         body: a.body,
         avatar: personOf(a.entity_type, a.title),
         icon: CATEGORY_ICONS[a.category] ?? "bell",
-        tone: a.priority === "high" ? "warn" : "info",
+        tone: toneOf(a),
         onOpen: () => open(a),
       });
-      alertArrival(a.category);
+      alertArrival(a.category, a.urgency);
       return true;
     },
     [open],
@@ -132,7 +141,11 @@ export function useArrivals(unread: number | undefined): void {
   useRealtime("notification", (payload) => {
     if (payload && typeof payload === "object" && "notification_id" in payload) arrive(fromSocket(payload as Notification));
   });
-  useRealtime("notification_read", () => void closeRead());
+  // A read mark or Acknowledge on another tab or device: the bell and the urgent bar follow.
+  useRealtime("notification_read", () => {
+    reloadBell();
+    void closeRead();
+  });
 
   // The service worker: a push for an app on screen, and a tap while the app runs.
   useEffect(() => {

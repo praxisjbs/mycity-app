@@ -79,6 +79,14 @@ describe("UploadField", () => {
     expect(screen.getByText("bad.pdf")).toBeInTheDocument();
   });
 
+  it("hands files over in the order they were picked, whichever arrives first", async () => {
+    const onUploaded = vi.fn();
+    const slowFirst: Uploader = ({ file: f }) => new Promise((resolve) => setTimeout(() => resolve(doc(f.name)), f.name === "one.pdf" ? 30 : 1));
+    const { container } = render(<UploadField purpose="attachment" upload={slowFirst} onUploaded={onUploaded} />);
+    await userEvent.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, [file("one.pdf"), file("two.pdf"), file("three.pdf")]);
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledWith([doc("one.pdf"), doc("two.pdf"), doc("three.pdf")]));
+  });
+
   it("keeps only the newest file when exactly one is allowed", async () => {
     const { container } = render(<UploadField purpose="cv" upload={fine} multiple={false} />);
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
@@ -95,6 +103,16 @@ describe("UploadField", () => {
     expect(screen.queryByText("Drop files here, or browse")).toBeNull();
     await userEvent.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, file());
     await waitFor(() => expect(screen.getByText("Done")).toBeInTheDocument());
+  });
+
+  it("opens the picker once as it shows when asked, and not otherwise", () => {
+    const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+    const { rerender } = render(<UploadField purpose="attachment" upload={fine} />);
+    expect(click).not.toHaveBeenCalled();
+    rerender(<UploadField key="sheet" purpose="attachment" upload={fine} autoOpen />);
+    rerender(<UploadField key="sheet" purpose="attachment" upload={fine} autoOpen kinds="Photos" />);
+    expect(click).toHaveBeenCalledTimes(1);
+    click.mockRestore();
   });
 
   it("says what kinds of file are wanted and how big they may be", () => {

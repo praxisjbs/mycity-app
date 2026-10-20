@@ -28,6 +28,8 @@ export interface BottomBarItem {
   onSelect?: () => void;
   /** Things waiting behind it; nothing is drawn for 0. */
   count?: number;
+  /** Something urgent waits behind it: its count shows red, at least 1. */
+  urgent?: boolean;
   /** For a button: whether what it opens is open. */
   expanded?: boolean;
 }
@@ -55,7 +57,9 @@ export function BottomBar({ items, current, onNavigate, label = "Main" }: Bottom
           <>
             <span className="relative">
               <Icon name={item.icon} size="l" />
-              {!!item.count && <CountBadge count={item.count} className="absolute -top-1.5 -right-2.5" />}
+              {(!!item.count || item.urgent) && (
+                <CountBadge count={Math.max(item.count ?? 0, item.urgent ? 1 : 0)} tone={item.urgent ? "err" : "primary"} className="absolute -top-1.5 -right-2.5" />
+              )}
             </span>
             <span data-ui="nav-label">{item.label}</span>
           </>

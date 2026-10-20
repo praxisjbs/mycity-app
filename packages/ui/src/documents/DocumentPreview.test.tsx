@@ -1,7 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { axe } from "../testing/axe";
 import { DocumentPreview } from "./DocumentPreview";
+
+/* PDF.js does not run in jsdom: the drawing chunk is a stand-in that says what it was given. */
+vi.mock("./PdfViewer.draw", () => ({
+  default: ({ name, data }: { name: string; data: Blob }) => (
+    <div role="document" aria-label={name} data-bytes={data.size}>
+      Pages
+    </div>
+  ),
+}));
 
 const HREF = "/api/v1/documents/d1/file";
 
@@ -15,19 +24,16 @@ describe("DocumentPreview", () => {
     expect(open).toHaveAttribute("target", "_blank");
   });
 
-  it("streams a PDF into the browser's own viewer, named by the file", () => {
-    const { container } = render(<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={HREF} />);
-    const frame = container.querySelector("object")!;
-    expect(frame).toHaveAttribute("type", "application/pdf");
-    expect(frame).toHaveAttribute("aria-label", "Receipt.pdf");
-    expect(frame).toHaveAttribute("data", HREF);
+  it("draws a PDF's pages in the app from its bytes, never in an <object>", async () => {
+    const file = new Blob(["%PDF-1.4"], { type: "application/pdf" });
+    const { container } = render(<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={HREF} file={file} />);
+    expect(await screen.findByRole("document", { name: "Receipt.pdf" })).toHaveAttribute("data-bytes", "8");
+    expect(container.querySelector("object")).toBeNull();
   });
 
-  it("carries the browser's own fallback inside the frame, so a PDF it will not draw is still reachable", () => {
-    const { container } = render(<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={HREF} />);
-    const frame = container.querySelector("object")!;
-    expect(within(frame).getByText("Cannot Show Here")).toBeInTheDocument();
-    expect(within(frame).getByRole("link", { name: "Download File" })).toHaveAttribute("download", "Receipt.pdf");
+  it("says it is opening a PDF whose bytes are still on their way", () => {
+    render(<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={HREF} />);
+    expect(screen.getByRole("status", { name: "Opening Receipt.pdf" })).toBeInTheDocument();
   });
 
   it("sends a picture to the image viewer", () => {

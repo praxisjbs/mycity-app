@@ -13,7 +13,7 @@ files.
 | `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
 | `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, hybrid staff's weekly schedule, `1340`, a client visit's site, `1350`, the clock watch, `1360` and `1394`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, email signatures, `1127` and `1129`, web push, `0460`, and the effective manager through a vacant seat, `1160`): 78 files, 165 tables and 6 views. Gate 6
+Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, hybrid staff's weekly schedule, `1340`, a client visit's site, `1350`, the clock watch, `1360` and `1394`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, email signatures, `1127` and `1129`, web push, `0460`, notice urgency, `0470` and `1145`, Settings · Notifications and the reminder engine, `0480`, and the effective manager through a vacant seat, `1160`): 84 files, 171 tables and 6 views. Gate 6
 (`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
 the same reading of the migrations on every PR.
 
@@ -66,7 +66,7 @@ erDiagram
 | Approvals | `workflow_definition`, `workflow_instance`, `workflow_decision` | `shared/workflow` | `workflow_instance_id` on the record waiting for approval; definitions seeded only if they pass `validateDefinition()` |
 | Files | `document`, `document_variant`, `template`, `template_version`, `document_request` | `shared/documents/vault`; the documents service for `document.verified_at` and `document_request` | `document_id uuid REFERENCES document`; never a path or a URL. A document People asked for and have not been given is a `document_request`, not a `document` (`docs/guides/foundation.md` §6.9) |
 | Numbers | `numbering_scheme`, `numbering_counter` | `numbering.allocate()` | `number citext NOT NULL UNIQUE` (or the contract's name for it, `staff_number`) and a scheme in `schemes.js` |
-| Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
+| Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `notification_rule`, `notification_rule_recipient`, `notification_reminder_rule`, `notification_setting`, `reminder`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
 | Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
@@ -109,7 +109,15 @@ given to someone else; `docs/guides/foundation.md` §11) · `0460` web push (bro
 TB, 19/10/2026; `docs/guides/notifications.md` §4): `push_subscription` as a device (its
 `known_device`, label and platform, the hash of its device token, the key id it was made under, its
 health and why it stopped) and `push_delivery`, one row per notice and device, so a retried push is
-never sent twice · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
+never sent twice · `0470` notice urgency (TB, 19/10/2026; `docs/guides/notifications.md` §4, §6):
+`notification.urgency`, `acknowledge_required` and `acknowledged_at`, the urgent repeats' pace
+(`repeat_count`, `last_alert_at`, `repeat_day`, `repeats_on_day`) and `push_delivery.round`
+· `0480` Settings · Notifications and the reminder engine (brought forward from M6 by TB,
+19/10/2026; `docs/guides/notifications.md` §4, §7.1): `notification_rule` and
+`notification_rule_recipient` (the company's rule per notice and its copies),
+`notification_reminder_rule` (approvals, probation, digest), `notification_setting` (a person's
+quiet hours and digest) and `reminder` (one row per occurrence of a declared reminder)
+· `0499` the leave flow, `leave.approval` (the line manager, then Operations &
 People over 5 days; §6.5).
 
 **Owes:**
@@ -146,7 +154,12 @@ their Show Mobile and WhatsApp switches; the mobile stays `employee.phone`) and
 shows, one row at most); the baked signature rides in `mail_send_queue.payload` and its pictures
 are vault documents (`mail_signature_image`) · `1129` reference data: the `mailbox.signature`
 capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
-member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
+member's own pin (`community_member.pinned_at`) · `1145` an announcement's level
+(`announcement.urgency`) and who acknowledged an urgent one (`announcement_read.acknowledged_at`;
+TB, 19/10/2026) · `1147` community media and links: `community_link_preview` (a link's card, one
+per address: the site, title, description and the picture as a vault document, ready, empty or
+failed, and when it was fetched), `community_message.community_link_preview_id` (the card a text
+carries), and `document.page_count` (a PDF's pages, counted by the worker) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
 recipients as users, one schedule per report; `home_report_run` (one numbered file per recipient and
@@ -314,12 +327,13 @@ cases and checklist items, employment contracts, talent pool · `5099` seed.
 ### M6 Payroll & Notifications · 6000 to 6999 · LA
 
 **Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
-preferences too (`0460`, brought forward by TB on 19/10/2026).
+preferences too (`0460`), and Settings · Notifications with the reminder settings (`0480`), all
+brought forward by TB on 19/10/2026.
 
 **Owes, all of payroll** (MILESTONES §11, in scope): payroll runs, payslips, salary structures
 and pay components, deductions (pending, accepted, in a run, including M3 fines and lateness),
-statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, the payroll approval workflow,
-and reminder settings. The `payroll_run` and `payslip` numbering schemes are already seeded.
+statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, and the payroll approval
+workflow (reminder settings are `0480`). The `payroll_run` and `payslip` numbering schemes are already seeded.
 The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
 
 **Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and

@@ -33,7 +33,7 @@ drift from how the company actually runs.
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | People · Organogram (`organogram`) | staff app | HR, Operations (People), CEO and management | The whole company tree with HR-rich node cards, solid and dotted reporting lines, and vacant seats | Search, collapse and expand branches, drag a card onto a new manager to reassign (desktop), open a person's sheet and Change Manager from it (both shells), set a dotted-line manager, add or edit a vacant seat, Download PDF (emailed) |
-| ESS · Org Chart (`org-chart`) | staff app | every employee, HR included | The same whole company tree, read only, with the standard node card | Search, collapse and expand, open a person's sheet and Send Message from it, Download PDF (emailed). No editing, no restricted fields |
+| ESS · Org Chart (`org-chart`) | staff app | every employee, HR included | The same whole company tree, read only, with the standard node card | Search, collapse and expand, open a person's sheet and Send Message from it, Download PDF (downloaded on the device). No editing, no restricted fields |
 | Recruitment · Vacancies (`vacancies`) | staff app | HR, hiring managers | A "suggested vacancies" list, each built from a vacant seat (role title, department, reporting line) | Turn a suggestion into a real vacancy |
 | People · Employees (`employees`) | staff app | HR, Operations | The employee edit form carries the line manager picker | Changing a line manager here is what moves the chart; the organogram reflects it |
 
@@ -54,8 +54,9 @@ The organogram reads one tree and nobody keeps a second copy.
   record on **People · Employees**, for those who may open it; Change Manager is the same reporting
   line form the record uses, and the same write as a drag (§5). On your own card, My Profile opens
   **ESS · My Profile**.
-- **Download PDF** queues the whole chart for the worker, which draws it as a PDF and emails it to
-  the person asking, so it arrives in their **Mailbox** (§5, §7).
+- **Download PDF** lays the whole chart out and queues it for the pdf-render job, which draws it
+  as a PDF; the screen waits for it and saves it on the device that pressed (§5, §7). Nothing is
+  emailed (`docs/guides/foundation.md` §6.12).
 - **People · Employees** also carries each employee's attendance setup (owned by the attendance
   guide, `docs/MyCity-ERP-Documents/attendance-guide.md`). A change of work arrangement applies
   from the employee's next punch; opening a registered home address, changing an arrangement and
@@ -93,12 +94,12 @@ scope read it (§6); the chart still draws the seat, because the seat is the tru
 | `GET /api/v1/org-chart?view=builder\|viewer` | `OrgChartQuery` to `OrgChartTree` | `ess` view (every member of staff) | no, bounded | The whole company: a node is a person or a vacant seat (`node_id`, `node_kind`), the solid line above it is `manager_node_id` and the dotted one `dotted_manager_node_id`. `view=builder` adds the since and arrangement line; nothing restricted is in the payload for anybody |
 | `PATCH /api/v1/employees/:id/line-manager` | `EmployeeReportingUpdate` | `people` edit · team/all | n/a | Sets `line_manager_id` **or** `line_manager_seat_id`, and the dotted one beside it. A loop (through people or vacant seats), reporting to oneself, and naming both a person and a seat are each refused |
 | `GET /api/v1/org-seats`, `POST /api/v1/org-seats`, `PATCH /api/v1/org-seats/:id` | `OrgSeat*` | `people` view, create, edit | list at 25 | The seats themselves: Add Role on the builder, and the seat a sheet's VACANT row becomes. A seat placed under one of its own reports is refused as a loop |
-| `POST /api/v1/org-chart/exports` | `OrgChartExportRequest` to `OrgChartExportQueued` | `ess` view (every member of staff) | n/a | Download PDF: queues the whole chart, in the view asked for, and answers 202 with the email it will reach. The worker draws it as the person asking and emails it (§6, §7). A login with no email is refused (`NO_EMAIL`). It takes `view`, as the read does, because the file holds nothing the read does not |
+| `POST /api/v1/org-chart/exports` | `OrgChartExportRequest` to `ExportFile` (documents) | `ess` view (every member of staff) | n/a | Download PDF: reads and lays out the whole chart, in the view asked for, queues it through `documents.generate` and answers 202 with the file pending. The pdf-render job draws it; the screen waits on `GET /exports/:id` and downloads it (§6, §7). It takes `view`, as the read does, because the file holds nothing the read does not |
 
 A drag on the chart and Change Manager in a person's sheet call the same employee write a form
-would. Download PDF is drawn on the server, never in the browser: the worker renders it through
-`documents.generate` and the shared PDF service, as every generated document is (BACKEND_STRUCTURE
-§5.5).
+would. Download PDF is drawn on the server, never in the browser: the request queues it through
+`documents.generate` and the pdf-render job draws it with the shared PDF service, as every generated
+document is (BACKEND_STRUCTURE §5.5).
 **Paging:** a tree must load whole to draw, so the org-chart read is the one bounded read in the
 module: `completeQuery()` with a ceiling of **2,000 nodes** and the `// pagination:complete` marker
 (BACKEND_STRUCTURE §16.3, `docs/guides/foundation.md` §6.6). Past the ceiling it fails loudly rather
@@ -129,16 +130,17 @@ stays off the table until MyCity is near that size.
 - **Team size.** A card with reports says how many report to it directly and in all, every place
   below it counted, people and open roles alike, as the tree draws them: "3 direct · 13 in all", or
   "7 direct" when nobody is further down.
-- **The PDF** (Download PDF) is the whole tree as the person asking may read it, built in the worker
-  from the same read, in the view they asked for: the same cards (initials, name, title, department
+- **The PDF** (Download PDF) is the whole tree as the person asking may read it, laid out from the
+  same read when they ask, in the view they asked for: the same cards (initials, name, title, department
   chip, the since and arrangement line on the builder's, a dotted-line tag) and the same solid
   lines as the desktop tree, the CEO's tree first, then any other card at the top. One change keeps
   it near A3 proportions: a manager with five or more reports, none of whom has reports of their
   own, has them in two columns down a line from their card instead of in one wide row. It is one
   page sized to the chart, so it stays sharp when a phone zooms in and a printer fits it to the
   sheet; a chart wider or taller than 4,900 mm is drawn smaller to stay inside a PDF page. Under the
-  letterhead it carries the seat count and the legend. It is a file for the person asking, kept in
-  the vault, opened by them and the CEO alone; it carries no number.
+  letterhead it carries the seat count and the legend. It is a file for the person asking, opened by
+  them and the CEO alone, kept in the vault a day and never locked (an export,
+  `docs/guides/foundation.md` §6.12); it carries no number.
 
 ## 7 · Events, jobs and notifications
 
@@ -146,9 +148,9 @@ stays off the table until MyCity is near that size.
 |---|---|---|
 | `employee.reporting_line_changed` | after a line manager or dotted manager change commits | outbox: the chart re-reads; permission scope caches that derive from the tree are refreshed |
 | `vacancy.suggested_from_seat` | when HR sends a vacant seat to Recruitment | outbox: creates a suggested-vacancy entry on Recruitment · Vacancies |
-| `org_chart.export_requested` | Download PDF | outbox `organisation.org_chart_pdf`: the tree read as the person asking (a login no longer active gets nothing), laid out (§6) and queued through `documents.generate` as doc type `org_chart` (template `templates/documents/org-chart.html`, no number); the pdf-render job draws it. Safe to run twice: a request that already has its document is left alone |
-| `document.generated`, doc type `org_chart` | the PDF exists | outbox `organisation.org_chart_email`: emailed to the person who asked (`templates/email/org-chart-export.html`, the PDF attached), once per document |
-| `document.render_failed`, doc type `org_chart` | the render job gave up | outbox `organisation.org_chart_failed` emits `org_chart.export_failed`, which tells the person who asked ("Your organogram PDF failed", linking to the Org Chart) so they can press Download PDF again |
+| `org_chart.export_requested` | Download PDF | the audit line, written with the PDF's document in the request: the tree read and laid out (§6) and queued through `documents.generate` as doc type `org_chart` (template `templates/documents/org-chart.html`, no number); `document.render_requested` sends it to the pdf-render job |
+| `document.generated`, `document.render_failed`, doc type `org_chart` | the PDF is drawn, or the render job gave up | no handler: the screen waiting on `GET /exports/:id` reads it done and downloads it, or reads it failed and says so; nothing is emailed and nobody is notified |
+| `export-cleanup` (scheduler, hourly) | a PDF is a day old | removed from the vault (`docs/guides/foundation.md` §6.12) |
 
 ## 8 · Permissions and visibility by role
 
@@ -196,7 +198,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| People · Organogram (`organogram`) | Organogram; the seat count on desktop (12 seats · 11 filled · 1 open); Search, Expand All, Download PDF, Add Role; a line above the tree when more than one person or role sits at the top; the legend (Reporting Line, Dotted Line, CEO, Vacant Seat); the whole tree. Each node card carries initials, name, title, the department chip, the since and arrangement line, a dotted-line tag where set, and Create Vacancy and Edit Role on a vacant seat (Edit Role is the role's title, department and who it reports to, which is how a seat the sheet left at the top gets its line). Node text is data. A person's card opens their sheet (Profile): initials, name and title; Department, Reports To, Dotted Line and Team; Send Message, Open Record and Change Manager as §8 allows. Download PDF answers "PDF on its way to your email" | Help term on the legend's Reporting Line: "Drag a card onto a new manager to change its reporting line." Help term on Dotted Line: "A second manager for matrix work. It does not change who approves leave, expenses or tasks." The sheet's Dotted Line label carries the same help term | That a drag is the same employee write as the form and is audited: §3, §5. That a vacant seat becomes a suggested vacancy in Recruitment: §3. That salary, bank details and phone never show on a card: §6, §8. The subtitle "The live reporting structure … drag a card to reassign" and the footnote paragraph under the tree are removed |
+| People · Organogram (`organogram`) | Organogram; the seat count on desktop (12 seats · 11 filled · 1 open); Search, Expand All, Download PDF, Add Role; a line above the tree when more than one person or role sits at the top; the legend (Reporting Line, Dotted Line, CEO, Vacant Seat); the whole tree. Each node card carries initials, name, title, the department chip, the since and arrangement line, a dotted-line tag where set, and Create Vacancy and Edit Role on a vacant seat (Edit Role is the role's title, department and who it reports to, which is how a seat the sheet left at the top gets its line). Node text is data. A person's card opens their sheet (Profile): initials, name and title; Department, Reports To, Dotted Line and Team; Send Message, Open Record and Change Manager as §8 allows. Download PDF is busy while the PDF is drawn, then saves it on this device: "PDF downloaded" | Help term on the legend's Reporting Line: "Drag a card onto a new manager to change its reporting line." Help term on Dotted Line: "A second manager for matrix work. It does not change who approves leave, expenses or tasks." The sheet's Dotted Line label carries the same help term | That a drag is the same employee write as the form and is audited: §3, §5. That a vacant seat becomes a suggested vacancy in Recruitment: §3. That salary, bank details and phone never show on a card: §6, §8. The subtitle "The live reporting structure … drag a card to reassign" and the footnote paragraph under the tree are removed |
 | ESS · Org Chart (`org-chart`) | Org Chart; the seat count on desktop; Search, Download PDF; the legend; the whole tree with the standard node card (no since and arrangement line; "Open role" on a vacant seat). A person's card opens their sheet (Profile): initials, name and title; Department, Reports To, Dotted Line and Team; Send Message, or My Profile on your own card | Help term on the legend's Dotted Line, the same text as the builder, and on the sheet's Dotted Line label | "Read only", "Every employee sees the whole company here" and the restricted fields never shown: §6, §8. "On a phone this becomes a focus view": §10.2. That the PDF is drawn on the server and emailed: §5, §7. The subtitle "Who reports to whom across MyCity · read only" and the footnote paragraph are removed |
 | Recruitment · Vacancies (`vacancies`) | Not in the demo yet. The suggested vacancies list: role title, department, reporting line; Create Vacancy | None | That nothing is auto-created from a seat, and the hand-off event: §3, §7 |
 | People · Employees (`employees`) | Employees; the staff and department count on desktop; Import Staff, Add Employee; Headcount, Confirmed, On Probation, Attrition 90 Days; the count per work pattern; All Employees (employee and job title, number, department, Line Manager, Work Pattern, Status, Login, View Record), 25 a page, sorted by the server; Headcount by Department; Needs a Decision. A row opens the record: Profile, Job, Reporting Line, Login, History, with Edit Record, Archive Record, Send Invite and Change Manager (`docs/guides/foundation.md` §10) | Help term on Invited: what an invited login is. On the record, a masked field shows Restricted behind a help term naming who may see it, and Dotted line carries the matrix help term | "Select a row for details and actions": the rows carry View Record. "A department is a setting, not a code change": §6. Attendance Today, the attendance and location modal and the home-address banner: they return with the attendance routes (attendance guide §1, §3) |
@@ -234,10 +236,11 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **Send Message to someone without a login:** Community refuses it with its own message; the
   sheet does not guess who has one.
 - **Your own card:** My Profile instead of Send Message. **The CEO's card:** no Change Manager.
-- **Download PDF on a login with no email:** refused, "Your login has no email to send the PDF to."
-- **A PDF the render job gives up on:** the person who asked is told (§7) and can press again;
-  pressed twice, the PDF is drawn and emailed twice.
-- **The person who asked is suspended before it is drawn or sent:** nothing is drawn or sent.
+- **Download PDF on a login with no email:** downloads as for anyone; nothing is emailed.
+- **A PDF the render job gives up on:** the screen waiting on it says so and they press again;
+  pressed twice, two PDFs are drawn, each downloaded where it was asked for.
+- **The person who asked leaves the screen while it is drawn:** it still downloads wherever they are
+  in the app; closed, the app gets nothing and the PDF leaves the vault a day later.
 - **A very wide or tall chart:** the page grows with it; past 4,900 mm it is drawn smaller (§6).
 
 ## 12 · Donor code
@@ -310,6 +313,8 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 19/10/2026 · TB · No change to the Org Chart: My Documents, in the ESS folder this guide shares, opens a PDF or a photo in the file viewer and draws a PDF's preview in the app (`docs/guides/ess.md` §10).
+- 19/10/2026 · TB · Download PDF downloads on the device that pressed, never by email (`docs/guides/foundation.md` §6.12, TB's decision; §3, §5 to §7, §11): the request reads and lays out the chart and queues it through `documents.generate`, answers 202 with the file pending (`ExportFile`), and the screen waits on `GET /exports/:id` and saves it. `org-chart.export.js`, the `org-chart-export` email, the three outbox handlers and the "Your organogram PDF failed" notice are gone; the `org_chart` type is an export, kept a day and never locked. A login with no email is no longer refused.
 - 19/10/2026 · AJ · The employee record (`Employee360`) carries `photo_url` at 384 px, and its header shows the face (`ProfileHeader` `photo`), initials when there is none. TB to review.
 - 19/10/2026 · AJ · Every node carries `photo_url` (`OrgNode`, from `shared/db/person.js` at 192 px; null for a vacant seat): the desktop chart, the phone's tiles and a person's sheet show the face through `Avatar`, initials when there is none. The Download PDF keeps initials. TB to review.
 - 19/10/2026 · AJ · `employee` gained `photo_document_id` (1170): the person's photo, a vault document of type

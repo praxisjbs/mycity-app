@@ -3,6 +3,7 @@ import devices from "@mycity/contract/schemas/devices.js";
 import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { useSearchParams } from "@/lib/router";
@@ -117,7 +118,7 @@ export function MyAttendancePage() {
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} min={`${Number(months[0].slice(0, 4)) - 2}-01`} max={months[0]} className="phone:flex-1" />
-            <ExportButton message="Export queued for your email" onExport={() => api.call("POST /api/v1/attendance/me/export", { body: { month } })}>Export Month</ExportButton>
+            <ExportButton onExport={() => saveExport(api.call("POST /api/v1/attendance/me/export", { body: { month } }))}>Export Month</ExportButton>
           </>
         }
       />

@@ -34,11 +34,14 @@ function styleOf(row, style) {
   return { tag, mode };
 }
 
+const URGENCIES = new Set(["normal", "important", "urgent"]);
+
 /**
- * The payload for one notice.
+ * The payload for one notice. `round` is 0 for its first alert and counts its urgent repeats.
  * @param {{id: string|null, title: string, body?: string|null, path?: string|null, tag: string,
  *          mode: "alert"|"quiet"|"single", category: string, priority?: "normal"|"high",
- *          ts: string|Date, unread?: number, test?: boolean}} p
+ *          urgency?: "normal"|"important"|"urgent", round?: number, ts: string|Date,
+ *          unread?: number, test?: boolean}} p
  */
 function build(p) {
   const out = {
@@ -51,6 +54,8 @@ function build(p) {
     mode: p.mode,
     category: p.category || "system",
     priority: p.priority === "high" ? "high" : "normal",
+    urgency: URGENCIES.has(p.urgency) ? p.urgency : "normal",
+    round: Math.max(0, Math.trunc(Number(p.round) || 0)),
     ts: new Date(p.ts || Date.now()).toISOString(),
     unread: Math.max(0, Number(p.unread) || 0),
     test: Boolean(p.test),

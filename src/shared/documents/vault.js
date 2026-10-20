@@ -24,7 +24,9 @@
  *   3. the master is stored under a generated key (<area>/<yyyy>/<mm>/<uuid>.<ext>) and
  *      hashed AS STORED; image variants go to derived/<document id>/;
  *   4. the row is written in the caller's transaction and document.stored is emitted, so
- *      the follow-on work (scan, voice/video transcoding) runs in the worker after commit.
+ *      the follow-on work (scan, voice/video transcoding, a PDF's first page) runs in the
+ *      worker after commit; completeAv() and completePdf() record it and emit
+ *      document.derived.
  *
  * A stranger's upload (`stranger: true`: a CV, a candidate's document) is not touched
  * beyond the type check: it lands in quarantine/ with scan_status "pending", and only
@@ -76,6 +78,9 @@ const EVENTS = defineEvents("settings", {
   "document.generated": { summary: "A document was generated" },
   "document.render_failed": { summary: "A document could not be generated" },
   "document.removed": { summary: "A file was removed from the vault" },
+  "document.derived": {
+    summary: "A file's derived sizes were made: a PDF's first page, a video's poster",
+  },
 });
 
 const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
@@ -85,7 +90,7 @@ const DOC_TYPE_RE = /^[a-z][a-z0-9_]{1,63}$/;
 const COLUMNS = `document_id, doc_type, title, original_name, storage_key, mime, bytes, content_hash, version,
   supersedes_id, is_current, entity_type, entity_id, subject_employee_id, sensitivity, locked_at, expires_on,
   scan_status, source, number, template_key, template_version, render_status, render_error, width, height,
-  duration_ms, uploaded_by, created_at`;
+  duration_ms, page_count, uploaded_by, created_at`;
 
 /** Where a purpose's files live (BACKEND_STRUCTURE §1). */
 const AREA_FOR = Object.freeze({
@@ -291,6 +296,7 @@ async function store(client, opts) {
   if (stranger) needs.push("scan");
   else if (sniffed.kind === "audio" || sniffed.kind === "video")
     needs.push("av");
+  else if (sniffed.mime === "application/pdf") needs.push("pdf");
   await emit(client, {
     key: EVENTS.DOCUMENT_STORED,
     entity: { type: "document", id },
@@ -396,12 +402,13 @@ async function lock(client, documentId, actor) {
 }
 
 /**
- * Remove a document that was only ever meant to be kept for a while (a Download My Data
- * workbook after seven days). The row and its derived files' rows go now, inside the
- * caller's transaction, with `document.removed` on the record; the bytes go after commit,
+ * Remove a document that was only ever meant to be kept for a while (an export, a day after
+ * it was made: shared/documents/exports.js). The row and its derived files' rows go now, inside
+ * the caller's transaction, with `document.removed` on the record; the bytes go after commit,
  * when the caller passes what this returns to removeFiles(), so a rolled-back removal
  * never leaves a row pointing at nothing. A locked document (signed, sent, filed) is never
- * removed. Gone already is not an error: answers null.
+ * removed, unless it is an export, which a render locked before exports were kept a day.
+ * Gone already is not an error: answers null.
  * @returns {Promise<string[]|null>} the storage keys to remove after commit
  */
 async function remove(client, documentId, { actor = null, reason } = {}) {
@@ -413,7 +420,7 @@ async function remove(client, documentId, { actor = null, reason } = {}) {
   );
   const doc = rows[0];
   if (!doc) return null;
-  if (doc.locked_at)
+  if (doc.locked_at && !docTypes.isExport(doc.doc_type))
     throw new AppError("DOCUMENT_LOCKED", "A locked document is kept", 409);
   const { rows: variants } = await client.query(
     "SELECT storage_key FROM document_variant WHERE document_id = $1",
@@ -689,6 +696,24 @@ async function completeScan(client, documentId, verdict) {
   return up[0];
 }
 
+/** Tell the follow-on work a document's derived files are ready. */
+async function derivedEvent(client, documentId, variants) {
+  const doc = await get(client, documentId);
+  if (!doc) return;
+  await emit(client, {
+    key: EVENTS.DOCUMENT_DERIVED,
+    entity: { type: "document", id: documentId },
+    module: moduleFor(doc.entity_type),
+    actor: null,
+    payload: {
+      document_id: documentId,
+      entity_type: doc.entity_type,
+      entity_id: doc.entity_id,
+      variants: variants.map((v) => v.kind),
+    },
+  });
+}
+
 /** Record transcoded audio/video variants and the duration (av-transcode job). */
 async function completeAv(client, documentId, derived) {
   if (!inTransaction(client))
@@ -698,6 +723,23 @@ async function completeAv(client, documentId, derived) {
     "UPDATE document SET duration_ms = COALESCE($2, duration_ms), width = COALESCE($3, width), height = COALESCE($4, height) WHERE document_id = $1",
     [documentId, derived.duration_ms, derived.width, derived.height],
   );
+  await derivedEvent(client, documentId, derived.variants);
+}
+
+/**
+ * Record a PDF's first page as pictures and its page count (media-derive job,
+ * services/media/pdf-pipeline.js). width and height are the first page's, in points,
+ * so a screen draws the picture at the page's shape before it arrives.
+ */
+async function completePdf(client, documentId, derived) {
+  if (!inTransaction(client))
+    throw new Error("vault.completePdf must run inside atomically()");
+  await insertVariants(client, documentId, derived.variants);
+  await client.query(
+    "UPDATE document SET page_count = $2, width = COALESCE($3, width), height = COALESCE($4, height) WHERE document_id = $1",
+    [documentId, derived.page_count, derived.width, derived.height],
+  );
+  await derivedEvent(client, documentId, derived.variants);
 }
 
 module.exports = {
@@ -718,6 +760,7 @@ module.exports = {
   parseRange,
   completeScan,
   completeAv,
+  completePdf,
   insertRow,
   moduleFor,
 };

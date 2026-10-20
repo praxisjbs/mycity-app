@@ -355,15 +355,16 @@ const HomeReportDocumentVars = z
   })
   .strict();
 
-/** templates/email/scheduled-report.html: the file is attached. */
+/**
+ * templates/email/scheduled-report.html: a schedule's file, attached. A run somebody pressed
+ * for (Run Now, the Overview's Export) is downloaded where they pressed, never emailed.
+ */
 const HomeReportEmailVars = z
   .object({
     report_name: z.string(),
     run_number: z.string(),
     /** How the attachment opens: "PDF" or "Excel". */
     format: z.enum(["PDF", "Excel"]),
-    /** Sent by a schedule; otherwise someone pressed Run Now or Export. */
-    scheduled: z.boolean(),
   })
   .strict();
 

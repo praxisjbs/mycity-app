@@ -454,3 +454,6 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 - 19/10/2026 · AJ · `/auth/me` carries the person's `photo_url` (from `employee.photo_document_id`, set on ESS · My Profile; `docs/guides/ess.md` §3 step 1) in place of null. The app fetches it with the session (`useMyPhoto`) for the rail, the phone top bar, More and the lock screen, and `refreshMe` reads `/me` again after the photo changes. TB to review.
 - 19/10/2026 · AJ · Download My Data's Sign-Ins sheet is the person's own `GET /auth/sessions` list, read in the worker through `identity.service.listSessions` (`docs/guides/ess.md` §3 step 8). TB to review.
 - 19/10/2026 · AJ · Settings · Users and a role's people show each person's photo: `UserRow.photo_url` (192 px, `users.repo.js` through `shared/db/person.js`), initials when there is none. TB to review.
+- 19/10/2026 · TB · Account and sign-in notices name their audience (The account holder) in
+  Settings · Notifications (`docs/guides/notifications.md` §6); they are Security: always on, no
+  copies.

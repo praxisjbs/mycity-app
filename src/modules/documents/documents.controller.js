@@ -23,6 +23,8 @@ module.exports = {
   content: async (req, res) =>
     service.serve(req, res, { documentId: id(req), inline: true }),
 
+  exportFile: async (req, res) => ok(res, await service.exportFile(req.user, id(req))),
+
   variant: async (req, res) =>
     service.serve(req, res, {
       documentId: id(req),

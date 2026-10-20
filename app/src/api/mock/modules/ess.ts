@@ -1,6 +1,7 @@
 import type { RawResponse } from "../../client";
-import { accepted, at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
-import type { EmployeeHistoryEntry, EssProfile } from "@mycity/contract/contract.gen.ts";
+import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
+import type { EmployeeHistoryEntry, EssProfile, ExportFile } from "@mycity/contract/contract.gen.ts";
+import { exportFile } from "./shared";
 import { byKey, managerOf } from "../data/people";
 import { weekOf } from "./attendance";
 
@@ -232,18 +233,19 @@ route("GET /api/v1/ess/documents/summary", (req) => {
 
 /*
  * Download My Data: once a day for a person, the CEO's Download Their Data counted with their own
- * (docs/guides/ess.md §6). Nothing is built in the mock; the answer says where it would go.
+ * (docs/guides/ess.md §6). The same asker pressing again that day gets that day's file again;
+ * anyone else that day is refused. The file is an export as any other (shared.ts), with no bytes.
  */
-const DATA_ASKED = new Map<string, string>();
-export function askDataExport(employeeId: string, email: string, own: boolean): RawResponse {
+const DATA_ASKED = new Map<string, { day: string; asker: string; file: ExportFile }>();
+export function askDataExport(person: { employee_id: string; staff_number: string }, asker: string, own: boolean): RawResponse {
   const today = new Date().toISOString().slice(0, 10);
-  if (DATA_ASKED.get(employeeId) === today)
-    return fail(429, "DATA_EXPORT_LIMIT", own ? "You already asked for your data today. Try again tomorrow." : "A copy of this person's data was already asked for today. Try again tomorrow.");
-  DATA_ASKED.set(employeeId, today);
-  return { ...accepted(), body: { queued: true, email } };
+  const held = DATA_ASKED.get(person.employee_id);
+  if (held?.day === today && held.asker === asker) return { status: 202, body: { ...held.file, status: "done" } };
+  if (held?.day === today)
+    return fail(429, "DATA_EXPORT_LIMIT", own ? "Your copy was already made today. Try tomorrow." : "Their copy was already made today. Try tomorrow.");
+  const answer = exportFile(asker, `my-data-${person.staff_number}`);
+  DATA_ASKED.set(person.employee_id, { day: today, asker, file: answer.body as ExportFile });
+  return answer;
 }
 
-route("POST /api/v1/ess/profile/export", (req) => {
-  const me = byKey(req.user!)!;
-  return askDataExport(me.employee_id, me.work_email, true);
-});
+route("POST /api/v1/ess/profile/export", (req) => askDataExport(byKey(req.user!)!, req.user!, true));

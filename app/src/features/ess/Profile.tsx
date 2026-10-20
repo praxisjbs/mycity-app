@@ -2,6 +2,7 @@ import ess from "@mycity/contract/schemas/ess.js";
 import type { EssProfile } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { useFileUrl } from "@/api/download";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import { useAuth } from "@/auth/AuthProvider";
@@ -29,14 +30,13 @@ export function MyProfilePage() {
   const exportData = useMutation("POST /api/v1/ess/profile/export");
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={8} />;
-  /* Download My Data: built in the background and emailed; once a day (docs/guides/ess.md §6). */
+  /* Download My Data: built in the background and downloaded here; once a day (docs/guides/ess.md §6). */
   const downloadData = async () => {
     try {
-      await exportData.run({ body: {} });
-      toast("We'll email it to you");
+      if (await saveExport(exportData.run({ body: {} }))) toast("Your data downloaded");
     } catch (e) {
       if (!(e instanceof ApiError)) throw e;
-      toast(e.message);
+      toast.error(e.message);
     }
   };
   const edit = () => modal.open({ title: "Edit Profile", body: (close) => <EditProfile p={p} close={close} /> });

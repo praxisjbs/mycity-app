@@ -4,10 +4,11 @@
  * test to the devices they asked for (docs/guides/notifications.md §3, §6). The
  * `notification-push` job calls it; nothing here runs in a request.
  *
- *   pushNotice(id, style)   skips a notice its person has read meanwhile (Security is sent
- *                           anyway), sends to every live device not yet sent to, revokes a
- *                           device its push service refuses for good, and says how many
- *                           devices to try again
+ *   pushNotice(id, style, round)  skips a notice its person has read meanwhile (Security is
+ *                           sent anyway; an urgent repeat, round 1 and up, goes while the
+ *                           notice is still open), sends to every live device not yet sent
+ *                           this round, revokes a device its push service refuses for good,
+ *                           and says how many devices to try again
  *   pushTest(user, device)  always shown, even with the app open
  *
  * Each (notice, device) is recorded in push_delivery, so a retried job sends only to the
@@ -60,7 +61,7 @@ async function pathOf(row) {
 }
 
 /** Sends one payload to each subscription; returns how many went and how many to try again. */
-async function sendAll(subs, payload, { notificationId, ttl, urgency, topic }) {
+async function sendAll(subs, payload, { notificationId, ttl, urgency, topic, round = 0 }) {
   let sent = 0;
   let retry = 0;
   for (const sub of subs) {
@@ -72,6 +73,7 @@ async function sendAll(subs, payload, { notificationId, ttl, urgency, topic }) {
         status,
         httpStatus: out.status ?? null,
         error: out.ok ? null : out.error,
+        round,
       });
     if (out.ok) {
       sent += 1;
@@ -89,25 +91,30 @@ async function sendAll(subs, payload, { notificationId, ttl, urgency, topic }) {
   return { sent, retry };
 }
 
+/** An urgent notice still open: closed by Acknowledge when it needs one, else by reading. */
+const stillOpen = (row) =>
+  row.urgency === "urgent" && (row.acknowledge_required ? !row.acknowledged_at : !row.read_at);
+
 /**
- * Pushes one notice.
+ * Pushes one notice: its first alert (round 0), or an urgent repeat (round 1 and up).
  * @param {string} notificationId
  * @param {{tag?: string|null, mode?: string|null}|null} [style]  from the event's declaration
+ * @param {number} [round]
  */
-async function pushNotice(notificationId, style = null) {
+async function pushNotice(notificationId, style = null, round = 0) {
   const row = await repo.forPush(pool, notificationId);
   if (!row || !row.reachable || !(row.channels || []).includes("push")) return { skipped: "unreachable" };
   const subs = await repo.liveSubscriptions(pool, row.user_id);
   if (subs.length === 0) return { skipped: "no_device" };
-  if (row.read_at && row.category !== "security") {
+  if (round > 0 ? !stillOpen(row) : row.read_at && row.category !== "security" && !stillOpen(row)) {
     for (const s of subs)
-      await repo.recordDelivery(pool, { notificationId, subscriptionId: s.push_subscription_id, status: "skipped_read" });
+      await repo.recordDelivery(pool, { notificationId, subscriptionId: s.push_subscription_id, status: "skipped_read", round });
     return { skipped: "read" };
   }
   const done = await repo.deliveriesOf(pool, notificationId);
   const owed = subs.filter((s) => {
     const d = done.get(s.push_subscription_id);
-    return !d || d.status === "failed";
+    return !d || d.round < round || (d.round === round && d.status === "failed");
   });
   if (owed.length === 0) return { sent: 0, retry: 0 };
   const { tag, mode } = payloads.styleOf(row, style);
@@ -120,15 +127,19 @@ async function pushNotice(notificationId, style = null) {
     mode,
     category: row.category,
     priority: row.priority,
+    urgency: row.urgency,
+    round,
     ts: row.created_at,
     unread: await repo.unreadCount(pool, row.user_id),
     test: false,
   });
+  const insistent = row.priority === "high" || row.urgency === "important" || row.urgency === "urgent";
   return sendAll(owed, payload, {
     notificationId,
     ttl: TTL_S[row.category] || DAY_S,
-    urgency: row.priority === "high" ? "high" : mode === "quiet" ? "low" : "normal",
+    urgency: insistent ? "high" : mode === "quiet" ? "low" : "normal",
     topic: mode === "single" ? undefined : tag,
+    round,
   });
 }
 

@@ -1,9 +1,10 @@
 "use strict";
 /**
- * Announcements' SQL (migrations 1000 and 1010): the announcement record, its audience
+ * Announcements' SQL (migrations 1000, 1010 and 1145): the announcement record, its audience
  * and who has read it. An announcement_read row is written for each person in the
  * audience when it is published, with read_at empty until they open it, so the read and
- * not-read lists and the counts come from one table.
+ * not-read lists and the counts come from one table. An urgent announcement counts as read
+ * only once acknowledged (TB, 19/10/2026): DONE says which mark counts.
  */
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { PERSON } = require("../community/community.repo");
@@ -11,13 +12,16 @@ const { PERSON } = require("../community/community.repo");
 const one = async (db, sql, params) =>
   (await db.query(sql, params)).rows[0] || null;
 
+/** Whether the read row `r` of announcement `a` counts as read: acknowledged when urgent, else opened. */
+const DONE = "(CASE WHEN a.urgency = 'urgent' THEN r.acknowledged_at IS NOT NULL ELSE r.read_at IS NOT NULL END)";
+
 const ROW = `
-  SELECT a.announcement_id, a.title, a.body, a.audience, a.status, a.publish_at, a.published_at,
+  SELECT a.announcement_id, a.title, a.body, a.audience, a.status, a.urgency, a.publish_at, a.published_at,
          a.audience_size, a.community_message_id, a.last_reminded_at, a.published_by,
          ${PERSON("e", "d")} AS author,
          COALESCE((SELECT array_agg(dd.name ORDER BY dd.name) FROM department dd
                     WHERE dd.department_id::text IN (SELECT jsonb_array_elements_text(a.audience->'department_ids'))), '{}') AS departments,
-         (SELECT count(*)::int FROM announcement_read r WHERE r.announcement_id = a.announcement_id AND r.read_at IS NOT NULL) AS reads`;
+         (SELECT count(*)::int FROM announcement_read r WHERE r.announcement_id = a.announcement_id AND ${DONE}) AS reads`;
 const FROM = `
     FROM announcement a
     LEFT JOIN app_user u ON u.user_id = a.published_by
@@ -51,8 +55,8 @@ function lockForUpdate(db, id) {
 function insert(db, a) {
   return one(
     db,
-    `INSERT INTO announcement (title, body, audience, status, published_by, publish_at)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    `INSERT INTO announcement (title, body, audience, status, published_by, publish_at, urgency)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
     [
       a.title,
       a.body,
@@ -60,16 +64,19 @@ function insert(db, a) {
       a.status,
       a.published_by,
       a.publish_at ?? null,
+      a.urgency || "normal",
     ],
   );
 }
 
+/** A scheduled announcement changed; without `urgency` its level stays. */
 function updateScheduled(db, id, a) {
   return one(
     db,
-    `UPDATE announcement SET title = $2, body = $3, audience = $4, publish_at = $5
+    `UPDATE announcement SET title = $2, body = $3, audience = $4, publish_at = $5,
+            urgency = COALESCE($6, urgency)
       WHERE announcement_id = $1 AND status = 'scheduled' RETURNING *`,
-    [id, a.title, a.body, a.audience, a.publish_at],
+    [id, a.title, a.body, a.audience, a.publish_at, a.urgency ?? null],
   );
 }
 
@@ -104,7 +111,9 @@ function stats(db) {
               WHERE u.status = 'active' AND e.status <> 'left') AS audience
        FROM announcement a
        LEFT JOIN LATERAL (SELECT count(*) AS reads FROM announcement_read x
-                           WHERE x.announcement_id = a.announcement_id AND x.read_at IS NOT NULL) r ON true`,
+                           WHERE x.announcement_id = a.announcement_id
+                             AND CASE WHEN a.urgency = 'urgent' THEN x.acknowledged_at IS NOT NULL
+                                      ELSE x.read_at IS NOT NULL END) r ON true`,
   );
 }
 
@@ -129,30 +138,70 @@ function addAudience(db, id, userIds) {
   );
 }
 
-/** The audience with their read marks; `read` narrows to those who have or have not read it. */
+/**
+ * The audience with their read marks; `read` narrows to those who have or have not read it
+ * (acknowledged it, when urgent), most recent first.
+ */
 function readers(db, id, query) {
   return pageQuery(
     db,
-    `SELECT r.read_at, ${PERSON()} AS person, ${TOTAL_COL}
+    `SELECT r.read_at, r.acknowledged_at, ${PERSON()} AS person, ${TOTAL_COL}
        FROM announcement_read r
+       JOIN announcement a ON a.announcement_id = r.announcement_id
        JOIN app_user u ON u.user_id = r.user_id
        JOIN employee e ON e.employee_id = u.employee_id
        LEFT JOIN department d ON d.department_id = e.department_id
       WHERE r.announcement_id = $1
-        AND ($2::text IS NULL OR ($2 = 'read') = (r.read_at IS NOT NULL))
+        AND ($2::text IS NULL OR ($2 = 'read') = ${DONE})
         AND ($3::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($3) || '%')
-      ORDER BY r.read_at DESC NULLS LAST, e.first_name, e.last_name, r.announcement_read_id`,
+      ORDER BY (CASE WHEN a.urgency = 'urgent' THEN r.acknowledged_at ELSE r.read_at END) DESC NULLS LAST,
+               e.first_name, e.last_name, r.announcement_read_id`,
     [id, query.read ?? null, query.q ?? null],
     query,
   );
 }
 
+/** Who has not read it yet (not acknowledged it, when urgent). */
 async function unreadUsers(db, id) {
   const { rows } = await db.query(
-    "SELECT user_id FROM announcement_read WHERE announcement_id = $1 AND read_at IS NULL ORDER BY user_id",
+    `SELECT r.user_id FROM announcement_read r JOIN announcement a ON a.announcement_id = r.announcement_id
+      WHERE r.announcement_id = $1 AND NOT ${DONE}
+      ORDER BY r.user_id`,
     [id],
   );
   return rows.map((r) => r.user_id);
+}
+
+/** One person's read row, locked; null when they are not in the audience. */
+function readRowForUpdate(db, id, userId) {
+  return one(
+    db,
+    "SELECT * FROM announcement_read WHERE announcement_id = $1 AND user_id = $2 FOR UPDATE",
+    [id, userId],
+  );
+}
+
+/** Acknowledge: acknowledged and read, each once. Returns the row. */
+function acknowledge(db, id, userId) {
+  return one(
+    db,
+    `UPDATE announcement_read
+        SET acknowledged_at = COALESCE(acknowledged_at, now()), read_at = COALESCE(read_at, now())
+      WHERE announcement_id = $1 AND user_id = $2
+      RETURNING *`,
+    [id, userId],
+  );
+}
+
+/** The poster has read what they posted, and acknowledged it when it is urgent. */
+function markPosterRead(db, id, userId, urgent) {
+  return db.query(
+    `UPDATE announcement_read
+        SET read_at = COALESCE(read_at, now()),
+            acknowledged_at = CASE WHEN $3::boolean THEN COALESCE(acknowledged_at, now()) ELSE acknowledged_at END
+      WHERE announcement_id = $1 AND user_id = $2`,
+    [id, userId, urgent],
+  );
 }
 
 function setReminded(db, id) {
@@ -198,6 +247,9 @@ module.exports = {
   addAudience,
   readers,
   unreadUsers,
+  readRowForUpdate,
+  acknowledge,
+  markPosterRead,
   setReminded,
   markReadByMessages,
   due,
