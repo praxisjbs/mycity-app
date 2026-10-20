@@ -62,6 +62,7 @@ const TYPES = Object.freeze({
   zip: t("application/zip", "zip", "archive"),
   csv: t("text/csv", "csv", "sheet"),
   txt: t("text/plain", "txt", "text"),
+  md: t("text/markdown", "md", "text"),
   html: t("text/html", "html", "markup"),
   svg: t("image/svg+xml", "svg", "markup"),
   xml: t("application/xml", "xml", "markup"),
@@ -161,6 +162,7 @@ function textKind(buf, name) {
   )
     return TYPES.html;
   if (/\.csv$/i.test(String(name || ""))) return TYPES.csv;
+  if (/\.md$/i.test(String(name || ""))) return TYPES.md;
   return TYPES.txt;
 }
 

@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 94 screens (88 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 95 screens (89 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
+| M9 Settings & Governance | 12 | 4 | 0 | 8 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **57** | **0** | **37** | **0** | **0** |
+| **Total** | **95** | **57** | **0** | **38** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -730,13 +730,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 89 | Policy Updates | `policy-updates` | M9 | LA | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
-| 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
+| 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
 - 19/10/2026 · TB · My Attendance (#9) and the clock panel: the three gaps against the 12 and 13 October rules closed (`docs/guides/attendance.md` §6.14). The sign-in prompt opens on whatever screen the day's first session lands on, Home or a link (`sign_in_prompt` on today, decided by Attendance); the start reminder's push is not sent to someone in front of the app, who has the start prompt instead, and reaches them if they leave it still not clocked in within the hour; every prompt opens over a blurred screen on both shells (`Modal` and `Sheet` take `blur`, also through `useModal().open`). Checked by 10 integration tests on the real migrations, 4 screen tests of the prompts at a held clock and 2 component tests of the blur. Left: nothing of the three; not yet seen on a phone with push on.
 - 19/10/2026 · TB · My Documents (#14): View File opens a PDF or a photo full screen in the file viewer shared with Staff Community (Download, Share on a phone), and the preview beside the list draws a PDF's pages in the app with PDF.js, where the browser's own viewer showed nothing on Android and was blocked by the security policy on staging and production. Checked in Chromium on the live build under the production policy (upload, preview, View File). Left: walk it on a phone once staging has it.
+- 19/10/2026 · AJ · My Security (#90): the Clock-In Devices card lists the person's registered and new devices (name and platform, status, last clock-in, This Device) from `GET /devices/mine`, with Manage My Devices; the phone tile counts the registered ones (the team lead, 19/10/2026).
 - 19/10/2026 · TB · My Profile (#8), My Attendance (#9) and Org Chart (#91): Download My Data, Export Month and Download PDF save the file on the device that pressed, never by email (`docs/guides/ess.md` §3 step 8, §5 to §7; attendance.md §5, §7; organogram.md §5 to §7; foundation.md §6.12). Download My Data pressed again the same day gives the same file; the CEO is refused for that person that day as before; a failed file does not count; the file is kept a day, not seven. Left: nothing.
 - 19/10/2026 · TB · My Attendance (#9) and the clock panel: clock prompts, reminders and the automatic clock-out (owner decisions, 19/10/2026, from the 12 and 13 October meetings; `docs/guides/attendance.md` §6.14). On both shells the panel opens by itself at the shift's start for someone not clocked in (once a day on each device, not after the sign-in prompt or Clock In already showed it) and at its end for someone still in, with Remind Me (15 minutes, 30 minutes, 1 hour); Esc, the scrim and a drag leave it open, and it never replaces a dialog that is open. Job `attendance-clock-watch` (every 5 minutes) sends one reminder a day in the first hour after the start (the bell and push, read on clock-in) and clocks out a shift left open once its end has passed and the person has been away from the app 15 minutes, at the end or the last moment they were on it; the person is told. My Days and a day's punches read Automatic, and Explain Time sends a note that People keep or correct. `1360`, `1394`; `POST /attendance/me/events/:id/explanation`; `useModal().open` takes `dismissible`. Checked by 8 integration tests on the real migrations, 3 backend unit tests, 5 tests of the prompts' timing and 3 of the prompts on the mock at a held clock. Left: configurable reminder rules stay M6 (#74); a cap on Remind Me is not decided; not yet seen on a phone with push on.
 - 19/10/2026 · AJ · My Profile (#8): the photo now also shows on the employee record's header (People · Employees) and on Settings · Users and a role's people. Left: the organogram PDF still draws initials.
@@ -1042,6 +1043,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 95 | System Health | `system-health` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1056,6 +1058,20 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · System Health (#95) built, second tab after Organisation, from TB's brief and
+  answers (`docs/guides/system-health.md`): the readiness checks as they stand, a day or a week of
+  snapshots, and every fault the code reports, grouped on the fingerprint the error reporter already
+  writes, with a status the team shares. Ticking faults downloads one Markdown brief that tells an AI
+  how this repository works and requires 4 to 10 clarity questions before any fix; the ticked faults
+  become Being Handled so nobody fixes one twice. Its own `system_health` permission key, seeded to
+  the Implementation Team and the System Administrator only, so HR, Management and the CEO are never
+  alerted about a stack trace. Backend: contract, migration 9100 (`error_group`, `error_group_note`,
+  `health_snapshot`), seed 9190, eight routes, three schedulers (roll-up and snapshot every 5
+  minutes, the 08:00 digest, the nightly purge). Notices sit in a new locked System Health category:
+  the bell and push cannot be switched off, email only on the 24 hour escalation, through a new
+  per-notice `channels` default on `defineNotification` (`docs/guides/notifications.md`). 30 unit
+  tests and 19 integration tests on the real migrations. Left: walk it on a phone once staging has
+  it; `ops/monitoring` still alerts by WhatsApp for infrastructure, which is unchanged.
 - 19/10/2026 · TB · Notifications (#74), brought forward from M6 to M0 by TB with the rest of the
   notifications work (`docs/handoff/notifications-everywhere.md`, PR 2), built on both shells: the
   Reminders card (Approvals Waiting, Probation Ending, Daily Digest; Edit Reminders) and every

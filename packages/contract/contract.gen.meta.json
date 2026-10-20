@@ -1,8 +1,8 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "9bc1d8443e0aabaf301b6ebc3949843607b75ab88dddf438c68072b7c419cc2e",
-  "schemas": 572,
-  "endpoints": 326,
+  "source_hash": "67d31f72eb92c3c1acb2c4313c6c375644bcd9e55a00918a2a8990d6f12e0d5a",
+  "schemas": 593,
+  "endpoints": 334,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -61,6 +61,7 @@
     "packages/contract/schemas/settings.js": "0f5244f72cfbc2c45a40c603c447fe77dafa67237fab581e851aac2279e066a0",
     "packages/contract/schemas/signatures.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/statutory.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/system_health.js": "71218624a78d808267dc85393c64a2d003f10b7e48dab47578768ceb9acf323a",
     "packages/contract/schemas/talent_pool.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/targets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/tasks.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -91,6 +92,7 @@
     "src/modules/search/search.routes.js": "0e82222d55484d42635f18d0da8068d4665bb070e4407a57b498ef829a7e44bd",
     "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
     "src/modules/settings/settings.routes.js": "17d00c037a0dd6e75179599b56ea76242f0f0ea6e4e347fed00609f44e748ec2",
+    "src/modules/system_health/system_health.routes.js": "81d0d1c8e699874ef38d0cb1d5493f5cd6c270f0951ffb7c4f7a6d40cd2ae524",
     "src/modules/users/users.routes.js": "c9afad57eaa4e584a792f9a779b1eb995df49de8c891f23bce8f98e75a648b26",
     "src/modules/workflow/workflow.routes.js": "ff43be65f65f035e02c355eb24668d1f4217b955a8690cf5ced982fa22904af5",
     "src/modules/worksites/worksites.routes.js": "7daf0982081974fffa0b2bca02029fef5d0e35b7f0af723599e5229146bcb7a1"

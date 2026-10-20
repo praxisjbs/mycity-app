@@ -1952,13 +1952,13 @@ The full-screen lock over the staff app when a session ends: who is signed in, w
 | `photo` | `string \| null` |  | Their photo, if they have one; the initials otherwise. |
 | `title` | `string` | yes | At most 4 words, Title Case ("Session Locked"). |
 | `reason` | `string` | yes | Why it locked, one short line ("Locked after 30 minutes idle"). |
-| `children` | `ReactNode` | yes | The password field (in a Form whose id the footer's submit button names). |
-| `footer` | `ReactNode` | yes | Buttons only: the way out (Sign Out), then the primary (Unlock). |
+| `children` | `ReactNode` | yes | The credential field (in a Form whose id the footer's submit button names). |
+| `footer` | `ReactNode` | yes | Buttons only, stacked full width down one centred column: the primary (Unlock) and any alternates first, then the way out (Sign Out) in red, set apart below a hairline. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its frame). |
 | `className` | `string` |  | Layout classes for the card only. |
 
 ```tsx
-<LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{passwordField}</LockScreen>
+<LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{pinField}</LockScreen>
 ```
 
 ### Menu

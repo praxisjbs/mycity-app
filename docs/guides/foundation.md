@@ -939,5 +939,11 @@ screen.
   (`docs/guides/notifications.md` §6), each with wording for someone it is not waiting on; the new
   Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
   Your import finished names its audience and takes no copies.
+- 20/10/2026 · TB · Settings gains a second tab, **System Health** (`system-health`), after
+  Organisation. It is the first screen with a permission key of its own rather than `settings`:
+  `system_health`, held by the Implementation Team and the System Administrator only, so a stack
+  trace never reaches Operations & People, Management or the CEO. Its own guide is
+  `docs/guides/system-health.md`; nothing else in Settings changes, and the tab is routed through
+  the same `app/src/features/settings/index.tsx` switch as the rest.
 - 20/10/2026 · GE · §6.1: the staff loader keeps a birthday the sheet gives as a day and month (`employee.birth_day`, `birth_month`, migration `1180`), on every deploy, so the Staff Community celebrations can post it.
 - 20/10/2026 · GE · The outbox dispatcher is woken by each commit (`emit()` sends a Postgres NOTIFY, delivered on commit; `src/jobs/loops/outbox-wake.js` LISTENs) instead of waiting up to a second for its tick, which stays as the safety net (SYSTEM_ARCHITECTURE §6). Measured locally: posting 12 ms, the handlers 5 ms, the reader's refetch 14 ms, so the tick was most of the wait.

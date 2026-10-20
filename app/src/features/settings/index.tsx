@@ -16,6 +16,7 @@ import { NumberingTab } from "./Numbering";
 import { OrganisationTab } from "./Organisation";
 import { Roles } from "./Roles";
 import { SecurityTab } from "./SecurityRules";
+import { SystemHealthTab } from "./SystemHealth";
 import { Button, Card, CardHeader, Chips, ChoiceField, DataView, Field, formatDateTime, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, StatusPill, Swatch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { RolePicker, type RoleRef } from "@/features/shared/pickers";
@@ -26,6 +27,7 @@ import { useSearchParams } from "@/lib/router";
 
 export default function Settings({ tab }: ModuleScreenProps) {
   switch (tab) {
+    case "system-health": return <SystemHealthTab />;
     case "users": return <Users />;
     case "roles-and-permissions": return <Roles />;
     case "approvals": return <Approvals />;

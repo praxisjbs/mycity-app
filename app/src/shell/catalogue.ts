@@ -62,7 +62,7 @@ export const MODULES: ModuleDef[] = [
   {
     key: "settings", label: "Settings", short: "Settings", icon: "cog", area: "System",
     tabs: [
-      t("Organisation", "organisation"), t("Users", "users"), t("Roles & Permissions", "roles-and-permissions"), t("Approvals", "approvals"),
+      t("Organisation", "organisation"), t("System Health", "system-health"), t("Users", "users"), t("Roles & Permissions", "roles-and-permissions"), t("Approvals", "approvals"),
       t("Attendance Policy", "attendance-policy"), t("Notifications", "notifications"), t("Appearance", "appearance"),
       t("Documents & Numbering", "documents-and-numbering"), t("Integrations", "integrations"), t("Security", "security"), t("Audit Log", "audit-log"), t("Imports", "imports"),
     ],

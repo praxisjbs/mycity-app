@@ -82,6 +82,9 @@
  * urgency replaces a fixed one, the default channels apply where a person has not chosen their
  * own. Two options say how a declaration reads there:
  *
+ *   channels  the notice's own default channels, where the category's are wrong for it:
+ *             { email: true } on the 24 hour escalation, whose category leaves email off.
+ *             A person's own preference and the company's rule still win over it.
  *   who    names an audience the code chooses ({ users }): "The channel's members"
  *   copy   the notice is about someone else, so People may copy it to roles and named people:
  *          true (a copy reads as the notice does) or { title?, body? } (what a copy reads
@@ -185,6 +188,14 @@ function defineNotification(key, spec) {
       throw new Error(`${where}: push.tag is (event) => string`);
     if (p.mode !== undefined && !PUSH_MODES.includes(p.mode))
       throw new Error(`${where}: push.mode is ${PUSH_MODES.join(", ")}`);
+  }
+  if (spec.channels !== undefined) {
+    const c = spec.channels;
+    if (!c || typeof c !== "object" || Object.keys(c).some((k) => !categories.CHANNELS.includes(k)))
+      throw new Error(`${where}: channels names ${categories.CHANNELS.join(", ")}`);
+    for (const k of Object.keys(c))
+      if (typeof c[k] !== "boolean")
+        throw new Error(`${where}: channels.${k} is a boolean`);
   }
   if (spec.who !== undefined && (typeof spec.who !== "string" || !spec.who.trim()))
     throw new Error(`${where}: who is the words naming its audience`);
@@ -403,9 +414,15 @@ async function preferencesOf(client, userIds, category) {
   return out;
 }
 
-function channelsFor(category, stored = {}, rule = null) {
+function channelsFor(category, stored = {}, rule = null, declared = null) {
   return categories.CHANNELS.filter((ch) =>
-    categories.isOn(category, ch, stored[ch], rule ? rule[ch] : null),
+    categories.isOn(
+      category,
+      ch,
+      stored[ch],
+      rule ? rule[ch] : null,
+      declared ? declared[ch] : null,
+    ),
   );
 }
 
@@ -489,7 +506,7 @@ async function handle(event, _ctx, { db = defaultPool } = {}) {
   const titles = [];
   const bodies = [];
   for (const id of ids) {
-    const channels = channelsFor(category, prefs.get(id), rule);
+    const channels = channelsFor(category, prefs.get(id), rule, spec && spec.channels);
     if (channels.length === 0) continue;
     users.push(id);
     chans.push(channels.join(","));
@@ -617,6 +634,7 @@ function notices() {
       locked: security || categories.isLocked(category),
       copies: Boolean(spec && spec.copy),
       urgency_default: urgencyDefault,
+      channels: (spec && spec.channels) || null,
     });
   }
   return out.sort(

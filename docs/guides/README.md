@@ -33,6 +33,7 @@ section exists to stop.
 | `foundation.md` | Foundation completion: People · Employees and the staff roster, imports, documents, roles and permissions, settings, audit, approvals, ⌘K search, in four tracks | TB | M0 | ☑ |
 | `organogram.md` | Organogram: People · Organogram (HR builder) and ESS · Org Chart (read-only viewer) over the live reporting tree | TB | M1 | ☐ |
 | `notifications.md` | Notifications: the bell's pane on both shells, the in-app banner, web push to phones and computers, Notification Settings (brought forward from M6) | TB | M0 | ☐ |
+| `system-health.md` | System Health: Settings tab for readiness checks, performance over time, grouped faults with a shared status, and the Markdown brief for an AI | GE | M9 | ☑ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.
 Later milestones add their rows as they start.

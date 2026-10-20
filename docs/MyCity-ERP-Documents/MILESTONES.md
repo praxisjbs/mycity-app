@@ -1279,6 +1279,8 @@ ratifying it also updates the summary counts, the `SCREENS` constant in
 
 **Ratified 15/10/2026 (TB).** Six screens join the inventory, taking the admin surface to 86 and the inventory to 92: **People · Organogram** (`organogram`) and **Employee Self-Service · Org Chart** (`org-chart`), the two proposed above; the three ESS attendance tabs built with the attendance work, **Work Location Requests** (`work-location-requests`), **My Devices** (`my-devices`) and **Policy Updates** (`policy-updates`); and **My Security** (`my-security`). All are M1. They are applied to the table above, the summary counts, the `SCREENS` constant in `scripts/check/progress.js`, `src/shared/route-map.js` and `docs/PROGRESS.md` (rows #87 to #92). They reuse the `ess` and `people` permission keys.
 
+**Ratified 20/10/2026 (TB).** One screen joins the inventory, taking the admin surface to 87 and the inventory to 93: **Settings · System Health** (`system-health`), second in Settings, after Organisation. It carries the readiness checks, a day or a week of snapshots, and every fault the code reports, grouped with a status the team shares, and downloads a Markdown brief an AI can fix them from. It is M9, and it is the first screen with a permission key of its own rather than a reused one: `system_health`, granted to the Implementation Team and the System Administrator only, because a stack trace is not Operations & People's or Management's to act on and alerting them creates alarm without action. It is applied to the table below, the `SCREENS` constant in `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js` and `docs/PROGRESS.md` (row #95). Its engineering shape is in `docs/guides/system-health.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1300,7 +1302,7 @@ staff never navigates to it to do their job.
 | Business | **Expenses** | 6 | My Requests · Approvals · Requisitions · Disbursements · Budgets · Categories | M8 |
 | System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · Announcements | M10 |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
-| System | **Settings** | 11 | Organisation · Users · Roles & Permissions · Approvals · Attendance Policy · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
+| System | **Settings** | 12 | Organisation · System Health · Users · Roles & Permissions · Approvals · Attendance Policy · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
 
 **Separate application — `go.mycityapp.io`, not in the rail**
 

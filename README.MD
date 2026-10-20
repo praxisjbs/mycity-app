@@ -122,7 +122,8 @@ mycity-app/
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
 │   ├── PROGRESS.md           93 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
-│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
+│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, system-health,
+│   │                         add-a-module,
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
 │   │                         first-accounts (the first two logins on a server),
 │   │                         staff-roster (MyCity's staff onto a server that has none),
@@ -500,6 +501,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
+| M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days, snapshots after 30, nightly) |
 | M10 | `knowledge-embed` | |
 
 `partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's
