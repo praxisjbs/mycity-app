@@ -31,7 +31,7 @@ import { Button } from "../actions/Button";
 import { ActionGroup } from "../actions/ActionGroup";
 import { PressGroupContext, usePressGroup } from "../actions/press";
 import { Chrome, Sheet } from "./Sheet";
-import { FooterContext, HostContext, IN_FOOTER, OverlayContext, focusInto, useReturnFocus, type HostLayer, type OverlayState } from "./context";
+import { FooterContext, HostContext, IN_FOOTER, OverlayContext, escapeClosesList, focusInto, useReturnFocus, type HostLayer, type OverlayState } from "./context";
 
 /** Content, or a function of `close` so a form can close its own modal after saving. */
 export type ModalContent = ReactNode | ((close: () => void) => ReactNode);
@@ -64,6 +64,8 @@ export interface ModalProps {
   dirty?: boolean;
   /** false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. */
   dismissible?: boolean;
+  /** Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). */
+  blur?: boolean;
   /** `alertdialog` for a confirmation that must be answered. Default `dialog`. */
   role?: "dialog" | "alertdialog";
   /** Where it mounts; document.body by default (the gallery passes its themed frame). */
@@ -87,6 +89,7 @@ export function Modal({
   side,
   dirty = false,
   dismissible = true,
+  blur = false,
   role,
   container,
   bodyClassName,
@@ -140,6 +143,7 @@ export function Modal({
           full={full || side}
           footer={foot}
           dismissible={dismissible}
+          blur={blur}
           role={role ?? "dialog"}
           container={container}
           bodyClassName={bodyClassName}
@@ -150,8 +154,10 @@ export function Modal({
         <Dialog.Root open={open} onOpenChange={(next) => !next && dismiss()}>
           <Dialog.Portal container={container ?? undefined}>
             <Dialog.Overlay
+              data-blur={blur || undefined}
               className={cn(
                 "fixed inset-0 z-50 grid bg-scrim",
+                blur && "backdrop-blur-md",
                 side ? "justify-items-end" : "place-items-center overflow-y-auto p-5",
               )}
             >
@@ -166,7 +172,7 @@ export function Modal({
                   focusInto(box.current, false);
                 }}
                 onCloseAutoFocus={returnFocus}
-                onEscapeKeyDown={(e) => !dismissible && e.preventDefault()}
+                onEscapeKeyDown={(e) => (!dismissible || escapeClosesList(e)) && e.preventDefault()}
                 onPointerDownOutside={(e) => !dismissible && e.preventDefault()}
                 className={cn(
                   "flex w-full flex-col bg-card text-card-foreground shadow-3 outline-none",
@@ -270,6 +276,8 @@ export interface ModalSpec {
   dirty?: boolean;
   /** false: Esc, the scrim and a drag do nothing; the close button and the footer still close it (a prompt that must be answered). */
   dismissible?: boolean;
+  /** Blur the screen behind the scrim (a prompt that must be answered before anything else). */
+  blur?: boolean;
   /** Called once the modal closes, however it closed. */
   onClose?: () => void;
 }
@@ -379,6 +387,7 @@ export function ModalProvider({ children, resetKey, container }: ModalProviderPr
             side={current.spec.side}
             dirty={current.spec.dirty}
             dismissible={current.spec.dismissible}
+            blur={current.spec.blur}
             container={container}
             footer={current.spec.footer}
           >

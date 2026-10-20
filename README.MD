@@ -211,6 +211,7 @@ src/
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
+│   ├── maps/          geoapify.service (address search, map tiles and a worksite's address, F21)
 │   ├── qr/            qr
 │   ├── web/           links (what counts as a link, the first one's card form) · public-fetch (a page or a
 │   │                  picture from the public web only: private addresses refused, size and time capped) ·
@@ -270,10 +271,11 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
 | `knowledge` | `knowledge` (announcements are read here too) |
 | `praxis_ai` | `assistant`, `ai_governance` |
-| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search` |
+| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search`, `maps` |
 
 The settings modules that every user touches (`identity` login, own `notifications`, own `documents`,
-`search`, the requests waiting on them in `workflow`) check ownership, not the `settings` grant.
+`search`, the address search in `maps`, the requests waiting on them in `workflow`) check ownership,
+not the `settings` grant.
 
 **Capabilities.** A capability is a named authority inside a module that its six actions cannot
 express: Home's `view` opens Home to every employee, `home.team` opens its Team tab to the people
@@ -323,6 +325,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (the reminder engine, Approvals Waiting, Probation Ending and the daily digest), `notifications.rules.js` (Settings · Notifications: the company's rule per notice and its reminders) | Caller's own inbox, preferences, quiet hours, digest and devices; Settings · Notifications (`docs/guides/notifications.md`) |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
+| `maps` | routes and controller only | `GET /maps/search` (the address search every location field types into), `/maps/tiles` (the map's tiles, signed in), `/maps/reverse` (a worksite's address) (`services/maps`; `docs/guides/foundation.md` §6.13) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
 
@@ -330,7 +333,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 
 | Module | Owner | Files beyond the template |
 |---|---|---|
-| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
+| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
 | `alerts` | TB | `.metrics` (the metric registry: what each of the nine metrics reads, from which module, about whom, a batch at a time), `.sweeps` (the 06:00 sweep, and one person's re-read on an attendance signal) |
 | `reports` | TB | `.sources` (the source registry: each source's module, grant, filters and columns over its own screen's query, gathered page by page as the reader, at most 2,000 rows a table; and the reader's own Overview for the Export), `.schedule` (a schedule's next slot in Lagos from its recurrence rule, start day and time), `.generate` (each run's file built as its recipient, PDF or XLSX: a schedule's emailed once it exists, one somebody pressed for downloaded where they pressed; skipped or failed with why), `.files` (a report's tables as the PDF's variables and the XLSX workbook, day-first and in Naira) |
 | `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, the worksite or approved home, and the shift for a date), `.home` (home locations of staff who work from home: sent, decided, read), `.requests` (work location requests: asked, withdrawn or cancelled, settled from their approval, read), `.assignments` (field assignments: set, cancelled, someone taken off, read), `.schedule` (hybrid staff's weekly schedule: the office days set, the week read), `.clock-watch` (the reminder to clock in and the automatic clock-out of a shift left open, every 5 minutes), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |

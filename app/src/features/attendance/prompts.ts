@@ -1,10 +1,13 @@
 import type { AttendanceToday } from "@mycity/contract/contract.gen.ts";
 
 /**
- * When the clock panel opens by itself (docs/guides/attendance.md §6.14): at the shift's start for
- * someone not yet clocked in, and at its end for someone still clocked in. The times are the
- * workplace's, read on the server's clock (`server_time`), never this device's.
+ * When the clock panel opens by itself (docs/guides/attendance.md §6.14): on the first screen of
+ * the day's first sign-in, at the shift's start for someone not yet clocked in, and at its end for
+ * someone still clocked in. The times are the workplace's, read on the server's clock
+ * (`server_time`), never this device's.
  *
+ *   sign_in once, when the server says this session is the first of a working day and the person
+ *           is not clocked in (`sign_in_prompt`), on whatever screen the app opens on
  *   start   once a day on each device: when the app is open at the start or comes to the front
  *           within START_WINDOW_MIN after it, and not once the panel has been shown since the
  *           start (noteShown: the sign-in prompt, Clock In)
@@ -15,33 +18,32 @@ import type { AttendanceToday } from "@mycity/contract/contract.gen.ts";
  * browser that refuses storage.
  */
 
-export type PromptKind = "start" | "close";
+export type PromptKind = "sign_in" | "start" | "close";
 
 /** How long after the start the start prompt may still open. */
 export const START_WINDOW_MIN = 60;
 /** Remind Me's choices, in minutes; the first is also what closing the prompt means. */
 export const REMIND_CHOICES = [15, 30, 60] as const;
 
+const SIGN_IN_KEY = "mc-clock-prompt";
 const START_KEY = "mc-clock-start";
 const CLOSE_KEY = "mc-clock-close";
 const memory = new Map<string, string>();
 
 function read(key: string): string | null {
   try {
-    const v = localStorage.getItem(key);
-    if (v !== null) return v;
+    return localStorage.getItem(key);
   } catch {
-    /* storage refused (a private window): the mark in memory holds while the page is open */
+    // Storage refused (a private window): the mark in memory holds while the page is open.
+    return memory.get(key) ?? null;
   }
-  return memory.get(key) ?? null;
 }
 
 function write(key: string, value: string) {
-  memory.set(key, value);
   try {
     localStorage.setItem(key, value);
   } catch {
-    /* storage refused: kept in memory */
+    memory.set(key, value);
   }
 }
 
@@ -84,6 +86,14 @@ export function promptDue(t: AttendanceToday, now: Date): PromptKind | null {
 }
 
 const markOf = (userId: string, date: string) => `${userId}|${date}`;
+
+/** True the first time the sign-in prompt is asked for, for this person and day on this device. */
+export function claimSignIn(userId: string, date: string): boolean {
+  const mark = markOf(userId, date);
+  if (read(SIGN_IN_KEY) === mark) return false;
+  write(SIGN_IN_KEY, mark);
+  return true;
+}
 
 /** True the first time the start prompt is due for this person and day on this device. */
 export function claimStart(userId: string, date: string): boolean {

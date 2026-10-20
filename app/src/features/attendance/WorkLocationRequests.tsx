@@ -3,12 +3,14 @@ import type { ApprovalDecision, LocationRequest, LocationRequestType } from "@my
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { coordinatesOf, searchPlaces } from "@/features/shared/places";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, NumberField, PageHeader, PhoneOnly, Pill, TextAreaField, TextField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, NumberField, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 import { useClock } from "./ClockButton";
 import { ReadingStep, useReading } from "./HomeLocation";
 import { REQUEST_STATUS, REQUEST_TYPE, REQUEST_TYPE_HELP } from "./labels";
+import { SiteMap } from "./SiteMap";
 
 /**
  * ESS · Work Location Requests (#87, docs/guides/attendance.md §6.11, §10): the person's own
@@ -272,7 +274,17 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
         <DateField {...f.field("ends_on")} min={v.starts_on || todayIso()} />
       </Field>
       <Field label="Address" optional={v.request_type === "remote_day"} {...f.status("address")}>
-        <TextField {...f.field("address")} placeholder="Street, area, city" />
+        <AddressField
+          {...f.field("address")}
+          search={searchPlaces}
+          onPick={(place) => {
+            // The client site's centre; a temporary home keeps its own reading.
+            const at = coordinatesOf(place);
+            f.set("site_latitude", at.latitude);
+            f.set("site_longitude", at.longitude);
+          }}
+          placeholder="Street, area, city"
+        />
       </Field>
       {visit && (
         <Card className="mb-3">
@@ -288,6 +300,18 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
           <Field label={<HelpTerm help="A punch within this distance of the site counts at the site. Between 100 and 500 metres.">Radius, Metres</HelpTerm>} {...f.status("site_radius")}>
             <NumberField {...f.field("site_radius")} />
           </Field>
+          <SiteMap
+            latitude={v.site_latitude}
+            longitude={v.site_longitude}
+            radius={v.site_radius}
+            min={100}
+            max={500}
+            label={v.address}
+            onMove={(latitude, longitude) => {
+              f.set("site_latitude", latitude);
+              f.set("site_longitude", longitude);
+            }}
+          />
         </Card>
       )}
       <Field label="Reason" {...f.status("reason")}>

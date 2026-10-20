@@ -3,7 +3,9 @@
  * screen that shows a map.
  *
  * Tiles come from our API, never from Geoapify directly, so the key stays on
- * the server. The markers are our own `divIcon`s in token classes rather than
+ * the server. That route is signed in, and an image request carries no token,
+ * so with `loadTile` each tile is fetched by the app with its session and drawn
+ * from the bytes (`TokenTiles`). The markers are our own `divIcon`s in token classes rather than
  * Leaflet's default images, so nothing depends on an asset path and both
  * themes read.
  *
@@ -18,17 +20,50 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { IconButton } from "../actions/Button";
-import { ATTRIBUTION, describePoint, type LatLon } from "./geoapify";
+import { ATTRIBUTION, describePoint, type LatLon, type LoadTile } from "./geoapify";
 
 export interface MapDrawProps {
   centre: LatLon;
   zoom: number;
   tileUrl: string;
+  loadTile?: LoadTile;
   markers: Array<LatLon & { key: string; label: string; tone?: "brand" | "plain" }>;
   /** A circle around the first marker, in metres (a worksite's geofence). */
   radiusMetres?: number;
   onPick?: (point: LatLon) => void;
   interactive: boolean;
+}
+
+/** Tiles fetched by the app with its session, then drawn from the bytes; a tile that fails stays blank. */
+class TokenTiles extends L.TileLayer {
+  constructor(
+    url: string,
+    options: L.TileLayerOptions,
+    private readonly load: LoadTile,
+  ) {
+    super(url, options);
+  }
+
+  override createTile(coords: L.Coords, done: L.DoneCallback): HTMLElement {
+    const tile = document.createElement("img");
+    tile.alt = "";
+    tile.setAttribute("role", "presentation");
+    this.load(this.getTileUrl(coords))
+      .then((blob) => {
+        const href = URL.createObjectURL(blob);
+        tile.onload = () => {
+          URL.revokeObjectURL(href);
+          done(undefined, tile);
+        };
+        tile.onerror = () => {
+          URL.revokeObjectURL(href);
+          done(new Error("tile"), tile);
+        };
+        tile.src = href;
+      })
+      .catch((err: unknown) => done(err instanceof Error ? err : new Error("tile"), tile));
+    return tile;
+  }
 }
 
 /** A pin drawn in our own markup, so no image file has to be found. */
@@ -44,7 +79,7 @@ function pin(tone: "brand" | "plain") {
   });
 }
 
-export default function MapDraw({ centre, zoom, tileUrl, markers, radiusMetres, onPick, interactive }: MapDrawProps) {
+export default function MapDraw({ centre, zoom, tileUrl, loadTile, markers, radiusMetres, onPick, interactive }: MapDrawProps) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const drawn = useRef<L.LayerGroup | null>(null);
@@ -66,7 +101,8 @@ export default function MapDraw({ centre, zoom, tileUrl, markers, radiusMetres, 
       keyboard: false,
       attributionControl: false,
     });
-    L.tileLayer(tileUrl, { attribution: ATTRIBUTION, maxZoom: 20, crossOrigin: true }).addTo(made);
+    const tiles = { attribution: ATTRIBUTION, maxZoom: 20 };
+    (loadTile ? new TokenTiles(tileUrl, tiles, loadTile) : L.tileLayer(tileUrl, { ...tiles, crossOrigin: true })).addTo(made);
     // The licence line only, with no link of Leaflet's own in front of it.
     L.control.attribution({ prefix: false }).addTo(made);
     made.on("click", (e: L.LeafletMouseEvent) => pick.current?.({ lat: e.latlng.lat, lon: e.latlng.lng }));

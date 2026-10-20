@@ -6,9 +6,11 @@ import { useFileUrl } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import { useAuth } from "@/auth/AuthProvider";
+import { searchPlaces } from "@/features/shared/places";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
+  AddressField,
   Button,
   Card,
   CardHeader,
@@ -34,7 +36,6 @@ import {
   Pill,
   Stack,
   Switch,
-  TextAreaField,
   TextField,
   TimeField,
   toast,
@@ -263,7 +264,7 @@ function ProfileForm({ org, close }: { org: Organisation; close: () => void }) {
         </Field>
       </Grid>
       <Field label="Address" optional {...f.status("address")}>
-        <TextAreaField rows={2} {...f.field("address")} />
+        <AddressField {...f.field("address")} search={searchPlaces} maxLength={500} />
       </Field>
       <Grid cols={2}>
         <Field label="Phone" optional {...f.status("phone")}>

@@ -2,9 +2,9 @@
 /**
  * The Overview beside its cards: which sections each Home view draws, and the figures in
  * each (docs/guides/home.md §6 Overview, §10.1). The cards are the KPI catalogue's; this
- * file is everything else the Overview shows but Activity Today (dashboard.activity.js),
- * Need You (GET /workflow/mine, read by the screen) and the clock-in prompt
- * (dashboard.prompt.js).
+ * file is everything else the Overview shows but Activity Today (dashboard.activity.js) and
+ * Need You (GET /workflow/mine, read by the screen). The clock-in prompt is Attendance's
+ * (docs/guides/attendance.md §6.14), opened by the shell on whatever screen comes first.
  *
  * WHICH VIEW DRAWS WHAT (code, like the cards' defaults; a role's Home view picks it):
  *
@@ -420,8 +420,8 @@ async function week(client, { user, today, scopes }) {
  * ------------------------------------------------------------------ */
 
 /**
- * Every section of the reader's Overview but its cards, Activity Today and the prompt
- * (HomeOverview), each null when it is not drawn.
+ * Every section of the reader's Overview but its cards and Activity Today (HomeOverview), each
+ * null when it is not drawn.
  * @param {{query: Function}} client
  * @param {{user: object, view: string, today: string, scopes: Map<string, object>}} reader
  *   view    their Home view (/me home_view)

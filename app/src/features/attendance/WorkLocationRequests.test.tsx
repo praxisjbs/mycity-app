@@ -114,6 +114,9 @@ describe("work location requests", () => {
     fill(dialog, "Address", "Client office, 9 Sample Close, Yaba");
     fill(dialog, "Latitude", "6.5095");
     fill(dialog, "Longitude", "3.3711");
+    // The client's site on a map under its coordinates.
+    await waitFor(() => expect(dialog.querySelector("[data-points]")?.getAttribute("data-points")).toBe("6.50950, 3.37110"));
+    expect(within(dialog).getByText("Client office, 9 Sample Close, Yaba: 6.50950, 3.37110")).toBeTruthy();
     fill(dialog, "Reason", "Setting up the client's new meeting rooms");
     pressIn(dialog, "Send Request");
     const row = await screen.findByText("WLR-0006 · Client Visit");

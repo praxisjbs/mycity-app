@@ -155,11 +155,12 @@ describeDb("the clock watch against the real migrations", () => {
 
   test("the reminder goes once, in the first hour after the start, to whoever is not in", async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
-    expect(await watch.remind({ now: at("08:55") })).toEqual({ reminded: 0 });
+    away(null);
+    expect(await watch.remind({ now: at("08:55") })).toEqual({ reminded: 0, in_front: 0 });
 
     await punchAt("early", at("08:50"));
-    expect(await watch.remind({ now: at("09:05") })).toEqual({ reminded: 3 });
-    expect(await watch.remind({ now: at("09:10") })).toEqual({ reminded: 0 });
+    expect(await watch.remind({ now: at("09:05") })).toEqual({ reminded: 3, in_front: 0 });
+    expect(await watch.remind({ now: at("09:10") })).toEqual({ reminded: 0, in_front: 0 });
     const sent = await q("SELECT employee_id FROM attendance_clock_reminder WHERE work_date = $1", [DAY]);
     expect(sent.rows.map((r) => r.employee_id)).not.toContain(employeeId("early"));
 
@@ -174,8 +175,48 @@ describeDb("the clock watch against the real migrations", () => {
     expect(read.read_at).not.toBeNull();
 
     // A day that is not worked, and a run after the first hour, send nothing.
-    expect(await watch.remind({ now: at("10:05") })).toEqual({ reminded: 0 });
-    expect(await watch.remind({ now: at("09:05", "2026-10-11") })).toEqual({ reminded: 0 });
+    expect(await watch.remind({ now: at("10:05") })).toEqual({ reminded: 0, in_front: 0 });
+    expect(await watch.remind({ now: at("09:05", "2026-10-11") })).toEqual({ reminded: 0, in_front: 0 });
+  });
+
+  test("someone in front of the app is not pushed: the app's prompt asks them, and a later run reminds them once away", async () => {
+    const day = "2026-10-13";
+    presence({ known: true, active: true, last_active_at: at("09:04", day) });
+    expect(await watch.remind({ now: at("09:05", day) })).toEqual({ reminded: 0, in_front: 4 });
+    expect((await q("SELECT count(*)::int AS n FROM attendance_clock_reminder WHERE work_date = $1", [day])).rows[0].n).toBe(0);
+    away(at("09:06", day));
+    expect(await watch.remind({ now: at("09:20", day) })).toEqual({ reminded: 4, in_front: 0 });
+    // Presence that cannot be read sends it, as before.
+    presence({ known: false, active: false, last_active_at: null });
+    expect(await watch.remind({ now: at("09:05", "2026-10-14") })).toEqual({ reminded: 4, in_front: 0 });
+  });
+
+  test("the sign-in prompt: the first session of a working day, not yet clocked in, once", async () => {
+    const day = "2026-10-15";
+    const sessionAt = async (instant) =>
+      (
+        await q(
+          `INSERT INTO user_session (user_id, refresh_token_hash, issued_at, expires_at)
+           VALUES ($1, $2, $3, $3::timestamptz + interval '1 day') RETURNING session_id`,
+          [people.ops.user.user_id, crypto.randomUUID(), instant],
+        )
+      ).rows[0].session_id;
+    const user = { ...(await actorOf("ops")) };
+    const todayAs = (sessionId, instant) => service.today({ ...user, session_id: sessionId }, { now: instant });
+
+    const first = await sessionAt(at("07:30", day));
+    const second = await sessionAt(at("08:15", day));
+    expect((await todayAs(first, at("08:30", day))).sign_in_prompt).toBe(true);
+    expect((await todayAs(second, at("08:30", day))).sign_in_prompt).toBe(false);
+    // A session kept alive from yesterday is not today's first.
+    expect((await todayAs(first, at("08:30", "2026-10-16"))).sign_in_prompt).toBe(false);
+    // Not once clocked in, and not on a day that is not worked.
+    await punchAt("ops", at("08:40", day));
+    expect((await todayAs(first, at("09:00", day))).sign_in_prompt).toBe(false);
+    const sunday = await sessionAt(at("08:00", "2026-10-18"));
+    expect((await todayAs(sunday, at("09:00", "2026-10-18"))).sign_in_prompt).toBe(false);
+    // Without a session to compare, never.
+    expect(await repo.firstSessionOn(pool, { user_id: people.ops.user.user_id }, day)).toBe(false);
   });
 
   test("nothing closes while the shift runs, while they are in front of the app, or when presence cannot answer", async () => {

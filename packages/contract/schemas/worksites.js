@@ -3,8 +3,8 @@
  * Worksites: the offices a punch is matched to, each a centre, a radius and a
  * timezone (docs/guides/attendance.md §6.5). People add, change, retire and restore
  * them, and assign the employees who work there (`employee.worksite_id`, through the
- * organisation service; assigning someone elsewhere moves them). The coordinates are
- * typed until the map's address search is served by our API (F21).
+ * organisation service; assigning someone elsewhere moves them). The form fills the
+ * coordinates from the address search (`maps.js`, F21); they arrive here as numbers.
  */
 const { z } = require("zod");
 const { uuid, text, optionalText, isoDateTime, listQuery, Paged } = require("./common");
