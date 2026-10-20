@@ -1061,6 +1061,24 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · Performance (#96) rebuilt from TB's six answers (`docs/guides/system-health.md`
+  §6, §14): four tiles judged against targets (99.9% up, p95 under 800 ms, under 1% failing),
+  editable with Edit Targets (`system_health` edit, audited; Status's disk, memory, processor and
+  connection checks read the same levels); Processor, Memory and Disk in real units, each split
+  by what uses it (production, staging, database, Redis, the upload scanner; the disk by each
+  environment's database and files, backups and logs), with steal, I/O wait, cache, reserved space
+  and days to full; Network and Server facts; nine trend charts over an Hour, a Day, a Week or a
+  Month; and Slowest Routes (p95 per route), Database (slow SQL from `pg_stat_statements`, largest
+  tables, connections), Background Work (queues, events, every scheduler's runs) and Processes
+  (people online, memory, event loop, restarts). Availability now counts minutes the API answered,
+  not minutes every check was up, which read 0.0% while the app served. New: migration 9120, a
+  one-minute sampler, per-process beats, a root timer for the disk's parts, 10 routes, `TrendChart`
+  and `StackBar` in `packages/ui`. Also (#95, #97): System Health's notices opened nothing, because
+  their record types had no route; a fault notice now opens its sheet on Faults and a check or the
+  digest opens Status, and the three tabs follow `system_health` in the shell and ⌘K. Tested: 13
+  new integration tests, 21 unit tests, 3 screen tests, the component tests. Left: `provision.sh`
+  run again on the server (one PostgreSQL restart) turns on slow SQL and the disk's parts
+  (`docs/runbooks/system-health.md` §7); until then both say so on screen.
 - 20/10/2026 · TB · System Health split into three tabs (#95 Status, #96 Performance, #97 Faults)
   after TB walked the first release on staging, and the engine behind it fixed. **The three
   schedulers were never registered in `src/jobs/registry.js`, so nothing ran for an hour and the

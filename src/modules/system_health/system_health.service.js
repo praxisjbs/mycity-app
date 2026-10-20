@@ -44,8 +44,8 @@ const CHECKS = [
   { key: "ai", label: "AI", look: "No AI vendor answers, so the assistant falls back to its stub." },
   { key: "static", label: "Frontend Build", look: "A frontend build is missing from this release." },
   { key: "disk", label: "Disk Space", look: "The disk is filling up. Nothing can be uploaded or written once it is full." },
-  { key: "memory", label: "Memory", look: "The server is close to its memory. The process is killed if it runs out." },
-  { key: "cpu", label: "Processor", look: "The server is working harder than it has cores for, so everything answers slowly." },
+  { key: "memory", label: "Memory", look: "The server is close to its memory. A process is killed if it runs out. Performance shows which service holds it." },
+  { key: "cpu", label: "Processor", look: "The processor is close to fully busy, so everything answers slowly. Performance shows which service is using it." },
   { key: "database_usage", label: "Database Usage", look: "The database is close to its connection limit, or growing fast." },
   { key: "schedulers", label: "Background Jobs", look: "A job has not run when it should have. Reminders, snapshots and clean-ups are waiting." },
 ];
@@ -66,8 +66,9 @@ function detailOf(key, v) {
   if (key === "mail" && v.sent_last_hour !== undefined) bits.push(`${v.sent_last_hour} of ${v.per_hour} this hour`);
   if (key === "ai" && v.vendor) bits.push(`answering: ${v.vendor}`);
   if (key === "disk" && v.free_pct !== undefined) bits.push(`${v.free_pct}% free, ${v.free_gb} GB of ${v.total_gb} GB`);
-  if (key === "memory" && v.used_pct !== undefined) bits.push(`${v.used_pct}% used, ${v.used_gb} GB of ${v.total_gb} GB`);
-  if (key === "cpu" && v.load !== undefined) bits.push(`load ${v.load} across ${v.cores} cores`);
+  if (key === "memory" && v.used_pct !== undefined) bits.push(`${v.used_pct}% in use, ${v.used_gb} GB of ${v.total_gb} GB`);
+  if (key === "cpu" && v.busy_pct !== undefined && v.busy_pct !== null) bits.push(`${v.busy_pct}% busy across ${v.cores} cores`);
+  else if (key === "cpu" && v.load !== undefined) bits.push(`load ${v.load} across ${v.cores} cores`);
   if (key === "database_usage" && v.size_mb !== undefined)
     bits.push(`${v.size_mb} MB, ${v.connections_used} of ${v.connections_allowed} connections`);
   if (key === "schedulers" && v.schedulers !== undefined)
@@ -102,56 +103,6 @@ async function status() {
     faults_open: counts ? counts.faults_open : 0,
     faults_new_24h: counts ? counts.faults_new_24h : 0,
     faults_returned_24h: counts ? counts.faults_returned_24h : 0,
-  };
-}
-
-/** How many minutes of the window have no snapshot: the worker was not running. */
-function gapMinutes(range, snapshots) {
-  const minutes = range === "7d" ? 60 * 24 * 7 : 60 * 24;
-  const expected = Math.floor(minutes / 5);
-  return Math.max(0, (expected - snapshots) * 5);
-}
-
-/** GET /system-health/performance */
-/**
- * A snapshot older than this means the five-minute job is not running, rather than the
- * system being quiet. Two intervals, so one missed tick is not an accusation.
- */
-const RECORDING_WITHIN_MS = 11 * 60_000;
-
-const asNumber = (v) => (v === null || v === undefined ? null : Number(v));
-const asDecimal = (v) => (v === null || v === undefined ? null : String(v));
-
-async function performance(query) {
-  const range = query.range || "24h";
-  const [points, up, last] = await Promise.all([
-    repo.series(pool, range),
-    repo.uptime(pool, range),
-    repo.lastSnapshot(pool),
-  ]);
-  const snapshots = up ? up.snapshots : 0;
-  const ready = up ? up.ready : 0;
-  const lastAt = last ? new Date(last.taken_at) : null;
-  return {
-    range,
-    points: points.map((p) => ({
-      at: new Date(p.at).toISOString(),
-      state: p.state,
-      faults: p.faults || 0,
-      outbox_backlog: p.outbox_backlog || 0,
-      worker_lag_s: p.worker_lag_s ?? null,
-      requests: asNumber(p.requests),
-      mean_ms: asNumber(p.mean_ms),
-      error_pct: asDecimal(p.error_pct),
-      disk_free_pct: asNumber(p.disk_free_pct),
-      memory_used_pct: asNumber(p.memory_used_pct),
-      cpu_load: asDecimal(p.cpu_load),
-      database_mb: asNumber(p.database_mb),
-    })),
-    gap_minutes: gapMinutes(range, snapshots),
-    recording: Boolean(lastAt) && Date.now() - lastAt.getTime() < RECORDING_WITHIN_MS,
-    last_snapshot_at: lastAt ? lastAt.toISOString() : null,
-    uptime_pct: (snapshots ? (ready * 100) / snapshots : 0).toFixed(1),
   };
 }
 
@@ -321,11 +272,8 @@ module.exports = {
   label,
   lookAt,
   detailOf,
-  gapMinutes,
-  RECORDING_WITHIN_MS,
   presentRow,
   status,
-  performance,
   faults,
   fault,
   patch,

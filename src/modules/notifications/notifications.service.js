@@ -53,7 +53,9 @@ async function present(rows, canOpen) {
   const out = [];
   for (const row of rows) {
     const link = routeMap.linkFor(row.entity_type, row.entity_id);
-    const shown = link && (await canOpen(link.module)) ? { module: link.module, tab: link.tab, path: link.path } : null;
+    // Who may open it is the route's own permission: System Health's tabs sit in Settings
+    // but are held by system_health (shared/route-map.js).
+    const shown = link && (await canOpen(routeMap.moduleOf(row.entity_type))) ? { module: link.module, tab: link.tab, path: link.path } : null;
     out.push({ ...row, body: row.body || null, link: shown });
   }
   return out;

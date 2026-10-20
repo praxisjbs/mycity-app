@@ -88,6 +88,10 @@ describe("counts and names", () => {
     expect(plural(1200, "employee")).toBe("1,200 employees");
     expect(formatBytes(86016)).toBe("84 KB");
     expect(formatBytes(1153434)).toBe("1.1 MB");
+    // A server's disk and memory read in the unit a person thinks in, not thousands of MB.
+    expect(formatBytes(18 * 1024 ** 3)).toBe("18.0 GB");
+    expect(formatBytes(236.4 * 1024 ** 3)).toBe("236.4 GB");
+    expect(formatBytes(1.25 * 1024 ** 4)).toBe("1.25 TB");
     expect(initials("Cynthia Osakunih")).toBe("CO");
     expect(initials("Tobi")).toBe("T");
   });

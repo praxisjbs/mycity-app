@@ -170,9 +170,10 @@ describe("how a check reads on screen", () => {
     expect(service.detailOf("redis", { status: "down", error: "not connected" })).toBe("not connected");
   });
 
-  test("minutes with no snapshot are counted as a gap, not drawn as a flat line", () => {
-    expect(service.gapMinutes("24h", 288)).toBe(0);
-    expect(service.gapMinutes("24h", 280)).toBe(40);
+  test("the processor reads as busy, and memory as in use, once /proc can be read", () => {
+    expect(service.detailOf("cpu", { status: "up", busy_pct: 23.5, load: 0.4, cores: 8 })).toBe("23.5% busy across 8 cores");
+    expect(service.detailOf("cpu", { status: "up", busy_pct: null, load: 0.4, cores: 8 })).toBe("load 0.4 across 8 cores");
+    expect(service.detailOf("memory", { status: "up", used_pct: 28, used_gb: 5.1, total_gb: 18 })).toBe("28% in use, 5.1 GB of 18 GB");
   });
 });
 
@@ -277,7 +278,12 @@ describe("the engine behind the screen", () => {
 
   test("each one loads, is named after its file and has a cadence", () => {
     const mine = registry.schedules().filter((x) => x.name.startsWith("system-health"));
-    expect(mine).toHaveLength(3);
+    expect(mine.map((x) => x.name).sort()).toEqual([
+      "system-health",
+      "system-health-digest",
+      "system-health-purge",
+      "system-health-sample",
+    ]);
     for (const spec of mine) {
       expect(typeof spec.run).toBe("function");
       expect(Boolean(spec.every) !== Boolean(spec.pattern)).toBe(true);
@@ -310,6 +316,37 @@ describe("a minute of traffic", () => {
     });
   });
 
+  test("each minute carries its latency buckets, so a percentile adds across processes", async () => {
+    const written = [];
+    stats.__reset({ query: (sql, params) => (written.push({ sql, params }), Promise.resolve()) });
+    stats.record(20, 200); // at most 25 ms
+    stats.record(25, 200); // a bound belongs to its own bucket
+    stats.record(790, 200); // at most 800 ms, the target's default
+    stats.record(12000, 200); // past the last bound
+    await stats.flush();
+    const buckets = written[0].params[7];
+    expect(buckets).toHaveLength(stats.BOUNDS_MS.length + 1);
+    expect(buckets[0]).toBe(2);
+    expect(buckets[stats.BOUNDS_MS.indexOf(800)]).toBe(1);
+    expect(buckets[stats.BOUNDS_MS.length]).toBe(1);
+    expect(written[0].sql).toMatch(/unnest\(request_stat\.buckets, EXCLUDED\.buckets\)/);
+  });
+
+  test("a route is counted a quarter hour at a time, under the route as declared", async () => {
+    const written = [];
+    stats.__reset({ query: (sql, params) => (written.push({ sql, params }), Promise.resolve()) });
+    stats.record(120, 200, { method: "GET", route: "/api/v1/system-health/faults/:id" });
+    stats.record(300, 500, { method: "GET", route: "/api/v1/system-health/faults/:id" });
+    stats.record(5, 404, { method: "GET", route: undefined });
+    await stats.flush();
+    const routes = written.filter((w) => /INSERT INTO route_stat/.test(w.sql)).map((w) => w.params);
+    expect(routes).toHaveLength(2);
+    const faults = routes.find((p) => p[2] === "/api/v1/system-health/faults/:id");
+    expect(faults.slice(3, 9)).toEqual([2, 1, 0, 0, 420, 300]);
+    expect(new Date(faults[0]).getTime() % stats.ROUTE_BUCKET_MS).toBe(0);
+    expect(routes.find((p) => p[2] === "(no route)")).toBeTruthy();
+  });
+
   test("a write that fails loses the minute rather than the process", async () => {
     stats.__reset({ query: () => Promise.reject(new Error("no table yet")) });
     stats.record(10, 200);
@@ -324,8 +361,9 @@ describe("a minute of traffic", () => {
 });
 
 describe("saying when nothing is recording", () => {
-  test("a chart with no recent snapshot is not the same as a quiet system", () => {
+  test("a window with no recent sample is not the same as a quiet system", () => {
     // The whole point: "Nothing Recorded Yet" read like good news while the job was dead.
-    expect(service.RECORDING_WITHIN_MS).toBe(11 * 60_000);
+    // Three one-minute samples missed, not one, before the screen says the job has stopped.
+    expect(require("./system_health.performance").RECORDING_WITHIN_MS).toBe(3 * 60_000);
   });
 });

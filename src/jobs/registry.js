@@ -149,6 +149,7 @@ const SCHEDULERS = Object.freeze([
   "system-health",
   "system-health-digest",
   "system-health-purge",
+  "system-health-sample",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */
@@ -247,8 +248,8 @@ function defineSchedule(spec) {
 async function recordRun(name, startedAt, ok, note) {
   try {
     await require("../config/db").pool.query(
-      `INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, note, runs, failures)
-       VALUES ($1, now(), $2, $3, $4, 1, $5)
+      `INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, note, runs, failures, total_ms, max_ms)
+       VALUES ($1, now(), $2, $3, $4, 1, $5, $2, $2)
        ON CONFLICT (name) DO UPDATE SET
          last_run_at = now(),
          duration_ms = EXCLUDED.duration_ms,
@@ -256,6 +257,8 @@ async function recordRun(name, startedAt, ok, note) {
          note = EXCLUDED.note,
          runs = schedule_run.runs + 1,
          failures = schedule_run.failures + EXCLUDED.failures,
+         total_ms = schedule_run.total_ms + EXCLUDED.total_ms,
+         max_ms = GREATEST(schedule_run.max_ms, EXCLUDED.max_ms),
          last_failure_at = CASE WHEN EXCLUDED.ok THEN schedule_run.last_failure_at ELSE now() END`,
       [name, Date.now() - startedAt, ok, note ? String(note).slice(0, 500) : null, ok ? 0 : 1],
     );

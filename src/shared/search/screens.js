@@ -145,8 +145,14 @@ function hasCapability(reader, code) {
  * @param {{module: string, tab: string}} screen
  * @param {Reader} reader
  */
+/** Settings' tabs that system_health holds rather than settings. */
+const SYSTEM_HEALTH_TABS = ["status", "performance", "faults"];
+
 function tabVisible(screen, reader) {
   const can = (module, action = "view") => (reader.grants[module] || []).includes(action);
+  // Status, Performance and Faults sit in Settings but are held by system_health
+  // (docs/guides/system-health.md §8), as the shell shows them (app/src/shell/access.ts).
+  if (screen.module === "settings" && SYSTEM_HEALTH_TABS.includes(screen.tab)) return reader.is_ceo || can("system_health");
   if (!can(screen.module)) return false;
   const full = can("settings") || reader.is_ceo;
   const { module, tab } = screen;

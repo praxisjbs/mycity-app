@@ -104,10 +104,13 @@ mycity-app/
 │   └── deploy/               deploy-gate, check-gate, release-manifest, verify-staging, rollback
 ├── ops/
 │   ├── systemd/              four units + env templates; mycity-backup.service + .timer (nightly
-│   │                         02:30), mycity-restore-drill.service + .timer (Sundays 04:00)
+│   │                         02:30), mycity-restore-drill.service + .timer (Sundays 04:00),
+│   │                         mycity-host-stats.service + .timer (every 15 minutes)
 │   ├── provision/            provision.sh: a fresh Ubuntu 24.04 to a ready server (runbooks/server-setup.md)
 │   ├── nginx/                mycity.conf (shared) + one file per host (runbooks/proxy.md)
-│   ├── monitoring/           uptime-probe.js, run from outside by .github/workflows/uptime.yml
+│   ├── monitoring/           uptime-probe.js, run from outside by .github/workflows/uptime.yml;
+│   │                         host-stats.sh, installed as mycity-host-stats: what fills the disk,
+│   │                         for Settings · Performance (/var/lib/mycity/host-stats.json)
 │   └── ssh/                  authorized_keys template for the deploy user
 ├── tests/
 │   ├── unit/                 cross-module unit tests
@@ -199,8 +202,9 @@ src/
 │   │                  actions (⌘K actions: each screen's New action, Clock In, Request Leave)
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
 │   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
-│                      row, for Settings · Performance) · alert (WhatsApp and webhook; also the
-│                      server's mycity-alert)
+│                      row and each route a quarter hour, with latency buckets, for Settings ·
+│                      Performance) · process-beat (each API and worker process's own row a
+│                      minute) · alert (WhatsApp and webhook; also the server's mycity-alert)
 ├── services/
 │   ├── storage/       storage.service
 │   ├── media/         image-pipeline · av-pipeline · pdf-pipeline (a PDF's page count and first page) ·
@@ -502,7 +506,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
-| M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days, snapshots after 30, nightly) |
+| M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute) |
 | M10 | `knowledge-embed` | |
 
 `partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's

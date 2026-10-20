@@ -59,6 +59,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Result](#result) | `Result` | The outcome of something a person just did: clocking in, signing, a check that passed or failed. | stable |
 | Display | [ShareBar](#sharebar) | `ShareBar` | The share of a total, drawn behind a row of text rather than beside it. | stable |
 | Display | [Skeleton](#skeleton) | `Skeleton`, `Spinner` | A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape. | stable |
+| Display | [StackBar](#stackbar) | `StackBar` | A whole split into named parts on one bar, with a key under it: memory by service, the disk by what fills it. | beta |
 | Display | [StatStrip](#statstrip) | `StatStrip` | A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts. | stable |
 | Display | [Sub](#sub) | `Sub` | The faint line under a heading or beside a value: the smallest secondary text there is. | stable |
 | Display | [Swatch](#swatch) | `Swatch` | A square of one palette token's colour, beside its name and its value. | stable |
@@ -122,6 +123,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
+| Charts | [TrendChart](#trendchart) | `TrendChart` | One to three figures over time on one scale, with an optional target line, gaps where nothing was recorded, and a readout that follows the pointer. | beta |
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
@@ -1563,6 +1565,38 @@ A shimmering placeholder in the shape of what is loading: lines of text, a block
 <Skeleton lines={4} />
 <Skeleton shape="circle" className="size-8" />
 <Spinner label="Loading payslips" />
+```
+
+### StackBar
+
+A whole split into named parts on one bar, with a key under it: memory by service, the disk by what fills it.
+
+| | |
+|---|---|
+| Use | Showing how a capacity is shared out, in real units, where the parts and what is left matter more than a trend. |
+| Avoid | One share of a whole (use Meter); parts over time (use TrendChart); more than seven parts (group the small ones as Other first). |
+| Phone | The key wraps under the bar; nothing scrolls sideways. |
+| Accessibility | The bar is drawn for the eye only; the key is a list read in order, each part's name and figure, then what is left. Pass `label` to name the whole. |
+| Status | beta |
+| Exports | `StackBar` |
+| Import | `import { StackBar } from "@mycity/ui";` |
+| File | `packages/ui/src/display/StackBar.tsx` |
+| Test | `packages/ui/src/display/StackBar.test.tsx` |
+| Gallery | `packages/ui/src/display/StackBar.gallery.tsx` (`npm run gallery`, `#/StackBar`) |
+
+**StackBar** props (`StackBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `parts` | `StackBarPart[]` | yes | The parts, in the order they are drawn, left to right. |
+| `total` | `number` | yes | The whole, in the parts' units. What the parts leave of it is drawn as the empty track. |
+| `rest` | `{ label: string; figure: string }` |  | The name and figure of what the parts leave (Free 3.5 GB); left out of the key when unset. |
+| `label` | `string` | yes | The whole's name for assistive technology (Memory, Disk). |
+| `legend` | `boolean` |  | Draw the key under the bar (on unless false). |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<StackBar label="Memory" total={18432} parts={[{ key: "production", label: "Production", value: 1900, figure: "1.9 GB" }]} rest={{ label: "Free", figure: "3.5 GB" }} />
 ```
 
 ### StatStrip
@@ -3875,6 +3909,44 @@ A bare trend line with no axes, for inside a table cell or beside a figure.
 <Sparkline label="Attendance" values={[18, 21, 22, 20, 24]} />
 ```
 
+### TrendChart
+
+One to three figures over time on one scale, with an optional target line, gaps where nothing was recorded, and a readout that follows the pointer.
+
+| | |
+|---|---|
+| Use | Behaviour over a window where the shape and the target both matter: response time against its target, the processor's busy and steal, data in and out. |
+| Avoid | A single figure where the target does not matter (use AreaChart); figures in different units on one scale (draw two charts); categories (use BarChart). |
+| Phone | No caption; a feature guide's §10 usually leaves trends off a phone, and the drawing never scrolls the page sideways. |
+| Accessibility | The drawing is hidden from screen readers; the frame reads every point with each series' figure, and the key names each series and its latest figure. |
+| Status | beta |
+| Exports | `TrendChart` |
+| Import | `import { TrendChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/TrendChart.tsx` |
+| Test | `packages/ui/src/charts/TrendChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/TrendChart.gallery.tsx` (`npm run gallery`, `#/TrendChart`) |
+
+**TrendChart** props (`TrendChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `labels` | `string[]` | yes | What each point is, in order (a time, a day): the readout and the screen reader's list. |
+| `ticks` | `string[]` |  | The shorter form under the chart, at its start, middle and end (14:00, Mon 19); the labels unless set. |
+| `lines` | `TrendLine[]` | yes | One to three lines, in the same units. |
+| `target` | `{ value: number; label: string }` |  | A dashed line across, and its name in the key (Target 800 ms). |
+| `max` | `number` |  | The top of the scale (100 for a share); the highest figure or the target, rounded up, unless set. |
+| `format` | `(value: number) => string` |  | Formats a figure for the scale, the readout and the screen reader (412 ms, 23%). |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<TrendChart title="Response Time" labels={times} lines={[{ name: "p95", values: p95 }]} target={{ value: 800, label: "Target 800 ms" }} format={(v) => `${v} ms`} />
+```
+
 ## Documents
 
 ### DocumentPreview
@@ -4855,7 +4927,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `isNegative` | `lib/format.ts` | Is this amount below zero? (string check; no float) |
 | `formatCount` | `lib/format.ts` | Whole-number count with thousands separators. |
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
-| `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB" from a byte count. |
+| `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB", "23.4 GB", "1.25 TB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |
 | `formatPhone` | `lib/format.ts` | A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. |
 | `formatPhoneLocal` | `lib/format.ts` | A stored number as a person types it at home, for a field to start from: "0803 123 4567". |

@@ -69,6 +69,7 @@ describe("job registry", () => {
       "system-health",
       "system-health-digest",
       "system-health-purge",
+      "system-health-sample",
       "urgent-repeats",
       "workflow-timeout",
     ]);

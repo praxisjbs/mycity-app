@@ -32,6 +32,7 @@ const EVENTS = defineEvents("system_health", {
   "system_health.fault_unattended": { summary: "A fault has been open for a day with nobody on it" },
   "system_health.digest": { summary: "The daily System Health summary" },
   "system_health.brief_requested": { summary: "A fault brief was downloaded" },
+  "system_health.targets_changed": { summary: "The performance targets or warning levels were changed" },
 });
 
 /** The file a brief is kept in. Restricted: it carries stack traces. */
