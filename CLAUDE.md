@@ -160,6 +160,14 @@ A task is not finished until:
 - When you do ask a question or surface a decision, use the AskUserQuestion tool, not prose, unless
   the person asks for the answer in chat or requests Markdown. Always include a recommendation: put
   the recommended option first and mark it `(Recommended)`.
+- **Work in the foreground, and stay fast.** Read, search and edit in the session itself, and send
+  independent tool calls together so they run at once. Spawn subagents only when the work is too
+  broad for one context or gains real coverage from parallel readers (a whole-module audit, a sweep
+  of large transcripts); then start them together in one message, in the foreground
+  (`run_in_background: false`), and bring their findings into the chat. Never run the same search
+  here and in an agent. A background agent or a Workflow is for work long enough that waiting would
+  block the person; say so when you start one. Slower in the foreground is fine; work lost with a
+  session that ends is not.
 
 Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M7, M9, community and mailbox) · TB Tom-Blake
 Asaah (Home, M4, M10, M11) · LA Love Adeola (migrations and data, attendance, M5, M6) · AJ Adole
