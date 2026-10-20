@@ -426,7 +426,10 @@ async function inScope(db, id, scope) {
  * travels. No point ever leaves.
  */
 const CHECK_IN = (place) => `c.attendance_check_in_id, c.work_date, c.occurred_at, c.temporary_site_location_id, l.position,
-  COALESCE(l.name, CASE WHEN cs.purpose = ${HOME} THEN 'Temporary Home' ELSE 'Address ' || l.position END) AS location_name,
+  COALESCE(l.name, CASE WHEN cs.purpose = ${HOME} THEN 'Temporary Home'
+    WHEN NOT EXISTS (SELECT 1 FROM attendance_temporary_site_location lx
+                      WHERE lx.temporary_site_id = cs.temporary_site_id AND lx.position > 1) THEN cs.name
+    ELSE 'Address ' || l.position END) AS location_name,
   CASE WHEN cs.purpose <> ${HOME} THEN l.address END AS address,
   CASE WHEN cs.purpose = ${HOME} AND ${place}::boolean THEN l.address END AS home_address,
   c.distance_m::float8 AS distance_m, c.accuracy_m::float8 AS accuracy_m, c.verdict,

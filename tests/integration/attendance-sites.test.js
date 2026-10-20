@@ -496,6 +496,10 @@ describeDb("temporary sites and check-ins against the real migrations", () => {
     expect(late.today.timezone).toBe("Africa/Gaborone");
     const dayRow = await q("SELECT late_minutes FROM attendance_day WHERE employee_id = $1 AND attendance_date = $2", [id("other"), first]);
     expect(dayRow.rows[0].late_minutes).toBe(30);
+    // One address with no label: the check-in is named by the site, as the punch is.
+    const stop = await checkInAt("other", `${first}T09:00:00Z`, at(GABORONE, 40));
+    expect(stop.check_in).toMatchObject({ location_name: "Gaborone Partner Days", work_date: first, verdict: "inside" });
+    expect(stop.message).toBe("Checked in at Gaborone Partner Days.");
     // 22:30 UTC on the first day is already the second day in Gaborone, and that is the work date.
     await q("UPDATE attendance_day SET closed_at = now() WHERE employee_id = $1 AND attendance_date = $2", [id("other"), first]);
     const night = await punchAt("other", `${first}T22:30:00Z`, at(GABORONE, 20));

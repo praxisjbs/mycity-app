@@ -226,7 +226,8 @@ const TemporarySiteMemberRemove = z.object({ employee_id: uuid, reason: siteReas
 const CheckInVerdict = z.enum(["inside", "outside", "unverified"]);
 
 /**
- * One stop. `location_name` is the address's label, else "Address N" (Temporary Home for a home);
+ * One stop. `location_name` is the address's label, else the site's name when it has one address,
+ * else "Address N" (Temporary Home for a home);
  * `address` its line for a venue, `home_address` a Temporary Home's (as on the site); never a point.
  * `flagged`: it opened an exception for People.
  */

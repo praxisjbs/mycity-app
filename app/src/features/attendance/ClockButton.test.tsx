@@ -224,13 +224,13 @@ describe("the clock panel", () => {
     act(() => answer!({ coords: { latitude: 6.4285, longitude: 3.4219, accuracy: 12 } }));
     await screen.findByText("Check-in not sent yet.");
     press("Try Again");
-    await screen.findByText("Checked in at Partner Training Week, Hall.");
+    await screen.findByText("Checked in at Hall.");
     const sent = call.mock.calls.filter(([key]) => key === "POST /api/v1/attendance/check-ins");
     expect(sent).toHaveLength(2);
     expect(sent[1][1]).toEqual(sent[0][1]);
     expect(getCurrentPosition).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(clock!.today!.check_ins).toHaveLength(1));
-    expect(clock!.today!.check_ins[0]).toMatchObject({ location_name: "Partner Training Week, Hall", verdict: "inside", flagged: false });
+    expect(clock!.today!.check_ins[0]).toMatchObject({ location_name: "Hall", verdict: "inside", flagged: false });
     expect(await screen.findByText("Inside")).toBeTruthy();
     expect(await axe(document.body)).toHaveNoViolations();
   }, 30000);

@@ -1511,7 +1511,7 @@ route("POST /api/v1/attendance/check-ins", (req) => {
   const c: MockCheckIn = {
     key, idem, body: JSON.stringify(b),
     attendance_check_in_id: sid(`check-in:${key}:${now}`), work_date: date, occurred_at: now, temporary_site_location_id: nearest.id, position: nearest.position,
-    location_name: nameOfAddress(t, nearest), address: home ? null : nearest.address, home_address: home ? nearest.address : null,
+    location_name: nearest.name ?? (home ? "Temporary Home" : t.locations.length === 1 ? t.name : `Address ${nearest.position}`), address: home ? null : nearest.address, home_address: home ? nearest.address : null,
     distance_m: distance, accuracy_m: point ? b.accuracy_m : null, verdict, location_reason: !point ? b.location_error || "no_location" : poor ? "poor_accuracy" : null, flagged: !!flag,
   };
   CHECK_INS.push(c);
