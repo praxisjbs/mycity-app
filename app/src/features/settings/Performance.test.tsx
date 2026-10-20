@@ -82,8 +82,8 @@ describe("Settings · Performance", () => {
     expect(screen.getByText("99.93%")).toBeTruthy();
     expect(screen.getByText("Target 99.90%, 1 min down")).toBeTruthy();
     expect(screen.getByText("912 ms")).toBeTruthy();
-    expect(screen.getByText("p95, target 800 ms")).toBeTruthy();
-    expect(screen.getByText("Target under 1%")).toBeTruthy();
+    expect(screen.getAllByText("Target 800 ms").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Target 1%").length).toBeGreaterThan(0);
     expect(screen.getByText("23.4 / min")).toBeTruthy();
   });
 

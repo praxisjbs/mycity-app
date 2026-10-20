@@ -17,6 +17,7 @@ import {
   ErrorState,
   Field,
   FilterSelect,
+  formatDate,
   formatDateTime,
   FormFooter,
   HelpTerm,
@@ -376,7 +377,7 @@ function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: ()
       <DesktopOnly unmount>
         <Bars
           className="mt-3"
-          rows={d.daily.map((x) => ({ label: x.day, value: String(x.events), percent: Math.round((x.events * 100) / worst) }))}
+          rows={d.daily.map((x) => ({ label: formatDate(x.day), value: String(x.events), percent: Math.round((x.events * 100) / worst) }))}
           note="The last 14 days"
         />
       </DesktopOnly>

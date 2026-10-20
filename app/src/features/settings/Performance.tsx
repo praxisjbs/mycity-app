@@ -109,7 +109,7 @@ const JOB_STATE: Record<JobRun["state"], { tone: Tone; text: string }> = {
 
 const HELP = {
   availability: "The share of minutes in the window in which the app answered. Minutes nobody recorded are not counted either way.",
-  p95: "95 of every 100 requests were answered within this time. Mean is the plain average.",
+  p95: "The p95: 95 of every 100 requests were answered within this time. Mean is the plain average.",
   failed: "Requests that failed on our side, with an error of 500 or more. A mistake in the request itself does not count.",
   steal: "Time the hosting provider gave this machine's processors to other machines. Ours to raise with the provider, not to fix.",
   iowait: "Time the processor sat waiting for the disk. High means the disk, not the processor, is what is slow.",
@@ -124,7 +124,7 @@ const size = (mb: number | null | undefined) => (mb === null || mb === undefined
 const pctOf = (v: string | null | undefined) => (v === null || v === undefined ? null : `${v}%`);
 /** A rate in KB a second: "120 KB/s", "1.4 MB/s". */
 const rate = (kbs: number | null | undefined) =>
-  kbs === null || kbs === undefined ? null : kbs < 1024 ? `${kbs} KB/s` : `${(kbs / 1024).toFixed(1)} MB/s`;
+  kbs === null || kbs === undefined ? null : kbs < 1000 ? `${kbs} KB/s` : `${(kbs / 1024).toFixed(1)} MB/s`;
 const ms = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`);
 const share = (part: number | null, whole: number | null) => (part === null || whole === null || whole <= 0 ? null : Math.round((part * 100) / whole));
 
@@ -246,14 +246,14 @@ function Headline({ s }: { s: PerformanceSeries }) {
           help={HELP.p95}
           value={s.response_p95.value === null ? <EmptyValue label="No traffic" /> : ms(Number(s.response_p95.value))}
           tone={TARGET_TONE[s.response_p95.state]}
-          caption={`p95, target ${ms(Number(s.response_p95.target))}`}
+          caption={`Target ${ms(Number(s.response_p95.target))}`}
         />
         <KpiCard
           title="Failed Requests"
           help={HELP.failed}
           value={s.failed.value === null ? <EmptyValue label="No traffic" /> : `${s.failed.value}%`}
           tone={TARGET_TONE[s.failed.state]}
-          caption={`Target under ${Number(s.failed.target)}%`}
+          caption={`Target ${Number(s.failed.target)}%`}
         />
         <KpiCard
           title="Requests"

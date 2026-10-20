@@ -430,7 +430,7 @@ function diskTrend(db) {
          FROM perf_sample
         WHERE minute > now() - interval '7 days' AND disk_used_mb IS NOT NULL
         GROUP BY 1)
-     SELECT regr_slope(used, extract(epoch FROM at) / 86400) AS mb_per_day, count(*)::int AS hours FROM h`,
+     SELECT regr_slope(used, date_part('epoch', at) / 86400) AS mb_per_day, count(*)::int AS hours FROM h`,
   );
 }
 
@@ -505,7 +505,7 @@ function databaseSummary(db) {
 function databaseGrowth(db) {
   return one(
     db,
-    `SELECT regr_slope(database_mb, extract(epoch FROM taken_at) / 86400) AS mb_per_day, count(*)::int AS snapshots
+    `SELECT regr_slope(database_mb, date_part('epoch', taken_at) / 86400) AS mb_per_day, count(*)::int AS snapshots
        FROM health_snapshot
       WHERE taken_at > now() - interval '7 days' AND database_mb IS NOT NULL`,
   );
