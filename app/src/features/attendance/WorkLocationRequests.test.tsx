@@ -10,23 +10,22 @@ import { mockSession } from "@/api/mock/core";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { useClock } from "./ClockButton";
-import { PeopleAttendance } from "./PeopleAttendance";
 import { WorkLocationRequestsPage } from "./WorkLocationRequests";
+import { Worksites } from "./Worksites";
 
 /**
- * Work location requests on the in-browser mock (docs/guides/attendance.md §6.11, §10): the sheet
- * offers the types the person's work pattern allows, a temporary home takes its reading there
- * first, a request waiting can be withdrawn, and People decide the stage that waits on them, the
- * line manager first and then Operations & People. The mock's requests are invented: WLR-0002 is
- * Kemi's temporary home waiting on Operations & People, WLR-0003 Chidera's remote day waiting on
- * their line manager.
+ * Temporary sites and the work location requests made before them, on the in-browser mock
+ * (docs/guides/attendance.md §6.11, §10). Add Work Site: the purpose searched, the addresses picked
+ * with their radius and map, checked as it is filled, sent to Operations & People and withdrawn
+ * with a reason. People · Worksites shows Permanent alone and Temporary beside it, where People
+ * approve or reject a waiting site, take someone off and cancel one in force, and still decide the
+ * old requests. The mock's sites and requests are invented: TS-0001, Partner Training Week, is in
+ * progress for Bashir and Tolu; TS-0002, in Gaborone, waits on Operations & People; WLR-0003 is
+ * Chidera's remote day waiting on their line manager, Cynthia.
  */
 
-type Position = { coords: { latitude: number; longitude: number; accuracy: number } };
-let answer: ((p: Position) => void) | null = null;
-const getCurrentPosition = vi.fn((ok: (p: Position) => void) => {
-  answer = ok;
-});
+// Nothing here reads the location: a temporary site's addresses are picked, never read from the device.
+const getCurrentPosition = vi.fn();
 
 expect.extend(axeMatchers);
 installMatchMedia();
@@ -41,7 +40,6 @@ if (!("ResizeObserver" in window)) {
 beforeEach(() => {
   setViewport(1440);
   getCurrentPosition.mockClear();
-  answer = null;
   Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
   Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: async () => ({ state: "prompt" }) } });
 });
@@ -91,93 +89,141 @@ const fill = (dialog: HTMLElement, label: string, value: string) => fireEvent.ch
 const pressIn = (dialog: HTMLElement, name: string) => fireEvent.click(within(dialog).getByRole("button", { name }));
 /** Picks an address the way a person does (F27): types to search, then presses the place found. */
 async function pickAddress(dialog: HTMLElement, text: string, option: RegExp) {
-  const box = within(dialog).getByRole("combobox", { name: /Address/ });
+  // The newest address card's search: a picked address shows its place, not a search box.
+  const box = within(dialog).getAllByRole("combobox", { name: "Address" }).at(-1)!;
   fireEvent.focus(box);
   fireEvent.change(box, { target: { value: text } });
   fireEvent.click(await within(dialog).findByRole("option", { name: option }, { timeout: 5000 }));
 }
 
-describe("work location requests", () => {
-  it("a hybrid employee asks for a client visit with its site, sees it wait on their line manager and withdraws it", async () => {
+describe("temporary sites", () => {
+  it("Add Work Site: the purpose searched, two addresses picked, checked as filled, sent for approval and withdrawn", async () => {
     await signedInAs("chidera@mycityapp.io", <WorkLocationRequestsPage />);
+    await screen.findByText("No Temporary Sites");
+    // The requests made before PR 4 stay under the sites; nobody makes a new one.
     await screen.findByText("WLR-0003 · Remote Day");
-    fireEvent.click((await screen.findAllByRole("button", { name: "New Request" }))[0]);
-    let dialog = await screen.findByRole("dialog");
-    // A hybrid employee asks for a remote day or a client visit, never a temporary home.
-    expect(within(dialog).getByRole("radio", { name: "Remote Day" })).toBeTruthy();
-    expect(within(dialog).queryByRole("radio", { name: "Temporary Home" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New Request" })).toBeNull();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add Work Site" })[0]);
+    let dialog = await screen.findByRole("dialog", { name: "Add Work Site" });
+    pressIn(dialog, "Submit for Approval");
+    const purpose = within(dialog).getByRole("combobox", { name: "Purpose" });
+    await waitFor(() => expect(purpose.getAttribute("aria-invalid")).toBe("true"));
+    for (const label of ["Name", "First Day", "Last Day"]) expect(within(dialog).getByLabelText(label).getAttribute("aria-invalid")).toBe("true");
+    expect(within(dialog).getByRole("combobox", { name: "Address" }).getAttribute("aria-invalid")).toBe("true");
+
+    // Seventeen purposes: typing narrows them.
+    fireEvent.click(purpose);
+    const search = await screen.findByRole("searchbox", { name: "Search Purpose" });
+    fireEvent.change(search, { target: { value: "train" } });
+    const purposes = screen.getByRole("listbox", { name: "Purpose" });
+    expect(within(purposes).getAllByRole("option").map((o) => o.textContent)).toEqual(["Training (Delivering)", "Training (Attending)"]);
+    fireEvent.click(within(purposes).getByRole("option", { name: "Training (Attending)" }));
+    expect(purpose.textContent).toBe("Training (Attending)");
+
+    fill(dialog, "Name", "Partner Training");
     expect(await axe(dialog)).toHaveNoViolations();
-
-    fireEvent.click(within(dialog).getByRole("radio", { name: "Client Visit" }));
-    pressIn(dialog, "Send Request");
-    await waitFor(() => expect(within(dialog).getByLabelText("First Day").getAttribute("aria-invalid")).toBe("true"));
-    expect(within(dialog).getByLabelText("Address").getAttribute("aria-invalid")).toBe("true");
-    // The client's site is typed, as a field site's is: a point and a radius.
-    expect(within(dialog).getByLabelText("Latitude").getAttribute("aria-invalid")).toBe("true");
-    expect(within(dialog).getByLabelText("Longitude").getAttribute("aria-invalid")).toBe("true");
-
-    fill(dialog, "First Day", typed(5));
-    fill(dialog, "Last Day", typed(6));
     await pickAddress(dialog, "herbert", /21 Herbert Macaulay Way, Yaba/);
-    fill(dialog, "Details", "Client office");
-    // The pick filled the site; it stays open to correct.
-    expect((within(dialog).getByLabelText("Latitude") as HTMLInputElement).value).toBe("6.509500");
-    fill(dialog, "Latitude", "6.5095");
-    fill(dialog, "Longitude", "3.3711");
-    // The client's site on a map under its coordinates.
-    await waitFor(() => expect(dialog.querySelector("[data-points]")?.getAttribute("data-points")).toBe("6.50950, 3.37110"));
-    expect(within(dialog).getByText("Client office, 21 Herbert Macaulay Way, Yaba, Lagos: 6.50950, 3.37110")).toBeTruthy();
-    fill(dialog, "Reason", "Setting up the client's new meeting rooms");
-    pressIn(dialog, "Send Request");
-    const row = await screen.findByText("WLR-0006 · Client Visit");
-    expect(getCurrentPosition).not.toHaveBeenCalled();
+    // Its point and the radius it starts at, on a small map.
+    await waitFor(() => expect(dialog.querySelector("[data-points]")?.getAttribute("data-points")).toBe("6.50950, 3.37900"));
+    pressIn(dialog, "Add Address");
+    await pickAddress(dialog, "bourdillon", /Bourdillon Road, Ikoyi/);
+    pressIn(dialog, "Add Address");
+    const cards = () => within(dialog).getAllByText(/^Address \d$/).map((h) => h.textContent);
+    expect(cards()).toEqual(["Address 1", "Address 2", "Address 3"]);
+    // Remove takes the third out again; the first has none.
+    fireEvent.click(within(dialog).getAllByRole("button", { name: "Remove" })[1]);
+    expect(cards()).toEqual(["Address 1", "Address 2"]);
+    fill(dialog, "First Day", typed(3));
+    fill(dialog, "Last Day", typed(4));
+    fireEvent.change(within(dialog).getByPlaceholderText("Partner training, Lekki"), { target: { value: "Two days of partner training at their offices." } });
+    pressIn(dialog, "Submit for Approval");
+    const row = await screen.findByText("TS-0006 · Partner Training");
+    const mine = await api.call("GET /api/v1/attendance/me/temporary-sites", { query: {} });
+    expect(mine.data.find((x) => x.number === "TS-0006")).toMatchObject({
+      purpose: "training_attending", status: "submitted", state: "submitted", days: 2, people: 1, waiting_on: "Operations & People", can_withdraw: true,
+      locations: [{ position: 1, radius_m: 150, address: "21 Herbert Macaulay Way, Yaba, Lagos" }, { position: 2, radius_m: 150 }],
+    });
 
     fireEvent.click(row);
-    dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("6.50950, 3.37110 · 200 m")).toBeTruthy();
+    dialog = await screen.findByRole("dialog", { name: "TS-0006 · Partner Training" });
     const route = await within(dialog).findByRole("list", { name: "Approval route" });
-    expect(within(route).getByText("Line Manager").textContent).toBe("Line Manager, waiting here");
-    pressIn(dialog, "Withdraw Request");
-    const confirm = await screen.findByRole("alertdialog");
-    fireEvent.click(within(confirm).getByRole("button", { name: "Withdraw Request" }));
-    await waitFor(async () => {
-      const mine = await api.call("GET /api/v1/attendance/me/requests", { query: {} });
-      expect(mine.data.find((r) => r.number === "WLR-0006")?.status).toBe("cancelled");
-    });
+    expect(within(route).getByText("Operations & People").textContent).toBe("Operations & People, waiting here");
+    pressIn(dialog, "Withdraw Submission");
+    const form = await screen.findByRole("dialog", { name: "Withdraw Submission" });
+    fill(form, "Reason", "short");
+    pressIn(form, "Withdraw Submission");
+    await waitFor(() => expect(within(form).getByLabelText("Reason").getAttribute("aria-invalid")).toBe("true"));
+    fill(form, "Reason", "The partner moved the training online");
+    pressIn(form, "Withdraw Submission");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const after = await api.call("GET /api/v1/attendance/me/temporary-sites", { query: {} });
+    expect(after.data.find((x) => x.number === "TS-0006")).toMatchObject({ status: "withdrawn", state: "withdrawn", cancel_reason: "The partner moved the training online", can_withdraw: false });
   }, 30000);
 
-  it("a remote employee's temporary home takes a reading there before it can be sent", async () => {
-    await signedInAs("kemi@mycityapp.io", <WorkLocationRequestsPage />);
-    await screen.findByText("WLR-0002 · Temporary Home");
-    fireEvent.click((await screen.findAllByRole("button", { name: "New Request" }))[0]);
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).queryByRole("radio", { name: "Remote Day" })).toBeNull();
-    await within(dialog).findByText("At That Home");
-    expect(within(dialog).queryByRole("button", { name: "Send Request" })).toBeNull();
-
-    pressIn(dialog, "Use This Location");
-    act(() => answer!({ coords: { latitude: 6.4521, longitude: 3.3912, accuracy: 300 } }));
-    await within(dialog).findByText("Weak Location Signal");
-    expect(within(dialog).queryByRole("button", { name: "Send Request" })).toBeNull();
-    pressIn(dialog, "Retry Location");
-    act(() => answer!({ coords: { latitude: 6.4521, longitude: 3.3912, accuracy: 12 } }));
-    await within(dialog).findByText("Location Found");
-
-    fill(dialog, "First Day", typed(25));
-    fill(dialog, "Last Day", typed(40));
-    await pickAddress(dialog, "bourdillon", /Bourdillon Road, Ikoyi/);
-    fill(dialog, "Details", "House 4");
-    fill(dialog, "Reason", "Looking after a relative for two weeks");
-    pressIn(dialog, "Send Request");
-    await waitFor(() => expect(screen.getAllByText(/· Temporary Home$/)).toHaveLength(2));
-    // The server has the reading taken there, not one typed in.
-    const mine = await api.call("GET /api/v1/attendance/me/requests", { query: {} });
-    expect(mine.data.find((r) => r.days === 16)).toMatchObject({ request_type: "temporary_home", status: "submitted", waiting_on: "Line Manager", address: "House 4, Bourdillon Road, Ikoyi, Lagos", home_latitude: 6.4521, home_longitude: 3.3912, accuracy_m: 12, days: 16 });
+  it("People · Worksites: Permanent alone, then Temporary, where Operations & People reject or approve a waiting site", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Worksites />);
+    await screen.findByText("Worksites", { selector: "h1" });
+    expect(screen.queryByText("TS-0002 · Gaborone Partner Training")).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: "Temporary" }));
+    fireEvent.click(await screen.findByText("TS-0002 · Gaborone Partner Training", undefined, { timeout: 5000 }));
+    let dialog = await screen.findByRole("dialog", { name: "TS-0002 · Gaborone Partner Training" });
+    // An address abroad keeps its own time zone.
+    expect(within(dialog).getByText("Africa/Gaborone")).toBeTruthy();
+    pressIn(dialog, "Reject");
+    const form = await screen.findByRole("dialog", { name: "Reject TS-0002" });
+    pressIn(form, "Reject");
+    await waitFor(() => expect(within(form).getByLabelText("Reason").getAttribute("aria-invalid")).toBe("true"));
+    // Keeping it closes the form; the site is still waiting.
+    pressIn(form, "Keep It");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByText("TS-0002 · Gaborone Partner Training"));
+    dialog = await screen.findByRole("dialog", { name: "TS-0002 · Gaborone Partner Training" });
+    pressIn(dialog, "Approve");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const page = await api.call("GET /api/v1/attendance/temporary-sites", { query: { q: "TS-0002" } });
+    expect(page.data[0]).toMatchObject({ status: "approved", state: "upcoming", approved_by_name: "Cynthia Osakunih", can_decide: false, waiting_on: null });
   }, 30000);
 
-  it("People decide the stage waiting on them: the line manager first, then Operations & People", async () => {
-    await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
-    fireEvent.click(screen.getByRole("radio", { name: "Requests" }));
+  it("People take someone off a site in force with a reason, then cancel it", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Worksites />);
+    fireEvent.click(screen.getByRole("radio", { name: "Temporary" }));
+    fireEvent.click(await screen.findByText("TS-0001 · Partner Training Week", undefined, { timeout: 5000 }));
+    let dialog = await screen.findByRole("dialog", { name: "TS-0001 · Partner Training Week" });
+    fireEvent.click(within(dialog).getByText("Tolu Adeyemi"));
+    let form = await screen.findByRole("dialog", { name: "Take Off Tolu Adeyemi" });
+    fill(form, "Reason", "Needed at the office this week");
+    pressIn(form, "Take Off");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    let site = (await api.call("GET /api/v1/attendance/temporary-sites", { query: { q: "TS-0001" } })).data[0];
+    expect(site).toMatchObject({ people: 1, status: "approved" });
+
+    fireEvent.click(await screen.findByText("TS-0001 · Partner Training Week"));
+    dialog = await screen.findByRole("dialog", { name: "TS-0001 · Partner Training Week" });
+    pressIn(dialog, "Cancel Site");
+    form = await screen.findByRole("dialog", { name: "Cancel Site" });
+    fill(form, "Reason", "The partner postponed the training");
+    pressIn(form, "Cancel Site");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    site = (await api.call("GET /api/v1/attendance/temporary-sites", { query: { q: "TS-0001" } })).data[0];
+    expect(site).toMatchObject({ status: "cancelled", state: "cancelled", cancel_reason: "The partner postponed the training", can_change: false });
+  }, 30000);
+
+  it("People add one in force at once, from the employee list, with Save Site", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Worksites />);
+    fireEvent.click(screen.getByRole("radio", { name: "Temporary" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Add Temporary Site" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add Temporary Site" });
+    expect(within(dialog).getByRole("button", { name: "Save Site" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Submit for Approval" })).toBeNull();
+  }, 30000);
+});
+
+describe("work location requests made before PR 4", () => {
+  it("People decide the stage waiting on them on Worksites, Temporary, Requests: the line manager first, then Operations & People", async () => {
+    await signedInAs("cynthia@mycityapp.io", <Worksites />);
+    fireEvent.click(screen.getByRole("radio", { name: "Temporary" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "Requests" }, { timeout: 5000 }));
     // Chidera's remote day waits on Cynthia as their line manager.
     fireEvent.click(await screen.findByText("WLR-0003 · Remote Day"));
     let dialog = await screen.findByRole("dialog");

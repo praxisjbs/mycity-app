@@ -26,6 +26,8 @@ const today = (over: Partial<AttendanceToday> = {}): AttendanceToday => ({
   location: { kind: "worksite", name: "Testbed Office", radius_m: 100, home_state: null },
   policy: { geofence_mode: "warn", device_mode: "off", max_accuracy_m: 100 },
   device: { state: "registered", label: "Chrome", registered_count: 1, can_register: false },
+  temporary_site: null,
+  check_ins: [],
   ...over,
 });
 const at = (iso: string) => new Date(iso);

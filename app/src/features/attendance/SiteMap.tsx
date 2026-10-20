@@ -3,7 +3,7 @@ import { loadTile, pointOf, zoomFor } from "@/features/shared/places";
 
 /**
  * A site's centre and its fence on a small map, under the coordinates of a form that sets
- * one: a worksite, a field assignment's site, a client visit's site. It shows once both
+ * one: a worksite. It shows once both
  * coordinates are real, and a tap moves the centre (to six places, about 10 cm). The map
  * never drags, so a sheet keeps its own scroll; the coordinate fields stay the way to
  * type a centre exactly.

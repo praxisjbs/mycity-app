@@ -240,16 +240,24 @@ describe("Home · Overview, by Home view", () => {
     await overviewAs("chidera@mycityapp.io");
     fireEvent.keyDown(screen.getByRole("button", { name: "New" }), { key: "Enter" });
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave"]);
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave", "Add Work Site"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Request Leave" }));
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe("/ess?tab=my-leave&action=new"));
+  }, 30000);
+
+  it("Add Work Site, beside New and in it, opens Attendance's temporary site sheet over the Overview", async () => {
+    await overviewAs("chidera@mycityapp.io");
+    fireEvent.click(screen.getByRole("button", { name: "Add Work Site" }));
+    const sheet = await screen.findByRole("dialog", { name: "Add Work Site" }, { timeout: 5000 });
+    expect(within(sheet).getByRole("button", { name: "Submit for Approval" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/home");
   }, 30000);
 
   it("offers New Rule and New Report to their capabilities' holders; New Rule opens the rule form on Alerts", async () => {
     await overviewAs("cynthia@mycityapp.io");
     fireEvent.keyDown(screen.getByRole("button", { name: "New" }), { key: "Enter" });
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave", "New Rule", "New Report"]);
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave", "Add Work Site", "New Rule", "New Report"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "New Rule" }));
     expect(await screen.findByRole("dialog", { name: "New Rule" }, { timeout: 5000 })).toBeTruthy();
     // The address asked once; it no longer does, so Back or a reload does not open the form again.

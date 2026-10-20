@@ -3139,6 +3139,9 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `placeholder` | `string` |  | A format example of at most 3 words; Search. |
 | `label` | `string` |  | Names the box for assistive technology; the placeholder otherwise. |
 | `className` | `string` |  | Layout classes only. |
+| `controls` | `string` |  | The id of the list this box narrows, when it moves through it (a searchable SelectField). |
+| `activeId` | `string` |  | The id of that list's highlighted option. |
+| `onKeyDown` | `(e: KeyboardEvent<HTMLInputElement>) => void` |  | Keys pressed in the box (the arrow keys and Enter of that list). |
 
 **FilterSelect** props (`FilterSelectProps`)
 
@@ -3195,10 +3198,10 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 
 | | |
 |---|---|
-| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
+| Use | SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
 | Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
-| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
-| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field. Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
+| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
 | Status | stable |
 | Exports | `SelectField`, `ChoiceField`, `SelectMenu` |
 | Import | `import { SelectField, ChoiceField, SelectMenu } from "@mycity/ui";` |
@@ -3223,6 +3226,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `className` | `string` |  | Layout classes only. |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default. |
+| `searchable` | `boolean` |  | A search box above the options (SelectMenu's `searchable`). |
 
 **ChoiceField** props (`ChoiceFieldProps`)
 
@@ -3257,6 +3261,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `disabled` | `boolean` |  | Shown but not usable. |
 | `name` | `string` |  | Its name in a submitted form. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default (the gallery passes its themed frame). |
+| `searchable` | `boolean` |  | A search box above the options, narrowing them as the person types: for a fixed list long enough to scroll. |
 
 ```tsx
 <SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />

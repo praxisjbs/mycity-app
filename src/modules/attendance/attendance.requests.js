@@ -1,13 +1,10 @@
 "use strict";
 /**
- * Work location requests: the one write path for asking to work somewhere else for some days,
- * and the reads behind ESS · Work Location Requests and People · Attendance's Requests
+ * Work location requests made before attendance's PR 4, which retired asking for new ones in favour
+ * of temporary sites (attendance.sites.js): the reads behind ESS · Work Location Requests and People ·
+ * Worksites' Requests, and what still applies to one waiting or in force until its last day
  * (docs/guides/attendance.md §6.11).
  *
- *   request()  the person asks. Checked (who may ask which type, the dates, the span, the
- *              overlap) under the person's lock, numbered WLR-0001, saved `submitted`, and the
- *              `attendance.location_request` approval opened in the same transaction: the line
- *              manager, then Operations & People
  *   cancel()   the person withdraws a request still waiting (the approval with it), or cancels an
  *              approved one until the day before its first day
  *   settle()   after commit, an approval's outcome is copied onto the request, at least once and
@@ -23,31 +20,12 @@ const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
-const numbering = require("../../shared/numbering/numbering");
 const { assertInScope } = require("../../shared/rbac/scope");
 const { scopeFor } = require("../../middleware/rbac");
 const lagos = require("../../shared/time/lagos");
 const engine = require("../../shared/workflow/engine");
-const calendar = require("./attendance.calendar");
 const repo = require("./attendance.repo");
-const places = require("../../shared/places/places");
-const { EVENTS, REQUEST_DEFINITION_KEY } = require("./attendance.events");
-
-/** The longest each type may run, in calendar days, and how far ahead a request may start. */
-const SPAN_DAYS = Object.freeze({ temporary_home: 90, remote_day: 5, client_visit: 14 });
-const AHEAD_DAYS = 90;
-
-/** Who may ask for which type, by work pattern (§6.11). */
-const PATTERNS = Object.freeze({
-  temporary_home: ["remote"],
-  remote_day: ["on_site", "hybrid"],
-  client_visit: ["on_site", "hybrid", "remote"],
-});
-const NOT_FOR_YOU = Object.freeze({
-  temporary_home: "Only remote staff ask for a temporary home.",
-  remote_day: "Remote staff already work remotely every day.",
-  client_visit: "Only people who work here now can ask.",
-});
+const { EVENTS } = require("./attendance.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -100,100 +78,6 @@ async function getMine(user, id) {
   const row = await repo.requestRow(pool, id, { place: true, reader: null });
   if (!row || row.employee.employee_id !== user.employee_id) throw notFound();
   return present(row);
-}
-
-/** The dates, against today in Lagos and the type's span (§6.11). */
-function checkDates(body, today) {
-  if (body.starts_on < today)
-    throw new AppError("REQUEST_IN_THE_PAST", "Pick a first day from today on", 422, { starts_on: ["Already past"] });
-  if (lagos.daysBetween(today, body.starts_on) > AHEAD_DAYS)
-    throw new AppError("REQUEST_TOO_FAR", `Pick a first day within ${AHEAD_DAYS} days`, 422, {
-      starts_on: ["Too far ahead"],
-    });
-  const days = lagos.daysBetween(body.starts_on, body.ends_on) + 1;
-  if (days > SPAN_DAYS[body.request_type])
-    throw new AppError("REQUEST_TOO_LONG", `This kind of request covers at most ${SPAN_DAYS[body.request_type]} days`, 422, {
-      ends_on: [`At most ${SPAN_DAYS[body.request_type]} days`],
-    });
-  return days;
-}
-
-/**
- * POST /attendance/me/requests.
- * @param {{user_id: string, employee_id: string}} user  the session's
- * @param {object} body  LocationRequestCreate
- */
-async function request(user, body) {
-  const employeeId = user.employee_id;
-  const today = lagos.today();
-  const days = checkDates(body, today);
-  const id = await tx(async (client) => {
-    await repo.lockEmployee(client, employeeId);
-    const person = await repo.person(client, employeeId);
-    if (!person || person.status !== "active")
-      throw new AppError("NOT_EMPLOYED", "Only people who work here now can ask.", 422);
-    if (!PATTERNS[body.request_type].includes(person.work_pattern))
-      throw new AppError("REQUEST_TYPE_NOT_ALLOWED", NOT_FOR_YOU[body.request_type], 422, {
-        request_type: ["Not for your work pattern"],
-      });
-    if (body.request_type === "temporary_home") {
-      const policy = await calendar.policyFor(client, employeeId, today);
-      if (Number(body.accuracy_m) > Number(policy.max_accuracy_m))
-        throw new AppError("HOME_READING_WEAK", "The location reading was not accurate enough.", 422, {
-          accuracy_m: ["Reading too weak"],
-        });
-    }
-    const clash = await repo.overlappingRequest(client, employeeId, body.starts_on, body.ends_on);
-    if (clash)
-      throw new AppError("REQUEST_OVERLAPS", `${clash.number} already covers one of these days`, 409, {
-        starts_on: ["Overlaps another"],
-      });
-
-    const { number } = await numbering.allocate(client, "location_request");
-    const home = body.request_type === "temporary_home";
-    const visit = body.request_type === "client_visit";
-    const row = await repo.insertRequest(client, {
-      number,
-      employee_id: employeeId,
-      request_type: body.request_type,
-      starts_on: body.starts_on,
-      ends_on: body.ends_on,
-      address: body.address ? places.lineOf(body.address) : null,
-      latitude: home ? body.home_latitude : null,
-      longitude: home ? body.home_longitude : null,
-      accuracy_m: home ? body.accuracy_m : null,
-      site_latitude: visit ? body.site_latitude : null,
-      site_longitude: visit ? body.site_longitude : null,
-      site_radius_m: visit ? body.site_radius_m : null,
-      reason: body.reason,
-      requested_by: user.user_id,
-    });
-    if (body.address) await places.save(client, "attendance_location_request.address", row.location_request_id, body.address);
-    const facts = payloadOf({ ...row, number, request_type: body.request_type }, employeeId);
-    await emit(client, {
-      key: EVENTS.LOCATION_REQUEST_SUBMITTED,
-      entity: { type: "attendance_location_request", id: row.location_request_id },
-      actor: user,
-      after: {
-        number,
-        request_type: body.request_type,
-        starts_on: body.starts_on,
-        ends_on: body.ends_on,
-        status: "submitted",
-      },
-      payload: { ...facts, employee_name: person.ref.display_name },
-    });
-    const instance = await engine.openInstance(client, {
-      definition_key: REQUEST_DEFINITION_KEY,
-      entity: { type: "attendance_location_request", id: row.location_request_id },
-      subject_employee_id: employeeId,
-      context: { days },
-      actor: user,
-    });
-    await repo.setRequestWorkflow(client, row.location_request_id, instance.workflow_instance_id);
-    return row.location_request_id;
-  });
-  return getMine(user, id);
 }
 
 /**
@@ -283,4 +167,4 @@ async function settle(id, status) {
   });
 }
 
-module.exports = { SPAN_DAYS, PATTERNS, mine, getMine, request, cancel, list, get, settle, present };
+module.exports = { mine, getMine, cancel, list, get, settle, present };

@@ -6,8 +6,9 @@ import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import { useMe } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
+import { useWorkSiteSheet } from "@/features/attendance/TemporarySites";
 import { useRouter, useSearchParams } from "@/lib/router";
-import { useScreenAction } from "@/shell/screen-action";
+import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, toast, zoneClock } from "@mycity/ui";
 import { CardRow } from "./cards";
 import { reloadsFor } from "./refresh";
@@ -26,9 +27,12 @@ import { ActivityToday, DayStrip, GoalBars, MainChart, NeedYou, Pipeline, SideDo
  * Export makes a file of the reader's own Overview, PDF or XLSX, through the reports engine
  * (POST /home/overview/export): numbered, kept in the vault, and downloaded here once it is made.
  *
+ * Add Work Site, beside New and in it (§3 step 10), opens Attendance's temporary site sheet over
+ * the Overview (`?action=work-site`, New's entry and ⌘K's): Home owns the button only.
+ *
  * Both shells come from one tree (§10.2): on a phone the cards are two to a row and the
- * sections stack in the same order; Choose Cards moves into the page menu, New into the
- * floating button's fan as well as the header, and the date line, the chart captions and
+ * sections stack in the same order; Choose Cards moves into the page menu, New and Add Work Site
+ * into the floating button's fan as well as the header, and the date line, the chart captions and
  * Export are left off. A card opens its records (./KpiDetail) as a dialog, a bottom sheet on a phone;
  * `?kpi=<key>` (the assistant's route) or `?id=<key>` (a ⌘K result) opens one straight away.
  */
@@ -159,6 +163,9 @@ export function Overview({ linked }: { linked: string | null }) {
   const first = create[0];
   // search:none the Overview's New runs another screen's own create action, which ⌘K lists with that screen
   useScreenAction(first ? { label: first.label, onSelect: () => navigate(first.href) } : null);
+  const addSite = useWorkSiteSheet();
+  useUrlAction("work-site", addSite);
+  useScreenAction(first && first.key !== "add_work_site" ? { label: "Add Work Site", icon: "pin", onSelect: addSite } : null, { second: true });
 
   /* A link straight to a card's records opens them once the Overview is in; closing them takes the link out of the address. */
   const asked = params.get("kpi") ?? linked;
@@ -187,6 +194,9 @@ export function Overview({ linked }: { linked: string | null }) {
             <DesktopOnly as="span" unmount>
               <ExportOverview />
             </DesktopOnly>
+            <Button icon="pin" onClick={addSite}>
+              Add Work Site
+            </Button>
             {create.length > 0 && (
               <Menu
                 label="New"

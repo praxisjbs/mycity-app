@@ -606,7 +606,7 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
-      expect(res.body.page.total).toBe(20);
+      expect(res.body.page.total).toBe(21);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -615,7 +615,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       const found = await as("ops").get("/settings/numbering?q=payslip");
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
-      expect(summary.body).toEqual(expect.objectContaining({ types: 20, resetting: 2 }));
+      expect(summary.body).toEqual(expect.objectContaining({ types: 21, resetting: 2 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {

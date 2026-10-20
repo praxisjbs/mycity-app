@@ -1,4 +1,4 @@
-import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow, ScheduleDay, ScheduleVersion, WorkSchedule } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, CheckIn, CheckInResult, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow, ScheduleDay, ScheduleVersion, TemporarySite, WorkSchedule } from "@mycity/contract/contract.gen.ts";
 import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, SIGN_INS, type MockPerson } from "../data/people";
@@ -171,6 +171,7 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
     attendance_exception_id: sid(`exception:${key}:${date}:${type}`),
     attendance_day_id: d.attendance_day_id,
     attendance_event_id: ev?.attendance_event_id ?? null,
+    attendance_check_in_id: null,
     employee: person(p),
     work_date: date,
     exception_type: type,
@@ -321,10 +322,16 @@ function needsHome(key: string) {
 }
 
 /** Where a person's punch is judged: their approved home when they work remotely, else their worksite. */
-type Fence = { kind: "worksite" | "home" | "temporary_home" | "field" | "client_visit"; name: string; latitude: number; longitude: number; radius_m: number | null; sites?: MockSite[] };
+type Fence = { kind: "worksite" | "home" | "temporary_home" | "field" | "client_visit" | "temporary_site"; name: string; latitude: number; longitude: number; radius_m: number | null; sites?: MockSite[] };
 function fenceOf(key: string): Fence | null {
-  // A field assignment covering today decides the place before anything (§6.12), then an approved
-  // work location request (§6.11).
+  // An approved temporary site covering today decides the place before anything (§6.11), then a
+  // field assignment or an approved work location request made before PR 4.
+  const ts = siteOn(key, todayIso());
+  if (ts) {
+    const home = ts.purpose === "temporary_home";
+    const sites = ts.locations.map((l) => ({ id: l.id, name: nameOfAddress(ts, l), address: l.address, latitude: l.latitude, longitude: l.longitude, radius_m: l.radius_m }));
+    return { kind: home ? "temporary_home" : "temporary_site", name: home ? "Temporary Home" : ts.name, latitude: sites[0].latitude, longitude: sites[0].longitude, radius_m: sites.length === 1 ? sites[0].radius_m : null, sites };
+  }
   const fa = fieldOn(key, todayIso());
   if (fa) return { kind: "field", name: fa.sites.map((x) => x.name).join(" or "), latitude: fa.sites[0].latitude, longitude: fa.sites[0].longitude, radius_m: fa.sites.length === 1 ? fa.sites[0].radius_m : null, sites: fa.sites };
   const r = approvedReqOn(key, todayIso());
@@ -346,7 +353,7 @@ function fenceOf(key: string): Fence | null {
 
 /** Today's approved remote day or client visit with no fence: the approval is the check. */
 function approvedDayOf(key: string): { name: string } | null {
-  if (fieldOn(key, todayIso())) return null;
+  if (siteOn(key, todayIso()) || fieldOn(key, todayIso())) return null;
   const r = approvedReqOn(key, todayIso());
   if (!r || r.request_type === "temporary_home" || (r.request_type === "client_visit" && r.site_latitude !== null) || (r.request_type === "remote_day" && homeOf(key, "approved"))) return null;
   return { name: r.request_type === "remote_day" ? "Remote Day" : "Client Visit" };
@@ -473,6 +480,8 @@ export function todayOf(key: string): AttendanceToday {
         : { kind: fromHome ? "remote" : "none", name: null, radius_m: null, home_state: homeState },
     policy: POLICY_MODES,
     device: { state: dev.status, label: dev.label, registered_count: count, can_register: dev.status !== "registered" && count < MAX_REGISTERED },
+    temporary_site: todaySite(key, date),
+    check_ins: siteOn(key, date) ? checkInsOn(key, date) : [],
   };
 }
 
@@ -543,7 +552,7 @@ route("POST /api/v1/attendance/punches", (req) => {
   const now = new Date().toISOString();
   const fence = fenceOf(key);
   const reading = b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
-  // On a field assignment's day, the site the reading is nearest judges it (§6.12).
+  // On a temporary site's or a field assignment's day, the address the reading is nearest judges it (§6.11).
   const nearest = fence?.sites && reading
     ? [...fence.sites].sort((x, y) => {
         const dx = distanceM(reading, x), dy = distanceM(reading, y);
@@ -571,7 +580,7 @@ route("POST /api/v1/attendance/punches", (req) => {
   let fenceResult: PunchState = "accepted";
   if (mode !== "off" && geofence === "outside") {
     fenceResult = mode === "block" ? "rejected" : "review";
-    reasons.push(site?.kind === "worksite" || site?.kind === "field" || site?.kind === "client_visit" ? "outside_worksite" : "outside_home");
+    reasons.push(site?.kind === "worksite" || site?.kind === "field" || site?.kind === "client_visit" || site?.kind === "temporary_site" ? "outside_worksite" : "outside_home");
   } else if (mode !== "off" && geofence === "unverified") {
     fenceResult = "review";
     reasons.push("location_unverified");
@@ -926,7 +935,8 @@ route("GET /api/v1/attendance/records/:id", (req) => {
 });
 
 /* ------------------------------------------------------------------ *
- * Work location requests (docs/guides/attendance.md §6.11)
+ * Work location requests made before PR 4 (docs/guides/attendance.md §6.11): read, cancelled and
+ * decided, never made
  * ------------------------------------------------------------------ */
 type ReqType = LocationRequest["request_type"];
 type MockReq = {
@@ -938,8 +948,6 @@ type MockReq = {
   trail: Array<{ stage: Stage; decision: "approve" | "reject" | "cancel"; by: string; reason: string | null; at: string }>;
 };
 type Stage = "line_manager" | "operations_people";
-const SPAN: Record<ReqType, number> = { temporary_home: 90, remote_day: 5, client_visit: 14 };
-const MAY_ASK: Record<ReqType, string[]> = { temporary_home: ["remote"], remote_day: ["on_site", "hybrid"], client_visit: ["on_site", "hybrid", "remote"] };
 const STAGE_NAME = { line_manager: "Line Manager", operations_people: "Operations & People" } as const;
 const LOC_REQS: MockReq[] = [];
 let reqSeq = 0;
@@ -993,47 +1001,6 @@ route("GET /api/v1/attendance/me/requests/:id", (req) => {
   const r = LOC_REQS.find((x) => x.id === req.params.id && x.key === req.user);
   return r ? ok(reqOut(r, req.user!, true)) : notFound();
 });
-route("POST /api/v1/attendance/me/requests", (req) => {
-  const key = req.user!;
-  const b = req.body as {
-    request_type: ReqType; starts_on: string; ends_on: string; address?: unknown; reason: string; home_latitude?: number | null; home_longitude?: number | null; accuracy_m?: number | null;
-    site_latitude?: number | null; site_longitude?: number | null; site_radius_m?: number | null;
-  };
-  const fields: Record<string, string[]> = {};
-  if (!b.starts_on) fields.starts_on = ["Pick the first day"];
-  if (!b.ends_on) fields.ends_on = ["Pick the last day"];
-  if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) fields.ends_on = ["Ends before it starts"];
-  // Picked, pinned or the device's location (F27): never typed.
-  const place = b.address === undefined ? null : placeOf(b.address);
-  if (b.address !== undefined && !place) fields.address = ["Pick an address"];
-  else if (b.request_type !== "remote_day" && !place) fields.address = ["Pick an address"];
-  if (!b.reason || b.reason.trim().length < 10) fields.reason = ["At least 10 characters"];
-  if (b.request_type === "temporary_home" && typeof b.home_latitude !== "number") fields.home_latitude = ["Take a reading there"];
-  if (b.request_type === "client_visit") {
-    if (typeof b.site_latitude !== "number") fields.site_latitude = ["Enter the latitude"];
-    if (typeof b.site_longitude !== "number") fields.site_longitude = ["Enter the longitude"];
-    if (typeof b.site_radius_m !== "number") fields.site_radius_m = ["Enter the radius"];
-    else if (b.site_radius_m < 100 || b.site_radius_m > 500) fields.site_radius_m = [b.site_radius_m < 100 ? "At least 100 m" : "At most 500 m"];
-  }
-  if (Object.keys(fields).length) return invalid(fields);
-  if (!MAY_ASK[b.request_type].includes(byKey(key)!.work_pattern)) return fail(422, "REQUEST_TYPE_NOT_ALLOWED", b.request_type === "remote_day" ? "Remote staff already work remotely every day." : "Only remote staff ask for a temporary home.", { request_type: ["Not for your work pattern"] });
-  const today = todayIso();
-  if (b.starts_on < today) return fail(422, "REQUEST_IN_THE_PAST", "Pick a first day from today on", { starts_on: ["Already past"] });
-  const days = Math.round((Date.parse(`${b.ends_on}T12:00:00Z`) - Date.parse(`${b.starts_on}T12:00:00Z`)) / 86400_000) + 1;
-  if (days > SPAN[b.request_type]) return fail(422, "REQUEST_TOO_LONG", `This kind of request covers at most ${SPAN[b.request_type]} days`, { ends_on: [`At most ${SPAN[b.request_type]} days`] });
-  if (b.request_type === "temporary_home" && (b.accuracy_m ?? 0) > POLICY_MODES.max_accuracy_m) return fail(422, "HOME_READING_WEAK", "The location reading was not accurate enough.", { accuracy_m: ["Reading too weak"] });
-  const clash = LOC_REQS.find((r) => r.key === key && ["submitted", "approved"].includes(r.status) && r.starts_on <= b.ends_on && r.ends_on >= b.starts_on);
-  if (clash) return fail(409, "REQUEST_OVERLAPS", `${clash.number} already covers one of these days`, { starts_on: ["Overlaps another"] });
-  const home = b.request_type === "temporary_home";
-  const visit = b.request_type === "client_visit";
-  const r = addReq({
-    key, request_type: b.request_type, starts_on: b.starts_on, ends_on: b.ends_on, address: place?.line ?? null,
-    latitude: home ? b.home_latitude! : null, longitude: home ? b.home_longitude! : null, accuracy_m: home ? b.accuracy_m! : null,
-    site_latitude: visit ? b.site_latitude! : null, site_longitude: visit ? b.site_longitude! : null, site_radius_m: visit ? b.site_radius_m! : null,
-    reason: b.reason.trim(), status: "submitted", stage: "line_manager", requested_at: new Date().toISOString(),
-  });
-  return created(reqOut(r, key, true));
-});
 route("POST /api/v1/attendance/me/requests/:id/cancel", (req) => {
   const r = LOC_REQS.find((x) => x.id === req.params.id && x.key === req.user);
   if (!r) return notFound();
@@ -1063,10 +1030,12 @@ route("GET /api/v1/attendance/requests/:id", (req) => {
 });
 
 /**
- * The approval's own routes (POST /workflow/instances/:id/approve|reject) for a work location
- * request: the leave mock answers them and passes on an id that is not a leave approval.
+ * The approval's own routes (POST /workflow/instances/:id/approve|reject) for a temporary site or a
+ * work location request: the leave mock answers them and passes on an id that is not a leave approval.
  */
 export function decideLocationRequest(user: string, wid: string, approve: boolean, reason?: string | null) {
+  const site = decideTemp(user, wid, approve, reason);
+  if (site) return site;
   const r = LOC_REQS.find((x) => x.wid === wid);
   if (!r || r.status !== "submitted") return null;
   if (!canDecideReq(r, user)) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
@@ -1080,9 +1049,9 @@ export function decideLocationRequest(user: string, wid: string, approve: boolea
   return ok({ workflow_instance_id: wid, state: r.status, stage_name: null });
 }
 
-/** The requests whose stage waits on this login, for GET /workflow/mine (Home's Need You). */
+/** The sites and requests whose stage waits on this login, for GET /workflow/mine (Home's Need You). */
 export function locationRequestsWaitingOn(user: string): ApprovalWaiting[] {
-  return LOC_REQS.filter((r) => canDecideReq(r, user)).map((r) => {
+  return tempWaitingOn(user).concat(LOC_REQS.filter((r) => canDecideReq(r, user)).map((r) => {
     const who = byKey(r.key)!;
     const entered = r.trail[r.trail.length - 1]?.at ?? r.requested_at;
     const due = new Date(Date.parse(entered) + 48 * 3600_000).toISOString();
@@ -1090,19 +1059,20 @@ export function locationRequestsWaitingOn(user: string): ApprovalWaiting[] {
       workflow_instance_id: r.wid, definition_key: "attendance.location_request", definition_name: "Work Location Request", module_key: "people",
       entity_type: "attendance_location_request", entity_id: r.id, subject_employee_id: who.employee_id, subject_name: who.display_name,
       current_stage: r.stage!, stage_name: STAGE_NAME[r.stage!], context: { days: reqOut(r, user, false).days }, stage_entered_at: entered, stage_due_at: due,
-      overdue: Date.parse(due) < Date.now(), opened_by: null, opened_by_name: who.display_name, opened_at: r.requested_at, link: `/people?tab=attendance&request=${r.id}`,
+      overdue: Date.parse(due) < Date.now(), opened_by: null, opened_by_name: who.display_name, opened_at: r.requested_at, link: `/people?tab=worksites&request=${r.id}`,
     };
-  });
+  }));
 }
 
 const STAGES: Stage[] = ["line_manager", "operations_people"];
 const STATE_OF: Record<MockReq["status"], ApprovalInstance["state"]> = { submitted: "pending", approved: "approved", rejected: "rejected", cancelled: "cancelled" };
 
 /**
- * GET /workflow/instances/:id for a work location request: its route and its moves, read by the
- * person it is about and by those who decide it; the leave mock passes on any other id.
+ * GET /workflow/instances/:id for a temporary site or a work location request: its route and its
+ * moves, read by the people it is about and by those who decide it; the leave mock passes on any other id.
  */
 export function locationRequestInstance(user: string, wid: string): ApprovalInstance | null {
+  if (TEMP.some((x) => x.wid === wid)) return tempInstance(user, wid);
   const r = LOC_REQS.find((x) => x.wid === wid);
   const view = SIGN_INS[user]?.view;
   if (!r || !(r.key === user || lineManagerOf(r.key) === user || view === "operations" || view === "ceo")) return null;
@@ -1134,7 +1104,8 @@ export function locationRequestInstance(user: string, wid: string): ApprovalInst
 }
 
 /* ------------------------------------------------------------------ *
- * Field assignments (docs/guides/attendance.md §6.12)
+ * Field assignments made before PR 4 (docs/guides/attendance.md §6.12): read, cancelled and
+ * changed, never made
  * ------------------------------------------------------------------ */
 type MockSite = { id: string; name: string; address: string | null; latitude: number; longitude: number; radius_m: number };
 type MockField = {
@@ -1212,42 +1183,6 @@ route("GET /api/v1/attendance/field-assignments/:id", (req) => {
   const f = FIELD.find((x) => x.id === req.params.id);
   return f && f.members.some((m) => g.sees(m.key)) ? ok(fieldOut(f, req.user!)) : notFound();
 });
-route("POST /api/v1/attendance/field-assignments", (req) => {
-  const user = req.user!;
-  const g = peopleGrant(user, "approve");
-  if (!g.may) return fail(403, "PERMISSION_DENIED", "You need people approve to send people out.");
-  const b = req.body as { name: string; client: string; note?: string; starts_on: string; ends_on: string; employee_ids: string[]; sites: Array<Omit<MockSite, "id" | "address"> & { address?: unknown }> };
-  const fields: Record<string, string[]> = {};
-  if (!b.name || b.name.trim().length < 3) fields.name = ["At least 3 characters"];
-  if (!b.client || b.client.trim().length < 2) fields.client = ["At least 2 characters"];
-  if (!b.starts_on) fields.starts_on = ["Pick the first day"];
-  if (!b.ends_on) fields.ends_on = ["Pick the last day"];
-  if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) fields.ends_on = ["Ends before it starts"];
-  if (!b.employee_ids?.length) fields.employee_ids = ["Pick someone"];
-  if (!b.sites?.length) fields.sites = ["Add a site"];
-  // Each site's address, when given, is picked or pinned (F27): never typed.
-  const placesAt = (b.sites ?? []).map((x) => (x.address === undefined ? null : placeOf(x.address)));
-  (b.sites ?? []).forEach((x, i) => {
-    if (x.address !== undefined && !placesAt[i]) fields[`sites.${i}.address`] = ["Pick an address"];
-  });
-  if (Object.keys(fields).length) return invalid(fields);
-  const keys = b.employee_ids.map((id) => byId(id)?.user_key).filter((k): k is string => !!k);
-  if (keys.includes(user)) return fail(403, "OWN_RECORD", "Someone else sends you out", { employee_ids: ["Not yourself"] });
-  if (!keys.every((k) => g.sees(k))) return fail(403, "FORBIDDEN", "You can only send out people in your team", { employee_ids: ["Outside your team"] });
-  if (b.starts_on < todayIso()) return fail(422, "ASSIGNMENT_IN_THE_PAST", "Pick a first day from today on", { starts_on: ["Already past"] });
-  const days = Math.round((Date.parse(`${b.ends_on}T12:00:00Z`) - Date.parse(`${b.starts_on}T12:00:00Z`)) / 86400_000) + 1;
-  if (days > 31) return fail(422, "ASSIGNMENT_TOO_LONG", "A field assignment covers at most 31 days", { ends_on: ["At most 31 days"] });
-  const clash = FIELD.find((f) => f.status === "active" && f.starts_on <= b.ends_on && f.ends_on >= b.starts_on && keys.some((k) => onIt(f, k)));
-  if (clash) {
-    const who = keys.find((k) => onIt(clash, k))!;
-    return fail(409, "ASSIGNMENT_OVERLAPS", `${byKey(who)!.display_name} is already on ${clash.number}`, { starts_on: ["Overlaps another"] });
-  }
-  const f = addField({
-    keys, name: b.name.trim(), client: b.client.trim(), note: b.note?.trim() || null, starts_on: b.starts_on, ends_on: b.ends_on, by: user, assigned_at: new Date().toISOString(),
-    sites: b.sites.map((x, i) => ({ id: sid(`fa-site:${fieldSeq + 1}:${i + 1}`), name: x.name.trim(), address: placesAt[i]?.line ?? null, latitude: x.latitude, longitude: x.longitude, radius_m: x.radius_m })),
-  });
-  return created(fieldOut(f, user));
-});
 /** Cancel or take someone off: the same grant over everyone still on it, while it runs. */
 function changeable(user: string, id: string) {
   const g = peopleGrant(user, "approve");
@@ -1279,6 +1214,325 @@ route("POST /api/v1/attendance/field-assignments/:id/remove", (req) => {
   if (f.members.filter((x) => !x.removed_at).length === 1) return fail(409, "ASSIGNMENT_LAST_PERSON", "Cancel the field assignment instead");
   Object.assign(m, { removed_at: new Date().toISOString(), removed_reason: reason });
   return ok(fieldOut(f, req.user!));
+});
+
+/* ------------------------------------------------------------------ *
+ * Temporary sites (docs/guides/attendance.md §6.11) and check-ins (§6.12)
+ * ------------------------------------------------------------------ */
+type Purpose = TemporarySite["purpose"];
+type MockLoc = { id: string; position: number; name: string | null; address: string; latitude: number; longitude: number; radius_m: number; timezone: string };
+type MockTemp = {
+  id: string; number: string; purpose: Purpose; name: string; description: string; starts_on: string; ends_on: string; status: TemporarySite["status"];
+  locations: MockLoc[]; by: string; submitted_at: string; wid: string | null; approved_at: string | null; approved_by: string | null;
+  cancelled_at: string | null; cancel_reason: string | null;
+  members: Array<{ key: string; added_at: string; removed_at: string | null; removed_reason: string | null }>;
+  /** The moves on its approval, oldest first. */
+  trail: Array<{ decision: "approve" | "reject" | "cancel"; by: string; reason: string | null; at: string }>;
+};
+const TEMP: MockTemp[] = [];
+let tempSeq = 0;
+const spanOf = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400_000) + 1;
+const loc = (n: number, name: string | null, address: string, latitude: number, longitude: number, radius_m: number, timezone = TZ): MockLoc => ({
+  id: sid(`ts-loc:${tempSeq + 1}:${n}`), position: n, name, address, latitude, longitude, radius_m, timezone,
+});
+const addTemp = (t: Omit<MockTemp, "id" | "number" | "wid" | "members" | "trail" | "approved_at" | "approved_by" | "cancelled_at" | "cancel_reason"> & Partial<MockTemp> & { keys: string[] }) => {
+  tempSeq += 1;
+  const { keys, ...rest } = t;
+  const row: MockTemp = {
+    id: sid(`ts:${tempSeq}`), number: `TS-${String(tempSeq).padStart(4, "0")}`, wid: t.by === "cynthia" && t.status === "approved" ? null : sid(`ts-flow:${tempSeq}`),
+    approved_at: null, approved_by: null, cancelled_at: null, cancel_reason: null, trail: [],
+    members: keys.map((key) => ({ key, added_at: t.submitted_at, removed_at: null, removed_reason: null })), ...rest,
+  };
+  TEMP.unshift(row);
+  return row;
+};
+/** Invented sites for the demonstration: one in progress, one waiting abroad, one to come, a Temporary Home, one done. */
+(() => {
+  addTemp({ keys: ["bashir", "tolu"], by: "bashir", purpose: "training_attending", name: "Partner Training Week", description: "Three days of partner training at their offices; the out-of-station letter is on file.", starts_on: isoDaysAgo(1), ends_on: isoDaysAhead(1), status: "approved", submitted_at: at(5, "10:00"), approved_at: at(4, "09:30"), approved_by: "cynthia", trail: [{ decision: "approve", by: "cynthia", reason: null, at: at(4, "09:30") }], locations: [loc(1, "Hall", "Partner Hall, 1 Example Road, Victoria Island", 6.4281, 3.4219, 200), loc(2, "Annex", "Partner Annex, 9 Example Road, Victoria Island", 6.43, 3.425, 150)] });
+  addTemp({ keys: ["kemi", "obinna"], by: "kemi", purpose: "out_of_station", name: "Gaborone Partner Training", description: "A week training a partner's team in Gaborone; travel and the out-of-station letter are approved.", starts_on: isoDaysAhead(10), ends_on: isoDaysAhead(14), status: "submitted", submitted_at: at(1, "14:10"), locations: [loc(1, "Venue", "Main Mall, Sample Plot 1, Gaborone", -24.6545, 25.9086, 300, "Africa/Gaborone")] });
+  addTemp({ keys: ["grace"], by: "cynthia", purpose: "exhibition", name: "Expo Stand", description: "Staffing our stand at the trade fair for the whole of the second day.", starts_on: isoDaysAhead(6), ends_on: isoDaysAhead(6), status: "approved", submitted_at: at(2, "11:00"), approved_at: at(2, "11:00"), approved_by: "cynthia", locations: [loc(1, null, "Expo Hall, 3 Fixture Road, Ikoyi", 6.4549, 3.4246, 250)] });
+  addTemp({ keys: ["tolu"], by: "tolu", purpose: "temporary_home", name: "Ibadan Stay", description: "Working from my family's home in Ibadan while my flat is repaired after the flood.", starts_on: isoDaysAhead(20), ends_on: isoDaysAhead(27), status: "submitted", submitted_at: at(0, "08:20"), locations: [loc(1, null, "Flat 2, 7 Sample Street, Bodija, Ibadan", 7.4352, 3.9133, 150)] });
+  addTemp({ keys: ["seyi"], by: "seyi", purpose: "client_visit", name: "Client Setup", description: "Setting up a client's new office network over two days on their site.", starts_on: isoDaysAgo(12), ends_on: isoDaysAgo(11), status: "approved", submitted_at: at(16, "09:00"), approved_at: at(15, "10:00"), approved_by: "cynthia", trail: [{ decision: "approve", by: "cynthia", reason: null, at: at(15, "10:00") }], locations: [loc(1, null, "Client office, 22 Placeholder Avenue, Lekki", 6.4474, 3.4723, 200)] });
+})();
+
+const onSite = (t: MockTemp, key: string) => t.members.some((m) => m.key === key && !m.removed_at);
+/** The approved site a person is still on, covering a day (one a day). */
+const siteOn = (key: string, date: string) => TEMP.find((t) => t.status === "approved" && t.starts_on <= date && t.ends_on >= date && onSite(t, key)) ?? null;
+/** An address's name on the punch and the check-in: Temporary Home, the site's name, or the site and the address's label. */
+const nameOfAddress = (t: MockTemp, l: MockLoc) => (t.purpose === "temporary_home" ? "Temporary Home" : t.locations.length === 1 ? t.name : `${t.name}, ${l.name ?? `Address ${l.position}`}`);
+const tempState = (t: MockTemp): TemporarySite["state"] => {
+  const today = todayIso();
+  if (t.status !== "approved") return t.status;
+  return t.starts_on > today ? "upcoming" : t.ends_on < today ? "done" : "in_progress";
+};
+/** Operations & People decide it, never someone on it; as on the API, the CEO is not waited on. */
+const canDecideTemp = (t: MockTemp, user: string) => t.status === "submitted" && !onSite(t, user) && SIGN_INS[user]?.view === "operations";
+const canChangeTemp = (t: MockTemp, user: string) => {
+  const g = peopleGrant(user, "approve");
+  return g.may && g.all && ["submitted", "approved"].includes(t.status) && t.ends_on >= todayIso() && !onSite(t, user);
+};
+const tempOut = (t: MockTemp, user: string): TemporarySite => {
+  const home = t.purpose === "temporary_home";
+  const g = peopleGrant(user, "view");
+  // A Temporary Home's line and point: its people, its submitter and scope all only.
+  const place = !home || t.members.some((m) => m.key === user) || t.by === user || g.all;
+  return {
+    temporary_site_id: t.id, number: t.number, purpose: t.purpose, name: t.name, description: t.description, starts_on: t.starts_on, ends_on: t.ends_on,
+    days: spanOf(t.starts_on, t.ends_on), status: t.status, state: tempState(t),
+    locations: t.locations.map((l) => ({
+      temporary_site_location_id: l.id, position: l.position, name: l.name, radius_m: l.radius_m, timezone: l.timezone,
+      address: home ? null : l.address, latitude: home ? null : l.latitude, longitude: home ? null : l.longitude,
+      home_address: home && place ? l.address : null, home_latitude: home && place ? l.latitude : null, home_longitude: home && place ? l.longitude : null,
+    })),
+    members: [...t.members].sort((a, b) => Number(!!a.removed_at) - Number(!!b.removed_at)).map((m) => ({ employee: person(byKey(m.key)!), added_at: m.added_at, removed_at: m.removed_at, removed_reason: m.removed_reason })),
+    people: t.members.filter((m) => !m.removed_at).length,
+    submitted_by_name: byKey(t.by)?.display_name ?? null, submitted_at: t.submitted_at, workflow_instance_id: t.wid,
+    waiting_on: t.status === "submitted" ? "Operations & People" : null,
+    approved_at: t.approved_at, approved_by_name: t.approved_by ? (byKey(t.approved_by)?.display_name ?? null) : null,
+    cancelled_at: t.cancelled_at, cancel_reason: t.cancel_reason,
+    can_decide: canDecideTemp(t, user), can_change: canChangeTemp(t, user), can_withdraw: t.status === "submitted" && t.by === user,
+  };
+};
+const TEMP_ORDER: Record<TemporarySite["state"], number> = { submitted: 0, in_progress: 1, upcoming: 2, done: 3, rejected: 4, withdrawn: 4, cancelled: 4 };
+const tempFirst = (a: TemporarySite, b: TemporarySite) => TEMP_ORDER[a.state] - TEMP_ORDER[b.state] || (TEMP_ORDER[a.state] >= 3 ? b.ends_on.localeCompare(a.ends_on) : a.starts_on.localeCompare(b.starts_on));
+const tempPage = (rows: TemporarySite[], req: Parameters<typeof paged>[1]) =>
+  paged(rows, req, {
+    search: (r) => [r.number, r.name, ...r.members.map((m) => m.employee.display_name)],
+    filters: { state: (r, v) => r.state === v, status: (r, v) => r.status === v, purpose: (r, v) => r.purpose === v, employee_id: (r, v) => r.members.some((m) => m.employee.employee_id === v) },
+    sort: { current: tempFirst, starts_on: (a, b) => a.starts_on.localeCompare(b.starts_on) },
+  });
+
+/** The day's site on the clock panel: no coordinates. */
+function todaySite(key: string, date: string): AttendanceToday["temporary_site"] {
+  const t = siteOn(key, date);
+  return t && { temporary_site_id: t.id, number: t.number, name: t.name, purpose: t.purpose, locations: t.locations.map((l) => ({ temporary_site_location_id: l.id, position: l.position, name: l.name, address: t.purpose === "temporary_home" ? null : l.address, radius_m: l.radius_m })) };
+}
+
+/** Add Work Site and Add Temporary Site: the contract's checks the API makes, then the site. */
+function createTemp(user: string, body: unknown, direct: boolean) {
+  const b = body as { purpose?: Purpose; name?: string; description?: string; starts_on?: string; ends_on?: string; locations?: Array<{ address?: unknown; name?: string; radius_m?: number }>; employee_ids?: string[] };
+  const fields: Record<string, string[]> = {};
+  if (!b.purpose) fields.purpose = ["Choose one"];
+  if (!b.name || b.name.trim().length < 3) fields.name = ["At least 3 characters"];
+  if (!b.description || b.description.trim().length < 30) fields.description = ["At least 30 characters"];
+  if (!b.starts_on) fields.starts_on = ["Required"];
+  if (!b.ends_on) fields.ends_on = ["Required"];
+  if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) fields.ends_on = ["Ends before it starts"];
+  else if (b.starts_on && b.ends_on && spanOf(b.starts_on, b.ends_on) > 90) fields.ends_on = ["At most 90 days"];
+  if (!b.employee_ids?.length) fields.employee_ids = ["Pick someone"];
+  const locs = b.locations ?? [];
+  if (!locs.length) fields.locations = ["Add an address"];
+  if (b.purpose === "temporary_home" && locs.length > 1) fields.locations = ["One address only"];
+  // Each address is picked or pinned (F27): never typed, and it must carry a point.
+  const picked = locs.map((x) => (x.address === undefined ? null : placeOf(x.address)));
+  locs.forEach((x, i) => {
+    if (!picked[i] || picked[i]!.view.lat === null) fields[`locations.${i}.address`] = ["Pick an address"];
+    if (typeof x.radius_m !== "number" || x.radius_m < 150 || x.radius_m > 500) fields[`locations.${i}.radius_m`] = [typeof x.radius_m === "number" && x.radius_m > 500 ? "At most 500 m" : "At least 150 m"];
+  });
+  if (Object.keys(fields).length) return invalid(fields);
+  const today = todayIso();
+  if (b.starts_on! < today) return fail(422, "SITE_IN_THE_PAST", "Pick a first day from today on", { starts_on: ["Already past"] });
+  if (b.starts_on! > isoDaysAhead(90)) return fail(422, "SITE_TOO_FAR", "Pick a first day within 90 days", { starts_on: ["Too far ahead"] });
+  const keys = b.employee_ids!.map((id) => byId(id)?.user_key).filter((k): k is string => !!k);
+  if (direct && keys.includes(user)) return fail(403, "OWN_RECORD", "Add a site you are on from Home, for approval", { employee_ids: ["Not yourself"] });
+  const clash = TEMP.find((t) => ["submitted", "approved"].includes(t.status) && t.starts_on <= b.ends_on! && t.ends_on >= b.starts_on! && keys.some((k) => onSite(t, k)));
+  if (clash) {
+    const who = keys.find((k) => onSite(clash, k))!;
+    return fail(409, "SITE_OVERLAPS", `${byKey(who)!.display_name} is already on ${clash.number}`, { starts_on: ["Overlaps another site"] });
+  }
+  const now = new Date().toISOString();
+  const t = addTemp({
+    keys, by: user, purpose: b.purpose!, name: b.name!.trim(), description: b.description!.trim(), starts_on: b.starts_on!, ends_on: b.ends_on!,
+    status: direct ? "approved" : "submitted", submitted_at: now, ...(direct && { approved_at: now, approved_by: user }),
+    locations: locs.map((x, i) => loc(i + 1, x.name?.trim() || null, picked[i]!.line, picked[i]!.view.lat!, picked[i]!.view.lon!, x.radius_m!)),
+  });
+  if (direct) t.wid = null;
+  return created(tempOut(t, user));
+}
+
+route("GET /api/v1/attendance/me/temporary-sites", (req) => tempPage(TEMP.filter((t) => t.by === req.user || t.members.some((m) => m.key === req.user)).map((t) => tempOut(t, req.user!)), req));
+route("GET /api/v1/attendance/me/temporary-sites/:id", (req) => {
+  const t = TEMP.find((x) => x.id === req.params.id && (x.by === req.user || x.members.some((m) => m.key === req.user)));
+  return t ? ok(tempOut(t, req.user!)) : notFound();
+});
+route("POST /api/v1/attendance/me/temporary-sites", (req) => createTemp(req.user!, req.body, false));
+route("POST /api/v1/attendance/me/temporary-sites/:id/withdraw", (req) => {
+  const t = TEMP.find((x) => x.id === req.params.id && x.by === req.user);
+  if (!t) return notFound();
+  const reason = String((req.body as { reason?: string }).reason ?? "").trim();
+  if (reason.length < 10) return invalid({ reason: ["At least 10 characters"] });
+  if (t.status !== "submitted") return fail(409, "SITE_NOT_WAITING", "This site no longer waits on approval");
+  t.trail.push({ decision: "cancel", by: req.user!, reason, at: new Date().toISOString() });
+  Object.assign(t, { status: "withdrawn", cancelled_at: new Date().toISOString(), cancel_reason: reason });
+  return ok(tempOut(t, req.user!));
+});
+route("GET /api/v1/attendance/temporary-sites", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  return tempPage(TEMP.filter((t) => t.members.some((m) => g.sees(m.key))).map((t) => tempOut(t, req.user!)), req);
+});
+route("GET /api/v1/attendance/temporary-sites/:id", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  const t = TEMP.find((x) => x.id === req.params.id);
+  return t && t.members.some((m) => g.sees(m.key)) ? ok(tempOut(t, req.user!)) : notFound();
+});
+route("POST /api/v1/attendance/temporary-sites", (req) => {
+  const g = peopleGrant(req.user!, "approve");
+  if (!g.may) return fail(403, "PERMISSION_DENIED", "You need people approve to add a temporary site.");
+  if (!g.all) return fail(403, "FORBIDDEN", "Only People with access to everyone add one directly");
+  return createTemp(req.user!, req.body, true);
+});
+/** Cancel or take someone off: People with access to everyone, never on it, until its last day. */
+function changeableTemp(user: string, id: string) {
+  const g = peopleGrant(user, "approve");
+  const t = TEMP.find((x) => x.id === id);
+  if (!g.may || !g.all) return { error: fail(403, "FORBIDDEN", "Only People with access to everyone change temporary sites") };
+  if (!t) return { error: notFound() };
+  if (onSite(t, user)) return { error: fail(403, "OWN_RECORD", "Someone else changes a site you are on") };
+  if (t.ends_on < todayIso()) return { error: fail(409, "SITE_ENDED", "This temporary site has ended") };
+  return { t };
+}
+route("POST /api/v1/attendance/temporary-sites/:id/cancel", (req) => {
+  const reason = String((req.body as { reason?: string }).reason ?? "").trim();
+  if (reason.length < 10) return invalid({ reason: ["At least 10 characters"] });
+  const { t, error } = changeableTemp(req.user!, req.params.id);
+  if (!t) return error;
+  if (t.status !== "approved") return fail(409, "SITE_NOT_APPROVED", "Only an approved site is cancelled; decide a waiting one");
+  Object.assign(t, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: reason });
+  return ok(tempOut(t, req.user!));
+});
+route("POST /api/v1/attendance/temporary-sites/:id/remove", (req) => {
+  const b = req.body as { employee_id: string; reason?: string };
+  const reason = String(b.reason ?? "").trim();
+  if (reason.length < 10) return invalid({ reason: ["At least 10 characters"] });
+  const { t, error } = changeableTemp(req.user!, req.params.id);
+  if (!t) return error;
+  if (!["submitted", "approved"].includes(t.status)) return fail(409, "SITE_CLOSED", "This temporary site is closed");
+  const m = t.members.find((x) => byKey(x.key)?.employee_id === b.employee_id && !x.removed_at);
+  if (!m) return fail(409, "NOT_ON_SITE", "That person is not on this site", { employee_id: ["Not on it"] });
+  if (t.members.filter((x) => !x.removed_at).length === 1) return fail(409, "SITE_LAST_PERSON", "Cancel the site instead");
+  Object.assign(m, { removed_at: new Date().toISOString(), removed_reason: reason });
+  return ok(tempOut(t, req.user!));
+});
+
+/** A site's approval, decided by the approval's own routes (organisation's mock passes the id on). */
+function decideTemp(user: string, wid: string, approve: boolean, reason?: string | null) {
+  const t = TEMP.find((x) => x.wid === wid);
+  if (!t || t.status !== "submitted") return null;
+  if (!canDecideTemp(t, user)) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  if (!approve && !String(reason ?? "").trim()) return invalid({ reason: ["is required"] });
+  const now = new Date().toISOString();
+  t.trail.push({ decision: approve ? "approve" : "reject", by: user, reason: String(reason ?? "").trim() || null, at: now });
+  Object.assign(t, approve ? { status: "approved", approved_at: now, approved_by: user } : { status: "rejected", cancelled_at: now, cancel_reason: String(reason).trim() });
+  return ok({ workflow_instance_id: wid, state: t.status, stage_name: null });
+}
+const tempWaitingOn = (user: string): ApprovalWaiting[] =>
+  TEMP.filter((t) => canDecideTemp(t, user)).map((t) => {
+    const who = byKey(t.by)!;
+    const due = new Date(Date.parse(t.submitted_at) + 48 * 3600_000).toISOString();
+    return {
+      workflow_instance_id: t.wid!, definition_key: "attendance.temporary_site", definition_name: "Temporary Site", module_key: "people",
+      entity_type: "attendance_temporary_site", entity_id: t.id, subject_employee_id: who.employee_id, subject_name: who.display_name,
+      current_stage: "operations_people", stage_name: "Operations & People", context: { days: spanOf(t.starts_on, t.ends_on) }, stage_entered_at: t.submitted_at, stage_due_at: due,
+      overdue: Date.parse(due) < Date.now(), opened_by: null, opened_by_name: who.display_name, opened_at: t.submitted_at, link: `/people?tab=worksites&site=${t.id}`,
+    };
+  });
+const TEMP_FLOW: Record<MockTemp["status"], ApprovalInstance["state"]> = { submitted: "pending", approved: "approved", rejected: "rejected", withdrawn: "cancelled", cancelled: "approved" };
+function tempInstance(user: string, wid: string): ApprovalInstance | null {
+  const t = TEMP.find((x) => x.wid === wid);
+  const view = SIGN_INS[user]?.view;
+  if (!t || !(t.by === user || t.members.some((m) => m.key === user) || view === "operations" || view === "ceo")) return null;
+  const who = byKey(t.by)!;
+  const move = t.trail[0];
+  const done = t.trail[t.trail.length - 1]?.at ?? null;
+  return {
+    workflow_instance_id: wid, definition_key: "attendance.temporary_site", definition_name: "Temporary Site", version: 1, module_key: "people",
+    entity_type: "attendance_temporary_site", entity_id: t.id, subject_employee_id: who.employee_id, subject_name: who.display_name,
+    state: TEMP_FLOW[t.status], current_stage: t.status === "submitted" ? "operations_people" : null, stage_name: t.status === "submitted" ? "Operations & People" : null,
+    context: { days: spanOf(t.starts_on, t.ends_on) }, stage_entered_at: t.submitted_at,
+    stage_due_at: t.status === "submitted" ? new Date(Date.parse(t.submitted_at) + 48 * 3600_000).toISOString() : null,
+    opened_by: null, opened_by_name: who.display_name, opened_at: t.submitted_at, completed_at: t.status === "submitted" ? null : done,
+    route: [{
+      key: "operations_people", name: "Operations & People",
+      state: t.status === "submitted" ? "now" : move?.decision === "approve" ? "done" : move ? "stopped" : "skipped",
+      approvers: [{ type: "role", value: "operations_people", label: "Operations & People" }],
+    }],
+    decisions: t.trail.map((x, i) => ({
+      workflow_decision_id: sid(`${wid}:${i}`), stage_key: "operations_people", stage_name: "Operations & People", actor_id: byKey(x.by)?.employee_id ?? null,
+      actor_name: byKey(x.by)?.display_name ?? null, decision: x.decision, reason: x.reason, decided_at: x.at,
+    })),
+    can_decide: canDecideTemp(t, user), can_withdraw: false, can_reassign: false, link: null,
+  };
+}
+
+type MockCheckIn = CheckIn & { key: string; idem: string; body: string };
+const CHECK_INS: MockCheckIn[] = [];
+const checkInOut = ({ key: _k, idem: _i, body: _b, ...c }: MockCheckIn): CheckIn => c;
+const checkInsOn = (key: string, date: string) => CHECK_INS.filter((c) => c.key === key && c.work_date === date).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).map(checkInOut);
+
+/** POST /attendance/check-ins, as the API makes one: matched to the nearest address, never the shift. */
+route("POST /api/v1/attendance/check-ins", (req) => {
+  const key = req.user!;
+  const idem = req.idempotency_key;
+  if (!idem) return fail(428, "IDEMPOTENCY_KEY_REQUIRED", "Send an Idempotency-Key with every check-in.");
+  const reply = (c: MockCheckIn, replayed: boolean): ReturnType<typeof ok> => {
+    const out = checkInOut(c);
+    const message = !out.flagged ? `Checked in at ${out.location_name}.` : out.verdict === "outside" ? `Checked in ${Math.round(out.distance_m ?? 0)} m from ${out.location_name}. People will review it.` : `Checked in at ${out.location_name}. People will review it: your location could not be confirmed.`;
+    const res: CheckInResult = { check_in: out, message, replayed, today: todayOf(key) };
+    return replayed ? ok(res) : created(res);
+  };
+  const seen = CHECK_INS.find((c) => c.key === key && c.idem === idem);
+  if (seen) return reply(seen, true);
+  const b = req.body as { device_at: string; latitude: number | null; longitude: number | null; accuracy_m: number | null; location_error?: string | null };
+  if ((b.latitude === null) !== (b.longitude === null)) return invalid({ longitude: ["Send both coordinates or neither"] });
+  const date = todayIso();
+  const t = siteOn(key, date);
+  if (!t) return fail(422, "NO_TEMPORARY_SITE", "Check In is for a temporary site's day.");
+  const evs = activeOn(key, date);
+  if (!evs.some((e) => e.event_type === "clock_in") || evs.some((e) => e.event_type === "clock_out")) return fail(409, "NOT_CLOCKED_IN", "Clock in before you check in.");
+  if (CHECK_INS.filter((c) => c.key === key && c.work_date === date).length >= 20) return fail(422, "CHECK_IN_LIMIT", "At most 20 check-ins a day.");
+  const point = b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
+  const nearest = point
+    ? [...t.locations].sort((x, y) => {
+        const dx = distanceM(point, x), dy = distanceM(point, y);
+        return Number(dy <= y.radius_m) - Number(dx <= x.radius_m) || (dx - x.radius_m) - (dy - y.radius_m);
+      })[0]
+    : t.locations[0];
+  const recent = CHECK_INS.find((c) => c.key === key && c.temporary_site_location_id === nearest.id && Date.now() - Date.parse(c.occurred_at) < 5 * 60_000);
+  if (recent) return reply(recent, true);
+  const distance = point ? distanceM(point, nearest) : null;
+  const poor = point && b.accuracy_m !== null && b.accuracy_m > POLICY_MODES.max_accuracy_m;
+  const verdict: CheckIn["verdict"] = !point || poor ? "unverified" : distance! <= nearest.radius_m ? "inside" : "outside";
+  const home = t.purpose === "temporary_home";
+  const mode = (home ? inForceRules().home_geofence_mode : inForceRules().site_geofence_mode) as string;
+  const flag: ExceptionType | null = mode === "off" || verdict === "inside" ? null : verdict === "outside" ? (home ? "outside_home" : "outside_worksite") : "location_unverified";
+  const now = new Date().toISOString();
+  const c: MockCheckIn = {
+    key, idem, body: JSON.stringify(b),
+    attendance_check_in_id: sid(`check-in:${key}:${now}`), work_date: date, occurred_at: now, temporary_site_location_id: nearest.id, position: nearest.position,
+    location_name: nearest.name ?? (home ? "Temporary Home" : t.locations.length === 1 ? t.name : `Address ${nearest.position}`), address: home ? null : nearest.address, home_address: home ? nearest.address : null,
+    distance_m: distance, accuracy_m: point ? b.accuracy_m : null, verdict, location_reason: !point ? b.location_error || "no_location" : poor ? "poor_accuracy" : null, flagged: !!flag,
+  };
+  CHECK_INS.push(c);
+  if (flag) {
+    const x = addException(key, date, flag, null, `Check-in: ${verdict === "outside" ? `${distance} m from ${c.location_name}, radius ${nearest.radius_m} m` : "location not confirmed"}`);
+    x.attendance_check_in_id = c.attendance_check_in_id;
+    x.created_at = now;
+    recompute(key, date);
+  }
+  return reply(c, false);
+});
+route("GET /api/v1/attendance/me/check-ins", (req) => {
+  const date = String(req.query.date ?? todayIso());
+  return paged(checkInsOn(req.user!, date), req);
+});
+route("GET /api/v1/attendance/check-ins", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  const p = byId(String(req.query.employee_id ?? ""));
+  if (!p || !g.sees(p.user_key)) return notFound();
+  return paged(checkInsOn(p.user_key, String(req.query.date ?? todayIso())), req);
 });
 
 /* ------------------------------------------------------------------ *

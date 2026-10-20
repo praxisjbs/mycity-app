@@ -27,6 +27,8 @@
  *  - The CEO may act on any stage of any approval (by design; A11).
  *  - Nobody else decides their own request: the person who opened it cannot approve,
  *    reject or return any stage of it, even when they hold the role.
+ *  - Nor anyone the approval excludes (workflow_instance.excluded_employee_ids, set when it
+ *    opened: a temporary site's people, docs/guides/foundation.md §6.5).
  *  - Otherwise the caller must match one snapshot entry.
  *
  * The route that records a decision also checks the module's `approve` grant; this
@@ -97,12 +99,13 @@ async function resolve(
  * @param {{query: Function}} client
  * @param {Array<object>} snapshot  workflow_instance.stage_approvers
  * @param {{user_id: string, employee_id?: string, role_ids?: string[], is_ceo?: boolean}} user
- * @param {{opened_by?: string|null}} instance
+ * @param {{opened_by?: string|null, excluded_employee_ids?: string[]}} instance
  */
 async function canAct(client, snapshot, user, instance = {}) {
   if (!user || !user.user_id) return false;
   if (user.is_ceo === true) return true;
   if (instance.opened_by && instance.opened_by === user.user_id) return false;
+  if (user.employee_id && (instance.excluded_employee_ids || []).includes(user.employee_id)) return false;
   const list = snapshot || [];
   if (list.some((a) => a.type === "user" && a.value === user.user_id))
     return true;
@@ -134,6 +137,8 @@ function waitingOnClause(alias, user, roleCodes, params) {
   );
   const n = params.length;
   return `(${alias}.opened_by IS DISTINCT FROM $${n - 3}::uuid OR $${n}::boolean)
+    AND ($${n - 2}::text IS NULL OR $${n}::boolean
+         OR NOT ($${n - 2}::text = ANY(${alias}.excluded_employee_ids::text[])))
     AND EXISTS (
       SELECT 1 FROM jsonb_array_elements(${alias}.stage_approvers) a
        WHERE (a->>'type' = 'user' AND a->>'value' = $${n - 3}::text)
@@ -148,13 +153,14 @@ function waitingOnClause(alias, user, roleCodes, params) {
  * named users, the manager's login, and the CEO when named. Active accounts only.
  * @param {{query: Function}} [client]
  * @param {Array<object>} snapshot
- * @param {{exclude?: string|null}} [opts]  the requester, who is never asked to approve
+ * @param {{exclude?: string|null, excludeEmployees?: string[]}} [opts]  the requester, who is never
+ *        asked to approve, and the employees the approval excludes (their logins are not told)
  * @returns {Promise<string[]>}
  */
 async function recipients(
   client = defaultPool,
   snapshot = [],
-  { exclude = null } = {},
+  { exclude = null, excludeEmployees = [] } = {},
 ) {
   const roles = snapshot.filter((a) => a.type === "role").map((a) => a.value);
   const users = snapshot.filter((a) => a.type === "user").map((a) => a.value);
@@ -167,6 +173,7 @@ async function recipients(
        FROM app_user u
       WHERE u.status = 'active'
         AND u.user_id IS DISTINCT FROM $5::uuid
+        AND (u.employee_id IS NULL OR NOT (u.employee_id = ANY($6::uuid[])))
         AND (
               u.user_id = ANY($2::uuid[])
            OR u.employee_id = ANY($3::uuid[])
@@ -175,7 +182,7 @@ async function recipients(
                        WHERE ur.user_id = u.user_id AND r.code = ANY($1::text[]))
         )
       ORDER BY u.user_id`,
-    [roles, users, employees, ceo, exclude],
+    [roles, users, employees, ceo, exclude, excludeEmployees || []],
   );
   return rows.map((r) => r.user_id);
 }

@@ -7,7 +7,10 @@
  * employee's home location is found by their name and opens in Homes; a work location request
  * by its number or the person's name, and opens in Requests. Neither by its address. A field
  * assignment by its number, name, client or anyone on it (seen when one of them is in scope),
- * opening in Field; never by a site's address.
+ * opening in Field; never by a site's address. A temporary site (PR 4) by its number, name, purpose
+ * or anyone on it, within the reader's `people` scope, opening People · Worksites (`?site=`); the
+ * person's own, those they submitted or are or were on, as My Temporary Sites, opening Work Location
+ * Requests (`?site=`). Never by an address.
  */
 const { recordProvider } = require("../../shared/search/provider");
 
@@ -88,5 +91,43 @@ module.exports = [
       column: "m.employee_id",
       through: "attendance_field_member m WHERE m.field_assignment_id = a.field_assignment_id",
     },
+  }),
+  recordProvider({
+    type: "attendance_temporary_site",
+    module: "people",
+    label: "Temporary Sites",
+    words: ["temporary site", "temporary sites", "work site", "out of station"],
+    from: "attendance_temporary_site s",
+    key: "s.temporary_site_id",
+    columns: [
+      "s.number",
+      "s.name",
+      "replace(s.purpose, '_', ' ')",
+      `(SELECT string_agg(te.first_name || ' ' || te.last_name || ' ' || COALESCE(te.preferred_name, ''), ' ')
+          FROM attendance_temporary_site_member tm JOIN employee te ON te.employee_id = tm.employee_id
+         WHERE tm.temporary_site_id = s.temporary_site_id)`,
+    ],
+    select:
+      "s.temporary_site_id AS id, s.number AS ref, s.name AS title, replace(s.purpose, '_', ' ') AS sub, s.status AS status",
+    order: "s.starts_on DESC",
+    scope: {
+      column: "m.employee_id",
+      through: "attendance_temporary_site_member m WHERE m.temporary_site_id = s.temporary_site_id",
+    },
+  }),
+  recordProvider({
+    type: "attendance_own_temporary_site",
+    module: "ess",
+    label: "My Temporary Sites",
+    words: ["my temporary sites", "my work sites", "my sites"],
+    from: "attendance_temporary_site s JOIN app_user u ON u.status = 'active'",
+    key: "s.temporary_site_id",
+    columns: ["s.number", "s.name", "replace(s.purpose, '_', ' ')"],
+    select:
+      "s.temporary_site_id AS id, s.number AS ref, s.name AS title, replace(s.purpose, '_', ' ') AS sub, s.status AS status",
+    where: `s.submitted_by = u.user_id OR EXISTS (SELECT 1 FROM attendance_temporary_site_member om
+              WHERE om.temporary_site_id = s.temporary_site_id AND om.employee_id = u.employee_id)`,
+    order: "s.starts_on DESC",
+    owner: { column: "u.user_id" },
   }),
 ];

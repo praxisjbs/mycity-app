@@ -23,6 +23,8 @@ const OWNERS = Object.freeze([
   Object.freeze({ name: "attendance_field_site.address", module: "attendance", level: "address", personal: false }),
   Object.freeze({ name: "attendance_location_request.address", module: "attendance", level: "address", personal: true }),
   Object.freeze({ name: "attendance_home.address", module: "attendance", level: "address", personal: true }),
+  // A temporary site's addresses (attendance.md §6.11): a venue, or a Temporary Home's, which is personal.
+  Object.freeze({ name: "attendance_temporary_site_location.address", module: "attendance", level: "address", personal: true }),
   Object.freeze({ name: "employee.home_address", module: "organisation", level: "address", personal: true }),
 ]);
 

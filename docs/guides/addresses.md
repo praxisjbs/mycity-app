@@ -62,8 +62,8 @@ Every place an address is entered today. The level (§6.3) is what a pick may be
 |---|---|---|---|---|
 | Settings · Organisation (`organisation`, #69) | Staff app | `settings` view, edit | **Address** (level address): the company's, printed on letterheads, PDFs, system mail and signatures | Pick the address, add details, drop a pin |
 | People · Worksites (`worksites`, #28) | Staff app | `people` create, edit | **Address** (address, optional) beside the fence's centre and radius; a pick fills the centre, and a centre typed or tapped first fills an empty address from the pin | Pick, pin, or let the centre name it |
-| People · Attendance, Field Assignments (`attendance`, #25) | Staff app | `people` create | **Site Address** on each of a field assignment's one or two sites (address, optional); a pick fills the site's centre | Pick or pin each site's address |
-| ESS · Work Location Requests (`work-location-requests`, #87) | Staff app, both shells | The person | **Address** of a temporary home or a client visit (address; optional for a remote day); a client visit's pick fills its site | Pick, pin, add details |
+| Add Work Site, the temporary site sheet (Home · Overview #1, ESS · Work Location Requests #87; Add Temporary Site on People · Worksites #28) | Staff app, both shells | Anyone; People for Add Temporary Site | **Addresses**, one to eight (address); each pick is the address's fence centre, with its own radius and small map | Pick, pin, add details; Add Address, Remove |
+| People · Attendance, Field Assignments, and ESS · Work Location Requests, New Request | Staff app | Until attendance's PR 4 | A field site's and a client visit's or temporary home's address; both forms went in PR 4, their saved addresses kept | None now |
 | ESS · My Attendance, Home Location (`my-attendance`, #9) | Staff app, both shells | The person | **Address** of the home they ask to clock in from (address, required). The fence stays on the reading taken at home | Pick, pin, add details, or use the current location in an outage |
 | ESS · My Profile, Edit Profile (`my-profile`, #8) | Staff app, both shells | The person | **Home Address** (address, optional) | Pick, pin, add details |
 | People · Employees (`employees`, #24) | Staff app | `people` view; the address under the `employee.personal` mask | The home address on the record, read only. The add and edit forms do not ask for it; the person sets it on My Profile | Read it |
@@ -121,6 +121,14 @@ clock-in line.
 `0490` also fills `place` from every address already saved (source typed, unverified, the record's
 own point where it has one). No seed: places are never demonstration data (A26).
 
+**A place's time zone** (TB, 20/10/2026, for attendance's temporary sites, attendance.md §6.4): the
+provider's `timezone.name` on a search or pin answer (Geoapify's result field, recorded in
+`src/modules/maps/maps.test.js`) is kept by `toPlace` when it is a zone the runtime knows, and travels
+in the token (§6.2). `place` keeps no time zone and gains no column: an owner that needs one keeps it
+in its own row (`attendance_temporary_site_location.timezone`), read from the parsed `PlaceInput`
+when the address is saved, Africa/Lagos when the place has none (the device's location while search
+is down, a token signed before the zone was kept, a place read back from `place` for an edit form).
+
 Schema migration file(s): `migrations/0490_place.sql`. Reference-data file(s): none.
 
 ## 5 · API
@@ -134,7 +142,8 @@ Schema migration file(s): `migrations/0490_place.sql`. Reference-data file(s): n
 | Every read an edit form opens | the address line as before, plus `<field>_place` (`PlaceView`, with a fresh token) | the owning route's | | `PlaceView` only where a form edits the address: Settings · Organisation, a worksite, My Profile |
 
 The write fields: `OrganisationPatch.address` and `WorksiteUpdate.address` (null clears them),
-`WorksiteCreate.address`, `FieldSiteInput.address`, `LocationRequestCreate.address`,
+`WorksiteCreate.address`, `TemporarySiteCreate.locations[].address` (attendance's PR 4, which retired
+`FieldSiteInput.address` and `LocationRequestCreate.address` with their create routes),
 `HomeRequestCreate.home_address`, and `EssProfileUpdate.home_address`, `EmployeeCreate.home_address`
 and `EmployeeUpdate.home_address` (left out, the address stays; nothing clears a home address).
 Recruitment and Partnerships take `PlaceInput` the day their contracts land (gate 22 holds them to
@@ -153,7 +162,8 @@ Lekki Phase 1, Lagos`).
 ### 6.2 The token
 
 - `p1.<payload>.<signature>`: the payload is the place as our API found it (source, line, point,
-  provider id, kind, city, state, country, verified, pending, accuracy), base64url JSON; the
+  provider id, kind, city, state, country, verified, pending, accuracy, and its time zone when the
+  provider named one, `tz`, optional, so a token signed before it still verifies), base64url JSON; the
   signature is HMAC-SHA256 over it, cut to 128 bits, with a key derived from `ENCRYPTION_KEY`
   (HKDF, info `place-token v1`). No new secret, and each environment's tokens are its own.
 - Made only by our API: a search answer, a pin, and a read for an edit form. A browser cannot make
@@ -340,3 +350,4 @@ None.
   session cache and cancelled requests (`usePlaces`); every screen in §2 moved; gate 22. Drop a Pin
   stays under the search throughout rather than only when nothing is found (§3 step 4, §10.1).
 - 20/10/2026 · TB · Fault #1 (staging: "Maps are not answering." once on `GET /maps/search`; the provider gave no answer within 4.5 seconds or the connection dropped; TB's four answers): a dropped connection is asked once more at once on the server, never a timeout, and its network code is logged; the field asks a failed search or pin once more after 400 ms before it calls search down; the provider not answering is recorded on System Health as a `warning`. §6.4, §6.5 updated.
+- 20/10/2026 · TB · A place's time zone (§4, §6.2), for attendance's temporary sites (attendance.md §6.4): `toPlace` keeps the provider's `timezone.name` when the runtime knows the zone, the token carries it as an optional `tz` (tokens signed before still verify), and the owner keeps it in its own row; `place` gains no column. A new owner, `attendance_temporary_site_location.address` (§6.9), in place of the field site's and the work location request's for new entries (both kept for the records already saved).

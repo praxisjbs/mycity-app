@@ -52,6 +52,8 @@ const reconcile = require("./attendance.reconcile");
 const attendanceExport = require("./attendance.export");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const sites = require("./attendance.sites");
+const checkIns = require("./attendance.check-ins");
 const { EVENTS } = require("./attendance.events");
 
 async function tx(fn) {
@@ -138,7 +140,7 @@ async function openSession(db, employeeId, date) {
 async function today(user, { now = new Date() } = {}) {
   const person = await repo.person(pool, user.employee_id);
   if (!person) throw notEmployed();
-  const zone = calendar.zoneOf(person);
+  const zone = await sites.zoneAt(pool, person, now, calendar.zoneOf(person));
   const date = rules.localDate(now, zone);
   const session = await openSession(pool, user.employee_id, date);
   const sessionDate = session.date || date;
@@ -191,6 +193,8 @@ async function today(user, { now = new Date() } = {}) {
       max_accuracy_m: ctx.policy.max_accuracy_m,
     },
     device,
+    temporary_site: sites.todayOf(ctx.site || null),
+    check_ins: ctx.site ? await checkIns.onDay(pool, user.employee_id, sessionDate) : [],
   };
 }
 
@@ -237,7 +241,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
 
     const person = await repo.person(client, employeeId);
     if (!person || person.status !== "active") throw notEmployed();
-    const zone = calendar.zoneOf(person);
+    const zone = await sites.zoneAt(client, person, now, calendar.zoneOf(person));
     const date = rules.localDate(now, zone);
     const leave = await repo.grantedLeave(client, employeeId, date);
     if (leave)
@@ -313,6 +317,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         request_id: geofence.request_id,
         assignment_id: geofence.assignment_id,
         site_id: geofence.site_id,
+        temporary_site_id: (ctx.fence && ctx.fence.temporary_site_id) || null,
         result: geofence.result,
       },
       device: {
@@ -582,6 +587,7 @@ function requestRegisterExport(actor, body) {
 }
 
 module.exports = {
+  openSession,
   today,
   punch,
   messageOf,

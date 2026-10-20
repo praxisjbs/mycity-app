@@ -335,6 +335,8 @@ async function audienceUsers(client, audience, event) {
     return approvers.recipients(
       client,
       (event.payload && event.payload.stage_approvers) || [],
+      // The people an approval excludes are never asked to decide it (foundation.md §6.5).
+      { excludeEmployees: (event.payload && event.payload.excluded_employee_ids) || [] },
     );
   if (audience.requester) {
     const id = event.payload && event.payload.opened_by;

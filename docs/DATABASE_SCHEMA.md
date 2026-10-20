@@ -214,7 +214,18 @@ who published or withdrew it and why, who saved it, and the location check per p
 (`office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode`, taking a row's one
 `geofence_mode`); `attendance_policy_acknowledgement` (one row per person and version: reminded,
 acknowledged) · `1395` `1099`'s Standard policy removed while it is as seeded and nothing was judged
-by it (A26, §5).
+by it (A26, §5) · `1450` temporary sites (attendance.md §6.11, PR 4): `attendance_temporary_site`
+(numbered `TS-0001`, a purpose of seventeen, a name, a description, one to 90 days, its status and
+approval, who submitted, approved or cancelled it and why), `attendance_temporary_site_location` (one
+to eight picked addresses, each its `place`, point, radius of 150 to 500 m and time zone) and
+`attendance_temporary_site_member` (one to 25 people, taken off with a reason) · `1455`
+`workflow_instance.excluded_employee_ids` (the people an approval excludes from deciding it:
+everyone on a temporary site) · `1460` `attendance_check_in` (one row per check-in at a stop,
+append-only: its point, accuracy, matched address, distance, verdict, evidence and policy version,
+unique per person and Idempotency-Key), `attendance_exception.attendance_check_in_id` (a flag a
+check-in opened), and `1300`'s day index narrowed to exceptions of neither a punch nor a check-in ·
+`1470` the `temporary_site` numbering scheme and version 1 of the `attendance.temporary_site`
+approval (Operations & People, 48 hours).
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
 other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026). The
@@ -232,7 +243,9 @@ are read by nothing after `1405` and are dropped by a later release (MIGRATIONS 
 use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
-- Attendance (attendance.md §4, §13): the redesign's tables above (PRs 2 to 4); dropping
+- Attendance (attendance.md §4, §13): the redesign's tables above (PRs 2 and 3; PR 4's places are
+  built in `1450` to `1470`); dropping `attendance_location_request` and the field assignment
+  tables once no request or assignment made before PR 4 is still read (MIGRATIONS §8); dropping
   `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
   nothing reads them; dropping the superseded booleans `require_geofence` and `require_known_device`
   and `1300`'s one `geofence_mode`, superseded by the place modes of `1370` (MIGRATIONS §8).

@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus, SchedulePlace } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, CheckIn, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus, SchedulePlace, TemporarySitePurpose, TemporarySiteState } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -83,6 +83,40 @@ export const ASSIGNMENT_STATE: Record<FieldAssignmentState, Shown> = {
   done: { tone: "neutral", text: "Done" },
   cancelled: { tone: "neutral", text: "Cancelled" },
 };
+
+/** Why people work at a temporary site, in the contract's order (§6.11). */
+export const SITE_PURPOSE: Record<TemporarySitePurpose, string> = {
+  client_visit: "Client Visit",
+  partner_meeting: "Partner Meeting",
+  training_delivering: "Training (Delivering)",
+  training_attending: "Training (Attending)",
+  event: "Event",
+  conference: "Conference",
+  workshop: "Workshop",
+  exhibition: "Exhibition",
+  market_activation: "Market Activation",
+  field_survey: "Field Survey",
+  site_inspection: "Site Inspection",
+  media_engagement: "Media Engagement",
+  government_visit: "Government Visit",
+  out_of_station: "Out-of-Station Assignment",
+  coworking_space: "Coworking Space",
+  temporary_home: "Temporary Home",
+  other: "Other",
+};
+/** Where a temporary site stands today. */
+export const SITE_STATE: Record<TemporarySiteState, Shown> = {
+  submitted: { tone: "warn", text: "Awaiting Approval" },
+  upcoming: { tone: "info", text: "Upcoming" },
+  in_progress: { tone: "ok", text: "In Progress" },
+  done: { tone: "neutral", text: "Done" },
+  rejected: { tone: "err", text: "Rejected" },
+  withdrawn: { tone: "neutral", text: "Withdrawn" },
+  cancelled: { tone: "neutral", text: "Cancelled" },
+};
+/** A check-in against the address it was matched to; flagged ones went to People. */
+export const checkInShown = (c: Pick<CheckIn, "flagged" | "verdict">): Shown =>
+  c.flagged ? { tone: "warn", text: "Flagged" } : c.verdict === "inside" ? { tone: "ok", text: "Inside" } : { tone: "neutral", text: "Recorded" };
 
 export const REQUEST_TYPE_HELP = "Temporary Home: clock in at another home, within 100 m. Remote Day: work away from the office. Client Visit: work at a client's site.";
 
