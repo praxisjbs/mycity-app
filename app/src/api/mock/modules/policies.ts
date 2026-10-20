@@ -109,7 +109,7 @@ const RULE_LABEL: Record<Visible, string> = {
   grace_minutes: "Grace Minutes",
   office_geofence_mode: "Office Check",
   home_geofence_mode: "Home Check",
-  site_geofence_mode: "Field Site Check",
+  site_geofence_mode: "Temporary Site Check",
   home_radius_m: "Home Radius",
   max_accuracy_m: "GPS Accuracy",
   device_mode: "Device Check",
@@ -133,12 +133,13 @@ function sectionsOf(r: AttendanceRules, changed: readonly string[]): PolicySecti
     r.home_geofence_mode === "off"
       ? ["Working from home, your location is recorded with each clock-in and clock-out. Nothing is flagged."]
       : [r.home_geofence_mode === "warn" ? `${away} is accepted and sent for review.` : `${away} is refused, and People see it.`, "Until People approve your home, your clock-ins are sent for review."];
+  const elsewhere = "Working somewhere else? Add it from Home, or ask People.";
   const site =
     r.site_geofence_mode === "off"
-      ? "At a field site or client visit, your location is recorded with each clock-in. Nothing is flagged."
+      ? ["At a temporary site, your location is recorded with each clock-in and check-in. Nothing is flagged.", elsewhere]
       : r.site_geofence_mode === "warn"
-        ? "At a field site or client visit, a clock-in outside the site's radius is accepted and sent for review."
-        : "At a field site or client visit, a clock-in outside the site's radius is refused, and People see it.";
+        ? ["At a temporary site, a clock-in or check-in outside its addresses is accepted and sent for review.", elsewhere]
+        : ["At a temporary site, a clock-in outside its addresses is refused, and People see it.", "A check-in outside them is sent for review.", elsewhere];
   const checked = [r.office_geofence_mode, r.home_geofence_mode, r.site_geofence_mode].some((m) => m !== "off");
   const device =
     r.device_mode === "off"
@@ -150,7 +151,7 @@ function sectionsOf(r: AttendanceRules, changed: readonly string[]): PolicySecti
     ["clocking_in", "Clocking In", ["grace_minutes"], [r.grace_minutes > 0 ? `You have a grace period of ${minutes(r.grace_minutes)} after your resumption time. A clock-in after it counts as late.` : "There is no grace period. A clock-in after your resumption time counts as late."]],
     ["office", "At the Office", ["office_geofence_mode"], [office]],
     ["home", "Working From Home", ["home_geofence_mode", "home_radius_m"], home],
-    ["site", "At a Field Site", ["site_geofence_mode"], [site]],
+    ["site", "At a Temporary Site", ["site_geofence_mode"], site],
     ["location", "Your Location", ["max_accuracy_m"], [`Your phone's location must be accurate to within ${r.max_accuracy_m} m. A weaker reading cannot confirm where you are.`, ...(checked ? ["When your location cannot be confirmed, your clock-in is sent to People for review."] : [])]],
     ["devices", "Your Devices", ["device_mode"], [device]],
   ];

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { RouterProvider } from "@/lib/router";
-import { ScreenActionProvider, useRegisteredAction, useScreenAction, useUrlAction } from "./screen-action";
+import { ScreenActionProvider, useRegisteredAction, useRegisteredSecond, useScreenAction, useUrlAction } from "./screen-action";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <RouterProvider>
@@ -64,6 +64,25 @@ describe("opening a screen on an action (search's links)", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(result.current?.label).toBe("Start Import");
     expect(renders).toBeLessThan(5);
+  });
+
+  it("holds a second action beside the first, which ?action=new never runs", () => {
+    at("/home?tab=overview&action=new");
+    const task = vi.fn();
+    const site = vi.fn();
+    const { result } = renderHook(
+      () => {
+        useScreenAction({ label: "New Task", onSelect: task });
+        useScreenAction({ label: "Add Work Site", icon: "pin", onSelect: site }, { second: true });
+        return [useRegisteredAction(), useRegisteredSecond()];
+      },
+      { wrapper },
+    );
+    expect(result.current.map((a) => a?.label)).toEqual(["New Task", "Add Work Site"]);
+    expect(task).toHaveBeenCalledTimes(1);
+    expect(site).not.toHaveBeenCalled();
+    result.current[1]?.onSelect();
+    expect(site).toHaveBeenCalledTimes(1);
   });
 
   it("does nothing on a screen opened without an action", () => {

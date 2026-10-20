@@ -1166,11 +1166,11 @@ never leave identity, and no log line carries them.
   service and scope as the screen; no coordinates, no device identifier, no evidence blob.
 - **AI routes**: clock in or see my attendance → ESS · My Attendance; review attendance → People ·
   Attendance; register a device → ESS · My Devices; add a worksite → People · Worksites; set my
-  home location → ESS · My Attendance; approve home locations → People · Attendance; ask for a work
-  location → ESS · Work Location Requests; approve work location requests → People · Worksites;
+  home location → ESS · My Attendance; approve home locations → People · Attendance; approve work
+  location requests → People · Worksites;
   read or acknowledge the attendance policy → ESS · Policy Updates; change the attendance policy →
-  Knowledge Hub · Policies (`?policy=attendance`); work somewhere else → Home's Add Work Site
-  (PR 4, `home.overview` with `action=work-site`); approve a temporary site → People · Worksites
+  Knowledge Hub · Policies (`?policy=attendance`); work somewhere else → ESS · Work Location Requests,
+  where Add Work Site is (PR 4; a manifest names no action, A23); approve a temporary site → People · Worksites
   (PR 4); my temporary sites → ESS · Work Location Requests; my deductions or overtime → ESS · My
   Attendance (PR 3); set a hybrid employee's office days → People · Employees (the record's
   Attendance tab); my work week → ESS · My Profile. The routes to send people out on a field
@@ -1184,8 +1184,9 @@ never leave identity, and no log line carries them.
   `attendance.search.js` also finds home locations by the person's name (never by the address), and
   work location requests by their number or the person's name (never by the address), and field
   assignments by their number, name, client or anyone on them (never by a site's address).
-  Each within the reader's `people` scope. A person's own request opens on ESS · Work Location
-  Requests by `?request=`; an assignment opens on People · Worksites, Temporary, by `?assignment=`,
+  Each within the reader's `people` scope. A request opens on People · Worksites, Temporary, by
+  `?request=`, and a person's own on ESS · Work Location Requests; an assignment opens on People ·
+  Worksites, Temporary, by `?assignment=`,
   and a person's own on My Attendance. ⌘K's New Request (`request_work_location`) and New Assignment
   (`new_field_assignment`) went in PR 4 with their sheets. A
   schedule is not a record of its own: it is found through the employee (⌘K's employee results
@@ -1197,7 +1198,9 @@ never leave identity, and no log line carries them.
   or anyone on them (never by an address), within the reader's `people` scope, opening People ·
   Worksites `?site=` or, for the person's own, ESS · Work Location Requests `?site=` (read through
   `GET /attendance/me/temporary-sites/:id`); ⌘K's Add Work Site (`add_work_site`, everyone) opens
-  Home · Overview with the sheet (`?action=work-site`). A check-in is found through its day, never on
+  Home · Overview with the sheet (`?action=work-site`), and Add Temporary Site (`add_temporary_site`,
+  `people` approve) People · Worksites on Temporary with People's sheet (`?action=temporary-site`).
+  A request or an assignment made before PR 4 opens on People · Worksites, Temporary. A check-in is found through its day, never on
   its own (`attendance_check_in`, `search:none` in the route map).
   A pay item is not looked up on its own (`search:none`): its notice opens My Attendance or the
   register on its day. AI does not create punches, decide exceptions, change the policy or infer missing

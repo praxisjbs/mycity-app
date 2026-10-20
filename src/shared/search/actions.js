@@ -80,6 +80,12 @@ const ACTIONS = Object.freeze([
     need: ["people", "create"],
     words: ["worksite", "office", "geofence", "new office", "clock-in location"],
   }),
+  a("add_temporary_site", "Add Temporary Site", {
+    screen: "people.worksites",
+    params: { action: "temporary-site" },
+    need: ["people", "approve"],
+    words: ["temporary site", "send people out", "field assignment", "client site", "out of station"],
+  }),
   a("import_staff", "Import Staff", {
     screen: "settings.imports",
     params: { importer: "employees" },

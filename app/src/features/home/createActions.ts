@@ -50,6 +50,16 @@ const OFFERS: Offer[] = [
     holds: (me) => !!me.grants.ess?.includes("create"),
   },
   {
+    key: "add_work_site",
+    label: "Add Work Site",
+    icon: "pin",
+    module: "home",
+    tab: "overview",
+    href: hrefFor("home", "overview", { action: "work-site" }),
+    // Anyone with an employee record adds a temporary site for approval (attendance.md §6.11).
+    holds: (me) => !!me.employee_id,
+  },
+  {
     key: "new_rule",
     label: "New Rule",
     icon: "alert",
@@ -82,6 +92,7 @@ export function useCreateActions(me: Me): CreateAction[] {
   const open: Record<string, boolean> = {
     "workspace.tasks": useScreenState("workspace", "tasks").open,
     "ess.my-leave": useScreenState("ess", "my-leave").open,
+    "home.overview": useScreenState("home", "overview").open,
     "home.alerts": useScreenState("home", "alerts").open,
     "home.reports": useScreenState("home", "reports").open,
   };

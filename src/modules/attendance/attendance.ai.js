@@ -93,7 +93,8 @@ module.exports = defineManifest({
     { intent: "review attendance", screen: "people.attendance" },
     { intent: "set my home location", screen: "ess.my-attendance" },
     { intent: "approve home locations", screen: "people.attendance" },
-    { intent: "work somewhere else for some days", screen: "home.overview", params: { action: "work-site" } },
+    // Add Work Site is that screen's own action; a manifest carries no action of its own (A23).
+    { intent: "work somewhere else for some days", screen: "ess.work-location-requests" },
     { intent: "approve a temporary site", screen: "people.worksites" },
     { intent: "see my temporary sites", screen: "ess.work-location-requests" },
     { intent: "approve work location requests", screen: "people.worksites" },

@@ -18,6 +18,10 @@ import { useSearchParams } from "@/lib/router";
  * it does not list) and opens the screen with `?action=new`, which runs it once
  * the screen has registered it. Another action a screen can be opened on
  * (Change Password, Set PIN) uses useUrlAction with its own word.
+ *
+ * A screen with a second action for everyone (Home's Add Work Site beside New)
+ * registers it with `{ second: true }`: the fan offers it after the first, and
+ * `?action=new` never runs it.
  */
 export interface ScreenAction {
   /** Verb Noun, at most 3 words (New Task). */
@@ -28,16 +32,26 @@ export interface ScreenAction {
   onSelect: () => void;
 }
 
-const Ctx = createContext<{ action: ScreenAction | null; set: (a: ScreenAction | null) => void }>({ action: null, set: () => undefined });
+type Slot = (a: ScreenAction | null) => void;
+const Ctx = createContext<{ action: ScreenAction | null; set: Slot; second: ScreenAction | null; setSecond: Slot }>({
+  action: null,
+  set: () => undefined,
+  second: null,
+  setSecond: () => undefined,
+});
 
 export function ScreenActionProvider({ children }: { children: ReactNode }) {
   const [action, set] = useState<ScreenAction | null>(null);
-  const value = useMemo(() => ({ action, set }), [action]);
+  const [second, setSecond] = useState<ScreenAction | null>(null);
+  const value = useMemo(() => ({ action, set, second, setSecond }), [action, second]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 /** The registered action, for the floating button. */
 export const useRegisteredAction = (): ScreenAction | null => useContext(Ctx).action;
+
+/** The screen's second action, offered after the first. */
+export const useRegisteredSecond = (): ScreenAction | null => useContext(Ctx).second;
 
 /**
  * Runs `run` once when the address asks for this action (`?action=<word>`), then
@@ -59,12 +73,14 @@ export function useUrlAction(word: string, run: (() => void) | null | undefined)
 }
 
 /**
- * Registers this screen's New action while the screen is mounted. What is
- * registered calls the screen's latest `onSelect`, so an inline arrow does not
- * register again on every render (which re-rendered the screen, and looped).
+ * Registers this screen's New action while the screen is mounted, or with
+ * `second` its second one. What is registered calls the screen's latest
+ * `onSelect`, so an inline arrow does not register again on every render
+ * (which re-rendered the screen, and looped).
  */
-export function useScreenAction(action: ScreenAction | null): void {
-  const { set } = useContext(Ctx);
+export function useScreenAction(action: ScreenAction | null, { second = false }: { second?: boolean } = {}): void {
+  const ctx = useContext(Ctx);
+  const set = second ? ctx.setSecond : ctx.set;
   const label = action?.label;
   const icon = action?.icon;
   const latest = useRef(action?.onSelect);
@@ -76,5 +92,5 @@ export function useScreenAction(action: ScreenAction | null): void {
     set({ label, icon, onSelect: run });
     return () => set(null);
   }, [label, icon, ready, run, set]);
-  useUrlAction("new", ready ? run : null);
+  useUrlAction("new", ready && !second ? run : null);
 }

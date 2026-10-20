@@ -207,17 +207,17 @@ const ENTITY_ROUTES = Object.freeze({
     param: "home",
     self: screen("ess", "my-attendance"),
   },
-  // A work location request: People · Attendance opens it in Requests (`?request=`); the
-  // person's own opens on Work Location Requests.
+  // A work location request made before attendance's PR 4: People · Worksites opens it in
+  // Temporary, Requests (`?request=`); the person's own opens on Work Location Requests.
   attendance_location_request: {
-    ...screen("people", "attendance"),
+    ...screen("people", "worksites"),
     param: "request",
     self: screen("ess", "work-location-requests"),
   },
   // A field assignment made before attendance's PR 4: People · Worksites opens it in Temporary,
   // Field (`?assignment=`); someone on it opens it on My Attendance.
   attendance_field_assignment: {
-    ...screen("people", "attendance"),
+    ...screen("people", "worksites"),
     param: "assignment",
     self: screen("ess", "my-attendance"),
   },
