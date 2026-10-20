@@ -949,3 +949,8 @@ screen.
   the same `app/src/features/settings/index.tsx` switch as the rest.
 - 20/10/2026 · GE · §6.1: the staff loader keeps a birthday the sheet gives as a day and month (`employee.birth_day`, `birth_month`, migration `1180`), on every deploy, so the Staff Community celebrations can post it.
 - 20/10/2026 · GE · The outbox dispatcher is woken by each commit (`emit()` sends a Postgres NOTIFY, delivered on commit; `src/jobs/loops/outbox-wake.js` LISTENs) instead of waiting up to a second for its tick, which stays as the safety net (SYSTEM_ARCHITECTURE §6). Measured locally: posting 12 ms, the handlers 5 ms, the reader's refetch 14 ms, so the tick was most of the wait.
+- 20/10/2026 · TB · Settings' System Health tab becomes three, **Status**, **Performance** and
+  **Faults**, after TB walked the first release: one tab meant scrolling past the checks and the
+  chart to reach the fault list, which is the part the IT team uses. The `system_health` permission
+  key, the routes and the data are unchanged; only which tab each section sits on changes. Their
+  guide is `docs/guides/system-health.md`.

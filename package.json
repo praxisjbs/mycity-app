@@ -45,7 +45,8 @@
     "fe:typecheck": "npm run typecheck -w @mycity/ui -w @mycity/app -w @mycity/public-app",
     "fe:lint": "npm run lint -w @mycity/ui -w @mycity/app -w @mycity/public-app",
     "fe:test": "node scripts/fe-test.js",
-    "fe:build": "npm run build -w @mycity/ui -w @mycity/app -w @mycity/public-app"
+    "fe:build": "npm run build -w @mycity/ui -w @mycity/app -w @mycity/public-app",
+    "check:schedulers": "node scripts/check/schedulers.js"
   },
   "dependencies": {
     "@mycity/contract": "file:packages/contract",

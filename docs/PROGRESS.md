@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 95 screens (89 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 97 screens (91 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 12 | 2 | 0 | 10 | 0 | 0 |
+| M9 Settings & Governance | 14 | 2 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **95** | **55** | **0** | **40** | **0** | **0** |
+| **Total** | **97** | **55** | **0** | **42** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -1044,7 +1044,9 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 95 | System Health | `system-health` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 95 | Status | `status` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 96 | Performance | `performance` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 97 | Faults | `faults` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1059,6 +1061,19 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · System Health split into three tabs (#95 Status, #96 Performance, #97 Faults)
+  after TB walked the first release on staging, and the engine behind it fixed. **The three
+  schedulers were never registered in `src/jobs/registry.js`, so nothing ran for an hour and the
+  Performance card read "Nothing Recorded Yet", which looks like good news.** Now: the schedulers
+  are registered; every tick is recorded in `schedule_run` (migration 9110); a new `schedulers`
+  readiness check reports any job that has not run within three of its own intervals; and
+  `scripts/check/schedulers.js` fails the build when a file in `jobs/schedulers/` is not started by
+  the worker, which is the gate that would have caught it. Status gains the resources people ask
+  for first: disk, memory, processor, and the database's size and connections. Performance now
+  shows response time and the share of requests that failed, from `request_stat`, a row a minute
+  written by the API (the snapshot runs in the worker and cannot read the API's own metrics), and
+  says plainly when nothing is recording instead of showing a neutral empty state. Left: thresholds
+  for disk and memory are first guesses and want a week of real numbers.
 - 19/10/2026 · LA · Attendance Policy (#73) on the real API, brought forward from M9 with Policy Updates (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.15): one organisation policy in numbered versions. People with `settings` edit change the clock checks (Grace Minutes 0 to 60; the location check for the office, a home and a field site, each Off, Warn or Block; GPS Accuracy 50 to 250 m; Home Radius 50 to 500 m; the Device Check), Save Draft (each changed rule tagged), Discard Changes, and Publish Policy from a first day (today to 90 days, after any version waiting) with a note, which makes it `Version N` and tells everyone; a version waiting can be withdrawn with a reason, its rules going back to the draft. Versions list each one's first day, state and acknowledgements; a version opens with its rules and who has acknowledged it (Everyone, Acknowledged, Pending). The location mode is now per place on the clock, and each punch keeps the version it was judged by. `1370` (versions, place modes, `attendance_policy_acknowledgement`), `1395` (1099's Standard policy out, A26); 12 routes; 6 events; one job. Owner set to LA, as the 17/10 note says. Checked by 8 integration tests, 4 backend unit tests and 3 screen tests on the mock (desktop and 390 px), and on the real API in Chromium at 390 px (20/10/2026): Save Draft, Publish Policy and Versions with who acknowledged; with the office on Block, a clock-in 1 km away was refused and one 30 m away accepted, each recorded with Version 1. Left: the pay rules (lateness deduction, overtime) join the policy with payroll (M6) and the late-arrivals query rule with Queries (M3).
 - 20/10/2026 · TB · System Health (#95) built, second tab after Organisation, from TB's brief and
   answers (`docs/guides/system-health.md`): the readiness checks as they stand, a day or a week of

@@ -102,6 +102,7 @@ const GATES = [
   { id: "capabilities", label: "Capabilities are catalogued and seeded", script: "scripts/check/capabilities.js" },
   { id: "public-surface", label: "Public routes import no auth", script: "scripts/check/public-surface.js" },
   { id: "numbering-schemes", label: "Numbering schemes exist", script: "scripts/check/numbering-schemes.js" },
+  { id: "schedulers", label: "Every scheduler is started", script: "scripts/check/schedulers.js" },
   { id: "production-environment-refs", label: "Only release/rollback reach production", script: "scripts/check/production-environment-refs.js" },
   { id: "ai-vendor-imports", label: "No AI vendor imports outside services/ai", script: "scripts/check/ai-vendor-imports.js" },
   { id: "shell", label: "Shell scripts LF and parse", script: "scripts/check/shell.js" },

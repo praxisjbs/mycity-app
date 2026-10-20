@@ -8,7 +8,7 @@
 | Frontend paths | `app/src/features/settings/SystemHealth.tsx` |
 | Permission key(s) | `system_health` |
 | Capabilities | none |
-| Screens (PROGRESS.md rows) | #95 |
+| Screens (PROGRESS.md rows) | #95, #96, #97 |
 | Status | Built |
 | Last changed | 20/10/2026 |
 
@@ -31,7 +31,9 @@ one creates alarm without action.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Settings · System Health (`system-health`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Status (every readiness check), Performance (24 hours and 7 days), Faults (grouped, 25 a page) | Filter and search faults, open one, set its status, assign it, note it, tick several and Download Brief |
+| Settings · Status (`status`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Every readiness check, including disk, memory, processor, database size and connections, and whether every background job has run | Read what is wrong and where to look |
+| Settings · Performance (`performance`) | staff app, third tab | the same | A day or a week: response time, the share of requests that failed, disk and memory, and open faults | Switch between Day and Week |
+| Settings · Faults (`faults`) | staff app, fourth tab | the same | Faults, grouped, 25 a page | Filter and search, open one, set its status, assign it, note it, tick several and Download Brief |
 | Settings · Notifications (`notifications`) | staff app | `settings` view | The six System Health notices in the System Health category, each with who it tells and its channels | Turn a notice off, change its urgency and channels |
 | Settings · Roles & Permissions (`roles-and-permissions`) | staff app | `settings` view | `system_health` as a module a role can be granted | Grant or remove System Health on a role |
 | The bell and the notification pane | staff app, both shells | the people a notice names | A check going down, a new or returning fault, a spike, the 08:00 digest | Open the notice, which lands on the fault or the Status section |
@@ -68,8 +70,11 @@ one creates alarm without action.
 | `error_group_note` | `error_group_id`, `author_user_id`, `body`, `created_at` | What the team worked out about a fault. `author_user_id` null means the system wrote it (came back, spiking) |
 | `health_snapshot` | `taken_at`, `status`, `checks` jsonb, `outbox_backlog`, `worker_lag_s`, `faults_open`, `faults_new_24h`, `release` | One row every 5 minutes. Drawn as the Performance section; kept 30 days |
 | `error_event` | gains index `(fingerprint, occurred_at DESC)` | The table itself is unchanged. The index is what makes the grouped list and the 24 hour and 7 day counts cheap |
+| `schedule_run` | `name`, `last_run_at`, `duration_ms`, `ok`, `runs`, `failures` | One row per background job, written after every tick by `jobs/registry.js`. Without it a job that stops is invisible, which is exactly how the first release shipped |
+| `request_stat` | `minute`, `requests`, `errors`, `client_errors`, `slow`, `total_ms`, `max_ms` | A minute of traffic, written by the API. Counts are added, never replaced, so several processes and a restart inside one minute land in one row. Sums, not a percentile: a mean adds across processes, a p95 does not |
+| `health_snapshot` | gains `disk_free_pct`, `memory_used_pct`, `cpu_load`, `database_mb`, `database_connections_pct`, `requests`, `error_pct`, `mean_ms` | What the Performance tab draws |
 
-Schema migration file: `migrations/9100_system_health.sql`. Reference-data file:
+Schema migration files: `migrations/9100_system_health.sql` and `migrations/9110_system_health_engine.sql`. Reference-data file:
 `seeds/reference/9190_seed_system_health.sql` (the `system_health` grants for the Implementation
 Team and the System Administrator).
 
@@ -112,6 +117,15 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   firing.
 - **Counts** on the list are aggregated from `error_event` for the window asked for: Today is the
   last 24 hours, In All is every event still kept. They are never incremented into `error_group`.
+- **Recording, not quiet.** A chart with no snapshot in the last 11 minutes (two intervals) says
+  the five-minute job has stopped, rather than showing a neutral empty state. The same fact is a
+  `schedulers` readiness check, so it is visible from Status as well as from the chart.
+- **A scheduler is late** when it has not run for three of its own intervals, or for 3 hours when
+  its cron runs hourly and 26 hours when it runs daily. Degraded, never fatal: the API serves
+  without background work.
+- **Thresholds.** Disk: degraded under 10% free, down under 5%. Memory: degraded at 90% used, down
+  at 95%. Processor: degraded at load 2 per core, down at 4. Database connections: degraded at 80%
+  of `max_connections`, down at 90%. First guesses; they want a week of real numbers.
 - **The brief's questions.** The Markdown tells the receiving AI to ask the owner **at least 4
   questions and at most 10**, at most 4 in one `AskUserQuestion` call, and to say why it needs more
   than 4 when it asks for more. MyCity is a wider system than a single shop ledger, so 2 questions,
@@ -124,7 +138,8 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
 
 | Event / job | When | Does |
 |---|---|---|
-| `system-health` (scheduler, every 5 minutes) | worker | Upserts groups, detects regressions and spikes, takes a `health_snapshot`, compares checks with the run before |
+| `system-health` (scheduler, every 5 minutes) | worker | Upserts groups, detects regressions and spikes, takes a `health_snapshot` with the resources and the traffic, compares checks with the run before |
+| Every scheduler's tick | worker | Writes `schedule_run`, so a job that stops can be seen. Best effort: a tick never fails because its bookkeeping did |
 | `system-health-digest` (scheduler, 08:00 Lagos) | worker | Emits `system_health.digest` once a day |
 | `system-health-purge` (scheduler, nightly) | worker | `error_event` over 90 days and `health_snapshot` over 30 days |
 | `system_health.check_down` | a readiness check leaves `up` | Notifies, urgency `urgent` for `postgres`, `redis` and `worker`, `important` otherwise |
@@ -180,14 +195,18 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Settings · System Health | Four tiles (Status, Open Faults, New Today, Checks Down); the check list with a state pill each; the 24 hour and 7 day chart; the fault table with severity, Today, In All, People, Last Seen, Status and who holds it; Set Status, Assign, Add Note, Download Brief | Help term on Came Back: a fault marked fixed that has happened again. Help term on People: how many different people hit it. Details row on a check: what to look at when it is not up | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used: §6 and §7 here, and `docs/runbooks/system-health.md` |
+| Settings · Status | Four tiles (Checks Down, Open Faults, New Today, Came Back); the check list with a state pill each, including disk, memory, processor, database and background jobs | Details row on a check that is not up: where to look | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used: §6 and §7 here, and `docs/runbooks/system-health.md` |
+| Settings · Performance | Uptime and gap for the window; disk free, memory used and database size; response time, failure share, disk and memory over time; open faults. A banner when nothing is recording | Nothing | The threshold numbers and how a scheduler is judged late: §6 here |
+| Settings · Faults | The fault table with severity, Today, In All, People, Last Seen, Status and who holds it; Set Status, Assign, Add Note, Download Brief | Help term on Came Back: a fault marked fixed that has happened again. Help term on People: how many different people hit it | The brief's full text: the downloaded file |
 | Fault sheet | Title, severity, where, first and last seen with release, the last 5 occurrences with stack, 14 days of bars, notes, history | Help term on Release: the build the fault was last seen on | The brief's full text, the AI instructions: the downloaded file |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Settings · System Health | The overall state line, then the four tiles two to a row, then checks that are not up as cards | The 7 day chart, the full check list when everything is up, the In All and People columns | Download Brief, full width in the sheet after faults are ticked | Bottom bar More, then Settings; the tabs scroll sideways |
+| Settings · Status | The state pill, then the four tiles two to a row, then checks that are not up as cards | The full check list when everything is up | Nothing; Status is for reading | Bottom bar More, then Settings; the tabs scroll sideways |
+| Settings · Performance | The banner when nothing is recording, then uptime and the resource figures | Every chart: a trend is not a phone screen | Day or Week | As above |
+| Settings · Faults | Search, then fault cards with a severity pill | The In All and People columns | Download Brief, full width in the sheet after faults are ticked | As above |
 | Fault sheet | Severity pill, title, when it was last seen, Set Status | The stack trace, collapsed behind Show Stack | Set Status, full width in the sheet's footer | Opens as a sheet over the list, back closes it |
 
 ## 11 · Edge cases
@@ -230,6 +249,13 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Split into three tabs (#95 Status, #96 Performance, #97 Faults) and the engine
+  behind it fixed, after TB walked the first release on staging. The three schedulers were never in
+  `SCHEDULERS` (`src/jobs/registry.js`), so nothing ran and the chart read "Nothing Recorded Yet",
+  which looks like good news. Added: the registration; `schedule_run` and a `schedulers` readiness
+  check; `scripts/check/schedulers.js`, the gate that would have caught it; disk, memory, processor
+  and database usage checks; `request_stat` and the response time and failure share they feed; and a
+  chart that says when nothing is recording. §2, §4, §6, §7 and §10 updated.
 - 20/10/2026 · TB · Built. 30 unit tests and 19 integration tests on the real migrations: who may open it, the roll-up and its idempotence, a fault coming back, the brief the worker writes and who may download it, the snapshot and the chart, the 24 hour escalation reaching email once a day, the digest, and the purge leaving the fault itself behind.
 - 20/10/2026 · TB · Written. Settings · System Health agreed as one tab after Organisation, with its
   own `system_health` permission key granted to the Implementation Team and the System Administrator

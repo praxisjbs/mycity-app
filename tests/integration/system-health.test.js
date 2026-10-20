@@ -322,6 +322,69 @@ describeDb("System Health against the real migrations", () => {
   });
 
   describe("snapshots, escalation and keeping", () => {
+    test("the resources a person asks about first are checked and recorded", async () => {
+      const res = await as("admin").get("/system-health/status");
+      const by = Object.fromEntries(res.body.checks.map((c) => [c.key, c]));
+      for (const key of ["disk", "memory", "cpu", "database_usage", "schedulers"]) {
+        expect(by[key]).toBeDefined();
+        // Each one reads as words, not as its key.
+        expect(by[key].label).not.toBe(key);
+        expect(by[key].detail.length).toBeGreaterThan(3);
+      }
+      expect(by.disk.detail).toMatch(/free/);
+      expect(by.database_usage.detail).toMatch(/connections/);
+
+      await rollup.snapshot();
+      const row = await repo.lastSnapshot(pool);
+      expect(row.disk_free_pct).not.toBeNull();
+      expect(row.memory_used_pct).not.toBeNull();
+      expect(row.database_mb).not.toBeNull();
+    });
+
+    test("a scheduler that has never run is reported, not passed over", async () => {
+      await q("DELETE FROM schedule_run");
+      const res = await as("admin").get("/system-health/status");
+      const schedulers = res.body.checks.find((c) => c.key === "schedulers");
+      expect(schedulers.state).toBe("degraded");
+      expect(schedulers.detail).toMatch(/have not run/);
+
+      // A job that has run is not reported.
+      await q(
+        `INSERT INTO schedule_run (name, last_run_at, ok, runs) 
+         SELECT x, now(), true, 1 FROM unnest($1::text[]) AS x`,
+        [require("../../src/jobs/registry").SCHEDULERS],
+      );
+      const after = await as("admin").get("/system-health/status");
+      expect(after.body.checks.find((c) => c.key === "schedulers").state).toBe("up");
+    });
+
+    test("the chart says whether it is empty because nothing happened or nothing is running", async () => {
+      await q("DELETE FROM health_snapshot");
+      const dead = await as("admin").get("/system-health/performance?range=24h");
+      expect(dead.body.recording).toBe(false);
+      expect(dead.body.last_snapshot_at).toBeNull();
+
+      await rollup.snapshot();
+      const live = await as("admin").get("/system-health/performance?range=24h");
+      expect(live.body.recording).toBe(true);
+      expect(live.body.last_snapshot_at).not.toBeNull();
+    });
+
+    test("response time and the share that failed come from the minutes the API wrote", async () => {
+      const stats = require("../../src/shared/observability/request-stats");
+      stats.__reset();
+      stats.record(100, 200);
+      stats.record(300, 200);
+      stats.record(50, 500);
+      await stats.flush();
+      await rollup.snapshot();
+      const row = await repo.lastSnapshot(pool);
+      expect(Number(row.requests)).toBe(3);
+      expect(Number(row.mean_ms)).toBe(150);
+      expect(Number(row.error_pct)).toBeCloseTo(33.33, 1);
+      stats.__reset();
+    });
+
     test("a snapshot records every check and the figures the chart draws", async () => {
       const first = await rollup.snapshot();
       expect(["ready", "degraded", "unavailable"]).toContain(first.state);
@@ -363,9 +426,11 @@ describeDb("System Health against the real migrations", () => {
       await writeFault(fault({ fingerprint: "Old|gone|x", occurred_at: new Date(Date.now() - 100 * 86_400_000).toISOString() }));
       await q("UPDATE health_snapshot SET taken_at = now() - interval '40 days'");
       const before = (await q("SELECT count(*)::int AS n FROM error_group")).rows[0].n;
+      await q("INSERT INTO request_stat (minute, requests) VALUES (now() - interval '40 days', 5)");
       const done = await repo.purge(pool);
       expect(done.events).toBeGreaterThan(0);
       expect(done.snapshots).toBeGreaterThan(0);
+      expect(done.minutes).toBeGreaterThan(0);
       expect((await q("SELECT count(*)::int AS n FROM error_group")).rows[0].n).toBe(before);
     });
   });

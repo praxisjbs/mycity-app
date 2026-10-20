@@ -108,7 +108,9 @@ const SCREENS = Object.freeze([
   s("praxis_ai", "history", "History", ["ai history", "past questions", "conversations"]),
 
   s("settings", "organisation", "Organisation", ["organization", "company", "company profile", "working week", "holidays", "public holidays"]),
-  s("settings", "system-health", "System Health", ["health", "errors", "faults", "uptime", "status", "crashes", "monitoring", "performance"]),
+  s("settings", "status", "Status", ["health", "system health", "uptime", "checks", "disk", "memory", "cpu", "server"]),
+  s("settings", "performance", "Performance", ["performance", "response time", "slow", "error rate", "load"]),
+  s("settings", "faults", "Faults", ["faults", "errors", "crashes", "exceptions", "stack trace", "brief"]),
   s("settings", "users", "Users", ["logins", "accounts", "invite", "user accounts"]),
   s("settings", "roles-and-permissions", "Roles & Permissions", ["roles", "permissions", "access", "grants", "rbac"]),
   s("settings", "approvals", "Approvals", ["approval flows", "workflow", "approval route", "hierarchy", "sign off"]),

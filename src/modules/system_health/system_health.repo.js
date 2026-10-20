@@ -235,11 +235,33 @@ function faultCounts(db) {
 function addSnapshot(db, s) {
   return one(
     db,
-    `INSERT INTO health_snapshot (status, checks, outbox_backlog, worker_lag_s, faults_open, faults_new_24h, release)
-     VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7)
+    `INSERT INTO health_snapshot (status, checks, outbox_backlog, worker_lag_s, faults_open, faults_new_24h, release,
+                                  disk_free_pct, memory_used_pct, cpu_load, database_mb, database_connections_pct,
+                                  requests, error_pct, mean_ms)
+     VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING health_snapshot_id, taken_at, status`,
     [s.status, JSON.stringify(s.checks || {}), s.outbox_backlog || 0, s.worker_lag_s ?? null,
-     s.faults_open || 0, s.faults_new_24h || 0, s.release || null],
+     s.faults_open || 0, s.faults_new_24h || 0, s.release || null,
+     s.disk_free_pct ?? null, s.memory_used_pct ?? null, s.cpu_load ?? null,
+     s.database_mb ?? null, s.database_connections_pct ?? null,
+     s.requests ?? null, s.error_pct ?? null, s.mean_ms ?? null],
+  );
+}
+
+/**
+ * The traffic of the window just gone, from the minutes the API wrote
+ * (shared/observability/request-stats.js). Null when nothing was served, which is
+ * different from zero and is drawn as a gap.
+ */
+function trafficSince(db, minutes = 5) {
+  return one(
+    db,
+    `SELECT COALESCE(sum(requests), 0)::bigint AS requests,
+            COALESCE(sum(errors), 0)::bigint AS errors,
+            COALESCE(sum(total_ms), 0)::bigint AS total_ms
+       FROM request_stat
+      WHERE minute > now() - make_interval(mins => $1)`,
+    [minutes],
   );
 }
 
@@ -263,6 +285,14 @@ function series(db, range) {
             max(faults_open)::int AS faults,
             max(outbox_backlog)::int AS outbox_backlog,
             max(worker_lag_s)::int AS worker_lag_s,
+            min(disk_free_pct)::int AS disk_free_pct,
+            max(memory_used_pct)::int AS memory_used_pct,
+            max(cpu_load)::numeric AS cpu_load,
+            max(database_mb)::int AS database_mb,
+            max(database_connections_pct)::int AS database_connections_pct,
+            sum(requests)::bigint AS requests,
+            max(error_pct)::numeric AS error_pct,
+            round(avg(mean_ms))::int AS mean_ms,
             count(*)::int AS snapshots
        FROM health_snapshot
       WHERE taken_at > now() - make_interval(hours => $1)
@@ -433,7 +463,10 @@ function digestFigures(db) {
   );
 }
 
-/** Nightly: occurrences past KEEP_EVENT_DAYS and snapshots past KEEP_SNAPSHOT_DAYS. */
+/**
+ * Nightly: occurrences past KEEP_EVENT_DAYS, snapshots and the minutes of traffic past
+ * KEEP_SNAPSHOT_DAYS. `schedule_run` is one row per job and is never purged.
+ */
 async function purge(db) {
   const events = await db.query(
     `DELETE FROM error_event WHERE occurred_at < now() - make_interval(days => $1)`,
@@ -443,7 +476,11 @@ async function purge(db) {
     `DELETE FROM health_snapshot WHERE taken_at < now() - make_interval(days => $1)`,
     [KEEP_SNAPSHOT_DAYS],
   );
-  return { events: events.rowCount, snapshots: snapshots.rowCount };
+  const minutes = await db.query(
+    `DELETE FROM request_stat WHERE minute < now() - make_interval(days => $1)`,
+    [KEEP_SNAPSHOT_DAYS],
+  );
+  return { events: events.rowCount, snapshots: snapshots.rowCount, minutes: minutes.rowCount };
 }
 
 module.exports = {
@@ -464,6 +501,7 @@ module.exports = {
   faultCounts,
   addSnapshot,
   lastSnapshot,
+  trafficSince,
   series,
   uptime,
   recentFingerprints,

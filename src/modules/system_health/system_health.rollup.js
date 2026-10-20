@@ -159,6 +159,16 @@ async function snapshot(now = new Date()) {
   const state = fatal ? "unavailable" : degraded ? "degraded" : "ready";
   const outbox = checks.outbox || {};
   const worker = checks.worker || {};
+  const disk = checks.disk || {};
+  const memory = checks.memory || {};
+  const cpu = checks.cpu || {};
+  const db = checks.database_usage || {};
+
+  // The traffic of the five minutes just gone, as the API recorded it minute by minute.
+  const traffic = await repo.trafficSince(pool, 5).catch(() => null);
+  const requests = traffic ? Number(traffic.requests) : 0;
+  const errors = traffic ? Number(traffic.errors) : 0;
+  const totalMs = traffic ? Number(traffic.total_ms) : 0;
 
   await tx((client) =>
     repo.addSnapshot(client, {
@@ -169,6 +179,15 @@ async function snapshot(now = new Date()) {
       faults_open: counts ? counts.faults_open : 0,
       faults_new_24h: counts ? counts.faults_new_24h : 0,
       release: config.BUILD_SHA || "local",
+      disk_free_pct: disk.free_pct ?? null,
+      memory_used_pct: memory.used_pct ?? null,
+      cpu_load: cpu.load ?? null,
+      database_mb: db.size_mb ?? null,
+      database_connections_pct: db.connections_pct ?? null,
+      // Null, not zero, when nothing was served: a quiet window is a gap, not 0 ms.
+      requests,
+      error_pct: requests ? Math.round((errors * 10000) / requests) / 100 : null,
+      mean_ms: requests ? Math.round(totalMs / requests) : null,
     }),
   );
 

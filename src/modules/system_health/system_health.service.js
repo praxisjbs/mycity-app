@@ -43,6 +43,11 @@ const CHECKS = [
   { key: "mail", label: "Mail", look: "Mail is not configured or the server refused. Queued mail waits." },
   { key: "ai", label: "AI", look: "No AI vendor answers, so the assistant falls back to its stub." },
   { key: "static", label: "Frontend Build", look: "A frontend build is missing from this release." },
+  { key: "disk", label: "Disk Space", look: "The disk is filling up. Nothing can be uploaded or written once it is full." },
+  { key: "memory", label: "Memory", look: "The server is close to its memory. The process is killed if it runs out." },
+  { key: "cpu", label: "Processor", look: "The server is working harder than it has cores for, so everything answers slowly." },
+  { key: "database_usage", label: "Database Usage", look: "The database is close to its connection limit, or growing fast." },
+  { key: "schedulers", label: "Background Jobs", look: "A job has not run when it should have. Reminders, snapshots and clean-ups are waiting." },
 ];
 
 const BY_KEY = new Map(CHECKS.map((c) => [c.key, c]));
@@ -60,6 +65,17 @@ function detailOf(key, v) {
   if (key === "migrations" && v.head) bits.push(`at ${v.head}`);
   if (key === "mail" && v.sent_last_hour !== undefined) bits.push(`${v.sent_last_hour} of ${v.per_hour} this hour`);
   if (key === "ai" && v.vendor) bits.push(`answering: ${v.vendor}`);
+  if (key === "disk" && v.free_pct !== undefined) bits.push(`${v.free_pct}% free, ${v.free_gb} GB of ${v.total_gb} GB`);
+  if (key === "memory" && v.used_pct !== undefined) bits.push(`${v.used_pct}% used, ${v.used_gb} GB of ${v.total_gb} GB`);
+  if (key === "cpu" && v.load !== undefined) bits.push(`load ${v.load} across ${v.cores} cores`);
+  if (key === "database_usage" && v.size_mb !== undefined)
+    bits.push(`${v.size_mb} MB, ${v.connections_used} of ${v.connections_allowed} connections`);
+  if (key === "schedulers" && v.schedulers !== undefined)
+    bits.push(
+      (v.late || []).length
+        ? `${v.late.length} of ${v.schedulers} have not run: ${v.late.slice(0, 3).join(", ")}`
+        : `all ${v.schedulers} running`,
+    );
   if (v.latency_ms !== undefined && v.latency_ms !== null) bits.push(`answered in ${v.latency_ms} ms`);
   if (!bits.length) bits.push(v.status === "up" ? "Answering" : "Not answering");
   return bits.join(", ");
@@ -97,11 +113,25 @@ function gapMinutes(range, snapshots) {
 }
 
 /** GET /system-health/performance */
+/**
+ * A snapshot older than this means the five-minute job is not running, rather than the
+ * system being quiet. Two intervals, so one missed tick is not an accusation.
+ */
+const RECORDING_WITHIN_MS = 11 * 60_000;
+
+const asNumber = (v) => (v === null || v === undefined ? null : Number(v));
+const asDecimal = (v) => (v === null || v === undefined ? null : String(v));
+
 async function performance(query) {
   const range = query.range || "24h";
-  const [points, up] = await Promise.all([repo.series(pool, range), repo.uptime(pool, range)]);
+  const [points, up, last] = await Promise.all([
+    repo.series(pool, range),
+    repo.uptime(pool, range),
+    repo.lastSnapshot(pool),
+  ]);
   const snapshots = up ? up.snapshots : 0;
   const ready = up ? up.ready : 0;
+  const lastAt = last ? new Date(last.taken_at) : null;
   return {
     range,
     points: points.map((p) => ({
@@ -110,8 +140,17 @@ async function performance(query) {
       faults: p.faults || 0,
       outbox_backlog: p.outbox_backlog || 0,
       worker_lag_s: p.worker_lag_s ?? null,
+      requests: asNumber(p.requests),
+      mean_ms: asNumber(p.mean_ms),
+      error_pct: asDecimal(p.error_pct),
+      disk_free_pct: asNumber(p.disk_free_pct),
+      memory_used_pct: asNumber(p.memory_used_pct),
+      cpu_load: asDecimal(p.cpu_load),
+      database_mb: asNumber(p.database_mb),
     })),
     gap_minutes: gapMinutes(range, snapshots),
+    recording: Boolean(lastAt) && Date.now() - lastAt.getTime() < RECORDING_WITHIN_MS,
+    last_snapshot_at: lastAt ? lastAt.toISOString() : null,
     uptime_pct: (snapshots ? (ready * 100) / snapshots : 0).toFixed(1),
   };
 }
@@ -283,6 +322,7 @@ module.exports = {
   lookAt,
   detailOf,
   gapMinutes,
+  RECORDING_WITHIN_MS,
   presentRow,
   status,
   performance,

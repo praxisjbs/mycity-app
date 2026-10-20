@@ -146,6 +146,9 @@ const SCHEDULERS = Object.freeze([
   "export-cleanup",
   "urgent-repeats",
   "reminders",
+  "system-health",
+  "system-health-digest",
+  "system-health-purge",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */
@@ -231,6 +234,34 @@ function defineSchedule(spec) {
   if (spec.inProcess && !hasEvery)
     throw new Error(`${where}: an in-process schedule uses every`);
   return Object.freeze({ tz: DEFAULT_TZ, inProcess: false, ...spec });
+}
+
+/**
+ * When each scheduler last ran, so a job that has stopped can be seen rather than
+ * quietly not happening (http/health.js "schedulers", Settings · System Health).
+ *
+ * Best effort by design: a tick must never fail because its bookkeeping did. The row
+ * is written after the run, whether or not this process held the cron lock, because a
+ * tick another process ran is still a tick that happened.
+ */
+async function recordRun(name, startedAt, ok, note) {
+  try {
+    await require("../config/db").pool.query(
+      `INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, note, runs, failures)
+       VALUES ($1, now(), $2, $3, $4, 1, $5)
+       ON CONFLICT (name) DO UPDATE SET
+         last_run_at = now(),
+         duration_ms = EXCLUDED.duration_ms,
+         ok = EXCLUDED.ok,
+         note = EXCLUDED.note,
+         runs = schedule_run.runs + 1,
+         failures = schedule_run.failures + EXCLUDED.failures,
+         last_failure_at = CASE WHEN EXCLUDED.ok THEN schedule_run.last_failure_at ELSE now() END`,
+      [name, Date.now() - startedAt, ok, note ? String(note).slice(0, 500) : null, ok ? 0 : 1],
+    );
+  } catch (err) {
+    logger.warn({ err, scheduler: name }, "a scheduler ran but its run was not recorded");
+  }
 }
 
 /** Every scheduler, loaded and checked. */
@@ -452,7 +483,16 @@ function startConsumers({ only = null } = {}) {
             );
             return { skipped: "unknown scheduler" };
           }
-          const out = await withCronLock(spec.name, () => spec.run());
+          const started = Date.now();
+          let out;
+          try {
+            out = await withCronLock(spec.name, () => spec.run());
+          } catch (err) {
+            await recordRun(spec.name, started, false, String((err && err.message) || err));
+            throw err;
+          }
+          // A tick another process held the lock for is still a tick that happened.
+          await recordRun(spec.name, started, true, null);
           return out === undefined ? { skipped: "locked" } : out;
         },
         SCHEDULE_CONCURRENCY,
