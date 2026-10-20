@@ -10,7 +10,7 @@
 | Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
 | Status | Built |
-| Last changed | 19/10/2026 |
+| Last changed | 20/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -397,3 +397,4 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 - 19/10/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them, My Profile's Home Address (`app/src/features/ess/Profile.tsx`) suggests addresses as it is typed (`docs/guides/foundation.md` §6.13, `docs/guides/ess.md`).
 - 20/10/2026 · GE · Nothing on the Organogram or Org Chart changed. The organisation module gains `setBirthday` (service and repo), which records a birthday known only as a day and month (`employee.birth_day`, `birth_month`, migration `1180`) for the staff loader; it emits `employee.updated` with the two fields before and after (foundation guide §6.1, community guide §3 step 3).
 - 20/10/2026 · TB · Nothing on the Organogram or Org Chart changed. An employee's home address is a picked place (F27, `docs/guides/addresses.md`): `EmployeeCreate` and `EmployeeUpdate.home_address` take a `PlaceInput` (left out, it stays), the organisation service keeps it through `shared/places` (owner `employee.home_address`) and registers how its line is rewritten in `organisation.events.js`. No People form asks for it; `create-admin` no longer types one.
+- 20/10/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them, the employee record (`app/src/features/people/Employee360.tsx`) names its place on the hub's trail with the person's name (`useTrailTitle`, FRONTEND_FOUNDATION F29; `docs/guides/foundation.md` §14).

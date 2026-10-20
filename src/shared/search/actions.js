@@ -11,7 +11,8 @@
  * `run` is for an action with no screen of its own, which the app does itself: Clock In
  * or Out (the clock sheet), Mark All Read, Notification Settings, Turn On Notifications and
  * Send Test Notification (the bell, docs/guides/notifications.md §9), the theme and density the person
- * prefers, Install App (the app drops it where the browser cannot install) and Sign Out.
+ * prefers, Install App (the app drops it where the browser cannot install), Refresh Screen and
+ * Reload App (the pull and the refresh button's two depths, FRONTEND_FOUNDATION F28) and Sign Out.
  *
  * Every screen's New action is here: the search coverage gate fails a
  * `useScreenAction({ label })` in the app whose label is not an action below, unless the
@@ -37,6 +38,8 @@ const RUNS = new Set([
   "theme_light",
   "density",
   "install",
+  "refresh",
+  "reload",
   "sign_out",
 ]);
 
@@ -209,6 +212,16 @@ const ACTIONS = Object.freeze([
     run: "install",
     need: null,
     words: ["install", "add to home screen", "app", "download app"],
+  }),
+  a("refresh_screen", "Refresh Screen", {
+    run: "refresh",
+    need: null,
+    words: ["refresh", "reload data", "update", "latest", "pull to refresh", "fresh numbers"],
+  }),
+  a("reload_app", "Reload App", {
+    run: "reload",
+    need: null,
+    words: ["reload", "restart", "restart app", "hard refresh", "start again"],
   }),
   a("sign_out", "Sign Out", {
     run: "sign_out",

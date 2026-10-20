@@ -106,6 +106,8 @@
   /* The sign-in city's name arriving out of focus, and its clock's colon keeping the seconds. */
   --animate-title-in: title-in 1.2s cubic-bezier(.2, .7, .2, 1) both;
   --animate-tick: tick 1s step-end infinite;
+  /* The pull to refresh (F28): the pin landing at the release point. */
+  --animate-pin-land: pin-land .34s cubic-bezier(.32, .72, 0, 1);
 }
 
 @theme inline {
@@ -236,3 +238,4 @@
 @keyframes sway { 0%, 100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.6deg); } }
 @keyframes graze { 0%, 55%, 100% { transform: rotate(0); } 70%, 85% { transform: rotate(34deg); } }
 @keyframes fill-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes pin-land { 0% { transform: translateY(-7px); } 55% { transform: translateY(1.5px) scale(1.06, .9); } 100% { transform: none; } }

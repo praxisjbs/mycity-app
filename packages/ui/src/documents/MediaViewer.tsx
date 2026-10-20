@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "../lib/cn";
 import { useIsPhone } from "../lib/media";
+import { useBackClose } from "../lib/history";
 import { Button, IconButton } from "../actions/Button";
 import { Icon } from "../icons/Icon";
 import { Spinner } from "../display/Skeleton";
@@ -267,22 +268,8 @@ export function MediaViewer({ open, items, index, onIndex, onClose, load, save, 
     return () => kept.forEach((l) => URL.revokeObjectURL(l.url));
   }, []);
 
-  /* On a phone the system's Back closes the viewer, not the screen behind it. */
-  useEffect(() => {
-    if (!open || !phone) return;
-    const mark = `mc-viewer-${Date.now()}`;
-    let byBack = false;
-    window.history.pushState({ ...(window.history.state ?? {}), mcViewer: mark }, "");
-    const onPop = () => {
-      byBack = true;
-      closeRef.current();
-    };
-    window.addEventListener("popstate", onPop);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      if (!byBack && window.history.state?.mcViewer === mark) window.history.back();
-    };
-  }, [open, phone]);
+  /* On a phone the system's Back closes the viewer, not the screen behind it (F29). */
+  useBackClose(open, () => closeRef.current());
 
   const step = useCallback(
     (by: 1 | -1) => {

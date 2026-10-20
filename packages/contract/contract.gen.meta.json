@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "f494c05f250309d3fe62fb9f45a34876f150cb16a3ed1815a03c95e72f3d0fca",
+  "source_hash": "39936fc4137dbcbdfc5b5308442b72839d1f4df1d014942f2ce513becc6a52d0",
   "schemas": 788,
   "endpoints": 409,
   "inputs": {
@@ -58,7 +58,7 @@
     "packages/contract/schemas/reviews.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/salary_structure.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/sanctions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/search.js": "a854c788876b3e3614c641c1054e7c259af2ca5e102141f970a51fb853d5421d",
+    "packages/contract/schemas/search.js": "9a4e125aefe30c297a7b915408cabd94ee6512c98eec2bbe59b69db1209f4225",
     "packages/contract/schemas/security.js": "6cf6f6a58006e811045e71036358fd5a74aeccc27f82db0174acc5cfd4c329e0",
     "packages/contract/schemas/settings.js": "4f73ebb69b6a3f02d040cd1adcf08bb4bbb708b4e442c90803e120ac1d406750",
     "packages/contract/schemas/signatures.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

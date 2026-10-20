@@ -30,7 +30,7 @@ describe("Icon", () => {
     expect(svgs).toHaveLength(ICON_NAMES.length);
     svgs.forEach((svg) => expect(svg).toHaveAttribute("stroke", "currentColor"));
     // The whole set, so a glyph is never added without a screen that needs it.
-    expect(ICON_NAMES).toHaveLength(94);
+    expect(ICON_NAMES).toHaveLength(96);
     expect(new Set(ICON_NAMES).size).toBe(ICON_NAMES.length);
   });
 

@@ -10,6 +10,7 @@ import { openNotificationSettings } from "@/features/notifications/state";
 import { useRouter } from "@/lib/router";
 import { useInstallApp } from "./Notices";
 import { usePwa } from "./pwa";
+import { refreshScreen, useReloadApp } from "./refresh";
 
 /**
  * Search, everywhere in the staff app: ⌘K or Ctrl K, the top bar's search
@@ -22,7 +23,9 @@ import { usePwa } from "./pwa";
  * A result opens its link. An action with no screen of its own the app runs
  * here: Clock In or Out opens the clock, Mark All Read clears the bell, and the
  * theme, density, Install App and Sign Out do what the account menu does.
- * Install App is left out where this browser cannot install.
+ * Install App is left out where this browser cannot install. Refresh Screen and
+ * Reload App do what the pull and the refresh button do (F28), for anyone who
+ * cannot pull or hold.
  */
 const ICONS: Record<string, IconName> = {
   app_user: "user",
@@ -43,6 +46,8 @@ const RUN_ICONS: Record<string, IconName> = {
   theme_light: "sun",
   density: "rows",
   install: "download",
+  refresh: "rotate",
+  reload: "refresh",
   sign_out: "logout",
 };
 
@@ -59,6 +64,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
   const density = useDensity();
   const { canInstall } = usePwa();
   const installApp = useInstallApp();
+  const reloadApp = useReloadApp();
   const { signOut } = useAuth();
   const [line, setLine] = useState("");
   const [q, setQ] = useState("");
@@ -84,6 +90,8 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
     if (hit?.run === "theme_light") return setTheme("light");
     if (hit?.run === "density") return density.toggle();
     if (hit?.run === "install") return installApp();
+    if (hit?.run === "refresh") return refreshScreen();
+    if (hit?.run === "reload") return reloadApp();
     if (hit?.run === "sign_out") return void signOut();
     if (hit?.run === "notify_settings") return openNotificationSettings();
     if (hit?.run === "notify_on") {

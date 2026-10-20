@@ -9,10 +9,9 @@
  * @status beta
  * @example <NotificationCenter open={open} onOpenChange={setOpen} trigger={bell} view="all" onView={setView} unread={3} items={rows} onOpenItem={open} onMarkRead={read} onMarkAllRead={readAll} onSettings={settings} />
  */
-import { useEffect, useRef, useState, type ReactElement, type ReactNode, type TouchEvent } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import * as Radix from "@radix-ui/react-popover";
 import { Slot } from "@radix-ui/react-slot";
-import { cn } from "../lib/cn";
 import { formatWhen } from "../lib/format";
 import { useIsPhone } from "../lib/media";
 import { IconButton } from "../actions/Button";
@@ -95,8 +94,6 @@ function groupsOf(items: NotificationItem[], now: Date): Array<[DayGroup, Notifi
 
 /** How close to the end of the list the next page is asked for. */
 const NEAR_END_PX = 240;
-/** How far a pull at the top must travel to refresh. */
-const PULL_PX = 64;
 
 function List({ items, loading, view, now, onOpenItem, onMarkRead }: Pick<NotificationCenterProps, "items" | "loading" | "view" | "onOpenItem" | "onMarkRead"> & { now: Date }) {
   if (loading && items.length === 0) {
@@ -196,11 +193,9 @@ export function NotificationCenter(props: NotificationCenterProps) {
         <Slot aria-haspopup="dialog" aria-expanded={open} onClick={() => onOpenChange(!open)}>
           {trigger}
         </Slot>
-        <PhonePage open={open} onClose={() => onOpenChange(false)} title="Notifications" actions={actions} bar={choices} bodyRef={setBody} container={container}>
-          <Pull onRefresh={onRefresh} scroller={body}>
-            {notice}
-            {list}
-          </Pull>
+        <PhonePage open={open} onClose={() => onOpenChange(false)} title="Notifications" actions={actions} bar={choices} bodyRef={setBody} onRefresh={onRefresh} container={container}>
+          {notice}
+          {list}
         </PhonePage>
       </>
     );
@@ -230,50 +225,5 @@ export function NotificationCenter(props: NotificationCenterProps) {
         </Radix.Content>
       </Radix.Portal>
     </Radix.Root>
-  );
-}
-
-/** Pull down at the top of the page to refresh, as a phone's lists do. */
-function Pull({ children, onRefresh, scroller }: { children: ReactNode; onRefresh?: () => Promise<unknown>; scroller: HTMLElement | null }) {
-  const box = useRef<HTMLDivElement | null>(null);
-  const start = useRef<number | null>(null);
-  const pulled = useRef(0);
-  const [busy, setBusy] = useState(false);
-  const move = (y: number, animate: boolean) => {
-    const el = box.current;
-    if (!el) return;
-    el.style.transition = animate ? "transform var(--dur) var(--ease-spring)" : "";
-    el.style.transform = y ? `translate3d(0, ${y}px, 0)` : "";
-  };
-  const touches = onRefresh
-    ? {
-        onTouchStart: (e: TouchEvent) => {
-          start.current = (scroller?.scrollTop ?? 0) <= 0 && !busy ? (e.touches[0]?.clientY ?? null) : null;
-        },
-        onTouchMove: (e: TouchEvent) => {
-          if (start.current === null) return;
-          const dy = (e.touches[0]?.clientY ?? start.current) - start.current;
-          pulled.current = dy > 0 ? Math.min(PULL_PX * 1.5, dy / 2) : 0;
-          move(pulled.current, false);
-        },
-        onTouchEnd: () => {
-          if (start.current === null) return;
-          start.current = null;
-          const far = pulled.current >= PULL_PX * 0.75;
-          pulled.current = 0;
-          move(0, true);
-          if (!far) return;
-          setBusy(true);
-          void onRefresh().finally(() => setBusy(false));
-        },
-      }
-    : {};
-  return (
-    <div ref={box} className="min-h-full" {...touches}>
-      <div aria-hidden={!busy} className={cn("flex justify-center overflow-hidden text-subtle-foreground transition-all duration-(--dur-fast)", busy ? "h-10 py-2.5" : "h-0")}>
-        <Icon name="refresh" className={cn(busy && "animate-spin")} />
-      </div>
-      {children}
-    </div>
   );
 }

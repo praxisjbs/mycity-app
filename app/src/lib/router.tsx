@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from "react";
+import { onHistory, pushStep, replaceStep, startHistory } from "@mycity/ui";
 
 /**
  * The one URL shape the backend produces for a screen or a record
@@ -12,6 +13,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
  * (filters, prefill from an AI deep link) and are passed through untouched.
  *
  * Small on purpose: the app has one route shape, so it needs no routing library.
+ *
+ * The window's history has one owner, @mycity/ui's history (FRONTEND_FOUNDATION
+ * F29), so Android's Back, the iPhone's edge swipe, a mouse's side buttons and
+ * the hub's own controls agree. `navigate` decides what a step is: another
+ * screen (the path or `tab`) or another record (`id`) adds one; any other key
+ * (filters, `q`, `sort`, `page`, a modal's own) changes the step in place, so
+ * Back returns to a list as it was left. A caller that knows better passes
+ * `replace`.
  */
 export interface Location {
   path: string;
@@ -30,24 +39,41 @@ function read(): Location {
 
 interface RouterValue {
   location: Location;
+  /** Opens an address: a new step for another screen or record, in place otherwise; `replace` decides when given. */
   navigate: (to: string, opts?: { replace?: boolean }) => void;
   /** Sets or clears the question asked before leaving this screen (useLeaveGuard). */
   setGuard: (ask: LeaveGuard | null) => void;
+  /**
+   * Before the whole app reloads (F28): asks the screen holding unsaved work, if
+   * any, as leaving it would; resolves true to go, and the browser then does not
+   * ask a second time.
+   */
+  confirmLeave: () => Promise<boolean>;
 }
 
 /** Asks whether to leave the screen; resolves true to go. */
 export type LeaveGuard = () => Promise<boolean>;
 
+/** Set once the person has agreed to leave for a reload, so the browser's own question stays away. */
+let leavingOnPurpose = false;
+
 const RouterContext = createContext<RouterValue | null>(null);
 
-export function RouterProvider({ children }: { children: ReactNode }) {
-  const [location, setLocation] = useState(read);
+/** Another screen (path or tab) or another record (id): a step of its own. */
+function isStep(from: { pathname: string; search: string }, to: URL): boolean {
+  const was = new URLSearchParams(from.search);
+  return to.pathname !== from.pathname || to.searchParams.get("tab") !== was.get("tab") || to.searchParams.get("id") !== was.get("id");
+}
 
-  useEffect(() => {
-    const onPop = () => setLocation(read());
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
+export function RouterProvider({ children }: { children: ReactNode }) {
+  // The history is started before the first render reads the address, so the entry it opens on is marked.
+  const [location, setLocation] = useState(() => {
+    startHistory();
+    return read();
+  });
+
+  // Back and Forward (the phone's own included), a jump through the trail, and the device's last session put back.
+  useEffect(() => onHistory((change) => change.kind === "pop" && setLocation(read())), []);
 
   const guard = useRef<LeaveGuard | null>(null);
   const setGuard = useCallback((ask: LeaveGuard | null) => {
@@ -58,9 +84,10 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     const url = new URL(to, window.location.origin);
     const next = url.pathname + url.search;
     if (next === window.location.pathname + window.location.search) return;
+    const step = opts.replace === undefined ? isStep(window.location, url) : !opts.replace;
     const go = () => {
-      if (opts.replace) window.history.replaceState(null, "", next);
-      else window.history.pushState(null, "", next);
+      if (step) pushStep(next);
+      else replaceStep(next);
       setLocation(read());
     };
     // Another screen (path or tab) while one holds unsaved work: it asks first.
@@ -77,7 +104,16 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     go();
   }, []);
 
-  const value = useMemo(() => ({ location, navigate, setGuard }), [location, navigate, setGuard]);
+  const confirmLeave = useCallback(async () => {
+    const ask = guard.current;
+    const ok = !ask || (await ask());
+    // Only for the reload about to happen: if the page stays after all, the browser asks again next time.
+    leavingOnPurpose = ok;
+    if (ok) window.setTimeout(() => (leavingOnPurpose = false), 5000);
+    return ok;
+  }, []);
+
+  const value = useMemo(() => ({ location, navigate, setGuard, confirmLeave }), [location, navigate, setGuard, confirmLeave]);
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
 
@@ -101,7 +137,9 @@ export function useLeaveGuard(active: boolean, ask: LeaveGuard): void {
   useEffect(() => {
     if (!active) return;
     setGuard(() => latest.current());
-    const onUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (!leavingOnPurpose) e.preventDefault();
+    };
     window.addEventListener("beforeunload", onUnload);
     return () => {
       setGuard(null);

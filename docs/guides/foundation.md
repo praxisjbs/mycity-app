@@ -465,8 +465,8 @@ As built (17/10/2026):
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
   Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
   Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
-  Dark Theme, Use Light Theme, Change Density, Install App, Sign Out, Add Work Site, Add Temporary
-  Site), then
+  Dark Theme, Use Light Theme, Change Density, Install App, Refresh Screen, Reload App, Sign Out, Add
+  Work Site, Add Temporary Site), then
   one group per kind of record from each `<module>.search.js` (Employees, Departments, Open Seats, Users,
   Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's).
 - **Waiting on You** comes first: the requests waiting on the reader's decision (the My Approvals list),
@@ -489,7 +489,10 @@ As built (17/10/2026):
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
   (`useScreenAction`), another word runs what the screen names with `useUrlAction` (`password`, `pin`),
   and `?importer=employees` opens the Import wizard. Clock In, Mark All Read and the three
-  notification actions run in the app itself (`docs/guides/notifications.md` §9).
+  notification actions run in the app itself (`docs/guides/notifications.md` §9), and so do Refresh
+  Screen and Reload App (`run` `refresh` and `reload`, FRONTEND_FOUNDATION F28): the same refresh in
+  place as the pull and the refresh button, and the same reload as holding it, which a person using a
+  screen reader reaches here.
 - **The gate** (`scripts/check/search-coverage.js`): every screen in the route map has a search entry
   whose label equals the shell's; every entity type in `ENTITY_ROUTES` is declared by a provider or its
   line carries `// search:none <reason>`; every `useScreenAction({ label })` in the app is an action in
@@ -823,11 +826,13 @@ screen.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · §6.7: ⌘K gains Refresh Screen and Reload App, run in the app (F28), so the
+  refresh and the reload have a path without the pull or the hold. The employee record names its
+  place on the trail with the person's name (`useTrailTitle`, F29).
 - 20/10/2026 · TB · AI Control is its own module under System (`docs/guides/ai-control.md`), beside
   Praxis AI, with its own `ai_control` key. Settings · Integrations opens a connection named in the
   address (`?id=` its code), for AI Control · Models' Open Connection, and each AI connection links to
   AI Control.
-
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) left the shell (`catalogue.ts`, `coming-soon.ts`, `features/settings/index.tsx`); Knowledge Hub · Policies is shown only to holders of `policies.manage` (`shell/access.ts`, as `src/shared/search/screens.js`); the shell mounts the acknowledge sheet beside the clock prompts (`docs/guides/policies.md` §6.7).
 - 20/10/2026 · TB · Settings · Integrations gains the AI providers (Groq, OpenAI, Anthropic,
   DeepSeek beside Gemini) with their model lists, Exchange Rates, and a Free or Paid plan on every

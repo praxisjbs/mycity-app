@@ -90,6 +90,36 @@
 @utility no-callout {
   -webkit-touch-callout: none;
 }
+/* The pull to refresh (F28). The phone shell writes how far the page is pulled (--pull, in px) and how
+   much of the way to the release point that is (--pull-p, 0 to 1) on the indicator, so the disc follows
+   the finger on the compositor without React drawing each move. */
+@utility pull-disc {
+  transform: translate3d(0, calc(var(--pull, 0) * 1px - 52px), 0) scale(calc(0.6 + 0.4 * var(--pull-p, 0)));
+  opacity: min(1, calc(var(--pull-p, 0) * 3));
+}
+@utility pull-ring {
+  stroke-dasharray: 100px;
+  stroke-dashoffset: calc((1 - var(--pull-p, 0)) * 100px);
+}
+/* While the screen refreshes: a quarter of the ring, turning (animate-spin). */
+@utility pull-ring-busy {
+  stroke-dasharray: 28px 72px;
+  stroke-dashoffset: 0;
+}
+@utility pull-lift {
+  transform: translateY(calc((1 - var(--pull-p, 0)) * -5px));
+}
+/* The Hold Ring (F28): the ring around the refresh button closes while it is held, in 0.6 s, then the
+   app reloads; let go early and it runs back. */
+@utility hold-ring {
+  stroke-dasharray: 100px;
+  stroke-dashoffset: 100px;
+  transition: stroke-dashoffset 0.14s linear;
+  [data-holding] & {
+    stroke-dashoffset: 0;
+    transition-duration: 0.6s;
+  }
+}
 @utility wrap-any {
   overflow-wrap: anywhere;
 }

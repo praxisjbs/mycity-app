@@ -51,7 +51,7 @@ app's session on the upload engine.
 
 ---
 
-## 3 · Decisions (15/10/2026, TB; F25 and F26 added 18/10/2026)
+## 3 · Decisions (15/10/2026, TB; F25 and F26 added 18/10/2026; F27 to F29 added 20/10/2026)
 
 | # | Decision |
 |---|---|
@@ -82,6 +82,8 @@ app's session on the upload engine.
 | F25 | **Nothing the browser styles itself** (added 18/10/2026). No native select or phone picker, no browser date, number, checkbox or radio input, no `title` tooltip, no validation bubble, no toast styled by a library: every control, list, tooltip and message is a `packages/ui` component in the brand's tokens, on both shells. A select is `SelectMenu` (a Radix listbox on desktop, a bottom sheet on a phone); a hover label is `Tooltip`; `base.css` resets what the browser would still draw. Gate 21 (`check/native-ui.js`) holds it in source and on every rendered screen, `packages/ui` included, with no exemptions (FRONTEND_GUIDE §8.8) |
 | F27 | **Addresses are picked, never typed** (added 20/10/2026, TB). Every address or location a person enters, in both apps, on production and staging, is an `AddressField` (a `PlacesField` for a list of cities), with no free-text mode: suggestions from the second character, about 100 ms after the last key, held on the device so retyping is instant; a pick, a pin on the map, or, while address search is down, the device's current location. The API accepts only a place our search or pin signed (`PlaceInput`); the Details line (house number, flat, directions) is the only free text. Gate 22 (`check/addresses.js`) holds the screens and the contract to it (`docs/guides/addresses.md`, FRONTEND_GUIDE §8.9) |
 | F26 | **One press, one request** (added 18/10/2026). A button answers the moment it is pressed. Its handler hands back the work (a promise), and the button is busy until that settles: its own colour and label, softened, with a spinner where its icon was (centred over the label when it has none, so its size never changes), and a second press refused at once, before the screen redraws. The buttons beside it wait with it (a modal, a form, a form footer, a card or page header, a shell notice, or an `ActionGroup`), and a modal cannot be dismissed mid-save. Busy stays focusable and named (`aria-busy`, `aria-disabled`), never `disabled`. A `Form` refuses a second submit while its save runs. The lint rule `mycity/no-void-press` refuses a handler that throws its work away (`() => void save()`) on `Button`, `IconButton`, `BigButton`, `Form`, `Wizard`, `ConfirmDialog` and `ExportButton` (FRONTEND_GUIDE §8.4, §9.4) |
+| F28 | **Refresh in place, reload on purpose** (added 20/10/2026, TB; the hub only). Refresh asks every read on the screen again where it is: scroll, filters, the open record and anything typed stay, nothing turns back into a skeleton, and it ends when the last read lands (the data client's `refresh`). **Phone:** pull down at the top of the page, the Pin Drop. The pin drops in a disc under the header while a yellow ring fills; at 64 px the ring closes and the pin lands (a tick on Android), and letting go refreshes, the ring spinning until the reads are in. Pulled on past 136 px the disc turns Deep Green with the reload mark, and letting go restarts the app on the same screen (two depths). The pull only listens and never holds up scrolling: it starts only when the page and every list under the finger are at their top, after a clear move down, never on a fit page (Chat, Mailbox) or over anything marked `data-pull="off"` (a map, the signature pad, a document), and the hub turns the browser's own pull off. **Desktop:** the refresh button at the start of the top bar, the Hold Ring: a click refreshes, its arrow turning until the reads are in; held, a yellow ring closes around it in 0.6 s and the app reloads; Shift and Enter reload from the keyboard. Refresh shows in a browser tab as well as in the installed app. A reload hands over to a waiting new version; F5 and Ctrl R keep the browser's own full reload. ⌘K offers Refresh Screen and Reload App (FRONTEND_GUIDE §7, §9.5) |
+| F29 | **Back and forward, one history** (added 20/10/2026, TB; the hub only). The window's own history is the only record of where a person has been, so Android's Back, the iPhone's edge swipe, a mouse's side buttons, Alt and an arrow key, and the hub's own controls always agree. A new screen, tab or opened record (`id`) is a step; filters, search, sort and the page change that step in place, so Back returns to a list as it was left. On a phone an open sheet, page, menu, search or viewer takes a step of its own, so Back closes it first; one holding unsaved work asks, as Esc does. Each device keeps its own trail, never sent to the server or shared with the person's other devices: the installed app reopens where they were, Back still working, when they left it within the last 12 hours, and Sign Out wipes it. **Desktop, installed app only:** back and forward join the refresh button in one capsule at the start of the top bar; hovering an arrow names where it goes; holding an arrow, right clicking it or holding the pin opens the trail, the last 8 places and the 1 ahead, to jump straight to one. **Phone:** no back button. Android's Back and the iPhone's edge swipe go back, and in the installed app holding the pin opens the trail as a sheet. A browser tab keeps the browser's own back and forward (FRONTEND_GUIDE §7, §9.2) |
 
 ---
 
@@ -216,6 +218,32 @@ app's session on the upload engine.
    `mycity/no-void-press` refuses the pattern from now on, inline or in the local function a button
    names.
 
+**F28 and F29 · Refresh and history** (20/10/2026, TB). Eight questions, each asked with a live design
+board of the options (pull them, hold them), for the hub only, production and staging alike.
+
+1. What does a pull do on a phone? **Two depths**: a short pull refreshes in place; pulled on past a
+   second notch, the pin turns to Reload and letting go restarts the app on that screen. Refresh in
+   place with Reload App kept in More, and a pull that always reloads, were turned down.
+2. How does the pull look? **Pin Drop**: the pin drops in a disc and a yellow ring fills, it lands
+   with a bounce at the release point and the ring spins while loading; the page stays still. A
+   sliding page, the Android disc and a line under the tabs were turned down.
+3. How does the desktop refresh button work? **Hold Ring**: a click refreshes, a hold closes a
+   yellow ring in 0.6 s and reloads. A split button with a menu, a freshness pill and a plain arrow
+   with Shift click were turned down.
+4. Where do the controls show? **Back and forward only in the installed app**, where the window has
+   none; refresh in a browser tab too, since it keeps the person's place where the browser's reload
+   does not.
+5. Where do they sit on desktop? **At the start of the top bar**, beside the menu toggle and before
+   search. The window's title bar, the rail and the tab strip were turned down.
+6. How do back and forward look on desktop? **One capsule** with refresh. Holding an arrow, or the
+   pin, drops down the last 5 to 8 places to jump straight back to one (built as the last 8, with
+   the 1 ahead).
+7. How does a person go back on a phone? **Gestures only**: Android's Back and the iPhone's edge
+   swipe, and holding the pin opens the trail. A chevron beside the pin, the pin turning into one,
+   and a chevron on iPhones only were turned down.
+8. What is one step? **A screen, a tab or an opened record**; filters, search, sort and the page
+   change in place; on a phone an open sheet is a step, so Back closes it first.
+
 ---
 
 ## 6 · Progress
@@ -228,6 +256,18 @@ app's session on the upload engine.
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 20/10/2026 · TB · F28 and F29, refresh and history in the hub (the eight answers in §5). The data
+  client's `refresh` (quiet: data stays, `loading` stays false; settles when the last read lands) is what
+  the pull, the refresh button and ⌘K's Refresh Screen run. New in the Shell group: `PullIndicator` (the
+  Pin Drop, fed by `shell/pull.ts`, which only listens and starts at the top after a clear move down),
+  `NavCapsule` (back, forward and the Hold Ring) and `TrailMenu` (the trail, a sheet on a phone).
+  `PhoneShell` and `PhonePage` pull to refresh (the bell's pane lost its own pull); `PhoneHeader` and
+  `Rail` open the trail on a held pin. New helpers: `lib/history.ts` (the window's history with one owner:
+  keyed steps, `useBackClose` in `Sheet`, `PhonePage`, `CommandPalette`, `FloatingButton` and
+  `MediaViewer`, whose own pushState it replaces), `lib/hold.ts` (press and hold), `useInstalled`, and the
+  glyphs `rotate` and `history`. The hub's router follows the step rule, `lib/trail.ts` keeps the device's
+  trail and reopens the installed app where the person was, and Sign Out wipes it. Left: real devices
+  (an installed Android, an iPhone home-screen app, a Windows window) before the next demo.
 - 19/10/2026 · TB · PR 3 question 4 changed (§5): PDFs are drawn by PDF.js (`PdfViewer`, its
   drawing in its own chunk, with the font and code files served from `/pdfjs/`), because the
   browser's own viewer could not draw a PDF on Android and the security policy blocked it

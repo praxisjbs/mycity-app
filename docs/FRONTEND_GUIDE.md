@@ -13,7 +13,8 @@ MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and
 rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8 brought into line;
 §1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell); §8.8 and gate 21
 (nothing the browser styles itself, F25) added 18 October 2026, and one press, one request (F26:
-§8.4, §9.4, the `no-void-press` lint) the same day.
+§8.4, §9.4, the `no-void-press` lint) the same day; refresh (F28) and back and forward (F29) in the
+hub added 20 October 2026 (§7, §9.2, §9.5, §9.7).
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -291,6 +292,20 @@ drawn with (PR 3: `DataView`, `Kanban`, the charts, the pickers, the editor, the
 Build every screen for them: the page keeps clear space under its content by itself, give the screen one New
 action (`useScreenAction`, below), and never rely on dragging on a phone.
 
+- **Pull to refresh** (F28): pulling down at the top of a page drops the pin in a disc under the
+  header while a yellow ring fills. Let go once the ring has closed (64 px) and every read on the
+  screen loads again in place, the ring spinning until the last one lands; pull on past 136 px and
+  the disc turns Deep Green with the reload mark, and letting go restarts the app on the same screen.
+  `PhoneShell` owns it (`onRefresh`, `onReload`) and so does `PhonePage` (`onRefresh`). It only
+  listens, so scrolling never waits on it: it starts only when the page and every list under the
+  finger are at their top and the first move is clearly down, never on a fit page, and never over
+  anything marked `data-pull="off"`. A component that drags vertically (a map, the signature pad, a
+  document) carries that mark; a screen never needs to.
+- **Back** (F29): there is no back button on a phone. Android's Back and the iPhone's edge swipe go
+  back a step: a new screen, tab or opened record. An open sheet, page, menu, search or the file
+  viewer is a step of its own, so Back closes it first (`useBackClose` in every overlay of
+  `@mycity/ui`; a feature does nothing for it). In the installed app, holding the pin opens the
+  trail (`TrailMenu`, a sheet): the last 8 places and the 1 ahead.
 - **Top bar and title rail** (PR 2 question 3): the pin alone at the left, which goes Home; search,
   the bell and the person's avatar at the right (the avatar opens More). Under it the title rail:
   the module's name as one large line, shortened when long, over the module's tabs. Scrolling down
@@ -335,7 +350,10 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
 - **What is left off a phone is decided per screen** in the feature guide's §10 (an extra KPI
   card, a secondary column, a chart), never ad hoc.
 
-**The desktop shell:** the sidebar, dense tables with the shared pager, keyboard navigation, side
+**The desktop shell:** at the start of the top bar, one capsule (`NavCapsule`): refresh, the Hold
+Ring (F28: a click refreshes in place, a 0.6 s hold reloads the app), and in the installed app back
+and forward (F29: hover names where an arrow goes; holding an arrow, right clicking it or holding the
+pin opens the trail). Then the sidebar, dense tables with the shared pager, keyboard navigation, side
 panels and multi-pane layouts where they help, hover help (§5.2). The mobile bottom bar and the
 floating button never show.
 
@@ -561,7 +579,9 @@ packages/ui/
     index.ts                  THE public barrel: everything a feature may import, and nothing else
     styles/                   tokens.css (the only file with a hex value), theme.css (the Tailwind 4
                               theme and variants), base.css (element defaults, focus ring, reduced motion)
-    lib/                      cn, format, media (useIsPhone), preferences (theme, density), slots, ids,
+    lib/                      history (the window's history: keyed steps, Back closing a phone's
+                              overlays, F29), hold (press and hold), cn, format, media (useIsPhone,
+                              useInstalled), preferences (theme, density), slots, ids,
                               environment (the staging marks), plan (what opens where, F14)
     icons/                    Icon (Lucide underneath)
     actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
@@ -577,13 +597,14 @@ packages/ui/
                               ErrorBoundary, ErrorState
     form/                     the form system: the only home of raw form elements (§8.6)
     data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate,
-                              DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
+                              refresh (F28), DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
     charts/                   AreaChart, BarChart, DonutChart, BandChart, Sparkline; each a boundary
                               around its own *.draw.tsx chunk (F22)
     documents/                DocumentPreview, ImageViewer, Paper, Reader
     maps/                     MapView, PlaceSearch, LocationLabel on Leaflet, with Geoapify proxied (F21)
     illustrations/            Illustration, in token colours; CityShowcase, the sign-in screen's photographs
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
+                              NavCapsule and TrailMenu (F28, F29), PullIndicator and pull (F28),
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
                               MoreSheet, FloatingButton, CommandPalette, NotificationCenter (the bell's
                               pane), NotificationRow, ShellNotice
@@ -608,7 +629,8 @@ app/
     main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
     sw.ts                     the service worker: precache, offline, update, web push (§9.7)
     styles/index.css          Tailwind and the @mycity/ui styles; the staging offset; no colour of its own
-    lib/                      plan (the delivery plan bound to this app), router, routes (screen URLs)
+    lib/                      plan (the delivery plan bound to this app), router (the step rule, F29),
+                              routes (screen URLs), trail (this device's trail of places, F29)
     api/
       client.ts               the staff app's client, made with createApiClient (session, refresh)
       endpoints.ts  hooks.ts  the typed endpoint map; the shared hooks bound to this client
@@ -634,6 +656,8 @@ app/
                               slugs, one-word names), access (grants, capabilities), nav (rail, bottom
                               bar, More), screens (lazy per module), More, Fab, screen-action
                               (useScreenAction), Search (⌘K), Bell, Notices, pwa (update, install),
+                              refresh (refresh in place and Reload App, F28), trail-items (the trail's
+                              names for its places, F29),
                               offline, Planned (Coming Soon, the Prototype View switch), coming-soon,
                               layout-context
     features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
@@ -722,12 +746,28 @@ screens still call it `useIsMobile`, the same hook), both from the Shell group o
 
 - **Desktop** (`DesktopShell`): the `Rail` (collapsible to 66 px, remembered in `mc-rail`; the
   person's menu at its foot: My Profile, My Security, Theme, Density, Install App, Sign Out), the
-  `TopBar` (rail toggle, `SearchButton`, Clock In or Out, the bell), the module's `Tabs`, the page.
+  `TopBar` (rail toggle, the `NavCapsule` of F28 and F29, `SearchButton`, Clock In or Out, the
+  bell), the module's `Tabs`, the page.
   When the window is too narrow for every tab, `Tabs` shows the ones that fit (the active one
   always among them) and folds the rest into More Tabs, a ⋯ menu at the end of the strip; it never
   scrolls sideways on desktop.
 - **Phone** (`PhoneShell`): `PhoneHeader` (§7: the pin; search, the bell, the avatar; the title rail
-  over the tabs, which scroll sideways), the page, the `FloatingButton` and the `BottomBar` with `MoreSheet` (F16 to F18).
+  over the tabs, which scroll sideways), the page with its pull to refresh (F28), the
+  `FloatingButton` and the `BottomBar` with `MoreSheet` (F16 to F18).
+
+**Steps and the trail** (F29). `lib/router.tsx` keeps the window's history through `@mycity/ui`'s
+history controller (`lib/history.ts`), which keys every entry, so a step is known again when Back or
+Forward returns to it. `navigate` decides what a step is: a change of path, `tab` or `id` adds one; a
+change of any other key (filters, `q`, `sort`, `page`, a modal's own key) replaces the current one,
+so Back returns to a list as it was left. `{ replace: true }` or `{ replace: false }` still decides
+for a caller that knows better. On a phone, every overlay in `@mycity/ui` takes a step of its own
+while it is open (`useBackClose`), so Back closes it first; when it closes any other way its step is
+taken back, and a step made while it was open lands on the screen underneath. `lib/trail.ts` keeps
+this device's trail (`localStorage`, never sent anywhere): each step's address and, for a record, the
+name a screen gives it with `useTrailTitle(name)`, so the trail reads "Ada Obi" rather than
+"Employees". The installed app reopens on the last place with its back steps, when the person left it
+within the last 12 hours; another person signing in, or Sign Out, starts it afresh. The trail shows
+the last 8 places and the 1 ahead.
 
 A screen may also render a different layout per shell; it never shrinks the desktop one. Chat and
 Mailbox are "fit" pages (`useFitPage`): only their panes scroll, and scrolling past a pane's end
@@ -888,7 +928,10 @@ with `code`, `message` and `fields`. Writes that must not repeat pass `idempoten
 `Idempotency-Key`). The hooks: `useApi` (one read), `usePaged` (server pages: `page`, `q` debounced
 250 ms, filters; changing either goes to page 1), `useInfinite` (phones), `useMutation` (with
 `fields` after a 422) and `invalidate(prefix)`, which reloads every mounted read under that path.
-There is no client cache beyond the mounted reads. The page size is the contract's
+`refresh(prefix)` (F28) asks every mounted read under that path again, quietly: data stays on
+screen, `loading` stays false, and the promise it returns settles when the last read has landed
+(the pull's ring and the refresh button spin until then). `invalidate` keeps its plain reload, for
+after a write. There is no client cache beyond the mounted reads. The page size is the contract's
 (`__CONTRACT_PAGE_SIZE__`, read from `packages/contract/schemas/common.js` at build), never a
 constant in an app.
 
@@ -995,6 +1038,12 @@ app's own, `src/sw.ts` (typed by `tsconfig.sw.json`, the WebWorker library, and 
   is installed (opened standalone, or the browser reports `appinstalled`). Where the browser offers
   its own prompt (`beforeinstallprompt`) Install App uses it; on an iPhone or iPad it shows the Add
   to Home Screen steps.
+- **Installed** (F28, F29): `useInstalled()` from `@mycity/ui` is true when the app runs as an
+  installed app (display mode standalone, minimal-ui or window controls overlay, or an iPhone's home
+  screen). Only then does the desktop capsule show back and forward and the pin open the trail; the
+  refresh button and the pull show everywhere. Reload App (a hold on the refresh button, the deep
+  pull, ⌘K) hands over to a waiting new version as the update notice's Reload does, and asks first
+  when a screen holds unsaved work.
 - **Offline**: the shell and assets are precached, so the installed app opens without a connection;
   the worker answers no `/api/` request, so every number on screen is live and nothing personal is
   cached. With no connection the page area shows the offline page (`shell/offline.tsx`: No

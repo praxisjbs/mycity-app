@@ -13,6 +13,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import * as Dialog from "@radix-ui/react-dialog";
 import { Drawer } from "vaul";
 import { cn } from "../lib/cn";
+import { useBackClose } from "../lib/history";
 import { IconButton } from "../actions/Button";
 import { FooterContext, IN_FOOTER, TEXT_ENTRY, escapeClosesList, focusInto, useReturnFocus } from "./context";
 
@@ -179,6 +180,9 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
   // Typing is never lost to a stray swipe or tap: a sheet with a text field and a close button
   // closes only through that button, Cancel or Esc.
   const locked = !dismissible || (holdsFields && !hideHeader);
+  // The phone's Back closes the sheet before it leaves the screen (F29), as Esc does: one that must be
+  // answered stays, and so does the screen under it.
+  useBackClose(open, onClose, { hold: !dismissible });
 
   const change = (next: boolean) => {
     if (next) return;

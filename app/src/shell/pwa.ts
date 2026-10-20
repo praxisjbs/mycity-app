@@ -167,6 +167,9 @@ export async function install(): Promise<"done" | "steps" | "none"> {
   return state.ios && !state.installed ? "steps" : "none";
 }
 
+/** The waiting version's takeover (reloadOnTakeover), when a new one is ready; Reload App uses it (F28). */
+export const pendingUpdate = (): (() => Promise<void>) | null => state.update;
+
 /** What the shell shows: the update notice, Install App, and the one-time banner. */
 export function usePwa() {
   const s = useSyncExternalStore(
