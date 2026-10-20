@@ -201,8 +201,11 @@ describe("the clock panel", () => {
       // Check In waits for the clock-in.
       expect(screen.queryByRole("button", { name: "Check In" })).toBeNull();
       press("Clock In");
+      // The permission is read first, then the location is asked for.
+      await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
       act(() => answer!({ coords: { latitude: 6.4282, longitude: 3.4219, accuracy: 12 } }));
       await waitFor(() => expect(clock!.today?.state).toBe("clocked_in"));
+      getCurrentPosition.mockClear();
       cleanup();
       await signedInAs("bashir@mycityapp.io");
       act(() => clock!.open());
@@ -221,6 +224,7 @@ describe("the clock panel", () => {
       return (real as (k: string, o: unknown) => Promise<unknown>)(key, opts);
     }) as typeof api.call);
     press("Check In");
+    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
     act(() => answer!({ coords: { latitude: 6.4285, longitude: 3.4219, accuracy: 12 } }));
     await screen.findByText("Check-in not sent yet.");
     press("Try Again");
