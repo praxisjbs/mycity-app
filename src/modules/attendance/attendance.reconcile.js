@@ -91,9 +91,10 @@ const LOCATION_REASON = Object.freeze({
   poor_accuracy: "the reading was not accurate enough",
 });
 
-/** One line saying what an exception is about, from its evidence. */
+/** One line saying what an exception is about, from its evidence; a check-in's says so (§6.12). */
 function detailOf(type, evidence = {}) {
   const ev = evidence || {};
+  if (ev.check_in) return `Check-in: ${detailOf(type, { ...ev, check_in: false })}`;
   switch (type) {
     case "outside_worksite":
       return `${ev.distance_m} m from ${ev.place === "client_visit" ? "the client's site" : ev.worksite_name}, radius ${ev.radius_m} m`;
@@ -139,6 +140,8 @@ const OUTCOME_TEXT = Object.freeze({
 });
 /** The exception types a clock-out time decides: the missing one, or the real one in place of the automatic. */
 const TAKES_TIME = new Set(["missing_clock_out", "automatic_clock_out"]);
+/** What a decision on a check-in's flag means to the person: it clears, or it stands. */
+const CHECK_IN_TEXT = Object.freeze({ accepted: "the check-in's flag is cleared", rejected: "the check-in's flag stands" });
 const outcomeText = (type, outcome) =>
   type === "automatic_clock_out" && outcome === "corrected" ? "the clock-out time was corrected" : OUTCOME_TEXT[outcome];
 
@@ -158,7 +161,8 @@ async function decide(actor, scope, id, body) {
     throw new AppError("DECISION_INVALID", "Only a missing or automatic clock-out takes a time", 422, {
       decision: ["Not for this"],
     });
-  if (body.decision === "reject" && !x.attendance_event_id)
+  // A check-in's flag is rejected as a punch's is: it stays counted toward Location Flags (§6.8, PR 4).
+  if (body.decision === "reject" && !x.attendance_event_id && !x.attendance_check_in_id)
     throw new AppError("DECISION_INVALID", "There is no punch to reject", 422, { decision: ["Not for this"] });
   // Rejecting an automatic clock-out would leave the shift open: keep its time or correct it.
   if (body.decision === "reject" && x.exception_type === "automatic_clock_out")
@@ -199,7 +203,8 @@ async function decide(actor, scope, id, body) {
     }
     const done = await repo.resolveException(client, id, { outcome, resolution: body.resolution, by: actor.user_id });
     if (!done) throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
-    await recomputeDay(client, person, x.work_date);
+    // A check-in is never the shift: deciding its flag leaves the day as it is.
+    if (!x.attendance_check_in_id) await recomputeDay(client, person, x.work_date);
     await emit(client, {
       key: EVENTS.ATTENDANCE_EXCEPTION_DECIDED,
       entity: { type: "attendance_exception", id },
@@ -213,7 +218,7 @@ async function decide(actor, scope, id, body) {
         work_date: x.work_date,
         exception_type: x.exception_type,
         outcome,
-        outcome_text: outcomeText(x.exception_type, outcome),
+        outcome_text: x.attendance_check_in_id ? CHECK_IN_TEXT[outcome] : outcomeText(x.exception_type, outcome),
       },
     });
   });

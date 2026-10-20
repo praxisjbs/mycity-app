@@ -606,7 +606,7 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
-      expect(res.body.page.total).toBe(20);
+      expect(res.body.page.total).toBe(21);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");

@@ -122,8 +122,19 @@ describe("the token", () => {
     const t = token.sign({ ...PICK, details: "Flat 3" });
     expect(t.split(".")).toHaveLength(3);
     expect(t.startsWith("p1.")).toBe(true);
-    expect(c.maps.readPlaceToken(t)).toEqual({ ...PICK, accuracy_m: null });
+    expect(c.maps.readPlaceToken(t)).toEqual({ ...PICK, accuracy_m: null, timezone: null });
     expect(Buffer.from(t.split(".")[1], "base64url").toString()).not.toContain("Flat 3");
+  });
+
+  test("a place's time zone travels in the token; one signed before it reads as none and still verifies", () => {
+    const zoned = token.sign({ ...PICK, timezone: "Africa/Gaborone" });
+    expect(c.maps.readPlaceToken(zoned)).toMatchObject({ timezone: "Africa/Gaborone" });
+    expect(parse({ token: zoned }).success).toBe(true);
+    // A token as it was signed before the zone was kept: the same payload with no `tz`.
+    const before = token.sign(PICK);
+    expect(Buffer.from(before.split(".")[1], "base64url").toString()).not.toContain("tz");
+    expect(c.maps.readPlaceToken(before).timezone).toBeNull();
+    expect(token.verify(before)).toBe(true);
   });
 
   test("only a token this environment made, unaltered, verifies", () => {
@@ -163,8 +174,35 @@ describe("searching", () => {
     ]);
     const found = await geoapify.searchPlaces("1 Testbed Road", { apiKey: "k", fetchImpl });
     expect(found).toEqual([
-      { place_id: "a1", formatted: "1 Testbed Road, Lagos", lat: 6.45, lon: 3.42, kind: "building", city: "Lagos", state: null, country_code: "ng" },
+      { place_id: "a1", formatted: "1 Testbed Road, Lagos", lat: 6.45, lon: 3.42, kind: "building", city: "Lagos", state: null, country_code: "ng", timezone: null },
     ]);
+  });
+
+  test("the provider's time zone is kept when the runtime knows it, and dropped otherwise", async () => {
+    // As Geoapify answers a search (docs: Address Autocomplete API, `timezone` on each result).
+    const fetchImpl = answer([
+      {
+        place_id: "g1",
+        formatted: "Plot 50, Main Mall, Gaborone, Botswana",
+        lat: -24.6545,
+        lon: 25.9086,
+        result_type: "building",
+        city: "Gaborone",
+        country_code: "bw",
+        timezone: {
+          name: "Africa/Gaborone",
+          offset_STD: "+02:00",
+          offset_STD_seconds: 7200,
+          offset_DST: "+02:00",
+          offset_DST_seconds: 7200,
+          abbreviation_STD: "CAT",
+          abbreviation_DST: "CAT",
+        },
+      },
+      { place_id: "x1", formatted: "1 Nowhere Lane", lat: 6.5, lon: 3.4, result_type: "building", timezone: { name: "Mars/Olympus" } },
+    ]);
+    const found = await geoapify.searchPlaces("Main Mall Gaborone", { apiKey: "k", fetchImpl });
+    expect(found.map((p) => p.timezone)).toEqual(["Africa/Gaborone", null]);
   });
 
   test("the request is biased to Lagos, not filtered, asks for more than a field shows, and carries the key", async () => {
@@ -413,6 +451,7 @@ describe("keeping a place", () => {
       "attendance_field_site.address",
       "attendance_home.address",
       "attendance_location_request.address",
+      "attendance_temporary_site_location.address",
       "employee.home_address",
       "organisation.address",
       "worksite.address",

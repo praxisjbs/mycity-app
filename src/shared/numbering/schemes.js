@@ -72,6 +72,13 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M1 attendance: a field assignment, "FA-0001" (seeded in 1393)
+  temporary_site: {
+    prefix: "TS",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M1 attendance: a temporary site, "TS-0001" (seeded in 1470)
   policy: {
     prefix: "POL",
     padding: 4,

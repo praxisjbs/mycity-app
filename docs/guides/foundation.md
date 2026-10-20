@@ -429,6 +429,14 @@ As built (17/10/2026):
   saving it is refused until every stage is valid.
 - **Who decides**: the people the current stage names, and only while they hold `approve` on the
   request's module; nobody decides their own request (the CEO excepted, who may decide any stage).
+- **People an approval excludes** (TB, 20/10/2026, for attendance's temporary sites, attendance.md
+  §6.11): a module may name, when it opens the approval, employees who never decide it whatever role
+  they hold (`openInstance({ exclude_employee_ids })`, kept on `workflow_instance.excluded_employee_ids`,
+  migration `1455`). The engine refuses them on every stage (`canAct`), My Approvals, Need You and ⌘K's
+  Waiting on You leave the approval out for them (`waitingOnClause`), and the stage's notice skips them
+  (`recipients`). The CEO is excepted as above. A temporary site excludes everyone on it, so a
+  colleague on the site who holds Operations & People cannot approve it; every other approval
+  excludes nobody.
 
 ### 6.6 The org tree
 
@@ -457,7 +465,7 @@ As built (17/10/2026):
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
   Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
   Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
-  Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
+  Dark Theme, Use Light Theme, Change Density, Install App, Sign Out, Add Work Site), then
   one group per kind of record from each `<module>.search.js` (Employees, Departments, Open Seats, Users,
   Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's).
 - **Waiting on You** comes first: the requests waiting on the reader's decision (the My Approvals list),
@@ -976,3 +984,4 @@ screen.
 - 20/10/2026 · TB · Settings · Integrations (#77) built with its own guide (`docs/guides/integrations.md`), brought forward from M9: §2 and §6.8 point there; Geoapify's key (§5, §6.13) and the local domains (§6.14) are kept there, with `GEOAPIFY_API_KEY` and `SMTP_LOCAL_DOMAINS` as the server file's fallback.
 - 20/10/2026 · TB · §6.13: addresses are picked, never typed (F27), with their own guide, `docs/guides/addresses.md`, which now covers the `maps` module (taken off this guide's header). The reverse lookup became `GET /maps/pin`, open to everyone signed in for a point they pin as an address.
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) is dropped: policies live on Knowledge Hub · Policies (`docs/guides/policies.md`), brought forward from M10; §2 and §6.8 say so, and Settings · Approvals gains the Policy Approval route (and the Temporary Site route with attendance's PR 4).
+- 20/10/2026 · TB · §6.5: an approval may exclude people from deciding it (`exclude_employee_ids` on `openInstance`, `workflow_instance.excluded_employee_ids`, `1455`), read by `canAct`, `waitingOnClause` and the stage's notice; attendance's temporary sites exclude everyone on them (attendance.md §6.11). §6.7: ⌘K's Add Work Site. §6.8's Temporary Site route is built as it says.

@@ -838,7 +838,7 @@ async function approvalsToRemind(db) {
 async function approvalOf(db, instanceId) {
   const { rows } = await db.query(
     `SELECT workflow_instance_id, workflow_definition_id, definition_key, entity_type, entity_id, state,
-            current_stage, stage_entered_at, stage_approvers, subject_employee_id, opened_by
+            current_stage, stage_entered_at, stage_approvers, subject_employee_id, opened_by, excluded_employee_ids
        FROM workflow_instance WHERE workflow_instance_id = $1`,
     [instanceId],
   );

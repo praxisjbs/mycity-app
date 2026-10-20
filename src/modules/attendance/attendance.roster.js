@@ -38,10 +38,12 @@
  *
  *   leave     on_leave
  *   late      late
- *   present   field on a day a field assignment they are still on covers (attendance.md
- *             §6.12); else remote for someone who works remotely (work_pattern remote, as the
- *             geofence, the clock panel and the register read it), is on an approved remote
- *             day (§6.11) or on a hybrid home day by their schedule (§6.13); else on_site
+ *   present   field on a day an approved temporary site they are still on covers, a Temporary
+ *             Home aside (attendance.md §6.11, PR 4), or a field assignment made before PR 4
+ *             (§6.12); else remote for someone who works remotely (work_pattern remote, as the
+ *             geofence, the clock panel and the register read it), is on an approved Temporary
+ *             Home, an approved remote day made before PR 4 (§6.11) or a hybrid home day by their
+ *             schedule (§6.13); else on_site (TB, 20/10/2026)
  *   absent    absent: a working day the day-close closed with no clock-in
  *   not_in    not_in: a working day not closed, no clock-in yet
  *   off       none: a day that is not worked, with nothing recorded
@@ -107,8 +109,10 @@ function yesterdayOf(date, cal) {
  *          remote_day?: boolean, field_day?: boolean}} f
  *   day_status  attendance_day.status for the day, null when there is no record or it has none
  *   on_leave    granted leave covers the day
- *   remote_day  an approved remote day covers the day, or it is a hybrid home day (§6.13)
- *   field_day   a field assignment the person is still on covers the day
+ *   remote_day  an approved Temporary Home or remote day covers the day, or it is a hybrid home
+ *               day (§6.13)
+ *   field_day   an approved temporary site (not a home) or a field assignment the person is still
+ *               on covers the day
  */
 function statusOf(f) {
   switch (f.day_status) {
@@ -168,22 +172,36 @@ const grantedLeave = (employee, day) => `EXISTS (
           OR (lr.status = 'submitted' AND wi.state IN ('approved', 'timeout_approved'))))`;
 
 /**
- * Whether `day` is worked remotely for `employee` beyond their pattern (SQL): an approved remote
- * day covers it (attendance.md §6.11), or it is a hybrid employee's home day by the schedule in
- * force then (§6.13, repo.HOME_DAY over the employee `e`).
+ * Whether an approved temporary site `employee` is still on covers `day` (attendance.md §6.11)
+ * (SQL): `home` true keeps a Temporary Home, false every other purpose.
  */
-const remoteDay = (employee, day) => `(EXISTS (
+const siteDay = (employee, day, home) => `EXISTS (
+  SELECT 1 FROM attendance_temporary_site_member tm
+    JOIN attendance_temporary_site ts ON ts.temporary_site_id = tm.temporary_site_id
+   WHERE tm.employee_id = ${employee} AND tm.removed_at IS NULL AND ts.status = 'approved'
+     AND ts.purpose ${home ? "=" : "<>"} 'temporary_home'
+     AND ts.starts_on <= ${day} AND ts.ends_on >= ${day})`;
+
+/**
+ * Whether `day` is worked remotely for `employee` beyond their pattern (SQL): an approved Temporary
+ * Home covers it (PR 4), or an approved remote day made before PR 4 (attendance.md §6.11), or it is
+ * a hybrid employee's home day by the schedule in force then (§6.13, repo.HOME_DAY over the employee `e`).
+ */
+const remoteDay = (employee, day) => `(${siteDay(employee, day, true)} OR EXISTS (
   SELECT 1 FROM attendance_location_request lr
    WHERE lr.employee_id = ${employee} AND lr.status = 'approved' AND lr.request_type = 'remote_day'
      AND lr.starts_on <= ${day} AND lr.ends_on >= ${day})
   OR ${repo.HOME_DAY(employee, "e.work_pattern", day)})`;
 
-/** Whether a field assignment `employee` is still on covers `day` (attendance.md §6.12) (SQL). */
-const fieldDay = (employee, day) => `EXISTS (
+/**
+ * Whether an approved temporary site (a Temporary Home aside) or a field assignment made before PR 4
+ * that `employee` is still on covers `day` (attendance.md §6.11, §6.12) (SQL).
+ */
+const fieldDay = (employee, day) => `(${siteDay(employee, day, false)} OR EXISTS (
   SELECT 1 FROM attendance_field_member fm
     JOIN attendance_field_assignment fa ON fa.field_assignment_id = fm.field_assignment_id
    WHERE fm.employee_id = ${employee} AND fm.removed_at IS NULL AND fa.status = 'active'
-     AND fa.starts_on <= ${day} AND fa.ends_on >= ${day})`;
+     AND fa.starts_on <= ${day} AND fa.ends_on >= ${day}))`;
 
 /**
  * Whether employee `e` is on the register on `day`, `ad` being their day's record: anyone
@@ -241,8 +259,8 @@ const binder = (params) => (value) => {
  *
  * The clock-in's worksite is the one its punch was judged against, read from the day's
  * active clock-in (one a day among the person's and People's punches,
- * attendance_event_one_active_person_uq; the system never clocks in), or on a field assignment's day
- * the site it was judged against; it shows only while the day's record has a clock-in, so a
+ * attendance_event_one_active_person_uq; the system never clocks in), or on a temporary site's or a
+ * field assignment's day the site it was judged against; it shows only while the day's record has a clock-in, so a
  * punch a decision excluded names none.
  *
  * @param {ReturnType<typeof dayOf>} day
@@ -271,7 +289,7 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
                ad.status AS day_status, ${grantedLeave("e.employee_id", date)} AS on_leave,
                ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
                COALESCE(ad.late_minutes, 0) AS late_minutes,
-               COALESCE(w.name, CASE WHEN ci.validation #>> '{geofence,place}' = 'field'
+               COALESCE(w.name, CASE WHEN ci.validation #>> '{geofence,place}' IN ('field', 'temporary_site')
                                      THEN ci.validation #>> '{geofence,worksite_name}' END) AS clock_in_worksite,
                (yd.first_clock_in_at IS NOT NULL AND yd.last_clock_out_at IS NULL) AS no_clock_out_yesterday
           FROM employee e

@@ -213,11 +213,26 @@ const ENTITY_ROUTES = Object.freeze({
     param: "request",
     self: screen("ess", "work-location-requests"),
   },
-  // A field assignment: People · Attendance opens it in Field (`?assignment=`); someone on it
-  // opens it on My Attendance.
+  // A field assignment made before attendance's PR 4: People · Worksites opens it in Temporary,
+  // Field (`?assignment=`); someone on it opens it on My Attendance.
   attendance_field_assignment: {
     ...screen("people", "attendance"),
     param: "assignment",
+    self: screen("ess", "my-attendance"),
+  },
+  // A temporary site (attendance.md §6.11): People · Worksites opens it in Temporary (`?site=`); its
+  // own people and its submitter open it on Work Location Requests (`?site=`).
+  attendance_temporary_site: {
+    ...screen("people", "worksites"),
+    param: "site",
+    self: screen("ess", "work-location-requests"),
+  },
+  // The person's own temporary sites, as ⌘K's My Temporary Sites finds them: Work Location Requests.
+  attendance_own_temporary_site: { ...screen("ess", "work-location-requests"), param: "site" },
+  // A check-in at a stop opens the person's day, where its route is (§6.12).
+  // search:none a check-in is found through its day, never on its own
+  attendance_check_in: {
+    ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
   // A version of the attendance policy from before policies (its notices kept from then): the same id
