@@ -82,8 +82,8 @@ const HELP: Record<PolicyRule, string> = {
   home_geofence_mode: "A clock-in away from an approved home: Off records it, Warn sends it for review, Block refuses it.",
   site_geofence_mode: "A clock-in outside a field assignment's or client visit's site: Off records it, Warn sends it for review, Block refuses it.",
   device_mode: "A clock-in from a device the person has not registered: Off records it, Warn sends it for review, Block refuses it.",
-  max_accuracy_m: "A location reading coarser than this cannot confirm where someone is.",
-  home_radius_m: "How far from an approved home a clock-in still counts as at home.",
+  max_accuracy_m: "GPS Accuracy: a reading coarser than this cannot confirm where someone is.",
+  home_radius_m: "Home Radius: how far from an approved home a clock-in still counts as at home.",
 };
 
 function RulesForm({ o }: { o: PolicyOverview }) {
@@ -100,8 +100,9 @@ function RulesForm({ o }: { o: PolicyOverview }) {
       {changed.has(rule) && <Pill tone="warn" className="ml-1.5">Changed</Pill>}
     </>
   );
+  // A number's help is on its card's title: a help-labelled input below a phone's fold reads to axe as unlabelled.
   const number = (rule: PolicyRule) => (
-    <Field label={label(rule)} help={HELP[rule]} {...f.status(rule)}>
+    <Field label={label(rule)} {...f.status(rule)}>
       <NumberField {...f.field(rule)} disabled={!o.can_edit} />
     </Field>
   );
@@ -140,7 +141,7 @@ function RulesForm({ o }: { o: PolicyOverview }) {
     <Form onSubmit={f.submit(submit)}>
       <Grid cols={2}>
         <Card>
-          <CardHeader title="Clocking In" />
+          <CardHeader title="Clocking In" help={HELP.grace_minutes} />
           {number("grace_minutes")}
         </Card>
         <Card>
@@ -154,7 +155,7 @@ function RulesForm({ o }: { o: PolicyOverview }) {
           {mode("site_geofence_mode")}
         </Card>
         <Card>
-          <CardHeader title="Location Reading" />
+          <CardHeader title="Location Reading" help={`${HELP.max_accuracy_m} ${HELP.home_radius_m}`} />
           {number("max_accuracy_m")}
           {number("home_radius_m")}
         </Card>
@@ -212,7 +213,7 @@ function PublishForm({ o, close }: { o: PolicyOverview; close: () => void }) {
         <DateField {...f.field("effective_from")} min={todayIso()} />
       </Field>
       <Field label="Note" {...f.status("note")}>
-        <TextAreaField {...f.field("note")} placeholder="Grace raised to 15 minutes" rows={3} />
+        <TextAreaField {...f.field("note")} placeholder="Grace now 15" rows={3} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -318,7 +319,7 @@ function WithdrawForm({ v, close }: { v: PolicyVersion; close: () => void }) {
   return (
     <>
       <Field label="Reason" {...f.status("reason")}>
-        <TextAreaField {...f.field("reason")} placeholder="Grace stays as it is" rows={3} />
+        <TextAreaField {...f.field("reason")} placeholder="Grace unchanged" rows={3} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
