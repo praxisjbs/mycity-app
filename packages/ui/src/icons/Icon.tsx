@@ -37,6 +37,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   FileText,
   Filter,
   FingerprintPattern,
@@ -71,6 +72,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Presentation,
   Quote,
   Redo2,
   RefreshCw,
@@ -92,6 +94,7 @@ import {
   Undo2,
   User,
   Users,
+  Video,
   Wallet,
   WifiOff,
   X,
@@ -192,6 +195,9 @@ export const ICONS = {
   key: KeyRound,
   copy: Copy,
   phone: Smartphone,
+  video: Video,
+  sheet: FileSpreadsheet,
+  slides: Presentation,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

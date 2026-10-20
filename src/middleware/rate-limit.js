@@ -17,6 +17,7 @@
  *   pinLimiter          PIN sign-in       per IP, failed attempts only, 10 per 15 minutes
  *   passkeyLimiter      passkey sign-in   per IP, every request, 60 per 15 minutes
  *   confirmLimiter      confirming it is you, per signed-in person, 10 per 15 minutes
+ *   linkPreviewLimiter  a link's card for the composer, per signed-in person, 30 per minute
  *
  * Limiters are built when this file loads, but Redis connects later at boot, so
  * each limiter asks for its store on every call and uses Redis once it exists.
@@ -225,6 +226,18 @@ const pushDeviceLimiter = makeLimiter({
   failuresOnly: true,
 });
 
+/**
+ * A link's card for the composer (community.md §6): the server reads a page on the web for
+ * it, so one person cannot have it read thousands. Per person, after auth.
+ */
+const linkPreviewLimiter = makeLimiter({
+  name: "link-preview",
+  max: 30,
+  windowMs: 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
 /** Confirming it is you before a sign-in method changes: per person, after auth. */
 const confirmLimiter = makeLimiter({
   name: "confirm",
@@ -252,5 +265,6 @@ module.exports = {
   pushDeviceLimiter,
   passkeyLimiter,
   confirmLimiter,
+  linkPreviewLimiter,
   TOO_MANY,
 };

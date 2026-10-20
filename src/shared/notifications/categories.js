@@ -239,13 +239,16 @@ function defaultOn(category, channel) {
 
 /**
  * Is a channel on, given the person's stored preference (true, false, or undefined
- * when they never set one)? A locked category stays on wherever it is on by default.
+ * when they never set one) and the company's default for the notice (Settings ·
+ * Notifications; undefined or null when People left it to the category)? The person's
+ * choice wins, then the company's, then the category's. A locked category stays on
+ * wherever it is on by default.
  */
-function isOn(category, channel, stored) {
+function isOn(category, channel, stored, company) {
   if (isLocked(category) && defaultOn(category, channel)) return true;
-  return stored === undefined || stored === null
-    ? defaultOn(category, channel)
-    : stored === true;
+  if (stored !== undefined && stored !== null) return stored === true;
+  if (company !== undefined && company !== null) return company === true;
+  return defaultOn(category, channel);
 }
 
 module.exports = {

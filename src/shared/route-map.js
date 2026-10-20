@@ -141,6 +141,7 @@ const ENTITY_ROUTES = Object.freeze({
   direct_message: screen("community", "direct-messages"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
   announcement: screen("community", "announcements"),
   recognition: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  community_link_preview: screen("community", "channels"), // search:none a page's card, kept once per address; found through the message that posts the link
   mail_thread: screen("mailbox", "inbox"), // opens the conversation by id, whichever folder it is in
   mail_message: screen("mailbox", "inbox"), // search:none a message is found through its conversation (mailbox.search.js)
   mail_signature: screen("mailbox", "signature"), // search:none one per person, their own; ⌘K finds the Signature tab (shared/search/screens.js)

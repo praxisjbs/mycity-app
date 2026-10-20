@@ -13,7 +13,7 @@
 const { z } = require("zod");
 const { uuid, text, optionalText, isoDateTime, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
-const { DocumentRef } = require("./documents");
+const { MediaRef } = require("./documents");
 const { NotificationUrgency } = require("./notifications");
 
 /** Who may post in a channel, fixed when it is created (§6). */
@@ -136,6 +136,28 @@ const DeliveredAck = z.object({ up_to: isoDateTime }).strict();
 
 const PollOption = z.object({ text: z.string(), votes: z.number().int().min(0) }).strict();
 
+/**
+ * A link's card (community.md §3 step 18): what the page says about itself, fetched by the
+ * server once a week per address. `url` is the link as posted, normalised; `site_name` is
+ * the page's own, else its host; `image` is the page's picture, copied into the vault.
+ */
+const LinkPreview = z
+  .object({
+    community_link_preview_id: uuid,
+    url: z.string(),
+    site_name: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    image: MediaRef.nullable(),
+  })
+  .strict();
+
+/** POST /community/link-previews: the composer asks for the card of the first link it holds. */
+const LinkPreviewRequest = z.object({ url: z.string().trim().min(4).max(2048) }).strict();
+
+/** The card, or null when the page offers none, cannot be reached, or is not on the public web. */
+const LinkPreviewAnswer = z.object({ preview: LinkPreview.nullable() }).strict();
+
 /** One message, for the caller. The block that matches message_type is set; the rest are null. */
 const Message = z
   .object({
@@ -146,7 +168,9 @@ const Message = z
     mine: z.boolean(),
     sent_at: isoDateTime,
     body: z.string().nullable(),
-    document: DocumentRef.nullable(),
+    document: MediaRef.nullable(),
+    album_key: uuid.nullable(),
+    link: LinkPreview.nullable(),
     duration_s: z.number().int().min(0).nullable(),
     transcript: z.string().nullable(),
     celebration: z
@@ -204,9 +228,9 @@ const MessagePage = Paged(Message);
 
 /**
  * POST /community/channels/:id/messages.
- *   text            body
+ *   text            body; no_link_preview when the sender removed the first link's card
  *   image, audio, video, file   document_id (uploaded first), body optional as a caption;
- *                   audio carries duration_s
+ *                   audio carries duration_s; album_key on files sent together
  *   poll            body is the question, options 2 to 4
  *   birthday, anniversary   subject_employee_id: a celebration card posted by hand
  */
@@ -218,6 +242,8 @@ const MessageCreate = z
     duration_s: z.number().int().min(1).max(300).optional(),
     options: z.array(text(80)).min(2).max(4).optional(),
     subject_employee_id: uuid.optional(),
+    album_key: uuid.optional(),
+    no_link_preview: z.boolean().optional(),
   })
   .strict()
   .superRefine((b, ctx) => {
@@ -300,7 +326,7 @@ const ProfileCard = z
     worksite: z.string().nullable(),
     online: z.boolean(),
     last_seen_at: isoDateTime.nullable(),
-    shared_files: z.array(DocumentRef).max(25),
+    shared_files: z.array(MediaRef).max(25),
     voice_notes: z.number().int().min(0),
     shared_channels: z.array(z.string()).max(25),
   })
@@ -348,12 +374,20 @@ const TABLES = {
   PinSet: { table: null, reason: "sets community_member.pinned_at for the caller" },
   DeliveredAck: { table: null, reason: "moves the caller's community_member.last_delivered_at" },
   PollOption: { table: null, reason: "one option of a poll, its text from metadata and its votes counted" },
+  LinkPreview: {
+    table: "community_link_preview",
+    virtual: { image: "the page's picture, a vault document from image_document_id, as a MediaRef" },
+  },
+  LinkPreviewRequest: { table: null, reason: "the link a composer asks a card for" },
+  LinkPreviewAnswer: { table: null, reason: "the card for a link, or null when the page offers none" },
   Message: {
     table: "community_message",
     virtual: {
       author: "the sender's employee, as a PersonRef with their photo_url; null for a system post",
       mine: "whether the caller sent it",
-      document: "the attached file, from document",
+      document: "the attached file, from document, as a MediaRef with its shape and derived sizes",
+      album_key: "files sent together share it, kept in metadata",
+      link: "the first link's card, from community_link_preview by community_link_preview_id",
       duration_s: "a voice note's length, from metadata",
       celebration: "a birthday or anniversary card: its person (a PersonRef with photo_url) from metadata, reactions counted",
       recognition: "a recognition card: who it recognises (a PersonRef with photo_url) from peer_recognition, reactions counted",
@@ -378,6 +412,8 @@ const TABLES = {
       duration_s: "a voice note's length, kept in metadata",
       options: "a poll's options, kept in metadata",
       subject_employee_id: "the person a celebration card is for, kept in metadata",
+      album_key: "files sent together share it, kept in metadata",
+      no_link_preview: "the sender removed the first link's card, kept in metadata",
     },
   },
   RecognitionCreate: { table: "peer_recognition" },
@@ -422,6 +458,9 @@ module.exports = {
   PinSet,
   DeliveredAck,
   PollOption,
+  LinkPreview,
+  LinkPreviewRequest,
+  LinkPreviewAnswer,
   Message,
   MessageListQuery,
   MessagePage,

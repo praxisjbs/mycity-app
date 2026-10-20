@@ -331,12 +331,21 @@ const CATEGORIES: Array<[string, string, boolean, boolean, boolean]> = [
   ["system", "System", false, false, false],
 ];
 const PREFS = new Map<string, boolean>();
+/** The person's quiet hours and digest switch (notification_setting), and the company's digest. */
+const SETTING = { quiet_enabled: false, quiet_from: "21:00", quiet_to: "07:00", digest: true };
+/** The company's reminders (Settings · Notifications), defaults applied. */
+const REMINDERS = {
+  approvals: { enabled: true, every_hours: 24 },
+  probation: { enabled: true, days_ahead: 14 },
+  digest: { enabled: true, at_time: "07:30" },
+};
 const prefsBody = () => ({
   categories: CATEGORIES.map(([category, label, locked, email, push]) => {
     const defaults = { in_app: true, email, push };
     const on = (ch: "in_app" | "email" | "push") => (locked && defaults[ch]) || (PREFS.get(`${category}:${ch}`) ?? defaults[ch]);
     return { category, label, locked, channels: { in_app: on("in_app"), email: on("email"), push: on("push") }, defaults };
   }),
+  settings: { ...SETTING, digest_offered: REMINDERS.digest.enabled, digest_at: REMINDERS.digest.at_time },
 });
 route("GET /api/v1/notifications/preferences", () => ok(prefsBody()));
 route("PUT /api/v1/notifications/preferences", (req) => {
@@ -346,6 +355,105 @@ route("PUT /api/v1/notifications/preferences", (req) => {
   if (c[2] && !enabled) return fail(422, "CATEGORY_LOCKED", "Security notices stay on.");
   PREFS.set(`${category}:${channel}`, enabled);
   return ok(prefsBody());
+});
+
+route("PUT /api/v1/notifications/preferences/quiet-hours", (req) => {
+  const body = req.body as { quiet_enabled: boolean; quiet_from: string; quiet_to: string };
+  if (body.quiet_from === body.quiet_to) return invalid({ quiet_to: ["Pick two different times"] });
+  Object.assign(SETTING, body);
+  return ok(prefsBody());
+});
+route("PUT /api/v1/notifications/preferences/digest", (req) => {
+  SETTING.digest = Boolean((req.body as { digest: boolean }).digest);
+  return ok(prefsBody());
+});
+
+/*
+ * Settings · Notifications. A handful of the notices the code declares (shared/notifications/
+ * fanout.notices() on the API), with the company's rule applied as the API applies it.
+ */
+type Urgency = "normal" | "important" | "urgent";
+type Notice = { event_key: string; name: string; category: string; who: string[]; locked: boolean; copies: boolean; urgency_default: Urgency | null };
+const NOTICES: Notice[] = [
+  { event_key: "role.created", name: "A role was created", category: "security", who: ["CEO", "Settings editors"], locked: true, copies: false, urgency_default: "urgent" },
+  { event_key: "auth.password_changed", name: "A password was changed", category: "security", who: ["The account holder"], locked: true, copies: false, urgency_default: "normal" },
+  { event_key: "workflow.opened", name: "An approval was started", category: "approvals", who: ["Approvers"], locked: false, copies: true, urgency_default: "normal" },
+  { event_key: "workflow.escalated", name: "An approval passed its time limit and was escalated", category: "approvals", who: ["CEO", "Approvers"], locked: false, copies: true, urgency_default: "urgent" },
+  { event_key: "workflow.reminded", name: "An approval still waiting was brought back to its approvers", category: "approvals", who: ["Approvers"], locked: false, copies: true, urgency_default: "important" },
+  { event_key: "home.alert_raised", name: "An alert was raised", category: "alerts", who: ["Those who can clear it"], locked: false, copies: true, urgency_default: "normal" },
+  { event_key: "announcement.published", name: "An announcement went out to its audience", category: "comms", who: ["Its audience"], locked: false, copies: false, urgency_default: null },
+  { event_key: "direct_message.sent", name: "A direct message was sent", category: "comms", who: ["The conversation's other members"], locked: false, copies: false, urgency_default: "normal" },
+  { event_key: "attendance.home_requested", name: "A remote employee asked for a home location", category: "people", who: ["People · Approve"], locked: false, copies: true, urgency_default: "normal" },
+  { event_key: "employee.bank_details_changed", name: "An employee changed their own bank details", category: "people", who: ["People · Edit"], locked: false, copies: true, urgency_default: "normal" },
+  { event_key: "employee.probation_ending", name: "A probation is about to end", category: "people", who: ["People · Approve"], locked: false, copies: true, urgency_default: "normal" },
+  { event_key: "import.committed", name: "An import was committed", category: "system", who: ["Who ran it"], locked: false, copies: false, urgency_default: "normal" },
+];
+type Rule = { enabled: boolean; urgency: Urgency | null; in_app: boolean | null; email: boolean | null; push: boolean | null; roles: Array<{ code: string; name: string }>; employee_ids: string[]; updated_at: string };
+const RULES = new Map<string, Rule>();
+const categoryOf = (key: string) => CATEGORIES.find(([k]) => k === key)!;
+const defaultsOf = (category: string) => {
+  const [, , , email, push] = categoryOf(category);
+  return { in_app: true, email, push };
+};
+const ruleView = (n: Notice) => {
+  const rule = RULES.get(n.event_key) ?? null;
+  const defaults = defaultsOf(n.category);
+  const channel = (ch: "in_app" | "email" | "push") => (n.locked && defaults[ch]) || (rule?.[ch] ?? defaults[ch]);
+  return {
+    event_key: n.event_key,
+    name: n.name,
+    category: n.category,
+    category_label: categoryOf(n.category)[1],
+    who: n.who,
+    locked: n.locked,
+    copies: n.copies,
+    enabled: n.locked || !rule ? true : rule.enabled,
+    urgency: n.urgency_default === null ? null : (!n.locked && rule?.urgency) || n.urgency_default,
+    urgency_default: n.urgency_default,
+    channels: { in_app: channel("in_app"), email: channel("email"), push: channel("push") },
+    defaults,
+    roles: rule?.roles ?? [],
+    people: PEOPLE.filter((p) => rule?.employee_ids.includes(p.employee_id)).map((p) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null })),
+    changed: Boolean(rule),
+    updated_at: rule?.updated_at ?? null,
+  };
+};
+route("GET /api/v1/notifications/rules", (req) =>
+  paged(NOTICES.map(ruleView), req, {
+    search: (n) => [n.name],
+    filters: { category: (n, v) => n.category === v },
+  }),
+);
+route("PUT /api/v1/notifications/rules/:key", (req) => {
+  const n = NOTICES.find((x) => x.event_key === req.params.key);
+  if (!n) return fail(404, "NOT_FOUND", "There is no such notice.");
+  const b = req.body as { enabled: boolean; urgency: Urgency | null; in_app: boolean; email: boolean; push: boolean; role_codes: string[]; employee_ids: string[] };
+  if (n.locked && (!b.enabled || (b.urgency !== null && b.urgency !== n.urgency_default))) return fail(422, "NOTICE_LOCKED", "Security notices stay on, as they are.");
+  if (n.urgency_default === null && b.urgency !== null) return fail(422, "URGENCY_SET_BY_POSTER", "Its poster chooses the level.");
+  if (!n.copies && (b.role_codes.length || b.employee_ids.length)) return fail(422, "NOTICE_TAKES_NO_COPIES", "This notice is for one person and takes no copies.");
+  const defaults = defaultsOf(n.category);
+  RULES.set(n.event_key, {
+    enabled: b.enabled,
+    urgency: b.urgency === n.urgency_default ? null : b.urgency,
+    in_app: b.in_app === defaults.in_app ? null : b.in_app,
+    email: b.email === defaults.email ? null : b.email,
+    push: b.push === defaults.push ? null : b.push,
+    roles: b.role_codes.map((code) => ({ code, name: code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) })),
+    employee_ids: b.employee_ids,
+    updated_at: new Date().toISOString(),
+  });
+  return ok(ruleView(n));
+});
+route("POST /api/v1/notifications/rules/:key/reset", (req) => {
+  const n = NOTICES.find((x) => x.event_key === req.params.key);
+  if (!n) return fail(404, "NOT_FOUND", "There is no such notice.");
+  RULES.delete(n.event_key);
+  return ok(ruleView(n));
+});
+route("GET /api/v1/notifications/reminders", () => ok(REMINDERS));
+route("PUT /api/v1/notifications/reminders", (req) => {
+  Object.assign(REMINDERS, req.body as typeof REMINDERS);
+  return ok(REMINDERS);
 });
 
 // The mock has no push service: the device reads Not Available, and the calls answer as the API would.

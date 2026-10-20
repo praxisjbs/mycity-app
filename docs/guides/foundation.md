@@ -183,6 +183,15 @@ importer arrives in the request: `engine.assertMay()` makes the real check and r
 The `documents` module mounts at the API root, because an employee's documents are read where the
 employee is (`/employees/:id/documents`) while `src/modules/organisation/` is track A's.
 
+A file as a screen draws it before opening it is a `MediaRef` (`packages/contract/schemas/documents.js`,
+19/10/2026, TB): the `DocumentRef` with the file's width and height, a PDF's page count
+(`document.page_count`, migration `1147`), a video's length and the sizes already made (`variants`,
+read from `/documents/:id/variant/:kind`). Besides a photo's sizes and a video's poster, the worker now
+counts a PDF's pages and draws its first page as `webp-960` and `webp-320` (`media-derive`, through
+`services/media/pdf-pipeline`), so a chat bubble shows the page without opening the file. Opening a
+photo, a video or a PDF anywhere in the app is the shared file viewer (`MediaViewer`); a PDF's pages
+are drawn in the app by PDF.js (FRONTEND_FOUNDATION §5, PR 3 question 4).
+
 **Track C · `access`, `settings`, `audit`** (built 17/10/2026)
 
 | Route | Permission |
@@ -585,7 +594,8 @@ device they pressed it on. Nothing pressed is emailed. Only a report schedule's 
 |---|---|---|
 | `employee.created`, `employee.updated`, `employee.archived`, `employee.restored`, `employee.reporting_line_changed`, `department.*` | A | Search reindex; the team cache version (`grants-cache`) on a reporting change |
 | `import.committed`, `import.reverted` | B | The person who ran it is told (`imports.events.js`) |
-| `document.stored`, `document.superseded` (the vault's own) | B | Scan and derive (existing jobs) |
+| `document.stored`, `document.superseded` (the vault's own) | B | Scan and derive (existing jobs); a PDF's page count and first page (`media-derive`) |
+| `document.derived` (the vault's own, 19/10/2026) | B | A file's sizes, poster or first page are ready: the owning module's handler tells its screens (Staff Community pushes the message again, so its bubble draws them) |
 | `document.requested` | B | The employee it is about is told; the notice opens My Documents |
 | `document.verified`, `document.request_cancelled` | B | Audit only |
 | `role.*`, `permission.changed`, `field_visibility.changed`, `capability.changed`, `settings.security_changed` | C | `security: true`: the watchers are told; the grants cache cleared |
@@ -844,6 +854,11 @@ screen.
   `0449` seeds the §6.3 defaults; `PASSWORD_MIN_LENGTH` joins the `.env` floors. Required two-step by
   role adds the set-up step to sign-in, in `identity` and `security` (§6.4, `identity.md`). §4, §5,
   §6.3, §6.4, §7 to §11 updated.
+- 19/10/2026 · TB · Track B: a file as a screen draws it is `MediaRef` (its shape, a PDF's page count,
+  a video's length, the sizes made); the worker counts a PDF's pages and draws its first page
+  (`document.page_count`, migration `1147`), and `document.derived` says when a file's sizes are ready.
+  ESS · My Documents previews a PDF's pages drawn in the app and opens a PDF or a photo in the file
+  viewer (`docs/guides/ess.md` §10). §5 and §7 updated.
 - 17/10/2026 · TB · Track B built: the `imports` API over any registered importer, Settings · Imports
   (#93, the wizard and the history), the `documents` module (gated upload, download, versions,
   verification and document requests) and ESS · My Documents (#14) on the real API. Migration `0350`
@@ -855,3 +870,7 @@ screen.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's
   twenty decisions of 16/10/2026 (§6); the staff sheet and role map go into `seeds/staff/` with
   track A, the repository being private.
+- 19/10/2026 · TB · Approval notices take copies in Settings · Notifications
+  (`docs/guides/notifications.md` §6), each with wording for someone it is not waiting on; the new
+  Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
+  Your import finished names its audience and takes no copies.

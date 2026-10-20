@@ -40,6 +40,7 @@ describe("job registry", () => {
       "home-alert-sweeps",
       "import-commit",
       "import-validate",
+      "link-preview",
       "mail-send",
       "mail-sync",
       "media-derive",
@@ -47,6 +48,7 @@ describe("job registry", () => {
       "notification-deliver",
       "notification-push",
       "pdf-render",
+      "reminders",
       "scheduled-report",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
@@ -61,6 +63,7 @@ describe("job registry", () => {
       "mail-sync",
       "media-reconcile",
       "outbox-dispatch",
+      "reminders",
       "scheduled-reports",
       "urgent-repeats",
       "workflow-timeout",
@@ -148,6 +151,11 @@ describe("job registry", () => {
     expect(av.when(stored(["av"]))).toBe(true);
     expect(av.data(stored(["av"]))).toEqual({ document_id: "d1" });
     expect(scan.opts.attempts).toBe(10);
+    // A PDF's first page and page count are drawn by media-derive (community.md §3 step 17).
+    const pdf = registry.TRIGGERS.find((t) => t.queue === "media-derive");
+    expect(pdf.when(stored(["pdf"]))).toBe(true);
+    expect(pdf.when(stored(["av"]))).toBe(false);
+    expect(pdf.data(stored(["pdf"]))).toEqual({ document_id: "d1" });
   });
 });
 

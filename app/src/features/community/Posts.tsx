@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
-import { saveFile, useFileUrl } from "@/api/download";
+import { useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
 import { usePhoto, usePhotos } from "@/api/download";
-import { Avatar, Button, Card, cn, Confetti, formatBytes, formatDate, formatDateTime, formatTime, Icon, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
+import { Avatar, Button, Card, cn, Confetti, formatDate, formatDateTime, formatTime, Icon, LinkText, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
+import { AlbumMedia, MessageLink, MessageMedia } from "./Media";
 
-/** Highlight search hits inside a message. */
+/** Highlight search hits inside a heading (a message's own text is LinkText, which also opens its links). */
 export function Hl({ text, q }: { text: string; q: string }) {
   if (!q.trim()) return <>{text}</>;
   const parts = text.split(new RegExp(`(${q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
@@ -145,7 +146,7 @@ function AnnouncementPost({ m, q }: { m: Message; q: string }) {
         {a?.urgency === "important" && <Pill tone="warn">Important</Pill>}
       </div>
       <h3 data-copy="content" className="text-base"><Hl text={a?.title ?? ""} q={q} /></h3>
-      <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
+      <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><LinkText text={m.body ?? ""} highlight={q} /></p>
       {asks &&
         (a.acknowledged_at ? (
           <p className="mt-2.5 flex items-center gap-1.5 text-xs text-success">
@@ -162,8 +163,53 @@ function AnnouncementPost({ m, q }: { m: Message; q: string }) {
 
 const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: ["ticks", "Read"] } as const;
 
+/** A sent message's ticks, in a direct conversation (§3 step 10). */
+function Ticks({ status }: { status: NonNullable<Message["status"]> }) {
+  return (
+    <Tooltip label={TICK[status][1]}>
+      <span role="img" className={cn("ml-1 inline-flex align-text-bottom", status === "read" ? "text-info" : "text-subtle-foreground")} aria-label={TICK[status][1]}>
+        <Icon name={TICK[status][0]} className="size-3.5" />
+      </span>
+    </Tooltip>
+  );
+}
+
+const bubble = (mine: boolean) =>
+  mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground";
+
+/** Four or more photos and videos sent together: one bubble, two by two, the caption under it (§3 step 17). */
+export function AlbumPost({ ms, q, dm, onView, menu }: { ms: Message[]; q: string; dm?: boolean; onView: (key: string) => void; menu?: ReactNode }) {
+  const first = ms[0]!;
+  const last = ms[ms.length - 1]!;
+  const authorPhoto = usePhoto(first.mine ? null : first.author?.photo_url);
+  const caption = ms.find((x) => x.body)?.body ?? null;
+  return (
+    <div className={cn("flex max-w-4/5 gap-2 max-md:max-w-11/12", first.mine && "flex-row-reverse self-end")}>
+      {!first.mine && <Avatar name={first.author?.display_name ?? "MyCity"} src={authorPhoto} size={30} className="mt-0.5" />}
+      <div className="min-w-0">
+        <div className={cn("mb-0.5 flex items-baseline gap-1.5 text-xs font-strong", first.mine && "justify-end")}>
+          {!first.mine && first.author?.display_name}
+          <span className="text-2xs font-normal text-subtle-foreground">
+            {formatTime(last.sent_at)}
+            {first.mine && dm && last.status && <Ticks status={last.status} />}
+          </span>
+          {menu}
+        </div>
+        <div className={cn("w-min p-1 text-sm leading-normal wrap-any", bubble(first.mine))}>
+          <AlbumMedia ms={ms} onView={onView} />
+          {caption && (
+            <div className="px-2 pt-1.5 pb-0.5 whitespace-pre-wrap">
+              <LinkText text={caption} highlight={q} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** One post in a channel or a conversation. */
-export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; menu?: ReactNode }) {
+export function Post({ m, q, dm, onCelebrate, onVote, onView, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; onView?: (key: string) => void; menu?: ReactNode }) {
   const authorPhoto = usePhoto(m.mine ? null : m.author?.photo_url);
   const toPhoto = usePhoto(m.recognition?.to.photo_url);
   /* A card keeps its look; its menu sits beside it. */
@@ -208,21 +254,33 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
     return <div className={cn("flex w-full max-w-140 items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div>;
   }
   if (m.message_type === "announcement") return <AnnouncementPost m={m} q={q} />;
+  /* A photo, a video or a file fills its bubble, its caption under it; a text carries its first link's card above it. */
+  const media = !m.deleted && m.message_type !== "audio" && Boolean(m.document);
   let inner: ReactNode;
   if (m.deleted) inner = <span className="italic opacity-70">Message deleted</span>;
   else if (m.message_type === "audio") inner = <VoiceNote m={m} mine={m.mine} />;
-  else if (m.document)
+  else if (media)
     inner = (
-      <button
-        type="button"
-        onClick={() => void saveFile(`/api/v1/documents/${m.document!.document_id}/content`, m.document!.file_name)}
-        className={cn("mt-0.5 flex items-center gap-2 rounded-box border px-2.5 py-2 text-left", m.mine ? "border-white/20 bg-white/10" : "border-border bg-background")}
-      >
-        <Icon name={m.message_type === "image" ? "image" : "doc"} />
-        <span><b className="block text-xs">{m.document.file_name}</b><span className="text-2xs opacity-70">{formatBytes(m.document.size_bytes)}</span></span>
-      </button>
+      <>
+        <MessageMedia m={m} onView={() => onView?.(m.community_message_id)} />
+        {m.body && (
+          <div className="px-2 pt-1.5 pb-0.5 whitespace-pre-wrap">
+            <LinkText text={m.body} highlight={q} />
+          </div>
+        )}
+      </>
     );
-  else inner = <Hl text={m.body ?? ""} q={q} />;
+  else
+    inner = (
+      <>
+        {m.link && (
+          <div className="mb-1.5">
+            <MessageLink link={m.link} mine={m.mine} />
+          </div>
+        )}
+        <LinkText text={m.body ?? ""} highlight={q} />
+      </>
+    );
   return (
     <div className={cn("flex max-w-4/5 gap-2 max-md:max-w-11/12", m.mine && "flex-row-reverse self-end")}>
       {!m.mine && <Avatar name={m.author?.display_name ?? "MyCity"} src={authorPhoto} size={30} className="mt-0.5" />}
@@ -232,17 +290,11 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
           <span className="text-2xs font-normal text-subtle-foreground">
             {formatTime(m.sent_at)}
             {m.edited_at && !m.deleted && " · Edited"}
-            {m.mine && dm && m.status && (
-              <Tooltip label={TICK[m.status][1]}>
-                <span role="img" className={cn("ml-1 inline-flex align-text-bottom", m.status === "read" ? "text-info" : "text-subtle-foreground")} aria-label={TICK[m.status][1]}>
-                  <Icon name={TICK[m.status][0]} className="size-3.5" />
-                </span>
-              </Tooltip>
-            )}
+            {m.mine && dm && m.status && <Ticks status={m.status} />}
           </span>
           {menu}
         </div>
-        <div className={cn("px-3 py-2 text-sm leading-normal whitespace-pre-wrap wrap-any", m.mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground")}>
+        <div className={cn("text-sm leading-normal wrap-any", media ? "w-min p-1" : "px-3 py-2 whitespace-pre-wrap", bubble(m.mine))}>
           {inner}
         </div>
       </div>
