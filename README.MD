@@ -225,11 +225,14 @@ src/
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
 │   │                  deliverability/{check, route-check, dns-check, dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
-│   ├── ai/            llm.service · governance · ledger · redact · structured · transcription (Groq,
-│   │                  then Gemini, then the browser's captions) · catalogue (a provider's model list,
-│   │                  sorted into what the ERP uses) · jobs (each AI job's model until AI Control) ·
-│   │                  skips (a provider skipped until its quota resets) · vendors/{http, gemini, groq,
-│   │                  openai, anthropic, deepseek, stub} · prompts/*.md · assistant/* (M10)
+│   ├── ai/            llm.service (complete, and search for Find Prices) · governance (the switch,
+│   │                  the caps, the spend) · ledger · redact · structured · transcription (Groq, then
+│   │                  Gemini, then the browser's captions) · catalogue (a provider's model list,
+│   │                  sorted into what the ERP uses) · actions (every AI feature, registered under
+│   │                  its job) · jobs (each action's chain and each model's state, AI Control) ·
+│   │                  prices (what a step is charged at, in naira) · skips (a provider skipped until
+│   │                  its quota resets) · vendors/{http, gemini, groq, openai, anthropic, deepseek,
+│   │                  stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
@@ -293,7 +296,8 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `partnerships` | `partners`, `partner_pipeline`, `leads`, `interactions`, `proposals`, `agreements`, `partnership_analytics` |
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
 | `knowledge` | `knowledge`, `policies` (with the `policies.manage` capability for writing them); announcements are read here too |
-| `praxis_ai` | `assistant`, `ai_governance` |
+| `praxis_ai` | `assistant` |
+| `ai_control` | `ai_governance` (AI Control: chains, prices, caps; `docs/guides/ai-control.md`) |
 | `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `templates`, `signatures`, `search`, `maps` |
 
 Two Settings tabs have a key of their own instead, granted only to the Implementation Team and the
@@ -504,7 +508,7 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
 | `assistant` | `.history` (Ask, History). Engine in `services/ai/assistant/{orchestrator, retrieval, embeddings, answer, conversation.repo}.js` |
-| `ai_governance` | Spend cap, model, per-module switch |
+| `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
 The assistant **reads only** (A23). It answers from the manifests every module has carried since M1.
 
@@ -715,7 +719,9 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
-`check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`, `check/provenance.js`
+`check/ai-vendor-imports.js`, `check/ai-actions.js` (every AI call names an action registered in
+`services/ai/actions.js`, with its job, its personal-data answer and who chose it; `docs/guides/ai-control.md`
+§6.5), `check/shell.js`, `check/pagination.js`, `check/provenance.js`
 (code and comments never name the project code came from; that lives in REUSE_MAP.md only).
 
 Frontend guards, from M0 (FRONTEND_GUIDE §10): `gen:components --check` and `check/components.js`

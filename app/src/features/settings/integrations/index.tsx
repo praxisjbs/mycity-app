@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { IntegrationGroup, IntegrationRow } from "@mycity/contract/contract.gen.ts";
 import { useApi, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -19,13 +19,21 @@ const GROUPS: Array<[GroupFilter, string]> = [["all", "All"], ...(Object.entries
  *
  * Shown to `integrations` viewers only (shell/access.ts visibleTabs).
  */
-export function IntegrationsTab() {
+export function IntegrationsTab({ id = null }: { id?: string | null }) {
   const { can } = useAuth();
   const phone = useIsPhone();
   const [group, setGroup] = useState<GroupFilter>("all");
   const summary = useApi("GET /api/v1/integrations/summary");
   const list = usePaged("GET /api/v1/integrations", { filters: group === "all" ? {} : { group } });
   const open = useConnection();
+  // A link that names a connection (AI Control · Models) opens it, once the list has it.
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    const row = id ? list.rows.find((r) => r.code === id) : null;
+    if (!row || opened.current === id) return;
+    opened.current = id;
+    open(row.code, row.display_name);
+  }, [id, list.rows, open]);
   const test = useTest();
   const canTest = can("integrations", "edit");
   const s = summary.data;

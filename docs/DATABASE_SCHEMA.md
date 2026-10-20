@@ -69,7 +69,7 @@ erDiagram
 | Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `notification_rule`, `notification_rule_recipient`, `notification_reminder_rule`, `notification_setting`, `reminder`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
-| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
+| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model`, `ai_chain`, `ai_provider_cap`, `ai_price_proposal` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
 
 Every core table above was checked against the shared code that writes it by running
 `tests/integration` on the real migrations (#26, #27): the code and the schema agree, and CI keeps
@@ -451,7 +451,11 @@ their grants on screen came forward to M0 with foundation track C (`0400`, `0449
 ### M10 Staff Knowledge Hub & AI Assistance · 10000 to 10999 · TB
 
 **Built:** `10000` knowledge categories, articles, versions, embeddings, AI conversations,
-messages, citations · `10099` seed.
+messages, citations · `10099` seed · `10200` AI Control, brought forward (`docs/guides/ai-control.md`
+§4): `ai_chain` (each job's and action's chain, a row per model), `ai_provider_cap` (a paid provider's
+monthly cap), `ai_price_proposal` (Find Prices' proposals, one open per model), `ai_model`'s price of a
+thousand searches, and on `ai_run_step` the audio seconds, searches, naira prices and rate a step was
+charged at, with kind `search` · `10290` seed: the `ai_control` grants.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

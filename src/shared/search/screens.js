@@ -107,6 +107,10 @@ const SCREENS = Object.freeze([
   s("praxis_ai", "ask", "Ask", ["ai", "assistant", "chat", "question"]),
   s("praxis_ai", "history", "History", ["ai history", "past questions", "conversations"]),
 
+  s("ai_control", "actions", "Actions", ["ai control", "ai actions", "fallback", "chain", "make first", "which model", "top tier", "deep reasoning", "transcription model", "gemini", "anthropic", "claude", "groq", "deepseek"]),
+  s("ai_control", "models", "Models", ["ai models", "model prices", "find prices", "ai prices", "openai", "price per million"]),
+  s("ai_control", "spend", "Spend", ["ai spend", "ai cost", "ai budget", "monthly cap", "set cap", "recharge", "spend by action"]),
+
   s("settings", "organisation", "Organisation", ["organization", "company", "company profile", "working week", "holidays", "public holidays"]),
   s("settings", "status", "Status", ["health", "system health", "uptime", "checks", "disk", "memory", "cpu", "server"]),
   s("settings", "performance", "Performance", ["performance", "response time", "slow", "error rate", "load"]),

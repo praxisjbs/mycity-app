@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   models: [] as unknown[],
   detail: null as unknown,
   can: ((_module: string, _action?: string) => true) as (module: string, action?: string) => boolean,
+  navigate: vi.fn(),
 }));
 vi.mock("@/api/hooks", () => ({
   invalidate: m.invalidate,
@@ -29,6 +30,7 @@ vi.mock("@/api/hooks", () => ({
 }));
 vi.mock("@/api/client", async () => ({ api: { call: m.call }, ApiError: (await import("@mycity/ui")).ApiError }));
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: m.can }) }));
+vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate }) }));
 vi.mock("@/auth/FreshSignIn", () => ({ useFreshSignIn: () => ({ guard: <T,>(run: () => Promise<T>) => run(), ensure: async () => true }) }));
 
 import { IntegrationsTab } from "./index";
@@ -199,6 +201,10 @@ describe("Settings · Integrations", () => {
         body: { model: "whisper-next", display_name: "", capabilities: ["audio"], endpoint_url: "" },
       }),
     );
+    // Which model answers each feature is chosen on AI Control.
+    const again = await screen.findByRole("dialog");
+    await user.click(within(again).getByRole("button", { name: "Open AI Control" }));
+    expect(m.navigate).toHaveBeenCalledWith("/ai-control?tab=actions");
   });
 
   it("Exchange Rates shows the dollar in naira, with Sync Rates beside it", async () => {

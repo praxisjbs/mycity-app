@@ -1,0 +1,399 @@
+import aiControl from "@mycity/contract/schemas/ai_control.js";
+import type { AiControlModel, AiPriceProposal, AiPricesSave, AiProvider } from "@mycity/contract/contract.gen.ts";
+import { api, ApiError } from "@/api/client";
+import { invalidate, useApi, usePaged } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
+import { doesOf } from "@/features/settings/integrations/words";
+import { useRouter } from "@/lib/router";
+import { hrefFor } from "@/lib/routes";
+import {
+  ActionGroup,
+  Button,
+  DataView,
+  DesktopOnly,
+  Field,
+  FilterSelect,
+  Form,
+  FormError,
+  FormFooter,
+  formatDateTime,
+  HelpTerm,
+  KeyValue,
+  LinkText,
+  Money,
+  PageHeader,
+  PhoneOnly,
+  Pill,
+  TextField,
+  toast,
+  useContractForm,
+  useModal,
+} from "@mycity/ui";
+import { useEffect, useState } from "react";
+import { HELP, JOB, PROVIDER, positionOf, usd } from "./words";
+
+const fail = (e: unknown, fallback: string) => toast(e instanceof ApiError ? e.message : fallback);
+
+type Priced = Pick<AiControlModel, "input_usd_per_million" | "output_usd_per_million" | "usd_per_audio_hour">;
+
+/** What a model costs: per hour of audio for a speech model, else per million tokens in and out. */
+function priceOf(m: Priced): string | null {
+  if (m.usd_per_audio_hour) return `${usd(m.usd_per_audio_hour)} an hour`;
+  const inp = usd(m.input_usd_per_million);
+  const out = usd(m.output_usd_per_million);
+  if (inp && out) return `${inp} / ${out} per M`;
+  return inp ? `${inp} per M` : null;
+}
+
+/** The same in naira at the day's rate. */
+function nairaOf(m: AiControlModel) {
+  if (m.ngn_per_audio_hour) return <Money value={m.ngn_per_audio_hour} />;
+  if (!m.input_ngn_per_million) return null;
+  return (
+    <span className="whitespace-nowrap">
+      <Money value={m.input_ngn_per_million} />
+      {m.output_ngn_per_million && (
+        <>
+          {" / "}
+          <Money value={m.output_ngn_per_million} />
+        </>
+      )}
+    </span>
+  );
+}
+
+const chainsOf = (m: AiControlModel) =>
+  m.in_chains.map((c) => `${c.scope === "job" ? JOB[c.key as keyof typeof JOB] : (c.label ?? c.key)}${c.position > 1 ? ` (${positionOf(c.position)})` : ""}`).join(", ") || null;
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
+
+/** While Find Prices runs, its state is read again this often. */
+const FINDING_MS = 3000;
+
+type Values = Record<keyof AiPricesSave, string>;
+const PRICE_FIELDS: Array<[keyof AiPricesSave, string]> = [
+  ["input_usd_per_million", "Input per Million"],
+  ["output_usd_per_million", "Output per Million"],
+  ["audio_usd_per_million", "Audio per Million"],
+  ["usd_per_audio_hour", "Per Audio Hour"],
+  ["usd_per_thousand_searches", "Per 1,000 Searches"],
+];
+
+/** A price as the field shows it: "0.3000" → "0.30". */
+const trimmed = (v: string | null) => (v ? v.replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1") : "");
+
+/**
+ * Edit Price, and Accept with the proposal's prices to change first: dollars as the provider
+ * publishes them; blank is no price.
+ */
+function PriceForm({ start, save, done, label }: { start: Priced & Partial<AiControlModel>; save: (body: AiPricesSave) => Promise<unknown>; done: () => void; label: string }) {
+  const [problem, setProblem] = useState<string | null>(null);
+  const f = useContractForm<Values>(
+    {
+      input_usd_per_million: trimmed(start.input_usd_per_million),
+      output_usd_per_million: trimmed(start.output_usd_per_million),
+      audio_usd_per_million: trimmed(start.audio_usd_per_million ?? null),
+      usd_per_audio_hour: trimmed(start.usd_per_audio_hour),
+      usd_per_thousand_searches: trimmed(start.usd_per_thousand_searches ?? null),
+    },
+    aiControl.AiPricesSave,
+  );
+  const submit = async () => {
+    setProblem(null);
+    try {
+      await save(f.values);
+      invalidate("/api/v1/ai-control");
+      toast("Prices saved");
+      done();
+    } catch (e) {
+      const err = e instanceof ApiError ? e : null;
+      if (err && Object.keys(err.fields).length) return f.setServerErrors(err.fields);
+      setProblem(err?.message ?? "Not saved");
+    }
+  };
+  return (
+    <Form onSubmit={f.submit(submit)}>
+      {PRICE_FIELDS.map(([k, text]) => (
+        <Field key={k} label={text} optional {...f.status(k)}>
+          <TextField {...f.field(k)} inputMode="decimal" placeholder="0.30" maxLength={14} />
+        </Field>
+      ))}
+      {problem && <FormError>{problem}</FormError>}
+      <FormFooter>
+        <Button onClick={done}>Cancel</Button>
+        <Button variant="primary" type="submit">
+          {label}
+        </Button>
+      </FormFooter>
+    </Form>
+  );
+}
+
+/** One model in a sheet: its prices in dollars and naira, the chains it is in, Edit Price. */
+function ModelSheet({ m, close }: { m: AiControlModel; close: () => void }) {
+  const { can } = useAuth();
+  const modal = useModal();
+  const { navigate } = useRouter();
+  const edit = () =>
+    modal.open({
+      title: "Edit Price",
+      body: (done) => <PriceForm start={m} label="Save Prices" save={(body) => api.call("PUT /api/v1/ai-control/models/:id/prices", { params: { id: m.ai_model_id }, body })} done={done} />,
+    });
+  return (
+    <>
+      <KeyValue
+        items={[
+          ["Provider", PROVIDER[m.provider]],
+          ["Model ID", <span data-copy="content">{m.model}</span>],
+          ["Does", doesOf(m.capabilities)],
+          ["On Key", m.available === true ? "Available" : m.available === false ? "Not on Key" : "Not Checked"],
+          ["Plan", m.plan === "free" ? "Free" : m.plan === "paid" ? "Paid" : null],
+          ["Price", priceOf(m)],
+          [<HelpTerm help={HELP.naira}>In Naira</HelpTerm>, nairaOf(m)],
+          ["Per 1,000 Searches", usd(m.usd_per_thousand_searches)],
+          ["In Chains", chainsOf(m)],
+        ]}
+      />
+      <FormFooter>
+        {can("integrations", "view") && (
+          <Button
+            onClick={() => {
+              close();
+              navigate(hrefFor("settings", "integrations", { id: m.provider }));
+            }}
+          >
+            Open Connection
+          </Button>
+        )}
+        {can("ai_control", "edit") && (
+          <Button variant="primary" icon="edit" onClick={edit}>
+            Edit Price
+          </Button>
+        )}
+      </FormFooter>
+    </>
+  );
+}
+
+/** The prices Find Prices read, waiting for IT: Accept, Edit Price, Dismiss. */
+function Proposals() {
+  const { can } = useAuth();
+  const modal = useModal();
+  const list = usePaged("GET /api/v1/ai-control/prices");
+  const edit = can("ai_control", "edit");
+  const accept = (p: AiPriceProposal, body?: AiPricesSave) =>
+    api.call("POST /api/v1/ai-control/prices/:id/accept", {
+      params: { id: p.ai_price_proposal_id },
+      body: body ?? {
+        input_usd_per_million: p.input_usd_per_million ?? "",
+        output_usd_per_million: p.output_usd_per_million ?? "",
+        audio_usd_per_million: p.audio_usd_per_million ?? "",
+        usd_per_audio_hour: p.usd_per_audio_hour ?? "",
+        usd_per_thousand_searches: p.usd_per_thousand_searches ?? "",
+      },
+    });
+  const acceptNow = async (p: AiPriceProposal) => {
+    try {
+      await accept(p);
+      invalidate("/api/v1/ai-control");
+      toast("Prices saved");
+    } catch (e) {
+      fail(e, "Not saved");
+    }
+  };
+  const dismiss = async (p: AiPriceProposal) => {
+    try {
+      await api.call("POST /api/v1/ai-control/prices/:id/dismiss", { params: { id: p.ai_price_proposal_id }, body: {} });
+      invalidate("/api/v1/ai-control");
+      toast("Proposal dismissed");
+    } catch (e) {
+      fail(e, "Not dismissed");
+    }
+  };
+  const editFirst = (p: AiPriceProposal) =>
+    modal.open({ title: "Edit Price", body: (done) => <PriceForm start={p} label="Accept Prices" save={(body) => accept(p, body)} done={done} /> });
+  const open = (p: AiPriceProposal) =>
+    modal.open({
+      title: p.display_name,
+      body: (close) => (
+        <>
+          <KeyValue
+            items={[
+              ["Provider", PROVIDER[p.provider]],
+              ["Price", priceOf(p)],
+              ["Per 1,000 Searches", usd(p.usd_per_thousand_searches)],
+              ["Page", <LinkText text={p.source_url} />],
+              ["Found", formatDateTime(p.created_at)],
+            ]}
+          />
+          {edit && (
+            <FormFooter>
+              <Button onClick={() => dismiss(p).then(close)}>Dismiss</Button>
+              <Button onClick={() => (close(), editFirst(p))}>Edit Price</Button>
+              <Button variant="primary" onClick={() => acceptNow(p).then(close)}>
+                Accept
+              </Button>
+            </FormFooter>
+          )}
+        </>
+      ),
+    });
+
+  if (!list.rows.length) return null;
+  return (
+    <DataView<AiPriceProposal>
+      className="mb-3"
+      list={list}
+      title="Proposed Prices"
+      caption="Proposed prices"
+      noun="proposal"
+      rowKey={(r) => r.ai_price_proposal_id}
+      onRowClick={open}
+      empty={{ title: "Nothing Proposed", icon: "check" }}
+      columns={[
+        {
+          key: "model",
+          label: "Model",
+          render: (r) => (
+            <span className="flex min-w-0 flex-col">
+              <span data-copy="content">{r.display_name}</span>
+              <span className="text-xs text-subtle-foreground">{PROVIDER[r.provider]}</span>
+            </span>
+          ),
+        },
+        { key: "price", label: "Price", render: priceOf },
+        { key: "page", label: "Page", desktop: true, render: (r) => <span data-copy="content">{hostOf(r.source_url)}</span> },
+        {
+          key: "do",
+          label: "",
+          desktop: true,
+          render: (r) =>
+            edit ? (
+              <ActionGroup>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    return acceptNow(r);
+                  }}
+                >
+                  Accept
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    return dismiss(r);
+                  }}
+                >
+                  Dismiss
+                </Button>
+              </ActionGroup>
+            ) : (
+              <></>
+            ),
+        },
+      ]}
+    />
+  );
+}
+
+const PROVIDERS: Array<[AiProvider | "", string]> = [["", "Any Provider"], ...(Object.entries(PROVIDER) as Array<[AiProvider, string]>)];
+
+/** AI Control · Models (docs/guides/ai-control.md §2, §10). */
+export function Models() {
+  const { can } = useAuth();
+  const modal = useModal();
+  const [provider, setProvider] = useState<AiProvider | "">("");
+  const summary = useApi("GET /api/v1/ai-control/models/summary");
+  const list = usePaged("GET /api/v1/ai-control/models", { filters: provider ? { provider } : {} });
+  const s = summary.data;
+  const finding = !!s?.finding;
+
+  // While a search runs, read its state again until it ends, then the whole tab.
+  const { reload } = summary;
+  useEffect(() => {
+    if (!finding) return;
+    const t = setInterval(reload, FINDING_MS);
+    return () => {
+      clearInterval(t);
+      invalidate("/api/v1/ai-control");
+    };
+  }, [finding, reload]);
+
+  const find = async () => {
+    try {
+      await api.call("POST /api/v1/ai-control/prices/find", { body: {} });
+      toast("Finding prices");
+      summary.reload();
+    } catch (e) {
+      fail(e, "Not started");
+    }
+  };
+  const findButton = can("ai_control", "edit") ? (
+    finding ? (
+      <Pill tone="info">Finding Prices</Pill>
+    ) : (
+      <Button variant="primary" icon="srch" onClick={find}>
+        Find Prices
+      </Button>
+    )
+  ) : null;
+
+  return (
+    <>
+      <PageHeader
+        title="Models"
+        sub="Every provider's models and their prices"
+        actions={<DesktopOnly>{findButton}</DesktopOnly>}
+      />
+      <Proposals />
+      <DataView<AiControlModel>
+        list={list}
+        title="Models"
+        caption="AI models"
+        noun="model"
+        search="Search models"
+        rowKey={(r) => r.ai_model_id}
+        onRowClick={(m) => modal.open({ title: m.display_name, body: (close) => <ModelSheet m={m} close={close} /> })}
+        actions={<FilterSelect label="Provider" value={provider} onChange={(v) => setProvider(v as AiProvider | "")} options={PROVIDERS} />}
+        empty={{ title: "No Models", icon: "spark" }}
+        columns={[
+          {
+            key: "name",
+            label: "Model",
+            render: (r) => (
+              <span className="flex min-w-0 flex-col">
+                <span data-copy="content" className="break-words">
+                  {r.display_name}
+                </span>
+                <span className="text-xs text-subtle-foreground">
+                  {PROVIDER[r.provider]}, {doesOf(r.capabilities)}
+                </span>
+              </span>
+            ),
+          },
+          {
+            key: "on_key",
+            label: "On Key",
+            render: (r) =>
+              r.available === true ? <Pill tone="ok">Available</Pill> : r.available === false ? <Pill tone="neutral">Not on Key</Pill> : <Pill tone="warn">Not Checked</Pill>,
+          },
+          { key: "price", label: "Price", render: (r) => priceOf(r) ?? (r.proposed ? <Pill tone="info">Proposed</Pill> : null) },
+          { key: "naira", label: <HelpTerm help={HELP.naira}>In Naira</HelpTerm>, desktop: true, render: nairaOf },
+          { key: "chains", label: "In Chains", desktop: true, render: chainsOf },
+        ]}
+      />
+      <PhoneOnly>
+        <div className="mt-3 flex flex-col">{findButton}</div>
+      </PhoneOnly>
+    </>
+  );
+}

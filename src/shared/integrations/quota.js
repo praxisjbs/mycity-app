@@ -60,10 +60,21 @@ async function spent(code, { db } = {}) {
   return Number(row.units_today) + waiting >= Number(row.daily_limit);
 }
 
+/**
+ * The plan in force for a connection: `free`, `paid`, or null for one with no daily limit.
+ * @param {string} code
+ * @param {{db?: {query: Function}}} [opts]
+ */
+async function plan(code, { db } = {}) {
+  const def = providers.get(code);
+  if (!def.limited) return null;
+  return planOf(def, await rowOf(db || pool(), code, lagos.today()));
+}
+
 /** After a save changes a plan or a limit; tests. */
 function forget(code) {
   if (code) cache.delete(code);
   else cache.clear();
 }
 
-module.exports = { spent, planOf, forget };
+module.exports = { spent, plan, planOf, forget };

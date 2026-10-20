@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 96 screens (90 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 99 screens (93 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -52,8 +52,8 @@ saying who agreed and when.
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 1 | 0 | 11 | 0 | 0 |
-| M10 Staff Knowledge Hub & AI Assistance | 6 | 6 | 0 | 0 | 0 | 0 |
-| **Total** | **96** | **53** | **0** | **43** | **0** | **0** |
+| M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
+| **Total** | **99** | **53** | **0** | **46** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -1051,6 +1051,32 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 - 15/10/2026 · AJ · Frontend built in `app/src/features/assistant/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/knowledge.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 15/10/2026 · AJ · Fixed a blank screen on Ask: the scroll effect returned a value, which crashed React in browsers where `scrollIntoView` returns a Promise. The shell now wraps every screen in an error boundary, so a crash in one screen shows an error card there and the menu and back button keep working.
 
+### AI Control
+
+| # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
+|---|---|---|---|---|---|---|---|---|---|
+| 98 | Actions | `actions` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 99 | Models | `models` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 100 | Spend | `spend` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+
+**Notes**
+
+- 20/10/2026 · TB · AI Control built (PR2 of the AI plan, M10 brought forward; `docs/guides/ai-control.md`,
+  decisions 12 to 28): its own module under System, the `ai_governance` stub filled and shown as AI Control
+  with its own `ai_control` key (IT edits, Operations & People view, seed 10290). Actions: the seven jobs and
+  the registered actions, each chain a first choice and up to three fallbacks with each model's state, Edit
+  Chain, Make First, an action's own chain and Use Job Chain. Models: every provider's models in dollars and
+  naira at the day's rate, Edit Price, and Find Prices (Deep Reasoning with Google Search, in the worker) with
+  Accept, Edit Price and Dismiss. Spend: this Lagos month per provider against its cap, all AI against the
+  overall cap, by day and by action; Set Cap. Every AI call now walks its action's chain (`services/ai/jobs.js`)
+  across Gemini, Anthropic and DeepSeek, passing a model that is not set up, off the key, at a Free plan's
+  daily limit, skipped until its reset, at its provider's cap, DeepSeek on personal data, or unable to search;
+  each step keeps the naira prices and rate it was charged at (`services/ai/prices.js`, migration 10200).
+  The registry `services/ai/actions.js` holds Voice Note Transcription, Tidy Policy, Data Answers (registered,
+  built in M10) and Find Prices; gate `check/ai-actions.js` fails a call that names no registered action.
+  Tests: 10 integration, 11 unit, 6 screen. Left: Data Answers and the per-module switch's screen with M10's
+  Assistant; set Find Prices' first prices on staging and production once the keys are in.
+
 ### Settings
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
@@ -1073,6 +1099,10 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · Integrations (#77) with AI Control (`docs/guides/ai-control.md` decision 26): the AI
+  providers no longer send Daily Limit Near at 80%, and their Daily Limit help says so; an AI connection's In
+  Use reads the chains saved on AI Control; Open AI Control on each AI connection, and Open Connection on a
+  model on AI Control · Models, which opens that connection here (`?id=` its code). Left: nothing.
 - 20/10/2026 · TB · Attendance Policy (#73) dropped: the Attendance policy moves to Knowledge Hub · Policies as a rules policy (MILESTONES §18, ratified 20/10/2026; `docs/guides/policies.md`). Its row stays, Dropped, counted nowhere. Left: the tab, its routes, its registrations and its screen come out in PR 1.
 - 20/10/2026 · TB · Integrations (#77) built, brought forward from M9 by TB (owner GE → TB) from TB's
   twelve answers (`docs/guides/integrations.md`): the system sender, the staff mail server, Geoapify,

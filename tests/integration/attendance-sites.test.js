@@ -16,7 +16,6 @@
  */
 const crypto = require("node:crypto");
 const request = require("supertest");
-const contract = require("@mycity/contract");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
@@ -27,7 +26,6 @@ const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const token = require("../../src/shared/places/token");
-const { picked } = require("../helpers/places");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
 const aiRegistry = require("../../src/shared/ai/registry");
 const lagos = require("../../src/shared/time/lagos");

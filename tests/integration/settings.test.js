@@ -151,7 +151,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(res.body.page.total).toBe(7);
       const byCode = Object.fromEntries(res.body.data.map((r) => [r.code, r]));
       expect(byCode.operations_people).toEqual(
-        expect.objectContaining({ is_system: true, users: 1, modules: 15, scope: "all", fields_visible: 4 }),
+        expect.objectContaining({ is_system: true, users: 1, modules: 16, scope: "all", fields_visible: 4 }),
       );
       expect(byCode.employee).toEqual(expect.objectContaining({ users: 1, scope: "own", fields_visible: 0 }));
       expect(res.body.data[0].code).toBe("implementation");
@@ -160,7 +160,7 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("the catalogue and the matrix: every module, every role", async () => {
       const cat = await as("ops").get("/settings/roles/catalogue");
       expect(cat.status).toBe(200);
-      expect(cat.body.modules).toHaveLength(17);
+      expect(cat.body.modules).toHaveLength(18);
       expect(cat.body.modules.find((m) => m.key === "ess").own_only).toBe(true);
       expect(cat.body.fields.map((f) => f.key)).toEqual([
         "employee.salary",
@@ -181,7 +181,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       const m = await as("ops").get("/settings/roles/matrix");
       expect(m.status).toBe(200);
       expect(m.body.roles).toHaveLength(7);
-      expect(m.body.rows).toHaveLength(17);
+      expect(m.body.rows).toHaveLength(18);
       const payroll = m.body.rows.find((r) => r.module_key === "payroll");
       const staffRole = m.body.roles.findIndex((r) => r.code === "employee");
       expect(payroll.cells[staffRole]).toEqual(expect.objectContaining({ actions: [], scope: null }));
@@ -882,7 +882,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(res.body.today).toBeGreaterThan(0);
       expect(res.body.this_month).toBeGreaterThanOrEqual(res.body.today);
       expect(res.body.by_module[0]).toEqual(expect.objectContaining({ module_key: "settings", label: "Settings" }));
-      expect(res.body.modules).toHaveLength(17);
+      expect(res.body.modules).toHaveLength(18);
     });
 
     test("the export is the whole filtered log, made by the worker into the file the Audit Log downloads", async () => {

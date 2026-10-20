@@ -95,6 +95,7 @@ const SCREENS = Object.freeze({
   ],
   knowledge: ["policies", "sops", "faqs", "training", "announcements"],
   praxis_ai: ["ask", "history"],
+  ai_control: ["actions", "models", "spend"],
   settings: [
     "organisation",
     "status",
