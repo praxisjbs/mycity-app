@@ -40,6 +40,8 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
      * (features/home/access.ts, docs/guides/home.md §10.1), so the tabs never move, and
      * only ⌘K hides it (src/shared/search/screens.js tabVisible).
      */
+    /* Knowledge Hub · Policies is where policies are written (docs/guides/policies.md §8); staff read theirs on Policy Updates. */
+    if (mod.key === "knowledge" && t.slug === "policies") return hasCapability(me, "policies.manage");
     if (mod.key === "settings" && SYSTEM_HEALTH_TABS.includes(t.slug)) return healthView(me);
     if (mod.key === "settings" && t.slug === "integrations") return integrationsView(me);
     if (mod.key === "settings") return !!FULL(me);

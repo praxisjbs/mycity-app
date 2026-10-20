@@ -18,7 +18,7 @@ import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, Expor
 /**
  * ESS · My Attendance (#9, with the person's field assignments) and My Devices (#88)
  * (docs/guides/attendance.md §10). Work Location Requests (#87) is WorkLocationRequests.tsx, Policy
- * Updates (#89) PolicyUpdates.tsx.
+ * Updates (#89) features/policies/PolicyUpdates.tsx.
  * Everything here is the caller's own: the routes take no employee id.
  */
 

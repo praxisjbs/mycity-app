@@ -298,9 +298,10 @@ async function get(user, id, { db = pool } = {}) {
   const draftRow = land.draft;
   let draft = null;
   if (draftRow) {
-    const [audience, baseAudience] = await Promise.all([
+    const [audience, baseAudience, people] = await Promise.all([
       repo.audienceOf(db, [draftRow.policy_version_id]),
       land.newest ? repo.audienceOf(db, [land.newest.policy_version_id]) : [],
+      repo.namedPeople(db, draftRow.policy_version_id),
     ]);
     const content = contentOf(draftRow, audience);
     const base = land.newest ? contentOf(land.newest, baseAudience) : null;
@@ -309,6 +310,7 @@ async function get(user, id, { db = pool } = {}) {
       policy_version_id: draftRow.policy_version_id,
       title: content.title,
       applies_to: content.applies_to,
+      applies_to_people: people,
       needs_acknowledgement: draftRow.needs_acknowledgement,
       acknowledge_within_days: Number(draftRow.acknowledge_within_days),
       needs_approval: draftRow.needs_approval,
@@ -340,6 +342,7 @@ async function get(user, id, { db = pool } = {}) {
     state: policyState(policy, land),
     today,
     current_rules: spec ? rulesOf(policy.kind, land.inForce ? land.inForce.rules : null) : null,
+    suggested_rules: spec ? spec.read.parse(spec.suggestions()) : null,
     in_force: land.inForce ? asVersion(byId.get(land.inForce.policy_version_id), today, land.inForceId) : null,
     waiting: land.waiting ? asVersion(byId.get(land.waiting.policy_version_id), today, land.inForceId) : null,
     draft,

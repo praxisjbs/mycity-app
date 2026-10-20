@@ -121,3 +121,8 @@ export function closeDue(userId: string, date: string, now: Date): boolean {
 export function remindIn(userId: string, date: string, now: Date, minutes: number = REMIND_CHOICES[0]): void {
   write(CLOSE_KEY, `${markOf(userId, date)}|${now.getTime() + minutes * 60_000}`);
 }
+
+/** Whether the sign-in prompt has been asked for, for this person and day on this device. */
+export function signInAsked(userId: string, date: string): boolean {
+  return read(SIGN_IN_KEY) === markOf(userId, date);
+}

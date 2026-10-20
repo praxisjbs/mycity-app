@@ -73,7 +73,7 @@ takes its migrations from its own part of the M1 block, so the four never collid
 
 | PR | Builds | Sections | Migrations | Status |
 |---|---|---|---|---|
-| 1 · Policies foundation | Knowledge Hub · Policies and ESS · Policy Updates for every policy (`policies.md`); the Attendance policy moved into it with today's rules; the clock reads its rules through `policies.rulesFor`; Settings · Attendance Policy retired | §6.1, §6.15 (the worksheet's existing rules, and the contract for every rule) | 1400 to 1419 | In progress |
+| 1 · Policies foundation | Knowledge Hub · Policies and ESS · Policy Updates for every policy (`policies.md`); the Attendance policy moved into it with today's rules; the clock reads its rules through `policies.rulesFor`; Settings · Attendance Policy retired | §6.1, §6.15 (the worksheet's existing rules, and the contract for every rule) | 1400 to 1419 | Built |
 | 2 · Clock fixes | The audit of 20/10/2026: the location reading, Location Unclear, Refuse opening an exception, a rejected punch freeing its slot, leave on the work date, the clock panel's location reader | §6.2, §6.3, §6.5, §6.7, §6.8, §11 | 1380 to 1389 | Not started |
 | 3 · Rules and schedules | Hours in the policy and work schedules; lateness from the start; the consequence rules (alerts, queries); pending deductions and overtime; reminders and the system clock-out; each day judged by its own version | §6.4, §6.13, §6.14, §6.15 (the rules' effects), §6.16, §6.17 | 1420 to 1449 | Not started |
 | 4 · Places | Permanent and temporary sites, Add Work Site on Home, HR's approval, Check In at each stop; work location requests and field assignments retired | §6.11, §6.12 | 1450 to 1479 | Not started |
@@ -1269,6 +1269,8 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   sites use them (PR 4).
 
 ## 14 · Change log
+
+- 20/10/2026 · TB · PR 1 built: the clock reads its rules through `policies.rulesFor` (`attendance.calendar.js`) and each punch keeps `policy_version_id`; `attendance.policy.js` and the `/attendance/policy` routes, events and reminder are gone, and `attendance.policy-type.js` registers the Attendance type. Settings · Attendance Policy's screen and its sentences left `app/src/features/attendance/` for `app/src/features/policies/`; `prompts.ts` gained `signInAsked`, which the acknowledge sheet waits on.
 
 - 14/10/2026 · LA · Added the template metadata, engineering sections, mobile register behaviour and ownership-ready scope required by the guide check.
 - 14/10/2026 · TB · §10 rewritten to the On screen and mobile shape (content tiers and phone layout) for the screen conventions in FRONTEND_GUIDE §5 and §7; the phone register cards from this guide are kept.

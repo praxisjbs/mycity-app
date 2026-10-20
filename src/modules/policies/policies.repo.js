@@ -319,6 +319,23 @@ async function audienceOf(db, ids) {
   return rows;
 }
 
+/** The people a version names in Applies To, as PersonRefs. */
+async function namedPeople(db, id) {
+  // pagination:complete Applies To names at most 200 people (contract AppliesTo)
+  const { rows } = await completeQuery(
+    db,
+    `SELECT ${PERSON()} AS person
+       FROM policy_audience pa
+       JOIN employee e ON e.employee_id = pa.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE pa.policy_version_id = $1
+      ORDER BY e.first_name, e.last_name, e.employee_id`,
+    [id],
+    { label: "the people a policy version names" },
+  );
+  return rows.map((r) => r.person);
+}
+
 /** The draft sent for approval. */
 function submit(client, id, { effective_from: from, note, contentHash, userId }) {
   return one(
@@ -710,6 +727,7 @@ module.exports = {
   replaceAudience,
   copyAudience,
   audienceOf,
+  namedPeople,
   submit,
   setWorkflowInstance,
   backToDraft,

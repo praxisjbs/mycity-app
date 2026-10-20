@@ -813,6 +813,7 @@ screen.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Settings · Attendance Policy (#73) left the shell (`catalogue.ts`, `coming-soon.ts`, `features/settings/index.tsx`); Knowledge Hub · Policies is shown only to holders of `policies.manage` (`shell/access.ts`, as `src/shared/search/screens.js`); the shell mounts the acknowledge sheet beside the clock prompts (`docs/guides/policies.md` §6.7).
 - 20/10/2026 · TB · Settings' Status, Performance and Faults follow `system_health`, not
   `settings`, in the shell (`app/src/shell/access.ts`) and ⌘K (`src/shared/search/screens.js`):
   Operations & People no longer see them, and a holder of System Health without Settings reaches

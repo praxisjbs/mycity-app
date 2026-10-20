@@ -192,6 +192,7 @@ describeDb("policies against the real migrations", () => {
     const one = await as("ops").get(`/policies/${attendanceId}`);
     expect(one.body).toMatchObject({ today: TODAY, in_force: null, waiting: null, draft: null, can_edit: true, can_archive: false });
     expect(one.body.current_rules).toEqual(c.attendance.AttendanceRules.parse({}));
+    expect(one.body.suggested_rules).toMatchObject({ grace_minutes: 5, device_mode: "warn", home_radius_m: 150 });
     expect(await policies.rulesFor(pool, "attendance", TODAY)).toMatchObject({ policy_version_id: null, version: null });
   });
 
@@ -271,6 +272,9 @@ describeDb("policies against the real migrations", () => {
     );
     expect(saved.status).toBe(200);
     expect(saved.body.draft.body_html).toBe("<h2>Laptops</h2>\n<p>Return it <strong>on your last day</strong>.</p>\n<p>Thanks</p>");
+    const named = await as("ops").put(`/policies/${itId}/draft`, itDraft({ applies_to: { ...EVERYONE, everyone: false, department_ids: [salesId], employee_ids: [employeeId("staff")] } }));
+    expect(named.body.draft.applies_to_people).toEqual([expect.objectContaining({ employee_id: employeeId("staff"), display_name: "Femi Ola" })]);
+    await as("ops").put(`/policies/${itId}/draft`, itDraft());
     expect((await as("ops").put(`/policies/${itId}/draft`, { ...itDraft(), rules: attendanceDraft().rules })).body.error.code).toBe("NO_RULES_ON_TEXT");
 
     const res = await publish("ops", itId);

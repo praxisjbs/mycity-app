@@ -375,6 +375,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Policy Updates (#89) built on `app/src/features/policies/PolicyUpdates.tsx` (every policy that applies to the person: To Acknowledge, All Policies, Waiting On You for an approver), described in `docs/guides/policies.md`; `features/ess/index.tsx` points there.
 - 13/10/2026 · AJ · First version, from the 12 October internal workflow meeting, MILESTONES §6.3 and the 13 October demo update.
 - 13/10/2026 · AJ · §10: phone layout for the four attendance tabs (icon cards that open the modal), built from LA's page.
 - 13/10/2026 · AJ · §6: page footnotes removed from ESS (My Documents, My Queries, My Attendance).

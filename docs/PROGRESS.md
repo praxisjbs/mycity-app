@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 32 items below: 31 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 32 | 0 | 2 | 30 | 0 | 0 |
+| M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 1 | 0 | 11 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 6 | 6 | 0 | 0 | 0 | 0 |
-| **Total** | **96** | **53** | **2** | **41** | **0** | **0** |
+| **Total** | **96** | **53** | **0** | **43** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -733,12 +733,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | In progress | 20/10/2026 |
+| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 20/10/2026 · TB · Policy Updates (#89) rebuilt for every policy (`app/src/features/policies/PolicyUpdates.tsx`, `docs/guides/policies.md`): To Acknowledge, All Policies and Waiting On You; a policy opens as its text or its sentences with what changed, its signatures, Download PDF and earlier versions; an approver approves with a signature or rejects with a reason; the acknowledge sheet after the clock (`AcknowledgeSheet.tsx`). Checked by 8 screen tests on the mock and, on the real API in Chromium (20/10/2026), the Attendance policy's Version 1 published with a drawn signature, a written policy for Engineering, the sign-in prompt then the sheet for each at 390 px with touch, Later holding until tomorrow, Acknowledge recorded, and the PDF made on the letterhead. Left: Tidy With AI against a real model (the local stub's answer is refused by the word check, as it should be).
 - 20/10/2026 · TB · Policy Updates (#89) moves to M1 with Knowledge Hub · Policies and will carry every policy that applies to the person, with the acknowledge sheet after the clock (`docs/guides/policies.md`); In progress until PR 1 rebuilds it. The attendance redesign of 20/10/2026 (`docs/guides/attendance.md` §1.1, four PRs) also changes My Attendance (#9: deductions, overtime, check-ins, System Clock-Out) and Work Location Requests (#87: becomes the person's temporary sites) in PRs 3 and 4; both stay Built until then.
 - 19/10/2026 · LA · Policy Updates (#89) on the real API, built with Settings · Attendance Policy (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.15): the newest version of the attendance policy as full sentences, one a rule and mode with People's values filled in (`features/attendance/policy-text.ts`), under Clocking In, At the Office, Working From Home, At a Field Site, Your Location and Your Devices, a section the version changed tagged Changed; People's note, its first day and state (In Force, or Starts on a date), Acknowledge, and All Versions, each opening its own sentences; a notice opens its version by `?version=`. Acknowledging never blocks the clock; everyone at work with a login is told of a new version (bell and push) and reminded once after 3 days, in the working day (the reminder engine's `attendance_policy_unacknowledged`). Before any version, the default rules show with nothing to acknowledge. Checked by 3 screen tests and 5 sentence tests on the mock (desktop and 390 px), 8 integration tests on the real migrations, and on the real API in Chromium at 390 px with touch (20/10/2026): Version 1 published from Settings, its web push delivered to a local push service (VAPID-signed, aes128gcm, decrypting to the notice and its link), the push's link opening Policy Updates, Acknowledge (332 by 44 px) recorded and the notice read; the 3-day reminder pushed once to the person who had not acknowledged, and never to the one who had; the live build's service worker, given those pushes, showed the device notification (title, line, badge, icon, Mark Read) with no window open and left it to the in-app banner with one on screen, and the link a tap opens kept through sign-in to Policy Updates, marking the notice read. Left: a physical phone through a real push service (Google's or Apple's) and its notification shade; a staging seed publishing a first version (it would tell every member of staff on staging).
 - 19/10/2026 · TB · My Attendance (#9) and the clock panel: the three gaps against the 12 and 13 October rules closed (`docs/guides/attendance.md` §6.14). The sign-in prompt opens on whatever screen the day's first session lands on, Home or a link (`sign_in_prompt` on today, decided by Attendance); the start reminder's push is not sent to someone in front of the app, who has the start prompt instead, and reaches them if they leave it still not clocked in within the hour; every prompt opens over a blurred screen on both shells (`Modal` and `Sheet` take `blur`, also through `useModal().open`). Checked by 10 integration tests on the real migrations, 4 screen tests of the prompts at a held clock and 2 component tests of the blur. Left: nothing of the three; not yet seen on a phone with push on.
@@ -1024,7 +1025,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 62 | Policies | `policies` | M1 | TB | ☐ | ☐ | ☐ | In progress | 20/10/2026 |
+| 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
@@ -1032,6 +1033,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · Policies (#62) built (PR 1): the `policies` module, contract and migrations `1400`, `1405` (the Attendance policy's versions moved over with their ids), seed `1396`; the screen in `app/src/features/policies/` (the list, a policy's draft with the editor or the Attendance worksheet, Publish or Submit with a signature, Withdraw, Recall, Archive, versions and acknowledgements, Download PDF), the mock, and `RichText` in `packages/ui`. Tests: unit, `tests/integration/policies.test.js` on the real migrations, the screen on the mock. Left: the model Tidy With AI uses (the AI area convention); the worksheet's PR 3 sections.
 - 20/10/2026 · TB · Policies (#62) brought forward from M10 to M1 (TB's decisions of 20/10/2026; MILESTONES §18 ratified 20/10/2026): Knowledge Hub · Policies becomes the one place for every company policy, documents and rules policies, the Attendance policy first, with versions, Applies To, an optional approval route with signatures, Tidy With AI and the letterhead PDF; staff acknowledge on ESS · Policy Updates. Guide written (`docs/guides/policies.md`); the build is PR 1 of four (`docs/guides/attendance.md` §1.2). Left: the contract, the `policies` module and migrations `1400`, `1405`, `1396`, the screens; Tidy With AI waits for the AI area convention to pick its model.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/knowledge/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/knowledge.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 

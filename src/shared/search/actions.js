@@ -124,6 +124,13 @@ const ACTIONS = Object.freeze([
     capability: "home.reports",
     words: ["report", "build report", "schedule report", "attendance report", "send me a report"],
   }),
+  a("new_policy", "New Policy", {
+    screen: "knowledge.policies",
+    params: { action: "new" },
+    need: ["knowledge", "create"],
+    capability: "policies.manage",
+    words: ["policy", "write a policy", "company policy", "handbook", "attendance policy"],
+  }),
   a("clock_in", "Clock In", {
     screen: "ess.my-attendance",
     run: "clock",

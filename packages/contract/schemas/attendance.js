@@ -906,9 +906,30 @@ const AttendanceRule = z.enum(Object.keys(ruleShape));
  * A version's rules as read: a rule a version predates takes its default (off), and anything a
  * version once held that is no longer a rule (`latest_clock_out_minutes`) is dropped.
  */
-const AttendanceRules = z.object(
-  Object.fromEntries(Object.entries(ruleShape).map(([k, v]) => [k, v.default(() => structuredClone(DEFAULT_RULES[k]))])),
-);
+// Each key written out, so the generated types know every rule (a mapped object would lose them);
+// each default a fresh copy, so no two versions share an object.
+const AttendanceRules = z.object({
+  hours: ruleShape.hours.default(() => structuredClone(DEFAULT_RULES.hours)),
+  grace_minutes: ruleShape.grace_minutes.default(() => structuredClone(DEFAULT_RULES.grace_minutes)),
+  late_rule: ruleShape.late_rule.default(() => structuredClone(DEFAULT_RULES.late_rule)),
+  late_deduction: ruleShape.late_deduction.default(() => structuredClone(DEFAULT_RULES.late_deduction)),
+  early_grace_minutes: ruleShape.early_grace_minutes.default(() => structuredClone(DEFAULT_RULES.early_grace_minutes)),
+  early_rule: ruleShape.early_rule.default(() => structuredClone(DEFAULT_RULES.early_rule)),
+  early_deduction: ruleShape.early_deduction.default(() => structuredClone(DEFAULT_RULES.early_deduction)),
+  absence_rule: ruleShape.absence_rule.default(() => structuredClone(DEFAULT_RULES.absence_rule)),
+  absence_deduction: ruleShape.absence_deduction.default(() => structuredClone(DEFAULT_RULES.absence_deduction)),
+  forgotten_rule: ruleShape.forgotten_rule.default(() => structuredClone(DEFAULT_RULES.forgotten_rule)),
+  location_rule: ruleShape.location_rule.default(() => structuredClone(DEFAULT_RULES.location_rule)),
+  overtime: ruleShape.overtime.default(() => structuredClone(DEFAULT_RULES.overtime)),
+  office_geofence_mode: ruleShape.office_geofence_mode.default(() => structuredClone(DEFAULT_RULES.office_geofence_mode)),
+  home_geofence_mode: ruleShape.home_geofence_mode.default(() => structuredClone(DEFAULT_RULES.home_geofence_mode)),
+  site_geofence_mode: ruleShape.site_geofence_mode.default(() => structuredClone(DEFAULT_RULES.site_geofence_mode)),
+  home_radius_m: ruleShape.home_radius_m.default(() => structuredClone(DEFAULT_RULES.home_radius_m)),
+  max_accuracy_m: ruleShape.max_accuracy_m.default(() => structuredClone(DEFAULT_RULES.max_accuracy_m)),
+  device_mode: ruleShape.device_mode.default(() => structuredClone(DEFAULT_RULES.device_mode)),
+  clock_out_reminder_minutes: ruleShape.clock_out_reminder_minutes.default(() => structuredClone(DEFAULT_RULES.clock_out_reminder_minutes)),
+  system_clock_out_after_minutes: ruleShape.system_clock_out_after_minutes.default(() => structuredClone(DEFAULT_RULES.system_clock_out_after_minutes)),
+});
 
 /** Fixed methods name their amount. */
 const amountGiven = (d) => !d.on || d.method === "pro_rata" || Boolean(d.amount);

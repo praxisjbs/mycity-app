@@ -145,6 +145,17 @@ describe("the Attendance policy type", () => {
     expect(text).toMatch(/more than 200 m from your approved home is refused/);
   });
 
+  test("the read schema names every rule the draft schema does, each with its default", () => {
+    const c = require("@mycity/contract");
+    let draft = c.attendance.AttendanceRulesDraft;
+    while (!draft.shape) draft = draft._def.schema;
+    expect(Object.keys(c.attendance.AttendanceRules.shape).sort()).toEqual(Object.keys(draft.shape).sort());
+    const a = c.attendance.AttendanceRules.parse({});
+    const b = c.attendance.AttendanceRules.parse({});
+    expect(a.late_rule).toEqual(b.late_rule);
+    expect(a.late_rule).not.toBe(b.late_rule);
+  });
+
   test("only the rules something enforces are shown", () => {
     expect(attendanceType.VISIBLE).not.toContain("late_rule");
     expect(attendanceType.VISIBLE).not.toContain("overtime");

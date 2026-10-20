@@ -134,6 +134,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
+| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML. | beta |
 | Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
 | Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
 | Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
@@ -4333,6 +4334,35 @@ An article list beside the article: the Knowledge Hub's shape, and anything else
 
 ```tsx
 <Reader groups={groups} selected={key} onSelect={setKey}><ArticleBody title={article.title}>{article.body}</ArticleBody></Reader>
+```
+
+### RichText
+
+Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML.
+
+| | |
+|---|---|
+| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; any text a person wrote that the API gives back as blocks. |
+| Avoid | Text being written (use RichTextField); an email's own HTML (use EmailFrame); a short plain answer (a paragraph is enough). |
+| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. |
+| Accessibility | Real headings, lists and links in reading order, so a screen reader can move by heading; pass `top` so the headings sit under the page's own. |
+| Status | beta |
+| Exports | `RichText` |
+| Import | `import { RichText } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/RichText.tsx` |
+| Test | `packages/ui/src/documents/RichText.test.tsx` |
+| Gallery | `packages/ui/src/documents/RichText.gallery.tsx` (`npm run gallery`, `#/RichText`) |
+
+**RichText** props (`RichTextProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `blocks` | `RichTextBlock[]` | yes | The text, block by block, as the API sends it. |
+| `top` | `2 \| 3 \| 4` |  | The heading level the text's top headings take (2 unless set): one below the heading the text sits under. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<RichText blocks={version.body} top={3} />
 ```
 
 ## Maps

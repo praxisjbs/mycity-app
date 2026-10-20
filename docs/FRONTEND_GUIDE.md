@@ -642,7 +642,8 @@ app/
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
-                              shared by People, ESS and Settings; notifications (the bell's pane, the banner,
+                              shared by People, ESS and Settings; policies (Knowledge Hub ·
+                              Policies, ESS · Policy Updates and the acknowledge sheet); notifications (the bell's pane, the banner,
                               push on the device, Notification Settings, §9.6); and shared/ (sections, KPI
                               tiles, letters)
 ```

@@ -371,6 +371,7 @@
   .rte p { margin: 6px 0; }
   .rte h2 { font-size: var(--text-lg); margin: 10px 0 4px; }
   .rte h3 { font-size: var(--text-md); margin: 8px 0 4px; }
+  .rte h4, .rte h5, .rte h6 { font-size: var(--text-base); margin: 8px 0 4px; }
   .rte a { color: var(--accent-foreground); text-decoration: underline; text-underline-offset: 2px; }
   .rte ul, .rte ol { margin: 6px 0; padding-left: 20px; }
   .rte ul { list-style: disc; }

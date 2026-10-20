@@ -140,6 +140,8 @@ const PolicyDraft = z
     policy_version_id: uuid,
     title: z.string(),
     applies_to: AppliesTo,
+    /** The people Applies To names, as the picker shows them. */
+    applies_to_people: z.array(PersonRef),
     needs_acknowledgement: z.boolean(),
     acknowledge_within_days: z.number().int().min(1).max(30),
     needs_approval: z.boolean(),
@@ -180,6 +182,8 @@ const Policy = z
     today: isoDate,
     /** A rules policy's rules applying today (the version in force, else the type's defaults). */
     current_rules: AttendanceRules.nullable(),
+    /** A rules policy's suggested values, which a first draft starts from (the type's, never seeded). */
+    suggested_rules: AttendanceRules.nullable(),
     in_force: PolicyVersion.nullable(),
     waiting: PolicyVersion.nullable(),
     draft: PolicyDraft.nullable(),
@@ -404,6 +408,7 @@ const TABLES = {
     table: "policy_version",
     virtual: {
       applies_to: "applies_to_everyone and the draft's policy_audience rows",
+      applies_to_people: "the employees of its policy_audience rows",
       body_html: "body_markdown, as the editor loads it",
       changed: "worked out against the version it would replace",
       change_lines: "changed, as a person reads it",
@@ -420,6 +425,7 @@ const TABLES = {
       state: "worked out from its versions and today",
       today: "today in Lagos",
       current_rules: "the rules a rules policy applies today",
+      suggested_rules: "the type's suggestions for a first draft",
       in_force: "the version in force",
       waiting: "the version waiting to start",
       draft: "its draft",

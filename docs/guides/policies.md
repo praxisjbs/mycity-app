@@ -9,7 +9,7 @@
 | Permission key(s) | `knowledge` (view, create, edit, delete) with the capability below for Knowledge Hub · Policies; none for a person's own policies and acknowledgements (`self`, own only); an approval's own approvers for a version waiting on them (`shared/workflow`) |
 | Capabilities | `policies.manage` (write, publish, withdraw and archive policies, and see who has acknowledged them; Knowledge Hub · Policies) |
 | Screens (PROGRESS.md rows) | #62 Policies, #89 Policy Updates; the acknowledge sheet over any screen; #73 Settings · Attendance Policy is dropped, its worksheet is the Attendance policy here |
-| Status | Agreed |
+| Status | Built |
 | Last changed | 20/10/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1), which
@@ -325,6 +325,11 @@ nobody else sees who has or has not acknowledged.
 | ESS · Policy Updates | To Acknowledge cards with Acknowledge full width, then policy cards | Subtitle | Acknowledge, full width; an approver's Approve Policy at the foot of the version's sheet, the pad full width | ESS tabs |
 | Acknowledge sheet | A bottom sheet that does not drag away: title, What Changed, Acknowledge full width, Later as a text button | Nothing | Acknowledge | Opens by itself (§6.7) |
 
+Built as follows (20/10/2026). Applies To is Everyone or Some People: departments and work patterns
+as chips, named people through the employee picker. The Attendance policy applies to everyone, so its
+title and Applies To are fixed on its worksheet. Tidy With AI opens Yours beside Tidied, with Keep Mine
+and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without opening the policy.
+
 ## 11 · Edge cases
 
 - No version of the Attendance policy yet: it is listed as Default Rules (the code's defaults, which
@@ -369,4 +374,5 @@ nobody else sees who has or has not acknowledged.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Built (PR 1): migrations 1400 and 1405, seed 1396, the `policies` module and its contract; Knowledge Hub · Policies (`PoliciesHub.tsx`: the list, a policy opened with `?policy=`, its draft in `PolicyDraft.tsx` with the editor and Tidy With AI or the Attendance worksheet, the publish, submit and reason sheets in `PolicyForms.tsx`, its versions and acknowledgements), ESS · Policy Updates (`PolicyUpdates.tsx`) and the acknowledge sheet (`AcknowledgeSheet.tsx`, mounted by the shell beside the clock prompts); `RichText` added to `packages/ui`. The draft carries the people Applies To names (`applies_to_people`) and a rules policy its type's suggestions (`suggested_rules`). Left: the model Tidy With AI uses (§13).
 - 20/10/2026 · TB · Written from TB's decisions of 20/10/2026: Knowledge Hub · Policies brought forward from M10 as the one place for every policy, documents and rules policies (Attendance first), versions from a first day, Applies To, an optional approval route with signatures, Tidy With AI, the letterhead PDF, and acknowledgement on ESS · Policy Updates with a sheet after the clock. Settings · Attendance Policy (#73) is retired into it.

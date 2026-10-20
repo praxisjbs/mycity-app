@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "1d8011c14781fdffda480c0ee692dbff38b2c68fb7ab89ad6192feb025b8509f",
+  "source_hash": "7a06e7690b663fee28c81b74dba94dbdbd6ac2f40f60a2c153bd2c00b7a607f4",
   "schemas": 716,
   "endpoints": 379,
   "inputs": {
@@ -11,7 +11,7 @@
     "packages/contract/schemas/announcements.js": "fd6e37d081b609ad75ee98a84357db39b3b07fa995369f55100a0d2d4f727af5",
     "packages/contract/schemas/assessments.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/assistant.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/attendance.js": "ea114ca8a4f0aa0033f36143cf6e3d6e3f4ac058987e98567652b366cd94260c",
+    "packages/contract/schemas/attendance.js": "f4becf39a8b34ae44cbd723fe72d823f692ed762dc3f266122dafac747d55b71",
     "packages/contract/schemas/audit.js": "0da325da2e49796743a8501459005a2cb952af522723ecc181498059f98458aa",
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -48,7 +48,7 @@
     "packages/contract/schemas/partnership_analytics.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/payroll.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/payslips.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/policies.js": "fa997c9237e75622a97153dfa275d4adc359b0c3b10059985271e4559a6b277e",
+    "packages/contract/schemas/policies.js": "c29667d0083229b85e9a439c72d93cd2cb4a1ec42cf01f584000fc77363a04fa",
     "packages/contract/schemas/proposals.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/queries.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/query_rules.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

@@ -394,10 +394,11 @@ describeDb("Home schema and reference data against the real migrations", () => {
       );
       const all = ["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"];
       const managers = ["alerts.clear", "home.reports", "home.team"];
-      // 1129 (Mailbox) adds Configure Signature to System Administrator and Implementation.
+      // 1129 (Mailbox) adds Configure Signature to System Administrator and Implementation; 1396
+      // (policies) Manage Policies to Operations & People and Implementation.
       expect(Object.fromEntries(rows.map((r) => [r.role, r.codes]))).toEqual({
-        implementation: [...all, "mailbox.signature"],
-        operations_people: all,
+        implementation: [...all, "mailbox.signature", "policies.manage"],
+        operations_people: [...all, "policies.manage"],
         management: all,
         head_of_department: managers,
         manager: managers,
@@ -468,8 +469,8 @@ describeDb("Home schema and reference data against the real migrations", () => {
         await c.query(SEED.down);
 
         const codes = await c.query("SELECT code::text AS code FROM capability ORDER BY code::text");
-        // 1129's capability is Mailbox's, untouched by undoing Home's seed.
-        expect(codes.rows.map((r) => r.code)).toEqual(["alerts.clear", "announcements.post", "home.team", "mailbox.signature"]);
+        // 1129's capability is Mailbox's and 1396's the policies', untouched by undoing Home's seed.
+        expect(codes.rows.map((r) => r.code)).toEqual(["alerts.clear", "announcements.post", "home.team", "mailbox.signature", "policies.manage"]);
         const heldBy = async (role) =>
           (
             await c.query(
@@ -479,7 +480,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
               [role],
             )
           ).rows.map((r) => r.code);
-        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post"]);
+        expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post", "policies.manage"]);
         expect(await heldBy("manager")).toEqual([]);
         expect(await heldBy("studio_lead")).toEqual(["home.team"]);
         expect(await seededKeysLeft(c)).toEqual([...SEEDED_KEYS].sort());
