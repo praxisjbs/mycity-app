@@ -3,13 +3,21 @@
  * Integrations: Settings · Integrations (docs/guides/integrations.md), where the IT team keeps
  * the settings and keys of the services the ERP runs on, instead of the server's .env file.
  *
- * Five connections, each defined once in src/shared/integrations/providers.js:
+ * Ten connections, each defined once in src/shared/integrations/providers.js:
  *
  *   mail_sender     the system sender (SMTP out: invitations, resets, notices)
  *   mailbox_server  the staff mail server (IMAP in and SMTP out for every person's mailbox)
  *   geoapify        address search, map tiles and a worksite's address
- *   gemini          the AI vendor's key
+ *   gemini          Google's models: everyday AI, images, transcription after Groq
+ *   groq            speech to text first (Whisper)
+ *   openai          embeddings for search
+ *   anthropic       top-tier drafting (Sonnet and Haiku only)
+ *   deepseek        work that carries no personal data
+ *   exchange_rates  every currency against the dollar, daily
  *   web_push        the environment's VAPID pair and its contact
+ *
+ * Each AI connection keeps a model list (`ai_model`): seeded, read from the provider with the
+ * key in use whenever it is saved or tested, and added to by hand (guide §1.2 decision 2).
  *
  * A connection's values come whole from one place (`source`): saved here, else the server
  * file, else nothing (guide §6.1). A secret never crosses the wire: a response says whether
@@ -22,10 +30,42 @@ const { z } = require("zod");
 const { uuid, text, email, isoDate, isoDateTime, listQuery, Paged, blank } = require("./common");
 
 /** The connections the registry holds, in its order. */
-const IntegrationCode = z.enum(["mail_sender", "mailbox_server", "geoapify", "gemini", "web_push"]);
+const IntegrationCode = z.enum([
+  "mail_sender",
+  "mailbox_server",
+  "geoapify",
+  "gemini",
+  "groq",
+  "openai",
+  "anthropic",
+  "deepseek",
+  "exchange_rates",
+  "web_push",
+]);
 
 /** How the page groups them. */
-const IntegrationGroup = z.enum(["mail", "maps", "ai", "notifications"]);
+const IntegrationGroup = z.enum(["mail", "maps", "ai", "finance", "notifications"]);
+
+/**
+ * A connection's plan with its provider (guide §1.2 decision 4). On `free` the daily limit is
+ * a hard stop; on `paid` it counts and warns. Null for a connection with no daily limit.
+ */
+const IntegrationPlan = z.enum(["free", "paid"]);
+
+/** The AI connections, each with a model list. */
+const AiProvider = z.enum(["gemini", "groq", "openai", "anthropic", "deepseek"]);
+
+/** What a model takes in or gives back that the ERP uses. */
+const ModelCapability = z.enum(["text", "image", "audio", "embeddings"]);
+
+/**
+ * The jobs AI is used for (docs/guides/ai-control.md §6.2). Until AI Control is built each job
+ * uses the best model the key can use, in the order the code prefers.
+ */
+const AiJob = z.enum(["default", "fast", "deep_reasoning", "image_reading", "transcription", "embeddings", "top_tier"]);
+
+/** Where a model on the list came from: the seed, the provider's own list, or Add Model. */
+const ModelSource = z.enum(["seed", "provider", "added"]);
 
 /**
  * The state the page shows: `ok` the newest check or call worked; `failing` it did not;
@@ -36,8 +76,11 @@ const IntegrationState = z.enum(["ok", "failing", "unchecked", "not_set"]);
 /** Where the values in use come from (guide §6.1). */
 const IntegrationSource = z.enum(["saved", "file", "none"]);
 
-/** Why a check ran: the test before a save, a Test, a Send Test Email, or the worker's watch. */
-const CheckKind = z.enum(["save", "test", "test_email", "watch"]);
+/**
+ * Why a check ran: the test before a save, a Test, a Send Test Email, the worker's watch, or
+ * an exchange rate fetch (Sync Rates, or the midnight job).
+ */
+const CheckKind = z.enum(["save", "test", "test_email", "watch", "sync"]);
 
 /** One step of a provider's test (guide §6.3). `setup` is the one step of a connection not set up. */
 const StepKey = z.enum([
@@ -51,7 +94,9 @@ const StepKey = z.enum([
   "reverse",
   "tile",
   "key",
+  "models",
   "answer",
+  "rates",
   "keys",
   "push",
 ]);
@@ -80,8 +125,8 @@ const StepCode = z.enum([
   "SKIPPED",
 ]);
 
-/** What a provider's use is counted as (guide §6.3). */
-const UsageKind = z.enum(["search", "reverse", "tile", "call", "send", "sync", "push"]);
+/** What a provider's use is counted as (guide §6.3). `transcribe` counts seconds of audio. */
+const UsageKind = z.enum(["search", "reverse", "tile", "call", "transcribe", "rates", "send", "sync", "push"]);
 
 /** SMTP's two ways to be secure: TLS from the first byte (465), or STARTTLS required (587). */
 const SmtpSecurity = z.enum(["tls", "starttls"]);
@@ -119,6 +164,12 @@ const secretText = (max) => z.string().min(1).max(max, "Too long");
 
 /** A plan's daily allowance; blank is no limit. */
 const dailyLimit = blank(z.number().int("Whole number").min(1, "At least 1").max(100_000_000, "Too large"));
+
+/** A provider's API key as typed; blank keeps the saved one. */
+const apiKey = blank(z.string().trim().min(8, "Too short").max(400, "Too long"));
+
+/** A rate or a unit price as a decimal string, never a float on the wire. */
+const decimal = z.string().regex(/^\d{1,14}(\.\d{1,10})?$/, "Not a number");
 
 /**
  * The `saved_at` the form opened with, so a save over someone else's newer one is refused
@@ -180,7 +231,9 @@ const IntegrationRow = z
     last_checked_at: isoDateTime.nullable(),
     last_error_code: StepCode.nullable(),
     daily_limit: z.number().int().min(1).nullable(),
-    /** Today's units against the daily limit (Geoapify credits, Gemini requests). */
+    /** Free or Paid; null for a connection with no daily limit. */
+    plan: IntegrationPlan.nullable(),
+    /** Today's units against the daily limit (Geoapify credits, AI requests, Groq's audio seconds). */
     units_today: z.number().min(0),
     /** The worker checks it every 15 minutes (a free test). */
     watched: z.boolean(),
@@ -256,11 +309,42 @@ const MailboxServerSettings = z
 
 const GeoapifySettings = z.object({ code: z.literal("geoapify") }).strict();
 
-const GeminiSettings = z
+/** One job a model of this connection does: first choice (1) or the fallback after it (2). */
+const ModelInUse = z
   .object({
-    code: z.literal("gemini"),
-    /** The model every AI call uses, from Praxis AI's settings. Shown, not changed here. */
+    job: AiJob,
+    position: z.number().int().min(1).max(4),
     model: z.string(),
+    display_name: z.string(),
+  })
+  .strict();
+
+/**
+ * An AI connection: the jobs its models do, and how much of its list this key can use. Each
+ * schema names its own code as a literal, so the union below stays discriminated in TypeScript.
+ */
+const aiShape = {
+  in_use: z.array(ModelInUse).max(14),
+  models: z.number().int().min(0),
+  available: z.number().int().min(0),
+};
+
+const GeminiSettings = z.object({ code: z.literal("gemini"), ...aiShape }).strict();
+const GroqSettings = z.object({ code: z.literal("groq"), ...aiShape }).strict();
+const OpenAiSettings = z.object({ code: z.literal("openai"), ...aiShape }).strict();
+const AnthropicSettings = z.object({ code: z.literal("anthropic"), ...aiShape }).strict();
+const DeepSeekSettings = z.object({ code: z.literal("deepseek"), ...aiShape }).strict();
+
+/** Exchange Rates: the newest table kept, shown by its dollar to naira rate. */
+const ExchangeRatesSettings = z
+  .object({
+    code: z.literal("exchange_rates"),
+    base: z.literal("USD"),
+    /** Naira to one dollar on the newest day kept; null before the first fetch. */
+    usd_ngn: decimal.nullable(),
+    rate_day: isoDate.nullable(),
+    fetched_at: isoDateTime.nullable(),
+    currencies: z.number().int().min(0),
   })
   .strict();
 
@@ -278,6 +362,11 @@ const IntegrationSettings = z.discriminatedUnion("code", [
   MailboxServerSettings,
   GeoapifySettings,
   GeminiSettings,
+  GroqSettings,
+  OpenAiSettings,
+  AnthropicSettings,
+  DeepSeekSettings,
+  ExchangeRatesSettings,
   WebPushSettings,
 ]);
 
@@ -335,23 +424,24 @@ const MailboxServerSave = z
   })
   .strict();
 
-const GeoapifySave = z
-  .object({
-    code: z.literal("geoapify"),
-    api_key: blank(z.string().trim().min(8, "Too short").max(200, "Too long")),
-    daily_limit: dailyLimit,
-    saved_at: seen,
-  })
-  .strict();
+/**
+ * A connection that is a key, a daily limit and a plan: Geoapify, the AI providers, Exchange
+ * Rates. `plan` left out keeps the plan in force. Each names its code as a literal (as above).
+ */
+const keyShape = {
+  api_key: apiKey,
+  daily_limit: dailyLimit,
+  plan: IntegrationPlan.optional(),
+  saved_at: seen,
+};
 
-const GeminiSave = z
-  .object({
-    code: z.literal("gemini"),
-    api_key: blank(z.string().trim().min(8, "Too short").max(200, "Too long")),
-    daily_limit: dailyLimit,
-    saved_at: seen,
-  })
-  .strict();
+const GeoapifySave = z.object({ code: z.literal("geoapify"), ...keyShape }).strict();
+const GeminiSave = z.object({ code: z.literal("gemini"), ...keyShape }).strict();
+const GroqSave = z.object({ code: z.literal("groq"), ...keyShape }).strict();
+const OpenAiSave = z.object({ code: z.literal("openai"), ...keyShape }).strict();
+const AnthropicSave = z.object({ code: z.literal("anthropic"), ...keyShape }).strict();
+const DeepSeekSave = z.object({ code: z.literal("deepseek"), ...keyShape }).strict();
+const ExchangeRatesSave = z.object({ code: z.literal("exchange_rates"), ...keyShape }).strict();
 
 const WebPushSave = z
   .object({
@@ -371,6 +461,11 @@ const IntegrationSave = z.discriminatedUnion("code", [
   MailboxServerSave,
   GeoapifySave,
   GeminiSave,
+  GroqSave,
+  OpenAiSave,
+  AnthropicSave,
+  DeepSeekSave,
+  ExchangeRatesSave,
   WebPushSave,
 ]);
 
@@ -382,6 +477,68 @@ const IntegrationTestBody = z.object({ address: blank(text(200)) }).strict();
 
 /** `/:code` */
 const IntegrationParams = z.object({ code: IntegrationCode }).strict();
+
+/* ------------------------------------------------------------------ *
+ * The model list of an AI connection (guide §1.2 decisions 2 and 3)
+ * ------------------------------------------------------------------ */
+
+/** One model on an AI connection's list. Prices are the provider's list prices, in dollars. */
+const AiModel = z
+  .object({
+    ai_model_id: uuid,
+    provider: AiProvider,
+    model: z.string(),
+    display_name: z.string(),
+    capabilities: z.array(ModelCapability).min(1).max(4),
+    /** Whether the key in use can use it: null until the key's list has been read. */
+    available: z.boolean().nullable(),
+    source: ModelSource,
+    /** Where it is called, for a model added with its own endpoint; null is the provider's own. */
+    endpoint_url: z.string().nullable(),
+    input_usd_per_million: decimal.nullable(),
+    output_usd_per_million: decimal.nullable(),
+    audio_usd_per_million: decimal.nullable(),
+    usd_per_audio_hour: decimal.nullable(),
+    /** The jobs it does now, first choice or fallback. */
+    in_use: z.array(ModelInUse).max(7),
+    /** When the key's list last named it. */
+    seen_at: isoDateTime.nullable(),
+    added_by_name: z.string().nullable(),
+    created_at: isoDateTime,
+  })
+  .strict();
+
+const AiModelListQuery = listQuery({
+  capability: ModelCapability.optional(),
+  available: z.enum(["true", "false"]).optional(),
+});
+
+const AiModelPage = Paged(AiModel);
+
+/** POST /integrations/:code/models: Add Model. */
+const AiModelCreate = z
+  .object({
+    model: z
+      .string()
+      .trim()
+      .min(2, "Too short")
+      .max(120, "Too long")
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/, "Not a model id"),
+    display_name: blank(text(120)),
+    capabilities: z.array(ModelCapability).min(1, "Pick at least one").max(4),
+    /** Blank: the provider's own endpoint. */
+    endpoint_url: blank(
+      z
+        .string()
+        .trim()
+        .max(300, "Too long")
+        .regex(/^https:\/\/[^\s/$.?#][^\s]*$/, "Not an https address"),
+    ),
+  })
+  .strict();
+
+/** `/:code/models/:id` */
+const AiModelParams = z.object({ code: IntegrationCode, id: uuid }).strict();
 
 /** templates/email/integration-test.html: Send Test Email's message. */
 const IntegrationTestEmailVars = z
@@ -411,6 +568,7 @@ const TABLES = {
       source: "saved when saved_at is set, else file when the server file has values, else none",
       units_today: "today's units summed from integration_usage",
       watched: "whether the registry lets the worker test it for free",
+      plan: "plan, else the registry's starting plan; null without a daily limit",
     },
   },
   IntegrationListQuery: { table: null, reason: "list controls and the group filter" },
@@ -435,7 +593,13 @@ const TABLES = {
   MailSenderSettings: { table: null, reason: "the system sender's settings in use: configuration, or SMTP_* and MAIL_* in the server file" },
   MailboxServerSettings: { table: null, reason: "the staff mail server's settings in use: configuration, or MAILBOX_* in the server file" },
   GeoapifySettings: { table: null, reason: "Geoapify has no setting besides its key and daily limit" },
-  GeminiSettings: { table: null, reason: "the model in use, read from ai_setting or the server file" },
+  ModelInUse: { table: null, reason: "a job a model does, worked out from the model list" },
+  GeminiSettings: { table: null, reason: "the jobs Gemini's models do and the size of its list, from ai_model" },
+  GroqSettings: { table: null, reason: "the jobs Groq's models do and the size of its list, from ai_model" },
+  OpenAiSettings: { table: null, reason: "the jobs OpenAI's models do and the size of its list, from ai_model" },
+  AnthropicSettings: { table: null, reason: "the jobs Anthropic's models do and the size of its list, from ai_model" },
+  DeepSeekSettings: { table: null, reason: "the jobs DeepSeek's models do and the size of its list, from ai_model" },
+  ExchangeRatesSettings: { table: null, reason: "the newest day of exchange_rate, read for the dollar to naira rate" },
   WebPushSettings: { table: null, reason: "the push contact and the key pair's id, from configuration and the stored pair" },
   Integration: {
     table: "integration_connection",
@@ -445,6 +609,7 @@ const TABLES = {
       source: "saved when saved_at is set, else file when the server file has values, else none",
       units_today: "today's units summed from integration_usage",
       watched: "whether the registry lets the worker test it for free",
+      plan: "plan, else the registry's starting plan; null without a daily limit",
       saved_by_name: "who saved it, from app_user and employee",
       settings: "the settings in use: configuration, or the server file",
       secrets: "each secret field's state, from integration_secret",
@@ -454,11 +619,27 @@ const TABLES = {
   },
   MailSenderSave: { table: null, reason: "the system sender's settings: configuration and its password in integration_secret" },
   MailboxServerSave: { table: null, reason: "the staff mail server's settings, kept in configuration" },
-  GeoapifySave: { table: null, reason: "Geoapify's key in integration_secret and its daily limit" },
-  GeminiSave: { table: null, reason: "Gemini's key in integration_secret and its daily limit" },
+  GeoapifySave: { table: null, reason: "Geoapify's key in integration_secret, its daily limit and plan" },
+  GeminiSave: { table: null, reason: "Gemini's key in integration_secret, its daily limit and plan" },
+  GroqSave: { table: null, reason: "Groq's key in integration_secret, its daily limit and plan" },
+  OpenAiSave: { table: null, reason: "OpenAI's key in integration_secret, its daily limit and plan" },
+  AnthropicSave: { table: null, reason: "Anthropic's key in integration_secret, its daily limit and plan" },
+  DeepSeekSave: { table: null, reason: "DeepSeek's key in integration_secret, its daily limit and plan" },
+  ExchangeRatesSave: { table: null, reason: "the exchange rate service's key in integration_secret, its daily limit and plan" },
   WebPushSave: { table: null, reason: "the push contact, kept in configuration" },
   IntegrationTestBody: { table: null, reason: "what a test is tried with" },
   IntegrationParams: { table: null, reason: "the :code path parameter" },
+  AiModel: {
+    table: "ai_model",
+    virtual: {
+      in_use: "the jobs it does now, worked out from the model list",
+      added_by_name: "who added it, from app_user and employee",
+    },
+  },
+  AiModelListQuery: { table: null, reason: "list controls and the capability and availability filters" },
+  AiModelPage: { table: null, reason: "a page of an AI connection's models" },
+  AiModelCreate: { table: "ai_model" },
+  AiModelParams: { table: null, reason: "the :code and :id path parameters" },
   IntegrationTestEmailVars: { table: null, reason: "the variables of templates/email/integration-test.html, not a row" },
 };
 
@@ -466,6 +647,11 @@ module.exports = {
   TABLES,
   IntegrationCode,
   IntegrationGroup,
+  IntegrationPlan,
+  AiProvider,
+  ModelCapability,
+  AiJob,
+  ModelSource,
   IntegrationState,
   IntegrationSource,
   CheckKind,
@@ -487,7 +673,13 @@ module.exports = {
   MailSenderSettings,
   MailboxServerSettings,
   GeoapifySettings,
+  ModelInUse,
   GeminiSettings,
+  GroqSettings,
+  OpenAiSettings,
+  AnthropicSettings,
+  DeepSeekSettings,
+  ExchangeRatesSettings,
   WebPushSettings,
   IntegrationSettings,
   Integration,
@@ -495,9 +687,19 @@ module.exports = {
   MailboxServerSave,
   GeoapifySave,
   GeminiSave,
+  GroqSave,
+  OpenAiSave,
+  AnthropicSave,
+  DeepSeekSave,
+  ExchangeRatesSave,
   WebPushSave,
   IntegrationSave,
   IntegrationTestBody,
   IntegrationParams,
+  AiModel,
+  AiModelListQuery,
+  AiModelPage,
+  AiModelCreate,
+  AiModelParams,
   IntegrationTestEmailVars,
 };

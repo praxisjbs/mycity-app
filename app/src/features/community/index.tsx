@@ -177,7 +177,7 @@ function Channels() {
         placeholder={`Message #${current.name}`}
         readOnly={current.can_post ? undefined : "Only admins post here"}
         onSend={(b) => after(t.send(b))}
-        onVoice={(file, secs) => after(t.sendFile(file, secs))}
+        onVoice={(file, secs, captions) => after(t.sendFile(file, secs, captions))}
         plus={(cls) => (
           <Menu
             align="start"
@@ -615,7 +615,7 @@ function Direct() {
         key={current.community_channel_id}
         placeholder={current.is_self ? "Message yourself" : `Message ${current.person.display_name.split(" ")[0]}`}
         onSend={(b) => after(t.send(b))}
-        onVoice={(file, secs) => after(t.sendFile(file, secs))}
+        onVoice={(file, secs, captions) => after(t.sendFile(file, secs, captions))}
         plus={(cls) => (
           <Menu
             align="start"

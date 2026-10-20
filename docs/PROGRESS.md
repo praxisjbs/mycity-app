@@ -804,8 +804,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
@@ -828,6 +828,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 - 13/10/2026 · GE · Demo updated per the 12 October meeting (guides removed, ＋ menu, members behind ⋮, fixed
   composer, read-only pinned #announcements, birthday and recognition cards, Praxis-style DMs with
   voice notes, mobile full screen). Engineering guide `docs/guides/community.md` written. No product code yet.
+- 20/10/2026 · TB · Voice notes in Channels (#15) and Direct Messages (#16) transcribe through Groq, then Gemini, then the captions the sender's browser wrote while recording (`docs/guides/integrations.md` §6.14, `community.md` §3 step 11): the captions go with the note, a browser draft is marked Draft and never stored, the stub's placeholder is never stored (the "[AI placeholder]" transcript seen on staging reads as none), and a failure is a toast instead of a stuck Transcribing. Left: set Groq's and Gemini's keys on staging and production.
 
 ### Mailbox
 
@@ -1084,6 +1085,21 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   server change re-points every mailbox. Migration 9200, seed 9290 (the `integrations` key for the
   Implementation Team and the System Administrator). Left: set the keys on staging and production;
   Appearance (#75) stays M9.
+- 20/10/2026 · TB · Integrations (#77), PR1 of TB's AI answers (`docs/guides/integrations.md` §1.2,
+  `docs/guides/ai-control.md`): Groq, OpenAI, Anthropic (Sonnet and Haiku only), DeepSeek and
+  Exchange Rates join Gemini; each AI connection keeps a model list (seeded by `9291`, read from the
+  provider with the key on every save and test, Add Model with an optional endpoint), and each job's
+  model comes from it (`services/ai/jobs.js`), so a new Google key no longer fails on the old
+  `gemini-2.5-flash` default. Free or Paid per connection, the Free limit a hard stop
+  (`shared/integrations/quota.js`, Geoapify included). Exchange rates daily after midnight Lagos and
+  by Sync Rates (`exchange_rate`, `shared/money/fx.js`). Every connection is a check on Settings ·
+  Status. Migrations 9210, 9220, seed 9291. Left: PR2, AI Control (actions and their chains, Make
+  First, Spend and per-provider caps, Find Prices, the job conventions' check, Data Answers); set the
+  new keys and plans on staging and production; confirm the seeded Gemini and DeepSeek ids with a
+  real key (guide §13).
+- 20/10/2026 · TB · Faults (#97) on a phone put each row's tick inside the card's open button (the
+  a11y gate's nested-interactive); the picking now goes through the list's own selection, with
+  Download Brief, Mark Fixed, Ignore Faults and Open Again in its bar. Left: nothing.
 - 20/10/2026 · TB · Performance (#96) rebuilt from TB's six answers (`docs/guides/system-health.md`
   §6, §14): four tiles judged against targets (99.9% up, p95 under 800 ms, under 1% failing),
   editable with Edit Targets (`system_health` edit, audited; Status's disk, memory, processor and

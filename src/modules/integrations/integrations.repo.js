@@ -1,8 +1,8 @@
 "use strict";
 /**
- * Integrations' SQL (migrations 0090, 9000, 9200; docs/guides/integrations.md §4): each
- * connection's saved settings and state, its secrets as far as they are ever shown, its
- * checks and its use.
+ * Integrations' SQL (migrations 0090, 9000, 9200, 9210, 9220; docs/guides/integrations.md §4):
+ * each connection's saved settings, plan and state, its secrets as far as they are ever shown,
+ * its checks and its use, the AI connections' model lists and the exchange rates.
  *
  * A secret's ciphertext is written here and never read back here: shared/integrations/
  * settings.js is its one reader. The state columns are shared/integrations/state.js's.
@@ -19,7 +19,7 @@ const NAME = (alias) => `trim(${alias}.first_name || ' ' || ${alias}.last_name)`
  * ------------------------------------------------------------------ */
 
 const CONNECTION = `c.integration_connection_id, c.code::text AS code, c.provider, c.display_name,
-  c.status, c.configuration, c.saved_at, c.saved_by, c.daily_limit, c.state_at, c.last_checked_at,
+  c.status, c.configuration, c.saved_at, c.saved_by, c.daily_limit, c.plan, c.state_at, c.last_checked_at,
   c.last_ok_at, c.last_error_code, c.quota_warned_on, c.updated_at`;
 
 /**
@@ -61,21 +61,22 @@ function connectionForUpdate(db, code) {
   return one(db, `SELECT ${CONNECTION} FROM integration_connection c WHERE c.code = $1 FOR UPDATE`, [code]);
 }
 
-/** Keep a save: the configuration, who saved it and when, the daily limit. */
-function saveConnection(db, { code, provider, name, configuration, daily_limit, by }) {
+/** Keep a save: the configuration, who saved it and when, the daily limit and the plan. */
+function saveConnection(db, { code, provider, name, configuration, daily_limit, plan = null, by }) {
   return one(
     db,
-    `INSERT INTO integration_connection (code, provider, display_name, configuration, saved_at, saved_by, daily_limit)
-     VALUES ($1, $2, $3, $4::jsonb, now(), $5, $6)
+    `INSERT INTO integration_connection (code, provider, display_name, configuration, saved_at, saved_by, daily_limit, plan)
+     VALUES ($1, $2, $3, $4::jsonb, now(), $5, $6, $7)
      ON CONFLICT (code) DO UPDATE SET
        provider = EXCLUDED.provider,
        display_name = EXCLUDED.display_name,
        configuration = EXCLUDED.configuration,
        saved_at = EXCLUDED.saved_at,
        saved_by = EXCLUDED.saved_by,
-       daily_limit = EXCLUDED.daily_limit
+       daily_limit = EXCLUDED.daily_limit,
+       plan = EXCLUDED.plan
      RETURNING ${CONNECTION.replace(/c\./g, "")}`,
-    [code, provider, name, JSON.stringify(configuration), by || null, daily_limit ?? null],
+    [code, provider, name, JSON.stringify(configuration), by || null, daily_limit ?? null, plan],
   );
 }
 
@@ -84,7 +85,7 @@ function clearSaved(db, code) {
   return one(
     db,
     `UPDATE integration_connection
-        SET configuration = '{}'::jsonb, saved_at = NULL, saved_by = NULL, daily_limit = NULL
+        SET configuration = '{}'::jsonb, saved_at = NULL, saved_by = NULL, daily_limit = NULL, plan = NULL
       WHERE code = $1
       RETURNING integration_connection_id, configuration, saved_at`,
     [code],
@@ -223,6 +224,138 @@ async function purge(db, { checkDays = 90, usageDays: keepDays = 30 } = {}) {
   return { checks: checks.rowCount, usage: usage.rowCount };
 }
 
+/* ------------------------------------------------------------------ *
+ * The model list of an AI connection (ai_model, 9210)
+ * ------------------------------------------------------------------ */
+
+const MODEL = `m.ai_model_id, m.provider, m.model::text AS model, m.display_name, m.capabilities, m.available,
+  m.source, m.endpoint_url, m.input_usd_per_million::text AS input_usd_per_million,
+  m.output_usd_per_million::text AS output_usd_per_million, m.audio_usd_per_million::text AS audio_usd_per_million,
+  m.usd_per_audio_hour::text AS usd_per_audio_hour, m.seen_at, ${NAME("me")} AS added_by_name, m.created_at`;
+const MODEL_FROM = `ai_model m
+  LEFT JOIN app_user mu ON mu.user_id = m.added_by
+  LEFT JOIN employee me ON me.employee_id = mu.employee_id`;
+
+/** Usable first (the key can use it, or it is not known yet), then by name. */
+const MODEL_SORTS = { display_name: "(m.available IS FALSE), m.display_name" };
+
+/** One provider's models, 25 a page. Filters: capability, available, q (id or name). */
+function modelPage(db, provider, query) {
+  return pageQuery(
+    db,
+    `SELECT ${MODEL}, ${TOTAL_COL}
+       FROM ${MODEL_FROM}
+      WHERE m.provider = $1
+        AND ($2::text IS NULL OR $2 = ANY(m.capabilities))
+        AND ($3::boolean IS NULL OR m.available IS NOT DISTINCT FROM $3)
+        AND ($4::text IS NULL OR search_fold(m.model || ' ' || m.display_name) LIKE '%' || search_fold($4) || '%')
+      ORDER BY ${orderBy(query, MODEL_SORTS, "m.ai_model_id")}`,
+    [provider, query.capability || null, query.available === undefined ? null : query.available === "true", query.q || null],
+    query,
+  );
+}
+
+function modelById(db, provider, id) {
+  return one(db, `SELECT ${MODEL} FROM ${MODEL_FROM} WHERE m.provider = $1 AND m.ai_model_id = $2`, [provider, id]);
+}
+
+/** How many models a provider's list holds, and how many the key in use can use. */
+function modelCounts(db, provider) {
+  return one(
+    db,
+    `SELECT count(*)::int AS models, count(*) FILTER (WHERE available)::int AS available
+       FROM ai_model WHERE provider = $1`,
+    [provider],
+  );
+}
+
+/**
+ * Keep what a key's list says (a save or a test): each model on it is available and seen now,
+ * and joins the list when it is new; a model it no longer names is not available, except one
+ * added by hand with its own endpoint, which the provider's list cannot speak for. A seeded or
+ * hand-added model keeps its name; a model the provider added takes the provider's.
+ * @param {{query: Function}} db
+ * @param {string} provider
+ * @param {Array<{model: string, display_name: string, capabilities: string[]}>} models
+ */
+async function keepModels(db, provider, models) {
+  if (models.length)
+    await db.query(
+      `INSERT INTO ai_model (provider, model, display_name, capabilities, source, available, seen_at)
+       SELECT $1, x.model, x.display_name, string_to_array(x.capabilities, ','), 'provider', true, now()
+         FROM unnest($2::text[], $3::text[], $4::text[]) AS x (model, display_name, capabilities)
+       ON CONFLICT (provider, model) DO UPDATE SET
+         available = true,
+         seen_at = now(),
+         display_name = CASE WHEN ai_model.source = 'provider' THEN EXCLUDED.display_name ELSE ai_model.display_name END`,
+      [
+        provider,
+        models.map((m) => m.model),
+        models.map((m) => m.display_name),
+        models.map((m) => m.capabilities.join(",")),
+      ],
+    );
+  await db.query(
+    `UPDATE ai_model SET available = false
+      WHERE provider = $1
+        AND NOT (model = ANY($2::citext[]))
+        AND NOT (source = 'added' AND endpoint_url IS NOT NULL)
+        AND available IS DISTINCT FROM false`,
+    [provider, models.map((m) => m.model)],
+  );
+}
+
+/** Add Model. Null when the provider's list already holds that id. */
+function addModel(db, { provider, model, display_name, capabilities, endpoint_url, by }) {
+  return one(
+    db,
+    `INSERT INTO ai_model (provider, model, display_name, capabilities, source, endpoint_url, added_by)
+     VALUES ($1, $2, $3, $4::text[], 'added', $5, $6)
+     ON CONFLICT (provider, model) DO NOTHING
+     RETURNING ai_model_id`,
+    [provider, model, display_name, capabilities, endpoint_url, by || null],
+  );
+}
+
+/** Remove a model added by hand; a seeded or listed one stays. Its row, or null. */
+function removeModel(db, provider, id) {
+  return one(
+    db,
+    `DELETE FROM ai_model WHERE provider = $1 AND ai_model_id = $2 AND source = 'added'
+     RETURNING ai_model_id, model::text AS model, display_name`,
+    [provider, id],
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Exchange rates (exchange_rate, 9220): written here, read by shared/money/fx.js
+ * ------------------------------------------------------------------ */
+
+/**
+ * Keep one fetched table for a Lagos day; a second fetch the same day replaces it.
+ * @param {{query: Function}} db
+ * @param {{day: string, base: string, rates: Record<string, string>, updated_at: Date|null}} t
+ */
+async function putRates(db, { day, base, rates, updated_at }) {
+  const codes = Object.keys(rates);
+  if (!codes.length) return 0;
+  const r = await db.query(
+    `INSERT INTO exchange_rate (day, base, currency, rate, provider_updated_at)
+     SELECT $1::date, $2, x.currency, x.rate::numeric, $5
+       FROM unnest($3::text[], $4::text[]) AS x (currency, rate)
+     ON CONFLICT (day, base, currency) DO UPDATE SET
+       rate = EXCLUDED.rate,
+       provider_updated_at = EXCLUDED.provider_updated_at`,
+    [day, base, codes, codes.map((c) => rates[c]), updated_at],
+  );
+  return r.rowCount;
+}
+
+/** Has today's table been kept? */
+async function hasRates(db, day, base = "USD") {
+  return Boolean(await one(db, "SELECT 1 AS yes FROM exchange_rate WHERE day = $1::date AND base = $2 LIMIT 1", [day, base]));
+}
+
 module.exports = {
   connections,
   connection,
@@ -239,4 +372,12 @@ module.exports = {
   usageDays,
   markWarned,
   purge,
+  modelPage,
+  modelById,
+  modelCounts,
+  keepModels,
+  addModel,
+  removeModel,
+  putRates,
+  hasRates,
 };

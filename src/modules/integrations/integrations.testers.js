@@ -8,7 +8,9 @@
  *
  * `inUse` is what shared/integrations/settings.js answers (values and secrets), or the
  * same shape built from a form before it is saved. Nothing here stores anything, throws,
- * or puts a secret in a step: the service records the steps it is given.
+ * or puts a secret in a step: the service records the steps it is given. What a test fetched
+ * that the service keeps (an AI connection's model list, a table of exchange rates) is handed
+ * back in `opts.collect`.
  *
  * Every step has its own limit and the whole test ends within 45 seconds. A step after a
  * failed one it depends on is skipped (`ok` null, `SKIPPED`), not run.
@@ -17,8 +19,12 @@ const geoapify = require("../../services/maps/geoapify.service");
 const tlsCheck = require("../../services/mail/tls-check");
 const systemMail = require("../../services/mail/system-mail.service");
 const ai = require("../../services/ai/llm.service");
+const jobs = require("../../services/ai/jobs");
+const fx = require("../../services/fx/exchangerate-api");
 const vapid = require("../../services/push/vapid");
+const money = require("../../shared/money/money");
 const providers = require("../../shared/integrations/providers");
+const usage = require("../../shared/integrations/usage");
 const { stepCodeOf } = require("../../services/mail/smtp-errors");
 
 /** The longest one test may take, whatever its steps' own limits say. */
@@ -91,6 +97,92 @@ async function mailDomain() {
   return m ? m[1].toLowerCase() : "mycityapp.io";
 }
 
+/** What each job is called where a person reads it (a step's findings). */
+const JOB_WORDS = {
+  default: "Default",
+  fast: "Fast",
+  deep_reasoning: "Deep Reasoning",
+  image_reading: "Image Reading",
+  transcription: "Transcription",
+  embeddings: "Embeddings",
+  top_tier: "Top Tier",
+};
+
+/** The model a provider's test asks: the cheapest that shows the key answers. */
+const ANSWER_FAMILY = { gemini: /^gemini-[\d.]+-flash(-lite)?$/i, anthropic: /^claude-haiku-/i, openai: /^text-embedding-3-small$/i, deepseek: /flash|chat/i };
+
+function answerModel(provider, models) {
+  if (provider === "gemini") {
+    const first = jobs.chainFrom("default", { gemini: models })[0];
+    if (first) return first.model;
+  }
+  const re = ANSWER_FAMILY[provider];
+  const wanted = provider === "openai" ? "embeddings" : "text";
+  const usable = models.filter((m) => m.capabilities.includes(wanted));
+  const m = usable.find((x) => re && re.test(x.model)) || usable[0];
+  return m ? m.model : null;
+}
+
+class NoModel extends Error {
+  constructor() {
+    super("no model this connection's jobs need is on the key's list");
+    this.code = "MODEL_NOT_FOUND";
+  }
+}
+
+/**
+ * An AI connection: the key accepted (its model list, free); the models its jobs need are on
+ * it, named in the step's findings; then one tiny request, recorded in the AI ledger.
+ * @param {string} provider
+ * @param {{answer?: boolean}} [o]  answer: false skips the paid request
+ */
+function aiTester(provider, { answer = true } = {}) {
+  return async (inUse, { actor, collect } = {}) => {
+    const apiKey = inUse.secrets.api_key;
+    if (!apiKey) return nothing(inUse.unreadable.includes("api_key") ? "SECRET_UNREADABLE" : "NOT_SET_UP");
+    const opts = { ms: 22_000, codeOf: ai.callCode };
+    let models = [];
+    const list = [
+      [
+        "key",
+        async () => {
+          models = await ai.checkKey({ provider, apiKey });
+          if (collect) collect.models = models;
+          return [];
+        },
+        opts,
+      ],
+      [
+        "models",
+        () => {
+          const mine = { [provider]: models.map((m) => ({ ...m, available: true })) };
+          const found = [];
+          for (const job of jobs.JOBS) {
+            const c = jobs.chainFrom(job, mine)[0];
+            if (c) found.push(`${JOB_WORDS[job]}: ${c.display_name}`);
+          }
+          if (found.length) return found;
+          // A provider no job uses yet (DeepSeek): a list with anything on it is enough.
+          if (models.length) return models.map((m) => m.display_name);
+          throw new NoModel();
+        },
+        { ms: 1000, codeOf: () => "MODEL_NOT_FOUND" },
+      ],
+    ];
+    if (answer)
+      list.push([
+        "answer",
+        () => {
+          const model = answerModel(provider, models);
+          if (!model) throw new NoModel();
+          return ai.testAnswer({ provider, apiKey, model, actor }).then(() => []);
+        },
+        { ms: 22_000, codeOf: (err) => (err instanceof NoModel ? "MODEL_NOT_FOUND" : ai.callCode(err)) },
+      ]);
+    return inOrder(list);
+  };
+}
+
 const TESTERS = {
   /** The system sender: reach the server (TLS as configured), then sign in. */
   async mail_sender(inUse) {
@@ -138,14 +230,35 @@ const TESTERS = {
     return steps;
   },
 
-  /** Gemini: the key accepted (the model list, free), then one tiny prompt to the model in use. */
-  async gemini(inUse, { actor, model } = {}) {
+  gemini: aiTester("gemini"),
+  // Groq's test spends nothing: a transcription would use at least ten of its free seconds.
+  groq: aiTester("groq", { answer: false }),
+  openai: aiTester("openai"),
+  anthropic: aiTester("anthropic"),
+  deepseek: aiTester("deepseek"),
+
+  /** Exchange Rates: one fetch of today's table, which a save or a test then keeps. */
+  async exchange_rates(inUse, { collect } = {}) {
     const apiKey = inUse.secrets.api_key;
     if (!apiKey) return nothing(inUse.unreadable.includes("api_key") ? "SECRET_UNREADABLE" : "NOT_SET_UP");
-    const opts = { ms: 22_000, codeOf: ai.callCode };
     return inOrder([
-      ["key", () => ai.checkKey({ apiKey }).then(() => []), opts],
-      ["answer", () => ai.testAnswer({ apiKey, model, actor }).then(() => []), opts],
+      [
+        "rates",
+        async () => {
+          let t;
+          try {
+            t = await fx.latest({ apiKey, base: "USD" });
+          } catch (err) {
+            usage.record("exchange_rates", "rates", { ok: false, error_code: err.code });
+            throw err;
+          }
+          usage.record("exchange_rates", "rates", { ok: true });
+          if (collect) collect.rates = t;
+          const ngn = t.rates.NGN;
+          return [ngn ? `1 USD = ${money.formatNaira(money.round(ngn))}` : "No naira rate", `${Object.keys(t.rates).length} currencies`];
+        },
+        { ms: 12_000, codeOf: (err) => (err && err.code) || "UNAVAILABLE" },
+      ],
     ]);
   },
 
@@ -179,9 +292,11 @@ const TESTERS = {
  * Test a connection's settings.
  * @param {string} code
  * @param {{values: object, secrets: object, unreadable: string[]}|null} inUse  null: not set up
- * @param {{address?: string, actor?: object, model?: string, forSave?: boolean, forWatch?: boolean}} [opts]
+ * @param {{address?: string, actor?: object, forSave?: boolean, forWatch?: boolean, collect?: object}} [opts]
  *   forSave   the typed settings before a save: nothing a person would notice is sent
  *   forWatch  the worker's watch: only connections whose test costs nothing are asked
+ *   collect   filled with what the test fetched that is worth keeping: `models` (an AI
+ *             connection's list), `rates` (Exchange Rates' table)
  * @returns {Promise<Array<{key: string, ok: boolean|null, ms: number|null, code: string|null, found: string[]}>>}
  */
 async function run(code, inUse, opts = {}) {
@@ -206,4 +321,4 @@ const firstFailure = (steps) => {
   return f ? f.code : null;
 };
 
-module.exports = { run, passed, firstFailure, mailCode, mailDomain, TEST_MS };
+module.exports = { run, passed, firstFailure, mailCode, mailDomain, answerModel, JOB_WORDS, TEST_MS };

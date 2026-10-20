@@ -6,7 +6,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { Button, Chips, DataView, formatWhen, PageHeader, Pill, useIsPhone, type DataViewColumn } from "@mycity/ui";
 import { useConnection, useTest } from "./Connection";
 import { todayOf, Where } from "./Where";
-import { GROUP, STATE } from "./words";
+import { GROUP, PLAN, STATE } from "./words";
 
 type GroupFilter = IntegrationGroup | "all";
 
@@ -72,6 +72,7 @@ export function IntegrationsTab() {
           { key: "name", label: "Connection", render: (r) => <span data-copy="content">{r.display_name}</span> },
           { key: "state", label: "State", render: (r) => <Pill tone={STATE[r.state].tone}>{STATE[r.state].text}</Pill> },
           { key: "source", label: "Source", render: (r) => <Where row={r} /> },
+          { key: "plan", label: "Plan", desktop: true, render: (r) => (r.plan ? <Pill tone={r.plan === "free" ? "neutral" : "info"}>{PLAN[r.plan]}</Pill> : null) },
           { key: "group", label: "Group", desktop: true, render: (r) => GROUP[r.group] },
           { key: "checked", label: "Checked", desktop: true, render: (r) => (r.last_checked_at ? formatWhen(r.last_checked_at) : null) },
           { key: "today", label: "Today", align: "n", desktop: true, render: (r) => todayOf(r) },

@@ -242,7 +242,9 @@ const MessagePage = Paged(Message);
  * POST /community/channels/:id/messages.
  *   text            body; no_link_preview when the sender removed the first link's card
  *   image, audio, video, file   document_id (uploaded first), body optional as a caption;
- *                   audio carries duration_s; album_key on files sent together
+ *                   audio carries duration_s, and captions when the sender's browser wrote
+ *                   them while recording (kept only as the transcript's last resort,
+ *                   docs/guides/integrations.md §1.2 decision 8); album_key on files sent together
  *   poll            body is the question, options 2 to 4
  *   birthday, anniversary   subject_employee_id: a celebration card posted by hand
  */
@@ -252,6 +254,7 @@ const MessageCreate = z
     body: optionalText(4000),
     document_id: uuid.optional(),
     duration_s: z.number().int().min(1).max(300).optional(),
+    captions: optionalText(10000),
     options: z.array(text(80)).min(2).max(4).optional(),
     subject_employee_id: uuid.optional(),
     album_key: uuid.optional(),
@@ -297,8 +300,12 @@ const PinListQuery = listQuery();
 
 const PollVote = z.object({ option_index: z.number().int().min(0).max(3) }).strict();
 
-/** POST /community/messages/:id/transcript. */
-const Transcript = z.object({ transcript: z.string() }).strict();
+/**
+ * POST /community/messages/:id/transcript. `draft` is the browser's own captions, shown when
+ * neither Groq nor Gemini could answer and never kept as the transcript: the next request asks
+ * them again.
+ */
+const Transcript = z.object({ transcript: z.string(), draft: z.boolean() }).strict();
 
 /* ------------------------------------------------------------------ *
  * Direct messages
@@ -495,6 +502,7 @@ const TABLES = {
     table: "community_message",
     virtual: {
       duration_s: "a voice note's length, kept in metadata",
+      captions: "what the sender's browser heard while recording, kept in metadata",
       options: "a poll's options, kept in metadata",
       subject_employee_id: "the person a celebration card is for, kept in metadata",
       album_key: "files sent together share it, kept in metadata",
@@ -503,7 +511,7 @@ const TABLES = {
   },
   RecognitionCreate: { table: "peer_recognition" },
   PollVote: { table: "community_poll_vote" },
-  Transcript: { table: "community_message" },
+  Transcript: { table: "community_message", virtual: { draft: "the browser's captions, not a stored transcript" } },
   Conversation: {
     table: null,
     reason: "a direct community_channel as the caller's list shows it: the other person (with photo_url) and the latest message",

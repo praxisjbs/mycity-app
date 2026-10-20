@@ -36,7 +36,8 @@ section exists to stop.
 | `system-health.md` | System Health: Settings tab for readiness checks, performance over time, grouped faults with a shared status, and the Markdown brief for an AI | GE | M9 | ☑ |
 | `policies.md` | Policies: Knowledge Hub · Policies for every company policy, documents and rules policies (Attendance first), versions, Applies To, approval and signatures, acknowledgement on ESS · Policy Updates (brought forward from M10) | TB | M1 | ☑ |
 | `addresses.md` | Addresses: every address across both apps picked from the address search, pinned on the map or, in an outage, taken from the device; never typed (F27, gate 22) | TB | M0 | ☑ |
-| `integrations.md` | Integrations: Settings tab for the system sender, the staff mail server, Geoapify, Gemini and web push, their keys encrypted, tested before save and watched (brought forward from M9) | TB | M9 | ☑ |
+| `integrations.md` | Integrations: Settings tab for the system sender, the staff mail server, Geoapify, the AI providers (Gemini, Groq, OpenAI, Anthropic, DeepSeek) with their model lists, Exchange Rates and web push, their keys encrypted, tested before save and watched (brought forward from M9) | TB | M9 | ☑ |
+| `ai-control.md` | AI Control: which model answers each AI feature, its fallbacks, model prices and the monthly spend per provider (brought forward from M10, built in PR2) | TB | M10 | ☑ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.
 Later milestones add their rows as they start.

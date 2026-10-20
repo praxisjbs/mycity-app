@@ -16,6 +16,7 @@ import {
   formatCount,
   formatDate,
   formatDateTime,
+  formatMoney,
   HelpTerm,
   Icon,
   IconButton,
@@ -34,8 +35,12 @@ import {
   type MenuItem,
 } from "@mycity/ui";
 import { carriesSecret, EditSettings } from "./EditSettings";
-import { HELP, KIND, PROBLEM, STATE, STEP } from "./words";
+import { Models } from "./Models";
+import { HELP, JOB, KIND, PLAN, PROBLEM, STATE, STEP } from "./words";
 import { Where } from "./Where";
+
+/** The AI connections: each keeps a model list, shown whether or not its key is set yet. */
+const AI_CODES: readonly IntegrationCode[] = ["gemini", "groq", "openai", "anthropic", "deepseek"];
 
 /** Where Geoapify's test searches, unless the person types another address. */
 const LAGOS_ADDRESS = "Admiralty Way, Lekki, Lagos";
@@ -85,6 +90,8 @@ function ConnectionPanel({ code, name, reopen }: { code: IntegrationCode; name: 
         <Where row={c} />
       </div>
       <SettingsCard c={c} />
+      {code === "exchange_rates" && <Rates c={c} />}
+      {AI_CODES.includes(code) && <Models code={code} reopen={reopen} />}
       {canEdit && code === "geoapify" && c.settings && (
         // address:none the text the Geoapify test searches once to try the key; nothing is kept
         <Field label="Address">
@@ -201,10 +208,27 @@ function Secret({ s, pair }: { s: SecretState | undefined; pair?: boolean }) {
 const term = (label: string, help: string) => <HelpTerm help={help}>{label}</HelpTerm>;
 const OWN_DOMAIN = "Each address's domain";
 
+/** The jobs an AI connection's models do: "Default: Gemini 3.8 Flash", a fallback marked. */
+function InUse({ items }: { items: Array<{ job: keyof typeof JOB; position: number; display_name: string }> }) {
+  if (!items.length) return null;
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {items.map((u) => (
+        <li key={`${u.job}:${u.position}`}>
+          {JOB[u.job]}
+          {u.position > 1 ? " (Fallback)" : ""}: <span data-copy="content">{u.display_name}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function settingsOf(c: Integration): KeyValueItem[] {
   const secret = (key: SecretState["key"]) => c.secrets.find((x) => x.key === key);
   const s = c.settings;
-  const daily: KeyValueItem = [term("Daily Limit", HELP.daily), c.daily_limit ? formatCount(c.daily_limit) : null];
+  const daily: KeyValueItem = [term("Daily Limit", c.code === "groq" ? HELP.dailyGroq : HELP.daily), c.daily_limit ? formatCount(c.daily_limit) : null];
+  const plan: KeyValueItem = [term("Plan", HELP.plan), c.plan ? PLAN[c.plan] : null];
+  const key: KeyValueItem = ["API Key", <Secret key="k" s={secret("api_key")} />];
   switch (s?.code) {
     case "mail_sender":
       return [
@@ -229,9 +253,14 @@ function settingsOf(c: Integration): KeyValueItem[] {
         [term("Live Connections", HELP.live), String(s.live_connections)],
       ];
     case "geoapify":
-      return [["API Key", <Secret key="k" s={secret("api_key")} />], daily];
+    case "exchange_rates":
+      return [key, plan, daily];
     case "gemini":
-      return [["API Key", <Secret key="k" s={secret("api_key")} />], ["Model", s.model], daily];
+    case "groq":
+    case "openai":
+    case "anthropic":
+    case "deepseek":
+      return [key, plan, daily, ["In Use", <InUse key="u" items={s.in_use} />], ["Models", `${formatCount(s.available)} of ${formatCount(s.models)} on this key`]];
     case "web_push":
       return [["Subject", s.subject], ["Key Pair", <Secret key="v" s={secret("vapid")} pair />], ["Key ID", s.key_id]];
     default:
@@ -246,6 +275,50 @@ function SettingsCard({ c }: { c: Integration }) {
     <Card>
       <CardHeader title="Settings" level={3} />
       {c.settings ? <KeyValue items={items} /> : <EmptyState title="Not Set Up" icon="link" bare />}
+    </Card>
+  );
+}
+
+/* ───────────── Exchange Rates ───────────── */
+
+/** The newest table, as the naira to a dollar, with Sync Rates beside it (decision 10). */
+function Rates({ c }: { c: Integration }) {
+  const { can } = useAuth();
+  const s = c.settings?.code === "exchange_rates" ? c.settings : null;
+  const sync = async () => {
+    try {
+      const done = await api.call("POST /api/v1/integrations/exchange_rates/sync", { body: {} });
+      toast(done.ok ? "Rates synced" : `Sync failed: ${PROBLEM[done.error_code ?? "UNAVAILABLE"]}`);
+    } catch (e) {
+      toast(problemOf(e));
+    } finally {
+      invalidate("/api/v1/integrations");
+    }
+  };
+  return (
+    <Card>
+      <CardHeader
+        title="Exchange Rate"
+        level={3}
+        actions={
+          can("integrations", "edit") && s ? (
+            <Button size="sm" icon="refresh" onClick={sync}>
+              Sync Rates
+            </Button>
+          ) : undefined
+        }
+      />
+      {s?.usd_ngn ? (
+        <KeyValue
+          items={[
+            ["One Dollar", formatMoney(s.usd_ngn)],
+            [term("Rates Of", HELP.rateDay), formatDate(s.rate_day)],
+            ["Currencies", formatCount(s.currencies)],
+          ]}
+        />
+      ) : (
+        <EmptyState title="No Rates Yet" icon="globe" bare />
+      )}
     </Card>
   );
 }

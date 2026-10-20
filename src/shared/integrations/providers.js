@@ -18,6 +18,9 @@
  *   watched          the worker tests it every 15 minutes, because its test costs nothing
  *   units            what one call of each kind counts toward the daily limit
  *   limited          whether a daily limit applies (it counts the units above)
+ *   plan             the plan it starts on, "free" or "paid", until IT sets one on the page;
+ *                    null for a connection with no daily limit (guide §1.2 decision 4)
+ *   models           the AI connections: the provider whose model list it keeps (ai_model)
  *   fromFile(config) the server file's values and secrets, or null when the file has none
  *   fromSaved(conf)  a saved configuration as the values the code uses, defaults filled
  *   toConfiguration(body) what a save keeps in integration_connection.configuration
@@ -31,6 +34,29 @@ const LAGOS = Object.freeze({ lat: 6.4281, lon: 3.4216, address: "Admiralty Way,
 
 const nul = (v) => (v === undefined || v === "" ? null : v);
 
+/**
+ * A connection that is one API key with a daily limit and a plan, saved here only: the AI
+ * providers that joined on 20/10/2026 and Exchange Rates have no server-file fallback.
+ */
+const keyOnly = ({ code, name, group, units, plan, models = null }) =>
+  Object.freeze({
+    code,
+    provider: code,
+    name,
+    group,
+    secrets: Object.freeze([{ key: "api_key", hint: "last4" }]),
+    destination: Object.freeze([]),
+    keptHere: Object.freeze([]),
+    watched: false,
+    units: Object.freeze(units),
+    limited: true,
+    plan,
+    models,
+    fromFile: () => null,
+    fromSaved: () => ({}),
+    toConfiguration: () => ({}),
+  });
+
 const PROVIDERS = Object.freeze([
   Object.freeze({
     code: "mail_sender",
@@ -43,6 +69,8 @@ const PROVIDERS = Object.freeze([
     watched: true,
     units: Object.freeze({ send: 1 }),
     limited: false,
+    plan: null,
+    models: null,
     fromFile: (c) =>
       c.SMTP_HOST
         ? {
@@ -95,6 +123,8 @@ const PROVIDERS = Object.freeze([
     watched: true,
     units: Object.freeze({ sync: 1, send: 1 }),
     limited: false,
+    plan: null,
+    models: null,
     // Always has values: the file's defaults are each address's own domain on 993 and 465.
     fromFile: (c) => ({
       values: {
@@ -143,6 +173,8 @@ const PROVIDERS = Object.freeze([
     // Geoapify's credits: a search or a lookup is one, four map tiles are one.
     units: Object.freeze({ search: 1, reverse: 1, tile: 0.25 }),
     limited: true,
+    plan: "free",
+    models: null,
     fromFile: (c) => (c.GEOAPIFY_API_KEY ? { values: {}, secrets: { api_key: c.GEOAPIFY_API_KEY } } : null),
     fromSaved: () => ({}),
     toConfiguration: () => ({}),
@@ -157,12 +189,24 @@ const PROVIDERS = Object.freeze([
     destination: Object.freeze([]),
     keptHere: Object.freeze([]),
     watched: false,
+    // A request, whatever it asked: an answer, a transcription after Groq, a test.
     units: Object.freeze({ call: 1 }),
     limited: true,
+    plan: "paid",
+    models: "gemini",
     fromFile: (c) => (c.GEMINI_API_KEY ? { values: {}, secrets: { api_key: c.GEMINI_API_KEY } } : null),
     fromSaved: () => ({}),
     toConfiguration: () => ({}),
   }),
+
+  // Speech to text first (decision 6). Groq's free plan counts seconds of audio, each request at
+  // least ten, so a transcription counts its billed seconds; a test or a model list is a call.
+  keyOnly({ code: "groq", name: "Groq", group: "ai", units: { transcribe: 1, call: 0 }, plan: "free", models: "groq" }),
+  keyOnly({ code: "openai", name: "OpenAI", group: "ai", units: { call: 1 }, plan: "paid", models: "openai" }),
+  keyOnly({ code: "anthropic", name: "Anthropic", group: "ai", units: { call: 1 }, plan: "paid", models: "anthropic" }),
+  keyOnly({ code: "deepseek", name: "DeepSeek", group: "ai", units: { call: 1 }, plan: "paid", models: "deepseek" }),
+  // One request brings every currency against the dollar (decision 10).
+  keyOnly({ code: "exchange_rates", name: "Exchange Rates", group: "finance", units: { rates: 1 }, plan: "free" }),
 
   Object.freeze({
     code: "web_push",
@@ -176,6 +220,8 @@ const PROVIDERS = Object.freeze([
     watched: false,
     units: Object.freeze({ push: 1 }),
     limited: false,
+    plan: null,
+    models: null,
     fromFile: (c) => ({
       values: { subject: c.VAPID_SUBJECT },
       secrets: {
@@ -201,7 +247,10 @@ function get(code) {
 
 const has = (code) => BY_CODE.has(code);
 
+/** The AI connections, each keeping a model list, in the registry's order. */
+const AI = Object.freeze(PROVIDERS.filter((p) => p.models));
+
 /** What integration_secret's AAD says for one secret (encryption.service `aad`). */
 const aadOf = (code, key) => `integration_secret:${code}:${key}`;
 
-module.exports = { PROVIDERS, get, has, aadOf, LAGOS };
+module.exports = { PROVIDERS, AI, get, has, aadOf, LAGOS };

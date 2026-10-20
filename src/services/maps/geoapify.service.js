@@ -263,10 +263,16 @@ function once(key, work) {
 
 const hashOf = (s) => crypto.createHash("sha1").update(s).digest("hex");
 
-/** The key given (tests, a test before save), else the key in use; MAPS_OFF without one. */
+/**
+ * The key given (tests, a test before save), else the key in use; MAPS_OFF without one. On the
+ * Free plan, today's daily limit reached stops real use (docs/guides/integrations.md §1.2
+ * decision 4): MAPS_BUSY, as when Geoapify itself says the quota is spent.
+ */
 async function keyOf(apiKey) {
   const key = apiKey === undefined ? await integrations.secret("geoapify", "api_key") : apiKey;
   if (!key) throw new AppError("MAPS_OFF", "Maps are not set up.", 503);
+  if (apiKey === undefined && (await require("../../shared/integrations/quota").spent("geoapify")))
+    throw refusal("MAPS_BUSY", "Maps have used today's allowance.", 429, { upstream: 429 });
   return key;
 }
 

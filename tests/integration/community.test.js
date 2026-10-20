@@ -855,15 +855,40 @@ describeDb("Staff Community against the real migrations", () => {
     expect(c.body.celebration).toMatchObject({ count: 1, mine: true, fans: [{ display_name: "Amaka Eze" }] });
   });
 
-  test("a voice note's transcript is asked for once and kept", async () => {
+  test("a voice note's transcript: a draft while nothing can answer, kept for everyone once Groq does", async () => {
     const ch = (await channelsOf("bola")).find((c) => c.name === "studio-crew");
     const page = await as("bola").get(`/community/channels/${ch.community_channel_id}/messages`);
     const note = page.body.data.find((m) => m.message_type === "audio");
-    const t = await as("bola").post(`/community/messages/${note.community_message_id}/transcript`).send({});
-    expect(t.status).toBe(200);
-    expect(typeof t.body.transcript).toBe("string");
-    const stored = await one("SELECT transcript FROM community_message WHERE community_message_id = $1", [note.community_message_id]);
-    expect(stored.transcript).toBe(t.body.transcript);
+    const ask = () => as("bola").post(`/community/messages/${note.community_message_id}/transcript`).send({});
+    const stored = async () =>
+      (await one("SELECT transcript FROM community_message WHERE community_message_id = $1", [note.community_message_id])).transcript;
+
+    // Nothing is set up here: the stub's placeholder, as a draft, and never kept.
+    const stub = await ask();
+    expect(stub.status).toBe(200);
+    expect(stub.body).toEqual({ transcript: expect.stringContaining("[AI placeholder]"), draft: true });
+    expect(await stored()).toBeNull();
+
+    // The captions the sender's browser wrote while recording are the last resort.
+    await q(`UPDATE community_message SET metadata = metadata || '{"captions": "quick update from the studio"}'::jsonb WHERE community_message_id = $1`, [
+      note.community_message_id,
+    ]);
+    expect((await ask()).body).toEqual({ transcript: "quick update from the studio", draft: true });
+    expect(await stored()).toBeNull();
+
+    // Groq answers: kept, and everyone after gets it without asking again.
+    const jobs = require("../../src/services/ai/jobs");
+    const settings = require("../../src/shared/integrations/settings");
+    const transcription = require("../../src/services/ai/transcription");
+    jest.spyOn(jobs, "chain").mockResolvedValue([{ provider: "groq", model: "whisper-large-v3", display_name: "Whisper Large v3", position: 1 }]);
+    jest.spyOn(settings, "secret").mockResolvedValue("gsk_test_key_0001");
+    jest.spyOn(transcription.DEFAULT_AUDIO, "forGroq").mockResolvedValue({ audio: Buffer.from("x"), mime: "audio/webm", filename: "voice-note.webm" });
+    const groq = jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ text: "Quick update from the studio.", duration: 3.1 }));
+    expect((await ask()).body).toEqual({ transcript: "Quick update from the studio.", draft: false });
+    expect(await stored()).toBe("Quick update from the studio.");
+    expect((await ask()).body).toEqual({ transcript: "Quick update from the studio.", draft: false });
+    expect(groq).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
   });
 
   describe("media and links (community.md §3 steps 17 and 18)", () => {

@@ -12,7 +12,8 @@
 | Status | Built |
 | Last changed | 20/10/2026 |
 
-Sources: TB's twelve answers of 20/10/2026 (§1.1), MILESTONES §14 (M9) and A4, the Mailbox guide
+Sources: TB's twelve answers of 20/10/2026 (§1.1), TB's answers on AI providers, transcription and
+exchange rates of the same day (§1.2, with `ai-control.md`), MILESTONES §14 (M9) and A4, the Mailbox guide
 (`mailbox.md`), the maps work of 19/10/2026 (`foundation.md` §6.13), the web push keys
 (`notifications.md` §6) and `docs/runbooks/dns-and-mail.md` §4.
 
@@ -76,14 +77,79 @@ Refinements made while writing this guide, within those decisions (TB to overrul
 - TLS cannot be switched off on the page. `MAILBOX_TLS=false` stays a server-file switch for a
   local test server only, so a password never crosses the network in clear.
 
+### 1.2 AI providers, transcription and exchange rates (TB, 20/10/2026, binding)
+
+The first build sent Gemini out like Geoapify: a key and nothing else. These answers replace that.
+They are built in two pull requests: **PR1** (this guide) puts every connection on this page and
+makes voice notes transcribe; **PR2** builds AI Control, the module that decides which model each
+AI feature uses (`ai-control.md`, decisions 12 to 24 there).
+
+1. **Six more connections.** Gemini, **Groq**, **OpenAI**, **Anthropic** and **DeepSeek** in the
+   AI group, and **Exchange Rates** (exchangerate-api.com) in a new Finance group. Each has its
+   key, its test before save, its daily limit and its use counted, like Geoapify. Groq is the
+   speech service (groq.com), not xAI's Grok.
+2. **Each AI connection has a model list.** A reference seed holds today's models and what each
+   does (text, audio, image, embeddings) with its list price. Saving or testing the key reads the
+   provider's own model list, which costs nothing: it marks which models this key can use and adds
+   the ones the seed does not know. **Add Model** takes a model id, what it does and an optional
+   endpoint URL (the provider's own when blank). Model names change often (Google limited the 2.5
+   models to existing projects in September 2026), so the live list decides what can be picked.
+3. **Anthropic is for top-tier work, Sonnet and Haiku only.** Its list filters out Opus and Fable;
+   nothing uses Anthropic until a feature needs long, careful drafting (proposals, MOUs).
+4. **Free or Paid, set on the page.** Every connection with a daily limit has a Plan, shown as a
+   pill on the list. It starts as Exchange Rates, Groq and Geoapify **Free**; Gemini, OpenAI,
+   Anthropic and DeepSeek **Paid**, and IT changes it when a plan is upgraded. On Free the daily
+   limit is a hard stop: the call is not made and transcription moves to the next provider. On
+   Paid the limit counts and warns as it does now (decision 10), and spend is shown in naira.
+5. **Staging and production share the keys and split the limits.** The same Groq and Gemini keys
+   on both, each environment's daily limit set to its share of the plan, as the mail limits are
+   split (§6.10). Groq counts its free allowance per organisation, so a second key in the same
+   organisation would not add any.
+6. **Transcription runs Groq, then Gemini, then the browser.** Groq's Whisper is first; Gemini
+   takes over when Groq cannot answer; the browser's own captions are the last resort.
+7. **Skip until reset.** A provider is passed over when it refuses (quota or rate limit), fails, or
+   takes more than 30 seconds. Once it says its quota is used up, every request goes straight to
+   the next provider until the reset time it gave, then back to it on its own. Reaching the daily
+   limit set on this page counts as used up, which keeps staging inside its share.
+8. **The browser captions while the sender records.** Chrome, Edge and Safari write captions
+   alongside the recording; they are kept with the voice note as a draft and used only when Groq
+   and Gemini both fail. Firefox, and devices that allow only one use of the microphone, record
+   without captions.
+9. **Transcribed on request, as now.** Transcribe under a voice note asks the server; the
+   transcript is stored once and everyone after gets it at once.
+10. **Exchange rates daily at midnight, with Sync beside the rate.** One request at 00:00 Lagos
+    brings every currency against the dollar (about 31 of the free plan's 1,500 requests a month);
+    each day's table is kept, so a later module (billing) switches currency with the same call.
+    **Sync Rates** beside the rate fetches it now. A failed fetch keeps the last rate and tries
+    again within the hour.
+11. **Status shows every connection.** Each connection on this page is a readiness check on
+    Settings · Status, so one screen says whether everything is healthy.
+
+Refinements made while recording these, within those decisions (TB to overrule):
+
+- The seed holds model ids, capabilities and list prices only, never a key or an endpoint URL
+  (A26, `MIGRATIONS.md` §9): like Nigeria's public holidays, a model list is set by an outside
+  party, not a business choice MyCity makes. A custom endpoint is typed on the page by IT.
+- Until AI Control is built (PR2), each job uses the best model the key can use, in the order the
+  code prefers (the newest stable Flash for Default, `services/ai/jobs.js`; §6.11), so a new key works
+  without anyone picking a model first.
+- The five providers that joined here and Exchange Rates have no server-file fallback: their keys are
+  set on this page only (decision 3 keeps the fallback for the connections that had one).
+- Groq's model for voice notes is `whisper-large-v3`, the more accurate of its two Whisper
+  models; turbo is cheaper and a little less accurate.
+- A browser caption is never stored as the transcript: it is shown, marked as a draft, and the next
+  Transcribe tries Groq and Gemini again.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Settings · Integrations (`integrations`) | Staff app | `integrations` view: Implementation Team, System Administrator, the CEO | Every connection, filtered by group (Mail, Maps, AI, Notifications): its state, where its settings come from, its last check, today's use against its daily limit | Open a connection; Test (edit) |
-| A connection (side panel on desktop, a full-screen page on a phone) | Staff app, over Integrations | The same | Its settings in use (secrets as Saved), the last test's steps, its checks (25 a page), 7 days of use | Edit Settings, Test, Send Test Email (System Sender), Remove Saved Settings, Replace Keys (Web Push) |
-| Edit Settings (form; a two-step wizard for the two mail connections) | Staff app, in the panel or a full-screen sheet | `integrations` edit | The connection's fields, secrets as Saved | Save Settings (tests first) |
-| Settings · Status (`status`) | Staff app | `system_health` view | Two new checks, Maps and Staff Mail Server; Mail and AI now read the settings in use | Read what is wrong and where to look (`system-health.md`) |
+| Settings · Integrations (`integrations`) | Staff app | `integrations` view: Implementation Team, System Administrator, the CEO | Every connection, filtered by group (Mail, Maps, AI, Finance, Notifications): its state, where its settings come from, its plan (Free or Paid), its last check, today's use against its daily limit | Open a connection; Test (edit) |
+| A connection (side panel on desktop, a full-screen page on a phone) | Staff app, over Integrations | The same | Its settings in use (secrets as Saved, the plan, the jobs an AI connection's models do), the model list of an AI connection (25 a page), the exchange rate of Exchange Rates, the last test's steps, its checks (25 a page), 7 days of use | Edit Settings, Test, Add Model and Remove (an AI connection), Sync Rates (Exchange Rates), Send Test Email (System Sender), Remove Saved Settings, Replace Keys (Web Push) |
+| Edit Settings (form; a two-step wizard for the two mail connections) | Staff app, in the panel or a full-screen sheet | `integrations` edit | The connection's fields, secrets as Saved, the plan | Save Settings (tests first) |
+| Add Model (form) | Staff app, a modal (a sheet on a phone) over the connection | `integrations` edit | Model ID, Name, what it does, Endpoint | Add Model |
+| Settings · Status (`status`) | Staff app | `system_health` view | A check for every connection: Maps and Staff Mail Server, and from PR1 Groq, OpenAI, Anthropic, DeepSeek, Exchange Rates and Web Push; Mail and AI read the settings in use, and AI is degraded while Gemini's connection fails | Read what is wrong and where to look (`system-health.md`) |
+| Staff Community · Channels and Direct Messages | Staff app | Each member | A voice note's Transcribe, now through Groq, then Gemini, then the browser's captions, marked Draft (`community.md`) | Transcribe, Hide Transcript |
 | Settings · Roles & Permissions (`roles-and-permissions`) | Staff app | `settings` view | `integrations` as a module a role can be granted | Grant or remove Integrations on a role |
 | Settings · Notifications (`notifications`) | Staff app | `settings` view | The new notices Integration Changed and Daily Limit Near | Turn a notice off, change its channels |
 | Mailbox (every tab) | Staff app | Each mailbox's owner | Unchanged; after a staff mail server change, the Reconnect banner for a refused password | Reconnect (`mailbox.md`) |
@@ -149,6 +215,25 @@ Refinements made while writing this guide, within those decisions (TB to overrul
     System Health's snapshot every 5 minutes sees a check go down or come back and tells IT.
 13. **Nightly** (`integrations-purge`): checks older than 90 days and use older than 30 days are
     deleted.
+14. **An AI connection's model list** (§6.11): a save or a test reads the provider's own list with the
+    key (step `key`, free), names the jobs its models can do (step `models`) and, except Groq, makes
+    one tiny request (step `answer`, recorded in the AI ledger). When the steps pass the service keeps
+    the list in the check's transaction: a model on it is available and seen now, a new one joins as
+    `provider`, one it no longer names is not available. The version is bumped, so each job's model
+    is worked out again in every process.
+15. **Add Model** → `POST /integrations/:code/models` keeps a model by hand (`added`), with an endpoint
+    of its own when given; `DELETE /integrations/:code/models/:id` takes one added by hand off. Both
+    are audited (`integration.model_added`, `integration.model_removed`) and tell nobody.
+16. **Exchange Rates** (§6.13): the `exchange-rates` job ticks at one minute past each hour and fetches
+    today's table while it is missing; **Sync Rates** (`POST /integrations/exchange_rates/sync`) fetches
+    it now. Either records a check of kind `sync` and keeps the table in `exchange_rate`, which
+    `shared/money/fx.js` reads for any module.
+17. **The Free plan's stop** (§6.12): `shared/integrations/quota.js` answers whether a Free connection
+    has reached its daily limit; Geoapify's real calls, the transcription chain and the rate fetch ask
+    it before calling out.
+18. **A voice note's Transcribe** (§6.14): `services/ai/transcription.js` walks the Transcription job's
+    chain, Groq then Gemini, skipping a provider until its quota resets, and falls back to the captions
+    the sender's browser wrote, as a draft that is never stored.
 
 ## 4 · Data
 
@@ -157,15 +242,22 @@ Refinements made while writing this guide, within those decisions (TB to overrul
 | `integration_connection` (`9000`, extended by `9200`) | `integration_connection_id`, `code` (citext, unique: `mail_sender`, `mailbox_server`, `geoapify`, `gemini`, `web_push`), `provider` (the registry's kind), `display_name`, `configuration` (the saved settings that are not secret, checked by the provider's contract schema; `{}` when nothing is saved), `saved_at`, `saved_by`, `daily_limit`, `status` (`ok`, `failing`, `unchecked`), `state_at`, `last_checked_at`, `last_ok_at`, `last_error_code`, `last_error`, `quota_warned_on` | One row per connection, made the first time it is saved, checked or used. `saved_at` null means nothing is saved here and the server file applies. Configuration columns are written by the module's service; the state columns by `shared/integrations/state.js` (checks, real use) |
 | `integration_secret` (`0090`, extended by `9200`) | `provider` (the connection's code), `key` (the field: `password`, `api_key`, `vapid`), `ciphertext`, `key_version`, `active`, `hint`, `set_by`, `rotated_at` | AES-256-GCM under `ENCRYPTION_KEY`, bound to `integration_secret:<provider>:<key>` (§6.4). `hint` is the last four characters of an API key, null for a password or a generated pair. The mailbox's own rows (`mailbox`, `mail_conn:<id>`) are unchanged |
 | `integration_check` (`9200`, new) | `integration_check_id`, `integration_connection_id` (cascade), `kind` (`save`, `test`, `test_email`, `watch`), `ok`, `steps` (each step's key, result, time and code), `error_code`, `checked_by` (null for `watch`), `created_at` | Append-only; deleted after 90 days. `steps` is open-ended per provider, so it is `jsonb` |
-| `integration_usage` (`9200`, new) | `integration_usage_id`, `integration_connection_id` (cascade), `day` (Lagos date), `kind` (`search`, `reverse`, `tile`, `call`, `send`, `sync`, `push`), `calls`, `failures`, `units` (`numeric(12,2)`); unique on connection, day and kind | Telemetry, like `request_stat`: no event, no audit row. Deleted after 30 days |
+| `integration_usage` (`9200`, new) | `integration_usage_id`, `integration_connection_id` (cascade), `day` (Lagos date), `kind` (`search`, `reverse`, `tile`, `call`, `transcribe`, `rates`, `send`, `sync`, `push`; `9210` adds `transcribe`, seconds of audio, and `rates`), `calls`, `failures`, `units` (`numeric(12,2)`); unique on connection, day and kind | Telemetry, like `request_stat`: no event, no audit row. Deleted after 30 days |
+| `integration_connection.plan` (`9210`) | `free`, `paid`, or null | Null keeps the registry's starting plan (decision 4); a save sets it, a removal clears it |
+| `ai_model` (`9210`, new) | `ai_model_id`, `provider` (`gemini`, `groq`, `openai`, `anthropic`, `deepseek`), `model` (citext, the id the API takes), `display_name`, `capabilities` (`text`, `image`, `audio`, `embeddings`), `available` (null until the key's list is read), `source` (`seed`, `provider`, `added`), `endpoint_url` (an added model's own, `https://` only), `input_usd_per_million`, `output_usd_per_million`, `audio_usd_per_million`, `usd_per_audio_hour` (`numeric(12,4)`, list prices in dollars), `seen_at`, `added_by`; unique on provider and model | Seeded by `9291` (ids, capabilities and the list prices known; never a key or a URL). Written by the integrations service only: a save or a test keeps the key's list; Add Model and Remove. Prices are confirmed by Find Prices in PR2 (`ai-control.md`) |
+| `exchange_rate` (`9220`, new) | `exchange_rate_id`, `day` (the Lagos day it is used for), `base`, `currency` (ISO 4217), `rate` (`numeric(24,10)`, units of `currency` to one `base`), `provider_updated_at`; unique on day, base and currency | Every currency against the dollar, one table a day, kept; a second fetch the same day replaces it. Read through `shared/money/fx.js` only |
 
 `9200` drops `integration_connection.integration_secret_id`: nothing ever wrote it, and a connection
 can hold more than one secret, so secrets are found by provider and key instead. It adds the CHECK
-on `status` and changes its default from `inactive` to `unchecked`; no row existed.
+on `status` and changes its default from `inactive` to `unchecked`; no row existed. `9210` widens the
+CHECKs on `integration_check.kind` (adds `sync`) and `integration_usage.kind` (adds `transcribe` and
+`rates`); its DOWN deletes rows of those kinds before narrowing them again.
 
-Schema migration file(s): `migrations/9200_integrations.sql`. Reference-data file(s):
-`seeds/reference/9290_seed_integrations.sql` (the `integrations` grant for the Implementation Team and
-the System Administrator, the `9190` pattern). No connection, key or URL is seeded (A26).
+Schema migration file(s): `migrations/9200_integrations.sql`, `migrations/9210_integrations_ai_models.sql`,
+`migrations/9220_exchange_rates.sql`. Reference-data file(s): `seeds/reference/9290_seed_integrations.sql`
+(the `integrations` grant for the Implementation Team and the System Administrator, the `9190`
+pattern), `seeds/reference/9291_seed_ai_models.sql` (the starting model lists, §1.2). No connection,
+key or URL is seeded (A26).
 
 ## 5 · API
 
@@ -182,8 +274,16 @@ All under `/api/v1/integrations`. Secrets never appear in a response.
 | `POST /:code/test` | `IntegrationTestBody` → `IntegrationCheck` | `integrations` edit | | The settings in use. `address` is Geoapify's search text |
 | `POST /mail_sender/test-email` | `EmptyBody` → `IntegrationCheck` | `integrations` edit | | To the tester's own work email; 429 `MAIL_PACED` when the hour is full |
 | `POST /web_push/replace-keys` | `EmptyBody` → `Integration` | `integrations` edit | | Fresh sign-in |
+| `POST /exchange_rates/sync` | `EmptyBody` → `IntegrationCheck` | `integrations` edit | | Fetches today's rates now; a check of kind `sync` |
+| `GET /:code/models` | `AiModelListQuery` → `AiModelPage` | `integrations` view | yes, 25 | An AI connection's model list, usable first then by name, each with the jobs it does (`in_use`). Filters: `capability`, `available`; `q` searches the id and the name. 404 for a connection with no list |
+| `POST /:code/models` | `AiModelCreate` → `AiModel` | `integrations` edit | | Add Model: 409 `ALREADY_LISTED` on `model`; Anthropic takes `claude-sonnet-*` and `claude-haiku-*` only (422 on `model`) |
+| `DELETE /:code/models/:id` | → 204 | `integrations` delete | | A model added here only; a seeded or listed one is a 404 |
 
-`:code` is one of the registry's codes (`IntegrationParams`), anything else a 422. Test and Send
+`:code` is one of the registry's codes (`IntegrationParams`), anything else a 422. A save of a key
+connection (Geoapify, the AI providers, Exchange Rates) takes `plan`; left out, the plan in force
+stays. The settings of an AI connection are `in_use` (each job its models do, first choice or
+fallback), `models` and `available` (the list's size and how much of it the key can use); Exchange
+Rates' are `usd_ngn`, `rate_day`, `fetched_at` and `currencies`. Test and Send
 Test Email need edit because they act on the connection: a test email is a real message and a
 Geoapify test spends about two credits.
 
@@ -217,7 +317,12 @@ page replaces stay readable as the fallback, and `.env.example` says so on each.
 | `mail_sender` · System Sender · Mail | `host`, `port`, `security` (`tls` from the first byte, or `starttls` required), `username`, **`password`**, `from` (an address, or Name and address), `reply_to`, `per_hour` (1 to 100,000), `local_domains` (blank, or the domains whose mailboxes are on this server, comma separated: mail to them is delivered without the route check) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_REPLY_TO`, `MAIL_SEND_PER_HOUR`, `SMTP_LOCAL_DOMAINS`; applies when `SMTP_HOST` is set | `connect`, `sign_in`; Send Test Email adds `send` | Yes | `send` (recipients) · none: the hourly limit is the pacing |
 | `mailbox_server` · Staff Mail Server · Mail | `imap_host` (blank: each address's own domain), `imap_port`, `smtp_host` (blank likewise), `smtp_port`, `per_person_per_hour` (1 to 10,000), `sync_every_min` (1 to 60), `live_connections` (0 to 30) | `MAILBOX_IMAP_HOST`, `MAILBOX_IMAP_PORT`, `MAILBOX_SMTP_HOST`, `MAILBOX_SMTP_PORT`, `MAILBOX_SEND_PER_HOUR`, `MAILBOX_SYNC_EVERY_MIN`, `MAILBOX_IDLE_MAX`; always applies | `imap`, `smtp`: a TLS connection, the certificate checked against the host, the server's greeting. A blank host is checked at the system sender's From domain | Yes | `sync` (mailboxes synced), `send` (recipients) · none |
 | `geoapify` · Geoapify · Maps | **`api_key`**; `daily_limit` | `GEOAPIFY_API_KEY` | `search` (the typed address; up to six suggestions shown), `reverse` (a point in Lagos), `tile` (zoom 15 over Lagos) | No | `search` (1 credit), `reverse` (1), `tile` (0.25: four tiles to a credit) · credits (the free plan's is 3,000) |
-| `gemini` · Gemini · AI | **`api_key`**; `daily_limit`; the model in use is shown, set in Praxis AI's settings | `GEMINI_API_KEY` | `key` (the model list, free), `answer` (one tiny prompt to the model in use, a few tokens, recorded in the AI ledger as `integration-test`) | No | `call` (requests) · requests |
+| `gemini` · Gemini · AI | **`api_key`**; `daily_limit`; `plan` (Paid); the jobs its models do are shown (§6.11) | `GEMINI_API_KEY` | `key` (Google's model list, free), `models` (the jobs it can do), `answer` (one tiny prompt to the Default model, a few tokens, recorded in the AI ledger as `integration-test`) | No | `call` (requests) · requests |
+| `groq` · Groq · AI | **`api_key`**; `daily_limit`; `plan` (Free) | none | `key`, `models` (Whisper must be on the list); no `answer`, which would spend ten free seconds | No | `transcribe` (seconds of audio billed, at least ten a request), `call` (counts nothing toward the limit) · seconds of audio |
+| `openai` · OpenAI · AI | **`api_key`**; `daily_limit`; `plan` (Paid) | none | `key`, `models`, `answer` (one embedding of "OK") | No | `call` · requests |
+| `anthropic` · Anthropic · AI | **`api_key`**; `daily_limit`; `plan` (Paid) | none | `key` (Sonnet and Haiku only), `models`, `answer` (one tiny prompt to Haiku) | No | `call` · requests |
+| `deepseek` · DeepSeek · AI | **`api_key`**; `daily_limit`; `plan` (Paid) | none | `key`, `models` (any model on the list: no job uses DeepSeek yet), `answer` | No | `call` · requests |
+| `exchange_rates` · Exchange Rates · Finance | **`api_key`**; `daily_limit`; `plan` (Free) | none | `rates` (one fetch of today's table, kept when the test passes; the naira rate and the number of currencies in its findings) | No | `rates` (requests) · requests |
 | `web_push` · Web Push · Notifications | `subject` (`mailto:` or `https:`); **the key pair**, made here, shown as its key id | `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | `keys` (the pair signs a token), `push` (to the tester's own devices; skipped when they have none) | No | `push` (pushes delivered) · none |
 
 A step's codes, and the field each lands on when Save is refused:
@@ -231,7 +336,7 @@ A step's codes, and the field each lands on when Save is refused:
 | `AUTH_FAILED` | `password` | Password refused |
 | `SENDER_REFUSED` | `from` | Sender refused |
 | `KEY_REFUSED` | `api_key` | Key refused |
-| `OVER_QUOTA` | `api_key` | Over today's quota |
+| `OVER_QUOTA` | `api_key` | Over today's quota (also a spent prepaid balance, a 402) |
 | `UNAVAILABLE`, `TIMEOUT`, `MODEL_NOT_FOUND` | none: one line above the footer | |
 
 ### 6.4 Secrets
@@ -322,6 +427,62 @@ reaches the other. They share the mail host's limits, so each page holds its sha
 mailbox's 50 recipients an hour (40 and 10) and the host's 30 IMAP connections per IP address (24 and
 4), as `dns-and-mail.md` §4 sets them.
 
+### 6.11 An AI connection's model list, and each job's model
+
+- **Start**: `9291` seeds the models known on 20/10/2026 with what each does and its published list
+  price; a price not known is null. A file key that has never been tested reads `available` null,
+  which keeps its models usable.
+- **Read with the key** (`services/ai/catalogue.js`, free): Gemini's from Google's own list (its
+  display names and methods), the others from their OpenAI-compatible list, Anthropic's every page.
+  A model the ERP has no use for is left off: speech or images out, video, live sessions,
+  moderation; Anthropic's Opus and Fable never join (decision 3).
+- **Kept** when the save's or the test's steps pass: listed models available, new ones added, the
+  rest not available. A model added by hand with its own endpoint keeps its state: the provider's
+  list cannot speak for it. A seeded or added model keeps its name; a listed one takes the provider's.
+- **Each job's model** (`services/ai/jobs.js`), until AI Control: Default and Image Reading the newest
+  stable Gemini Flash; Fast the newest Flash-Lite; Deep Reasoning the newest Pro; Transcription Groq's
+  `whisper-large-v3` (then turbo), then Gemini's Flash; Embeddings OpenAI's `text-embedding-3-small`;
+  Top Tier Gemini's Pro, then Anthropic's newest Sonnet. A provider without a readable key is left
+  out; a model the key's list no longer names is passed over. With nothing on Gemini's list, the
+  Default model is `ai_setting.model`, else `GEMINI_MODEL`.
+
+### 6.12 Plans
+
+- Every connection with a daily limit has a plan: the one saved here, else the registry's starting
+  plan (Geoapify, Groq and Exchange Rates Free; Gemini, OpenAI, Anthropic and DeepSeek Paid).
+- **Free** with a daily limit set: once today's units (written, plus what this process counted and has
+  not written) reach the limit, the call is not made. Geoapify answers 429 `MAPS_BUSY`; the
+  transcription chain passes to the next provider; the rate fetch records `OVER_QUOTA`. The answer is
+  kept 10 seconds per connection.
+- **Paid**: the limit only counts, and warns at 80% as before (decision 10).
+
+### 6.13 Exchange rates
+
+- One request (`latest/USD`, the key as a bearer token, never in the address) brings every currency
+  against the dollar. Each rate is kept as a decimal string, `numeric(24,10)`.
+- The job fetches only while today's table (Lagos) is missing: about one request a day. A failure is
+  tried again the next hour; Sync Rates always fetches.
+- `shared/money/fx.js`: `rate(from, to, { day })` the newest table on or before the day, a pair
+  without the dollar worked out through it; `convert(amount, from, to)` a Decimal; `newest()` the day,
+  the dollar to naira rate and the currencies. An unknown rate is null.
+- The `exchange_rates` readiness check is degraded when the newest table is more than 36 hours old.
+
+### 6.14 Transcription
+
+- The chain is the Transcription job's (§6.11). A provider is passed over when it is skipped until its
+  reset (`services/ai/skips.js`, in Redis so every process agrees; at most a day), when its Free plan
+  has reached its daily limit, or when it refuses, fails or takes more than 30 seconds.
+- A refusal for quota or rate limit (429, or 402) marks it skipped for as long as it said
+  (`retry-after`, Groq's reset headers, Google's RetryInfo), else a minute.
+- Groq gets the original recording (WebM, Ogg, MP4 and the rest as they are); Gemini an MP3 of it at
+  16 kHz mono (ffmpeg), with the prompt `voice-note-transcription` (word for word, the speaker's own
+  words, no translation).
+- Each attempt is a step of one AI run; Groq's seconds count toward its daily limit.
+- None answered: the captions in the voice note's metadata come back as a draft
+  (`Transcript.draft`), never stored; without them 503 `AI_UNAVAILABLE`. AI switched off still
+  returns the captions. Nothing set up: the stub's placeholder, as a draft; one stored before this
+  reads as no transcript.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -333,6 +494,9 @@ mailbox's 50 recipients an hour (40 and 10) and the host's 30 IMAP connections p
 | `integration.quota_warning` | A flush crosses 80% of the daily limit | Tells every IT holder (Daily Limit Near), once a day |
 | `integrations-watch` (scheduler, every 15 minutes) | On schedule | Tests the free connections (§3 step 10) |
 | `integrations-purge` (scheduler, 03:10 Lagos) | On schedule | Deletes checks older than 90 days and use older than 30 |
+| `integration.model_added`, `integration.model_removed` | Add Model, Remove | Audit only; nobody is told |
+| `exchange-rates` (scheduler, one minute past each hour, Lagos) | On schedule | Fetches today's rates while they are missing (§6.13) |
+| Readiness `groq`, `openai`, `anthropic`, `deepseek`, `exchange_rates`, `web_push` (new); `ai` degraded while Gemini fails | Every readiness call and System Health's snapshot | Settings · Status shows every connection (decision 11) |
 | Readiness `maps`, `mail_server` (new); `mail`, `ai` (now from the settings in use) | Every readiness call and System Health's snapshot | Settings · Status; `system_health.check_down` and `check_recovered` tell IT |
 
 The `integration` events sit in the System Health category (`categories.js`): the bell and push for
@@ -362,8 +526,9 @@ No restricted fields: secrets never leave the server.
 - **AI routes**: none.
 - **Search**: the screen is found by its words (`shared/search/screens.js`): integration, connect,
   API keys, SMTP, mail server, no-reply, IMAP, Geoapify, maps key, address search, Gemini, AI key,
-  web push, VAPID. The record type `integration` is `search:none` in the route map: five
-  connections, each found as the screen by its name.
+  web push, VAPID, Groq, Whisper, OpenAI, Anthropic, Claude, DeepSeek, AI models, Add Model, exchange
+  rates, dollar rate, Sync Rates, free plan, paid plan. The record type `integration` is `search:none`
+  in the route map: ten connections and their model lists, each found as the screen by its name.
 
 ## 10 · On screen and mobile
 
@@ -377,18 +542,20 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Settings · Integrations (`integrations`) | Integrations as the title; the subtitle "Connected services and their keys" (desktop); KPI cards Working, Failing, Not Set Up; the group chips All, Mail, Maps, AI, Notifications; Connections, one row each (a card on a phone): its name, a state pill (Working, Failing, Not Checked, Not Set Up), its source (Saved Here or Server File) or, when failing, the failure in a few words in its place (Password refused, Key refused, Not answering, Over today's quota, Saved key unreadable), its group, Checked with the time (day-first when not today), today's use against the daily limit (120 of 3,000) where one is set, and Test (edit); toasts "Test passed", "Test failed: Key refused" | Help term on Server File: "Set in the server's environment file. Saving here takes over from it." | Where values come from, the cache and the version, encryption, why a password shows no characters, what the watch probes: §3, §6 |
-| A connection (side panel; a full-screen page on a phone) | Its name as the title, the state pill and the source; Settings: the values in use as label and value pairs, each secret as "Saved, ends 1a2b" (a key) or Saved (a password or a pair), with who set it and the day, or Not Set; Test and Edit Settings at the foot, and behind More Actions (⋯) Send Test Email (System Sender), Replace Keys (Web Push) and Remove Saved Settings (Saved Here only); for Geoapify an Address field above the tests, prefilled; Last Test: each step with a tick or a cross, its name (Connect, Sign In, Send Email, IMAP, SMTP, Address Search, Address Lookup, Map Tile, Key, Answer, Keys, Test Push), its time, and the suggestions an address search found; Checks: when, kind (Save, Test, Test Email, Watch), result, by, 25 a page; Use: 7 days of calls and failures as bars with the daily limit; toasts "Test passed", "Test failed: Key refused", "Test email sent", "Keys replaced", "Settings removed"; Remove and Replace confirm by name (Remove Settings, Replace Keys) | Help terms: Server File ("Set in the server's environment file. Saving here takes over from it."), Daily Limit ("Your plan's allowance a day. IT is warned at 80%."), Hourly Limit ("Recipients the mail host accepts an hour. Production and staging share the plan's 50."), Hourly Limit per Person ("Messages each person may send from their mailbox in an hour."), Local Domains ("Domains whose mailboxes are on this server, comma separated. Mail to them skips the route check."), Security, IMAP Host, SMTP Host and Sync Every (as on Edit Settings), Live Connections ("Mailboxes held open so new mail arrives at once. Production and staging share the host's 30."), Units on Use ("Geoapify counts credits: a search or lookup is one, four map tiles are one.") | What each step does on the network, which steps cost credits, how Replace Keys reaches devices: §3, §6.3, §6.6 |
-| Edit Settings (form; a two-step wizard for the two mail connections) | System Sender, step Server: Server, Port, Security (TLS, STARTTLS), Username (Optional), Password; step Sending: From, Reply-To (Optional), Hourly Limit, Local Domains (Optional). Staff Mail Server, step Servers: IMAP Host (Optional), IMAP Port, SMTP Host (Optional), SMTP Port; step Limits: Hourly Limit per Person, Sync Every, Minutes, Live Connections. Geoapify and Gemini: API Key, Daily Limit (Optional). Web Push: Subject. A saved secret reads "Saved, ends 1a2b" or Saved with Replace, and Keep Saved puts it back (`SecretField`); Cancel, Back, Next, Save Settings; a refused field takes the wizard back to its step; field errors from §6.3 and "Type the password again"; toast "Settings saved" | Help terms: Security ("TLS from the first byte on 465; STARTTLS on 587."), IMAP Host and SMTP Host ("Blank uses each address's own domain."), Sync Every ("Minutes between syncs of every mailbox, behind live mail."), and Hourly Limit, Hourly Limit per Person, Local Domains, Live Connections and Daily Limit as on the connection | The test before save, the fresh sign-in and the destination rule: §6.4, §6.5 |
-| Settings · Status (`status`) | Owned by System Health (`system-health.md` §10): the two new rows Maps and Staff Mail Server, like every check | As built there | §3 step 12 here |
+| Settings · Integrations (`integrations`) | Integrations as the title; the subtitle "Connected services and their keys" (desktop); KPI cards Working, Failing, Not Set Up; the group chips All, Mail, Maps, AI, Finance, Notifications; Connections, one row each (a card on a phone): its name, a state pill (Working, Failing, Not Checked, Not Set Up), its source (Saved Here or Server File) or, when failing, the failure in a few words in its place (Password refused, Key refused, Not answering, Over today's quota, Saved key unreadable, Model not available), its plan pill (Free, Paid; desktop), its group, Checked with the time (day-first when not today), today's use against the daily limit (120 of 3,000) where one is set, and Test (edit); toasts "Test passed", "Test failed: Key refused" | Help term on Server File: "Set in the server's environment file. Saving here takes over from it." | Where values come from, the cache and the version, encryption, why a password shows no characters, what the watch probes: §3, §6 |
+| A connection (side panel; a full-screen page on a phone) | Its name as the title, the state pill and the source; Settings: the values in use as label and value pairs, each secret as "Saved, ends 1a2b" (a key) or Saved (a password or a pair), with who set it and the day, or Not Set; Plan; for an AI connection In Use (each job and its model, "Transcription (Fallback): Gemini 3.8 Flash") and Models ("2 of 3 on this key"); for an AI connection the Models card: Search Models, each model's name with what it does and the jobs it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour", desktop), Add Model (edit) and, on a model added here, Remove (delete), 25 a page; for Exchange Rates the Exchange Rate card: One Dollar (₦1,534.21), Rates Of (the day), Currencies, and Sync Rates (edit); toasts "Rates synced", "Sync failed: Key refused", "Model added", "Model removed"; Remove Model confirms by name; Test and Edit Settings at the foot, and behind More Actions (⋯) Send Test Email (System Sender), Replace Keys (Web Push) and Remove Saved Settings (Saved Here only); for Geoapify an Address field above the tests, prefilled; Last Test: each step with a tick or a cross, its name (Connect, Sign In, Send Email, IMAP, SMTP, Address Search, Address Lookup, Map Tile, Key, Answer, Keys, Test Push), its time, and the suggestions an address search found; Checks: when, kind (Save, Test, Test Email, Watch), result, by, 25 a page; Use: 7 days of calls and failures as bars with the daily limit; toasts "Test passed", "Test failed: Key refused", "Test email sent", "Keys replaced", "Settings removed"; Remove and Replace confirm by name (Remove Settings, Replace Keys) | Help terms: Server File ("Set in the server's environment file. Saving here takes over from it."), Daily Limit ("Your plan's allowance a day. IT is warned at 80%."; Groq's: "Seconds of audio a day, each request counted as at least ten. IT is warned at 80%."), Plan ("Free stops at the daily limit and the next provider answers. Paid counts and warns."), Rates Of ("Fetched after midnight, Lagos, each day."), Hourly Limit ("Recipients the mail host accepts an hour. Production and staging share the plan's 50."), Hourly Limit per Person ("Messages each person may send from their mailbox in an hour."), Local Domains ("Domains whose mailboxes are on this server, comma separated. Mail to them skips the route check."), Security, IMAP Host, SMTP Host and Sync Every (as on Edit Settings), Live Connections ("Mailboxes held open so new mail arrives at once. Production and staging share the host's 30."), Units on Use ("Geoapify counts credits: a search or lookup is one, four map tiles are one.") | What each step does on the network, which steps cost credits, how Replace Keys reaches devices, how a model list is read and kept, how each job's model is chosen, when rates are fetched: §3, §6.3, §6.6, §6.11, §6.13 |
+| Edit Settings (form; a two-step wizard for the two mail connections) | System Sender, step Server: Server, Port, Security (TLS, STARTTLS), Username (Optional), Password; step Sending: From, Reply-To (Optional), Hourly Limit, Local Domains (Optional). Staff Mail Server, step Servers: IMAP Host (Optional), IMAP Port, SMTP Host (Optional), SMTP Port; step Limits: Hourly Limit per Person, Sync Every, Minutes, Live Connections. Geoapify, Gemini, Groq, OpenAI, Anthropic, DeepSeek and Exchange Rates: API Key, Plan (Free, Paid), Daily Limit (Optional). Web Push: Subject. A saved secret reads "Saved, ends 1a2b" or Saved with Replace, and Keep Saved puts it back (`SecretField`); Cancel, Back, Next, Save Settings; a refused field takes the wizard back to its step; field errors from §6.3 and "Type the password again"; toast "Settings saved" | Help terms: Security ("TLS from the first byte on 465; STARTTLS on 587."), IMAP Host and SMTP Host ("Blank uses each address's own domain."), Sync Every ("Minutes between syncs of every mailbox, behind live mail."), and Hourly Limit, Hourly Limit per Person, Local Domains, Live Connections and Daily Limit as on the connection | The test before save, the fresh sign-in and the destination rule: §6.4, §6.5 |
+| Add Model (modal; a sheet on a phone) | Model ID, Name (Optional), Does (Text Only, Text and Images, Text, Images, Audio, Speech to Text, Embeddings), Endpoint (Optional); Cancel, Add Model; field errors "Not a model id", "Already on the list", "Sonnet or Haiku only", "Not an https address"; toast "Model added" | None | Where a model's list comes from and why Opus and Fable are left off: §1.2, §6.11 |
+| Settings · Status (`status`) | Owned by System Health (`system-health.md` §10): the rows Maps and Staff Mail Server, and from PR1 Groq, OpenAI, Anthropic, DeepSeek, Exchange Rates and Web Push, like every check | As built there | §3 step 12 here |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Settings · Integrations (`integrations`) | Two KPI cards, Working and Failing; the group chips; then each connection as a card: the name, the state pill, and the source or the failure | The subtitle; the Not Set Up card; the group, Checked, today's use and Test on each card (all on the connection's page) | Tap a connection: its page opens full screen | Settings from More; the tabs scroll sideways along the top |
-| A connection (full-screen sheet) | The state pill and the source; Settings as label over value; Last Test with its steps; Use as bars | Nothing: the Checks list pages 25 at a time as cards | Test, full width at the foot, with Edit Settings above it and More Actions (⋯), an action sheet of Send Test Email, Replace Keys and Remove Saved Settings | Close returns to Integrations |
-| Edit Settings | A full-screen sheet: the step's title and fields (one step for Geoapify, Gemini and Web Push) | Nothing | Next, then Save Settings, full width at the foot | Close at the top; Back on the second step |
+| Settings · Integrations (`integrations`) | Two KPI cards, Working and Failing; the group chips; then each connection as a card: the name, the state pill, and the source or the failure | The subtitle; the Not Set Up card; the plan, the group, Checked, today's use and Test on each card (all on the connection's page) | Tap a connection: its page opens full screen | Settings from More; the tabs scroll sideways along the top |
+| A connection (full-screen sheet) | The state pill and the source; Settings as label over value; for an AI connection the Models card as cards (the name with what it does, On Key); for Exchange Rates the Exchange Rate card with Sync Rates; Last Test with its steps; Use as bars | A model's price and Remove (on desktop); the Checks and Models lists page 25 at a time as cards | Test, full width at the foot, with Edit Settings above it and More Actions (⋯), an action sheet of Send Test Email, Replace Keys and Remove Saved Settings | Close returns to Integrations |
+| Edit Settings | A full-screen sheet: the step's title and fields (one step for the key connections and Web Push) | Nothing | Next, then Save Settings, full width at the foot | Close at the top; Back on the second step |
+| Add Model | A sheet: Model ID, Name, Does, Endpoint | Nothing | Add Model, full width at the foot | Close at the top, or Cancel, returns to the connection |
 
 ## 11 · Edge cases
 
@@ -413,6 +580,15 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   no push. A device never opened again stays silent, as with any key change.
 - **No daily limit set**: use is still counted; nothing warns.
 - **A provider added to the registry later** appears as Not Set Up with no migration.
+- **A model withdrawn by its provider** (Google limited the 2.5 models to existing projects): the next
+  save or test marks it Not on Key, and each job moves to the next model its family ranks.
+- **A key's list that names none of a connection's models**: the `models` step fails with
+  `MODEL_NOT_FOUND` ("Model not available"), so the key is not saved.
+- **Groq's free seconds used up mid-day**: Groq answers 429 with `retry-after`; voice notes go to
+  Gemini until then, and the Free plan's own limit stops it before Groq refuses when it is set lower.
+- **No exchange rate yet** (a new key, a failing fetch): the Exchange Rate card says No Rates Yet;
+  `fx.rate()` answers null, and the readiness check reads degraded after 36 hours.
+- **Add Model for Anthropic with an Opus or Fable id**: refused on the field, Sonnet or Haiku only.
 - **Laptops and CI** run without network access to the providers: tests fake them, and unset mail is
   captured.
 
@@ -431,6 +607,11 @@ bound form here; nothing else is ported.
 3. **Bounces on the no-reply inbox** (decision 1's fourth option, not chosen).
 4. **Whether the 50 recipients an hour is per mailbox or for the hosting account**
    (`dns-and-mail.md` §4), which decides the two hourly limits.
+5. **The seeded model ids**: Gemini 3.8 Flash and 3.5 Flash-Lite and DeepSeek V4 Flash and Pro were
+   named from Google's and DeepSeek's announcements, not read from a key; the first save of a real key
+   confirms or marks them. Their prices are null until Find Prices (PR2) or IT fills them.
+6. **Daily Limit Near for the AI providers**: decision 21 in `ai-control.md` sends no AI notifications;
+   this page still warns at 80% of a daily limit (decision 10). TB to say if that stops for AI.
 
 ## 14 · Change log
 
@@ -443,4 +624,13 @@ bound form here; nothing else is ported.
   the tests moved to the module (`integrations.testers.js`); the System Sender gained Local Domains
   (`SMTP_LOCAL_DOMAINS`, from main's route-check fix). New shared field `SecretField`; the shared
   side panel now keeps its footer in view when its body is long.
+- 20/10/2026 · TB · §1.2 recorded: Groq, OpenAI, Anthropic, DeepSeek and Exchange Rates join Gemini,
+  each AI connection gets a model list (seeded, read live from the key, Add Model), a Free or Paid
+  plan, transcription by Groq then Gemini then the browser's captions, rates daily at midnight with
+  Sync, every connection on Status. Built in PR1; the sections below follow as it is built.
+- 20/10/2026 · TB · PR1 built (API, UI, mobile): §2 to §11 brought up to it: the model lists (`ai_model`,
+  `9210`, `9291`), plans, Add Model, the exchange rates (`exchange_rate`, `9220`, `shared/money/fx.js`,
+  the `exchange-rates` job, Sync Rates), the Free plan's stop, each job's model until AI Control, the
+  readiness check of every connection, and voice notes through Groq, then Gemini, then the browser's
+  captions. The new providers have no server-file fallback.
 - 20/10/2026 · TB · Every address field now searches from the second character and names a pin through `GET /maps/pin` (`docs/guides/addresses.md`), each counted here as a search or a lookup; answers kept in memory and in Redis spend nothing. The Geoapify test's Address stays a plain field, marked `address:none` (the text the test searches once; gate 22), and its body's `address` is marked the same in the contract.

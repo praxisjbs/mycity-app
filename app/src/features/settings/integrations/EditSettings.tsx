@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import integrations from "@mycity/contract/schemas/integrations.js";
-import type { Integration, IntegrationCode, IntegrationSave, SecretState } from "@mycity/contract/contract.gen.ts";
+import type { Integration, IntegrationCode, IntegrationPlan, IntegrationSave, SecretState } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { Button, ChoiceField, Field, Form, FormError, FormFooter, HelpTerm, NumberField, SecretField, TextField, toast, useContractForm, Wizard } from "@mycity/ui";
-import { HELP } from "./words";
+import { HELP, PLAN } from "./words";
+
+/** The connections that are a key, a daily limit and a plan. */
+const KEY_ONLY = ["geoapify", "gemini", "groq", "openai", "anthropic", "deepseek", "exchange_rates"] as const;
+type KeyCode = (typeof KEY_ONLY)[number];
+const isKeyOnly = (code: IntegrationCode): code is KeyCode => (KEY_ONLY as readonly string[]).includes(code);
 
 /** The connections whose form holds a secret: opening one asks for a fresh sign-in first. */
-const WITH_SECRET: readonly IntegrationCode[] = ["mail_sender", "geoapify", "gemini"];
-export const carriesSecret = (code: IntegrationCode) => WITH_SECRET.includes(code);
+export const carriesSecret = (code: IntegrationCode) => code === "mail_sender" || isKeyOnly(code);
 
 type Fields = Record<string, string[]>;
 
@@ -28,11 +32,10 @@ export function EditSettings({ c, done }: { c: Integration; done: () => void }) 
       return <SenderForm c={c} done={done} />;
     case "mailbox_server":
       return <ServerForm c={c} done={done} />;
-    case "geoapify":
-    case "gemini":
-      return <KeyForm c={c} done={done} />;
-    default:
+    case "web_push":
       return <PushForm c={c} done={done} />;
+    default:
+      return <KeyForm c={c} done={done} />;
   }
 }
 
@@ -264,15 +267,37 @@ function ServerForm({ c, done }: { c: Integration; done: () => void }) {
   );
 }
 
-/* ───────────── Geoapify and Gemini ───────────── */
+/* ───────────── A key, a daily limit and a plan ───────────── */
 
-type KeyValues = { api_key: string; daily_limit: string };
+type KeyValues = { api_key: string; daily_limit: string; plan: IntegrationPlan };
+
+/** Each key connection's own save schema. */
+const KEY_SCHEMA = {
+  geoapify: integrations.GeoapifySave,
+  gemini: integrations.GeminiSave,
+  groq: integrations.GroqSave,
+  openai: integrations.OpenAiSave,
+  anthropic: integrations.AnthropicSave,
+  deepseek: integrations.DeepSeekSave,
+  exchange_rates: integrations.ExchangeRatesSave,
+} as const;
+
+/** A daily limit's format example, in the connection's own unit. */
+const LIMIT_EXAMPLE: Partial<Record<KeyCode, string>> = { geoapify: "3000", groq: "23040", exchange_rates: "40" };
+
+const PLANS: Array<[IntegrationPlan, string]> = [
+  ["free", PLAN.free],
+  ["paid", PLAN.paid],
+];
 
 function KeyForm({ c, done }: { c: Integration; done: () => void }) {
-  const code = c.code as "geoapify" | "gemini";
-  const schema = code === "geoapify" ? integrations.GeoapifySave : integrations.GeminiSave;
-  const body = (v: KeyValues) => ({ code, api_key: v.api_key, daily_limit: num(v.daily_limit) ?? null, saved_at: c.saved_at });
-  const f = useContractForm<KeyValues>({ api_key: "", daily_limit: text(c.daily_limit) }, { safeParse: (v: KeyValues) => schema.safeParse(body(v)) });
+  const code = c.code as KeyCode;
+  const schema = KEY_SCHEMA[code];
+  const body = (v: KeyValues) => ({ code, api_key: v.api_key, daily_limit: num(v.daily_limit) ?? null, plan: v.plan, saved_at: c.saved_at });
+  const f = useContractForm<KeyValues>(
+    { api_key: "", daily_limit: text(c.daily_limit), plan: c.plan ?? "paid" },
+    { safeParse: (v: KeyValues) => schema.safeParse(body(v)) },
+  );
   const key = secretOf(c, "api_key");
   const { save, problem } = useSave(c, done, f.setServerErrors);
   return (
@@ -280,8 +305,11 @@ function KeyForm({ c, done }: { c: Integration; done: () => void }) {
       <Field label="API Key" {...f.status("api_key")}>
         <SecretField {...f.field("api_key")} saved={key?.set} hint={key?.hint} noun="key" />
       </Field>
-      <Field label={<HelpTerm help={HELP.daily}>Daily Limit</HelpTerm>} optional {...f.status("daily_limit")}>
-        <NumberField {...f.field("daily_limit")} placeholder="3000" />
+      <Field label={<HelpTerm help={HELP.plan}>Plan</HelpTerm>} {...f.status("plan")}>
+        <ChoiceField {...f.field("plan")} options={PLANS} />
+      </Field>
+      <Field label={<HelpTerm help={code === "groq" ? HELP.dailyGroq : HELP.daily}>Daily Limit</HelpTerm>} optional {...f.status("daily_limit")}>
+        <NumberField {...f.field("daily_limit")} placeholder={LIMIT_EXAMPLE[code] ?? "1000"} />
       </Field>
       {problem && <FormError>{problem}</FormError>}
       <FormFooter>

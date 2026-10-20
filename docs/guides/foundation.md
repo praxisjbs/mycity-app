@@ -243,7 +243,7 @@ only under `src/modules/`; the work is `shared/search`.
 | `GET /maps/tiles/:z/:x/:y.png` (`TileParams`: zoom 0 to 20, a column and row that exist at it → the PNG, `no_content` in the contract, `Cache-Control: private, max-age=604800`) | everyone signed in (`self`) |
 
 503 `MAPS_OFF` when no Geoapify key is set (Settings · Integrations, else `GEOAPIFY_API_KEY`), 429 `MAPS_BUSY` over the provider's
-quota, 502 `MAPS_UNAVAILABLE` when the provider refuses, sends a tile that is not an image, or takes
+quota or, on the Free plan, once today's daily limit set there is reached, 502 `MAPS_UNAVAILABLE` when the provider refuses, sends a tile that is not an image, or takes
 longer than 4.5 seconds.
 
 ## 6 · Rules and calculations
@@ -620,8 +620,9 @@ the inventory of every address field, the signed place, the instant search, the 
 path (TB, 20/10/2026). What stays here is how maps first came in:
 
 - **The key** stays on the server: the browser asks our API (`/api/v1/maps/...`), never Geoapify.
-  It is kept on Settings · Integrations, encrypted, with a daily limit, read at each call through
-  `shared/integrations/settings.js`; the server file's `GEOAPIFY_API_KEY` is the fallback, and
+  It is kept on Settings · Integrations, encrypted, with a Free or Paid plan and a daily limit, read
+  at each call through `shared/integrations/settings.js`; on the Free plan the limit stops real use
+  (`shared/integrations/quota.js`, `docs/guides/integrations.md` §6.12); the server file's `GEOAPIFY_API_KEY` is the fallback, and
   every search, pin and tile is counted (`docs/guides/integrations.md` §6.9).
 - **Tiles** (decided 19/10/2026): the tile route is signed in like every staff route, and an image
   request carries no token, so `MapView` takes `loadTile` and fetches each tile with the session
@@ -814,6 +815,12 @@ screen.
 ## 14 · Change log
 
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) left the shell (`catalogue.ts`, `coming-soon.ts`, `features/settings/index.tsx`); Knowledge Hub · Policies is shown only to holders of `policies.manage` (`shell/access.ts`, as `src/shared/search/screens.js`); the shell mounts the acknowledge sheet beside the clock prompts (`docs/guides/policies.md` §6.7).
+- 20/10/2026 · TB · Settings · Integrations gains the AI providers (Groq, OpenAI, Anthropic,
+  DeepSeek beside Gemini) with their model lists, Exchange Rates, and a Free or Paid plan on every
+  connection (`docs/guides/integrations.md` §1.2). Geoapify is Free: today's daily limit reached
+  answers `MAPS_BUSY` (§5, §6.13). Settings · Faults picks through the list's selection bar
+  (`docs/guides/system-health.md`).
+
 - 20/10/2026 · TB · Settings' Status, Performance and Faults follow `system_health`, not
   `settings`, in the shell (`app/src/shell/access.ts`) and ⌘K (`src/shared/search/screens.js`):
   Operations & People no longer see them, and a holder of System Health without Settings reaches

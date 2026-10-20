@@ -69,7 +69,7 @@ erDiagram
 | Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `notification_rule`, `notification_rule_recipient`, `notification_reminder_rule`, `notification_setting`, `reminder`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
-| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
+| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
 
 Every core table above was checked against the shared code that writes it by running
 `tests/integration` on the real migrations (#26, #27): the code and the schema agree, and CI keeps
@@ -437,7 +437,12 @@ later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed · `9100
 time and author, a daily limit and its state, `integration_secret` a hint and who set it, and two
 new tables, `integration_check` (each test, 90 days) and `integration_usage` (calls a day per kind,
 30 days) · `9290` seed: the `integrations` grant for the Implementation Team and the System
-Administrator.
+Administrator · `9210` AI providers on Settings · Integrations (TB, 20/10/2026;
+`docs/guides/integrations.md` §1.2, §4): `integration_connection.plan` (Free or Paid), the wider kinds
+of `integration_check` (`sync`) and `integration_usage` (`transcribe`, `rates`), and the new `ai_model`
+(each AI connection's model list: what each model does, whether the key can use it, its list price)
+· `9220` `exchange_rate` (every currency against the dollar, a table a day, read through
+`shared/money/fx.js`) · `9291` seed: the starting model lists (ids, capabilities and known prices only).
 
 **Owes:** nothing from this list since 17/10/2026: two-step required per role and editing roles and
 their grants on screen came forward to M0 with foundation track C (`0400`, `0449`;

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
 import { usePhoto, usePhotos } from "@/api/download";
-import { Avatar, Button, Card, cn, Confetti, formatDate, formatDateTime, formatTime, Icon, LinkText, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
+import { Avatar, Button, Card, cn, Confetti, formatDate, formatDateTime, formatTime, Icon, LinkText, Pill, ShareBar, toast, Tooltip, Waveform } from "@mycity/ui";
 import { AlbumMedia, MessageLink, MessageMedia } from "./Media";
 
 /** Highlight search hits inside a heading (a message's own text is LinkText, which also opens its links). */
@@ -150,14 +150,22 @@ function useVoicePlayer(m: Message) {
 function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
   const [tr, setTr] = useState<"hidden" | "loading" | "shown">("hidden");
   const [text, setText] = useState(m.transcript ?? "");
+  /** The browser's own captions, shown when no transcription service could answer: asked again next time. */
+  const [draft, setDraft] = useState(false);
   const { playing, progress, toggle: play, secs } = useVoicePlayer(m);
   const transcribe = async () => {
     if (tr === "shown") return setTr("hidden");
-    if (text) return setTr("shown");
+    if (text && !draft) return setTr("shown");
     setTr("loading");
-    const r = await api.call("POST /api/v1/community/messages/:id/transcript", { params: { id: m.community_message_id }, body: {} });
-    setText(r.transcript);
-    setTr("shown");
+    try {
+      const r = await api.call("POST /api/v1/community/messages/:id/transcript", { params: { id: m.community_message_id }, body: {} });
+      setText(r.transcript);
+      setDraft(r.draft);
+      setTr("shown");
+    } catch (e) {
+      setTr("hidden");
+      toast(e instanceof ApiError ? e.message : "Could not transcribe");
+    }
   };
   return (
     <>
@@ -169,7 +177,16 @@ function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
         <em className="text-2xs not-italic opacity-80">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}</em>
       </div>
       {tr === "loading" && <p className="shimmer mt-2 max-w-80 rounded-ctl px-2.5 py-2 text-xs leading-normal opacity-75">Transcribing…</p>}
-      {tr === "shown" && <p className={cn("mt-2 max-w-80 rounded-ctl px-2.5 py-2 text-xs leading-normal", mine ? "bg-white/10" : "bg-black/5")}>{text}</p>}
+      {tr === "shown" && (
+        <div className={cn("mt-2 max-w-80 rounded-ctl px-2.5 py-2 text-xs leading-normal", mine ? "bg-white/10" : "bg-black/5")}>
+          {draft && (
+            <Pill tone="warn" className="mb-1">
+              Draft
+            </Pill>
+          )}
+          <p data-copy="content">{text}</p>
+        </div>
+      )}
       <button type="button" onClick={transcribe} className="mt-1.5 inline-flex items-center gap-1 text-2xs font-strong underline underline-offset-2 opacity-85">
         {tr === "shown" ? "Hide Transcript" : <><Icon name="doc" className="size-3" />Transcribe</>}
       </button>

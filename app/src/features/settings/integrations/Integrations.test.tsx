@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
   call: vi.fn(async (..._args: unknown[]): Promise<unknown> => ({})),
   invalidate: vi.fn(),
   rows: [] as unknown[],
+  models: [] as unknown[],
   detail: null as unknown,
   can: ((_module: string, _action?: string) => true) as (module: string, action?: string) => boolean,
 }));
@@ -22,7 +23,7 @@ vi.mock("@/api/hooks", () => ({
     set: () => undefined,
   }),
   usePaged: (key: string) => {
-    const rows = key.endsWith("/checks") ? [] : m.rows;
+    const rows = key.endsWith("/checks") ? [] : key.endsWith("/models") ? m.models : m.rows;
     return { rows, page: { number: 1, size: 25, total: rows.length, pages: 1, has_next: false }, loading: false, error: null, q: "", setQ: () => undefined, setPage: () => undefined };
   },
 }));
@@ -31,6 +32,15 @@ vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: m.can }) }));
 vi.mock("@/auth/FreshSignIn", () => ({ useFreshSignIn: () => ({ guard: <T,>(run: () => Promise<T>) => run(), ensure: async () => true }) }));
 
 import { IntegrationsTab } from "./index";
+
+// jsdom has no ResizeObserver; the plan's choice (a Radix radio group) measures itself with one.
+if (!("ResizeObserver" in window)) {
+  (window as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
 
 const row = (over: Partial<IntegrationRow> = {}): IntegrationRow => ({
   integration_connection_id: "00000000-0000-4000-8000-000000000001",
@@ -42,6 +52,7 @@ const row = (over: Partial<IntegrationRow> = {}): IntegrationRow => ({
   last_checked_at: null,
   last_error_code: null,
   daily_limit: 3000,
+  plan: "free",
   units_today: 120,
   watched: false,
   ...over,
@@ -59,8 +70,8 @@ const geoapify = (over: Partial<Integration> = {}): Integration => ({
 });
 
 const ROWS = [
-  row({ code: "mail_sender", display_name: "System Sender", group: "mail", daily_limit: null, units_today: 14 }),
-  row({ code: "gemini", display_name: "Gemini", group: "ai", state: "failing", source: "file", last_error_code: "KEY_REFUSED", daily_limit: null, units_today: 3 }),
+  row({ code: "mail_sender", display_name: "System Sender", group: "mail", daily_limit: null, plan: null, units_today: 14 }),
+  row({ code: "gemini", display_name: "Gemini", group: "ai", state: "failing", source: "file", last_error_code: "KEY_REFUSED", daily_limit: null, plan: "paid", units_today: 3 }),
   row(),
 ];
 
@@ -124,9 +135,91 @@ describe("Settings · Integrations", () => {
     await waitFor(() =>
       expect(m.call).toHaveBeenCalledWith("PUT /api/v1/integrations/:code", {
         params: { code: "geoapify" },
-        body: { code: "geoapify", api_key: "new-geo-key-9876", daily_limit: 3000, saved_at: "2026-10-20T08:00:00.000Z" },
+        body: { code: "geoapify", api_key: "new-geo-key-9876", daily_limit: 3000, plan: "free", saved_at: "2026-10-20T08:00:00.000Z" },
       }),
     );
     expect(await screen.findByText("Key refused", undefined, { timeout: 3000 })).toBeTruthy();
+  });
+
+  it("shows each connection's plan, Free or Paid", () => {
+    m.rows = ROWS;
+    render(<ModalProvider><IntegrationsTab /></ModalProvider>);
+    expect(screen.getAllByText("Free").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Paid").length).toBeGreaterThan(0);
+  });
+
+  const groq = (): Integration => ({
+    ...row({ code: "groq", display_name: "Groq", group: "ai", daily_limit: 23040 }),
+    saved_at: "2026-10-20T08:00:00.000Z",
+    saved_by_name: "Godwin-Okoh Elisha",
+    settings: { code: "groq", in_use: [{ job: "transcription", position: 1, model: "whisper-large-v3", display_name: "Whisper Large v3" }], models: 3, available: 2 },
+    secrets: [{ key: "api_key", set: true, hint: "Qp4w", set_by_name: "Godwin-Okoh Elisha", set_at: "2026-10-20T08:00:00.000Z" }],
+    last_check: null,
+    usage: [{ day: "2026-10-20", calls: 30, failures: 0, units: 900 }],
+  });
+
+  const whisper = {
+    ai_model_id: "00000000-0000-4000-8000-0000000000a1",
+    provider: "groq",
+    model: "whisper-large-v3",
+    display_name: "Whisper Large v3",
+    capabilities: ["audio"],
+    available: true,
+    source: "seed",
+    endpoint_url: null,
+    input_usd_per_million: null,
+    output_usd_per_million: null,
+    audio_usd_per_million: null,
+    usd_per_audio_hour: "0.1110",
+    in_use: [{ job: "transcription", position: 1, model: "whisper-large-v3", display_name: "Whisper Large v3" }],
+    seen_at: null,
+    added_by_name: null,
+    created_at: "2026-10-20T08:00:00.000Z",
+  };
+
+  it("an AI connection shows the jobs its models do and its model list, and adds a model", async () => {
+    const user = userEvent.setup();
+    m.rows = [row({ code: "groq", display_name: "Groq", group: "ai" })];
+    m.detail = groq();
+    m.models = [whisper];
+    render(<ModalProvider><IntegrationsTab /></ModalProvider>);
+    await user.click(screen.getAllByText("Groq")[0]);
+    const panel = await screen.findByRole("dialog");
+    expect(within(panel).getAllByText("Whisper Large v3").length).toBeGreaterThan(0);
+    expect(within(panel).getByText("2 of 3 on this key")).toBeTruthy();
+    expect(within(panel).getAllByText("Speech to Text, Transcription").length).toBeGreaterThan(0);
+    expect(within(panel).getAllByText("$0.111 an hour").length).toBeGreaterThan(0);
+    m.call.mockResolvedValueOnce({ ...whisper, model: "whisper-next", display_name: "whisper-next", source: "added" });
+    await user.click(within(panel).getByRole("button", { name: "Add Model" }));
+    await user.type(await screen.findByLabelText("Model ID"), "whisper-next");
+    await user.click(screen.getByRole("button", { name: "Add Model" }));
+    await waitFor(() =>
+      expect(m.call).toHaveBeenCalledWith("POST /api/v1/integrations/:code/models", {
+        params: { code: "groq" },
+        body: { model: "whisper-next", display_name: "", capabilities: ["audio"], endpoint_url: "" },
+      }),
+    );
+  });
+
+  it("Exchange Rates shows the dollar in naira, with Sync Rates beside it", async () => {
+    const user = userEvent.setup();
+    m.rows = [row({ code: "exchange_rates", display_name: "Exchange Rates", group: "finance" })];
+    m.detail = {
+      ...row({ code: "exchange_rates", display_name: "Exchange Rates", group: "finance", daily_limit: 40 }),
+      saved_at: "2026-10-20T08:00:00.000Z",
+      saved_by_name: "Godwin-Okoh Elisha",
+      settings: { code: "exchange_rates", base: "USD", usd_ngn: "1534.2100000000", rate_day: "2026-10-20", fetched_at: "2026-10-20T00:01:00.000Z", currencies: 161 },
+      secrets: [{ key: "api_key", set: true, hint: "7c1d", set_by_name: null, set_at: null }],
+      last_check: null,
+      usage: [],
+    } satisfies Integration;
+    m.call.mockResolvedValueOnce({ ok: true, error_code: null });
+    render(<ModalProvider><IntegrationsTab /></ModalProvider>);
+    await user.click(screen.getAllByText("Exchange Rates")[0]);
+    const panel = await screen.findByRole("dialog");
+    expect(within(panel).getByText("₦1,534.21")).toBeTruthy();
+    expect(within(panel).getByText("20/10/2026")).toBeTruthy();
+    await user.click(within(panel).getByRole("button", { name: "Sync Rates" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/integrations/exchange_rates/sync", { body: {} }));
   });
 });

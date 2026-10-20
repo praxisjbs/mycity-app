@@ -36,14 +36,20 @@ function fakeDb({ row = null, secrets = [] } = {}) {
 const bound = (code, key, value) => encryption.encrypt(value, { aad: providers.aadOf(code, key) });
 
 describe("the registry", () => {
-  test("holds the five connections in the page's order, each in its group", () => {
+  test("holds the ten connections in the page's order, each in its group", () => {
     expect(providers.PROVIDERS.map((p) => [p.code, p.group])).toEqual([
       ["mail_sender", "mail"],
       ["mailbox_server", "mail"],
       ["geoapify", "maps"],
       ["gemini", "ai"],
+      ["groq", "ai"],
+      ["openai", "ai"],
+      ["anthropic", "ai"],
+      ["deepseek", "ai"],
+      ["exchange_rates", "finance"],
       ["web_push", "notifications"],
     ]);
+    expect(providers.AI.map((p) => p.models)).toEqual(["gemini", "groq", "openai", "anthropic", "deepseek"]);
     expect(() => providers.get("nothing")).toThrow(/no connection/);
   });
 
@@ -53,14 +59,35 @@ describe("the registry", () => {
       "mail_sender.password": "none",
       "geoapify.api_key": "last4",
       "gemini.api_key": "last4",
+      "groq.api_key": "last4",
+      "openai.api_key": "last4",
+      "anthropic.api_key": "last4",
+      "deepseek.api_key": "last4",
+      "exchange_rates.api_key": "last4",
       "web_push.vapid": "key_id",
     });
   });
 
-  test("only free tests are watched, and only paid services carry a daily limit", () => {
+  test("only free tests are watched; the counted services carry a daily limit and start on a plan", () => {
     expect(providers.PROVIDERS.filter((p) => p.watched).map((p) => p.code)).toEqual(["mail_sender", "mailbox_server"]);
-    expect(providers.PROVIDERS.filter((p) => p.limited).map((p) => p.code)).toEqual(["geoapify", "gemini"]);
+    expect(providers.PROVIDERS.filter((p) => p.limited).map((p) => [p.code, p.plan])).toEqual([
+      ["geoapify", "free"],
+      ["gemini", "paid"],
+      ["groq", "free"],
+      ["openai", "paid"],
+      ["anthropic", "paid"],
+      ["deepseek", "paid"],
+      ["exchange_rates", "free"],
+    ]);
+    expect(providers.PROVIDERS.filter((p) => !p.limited).every((p) => p.plan === null)).toBe(true);
     expect(providers.get("geoapify").units).toEqual({ search: 1, reverse: 1, tile: 0.25 });
+    // Groq's daily limit counts seconds of audio; its free test calls count nothing toward it.
+    expect(providers.get("groq").units).toEqual({ transcribe: 1, call: 0 });
+  });
+
+  test("the new connections have no server-file fallback: they are set on the page", () => {
+    for (const code of ["groq", "openai", "anthropic", "deepseek", "exchange_rates"])
+      expect(providers.get(code).fromFile({ GEMINI_API_KEY: "x" })).toBeNull();
   });
 
   test("the server file: a sender only with a host, the staff mail server always", () => {
@@ -282,11 +309,73 @@ describe("the testers", () => {
     expect(steps.map((s) => [s.key, s.ok])).toEqual([["imap", false], ["smtp", true]]);
   });
 
-  test("Gemini: the free key check, then one tiny answer; a refused key skips the answer", async () => {
+  test("Gemini: the free key check, then one tiny answer; a refused key skips the rest", async () => {
     jest.spyOn(ai, "checkKey").mockRejectedValue(Object.assign(new Error("gemini 400"), { status: 400 }));
     const answer = jest.spyOn(ai, "testAnswer");
-    const steps = await testers.run("gemini", inUse("gemini", {}, { api_key: "k" }), { model: "gemini-2.5-flash" });
-    expect(steps.map((s) => [s.key, s.code])).toEqual([["key", "KEY_REFUSED"], ["answer", "SKIPPED"]]);
+    const steps = await testers.run("gemini", inUse("gemini", {}, { api_key: "k" }));
+    expect(steps.map((s) => [s.key, s.code])).toEqual([["key", "KEY_REFUSED"], ["models", "SKIPPED"], ["answer", "SKIPPED"]]);
     expect(answer).not.toHaveBeenCalled();
+  });
+
+  const listed = (...ids) =>
+    ids.map(([model, capabilities]) => ({ model, display_name: model.toUpperCase(), capabilities }));
+
+  test("Gemini: the key's list names the jobs it can do, the answer uses the Default model, and the list is handed back", async () => {
+    const models = listed(["gemini-2.5-flash", ["text", "image", "audio"]], ["gemini-3.8-flash", ["text", "image", "audio"]], ["gemini-2.5-pro", ["text", "image", "audio"]]);
+    jest.spyOn(ai, "checkKey").mockResolvedValue(models);
+    const answer = jest.spyOn(ai, "testAnswer").mockResolvedValue({});
+    const collect = {};
+    const steps = await testers.run("gemini", inUse("gemini", {}, { api_key: "k" }), { collect });
+    expect(steps.map((s) => [s.key, s.ok])).toEqual([["key", true], ["models", true], ["answer", true]]);
+    expect(steps[1].found).toEqual([
+      "Default: GEMINI-3.8-FLASH",
+      "Deep Reasoning: GEMINI-2.5-PRO",
+      "Image Reading: GEMINI-3.8-FLASH",
+      "Transcription: GEMINI-3.8-FLASH",
+      "Top Tier: GEMINI-2.5-PRO",
+    ]);
+    expect(answer).toHaveBeenCalledWith(expect.objectContaining({ provider: "gemini", model: "gemini-3.8-flash" }));
+    expect(collect.models).toBe(models);
+  });
+
+  test("Groq: no answer step, so a test spends none of the free audio seconds; no Whisper is a failure", async () => {
+    jest.spyOn(ai, "checkKey").mockResolvedValue(listed(["llama-3.3-70b-versatile", ["text"]]));
+    const answer = jest.spyOn(ai, "testAnswer");
+    const steps = await testers.run("groq", inUse("groq", {}, { api_key: "k" }));
+    // A list with something on it passes for a provider no job uses; Groq's Transcription needs Whisper.
+    expect(steps.map((s) => s.key)).toEqual(["key", "models"]);
+    expect(answer).not.toHaveBeenCalled();
+    jest.spyOn(ai, "checkKey").mockResolvedValue(listed(["whisper-large-v3-turbo", ["audio"]], ["whisper-large-v3", ["audio"]]));
+    const ok = await testers.run("groq", inUse("groq", {}, { api_key: "k" }));
+    expect(ok[1].found).toEqual(["Transcription: WHISPER-LARGE-V3"]);
+    jest.spyOn(ai, "checkKey").mockResolvedValue([]);
+    const none = await testers.run("groq", inUse("groq", {}, { api_key: "k" }));
+    expect(none.map((s) => [s.key, s.code])).toEqual([["key", null], ["models", "MODEL_NOT_FOUND"]]);
+  });
+
+  test("Anthropic and OpenAI answer with their cheapest model; a spent balance reads over quota", async () => {
+    jest.spyOn(ai, "checkKey").mockResolvedValue(listed(["claude-sonnet-5-5", ["text"]], ["claude-haiku-5-5", ["text"]]));
+    const answer = jest.spyOn(ai, "testAnswer").mockResolvedValue({});
+    await testers.run("anthropic", inUse("anthropic", {}, { api_key: "k" }));
+    expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "anthropic", model: "claude-haiku-5-5" }));
+    jest.spyOn(ai, "checkKey").mockResolvedValue(listed(["text-embedding-3-large", ["embeddings"]], ["text-embedding-3-small", ["embeddings"]]));
+    await testers.run("openai", inUse("openai", {}, { api_key: "k" }));
+    expect(answer).toHaveBeenLastCalledWith(expect.objectContaining({ provider: "openai", model: "text-embedding-3-small" }));
+    jest.spyOn(ai, "checkKey").mockResolvedValue(listed(["deepseek-v4-flash", ["text"]]));
+    answer.mockRejectedValue(Object.assign(new Error("deepseek 402"), { status: 402 }));
+    const steps = await testers.run("deepseek", inUse("deepseek", {}, { api_key: "k" }));
+    expect(steps.map((s) => [s.key, s.code])).toEqual([["key", null], ["models", null], ["answer", "OVER_QUOTA"]]);
+  });
+
+  test("Exchange Rates: one fetch, the naira rate in the findings, the table handed back", async () => {
+    const fx = require("../../services/fx/exchangerate-api");
+    jest.spyOn(fx, "latest").mockResolvedValue({ base: "USD", rates: { NGN: "1534.2134000000", EUR: "0.9200000000" }, updated_at: null });
+    const collect = {};
+    const steps = await testers.run("exchange_rates", inUse("exchange_rates", {}, { api_key: "k" }), { collect });
+    expect(steps).toEqual([expect.objectContaining({ key: "rates", ok: true, found: ["1 USD = ₦1,534.21", "2 currencies"] })]);
+    expect(collect.rates.rates.NGN).toBe("1534.2134000000");
+    jest.spyOn(fx, "latest").mockRejectedValue(new fx.FxError("quota", "OVER_QUOTA"));
+    const spent = await testers.run("exchange_rates", inUse("exchange_rates", {}, { api_key: "k" }));
+    expect(spent[0].code).toBe("OVER_QUOTA");
   });
 });

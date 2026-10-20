@@ -43,7 +43,13 @@ const CHECKS = [
   { key: "mail", label: "Mail", look: "Mail is not set up or the server refused. Queued mail waits. Open Settings, Integrations." },
   { key: "mail_server", label: "Staff Mail Server", look: "Staff mailboxes cannot reach their mail server. Open Settings, Integrations." },
   { key: "maps", label: "Maps", look: "Address search and maps are failing. Open Settings, Integrations." },
-  { key: "ai", label: "AI", look: "No AI vendor answers, so the assistant falls back to its stub." },
+  { key: "ai", label: "AI", look: "No AI vendor answers, or Gemini is failing. Open Settings, Integrations." },
+  { key: "groq", label: "Groq", look: "Voice notes go to Gemini, then the browser. Open Settings, Integrations." },
+  { key: "openai", label: "OpenAI", look: "Embeddings for search are failing. Open Settings, Integrations." },
+  { key: "anthropic", label: "Anthropic", look: "Top-tier drafting falls back to Gemini. Open Settings, Integrations." },
+  { key: "deepseek", label: "DeepSeek", look: "DeepSeek is failing. Open Settings, Integrations." },
+  { key: "exchange_rates", label: "Exchange Rates", look: "Rates are not fresh, so naira prices use the last rate. Open Settings, Integrations." },
+  { key: "web_push", label: "Web Push", look: "Pushes to phones and computers are failing. Open Settings, Integrations." },
   { key: "static", label: "Frontend Build", look: "A frontend build is missing from this release." },
   { key: "disk", label: "Disk Space", look: "The disk is filling up. Nothing can be uploaded or written once it is full." },
   { key: "memory", label: "Memory", look: "The server is close to its memory. A process is killed if it runs out. Performance shows which service holds it." },
@@ -68,14 +74,21 @@ const CONNECTION_ERROR = {
   OVER_QUOTA: "over today's quota",
   SECRET_UNREADABLE: "saved key cannot be read",
   TIMEOUT: "no answer in time",
+  MODEL_NOT_FOUND: "no model it needs is on the key",
+  RATES_STALE: "rates are more than a day old",
 };
+
+/** The checks that are a connection's stored state on Settings · Integrations. */
+const CONNECTIONS = new Set(["maps", "mail_server", "groq", "openai", "anthropic", "deepseek", "exchange_rates", "web_push"]);
 
 /** What a probe is doing, in a line, from whatever it chose to report. */
 function detailOf(key, v) {
-  if ((key === "maps" || key === "mail_server") && v.error) return `Failing: ${CONNECTION_ERROR[v.error] || "not answering"}`;
-  if ((key === "maps" || key === "mail_server" || key === "mail") && v.mode === "not_set_up") return "Not set up";
+  if ((CONNECTIONS.has(key) || key === "ai") && v.error && CONNECTION_ERROR[v.error]) return `Failing: ${CONNECTION_ERROR[v.error]}`;
+  if (CONNECTIONS.has(key) && v.error) return "Failing: not answering";
+  if ((CONNECTIONS.has(key) || key === "mail") && v.mode === "not_set_up") return "Not set up";
   if (v.error) return String(v.error).slice(0, 200);
   const bits = [];
+  if (key === "exchange_rates" && v.rate_day) bits.push(`rates of ${require("../../shared/time/day-first").formatDate(v.rate_day)}`);
   if (key === "outbox" && v.backlog !== undefined) bits.push(`${v.backlog} waiting`);
   if (key === "modules" && v.mounted !== undefined) bits.push(`${v.mounted} mounted`);
   if (key === "modules" && v.skipped && v.skipped.length) bits.push(`skipped: ${v.skipped.join(", ")}`);

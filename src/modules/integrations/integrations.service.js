@@ -12,6 +12,9 @@
  *   test(code, body, by)   test the settings in use
  *   testEmail(by)          a real message to the tester, through system mail
  *   replaceKeys(by)        a new web push key pair
+ *   models(code, query)    an AI connection's model list, 25 a page
+ *   addModel(code, b, by)  Add Model; removeModel(code, id, by) takes one added by hand off
+ *   syncRates(by, opts)    today's exchange rates, by Sync Rates or the job at midnight
  *   watch()                the worker's free tests every 15 minutes, and the daily limit
  *   purge()                old checks and use, nightly
  *
@@ -30,8 +33,11 @@ const { envelope, pageOf, PAGE_SIZE } = require("../../shared/http/paged");
 const lagos = require("../../shared/time/lagos");
 const encryption = require("../../services/secrets/encryption.service");
 const providers = require("../../shared/integrations/providers");
+const quota = require("../../shared/integrations/quota");
 const settings = require("../../shared/integrations/settings");
 const state = require("../../shared/integrations/state");
+const fx = require("../../shared/money/fx");
+const jobs = require("../../services/ai/jobs");
 const security = require("../security/security.service");
 const testers = require("./integrations.testers");
 const repo = require("./integrations.repo");
@@ -51,11 +57,6 @@ async function tx(fn) {
 
 const iso = (v) => (v ? new Date(v).toISOString() : null);
 const known = (code) => (c.integrations.StepCode.safeParse(code).success ? code : "UNAVAILABLE");
-
-/** The model AI uses, from Praxis AI's settings: shown on Gemini's card, and its test's answer. */
-async function modelInUse() {
-  return (await require("../../services/ai/governance").settings(pool)).model;
-}
 
 /* ------------------------------------------------------------------ *
  * What the page reads
@@ -77,6 +78,7 @@ function rowOf(def, row, inUse, unitsToday) {
     last_checked_at: row ? iso(row.last_checked_at) : null,
     last_error_code: unreadable ? "SECRET_UNREADABLE" : inUse && status === "failing" ? known(row.last_error_code) : null,
     daily_limit: def.limited && row && row.daily_limit ? Number(row.daily_limit) : null,
+    plan: quota.planOf(def, row),
     units_today: Math.round((Number(unitsToday) || 0) * 100) / 100,
     watched: def.watched,
   };
@@ -138,8 +140,17 @@ async function settingsView(def, inUse) {
         sync_every_min: v.sync_every_min,
         live_connections: v.live_connections,
       };
-    case "gemini":
-      return { code: def.code, model: await modelInUse() };
+    case "exchange_rates": {
+      const t = await fx.newest();
+      return {
+        code: def.code,
+        base: "USD",
+        usd_ngn: t && t.usd_ngn ? String(t.usd_ngn) : null,
+        rate_day: t ? t.day : null,
+        fetched_at: t ? iso(t.fetched_at) : null,
+        currencies: t ? Number(t.currencies) : 0,
+      };
+    }
     case "web_push": {
       const pair = inUse.secrets.vapid ? JSON.parse(inUse.secrets.vapid) : null;
       return {
@@ -148,8 +159,16 @@ async function settingsView(def, inUse) {
         key_id: pair ? require("../../services/push/vapid").keyIdOf(pair.publicKey) : null,
       };
     }
-    default:
-      return { code: def.code };
+    default: {
+      if (!def.models) return { code: def.code };
+      const counts = await repo.modelCounts(pool, def.code);
+      return {
+        code: def.code,
+        in_use: jobs.inUseBy(def.code, await jobs.lists(pool)),
+        models: counts ? counts.models : 0,
+        available: counts ? counts.available : 0,
+      };
+    }
   }
 }
 
@@ -282,7 +301,7 @@ const FIELD_ERROR = {
 const GENERAL = {
   UNAVAILABLE: "The service is not answering. Try again shortly.",
   TIMEOUT: "The service did not answer in time.",
-  MODEL_NOT_FOUND: "The model in Praxis AI's settings is not available.",
+  MODEL_NOT_FOUND: "None of the models this connection needs is on the key's list.",
   RECIPIENT_REFUSED: "The mail server refused the recipient.",
   SECRET_UNREADABLE: "The saved key cannot be read. Type it again.",
   NOT_SET_UP: "Nothing is set up to test.",
@@ -345,10 +364,11 @@ async function save(code, body, actor) {
     else secrets[key] = null;
   }
 
+  const collect = {};
   const steps = await testers.run(code, { code, source: "saved", values, secrets, unreadable: [] }, {
     actor,
-    model: def.code === "gemini" ? await modelInUse() : undefined,
     forSave: true,
+    collect,
   });
   const ok = testers.passed(steps);
   if (!ok) {
@@ -362,6 +382,7 @@ async function save(code, body, actor) {
   }
 
   const dailyLimit = def.limited ? body.daily_limit ?? null : null;
+  const plan = def.limited ? body.plan || (before && before.plan) || def.plan : null;
   await tx(async (client) => {
     const locked = await repo.connectionForUpdate(client, code);
     if ((locked ? iso(locked.saved_at) : null) !== storedAt) throw stale();
@@ -371,8 +392,10 @@ async function save(code, body, actor) {
       name: def.name,
       configuration,
       daily_limit: dailyLimit,
+      plan,
       by: actor.user_id,
     });
+    await keepFetched(client, code, collect);
     for (const [key, value] of Object.entries(typed))
       await repo.putSecret(client, {
         code,
@@ -391,8 +414,11 @@ async function save(code, body, actor) {
       key: EVENTS.INTEGRATION_SAVED,
       entity: { type: "integration", id: row.integration_connection_id },
       actor,
-      before: before && before.saved_at ? { configuration: before.configuration, daily_limit: before.daily_limit } : undefined,
-      after: { configuration, daily_limit: dailyLimit },
+      before:
+        before && before.saved_at
+          ? { configuration: before.configuration, daily_limit: before.daily_limit, plan: before.plan || null }
+          : undefined,
+      after: { configuration, daily_limit: dailyLimit, plan },
       payload: {
         code,
         integration_connection_id: row.integration_connection_id,
@@ -400,8 +426,26 @@ async function save(code, body, actor) {
       },
     });
   });
-  await settings.bump();
+  await changed(code);
   return get(code);
+}
+
+/**
+ * Keep what a passing test fetched, in the caller's transaction: an AI connection's model list
+ * (which models the key can use), or Exchange Rates' table for today.
+ */
+async function keepFetched(client, code, collect) {
+  const def = providers.get(code);
+  if (def.models && Array.isArray(collect.models)) await repo.keepModels(client, def.models, collect.models);
+  if (code === "exchange_rates" && collect.rates)
+    await repo.putRates(client, { ...collect.rates, day: lagos.today() });
+}
+
+/** After a connection, its plan or its model list changed: every process reads them again. */
+async function changed(code) {
+  quota.forget(code);
+  jobs.forget();
+  await settings.bump();
 }
 
 /** DELETE /integrations/:code */
@@ -417,11 +461,11 @@ async function remove(code, actor) {
       key: EVENTS.INTEGRATION_REMOVED,
       entity: { type: "integration", id: row.integration_connection_id },
       actor,
-      before: { configuration: row.configuration, daily_limit: row.daily_limit },
+      before: { configuration: row.configuration, daily_limit: row.daily_limit, plan: row.plan || null },
       payload: { code, integration_connection_id: row.integration_connection_id },
     });
   });
-  await settings.bump();
+  await changed(code);
 }
 
 /* ------------------------------------------------------------------ *
@@ -432,10 +476,12 @@ async function remove(code, actor) {
  * Keep a check of the settings in use, and move the connection's state by it.
  * @param {{audit?: boolean}} opts  audit: a person pressed it (the worker's watch is not audited)
  */
-async function record(code, kind, steps, actor, { moveState, audit }) {
+async function record(code, kind, steps, actor, { moveState, audit, collect = {} }) {
   const ok = testers.passed(steps);
+  const fetched = ok && (collect.models || collect.rates);
   const id = await tx(async (client) => {
     const connectionId = await state.ensure(client, code);
+    if (fetched) await keepFetched(client, code, collect);
     const check = await repo.insertCheck(client, {
       connectionId,
       kind,
@@ -454,19 +500,16 @@ async function record(code, kind, steps, actor, { moveState, audit }) {
       });
     return check.integration_check_id;
   });
+  if (fetched) await changed(code);
   return checkView(await repo.checkById(pool, id));
 }
 
 /** POST /integrations/:code/test */
 async function test(code, body, actor) {
-  const def = providers.get(code);
   const inUse = await settings.of(code);
-  const steps = await testers.run(code, inUse, {
-    actor,
-    address: body.address,
-    model: def.code === "gemini" ? await modelInUse() : undefined,
-  });
-  return record(code, "test", steps, actor, { moveState: Boolean(inUse), audit: true });
+  const collect = {};
+  const steps = await testers.run(code, inUse, { actor, address: body.address, collect });
+  return record(code, "test", steps, actor, { moveState: Boolean(inUse), audit: true, collect });
 }
 
 /** POST /integrations/mail_sender/test-email */
@@ -529,6 +572,125 @@ async function replaceKeys(actor) {
 }
 
 /* ------------------------------------------------------------------ *
+ * An AI connection's model list (guide §1.2 decisions 2 and 3)
+ * ------------------------------------------------------------------ */
+
+/** The connection's provider, or a 404 for a connection that keeps no model list. */
+function aiDef(code) {
+  const def = providers.get(code);
+  if (!def.models) throw new AppError("NOT_FOUND", "This connection has no model list.", 404);
+  return def;
+}
+
+function modelView(r, inUse) {
+  return {
+    ai_model_id: r.ai_model_id,
+    provider: r.provider,
+    model: r.model,
+    display_name: r.display_name,
+    capabilities: Array.isArray(r.capabilities) ? r.capabilities : [],
+    available: r.available === null || r.available === undefined ? null : Boolean(r.available),
+    source: r.source,
+    endpoint_url: r.endpoint_url || null,
+    input_usd_per_million: r.input_usd_per_million ?? null,
+    output_usd_per_million: r.output_usd_per_million ?? null,
+    audio_usd_per_million: r.audio_usd_per_million ?? null,
+    usd_per_audio_hour: r.usd_per_audio_hour ?? null,
+    in_use: inUse
+      .filter((u) => u.model.toLowerCase() === String(r.model).toLowerCase())
+      .map((u) => ({ job: u.job, position: u.position, model: u.model, display_name: u.display_name })),
+    seen_at: iso(r.seen_at),
+    added_by_name: r.added_by_name || null,
+    created_at: iso(r.created_at),
+  };
+}
+
+/** GET /integrations/:code/models */
+async function models(code, query) {
+  const def = aiDef(code);
+  const page = await repo.modelPage(pool, def.models, query);
+  const inUse = jobs.inUseBy(def.models, await jobs.lists(pool));
+  return { ...page, data: page.data.map((r) => modelView(r, inUse)) };
+}
+
+/** Anthropic's list is Sonnet and Haiku only (decision 3). */
+const ALLOWED_MODEL = { anthropic: /^claude-(sonnet|haiku)-/i };
+
+/** POST /integrations/:code/models: Add Model. */
+async function addModel(code, body, actor) {
+  const def = aiDef(code);
+  const allowed = ALLOWED_MODEL[def.models];
+  if (allowed && !allowed.test(body.model))
+    throw new AppError("VALIDATION_FAILED", "Only Sonnet and Haiku models are used here.", 422, { model: ["Sonnet or Haiku only"] });
+  const id = await tx(async (client) => {
+    const row = await repo.addModel(client, {
+      provider: def.models,
+      model: body.model,
+      display_name: body.display_name || body.model,
+      capabilities: body.capabilities,
+      endpoint_url: body.endpoint_url || null,
+      by: actor.user_id,
+    });
+    if (!row) throw new AppError("ALREADY_LISTED", "This model is already on the list.", 409, { model: ["Already on the list"] });
+    const connectionId = await state.ensure(client, code);
+    await emit(client, {
+      key: EVENTS.INTEGRATION_MODEL_ADDED,
+      entity: { type: "integration", id: connectionId },
+      actor,
+      after: { model: body.model, capabilities: body.capabilities, endpoint_url: body.endpoint_url || null },
+      payload: { code, ai_model_id: row.ai_model_id, model: body.model },
+    });
+    return row.ai_model_id;
+  });
+  await changed(code);
+  const inUse = jobs.inUseBy(def.models, await jobs.lists(pool));
+  return modelView(await repo.modelById(pool, def.models, id), inUse);
+}
+
+/** DELETE /integrations/:code/models/:id: only a model added by hand comes off the list. */
+async function removeModel(code, id, actor) {
+  const def = aiDef(code);
+  await tx(async (client) => {
+    const row = await repo.removeModel(client, def.models, id);
+    if (!row) throw new AppError("NOT_FOUND", "Only a model added here can be removed.", 404);
+    const connectionId = await state.ensure(client, code);
+    await emit(client, {
+      key: EVENTS.INTEGRATION_MODEL_REMOVED,
+      entity: { type: "integration", id: connectionId },
+      actor,
+      before: { model: row.model },
+      payload: { code, ai_model_id: row.ai_model_id, model: row.model },
+    });
+  });
+  await changed(code);
+}
+
+/* ------------------------------------------------------------------ *
+ * Exchange rates (guide §1.2 decision 10)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Fetch today's rates and keep them, recorded as a check of kind `sync`. Sync Rates (a person,
+ * audited) always fetches; the hourly job (`actor` null) fetches only while today's table is
+ * missing, so after midnight's success it spends nothing until the next day, and a failure is
+ * tried again within the hour. A Free plan at its daily limit is not asked.
+ * @param {object|null} actor
+ * @returns {Promise<object|null>} the check, or null when the job had nothing to do
+ */
+async function syncRates(actor) {
+  const inUse = await settings.of("exchange_rates");
+  if (!actor) {
+    if (!inUse || !inUse.secrets.api_key) return null;
+    if (await repo.hasRates(pool, lagos.today())) return null;
+  }
+  let steps;
+  const collect = {};
+  if (inUse && (await quota.spent("exchange_rates"))) steps = [{ key: "rates", ok: false, ms: 0, code: "OVER_QUOTA", found: [] }];
+  else steps = await testers.run("exchange_rates", inUse, { actor, collect });
+  return record("exchange_rates", "sync", steps, actor, { moveState: Boolean(inUse), audit: Boolean(actor), collect });
+}
+
+/* ------------------------------------------------------------------ *
  * The worker
  * ------------------------------------------------------------------ */
 
@@ -573,4 +735,22 @@ function purge() {
   return repo.purge(pool);
 }
 
-module.exports = { list, summary, get, checks, save, remove, test, testEmail, replaceKeys, watch, purge, fieldOf, WARN_AT };
+module.exports = {
+  list,
+  summary,
+  get,
+  checks,
+  save,
+  remove,
+  test,
+  testEmail,
+  replaceKeys,
+  models,
+  addModel,
+  removeModel,
+  syncRates,
+  watch,
+  purge,
+  fieldOf,
+  WARN_AT,
+};

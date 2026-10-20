@@ -124,10 +124,30 @@ registerCheck("maps", () =>
 registerCheck("mail_server", () =>
   require("../shared/integrations/state").readiness(require("../config/db").pool, "mailbox_server"),
 );
-// Which AI vendor answers (Gemini or the stub), from configuration only: no call out.
-registerCheck("ai", () =>
-  require("../services/ai/governance").health(require("../config/db").pool),
-);
+// Which AI vendor answers (Gemini or the stub), from configuration only: no call out; degraded
+// when Gemini's own connection is failing (a refused key, a spent quota).
+registerCheck("ai", async () => {
+  const db = require("../config/db").pool;
+  const [ai, gemini] = await Promise.all([
+    require("../services/ai/governance").health(db),
+    require("../shared/integrations/state").readiness(db, "gemini"),
+  ]);
+  return gemini.status === "degraded" ? { ...ai, status: "degraded", error: gemini.error } : ai;
+});
+// Every other connection on Settings · Integrations, from its stored state, so Settings · Status
+// shows each one (docs/guides/integrations.md §1.2 decision 11). Exchange Rates is also degraded
+// when its newest table is more than a day and a half old.
+for (const code of ["groq", "openai", "anthropic", "deepseek", "web_push"])
+  registerCheck(code, () => require("../shared/integrations/state").readiness(require("../config/db").pool, code));
+registerCheck("exchange_rates", async () => {
+  const db = require("../config/db").pool;
+  const r = await require("../shared/integrations/state").readiness(db, "exchange_rates");
+  if (r.status !== "up" || r.mode === "not_set_up") return r;
+  const t = await require("../shared/money/fx").newest({ db });
+  const ageH = t && t.fetched_at ? (Date.now() - new Date(t.fetched_at).getTime()) / 3_600_000 : null;
+  if (ageH === null || ageH > 36) return { ...r, status: "degraded", error: "RATES_STALE" };
+  return { ...r, rate_day: t.day };
+});
 
 // What a person asks first when something is slow: how much room is left. The levels are
 // the ones Settings · Performance's Edit Targets holds (kept a minute; the defaults when the
