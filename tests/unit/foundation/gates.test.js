@@ -588,6 +588,62 @@ describe("shell scripts and JavaScript parse", () => {
     );
   });
 
+  test("a positional parameter in an unquoted here-document stops a set -u script, and is caught", () => {
+    // provision.sh stopped at step 6 of 12 on 20/10/2026: "line 194: $1: unbound variable",
+    // from a comment inside the PostgreSQL settings it writes. bash -n passed it.
+    const bad = [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "mem_gb=18",
+      "cat >/etc/postgresql/16/main/conf.d/mycity.conf <<CONF",
+      "shared_buffers = $((mem_gb / 4))GB",
+      "# every statement's time, normalised ($1, never the values)",
+      "CONF",
+      "",
+    ].join("\n");
+    expect(shell.heredocProblems("ops/provision.sh", bad)).toEqual([
+      expect.stringMatching(/^ops\/provision\.sh:6: \$1 inside an unquoted here-document \(<<CONF\)/),
+    ]);
+
+    const fine = [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      // Quoted: the body is written as it stands.
+      "cat >/etc/a.conf <<'CONF'",
+      "price is $1",
+      "CONF",
+      // Escaped, a here-string, a variable that is set, and arithmetic.
+      "cat >/etc/b.conf <<CONF",
+      "price is \\$1, ${HOME} and $((2 + 2))",
+      "CONF",
+      'read -r -a WORDS <<<"$1"',
+      // A function's $1 is its own argument.
+      "say() {",
+      "  cat <<MSG",
+      "  $1",
+      "MSG",
+      "}",
+      "",
+    ].join("\n");
+    expect(shell.heredocProblems("ops/fine.sh", fine)).toEqual([]);
+    // Without set -u an unset $1 is an empty string, not a stop.
+    expect(shell.heredocProblems("ops/loose.sh", bad.replace("set -euo pipefail", "set -e"))).toEqual([]);
+
+    const root = tmp("mycity-sh-");
+    put(root, "ops/provision.sh", bad);
+    expect(shell.check({ root, bash: false, inCi: false }).problems.join("\n")).toMatch(/unbound variable/);
+    if (hasBash) {
+      // What the rule describes is what bash does: the run stops, and the file it was
+      // writing is left empty, because the redirection happened before the expansion.
+      const conf = path.join(root, "mycity.conf");
+      put(root, "ops/run.sh", bad.replace("/etc/postgresql/16/main/conf.d/mycity.conf", conf));
+      const r = spawnSync("bash", [path.join(root, "ops/run.sh")], { encoding: "utf8" });
+      expect(r.status).not.toBe(0);
+      expect(r.stderr).toMatch(/\$1: unbound variable/);
+      expect(fs.readFileSync(conf, "utf8")).toBe("");
+    }
+  });
+
   test("without bash the parse step is a note locally and a failure in CI", () => {
     const root = tmp("mycity-sh-");
     put(root, "ops/ok.sh", "#!/usr/bin/env bash\necho ok\n");

@@ -249,6 +249,18 @@ sudo bash ops/provision/provision.sh
 
 It is safe to run again (it says so at its top). For this release it does two things:
 
+**If a run stopped at step 6 with `line 194: $1: unbound variable`** (the first version of this
+release, 20/10/2026), it had already emptied `/etc/postgresql/16/main/conf.d/mycity.conf` before
+it stopped. PostgreSQL keeps running on the settings it started with, so nothing breaks at once,
+but a restart before the file is written again would start it on the defaults (100 connections,
+a 128 MB cache). Pull and run the fixed script, or the previous one, before PostgreSQL restarts
+for any reason, then check the file is full again:
+
+```
+sudo cat /etc/postgresql/16/main/conf.d/mycity.conf      # max_connections = 200 and the rest
+```
+
+
 | What | Why | Cost |
 |---|---|---|
 | Adds `shared_preload_libraries = 'pg_stat_statements'` to `/etc/postgresql/16/main/conf.d/mycity.conf` and creates the extension in `mycity_prod` and `mycity_stg` | Slowest Queries: each statement's time, normalised (`$1`, never the values), this environment's role only | **One PostgreSQL restart**, a few seconds in which both environments cannot reach the database. Do it outside working hours; the API answers 503 for those seconds and recovers on its own |

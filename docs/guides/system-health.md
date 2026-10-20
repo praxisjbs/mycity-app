@@ -429,6 +429,13 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · `provision.sh` stopped at step 6 on the server (`line 194: $1: unbound
+  variable`): a comment inside PostgreSQL's settings, which the script writes through an unquoted
+  here-document under `set -u`, read "($1, never the values)", and bash expanded it. The comment
+  is reworded, and `scripts/check/shell.js` now fails a positional parameter in an unquoted
+  here-document of a `set -u` script, which `bash -n` cannot see. The runbook (§8) says what the
+  stopped run left behind and how to check it.
+
 - 20/10/2026 · TB · Performance rebuilt from TB's answers (targets 99.9% up, p95 under 800 ms,
   failed requests under 1%, editable on screen; this environment's traffic and the whole server's
   resources with staging's share; Hour, Day, Week and Month; processor, memory and disk in real
