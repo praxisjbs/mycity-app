@@ -19,7 +19,7 @@ import { Button, IconButton } from "../actions/Button";
 import { HelpTerm } from "../help/HelpTerm";
 import { MapView } from "../maps/MapView";
 import { describePoint, LAGOS, type DevicePoint, type LatLon, type Place, type PlaceKind, type PlaceLevel, type Places, type PlaceValue } from "../maps/geoapify";
-import { usePlaces } from "../maps/usePlaces";
+import { RETRY_MS, usePlaces } from "../maps/usePlaces";
 import type { FieldState } from "./binding";
 import { Field, useFieldControl, useFieldLabelId, useFieldOptional } from "./Field";
 import { TextField, controlClass } from "./TextField";
@@ -224,18 +224,22 @@ export function AddressField({
   const tap = (point: LatLon) => {
     const seq = ++pinSeq.current;
     setPin((p) => (p ? { ...p, at: point, found: null, naming: true } : p));
-    places.pin(point, { level }).then(
-      (named) => {
-        if (seq === pinSeq.current) setPin((p) => (p ? { ...p, found: named, naming: false } : p));
-      },
-      (err: unknown) => {
-        if (seq !== pinSeq.current) return;
-        if (isOutage(err)) {
-          setPinDown(true);
-          setPin(null);
-        } else setPin((p) => (p ? { ...p, naming: false } : p));
-      },
-    );
+    const name = (retried: boolean): Promise<void> =>
+      places.pin(point, { level }).then(
+        (named) => {
+          if (seq === pinSeq.current) setPin((p) => (p ? { ...p, found: named, naming: false } : p));
+        },
+        (err: unknown) => {
+          if (seq !== pinSeq.current) return;
+          // As a search: one failure is asked once more, a second means search is down.
+          if (isOutage(err) && !retried) setTimeout(() => void (seq === pinSeq.current && name(true)), RETRY_MS);
+          else if (isOutage(err)) {
+            setPinDown(true);
+            setPin(null);
+          } else setPin((p) => (p ? { ...p, naming: false } : p));
+        },
+      );
+    void name(false);
   };
   const takePin = () => {
     if (pin?.found?.token) choose({ token: pin.found.token }, pin.found);

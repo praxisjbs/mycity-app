@@ -179,15 +179,18 @@ at level city it names the city around it.
 
 | Where | What |
 |---|---|
-| Field | Searches from the 2nd character, 100 ms after the last key; cancels the request a newer key overtakes; shows at once the places held for an earlier, shorter text that still match every word; keeps each answer for the session (200 texts); keeps the list on screen while a new answer comes, so it never flickers empty |
-| Server | This process's memory (ten minutes, 500 texts), then Redis (seven days), then the provider; one request for the same text typed at once; at most five requests a second to the provider (its free plan's rate), a sixth waiting up to 300 ms |
+| Field | Searches from the 2nd character, 100 ms after the last key; cancels the request a newer key overtakes; shows at once the places held for an earlier, shorter text that still match every word; keeps each answer for the session (200 texts); keeps the list on screen while a new answer comes, so it never flickers empty; asks a failed search or pin once more after 400 ms, so one blip never shows |
+| Server | This process's memory (ten minutes, 500 texts), then Redis (seven days), then the provider; one request for the same text typed at once; at most five requests a second to the provider (its free plan's rate), a sixth waiting up to 300 ms; a dropped connection (closed, reset, refused, a failed lookup) asked once more at once, never a request that ran out of its 4.5 seconds |
 | Credits | A search or a pin is one credit; an answer from memory or Redis is none. About 4 to 6 credits an address typed. Counted on Settings · Integrations, Geoapify, against its daily limit |
 
 ### 6.5 When address search is down
 
 - Down means: no key (503 `MAPS_OFF`), the provider failing or silent (502 `MAPS_UNAVAILABLE`), or
-  over the day's credits or our rate twice running (429 `MAPS_BUSY`). A single 429 is retried once
-  after 400 ms before the field calls it down.
+  over the day's credits or our rate (429 `MAPS_BUSY`), twice running: the field asks a failed
+  search or pin once more after 400 ms before it calls search down (fault #1, 20/10/2026).
+- The provider failing or silent is its outage, not a defect of ours: System Health counts it as a
+  `warning`, which never alerts or escalates, while Settings · Integrations and the `maps`
+  readiness check carry the outage itself (`system-health.md` §6). No key stays an `error`.
 - The field keeps whatever the person typed in its box, says "Address search is unavailable", and
   offers Try Again and Use Current Location. Pin is hidden: the map's tiles come from the same
   provider.
@@ -336,3 +339,4 @@ None.
   Drop a Pin under the search, the outage with Use Current Location), `PlacesField`, the device's
   session cache and cancelled requests (`usePlaces`); every screen in §2 moved; gate 22. Drop a Pin
   stays under the search throughout rather than only when nothing is found (§3 step 4, §10.1).
+- 20/10/2026 · TB · Fault #1 (staging: "Maps are not answering." once on `GET /maps/search`; the provider gave no answer within 4.5 seconds or the connection dropped; TB's four answers): a dropped connection is asked once more at once on the server, never a timeout, and its network code is logged; the field asks a failed search or pin once more after 400 ms before it calls search down; the provider not answering is recorded on System Health as a `warning`. §6.4, §6.5 updated.

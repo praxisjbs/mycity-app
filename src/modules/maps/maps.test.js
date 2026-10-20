@@ -285,6 +285,38 @@ describe("when the provider cannot answer", () => {
     const fetchImpl = answer([{ place_id: "a", formatted: "Testbed Road", lat: 6.4, lon: 3.4 }]);
     expect(await geoapify.searchPlaces("Testbed", { apiKey: "k", fetchImpl })).toHaveLength(1);
   });
+
+  // Fault #1 (staging, 20/10/2026): the request to the provider got no answer at all.
+  const dropped = () =>
+    Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error("other side closed"), { code: "UND_ERR_SOCKET" }) });
+  const timedOut = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+  const found = { ok: true, status: 200, json: async () => ({ results: [{ place_id: "a", formatted: "Testbed Road", lat: 6.4, lon: 3.4 }] }) };
+
+  test("a dropped connection is asked once more at once, and the person never sees it", async () => {
+    const fetchImpl = jest.fn().mockRejectedValueOnce(dropped()).mockResolvedValue(found);
+    expect(await geoapify.searchPlaces("Testbed Road", { apiKey: "k", fetchImpl })).toHaveLength(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  test("dropped twice, it is the provider's outage; a timeout is never asked again", async () => {
+    const twice = jest.fn().mockRejectedValue(dropped());
+    await expect(geoapify.searchPlaces("Testbed Road", { apiKey: "k", fetchImpl: twice })).rejects.toMatchObject({ code: "MAPS_UNAVAILABLE", status: 502 });
+    expect(twice).toHaveBeenCalledTimes(2);
+    const slow = jest.fn().mockRejectedValue(timedOut());
+    await expect(geoapify.searchPlaces("Testbed Lane", { apiKey: "k", fetchImpl: slow })).rejects.toMatchObject({ code: "MAPS_UNAVAILABLE", timed_out: true });
+    expect(slow).toHaveBeenCalledTimes(1);
+  });
+
+  test("the provider not answering is recorded as a warning, never an alerting error; no key still is one", async () => {
+    const fails = async (fetchImpl, text = "Testbed") => geoapify.searchPlaces(text, { apiKey: "k", fetchImpl }).catch((e) => e);
+    expect(await fails(jest.fn().mockRejectedValue(timedOut()))).toMatchObject({ code: "MAPS_UNAVAILABLE", severity: "warning" });
+    expect(await fails(answer([], 401), "Testbed Close")).toMatchObject({ code: "MAPS_UNAVAILABLE", severity: "warning" });
+    const notJson = jest.fn(async () => ({ ok: true, status: 200, json: async () => JSON.parse("<html>") }));
+    expect(await fails(notJson, "Testbed Way")).toMatchObject({ code: "MAPS_UNAVAILABLE", severity: "warning" });
+    const off = await geoapify.searchPlaces("Testbed", { apiKey: "", fetchImpl: answer([]) }).catch((e) => e);
+    expect(off.code).toBe("MAPS_OFF");
+    expect(off.severity).toBeUndefined();
+  });
 });
 
 const png = (status = 200, type = "image/png") =>

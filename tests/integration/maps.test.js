@@ -235,6 +235,11 @@ describeDb("addresses against the real migrations", () => {
       up = false;
       const down = await search("Testbed Lane");
       expect([down.status, down.body.error.code]).toEqual([502, "MAPS_UNAVAILABLE"]);
+      // The provider's outage is counted on System Health as a warning, which never alerts
+      // (fault #1, 20/10/2026); Settings · Integrations and the maps check carry it.
+      await require("../../src/shared/observability/error-reporter").flush();
+      const recorded = await q("SELECT severity FROM error_event WHERE request_id = $1", [down.body.request_id]);
+      expect(recorded.rows).toEqual([{ severity: "warning" }]);
 
       const made = await api("ops").post("/worksites", {
         name: "Outage Depot",

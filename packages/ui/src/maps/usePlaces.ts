@@ -10,8 +10,9 @@
  *     answer replaces it, so it never flickers empty;
  *   - a newer key cancels the request it overtakes, and an answer to a text already typed
  *     past is dropped;
- *   - a busy answer (429) is asked once more after 400 ms; any other failure, or a second
- *     busy, means address search is down: the field stops asking until Try Again (retry).
+ *   - a failed answer (busy, or the provider not answering) is asked once more after 400 ms,
+ *     so one blip never shows; a second failure means address search is down, and the field
+ *     stops asking until Try Again (retry).
  */
 import { useCallback, useEffect, useState } from "react";
 import type { Place, PlaceLevel, SearchPlaces } from "./geoapify";
@@ -22,8 +23,8 @@ export const SEARCH_FROM = 2;
 /** How long after the last key the request goes, in milliseconds. */
 export const SETTLE_MS = 100;
 
-/** How long a busy answer waits before it is asked once more. */
-export const BUSY_RETRY_MS = 400;
+/** How long a failed answer waits before it is asked once more. */
+export const RETRY_MS = 400;
 
 /** Texts kept for the session, across every field. */
 const KEEP = 200;
@@ -61,9 +62,6 @@ function heldFor(level: PlaceLevel, q: string): Place[] | undefined {
   }
   return undefined;
 }
-
-/** The HTTP status an error carries, where it carries one (the API client's ApiError does). */
-const statusOf = (err: unknown) => (err && typeof err === "object" && "status" in err ? Number((err as { status: unknown }).status) : 0);
 
 /** Where one search stands. */
 export interface PlaceResults {
@@ -124,10 +122,10 @@ export function usePlaces(search: SearchPlaces, text: string, { level = "address
           keep(key, found);
           setShown({ places: found, looking: false, answered: true });
         },
-        (err: unknown) => {
+        () => {
           if (ctl.signal.aborted) return;
-          if (statusOf(err) === 429 && !retried) {
-            again = setTimeout(() => void ask(true), BUSY_RETRY_MS);
+          if (!retried) {
+            again = setTimeout(() => void ask(true), RETRY_MS);
             return;
           }
           setDown(true);

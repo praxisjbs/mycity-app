@@ -169,6 +169,11 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   fingerprints anything itself, so the screen and the alert channel always agree on what one fault is.
 - A group's `severity` is the worst severity seen on it. `notice` (a 422) never alerts and never
   escalates: it is counted so form trouble can be seen, nothing more.
+- An `AppError` may name its own severity (`err.severity`, `shared/errors.js`), which the error
+  handler records in place of `error`. An outside service not answering, whose outage a readiness
+  check already carries, is a `warning`: counted, never alerting or escalating. Geoapify's
+  `MAPS_UNAVAILABLE` is the first (TB, 20/10/2026, fault #1); the `maps` check and Settings ·
+  Integrations show the outage itself.
 - Status is `open`, `handling`, `fixed` or `ignored`. Only `open` escalates, and only `open` and
   `handling` are shown by default.
 - **Came back.** A group whose status is `fixed` and which has an event later than
@@ -483,3 +488,4 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   only; faults grouped on the existing fingerprint with a shared status; push and in-app to every
   registered device, email only after 24 hours unattended, an 08:00 digest, and no WhatsApp; a
   Markdown brief whose instructions require 4 to 10 clarity questions before any fix.
+- 20/10/2026 · TB · §6: an `AppError` may name its own severity, which the error handler records in place of `error`; Geoapify not answering (`MAPS_UNAVAILABLE`) is a `warning`, counted but never alerting or escalating, since the `maps` check carries the outage (fault #1 on staging; `docs/guides/addresses.md` §6.5).
