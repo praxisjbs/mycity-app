@@ -89,18 +89,34 @@ async function clockIn() {
   await waitFor(() => expect(clock!.today?.state).toBe("clocked_in"));
 }
 
+/** The sign-in prompt the first screen opens for anyone not clocked in: answered with Not Now. */
+async function skipSignInPrompt() {
+  await screen.findByText("Start Your Day", {}, { timeout: 5000 });
+  fireEvent.click(screen.getByRole("button", { name: "Not Now" }));
+  await waitFor(() => expect(screen.queryByText("Start Your Day")).toBeNull());
+}
+
 describe("the clock prompts", () => {
-  it("open the panel at the start for someone not clocked in, once, and Esc does not dismiss it", async () => {
-    vi.setSystemTime(lagos("09:05"));
+  it("open on the first screen of the day's first sign-in, over a blurred screen, once, and Esc does not dismiss it", async () => {
+    vi.setSystemTime(lagos("08:30"));
     await signedInAs("cynthia@mycityapp.io");
     expect(await screen.findByText("Start Your Day", {}, { timeout: 5000 })).toBeTruthy();
+    expect(document.querySelector("[data-blur]")?.className).toContain("backdrop-blur-md");
     expect(await axe(document.body)).toHaveNoViolations();
 
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     expect(screen.getByText("Start Your Day")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Not Now" }));
     await waitFor(() => expect(screen.queryByText("Start Your Day")).toBeNull());
+    toFront();
+    expect(screen.queryByText("Start Your Day")).toBeNull();
 
+    // Shown before the start, it still opens at the start, once.
+    vi.setSystemTime(lagos("09:05"));
+    toFront();
+    expect(await screen.findByText("Start Your Day", {}, { timeout: 5000 })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Not Now" }));
+    await waitFor(() => expect(screen.queryByText("Start Your Day")).toBeNull());
     toFront();
     expect(screen.queryByText("Start Your Day")).toBeNull();
   }, 20000);
@@ -108,6 +124,7 @@ describe("the clock prompts", () => {
   it("open it at the end for someone still in, with Remind Me, and again when the reminder is up", async () => {
     vi.setSystemTime(lagos("16:50"));
     await signedInAs("cynthia@mycityapp.io");
+    await skipSignInPrompt();
     await clockIn();
     expect(screen.queryByText("Finish Your Day")).toBeNull();
 
@@ -115,6 +132,7 @@ describe("the clock prompts", () => {
     invalidate("/api/v1/attendance");
     expect(await screen.findByText("Finish Your Day", {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Clock Out" })).toBeTruthy();
+    expect(document.querySelector("[data-blur]")).toBeTruthy();
     fireEvent.pointerDown(screen.getByRole("button", { name: "Remind Me" }), { button: 0, pointerType: "mouse" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "In 30 Minutes" }));
     await waitFor(() => expect(screen.queryByText("Finish Your Day")).toBeNull());
@@ -129,9 +147,12 @@ describe("the clock prompts", () => {
   it("wait for a dialog that is open instead of replacing it", async () => {
     vi.setSystemTime(lagos("16:50"));
     await signedInAs("chidera@mycityapp.io");
+    await skipSignInPrompt();
     await clockIn();
     act(() => modal!.open({ title: "New Task", body: (close) => <Button onClick={close}>Done Here</Button> }));
     await screen.findByRole("dialog", { name: "New Task" });
+    // A panel the person opens is not a prompt: nothing behind it is blurred.
+    expect(document.querySelector("[data-blur]")).toBeNull();
 
     vi.setSystemTime(lagos("17:10"));
     invalidate("/api/v1/attendance");
@@ -144,5 +165,20 @@ describe("the clock prompts", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Done Here" }));
     expect(await screen.findByText("Finish Your Day", {}, { timeout: 5000 })).toBeTruthy();
+  }, 20000);
+
+  it("leave the sign-in prompt to the first session: someone already clocked in is not asked", async () => {
+    vi.setSystemTime(lagos("10:15"));
+    await signedInAs("ngozi@mycityapp.io");
+    await skipSignInPrompt();
+    await clockIn();
+    cleanup();
+    localStorage.clear();
+    // Signing in again later that day, already clocked in: no prompt, whatever this device remembers.
+    await signedInAs("ngozi@mycityapp.io");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300));
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
   }, 20000);
 });

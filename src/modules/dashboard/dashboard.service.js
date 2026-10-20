@@ -36,7 +36,6 @@ const resolve = require("./kpi-catalog/resolve");
 const alerts = require("../alerts/alerts.service");
 const activity = require("./dashboard.activity");
 const layout = require("./dashboard.layout");
-const prompt = require("./dashboard.prompt");
 const repo = require("./dashboard.repo");
 const { EVENTS } = require("./dashboard.events");
 
@@ -98,12 +97,11 @@ async function cardsOf(db, user, reader, { today, now }) {
 async function overview(user, { now = new Date() } = {}) {
   const today = lagos.today(now);
   const reader = await readerOf(pool, user);
-  const [cards, sections, happened, toClear, promptClockIn] = await Promise.all([
+  const [cards, sections, happened, toClear] = await Promise.all([
     cardsOf(pool, user, reader, { today, now }),
     layout.sectionsFor(pool, { user, view: reader.me.home_view, today, scopes: reader.scopes }),
     layout.guarded("activity", () => activity.today(pool, user, { today })),
     layout.guarded("alerts_to_clear", () => alerts.openToClear(pool, user)),
-    layout.guarded("prompt_clock_in", () => prompt.shouldPrompt(pool, user, { now, today })),
   ]);
   return {
     greeting_name: reader.me.first_name,
@@ -121,8 +119,6 @@ async function overview(user, { now = new Date() } = {}) {
     activity: happened,
     week: sections.week,
     alerts_to_clear: toClear,
-    // A prompt that could not be decided is not shown.
-    prompt_clock_in: promptClockIn === true,
   };
 }
 

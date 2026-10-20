@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import dashboard from "@mycity/contract/schemas/dashboard.js";
 import reports from "@mycity/contract/schemas/reports.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import { formatTime, ModalProvider, Toaster, todayIso } from "@mycity/ui";
+import { formatTime, ModalProvider, Toaster } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
@@ -17,7 +17,7 @@ import Home from "./index";
 /**
  * Home · Overview on the in-browser mock (docs/guides/home.md §10): each Home view draws its
  * own sections and nothing a guide keeps off a screen; Choose Cards; the records behind a card;
- * the clock-in prompt; Export; the phone's layout. The screen gates crawl Operations only (FRONTEND_GUIDE
+ * the Overview read again after a clock-in; Export; the phone's layout. The screen gates crawl Operations only (FRONTEND_GUIDE
  * §9.4), so the CEO, Partnerships and Staff Overviews are held to the copy rules here.
  *
  * The clock is a Monday morning in Lagos, a working day, whatever day the suite runs.
@@ -82,12 +82,8 @@ async function signedIn(email: string, at = "/home?tab=overview") {
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
   });
   return {
-    /**
-     * Puts the Overview on screen. Unless the test is about the clock-in prompt, the prompt is
-     * marked as already opened today, so a dialog does not cover the page under test.
-     */
-    show: async ({ prompt = false }: { prompt?: boolean } = {}) => {
-      if (!prompt) localStorage.setItem("mc-clock-prompt", `${auth!.me!.user_id}|${todayIso()}`);
+    /** Puts the Overview on screen. */
+    show: async () => {
       rerender(app(true));
       // A dialog the screen opens by itself hides the page from the accessibility tree: look past it.
       await screen.findByRole("heading", { level: 1, name: /^Good Morning, /, hidden: true }, { timeout: 8000 });
@@ -98,8 +94,8 @@ async function signedIn(email: string, at = "/home?tab=overview") {
 }
 
 /** Signs in on the mock and waits for the Overview. */
-async function overviewAs(email: string, at?: string, opts?: { prompt?: boolean }) {
-  await (await signedIn(email, at)).show(opts);
+async function overviewAs(email: string, at?: string) {
+  await (await signedIn(email, at)).show();
 }
 
 /** Opens a link on the screen in view, as the address bar or a ⌘K result would. */
@@ -156,51 +152,20 @@ function copyProblems(root: ParentNode = document.body): string[] {
 /** Lines the earlier, server-written Overview carried that are tier 3 (home.md §10.1): never on a screen. */
 const TIER_3 = /Your own attendance is in|live in My Workspace|threshold the rule watches|Grouped the way|Raised by the rule|Posted automatically|Weighted across departments/;
 
-describe("the clock-in prompt", () => {
-  it("opens once when the server says it is due, and not again that day", async () => {
-    await overviewAs("cynthia@mycityapp.io", undefined, { prompt: true });
-    expect(await screen.findByRole("dialog", { name: "Clock In" }, { timeout: 5000 })).toBeTruthy();
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    cleanup();
-    // Back on Home later the same day: the session is still the day's first, the screen does not open it again.
-    await overviewAs("cynthia@mycityapp.io", undefined, { prompt: true });
-    expect(dashboard.HomeOverview.parse(await api.call("GET /api/v1/home/overview")).prompt_clock_in).toBe(true);
-    expect(screen.queryByRole("dialog")).toBeNull();
-  }, 30000);
-
-  it("waits while a link has a card's records open, and opens once they close", async () => {
-    await overviewAs("ngozi@mycityapp.io", "/home?tab=overview&kpi=partnerships_active", { prompt: true });
-    const sheet = await screen.findByRole("dialog", { name: "Active Partnerships" }, { timeout: 5000 });
-    expect(screen.queryByRole("dialog", { name: "Clock In" })).toBeNull();
-    fireEvent.keyDown(sheet, { key: "Escape" });
-    expect(await screen.findByRole("dialog", { name: "Clock In" }, { timeout: 5000 })).toBeTruthy();
-  }, 30000);
-
-  it("does not open when the server says it is not due: here, someone already clocked in", async () => {
-    const session = await signedIn("chidera@mycityapp.io");
-    await api.call("POST /api/v1/attendance/punches", {
-      body: { event_type: "clock_in", device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, location_error: "denied" },
-      idempotencyKey: crypto.randomUUID(),
-    });
-    await session.show({ prompt: true });
-    expect(dashboard.HomeOverview.parse(await api.call("GET /api/v1/home/overview")).prompt_clock_in).toBe(false);
-    expect(screen.queryByRole("dialog")).toBeNull();
-  }, 30000);
-
-  it("reads the Overview again after the clock-in it opens: the day strip shows the punch", async () => {
+describe("a clock-in", () => {
+  it("reads the Overview again: the day strip shows the punch", async () => {
     // Precious has not clocked in today, and no other case here signs her in.
-    await overviewAs("precious@mycityapp.io", undefined, { prompt: true });
-    const panel = await screen.findByRole("dialog", { name: "Clock In" }, { timeout: 5000 });
+    await overviewAs("precious@mycityapp.io");
     const strip = () => within(screen.getByRole("list", { name: "Your Day", hidden: true }));
     expect(strip().getByText("Not In")).toBeTruthy();
-    fireEvent.click(await within(panel).findByRole("button", { name: "Clock In" }));
-    fireEvent.click(await within(panel).findByRole("button", { name: "Allow Location" }));
-    fireEvent.click(await within(panel).findByRole("button", { name: "Clock In Anyway" }));
-    // The punch is recorded (for review: the device is not registered); the panel then closes.
-    await within(panel).findAllByText(/^Clocked In/, {}, { timeout: 5000 });
-    fireEvent.keyDown(panel, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // As the clock panel does after a punch: record it, then reload attendance's reads.
+    await act(async () => {
+      await api.call("POST /api/v1/attendance/punches", {
+        body: { event_type: "clock_in", device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, location_error: "denied" },
+        idempotencyKey: crypto.randomUUID(),
+      });
+      invalidate("/api/v1/attendance");
+    });
     const today = dashboard.HomeOverview.parse(await api.call("GET /api/v1/home/overview")).day_strip!;
     expect(today.clock_in_at).not.toBeNull();
     await waitFor(() => expect(strip().getByText(formatTime(today.clock_in_at!))).toBeTruthy());
