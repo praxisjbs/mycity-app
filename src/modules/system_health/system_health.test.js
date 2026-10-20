@@ -252,3 +252,80 @@ describe("the contract", () => {
     expect(() => c.system_health.FaultPatch.parse({ status: "fixed" })).not.toThrow();
   });
 });
+
+describe("the engine behind the screen", () => {
+  const registry = require("../../jobs/registry");
+
+  test("every System Health scheduler is one the worker actually starts", () => {
+    // The first release shipped these three files unregistered, so nothing ran and the
+    // Performance card read "Nothing Recorded Yet" for an hour. This is that bug.
+    for (const name of ["system-health", "system-health-digest", "system-health-purge"]) {
+      expect(registry.SCHEDULERS).toContain(name);
+    }
+  });
+
+  test("every scheduler file on disk is started, not just mine", () => {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const dir = path.resolve(__dirname, "../../jobs/schedulers");
+    const onDisk = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".js") && fs.statSync(path.join(dir, f)).size > 0)
+      .map((f) => f.replace(/\.js$/, ""));
+    expect([...onDisk].sort()).toEqual([...registry.SCHEDULERS].sort());
+  });
+
+  test("each one loads, is named after its file and has a cadence", () => {
+    const mine = registry.schedules().filter((x) => x.name.startsWith("system-health"));
+    expect(mine).toHaveLength(3);
+    for (const spec of mine) {
+      expect(typeof spec.run).toBe("function");
+      expect(Boolean(spec.every) !== Boolean(spec.pattern)).toBe(true);
+    }
+  });
+});
+
+describe("a minute of traffic", () => {
+  const stats = require("../../shared/observability/request-stats");
+
+  afterEach(() => stats.__reset());
+
+  test("counts requests, failures and slow ones into one row a minute", async () => {
+    const written = [];
+    stats.__reset({ query: (_sql, params) => (written.push(params), Promise.resolve()) });
+    stats.record(120, 200);
+    stats.record(1500, 200);
+    stats.record(40, 503);
+    stats.record(10, 404);
+    await stats.flush();
+    expect(written).toHaveLength(1);
+    const [, requests, errors, clientErrors, slow, totalMs, maxMs] = written[0];
+    expect({ requests, errors, clientErrors, slow, totalMs, maxMs }).toEqual({
+      requests: 4,
+      errors: 1,
+      clientErrors: 1,
+      slow: 1,
+      totalMs: 1670,
+      maxMs: 1500,
+    });
+  });
+
+  test("a write that fails loses the minute rather than the process", async () => {
+    stats.__reset({ query: () => Promise.reject(new Error("no table yet")) });
+    stats.record(10, 200);
+    await expect(stats.flush()).resolves.toBe(0);
+  });
+
+  test("recording never throws, whatever it is handed", () => {
+    stats.__reset({ query: () => Promise.resolve() });
+    expect(() => stats.record(undefined, undefined)).not.toThrow();
+    expect(() => stats.record(NaN, 200)).not.toThrow();
+  });
+});
+
+describe("saying when nothing is recording", () => {
+  test("a chart with no recent snapshot is not the same as a quiet system", () => {
+    // The whole point: "Nothing Recorded Yet" read like good news while the job was dead.
+    expect(service.RECORDING_WITHIN_MS).toBe(11 * 60_000);
+  });
+});

@@ -17,6 +17,7 @@ const pinoHttp = require("pino-http");
 const { logger } = require("../config/logger");
 const requestContext = require("../config/request-context");
 const metrics = require("../shared/observability/metrics");
+const requestStats = require("../shared/observability/request-stats");
 
 const QUIET = /^\/api\/health(\/|$)/;
 
@@ -30,6 +31,9 @@ function record(req, res) {
       "HTTP requests by method, templated route and status.",
     );
     const ms = Number(res.responseTime || 0);
+    // The same numbers a minute at a time in the database, for Settings · System
+    // Health: the snapshot runs in the worker, which cannot read this process's metrics.
+    requestStats.record(ms, res.statusCode);
     if (ms > 0) {
       metrics.observe(
         "mycity_http_request_duration_seconds",

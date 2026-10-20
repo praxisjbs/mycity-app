@@ -33,6 +33,11 @@ const CHECKS: HealthCheck[] = [
   },
   { key: "mail", label: "Mail", state: "up", detail: "4 of 200 this hour", look_at: null, latency_ms: null },
   { key: "ai", label: "AI", state: "up", detail: "answering: stub", look_at: null, latency_ms: null },
+  { key: "disk", label: "Disk Space", state: "up", detail: "46% free, 118 GB of 252 GB", look_at: null, latency_ms: null },
+  { key: "memory", label: "Memory", state: "up", detail: "58% used, 9.1 GB of 15.7 GB", look_at: null, latency_ms: null },
+  { key: "cpu", label: "Processor", state: "up", detail: "load 0.62 across 4 cores", look_at: null, latency_ms: null },
+  { key: "database_usage", label: "Database Usage", state: "up", detail: "742 MB, 11 of 100 connections", look_at: null, latency_ms: null },
+  { key: "schedulers", label: "Background Jobs", state: "up", detail: "all 19 running", look_at: null, latency_ms: null },
 ];
 
 const FAULTS: FaultRow[] = [
@@ -131,8 +136,22 @@ route("GET /api/v1/system-health/performance", (req) => {
     faults: 2 + ((i * 3) % 4),
     outbox_backlog: (i * 2) % 7,
     worker_lag_s: 5 + (i % 4),
+    requests: 400 + ((i * 137) % 900),
+    mean_ms: 60 + ((i * 29) % 180),
+    error_pct: ((i * 7) % 40 === 0 ? 2.4 : 0.3).toFixed(2),
+    disk_free_pct: 46 - Math.floor(i / 4),
+    memory_used_pct: 55 + ((i * 3) % 18),
+    cpu_load: (0.4 + ((i * 11) % 90) / 100).toFixed(2),
+    database_mb: 740 + i * 2,
   }));
-  return ok({ range, points, gap_minutes: range === "7d" ? 25 : 0, uptime_pct: range === "7d" ? "98.6" : "95.8" });
+  return ok({
+    range,
+    points,
+    gap_minutes: range === "7d" ? 25 : 0,
+    recording: true,
+    last_snapshot_at: HOURS(0),
+    uptime_pct: range === "7d" ? "98.6" : "95.8",
+  });
 });
 
 route("GET /api/v1/system-health/faults", (req) =>

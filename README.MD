@@ -198,7 +198,8 @@ src/
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms) ·
 │   │                  actions (⌘K actions: each screen's New action, Clock In, Request Leave)
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
-│   └── observability/ scrub · metrics · error-reporter · alert (WhatsApp and webhook; also the
+│   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
+│                      row, for Settings · Performance) · alert (WhatsApp and webhook; also the
 │                      server's mycity-alert)
 ├── services/
 │   ├── storage/       storage.service
@@ -508,6 +509,10 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 `home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity and budget threshold
 read through Home's source adapters, approval ageing reads the workflow tables in the metric's own SQL.
 Their stub files stay for their milestones to delete or fill.
+
+Every scheduler file must be named in `SCHEDULERS` or the worker never starts it;
+`scripts/check/schedulers.js` fails the build otherwise, and every tick is recorded in
+`schedule_run` so a job that stops is visible on Settings · Status.
 
 Every scheduler takes `cron-lock` so a restart overlap cannot double-fire. Every handler is
 idempotent: the outbox and BullMQ both deliver at least once.

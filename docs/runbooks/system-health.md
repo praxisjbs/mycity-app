@@ -17,6 +17,7 @@ Nothing here is run by hand. `main` to staging, then a person approves productio
 | | |
 |---|---|
 | `migrations/9100_system_health.sql` | Creates `error_group`, `error_group_note`, `health_snapshot`, and the index on `error_event` that makes the counts cheap |
+| `migrations/9110_system_health_engine.sql` | Creates `schedule_run` (when each background job last ran) and `request_stat` (a minute of traffic), and adds the resource columns to `health_snapshot` |
 | `seeds/reference/9190_seed_system_health.sql` | Grants the new `system_health` permission to the Implementation Team and the System Administrator |
 | The worker | Picks up three schedulers: `system-health` every 5 minutes, `system-health-digest` at 08:00 Lagos, `system-health-purge` at 02:10 |
 
@@ -50,15 +51,21 @@ Exactly two rows: **Implementation Team** and **System Administrator**. If Opera
 Management appears, somebody granted it in the app; that is their call, but say so to TB, because
 the whole reason the permission exists is to keep stack traces away from them.
 
-**3. The three schedulers are registered.**
+**3. Every background job is actually running.** This is the one that matters most: the first
+release of this module shipped with its own three schedulers unregistered, so nothing ran for an
+hour and the screen showed an empty chart that read like good news.
 
 ```
-journalctl -u mycity-worker-prod --since "10 minutes ago" | grep system-health
+sudo -u postgres psql -d mycity_prod -c \
+  "SELECT name, last_run_at, ok, runs FROM schedule_run ORDER BY last_run_at DESC NULLS FIRST"
 ```
 
-You want a line for `system-health` within five minutes of the worker starting. Nothing at all
-means the worker did not load the module: `systemctl status mycity-worker-prod`, then
-`journalctl -u mycity-worker-prod -n 100`.
+Within ten minutes of the worker starting you want a row for every job, `system-health` among them,
+with a recent `last_run_at`. A job missing from the table has never run: `systemctl status
+mycity-worker-prod`, then `journalctl -u mycity-worker-prod -n 100`.
+
+You do not have to remember this: **Settings · Status now has a Background Jobs line** that turns
+amber and names any job that has not run when it should have.
 
 **4. The snapshots are being written.** Five minutes after the worker is up:
 
@@ -114,6 +121,11 @@ list; these are the ones that reach somebody's phone.
 | Events | `curl -s localhost:7000/api/health/ready \| jq '.checks.outbox'` | A backlog that keeps growing with a healthy worker means a handler is failing: `journalctl -u mycity-worker-prod \| grep outbox` |
 | File Storage | `ls -ld /srv/mycity/prod/media` | It must be writable by the service user |
 | Upload Scanning | `systemctl status clamav-daemon` | Uploads are refused while it is down. Degraded, never fatal |
+| Disk Space | `df -h /` | Amber under 10% free, red under 5%. Old releases and dumps are pruned; media and logs grow |
+| Memory | `free -h` | Amber at 90% used, red at 95%. A process that runs out is killed |
+| Processor | `uptime` | Amber at load 2 per core over one minute, red at 4 |
+| Database Usage | `sudo -u postgres psql -d mycity_prod -c "SELECT count(*) FROM pg_stat_activity"` | Amber at 80% of `max_connections`. Something is holding connections open, or the pool is too large |
+| Background Jobs | the `schedule_run` query in §2 | A job that has stopped. Reminders, snapshots and clean-ups are waiting |
 
 ## 5 · Keeping and space
 
@@ -124,6 +136,8 @@ The purge runs nightly at 02:10, before the backup.
 | `error_event` | 90 days | Long enough to see a fault that only fires at month end |
 | `health_snapshot` | 30 days | The screen draws a week |
 | `error_group` | Forever | A fault's history, and the decision somebody took on it, outlive the rows that raised it. A group is one row |
+| `request_stat` | 30 days | A row a minute, about 43,000 a month, a few MB |
+| `schedule_run` | Forever | One row per job, 19 rows |
 
 How much space it is using:
 
@@ -131,7 +145,7 @@ How much space it is using:
 sudo -u postgres psql -d mycity_prod -c \
   "SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) AS size
      FROM pg_catalog.pg_statio_user_tables
-    WHERE relname IN ('error_event', 'error_group', 'health_snapshot') ORDER BY relname"
+    WHERE relname IN ('error_event', 'error_group', 'health_snapshot', 'request_stat', 'schedule_run') ORDER BY relname"
 ```
 
 `health_snapshot` settles at roughly 8,600 rows. If `error_event` is growing past a gigabyte the

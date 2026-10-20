@@ -120,6 +120,121 @@ registerCheck("ai", () =>
   require("../services/ai/governance").health(require("../config/db").pool),
 );
 
+// What a person asks first when something is slow: how much room is left.
+// Degraded, never fatal: the app still answers on a full disk, it just cannot write.
+registerCheck("disk", async () => {
+  const fs = require("node:fs/promises");
+  const { config } = require("../config/env");
+  const where = config.MEDIA_ROOT || process.cwd();
+  const st = await fs.statfs(where);
+  const total = st.blocks * st.bsize;
+  const free = st.bavail * st.bsize;
+  const freePct = total > 0 ? Math.round((free * 100) / total) : null;
+  return {
+    status: freePct === null ? "degraded" : freePct < 5 ? "down" : freePct < 10 ? "degraded" : "up",
+    free_pct: freePct,
+    free_gb: Math.round((free / 1024 ** 3) * 10) / 10,
+    total_gb: Math.round((total / 1024 ** 3) * 10) / 10,
+    path: where,
+  };
+});
+
+registerCheck("memory", async () => {
+  const os = require("node:os");
+  const total = os.totalmem();
+  const used = total - os.freemem();
+  const usedPct = total > 0 ? Math.round((used * 100) / total) : null;
+  return {
+    status: usedPct === null ? "degraded" : usedPct >= 95 ? "down" : usedPct >= 90 ? "degraded" : "up",
+    used_pct: usedPct,
+    used_gb: Math.round((used / 1024 ** 3) * 10) / 10,
+    total_gb: Math.round((total / 1024 ** 3) * 10) / 10,
+    process_mb: Math.round(process.memoryUsage().rss / 1024 ** 2),
+  };
+});
+
+// Load per core over one minute: 1.0 means the machine is exactly busy.
+registerCheck("cpu", async () => {
+  const os = require("node:os");
+  const cores = Math.max(1, os.cpus().length);
+  const load = os.loadavg()[0] / cores;
+  return {
+    status: load >= 4 ? "down" : load >= 2 ? "degraded" : "up",
+    load: Math.round(load * 100) / 100,
+    cores,
+  };
+});
+
+// Size and connections in one query rather than two checks: /health/ready already
+// asks the pool for several things at once, and every extra round trip here is a
+// connection this endpoint holds while the app is trying to serve people.
+registerCheck("database_usage", async () => {
+  const { rows } = await require("../config/db").pool.query(
+    `SELECT pg_database_size(current_database()) AS bytes,
+            (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database())::int AS used,
+            current_setting('max_connections')::int AS allowed`,
+  );
+  const { bytes, used, allowed } = rows[0];
+  const pct = allowed > 0 ? Math.round((used * 100) / allowed) : null;
+  return {
+    status: pct === null ? "degraded" : pct >= 90 ? "down" : pct >= 80 ? "degraded" : "up",
+    size_mb: Math.round(Number(bytes) / 1024 ** 2),
+    connections_used: used,
+    connections_allowed: allowed,
+    connections_pct: pct,
+  };
+});
+
+/**
+ * How long a scheduler may be silent before something is wrong. Three times its own
+ * interval, so one missed tick is not an alarm. A cron schedule is read coarsely: by
+ * its hour field, hourly or daily, which is all the shapes this repository uses.
+ */
+function staleAfterMs(spec) {
+  if (spec.every) return Math.max(spec.every * 3, 15 * 60_000);
+  const hour = String(spec.pattern || "").trim().split(/\s+/)[1] || "*";
+  return hour === "*" || hour.startsWith("*/") ? 3 * 3600_000 : 26 * 3600_000;
+}
+
+/**
+ * Has every background job actually run? Without this a scheduler that is never
+ * started is invisible: the first release of System Health shipped with its own three
+ * unregistered, and nothing said so. Degraded, never fatal: the API serves without them.
+ */
+registerCheck("schedulers", async () => {
+  const { schedules } = require("../jobs/registry");
+  const specs = schedules();
+  let rows;
+  try {
+    ({ rows } = await require("../config/db").pool.query(
+      "SELECT name, last_run_at, ok FROM schedule_run",
+    ));
+  } catch (err) {
+    // A database from before 9110 has no table yet: say so rather than read as broken.
+    return {
+      status: "degraded",
+      schedulers: specs.length,
+      error: err.code === "42P01" ? "no schedule_run table yet" : "unreadable",
+    };
+  }
+  const seen = new Map(rows.map((r) => [r.name, r]));
+  const now = Date.now();
+  const late = [];
+  const failing = [];
+  for (const spec of specs) {
+    const run = seen.get(spec.name);
+    const at = run && run.last_run_at ? new Date(run.last_run_at).getTime() : null;
+    if (at === null || now - at > staleAfterMs(spec)) late.push(spec.name);
+    else if (run.ok === false) failing.push(spec.name);
+  }
+  return {
+    status: late.length || failing.length ? "degraded" : "up",
+    schedulers: specs.length,
+    late,
+    failing,
+  };
+});
+
 registerCheck("migrations", async () => {
   try {
     const { rows } = await require("../config/db").pool.query(

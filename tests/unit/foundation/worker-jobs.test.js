@@ -66,6 +66,9 @@ describe("job registry", () => {
       "outbox-dispatch",
       "reminders",
       "scheduled-reports",
+      "system-health",
+      "system-health-digest",
+      "system-health-purge",
       "urgent-repeats",
       "workflow-timeout",
     ]);

@@ -81,6 +81,15 @@ const PerformancePoint = z
     faults: z.number().int().min(0),
     outbox_backlog: z.number().int().min(0),
     worker_lag_s: z.number().int().min(0).nullable(),
+    /** How the app answered. Null where nothing was served in the bucket. */
+    requests: z.number().int().min(0).nullable(),
+    mean_ms: z.number().int().min(0).nullable(),
+    error_pct: z.string().nullable(),
+    /** What the server had left. Null before the resource checks existed. */
+    disk_free_pct: z.number().int().min(0).max(100).nullable(),
+    memory_used_pct: z.number().int().min(0).max(100).nullable(),
+    cpu_load: z.string().nullable(),
+    database_mb: z.number().int().min(0).nullable(),
   })
   .strict();
 
@@ -90,6 +99,12 @@ const PerformanceSeries = z
     points: z.array(PerformancePoint),
     /** Minutes in the window with no snapshot: the worker was not running. */
     gap_minutes: z.number().int().min(0),
+    /**
+     * Nothing has been recorded recently, so the chart is empty because the job is not
+     * running, not because the system is quiet. The screen says which (§10).
+     */
+    recording: z.boolean(),
+    last_snapshot_at: isoDateTime.nullable(),
     /** How much of the window every check was up, as a percentage with one place. */
     uptime_pct: z.string().regex(/^\d{1,3}\.\d$/),
   })
@@ -207,7 +222,18 @@ const TABLES = {
   HealthCheck: { table: null, reason: "one readiness probe, run in process by src/http/health.js" },
   SystemHealthStatus: { table: null, reason: "the readiness probes and fault counts, neither of them stored" },
   PerformanceQuery: { table: null, reason: "which window the chart draws" },
-  PerformancePoint: { table: null, reason: "health_snapshot rows bucketed into an hour or a day" },
+  PerformancePoint: {
+    table: "health_snapshot",
+    virtual: {
+      at: "the hour or day the snapshots in it were bucketed into",
+      state: "the worst status of the snapshots in the bucket",
+      faults: "the highest faults_open in the bucket",
+      requests: "the requests summed over the bucket",
+      mean_ms: "the mean of each snapshot's own mean",
+      error_pct: "the highest error_pct in the bucket",
+      cpu_load: "the highest cpu_load in the bucket",
+    },
+  },
   PerformanceSeries: { table: null, reason: "a window of bucketed snapshots" },
   FaultRow: {
     table: "error_group",

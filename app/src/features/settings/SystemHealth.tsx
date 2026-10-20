@@ -1,11 +1,12 @@
 import { useState } from "react";
-import type { FaultDetail, FaultRow, HealthCheck } from "@mycity/contract/contract.gen.ts";
+import type { FaultDetail, FaultRow, HealthCheck, PerformancePoint } from "@mycity/contract/contract.gen.ts";
 import { api } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import {
+  Banner,
   Bars,
   Button,
   Card,
@@ -77,8 +78,7 @@ const BRIEF = "One Markdown file with everything an AI needs to fix the ticked f
  *
  * Only the Implementation Team and the System Administrator hold `system_health`.
  */
-export function SystemHealthTab() {
-  const { can } = useAuth();
+export function StatusTab() {
   const status = useApi("GET /api/v1/system-health/status");
   const s = status.data;
 
@@ -95,8 +95,8 @@ export function SystemHealthTab() {
   return (
     <>
       <PageHeader
-        title="System Health"
-        sub={s ? `Build ${s.release}` : " "}
+        title="Status"
+        sub={s ? `Build ${s.release.slice(0, 12)}` : " "}
         actions={s ? <Pill tone={s.state === "ready" ? "ok" : s.state === "degraded" ? "warn" : "err"}>{s.state === "ready" ? "All Up" : s.state === "degraded" ? "Degraded" : "Unavailable"}</Pill> : undefined}
       />
       {s && (
@@ -111,9 +111,26 @@ export function SystemHealthTab() {
         />
       )}
       <Checks checks={s?.checks} loading={status.loading} />
-      <DesktopOnly unmount>
-        <Performance />
-      </DesktopOnly>
+    </>
+  );
+}
+
+/** Settings · Performance: how the app answered, and what the server has left. */
+export function PerformanceTab() {
+  return (
+    <>
+      <PageHeader title="Performance" sub="How the app answered" />
+      <Performance />
+    </>
+  );
+}
+
+/** Settings · Faults: every fault the code reported, grouped, with the brief. */
+export function FaultsTab() {
+  const { can } = useAuth();
+  return (
+    <>
+      <PageHeader title="Faults" sub="What the code reported" />
       <Faults canEdit={can("system_health", "edit")} canExport={can("system_health", "export")} />
     </>
   );
@@ -168,44 +185,114 @@ function Checks({ checks, loading }: { checks?: HealthCheck[]; loading: boolean 
 
 /* ───────────── Performance ───────────── */
 
-/** A day or a week of snapshots. Desktop only: a trend is not a phone screen. */
+/**
+ * A day or a week of snapshots: how the app answered, and what the server has left.
+ *
+ * The empty state is deliberate. "Nothing recorded yet" reads like good news, and the
+ * first release of this screen showed exactly that for an hour while the job behind it
+ * was never started. So an empty chart says which of the two it is.
+ */
 function Performance() {
   const [range, setRange] = useState<"24h" | "7d">("24h");
   const p = useApi("GET /api/v1/system-health/performance", { query: { range } });
   const d = p.data;
-  const worst = Math.max(1, ...(d?.points ?? []).map((x) => x.faults));
+  const span = range === "24h" ? "day" : "week";
+
+  if (p.error)
+    return (
+      <Card>
+        <ErrorState error={p.error} onRetry={p.reload} />
+      </Card>
+    );
+  if (!d)
+    return (
+      <Card>
+        <LoadingRows count={6} />
+      </Card>
+    );
+
+  const bars = (pick: (x: PerformancePoint) => number | null, unit: string) => {
+    const vals = d.points.map(pick).filter((v): v is number => v !== null);
+    const worst = Math.max(1, ...vals);
+    return d.points
+      .filter((x) => pick(x) !== null)
+      .slice(-14)
+      .map((x) => ({
+        label: formatDateTime(x.at),
+        value: `${pick(x)}${unit}`,
+        percent: Math.round(((pick(x) as number) * 100) / worst),
+      }));
+  };
+
+  const served = d.points.some((x) => x.requests !== null);
+  const resourced = d.points.some((x) => x.disk_free_pct !== null);
+  const latest = [...d.points].reverse().find((x) => x.disk_free_pct !== null);
+
   return (
-    <Grid cols={2} className="mt-3">
+    <>
       <Card>
         <CardHeader
-          title="Performance"
+          title="Over Time"
           right={<SegmentedControl value={range} onChange={(v) => setRange(v as "24h" | "7d")} options={[["24h", "Day"], ["7d", "Week"]]} />}
         />
-        {!d ? (
-          <LoadingRows count={5} />
-        ) : d.points.length === 0 ? (
-          <EmptyState icon="chart" title="Nothing Recorded Yet" text="The worker takes a snapshot every five minutes." />
-        ) : (
-          <>
-            <KeyValue
-              items={[
-                ["Every check up", `${d.uptime_pct}% of the ${range === "24h" ? "day" : "week"}`],
-                ["Not recorded", d.gap_minutes ? `${d.gap_minutes} minutes` : "None"],
-              ]}
-            />
-            <Bars
-              className="mt-3"
-              rows={d.points.slice(-12).map((x) => ({
-                label: formatDateTime(x.at),
-                value: `${x.faults} open`,
-                percent: Math.round((x.faults * 100) / worst),
-              }))}
-              note={range === "24h" ? "Open faults, by hour" : "Open faults, by day"}
-            />
-          </>
+        {!d.recording && (
+          <Banner tone="warn">
+            {d.last_snapshot_at
+              ? "The five minute job has stopped, so nothing is recording. See Status, Background Jobs."
+              : "No snapshot has ever been taken, so the job is not running. See Status, Background Jobs."}
+          </Banner>
         )}
+        <KeyValue
+          items={[
+            ["Every check up", `${d.uptime_pct}% of the ${span}`],
+            ["Not recorded", d.gap_minutes ? `${d.gap_minutes} minutes` : "None"],
+            ["Disk free", latest?.disk_free_pct != null ? `${latest.disk_free_pct}%` : null],
+            ["Memory used", latest?.memory_used_pct != null ? `${latest.memory_used_pct}%` : null],
+            ["Database", latest?.database_mb != null ? `${latest.database_mb} MB` : null],
+          ]}
+        />
       </Card>
-    </Grid>
+
+      {d.recording && d.points.length > 0 && (
+        <Grid cols={2} className="mt-3">
+          <Card>
+            <CardHeader title="How It Answered" />
+            {served ? (
+              <>
+                <Bars rows={bars((x) => x.mean_ms, " ms")} note={`Average response time, by ${range === "24h" ? "hour" : "day"}`} />
+                <Bars
+                  className="mt-3"
+                  rows={bars((x) => (x.error_pct === null ? null : Math.round(Number(x.error_pct))), "%")}
+                  note="Share of requests that failed"
+                />
+              </>
+            ) : (
+              <EmptyState icon="chart" title="No Traffic Yet" text="Figures appear once people use the app." />
+            )}
+          </Card>
+          <Card>
+            <CardHeader title="What The Server Has" />
+            {resourced ? (
+              <>
+                <Bars rows={bars((x) => x.disk_free_pct, "%")} note="Disk free" />
+                <Bars className="mt-3" rows={bars((x) => x.memory_used_pct, "%")} note="Memory used" />
+              </>
+            ) : (
+              <EmptyState icon="chart" title="Not Recorded Yet" text="Resource figures start with the next snapshot." />
+            )}
+          </Card>
+        </Grid>
+      )}
+
+      {d.recording && d.points.length > 0 && (
+        <Grid cols={2} className="mt-3">
+          <Card>
+            <CardHeader title="Open Faults" />
+            <Bars rows={bars((x) => x.faults, "")} note={`By ${range === "24h" ? "hour" : "day"}`} />
+          </Card>
+        </Grid>
+      )}
+    </>
   );
 }
 
