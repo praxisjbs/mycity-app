@@ -34,6 +34,8 @@ const ACTIONS: Array<{ hit: SearchHit; need: [string, string] | null; words: str
   { hit: hit({ id: "theme_light", kind: "action", type: "action", title: "Use Light Theme", run: "theme_light" }), need: null, words: "light mode day" },
   { hit: hit({ id: "density", kind: "action", type: "action", title: "Change Density", run: "density" }), need: null, words: "compact comfortable spacing" },
   { hit: hit({ id: "install_app", kind: "action", type: "action", title: "Install App", run: "install" }), need: null, words: "install home screen" },
+  { hit: hit({ id: "refresh_screen", kind: "action", type: "action", title: "Refresh Screen", run: "refresh" }), need: null, words: "refresh reload data update latest" },
+  { hit: hit({ id: "reload_app", kind: "action", type: "action", title: "Reload App", run: "reload" }), need: null, words: "reload restart hard refresh" },
   { hit: hit({ id: "sign_out", kind: "action", type: "action", title: "Sign Out", run: "sign_out" }), need: null, words: "log out logout" },
 ];
 

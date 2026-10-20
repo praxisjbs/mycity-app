@@ -11,6 +11,7 @@
  */
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { cn } from "../lib/cn";
+import { useBackClose } from "../lib/history";
 import { Icon, type IconName } from "../icons/Icon";
 import { FanContext, useShellScroll } from "./scroll";
 
@@ -87,6 +88,8 @@ export function FloatingButton({ actions, onHideHere, hidden = false, label = "Q
     setFanOpen(open);
     return () => setFanOpen(false);
   }, [open, setFanOpen]);
+  // The phone's Back folds the fan away before it leaves the screen (F29).
+  useBackClose(open, () => setOpen(false));
 
   useEffect(() => {
     if (away) setOpen(false);

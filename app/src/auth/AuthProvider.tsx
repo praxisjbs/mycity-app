@@ -6,6 +6,7 @@ import { connectRealtime, disconnectRealtime } from "@/api/realtime";
 import type { Me, Session } from "@/api/types/identity";
 import type { SignInResult } from "@mycity/contract/contract.gen.ts";
 import { hrefFor } from "@/lib/routes";
+import { forgetTrail } from "@/lib/trail";
 import { toast } from "@mycity/ui";
 import { passkeyCancelled, signWithPasskey } from "./passkey";
 
@@ -365,6 +366,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!(e instanceof ApiError)) throw e;
     }
     signedOut();
+    // This device's trail of places leaves with the person (F29), so the next one on it never sees it.
+    forgetTrail();
     tell({ t: "signed-out" });
   }, [signedOut, tell]);
 

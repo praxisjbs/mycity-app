@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `/auth/me` lists the ones the person holds (§5) |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
-| Last changed | 19/10/2026 |
+| Last changed | 20/10/2026 |
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
@@ -458,3 +458,4 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   Settings · Notifications (`docs/guides/notifications.md` §6); they are Security: always on, no
   copies.
 - 19/10/2026 · AJ · My Security's Clock-In Devices card lists the person's registered and new devices (`GET /devices/mine`) above Manage My Devices, in place of the link alone (the team lead, 19/10/2026). §10 updated.
+- 20/10/2026 · TB · Sign Out also wipes this device's trail of places (`app/src/lib/trail.ts`, FRONTEND_FOUNDATION F29), so the next person on a shared device never sees where the last one went; a session that ends or locks keeps it for the same person's next sign-in.

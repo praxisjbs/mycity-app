@@ -133,4 +133,82 @@ describe("createApi", () => {
     act(() => core.invalidate("/api/v1/employees"));
     await waitFor(() => expect(seen).toHaveLength(2));
   });
+
+  it("refresh asks every mounted read again quietly and settles when the last has landed", async () => {
+    let n = 0;
+    const answers: Array<() => void> = [];
+    const transport = vi.fn(
+      (req: RawRequest) =>
+        new Promise<RawResponse>((resolve) => {
+          const k = (n += 1);
+          const body = req.path.endsWith("/e1") ? { employee_id: `one-${k}` } : page(1, 60 + k);
+          if (k <= 2) resolve({ status: 200, body });
+          else answers.push(() => resolve({ status: 200, body }));
+        }),
+    );
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    const list = renderHook(() => core.useApi("GET /api/v1/employees", { query: { page: 1 } }));
+    const one = renderHook(() => core.useApi("GET /api/v1/employees/:id", { params: { id: "e1" } }));
+    await waitFor(() => expect(list.result.current.data?.page.total).toBe(61));
+    await waitFor(() => expect(one.result.current.data?.employee_id).toBe("one-2"));
+
+    let settled = false;
+    let done!: Promise<void>;
+    act(() => {
+      done = core.refresh("/api/").then(() => {
+        settled = true;
+      });
+    });
+    await waitFor(() => expect(answers).toHaveLength(2));
+    // While it asks, the screen keeps what it shows and nothing says it is loading.
+    expect(list.result.current.loading).toBe(false);
+    expect(list.result.current.data?.page.total).toBe(61);
+    expect(one.result.current.loading).toBe(false);
+
+    await act(async () => answers[0]!());
+    expect(settled).toBe(false);
+    await act(async () => {
+      answers[1]!();
+      await done;
+    });
+    expect(settled).toBe(true);
+    expect([list.result.current.data?.page.total, one.result.current.data?.employee_id].sort()).toEqual([63, "one-4"].sort());
+  });
+
+  it("refresh settles at once with nothing mounted, and a reload still says it is loading", async () => {
+    const { transport, seen } = fake(() => ({ status: 200, body: page(1) }));
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    await expect(core.refresh("/api/")).resolves.toBeUndefined();
+    const { result } = renderHook(() => core.useApi("GET /api/v1/employees", { query: { page: 1 } }));
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    let reloading!: Promise<void>;
+    act(() => {
+      reloading = result.current.reload();
+    });
+    expect(result.current.loading).toBe(true);
+    await act(async () => reloading);
+    expect(result.current.loading).toBe(false);
+    expect(seen).toHaveLength(2);
+  });
+
+  it("refresh keeps a phone list's rows while its first page comes again", async () => {
+    let total = 60;
+    const { transport, seen } = fake((req) => ({ status: 200, body: page(Number(req.query.page), total) }));
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    const { result } = renderHook(() => core.useInfinite("GET /api/v1/employees"));
+    await waitFor(() => expect(result.current.rows).toHaveLength(1));
+    act(() => result.current.more());
+    await waitFor(() => expect(result.current.rows).toHaveLength(2));
+    total = 61;
+    let done!: Promise<void>;
+    act(() => {
+      done = core.refresh("/api/v1/employees");
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.rows).toHaveLength(2);
+    await act(async () => done);
+    expect(result.current.page?.total).toBe(61);
+    expect(result.current.rows).toHaveLength(1);
+    expect(seen.at(-1)!.query.page).toBe(1);
+  });
 });

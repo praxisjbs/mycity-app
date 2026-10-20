@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { setViewport } from "../testing/viewport";
@@ -32,6 +32,20 @@ describe("PhoneHeader", () => {
     setViewport(390);
     render(<ShellScrollContext.Provider value={{ direction: "down", atTop: true }}>{header()}</ShellScrollContext.Provider>);
     expect(screen.getByText("Employee Self-Service").parentElement).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("held, the pin opens the trail instead of going Home; tapped, it goes Home", async () => {
+    setViewport(390);
+    const onNavigate = vi.fn();
+    const onPinHold = vi.fn();
+    render(<PhoneHeader title="People" homeHref="/home" onNavigate={onNavigate} onPinHold={onPinHold} />);
+    const pin = screen.getByRole("link", { name: "MyCity App, Home" });
+    expect(pin).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.contextMenu(pin);
+    expect(onPinHold).toHaveBeenCalledOnce();
+    expect(onNavigate).not.toHaveBeenCalled();
+    await userEvent.click(pin);
+    expect(onNavigate).toHaveBeenCalledWith("/home");
   });
 
   it("has no accessibility violations", async () => {
