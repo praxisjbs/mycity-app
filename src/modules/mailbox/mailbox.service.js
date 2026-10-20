@@ -930,7 +930,17 @@ async function flush(queueId = null) {
   return out;
 }
 
+/**
+ * A mail attachment's stored file, for its mailbox's owner only: what Forward to Chat sends
+ * (docs/guides/community.md §3 step 19). Null for anyone else, or an attachment that is not there.
+ */
+async function attachmentFile(db, mailAttachmentId, user) {
+  const row = await repo.attachmentOf(db, mailAttachmentId, user.user_id);
+  return row ? vault.get(db, row.document_id) : null;
+}
+
 module.exports = {
+  attachmentFile,
   useProvider,
   connectionView,
   getConnection,

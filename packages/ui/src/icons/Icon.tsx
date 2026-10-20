@@ -38,6 +38,7 @@ import {
   Eye,
   EyeOff,
   FileSpreadsheet,
+  Forward,
   FileText,
   Filter,
   FingerprintPattern,
@@ -109,6 +110,7 @@ import { cn } from "../lib/cn";
  */
 export const ICONS = {
   pin: MapPin,
+  forward: Forward,
   grid: LayoutGrid,
   clock: Clock,
   user: User,

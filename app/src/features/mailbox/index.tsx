@@ -5,6 +5,7 @@ import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
 import { saveFile, useFileUrls } from "@/api/download";
 import { useFileViewer, viewableFile } from "@/features/shared/files";
+import { ForwardTo } from "@/features/community/Forward";
 import { useRealtime } from "@/api/realtime";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFitPage } from "@/shell/layout-context";
@@ -243,13 +244,13 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
         </span>
       </div>
       {thread.messages.map((m, i) => (
-        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} />
+        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} forwardable={!spam} />
       ))}
     </div>
   );
 }
 
-function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onTrust: (address: string, trusted: boolean) => Promise<void>; onMailto: (m: Mailto) => void }) {
+function Message({ m, subject, head, images, onImages, onTrust, onMailto, forwardable }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onTrust: (address: string, trusted: boolean) => Promise<void>; onMailto: (m: Mailto) => void; forwardable?: boolean }) {
   const showRemote = images || m.images_trusted;
   /* Only the parts the body draws are fetched, each into a local URL the sealed frame may show. */
   const parts = useMemo(() => {
@@ -261,6 +262,10 @@ function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m:
   const split = useMemo(() => (body ? splitQuoted(body.html) : null), [body]);
   const [history, setHistory] = useState(false);
   const files = useFileViewer();
+  const modal = useModal();
+  /* Forward to Chat (community.md §3 step 19): the file goes to up to 5 Staff Community chats; never from Spam. */
+  const toChat = (a: MailMessage["attachments"][number]) =>
+    modal.open({ title: "Forward To", body: (close) => <ForwardTo source={{ mail_attachment_id: a.mail_attachment_id }} close={close} /> });
   return (
     <div className={cn(head && "border-b border-dashed border-border")}>
       {head && <p className="pt-3 text-2xs font-semibold text-subtle-foreground">{who(m.from)} · {formatWhen(m.sent_at)}</p>}
@@ -293,11 +298,15 @@ function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m:
           {m.attachments.map((a) => {
             const url = `/api/v1/documents/${a.document_id}/content`;
             /* A photo, a video or a PDF opens in the file viewer; anything else downloads. */
-            const openIt = () => (viewableFile(a.mime_type) ? files.view(url, { name: a.file_name, mime: a.mime_type, by: who(m.from), at: formatWhen(m.sent_at) }) : saveFile(url, a.file_name));
+            const forward = forwardable ? () => toChat(a) : undefined;
+            const openIt = () => (viewableFile(a.mime_type) ? files.view(url, { name: a.file_name, mime: a.mime_type, by: who(m.from), at: formatWhen(m.sent_at) }, forward) : saveFile(url, a.file_name));
             return (
-              <button key={a.mail_attachment_id} type="button" onClick={openIt} className="flex cursor-pointer items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">
-                <Icon name={fileTypeOf(a.mime_type, a.file_name).glyph} />{a.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
-              </button>
+              <span key={a.mail_attachment_id} className="flex items-center gap-0.5">
+                <button type="button" onClick={openIt} className="flex cursor-pointer items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">
+                  <Icon name={fileTypeOf(a.mime_type, a.file_name).glyph} />{a.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
+                </button>
+                {forward && <IconButton icon="forward" label={`Forward ${a.file_name} to a chat`} size="sm" onClick={forward} />}
+              </span>
             );
           })}
         </div>

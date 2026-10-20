@@ -1,10 +1,10 @@
 /**
  * @component MediaViewer
  * @group Documents
- * @summary A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, and Share on a phone.
+ * @summary A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it.
  * @use Opening a file someone sent or attached: a chat's photos, videos and PDFs, a conversation's shared files, a mail attachment, a document on My Documents.
  * @avoid A file the app cannot show (Word, Excel, PowerPoint: download it instead); a preview beside a list on desktop (DocumentPreview); a document the product generated (Paper).
- * @phone The whole screen on deep green: Close, who sent it and when, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it.
+ * @phone The whole screen on deep green: Close, who sent it and when, Forward, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it.
  * @a11y A modal dialog named by the file: focus moves in and is trapped, Esc closes it and focus returns to what opened it; the arrow keys step on desktop; every control is a named button; a file that cannot be shown says so, with Download beside it.
  * @status beta
  * @example <MediaViewer open={open} items={items} index={at} onIndex={setAt} onClose={close} load={(item) => fetchFile(item)} />
@@ -53,6 +53,8 @@ export interface MediaViewerProps {
   load: (item: ViewerItem) => Promise<Blob>;
   /** How Download hands the file to this device (the app's own, which uses the share sheet where a download cannot land); the browser's download otherwise. */
   save?: (blob: Blob, name: string) => unknown;
+  /** Forward the file on view to a chat; no Forward unless set. */
+  onForward?: (item: ViewerItem) => void;
   /** Where it mounts; document.body by default (the gallery passes its themed frame). */
   container?: HTMLElement | null;
 }
@@ -207,7 +209,7 @@ interface Loaded {
   url: string;
 }
 
-export function MediaViewer({ open, items, index, onIndex, onClose, load, save, container }: MediaViewerProps) {
+export function MediaViewer({ open, items, index, onIndex, onClose, load, save, onForward, container }: MediaViewerProps) {
   const phone = useIsPhone();
   const item = open ? items[index] : undefined;
   const cache = useRef(new Map<string, Loaded>());
@@ -388,6 +390,18 @@ export function MediaViewer({ open, items, index, onIndex, onClose, load, save, 
                 </span>
               )}
             </div>
+            {onForward && (
+              <IconButton
+                icon="forward"
+                label="Forward"
+                className={glassy}
+                onClick={() => {
+                  // The screen's sheet hands focus back to the viewer itself, not to this button, whose tooltip would take the first Esc.
+                  content.current?.focus();
+                  onForward(item);
+                }}
+              />
+            )}
             {share && <IconButton icon="share" label="Share" className={glassy} onClick={shareIt} />}
             <IconButton icon="download" label="Download" className={glassy} onClick={download} />
           </div>

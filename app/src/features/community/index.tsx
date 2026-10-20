@@ -10,7 +10,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Composer, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
+import { Composer, PickBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
 import { SendFiles, SharedFiles } from "./Media";
 import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
@@ -166,8 +166,8 @@ function Channels() {
                 })
             } /> })}
       />
-      {/* #announcements takes nothing posted straight in: no composer, for anyone. */}
-      {current.post_policy !== "people_ceo" && (
+      {/* #announcements takes nothing posted straight in: no composer, for anyone. While picking, the bar takes its place. */}
+      {t.picking ? <PickBar t={t} /> : current.post_policy !== "people_ceo" && (
       <Composer
         key={current.community_channel_id}
         placeholder={`Message #${current.name}`}
@@ -568,7 +568,7 @@ function Direct() {
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
       <ThreadBody t={t} dm />
-      <Composer
+      {t.picking ? <PickBar t={t} /> : <Composer
         key={current.community_channel_id}
         placeholder={current.is_self ? "Message yourself" : `Message ${current.person.display_name.split(" ")[0]}`}
         onSend={(b) => after(t.send(b))}
@@ -583,7 +583,7 @@ function Direct() {
             ]}
           />
         )}
-      />
+      />}
     </>
   ) : (
     <p className="m-auto text-xs text-subtle-foreground">Pick a conversation.</p>

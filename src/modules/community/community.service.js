@@ -15,12 +15,15 @@
  * Every write runs in one transaction with emit(); realtime pushes and notifications are
  * outbox handlers in community.events.js.
  */
+const crypto = require("node:crypto");
+const { FORWARDABLE: FORWARDABLE_TYPES } = require("@mycity/contract").community;
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const vault = require("../../shared/documents/vault");
+const storage = require("../../services/storage/storage.service");
 const lagos = require("../../shared/time/lagos");
 const transcription = require("../../services/ai/transcription");
 const repo = require("./community.repo");
@@ -28,6 +31,9 @@ const { EVENTS } = require("./community.events");
 const { noteFor } = require("./community.recognition");
 const links = require("./community.links");
 const { wishFor } = require("./community.celebrations");
+
+/** Mailbox's own service, asked for a mail attachment's file (loaded on use, so the two modules load apart). */
+const mailbox = () => require("../mailbox/mailbox.service");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -463,6 +469,7 @@ async function present(
       document: deleted ? null : r.document,
       album_key: m.album_key ?? null,
       link: deleted ? null : (r.link ?? null),
+      forwarded: m.forwarded === true,
       duration_s: r.message_type === "audio" ? (m.duration_s ?? null) : null,
       transcript: deleted ? null : (r.transcript ?? null),
       celebration,
@@ -973,37 +980,172 @@ async function listConversations(user, query) {
 }
 
 /** Open the conversation with a colleague, making it the first time (one per pair). */
-async function openDirect(employeeId, user) {
-  const channelId = await tx(async (client) => {
-    const other = await repo.userOfEmployee(client, employeeId);
-    if (!other)
-      throw new AppError("NO_LOGIN", "That colleague has no login yet", 422, {
-        employee_id: ["No login yet"],
-      });
-    // A conversation with oneself is allowed: notes, drafts, files to keep (one member).
-    await repo.lockPair(client, user.user_id, other);
-    const found = await repo.findDirect(client, user.user_id, other);
-    if (found) return found.community_channel_id;
-    const made = await repo.insertChannel(client, {
-      name: null,
-      description: null,
-      post_policy: "everyone",
-      channel_type: "direct",
-      created_by: user.user_id,
+/** The caller's conversation with a colleague, started if there is none; inside the caller's transaction. */
+async function directWith(client, employeeId, user) {
+  const other = await repo.userOfEmployee(client, employeeId);
+  if (!other)
+    throw new AppError("NO_LOGIN", "That colleague has no login yet", 422, {
+      employee_id: ["No login yet"],
     });
-    await repo.addMembers(client, made.community_channel_id, [
-      ...new Set([user.user_id, other]),
-    ]);
-    await emit(client, {
-      key: EVENTS.DIRECT_THREAD_OPENED,
-      entity: { type: "direct_thread", id: made.community_channel_id },
-      actor: user,
-      payload: { community_channel_id: made.community_channel_id },
-    });
-    return made.community_channel_id;
+  // A conversation with oneself is allowed: notes, drafts, files to keep (one member).
+  await repo.lockPair(client, user.user_id, other);
+  const found = await repo.findDirect(client, user.user_id, other);
+  if (found) return found.community_channel_id;
+  const made = await repo.insertChannel(client, {
+    name: null,
+    description: null,
+    post_policy: "everyone",
+    channel_type: "direct",
+    created_by: user.user_id,
   });
+  await repo.addMembers(client, made.community_channel_id, [
+    ...new Set([user.user_id, other]),
+  ]);
+  await emit(client, {
+    key: EVENTS.DIRECT_THREAD_OPENED,
+    entity: { type: "direct_thread", id: made.community_channel_id },
+    actor: user,
+    payload: { community_channel_id: made.community_channel_id },
+  });
+  return made.community_channel_id;
+}
+
+async function openDirect(employeeId, user) {
+  const channelId = await tx((client) => directWith(client, employeeId, user));
   const row = await repo.conversationFor(pool, channelId, user.user_id);
   return conversationView(row);
+}
+
+/* ------------------------------------------------------------------ *
+ * Forwarding (§3 step 19)
+ * ------------------------------------------------------------------ */
+
+const FORWARDABLE = new Set(FORWARDABLE_TYPES);
+
+async function listForwardTargets(user, query) {
+  return repo.forwardTargets(pool, user.user_id, query);
+}
+
+/** The messages to forward, each in a conversation the caller is in, each of a kind that travels. */
+async function forwardSources(client, messageIds, user) {
+  const ids = [...new Set(messageIds)];
+  const rows = await repo.messagesForForward(client, ids);
+  if (rows.length !== ids.length) throw new AppError("MESSAGE_GONE", "A message was deleted", 404);
+  for (const channelId of new Set(rows.map((r) => r.community_channel_id))) await member(client, channelId, user);
+  if (rows.some((r) => !FORWARDABLE.has(r.message_type)))
+    throw new AppError("NOT_FORWARDABLE", "Polls, cards and announcements are not forwarded", 422);
+  return rows;
+}
+
+/**
+ * A mail's attachment as a chat file: the mailbox owner's own, scanned clean, copied into
+ * Community once against the first chat (the upload rules for chats decide its type).
+ */
+async function mailSource(client, mailAttachmentId, channelId, user) {
+  const doc = await mailbox().attachmentFile(client, mailAttachmentId, user);
+  if (!doc) throw notFound();
+  if (doc.scan_status === "pending")
+    throw new AppError("DOCUMENT_SCANNING", "This file is still being checked. Try again in a minute.", 409);
+  if (doc.scan_status === "infected")
+    throw new AppError("DOCUMENT_INFECTED", "This file failed its virus check and cannot be sent.", 422);
+  const copy = await vault.store(client, {
+    file: { buffer: await storage.get(doc.storage_key), originalname: doc.original_name },
+    purpose: "attachment",
+    doc_type: "community_media",
+    entity: { type: "community_channel", id: channelId },
+    actor: user,
+  });
+  const type = kindOfFile(copy.mime);
+  return {
+    community_message_id: null,
+    sender_user_id: null,
+    message_type: type === "audio" ? "file" : type,
+    body: null,
+    document_id: copy.document_id,
+    metadata: {},
+    transcript: null,
+    mail_attachment_id: mailAttachmentId,
+  };
+}
+
+/**
+ * Forward (§3 step 19, TB 19/10/2026): messages, or a mail's attachment, to up to 5 chats, all
+ * or nothing. A colleague named by employee id gets their conversation, started if new. Each
+ * copy is a new message from the caller, marked forwarded and carrying the same file, which the
+ * vault lets every conversation holding a live message with it read; who first sent it rides
+ * in the event's payload for the audit, never on screen.
+ */
+async function forward(body, user) {
+  return tx(async (client) => {
+    const chats = [];
+    const add = async (channelId) => {
+      if (chats.some((m) => m.community_channel_id === channelId)) return;
+      const m = await member(client, channelId, user);
+      if (!mayPost(m))
+        throw new AppError("CANNOT_POST", m.name ? `You cannot post in #${m.name}` : "You cannot post in this conversation", 403);
+      chats.push(m);
+    };
+    for (const id of body.channel_ids ?? []) await add(id);
+    for (const employeeId of body.employee_ids ?? []) await add(await directWith(client, employeeId, user));
+
+    const items = body.message_ids
+      ? await forwardSources(client, body.message_ids, user)
+      : [await mailSource(client, body.mail_attachment_id, chats[0].community_channel_id, user)];
+
+    let sent = 0;
+    for (const chat of chats) {
+      // Photos sent together stay one album in each chat, under a key of its own.
+      const albums = new Map();
+      for (const it of items) {
+        const was = it.metadata || {};
+        const metadata = { forwarded: true };
+        if (it.community_message_id) metadata.forwarded_from = it.community_message_id;
+        if (was.duration_s) metadata.duration_s = was.duration_s;
+        if (was.no_link_preview) metadata.no_link_preview = true;
+        if (was.album_key) {
+          if (!albums.has(was.album_key)) albums.set(was.album_key, crypto.randomUUID());
+          metadata.album_key = albums.get(was.album_key);
+        }
+        const card =
+          it.message_type === "text"
+            ? await links.linkFor(client, it.body, metadata)
+            : { community_link_preview_id: null, fetch: null };
+        const message = await repo.insertMessage(client, {
+          community_channel_id: chat.community_channel_id,
+          sender_user_id: user.user_id,
+          message_type: it.message_type,
+          body: it.body,
+          document_id: it.document_id,
+          metadata,
+          community_link_preview_id: card.community_link_preview_id,
+          transcript: it.transcript,
+          in_order: true,
+        });
+        const direct = chat.channel_type === "direct";
+        await emit(client, {
+          key: direct ? EVENTS.DIRECT_MESSAGE_SENT : EVENTS.CHANNEL_MESSAGE_POSTED,
+          entity: { type: direct ? "direct_message" : "channel_message", id: message.community_message_id },
+          actor: user,
+          payload: {
+            community_channel_id: chat.community_channel_id,
+            community_message_id: message.community_message_id,
+            message_type: it.message_type,
+            sender_name: user.display_name || null,
+            channel_name: direct ? null : chat.name || null,
+            preview: lineOf(it.message_type, message.body),
+            forwarded_from: it.community_message_id
+              ? { community_message_id: it.community_message_id, sender_user_id: it.sender_user_id }
+              : { mail_attachment_id: it.mail_attachment_id },
+            ...(card.fetch ? { link_url: card.fetch } : {}),
+          },
+        });
+        sent += 1;
+      }
+      // Sending is reading, as when posting.
+      await repo.markRead(client, chat.community_channel_id, user.user_id);
+    }
+    return { sent, community_channel_ids: chats.map((m) => m.community_channel_id) };
+  });
 }
 
 async function listColleagues(query, user) {
@@ -1122,6 +1264,8 @@ module.exports = {
   listConversations,
   openDirect,
   listColleagues,
+  listForwardTargets,
+  forward,
   profileCard,
   postCelebrations,
   touchPresence,

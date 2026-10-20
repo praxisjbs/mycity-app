@@ -18,6 +18,7 @@
  *   passkeyLimiter      passkey sign-in   per IP, every request, 60 per 15 minutes
  *   confirmLimiter      confirming it is you, per signed-in person, 10 per 15 minutes
  *   linkPreviewLimiter  a link's card for the composer, per signed-in person, 30 per minute
+ *   forwardLimiter      forwarding in Staff Community, per signed-in person, 20 per minute
  *
  * Limiters are built when this file loads, but Redis connects later at boot, so
  * each limiter asks for its store on every call and uses Redis once it exists.
@@ -238,6 +239,18 @@ const linkPreviewLimiter = makeLimiter({
     req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
 });
 
+/**
+ * Forwarding (docs/guides/community.md §3 step 19): one forward posts up to 25 messages in up
+ * to 5 chats, so one person cannot flood the company's conversations. Per person, after auth.
+ */
+const forwardLimiter = makeLimiter({
+  name: "forward",
+  max: 20,
+  windowMs: 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
 /** Confirming it is you before a sign-in method changes: per person, after auth. */
 const confirmLimiter = makeLimiter({
   name: "confirm",
@@ -266,5 +279,6 @@ module.exports = {
   passkeyLimiter,
   confirmLimiter,
   linkPreviewLimiter,
+  forwardLimiter,
   TOO_MANY,
 };
