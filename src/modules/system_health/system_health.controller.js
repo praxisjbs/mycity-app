@@ -14,6 +14,9 @@ const targets = require("./system_health.targets");
 
 module.exports = {
   status: async (_req, res) => ok(res, await service.status()),
+  check: async (req, res) => ok(res, await service.check(req.params.key)),
+  history: async (req, res) => sendPaged(res, await service.history(req.params.key, req.validated.query)),
+  statusBrief: async (req, res) => accepted(res, await service.requestStatusBrief(withActor(req))),
   performance: async (req, res) => ok(res, await performance.series(req.validated.query)),
   capacity: async (_req, res) => ok(res, await performance.capacity()),
   routes: async (req, res) => sendPaged(res, await performance.routes(req.validated.query)),

@@ -1,5 +1,6 @@
 import type {
   BackgroundWork,
+  CheckChange,
   DatabaseSummary,
   FaultRow,
   HealthCheck,
@@ -10,7 +11,9 @@ import type {
   PerformanceTargets,
   ProcessList,
   QueryStat,
+  QueueRow,
   RouteStat,
+  SchedulerRow,
   TableStat,
 } from "@mycity/contract/contract.gen.ts";
 import { fail, ok, paged, route } from "../core";
@@ -27,16 +30,16 @@ import { fail, ok, paged, route } from "../core";
 const HOURS = (n: number) => new Date(Date.now() - n * 3_600_000).toISOString();
 
 const CHECKS: HealthCheck[] = [
-  { key: "postgres", label: "Database", state: "up", detail: "answered in 2 ms", look_at: null, latency_ms: 2 },
-  { key: "redis", label: "Cache and Sessions", state: "up", detail: "answered in 1 ms", look_at: null, latency_ms: 1 },
-  { key: "worker", label: "Worker", state: "up", detail: "last beat 12 s ago", look_at: null, latency_ms: null },
-  { key: "modules", label: "Modules", state: "up", detail: "25 mounted", look_at: null, latency_ms: null },
-  { key: "migrations", label: "Migrations", state: "up", detail: "at 9190_seed_system_health", look_at: null, latency_ms: null },
-  { key: "numbering", label: "Numbering", state: "up", detail: "Answering", look_at: null, latency_ms: null },
-  { key: "outbox", label: "Events", state: "up", detail: "3 waiting", look_at: null, latency_ms: null },
-  { key: "storage", label: "File Storage", state: "up", detail: "Answering", look_at: null, latency_ms: null },
-  { key: "chromium", label: "PDFs", state: "up", detail: "Answering", look_at: null, latency_ms: null },
-  { key: "ffmpeg", label: "Voice and Video", state: "up", detail: "Answering", look_at: null, latency_ms: null },
+  { key: "postgres", label: "Database", state: "up", detail: "answered in 2 ms", look_at: null, latency_ms: 2, since: null },
+  { key: "redis", label: "Cache and Sessions", state: "up", detail: "answered in 1 ms", look_at: null, latency_ms: 1, since: null },
+  { key: "worker", label: "Worker", state: "up", detail: "last beat 12 s ago", look_at: null, latency_ms: null, since: null },
+  { key: "modules", label: "Modules", state: "up", detail: "25 mounted", look_at: null, latency_ms: null, since: null },
+  { key: "migrations", label: "Migrations", state: "up", detail: "at 9190_seed_system_health", look_at: null, latency_ms: null, since: null },
+  { key: "numbering", label: "Numbering", state: "up", detail: "Answering", look_at: null, latency_ms: null, since: null },
+  { key: "outbox", label: "Events", state: "up", detail: "3 waiting", look_at: null, latency_ms: null, since: null },
+  { key: "storage", label: "File Storage", state: "up", detail: "Answering", look_at: null, latency_ms: null, since: null },
+  { key: "chromium", label: "PDFs", state: "up", detail: "Answering", look_at: null, latency_ms: null, since: null },
+  { key: "ffmpeg", label: "Voice and Video", state: "up", detail: "Answering", look_at: null, latency_ms: null, since: null },
   {
     key: "clamd",
     label: "Upload Scanning",
@@ -44,14 +47,23 @@ const CHECKS: HealthCheck[] = [
     detail: "not connected",
     look_at: "Uploads cannot be scanned, so they are refused.",
     latency_ms: null,
+    since: HOURS(3),
   },
-  { key: "mail", label: "Mail", state: "up", detail: "4 of 200 this hour", look_at: null, latency_ms: null },
-  { key: "ai", label: "AI", state: "up", detail: "answering: stub", look_at: null, latency_ms: null },
-  { key: "disk", label: "Disk Space", state: "up", detail: "46% free, 118 GB of 252 GB", look_at: null, latency_ms: null },
-  { key: "memory", label: "Memory", state: "up", detail: "28% in use, 5.1 GB of 18 GB", look_at: null, latency_ms: null },
-  { key: "cpu", label: "Processor", state: "up", detail: "23.4% busy across 8 cores", look_at: null, latency_ms: null },
-  { key: "database_usage", label: "Database Usage", state: "up", detail: "742 MB, 11 of 100 connections", look_at: null, latency_ms: null },
-  { key: "schedulers", label: "Background Jobs", state: "up", detail: "all 19 running", look_at: null, latency_ms: null },
+  { key: "mail", label: "Mail", state: "up", detail: "4 of 200 this hour", look_at: null, latency_ms: null, since: null },
+  { key: "ai", label: "AI", state: "up", detail: "answering: stub", look_at: null, latency_ms: null, since: null },
+  { key: "disk", label: "Disk Space", state: "up", detail: "46% free, 118 GB of 252 GB", look_at: null, latency_ms: null, since: null },
+  { key: "memory", label: "Memory", state: "up", detail: "28% in use, 5.1 GB of 18 GB", look_at: null, latency_ms: null, since: null },
+  { key: "cpu", label: "Processor", state: "up", detail: "23.4% busy across 8 cores", look_at: null, latency_ms: null, since: null },
+  { key: "database_usage", label: "Database Usage", state: "up", detail: "742 MB, 11 of 100 connections", look_at: null, latency_ms: null, since: null },
+  {
+    key: "schedulers",
+    label: "Background Jobs",
+    state: "degraded",
+    detail: "1 of 19 have not run: media-reconcile, 2 not due yet",
+    look_at: "A job has not run when it should have. Reminders, snapshots and clean-ups are waiting.",
+    latency_ms: null,
+    since: HOURS(26),
+  },
 ];
 
 const FAULTS: FaultRow[] = [
@@ -126,6 +138,65 @@ const FAULTS: FaultRow[] = [
 ];
 
 const ACTIVE = new Set(["open", "handling"]);
+
+/** The worker's schedulers as the code declares them (src/jobs/schedulers), with invented runs. */
+const SCHEDULE: Array<[string, string, string, string, string]> = [
+  ["outbox-dispatch", "Runs the follow-on work of committed changes", "Every second", "every 1000 ms", "worker"],
+  ["workflow-timeout", "Applies the time limit of approvals nobody decided", "Every 5 minutes", "every 300000 ms", "queue"],
+  ["alert-ageing", "Escalates high alerts nobody cleared", "Hourly at :10", "cron 10 * * * * Africa/Lagos", "queue"],
+  ["media-reconcile", "Finds files without a record and records without a file", "Daily at 02:30 (Lagos)", "cron 30 2 * * * Africa/Lagos", "queue"],
+  ["import-cleanup", "Closes imports that were started and left", "Daily at 03:00 (Lagos)", "cron 0 3 * * * Africa/Lagos", "queue"],
+  ["celebrations", "Birthday and work anniversary cards posted to #general", "Daily at 08:00 (Lagos)", "cron 0 8 * * * Africa/Lagos", "queue"],
+  ["system-health", "Groups faults, snapshots the readiness checks", "Every 5 minutes", "every 300000 ms", "queue"],
+  ["system-health-digest", "The daily System Health summary at 08:00", "Daily at 08:00 (Lagos)", "cron 0 8 * * * Africa/Lagos", "queue"],
+];
+
+const JOBS: SchedulerRow[] = SCHEDULE.map(([name, summary, cadence, set_as, runs_in], i) => {
+  const late = name === "media-reconcile";
+  const waiting = name === "import-cleanup" || name === "system-health-digest";
+  return {
+    name,
+    summary,
+    runs_in: runs_in as SchedulerRow["runs_in"],
+    cadence,
+    set_as,
+    late_after: set_as.startsWith("cron") && !set_as.includes(" * * * * ") ? "26 hours" : "15 minutes",
+    state: late ? "late" : waiting ? "waiting" : "on_time",
+    reason: late ? "Has not run for 2 days" : waiting ? "Its first slot has not come yet" : null,
+    started_at: HOURS(late ? 72 : waiting ? 2 : 72),
+    last_run_at: waiting ? null : HOURS(late ? 50 : 0),
+    duration_ms: waiting ? null : 40 + i * 13,
+    last_ok: waiting ? null : !late,
+    last_error: late ? "ENOENT: no such file or directory, scandir '/srv/mycity/prod/media/vault'" : null,
+    runs: waiting ? 0 : 120 + i * 40,
+    failures: late ? 3 : 0,
+    last_failure_at: late ? HOURS(50) : null,
+    next_run_at: runs_in === "worker" ? HOURS(0) : HOURS(-2 - i),
+  };
+});
+
+const QUEUES: QueueRow[] = ["email-send", "pdf-render", "notification-deliver", "media-scan", "scheduled-report"].map((queue, i) => ({
+  queue,
+  summary: null,
+  concurrency: 2,
+  waiting: queue === "media-scan" ? 4 : 0,
+  active: 0,
+  delayed: queue === "email-send" ? 2 : 0,
+  failed: queue === "media-scan" ? 6 : i,
+  paused: 0,
+  last_failed_at: queue === "media-scan" ? HOURS(3) : null,
+  last_failure: queue === "media-scan" ? "connect ECONNREFUSED /var/run/clamav/clamd.ctl" : null,
+}));
+
+/** A week of one check flipping now and then, newest first. */
+const changesOf = (c: HealthCheck): CheckChange[] =>
+  c.state === "up"
+    ? []
+    : [
+        { at: c.since ?? HOURS(1), from: "up", to: c.state, detail: c.detail },
+        { at: HOURS(40), from: c.state, to: "up", detail: "Answering" },
+        { at: HOURS(44), from: "up", to: c.state, detail: c.detail },
+      ];
 
 route("GET /api/v1/system-health/status", () =>
   ok({
@@ -436,14 +507,14 @@ route("GET /api/v1/system-health/background", () => {
   return ok(body);
 });
 
-const JOBS: JobRun[] = [
+const JOB_RUNS: JobRun[] = [
   ["system-health-sample", "Every minute", 0.6, 840, 790, 2400, 4310, 0, "on_time"],
   ["system-health", "Every 5 minutes", 2, 3100, 2850, 9100, 860, 0, "on_time"],
   ["outbox-dispatch", "Every second", 0.01, 12, 9, 640, 258_000, 2, "on_time"],
   ["reminders", "Every 5 minutes", 3, 210, 190, 1800, 860, 0, "on_time"],
-  ["system-health-digest", "Daily at 08:00", 280, 420, 410, 700, 3, 0, "on_time"],
+  ["system-health-digest", "Daily at 08:00 (Lagos)", 280, 420, 410, 700, 3, 0, "on_time"],
   ["mail-sync", "Every 2 minutes", 30, 5200, 4100, 31_000, 2150, 41, "failing"],
-  ["scheduled-reports", "Hourly at :20", null, null, null, null, 0, 0, "never"],
+  ["scheduled-reports", "Hourly at :20", null, null, null, null, 0, 0, "waiting"],
 ].map(([name, every, ago, last, mean, max, runs, failures, state]) => ({
   name: name as string,
   summary: null,
@@ -458,7 +529,7 @@ const JOBS: JobRun[] = [
 }));
 
 route("GET /api/v1/system-health/background/jobs", (req) =>
-  paged(JOBS, req, {
+  paged(JOB_RUNS, req, {
     sort: {
       name: (a, b) => a.name.localeCompare(b.name),
       last_ms: (a, b) => (a.last_ms ?? 0) - (b.last_ms ?? 0),
@@ -613,3 +684,30 @@ route("POST /api/v1/system-health/briefs", (req) => {
   for (const f of FAULTS) if (ids.includes(f.error_group_id) && f.status === "open") f.status = "handling";
   return { status: 202, body: { document_id: "d0000000-0000-4000-8000-000000000001", file_name: "mycity-faults.md", status: "done" } };
 });
+
+route("GET /api/v1/system-health/checks/:key", (req) => {
+  const c = CHECKS.find((x) => x.key === req.params.key);
+  if (!c) return fail(404, "NOT_FOUND", "Not found");
+  return ok({
+    ...c,
+    facts: [
+      { label: "Answered In", value: `${c.latency_ms ?? 3} ms` },
+      ...(c.key === "disk" ? [{ label: "Free", value: "46%" }, { label: "Measured At", value: "/srv/mycity/prod/media" }] : []),
+      ...(c.key === "schedulers" ? [{ label: "Jobs", value: "19" }, { label: "Late", value: "media-reconcile" }] : []),
+    ],
+    jobs: c.key === "schedulers" ? JOBS : null,
+    queues: c.key === "worker" ? QUEUES : null,
+    unread: [],
+  });
+});
+
+route("GET /api/v1/system-health/checks/:key/history", (req) => {
+  const c = CHECKS.find((x) => x.key === req.params.key);
+  if (!c) return fail(404, "NOT_FOUND", "Not found");
+  return paged(changesOf(c), req, {});
+});
+
+route("POST /api/v1/system-health/status-briefs", () => ({
+  status: 202,
+  body: { document_id: "d0000000-0000-4000-8000-000000000002", file_name: "mycity-status.md", status: "done" },
+}));

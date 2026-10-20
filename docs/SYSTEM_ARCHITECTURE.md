@@ -430,6 +430,10 @@ seed guard.
   and the certificate's days left. Errors, backup, drill and probe all alert through one sender
   (`shared/observability/alert.js`): WhatsApp links per person (`ALERT_WHATSAPP_URLS`) and/or a
   chat webhook (`ALERT_WEBHOOK_URL`).
+- **Health watch.** `mycity-health-watch-<env>.timer` every 5 minutes on the server
+  (`scripts/ops/health-brief.js --watch`): reads the readiness checks without needing the API, the
+  database or Redis, and mails the Status brief to `HEALTH_ALERT_TO` when something is down
+  (`docs/guides/system-health.md` §6, `docs/runbooks/system-health.md` §7).
 
 ---
 

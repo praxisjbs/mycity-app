@@ -2,7 +2,7 @@
 /**
  * /api/v1/system-health: Settings · System Health. Reading needs `system_health` view,
  * acting on a fault needs edit, and downloading a brief needs export, because the file
- * carries stack traces and leaves the building.
+ * carries stack traces or the server's paths and leaves the building.
  *
  * The readiness checks themselves stay on the unauthenticated /api/health/ready, which
  * the proxy and the uptime probe call. This module reads the same probes and adds the
@@ -22,6 +22,18 @@ const exportFaults = requirePermission("system_health", "export");
 route(router, "get", "/status",
   { response: c.system_health.SystemHealthStatus, summary: "Every readiness check as it stands now" },
   view, controller.status);
+
+route(router, "get", "/checks/:key",
+  { response: c.system_health.CheckDetail, summary: "One readiness check run now, with the jobs or queues behind it" },
+  view, controller.check);
+
+route(router, "get", "/checks/:key/history",
+  { query: c.system_health.CheckHistoryQuery, response: c.system_health.CheckChangePage, summary: "A check's changes of state over the last 7 days" },
+  view, controller.history);
+
+route(router, "post", "/status-briefs",
+  { body: c.common.EmptyBody, response: c.documents.ExportFile, summary: "Download the whole system as a brief for an AI" },
+  exportFaults, controller.statusBrief);
 
 route(router, "get", "/performance",
   { query: c.system_health.PerformanceQuery, response: c.system_health.PerformanceSeries, summary: "How the app and the server behaved over an hour, a day, a week or a month" },

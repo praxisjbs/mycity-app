@@ -352,32 +352,17 @@ async function queries(query) {
   };
 }
 
-/** Each queue's counts, from Redis. Null when Redis does not answer. */
-async function queueCounts() {
-  const { JOBS } = require("../../jobs/registry");
-  const queues = require("../../jobs/queues");
-  try {
-    return await Promise.all(
-      JOBS.map(async (j) => {
-        const c = await queues.getQueue(j.queue).getJobCounts("waiting", "active", "delayed", "failed");
-        return { name: j.queue, waiting: c.waiting || 0, active: c.active || 0, delayed: c.delayed || 0, failed: c.failed || 0 };
-      }),
-    );
-  } catch {
-    return null;
-  }
-}
-
 /** GET /system-health/background */
 async function background() {
   const registry = require("../../jobs/registry");
+  const report = require("../../jobs/report");
   const [q, outbox, workers] = await Promise.all([
-    queueCounts(),
+    report.queues(),
     repo.outboxFigures(pool),
     registry.workerHealth().catch(() => null),
   ]);
   return {
-    queues: q,
+    queues: q.error ? null : q.queues.map((x) => ({ name: x.queue, waiting: x.waiting, active: x.active, delayed: x.delayed, failed: x.failed })),
     outbox_waiting: outbox.waiting,
     outbox_oldest_s: outbox.oldest_s === null ? null : Math.max(0, outbox.oldest_s),
     outbox_failed: outbox.failed,
@@ -386,59 +371,36 @@ async function background() {
   };
 }
 
-/** "Every 5 minutes", "Daily at 08:00", "Hourly at :10": a scheduler's interval in words. */
-function everyOf(spec) {
-  if (spec.every) {
-    const minutes = spec.every / 60_000;
-    if (spec.every < 60_000) {
-      const seconds = Math.round(spec.every / 1000);
-      return seconds === 1 ? "Every second" : `Every ${seconds} seconds`;
-    }
-    if (minutes === 1) return "Every minute";
-    if (minutes < 60) return `Every ${Math.round(minutes)} minutes`;
-    return minutes === 60 ? "Hourly" : `Every ${Math.round(minutes / 60)} hours`;
-  }
-  const [m, h, dom, mon, dow] = String(spec.pattern).trim().split(/\s+/);
-  const daily = dom === "*" && mon === "*" && dow === "*";
-  const two = (n) => String(n).padStart(2, "0");
-  if (daily && /^\d+$/.test(m) && /^\d+$/.test(h)) return `Daily at ${two(h)}:${two(m)}`;
-  if (daily && /^\d+$/.test(m) && h === "*") return `Hourly at :${two(m)}`;
-  const step = /^\*\/(\d+)$/.exec(m);
-  if (daily && step && h === "*") return `Every ${step[1]} minutes`;
-  const hours = /^(\d+)-(\d+)$/.exec(h);
-  if (daily && step && hours) return `Every ${step[1]} minutes, ${two(hours[1])}:00 to ${two(Number(hours[2]) + 1)}:00`;
-  return spec.pattern;
-}
-
-/** GET /system-health/background/jobs */
+/**
+ * GET /system-health/background/jobs: how long each scheduler's runs take and how often they
+ * fail. Whether it is on time, and its cadence in words, come from the one judgement in
+ * jobs/report.js that Status reads too, so the two tabs never disagree.
+ */
 async function jobs(query) {
   const registry = require("../../jobs/registry");
-  const { staleAfterMs } = require("../../http/health");
+  const report = require("../../jobs/report");
   const specs = registry.schedules();
-  const byName = new Map(specs.map((s) => [s.name, s]));
-  const page = await repo.jobsPage(pool, query, specs.map((s) => s.name));
-  const now = Date.now();
+  const [page, judged] = await Promise.all([
+    repo.jobsPage(pool, query, specs.map((s) => s.name)),
+    report.schedulers({ db: pool, redis: true }),
+  ]);
+  const byName = new Map(judged.jobs.map((j) => [j.name, j]));
   return {
     ...page,
     data: page.data.map((r) => {
-      const spec = byName.get(r.name);
-      const at = r.last_run_at ? new Date(r.last_run_at).getTime() : null;
+      const j = byName.get(r.name);
       const runs = Number(r.runs) || 0;
-      let state = "on_time";
-      if (at === null) state = "never";
-      else if (now - at > staleAfterMs(spec)) state = "late";
-      else if (r.ok === false) state = "failing";
       return {
         name: r.name,
-        summary: (spec && spec.summary) || null,
-        every: spec ? everyOf(spec) : "",
+        summary: (j && j.summary) || null,
+        every: j ? j.cadence : "",
         last_run_at: iso(r.last_run_at),
         last_ms: int(r.duration_ms),
         mean_ms: runs && r.total_ms !== null ? Math.round(Number(r.total_ms) / runs) : null,
         max_ms: r.max_ms === null || r.max_ms === undefined || !runs ? null : int(r.max_ms),
         runs,
         failures: Number(r.failures) || 0,
-        state,
+        state: j ? j.state : "late",
       };
     }),
   };
@@ -482,7 +444,6 @@ module.exports = {
   jobs,
   processes,
   RECORDING_WITHIN_MS,
-  everyOf,
   judge,
   level,
   partsOf,

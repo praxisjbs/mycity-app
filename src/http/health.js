@@ -214,52 +214,27 @@ registerCheck("database_usage", async () => {
 });
 
 /**
- * How long a scheduler may be silent before something is wrong. Three times its own
- * interval, so one missed tick is not an alarm. A cron schedule is read coarsely: by
- * its hour field, hourly or daily, which is all the shapes this repository uses.
- */
-function staleAfterMs(spec) {
-  if (spec.every) return Math.max(spec.every * 3, 15 * 60_000);
-  const hour = String(spec.pattern || "").trim().split(/\s+/)[1] || "*";
-  return hour === "*" || hour.startsWith("*/") ? 3 * 3600_000 : 26 * 3600_000;
-}
-
-/**
  * Has every background job actually run? Without this a scheduler that is never
  * started is invisible: the first release of System Health shipped with its own three
  * unregistered, and nothing said so. Degraded, never fatal: the API serves without them.
+ * Whether a job is on time is jobs/report.js's judgement, so this probe, the check
+ * sheet and the brief can never disagree. Only names leave here: the reasons and the
+ * errors are behind the System Health permission.
  */
 registerCheck("schedulers", async () => {
-  const { schedules } = require("../jobs/registry");
-  const specs = schedules();
-  let rows;
-  try {
-    ({ rows } = await require("../config/db").pool.query(
-      "SELECT name, last_run_at, ok FROM schedule_run",
-    ));
-  } catch (err) {
-    // A database from before 9110 has no table yet: say so rather than read as broken.
-    return {
-      status: "degraded",
-      schedulers: specs.length,
-      error: err.code === "42P01" ? "no schedule_run table yet" : "unreadable",
-    };
-  }
-  const seen = new Map(rows.map((r) => [r.name, r]));
-  const now = Date.now();
-  const late = [];
-  const failing = [];
-  for (const spec of specs) {
-    const run = seen.get(spec.name);
-    const at = run && run.last_run_at ? new Date(run.last_run_at).getTime() : null;
-    if (at === null || now - at > staleAfterMs(spec)) late.push(spec.name);
-    else if (run.ok === false) failing.push(spec.name);
-  }
+  const { jobs, db_error: error } = await require("../jobs/report").schedulers({
+    db: require("../config/db").pool,
+  });
+  const named = (state) => jobs.filter((j) => j.state === state).map((j) => j.name);
+  if (error) return { status: "degraded", schedulers: jobs.length, error };
+  const late = named("late");
+  const failing = named("failing");
   return {
     status: late.length || failing.length ? "degraded" : "up",
-    schedulers: specs.length,
+    schedulers: jobs.length,
     late,
     failing,
+    waiting: named("waiting"),
   };
 });
 
@@ -281,6 +256,42 @@ registerCheck("migrations", async () => {
     };
   }
 });
+
+/** The names of every probe, in the order they were registered. */
+function checkNames() {
+  return [...checks.keys()];
+}
+
+/**
+ * One probe, run now, with the same timeout and the same reading of a throw as runChecks().
+ * @param {string} name
+ * @returns {Promise<{status: string}|null>}  null for a name no probe has
+ */
+async function runCheck(name) {
+  const check = checks.get(name);
+  if (!check) return null;
+  try {
+    return await withTimeout(Promise.resolve().then(check.fn), name);
+  } catch (err) {
+    return { status: "down", error: err && err.message };
+  }
+}
+
+/**
+ * ready, degraded or unavailable for a set of results, by runChecks()'s own rule: a
+ * fatal check down makes it unavailable, anything else not up makes it degraded.
+ * @param {Record<string, {status: string}>} results
+ */
+function serviceState(results) {
+  let fatal = false;
+  let degraded = false;
+  for (const [name, value] of Object.entries(results || {})) {
+    const check = checks.get(name);
+    if (value && value.status === "down" && check && check.fatal) fatal = true;
+    else if (!value || value.status !== "up") degraded = true;
+  }
+  return fatal ? "unavailable" : degraded ? "degraded" : "ready";
+}
 
 async function runChecks() {
   const names = [...checks.keys()];
@@ -328,4 +339,4 @@ function healthRouter() {
   return router;
 }
 
-module.exports = { healthRouter, registerCheck, runChecks, staleAfterMs };
+module.exports = { healthRouter, registerCheck, runChecks, runCheck, checkNames, serviceState };

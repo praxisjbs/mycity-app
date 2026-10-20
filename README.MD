@@ -101,10 +101,14 @@ mycity-app/
 │   │                         restore-drill.js (weekly), installed on the server as mycity-backup,
 │   │                         mycity-restore-drill
 │   ├── import/               command-line import
+│   ├── ops/                  health-brief.js: the Status brief made on the server (npm run health:brief),
+│   │                         and with --watch the health watch that mails it when something is down
 │   └── deploy/               deploy-gate, check-gate, release-manifest, verify-staging, rollback
 ├── ops/
 │   ├── systemd/              four units + env templates; mycity-backup.service + .timer (nightly
 │   │                         02:30), mycity-restore-drill.service + .timer (Sundays 04:00),
+│   │                         mycity-health-watch-prod.service + .timer and
+│   │                         mycity-health-watch-stg.service + mycity-health-watch-stg.timer (every 5 minutes),
 │   │                         mycity-host-stats.service + .timer (every 15 minutes)
 │   ├── provision/            provision.sh: a fresh Ubuntu 24.04 to a ready server (runbooks/server-setup.md)
 │   ├── nginx/                mycity.conf (shared) + one file per host (runbooks/proxy.md)
@@ -225,7 +229,7 @@ src/
 │   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
 └── jobs/
-    ├── queues.js · registry.js · cron-lock.js
+    ├── queues.js · registry.js · cron-lock.js · report.js (whether each scheduler is on time, what each queue holds)
     ├── handlers/      one file per queue (table in §5.15)
     ├── schedulers/    one file per recurring job
     └── loops/         long-running loops (mail-idle, outbox-wake)

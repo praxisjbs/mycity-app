@@ -102,9 +102,9 @@ const PART: Record<string, { label: string; series: StackBarPart["series"] }> = 
 
 const JOB_STATE: Record<JobRun["state"], { tone: Tone; text: string }> = {
   on_time: { tone: "ok", text: "On Time" },
-  late: { tone: "err", text: "Late" },
   failing: { tone: "err", text: "Failing" },
-  never: { tone: "warn", text: "Never Run" },
+  late: { tone: "err", text: "Late" },
+  waiting: { tone: "neutral", text: "Waiting" },
 };
 
 const HELP = {

@@ -243,14 +243,4 @@ describe("judging and splitting what the server says", () => {
     ]);
     expect(perf.diskParts(null, 1000)).toEqual([]);
   });
-
-  test("every scheduler's cadence reads as words", () => {
-    expect(perf.everyOf({ every: 60_000 })).toBe("Every minute");
-    expect(perf.everyOf({ every: 5 * 60_000 })).toBe("Every 5 minutes");
-    expect(perf.everyOf({ every: 1000 })).toBe("Every second");
-    expect(perf.everyOf({ pattern: "0 8 * * *" })).toBe("Daily at 08:00");
-    expect(perf.everyOf({ pattern: "10 * * * *" })).toBe("Hourly at :10");
-    expect(perf.everyOf({ pattern: "*/5 * * * *" })).toBe("Every 5 minutes");
-    expect(perf.everyOf({ pattern: "*/5 8-17 * * *" })).toBe("Every 5 minutes, 08:00 to 18:00");
-  });
 });

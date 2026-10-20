@@ -19,7 +19,7 @@ const exportFiles = require("../../shared/documents/exports");
 const { exportFilename } = require("../../shared/spreadsheet/cells");
 const repo = require("./system_health.repo");
 const { explain } = require("./system_health.explain");
-const { EVENTS, BRIEF_DOC_TYPE } = require("./system_health.events");
+const { EVENTS, BRIEF_DOC_TYPE, STATUS_BRIEF_DOC_TYPE } = require("./system_health.events");
 
 /**
  * What each probe is called on screen, and where to look when it is not up. A list of
@@ -71,40 +71,182 @@ function detailOf(key, v) {
   else if (key === "cpu" && v.load !== undefined) bits.push(`load ${v.load} across ${v.cores} cores`);
   if (key === "database_usage" && v.size_mb !== undefined)
     bits.push(`${v.size_mb} MB, ${v.connections_used} of ${v.connections_allowed} connections`);
-  if (key === "schedulers" && v.schedulers !== undefined)
-    bits.push(
-      (v.late || []).length
-        ? `${v.late.length} of ${v.schedulers} have not run: ${v.late.slice(0, 3).join(", ")}`
-        : `all ${v.schedulers} running`,
-    );
+  if (key === "schedulers" && v.schedulers !== undefined) {
+    const late = v.late || [];
+    const failing = v.failing || [];
+    const waiting = v.waiting || [];
+    const some = (names) => `${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""}`;
+    if (late.length) bits.push(`${late.length} of ${v.schedulers} have not run: ${some(late)}`);
+    if (failing.length) bits.push(`${failing.length} failing: ${some(failing)}`);
+    if (!late.length && !failing.length) bits.push(`all ${v.schedulers - waiting.length} on time`);
+    if (waiting.length) bits.push(`${waiting.length} not due yet`);
+  }
   if (v.latency_ms !== undefined && v.latency_ms !== null) bits.push(`answered in ${v.latency_ms} ms`);
   if (!bits.length) bits.push(v.status === "up" ? "Answering" : "Not answering");
   return bits.join(", ");
 }
 
+const stateOf = (v) => (v.status === "up" ? "up" : v.status === "degraded" ? "degraded" : "down");
+
+/**
+ * When each check entered the state the snapshots last saw, by key. Empty when the
+ * database cannot say: the checks still show, without a since.
+ */
+async function sinceByKey() {
+  const rows = await repo.lastChanges(pool).catch(() => []);
+  return new Map(rows.map((r) => [r.key, r]));
+}
+
+/** One probe's result as the wire carries it. */
+function presentCheck(key, v, since) {
+  const state = stateOf(v);
+  const seen = since.get(key);
+  return {
+    key,
+    label: label(key),
+    state,
+    detail: detailOf(key, v),
+    look_at: state === "up" ? null : lookAt(key),
+    latency_ms: v.latency_ms ?? null,
+    since: seen && seen.state === state && seen.since ? new Date(seen.since).toISOString() : null,
+  };
+}
+
 /** GET /system-health/status */
 async function status() {
   const { runChecks } = require("../../http/health");
-  const [{ checks, fatal, degraded }, counts] = await Promise.all([runChecks(), repo.faultCounts(pool)]);
+  // Neither database read may take the screen down with it: with Postgres down the
+  // checks are exactly what a person needs to see (§11).
+  const [{ checks, fatal, degraded }, counts, since] = await Promise.all([
+    runChecks(),
+    repo.faultCounts(pool).catch(() => null),
+    sinceByKey(),
+  ]);
   const build = buildInfo();
   return {
     state: fatal ? "unavailable" : degraded ? "degraded" : "ready",
     checked_at: new Date().toISOString(),
     release: build.sha,
     deployed_at: build.built_at || null,
-    checks: Object.entries(checks).map(([key, v]) => ({
-      key,
-      label: label(key),
-      state: v.status === "up" ? "up" : v.status === "degraded" ? "degraded" : "down",
-      detail: detailOf(key, v),
-      look_at: v.status === "up" ? null : lookAt(key),
-      latency_ms: v.latency_ms ?? null,
-    })),
+    checks: Object.entries(checks).map(([key, v]) => presentCheck(key, v, since)),
     faults_open: counts ? counts.faults_open : 0,
     faults_new_24h: counts ? counts.faults_new_24h : 0,
     faults_returned_24h: counts ? counts.faults_returned_24h : 0,
   };
 }
+
+/**
+ * What each figure a probe reports is called on screen, and its unit. Anything a probe
+ * adds later still shows, under its own key in words.
+ */
+const FACTS = {
+  latency_ms: ["Answered In", " ms"],
+  error: ["Error", ""],
+  backlog: ["Waiting Events", ""],
+  failed: ["Failed Events", ""],
+  workers: ["Workers Alive", ""],
+  mounted: ["Modules Mounted", ""],
+  routes: ["Routes", ""],
+  skipped: ["Modules Skipped", ""],
+  head: ["Latest Migration", ""],
+  vendor: ["Answering", ""],
+  mode: ["Mode", ""],
+  sent_last_hour: ["Sent This Hour", ""],
+  per_hour: ["Hourly Limit", ""],
+  free_pct: ["Free", "%"],
+  free_gb: ["Free Space", " GB"],
+  total_gb: ["Total", " GB"],
+  path: ["Measured At", ""],
+  used_pct: ["In Use", "%"],
+  used_gb: ["Used Space", " GB"],
+  process_mb: ["This Process", " MB"],
+  busy_pct: ["Busy", "%"],
+  load: ["Load per Core", ""],
+  cores: ["Cores", ""],
+  size_mb: ["Size", " MB"],
+  connections_used: ["Connections Used", ""],
+  connections_allowed: ["Connections Allowed", ""],
+  connections_pct: ["Connections", "%"],
+  schedulers: ["Jobs", ""],
+  late: ["Late", ""],
+  failing: ["Failing", ""],
+  waiting: ["Not Due Yet", ""],
+};
+
+const words = (key) => key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+/** Every figure a probe reported, labelled, scrubbed and in the order it reported them. */
+function factsOf(v) {
+  const { scrub } = require("../../shared/observability/scrub");
+  const shown = ([k, value]) =>
+    k !== "status" && value !== undefined && value !== null && (Array.isArray(value) || typeof value !== "object");
+  return Object.entries(v || {})
+    .filter(shown)
+    .map(([k, value]) => {
+      const [name, unit] = FACTS[k] || [words(k), ""];
+      const text = Array.isArray(value)
+        ? value.length ? value.join(", ") : "None"
+        : typeof value === "boolean"
+          ? value ? "Yes" : "No"
+          : `${value}${unit}`;
+      return { label: name, value: scrub(String(text)).slice(0, 300) };
+    });
+}
+
+/**
+ * A readiness snapshot newer than this is the system as it stands: two of the five-minute
+ * job's intervals, so one missed tick is not an accusation (the Faults brief's state now).
+ */
+const SNAPSHOT_RECENT_MS = 11 * 60_000;
+
+/** The check keys this build has probes for. */
+function checkKeys() {
+  return require("../../http/health").checkNames();
+}
+
+/**
+ * GET /system-health/checks/:key: one probe run now, with everything behind it. The jobs
+ * and the queues are read from the source, not from the probe, so a person sees each
+ * scheduler and queue rather than a count.
+ */
+async function check(key) {
+  if (!checkKeys().includes(key)) throw new AppError("NOT_FOUND", "Not found", 404);
+  const health = require("../../http/health");
+  const report = require("../../jobs/report");
+  const [v, since, jobs, queues] = await Promise.all([
+    health.runCheck(key),
+    sinceByKey(),
+    key === "schedulers" ? report.schedulers({ db: pool }) : null,
+    key === "worker" ? report.queues() : null,
+  ]);
+  const unread = [];
+  if (jobs && jobs.db_error) unread.push(`Job runs: ${jobs.db_error}`);
+  if (jobs && jobs.queue_error) unread.push(`Next ticks: ${jobs.queue_error}`);
+  if (queues && queues.error) unread.push(`Queues: ${queues.error}`);
+  return {
+    ...presentCheck(key, v, since),
+    facts: factsOf(v),
+    jobs: jobs ? jobs.jobs : null,
+    queues: queues ? queues.queues : null,
+    unread,
+  };
+}
+
+/** GET /system-health/checks/:key/history */
+async function history(key, query) {
+  if (!checkKeys().includes(key)) throw new AppError("NOT_FOUND", "Not found", 404);
+  const page = await repo.changes(pool, key, query);
+  return {
+    ...page,
+    data: page.data.map((r) => ({
+      at: new Date(r.at).toISOString(),
+      from: r.from,
+      to: r.to,
+      detail: detailOf(key, r.value || { status: r.to }),
+    })),
+  };
+}
+
 
 /* ------------------------------------------------------------------ *
  * Faults
@@ -267,8 +409,126 @@ async function requestBrief(body, actor) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * The Status brief
+ * ------------------------------------------------------------------ */
+
+/** The checks of one probe run that are not up, labelled: the Faults brief's state lines. */
+function notUpIn(checks) {
+  return Object.entries(checks || {})
+    .filter(([, v]) => v && v.status !== "up")
+    .map(([key, v]) => ({ key, label: label(key), state: stateOf(v), detail: detailOf(key, v) }));
+}
+
+/**
+ * Everything the Status brief reads, each part on its own, so one source being down never
+ * costs the rest: a part that fails is named in `unread` instead. Used by the worker for
+ * Download Brief and by scripts/ops/health-brief.js on the server, where the database,
+ * Redis or the API itself may be what is down.
+ * @param {{checks: object, api?: {answering: boolean, error?: string|null}|null}} seen
+ *   checks  runChecks()'s `checks`, as whoever ran them saw them
+ */
+async function statusBriefInput({ checks, api = null }) {
+  const { scrub } = require("../../shared/observability/scrub");
+  const report = require("../../jobs/report");
+  const unread = [];
+  const part = async (what, fn) => {
+    try {
+      return await fn();
+    } catch (err) {
+      unread.push(`${what}: ${scrub(String((err && err.message) || err)).slice(0, 200)}`);
+      return null;
+    }
+  };
+  const [since, jobs, queues, changes, last24, open] = await Promise.all([
+    part("When each check changed", sinceByKey),
+    report.schedulers({ db: pool }),
+    report.queues(),
+    part("Changes over the last 7 days", () => repo.changesOfAll(pool, { page: 1 })),
+    part("The last 24 hours", () => performance({ range: "24h" })),
+    part("Open faults", () => faults({ status: "active", page: 1 })),
+  ]);
+  if (jobs.db_error) unread.push(`Background job runs: ${jobs.db_error}`);
+  if (jobs.queue_error) unread.push(`The schedule queue: ${jobs.queue_error}`);
+  if (queues.error) unread.push(`Queues: ${queues.error}`);
+
+  const list = Object.entries(checks || {}).map(([key, v]) => ({
+    ...presentCheck(key, v, since || new Map()),
+    facts: factsOf(v),
+  }));
+  const build = buildInfo();
+  return {
+    now: new Date(),
+    config,
+    release: build.sha,
+    deployed_at: build.built_at || null,
+    // From the checks given, never from a second run that could disagree with them.
+    state: require("../../http/health").serviceState(checks),
+    checks: list,
+    api,
+    jobs,
+    queues,
+    changes: changes
+      ? {
+          rows: changes.data.map((r) => ({
+            at: new Date(r.at).toISOString(),
+            key: r.key,
+            label: label(r.key),
+            from: r.from,
+            to: r.to,
+            detail: detailOf(r.key, r.value || { status: r.to }),
+          })),
+          total: changes.page.total,
+        }
+      : null,
+    last24,
+    faults: open ? { rows: open.data, total: open.page.total } : null,
+    host: null,
+    unread,
+  };
+}
+
+/**
+ * Download Brief on Status: the file is reserved here and written by the worker, as every
+ * export is. The checks travel in the event exactly as the API ran them at the press,
+ * because only the API mounts the modules, and the worker's own run would say less.
+ * Nothing about any fault changes.
+ */
+async function requestStatusBrief(actor) {
+  const { runChecks } = require("../../http/health");
+  const { scrubObject } = require("../../shared/observability/scrub");
+  const { checks } = await runChecks();
+  const client = await pool.connect();
+  try {
+    return await atomically(client, async () => {
+      const doc = await exportFiles.reserve(client, {
+        doc_type: STATUS_BRIEF_DOC_TYPE,
+        entity: { type: STATUS_BRIEF_DOC_TYPE, id: crypto.randomUUID() },
+        file_name: exportFilename({ base: "mycity-status", env: config.APP_ENV, extension: "md" }),
+        title: "System Health status brief",
+        actor,
+      });
+      await emit(client, {
+        key: EVENTS.SYSTEM_HEALTH_STATUS_BRIEF_REQUESTED,
+        entity: { type: doc.entity_type, id: doc.entity_id },
+        actor,
+        payload: {
+          document_id: doc.document_id,
+          requested_by: actor.user_id,
+          checked_at: new Date().toISOString(),
+          checks: scrubObject(checks),
+        },
+      });
+      return exportFiles.present(doc);
+    });
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   CHECKS,
+  SNAPSHOT_RECENT_MS,
   label,
   lookAt,
   detailOf,
@@ -280,4 +540,11 @@ module.exports = {
   addNote,
   bulk,
   requestBrief,
+  presentCheck,
+  factsOf,
+  check,
+  history,
+  notUpIn,
+  statusBriefInput,
+  requestStatusBrief,
 };

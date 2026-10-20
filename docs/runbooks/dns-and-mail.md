@@ -59,6 +59,7 @@ password they already use for webmail.
 | Sending limit | **50 recipients an hour** | `MAIL_SEND_PER_HOUR`: production 40, staging 10 (both send from `no-reply`) |
 | IMAP connections | **30 at once from one IP address** | the Mailbox module's limit (guide `mailbox.md` §6); prod and staging share the server's IP |
 | Mailboxes on the plan | **30** | at most 30 staff mailboxes; more needs a bigger plan |
+| MX | `mx1-hosting`, `mx2-hosting`, `mx3-hosting.jellyfish.systems`: Namecheap's spam filter, which hands mail back to the mailboxes on `mycityapp.io` | `SMTP_LOCAL_DOMAINS=mycityapp.io` (the default): system mail to staff is delivered on the host, not refused by the route check (foundation guide §6.14) |
 
 System mail is paced to the limit (`src/services/mail/pace.js`): a batch larger than the hour's
 allowance (payslips for every employee, a round of invitations) goes out over several hours instead

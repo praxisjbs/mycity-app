@@ -106,6 +106,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · System mail to `mycityapp.io` was refused as a trapped route (System Health fault #1: every staging digest failed with `MAIL_ROUTE_TRAPPED`). The domain's MX is Namecheap's spam filter in front of the same cPanel host that holds the mailboxes, which the route check cannot tell from a real trap by DNS. New `SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) names the domains whose mailboxes are on the relay; they are not checked, every other domain still is (`docs/guides/foundation.md` §6.14). Today's failed digests are not re-sent. Left: nothing.
 - 19/10/2026 · TB · Map tiles and a worksite's address (decided 19/10/2026; `docs/guides/foundation.md` §5, §6.13): `GET /api/v1/maps/tiles/:z/:x/:y.png` (signed in; `MapView` takes `loadTile` and the app fetches each tile with the session, as photos load, so no public route spends the quota; kept a day on the server, a week in the browser) and `GET /api/v1/maps/reverse` (`people` create or edit; a worksite's centre only, never a home or a punch). Left: `GEOAPIFY_API_KEY` on staging and production (GE).
 - 19/10/2026 · TB · Address search (F21; `docs/guides/foundation.md` §6.13): `GET /api/v1/maps/search` in a new `maps` module (`self`, reads and writes nothing) over `services/maps/geoapify.service.js` (Geoapify autocomplete with the key on the server, biased to Lagos, six places at most, answers kept ten minutes; 503 `MAPS_OFF` with no `GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui` (a combobox that suggests places as it is typed and hands back the place picked; `maps/usePlaces.ts` now shared with `PlaceSearch`). On every address a person types: Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation, a vacancy's location. Left: `GEOAPIFY_API_KEY` set on staging and production (GE); the map tiles and the reverse lookup through our API (`MapView`, `LocationLabel`), whose tiles load without the session's token.
 - 19/10/2026 · TB · Documents and media: a PDF's pages are drawn in the app by PDF.js (`PdfViewer`, its own chunk; its fonts, character maps and decoders served from `/pdfjs/`, never precached), replacing the browser's own viewer, which drew nothing on Android and was blocked by the security policy (`object-src 'none'`) on staging and production (FRONTEND_FOUNDATION §5, PR 3 question 4). `MediaViewer` opens a photo, a video or a PDF full screen everywhere a file is opened (Staff Community, My Documents, a mail's attachments), with Download and Share on a phone; `MediaRef` carries a file's shape, page count, length and sizes; the worker counts a PDF's pages and draws its first page (`document.page_count`, migration 1147, `document.derived`). Checked in Chromium on the live build under the production policy, desktop and an emulated Pixel 7: a three-page PDF, a JPEG 2000 photo (WebAssembly refused by the policy, PDF.js's plain decoder used) and Japanese text (character maps from `/pdfjs/cmaps`). Left: Share on a real phone; the worker's first page shows boxes for Japanese or Chinese text in a PDF that does not carry its fonts (no such fonts on the servers).
@@ -1078,7 +1079,23 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   digest opens Status, and the three tabs follow `system_health` in the shell and ⌘K. Tested: 13
   new integration tests, 21 unit tests, 3 screen tests, the component tests. Left: `provision.sh`
   run again on the server (one PostgreSQL restart) turns on slow SQL and the disk's parts
-  (`docs/runbooks/system-health.md` §7); until then both say so on screen.
+  (`docs/runbooks/system-health.md` §8); until then both say so on screen.
+- 20/10/2026 · TB · Status (#95) made for investigating. It refreshes every 30 seconds; each check
+  opens a sheet (`GET /system-health/checks/:key`) with what its probe measured, since when, its 7
+  days of changes 25 a page, every scheduler for Background Jobs (what the code set it to, in words,
+  last run, result, error, next run, why it is late) and every queue for Worker. **Download Brief**
+  on Status writes the whole system as Markdown (`system_health.status-brief.js`) with instructions
+  that make an AI understand first, ask 4 to 10 questions, gather evidence with read-only SSH
+  commands pasted back, change the server only with a yes, open a draft PR for code and walk the
+  owner through the rest; the Faults brief shares those instructions and gains the system's state
+  at each occurrence. On the server, `npm run health:brief` (`scripts/ops/health-brief.js`) builds
+  the same file without the app, and `mycity-health-watch-<env>.timer` mails it every time
+  something is down to intelligence@jbspraxis.com, copying tomblakeasaah@gmail.com and
+  praxisjbs@gmail.com. Fixed: `outbox-dispatch` was never recorded (so it always read as not run),
+  a nightly job read as late before its first slot, a run that failed on its first try kept no
+  failure time, and Status failed outright while the database was down. Left: install the two
+  watch timers once on the server (`docs/runbooks/system-health.md` §7.3), and confirm the first
+  mail arrives.
 - 20/10/2026 · TB · System Health split into three tabs (#95 Status, #96 Performance, #97 Faults)
   after TB walked the first release on staging, and the engine behind it fixed. **The three
   schedulers were never registered in `src/jobs/registry.js`, so nothing ran for an hour and the

@@ -486,3 +486,75 @@ describe("shipped templates survive an editor's formatter", () => {
     expect(templates.shipped("email", "notification").subject).toBe("{{ title }}");
   });
 });
+
+describe("whether a job is on time (src/jobs/report.js)", () => {
+  const report = require("../../../src/jobs/report");
+  const NOW = Date.parse("2026-10-20T12:00:00Z");
+  const H = 3_600_000;
+  const daily = { name: "media-reconcile", pattern: "30 2 * * *", tz: "Africa/Lagos" };
+  const fiveMin = { name: "system-health", every: 5 * 60_000 };
+  const inProcess = { name: "outbox-dispatch", every: 1000, inProcess: true };
+  const row = (over = {}) => ({ created_at: new Date(NOW - 30 * 24 * H), last_run_at: null, ok: null, ...over });
+
+  test("what a job was set to, in words", () => {
+    expect(report.cadenceOf({ every: 1000 })).toBe("Every second");
+    expect(report.cadenceOf({ every: 120_000 })).toBe("Every 2 minutes");
+    expect(report.cadenceOf({ every: 3_600_000 })).toBe("Every hour");
+    expect(report.cadenceOf({ pattern: "*/5 * * * *", tz: "Africa/Lagos" })).toBe("Every 5 minutes");
+    expect(report.cadenceOf({ pattern: "*/5 8-17 * * *", tz: "Africa/Lagos" })).toBe("Every 5 minutes, 08:00 to 17:59 (Lagos)");
+    expect(report.cadenceOf({ pattern: "10 * * * *", tz: "Africa/Lagos" })).toBe("Hourly at :10");
+    expect(report.cadenceOf(daily)).toBe("Daily at 02:30 (Lagos)");
+    expect(report.cadenceOf({ pattern: "0 4 * * 0", tz: "Africa/Lagos" })).toBe("Sundays at 04:00 (Lagos)");
+    expect(report.cadenceOf({ pattern: "0 9 * * 1-5", tz: "Africa/Lagos" })).toBe("Weekdays at 09:00 (Lagos)");
+    expect(report.cadenceOf({ pattern: "0 9 1,15 * *", tz: "Africa/Lagos" })).toBe("Cron 0 9 1,15 * * (Lagos)");
+    expect(report.setAsOf(daily)).toBe("cron 30 2 * * * Africa/Lagos");
+    expect(report.setAsOf(fiveMin)).toBe("every 300000 ms");
+  });
+
+  test("every scheduler this build has reads in words, not as cron", () => {
+    for (const spec of registry.schedules()) expect(report.cadenceOf(spec)).not.toMatch(/^Cron /);
+  });
+
+  test("how long a job may be silent", () => {
+    expect(report.staleAfterMs(fiveMin)).toBe(15 * 60_000);
+    expect(report.staleAfterMs(inProcess)).toBe(15 * 60_000);
+    expect(report.staleAfterMs({ pattern: "*/5 * * * *" })).toBe(15 * 60_000);
+    expect(report.staleAfterMs({ pattern: "10 * * * *" })).toBe(3 * H);
+    expect(report.staleAfterMs(daily)).toBe(26 * H);
+    expect(report.staleAfterMs({ pattern: "*/5 8-17 * * *" })).toBe(26 * H);
+  });
+
+  test("a nightly job started at noon is not due yet, and late a day later if it never ran", () => {
+    const started = row({ created_at: new Date(NOW - 1 * H) });
+    expect(report.judge(daily, started, { now: NOW })).toEqual({ state: "waiting", reason: "Its first slot has not come yet" });
+    expect(report.judge(daily, row({ created_at: new Date(NOW - 27 * H) }), { now: NOW }).state).toBe("late");
+  });
+
+  test("never started, missing from the queue, or a tick nobody took is late", () => {
+    expect(report.judge(daily, undefined, { now: NOW }).reason).toBe("Never started by the worker");
+    const ran = row({ last_run_at: new Date(NOW - 2 * H), ok: true });
+    expect(report.judge(daily, ran, { now: NOW, queued: false }).reason).toBe("Missing from the schedule queue");
+    expect(report.judge(daily, ran, { now: NOW, queued: true, next: NOW - 30 * 60_000 }).reason).toMatch(/overdue: no worker is taking it/);
+    // An in-process job is not on the queue at all, and is never judged by it.
+    expect(report.judge(inProcess, row({ last_run_at: new Date(NOW - 1000), ok: true }), { now: NOW, queued: false }).state).toBe("on_time");
+  });
+
+  test("a job that ran is on time, failing when its last run threw, late once it stops", () => {
+    expect(report.judge(fiveMin, row({ last_run_at: new Date(NOW - 4 * 60_000), ok: true }), { now: NOW }).state).toBe("on_time");
+    expect(report.judge(fiveMin, row({ last_run_at: new Date(NOW - 4 * 60_000), ok: false }), { now: NOW }).state).toBe("failing");
+    expect(report.judge(fiveMin, row({ last_run_at: new Date(NOW - 20 * 60_000), ok: true }), { now: NOW })).toEqual({
+      state: "late",
+      reason: "Has not run for 20 minutes",
+    });
+  });
+
+  test("with no database or Redis, every job still has a row saying what it was set to", async () => {
+    const r = await report.schedulers({ db: null, redis: false });
+    expect(r.jobs).toHaveLength(registry.SCHEDULERS.length);
+    expect(r.db_error).toBe("the database was not asked");
+    expect(r.jobs.every((j) => j.cadence && j.set_as && j.state === "late")).toBe(true);
+    const q = await report.queues();
+    expect(q.queues).toEqual([]);
+    expect(q.error).toMatch(/Redis is not connected/);
+  });
+});

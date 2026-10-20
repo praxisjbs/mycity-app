@@ -473,6 +473,14 @@ const ENTRIES = [
     },
   ],
   [
+    "SMTP_LOCAL_DOMAINS",
+    str("mycityapp.io"),
+    {
+      group: "Mail",
+      doc: "Comma-separated domains whose mailboxes are on the SMTP server itself, behind the host's spam-filter MX. System mail to them is delivered there; every other domain is still route-checked. Empty: none.",
+    },
+  ],
+  [
     "MAIL_RBL_HOSTS",
     str(""),
     {
@@ -648,6 +656,22 @@ const ENTRIES = [
       group: "Observability",
       doc: "WhatsApp alert links, one per person, separated by spaces; each a gateway link with {text} where the message goes (docs/runbooks/monitoring.md §2). Empty: not used.",
       secret: true,
+    },
+  ],
+  [
+    "HEALTH_ALERT_TO",
+    str("intelligence@jbspraxis.com"),
+    {
+      group: "Observability",
+      doc: "Who the server's health watch mails the Status brief to when something is down (scripts/ops/health-brief.js, docs/runbooks/system-health.md). Addresses separated by commas or spaces. Empty: it mails nobody.",
+    },
+  ],
+  [
+    "HEALTH_ALERT_CC",
+    str("tomblakeasaah@gmail.com, praxisjbs@gmail.com"),
+    {
+      group: "Observability",
+      doc: "Who the health watch copies on that mail. Addresses separated by commas or spaces.",
     },
   ],
   [
