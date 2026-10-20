@@ -181,6 +181,9 @@ describeDb("the attendance roster against the real migrations", () => {
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
+    // The organisation's policy, with no grace: the oldest row from before versions, so a
+    // person's own policy below never becomes everyone's. No policy is seeded (A26).
+    await one("INSERT INTO attendance_policy (name, grace_minutes) VALUES ('Organisation', 0) RETURNING attendance_policy_id");
     workingWeek.invalidateCalendar();
     ({ department_id: ops } = await one(
       "INSERT INTO department (code, name) VALUES ('ROSTER_OPS', 'Field Operations') RETURNING department_id",

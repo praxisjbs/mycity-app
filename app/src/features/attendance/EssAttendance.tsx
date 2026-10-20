@@ -4,7 +4,6 @@ import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceTod
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
@@ -13,12 +12,12 @@ import { useClock } from "./ClockButton";
 import { HomeLocationCard } from "./HomeLocation";
 import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAssignments";
 import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
-import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
 /**
- * ESS · My Attendance (#9, with the person's field assignments), My Devices (#88), and Policy
- * Updates (#89), still on INTERIM shapes until M9 (docs/guides/attendance.md §10). Work Location
- * Requests (#87) is WorkLocationRequests.tsx.
+ * ESS · My Attendance (#9, with the person's field assignments) and My Devices (#88)
+ * (docs/guides/attendance.md §10). Work Location Requests (#87) is WorkLocationRequests.tsx, Policy
+ * Updates (#89) PolicyUpdates.tsx.
  * Everything here is the caller's own: the routes take no employee id.
  */
 
@@ -423,79 +422,6 @@ function RegisterForm({ close }: { close: () => void }) {
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={() => submit()}>Register Device</Button>
       </FormFooter>
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * INTERIM: Work Location Requests (#87) and Policy Updates (#89)
- * ------------------------------------------------------------------ */
-
-export function PolicyUpdatesPage() {
-  const me = useMe();
-  const cur = useApi("GET /api/v1/attendance/policies/current");
-  const versions = usePaged("GET /api/v1/attendance/policies");
-  const ack = useMutation("POST /api/v1/attendance/policies/:version/acknowledge");
-  const modal = useModal();
-  const p = cur.data;
-  if (cur.error) return <ErrorState error={cur.error} onRetry={cur.reload} />;
-  if (!p) return <LoadingRows count={6} />;
-  const read = () =>
-    modal.open({
-      title: `Attendance Policy v${p.version}`,
-      wide: true,
-      body: (
-        <>
-          {[...new Set(p.settings.map((s) => s.section))].map((sec) => (
-            <Card key={sec} className="mb-3">
-              <CardHeader title={sec} />
-              <KeyValue items={p.settings.filter((s) => s.section === sec).map((s) => [s.label, String(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.kind === "mode" ? { record: "Record only", warn: "Warn", block: "Block" }[s.value as string] : s.value)])} />
-            </Card>
-          ))}
-        </>
-      ),
-    });
-  return (
-    <>
-      <PageHeader title="Policy Updates" sub={`Attendance policy · ${me.display_name}`} />
-      <div className="mb-3 rounded-card border border-border bg-background px-3.5 py-3">
-        <h2 data-ui="title" className="text-base">Policy v{p.version}</h2>
-        <div data-copy="content">
-          <p className="mt-1 text-sm leading-normal text-muted-foreground">{p.summary}</p>
-          <ul className="mt-2 list-disc pl-5 text-xs text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={read}>Read Full Policy</Button>
-          {!p.acknowledged_at && (
-            <Button variant="primary" icon="ok" busy={ack.pending} onClick={async () => (await ack.run({ params: { version: String(p.version) }, body: {} }), invalidate("/api/v1/attendance"), toast(`Policy v${p.version} acknowledged`))}>
-              Acknowledge
-            </Button>
-          )}
-        </div>
-      </div>
-      <Grid cols={2}>
-        <Card>
-          <CardHeader title="Acknowledgment" right={p.acknowledged_at ? <Pill tone="ok">{`Acknowledged ${formatDate(p.acknowledged_at)}`}</Pill> : <Pill tone="err">Pending</Pill>} />
-          <KeyValue items={[["Current version", `v${p.version}`], ["Published", formatDate(p.published_at)], ["Published by", p.published_by], ["Clock-in while pending", p.settings.find((s) => s.key === "ack_blocks")?.value ? "Blocked until acknowledged" : "Allowed, with a reminder"]]} />
-        </Card>
-        <Card>
-          <CardHeader title="Full Policy" />
-          <KeyValue items={p.settings.filter((s) => ["grace", "mode_remote", "mode_office", "dev_warn_new", "late_rule"].includes(s.key)).map((s) => [s.label, String(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.kind === "mode" ? { record: "Record only", warn: "Warn", block: "Block" }[s.value as string] : s.value)])} />
-        </Card>
-      </Grid>
-      <DataView
-        title="All Versions"
-        rows={versions.rows}
-        rowKey={(v) => String(v.version)}
-        loading={versions.loading}
-        columns={[
-          { key: "v", label: "Version", render: (v) => `v${v.version}` },
-          { key: "p", label: "Published", render: (v) => formatDate(v.published_at) },
-          { key: "s", label: "Summary", render: (v) => v.summary },
-          { key: "a", label: "Your Acknowledgment", render: (v) => (v.acknowledged_at ? <Pill tone="ok">{formatDate(v.acknowledged_at)}</Pill> : <Pill tone="warn">Pending</Pill>) },
-        ]}
-        footer={<Pager page={versions.page} onPage={versions.setPage} noun="version" />}
-      />
     </>
   );
 }

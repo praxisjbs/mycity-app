@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 7 | 7 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
+| M9 Settings & Governance | 11 | 2 | 0 | 9 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **58** | **0** | **36** | **0** | **0** |
+| **Total** | **94** | **56** | **0** | **38** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -705,12 +705,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 89 | Policy Updates | `policy-updates` | M9 | LA | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
+| 89 | Policy Updates | `policy-updates` | M9 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · LA · Policy Updates (#89) on the real API, built with Settings · Attendance Policy (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.15): the newest version of the attendance policy as full sentences, one a rule and mode with People's values filled in (`features/attendance/policy-text.ts`), under Clocking In, At the Office, Working From Home, At a Field Site, Your Location and Your Devices, a section the version changed tagged Changed; People's note, its first day and state (In Force, or Starts on a date), Acknowledge, and All Versions, each opening its own sentences; a notice opens its version by `?version=`. Acknowledging never blocks the clock; everyone at work with a login is told of a new version (bell and push) and reminded once after 3 days (job `attendance-policy-reminder`). Before any version, the default rules show with nothing to acknowledge. Checked by 3 screen tests and 5 sentence tests on the mock (desktop and 390 px) and 8 integration tests on the real migrations. Left: seeing it on a phone with push on; a staging seed publishing a first version (it would tell every member of staff on staging).
 - 19/10/2026 · TB · My Attendance (#9) and the clock panel: clock prompts, reminders and the automatic clock-out (owner decisions, 19/10/2026, from the 12 and 13 October meetings; `docs/guides/attendance.md` §6.14). On both shells the panel opens by itself at the shift's start for someone not clocked in (once a day on each device, not after the sign-in prompt or Clock In already showed it) and at its end for someone still in, with Remind Me (15 minutes, 30 minutes, 1 hour); Esc, the scrim and a drag leave it open, and it never replaces a dialog that is open. Job `attendance-clock-watch` (every 5 minutes) sends one reminder a day in the first hour after the start (the bell and push, read on clock-in) and clocks out a shift left open once its end has passed and the person has been away from the app 15 minutes, at the end or the last moment they were on it; the person is told. My Days and a day's punches read Automatic, and Explain Time sends a note that People keep or correct. `1360`, `1394`; `POST /attendance/me/events/:id/explanation`; `useModal().open` takes `dismissible`. Checked by 8 integration tests on the real migrations, 3 backend unit tests, 5 tests of the prompts' timing and 3 of the prompts on the mock at a held clock. Left: configurable reminder rules stay M6 (#74); a cap on Remind Me is not decided; not yet seen on a phone with push on.
 - 19/10/2026 · AJ · My Profile (#8): the photo now also shows on the employee record's header (People · Employees) and on Settings · Users and a role's people. Left: the organogram PDF still draws initials.
 - 19/10/2026 · LA · The client's clock-in rules (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.5, §6.11, §6.13). My Profile (#8): the Work Schedule shows each day's place, Office, Remote or Off (`EssWorkDay.place`, from attendance's week). My Attendance (#9): the Home Location card shows for hybrid staff whose schedule has home days too, and they set a home as remote staff do; the clock panel names a client visit's site (Client Visit · 200 m), says No Office Assigned for someone expected at an office with none (and still takes a reading, the punch going to review), and matches a hybrid home day to the approved home. Work Location Requests (#87): a client visit carries its site, a Client Site card with Latitude, Longitude and Radius (100 to 500 m), checked by the contract, and the request shows it. Checked by screen tests on the mock (the request form, the record's tab at 1440 and 390 px, the clock panel with no office) and integration tests on the real migrations. Left: picking a client's site from an address once address search exists (F21).
@@ -1003,7 +1004,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1014,6 +1015,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · LA · Attendance Policy (#73) on the real API, brought forward from M9 with Policy Updates (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.15): one organisation policy in numbered versions. People with `settings` edit change the clock checks (Grace Minutes 0 to 60; the location check for the office, a home and a field site, each Off, Warn or Block; GPS Accuracy 50 to 250 m; Home Radius 50 to 500 m; the Device Check), Save Draft (each changed rule tagged), Discard Changes, and Publish Policy from a first day (today to 90 days, after any version waiting) with a note, which makes it `Version N` and tells everyone; a version waiting can be withdrawn with a reason, its rules going back to the draft. Versions list each one's first day, state and acknowledgements; a version opens with its rules and who has acknowledged it (Everyone, Acknowledged, Pending). The location mode is now per place on the clock, and each punch keeps the version it was judged by. `1370` (versions, place modes, `attendance_policy_acknowledgement`), `1395` (1099's Standard policy out, A26); 12 routes; 6 events; one job. Owner set to LA, as the 17/10 note says. Checked by 8 integration tests, 4 backend unit tests and 3 screen tests on the mock (desktop and 390 px). Left: the pay rules (lateness deduction, overtime) join the policy with payroll (M6) and the late-arrivals query rule with Queries (M3).
 - 19/10/2026 · TB · Organisation (#69): the brand files (`docs/guides/foundation.md` §6.11). A Brand card takes the Logo, the White Logo (shown on Deep Green) and the Icon, each one upload that applies at once (`POST`, `DELETE /settings/organisation/brand/:slot`, purpose `brand`: PNG or WebP, kept a PNG, colours untouched), and Remove. Letterheads and PDFs draw the Logo, system mail's header the White Logo inside the message, email signatures the White Logo or the Icon. One reader of the profile for all of them (`shared/organisation/profile.js`) also fixes letterheads and system mail, which read an `organisation.profile` row nothing wrote and so always printed the defaults; the letterhead's footer now carries the RC number. Left: MyCity uploads its files.
 - 19/10/2026 · TB · Imports (#93): a row saved with something missing (a warning: a person left
   without a Line Manager, say) is a problem beside the errors and duplicates. The preview lists

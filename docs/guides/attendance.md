@@ -6,16 +6,17 @@
 | Milestone | M1 |
 | Backend modules | `attendance`, `devices`, `worksites` |
 | Frontend paths | `app/src/features/attendance/` |
-| Permission key(s) | `people` (all, team, own) for the register, devices and worksites; `people` approve, within its scope, to set a field assignment; `people` edit, within its scope, to set a hybrid employee's work schedule; none for the person's own clock, attendance and devices (`self`, own only) |
+| Permission key(s) | `people` (all, team, own) for the register, devices and worksites; `people` approve, within its scope, to set a field assignment; `people` edit, within its scope, to set a hybrid employee's work schedule; `settings` view to read the attendance policy and its acknowledgements, `settings` edit to change and publish it; none for the person's own clock, attendance, devices and policy updates (`self`, own only) |
 | Capabilities | none |
-| Screens (PROGRESS.md rows) | #9 My Attendance, #87 Work Location Requests, #88 My Devices, #25 Attendance, #27 Devices, #28 Worksites, and the Attendance tab of the employee record (#24 Employees); later in this guide: #89 Policy Updates; #73 Attendance Policy is M9 (MILESTONES §18) |
+| Screens (PROGRESS.md rows) | #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #25 Attendance, #27 Devices, #28 Worksites, the Attendance tab of the employee record (#24 Employees), and #73 Settings · Attendance Policy (an M9 screen, built with Policy Updates by owner decision, 19/10/2026) |
 | Status | Draft |
 | Last changed | 19/10/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): MILESTONES §6.2 and A22, A26; REUSE_MAP §2.2
 (the policy model and the donor files); the 12 and 13 October meetings (three devices, enrolment
-without People's approval, the 100 m office fence); BACKEND_STRUCTURE §15 (the device's own time
-beside the server's). `demo.html` is look only.
+without People's approval, the 100 m office fence, a policy People set and staff read and
+acknowledge); BACKEND_STRUCTURE §15 (the device's own time beside the server's). `demo.html` is look
+only.
 
 ---
 
@@ -32,6 +33,12 @@ venue), their line manager or People set a field assignment, and on its days the
 matched to its sites. A punch the rules cannot accept outright is still
 recorded, as evidence, and opens an exception People review; nothing is overwritten.
 
+The rules a punch is judged by are the attendance policy, which People set on Settings · Attendance
+Policy: the grace period, how strictly the location is checked at the office, at home and at a field
+site, the accuracy a reading must reach, the home radius and the device check. A change is a draft
+until People publish it as a numbered version from a first day; everyone is told, reads it on ESS ·
+Policy Updates in plain sentences with what changed, and acknowledges it.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -45,9 +52,9 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
 | People · Employees, the record's Attendance tab | People | `people` view, within scope | The person's work pattern, their office and radius, their home location's state, and their week: each day Office, Remote or Off; for hybrid staff the schedule in force and one waiting to start | Set Schedule for a hybrid employee (`people` edit, within scope, never their own) |
 | ESS · My Profile (`my-profile`, ess.md) | Employee Self-Service | Every employee, own record | Inside Employment, the week: each day Office, Remote or Off with its hours (read from this module) | Nothing here: People set it |
 | ESS · Work Location Requests (`work-location-requests`) | Employee Self-Service | Every employee, own requests | Their requests with number, type, dates, place and status (waiting at its stage, Approved, Rejected, Cancelled), each with its approval trail | New Request: a temporary home (remote staff), a remote day (on-site and hybrid staff) or a client visit (anyone, with the site's location and radius); withdraw one still waiting, or cancel an approved one before its first day |
-| ESS · Policy Updates (`policy-updates`) | Employee Self-Service | Employee, own | Not built in this delivery: M9, with Settings · Attendance Policy (§13) | |
-| Settings · Attendance Policy (`attendance-policy`) | Settings | Authorised People users | M9 (MILESTONES §18); the policy is read from the database meanwhile (§6.1) | |
-| Notifications (bell) | Global header | The person and People within scope | A reminder to clock in when the shift starts, a clock-out made automatically, review needed, a missing clock-out, a decision on an exception, a device registered or removed, a home location waiting or decided, a work location request waiting on you or decided, a field assignment you are put on, taken off or that is cancelled, your work schedule set | Open the record |
+| ESS · Policy Updates (`policy-updates`) | Employee Self-Service | Every employee | The newest version of the attendance policy (in force, or waiting to start, with its first day), People's note on it, the rules in plain sentences with what changed tagged, whether they acknowledged it; the earlier versions | Acknowledge the newest version; open an earlier one |
+| Settings · Attendance Policy (`attendance-policy`) | Settings | `settings` view (Operations & People, Management, Implementation, the System Administrator, the CEO) | The rules in force today and the version they come from, a version waiting to start, the draft and what it changes, every version with its first day and how many acknowledged it, and for a version who has and who has not | `settings` edit: change the rules (Save Draft), Discard Changes, Publish Policy from a first day with a note, Withdraw Version before its first day |
+| Notifications (bell) | Global header | The person and People within scope | A reminder to clock in when the shift starts, a clock-out made automatically, review needed, a missing clock-out, a decision on an exception, a device registered or removed, a home location waiting or decided, a work location request waiting on you or decided, a field assignment you are put on, taken off or that is cancelled, your work schedule set, a new version of the attendance policy, one withdrawn, and a reminder to acknowledge it | Open the record |
 
 ## 3 · How the screens relate
 
@@ -123,13 +130,27 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
     the system's (`source = 'system'`), counts at once, reads Automatic, and the person is told. If
     they think its time is wrong they explain it from the day on My Attendance, which opens an
     `automatic_clock_out` exception People accept or correct (§6.8).
+11. **People change the policy** (Settings · Attendance Policy, §6.15). The rules in force show in
+    a form; Save Draft keeps the changes as the draft, tagged against the version they would
+    replace, and nobody is told. Publish Policy asks for the first day (today or later) and a note
+    on what changed, and makes the draft the next version (`Version 6`). Every punch on or after
+    that day is judged by it (§6.1); a punch already made keeps the version it was judged by
+    (`attendance_event.attendance_policy_id`). A version waiting to start can be withdrawn with a
+    reason; its rules go back to the draft.
+12. **Everyone is told and acknowledges it** (ESS · Policy Updates, §6.15). Publishing tells every
+    employee with a login (the bell, and a push as their Attendance and Leave preference allows).
+    Policy Updates shows the newest version in sentences, with what changed tagged and People's
+    note, and Acknowledge. Acknowledging never blocks the clock. Three days after a version is
+    published, the `attendance-policy-reminder` job reminds once whoever has not acknowledged it.
+    People see who has and who has not on the version.
 
 ## 4 · Data
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `attendance_policy` (1000, 1300, 1310) | `name`, `grace_minutes`, `geofence_mode` (`off`, `warn`, `block`), `device_mode` (`off`, `warn`, `block`), `max_accuracy_m`, `home_radius_m` (100), `latest_clock_out_minutes`, `active` | The modes came in `1300`; the booleans `require_geofence` and `require_known_device` of `1000` are superseded and dropped in a later release (MIGRATIONS §8) |
-| `employee_attendance_policy` (1000) | `employee_id`, `attendance_policy_id`, `worksite_id`, `effective_from`, `effective_to` | Effective-dated override of the policy and the worksite for one person; read only in this delivery |
+| `attendance_policy` (1000, 1300, 1310, 1370) | `name`, `grace_minutes`, `office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode` (each `off`, `warn`, `block`), `device_mode` (`off`, `warn`, `block`), `max_accuracy_m`, `home_radius_m`, `latest_clock_out_minutes`, `active`; from `1370` `status` (`draft`, `published`, `withdrawn`), `version`, `effective_from`, `note`, `published_at`, `published_by`, `withdrawn_at`, `withdrawn_by`, `withdraw_reason`, `created_by`, `updated_by` | One organisation policy in numbered versions (§6.15): at most one `draft`; a `published` version (`Version 6`) applies from its `effective_from` and is never edited; a `withdrawn` one never applied. A row with no `version` is from before `1370` (a test's, or a database's own) and applies only until the first version starts. `geofence_mode` (`1300`) is superseded by the three place modes, written equal to the office's and dropped in a later release with `1000`'s booleans `require_geofence` and `require_known_device` (MIGRATIONS §8) |
+| `attendance_policy_acknowledgement` (1370) | `attendance_policy_id`, `employee_id`, `reminded_at`, `acknowledged_at` | One row per person and version, written when they acknowledge it or are reminded to; unique on the pair. Nobody else's choices or data |
+| `employee_attendance_policy` (1000) | `employee_id`, `attendance_policy_id`, `worksite_id`, `effective_from`, `effective_to` | Effective-dated override of the policy and the worksite for one person; read only in this delivery, and nothing writes it (one organisation policy, owner decision 19/10/2026) |
 | `attendance_event` (1000, 1300, 1360) | `employee_id`, `event_type` (`clock_in`, `clock_out`), `work_date`, `occurred_at` (server time), `device_at`, `latitude`, `longitude`, `accuracy_m`, `distance_m`, `worksite_id`, `known_device_id`, `attendance_device_id`, `source` (`pwa`; `admin`, People's correction; `system`, an automatic clock-out, §6.14), `validation_state` (`accepted`, `review`, `rejected`), `validation` (evidence), `idempotency_key`, `attendance_policy_id`, `note`, `recorded_by`, `reason` | Append-only. Unique: one active (`accepted` or `review`) event of each type per person per work date among the person's and People's punches, and one automatic clock-out per person per work date (`1360`), so People's correction stands beside the automatic one it replaces; one event per person per idempotency key |
 | `attendance_day` (1000, 1300) | `employee_id`, `attendance_date`, `status` (`present`, `late`, `absent`, `leave`, or none while nothing on an open day counts), `first_clock_in_at`, `last_clock_out_at`, `worked_minutes`, `late_minutes`, `overtime_minutes`, `closed_at` | The projection, recalculated from the day's events in the punch's transaction and by the day-close job |
 | `attendance_exception` (1000, 1300, 1310, 1360) | `attendance_day_id`, `attendance_event_id`, `exception_type` (`outside_worksite`, `outside_home`, `location_unverified`, `unknown_device`, `suspicious_timestamp`, `missing_clock_out`, `automatic_clock_out`: opened only when the person explains one, §6.14), `severity`, `status` (`open`, `resolved`), `outcome` (`accepted`, `rejected`, `corrected`), `evidence`, `employee_note`, `reviewed_by`, `reviewed_at`, `resolution` | One per event and type, one day-level `missing_clock_out` per day (partial unique indexes), so a retried job adds none |
@@ -150,14 +171,17 @@ Schema migrations: `migrations/1300_attendance_clock.sql`, `migrations/1310_atte
 their sites and people), `migrations/1340_attendance_schedule.sql` (hybrid staff's weekly
 schedule), `migrations/1350_attendance_client_visit_site.sql` (a client visit's site),
 `migrations/1360_attendance_clock_watch.sql` (the reminders sent, the `automatic_clock_out` type and
-the unique indexes that count an automatic clock-out apart). Reference data:
+the unique indexes that count an automatic clock-out apart), `migrations/1370_attendance_policy_versions.sql`
+(policy versions, the three place modes, acknowledgements). Reference data:
 `seeds/reference/1390_seed_attendance.sql` (two exception types),
 `seeds/reference/1391_seed_attendance_home.sql` (Outside Home),
 `seeds/reference/1392_seed_attendance_location_request.sql` (the `location_request` numbering scheme,
 `WLR-0001`, and version 1 of the `attendance.location_request` approval),
 `seeds/reference/1393_seed_attendance_field_assignment.sql` (the `field_assignment` numbering scheme,
-`FA-0001`), `seeds/reference/1394_seed_attendance_clock_watch.sql` (Automatic Clock-Out). Nothing about a person,
-a device, a punch, a holiday or a coordinate is seeded (A26).
+`FA-0001`), `seeds/reference/1394_seed_attendance_clock_watch.sql` (Automatic Clock-Out),
+`seeds/reference/1395_seed_attendance_policy.sql` (removes `1099`'s Standard policy while it is as
+seeded and nothing was judged by it: a policy is MyCity's choice, A26). Nothing about a person, a
+device, a punch, a holiday, a coordinate or a policy is seeded (A26).
 
 **The shared roster** (§6.9) reads `attendance_day` as the punch, the decision and the day-close
 write it; the day's one active clock-in on `attendance_event` (by `work_date`, for the worksite it
@@ -170,7 +194,7 @@ event a day) and needs none of its own.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /api/v1/attendance/me/today` | → `AttendanceToday` | self, own | no | The authoritative state, the shift, the clock location (name and radius, no coordinates), the policy's modes and accuracy limit, this device; `clock_out_automatic` when the day's clock-out was the system's (§6.14) |
+| `GET /api/v1/attendance/me/today` | → `AttendanceToday` | self, own | no | The authoritative state, the shift, the clock location (name and radius, no coordinates), the policy's modes (the location mode of today's place) and accuracy limit, this device; `clock_out_automatic` when the day's clock-out was the system's (§6.14) |
 | `POST /api/v1/attendance/punches` | `PunchCreate` → `PunchResult` | self, own | no | `Idempotency-Key` required (428 without). The person is the session's; the body names nobody. 409 for a refused transition, 422 on leave or not employed |
 | `GET /api/v1/attendance/me` | `MyDayListQuery` (`month`, `status`) → `AttendanceDayPage` | self, own | yes, 25 | Days of the month, newest first; `status` keeps one figure's days (`present` takes late days too, as Days Present counts them) |
 | `GET /api/v1/attendance/me/summary` | `MySummaryQuery` → `MyAttendanceSummary` | self, own | no | The month's figures |
@@ -205,6 +229,18 @@ event a day) and needs none of its own.
 | `POST /api/v1/attendance/field-assignments/:id/remove` | `FieldMemberRemove` (`employee_id`, `reason`) → `FieldAssignment` | `people` approve · scope | no | Takes one person off; not the last one (cancel instead) |
 | `GET /api/v1/attendance/me/field-assignments` | `MyFieldAssignmentListQuery` (`state`) → `FieldAssignmentPage` | self, own | yes, 25 | The person's own, in progress and upcoming first |
 | `GET /api/v1/attendance/me/field-assignments/:id` | → `FieldAssignment` | self, own | no | One they are or were on; anyone else's is a 404 |
+| `GET /api/v1/attendance/me/policy` | → `MyPolicy` | self, own | no | The rules in force today, the newest version (in force or waiting) with what changed and whether the person acknowledged it, and the version in force |
+| `GET /api/v1/attendance/me/policy/versions` | `MyPolicyVersionListQuery` → `MyPolicyVersionPage` | self, own | yes, 25 | Every published or withdrawn version, newest first, with the person's acknowledgement |
+| `GET /api/v1/attendance/me/policy/versions/:id` | → `MyPolicyVersion` | self, own | no | One version (`?version=` on Policy Updates, the notice's link); a draft is a 404 |
+| `POST /api/v1/attendance/me/policy/versions/:id/acknowledge` | `EmptyBody` → `MyPolicy` | self, own | no | The newest version only (409 `POLICY_NOT_LATEST`); again is a no-op; reads the person's notices about it |
+| `GET /api/v1/attendance/policy` | → `PolicyOverview` | `settings` view | no | The rules in force today, the version in force, the versions waiting, the draft with what it changes, `can_edit` |
+| `PUT /api/v1/attendance/policy/draft` | `PolicySettings` → `PolicyOverview` | `settings` edit | no | Saves every rule as the draft, creating it when there is none |
+| `POST /api/v1/attendance/policy/draft/discard` | `EmptyBody` → `PolicyOverview` | `settings` edit | no | 409 `NO_DRAFT` when there is none |
+| `POST /api/v1/attendance/policy/publish` | `PolicyPublish` (`effective_from`, `note`) → `PolicyOverview` | `settings` edit | no | The checks of §6.15; the draft becomes the next version and everyone is told |
+| `GET /api/v1/attendance/policy/versions` | `PolicyVersionListQuery` (`state`) → `PolicyVersionPage` | `settings` view | yes, 25 | Newest first, each with its acknowledgement count |
+| `GET /api/v1/attendance/policy/versions/:id` | → `PolicyVersion` | `settings` view | no | |
+| `POST /api/v1/attendance/policy/versions/:id/withdraw` | `PolicyWithdraw` (`reason`) → `PolicyOverview` | `settings` edit | no | A version waiting to start only (409 `POLICY_NOT_WAITING`) |
+| `GET /api/v1/attendance/policy/versions/:id/acknowledgements` | `PolicyAckListQuery` (`status`, `q`, `sort`) → `PolicyAckPage` | `settings` view · scope | yes, 25 | Everyone at work with a login, within the reader's `settings` scope, acknowledged or not |
 | `POST /api/v1/workflow/instances/:id/approve`, `/reject` | the approval's own routes (foundation.md §5) | the stage's approvers | no | How a request is decided; never by a route of this module |
 | `GET /api/v1/attendance/schedules/:employee_id` | `ScheduleParams` → `WorkSchedule` | `people` view · scope | no | The person's pattern, office, home state, the week day by day, the schedule in force and the one waiting to start; `can_edit` for the reader. 404 outside scope |
 | `POST /api/v1/attendance/schedules/:employee_id` | `ScheduleParams`, `WorkScheduleSet` (`office_days`, `effective_from`, `reason`) → `WorkSchedule` | `people` edit · scope | no | Hybrid staff only (422 `SCHEDULE_NOT_NEEDED`); never your own (403 `OWN_RECORD`); the checks of §6.13 |
@@ -232,12 +268,21 @@ answer in the list envelope at 25, filtered, searched and sorted in SQL.
 
 ### 6.1 The policy
 
-- The policy for a person on a work date is the active `attendance_policy` of their effective
-  `employee_attendance_policy` row; else the oldest active policy; else the code's defaults. A
-  policy is a business choice (A26): MyCity sets it on Settings · Attendance Policy (M9).
-- `geofence_mode` defaults to `warn` and `device_mode` to `off` (MILESTONES §6.2, REUSE_MAP §2.2).
-  `off` judges nothing but records the evidence; `warn` accepts for review and opens an exception;
-  `block` rejects.
+- The policy for a person on a work date is the active, published `attendance_policy` of their
+  effective `employee_attendance_policy` row (none is written today); else the organisation's: the
+  published version whose first day is the latest on or before the date (§6.15); before any version
+  starts, the oldest active row from before versions (`version` empty); else the code's defaults
+  (`attendance.rules.js` `DEFAULT_POLICY`). A policy is a business choice (A26): MyCity sets it on
+  Settings · Attendance Policy.
+- Each punch records the version it was judged by (`attendance_event.attendance_policy_id`); a new
+  version never re-judges a punch already made.
+- The location check has a mode for each kind of place (owner decision, 19/10/2026): the office
+  (`office_geofence_mode`: a worksite, or no worksite on an office day), a home
+  (`home_geofence_mode`: remote staff, a hybrid home day, a temporary home, a remote day matched to
+  the approved home) and a field site (`site_geofence_mode`: a field assignment's sites, a client
+  visit's site). Each defaults to `warn`, and `device_mode` to `off` (MILESTONES §6.2, REUSE_MAP
+  §2.2). `off` judges nothing but records the evidence; `warn` accepts for review and opens an
+  exception; `block` rejects.
 - Grace is the policy's `grace_minutes` (code default 0). The day's start and end are the working
   week's hours for that weekday (Settings · Organisation, A22); public holidays come from the same
   calendar (`shared/time/working-week`).
@@ -300,10 +345,11 @@ answer in the list envelope at 25, filtered, searched and sorted in SQL.
 - Accuracy of 50 m or better is good, up to `max_accuracy_m` (100) fair; worse is not a compliant
   reading: the location is `unverified` (`poor_accuracy`), and the panel offers Retry Location.
 - No coordinates (denied, unavailable, timed out, unsupported) is `unverified` with that reason.
-- `off`: accepted, the verdict kept as evidence. `warn`: outside or unverified is `review` with an
-  `outside_worksite` (or, against a home, `outside_home`) or `location_unverified` exception.
-  `block`: outside is `rejected`; unverified is `review` (a reading that could not be taken, or a
-  home not yet approved, is not proof of being elsewhere).
+- The mode is the one for the day's place (§6.1, `attendance.calendar.js` `contextFor`): the
+  office's, a home's or a field site's. `off`: accepted, the verdict kept as evidence. `warn`:
+  outside or unverified is `review` with an `outside_worksite` (or, against a home, `outside_home`)
+  or `location_unverified` exception. `block`: outside is `rejected`; unverified is `review` (a
+  reading that could not be taken, or a home not yet approved, is not proof of being elsewhere).
 - A punch against a home keeps `worksite_id` empty (the roster, §6.9, and Home read it as remote);
   its evidence names the place `home` and the home record it was judged against.
 - On a day an approved work location request covers, the request decides the expected place
@@ -599,6 +645,65 @@ request.
   was in front of the app is read on the server and never sent to a screen, an event payload or a
   notice; the punch's evidence keeps the moment its time came from, for the audit.
 
+### 6.15 Policy versions and acknowledgement (`attendance.policy.js`)
+
+Owner decisions of 19/10/2026: People edit the clock checks (not yet the pay or query rules, which
+come with M6 and M3); one organisation policy in versions; a version applies from a first day
+People pick; acknowledging never blocks the clock; everyone with a login is told by the bell and a
+push and reminded once after three days; `settings` edit publishes, audited; staff read the rules
+as full sentences.
+
+- **The rules** (`PolicySettings`), each checked by the contract:
+
+  | Rule | Range | Default |
+  |---|---|---|
+  | `grace_minutes` | 0 to 60 | 0 |
+  | `office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode` | `off`, `warn`, `block` | `warn` |
+  | `device_mode` | `off`, `warn`, `block` | `off` |
+  | `max_accuracy_m` | 50 to 250 m (50 m or better is a good reading, §6.5) | 100 |
+  | `home_radius_m` | 50 to 500 m | 100 |
+
+  `latest_clock_out_minutes` is carried from version to version and not edited (§13).
+- **The draft**: `settings` edit saves every rule at once (Save Draft, `PUT /attendance/policy/draft`);
+  the first save creates the draft (`status = 'draft'`, at most one), later ones replace its rules.
+  `changed` lists the rules it changes against the version it would replace: the newest published
+  one (waiting or in force), else the rules in force today. Discard Changes deletes it. Neither tells
+  anyone; both are audited with before and after.
+- **Publishing** (`POST /attendance/policy/publish`), one at a time under a lock: there must be a
+  draft (409 `NO_DRAFT`) that changes something once a version exists (409 `NO_CHANGES`; the first
+  version may keep the rules as they are). The first day is from today in Lagos (422
+  `POLICY_IN_THE_PAST`) and within 90 days (422 `POLICY_TOO_FAR`), and after the first day of any
+  version still waiting (422 `POLICY_BEFORE_WAITING`). A note of 10 to 500 characters says what
+  changed; staff read it. The draft becomes `Version N` (the next number, never reused), published
+  by the reader, and `attendance.policy_published` tells every employee at work with a login.
+- **States**, worked out on the day in Lagos: `waiting` (published, its first day after today),
+  `in_force` (the version a punch today is judged by), `past` (published and replaced by a later
+  one), `withdrawn`.
+- **Withdrawing** (`POST /attendance/policy/versions/:id/withdraw`): a waiting version only (409
+  `POLICY_NOT_WAITING`), with a reason of 10 to 500 characters. It never applies, its number is not
+  reused, and everyone is told the version they were sent will not apply. When there is no draft,
+  its rules become the draft, so nothing People prepared is lost.
+- **What changed** on a version (`changed`): the rules that differ from the version before it (the
+  previous published one, withdrawn ones skipped); none on the first.
+- **Acknowledging** (`POST /attendance/me/policy/versions/:id/acknowledge`): the newest published
+  version (waiting or in force) only (409 `POLICY_NOT_LATEST`), by someone at work (422
+  `NOT_EMPLOYED`); a second time changes nothing. It marks read the person's notices about that
+  version. It is a record, never a gate: the clock judges a punch the same whether the person
+  acknowledged or not.
+- **Who is asked**: everyone at work (active, started, not left) with an active login, counted when
+  read, so someone who joins after a version is published is asked too. The version's report lists
+  them within the reader's `settings` scope, acknowledged or pending.
+- **The reminder** (job `attendance-policy-reminder`, daily at 10:00 Lagos): for the newest version
+  published at least 3 days before, everyone asked who has not acknowledged it and was not reminded
+  of it is reminded once (`attendance.policy_reminder_due`, the bell and a push as their preference
+  allows; `reminded_at` decides once).
+- **The sentences** staff read are the app's (`app/src/features/attendance/policy-text.ts`), one per
+  rule and mode, the values filled in, so a changed value changes the sentence; the server sends
+  the values, never prose.
+- **Who sees what**: every employee reads every published and withdrawn version and their own
+  acknowledgement; `settings` view reads the draft, every version and who acknowledged within their
+  scope. Events carry the version's id, number and first day.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -624,15 +729,23 @@ request.
 | `attendance.clocked_out_automatically` | The watch clocks out an open shift (§6.14) | Audit; notifies the person with the date and time (the day opens on My Attendance); the punch's own `attendance.punched` reloads the screens |
 | Job `attendance-day-close` (scheduler, 01:30 Africa/Lagos; queue of the same name for a given date) | Daily | Closes every open day before today within 14 days, under the cron lock; idempotent |
 | Job `attendance-clock-watch` (scheduler, every 5 minutes) | All day | Sends the start reminders and makes the automatic clock-outs (§6.14), under the cron lock; idempotent (one reminder a day, one automatic clock-out a shift) |
+| `attendance.policy_draft_saved`, `attendance.policy_draft_discarded` | People save or discard the policy's draft | Audit, with the rules before and after; nobody is told |
+| `attendance.policy_published` | People publish a version (§6.15) | Audit; notifies every employee at work with a login ("Attendance policy updated", its number and first day; push as their Attendance and Leave preference allows); the notice opens Policy Updates on that version |
+| `attendance.policy_withdrawn` | People withdraw a version waiting to start | Audit; notifies the same people that it will not apply |
+| `attendance.policy_acknowledged` | Someone acknowledges the newest version | Audit; their notices about it are read |
+| `attendance.policy_reminder_due` | The reminder job finds someone who has not acknowledged a version 3 days after it was published | Notifies the person, once a version |
+| Job `attendance-policy-reminder` (scheduler, 10:00 Africa/Lagos) | Daily | Sends the acknowledgement reminders (§6.15), under the cron lock; idempotent (`reminded_at`) |
 
 ## 8 · Permissions and visibility by role
 
 | Role | Sees | Can do |
 |---|---|---|
-| Employee | Own clock, days, punches, exceptions, devices, home location, work location requests, field assignments and week | Clock in and out, explain an exception, export the month, register and remove own devices; remote staff, and hybrid staff with a home day, set their home location; ask for a work location, withdraw or cancel it |
+| Employee | Own clock, days, punches, exceptions, devices, home location, work location requests, field assignments and week; every published version of the attendance policy | Clock in and out, explain an exception, export the month, register and remove own devices; remote staff, and hybrid staff with a home day, set their home location; ask for a work location, withdraw or cancel it; acknowledge the newest policy version |
 | Line Manager, Head of Department (`people` team) | The register, days, devices, exceptions and home statuses of their reporting tree, its work location requests (no temporary home's point) and its weekly schedules; no coordinates or home addresses | Decide the first stage of a direct report's work location request; set a field assignment for people in their reporting tree, cancel it or take someone off (`people` approve); set a hybrid report's schedule where their role holds `people` edit; otherwise read only; export (heads) |
 | Operations & People, Management (`people` all) | Everyone, with the punch coordinates, home locations and work location requests | Decide exceptions and home locations (approve), decide a work location request's Operations & People stage, set, cancel and change field assignments for anyone (approve), remove devices and set hybrid staff's schedules (edit), manage worksites (create, edit), export |
 | CEO | Everything, as the access rules give the CEO | The same as `people` all, never on their own exception |
+| `settings` view (Operations & People, Management, Implementation, the System Administrator) | Settings · Attendance Policy: the rules in force, the draft, every version and who acknowledged it, within their `settings` scope | Read only, unless they also hold `settings` edit |
+| `settings` edit (Operations & People, Implementation, the System Administrator; not Management) | As view | Save and discard the draft, publish a version, withdraw one waiting to start |
 
 The shared roster reads within the scope the caller's grant gives (`scopeClause` on the employee):
 the whole organisation, the reader and everyone below them on the solid line, or the reader alone.
@@ -646,13 +759,16 @@ never leave identity, and no log line carries them.
 ## 9 · AI and search
 
 - **AI reads** (`attendance.ai.js`): `attendance.my_days` (ess view, own), `attendance.register`
-  and `attendance.exceptions` (`people` view, the caller's scope); `devices.ai.js`: `devices.mine`,
+  and `attendance.exceptions` (`people` view, the caller's scope), `attendance.policy` (the rules in
+  force today and the newest version, for anyone: every employee reads it on Policy Updates); `devices.ai.js`: `devices.mine`,
   `devices.list`; `worksites.ai.js`: `worksites.list`. Every list is a page of 25, through the same
   service and scope as the screen; no coordinates, no device identifier, no evidence blob.
 - **AI routes**: clock in or see my attendance → ESS · My Attendance; review attendance → People ·
   Attendance; register a device → ESS · My Devices; add a worksite → People · Worksites; set my
   home location → ESS · My Attendance; approve home locations → People · Attendance; ask for a work
   location → ESS · Work Location Requests; approve work location requests → People · Attendance;
+  read or acknowledge the attendance policy → ESS · Policy Updates; change the attendance policy →
+  Settings · Attendance Policy;
   send people out on a field assignment → People · Attendance; my field assignments → ESS · My
   Attendance; set a hybrid employee's office days → People · Employees (the record's Attendance
   tab); my work week → ESS · My Profile. No AI read touches a home location, a work location
@@ -670,7 +786,10 @@ never leave identity, and no log line carries them.
   open the record, whose Attendance tab holds it), and its notice opens the person's own record
   (`employee`, My Profile). A clock-in reminder is not a record to look up
   (`attendance_clock_reminder`, `search:none` in the route map): its notice opens My Attendance with
-  the clock panel (`?clock=`). AI does not create punches, decide exceptions or infer missing
+  the clock panel (`?clock=`). A policy version is not looked up on its own
+  (`attendance_policy`, `search:none` in the route map): ⌘K finds Policy Updates and Settings ·
+  Attendance Policy, which list every version, and its notice opens Policy Updates on it
+  (`?version=`). AI does not create punches, decide exceptions, change the policy or infer missing
   location evidence.
 
 ## 10 · On screen and mobile
@@ -690,7 +809,8 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 | People · Devices | Device list with employee, device, status, first seen, last punch; Remove Device | Status header: as on My Devices | "devices register on every punch": §6.6 |
 | People · Worksites | Worksites with code, address, radius, assigned and status; Add Worksite; a worksite's details, Edit, Retire or Restore, its employees with Assign Employee | Radius: punches inside count as on site | "How the geofence behaves": §6.5 |
 | People · Employees, the record's Attendance tab | A Work Setup card: Work Pattern, Office (the worksite and its radius, or No Office Assigned), Home Location (Approved, Waiting or Not Set, for remote staff and hybrid staff with a home day); a Work Week card: each day of the week with an Office, Remote or Off pill, From (the schedule's first day) and Next (a schedule waiting to start, its days and first day); Set Schedule for a hybrid employee when `can_edit` (a sheet: one Office or Remote choice for each working day, From, Reason, Save Schedule) | Office: a punch on an office day is matched here; Work Week: the days at the office, the other working days from home | How a home day is fenced, the version rules: §6.13 |
-| Settings · Attendance Policy | M9 (MILESTONES §18) | | |
+| ESS · Policy Updates | The newest version: Version N with In Force or Starts and its first day, People's note, Acknowledge (or Acknowledged with the date); the policy as sentences (shown as content) under Clocking In, At the Office, Working From Home, At a Field Site, Your Location and Your Devices, a rule the version changed tagged Changed; All Versions (version, first day, state, your acknowledgement), one opening its sentences; before any version, Default Rules with the sentences and no Acknowledge | Nothing | How versions apply, that acknowledging never blocks the clock, the reminder: §6.15 |
+| Settings · Attendance Policy | The subtitle (the version in force and its first day, or Default Rules); a banner for a version waiting (Version N Starts, with Withdraw Version) and one for the draft (Draft with the number of changes, Discard Changes, Publish Policy); the rules in four cards, Clocking In (Grace Minutes), Devices (Device Check), Location Checks (Office Check, Home Check, Field Site Check, each Off, Warn or Block) and Location Reading (GPS Accuracy, Home Radius), a rule the draft changes tagged Changed, Save Draft (`settings` edit; read only otherwise); Versions (version, first day, state, published by, acknowledged); a version opens with its note, its rules, Withdraw Version while it waits (a reason) and Acknowledgements (Everyone, Acknowledged, Pending; person, acknowledged on); Publish Policy opens a sheet: the changes (Rule, Now, New), First Day, Note, Publish Version | Each rule's label: what it decides (Grace Minutes: minutes after the start before a clock-in is late; a place's mode: Off records, Warn sends for review, Block refuses; GPS Accuracy: a coarser reading cannot confirm a place; Home Radius: how far from an approved home still counts) | Versioning, the draft's base, the lock, the reminder job: §6.15 |
 
 ### 10.2 Phone layout
 
@@ -704,7 +824,8 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 | People · Devices | Device cards with status | Subtitle | A card opens it; Remove Device in its sheet | People tabs |
 | People · Worksites | Worksite cards | Subtitle | Add Worksite, full width | People tabs |
 | People · Employees, the record's Attendance tab | Work Setup, then Work Week, one under the other | Nothing | Set Schedule, full width under Work Week; its sheet's Save Schedule at the foot | The record's tabs scroll sideways |
-| Settings · Attendance Policy | M9 | | | Settings tabs |
+| ESS · Policy Updates | The newest version's card (number, state, note, Acknowledge full width), then the sentences as cards by section, then All Versions as cards | Subtitle | Acknowledge, full width in the version's card | ESS tabs |
+| Settings · Attendance Policy | The banners, then the four rule cards one under another, Save Draft full width at their foot, then Versions as cards with version, first day and state | Subtitle; the Published By column (in the version's sheet) | Save Draft; Publish Policy in the draft's banner opens a full sheet with Publish Version at its foot | More, then Settings; Settings tabs |
 
 ## 11 · Edge cases
 
@@ -776,6 +897,20 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - Explaining an automatic clock-out twice: 409 `ALREADY_EXPLAINED`; the note is on the first.
 - Push turned off for Attendance and Leave: the reminder still reaches the bell; the prompt still
   opens in the app.
+- No policy version yet: the rules in force are a row from before versions, else the code's
+  defaults (§6.1); Policy Updates shows them as Default Rules with nothing to acknowledge, and
+  Settings saves them as the first draft.
+- A version published today from today: punches before it was published keep the version they were
+  judged by; the next punch is judged by it.
+- A version waiting when another is published: the new one must start after it; both wait, the
+  newer is the one to acknowledge, and each applies from its own first day.
+- Withdrawing a version someone acknowledged: their acknowledgement stays on the withdrawn version;
+  they acknowledge the next one when it comes.
+- Two people at Settings at once: the last Save Draft wins; publishing takes the policy's lock, so
+  two versions never get one number.
+- Someone who joins after a version is published: asked from their first day, reminded 3 days after
+  it was published at the earliest.
+- An employee who left: no longer counted as asked; their acknowledgement stays on the version.
 
 ## 12 · Donor code
 
@@ -807,8 +942,11 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   staff (today remote staff only).
 - The map and address search proxy (F21, Geoapify through our API) is not built; worksite
   coordinates are typed in.
-- Policy Updates (#89) and policy versions with acknowledgement come with Settings · Attendance
-  Policy (M9).
+- Policy Updates (#89) and Settings · Attendance Policy (#73) are decided and built (§6.15,
+  19/10/2026). Still open: the pay rules (a lateness deduction and overtime, on or off with their
+  rates) join the policy with payroll (M6), and the late-arrivals query rule with Queries (M3), each
+  as a new rule in `PolicySettings` and a sentence; a per-person or per-group policy
+  (`employee_attendance_policy`, read but never written).
 - A late punch raising a query (MILESTONES §6 definition of done) waits for the query rules (M3).
 - Offline punching for field staff is not in scope (BACKEND_STRUCTURE §15).
 - Clock prompts are decided (§6.14, 19/10/2026). Configurable reminder rules (other times, other
@@ -851,3 +989,4 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - 19/10/2026 · AJ · The person on the register, exceptions, devices and a worksite's people carries `photo_url` (`PersonRef`, `WorksiteEmployee`; `attendance.repo.js` and `devices.repo.js` now read the person through `shared/db/person.js`, the roster adds it to its rows): People · Attendance, Devices and Worksites show faces, initials when there is none. Download My Data reads a person's days and punches through `listDays` and `listEvents` without coordinates (`docs/guides/ess.md` §3 step 8). LA to review.
 - 19/10/2026 · LA · The client's attendance rules (owner decisions, 19/10/2026): hybrid staff's weekly schedule (§6.13): People set the office days from a date on the employee record's Attendance tab, the other working days are home days fenced on the approved home (hybrid staff with a home day now set a home too), and a present home day counts as remote on Home's roster and the register; the week, Office, Remote or Off, reaches My Profile. A client visit carries its site's centre and radius (100 to 500 m) and is fenced on it (§6.11). A day at the office with no office assigned is `unverified` (`no_worksite`) and goes to review instead of being accepted unchecked (§6.5). `1340`, `1350`; two routes; one event. §1 to §11 and §13 updated; §6.13 added.
 - 19/10/2026 · TB · Clock prompts, reminders and the automatic clock-out (owner decisions, 19/10/2026, from the 12 and 13 October meetings; §6.14): the clock panel opens by itself at the shift's start for someone not clocked in and at its end for someone still in (Remind Me in 15 minutes, 30 minutes or an hour), never over an open dialog and never dismissed by the scrim; job `attendance-clock-watch` (every 5 minutes) sends one reminder a day in the first hour after the start (`attendance.clock_in_due`, bell and push, marked read on clock-in) and clocks out an open shift once its end has passed and the person has been away from the app for 15 minutes, at the shift's end or the last moment they were in front of it (`source = 'system'`, accepted, read as Automatic, `attendance.clocked_out_automatically` tells them). The person explains one from the day (`POST /attendance/me/events/:id/explanation`), which opens an `automatic_clock_out` exception People accept or correct; the day-close's missing clock-out stays for what the watch cannot judge. `attendance_clock_reminder`, the new type and the unique indexes in `1360`, its label in `1394`; one route; two events; one job. §2 to §11 and §13 updated.
+- 19/10/2026 · LA · Settings · Attendance Policy (#73) and ESS · Policy Updates (#89) built (owner decisions, 19/10/2026; §6.15): one organisation policy in numbered versions. People edit the clock checks (grace minutes; the location check for the office, a home and a field site, each off, warn or block; GPS accuracy; home radius; the device check), save them as a draft and publish it as `Version N` from a first day with a note; a version waiting can be withdrawn. Everyone at work with a login is told (bell and push), reads the version on Policy Updates as full sentences with what changed tagged, and acknowledges it; acknowledging never blocks the clock; the `attendance-policy-reminder` job reminds once after 3 days; People see who has acknowledged. The location mode is now per place (§6.1, §6.5) and each punch keeps the version it was judged by. `1370` (versions, the place modes, `attendance_policy_acknowledgement`), `1395` (1099's Standard policy out, A26); twelve routes; five events; one job. §1 to §11 and §13 updated; §6.15 added.

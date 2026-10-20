@@ -25,17 +25,34 @@ const FUTURE_TOLERANCE_S = 120;
 const DELAY_FLAG_S = 300;
 const DEFAULT_TZ = "Africa/Lagos";
 
-/** The defaults when MyCity has entered no policy (MILESTONES §6.2; A26). */
+/**
+ * The defaults when MyCity has entered no policy (MILESTONES §6.2; A26). The location check has a
+ * mode for each kind of place (guide §6.1); `geofence_mode` is the one for the place a date is
+ * matched to, the office's until attendance.calendar.js contextFor knows the place.
+ */
 const DEFAULT_POLICY = Object.freeze({
   attendance_policy_id: null,
   name: null,
+  version: null,
   grace_minutes: 0,
   latest_clock_out_minutes: 240,
+  office_geofence_mode: "warn",
+  home_geofence_mode: "warn",
+  site_geofence_mode: "warn",
   geofence_mode: "warn",
   device_mode: "off",
   max_accuracy_m: 100,
   home_radius_m: 100,
 });
+
+/** The kinds of place a date is matched to, each with its own location mode (guide §6.1). */
+const PLACES = Object.freeze(["office", "home", "site"]);
+
+/** The policy with `geofence_mode` set to the mode of the place: office, home or site. Pure. */
+function forPlace(policy, place) {
+  if (!PLACES.includes(place)) throw new Error(`attendance: "${place}" is not a place`);
+  return { ...policy, geofence_mode: policy[`${place}_geofence_mode`] || DEFAULT_POLICY.geofence_mode };
+}
 
 /** Accuracy at or under this many metres is a good reading (the guide's §6.5). */
 const GOOD_ACCURACY_M = 50;
@@ -243,6 +260,8 @@ module.exports = {
   DELAY_FLAG_S,
   DEFAULT_TZ,
   DEFAULT_POLICY,
+  PLACES,
+  forPlace,
   GOOD_ACCURACY_M,
   isTimeZone,
   wallClock,

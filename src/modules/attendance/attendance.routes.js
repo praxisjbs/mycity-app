@@ -18,6 +18,9 @@
  *   GET   /me/requests/:id               one of mine
  *   POST  /me/requests/:id/cancel        withdraw or cancel one of mine
  *   GET   /me/field-assignments, /me/field-assignments/:id  the field assignments I am or was on
+ *   GET   /me/policy                     the attendance policy in force and its newest version
+ *   GET   /me/policy/versions, /me/policy/versions/:id  every version, with my acknowledgement
+ *   POST  /me/policy/versions/:id/acknowledge  acknowledge the newest version
  *
  * People, within the `people` grant's scope (all, team, own):
  *   GET   /register, /summary            the day's register and its figures (view)
@@ -38,6 +41,16 @@
  *   GET   /schedules/:employee_id        a person's week, office and home state (view)
  *   POST  /schedules/:employee_id        set a hybrid employee's office days (edit; never your own)
  *   POST  /export                        the register over up to 31 days, emailed (export)
+ *
+ * The attendance policy, on Settings (the `settings` grant):
+ *   GET   /policy                        the rules in force, the versions in force and waiting, the
+ *                                        draft (view)
+ *   PUT   /policy/draft                  save every rule as the draft (edit)
+ *   POST  /policy/draft/discard          discard the draft (edit)
+ *   POST  /policy/publish                publish the draft as the next version (edit)
+ *   GET   /policy/versions, /policy/versions/:id  every version (view)
+ *   POST  /policy/versions/:id/withdraw  withdraw a version waiting to start (edit)
+ *   GET   /policy/versions/:id/acknowledgements  who has acknowledged it (view, within scope)
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -210,5 +223,58 @@ route(router, "post", "/schedules/:employee_id",
 route(router, "post", "/export",
   { body: a.RegisterExportRequest, response: a.AttendanceExportQueued, summary: "Email the register" },
   requirePermission("people", "export"), controller.export);
+
+route(router, "get", "/me/policy",
+  { response: a.MyPolicy, self: true, summary: "The attendance policy, for me" },
+  controller.myPolicy);
+
+route(router, "get", "/me/policy/versions",
+  { query: a.MyPolicyVersionListQuery, response: a.MyPolicyVersionPage, self: true,
+    summary: "Every version of the attendance policy, with my acknowledgement" },
+  controller.myPolicyVersions);
+
+route(router, "get", "/me/policy/versions/:id",
+  { params: c.common.IdParams, response: a.MyPolicyVersion, self: true,
+    summary: "One version of the attendance policy, for me" },
+  controller.myPolicyVersion);
+
+route(router, "post", "/me/policy/versions/:id/acknowledge",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: a.MyPolicy, self: true,
+    summary: "Acknowledge the newest version of the attendance policy" },
+  controller.acknowledgePolicy);
+
+route(router, "get", "/policy",
+  { response: a.PolicyOverview, summary: "The attendance policy: in force, waiting and the draft" },
+  requirePermission("settings", "view"), controller.policy);
+
+route(router, "put", "/policy/draft",
+  { body: a.PolicySettings, response: a.PolicyOverview, summary: "Save the attendance policy's draft" },
+  requirePermission("settings", "edit"), controller.savePolicyDraft);
+
+route(router, "post", "/policy/draft/discard",
+  { body: c.common.EmptyBody, response: a.PolicyOverview, summary: "Discard the attendance policy's draft" },
+  requirePermission("settings", "edit"), controller.discardPolicyDraft);
+
+route(router, "post", "/policy/publish",
+  { body: a.PolicyPublish, response: a.PolicyOverview, summary: "Publish the draft as the next version" },
+  requirePermission("settings", "edit"), controller.publishPolicy);
+
+route(router, "get", "/policy/versions",
+  { query: a.PolicyVersionListQuery, response: a.PolicyVersionPage, summary: "The attendance policy's versions" },
+  requirePermission("settings", "view"), controller.policyVersions);
+
+route(router, "get", "/policy/versions/:id",
+  { params: c.common.IdParams, response: a.PolicyVersion, summary: "One version of the attendance policy" },
+  requirePermission("settings", "view"), controller.policyVersion);
+
+route(router, "post", "/policy/versions/:id/withdraw",
+  { params: c.common.IdParams, body: a.PolicyWithdraw, response: a.PolicyOverview,
+    summary: "Withdraw a version waiting to start" },
+  requirePermission("settings", "edit"), controller.withdrawPolicy);
+
+route(router, "get", "/policy/versions/:id/acknowledgements",
+  { params: c.common.IdParams, query: a.PolicyAckListQuery, response: a.PolicyAckPage,
+    summary: "Who has acknowledged a version of the attendance policy" },
+  requirePermission("settings", "view"), controller.policyAcknowledgements);
 
 module.exports = { basePath: "/attendance", surface: "staff", router };

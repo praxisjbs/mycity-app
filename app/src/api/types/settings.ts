@@ -1,11 +1,11 @@
-import type { IsoDateTime, Paged, PersonRef } from "./common";
+import type { IsoDateTime } from "./common";
 import type { Status } from "./performance";
 
 /**
  * INTERIM shapes for the Settings screens still on the mock: Approvals (track D),
- * Notifications (M6), Appearance and Integrations (M9), and the attendance policy
- * acknowledgements (LA). Organisation, Roles & Permissions, Documents & Numbering,
- * Security and the Audit Log are on the contract (contract.gen.ts).
+ * Notifications (M6), Appearance and Integrations (M9). Organisation, Roles & Permissions,
+ * Documents & Numbering, Security, the Audit Log and the attendance policy (LA) are on the
+ * contract (contract.gen.ts).
  */
 export interface NotificationPref {
   key: string;
@@ -35,13 +35,7 @@ export interface IntegrationHealth {
   failures: number;
   status: Status;
 }
-export interface PolicyAck {
-  employee: PersonRef;
-  read_at: IsoDateTime | null;
-  acknowledged_at: IsoDateTime | null;
-}
 
-type Q<T = object> = T & { page?: number; q?: string };
 declare module "@/api/endpoints" {
   interface Endpoints {
     "GET /api/v1/settings/notifications": { query: never; body: never; params: never; response: NotificationPref[] };
@@ -49,6 +43,5 @@ declare module "@/api/endpoints" {
     "GET /api/v1/settings/appearance": { query: never; body: never; params: never; response: Appearance };
     "PATCH /api/v1/settings/appearance": { query: never; body: { theme_default: Appearance["theme_default"] }; params: never; response: Appearance };
     "GET /api/v1/settings/integrations": { query: never; body: never; params: never; response: { items: Integration[]; health: IntegrationHealth[] } };
-    "GET /api/v1/attendance/policies/:version/acknowledgements": { query: Q; body: never; params: { version: string }; response: Paged<PolicyAck> };
   }
 }

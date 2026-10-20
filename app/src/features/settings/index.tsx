@@ -9,7 +9,7 @@ import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AttendancePolicyTab } from "./Policy";
+import { AttendancePolicyTab } from "@/features/attendance/AttendancePolicy";
 import { AuditLog } from "./AuditLog";
 import { NumberingTab } from "./Numbering";
 import { OrganisationTab } from "./Organisation";

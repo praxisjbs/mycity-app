@@ -84,7 +84,8 @@ These finish M0 and no prompt can do them:
 | Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export by email, values masked per reader |
 | Settings · Approvals (#72) | Settings | `settings` view; edit to change | D | **Built** (17/10/2026) | Every flow, its stages and version; Edit Stages saves a new version |
 | ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
-| Settings · Integrations (#77), Appearance (#75), Notifications (#74), Attendance Policy (#73) | Settings | | none | Mock | Coming Soon (#74 is M6; #73 is LA's attendance) |
+| Settings · Integrations (#77), Appearance (#75), Notifications (#74) | Settings | | none | Mock | Coming Soon (#74 is M6) |
+| Settings · Attendance Policy (#73) | Settings | `settings` view; edit to change and publish | LA | **Built** (19/10/2026) | The attendance policy's versions, draft, publishing and acknowledgements: `docs/guides/attendance.md` §6.15 |
 
 ## 3 · How the screens relate
 
@@ -461,7 +462,7 @@ As built (17/10/2026):
 ### 6.8 Settings screens not in this guide
 
 Integrations (#77), Appearance (#75) and Notifications (#74, M6) stay Coming Soon. Attendance Policy
-(#73) belongs to LA's attendance work.
+(#73) belongs to LA's attendance work and is described in `docs/guides/attendance.md` §6.15.
 
 ### 6.9 What a document's status means (TB, 17/10/2026)
 
@@ -815,3 +816,4 @@ screen.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's
   twenty decisions of 16/10/2026 (§6); the staff sheet and role map go into `seeds/staff/` with
   track A, the repository being private.
+- 19/10/2026 · LA · Settings · Attendance Policy (#73) is built from the attendance guide, which owns it (§6.15): §2 and §6.8 point there.
