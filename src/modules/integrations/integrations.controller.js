@@ -1,6 +1,6 @@
 "use strict";
 // ai:none keys and connections are configuration; an assistant that could read them would be one more way for them to leak
-// search:none five connections, each found as the Integrations screen by its name (shared/search/screens.js)
+// search:none ten connections and their model lists, each found as the Integrations screen by its name (shared/search/screens.js)
 /**
  * Integrations: the HTTP edge for Settings · Integrations (docs/guides/integrations.md §5).
  * The provider calls a test makes run in the service, outside any transaction.
@@ -25,4 +25,11 @@ module.exports = {
   test: async (req, res) => ok(res, await service.test(code(req), req.validated.body, withActor(req))),
   testEmail: async (req, res) => ok(res, await service.testEmail(withActor(req))),
   replaceKeys: async (req, res) => ok(res, await service.replaceKeys(withActor(req))),
+  syncRates: async (req, res) => ok(res, await service.syncRates(withActor(req))),
+  models: async (req, res) => sendPaged(res, await service.models(code(req), req.validated.query)),
+  addModel: async (req, res) => ok(res, await service.addModel(code(req), req.validated.body, withActor(req))),
+  removeModel: async (req, res) => {
+    await service.removeModel(code(req), req.validated.params.id, withActor(req));
+    noContent(res);
+  },
 };

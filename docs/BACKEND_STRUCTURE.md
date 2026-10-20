@@ -890,8 +890,16 @@ prompts.
 | **Feature AI**: one task inside a module's service | M2 transcript cleanup, M4 JD draft and CV screening, M7 proposal draft | The module's service, via `ai.complete()` | M2, M4, M7 |
 | **Assistant**: answers questions from data | M10 Praxis AI ("who has overdue tasks?") | `services/ai/assistant/`, via the manifests | M10 |
 
-Both go through `services/ai/llm.service.js`. Nothing else in `src/` may import a vendor SDK;
-`check/ai-vendor-imports.js` fails the build if it does.
+Both go through `services/ai/llm.service.js` (voice through `services/ai/transcription.js`, the same
+governance and ledger). Nothing else in `src/` may import a vendor SDK; `check/ai-vendor-imports.js`
+fails the build if it does.
+
+The vendors are Gemini, Groq (speech to text), OpenAI (embeddings), Anthropic (top-tier drafting,
+Sonnet and Haiku only) and DeepSeek (work with no personal data), each one file in
+`services/ai/vendors/`, plain HTTPS through `vendors/http.js`, with its key and model list on
+Settings · Integrations (`docs/guides/integrations.md` §1.2). Which model answers each job (Default,
+Fast, Deep Reasoning, Image Reading, Transcription, Embeddings, Top Tier) is `services/ai/jobs.js`
+until AI Control is built (`docs/guides/ai-control.md`); every new AI feature names its job there.
 
 ### 14.2 What every call passes through
 
@@ -969,7 +977,7 @@ This keeps a broad question from timing out the AI call or the request behind it
 | Milestone | Adds | On top of |
 |---|---|---|
 | M1 onward | One `.ai.js` per module | registry, gate 9 |
-| M2 | `transcription.js` body, `prompts/review-cleanup.md`, vendor key in `.env` | `complete()`, ledger |
+| M2 | `prompts/review-cleanup.md` (`transcription.js` came early, 20/10/2026: Groq, then Gemini, then the browser's captions, `docs/guides/integrations.md` §6.14; keys on Settings · Integrations) | `complete()`, ledger |
 | M4 | `prompts/jd-draft.md`, `prompts/cv-screen.md` | structured output, provisional flag |
 | M7 | `prompts/proposal-draft.md`, `prompts/mou-draft.md` | same |
 | M10 | `services/ai/assistant/` (retrieve, choose reads, answer, cite), embeddings with pgvector, spend screen | catalogue, authorise, cite, ledger, governance |

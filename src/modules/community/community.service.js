@@ -27,6 +27,8 @@ const vault = require("../../shared/documents/vault");
 const storage = require("../../services/storage/storage.service");
 const lagos = require("../../shared/time/lagos");
 const transcription = require("../../services/ai/transcription");
+
+const STUB_TRANSCRIPT = transcription.STUB_TEXT;
 const repo = require("./community.repo");
 const { EVENTS } = require("./community.events");
 const { noteFor } = require("./community.recognition");
@@ -511,7 +513,8 @@ async function present(
       link: deleted ? null : (r.link ?? null),
       forwarded: m.forwarded === true,
       duration_s: r.message_type === "audio" ? (m.duration_s ?? null) : null,
-      transcript: deleted ? null : (r.transcript ?? null),
+      // The stub's placeholder, stored before transcripts became drafts, reads as none.
+      transcript: deleted || r.transcript === STUB_TRANSCRIPT ? null : (r.transcript ?? null),
       celebration,
       recognition,
       poll,
@@ -654,6 +657,7 @@ async function postMessage(channelId, body, user) {
       }
       if (type !== "audio") type = kindOfFile(doc.mime);
       if (type === "audio") metadata.duration_s = body.duration_s ?? 1;
+      if (type === "audio" && body.captions) metadata.captions = body.captions;
       if (body.album_key && FILE_TYPES.has(type)) metadata.album_key = body.album_key;
     }
     if (type === "text" && body.no_link_preview) metadata.no_link_preview = true;
@@ -1039,7 +1043,12 @@ async function listPins(channelId, user, query) {
   return { ...page, data: await present(pool, page.data, user, { direct, other, moderator }) };
 }
 
-/** A voice note's transcript, asked for once and stored for everyone after (§3 step 11). */
+/**
+ * A voice note's transcript, asked for once and stored for everyone after (§3 step 11). Groq,
+ * then Gemini (services/ai/transcription.js); when neither answers, the captions the sender's
+ * browser wrote while recording, as a draft that is never stored, so the next request asks them
+ * again. The stub's placeholder, stored before that rule, is treated as no transcript.
+ */
 async function transcript(messageId, user) {
   const row = await repo.messageFor(pool, messageId, user.user_id);
   if (
@@ -1054,14 +1063,16 @@ async function transcript(messageId, user) {
       422,
     );
   }
-  if (row.transcript) return { transcript: row.transcript };
+  if (row.transcript && row.transcript !== STUB_TRANSCRIPT) return { transcript: row.transcript, draft: false };
   const t = await transcription.transcribe({
     document_id: row.document_id,
     module: "community",
     actor: user,
+    captions: (row.metadata && row.metadata.captions) || null,
   });
+  if (t.draft) return { transcript: t.text, draft: true };
   await repo.setTranscript(pool, messageId, t.text);
-  return { transcript: t.text };
+  return { transcript: t.text, draft: false };
 }
 
 /* ------------------------------------------------------------------ *
@@ -1195,6 +1206,7 @@ async function forward(body, user) {
         const metadata = { forwarded: true };
         if (it.community_message_id) metadata.forwarded_from = it.community_message_id;
         if (was.duration_s) metadata.duration_s = was.duration_s;
+        if (was.captions) metadata.captions = was.captions;
         if (was.no_link_preview) metadata.no_link_preview = true;
         if (was.album_key) {
           if (!albums.has(was.album_key)) albums.set(was.album_key, crypto.randomUUID());

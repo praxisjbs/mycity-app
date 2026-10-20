@@ -11,6 +11,10 @@
  *   POST   /:code/test                     edit    test the settings in use
  *   POST   /mail_sender/test-email         edit    a real message to the tester
  *   POST   /web_push/replace-keys          edit    a new key pair
+ *   POST   /exchange_rates/sync            edit    fetch today's exchange rates now
+ *   GET    /:code/models                   view    an AI connection's model list, 25 a page
+ *   POST   /:code/models                   edit    Add Model
+ *   DELETE /:code/models/:id               delete  take a model added by hand off the list
  *
  * The `integrations` key, not `settings`: only the IT team holds it (seed 9290). A test and a
  * test email need edit because they act on the connection: a test email is a real message,
@@ -41,6 +45,22 @@ route(router, "post", "/mail_sender/test-email",
 route(router, "post", "/web_push/replace-keys",
   { body: c.common.EmptyBody, response: i.Integration, summary: "Replace the web push key pair" },
   requirePermission("integrations", "edit"), controller.replaceKeys);
+
+route(router, "post", "/exchange_rates/sync",
+  { body: c.common.EmptyBody, response: i.IntegrationCheck, summary: "Fetch today's exchange rates now" },
+  requirePermission("integrations", "edit"), controller.syncRates);
+
+route(router, "get", "/:code/models",
+  { params: i.IntegrationParams, query: i.AiModelListQuery, response: i.AiModelPage, summary: "An AI connection's model list" },
+  requirePermission("integrations", "view"), controller.models);
+
+route(router, "post", "/:code/models",
+  { params: i.IntegrationParams, body: i.AiModelCreate, response: i.AiModel, summary: "Add a model to an AI connection's list" },
+  requirePermission("integrations", "edit"), controller.addModel);
+
+route(router, "delete", "/:code/models/:id",
+  { params: i.AiModelParams, no_content: true, summary: "Remove a model added by hand" },
+  requirePermission("integrations", "delete"), controller.removeModel);
 
 route(router, "get", "/:code",
   { params: i.IntegrationParams, response: i.Integration, summary: "One connection" },

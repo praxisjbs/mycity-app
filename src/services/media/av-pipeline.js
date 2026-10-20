@@ -121,6 +121,14 @@ async function toOpus(inAbs, outAbs) {
   ]);
 }
 
+/**
+ * Speech as MP3, 16 kHz mono: what a model that cannot read the browser's WebM is sent
+ * (services/ai/transcription.js). Small, and enough for a voice.
+ */
+async function speechMp3(inAbs, outAbs) {
+  await ffmpeg(["-i", inAbs, "-t", String(MAX_SECONDS), "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k", outAbs]);
+}
+
 async function toMp4(inAbs, outAbs) {
   await ffmpeg([
     "-i",
@@ -278,4 +286,4 @@ async function health() {
   }
 }
 
-module.exports = { run, probe, derive, health, waveformOf, MAX_SECONDS, WAVEFORM_BARS };
+module.exports = { run, probe, derive, health, waveformOf, speechMp3, MAX_SECONDS, WAVEFORM_BARS };

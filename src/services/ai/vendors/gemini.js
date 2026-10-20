@@ -20,19 +20,17 @@
  *  - `finish_reason: "length"` means the answer was cut off at the ceiling; it is
  *    returned so the ledger records it.
  *
- * Errors carry a `kind`: "config" (401, 403, 404: the key or model is wrong, retrying
- * cannot help), "rate_limited" (429), "timeout", or "transient" (5xx, network).
+ * Errors carry a `kind` (vendors/http.js): "config" (400, 401, 403, 404: the key or model is
+ * wrong, retrying cannot help), "rate_limited" (429, with how long Google asked us to wait),
+ * "timeout", or "transient" (5xx, network).
+ *
+ * The model list and transcription use Google's own API beside the compatible one: its list says
+ * what each model does and its display name, and it takes audio inline as MP3.
  */
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
+const { VendorError, classify, request, retryAfterOf } = require("./http");
 
-class VendorError extends Error {
-  constructor(message, kind, status = null) {
-    super(message);
-    this.name = "VendorError";
-    this.kind = kind;
-    this.status = status;
-  }
-}
+const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
+const NATIVE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 function reasoningEffort(model) {
   return /^(models\/)?gemini-2\.5-flash/i.test(String(model || ""))
@@ -64,12 +62,6 @@ function toolSchema(node) {
     }
   }
   return out;
-}
-
-function classify(status) {
-  if (status === 401 || status === 403 || status === 404) return "config";
-  if (status === 429) return "rate_limited";
-  return "transient";
 }
 
 /**
@@ -160,6 +152,7 @@ async function complete({
       `gemini ${res.status}: ${detail}`,
       classify(res.status),
       res.status,
+      { retryAfterMs: res.status === 429 ? retryAfterOf(res.headers, data) : null },
     );
   }
   if (!data)
@@ -223,12 +216,81 @@ async function listModels({ apiKey, timeoutMs = 20_000, fetchImpl = fetch }) {
   return list.map((m) => String((m && m.id) || "").replace(/^models\//, "")).filter(Boolean);
 }
 
+/**
+ * The models the key may use, from Google's own list (free): each one's id without "models/",
+ * its display name, and the methods it answers (generateContent, embedContent).
+ * @param {{apiKey: string, timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<Array<{id: string, display_name: string, methods: string[]}>>}
+ */
+async function listModelsDetailed({ apiKey, timeoutMs = 20_000, fetchImpl }) {
+  if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  const out = [];
+  let token = null;
+  for (let page = 0; page < 10; page += 1) {
+    const url = `${NATIVE_URL}/models?pageSize=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ""}`;
+    const { data } = await request("gemini", url, { headers: { "x-goog-api-key": apiKey }, timeoutMs, fetchImpl });
+    for (const m of Array.isArray(data.models) ? data.models : []) {
+      const id = String((m && m.name) || "").replace(/^models\//, "");
+      if (!id) continue;
+      out.push({
+        id,
+        display_name: String(m.displayName || id),
+        methods: Array.isArray(m.supportedGenerationMethods) ? m.supportedGenerationMethods.map(String) : [],
+      });
+    }
+    if (!data.nextPageToken) break;
+    token = data.nextPageToken;
+  }
+  return out;
+}
+
+/**
+ * One recording to text, sent inline (a voice note is well under Google's 20 MB inline limit).
+ * @param {{apiKey: string, model: string, audio: Buffer, mime: string, prompt: string,
+ *          maxTokens?: number, timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}>}
+ */
+async function transcribe({ apiKey, model, audio, mime, prompt, maxTokens = 8192, timeoutMs = 30_000, fetchImpl }) {
+  if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  const body = {
+    contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: audio.toString("base64") } }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: maxTokens },
+  };
+  const id = String(model).replace(/^models\//, "");
+  const { data } = await request("gemini", `${NATIVE_URL}/models/${encodeURIComponent(id)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs,
+    fetchImpl,
+  });
+  const candidate = (Array.isArray(data.candidates) && data.candidates[0]) || {};
+  const parts = (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts) || [];
+  const meta = data.usageMetadata || {};
+  return {
+    text: parts
+      .filter((p) => p && typeof p.text === "string" && !p.thought)
+      .map((p) => p.text)
+      .join("")
+      .trim(),
+    usage: {
+      input_tokens: Number(meta.promptTokenCount) || 0,
+      output_tokens: (Number(meta.candidatesTokenCount) || 0) + (Number(meta.thoughtsTokenCount) || 0),
+    },
+    model: data.modelVersion || id,
+    finish_reason: candidate.finishReason || null,
+  };
+}
+
 module.exports = {
   name: "gemini",
   BASE_URL,
+  NATIVE_URL,
   VendorError,
   complete,
   listModels,
+  listModelsDetailed,
+  transcribe,
   toolSchema,
   reasoningEffort,
   classify,

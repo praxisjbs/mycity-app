@@ -68,8 +68,10 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
 
 1. **Set mail and the keys on Settings · Integrations**, on each environment, once the app is up
    (`docs/guides/integrations.md`; `docs/runbooks/dns-and-mail.md` §4 has the values): the System
-   Sender, the Staff Mail Server when its hosts differ from the defaults, Geoapify's key and
-   Gemini's (none uses the stub). Until a sender is set, system mail is held, not lost. The `.env`
+   Sender, the Staff Mail Server when its hosts differ from the defaults, Geoapify's key, Gemini's
+   (none uses the stub), Groq's (voice notes, Free plan), Exchange Rates' (the daily rates) and, when
+   they are used, OpenAI's, Anthropic's and DeepSeek's, each with its plan and its share of the daily
+   limit (staging and production share the keys, `docs/guides/integrations.md` §1.2 decision 5). Until a sender is set, system mail is held, not lost. The `.env`
    lines (`SMTP_*`, `MAIL_SEND_PER_HOUR`, `GEOAPIFY_API_KEY`, `GEMINI_API_KEY`) still work as the
    fallback, and a server starts without them.
 2. **Copy `/root/mycity-secrets/` somewhere safe**, off the server. It holds the database

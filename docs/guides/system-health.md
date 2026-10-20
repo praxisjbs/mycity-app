@@ -42,7 +42,7 @@ one creates alarm without action.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Settings · Status (`status`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Every readiness check, including disk, memory, processor, database size and connections, whether every background job has run, and the Maps and Staff Mail Server connections; refreshed every 30 seconds | Read what is wrong and where to look; open a check's sheet (what it measured, since when, 7 days of changes, every scheduler or queue behind it); Download Brief (`system_health` export) |
+| Settings · Status (`status`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Every readiness check, including disk, memory, processor, database size and connections, whether every background job has run, and every connection on Settings · Integrations (Maps, Staff Mail Server, Gemini, Groq, OpenAI, Anthropic, DeepSeek, Exchange Rates, web push); refreshed every 30 seconds | Read what is wrong and where to look; open a check's sheet (what it measured, since when, 7 days of changes, every scheduler or queue behind it); Download Brief (`system_health` export) |
 | Settings · Performance (`performance`) | staff app, third tab | the same | Availability, response time and failed requests against their targets; the whole server's processor, memory and disk in real units, split by what uses them; network, disk activity and server facts; trends over an hour, a day, a week or a month; then Slowest Routes, Database, Background Work and Processes | Switch the window, switch the section, Edit Targets (`system_health` edit) |
 | Settings · Faults (`faults`) | staff app, fourth tab | the same | Faults, grouped, 25 a page | Filter and search, open one, set its status, assign it, note it, tick several and Download Brief |
 | Settings · Notifications (`notifications`) | staff app | `settings` view | The six System Health notices in the System Health category, each with who it tells and its channels | Turn a notice off, change its urgency and channels |
@@ -348,7 +348,7 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Settings · Status | Four tiles (Checks Down, Open Faults, New Today, Came Back); the check list with a state pill each, including disk, memory, processor, database, background jobs, Maps and Staff Mail Server (Failing with the reason in a few words, or Not set up), and how long a check that is not up has been so; Download Brief | Details row on a check that is not up: where to look | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used, how a job is judged late, the watcher's mail rules: §6 and §7 here, and `docs/runbooks/system-health.md` |
+| Settings · Status | Four tiles (Checks Down, Open Faults, New Today, Came Back); the check list with a state pill each, including disk, memory, processor, database, background jobs and every connection on Settings · Integrations (Failing with the reason in a few words, or Not set up), and how long a check that is not up has been so; Download Brief | Details row on a check that is not up: where to look | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used, how a job is judged late, the watcher's mail rules: §6 and §7 here, and `docs/runbooks/system-health.md` |
 | Check sheet | State pill, since when, what it said; the probe's figures; for Background Jobs every scheduler (Job, Set As, Last Run, Result, Next, State); for Worker every queue (Waiting, Active, Delayed, Failed); the changes over 7 days, 25 a page | Help term on Set As: what the code declared. Help term on Not Due Yet: started, first slot still to come. Help term on Failed: failed jobs still kept, not today's. A job's last error is content, under its name | The read-only commands and the AI instructions: the downloaded brief |
 | Settings · Performance | Four target tiles (Availability, Response Time, Failed Requests, Requests), each with its target; Processor, Memory and Disk cards in real units with a bar split by what uses them; Network and Server cards; Response Time, Requests, Failed Requests, Processor, Memory, Disk Activity and Network over the window; the section switch (Slowest Routes, Database, Background Work, Processes). A banner when nothing is recording | Help terms on Steal, I/O Wait, Cache, Reserved, Full In and p95, one sentence each; the ⓘ on a chart says what it counts | How each figure is worked out, the bucket bounds and the regression: §6 here |
 | Edit Targets | A three-step wizard: Targets (availability, response time, failed requests), Disk and Memory, Processor and Connections; Save Targets | Nothing | Why the defaults are what they are: §6 here |
@@ -362,7 +362,7 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 | Settings · Status | The state pill, then the four tiles two to a row, then checks that are not up as cards | The full check list when everything is up | Download Brief, in the page header | Bottom bar More, then Settings; the tabs scroll sideways |
 | Check sheet | State pill, since when, what it said, then the jobs or queues that are not well as cards | The figures and the history, behind Show More; jobs that are on time | None; the sheet is for reading | Opens as a sheet over Status, back closes it |
 | Settings · Performance | The window switch, the banner when nothing is recording, then the four target tiles two to a row, then Processor, Memory and Disk with their split bars, then Network | Every trend chart (a trend is not a phone screen), the Server card, and the columns marked desktop in each section (Over 1 s, Longest, Indexes, Heap) | The window switch; Edit Targets as a full-screen sheet | As above; sections are cards, not tables |
-| Settings · Faults | Search, then fault cards with a severity pill | The In All and People columns | Download Brief, full width in the sheet after faults are ticked | As above |
+| Settings · Faults | Search, then fault cards with a severity pill | The In All and People columns | Download Brief, in the list's selection bar after faults are ticked (the tick sits beside each card, never inside it) | As above |
 | Fault sheet | Severity pill, title, when it was last seen, Set Status | The stack trace, collapsed behind Show Stack | Set Status, full width in the sheet's footer | Opens as a sheet over the list, back closes it |
 
 ## 11 · Edge cases
@@ -432,6 +432,13 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   built; TB decided against it on 20/10/2026 to keep the screen single-audience.
 
 ## 14 · Change log
+
+- 20/10/2026 · TB · Settings · Integrations' AI providers and Exchange Rates
+  (`docs/guides/integrations.md` §1.2): Groq, OpenAI, Anthropic, DeepSeek, Exchange Rates and web
+  push join Status as readiness checks from each connection's state; Exchange Rates is also
+  Failing (`RATES_STALE`) when the newest rates are more than 36 hours old, and the Status brief
+  shows them. Faults on a phone put the tick inside the card's open button (the a11y gate's
+  nested-interactive); picking now goes through the list's selection bar, the same four actions.
 
 - 20/10/2026 · TB · Settings · Integrations (`docs/guides/integrations.md`): two new readiness
   checks, Maps and Staff Mail Server, from each connection's stored state, with "where to look"

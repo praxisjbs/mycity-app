@@ -27,8 +27,11 @@ const EVENTS = defineEvents("integrations", {
   "integration.saved": { summary: "A connection's settings were saved on Settings, Integrations" },
   "integration.removed": { summary: "A connection's saved settings were removed; the server file applies again" },
   "integration.keys_replaced": { summary: "The web push key pair was replaced" },
-  "integration.tested": { summary: "A connection was tested, or a test email sent" },
+  "integration.tested": { summary: "A connection was tested, a test email sent, or exchange rates synced" },
   "integration.quota_warning": { summary: "A connection used 80% of its daily limit" },
+  // Audit only, told to nobody: a model list is configuration, like a test (guide §1.2).
+  "integration.model_added": { summary: "A model was added by hand to an AI connection's list" },
+  "integration.model_removed": { summary: "A model added by hand was taken off an AI connection's list" },
 });
 
 /** Send Test Email's message (templates/email/integration-test.html). */

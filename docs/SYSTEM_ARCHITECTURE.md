@@ -241,8 +241,8 @@ seconds; `/api/health/ready` reports `worker` degraded when none is fresh.
 - **Module catalogue** (`shared/access/access.catalog.js`) is the single list of permission keys; a
   CI gate checks it equals the distinct `requirePermission` keys in `src/`.
 - **Secrets.** `.env` per environment, mode 600, owned by the service user. Integration secrets
-  (mailbox passwords; the system sender's password, Geoapify's and Gemini's keys and the web push
-  pair, set on Settings · Integrations, `docs/guides/integrations.md` §6.4) AES-256-GCM in
+  (mailbox passwords; the system sender's password, the keys of Geoapify, Gemini, Groq, OpenAI,
+  Anthropic, DeepSeek and Exchange Rates, and the web push pair, set on Settings · Integrations, `docs/guides/integrations.md` §6.4) AES-256-GCM in
   `integration_secret`, each bound to its row, never on the row that uses them and never sent back
   to a browser. What changes often (mail, keys, limits) is set on that page, per environment,
   without SSH or a restart; `.env` keeps what the app needs before it can read its database

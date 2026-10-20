@@ -703,7 +703,7 @@ route("POST /api/v1/community/messages/:id/transcript", async (req) => {
   if (!f || !isMember(f.c, req.user!) || f.m.message_type !== "audio") return notFound();
   await new Promise((r) => setTimeout(r, 900));
   f.m.transcript = TRANSCRIPTS[f.m._by ?? ""] ?? "Quick update: all on track for Friday. I will send the details in writing.";
-  return ok({ transcript: f.m.transcript });
+  return ok({ transcript: f.m.transcript, draft: false });
 });
 
 route("GET /api/v1/community/direct", (req) =>

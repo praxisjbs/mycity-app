@@ -187,7 +187,7 @@ src/
 │   ├── organisation/  profile (Settings · Organisation's profile and brand files, the one reader for
 │   │                  letterheads, system mail and email signatures)
 │   ├── rbac/          grants-cache · field-mask · scope · sessions
-│   ├── money/         money
+│   ├── money/         money · fx (exchange rates read: the dollar against every currency, kept by day)
 │   ├── time/          lagos · working-week · day-first · recurrence
 │   ├── numbering/     numbering · schemes
 │   ├── files/         sniff · mime-policy · hash · safe-name · variant-key
@@ -207,7 +207,8 @@ src/
 │   ├── notifications/ categories · fanout
 │   ├── integrations/  providers (the registry of Settings · Integrations' connections) · settings (the
 │   │                  one reader of a connection's values: saved here, else the server file) · state ·
-│   │                  usage (each provider call counted a day, flushed every 15 s)
+│   │                  usage (each provider call counted a day, flushed every 15 s) · quota (a Free plan's
+│   │                  daily limit as a hard stop)
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms) ·
 │   │                  actions (⌘K actions: each screen's New action, Clock In, Request Leave)
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
@@ -224,12 +225,16 @@ src/
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
 │   │                  deliverability/{check, route-check, dns-check, dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
-│   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
-│   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
+│   ├── ai/            llm.service · governance · ledger · redact · structured · transcription (Groq,
+│   │                  then Gemini, then the browser's captions) · catalogue (a provider's model list,
+│   │                  sorted into what the ERP uses) · jobs (each AI job's model until AI Control) ·
+│   │                  skips (a provider skipped until its quota resets) · vendors/{http, gemini, groq,
+│   │                  openai, anthropic, deepseek, stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
 │   │                  map tiles, cached and kept under the provider's rate; F21, F27)
+│   ├── fx/            exchangerate-api (Exchange Rates' provider: every currency against a base, daily)
 │   ├── qr/            qr
 │   ├── web/           links (what counts as a link, the first one's card form) · public-fetch (a page or a
 │   │                  picture from the public web only: private addresses refused, size and time capped) ·
@@ -523,7 +528,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
-| M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly) |
+| M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
 | M10 | `knowledge-embed` | |
 
 `partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's

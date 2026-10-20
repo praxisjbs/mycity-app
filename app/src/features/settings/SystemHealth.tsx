@@ -38,7 +38,6 @@ import {
   SearchInput,
   SidePanel,
   TextAreaField,
-  Tick,
   toast,
   Toolbar,
   useIsPhone,
@@ -459,10 +458,6 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
   const list = usePaged("GET /api/v1/system-health/faults", { filters });
   const bulk = useMutation("POST /api/v1/system-health/faults/bulk");
 
-  const onPage = list.rows.map((f) => f.error_group_id);
-  const allPicked = onPage.length > 0 && onPage.every((id) => picked.includes(id));
-  const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const togglePage = () => setPicked((p) => (allPicked ? p.filter((id) => !onPage.includes(id)) : [...new Set([...p, ...onPage])]));
   const done = () => {
     setPicked([]);
     invalidate("/api/v1/system-health");
@@ -512,33 +507,30 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
         </div>
       </PhoneOnly>
 
-      {picked.length > 0 && (
-        <Card className="mt-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <b className="text-sm">{picked.length} picked</b>
-            {canExport && (
-              <HelpTerm help={BRIEF}>
-                <Button variant="primary" icon="download" onClick={download}>
-                  Download Brief
-                </Button>
-              </HelpTerm>
-            )}
-            {canEdit && <Button onClick={() => mark("fixed")}>Mark Fixed</Button>}
-            {canEdit && <Button onClick={() => mark("ignored")}>Ignore Faults</Button>}
-            {canEdit && filters.status !== "active" && <Button onClick={() => mark("open")}>Open Again</Button>}
-            <Button variant="ghost" onClick={() => setPicked([])}>
-              Clear Picked
-            </Button>
-          </div>
-        </Card>
-      )}
-
       <DataView<FaultRow>
         className="mt-3"
         title="Faults"
         list={list}
         rowKey={(f) => f.error_group_id}
         noun="fault"
+        selection={{
+          keys: picked,
+          onChange: setPicked,
+          actions: (
+            <>
+              {canExport && (
+                <HelpTerm help={BRIEF}>
+                  <Button variant="primary" icon="download" onClick={download}>
+                    Download Brief
+                  </Button>
+                </HelpTerm>
+              )}
+              {canEdit && <Button onClick={() => mark("fixed")}>Mark Fixed</Button>}
+              {canEdit && <Button onClick={() => mark("ignored")}>Ignore Faults</Button>}
+              {canEdit && filters.status !== "active" && <Button onClick={() => mark("open")}>Open Again</Button>}
+            </>
+          ),
+        }}
         onRowClick={(f) =>
           modal.open({
             title: f.title,
@@ -548,11 +540,6 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
         }
         empty={{ title: "Nothing Has Failed", text: "Faults show here within five minutes.", icon: "check" }}
         columns={[
-          {
-            key: "tick",
-            label: <Tick checked={allPicked} onChange={togglePage} label="Select Page" />,
-            render: (f) => <Tick checked={picked.includes(f.error_group_id)} onChange={() => toggle(f.error_group_id)} label={`Select ${f.title}`} />,
-          },
           {
             key: "fault",
             label: "Fault",

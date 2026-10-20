@@ -16,7 +16,9 @@
  *   monthly_cap_ngn         spend ceiling for the Lagos calendar month; NULL is no cap
  *   input/output_ngn_per_million  token prices, so the spend is in naira
  * With no row (or before migration 0095), the defaults come from the environment:
- * enabled, Gemini when it has a key, no cap, the AI_*_NGN_PER_MILLION prices.
+ * enabled, Gemini when it has a key, no cap, the AI_*_NGN_PER_MILLION prices. The model is the
+ * Default job's: the best one Gemini's key can use (services/ai/jobs.js), else GEMINI_MODEL. A
+ * key made for a new Google project cannot use every older model, so a fixed default would fail.
  *
  * Which vendor answers: "gemini" with a key; the stub otherwise, never an error
  * (a missing key is a configuration the product supports: CI, laptops, staging). The key
@@ -41,11 +43,11 @@ const VENDORS = new Set(["gemini", "stub"]);
 /** Gemini's key in use, or null: AI then answers from the stub. */
 const keyOf = (db) => integrations.secret("gemini", "api_key", { db });
 
-function defaults(apiKey = null) {
+function defaults(apiKey = null, model = config.GEMINI_MODEL) {
   return {
     enabled: true,
     vendor: apiKey ? "gemini" : "stub",
-    model: config.GEMINI_MODEL,
+    model,
     disabled_modules: [],
     monthly_cap_ngn: null,
     input_ngn_per_million: config.AI_INPUT_NGN_PER_MILLION,
@@ -60,8 +62,14 @@ const str2 = (v) =>
  * The effective settings: the ai_setting row over the environment defaults.
  * @param {{query: Function}} db
  */
+/** The Default job's Gemini model from the key's list, or null when the list has none yet. */
+async function defaultModel(db) {
+  const first = (await require("./jobs").chain("default", { db }))[0];
+  return first && first.provider === "gemini" ? first.model : null;
+}
+
 async function settings(db) {
-  const base = defaults(await keyOf(db));
+  const base = defaults(await keyOf(db), (await defaultModel(db)) || config.GEMINI_MODEL);
   let row = null;
   try {
     const { rows } = await db.query(

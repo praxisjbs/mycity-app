@@ -4,7 +4,7 @@ import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
 import type { LinkPreview, Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { ActionGroup, Button, ChoiceField, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
+import { ActionGroup, Button, ChoiceField, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, startCaptions, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type Captions, type MenuItem } from "@mycity/ui";
 import { AlbumPost, Post } from "./Posts";
 import { MessageLink, useViewer, viewerFilesOf } from "./Media";
 import { ForwardTo, forwardable } from "./Forward";
@@ -122,11 +122,18 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
     void reload();
   };
 
-  /** A file or a voice note: uploaded to the conversation first, then posted. */
-  const sendFile = async (file: File, durationS?: number) => {
+  /**
+   * A file or a voice note: uploaded to the conversation first, then posted. A voice note carries
+   * the captions the browser wrote while it was recorded, the transcript's last resort.
+   */
+  const sendFile = async (file: File, durationS?: number, captions?: string) => {
     if (!id) return;
     const doc = await upload({ endpoint: `/api/v1/community/channels/${id}/media`, file, fields: { purpose: durationS ? "voice_note" : "attachment" } });
-    await send(durationS ? { message_type: "audio", document_id: doc.document_id, duration_s: durationS } : { message_type: "file", document_id: doc.document_id });
+    await send(
+      durationS
+        ? { message_type: "audio", document_id: doc.document_id, duration_s: durationS, ...(captions ? { captions } : {}) }
+        : { message_type: "file", document_id: doc.document_id },
+    );
   };
 
   const replace = (m: Message) => setMsgs((list) => list.map((x) => (x.community_message_id === m.community_message_id ? m : x)));
@@ -620,7 +627,7 @@ function useComposerLink(text: string) {
 }
 
 /** The composer for a channel or a conversation, with voice notes in both. */
-export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { placeholder: string; onSend: (b: MessageCreate) => Promise<void>; onVoice: (file: File, seconds: number) => Promise<void>; plus?: (cls: string) => ReactNode; readOnly?: string }) {
+export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { placeholder: string; onSend: (b: MessageCreate) => Promise<void>; onVoice: (file: File, seconds: number, captions: string) => Promise<void>; plus?: (cls: string) => ReactNode; readOnly?: string }) {
   const [text, setText] = useState("");
   const phone = useIsMobile();
   const box = useRef<HTMLTextAreaElement>(null);
@@ -639,6 +646,8 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const stream = useRef<MediaStream | null>(null);
+  /** What the browser hears while recording, where it can (decision 8 of the integrations guide). */
+  const captions = useRef<Captions | null>(null);
   const keep = useRef(false);
 
   useEffect(() => {
@@ -646,7 +655,13 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
     const i = setInterval(() => setRec((s) => (s == null ? s : s + 1)), 1000);
     return () => clearInterval(i);
   }, [rec]);
-  useEffect(() => () => stream.current?.getTracks().forEach((tr) => tr.stop()), []);
+  useEffect(
+    () => () => {
+      captions.current?.stop();
+      stream.current?.getTracks().forEach((tr) => tr.stop());
+    },
+    [],
+  );
 
   const send = async () => {
     if (!text.trim() || busy) return;
@@ -678,6 +693,7 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
     r.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
     recorder.current = r;
     r.start();
+    captions.current = startCaptions();
     setRec(0);
   };
 
@@ -694,13 +710,15 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
         })
       : Promise.resolve(new Blob([new Uint8Array(64)], { type: "audio/webm" }));
     const blob = await done;
+    const heard = captions.current?.stop() ?? "";
+    captions.current = null;
     stream.current?.getTracks().forEach((tr) => tr.stop());
     stream.current = null;
     if (!keep.current) return;
     setBusy(true);
     try {
       const ext = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
-      await onVoice(new File([blob], `voice-note.${ext}`, { type: blob.type || "audio/webm" }), seconds);
+      await onVoice(new File([blob], `voice-note.${ext}`, { type: blob.type || "audio/webm" }), seconds, heard);
     } catch {
       toast("Could not send the voice note");
     } finally {

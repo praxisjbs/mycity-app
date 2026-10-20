@@ -9,8 +9,9 @@
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/integrations
  *
  * Refuses to run unless the database name ends in "_test": it drops and rebuilds the public
- * schema. No provider is reached: Geoapify and Gemini answer through a fake fetch, the mail
- * servers through fakes of the sign-in and the TLS check. The keys are invented.
+ * schema. No provider is reached: Geoapify, Gemini, Groq and the exchange rate service answer
+ * through a fake fetch, the mail servers through fakes of the sign-in and the TLS check. The keys
+ * are invented.
  */
 const request = require("supertest");
 const { config } = require("../../src/config/env");
@@ -73,6 +74,21 @@ const asked = [];
 async function fakeFetch(input) {
   const url = new URL(String(input));
   asked.push(url);
+  if (url.hostname === "api.groq.com" && url.pathname.endsWith("/models"))
+    return Response.json({
+      data: [
+        { id: "whisper-large-v3", active: true },
+        { id: "llama-3.3-70b-versatile", active: true },
+        { id: "playai-tts", active: true },
+      ],
+    });
+  if (url.hostname === "v6.exchangerate-api.com")
+    return Response.json({
+      result: "success",
+      base_code: "USD",
+      time_last_update_unix: 1760918401,
+      conversion_rates: { USD: 1, NGN: 1534.21, EUR: 0.92, GBP: 0.79 },
+    });
   if (geoStatus !== 200) return new Response("{}", { status: geoStatus, headers: { "content-type": "application/json" } });
   if (url.pathname.includes("/autocomplete"))
     return Response.json({ results: [{ place_id: "p1", formatted: "Admiralty Way, Lekki, Lagos", lat: 6.4335, lon: 3.4501 }] });
@@ -165,12 +181,23 @@ describeDb("Settings · Integrations against the real migrations", () => {
     test("every connection of the registry, in its order, with where its values come from", async () => {
       const res = await as("admin").get("/integrations");
       expect(res.status).toBe(200);
-      expect(res.body.data.map((r) => r.code)).toEqual(["mail_sender", "mailbox_server", "geoapify", "gemini", "web_push"]);
+      expect(res.body.data.map((r) => r.code)).toEqual([
+        "mail_sender",
+        "mailbox_server",
+        "geoapify",
+        "gemini",
+        "groq",
+        "openai",
+        "anthropic",
+        "deepseek",
+        "exchange_rates",
+        "web_push",
+      ]);
       const byCode = Object.fromEntries(res.body.data.map((r) => [r.code, r]));
       // The staff mail server always has the file's defaults; nothing is saved yet.
       expect(byCode.mailbox_server).toMatchObject({ source: "file", group: "mail", watched: true });
       if (!config.GEOAPIFY_API_KEY) expect(byCode.geoapify).toMatchObject({ source: "none", state: "not_set" });
-      expect(res.body.page.total).toBe(5);
+      expect(res.body.page.total).toBe(10);
       expect((await as("admin").get("/integrations?group=maps")).body.data.map((r) => r.code)).toEqual(["geoapify"]);
     });
 
@@ -179,7 +206,7 @@ describeDb("Settings · Integrations against the real migrations", () => {
       expect(summary.status).toBe(200);
       const count = (s) => list.body.data.filter((r) => r.state === s).length;
       expect(summary.body).toEqual({ working: count("ok"), failing: count("failing"), unchecked: count("unchecked"), not_set: count("not_set") });
-      expect(Object.values(summary.body).reduce((a, n) => a + n, 0)).toBe(5);
+      expect(Object.values(summary.body).reduce((a, n) => a + n, 0)).toBe(10);
       expect((await as("ops").get("/integrations/summary")).status).toBe(403);
     });
   });
@@ -377,6 +404,100 @@ describeDb("Settings · Integrations against the real migrations", () => {
       expect(res.body.settings.key_id).not.toBe(before.keyId);
       expect((await vapid.keys()).keyId).toBe(res.body.settings.key_id);
       expect(res.body.secrets[0]).toMatchObject({ key: "vapid", set: true, hint: res.body.settings.key_id });
+    });
+  });
+
+  describe("AI connections, their model lists, and exchange rates", () => {
+    const quota = require("../../src/shared/integrations/quota");
+    const fx = require("../../src/shared/money/fx");
+
+    test("a list starts from the seed; saving Groq's key reads its own list, marks what it can use, adds the rest", async () => {
+      const seeded = await as("admin").get("/integrations/groq/models");
+      expect(seeded.status).toBe(200);
+      expect(seeded.body.data.map((m) => [m.model, m.source, m.available])).toEqual([
+        ["whisper-large-v3", "seed", null],
+        ["whisper-large-v3-turbo", "seed", null],
+      ]);
+      const res = await as("admin")
+        .put("/integrations/groq")
+        .send({ code: "groq", api_key: "gsk_test_key_0001", daily_limit: 23040, plan: "free", saved_at: null });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ plan: "free", daily_limit: 23040, state: "ok", source: "saved" });
+      expect(res.body.settings).toMatchObject({
+        code: "groq",
+        in_use: [{ job: "transcription", position: 1, model: "whisper-large-v3" }],
+        models: 3,
+        available: 2,
+      });
+      expect(res.body.last_check.steps.map((st) => st.key)).toEqual(["key", "models"]);
+      const list = (await as("admin").get("/integrations/groq/models")).body.data;
+      const by = Object.fromEntries(list.map((m) => [m.model, m]));
+      expect(by["whisper-large-v3"]).toMatchObject({ available: true, source: "seed", usd_per_audio_hour: "0.1110" });
+      expect(by["whisper-large-v3"].in_use).toEqual([expect.objectContaining({ job: "transcription", position: 1 })]);
+      // Not on this key's list any more; speech out is no use to the ERP and is left off.
+      expect(by["whisper-large-v3-turbo"].available).toBe(false);
+      expect(by["llama-3.3-70b-versatile"]).toMatchObject({ source: "provider", available: true, capabilities: ["text"] });
+      expect(by["playai-tts"]).toBeUndefined();
+      expect((await as("admin").get("/integrations/groq/models?available=false")).body.data.map((m) => m.model)).toEqual([
+        "whisper-large-v3-turbo",
+      ]);
+      expect((await as("ops").get("/integrations/groq/models")).status).toBe(403);
+    });
+
+    test("Add Model keeps a model with its own endpoint; Anthropic takes Sonnet and Haiku only; only an added model comes off", async () => {
+      const added = await as("admin")
+        .post("/integrations/gemini/models")
+        .send({ model: "gemini-custom-1", display_name: "", capabilities: ["text", "image"], endpoint_url: "https://proxy.test/v1" });
+      expect(added.status).toBe(200);
+      expect(added.body).toMatchObject({ source: "added", display_name: "gemini-custom-1", endpoint_url: "https://proxy.test/v1", added_by_name: "Femi Bello" });
+      const again = await as("admin").post("/integrations/gemini/models").send({ model: "gemini-custom-1", capabilities: ["text"] });
+      expect(again.status).toBe(409);
+      expect(again.body.error.fields).toEqual({ model: ["Already on the list"] });
+      const opus = await as("admin").post("/integrations/anthropic/models").send({ model: "claude-opus-5-5", capabilities: ["text"] });
+      expect(opus.status).toBe(422);
+      expect(opus.body.error.fields).toEqual({ model: ["Sonnet or Haiku only"] });
+      expect((await as("admin").post("/integrations/mail_sender/models").send({ model: "x1", capabilities: ["text"] })).status).toBe(404);
+      const seed = (await as("admin").get("/integrations/gemini/models")).body.data.find((m) => m.source === "seed");
+      expect((await as("admin").delete(`/integrations/gemini/models/${seed.ai_model_id}`)).status).toBe(404);
+      expect((await as("admin").delete(`/integrations/gemini/models/${added.body.ai_model_id}`)).status).toBe(204);
+      const audit = await q("SELECT action FROM audit_ledger WHERE action LIKE 'integration.model_%' ORDER BY occurred_at");
+      expect(audit.rows.map((r) => r.action)).toEqual(["integration.model_added", "integration.model_removed"]);
+    });
+
+    test("saving the rate key keeps today's table; the job fetches only while it is missing; Sync Rates always does", async () => {
+      const res = await as("admin")
+        .put("/integrations/exchange_rates")
+        .send({ code: "exchange_rates", api_key: "fx-key-0001-abcd", daily_limit: 40, saved_at: null });
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ group: "finance", plan: "free" });
+      expect(res.body.settings).toMatchObject({ code: "exchange_rates", base: "USD", usd_ngn: "1534.2100000000", currencies: 4 });
+      expect(res.body.last_check.steps[0].found).toEqual(["1 USD = ₦1,534.21", "4 currencies"]);
+      // The key went as a bearer token, never in the address.
+      expect(asked.filter((u) => u.hostname === "v6.exchangerate-api.com").map((u) => u.pathname)).toEqual(["/v6/latest/USD"]);
+      expect(await fx.rate("USD", "NGN")).toBe("1534.21");
+      expect(await fx.rate("EUR", "NGN")).toBe("1667.6195652174");
+      expect(await fx.rate("NGN", "NGN")).toBe("1");
+      expect(await fx.rate("USD", "XYZ")).toBeNull();
+      asked.length = 0;
+      expect(await service.syncRates(null)).toBeNull();
+      expect(asked).toHaveLength(0);
+      const sync = await as("admin").post("/integrations/exchange_rates/sync").send({});
+      expect(sync.status).toBe(200);
+      expect(sync.body).toMatchObject({ kind: "sync", ok: true, checked_by_name: "Femi Bello" });
+      const { checks } = await require("../../src/http/health").runChecks();
+      expect(checks.exchange_rates).toMatchObject({ status: "up" });
+    });
+
+    test("on the Free plan the daily limit is a hard stop; on Paid it never stops a call", async () => {
+      quota.forget();
+      expect(await quota.spent("groq")).toBe(false);
+      usage.record("groq", "transcribe", { ok: true, units: 23040 });
+      expect(await quota.spent("groq")).toBe(true);
+      await usage.flush();
+      quota.forget();
+      expect(await quota.spent("groq")).toBe(true);
+      expect(await quota.spent("gemini")).toBe(false);
+      expect(await quota.spent("mail_sender")).toBe(false);
     });
   });
 

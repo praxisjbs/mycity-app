@@ -1,4 +1,4 @@
-/** The helpers every screen uses: classes, formats, the phone query, preferences, the gate slots, control ids, the environment, the delivery plan, a mail body made ready for EmailFrame and the links in a message. */
+/** The helpers every screen uses: classes, formats, the phone query, preferences, the gate slots, control ids, the environment, the delivery plan, a mail body made ready for EmailFrame, the links in a message and the browser's captions while recording. */
 export { cn } from "./cn";
 export * from "./format";
 export { PHONE_QUERY, useIsMobile, useIsPhone, useMediaQuery } from "./media";
@@ -10,3 +10,4 @@ export * from "./plan";
 export { uploadFile, type UploadOptions, type DocumentRef, type Uploader } from "./upload";
 export { prepareEmail, referencedCids, splitQuoted, type PreparedEmail, type SplitEmail } from "./email-body";
 export { findLinks, firstLink, normaliseLink, hostOf, LINK_ENDINGS, type FoundLink } from "./links";
+export { captionsSupported, startCaptions, type Captions } from "./captions";

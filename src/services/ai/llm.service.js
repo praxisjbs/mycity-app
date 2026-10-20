@@ -338,71 +338,112 @@ async function complete(req) {
   );
 }
 
-/** A vendor error as Settings · Integrations names it (docs/guides/integrations.md §6.3). */
+/**
+ * A vendor error as Settings · Integrations names it (docs/guides/integrations.md §6.3). A
+ * 402 is a prepaid balance spent (DeepSeek), which reads as over quota.
+ */
 function callCode(err) {
   const status = err && err.status;
   if (status === 400 || status === 401 || status === 403) return "KEY_REFUSED";
   if (status === 404) return "MODEL_NOT_FOUND";
-  if (status === 429) return "OVER_QUOTA";
+  if (status === 402 || status === 429 || (err && err.kind === "rate_limited")) return "OVER_QUOTA";
   if (err && err.kind === "timeout") return "TIMEOUT";
   return "UNAVAILABLE";
 }
 
 /**
- * Settings · Integrations' test of a Gemini key, first step: is the key accepted? The model
- * list costs nothing. Throws the vendor's error; callCode() names it.
- * @param {{apiKey: string, vendors?: object}} req
- * @returns {Promise<string[]>} the models the key may use
+ * Settings · Integrations' test of an AI key, first step: is the key accepted? The provider's
+ * model list costs nothing, and it is the list the connection keeps (services/ai/catalogue.js).
+ * Throws the vendor's error; callCode() names it.
+ * @param {{provider?: string, apiKey: string, catalogue?: object}} req
+ * @returns {Promise<Array<{model: string, display_name: string, capabilities: string[]}>>} the models the key may use
  */
-async function checkKey({ apiKey, vendors = DEFAULT_VENDORS }) {
-  return vendors.gemini.listModels({ apiKey, timeoutMs: 20_000 });
+async function checkKey({ provider = "gemini", apiKey, catalogue = require("./catalogue") }) {
+  return catalogue.fetch(provider, apiKey, { timeoutMs: 20_000 });
 }
 
-/**
- * Second step: one tiny prompt to the model in use, with a key that may not be saved yet.
- * Recorded in the ledger as `integration-test` like any other call, and counted. Governance
- * is not asked: this is how a key is checked before AI is switched on, and it costs a few
- * tokens. Throws the vendor's error.
- * @param {{apiKey: string, model: string, actor?: object|null, db?: object, vendors?: object}} req
- */
-async function testAnswer({ apiKey, model, actor = null, db = require("../../config/db").pool, vendors = DEFAULT_VENDORS }) {
-  const p = loadPrompt("integration-test");
-  const s = await governance.settings(db);
-  const prices = { input_ngn_per_million: s.input_ngn_per_million, output_ngn_per_million: s.output_ngn_per_million };
-  const runId = await ledger.startRun(db, { purpose: "integration-test", module: "integrations", actor, vendor: "gemini", model, prompt: p });
-  const started = Date.now();
-  try {
-    const res = await vendors.gemini.complete({
+/** The test's one tiny request, per provider: an answer, or for OpenAI one embedding. */
+const TEST_CALLS = {
+  gemini: (v, { apiKey, model, prompt }) =>
+    v.complete({
       apiKey,
       model,
       messages: [
-        { role: "system", content: p.body },
+        { role: "system", content: prompt },
         { role: "user", content: "OK" },
       ],
       temperature: 0,
       maxTokens: 16,
       timeoutMs: 20_000,
-    });
-    usage.record("gemini", "call", { ok: true });
+    }),
+  deepseek: (v, { apiKey, model, prompt }) =>
+    v.complete({
+      apiKey,
+      model,
+      messages: [
+        { role: "system", content: prompt },
+        { role: "user", content: "OK" },
+      ],
+      temperature: 0,
+      maxTokens: 16,
+      timeoutMs: 20_000,
+    }),
+  anthropic: (v, { apiKey, model, prompt }) =>
+    v.complete({ apiKey, model, system: prompt, messages: [{ role: "user", content: "OK" }], maxTokens: 16, effort: "low", timeoutMs: 20_000 }),
+  openai: (v, { apiKey, model }) => v.embed({ apiKey, model, input: "OK", timeoutMs: 20_000 }),
+};
+
+const TEST_VENDORS = Object.freeze({
+  ...DEFAULT_VENDORS,
+  anthropic: require("./vendors/anthropic"),
+  deepseek: require("./vendors/deepseek"),
+  openai: require("./vendors/openai"),
+});
+
+/**
+ * Second step: one tiny request to the model the connection's jobs would use, with a key that
+ * may not be saved yet. Recorded in the ledger as `integration-test` like any other call, and
+ * counted. Governance is not asked: this is how a key is checked before AI is switched on, and
+ * it costs a few tokens. Throws the vendor's error.
+ * @param {{provider?: string, apiKey: string, model: string, actor?: object|null, db?: object, vendors?: object}} req
+ */
+async function testAnswer({
+  provider = "gemini",
+  apiKey,
+  model,
+  actor = null,
+  db = require("../../config/db").pool,
+  vendors = TEST_VENDORS,
+}) {
+  const call = TEST_CALLS[provider];
+  if (!call) throw new Error(`ai.testAnswer: no test call for "${provider}"`);
+  const p = loadPrompt("integration-test");
+  const s = await governance.settings(db);
+  const prices = { input_ngn_per_million: s.input_ngn_per_million, output_ngn_per_million: s.output_ngn_per_million };
+  const runId = await ledger.startRun(db, { purpose: "integration-test", module: "integrations", actor, vendor: provider, model, prompt: p });
+  const started = Date.now();
+  try {
+    const res = await call(vendors[provider], { apiKey, model, prompt: p.body });
+    usage.record(provider, "call", { ok: true });
     await ledger.recordStep(db, runId, {
       step_no: 1,
       kind: "completion",
-      vendor: "gemini",
+      vendor: provider,
       model: res.model || model,
       usage: res.usage,
       prices,
       latency_ms: Date.now() - started,
-      finish_reason: res.finish_reason,
+      finish_reason: res.finish_reason || null,
       outcome: "ok",
     });
     await ledger.finishRun(db, runId, { status: "ok" });
     return res;
   } catch (err) {
-    usage.record("gemini", "call", { ok: false, error_code: callCode(err) });
+    usage.record(provider, "call", { ok: false, error_code: callCode(err) });
     await ledger.recordStep(db, runId, {
       step_no: 1,
       kind: "completion",
-      vendor: "gemini",
+      vendor: provider,
       model,
       prices,
       latency_ms: Date.now() - started,

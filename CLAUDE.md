@@ -68,6 +68,11 @@ silently.
   `src/shared/http/paged.js` (`pageQuery`, `sendPaged`). No `LIMIT`/`OFFSET` in a repo, no
   page-size parameter in the contract or the frontend. The AI reads in pages of 25 too.
 - **AI reads, never writes** (A23). Manifests declare reads and screen routes only.
+- **Every AI feature names its job** (`docs/guides/ai-control.md` §6.2: Default, Fast, Deep
+  Reasoning, Image Reading, Transcription, Embeddings, Top Tier). Before building one, ask the person
+  which job it uses, your recommendation first, and register the action with who chose it. Top Tier
+  is only for long drafting from many sources, never work Default or Deep Reasoning can do. No
+  personal data goes to DeepSeek. Permissions are checked by code, never by a model.
 - **One write path**: every write goes through the owning module's service, in a transaction,
   with `emit()`. Follow-on work is an outbox handler.
 - **Contract**: every request and response shape is a Zod schema in `packages/contract`,

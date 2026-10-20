@@ -38,7 +38,10 @@ What each check means when it is not `up`:
 | `mail_server` | The staff mail server's newest check failed: not found, no answer, or its TLS or certificate refused. Read from the stored state, never a live call | Settings · Integrations, Staff Mail Server: Test and its Checks; `docs/runbooks/dns-and-mail.md` §4 |
 | `maps` | Geoapify's newest test or call failed (key refused, over the day's quota), or its saved key cannot be read. Not set up when there is no key: address fields then take a typed address | Settings · Integrations, Geoapify: Test, Use and Checks |
 | `static` | a frontend build is missing from the release | the release; `deploy.md` |
-| `ai` | which AI vendor answers (Gemini or the stub), from settings only | AI settings; the key on Settings · Integrations, Gemini |
+| `ai` | which AI vendor answers (Gemini or the stub), from settings only; degraded while Gemini's newest test or call failed (key refused, over quota, no model it needs on the key) | AI settings; Settings · Integrations, Gemini: Test, its Models and Checks |
+| `groq`, `openai`, `anthropic`, `deepseek` | That provider's newest test or call failed, or its saved key cannot be read. Not set up when there is no key. A failing Groq sends voice notes to Gemini, then to the browser's captions | Settings · Integrations, the provider: Test, Models and Checks (`docs/guides/integrations.md` §6.11, §6.14) |
+| `exchange_rates` | The newest rate fetch failed, or the newest table is more than 36 hours old: naira prices use the last rate | Settings · Integrations, Exchange Rates: Sync Rates and its Checks; the `exchange-rates` job on Background Jobs |
+| `web_push` | The newest test or push failed (the pair does not sign, a push service refused) | Settings · Integrations, Web Push; `docs/runbooks/push-notifications.md` |
 
 ## 2 · Errors that alert
 

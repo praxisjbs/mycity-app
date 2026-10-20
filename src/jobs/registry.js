@@ -152,6 +152,7 @@ const SCHEDULERS = Object.freeze([
   "system-health-sample",
   "integrations-watch",
   "integrations-purge",
+  "exchange-rates",
   "places-name",
 ]);
 

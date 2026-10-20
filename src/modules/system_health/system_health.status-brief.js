@@ -140,6 +140,11 @@ const FIRST_LOOK = new Map([
     `${journal(s.worker_unit, 400)} | grep -iE "mail|smtp"`,
   ]],
   ["ai", (s) => [ready(s, "ai"), `sudo grep -E '^GEMINI_MODEL=' ${s.env_file}`, `sudo grep -c '^GEMINI_API_KEY=.' ${s.env_file}`]],
+  ["exchange_rates", (s) => [
+    ready(s, "exchange_rates"),
+    `${psql(s, "SELECT day, base, count(*) AS currencies, max(updated_at) AS fetched FROM exchange_rate GROUP BY 1, 2 ORDER BY 1 DESC")} | head -6`,
+    psql(s, "SELECT name, last_run_at, ok, left(note, 120) AS note FROM schedule_run WHERE name = 'exchange-rates'"),
+  ]],
   ["static", (s) => [`ls -l ${s.release}/app/dist/index.html ${s.release}/public-app/dist/index.html`, ready(s, "static")]],
   ["disk", (s) => [
     "df -h",

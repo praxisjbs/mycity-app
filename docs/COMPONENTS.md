@@ -4971,6 +4971,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 
 | Export | File | What it does |
 |---|---|---|
+| `captionsSupported` | `lib/captions.ts` | Whether this browser can caption a recording. |
+| `Captions` (type) | `lib/captions.ts` | A running caption: stop() ends it and answers what it heard. |
+| `startCaptions` | `lib/captions.ts` | Start captioning the microphone, in the person's language (Nigerian English when the browser names none). |
 | `cn` | `lib/cn.ts` | Join class names, skipping the falsy ones; of two that conflict, the later wins (`cn("h-control", "h-9")` is `h-9`). |
 | `referencedCids` | `lib/email-body.ts` | The content ids a body draws, so only those parts are fetched. |
 | `PreparedEmail` (type) | `lib/email-body.ts` |  |
