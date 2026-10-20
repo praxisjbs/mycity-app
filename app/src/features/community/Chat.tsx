@@ -4,7 +4,7 @@ import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
 import type { LinkPreview, Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { Button, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
+import { ActionGroup, Button, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
 import { AlbumPost, Post } from "./Posts";
 import { MessageLink, useViewer, viewerFilesOf } from "./Media";
 import { ForwardTo, forwardable } from "./Forward";
@@ -168,20 +168,28 @@ export function PickBar({ t }: { t: ReturnType<typeof useThread> }) {
   const picked = t.msgs.filter((m) => ids.includes(m.community_message_id));
   const texts = picked.length > 0 && picked.every((m) => m.message_type === "text" && m.body);
   const copy = async () => {
-    await navigator.clipboard.writeText(picked.map((m) => m.body).join("\n\n"));
+    try {
+      await navigator.clipboard.writeText(picked.map((m) => m.body).join("\n\n"));
+    } catch {
+      // The browser refused the clipboard: say so, and keep the messages picked to try again.
+      toast("Copy did not work. Try again.");
+      return;
+    }
     toast("Copied");
     t.setPicking(null);
   };
   return (
     <div className="flex flex-none items-center gap-2 border-t border-border bg-card px-3 py-2.5 max-md:px-2 max-md:pb-safe-2">
-      <IconButton icon="x" label="Cancel" onClick={() => t.setPicking(null)} />
-      <span aria-live="polite" className="flex-1 text-sm font-semibold">
-        {ids.length} Selected
-      </span>
-      {texts && <IconButton icon="copy" label="Copy" onClick={copy} />}
-      <Button variant="primary" icon="forward" onClick={() => forward(ids)}>
-        Forward
-      </Button>
+      <ActionGroup>
+        <IconButton icon="x" label="Cancel" onClick={() => t.setPicking(null)} />
+        <span aria-live="polite" className="flex-1 text-sm font-semibold">
+          {ids.length} Selected
+        </span>
+        {texts && <IconButton icon="copy" label="Copy" onClick={copy} />}
+        <Button variant="primary" icon="forward" onClick={() => forward(ids)}>
+          Forward
+        </Button>
+      </ActionGroup>
     </div>
   );
 }
