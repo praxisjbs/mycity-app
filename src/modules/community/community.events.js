@@ -58,15 +58,23 @@ const EVENTS = defineEvents("community", {
   },
 });
 
-/** Files posted in a conversation: read by its members only, whoever they are. */
+/**
+ * Files posted in a conversation: read by its members, whoever they are, and by the members of
+ * any other conversation holding a live message with the same file (a forwarded copy, §4).
+ */
 defineDocumentType("community_media", {
   label: "Chat file",
   module: "community",
 });
 vault.defineAccess("community_channel", async (client, user, doc) => {
   const { rows } = await client.query(
-    "SELECT 1 FROM community_member WHERE community_channel_id = $1 AND user_id = $2",
-    [doc.entity_id, user.user_id],
+    `SELECT 1 FROM community_member WHERE community_channel_id = $1 AND user_id = $2
+     UNION ALL
+     SELECT 1 FROM community_message x
+       JOIN community_member m ON m.community_channel_id = x.community_channel_id AND m.user_id = $2
+      WHERE x.document_id = $3 AND x.deleted_at IS NULL
+     LIMIT 1`,
+    [doc.entity_id, user.user_id, doc.document_id],
   );
   return rows.length > 0;
 });
@@ -163,24 +171,27 @@ for (const key of [
   });
 }
 
-/* A PDF's first page or a video's poster is ready: the conversations holding the file redraw it. */
 /* Everyone is in #general and #announcements from the moment their login exists, not from their first visit. */
 const joinLogin = (event) => require("./community.service").joinLogin(event.entity && event.entity.id);
 outbox.register("app_user.created", "community.join_company", joinLogin);
 outbox.register("app_user.reactivated", "community.join_company_again", joinLogin);
 
+/*
+ * A PDF's first page or a video's poster is ready: every conversation holding the file redraws
+ * it, the one it was posted in and any it was forwarded to.
+ */
 outbox.register(vault.EVENTS.DOCUMENT_DERIVED, "community.push_derived", async (event) => {
   if (event.payload.entity_type !== "community_channel") return;
   const { rows } = await pool.query(
-    `SELECT community_message_id FROM community_message
-      WHERE community_channel_id = $1 AND document_id = $2 AND deleted_at IS NULL`,
-    [event.payload.entity_id, event.payload.document_id],
+    `SELECT community_channel_id, community_message_id FROM community_message
+      WHERE document_id = $1 AND deleted_at IS NULL`,
+    [event.payload.document_id],
   );
   for (const r of rows) {
     await pushToMembers(
       {
         payload: {
-          community_channel_id: event.payload.entity_id,
+          community_channel_id: r.community_channel_id,
           community_message_id: r.community_message_id,
         },
       },

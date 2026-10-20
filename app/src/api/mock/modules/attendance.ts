@@ -448,6 +448,8 @@ export function todayOf(key: string): AttendanceToday {
     clock_in_at: inEv?.occurred_at ?? null,
     clock_out_at: outEv?.occurred_at ?? null,
     clock_out_automatic: outEv?.source === "system",
+    // The mock has no sessions: every session it serves is the day's first (§6.14), and the device's mark keeps it to once.
+    sign_in_prompt: !onLeave && !inEv && shiftOf(date).working_day,
     review: evs.some((e) => e.validation_state === "review"),
     shift: shiftOf(date),
     work_pattern: p.work_pattern,

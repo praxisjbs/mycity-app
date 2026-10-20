@@ -79,6 +79,11 @@ const AttendanceToday = z
     clock_out_at: isoDateTime.nullable(),
     /** The clock-out was the system's, made once the shift ended and the person was away (§6.14). */
     clock_out_automatic: z.boolean(),
+    /**
+     * Open the clock panel once, on whatever screen comes first: this is the person's first session
+     * of a working day and they are not clocked in (attendance.md §6.14, the sign-in prompt).
+     */
+    sign_in_prompt: z.boolean(),
     review: z.boolean(),
     shift: z
       .object({

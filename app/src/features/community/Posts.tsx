@@ -212,6 +212,16 @@ function AnnouncementPost({ m, q }: { m: Message; q: string }) {
   );
 }
 
+/** The mark on a forwarded copy (§3 step 19); who first sent it is never shown. */
+function Forwarded({ media }: { media?: boolean }) {
+  return (
+    <span className={cn("flex items-center gap-1 text-2xs italic opacity-75", media ? "px-2 pt-1 pb-1.5" : "mb-0.5")}>
+      <Icon name="forward" className="size-3" />
+      Forwarded
+    </span>
+  );
+}
+
 const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: ["ticks", "Read"] } as const;
 
 /** A sent message's ticks, in a direct conversation (§3 step 10). */
@@ -247,6 +257,7 @@ export function AlbumPost({ ms, q, dm, onView, menu }: { ms: Message[]; q: strin
           {menu}
         </div>
         <div className={cn("w-min p-1 text-sm leading-normal wrap-any", bubble(first.mine))}>
+          {first.forwarded && <Forwarded media />}
           <AlbumMedia ms={ms} onView={onView} />
           {caption && (
             <div className="px-2 pt-1.5 pb-0.5 whitespace-pre-wrap">
@@ -346,6 +357,7 @@ export function Post({ m, q, dm, onCelebrate, onVote, onView, menu }: { m: Messa
           {menu}
         </div>
         <div className={cn("text-sm leading-normal wrap-any", media ? "w-min p-1" : "px-3 py-2 whitespace-pre-wrap", bubble(m.mine))}>
+          {m.forwarded && !m.deleted && <Forwarded media={media} />}
           {inner}
         </div>
       </div>

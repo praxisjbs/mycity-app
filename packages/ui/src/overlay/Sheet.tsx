@@ -14,7 +14,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Drawer } from "vaul";
 import { cn } from "../lib/cn";
 import { IconButton } from "../actions/Button";
-import { FooterContext, IN_FOOTER, TEXT_ENTRY, focusInto, useReturnFocus } from "./context";
+import { FooterContext, IN_FOOTER, TEXT_ENTRY, escapeClosesList, focusInto, useReturnFocus } from "./context";
 
 export interface ChromeProps {
   /** The heading. */
@@ -92,6 +92,8 @@ export interface SheetProps {
   children?: ReactNode;
   /** false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. */
   dismissible?: boolean;
+  /** Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). */
+  blur?: boolean;
   /** `alertdialog` for a confirmation. Default `dialog`. */
   role?: "dialog" | "alertdialog";
   /** Where the sheet mounts; document.body by default (the gallery passes its themed frame). */
@@ -158,7 +160,7 @@ function useKeyboardInset(el: HTMLElement | null, full: boolean): void {
   }, [el, full]);
 }
 
-export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, children, dismissible = true, role, container, bodyClassName }: SheetProps) {
+export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, children, dismissible = true, blur = false, role, container, bodyClassName }: SheetProps) {
   const content = useRef<HTMLDivElement | null>(null);
   // The sheet's element as state too: it mounts after the first render, and the hooks below start then.
   const [node, setNode] = useState<HTMLDivElement | null>(null);
@@ -199,7 +201,7 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
     // The sheet places itself around the keyboard (useKeyboardInset), so Vaul's own repositioning is off.
     <Drawer.Root open={open} onOpenChange={change} handleOnly={locked} repositionInputs={false}>
       <Drawer.Portal container={container ?? undefined}>
-        <Drawer.Overlay ref={overlay} className="fixed inset-0 z-50 bg-scrim" />
+        <Drawer.Overlay ref={overlay} data-blur={blur || undefined} className={cn("fixed inset-0 z-50 bg-scrim", blur && "backdrop-blur-md")} />
         <Drawer.Content
           ref={contentRef}
           role={role ?? "dialog"}
@@ -211,7 +213,7 @@ export function Sheet({ open, onClose, title, sub, hideHeader, full, footer, chi
             focusInto(content.current, true);
           }}
           onCloseAutoFocus={returnFocus}
-          onEscapeKeyDown={(e) => !dismissible && e.preventDefault()}
+          onEscapeKeyDown={(e) => (!dismissible || escapeClosesList(e)) && e.preventDefault()}
           onPointerDownOutside={(e) => {
             if (!locked) return;
             e.preventDefault();

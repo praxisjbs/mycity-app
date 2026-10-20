@@ -8,7 +8,10 @@
  *              REMIND_WINDOW_MIN minutes after the start, everyone at work with a login, not on
  *              granted leave and with no clock-in that counts is reminded once
  *              (attendance_clock_reminder decides "once"; the notice goes to the bell and, as the
- *              person's Attendance and Leave preference allows, their devices)
+ *              person's Attendance and Leave preference allows, their devices). Someone in front
+ *              of the app is not: the app's start prompt asks them, and a later run reminds them
+ *              if they leave it still not clocked in. When presence cannot be read, the reminder
+ *              goes
  *   clockOut   a shift still open once its date's end has passed is clocked out when the person
  *              has been away from the app for AWAY_MIN minutes: at the later of the end and the
  *              last moment they were in front of it, never before the clock-in. While they are in
@@ -104,18 +107,28 @@ async function sendReminder(employeeId, date, startsAt) {
   });
 }
 
-/** Remind everyone due today, in the first hour after the start. */
+/**
+ * Remind everyone due today, in the first hour after the start, who is not in front of the app:
+ * the push is for someone away from it (the 12 and 13 October meetings).
+ */
 async function remind({ now = new Date() } = {}) {
   const today = lagos.today(now);
   const cal = await workingWeek.loadCalendar(pool);
   const shift = rules.shiftFor(today, cal, rules.DEFAULT_POLICY);
-  if (!shift.working_day || !shift.starts_at) return { reminded: 0 };
+  if (!shift.working_day || !shift.starts_at) return { reminded: 0, in_front: 0 };
   const start = rules.zonedInstant(today, shift.starts_at, rules.DEFAULT_TZ);
-  if (now < start || now.getTime() - start.getTime() >= REMIND_WINDOW_MIN * 60_000) return { reminded: 0 };
+  if (now < start || now.getTime() - start.getTime() >= REMIND_WINDOW_MIN * 60_000) return { reminded: 0, in_front: 0 };
   let reminded = 0;
-  for (const { employee_id: employeeId } of await repo.dueForReminder(pool, today))
+  let inFront = 0;
+  for (const { employee_id: employeeId, user_ids: userIds } of await repo.dueForReminder(pool, today)) {
+    const seen = await active.activity(userIds, now.getTime());
+    if (seen.known && seen.active) {
+      inFront += 1;
+      continue;
+    }
     if (await sendReminder(employeeId, today, shift.starts_at)) reminded += 1;
-  return { reminded };
+  }
+  return { reminded, in_front: inFront };
 }
 
 /* ------------------------------------------------------------------ *

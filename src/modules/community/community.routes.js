@@ -9,7 +9,7 @@ const c = require("@mycity/contract");
 const { route } = require("../../http/route");
 const { requirePermission } = require("../../middleware/rbac");
 const upload = require("../../middleware/upload");
-const { linkPreviewLimiter } = require("../../middleware/rate-limit");
+const { forwardLimiter, linkPreviewLimiter } = require("../../middleware/rate-limit");
 const controller = require("./community.controller");
 
 const router = express.Router();
@@ -323,6 +323,31 @@ route(
   },
   view(),
   controller.listColleagues,
+);
+route(
+  router,
+  "get",
+  "/forward-targets",
+  {
+    query: cm.ForwardTargetQuery,
+    response: cm.ForwardTargetPage,
+    summary: "Where I may forward to",
+  },
+  view(),
+  controller.listForwardTargets,
+);
+route(
+  router,
+  "post",
+  "/forward",
+  {
+    body: cm.ForwardRequest,
+    response: cm.ForwardResult,
+    summary: "Forward messages or a mail attachment to up to 5 chats",
+  },
+  create(),
+  forwardLimiter,
+  controller.forward,
 );
 route(
   router,

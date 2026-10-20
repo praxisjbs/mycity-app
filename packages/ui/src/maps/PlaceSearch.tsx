@@ -9,18 +9,13 @@
  * @status stable
  * @example <PlaceSearch search={api.searchPlaces} onPick={(place) => form.set("point", place)} />
  */
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { cn } from "../lib/cn";
 import { Icon } from "../icons/Icon";
 import { Spinner } from "../display/Skeleton";
 import { SearchInput } from "../form/SearchInput";
 import type { Place, SearchPlaces } from "./geoapify";
-
-/** Characters before the first request: fewer finds the whole of Lagos. */
-const FROM = 3;
-
-/** How long after the last key the request goes, in milliseconds. */
-const SETTLE = 300;
+import { usePlaces } from "./usePlaces";
 
 export interface PlaceSearchProps {
   /** Finds addresses; the app's own call through our proxy. */
@@ -37,38 +32,7 @@ export interface PlaceSearchProps {
 
 export function PlaceSearch({ search, onPick, value, placeholder = "Search address", className }: PlaceSearchProps) {
   const [q, setQ] = useState("");
-  const [places, setPlaces] = useState<Place[]>([]);
-  const [looking, setLooking] = useState(false);
-  const [problem, setProblem] = useState(false);
-  const latest = useRef(0);
-
-  useEffect(() => {
-    const text = q.trim();
-    if (text.length < FROM) {
-      setPlaces([]);
-      setLooking(false);
-      return;
-    }
-    setLooking(true);
-    setProblem(false);
-    const mine = ++latest.current;
-    const timer = setTimeout(() => {
-      search(text)
-        .then((found) => {
-          // An answer to a search the person has already typed past is dropped.
-          if (mine !== latest.current) return;
-          setPlaces(found);
-          setLooking(false);
-        })
-        .catch(() => {
-          if (mine !== latest.current) return;
-          setProblem(true);
-          setPlaces([]);
-          setLooking(false);
-        });
-    }, SETTLE);
-    return () => clearTimeout(timer);
-  }, [q, search]);
+  const { places, looking, problem, asked } = usePlaces(search, q);
 
   return (
     <div className={className}>
@@ -103,7 +67,6 @@ export function PlaceSearch({ search, onPick, value, placeholder = "Search addre
                 onClick={() => {
                   onPick(place);
                   setQ("");
-                  setPlaces([]);
                 }}
                 className={cn(
                   "flex w-full items-start gap-2 border-b border-border px-3 py-2 text-left text-xs last:border-b-0 hover:bg-muted phone:min-h-tap",
@@ -119,7 +82,7 @@ export function PlaceSearch({ search, onPick, value, placeholder = "Search addre
           </div>
         </>
       )}
-      {!looking && !problem && q.trim().length >= FROM && places.length === 0 && (
+      {!looking && !problem && asked && places.length === 0 && (
         <p className="px-3 py-2 text-2xs text-subtle-foreground">No address matches</p>
       )}
     </div>

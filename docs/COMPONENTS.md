@@ -86,6 +86,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [NotificationBanner](#notificationbanner) | `NotificationBanner` | The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere. | beta |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top. | stable |
 | Feedback | [UrgentBar](#urgentbar) | `UrgentBar` | The red bar under the top bar on every screen while an urgent notice waits on the person: its title, how many wait, and Acknowledge or Open. | beta |
+| Forms | [AddressField](#addressfield) | `AddressField` | An address typed with suggestions from our own address search; picking one fills the address and hands back its coordinates. | stable |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
@@ -125,7 +126,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
-| Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, and Share on a phone. | beta |
+| Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
@@ -2024,6 +2025,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
 | `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
 | `dismissible` | `boolean` |  | false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation that must be answered. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -2153,6 +2155,7 @@ The phone's bottom sheet: slides up with a spring, closes by dragging down, a ta
 | `footer` | `ReactNode` |  | Buttons for the footer; the main action is last and full width at the bottom. |
 | `children` | `ReactNode` |  | The body. |
 | `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -2492,6 +2495,39 @@ The red bar under the top bar on every screen while an urgent notice waits on th
 ```
 
 ## Forms
+
+### AddressField
+
+An address typed with suggestions from our own address search; picking one fills the address and hands back its coordinates.
+
+| | |
+|---|---|
+| Use | Any address in a form: a worksite, a field site, a client visit, a home. Pass `onPick` where the place's latitude and longitude fill the form's own fields. |
+| Avoid | Calling the provider from the browser (the key stays on the server); a search box that only finds (PlaceSearch); the browser's own autofill list or a `<datalist>` (gate 21). |
+| Phone | 44 px tall with 16 px text; the suggestions open under the field as 44 px rows, inside the sheet's own scroll. |
+| Accessibility | A combobox over a listbox of addresses: arrows move through them, Enter picks, Esc closes; the count found is announced. Takes its label and error links from the Field around it. |
+| Status | stable |
+| Exports | `AddressField` |
+| Import | `import { AddressField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/AddressField.tsx` |
+| Test | `packages/ui/src/form/AddressField.test.tsx` |
+| Gallery | `packages/ui/src/form/AddressField.gallery.tsx` (`npm run gallery`, `#/AddressField`) |
+
+**AddressField** props (`AddressFieldProps`, extends `NativeInput`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The address, from form.field(name): what was typed, or the place picked. |
+| `onChange` | `(value: string) => void` | yes | Called with the new address as the person types or picks. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `search` | `SearchPlaces` | yes | Finds addresses; the app's own call through our proxy. |
+| `onPick` | `(place: Place) => void` |  | Called with the place picked, its coordinates included, after the address is set. |
+
+```tsx
+<AddressField {...f.field("address")} search={searchPlaces} onPick={(p) => { f.set("latitude", String(p.lat)); f.set("longitude", String(p.lon)); }} />
+```
 
 ### CardPicker
 
@@ -3976,13 +4012,13 @@ A picture at a readable size, with zoom and a way to open it full size in a new 
 
 ### MediaViewer
 
-A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, and Share on a phone.
+A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it.
 
 | | |
 |---|---|
 | Use | Opening a file someone sent or attached: a chat's photos, videos and PDFs, a conversation's shared files, a mail attachment, a document on My Documents. |
 | Avoid | A file the app cannot show (Word, Excel, PowerPoint: download it instead); a preview beside a list on desktop (DocumentPreview); a document the product generated (Paper). |
-| Phone | The whole screen on deep green: Close, who sent it and when, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it. |
+| Phone | The whole screen on deep green: Close, who sent it and when, Forward, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it. |
 | Accessibility | A modal dialog named by the file: focus moves in and is trapped, Esc closes it and focus returns to what opened it; the arrow keys step on desktop; every control is a named button; a file that cannot be shown says so, with Download beside it. |
 | Status | beta |
 | Exports | `MediaViewer` |
@@ -4002,6 +4038,7 @@ A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, D
 | `onClose` | `() => void` | yes | Called to close it: Close, Esc, a swipe down, the phone's Back. |
 | `load` | `(item: ViewerItem) => Promise<Blob>` | yes | The file itself, fetched with the session: drawn here, and what Download and Share save. |
 | `save` | `(blob: Blob, name: string) => unknown` |  | How Download hands the file to this device (the app's own, which uses the share sheet where a download cannot land); the browser's download otherwise. |
+| `onForward` | `(item: ViewerItem) => void` |  | Forward the file on view to a chat; no Forward unless set. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
 
 ```tsx
@@ -4202,6 +4239,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 | `zoom` | `number` |  | How close in; 15 unless set (a street), 11 for a city. |
 | `radiusMetres` | `number` |  | A circle around the first point, in metres: a worksite's geofence. |
 | `tileUrl` | `string` |  | Where the tiles come from; our own proxy unless a screen passes its own. |
+| `loadTile` | `LoadTile` |  | Fetches each tile with the app's session (our tile route is signed in); a plain image request otherwise. |
 | `onPick` | `(point: LatLon) => void` |  | Called with the point pressed, for choosing a place (setting up a worksite). |
 | `interactive` | `boolean` |  | Let the person drag and zoom. Off by default, so a map inside a page cannot swallow its scroll. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall; `sm` in a card, `md` on a page, `lg` on a screen of its own. |
@@ -4211,6 +4249,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 ```tsx
 <MapView markers={[{ key: "in", lat, lon, label: "Clocked in 07:52" }]} />
 <MapView centre={site} radiusMetres={site.radius_metres} onPick={setPoint} interactive />
+<MapView markers={[site]} radiusMetres={site.radius_m} loadTile={loadTile} />
 ```
 
 ### PlaceSearch
