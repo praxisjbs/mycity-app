@@ -178,6 +178,10 @@ async function checkApp(browser, origin, list, width, axe) {
       }, s.path);
       await screens.appSettle(page);
       if (await page.$(target.modal)) {
+        // A prompt that opens by itself (the clock-in sheet) starts its transition
+        // after the screen has settled, so settle once more before reading colours:
+        // a button measured mid-fade reports the contrast of its own animation.
+        await screens.appSettle(page);
         push(await runAxeDocument(page, "opened by itself"), screen);
         await page.keyboard.press("Escape");
         await screens.appSettle(page);
