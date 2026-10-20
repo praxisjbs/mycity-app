@@ -12,7 +12,13 @@
  * Fails the build on:
  *  1. a shell script (*.sh, or a file whose first line is a sh/bash shebang) with a
  *     carriage return, without a #! first line, or that `bash -n` rejects;
- *  2. a .js, .cjs or .mjs file under src/, scripts/, packages/, tests/, ops/ or the
+ *  2. a positional parameter ($1 to $9) inside an unquoted here-document outside any
+ *     function, in a script that sets `-u`. Bash expands the body, the script was run
+ *     without arguments, and it stops there with "$1: unbound variable", after the
+ *     redirection has already emptied the file being written. `bash -n` cannot see it:
+ *     provision.sh stopped at step 6 of 12 on a comment that read "($1, never the
+ *     values)", leaving PostgreSQL's conf.d/mycity.conf empty (20/10/2026);
+ *  3. a .js, .cjs or .mjs file under src/, scripts/, packages/, tests/, ops/ or the
  *     repository root that does not parse (the same check as `node --check`).
  * An empty shell script is a file the repository map created and nobody has written
  * yet: listed as a note, not a failure.
@@ -49,6 +55,46 @@ function shellFiles(root) {
       return false;
     }
   });
+}
+
+/** `set -u`, `set -eu`, `set -euo pipefail`, `set -o nounset`. */
+const NOUNSET = /^\s*set\s+(?:-[a-zA-Z]*u[a-zA-Z]*\b|.*-o\s+nounset\b)/m;
+/** A here-document's start, not a here-string (<<<): its dash, its quote and its word. */
+const HEREDOC = /(?:^|[^<])<<(-?)\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/;
+/** A function's first line, `name() {` or `function name {`, braces opened on the line. */
+const FUNCTION_START = /^\s*(?:function\s+[A-Za-z_][\w-]*\s*(?:\(\))?|[A-Za-z_][\w-]*\s*\(\))\s*\{\s*(?:#.*)?$/;
+/** $1 to $9 or ${1} to ${9}, not escaped. */
+const POSITIONAL = /(?:^|[^\\$])\$\{?([1-9])/;
+
+/**
+ * Positional parameters in the unquoted here-documents of a `set -u` script, outside any
+ * function (a function's $1 is its own argument).
+ * @returns {string[]} one problem per line
+ */
+function heredocProblems(rel, text) {
+  if (!NOUNSET.test(text)) return [];
+  const out = [];
+  const lines = text.split("\n");
+  let inFunction = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!inFunction && FUNCTION_START.test(line)) inFunction = true;
+    else if (inFunction && /^\}\s*$/.test(line)) inFunction = false;
+    const m = HEREDOC.exec(line.replace(/#.*$/, ""));
+    if (!m) continue;
+    const [, dash, quote, word] = m;
+    for (i += 1; i < lines.length; i += 1) {
+      const body = lines[i];
+      if ((dash ? body.replace(/^\t+/, "") : body) === word) break;
+      const p = !quote && !inFunction ? POSITIONAL.exec(body) : null;
+      if (p)
+        out.push(
+          `${rel}:${i + 1}: $${p[1]} inside an unquoted here-document (<<${word}) in a set -u script: ` +
+            `bash expands it and stops with "unbound variable"; write \\$${p[1]}, or quote the delimiter (<<'${word}')`,
+        );
+    }
+  }
+  return out;
 }
 
 let bashChecked;
@@ -111,6 +157,7 @@ function check({ root = ROOT, bash, inCi = process.env.CI === "true" } = {}) {
       problems.push(
         `${rel}: the first line is the interpreter, e.g. #!/usr/bin/env bash`,
       );
+    problems.push(...heredocProblems(rel, text));
     if (withBash && !text.includes("\r")) {
       const r = spawnSync("bash", ["-n", f], { encoding: "utf8" });
       if (r.status !== 0)
@@ -166,4 +213,4 @@ if (require.main === module) {
   process.exit(1);
 }
 
-module.exports = { check, shellFiles, jsError };
+module.exports = { check, shellFiles, jsError, heredocProblems };

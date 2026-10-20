@@ -204,8 +204,8 @@ random_page_cost = 1.1
 wal_compression = on
 log_min_duration_statement = 1000
 timezone = 'UTC'
-# Settings · Performance, Slowest Queries: every statement's time, normalised ($1, never the
-# values). Loaded at start, so the restart below is what turns it on.
+# Settings · Performance, Slowest Queries: every statement's time, its values replaced by
+# placeholders. Loaded at start, so the restart below is what turns it on.
 shared_preload_libraries = 'pg_stat_statements'
 pg_stat_statements.track = top
 pg_stat_statements.max = 5000
