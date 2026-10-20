@@ -9,12 +9,13 @@
  * @status stable
  * @example <MapView markers={[{ key: "in", lat, lon, label: "Clocked in 07:52" }]} />
  * @example <MapView centre={site} radiusMetres={site.radius_metres} onPick={setPoint} interactive />
+ * @example <MapView markers={[site]} radiusMetres={site.radius_m} loadTile={loadTile} />
  */
 import { Suspense, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { Skeleton } from "../display/Skeleton";
 import { lazyDraw } from "../charts/lazy";
-import { describePoint, LAGOS, TILES, type LatLon } from "./geoapify";
+import { describePoint, LAGOS, TILES, type LatLon, type LoadTile } from "./geoapify";
 import type { MapDrawProps } from "./MapView.draw";
 
 const Draw = lazyDraw<MapDrawProps>(() => import("./MapView.draw"));
@@ -40,6 +41,8 @@ export interface MapViewProps {
   radiusMetres?: number;
   /** Where the tiles come from; our own proxy unless a screen passes its own. */
   tileUrl?: string;
+  /** Fetches each tile with the app's session (our tile route is signed in); a plain image request otherwise. */
+  loadTile?: LoadTile;
   /** Called with the point pressed, for choosing a place (setting up a worksite). */
   onPick?: (point: LatLon) => void;
   /** Let the person drag and zoom. Off by default, so a map inside a page cannot swallow its scroll. */
@@ -54,7 +57,7 @@ export interface MapViewProps {
 
 const HEIGHT = { sm: "h-40", md: "h-64", lg: "h-96" } as const;
 
-export function MapView({ markers = [], centre, zoom = 15, radiusMetres, tileUrl = TILES, onPick, interactive, height = "md", children, className }: MapViewProps) {
+export function MapView({ markers = [], centre, zoom = 15, radiusMetres, tileUrl = TILES, loadTile, onPick, interactive, height = "md", children, className }: MapViewProps) {
   const first = markers[0];
   const view = centre ?? (first ? { lat: first.lat, lon: first.lon } : LAGOS);
 
@@ -62,7 +65,7 @@ export function MapView({ markers = [], centre, zoom = 15, radiusMetres, tileUrl
     <div className={cn("overflow-hidden rounded-card border border-border bg-muted", className)}>
       <div className={cn("w-full", HEIGHT[height])}>
         <Suspense fallback={<Skeleton shape="block" className="size-full" />}>
-          <Draw centre={view} zoom={zoom} tileUrl={tileUrl} markers={markers} radiusMetres={radiusMetres} onPick={onPick} interactive={Boolean(interactive)} />
+          <Draw centre={view} zoom={zoom} tileUrl={tileUrl} loadTile={loadTile} markers={markers} radiusMetres={radiusMetres} onPick={onPick} interactive={Boolean(interactive)} />
         </Suspense>
       </div>
       {markers.length > 0 && (

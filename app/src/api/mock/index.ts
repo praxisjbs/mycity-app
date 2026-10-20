@@ -5,6 +5,7 @@
 import "./modules/identity";
 import "./modules/security";
 import "./modules/worksites";
+import "./modules/maps";
 import "./modules/devices";
 import "./modules/attendance";
 import "./modules/home";

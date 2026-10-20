@@ -211,6 +211,7 @@ src/
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
+│   ├── maps/          geoapify.service (address search, map tiles and a worksite's address, F21)
 │   ├── qr/            qr
 │   ├── web/           links (what counts as a link, the first one's card form) · public-fetch (a page or a
 │   │                  picture from the public web only: private addresses refused, size and time capped) ·
@@ -270,10 +271,11 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
 | `knowledge` | `knowledge` (announcements are read here too) |
 | `praxis_ai` | `assistant`, `ai_governance` |
-| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search` |
+| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search`, `maps` |
 
 The settings modules that every user touches (`identity` login, own `notifications`, own `documents`,
-`search`, the requests waiting on them in `workflow`) check ownership, not the `settings` grant.
+`search`, the address search in `maps`, the requests waiting on them in `workflow`) check ownership,
+not the `settings` grant.
 
 **Capabilities.** A capability is a named authority inside a module that its six actions cannot
 express: Home's `view` opens Home to every employee, `home.team` opens its Team tab to the people
@@ -323,6 +325,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (the reminder engine, Approvals Waiting, Probation Ending and the daily digest), `notifications.rules.js` (Settings · Notifications: the company's rule per notice and its reminders) | Caller's own inbox, preferences, quiet hours, digest and devices; Settings · Notifications (`docs/guides/notifications.md`) |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
+| `maps` | routes and controller only | `GET /maps/search` (the address search every location field types into), `/maps/tiles` (the map's tiles, signed in), `/maps/reverse` (a worksite's address) (`services/maps`; `docs/guides/foundation.md` §6.13) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
 
