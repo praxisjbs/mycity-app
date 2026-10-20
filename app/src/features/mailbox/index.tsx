@@ -344,7 +344,7 @@ function DraftReader({ row, onBack, compose }: { row: ThreadRow; onBack: () => v
         </span>
         <span className="flex flex-wrap gap-1.5 max-md:w-full">
           {row.scheduled && <Button onClick={() => cancelSchedule()}>Cancel Schedule</Button>}
-          <Button variant="primary" icon="send" onClick={() => compose({ draft_id: draft.mail_draft_id, to: draft.to_addresses, cc: draft.cc_addresses, bcc: draft.bcc_addresses, subject: draft.subject, body_html: draft.body_html, attachments: draft.attachments, in_reply_to: draft.in_reply_to }, "Continue Draft")}>Continue Editing</Button>
+          <Button variant="primary" icon="send" onClick={() => compose({ draft_id: draft.mail_draft_id, to: draft.to_addresses, cc: draft.cc_addresses, bcc: draft.bcc_addresses, subject: draft.subject, body_html: draft.body_html, attachments: draft.attachments, in_reply_to: draft.in_reply_to, scheduled: row.scheduled ? { release_at: row.scheduled.release_at } : null }, row.scheduled ? "Edit Scheduled Mail" : "Continue Draft")}>Continue Editing</Button>
         </span>
       </div>
       {row.scheduled && <div className="mt-3"><Pill tone="info">Scheduled {formatDateTime(row.scheduled.release_at)}</Pill></div>}

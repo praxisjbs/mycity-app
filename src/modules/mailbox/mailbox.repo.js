@@ -474,6 +474,40 @@ function enqueue(db, q) {
   );
 }
 
+/**
+ * A draft's waiting send stood down: it is being replaced by a new schedule, or the draft
+ * was discarded. `keepKey` spares the send this same request already made (a retried press).
+ */
+function cancelQueuedForDraft(db, userId, draftId, keepKey = null) {
+  return db.query(
+    `UPDATE mail_send_queue SET status = 'cancelled'
+      WHERE user_id = $1 AND mail_draft_id = $2 AND status = 'queued'
+        AND idempotency_key IS DISTINCT FROM $3`,
+    [userId, draftId, keepKey],
+  );
+}
+
+/** A scheduled draft was edited: its waiting send carries the new words, recipients and files. */
+function refreshQueued(db, userId, draftId, d) {
+  return db.query(
+    `UPDATE mail_send_queue SET payload = payload || $3::jsonb
+      WHERE user_id = $1 AND mail_draft_id = $2 AND status = 'queued'`,
+    [
+      userId,
+      draftId,
+      JSON.stringify({
+        to_addresses: d.to_addresses,
+        cc_addresses: d.cc_addresses,
+        bcc_addresses: d.bcc_addresses,
+        subject: d.subject,
+        body_html: d.body_html,
+        document_ids: d.document_ids,
+        in_reply_to: d.in_reply_to,
+      }),
+    ],
+  );
+}
+
 function cancelQueued(db, userId, queueId) {
   return one(
     db,
@@ -592,6 +626,8 @@ module.exports = {
   listDrafts,
   enqueue,
   cancelQueued,
+  cancelQueuedForDraft,
+  refreshQueued,
   claimDue,
   claimOne,
   requeueStalled,

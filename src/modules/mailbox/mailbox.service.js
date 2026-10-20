@@ -612,20 +612,28 @@ async function getDraft(id, user) {
   return draftView(d);
 }
 
+/** Autosave. A scheduled draft's waiting send is kept in step, so what goes is what was last seen. */
 async function saveDraft(id, body, user) {
   const a = await account(user);
-  const saved = await repo.saveDraft(pool, {
-    id,
-    userId: user.user_id,
-    accountId: a.mail_account_id,
-    d: body,
+  await tx(async (client) => {
+    const saved = await repo.saveDraft(client, {
+      id,
+      userId: user.user_id,
+      accountId: a.mail_account_id,
+      d: body,
+    });
+    if (!saved) throw new AppError("NOT_FOUND", "There is no such draft", 404);
+    await repo.refreshQueued(client, user.user_id, id, body);
   });
-  if (!saved) throw new AppError("NOT_FOUND", "There is no such draft", 404);
   return getDraft(id, user);
 }
 
+/** Discard: a scheduled draft's send is cancelled with it, never left to go out on its own. */
 async function deleteDraft(id, user) {
-  await repo.deleteDraft(pool, user.user_id, id);
+  await tx(async (client) => {
+    await repo.cancelQueuedForDraft(client, user.user_id, id);
+    await repo.deleteDraft(client, user.user_id, id);
+  });
 }
 
 /** A file for the composer, held in the vault against the caller's mailbox. */
@@ -682,7 +690,10 @@ async function send(body, user, idempotencyKey) {
     });
   }
   const signature = await signatureOf(user, body, String(a.email));
+  const key = idempotencyKey ? `${user.user_id}:${idempotencyKey}` : null;
   const queued = await tx(async (client) => {
+    // A draft waits on the queue once: scheduling it again replaces the send it had.
+    await repo.cancelQueuedForDraft(client, user.user_id, body.mail_draft_id, key);
     await repo.saveDraft(client, {
       id: body.mail_draft_id,
       userId: user.user_id,
@@ -695,9 +706,7 @@ async function send(body, user, idempotencyKey) {
       mail_draft_id: body.mail_draft_id,
       payload: { ...body, release_at: undefined, signature },
       release_at: release,
-      idempotency_key: idempotencyKey
-        ? `${user.user_id}:${idempotencyKey}`
-        : null,
+      idempotency_key: key,
     });
     await emit(client, {
       key: EVENTS.MAIL_MESSAGE_QUEUED,
