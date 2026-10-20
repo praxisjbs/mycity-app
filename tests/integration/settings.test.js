@@ -615,7 +615,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       const found = await as("ops").get("/settings/numbering?q=payslip");
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
-      expect(summary.body).toEqual(expect.objectContaining({ types: 20, resetting: 2 }));
+      expect(summary.body).toEqual(expect.objectContaining({ types: 21, resetting: 2 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {
