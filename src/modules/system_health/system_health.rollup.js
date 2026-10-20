@@ -26,6 +26,7 @@ const { emit } = require("../../shared/events/emit");
 const repo = require("./system_health.repo");
 const { explain } = require("./system_health.explain");
 const { EVENTS } = require("./system_health.events");
+const { ALERT_SEVERITIES } = require("../../shared/observability/error-reporter");
 
 /** How far back a run looks. Wider than the 5 minute pace, so a late write is never missed. */
 const LOOKBACK_MINUTES = 15;
@@ -34,6 +35,9 @@ const MAX_PER_RUN = 200;
 
 /** Nobody acted on the system's behalf: these events have no person behind them. */
 const SYSTEM = null;
+
+/** Only a fatal or an error is told; a warning or a notice is counted on Faults, nothing more (§6). */
+const tells = (g) => ALERT_SEVERITIES.has(g.severity);
 
 const tx = async (fn) => {
   const client = await pool.connect();
@@ -55,7 +59,8 @@ function titleOf(row) {
 /**
  * Group everything written since the last run, and tell the IT team about what is worth
  * telling: a fault seen for the first time, one that came back after somebody marked it
- * fixed, and one that has started happening far faster than it does.
+ * fixed, and one that has started happening far faster than it does. A warning or a notice
+ * is grouped and reopened like any other, but never told (TB, 20/10/2026).
  * @returns {Promise<{groups: number, new: number, returned: number, spiking: number}>}
  */
 async function rollupFaults(now = new Date()) {
@@ -67,7 +72,7 @@ async function rollupFaults(now = new Date()) {
     try {
       const group = await tx(async (client) => {
         const g = await repo.upsertGroup(client, { ...row, title: titleOf(row) });
-        if (g && g.is_new) {
+        if (g && g.is_new && tells(g)) {
           await emit(client, {
             key: EVENTS.SYSTEM_HEALTH_FAULT_NEW,
             entity: { type: "error_group", id: g.error_group_id },
@@ -98,19 +103,21 @@ async function rollupFaults(now = new Date()) {
               author_user_id: SYSTEM,
               body: "It happened again after it was marked fixed, so it is open again.",
             });
-            await emit(client, {
-              key: EVENTS.SYSTEM_HEALTH_FAULT_RETURNED,
-              entity: { type: "error_group", id: r.error_group_id },
-              actor: SYSTEM,
-              payload: { error_group_id: r.error_group_id, title: r.title, regressions: r.regressions },
-            });
+            if (tells(r)) {
+              await emit(client, {
+                key: EVENTS.SYSTEM_HEALTH_FAULT_RETURNED,
+                entity: { type: "error_group", id: r.error_group_id },
+                actor: SYSTEM,
+                payload: { error_group_id: r.error_group_id, title: r.title, regressions: r.regressions },
+              });
+            }
           }
           return r;
         });
         if (back) done.returned += 1;
       }
 
-      if (group && (await repo.spiking(pool, group.fingerprint))) {
+      if (group && tells(group) && (await repo.spiking(pool, group.fingerprint))) {
         const told = await tx(async (client) => {
           const { rowCount } = await repo.markSpiked(client, group.error_group_id);
           if (!rowCount) return false;
