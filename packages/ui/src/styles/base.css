@@ -86,6 +86,10 @@
 /* A long value with no spaces (a document number, an email, a file name) breaks
    rather than pushing a card or a table cell sideways (gate 11: a phone never
    scrolls sideways). */
+/* A long press selects (a chat's messages), so the phone's own callout for a photo stays away. */
+@utility no-callout {
+  -webkit-touch-callout: none;
+}
 @utility wrap-any {
   overflow-wrap: anywhere;
 }

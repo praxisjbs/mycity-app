@@ -13,6 +13,8 @@ export type {
   Channel,
   ChannelCreate,
   Conversation,
+  ForwardRequest,
+  ForwardTarget,
   LinkPreview,
   MediaRef,
   Member,

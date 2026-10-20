@@ -126,7 +126,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
-| Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, and Share on a phone. | beta |
+| Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
 | Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
@@ -4010,13 +4010,13 @@ A picture at a readable size, with zoom and a way to open it full size in a new 
 
 ### MediaViewer
 
-A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, and Share on a phone.
+A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it.
 
 | | |
 |---|---|
 | Use | Opening a file someone sent or attached: a chat's photos, videos and PDFs, a conversation's shared files, a mail attachment, a document on My Documents. |
 | Avoid | A file the app cannot show (Word, Excel, PowerPoint: download it instead); a preview beside a list on desktop (DocumentPreview); a document the product generated (Paper). |
-| Phone | The whole screen on deep green: Close, who sent it and when, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it. |
+| Phone | The whole screen on deep green: Close, who sent it and when, Forward, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it. |
 | Accessibility | A modal dialog named by the file: focus moves in and is trapped, Esc closes it and focus returns to what opened it; the arrow keys step on desktop; every control is a named button; a file that cannot be shown says so, with Download beside it. |
 | Status | beta |
 | Exports | `MediaViewer` |
@@ -4036,6 +4036,7 @@ A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, D
 | `onClose` | `() => void` | yes | Called to close it: Close, Esc, a swipe down, the phone's Back. |
 | `load` | `(item: ViewerItem) => Promise<Blob>` | yes | The file itself, fetched with the session: drawn here, and what Download and Share save. |
 | `save` | `(blob: Blob, name: string) => unknown` |  | How Download hands the file to this device (the app's own, which uses the share sheet where a download cannot land); the browser's download otherwise. |
+| `onForward` | `(item: ViewerItem) => void` |  | Forward the file on view to a chat; no Forward unless set. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
 
 ```tsx

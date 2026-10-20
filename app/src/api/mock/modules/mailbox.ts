@@ -20,6 +20,15 @@ interface MBox { address: string; name: string; threads: MThread[]; trusted: Set
 const BOXES = new Map<string, MBox>();
 
 const A = (name: string | null, address: string): MailAddress => ({ name, address });
+
+/** A mail attachment in one person's own mailbox, not in Spam: what Staff Community's Forward to Chat sends. */
+export function attachmentOf(user: string, mailAttachmentId: string): MailAttachment | null {
+  for (const t of BOXES.get(user)?.threads ?? []) {
+    if (t.folder === "spam") continue;
+    for (const m of t.messages) for (const a of m.attachments) if (a.mail_attachment_id === mailAttachmentId) return a;
+  }
+  return null;
+}
 const att = (name: string, kb: number, mime = "application/pdf"): MailAttachment => ({ mail_attachment_id: sid(`att:${name}`), document_id: sid(`doc:${name}`), file_name: name, size_bytes: kb * 1024, mime_type: mime });
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const html = (...paras: string[]) => paras.map((p) => `<p>${p}</p>`).join("");

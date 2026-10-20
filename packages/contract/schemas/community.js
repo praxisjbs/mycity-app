@@ -171,6 +171,7 @@ const Message = z
     document: MediaRef.nullable(),
     album_key: uuid.nullable(),
     link: LinkPreview.nullable(),
+    forwarded: z.boolean(),
     duration_s: z.number().int().min(0).nullable(),
     transcript: z.string().nullable(),
     celebration: z
@@ -316,6 +317,64 @@ const DirectCreate = z.object({ employee_id: uuid }).strict();
 const ColleagueListQuery = listQuery({ with_self: z.coerce.boolean().optional() });
 const ColleaguePage = Paged(PersonRef);
 
+/* ------------------------------------------------------------------ *
+ * Forwarding (§3 step 19)
+ * ------------------------------------------------------------------ */
+
+/** The kinds of message that may be forwarded: words, files and voice notes. */
+const FORWARDABLE = ["text", "image", "audio", "video", "file"];
+/** At most this many messages, and this many chats, in one forward. */
+const MAX_FORWARD_MESSAGES = 25;
+const MAX_FORWARD_CHATS = 5;
+
+/**
+ * GET /community/forward-targets: where the caller may forward to. A `channel` or `direct`
+ * conversation they are in carries its `community_channel_id`; a `person` is a colleague with
+ * no conversation yet, by `employee_id` (forwarding starts one). `person` is the other member of
+ * a direct conversation, or the colleague.
+ */
+const ForwardTarget = z
+  .object({
+    kind: z.enum(["channel", "direct", "person"]),
+    community_channel_id: uuid.nullable(),
+    employee_id: uuid.nullable(),
+    name: z.string(),
+    person: PersonRef.nullable(),
+    members: z.number().int().min(0).nullable(),
+    is_self: z.boolean(),
+  })
+  .strict();
+const ForwardTargetQuery = listQuery();
+const ForwardTargetPage = Paged(ForwardTarget);
+
+/**
+ * POST /community/forward: messages (in the order they were sent), or one mail attachment, to
+ * up to 5 chats: conversations by `channel_ids`, colleagues by `employee_ids`.
+ */
+const ForwardRequest = z
+  .object({
+    message_ids: z.array(uuid).min(1).max(MAX_FORWARD_MESSAGES).optional(),
+    mail_attachment_id: uuid.optional(),
+    channel_ids: z.array(uuid).max(MAX_FORWARD_CHATS).optional(),
+    employee_ids: z.array(uuid).max(MAX_FORWARD_CHATS).optional(),
+  })
+  .strict()
+  .superRefine((b, ctx) => {
+    const issue = (key, message) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message });
+    if (Boolean(b.message_ids) === Boolean(b.mail_attachment_id)) issue("message_ids", "Choose what to forward");
+    const chats = new Set([...(b.channel_ids ?? []), ...(b.employee_ids ?? [])]).size;
+    if (chats === 0) issue("channel_ids", "Choose a chat");
+    if (chats > MAX_FORWARD_CHATS) issue("channel_ids", "At most 5 chats");
+  });
+
+/** What a forward did: how many messages it posted, and in which conversations. */
+const ForwardResult = z
+  .object({
+    sent: z.number().int().min(1),
+    community_channel_ids: z.array(uuid).min(1).max(MAX_FORWARD_CHATS),
+  })
+  .strict();
+
 /** GET /community/people/:id/card: the profile panel (§3 step 8). */
 const ProfileCard = z
   .object({
@@ -388,6 +447,7 @@ const TABLES = {
       document: "the attached file, from document, as a MediaRef with its shape and derived sizes",
       album_key: "files sent together share it, kept in metadata",
       link: "the first link's card, from community_link_preview by community_link_preview_id",
+      forwarded: "whether it is a forwarded copy, from metadata",
       duration_s: "a voice note's length, from metadata",
       celebration: "a birthday or anniversary card: its person (a PersonRef with photo_url) from metadata, reactions counted",
       recognition: "a recognition card: who it recognises (a PersonRef with photo_url) from peer_recognition, reactions counted",
@@ -428,6 +488,14 @@ const TABLES = {
   DirectCreate: { table: null, reason: "the colleague to talk to; becomes a direct community_channel and two members" },
   ColleagueListQuery: { table: null, reason: "list controls for the colleague picker, and whether to offer the caller" },
   ColleaguePage: { table: null, reason: "a page of colleagues, each a PersonRef with their photo_url" },
+  ForwardTarget: {
+    table: null,
+    reason: "a conversation the caller may post in (community_channel), or a colleague with no conversation yet (employee)",
+  },
+  ForwardTargetQuery: { table: null, reason: "list controls for the Forward To sheet" },
+  ForwardTargetPage: { table: null, reason: "a page of places to forward to" },
+  ForwardRequest: { table: null, reason: "what to forward and where; becomes a community_message in each chat" },
+  ForwardResult: { table: null, reason: "how many messages a forward posted, and where" },
   ProfileCard: {
     table: null,
     reason: "a colleague's public work details and photo_url from employee, with what this conversation shares",
@@ -475,5 +543,13 @@ module.exports = {
   DirectCreate,
   ColleagueListQuery,
   ColleaguePage,
+  FORWARDABLE,
+  MAX_FORWARD_MESSAGES,
+  MAX_FORWARD_CHATS,
+  ForwardTarget,
+  ForwardTargetQuery,
+  ForwardTargetPage,
+  ForwardRequest,
+  ForwardResult,
   ProfileCard,
 };

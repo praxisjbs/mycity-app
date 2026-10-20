@@ -506,12 +506,16 @@ async function voteCount(db, messageId) {
   return row.n;
 }
 
+/**
+ * One message. `in_order` stamps it with the moment of the insert rather than its transaction's
+ * start, so several written in one transaction (a forward) keep the order they were written in.
+ */
 function insertMessage(db, m) {
   return one(
     db,
     `INSERT INTO community_message (community_channel_id, sender_user_id, message_type, body, document_id, metadata,
-                                    community_link_preview_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+                                    community_link_preview_id, transcript, sent_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${m.in_order ? "clock_timestamp()" : "now()"}) RETURNING *`,
     [
       m.community_channel_id,
       m.sender_user_id ?? null,
@@ -520,7 +524,70 @@ function insertMessage(db, m) {
       m.document_id ?? null,
       m.metadata ?? {},
       m.community_link_preview_id ?? null,
+      m.transcript ?? null,
     ],
+  );
+}
+
+/** The messages a forward names, in the order they were sent; deleted ones are left out. */
+async function messagesForForward(db, messageIds) {
+  const { rows } = await db.query(
+    `SELECT community_message_id, community_channel_id, sender_user_id, message_type, body, document_id,
+            metadata, transcript, community_link_preview_id, sent_at
+       FROM community_message
+      WHERE community_message_id = ANY($1::uuid[]) AND deleted_at IS NULL
+      ORDER BY sent_at, community_message_id`,
+    [messageIds],
+  );
+  return rows;
+}
+
+/**
+ * Where the caller may forward to (§3 step 19): the channels they may post in and their
+ * conversations, latest activity first, then colleagues with a login and no conversation with
+ * them yet, by name. `q` searches the names. One page of 25.
+ */
+function forwardTargets(db, userId, query) {
+  return pageQuery(
+    db,
+    `SELECT kind, community_channel_id, employee_id, name, person, members, is_self, ${TOTAL_COL}
+       FROM (
+         SELECT 'channel'::text AS kind, c.community_channel_id, NULL::uuid AS employee_id, c.name,
+                NULL::json AS person,
+                (SELECT count(*)::int FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) AS members,
+                false AS is_self, 0 AS bucket, COALESCE(lm.last_at, c.created_at) AS active_at
+           FROM community_channel c
+           JOIN community_member m ON m.community_channel_id = c.community_channel_id AND m.user_id = $1
+           ${LAST}
+          WHERE c.channel_type <> 'direct' AND c.archived_at IS NULL
+            AND c.post_policy <> 'people_ceo' AND (c.post_policy <> 'admins' OR m.member_role = 'admin')
+            AND ($2::text IS NULL OR search_fold(c.name) LIKE '%' || search_fold($2) || '%')
+         UNION ALL
+         SELECT 'direct', c.community_channel_id, e.employee_id, e.first_name || ' ' || e.last_name,
+                ${PERSON("e", "d")}, NULL, other.user_id = $1, 0, COALESCE(lm.last_at, c.created_at)
+           ${CONVERSATION_FROM}
+          WHERE c.channel_type = 'direct' AND c.archived_at IS NULL AND (lm.last_at IS NOT NULL OR c.created_by = $1)
+            AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
+         UNION ALL
+         SELECT 'person', NULL, e.employee_id, e.first_name || ' ' || e.last_name,
+                ${PERSON("e", "d")}, NULL, u.user_id = $1, 1, NULL
+           FROM employee e
+           JOIN app_user u ON u.employee_id = e.employee_id AND u.status = 'active'
+           LEFT JOIN department d ON d.department_id = e.department_id
+          WHERE e.status = 'active' AND e.archived_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM community_channel c
+                JOIN community_member a ON a.community_channel_id = c.community_channel_id AND a.user_id = $1
+                JOIN community_member b ON b.community_channel_id = c.community_channel_id AND b.user_id = u.user_id
+               WHERE c.channel_type = 'direct'
+                 AND (SELECT count(*) FROM community_member z WHERE z.community_channel_id = c.community_channel_id)
+                     = CASE WHEN u.user_id = $1 THEN 1 ELSE 2 END)
+            AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || COALESCE(d.name, '') || ' ' || e.job_title)
+                                     LIKE '%' || search_fold($2) || '%')
+       ) t
+      ORDER BY bucket, active_at DESC NULLS LAST, name, community_channel_id, employee_id`,
+    [userId, query.q ?? null],
+    query,
   );
 }
 
@@ -883,6 +950,8 @@ module.exports = {
   linkPreviewView,
   attachLinkPreview,
   messageForCard,
+  messagesForForward,
+  forwardTargets,
   setTranscript,
   people,
   fans,

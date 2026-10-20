@@ -55,9 +55,10 @@ function sentLine(iso: string) {
 
 /**
  * The file viewer over a set of files: `open(key)` shows one, and the viewer steps through
- * the rest in order. `files` maps a key to its file, who sent it, when and its caption.
+ * the rest in order. `files` maps a key to its file, who sent it, when and its caption;
+ * `onForward`, when given, offers Forward for the file on view, by its key.
  */
-export function useViewer(files: Array<{ key: string; doc: MediaRef; by?: string | null; at?: string | null; caption?: string | null }>) {
+export function useViewer(files: Array<{ key: string; doc: MediaRef; by?: string | null; at?: string | null; caption?: string | null }>, onForward?: (key: string) => void) {
   const [at, setAt] = useState<number | null>(null);
   const shown = useMemo(() => files.filter((f) => viewable(f.doc)), [files]);
   const items: ViewerItem[] = useMemo(
@@ -82,7 +83,7 @@ export function useViewer(files: Array<{ key: string; doc: MediaRef; by?: string
     },
     [shown],
   );
-  const viewer = <MediaViewer open={at !== null && at < items.length} items={items} index={at ?? 0} onIndex={setAt} onClose={() => setAt(null)} load={load} save={saveBlob} />;
+  const viewer = <MediaViewer open={at !== null && at < items.length} items={items} index={at ?? 0} onIndex={setAt} onClose={() => setAt(null)} load={load} save={saveBlob} onForward={onForward ? (item) => onForward(item.key) : undefined} />;
   return { open, viewer };
 }
 
