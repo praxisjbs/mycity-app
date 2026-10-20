@@ -7,7 +7,7 @@ import { useRealtime } from "@/api/realtime";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
 import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Menu, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
-import { claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES, remindIn, type PromptKind } from "./prompts";
+import { claimSignIn, claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES, remindIn, type PromptKind } from "./prompts";
 
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
@@ -34,8 +34,7 @@ export function useClock() {
 
 /**
  * Called once by the shell: a punch made on another device or decided by People, or an automatic
- * clock-out, refreshes the state. The sign-in prompt is Home's to open (docs/guides/home.md §6
- * Clock-in prompt, with useClock().open); the start and closing prompts are ClockPrompts'.
+ * clock-out, refreshes the state. The prompts that open the panel by themselves are ClockPrompts'.
  */
 export function useClockSync() {
   useRealtime("attendance.updated", () => invalidate("/api/v1/attendance"));
@@ -45,9 +44,10 @@ export function useClockSync() {
 const PROMPT_CHECK_MS = 30_000;
 
 /**
- * Rendered once by the shell, on both shells: opens the panel by itself at the shift's start for
- * someone not yet clocked in, and at its end for someone still clocked in
- * (docs/guides/attendance.md §6.14; the rules in ./prompts). It looks every half minute and when
+ * Rendered once by the shell, on both shells: opens the panel by itself on the first screen of the
+ * day's first sign-in, at the shift's start for someone not yet clocked in, and at its end for
+ * someone still clocked in, over a blurred screen (docs/guides/attendance.md §6.14; the rules in
+ * ./prompts). It looks every half minute and when
  * the app comes to the front, on the server's clock, and never opens over a dialog that is open
  * or a locked session: it waits until that one closes, so a half-filled form is never lost.
  */
@@ -68,6 +68,7 @@ export function ClockPrompts() {
     const { t: today, busy } = latest.current;
     if (!today || busy) return;
     const now = new Date(Date.now() + offset.current);
+    if (today.sign_in_prompt && today.state === "not_clocked_in" && claimSignIn(me.user_id, today.date)) return openPanel("Clock In", "sign_in");
     const kind = promptDue(today, now);
     if (kind === "start" && claimStart(me.user_id, today.date)) openPanel("Clock In", "start");
     else if (kind === "close" && closeDue(me.user_id, today.date, now)) {
@@ -119,11 +120,15 @@ export function ClockButton({ compact }: { compact?: boolean }) {
   );
 }
 
-/** Opens the panel; as a prompt it must be answered: the scrim, Esc and a drag leave it open. */
+/**
+ * Opens the panel. As a prompt it must be answered, over a blurred screen: the scrim, Esc and a drag
+ * leave it open.
+ */
 function useClockPanel() {
   const modal = useModal();
   return useCallback(
-    (title: string, prompt?: PromptKind) => modal.open({ title, dismissible: !prompt, body: (close) => <ClockPanel close={close} prompt={prompt} /> }),
+    (title: string, prompt?: PromptKind) =>
+      modal.open({ title, dismissible: !prompt, blur: !!prompt, body: (close) => <ClockPanel close={close} prompt={prompt} /> }),
     [modal],
   );
 }

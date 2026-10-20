@@ -19,6 +19,7 @@ const today = (over: Partial<AttendanceToday> = {}): AttendanceToday => ({
   clock_in_at: null,
   clock_out_at: null,
   clock_out_automatic: false,
+  sign_in_prompt: false,
   review: false,
   shift: { working_day: true, starts_at: "09:00", ends_at: "17:00", grace_minutes: 0, off_reason: null },
   work_pattern: "on_site",

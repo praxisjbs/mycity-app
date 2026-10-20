@@ -56,7 +56,7 @@ control for data-driven oversight" (02/09/2026).
 | Home · Reports (`reports`) | staff app | holders of `home.reports`; everyone else sees the gated state | their own reports and the shared ones whose source they may open, with schedule, status and audience; Recent Runs | build a report, schedule it, pause or resume it, run it now, download a finished run, archive it |
 | KPI detail (the report model) | any KPI card, Overview and Team | the scope the card was computed in | the paged records behind the number, with its groups | page at 25; filter by group; open a record |
 | Gated tab | Team, Alerts or Reports without the capability | every `home` viewer who lacks it | the page title, the Locked illustration, "For Managers" and one line | nothing; the tab is listed so the four tabs stay in place |
-| Clock-in prompt | opened by Home, owned by Attendance | the signed-in employee, when the first session of a working day opens Home · Overview | Attendance's clock-in panel | clock in, or close it |
+| Clock-in prompt | Attendance's, opened by the shell on whatever screen comes first (attendance.md §6.14) | the signed-in employee, on the first session of a working day | Attendance's clock-in panel | clock in, or Not Now |
 | Settings · Roles (role cards) | Settings, M9 | `settings` view and edit | a role's default cards and locks | set or clear them (routes in M1, the screen in M9) |
 
 Home renders but does not own the attendance, partnership, approval, recruitment and task figures
@@ -67,12 +67,10 @@ the saved reports, their schedules and runs, the per-role cards and each person'
 
 1. **Sign-in → Home, and the clock-in prompt.** An employee signs in and lands on Home · Overview,
    resolved for their role (a sign-in through a link to another screen lands on that screen). The
-   Overview answer carries `prompt_clock_in`; when it is true the screen opens Attendance's
-   clock-in panel once. So the prompt opens when the first session of a working day opens Home ·
-   Overview: a first session that never opens it is not prompted that day, and the top bar's
-   Clock In and the phone's floating button still open the panel. The server decides it (§6
-   Clock-in prompt), so the shell no longer opens the panel after every sign-in. The punch itself
-   is Attendance's write (`POST /api/v1/attendance/punches`, LA).
+   clock-in prompt is Attendance's (attendance.md §6.14, owner decision of 19/10/2026 in place of
+   O12): on the first session of a working day the shell opens Attendance's clock-in panel over a
+   blurred screen, on whatever screen comes first, Home or not. Home reads nothing for it. The
+   punch itself is Attendance's write (`POST /api/v1/attendance/punches`, LA).
 2. **A clock-in reflects on Home.** A punch commits through Attendance, which records it and
    recalculates the person's day (`attendance_day`). Clocked In Today, the Operations chart, the
    Team roster and the Staff day strip all read the shared attendance roster
@@ -370,15 +368,9 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   25; View All opens ESS · My Leave, its paged home.
 - **New** lists only the create actions the reader holds: New Task, Request Leave, New Rule, New
   Report.
-- **Clock-in prompt** (`dashboard.prompt.js`). `prompt_clock_in` is true when all hold: the
-  session reading the Overview is the first one they signed in with today (the earliest
-  `user_session` issued that Lagos day is the caller's), and Attendance's own word on where they
-  stand (`GET /attendance/me/today`, read only for that first session) is Not Clocked In on a
-  working day: the employee is active, no granted leave covers today (approved, or granted by its
-  approval), no clock-in counts today (accepted or in review, not excluded by People's decision)
-  and no shift is still open from yesterday. It is stateless: closing the panel is enough for the
-  day, a session kept from yesterday or a second session that day does not prompt, and a prompt
-  that cannot be decided is not shown.
+- **Clock-in prompt.** Not the Overview's: Attendance decides it (`AttendanceToday.sign_in_prompt`,
+  attendance.md §6.14) and the shell opens it on the first screen, so a sign-in through a link to
+  another screen is prompted too. The Overview carries no flag for it.
 
 **Team**
 
@@ -639,7 +631,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Home · Reports (`reports`) | Scheduled, Paused, Runs This Month, Recipients; a card per report the reader may see (name, status pill Scheduled, Paused or On Demand, Source, Schedule in words ("Every working day at 18:00"), Audience) with Run Now, and for its owner or the CEO an actions menu: Edit Report, Pause Report or Resume Report, Archive Report (asks "Archive Report" with "It stops running and leaves this list. Its runs stay."; Cancel, Archive Report); empty: "No Reports Yet". Recent Runs: number, report, run (day-first date and time), recipient, format, status (Pending, Failed, Skipped, or Download once done); empty: "No Runs Yet". New Report, a form in three steps: Report (Report Name, Source, its filters, Share With Managers), Schedule (Repeats: Daily, Weekly, Monthly or On Demand; Days for Weekly; Start Date, Time, Working Days Only), Delivery (Recipients, Formats: PDF, XLSX or Both), with no Delivery step On Demand; Cancel, Back, Next, Create Report; a person Recipients cannot go to is named on it ("Ada Obi: no access"). Edit Report is the same form without Source; Save Report. Run Now asks the format (Run as PDF, Run as XLSX) when the report has both. A report opened from a link: Status (Archived for an archived one, which offers nothing else), Source, Schedule, Audience, Owner, Next Run; Close, the actions menu, Run Now. A run opened from a link, however far back: its number as the title, Report, Run, Recipient, Format, Status (Done, Pending, Failed or Skipped); Close, and Download once done. Toasts "RPT-0215 downloaded" (Run Now, once its file is saved on this device; busy until then), "Report created", "Report saved", "Report paused", "Report resumed", "Report archived", and "Report not found" or "Run not found" for a link to one the reader may not see | None | Generation as the recipient, skipped runs, sources being the screens' own queries, email delivery, who may open a file, what Paused means: §3 step 7, §4, §6 Reports |
 | KPI detail (the report model) | The card's title, the summary line ("22 of 25 clocked in across the organisation"), the group chips with their counts (Clocked In Today: On Site, Remote, Field, Late, Not In, On Leave, No Clock-Out Yesterday), the paged list, the page count; empty: "Nothing Behind This" | None | Paging at 25: §5. Scope: §6 |
 | Gated tab (Team, Alerts, Reports) | The page title, the Locked illustration, "For Managers" and one line, "This tab is for managers and the CEO." | None | Which capability opens which tab: §8 |
-| Clock-in prompt | Owned by Attendance: the attendance guide's §10 | The attendance guide's §10 | When Home opens it: §6 Overview |
+| Clock-in prompt | Owned by Attendance: the attendance guide's §10 | The attendance guide's §10 | When it opens: attendance.md §6.14 |
 | Attendance figures on Overview and Team | The clocked-in count, the On Time donut and the roster statuses, as in the rows above | None | That the figures are read from the shared roster and always equal My Attendance: §3 step 2, §6 |
 
 The demo's Viewing As switcher is a demo device for showing each role; the real Home resolves the
@@ -717,11 +709,9 @@ and Move Down rather than bare arrows.
   than an empty one. A Head of Department whose team owns no partner (one outside Partnerships)
   sees the pipeline's empty state; their role's own cards (`role_kpi`, §6) can lead with their
   own work instead of the partnership cards.
-- **The first session of the day.** The clock-in prompt opens once, when the first session the
-  person signs in with on a working day opens Home · Overview; closing it ends it for the day, a
-  second device that day does not prompt, and nobody on approved leave is prompted. A first
-  session that signs in through a link to another screen and never opens the Overview is not
-  prompted that day; the top bar's Clock In and the floating button still open the panel.
+- **The first session of the day.** The clock-in prompt is Attendance's and opens on whatever
+  screen the first session lands on (attendance.md §6.14, §11); Home's Overview no longer waits
+  for it or opens it.
 - **A report skipped.** A recipient who has left, been suspended, or lost the source's grant or
   `home.reports` since the schedule was saved gets a `skipped` run, no file and no email; the other
   recipients get theirs. Its owner still edits the report without taking them off: an edit checks
@@ -821,4 +811,5 @@ rows, and nothing in the code says where anything came from.
   (`docs/guides/organogram.md` §7) and the order they load in is not Home's to fix.
 - 19/10/2026 · LA · The roster's `field` status (attendance.md §6.12): a present day on a field assignment reads Field, counted in Present Today and Clocked In Today, with a Field chip on Team and in Clocked In Today's groups. Team's four cards are unchanged.
 - 19/10/2026 · AJ · Team (the roster and Attendance This Month) and a card's records show each person's photo: `HomeTeamRow.employee`, `HomeTeamAttendanceRow.employee` and a person cell are `PersonRef` with `photo_url` (the roster reads it, `kpi-catalog/shared.js` `PERSON` is now `shared/db/person.js`); initials when there is none. TB to review.
+- 19/10/2026 · TB · The clock-in prompt left Home (owner decision of 19/10/2026, replacing O12): Attendance decides it (`AttendanceToday.sign_in_prompt`, the same first-session rule `dashboard.prompt.js` held) and the shell opens it over a blurred screen on whatever screen comes first, so a sign-in through a link is prompted too. `dashboard.prompt.js`, `HomeOverview.prompt_clock_in` and the Overview's opener (`clockPrompt.ts`) are gone; §2, §3 step 1, §6, §10 and §11 say so. Nothing else on Home changed.
 - 19/10/2026 · TB · Run Now and the Overview's Export download on the device that pressed, never by email (`docs/guides/foundation.md` §6.12, TB's decision; §3 steps 7 and 8, §4, §5, §6, §7, §10): a run on demand is done once its file exists and is not emailed (`emailed_at` stays empty), the screens wait on the run and save its file (toast "RPT-0215 downloaded"), and `GET /home/overview/export/:id` lets every Home reader, Staff included, wait on their own Overview run. A schedule's runs are still emailed; the email's `scheduled` variable is gone with the branch it chose.

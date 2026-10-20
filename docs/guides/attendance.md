@@ -36,7 +36,7 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Clock In / Clock Out panel (`clock`) | Desktop top bar, the phone's floating button, opened by Home · Overview when the first session of a working day opens it, and by itself at the shift's start and end (§6.14) | Every employee, own record | Today's date and time at the workplace, the shift, the clock location and radius, the state (Clocked Out, Clocked In since, Review Required), this device's state, the result of a punch, a day clocked out automatically | Clock in or out, allow location, retry location, register this device, add a note to a punch under review; at the shift's end, Remind Me in 15 minutes, 30 minutes or an hour |
+| Clock In / Clock Out panel (`clock`) | Desktop top bar, the phone's floating button, and by itself over a blurred screen: on the first screen of the day's first sign-in, at the shift's start and at its end (§6.14) | Every employee, own record | Today's date and time at the workplace, the shift, the clock location and radius, the state (Clocked Out, Clocked In since, Review Required), this device's state, the result of a punch, a day clocked out automatically | Clock in or out, allow location, retry location, register this device, add a note to a punch under review; at the shift's end, Remind Me in 15 minutes, 30 minutes or an hour |
 | ESS · My Attendance (`my-attendance`) | Employee Self-Service | Every employee, own record | Today, the month's figures, the days of the month, each day's punches (a clock-out the system made reads Automatic), open exceptions; for remote staff, their home location (approved, waiting or not set); their field assignments, today's and those to come | Pick a month, open a figure's days, switch the days between a table and a chart, open a day, explain an exception or an automatic clock-out, export the month, open a field assignment; remote staff set their home location from home, for People to approve |
 | ESS · My Devices (`my-devices`) | Employee Self-Service | Every employee, own devices | The devices they clock in from, each with its status, up to three registered | Register this device, remove one of theirs |
 | People · Attendance (`attendance`) | People | `people` view: Operations & People and Management everyone, line managers and heads their team | The day's figures, the register, a day's evidence (each punch's source: Clock, Added by People, Automatic), exceptions, remote staff's home locations, work location requests, field assignments | Pick a day, filter, open a person's day, decide an exception (scope all, `people` approve), approve or reject a home location (scope all, `people` approve), approve or reject a work location request waiting on them (the line manager, then Operations & People), set a field assignment for people in their scope, cancel it or take someone off it (`people` approve, within scope), export the register |
@@ -111,12 +111,14 @@ recorded, as evidence, and opens an exception People review; nothing is overwrit
    (`src/modules/alerts/alerts.metrics.js`, home.md §6 Alerts) are the one other reader: Late
    Arrivals counts the days recorded `late`, and Missing Clock-Out the day-close's
    `missing_clock_out` exception and a day still open before today with a clock-in and no clock-out.
-9. **The clock asks at the start and the end of the shift** (§6.14). Besides the sign-in prompt
-   Home opens, the clock panel opens by itself over any screen: at the shift's start for someone
-   not yet clocked in, and at its end for someone still clocked in, where Remind Me brings it back
-   in 15 minutes, 30 minutes or an hour. Every five minutes the `attendance-clock-watch` job sends
-   anyone expected and not yet in one reminder in the first hour after the start (the bell, and a
-   push to their phone or computer); clocking in marks it read.
+9. **The clock asks at sign-in, and at the start and the end of the shift** (§6.14). The clock
+   panel opens by itself over any screen, the screen behind it blurred: on the first screen of the
+   first session of a working day for someone not clocked in (`sign_in_prompt` on today), at the
+   shift's start for someone not yet clocked in, and at its end for someone still clocked in,
+   where Remind Me brings it back in 15 minutes, 30 minutes or an hour. Every five minutes the
+   `attendance-clock-watch` job sends anyone expected, not yet in and away from the app one
+   reminder in the first hour after the start (the bell, and a push to their phone or computer);
+   someone in front of the app has the prompt instead. Clocking in marks it read.
 10. **An open shift closes by itself** (§6.14). Once the shift has ended, the same job clocks out
     anyone still clocked in who has been away from the app for 15 minutes: at the shift's end, or,
     when they stayed on the app after it, at the last moment they were in front of it. The punch is
@@ -170,7 +172,7 @@ event a day) and needs none of its own.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /api/v1/attendance/me/today` | → `AttendanceToday` | self, own | no | The authoritative state, the shift, the clock location (name and radius, no coordinates), the policy's modes and accuracy limit, this device; `clock_out_automatic` when the day's clock-out was the system's (§6.14) |
+| `GET /api/v1/attendance/me/today` | → `AttendanceToday` | self, own | no | The authoritative state, the shift, the clock location (name and radius, no coordinates), the policy's modes and accuracy limit, this device; `clock_out_automatic` when the day's clock-out was the system's, and `sign_in_prompt` when this session is the first of a working day and the person is not clocked in (§6.14) |
 | `POST /api/v1/attendance/punches` | `PunchCreate` → `PunchResult` | self, own | no | `Idempotency-Key` required (428 without). The person is the session's; the body names nobody. 409 for a refused transition, 422 on leave or not employed |
 | `GET /api/v1/attendance/me` | `MyDayListQuery` (`month`, `status`) → `AttendanceDayPage` | self, own | yes, 25 | Days of the month, newest first; `status` keeps one figure's days (`present` takes late days too, as Days Present counts them) |
 | `GET /api/v1/attendance/me/summary` | `MySummaryQuery` → `MyAttendanceSummary` | self, own | no | The month's figures |
@@ -555,18 +557,29 @@ like a remote employee's. Set on the employee record (ess.md §3 step 2, "Attend
 ### 6.14 Clock prompts, reminders and the automatic clock-out (`attendance.clock-watch.js`)
 
 Agreed at the 12 and 13 October meetings and settled by the owner on 19/10/2026: a pop-up the
-person must answer, not a toast, at the shift's start and end; push reminders; an open shift
-closed at the shift's end, or at the last moment the person was on the app when they stayed on
-after it; an automatic clock-out counts at once, reads Automatic, and the person can explain it.
-The times below (5, 15 and 60 minutes, the three Remind Me choices) are the code's, to change on
-request.
+person must answer, not a toast, over a blurred screen, at the first sign-in of the day, before
+the screen they asked for, and at the shift's start and end; a push reminder to whoever is not on
+the app; an open shift closed at the shift's end, or at the last moment the person was on the app
+when they stayed on after it; an automatic clock-out counts at once, reads Automatic, and the
+person can explain it. The sign-in prompt is Attendance's, opened by the shell, in place of Home's
+(owner decision O12, home.md §6). The times below (5, 15 and 60 minutes, the three Remind Me
+choices) are the code's, to change on request.
 
+- **The sign-in prompt** (the server's `sign_in_prompt` on today, the app's `ClockPrompts`): true
+  when the session reading it is the first the person signed in with that Lagos day (the earliest
+  `user_session` issued that day is the caller's) and they are not clocked in on a working day
+  (active, no granted leave, no clock-in that counts, no shift still open from yesterday). The
+  shell opens the panel on whatever screen the session lands on, Home or a link to anything
+  else, once a day on each device. A session kept from yesterday or a second device that day is
+  not prompted at sign-in (the start prompt still reaches it in the first hour). Not Now closes
+  it, as for the start prompt.
 - **The start prompt** (the app, `features/attendance/prompts.ts`): on a working day, when the
   workplace's clock (kept to the server's) reaches the shift's start and the person is not clocked
   in, the clock panel opens over whatever screen is open, as Start Your Day. Once a day on each
   device: when the app is open at the start or comes to the front within the hour after it, and
   not when the panel was already shown since the start on that device (the sign-in prompt, Clock
-  In). The scrim, Esc and a drag do not close it; Not Now does.
+  In). The scrim, Esc and a drag do not close it; Not Now does. Behind every prompt the screen is
+  blurred (`useModal().open({ blur })`); a panel the person opens themselves is not.
 - **The closing prompt**: when the clock passes the shift's end and the person is still clocked
   in, the panel opens as Finish Your Day. Clock Out or Remind Me (in 15 minutes, 30 minutes or 1
   hour) answers it; after Remind Me it opens again at that time while they are still clocked in,
@@ -578,9 +591,12 @@ request.
   organisation's week (Lagos), in the first 60 minutes after the start, everyone active and
   started, with a login, not on granted leave and with no clock-in that counts that day, is sent
   one reminder (`attendance.clock_in_due`): in the bell, and pushed to their devices as their
-  Attendance and Leave preference allows. One a day (`attendance_clock_reminder`, unique per
-  person, day and kind); a run after the first hour sends none. Clocking in marks it read, so a
-  push still held (the minute it waits while the person is in front of the app) is not sent.
+  Attendance and Leave preference allows. Not while they are in front of the app on any login
+  (the push hold's reading, `services/realtime/active.js`): the start prompt asks them there, and
+  a later run reminds them once they are away, still not clocked in, within the hour. When
+  presence cannot be read (no Redis) the reminder goes. One a day (`attendance_clock_reminder`,
+  unique per person, day and kind); a run after the first hour sends none. Clocking in marks it
+  read.
 - **The automatic clock-out** (the same job): for a person with an open shift (a clock-in that
   counts and no clock-out) on a work date not yet closed (today, or yesterday before the
   day-close), once the workplace's clock is past that date's shift end:
@@ -631,7 +647,7 @@ request.
 | `field_assignment.cancelled` | It is cancelled (one for each person still on it) | Audit; notifies the person with the reason; realtime refresh |
 | `field_assignment.member_removed` | Someone is taken off it | Audit; notifies the person with the reason; realtime refresh |
 | `attendance.schedule_set` | People set a hybrid employee's schedule | Audit on the employee (Record History: Work schedule set); notifies the person with the office days and the first day; realtime refresh |
-| `attendance.clock_in_due` | The watch finds someone expected and not clocked in, in the first hour after the start (§6.14) | Notifies the person ("Time to clock in", on the `attendance_clock_reminder` row; push as their preference allows); marked read when they clock in |
+| `attendance.clock_in_due` | The watch finds someone expected, not clocked in and away from the app, in the first hour after the start (§6.14) | Notifies the person ("Time to clock in", on the `attendance_clock_reminder` row; push as their preference allows); marked read when they clock in |
 | `attendance.clocked_out_automatically` | The watch clocks out an open shift (§6.14) | Audit; notifies the person with the date and time (the day opens on My Attendance); the punch's own `attendance.punched` reloads the screens |
 | Job `attendance-day-close` (scheduler, 01:30 Africa/Lagos; queue of the same name for a given date) | Daily | Closes every open day before today within 14 days, under the cron lock; idempotent |
 | Job `attendance-clock-watch` (scheduler, every 5 minutes) | All day | Sends the start reminders and makes the automatic clock-outs (§6.14), under the cron lock; idempotent (one reminder a day, one automatic clock-out a shift) |
@@ -693,8 +709,8 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Clock In / Clock Out panel | For someone working from home that day (remote, or a hybrid home day) with no approved home, a banner (No Approved Home) with Set Home; for someone expected at an office with none assigned, a banner (No Office Assigned); the date and the workplace's current time, the state pill (Clocked Out, Clocked In with its time, Review Required), Shift, Work Arrangement, Clock Location with its radius (on a field assignment's day, its site), This Device with its status; the step before the browser asks (Location Check, one line naming the worksite); Clock In or Clock Out, Allow Location, Retry Location, Register Device, Not Now; the result after a punch with its reasons; Add Note when it is under review; opened by itself, Start Your Day at the start and Finish Your Day at the end, with Remind Me (In 15 Minutes, In 30 Minutes, In 1 Hour) beside Clock Out; after an automatic clock-out, Automatic Clock-Out with the day's times | Clock Location: the punch is matched to this place; This Device: why an unregistered device is flagged under the current policy | "location is read only and not continuously tracked", how block and warn decide, idempotency, how the watch decides who is away and when: §6 here |
-| ESS · My Attendance | For remote staff, and hybrid staff with a home day, a Home Location card: the status (Approved, Waiting, Not Set, Rejected with People's reason), the address, Set Home Location or Update Home (a sheet: Use This Location with the reading's accuracy, Address with suggestions as it is typed, Send for Approval); Today's card, Field Assignments when the person has any in progress or to come (number and name, dates, the site; one opens with the client, its sites with their address and radius, and who else is on it), the month picker beside Export Month (arrows a month at a time; the month's name opens a year and its months, back two years), Days Present, Late Days (with the share of days present), Absent, Hours Worked, each of the first three opening its days paged at 25, the days with clock in, clock out, hours, status and Review or as a chart of hours (late days stand out), a day's punches, open exceptions with Explain; a clock-out the system made reads Automatic in My Days and the day's punches, and the day offers Explain Time (a sheet: Your Note, Send Note); Export Month | Hours Worked: from the first clock-in to the last clock-out | "a correction never overwrites a punch", how the automatic time is chosen: §6.8, §6.14 |
+| Clock In / Clock Out panel | For someone working from home that day (remote, or a hybrid home day) with no approved home, a banner (No Approved Home) with Set Home; for someone expected at an office with none assigned, a banner (No Office Assigned); the date and the workplace's current time, the state pill (Clocked Out, Clocked In with its time, Review Required), Shift, Work Arrangement, Clock Location with its radius (on a field assignment's day, its site), This Device with its status; the step before the browser asks (Location Check, one line naming the worksite); Clock In or Clock Out, Allow Location, Retry Location, Register Device, Not Now; the result after a punch with its reasons; Add Note when it is under review; opened by itself over a blurred screen, Start Your Day at the day's first sign-in and at the start and Finish Your Day at the end, with Remind Me (In 15 Minutes, In 30 Minutes, In 1 Hour) beside Clock Out; after an automatic clock-out, Automatic Clock-Out with the day's times | Clock Location: the punch is matched to this place; This Device: why an unregistered device is flagged under the current policy | "location is read only and not continuously tracked", how block and warn decide, idempotency, how the watch decides who is away and when: §6 here |
+| ESS · My Attendance | For remote staff, and hybrid staff with a home day, a Home Location card: the status (Approved, Waiting, Not Set, Rejected with People's reason), the address, Set Home Location or Update Home (a sheet: Use This Location with the reading's accuracy, Address, Send for Approval); Today's card, Field Assignments when the person has any in progress or to come (number and name, dates, the site; one opens with the client, its sites with their address and radius, and who else is on it), the month picker beside Export Month (arrows a month at a time; the month's name opens a year and its months, back two years), Days Present, Late Days (with the share of days present), Absent, Hours Worked, each of the first three opening its days paged at 25, the days with clock in, clock out, hours, status and Review or as a chart of hours (late days stand out), a day's punches, open exceptions with Explain; a clock-out the system made reads Automatic in My Days and the day's punches, and the day offers Explain Time (a sheet: Your Note, Send Note); Export Month | Hours Worked: from the first clock-in to the last clock-out | "a correction never overwrites a punch", how the automatic time is chosen: §6.8, §6.14 |
 | ESS · Work Location Requests | New Request; the requests with number, type, dates, place and status (Waiting on its stage, Approved, Rejected, Cancelled); a request opens with its details, its approval trail and Withdraw Request or Cancel Request; the New Request sheet: Type, First Day, Last Day, Address (suggestions as it is typed; for a client visit the one picked fills the Client Site's Latitude and Longitude), Reason, for a temporary home Use This Location with the reading's accuracy, and for a client visit a Client Site card (Latitude, Longitude, Radius, Metres, then a map of the site and its fence once both coordinates are real; a tap on it moves the centre), Send Request; a client visit's request shows its Site (the point and radius) | Type: what each type changes on the clock; Radius on the client site: a punch within it counts at the site | How the approval routes and what the clock does on an approved day: §6.11 |
 | ESS · My Devices | The devices with status, first seen, last punch and This Device; Register This Device, Remove | Status header: what New, Registered and Removed mean | "How device checks work", the three-device reason: §6.6 |
 | People · Attendance | The date, Expected, Present, Late, Absent, On Leave, Not In, Open Exceptions; Register, Exceptions, Homes (status chips; person, address, accuracy, requested, distance from the approved home, status; a home opens with Approve and Reject) and Requests (status chips; person, number, type, dates, waiting on, status; a request opens with its details, its approval route and the decisions so far, and Record Decision, Approve or Reject with a reason, when it waits on the reader) and Field (state chips; number and name, client, people, dates, sites, state; New Assignment: Name, Client, People, First Day, Last Day, Site with Address (suggestions as it is typed, the one picked filling Latitude and Longitude), Latitude, Longitude and Radius, then a map of the site and its fence once both coordinates are real (a tap on it moves the centre), a second site, Note, Save Assignment; an assignment opens with its details, its sites and people, Take Off on a person and Cancel Assignment, each with a reason); the register (person, arrangement, clock in, clock out, location, device, status, review); a day's evidence, each punch's Source (Clock, Added by People, Automatic); Decide, an Automatic Clock-Out offering Accept and Correct Time; Export | Open Exceptions: what waits on People; Outcome on the decision form: accept, reject or add the clock-out, or for an automatic one keep or correct its time; From Approved Home: how far a new home is from the one in force; Radius on a site: a punch within it counts at the site | The page explainer, "what a manager can and cannot do", reconciliation mechanics: §3, §6.8, §8 |
@@ -707,7 +723,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Clock In / Clock Out panel | A bottom sheet: the state, the time, the shift and location, then the result (no toast over it); opened by itself, it does not drag away | Nothing | Clock In or Clock Out, full width at the foot; Remind Me above it at the shift's end, its choices an action sheet | The floating button's Clock In or Out (F18); the top bar's clock on desktop; Home · Overview opens it once, when the first session of a working day opens the Overview, for anyone not yet clocked in (home.md §6 Clock-in prompt); it opens by itself at the shift's start and end (§6.14), and from the reminder's notice |
+| Clock In / Clock Out panel | A bottom sheet: the state, the time, the shift and location, then the result (no toast over it); opened by itself, it does not drag away | Nothing | Clock In or Clock Out, full width at the foot; Remind Me above it at the shift's end, its choices an action sheet | The floating button's Clock In or Out (F18); the top bar's clock on desktop; it opens by itself on the first screen of the day's first sign-in, at the shift's start and at its end (§6.14), and from the reminder's notice |
 | ESS · My Attendance | For remote staff, and hybrid staff with a home day, the Home Location card first, then Today's card, Field Assignments as cards when there are any, the four figures two to a row, then days as cards | Subtitle | Export Month in the header; Set Home Location full width in its card, its sheet's Send for Approval at the foot | Bottom bar Self-Service; ESS tabs scroll sideways |
 | ESS · Work Location Requests | Request cards with number, type, dates and status; in the New Request sheet, a client visit's small map under its Radius | Subtitle; the place and Waiting On columns (in the request's sheet) | New Request, full width at the foot; the sheet's Send Request at its foot; a tap on the map moves the client site's centre (the map never drags, so the sheet keeps its scroll) | ESS tabs |
 | ESS · My Devices | Device cards with their status | Subtitle | Register This Device, full width | ESS tabs |
@@ -787,6 +803,10 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - Explaining an automatic clock-out twice: 409 `ALREADY_EXPLAINED`; the note is on the first.
 - Push turned off for Attendance and Leave: the reminder still reaches the bell; the prompt still
   opens in the app.
+- In front of the app at the start and not clocked in: the start prompt, no push; away within the
+  hour still not clocked in: the push then.
+- Signing in through a link to another screen, first thing in the day: the sign-in prompt opens
+  over that screen; closing it leaves the screen as it was.
 
 ## 12 · Donor code
 
@@ -869,6 +889,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - 19/10/2026 · TB · Every address on these screens searches as it is typed (`AddressField` over `GET /maps/search`, foundation.md §6.13): on People · Worksites, a field assignment's sites and a client visit the place picked fills Latitude and Longitude, which stay open to correct; on a home and a temporary home it fills the address only, the coordinates staying the reading's. §5, §6.10, §6.11, §6.13, §10 and §13 updated; the map tiles and the reverse lookup stay open.
 - 19/10/2026 · TB · People · Worksites draws the centre and its fence on a map, in the form and the worksite's details (tiles through `GET /maps/tiles`, fetched with the session); a tap on the form's map moves the centre, and coordinates typed with no address fill it from `GET /maps/reverse`, for worksites only (decided 19/10/2026: a home's or a punch's coordinates are never sent to the provider). §5, §10 and §13 updated.
 - 19/10/2026 · TB · A field assignment's sites (People · Attendance, New Assignment) and a client visit's site (ESS · Work Location Requests, New Request) show the site and its fence on a map under the radius once both coordinates are real; a tap moves the centre. One piece, `SiteMap.tsx`, draws it on all three forms (worksites too). No address lookup on these two (worksites only, decided 19/10/2026). §10 and §13 updated.
+- 19/10/2026 · TB · The three gaps against the 12 and 13 October rules closed (owner, 19/10/2026; §6.14): the sign-in prompt is Attendance's (`sign_in_prompt` on today, the first-session rule Home's `dashboard.prompt.js` held, which is gone) and the shell opens it on whatever screen comes first, Home or a link; the start reminder is not sent to someone in front of the app (the start prompt asks them; a later run reminds them once away); every prompt opens over a blurred screen (`useModal().open({ blur })`). §2, §3, §5, §6.14, §7, §10 and §11 updated; home.md says the prompt left Home (O12 replaced).
 - 19/10/2026 · TB · Exports download on the device that pressed (`docs/guides/foundation.md` §6.12, TB's decision): Export Month and Export Register answer 202 with the file pending (`ExportFile`) instead of the email they would reach, `attendance.build_export` makes the workbook into that file, and the screens wait and save it (Downloads on Android and desktop, the share sheet on an iPhone app). Export Register's sheet closes once the request is taken and the file arrives wherever the person is in the app. A login with no email is no longer refused. The `attendance-export` email template is gone.
 - 19/10/2026 · TB · Attendance's notices are listed in Settings · Notifications (`docs/guides/notifications.md` §6):
   People may switch any of them off company-wide, and copy Attendance needs review, Attendance
