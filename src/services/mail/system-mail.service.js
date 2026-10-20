@@ -238,13 +238,15 @@ async function send(msg) {
   const recipient =
     msg.recipient || (typeof first === "object" ? first : { email: first });
   // A relay that hosts a recipient's domain but not its mail would accept the message and
-  // keep it in a local mailbox: fail loudly instead (code MAIL_ROUTE_TRAPPED).
+  // keep it in a local mailbox: fail loudly instead (code MAIL_ROUTE_TRAPPED). Domains whose
+  // mailboxes are on the relay (SMTP_LOCAL_DOMAINS, MyCity's own) are delivered there.
   if (config.SMTP_HOST)
     await routeCheck.assertRoutable({
       smtpHost: config.SMTP_HOST,
       to: [...to, ...(cc || [])].map((a) =>
         typeof a === "string" ? a : a.address,
       ),
+      localDomains: config.SMTP_LOCAL_DOMAINS,
     });
   const rendered = await renderEmail(db, msg.template, msg.data || {}, {
     recipient,

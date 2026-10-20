@@ -473,6 +473,14 @@ const ENTRIES = [
     },
   ],
   [
+    "SMTP_LOCAL_DOMAINS",
+    str("mycityapp.io"),
+    {
+      group: "Mail",
+      doc: "Comma-separated domains whose mailboxes are on the SMTP server itself, behind the host's spam-filter MX. System mail to them is delivered there; every other domain is still route-checked. Empty: none.",
+    },
+  ],
+  [
     "MAIL_RBL_HOSTS",
     str(""),
     {
