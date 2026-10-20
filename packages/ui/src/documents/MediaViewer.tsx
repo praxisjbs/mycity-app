@@ -390,7 +390,18 @@ export function MediaViewer({ open, items, index, onIndex, onClose, load, save, 
                 </span>
               )}
             </div>
-            {onForward && <IconButton icon="forward" label="Forward" className={glassy} onClick={() => onForward(item)} />}
+            {onForward && (
+              <IconButton
+                icon="forward"
+                label="Forward"
+                className={glassy}
+                onClick={() => {
+                  // The screen's sheet hands focus back to the viewer itself, not to this button, whose tooltip would take the first Esc.
+                  content.current?.focus();
+                  onForward(item);
+                }}
+              />
+            )}
             {share && <IconButton icon="share" label="Share" className={glassy} onClick={shareIt} />}
             <IconButton icon="download" label="Download" className={glassy} onClick={download} />
           </div>
