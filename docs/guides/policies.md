@@ -296,12 +296,16 @@ nobody else sees who has or has not acknowledged.
 ## 9 · AI and search
 
 - **AI reads** (`policies.ai.js`): `policies.mine` (the policies that apply to the reader, with
-  state and due date, own), `policies.text` (one policy's version in force as text or sentences, for
+  state and due date, own), `policies.read` (one policy's version in force as text or sentences, for
   anyone it applies to; cites the version), `policies.list` (`policies.manage`: every policy with
   its acknowledgement counts). Paged at 25.
 - **AI routes**: read or acknowledge a policy → ESS · Policy Updates; write, publish or change a
   policy → Knowledge Hub · Policies; change the attendance rules → Knowledge Hub · Policies
   (`?policy=attendance`). The AI never writes, publishes or acknowledges (A23).
+- **Tidy With AI** is the AI action `policy-tidy` (prompt `services/ai/prompts/policy-tidy.md`) on the
+  **Default** job (`ai-control.md` §6.2), and it carries personal data, so DeepSeek is never in its
+  chain: chosen by TB, 20/10/2026. It joins AI Control's action registry when that is built
+  (`ai-control.md` decision 24).
 - **Search** (`policies.search.js`): HR find policies by number or title (`policy`, opening
   Knowledge Hub · Policies `?policy=`); everyone finds the published policies that apply to them by
   title (`policy_version`, opening ESS · Policy Updates `?version=`). ⌘K's New Policy opens the form
@@ -364,9 +368,6 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 13 · Open questions
 
-- **The model for Tidy With AI** waits on the AI area convention (the AI integrations PR, 20/10/2026):
-  each area using AI picks its model. TB answers once that PR is open; until then Tidy With AI is
-  built last in PR 1.
 - Further rules types (Leave, Expenses) are added the same way when their modules want them; none is
   decided.
 - A public verification page for a signed policy (A12, the PDF's hash) waits for M5's Verify
@@ -374,5 +375,6 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
-- 20/10/2026 · TB · Built (PR 1): migrations 1400 and 1405, seed 1396, the `policies` module and its contract; Knowledge Hub · Policies (`PoliciesHub.tsx`: the list, a policy opened with `?policy=`, its draft in `PolicyDraft.tsx` with the editor and Tidy With AI or the Attendance worksheet, the publish, submit and reason sheets in `PolicyForms.tsx`, its versions and acknowledgements), ESS · Policy Updates (`PolicyUpdates.tsx`) and the acknowledge sheet (`AcknowledgeSheet.tsx`, mounted by the shell beside the clock prompts); `RichText` added to `packages/ui`. The draft carries the people Applies To names (`applies_to_people`) and a rules policy its type's suggestions (`suggested_rules`). Left: the model Tidy With AI uses (§13).
+- 20/10/2026 · TB · Tidy With AI's job chosen under the AI convention merged from main (#101): Default, carrying personal data, never DeepSeek (§9); the open question on its model is closed.
+- 20/10/2026 · TB · Built (PR 1): migrations 1400 and 1405, seed 1396, the `policies` module and its contract; Knowledge Hub · Policies (`PoliciesHub.tsx`: the list, a policy opened with `?policy=`, its draft in `PolicyDraft.tsx` with the editor and Tidy With AI or the Attendance worksheet, the publish, submit and reason sheets in `PolicyForms.tsx`, its versions and acknowledgements), ESS · Policy Updates (`PolicyUpdates.tsx`) and the acknowledge sheet (`AcknowledgeSheet.tsx`, mounted by the shell beside the clock prompts); `RichText` added to `packages/ui`. The draft carries the people Applies To names (`applies_to_people`) and a rules policy its type's suggestions (`suggested_rules`). Left: nothing in PR 1.
 - 20/10/2026 · TB · Written from TB's decisions of 20/10/2026: Knowledge Hub · Policies brought forward from M10 as the one place for every policy, documents and rules policies (Attendance first), versions from a first day, Applies To, an optional approval route with signatures, Tidy With AI, the letterhead PDF, and acknowledgement on ESS · Policy Updates with a sheet after the clock. Settings · Attendance Policy (#73) is retired into it.
