@@ -427,6 +427,29 @@ describe("small services", () => {
     await expect(routeCheck.assertRoutable({ smtpHost: "", to: "a@b.ng" })).resolves.toBeUndefined();
   });
 
+  test("deliverability: a domain whose mailboxes are on the relay is sent, any other trapped domain refused", async () => {
+    // Staging's shape: the relay is the domain's own host, its MX the host's spam filter.
+    const dns = require("dns/promises");
+    const hosts = { "mycityapp.io": ["198.51.100.7"], "partner.ng": ["198.51.100.7"] };
+    const a = jest.spyOn(dns, "resolve4").mockImplementation(async (h) => hosts[h] || ["203.0.113.9"]);
+    const mx = jest.spyOn(dns, "resolveMx").mockResolvedValue([{ exchange: "mx1-hosting.jellyfish.systems", priority: 10 }]);
+    routeCheck._resetCache();
+    try {
+      const smtpHost = "mycityapp.io";
+      await expect(routeCheck.assertRoutable({ smtpHost, to: ["ada@mycityapp.io"] })).rejects.toMatchObject({ code: "MAIL_ROUTE_TRAPPED" });
+      await expect(
+        routeCheck.assertRoutable({ smtpHost, to: ["Ada Obi <Ada@MyCityApp.io>"], localDomains: "mycityapp.io" }),
+      ).resolves.toBeUndefined();
+      await expect(
+        routeCheck.assertRoutable({ smtpHost, to: ["ada@mycityapp.io", "obi@partner.ng"], localDomains: " other.ng, MyCityApp.io " }),
+      ).rejects.toMatchObject({ code: "MAIL_ROUTE_TRAPPED", details: { domain: "partner.ng" } });
+    } finally {
+      a.mockRestore();
+      mx.mockRestore();
+      routeCheck._resetCache();
+    }
+  });
+
   test("mail text part", () => {
     expect(mail.textOf('<p>Hi <a href="https://x.y">there</a></p><br><style>p{}</style>&amp;')).toBe("Hi there (https://x.y)\n\n&");
   });
