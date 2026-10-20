@@ -18,6 +18,7 @@
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { personJson } = require("../../shared/db/person");
+const lagos = require("../../shared/time/lagos");
 const approvers = require("../../shared/workflow/approvers");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
@@ -651,13 +652,16 @@ async function withoutDay(db, date) {
 
 /**
  * The people a clock-in reminder is due to on a date: at work (active, started, not left), with a
- * login to tell, not on granted leave, with no clock-in that counts and no reminder yet.
+ * login to tell, not on granted leave, with no clock-in that counts and no reminder yet; with
+ * their active logins, whose presence decides whether the push or the app's prompt reaches them.
  */
 async function dueForReminder(db, date) {
   // pagination:complete the watch reminds everyone who is due, not a page of them
   const { rows } = await completeQuery(
     db,
-    `SELECT e.employee_id
+    `SELECT e.employee_id,
+            ARRAY(SELECT u.user_id FROM app_user u
+                   WHERE u.employee_id = e.employee_id AND u.status = 'active' ORDER BY u.user_id) AS user_ids
        FROM employee e
       WHERE e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= $1::date)
         AND (e.left_on IS NULL OR e.left_on > $1::date)
@@ -674,6 +678,26 @@ async function dueForReminder(db, date) {
     { label: "people due a clock-in reminder" },
   );
   return rows;
+}
+
+/**
+ * Whether the session is the first the person signed in with on `date` (Lagos): the earliest
+ * user_session issued that day is theirs. A session kept alive since yesterday, or a second
+ * device that day, is not. One indexed read of identity's sessions (§6.14, the sign-in prompt).
+ * @param {{user_id: string, session_id?: string}} user  req.user (auth sets session_id)
+ */
+async function firstSessionOn(db, user, date) {
+  if (!user.session_id) return false;
+  const row = await one(
+    db,
+    `SELECT s.session_id
+       FROM user_session s
+      WHERE s.user_id = $1 AND s.issued_at >= $2::timestamptz AND s.issued_at < $3::timestamptz
+      ORDER BY s.issued_at, s.session_id
+      LIMIT 1`,
+    [user.user_id, lagos.startOfDay(date), lagos.endOfDayExclusive(date)],
+  );
+  return Boolean(row) && row.session_id === user.session_id;
 }
 
 /** Record a reminder as sent, once: null when it already was. */
@@ -1651,6 +1675,7 @@ module.exports = {
   unclosedDays,
   withoutDay,
   dueForReminder,
+  firstSessionOn,
   recordReminder,
   reminderOn,
   openShifts,

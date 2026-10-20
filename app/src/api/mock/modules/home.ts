@@ -946,7 +946,6 @@ function overviewOf(user: string): HomeOverview {
     on_time: () => (may("people") ? onTimeDonut(user) : null),
     org_kpi: () => (may("performance") ? { kind: "org_kpi", percent: null, departments: DEPARTMENTS.map((name) => ({ department_id: departmentId(name), department: name, percent: null })) } : null),
   };
-  const t = todayOf(user);
   return {
     greeting_name: m.first_name,
     date: todayIso(),
@@ -964,7 +963,6 @@ function overviewOf(user: string): HomeOverview {
     week: weekOf(user, m),
     alerts_to_clear: holds(m, "alerts.clear") ? alertsToClear(user).length : null,
     // The mock keeps one session per tab, so every Overview it answers is the day's first session's.
-    prompt_clock_in: t.state === "not_clocked_in" && t.shift.working_day,
   };
 }
 

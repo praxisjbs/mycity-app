@@ -2022,6 +2022,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
 | `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
 | `dismissible` | `boolean` |  | false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation that must be answered. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -2151,6 +2152,7 @@ The phone's bottom sheet: slides up with a spring, closes by dragging down, a ta
 | `footer` | `ReactNode` |  | Buttons for the footer; the main action is last and full width at the bottom. |
 | `children` | `ReactNode` |  | The body. |
 | `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
