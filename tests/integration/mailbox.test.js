@@ -374,6 +374,37 @@ describeDb("Mailbox against the real migrations", () => {
     expect(past.body.error.fields.release_at).toEqual(["Time already passed"]);
   });
 
+  test("a scheduled draft: edited, it keeps one send that carries the edit; scheduled again, it is replaced; discarded, it never goes", async () => {
+    const draftId = "0b7d2d6e-3f1a-4c8e-9a51-6c2f4e8d9a21";
+    const later = (h) => new Date(Date.now() + h * 3600000).toISOString();
+    const first = await api().post("/mailbox/messages").set("Idempotency-Key", "8a1d6c52-1f3e-4b7a-9c0d-2e5f6a7b8c91").send({ mail_draft_id: draftId, to_addresses: ["ops@partner.test"], subject: "Delivery", body_html: "<p>First words</p>", release_at: later(2) });
+    expect(first.status).toBe(201);
+    const waiting = () => pool.query("SELECT mail_send_queue_id, release_at, payload FROM mail_send_queue WHERE mail_draft_id = $1 AND status = 'queued'", [draftId]).then((r) => r.rows);
+
+    // Edited while scheduled: the waiting send carries what was saved.
+    await api().put(`/mailbox/drafts/${draftId}`).send({ to_addresses: ["ops@partner.test"], cc_addresses: [], bcc_addresses: [], subject: "Delivery", body_html: "<p>Better words</p>", document_ids: [], in_reply_to: null });
+    let rows = await waiting();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].payload.body_html).toBe("<p>Better words</p>");
+
+    // Done (the same time) or a new time: one send replaces the other, never two.
+    const again = await api().post("/mailbox/messages").set("Idempotency-Key", "8a1d6c52-1f3e-4b7a-9c0d-2e5f6a7b8c92").send({ mail_draft_id: draftId, to_addresses: ["ops@partner.test"], subject: "Delivery", body_html: "<p>Final words</p>", release_at: later(3) });
+    expect(again.status).toBe(201);
+    rows = await waiting();
+    expect(rows.map((r) => r.mail_send_queue_id)).toEqual([again.body.mail_send_queue_id]);
+    expect(rows[0].payload.body_html).toBe("<p>Final words</p>");
+    const drafts = (await api().get("/mailbox/threads?folder=drafts")).body.data.filter((d) => d.mail_draft_id === draftId);
+    expect(drafts).toHaveLength(1);
+    // The same press retried keeps the send it made.
+    await api().post("/mailbox/messages").set("Idempotency-Key", "8a1d6c52-1f3e-4b7a-9c0d-2e5f6a7b8c92").send({ mail_draft_id: draftId, to_addresses: ["ops@partner.test"], subject: "Delivery", body_html: "<p>Final words</p>", release_at: later(3) });
+    expect((await waiting()).map((r) => r.mail_send_queue_id)).toEqual([again.body.mail_send_queue_id]);
+
+    // Discarded while scheduled: its send is cancelled, not orphaned.
+    expect((await api().del(`/mailbox/drafts/${draftId}`)).status).toBe(204);
+    const left = await pool.query("SELECT status FROM mail_send_queue WHERE mail_send_queue_id = $1", [again.body.mail_send_queue_id]);
+    expect(left.rows[0].status).toBe("cancelled");
+  });
+
   test("empty Trash removes for good, here and on the server", async () => {
     const t = (await api().get("/mailbox/threads?folder=inbox")).body.data[0];
     await api().post(`/mailbox/threads/${t.mail_thread_id}/move`).send({ to: "trash" });
