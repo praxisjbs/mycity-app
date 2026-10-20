@@ -470,3 +470,10 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
   Edit Notice opens in a modal on desktop and a sheet on a phone; Notification Settings gains a
   Quiet Hours and Digest card. Checked by the `notifications-rules` integration suite and the
   whole `npm run ci`.
+- 20/10/2026 · TB · A notice may now declare its own default channels, where its category's are
+  wrong for it: `defineNotification(key, { channels: { email: true } })`, which sits between the
+  company's rule and the category's default in `categories.isOn()`. A person's own preference and
+  the company's rule still win over it, and Settings · Notifications shows it as the notice's
+  default. Added for Settings · System Health, whose category leaves email off so that only the 24
+  hour escalation reaches an inbox (`docs/guides/system-health.md` §7). No existing notice declares
+  one, so nothing already sent changes.

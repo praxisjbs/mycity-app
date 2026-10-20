@@ -24,6 +24,7 @@ import "./modules/partnerships";
 import "./modules/expenses";
 import "./modules/knowledge";
 import "./modules/settings";
+import "./modules/system_health";
 import "./modules/imports";
 import "./modules/workflow";
 import { dispatch } from "./core";

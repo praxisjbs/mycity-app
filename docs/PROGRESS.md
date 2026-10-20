@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 94 screens (88 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 95 screens (89 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
+| M9 Settings & Governance | 12 | 4 | 0 | 8 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **57** | **0** | **37** | **0** | **0** |
+| **Total** | **95** | **57** | **0** | **38** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -1035,6 +1035,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 95 | System Health | `system-health` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1049,6 +1050,20 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · System Health (#95) built, second tab after Organisation, from TB's brief and
+  answers (`docs/guides/system-health.md`): the readiness checks as they stand, a day or a week of
+  snapshots, and every fault the code reports, grouped on the fingerprint the error reporter already
+  writes, with a status the team shares. Ticking faults downloads one Markdown brief that tells an AI
+  how this repository works and requires 4 to 10 clarity questions before any fix; the ticked faults
+  become Being Handled so nobody fixes one twice. Its own `system_health` permission key, seeded to
+  the Implementation Team and the System Administrator only, so HR, Management and the CEO are never
+  alerted about a stack trace. Backend: contract, migration 9100 (`error_group`, `error_group_note`,
+  `health_snapshot`), seed 9190, eight routes, three schedulers (roll-up and snapshot every 5
+  minutes, the 08:00 digest, the nightly purge). Notices sit in a new locked System Health category:
+  the bell and push cannot be switched off, email only on the 24 hour escalation, through a new
+  per-notice `channels` default on `defineNotification` (`docs/guides/notifications.md`). 30 unit
+  tests and 19 integration tests on the real migrations. Left: walk it on a phone once staging has
+  it; `ops/monitoring` still alerts by WhatsApp for infrastructure, which is unchanged.
 - 19/10/2026 · TB · Notifications (#74), brought forward from M6 to M0 by TB with the rest of the
   notifications work (`docs/handoff/notifications-everywhere.md`, PR 2), built on both shells: the
   Reminders card (Approvals Waiting, Probation Ending, Daily Digest; Edit Reminders) and every

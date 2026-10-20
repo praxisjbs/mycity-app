@@ -97,6 +97,7 @@ const SCREENS = Object.freeze({
   praxis_ai: ["ask", "history"],
   settings: [
     "organisation",
+    "system-health",
     "users",
     "roles-and-permissions",
     "approvals",

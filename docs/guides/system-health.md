@@ -9,7 +9,7 @@
 | Permission key(s) | `system_health` |
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #95 |
-| Status | Draft |
+| Status | Built |
 | Last changed | 20/10/2026 |
 
 ---
@@ -217,6 +217,8 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 |---|---|---|
 | none | | The shape of the fault list, the shared status and the Markdown brief follow a working pattern from another operations console, rewritten here against Postgres, the contract, the fan-out and the export pipeline. No file is copied |
 
+As built: the roll-up lives in the worker rather than the error reporter, because the reporter writes on a path that has already gone wrong and its own comment says a reporter that breaks the thing it reports on is worse than none. `text/markdown` was added to `shared/files/sniff.js` so an export file may be `.md`; no upload purpose lists it, so nothing new can be uploaded.
+
 ## 13 · Open questions
 
 - The per-notice `channels` option on `defineNotification` (§7) is a change to shared fan-out code
@@ -228,6 +230,7 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Built. 30 unit tests and 19 integration tests on the real migrations: who may open it, the roll-up and its idempotence, a fault coming back, the brief the worker writes and who may download it, the snapshot and the chart, the 24 hour escalation reaching email once a day, the digest, and the purge leaving the fault itself behind.
 - 20/10/2026 · TB · Written. Settings · System Health agreed as one tab after Organisation, with its
   own `system_health` permission key granted to the Implementation Team and the System Administrator
   only; faults grouped on the existing fingerprint with a shared status; push and in-app to every

@@ -500,6 +500,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
+| M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days, snapshots after 30, nightly) |
 | M10 | `knowledge-embed` | |
 
 `partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's
