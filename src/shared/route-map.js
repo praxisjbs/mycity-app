@@ -327,10 +327,11 @@ const ENTITY_ROUTES = Object.freeze({
   numbering_scheme: screen("settings", "documents-and-numbering"),
   public_holiday: screen("settings", "organisation"),
   template: screen("settings", "documents-and-numbering"), // search:none not built yet (src/modules/templates)
-  integration: screen("settings", "integrations"), // search:none not built yet (src/modules/integrations)
-  // Status, Performance and Faults sit in Settings but are held by system_health, not settings
-  // (docs/guides/system-health.md §8): `permission` is what a viewer must hold to open them.
-  // A fault opens its sheet on Faults; a check going down or coming back, and the digest, open Status.
+  // Status, Performance, Faults and Integrations sit in Settings but are held by keys of their
+  // own (docs/guides/system-health.md §8, integrations.md §8): `permission` is what a viewer must
+  // hold to open them. A fault opens its sheet on Faults; a check going down or coming back, and
+  // the digest, open Status.
+  integration: { ...screen("settings", "integrations"), permission: "integrations" }, // search:none five connections, each found as the Integrations screen by its name (shared/search/screens.js)
   error_group: { ...screen("settings", "faults"), permission: "system_health" }, // search:none faults are found on Settings · Faults with its filters, not by name: a fingerprint is not a word anybody types
   health_snapshot: { ...screen("settings", "status"), permission: "system_health" }, // search:none a snapshot is a moment of the readiness checks; its notices open Status
   performance_target: { ...screen("settings", "performance"), permission: "system_health" }, // search:none one row for the organisation, changed with Edit Targets on Performance

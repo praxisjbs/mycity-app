@@ -99,6 +99,8 @@ async function start() {
       await stopBeat().catch(() => {});
       await require("./shared/observability/request-stats").flush().catch(() => {});
       await flush().catch(() => {});
+      // The connections' counted use (Settings · Integrations), before the pool closes.
+      await require("./shared/integrations/usage").stop();
       await Promise.allSettled([closeRedis(), closeDb()]);
       process.exit(0);
     };

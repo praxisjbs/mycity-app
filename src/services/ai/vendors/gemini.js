@@ -184,11 +184,51 @@ async function complete({
   };
 }
 
+/**
+ * The models a key may use (GET /models). It costs nothing, so Settings · Integrations checks
+ * a key with it (docs/guides/integrations.md §6.3). Errors as complete(): a VendorError with
+ * the status (Google answers 400 to a key that is not valid).
+ * @param {{apiKey: string, timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<string[]>} the model names, without "models/"
+ */
+async function listModels({ apiKey, timeoutMs = 20_000, fetchImpl = fetch }) {
+  if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetchImpl(`${BASE_URL}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: ctrl.signal,
+    });
+  } catch (err) {
+    if (err && err.name === "AbortError")
+      throw new VendorError(`gemini: no answer within ${timeoutMs} ms`, "timeout");
+    throw new VendorError(`gemini: ${err && err.message}`, "transient");
+  } finally {
+    clearTimeout(timer);
+  }
+  const raw = await res.text();
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    const detail = (data && data.error && (data.error.message || data.error.status)) || raw.slice(0, 300);
+    throw new VendorError(`gemini ${res.status}: ${detail}`, classify(res.status), res.status);
+  }
+  const list = (data && Array.isArray(data.data) && data.data) || [];
+  return list.map((m) => String((m && m.id) || "").replace(/^models\//, "")).filter(Boolean);
+}
+
 module.exports = {
   name: "gemini",
   BASE_URL,
   VendorError,
   complete,
+  listModels,
   toolSchema,
   reasoningEffort,
   classify,

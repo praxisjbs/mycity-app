@@ -123,6 +123,12 @@ const MODULE_CATALOG = [
     label: "System Health",
     description: "Readiness checks, performance over time, and the faults the code reports",
   },
+  {
+    key: "integrations",
+    area: "system",
+    label: "Integrations",
+    description: "Mail, maps, AI and push settings, their keys kept encrypted, tested and watched",
+  },
 ];
 
 /** Every permission check names one of these. It is `edit`, never `update`. */

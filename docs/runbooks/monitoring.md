@@ -34,9 +34,11 @@ What each check means when it is not `up`:
 | `outbox` | events are piling up (the worker is behind or down) | the worker |
 | `storage` | the media folder is missing or not writable | `/srv/mycity/<env>/media` |
 | `chromium`, `ffmpeg`, `clamd` | PDFs, voice and video, or upload scanning are unavailable | `ops/provision/provision.sh` installs them; `systemctl status clamav-daemon` |
-| `mail` | SMTP is not configured or refuses. When up it shows `sent_last_hour` of `per_hour`: at the limit, system mail waits for a slot (it is not lost) | `SMTP_*` and `MAIL_SEND_PER_HOUR` in the `.env`; `docs/runbooks/dns-and-mail.md` §4 |
+| `mail` | SMTP is not configured or refuses. When up it shows `sent_last_hour` of `per_hour`: at the limit, system mail waits for a slot (it is not lost) | Settings · Integrations, System Sender (else `SMTP_*` and `MAIL_SEND_PER_HOUR` in the `.env`); `docs/runbooks/dns-and-mail.md` §4 |
+| `mail_server` | The staff mail server's newest check failed: not found, no answer, or its TLS or certificate refused. Read from the stored state, never a live call | Settings · Integrations, Staff Mail Server: Test and its Checks; `docs/runbooks/dns-and-mail.md` §4 |
+| `maps` | Geoapify's newest test or call failed (key refused, over the day's quota), or its saved key cannot be read. Not set up when there is no key: address fields then take a typed address | Settings · Integrations, Geoapify: Test, Use and Checks |
 | `static` | a frontend build is missing from the release | the release; `deploy.md` |
-| `ai` | which AI vendor answers (Gemini or the stub), from settings only | AI settings |
+| `ai` | which AI vendor answers (Gemini or the stub), from settings only | AI settings; the key on Settings · Integrations, Gemini |
 
 ## 2 · Errors that alert
 

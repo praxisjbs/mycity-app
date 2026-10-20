@@ -118,7 +118,10 @@ const SCREENS = Object.freeze([
   s("settings", "notifications", "Notifications", ["notification settings", "alerts settings", "email settings"]),
   s("settings", "appearance", "Appearance", ["theme", "dark mode", "branding"]),
   s("settings", "documents-and-numbering", "Documents & Numbering", ["numbering", "number format", "document numbers", "prefixes"]),
-  s("settings", "integrations", "Integrations", ["integration", "connect", "api keys"]),
+  s("settings", "integrations", "Integrations", [
+    "integration", "connect", "api keys", "smtp", "mail server", "no-reply", "imap", "system sender",
+    "geoapify", "maps key", "address search", "gemini", "ai key", "web push", "vapid", "push keys",
+  ]),
   s("settings", "security", "Security", ["password rules", "sessions", "two step", "failed sign ins"]),
   s("settings", "audit-log", "Audit Log", ["audit", "history", "who changed", "activity log"]),
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
@@ -153,6 +156,8 @@ function tabVisible(screen, reader) {
   // Status, Performance and Faults sit in Settings but are held by system_health
   // (docs/guides/system-health.md §8), as the shell shows them (app/src/shell/access.ts).
   if (screen.module === "settings" && SYSTEM_HEALTH_TABS.includes(screen.tab)) return reader.is_ceo || can("system_health");
+  // Integrations is the IT team's: its own key, not Settings' (docs/guides/integrations.md §8).
+  if (screen.module === "settings" && screen.tab === "integrations") return reader.is_ceo || can("integrations");
   if (!can(screen.module)) return false;
   const full = can("settings") || reader.is_ceo;
   const { module, tab } = screen;

@@ -8,9 +8,9 @@
 | Frontend paths | `app/src/features/mailbox/` |
 | Permission key(s) | `mailbox` |
 | Capabilities | `mailbox.signature` (Configure Signature): the company links and what shows on everyone's signature (§8) |
-| Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash, #94 Signature; connection under Settings · Integrations; the brand files under Settings · Organisation (#69, `docs/guides/foundation.md`) |
+| Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash, #94 Signature; the staff mail server's settings under Settings · Integrations (#77, `docs/guides/integrations.md`); the brand files under Settings · Organisation (#69, `docs/guides/foundation.md`) |
 | Status | Built |
-| Last changed | 19/10/2026 |
+| Last changed | 20/10/2026 |
 
 Sources: MILESTONES §6.5 and D6; REUSE_MAP §2.5; the internal workflow meeting of 12 October 2026.
 The demo (`demo.html`, Mailbox) was updated the same day with the composer described here. Email
@@ -50,7 +50,7 @@ company's links and what shows are set once, with Configure, by the holders of
 | Composer (modal; full screen on mobile) | Staff app | Owner | From, To, Cc, Bcc, Subject, rich text body, attachments; the signature that will be added, behind Show Signature | Write, format, attach, send now or schedule, discard; preview the signature |
 | Mailbox · Signature (`signature`) | Staff app | Every employee with `mailbox` view, their own | Their signature as it sends (New Mail, or Reply for the slim line), the details it is built from, their numbers | Edit Numbers (mobile, office line); show or hide the mobile and its WhatsApp link; Copy Signature |
 | Configure Signature (wizard over the Signature tab) | Staff app | `mailbox.signature` holders | The company's app and social links, and what shows on everyone's signature | Set the App Store and Google Play links, six social links, the confidentiality note; switch WhatsApp links, app links, social links and the legal line on or off |
-| Settings · Integrations, mailbox connection | Staff app | Owner | Connection status, last sync | Reads the connection; connecting happens in Mailbox |
+| Settings · Integrations, Staff Mail Server | Staff app | IT (`integrations` view) | The IMAP and SMTP hosts and ports every mailbox uses, the hourly limit per person, the sync interval and the live connections; no person's mailbox (TB, 20/10/2026: connecting stays in Mailbox) | IT changes them; a change re-points every mailbox (§3 step 11) |
 | Notification bell | Staff app | Owner | New mail (per Settings · Notifications) | Open the thread |
 
 ## 3 · How the screens relate
@@ -58,7 +58,8 @@ company's links and what shows are set once, with Configure, by the holders of
 1. **Connect** (the Connect sheet, which opens over Mailbox the first time it is opened with no
    connection; GE, 17/10/2026): address and password →
    `autodiscover` uses the address's own domain as the IMAP and SMTP host (`mycityapp.io`, the name
-   on the host's certificate; the `MAILBOX_*` settings override it) → `POST /connection` signs in to both before anything is saved → the password is stored
+   on the host's certificate; the staff mail server's hosts on Settings · Integrations override it,
+   else the `MAILBOX_*` fallback in the server file) → `POST /connection` signs in to both before anything is saved → the password is stored
    encrypted in `integration_secret` under `mail_conn:<id>`, never on the connection row. The first
    sync starts at once (`mail_account.connected` → `mail-sync`).
 2. **Sync**: the worker's `mail-sync` scheduler and the `mail-idle` loop (IMAP IDLE) pull new mail
@@ -125,6 +126,13 @@ company's links and what shows are set once, with Configure, by the holders of
 10. **Brand files** (Settings · Organisation, `docs/guides/foundation.md`). The white logo, when
    uploaded, replaces the drawn pin and the company name on the band; until then the band carries
    the app's own pin and the company's name. Replacing a file changes the next signature at once.
+11. **The staff mail server moves** (Settings · Integrations, `docs/guides/integrations.md` §3 step
+   8): on `integration.saved` or `integration.removed` for `mailbox_server`, this module's outbox
+   handler re-points every connected mailbox at the new hosts (the same autodiscover as Connect,
+   `mail_account.server_moved`, audited) and queues a sync for each, which is its retest: a refused
+   password marks it `needs_reconnect` as in step 2. The IDLE loop re-reads the settings every 30
+   seconds and reopens its connections on the new hosts; the sync interval and the live connections
+   apply at the next tick.
 
 ## 4 · Data
 
@@ -217,8 +225,8 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
 - **The mail host's limits** (Namecheap plan, `docs/runbooks/dns-and-mail.md` §4): IMAP and SMTP
   at `mycityapp.io` (993, 465), strict certificate check on that name. At most **30 IMAP connections
   at once from one IP address**, and production and staging share the server's address: production
-  holds at most one IDLE connection per connected mailbox, up to 24 (`MAILBOX_IDLE_MAX`, 24 on
-  production when unset), and syncs with one short-lived connection at a time; mailboxes beyond that
+  holds at most one IDLE connection per connected mailbox, up to 24 (Live Connections on Settings ·
+  Integrations, else `MAILBOX_IDLE_MAX`, 24 on production when unset), and syncs with one short-lived connection at a time; mailboxes beyond that
   are polled. Staging holds up to 4 (its default) and syncs with one connection at a time, so the
   two stay inside 30 (TB, 19/10/2026: new mail is noticed the moment it lands on both). People's own phones and webmail
   connect from other addresses and do not count. **30 mailboxes** on the plan. **50 recipients an
@@ -229,21 +237,25 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
 
 | Event / job | When | Does |
 |---|---|---|
-| `mail-sync` (scheduler, every `MAILBOX_SYNC_EVERY_MIN` minutes) | On schedule | Syncs every connected mailbox, then flushes due mail from the send queue |
+| `mail-sync` (scheduler, ticks every minute) | Once Sync Every minutes have passed since the last full pass (Settings · Integrations, else `MAILBOX_SYNC_EVERY_MIN`) | Syncs every connected mailbox, then flushes due mail from the send queue |
 | `mail-sync` (handler) | `mail_account.connected`, `mail_account.sync_requested`, IDLE | Syncs one mailbox |
-| `loops/mail-idle` | Continuously in the worker, up to `MAILBOX_IDLE_MAX` mailboxes (unset: 24 on production, 4 on staging, 0 on laptops) | IMAP IDLE on the inbox; new mail enqueues `mail-sync` |
-| `mail-send` | `mail_message.queued`, delayed to `release_at` | Delivers through SMTP, paced to `MAILBOX_SEND_PER_HOUR`; files it in Sent; classifies failures (`smtp-errors`) |
+| `loops/mail-idle` | Continuously in the worker, up to Live Connections mailboxes (Settings · Integrations, else `MAILBOX_IDLE_MAX`; unset: 24 on production, 4 on staging, 0 on laptops), re-read every 30 seconds | IMAP IDLE on the inbox; new mail enqueues `mail-sync`; a change of host, port or limit closes the connections and opens them again within it |
+| `mail-send` | `mail_message.queued`, delayed to `release_at` | Delivers through SMTP, paced to the Hourly Limit per Person (Settings · Integrations, else `MAILBOX_SEND_PER_HOUR`); files it in Sent; classifies failures (`services/mail/smtp-errors.js`, shared with the integration tests) |
 | `mail_message.received` | New inbound message | Notification to the owner: the sender as the title, the subject and the message's first line as the text (`payload.preview`); on a phone a conversation's mail shares one notification (`docs/guides/notifications.md` §6). Reading the conversation marks its notices read |
 | `mail_account.needs_reconnect` | The server refused the saved password | Notification to the owner; banner in Mailbox |
+| `mail_account.server_moved` | The staff mail server's hosts changed on Settings · Integrations (§3 step 11) | Audit; the mailbox is re-pointed and a sync queued |
 | `mail_message.sent` / `mail_send.failed` | After delivery or a permanent failure | Updates the queue; notifies on failure |
 | `mail_account.connected` / `disconnected`, `mail_thread.moved`, `mail_folder.emptied` | As named | Audit; `mailbox.updated` to the owner's socket |
 | `mail_account.images_trusted` | Always Show Images or Stop Showing Images | Audit |
 | `mail_signature.changed` | A person saves their numbers or switches | Audit (the mobile's own change is the organisation service's `employee.updated`) |
 | `mail_signature.config_changed` | Configure saved | Audit, with the links before and after |
 
-Settings (`.env`, group Mailbox): `MAILBOX_IMAP_HOST`, `MAILBOX_IMAP_PORT`, `MAILBOX_SMTP_HOST`,
-`MAILBOX_SMTP_PORT`, `MAILBOX_TLS`, `MAILBOX_SEND_PER_HOUR`, `MAILBOX_SYNC_EVERY_MIN`,
-`MAILBOX_IDLE_MAX`.
+Settings: the staff mail server on Settings · Integrations (`docs/guides/integrations.md` §6.3: the
+IMAP and SMTP hosts and ports, the hourly limit per person, Sync Every and Live Connections), read
+through `shared/integrations/settings.js`. The server file's `MAILBOX_IMAP_HOST`, `MAILBOX_IMAP_PORT`,
+`MAILBOX_SMTP_HOST`, `MAILBOX_SMTP_PORT`, `MAILBOX_SEND_PER_HOUR`, `MAILBOX_SYNC_EVERY_MIN` and
+`MAILBOX_IDLE_MAX` (group Mailbox) are the fallback when nothing is saved there. `MAILBOX_TLS` stays
+in the file only (off for a local test server).
 
 ## 8 · Permissions and visibility by role
 
@@ -288,7 +300,7 @@ interface copy; the copy rules apply to the chrome around them.
 | Mailbox · Signature (`signature`) | Signature as the title; Configure in the header for `mailbox.signature` holders; Your Signature: New Mail and Reply (a segmented switch), the signature in its own frame exactly as it sends, Copy Signature; Details: Name, Job Title, Department, Email; Numbers: Mobile, Office Line, the switches Show Mobile and WhatsApp Link (WhatsApp Link only when the company allows it), Edit Numbers. Edit Numbers (a modal): Mobile, Office Line (Optional); Cancel, Save Numbers; "Not a phone number" on the field. Toasts: "Numbers saved", "Signature copied" (or "Not copied. Try again."), "Mobile hidden", "Mobile shown", "WhatsApp link off", "WhatsApp link on" | Help term on the Details title: "From your employee record and your mailbox. People change your name, title and department." | The one design and why: §1. What each line is made of and where it comes from: §3 step 7. Full or slim, and where it lands in a message: §3 steps 8 and 9. Pictures sent inside the message: §3 step 9. Dark mode and phone widths: §6 |
 | Configure Signature (wizard) | Configure Signature as the title; three steps: App Links (App Store, Google Play, each Optional), Social Links (Instagram, TikTok, LinkedIn, X, Facebook, YouTube, each Optional), What Shows (WhatsApp Links, App Links, Social Links, Legal Line as checkboxes; Confidentiality Note, Optional); Back, Next, Save Signature; "Not a web address" on a link field. Toast: "Signature saved" | Help term on Confidentiality Note: "Printed under the company line with the RC number from Settings, Organisation, when Legal Line is ticked." (A checkbox's label cannot carry a help term: it would join the label.) | Who may configure: §8. An empty link shows nothing: §6 |
 | Mailbox · Connect (sheet) | Connect Mailbox as the title; Email Address, Password; Connect. On a refused password the banner over the list reads "Mail server refused the password" with Reconnect. Errors of at most 4 words on the field: "Not an email address", "Password refused", "Mail server not found" | None | Autodiscover, the test in both directions and where the password is kept: §3 step 1, §4 |
-| Settings · Integrations, mailbox connection | Owned by Settings · Integrations: that module's guide | That module's guide | How the connection is tested and where the password is kept: §3 step 1, §4 |
+| Settings · Integrations, Staff Mail Server | Owned by Settings · Integrations: that module's guide | That module's guide | How a mailbox is tested and where its password is kept: §3 step 1, §4 |
 | Notification bell | Owned by the frontend foundation (FRONTEND_GUIDE §9.6): the sender and subject; a tap opens the message | None | Which mail notifies: §7, Settings · Notifications |
 
 ### 10.2 Phone layout
@@ -301,16 +313,19 @@ interface copy; the copy rules apply to the chrome around them.
 | Mailbox · Signature (`signature`) | Your Signature first: the New Mail and Reply switch full width (44 px segments), the signature at full width (it is at most 400 px, so it is never shrunk), Copy Signature as a 44 px icon button; then Numbers with its two switches; Configure as a 44 px icon button beside the title for holders | The Details card: a Details row at the foot of Numbers, closed, opening Name, Job Title, Department and Email as a bottom sheet | Edit Numbers opens a bottom sheet, Save Numbers full width at its foot | Mailbox from More; the seven tabs scroll sideways along the top |
 | Configure Signature (wizard) | A full screen sheet: the step number and title, the step's fields, Next full width at the bottom | Nothing: the same steps as desktop | Save Signature full width on the last step | Close at the top of the sheet; Back on the steps after the first |
 | Mailbox · Connect (sheet) | A bottom sheet: Email Address, Password, Connect full width | Nothing | Connect | Opens by itself over Mailbox; Close returns to the menu |
-| Settings · Integrations, mailbox connection | Owned by Settings | That module's guide | That module's guide | That module's guide |
+| Settings · Integrations, Staff Mail Server | Owned by Settings · Integrations | That module's guide | That module's guide | That module's guide |
 | Notification bell | The bell in the top bar; push on the phone | None | A tap opens the message in the full screen reader | The top bar |
 
 ## 11 · Edge cases
 
 - **Wrong password / server refuses**: the connection test fails with the classified reason and
-  the fix (`smtp-errors.js`): "Password refused" or "Mail server not found" on the field; nothing is
+  the fix (`services/mail/smtp-errors.js`): "Password refused" or "Mail server not found" on the field; nothing is
   saved.
 - **Password changed on the mail server**: sync fails → connection marked `needs_reconnect` → a
   banner in Mailbox with **Reconnect**, which opens the Connect sheet with the address filled in.
+- **The staff mail server moves** (§3 step 11): every connected mailbox is re-pointed and synced; one
+  whose password the new server refuses goes to `needs_reconnect` with the same banner. A message
+  queued before the move is delivered through the new hosts.
 - **First sync of a large mailbox**: read in batches from the last UID; each run takes the next
   batch until the folder is caught up.
 - **Hard-bounced recipient**: the send fails with `RECIPIENT_REFUSED` and the sender is notified.
@@ -378,3 +393,9 @@ interface copy; the copy rules apply to the chrome around them.
   Notifications (`docs/guides/notifications.md` §6) and take no copies.
 - 19/10/2026 · TB · §1 and §10: Forward to Chat beside each attachment and in the file viewer sends the file to up to 5 Staff Community chats (`docs/guides/community.md` §3 step 19, `POST /community/forward` with `mail_attachment_id`); only the mailbox's owner, only a file scanned clean and of a type chats take, never from Spam (§6).
 - 20/10/2026 · GE · From a test on staging: scheduling a scheduled draft again added a second send (it showed twice in Drafts and would have gone twice), its edits never reached the waiting send, and Discard left the send to go anyway. Now one waiting send per draft (`1128` cancels the doubles and indexes the rule), autosave keeps it in step, Discard cancels it, and Edit Scheduled Mail has the time and Done in its footer (§3 step 5, §4, §10).
+- 20/10/2026 · TB · Settings · Integrations (#77, `docs/guides/integrations.md`, TB's answer 12,
+  "Nothing here"): mailbox connections stay in Mailbox and no person's mailbox is on that page. The
+  staff mail server's hosts, ports, hourly limit per person, sync interval and live connections
+  move there, with the `MAILBOX_*` variables as the fallback; a change re-points every mailbox
+  (`mail_account.server_moved`) and syncs it as its retest (§3 step 11, §7, §11). The sync scheduler
+  ticks every minute to honour a changed interval; `smtp-errors.js` moved to `services/mail/`.

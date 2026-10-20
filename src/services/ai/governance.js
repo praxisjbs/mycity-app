@@ -16,10 +16,12 @@
  *   monthly_cap_ngn         spend ceiling for the Lagos calendar month; NULL is no cap
  *   input/output_ngn_per_million  token prices, so the spend is in naira
  * With no row (or before migration 0095), the defaults come from the environment:
- * enabled, Gemini when GEMINI_API_KEY is set, no cap, the AI_*_NGN_PER_MILLION prices.
+ * enabled, Gemini when it has a key, no cap, the AI_*_NGN_PER_MILLION prices.
  *
  * Which vendor answers: "gemini" with a key; the stub otherwise, never an error
- * (a missing key is a configuration the product supports: CI, laptops, staging).
+ * (a missing key is a configuration the product supports: CI, laptops, staging). The key
+ * is Settings · Integrations' (shared/integrations/settings.js: saved there, else
+ * GEMINI_API_KEY in the server file; docs/guides/integrations.md §6.3).
  *
  * Spend is computed from the tokens each step recorded and the prices recorded with
  * it, summed for the month and rounded once at the end. Rounding each call to the
@@ -29,16 +31,20 @@
  */
 const { config } = require("../../config/env");
 const { AppError } = require("../../shared/errors");
+const integrations = require("../../shared/integrations/settings");
 const catalog = require("../../shared/access/access.catalog");
 const money = require("../../shared/money/money");
 const lagos = require("../../shared/time/lagos");
 
 const VENDORS = new Set(["gemini", "stub"]);
 
-function defaults() {
+/** Gemini's key in use, or null: AI then answers from the stub. */
+const keyOf = (db) => integrations.secret("gemini", "api_key", { db });
+
+function defaults(apiKey = null) {
   return {
     enabled: true,
-    vendor: config.GEMINI_API_KEY ? "gemini" : "stub",
+    vendor: apiKey ? "gemini" : "stub",
     model: config.GEMINI_MODEL,
     disabled_modules: [],
     monthly_cap_ngn: null,
@@ -55,7 +61,7 @@ const str2 = (v) =>
  * @param {{query: Function}} db
  */
 async function settings(db) {
-  const base = defaults();
+  const base = defaults(await keyOf(db));
   let row = null;
   try {
     const { rows } = await db.query(
@@ -83,8 +89,8 @@ async function settings(db) {
 }
 
 /** The vendor that will answer: the setting, falling back to the stub without a key. */
-function vendorFor(s) {
-  return s.vendor === "gemini" && config.GEMINI_API_KEY ? "gemini" : "stub";
+function vendorFor(s, apiKey) {
+  return s.vendor === "gemini" && apiKey ? "gemini" : "stub";
 }
 
 /**
@@ -160,10 +166,13 @@ async function check(db, { module, now = new Date() }) {
       429,
     );
   }
+  const apiKey = await keyOf(db);
   return {
     settings: s,
-    vendor: vendorFor(s),
+    vendor: vendorFor(s, apiKey),
     model: s.model,
+    /** For the vendor call only; never logged, stored or sent anywhere else. */
+    api_key: apiKey,
     spent_ngn: spent,
     cap_ngn: s.monthly_cap_ngn,
   };
@@ -173,10 +182,11 @@ async function check(db, { module, now = new Date() }) {
 async function health(db) {
   try {
     const s = await settings(db);
+    const vendor = vendorFor(s, await keyOf(db));
     return {
       status: "up",
-      vendor: vendorFor(s),
-      model: vendorFor(s) === "stub" ? "stub" : s.model,
+      vendor,
+      model: vendor === "stub" ? "stub" : s.model,
       enabled: s.enabled,
     };
   } catch (err) {

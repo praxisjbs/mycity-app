@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #74 Settings · Notifications (brought forward from M6); the bell, its pane, the banner, the urgent bar and Notification Settings are shell parts on every screen |
 | Status | Built |
-| Last changed | 19/10/2026 |
+| Last changed | 20/10/2026 |
 
 TB's decisions of 19/10/2026 and their build logs are in `docs/handoff/push-notifications.md` (web
 push, the banner, the pane) and `docs/handoff/notifications-everywhere.md` (urgency, every device,
@@ -104,7 +104,7 @@ left alone.
 | `notification_preference` | `user_id`, `category`, `channel`, `enabled` | A row only where the person changed a default |
 | `push_subscription` | `push_subscription_id`, `user_id`, `endpoint` (unique), `p256dh`, `auth`, `expires_at`, `revoked_at`, and from `0460`: `known_device_id`, `label`, `platform`, `device_token_hash`, `vapid_key_id`, `last_seen_at`, `last_success_at`, `last_failure_at`, `failure_count`, `last_error`, `revoked_reason` (`turned_off`, `refused`, `moved`, `signed_out`, `suspended`, `left`) | One per browser install. Subscribing again from the same browser updates the row and moves it to whoever is signed in; `device_token_hash` is the hash of the token its service worker shows (§5) |
 | `push_delivery` (new, `0460`) | `push_delivery_id`, `notification_id` (null for a test), `push_subscription_id`, `status` (`sent`, `failed`, `gone`, `skipped_read`), `http_status`, `error`, `attempts`, `sent_at`, and from `0470`: `round` (0 the first alert, then each urgent repeat) | Unique per (notification, subscription, round): a retried job sends only to the devices still owed |
-| `integration_secret` | provider `web_push`, key `vapid` | The environment's VAPID pair, encrypted with `ENCRYPTION_KEY`, made the first time a browser asks for it (`GET /push/config`) when `.env` gives none |
+| `integration_secret` | provider `web_push`, key `vapid` | The environment's VAPID pair, encrypted with `ENCRYPTION_KEY` (bound to its row from `9200`), made the first time a browser asks for it (`GET /push/config`) when `.env` gives none, or by Replace Keys on Settings · Integrations |
 | `notification_rule` (new, `0480`) | `notification_rule_id`, `event_key` (unique), `enabled`, `urgency` (null: as the code says), `in_app`, `email`, `push` (each null: the category's default), `updated_by`, `updated_at` | The company's rule for one notice. A row only where People changed something; Reset to Default deletes it |
 | `notification_rule_recipient` (new, `0480`) | `notification_rule_recipient_id`, `notification_rule_id`, `role_id` or `user_id` (exactly one) | The roles and people a notice is copied to. Unique per rule and role, per rule and person |
 | `notification_reminder_rule` (new, `0480`) | `notification_reminder_rule_id`, `reminder_key` (`approvals`, `probation`, `digest`, unique), `enabled`, `every_hours`, `days_ahead`, `at_time`, `updated_by`, `updated_at` | The company's reminders. A row only once People save one; until then the defaults in §6 apply |
@@ -201,9 +201,12 @@ Reference-data file(s): none.
 - **The urgent bar.** Shows the newest open urgent notice and how many are open; Acknowledge or
   Open closes it there and on every other device (`notification_read`), and the next one shows. It
   pulses slowly (once every 2 s, never flashing); with reduced motion it is steady red.
-- **Keys.** The VAPID pair comes from `.env` when both halves are set, else from `integration_secret`,
-  else it is generated once, the first time a browser asks for it, and stored. Subject
-  `VAPID_SUBJECT` (`mailto:jbspraxisllc@gmail.com`).
+- **Keys.** Kept on Settings · Integrations, Web Push (`docs/guides/integrations.md` §6.3, §6.6): the
+  pair stored in `integration_secret` wins (made there the first time a browser asked, or by
+  Replace Keys), else `.env`'s when both halves are set, else one is generated once and stored. A
+  server that has always used `.env`'s pair keeps it, since none was ever stored beside it. Subject:
+  the one saved there, else `VAPID_SUBJECT` (`mailto:jbspraxisllc@gmail.com`). Replace Keys changes
+  the key id, so every device subscribes again the next time the app starts (§3).
 
 **Settings · Notifications (TB, 19/10/2026)**
 
@@ -487,3 +490,4 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
   hour escalation reaches an inbox (`docs/guides/system-health.md` §7). No existing notice declares
   one, so nothing already sent changes.
 - 20/10/2026 · GE · §7: `notification.withdrawn`. `service.withdrawForRecord(entityType, entityId)` takes down the unopened notices of a record that was itself taken down; Staff Community calls it when a published announcement is archived (TB's review, 19/10). TB to review.
+- 20/10/2026 · TB · Web push keys on Settings · Integrations (`docs/guides/integrations.md`): the pair stored there wins over `.env`'s, the subject is saved there, Replace Keys makes a new pair (devices subscribe again at their next start), and each push is counted as the connection's use (§4, §6).

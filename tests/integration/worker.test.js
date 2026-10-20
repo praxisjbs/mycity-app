@@ -599,6 +599,8 @@ describe("schedules and heartbeat", () => {
       "export-cleanup",
       "home-alert-sweeps",
       "import-cleanup",
+      "integrations-purge",
+      "integrations-watch",
       "mail-sync",
       "media-reconcile",
       "reminders",

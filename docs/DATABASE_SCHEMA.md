@@ -416,7 +416,12 @@ later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed · `9100
 `request_stat`, resource columns on `health_snapshot`) · `9120` Settings · Performance
 (`perf_sample`, `route_stat`, `process_beat`, `performance_target`, latency buckets on
 `request_stat`, run times on `schedule_run`, `perf_percentile()`; `docs/guides/system-health.md`
-§4) · `9190` seed (the `system_health` grants).
+§4) · `9190` seed (the `system_health` grants) · `9200` Settings · Integrations, brought forward by TB on
+20/10/2026 (`docs/guides/integrations.md` §4): `integration_connection` gains the saved settings'
+time and author, a daily limit and its state, `integration_secret` a hint and who set it, and two
+new tables, `integration_check` (each test, 90 days) and `integration_usage` (calls a day per kind,
+30 days) · `9290` seed: the `integrations` grant for the Implementation Team and the System
+Administrator.
 
 **Owes:** nothing from this list since 17/10/2026: two-step required per role and editing roles and
 their grants on screen came forward to M0 with foundation track C (`0400`, `0449`;

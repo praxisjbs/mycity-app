@@ -3,7 +3,8 @@
  * Settings screen shows and stores: MX, SPF, DKIM, DMARC for the domain, and PTR
  * and RBL standing for the IP our relay sends from.
  *
- *   const { rows } = await check.checkOne("mycityapp.io", { smtpHost: config.SMTP_HOST });
+ *   const { rows } = await check.checkOne("mycityapp.io", { smtpHost: "mycityapp.io" });
+ *   const { rows } = await check.checkSender();     // the system sender in use
  *
  * Storing the rows, and telling the CEO when a record that passed now fails
  * (evaluate.regression), is the Settings module's job (M9): this file only looks.
@@ -35,7 +36,7 @@ async function resolveIpv4(host) {
  */
 async function checkOne(
   domain,
-  { smtpHost = config.SMTP_HOST || null, ip = null } = {},
+  { smtpHost = null, ip = null } = {},
 ) {
   const base = await dnsCheck.checkDomain(domain, { smtpHost });
   const sendingIp = ip || (await resolveIpv4(smtpHost));
@@ -59,11 +60,15 @@ async function checkOne(
   return { domain: base.domain, rows, checked_at: base.checked_at };
 }
 
-/** The domain system mail is sent as (MAIL_FROM), checked. */
-function checkSender() {
-  const domain = dnsCheck.senderDomain(config.MAIL_FROM);
-  if (!domain) throw new Error("MAIL_FROM has no domain");
-  return checkOne(domain);
+/**
+ * The domain system mail is sent as, checked against the server it goes through: the
+ * system sender in use (Settings, Integrations, else the server file).
+ */
+async function checkSender() {
+  const s = await require("../../../shared/integrations/settings").of("mail_sender");
+  const domain = dnsCheck.senderDomain(s ? s.values.from : config.MAIL_FROM);
+  if (!domain) throw new Error("the system sender's From has no domain");
+  return checkOne(domain, { smtpHost: s ? s.values.host : null });
 }
 
 module.exports = { checkOne, checkSender };

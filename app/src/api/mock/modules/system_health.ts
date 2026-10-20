@@ -50,6 +50,8 @@ const CHECKS: HealthCheck[] = [
     since: HOURS(3),
   },
   { key: "mail", label: "Mail", state: "up", detail: "4 of 200 this hour", look_at: null, latency_ms: null, since: null },
+  { key: "mail_server", label: "Staff Mail Server", state: "up", detail: "Answering", look_at: null, latency_ms: null, since: null },
+  { key: "maps", label: "Maps", state: "up", detail: "Answering", look_at: null, latency_ms: null, since: null },
   { key: "ai", label: "AI", state: "up", detail: "answering: stub", look_at: null, latency_ms: null, since: null },
   { key: "disk", label: "Disk Space", state: "up", detail: "46% free, 118 GB of 252 GB", look_at: null, latency_ms: null, since: null },
   { key: "memory", label: "Memory", state: "up", detail: "28% in use, 5.1 GB of 18 GB", look_at: null, latency_ms: null, since: null },

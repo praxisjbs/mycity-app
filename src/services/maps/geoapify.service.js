@@ -10,7 +10,10 @@
  *
  * The key stays on the server: the browser asks our API (`/api/v1/maps/...`), never
  * the provider. Nothing is stored; a form that picks a place saves the address and the
- * coordinates as its own fields, through its own module.
+ * coordinates as its own fields, through its own module. The key is Settings ·
+ * Integrations' (shared/integrations/settings.js: saved there, else GEOAPIFY_API_KEY in the
+ * server file; docs/guides/integrations.md §6.3), read at each call, so a new key works at
+ * once.
  *
  * Rules:
  *  - Call it outside any transaction: an HTTP wait must never hold a pooled connection.
@@ -25,10 +28,14 @@
  *    same office typed by two people, spends one request of the day's quota. A tile is kept
  *    for a day (the map of an office is the same for everyone who opens it), an address
  *    for a point for a day; both stores are bounded.
+ *  - Every request that reached the provider is counted (shared/integrations/usage.js):
+ *    an answer from memory spent nothing and is not. A refusal carries the provider's
+ *    status (`upstream`) so Settings · Integrations can tell a refused key from an outage.
  */
-const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 const { AppError } = require("../../shared/errors");
+const integrations = require("../../shared/integrations/settings");
+const usage = require("../../shared/integrations/usage");
 
 const AUTOCOMPLETE_URL = "https://api.geoapify.com/v1/geocode/autocomplete";
 const REVERSE_URL = "https://api.geoapify.com/v1/geocode/reverse";
@@ -120,35 +127,60 @@ function placesOf(data) {
   return out;
 }
 
+/** What a refusal means on Settings · Integrations (contract StepCode). */
+function codeOf(err) {
+  const status = err && err.upstream;
+  if (status === 401 || status === 403) return "KEY_REFUSED";
+  if (status === 429) return "OVER_QUOTA";
+  if (err && err.timed_out) return "TIMEOUT";
+  return "UNAVAILABLE";
+}
+
+/** A failure the screen can tell apart, carrying the provider's status for codeOf(). */
+function refusal(code, message, status, { upstream = null, timedOut = false } = {}) {
+  const err = new AppError(code, message, status);
+  err.upstream = upstream;
+  err.timed_out = timedOut;
+  return err;
+}
+
 /**
  * One request to the provider, its failures turned into the errors a screen can tell
- * apart. Logged by status and message only: the URL carries the key.
+ * apart, and counted as `kind`. Logged by status and message only: the URL carries the key.
  * @returns {Promise<Response>}
  */
-async function ask(url, what, fetchImpl) {
+async function ask(url, what, fetchImpl, kind) {
   let res;
   try {
     res = await fetchImpl(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   } catch (err) {
     const timedOut = err && (err.name === "TimeoutError" || err.name === "AbortError");
     logger.warn({ provider: "geoapify", timed_out: timedOut, message: String((err && err.message) || "").slice(0, 200) }, `${what} failed`);
-    throw new AppError("MAPS_UNAVAILABLE", "Maps are not answering.", 502);
+    const e = refusal("MAPS_UNAVAILABLE", "Maps are not answering.", 502, { timedOut });
+    usage.record("geoapify", kind, { ok: false, error_code: codeOf(e) });
+    throw e;
   }
   if (res.status === 429) {
     logger.warn({ provider: "geoapify", status: 429 }, `${what} over its quota`);
-    throw new AppError("MAPS_BUSY", "Maps are busy. Try again shortly.", 429);
+    usage.record("geoapify", kind, { ok: false, error_code: "OVER_QUOTA" });
+    throw refusal("MAPS_BUSY", "Maps are busy. Try again shortly.", 429, { upstream: 429 });
   }
   if (!res.ok) {
     logger.warn({ provider: "geoapify", status: res.status }, `${what} refused`);
-    throw new AppError("MAPS_UNAVAILABLE", "Maps are not answering.", 502);
+    const e = refusal("MAPS_UNAVAILABLE", "Maps are not answering.", 502, { upstream: res.status });
+    usage.record("geoapify", kind, { ok: false, error_code: codeOf(e) });
+    throw e;
   }
+  usage.record("geoapify", kind, { ok: true });
   return res;
 }
 
-const keyOf = (apiKey) => {
-  if (!apiKey) throw new AppError("MAPS_OFF", "Maps are not set up.", 503);
-  return apiKey;
-};
+/** The key given (tests, a test before save), else the key in use; MAPS_OFF without one. */
+async function keyOf(apiKey) {
+  const key = apiKey === undefined ? await integrations.secret("geoapify", "api_key") : apiKey;
+  if (!key) throw new AppError("MAPS_OFF", "Maps are not set up.", 503);
+  return key;
+}
 
 async function jsonOf(res) {
   try {
@@ -161,16 +193,18 @@ async function jsonOf(res) {
 /**
  * Places matching what a person typed.
  * @param {string} text
- * @param {{apiKey?: string, fetchImpl?: typeof fetch}} [opts]  tests
+ * @param {{apiKey?: string, fetchImpl?: typeof fetch, fresh?: boolean}} [opts]
+ *   apiKey  a key to use instead of the one in use (a test before save; tests)
+ *   fresh   ask the provider even when the answer is remembered (a test)
  * @returns {Promise<Array<{place_id: string, formatted: string, lat: number, lon: number}>>}
  */
-async function searchPlaces(text, { apiKey = config.GEOAPIFY_API_KEY, fetchImpl = fetch } = {}) {
+async function searchPlaces(text, { apiKey, fetchImpl = fetch, fresh = false } = {}) {
   const query = String(text || "").trim().replace(/\s+/g, " ");
   if (query.length < MIN_CHARS) return [];
-  keyOf(apiKey);
+  const usedKey = await keyOf(apiKey);
 
   const key = query.toLowerCase();
-  const known = searches.get(key);
+  const known = fresh ? undefined : searches.get(key);
   if (known) return known;
 
   const url = new URL(AUTOCOMPLETE_URL);
@@ -179,10 +213,10 @@ async function searchPlaces(text, { apiKey = config.GEOAPIFY_API_KEY, fetchImpl 
   url.searchParams.set("lang", "en");
   url.searchParams.set("limit", String(MAX_PLACES + 2));
   url.searchParams.set("bias", `proximity:${LAGOS}|countrycode:ng`);
-  url.searchParams.set("apiKey", apiKey);
+  url.searchParams.set("apiKey", usedKey);
 
-  const places = placesOf(await jsonOf(await ask(url, "address search", fetchImpl)));
-  searches.set(key, places);
+  const places = placesOf(await jsonOf(await ask(url, "address search", fetchImpl, "search")));
+  if (!fresh) searches.set(key, places);
   return places;
 }
 
@@ -195,19 +229,19 @@ function isTile(z, x, y) {
 /**
  * One map tile, as the provider draws it.
  * @param {number} z  @param {number} x  @param {number} y
- * @param {{apiKey?: string, fetchImpl?: typeof fetch}} [opts]  tests
+ * @param {{apiKey?: string, fetchImpl?: typeof fetch, fresh?: boolean}} [opts]  as searchPlaces
  * @returns {Promise<{bytes: Buffer, type: string}>}
  */
-async function tile(z, x, y, { apiKey = config.GEOAPIFY_API_KEY, fetchImpl = fetch } = {}) {
+async function tile(z, x, y, { apiKey, fetchImpl = fetch, fresh = false } = {}) {
   if (!isTile(z, x, y)) throw new AppError("NOT_FOUND", "No such tile.", 404);
-  keyOf(apiKey);
+  const usedKey = await keyOf(apiKey);
   const key = `${z}/${x}/${y}`;
-  const known = tiles.get(key);
+  const known = fresh ? undefined : tiles.get(key);
   if (known) return known;
 
   const url = new URL(`${TILE_URL}/${key}.png`);
-  url.searchParams.set("apiKey", apiKey);
-  const res = await ask(url, "map tile", fetchImpl);
+  url.searchParams.set("apiKey", usedKey);
+  const res = await ask(url, "map tile", fetchImpl, "tile");
   const type = String(res.headers.get("content-type") || "");
   // Only an image goes back to the browser: anything else from the provider is a failure.
   if (!/^image\/(png|jpeg|webp)$/.test(type.split(";")[0].trim())) {
@@ -215,7 +249,7 @@ async function tile(z, x, y, { apiKey = config.GEOAPIFY_API_KEY, fetchImpl = fet
     throw new AppError("MAPS_UNAVAILABLE", "Maps are not answering.", 502);
   }
   const found = { bytes: Buffer.from(await res.arrayBuffer()), type: type.split(";")[0].trim() };
-  tiles.set(key, found);
+  if (!fresh) tiles.set(key, found);
   return found;
 }
 
@@ -223,16 +257,16 @@ async function tile(z, x, y, { apiKey = config.GEOAPIFY_API_KEY, fetchImpl = fet
  * The address at a point, or null when the provider knows none. Used for a worksite's
  * centre only: a person's home or a punch is never sent (docs/guides/foundation.md §6.13).
  * @param {number} lat  @param {number} lon
- * @param {{apiKey?: string, fetchImpl?: typeof fetch}} [opts]  tests
+ * @param {{apiKey?: string, fetchImpl?: typeof fetch, fresh?: boolean}} [opts]  as searchPlaces
  * @returns {Promise<string|null>}
  */
-async function reverseGeocode(lat, lon, { apiKey = config.GEOAPIFY_API_KEY, fetchImpl = fetch } = {}) {
+async function reverseGeocode(lat, lon, { apiKey, fetchImpl = fetch, fresh = false } = {}) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180)
     throw new AppError("VALIDATION_FAILED", "Not a point.", 422);
-  keyOf(apiKey);
+  const usedKey = await keyOf(apiKey);
   // About a metre: two people on the same spot ask once.
   const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
-  const known = addresses.get(key);
+  const known = fresh ? undefined : addresses.get(key);
   if (known !== undefined) return known;
 
   const url = new URL(REVERSE_URL);
@@ -241,12 +275,21 @@ async function reverseGeocode(lat, lon, { apiKey = config.GEOAPIFY_API_KEY, fetc
   url.searchParams.set("format", "json");
   url.searchParams.set("lang", "en");
   url.searchParams.set("limit", "1");
-  url.searchParams.set("apiKey", apiKey);
-  const data = await jsonOf(await ask(url, "address lookup", fetchImpl));
+  url.searchParams.set("apiKey", usedKey);
+  const data = await jsonOf(await ask(url, "address lookup", fetchImpl, "reverse"));
   const hit = (Array.isArray(data && data.results) && data.results[0]) || (Array.isArray(data && data.features) && data.features[0] && data.features[0].properties) || null;
   const formatted = hit ? capped(hit.formatted, 300) : null;
-  addresses.set(key, formatted);
+  if (!fresh) addresses.set(key, formatted);
   return formatted;
+}
+
+/** The tile at zoom `z` that holds a point (the Web Mercator tiling every map uses). */
+function tileOf(lat, lon, z) {
+  const n = 2 ** z;
+  const rad = (lat * Math.PI) / 180;
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const y = Math.floor(((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * n);
+  return { z, x: Math.min(n - 1, Math.max(0, x)), y: Math.min(n - 1, Math.max(0, y)) };
 }
 
 /** Tests: forget every remembered answer. */
@@ -256,4 +299,4 @@ function clearCache() {
   addresses.clear();
 }
 
-module.exports = { searchPlaces, tile, reverseGeocode, clearCache, MAX_PLACES, MIN_CHARS, MAX_ZOOM };
+module.exports = { searchPlaces, tile, reverseGeocode, tileOf, codeOf, clearCache, MAX_PLACES, MIN_CHARS, MAX_ZOOM };

@@ -49,6 +49,7 @@ const money = require("../../shared/money/money");
 const governance = require("./governance");
 const ledger = require("./ledger");
 const { redactValue } = require("./redact");
+const usage = require("../../shared/integrations/usage");
 const { jsonSchemaOf, parseStructured } = require("./structured");
 
 const PROMPTS_DIR = path.join(__dirname, "prompts");
@@ -169,6 +170,7 @@ async function complete(req) {
   }
   const vendorName = g.vendor;
   const vendor = vendors[vendorName];
+  const apiKey = vendorName === "gemini" ? g.api_key : null;
   const model = vendorName === "stub" ? "stub" : g.model;
   const prices =
     vendorName === "stub"
@@ -203,7 +205,7 @@ async function complete(req) {
       const started = Date.now();
       try {
         const res = await vendor.complete({
-          apiKey: config.GEMINI_API_KEY,
+          apiKey,
           model,
           messages: msgs,
           json: Boolean(output),
@@ -224,8 +226,10 @@ async function complete(req) {
           outcome: "ok",
         });
         cost = money.toWire(money.money(cost).plus(money.money(c)));
+        if (vendorName === "gemini") usage.record("gemini", "call", { ok: true });
         return res;
       } catch (err) {
+        if (vendorName === "gemini") usage.record("gemini", "call", { ok: false, error_code: callCode(err) });
         await ledger.recordStep(db, runId, {
           step_no: step,
           kind,
@@ -262,7 +266,7 @@ async function complete(req) {
     if (err.kind === "config") {
       logger.error(
         { err, purpose },
-        "AI vendor configuration error: check GEMINI_API_KEY and the model name",
+        "AI vendor configuration error: check Gemini's key on Settings · Integrations and the model name",
       );
       require("../../shared/observability/error-reporter").report(err, {
         origin: "ai",
@@ -334,6 +338,82 @@ async function complete(req) {
   );
 }
 
+/** A vendor error as Settings · Integrations names it (docs/guides/integrations.md §6.3). */
+function callCode(err) {
+  const status = err && err.status;
+  if (status === 400 || status === 401 || status === 403) return "KEY_REFUSED";
+  if (status === 404) return "MODEL_NOT_FOUND";
+  if (status === 429) return "OVER_QUOTA";
+  if (err && err.kind === "timeout") return "TIMEOUT";
+  return "UNAVAILABLE";
+}
+
+/**
+ * Settings · Integrations' test of a Gemini key, first step: is the key accepted? The model
+ * list costs nothing. Throws the vendor's error; callCode() names it.
+ * @param {{apiKey: string, vendors?: object}} req
+ * @returns {Promise<string[]>} the models the key may use
+ */
+async function checkKey({ apiKey, vendors = DEFAULT_VENDORS }) {
+  return vendors.gemini.listModels({ apiKey, timeoutMs: 20_000 });
+}
+
+/**
+ * Second step: one tiny prompt to the model in use, with a key that may not be saved yet.
+ * Recorded in the ledger as `integration-test` like any other call, and counted. Governance
+ * is not asked: this is how a key is checked before AI is switched on, and it costs a few
+ * tokens. Throws the vendor's error.
+ * @param {{apiKey: string, model: string, actor?: object|null, db?: object, vendors?: object}} req
+ */
+async function testAnswer({ apiKey, model, actor = null, db = require("../../config/db").pool, vendors = DEFAULT_VENDORS }) {
+  const p = loadPrompt("integration-test");
+  const s = await governance.settings(db);
+  const prices = { input_ngn_per_million: s.input_ngn_per_million, output_ngn_per_million: s.output_ngn_per_million };
+  const runId = await ledger.startRun(db, { purpose: "integration-test", module: "integrations", actor, vendor: "gemini", model, prompt: p });
+  const started = Date.now();
+  try {
+    const res = await vendors.gemini.complete({
+      apiKey,
+      model,
+      messages: [
+        { role: "system", content: p.body },
+        { role: "user", content: "OK" },
+      ],
+      temperature: 0,
+      maxTokens: 16,
+      timeoutMs: 20_000,
+    });
+    usage.record("gemini", "call", { ok: true });
+    await ledger.recordStep(db, runId, {
+      step_no: 1,
+      kind: "completion",
+      vendor: "gemini",
+      model: res.model || model,
+      usage: res.usage,
+      prices,
+      latency_ms: Date.now() - started,
+      finish_reason: res.finish_reason,
+      outcome: "ok",
+    });
+    await ledger.finishRun(db, runId, { status: "ok" });
+    return res;
+  } catch (err) {
+    usage.record("gemini", "call", { ok: false, error_code: callCode(err) });
+    await ledger.recordStep(db, runId, {
+      step_no: 1,
+      kind: "completion",
+      vendor: "gemini",
+      model,
+      prices,
+      latency_ms: Date.now() - started,
+      outcome: "failed",
+      error: err.message,
+    });
+    await ledger.finishRun(db, runId, { status: "failed", error_code: "AI_TEST_FAILED", error: err.message });
+    throw err;
+  }
+}
+
 /** Tests: forget loaded prompts. */
 function __clearPrompts() {
   promptCache.clear();
@@ -341,6 +421,9 @@ function __clearPrompts() {
 
 module.exports = {
   complete,
+  checkKey,
+  testAnswer,
+  callCode,
   loadPrompt,
   systemText,
   PROMPTS_DIR,

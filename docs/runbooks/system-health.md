@@ -85,7 +85,8 @@ fire. Check 3 above first.
 
 System Health tells people on the bell, on their phones, and by email once a fault has sat open for
 a day. The bell always works. The other two use what is already configured, so they only need
-checking, not setting up:
+checking, not setting up. Settings · Integrations shows both (System Sender and Web Push: Saved
+Here, Server File or Not Set Up); on the server, the fallback lines are:
 
 ```
 grep -E '^(VAPID_PUBLIC_KEY|VAPID_PRIVATE_KEY|SMTP_HOST|MAIL_FROM)=' /srv/mycity/prod/shared/.env
@@ -93,8 +94,8 @@ grep -E '^(VAPID_PUBLIC_KEY|VAPID_PRIVATE_KEY|SMTP_HOST|MAIL_FROM)=' /srv/mycity
 
 | Line | If it is empty |
 |---|---|
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Fine. The app makes a pair on first start and keeps it encrypted in the database (`.env.example` line 149). Phones still get notifications |
-| `SMTP_HOST`, `MAIL_FROM` | **Not fine.** The 24 hour escalation has nowhere to go. Set them as `docs/runbooks/dns-and-mail.md` §4 says, then `sudo systemctl restart mycity-api-prod mycity-worker-prod` |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Fine. The app makes a pair on first start and keeps it encrypted in the database. Phones still get notifications |
+| `SMTP_HOST`, `MAIL_FROM` | Fine only when Settings · Integrations shows the System Sender as Saved Here. Otherwise the 24 hour escalation has nowhere to go: set the System Sender there as `docs/runbooks/dns-and-mail.md` §4 says (tested before it is kept, no restart; held mail goes out at once) |
 
 Confirm mail is answering without sending anything:
 

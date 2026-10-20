@@ -118,7 +118,7 @@ export const COMING: Record<string, string[]> = {
   "settings/notifications": ["Which events notify whom", "In the app, by email, or both", "Quiet hours and digests"],
   "settings/appearance": ["The organisation's default theme", "Light, dark or the device setting", "Each person can still choose their own"],
   "settings/documents-and-numbering": ["Number formats for offers, queries and documents", "Letterhead and document templates", "Gap-free numbering, checked"],
-  "settings/integrations": ["Mail, bank and other connected services", "Health checks for each connection", "Keys stored encrypted"],
+  "settings/integrations": ["Mail, maps, AI and push keys, changed without a deploy", "Each connection tested before it is saved", "Keys stored encrypted and never shown again"],
   "settings/security": ["Two-step sign-in, required by role", "Active sessions, ended remotely", "Failed sign-ins and blocked attempts"],
   "settings/audit-log": ["Who did what, when, to which record", "Search by person, record, action or date", "Cannot be edited by anyone"],
   "settings/imports": ["Import a spreadsheet of records, column by column", "See what will be created before you commit", "Every import kept, with its error file and Revert"],

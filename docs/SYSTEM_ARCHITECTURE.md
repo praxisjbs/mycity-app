@@ -241,7 +241,12 @@ seconds; `/api/health/ready` reports `worker` degraded when none is fresh.
 - **Module catalogue** (`shared/access/access.catalog.js`) is the single list of permission keys; a
   CI gate checks it equals the distinct `requirePermission` keys in `src/`.
 - **Secrets.** `.env` per environment, mode 600, owned by the service user. Integration secrets
-  (mailbox passwords) AES-256-GCM in `integration_secret`, never on the row that uses them.
+  (mailbox passwords; the system sender's password, Geoapify's and Gemini's keys and the web push
+  pair, set on Settings · Integrations, `docs/guides/integrations.md` §6.4) AES-256-GCM in
+  `integration_secret`, each bound to its row, never on the row that uses them and never sent back
+  to a browser. What changes often (mail, keys, limits) is set on that page, per environment,
+  without SSH or a restart; `.env` keeps what the app needs before it can read its database
+  (`ENCRYPTION_KEY` first) and stays the fallback for the rest.
 - **Service users.** `mycity-prod` and `mycity-stg` run their own units and cannot read each
   other's `.env` or media. `mycity-deploy` is the only SSH login CI has, with a forced command
   (§ 9.5).

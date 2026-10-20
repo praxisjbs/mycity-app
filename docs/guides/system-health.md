@@ -42,7 +42,7 @@ one creates alarm without action.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Settings · Status (`status`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Every readiness check, including disk, memory, processor, database size and connections, and whether every background job has run; refreshed every 30 seconds | Read what is wrong and where to look; open a check's sheet (what it measured, since when, 7 days of changes, every scheduler or queue behind it); Download Brief (`system_health` export) |
+| Settings · Status (`status`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Every readiness check, including disk, memory, processor, database size and connections, whether every background job has run, and the Maps and Staff Mail Server connections; refreshed every 30 seconds | Read what is wrong and where to look; open a check's sheet (what it measured, since when, 7 days of changes, every scheduler or queue behind it); Download Brief (`system_health` export) |
 | Settings · Performance (`performance`) | staff app, third tab | the same | Availability, response time and failed requests against their targets; the whole server's processor, memory and disk in real units, split by what uses them; network, disk activity and server facts; trends over an hour, a day, a week or a month; then Slowest Routes, Database, Background Work and Processes | Switch the window, switch the section, Edit Targets (`system_health` edit) |
 | Settings · Faults (`faults`) | staff app, fourth tab | the same | Faults, grouped, 25 a page | Filter and search, open one, set its status, assign it, note it, tick several and Download Brief |
 | Settings · Notifications (`notifications`) | staff app | `settings` view | The six System Health notices in the System Health category, each with who it tells and its channels | Turn a notice off, change its urgency and channels |
@@ -61,6 +61,10 @@ one creates alarm without action.
 4. The same run takes a readiness snapshot (`src/http/health.js` `runChecks()`) into
    `health_snapshot`, and compares it with the run before: a check that moved off `up` emits
    `system_health.check_down`, and one that came back emits `system_health.check_recovered`.
+   Settings · Integrations (`docs/guides/integrations.md` §3 step 12) adds two checks, `maps`
+   (Geoapify) and `mail_server` (the staff mail server), which read the connection's stored state
+   and never call the provider; `mail` and `ai` now read the settings in use there. A failing
+   connection therefore reaches IT through these two events, with no alert of its own.
 5. The IT team opens Settings · System Health from the notice. Status shows the live checks,
    Performance draws the samples, Faults lists the groups.
 5a. Every minute the `system-health-sample` scheduler reads the whole server (processor, memory,
@@ -344,7 +348,7 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Settings · Status | Four tiles (Checks Down, Open Faults, New Today, Came Back); the check list with a state pill each, including disk, memory, processor, database and background jobs, and how long a check that is not up has been so; Download Brief | Details row on a check that is not up: where to look | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used, how a job is judged late, the watcher's mail rules: §6 and §7 here, and `docs/runbooks/system-health.md` |
+| Settings · Status | Four tiles (Checks Down, Open Faults, New Today, Came Back); the check list with a state pill each, including disk, memory, processor, database, background jobs, Maps and Staff Mail Server (Failing with the reason in a few words, or Not set up), and how long a check that is not up has been so; Download Brief | Details row on a check that is not up: where to look | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used, how a job is judged late, the watcher's mail rules: §6 and §7 here, and `docs/runbooks/system-health.md` |
 | Check sheet | State pill, since when, what it said; the probe's figures; for Background Jobs every scheduler (Job, Set As, Last Run, Result, Next, State); for Worker every queue (Waiting, Active, Delayed, Failed); the changes over 7 days, 25 a page | Help term on Set As: what the code declared. Help term on Not Due Yet: started, first slot still to come. Help term on Failed: failed jobs still kept, not today's. A job's last error is content, under its name | The read-only commands and the AI instructions: the downloaded brief |
 | Settings · Performance | Four target tiles (Availability, Response Time, Failed Requests, Requests), each with its target; Processor, Memory and Disk cards in real units with a bar split by what uses them; Network and Server cards; Response Time, Requests, Failed Requests, Processor, Memory, Disk Activity and Network over the window; the section switch (Slowest Routes, Database, Background Work, Processes). A banner when nothing is recording | Help terms on Steal, I/O Wait, Cache, Reserved, Full In and p95, one sentence each; the ⓘ on a chart says what it counts | How each figure is worked out, the bucket bounds and the regression: §6 here |
 | Edit Targets | A three-step wizard: Targets (availability, response time, failed requests), Disk and Memory, Processor and Connections; Save Targets | Nothing | Why the defaults are what they are: §6 here |
@@ -429,6 +433,10 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Settings · Integrations (`docs/guides/integrations.md`): two new readiness
+  checks, Maps and Staff Mail Server, from each connection's stored state, with "where to look"
+  pointing at Settings · Integrations; Mail and AI read the settings in use there. A connection that
+  fails or recovers reaches IT through `check_down` and `check_recovered` (§3 step 4).
 - 20/10/2026 · TB · `provision.sh` stopped at step 6 on the server (`line 194: $1: unbound
   variable`): a comment inside PostgreSQL's settings, which the script writes through an unquoted
   here-document under `set -u`, read "($1, never the values)", and bash expanded it. The comment

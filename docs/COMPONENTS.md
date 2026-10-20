@@ -102,6 +102,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row. | stable |
+| Forms | [SecretField](#secretfield) | `SecretField` | A password or an API key the server may already keep: Saved (with a key's last four) and Replace, never a character of what is saved. | beta |
 | Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField`, `SelectMenu` | Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField). | stable |
 | Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
 | Forms | [StepBar](#stepbar) | `StepBar` | Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4. | stable |
@@ -3101,6 +3102,42 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 <SearchInput label="Search Employees" placeholder="Name or Email" value={q} onChange={setQ} />
 ```
 
+### SecretField
+
+A password or an API key the server may already keep: Saved (with a key's last four) and Replace, never a character of what is saved.
+
+| | |
+|---|---|
+| Use | A secret in a settings form that the server never sends back (a mail password, a provider's key), where leaving the field alone keeps the saved one. |
+| Avoid | Signing in or choosing your own password (use PasswordField); a value a person may read back (use TextField). |
+| Phone | The same: Replace and Keep Saved are 44 px buttons beside the line, and the field Replace opens fills the rest of the width. |
+| Accessibility | The saved line is a read-only field named by the Field's label; Replace moves focus into the new field and Keep Saved back to Replace. The caller passes `saved` and, for a key, `hint`. |
+| Status | beta |
+| Exports | `SecretField` |
+| Import | `import { SecretField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/SecretField.tsx` |
+| Test | `packages/ui/src/form/SecretField.test.tsx` |
+| Gallery | `packages/ui/src/form/SecretField.gallery.tsx` (`npm run gallery`, `#/SecretField`) |
+
+**SecretField** props (`SecretFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | What was typed, from form.field(name). Empty keeps the saved one. |
+| `onChange` | `(value: string) => void` | yes | Called with the new value. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `saved` | `boolean` |  | One is saved: the field reads Saved and offers Replace instead of an empty box. |
+| `hint` | `string \| null` |  | What may be shown of the saved one: a key's last four characters. Never any part of a password. |
+| `noun` | `"password" \| "key"` |  | What it is, for the show and hide button: password (the default) or key. |
+| `id` | `string` |  | The control's id when no Field gives one. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<Field label="API Key"><SecretField saved={key.set} hint={key.hint} noun="key" {...form.field("api_key")} /></Field>
+```
+
 ### SelectField
 
 Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField).
@@ -3318,6 +3355,7 @@ The text input of the form system, with its typed relatives: password, whole num
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `autoComplete` | `"current-password" \| "new-password"` |  | new-password on sign-up and change, current-password on sign-in. |
+| `noun` | `"password" \| "key"` |  | What the show and hide button names: password (the default), or key for an API key. |
 
 **NumberField** props (`NumberFieldProps`, extends `BoundProps`, `NativeInput`)
 

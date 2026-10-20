@@ -1,6 +1,7 @@
 "use strict";
 /**
- * What a mail server's refusal means, and what the person should do (mailbox.md §11).
+ * What a mail server's refusal means, and what the person should do (mailbox.md §11), for
+ * the mailbox, the system sender's test and its counted sends.
  * One ladder, in this order: authentication, sender, recipient, temporary, other 5xx,
  * anything else. The send queue retries on the verdict's code, so a permanent refusal
  * is never retried and a deferral is.
@@ -131,4 +132,23 @@ function retryPlan(err, attempts, now = Date.now()) {
   };
 }
 
-module.exports = { PERMANENT, mapSmtpError, mapImapError, retryPlan };
+/**
+ * What a mail failure means on Settings · Integrations (contract StepCode;
+ * docs/guides/integrations.md §6.3): the network first (no such server, no answer, TLS, a
+ * certificate for another name), then the server's own refusal through the ladder above.
+ * Shared by the system sender's test and the counting of its real sends.
+ */
+function stepCodeOf(err) {
+  const network = require("./tls-check").codeOf(err);
+  if (network !== "UNAVAILABLE") return network;
+  const code = String((err && err.code) || "");
+  if (code === "EDNS") return "SERVER_NOT_FOUND";
+  if (code === "ETIMEDOUT" || code === "ECONNECTION") return "NO_ANSWER";
+  const mapped = mapSmtpError(err);
+  if (mapped.code === "MAIL_AUTH_FAILED") return "AUTH_FAILED";
+  if (mapped.code === "SENDER_REFUSED") return "SENDER_REFUSED";
+  if (mapped.code === "RECIPIENT_REFUSED") return "RECIPIENT_REFUSED";
+  return "UNAVAILABLE";
+}
+
+module.exports = { PERMANENT, mapSmtpError, mapImapError, retryPlan, stepCodeOf };

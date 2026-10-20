@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 14 | 2 | 0 | 12 | 0 | 0 |
+| M9 Settings & Governance | 14 | 1 | 0 | 13 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **97** | **55** | **0** | **42** | **0** | **0** |
+| **Total** | **97** | **54** | **0** | **43** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -1056,13 +1056,25 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 20/10/2026 · TB · Integrations (#77) built, brought forward from M9 by TB (owner GE → TB) from TB's
+  twelve answers (`docs/guides/integrations.md`): the system sender, the staff mail server, Geoapify,
+  Gemini and the web push keys are set on the page per environment instead of the server's `.env`,
+  which stays the fallback. One registry (`shared/integrations/providers.js`) and one reader
+  (`settings.js`, a change reaching the API and the worker within a second); secrets encrypted and
+  bound to their row, never shown again (a key's last four), a fresh sign-in to set one; every save
+  tested first, the free tests watched every 15 minutes, paid ones judged by real use counted per
+  day against a daily limit (warned at 80%); failures reach IT through System Health's new Maps and
+  Staff Mail Server checks. A server with no mail settings starts and holds its mail; a staff mail
+  server change re-points every mailbox. Migration 9200, seed 9290 (the `integrations` key for the
+  Implementation Team and the System Administrator). Left: set the keys on staging and production;
+  Appearance (#75) stays M9.
 - 20/10/2026 · TB · Performance (#96) rebuilt from TB's six answers (`docs/guides/system-health.md`
   §6, §14): four tiles judged against targets (99.9% up, p95 under 800 ms, under 1% failing),
   editable with Edit Targets (`system_health` edit, audited; Status's disk, memory, processor and

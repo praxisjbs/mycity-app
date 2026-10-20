@@ -101,8 +101,9 @@ const BY_KEY = new Map(CATEGORIES.map((c) => [c.key, c]));
 
 /** First segment of an event key → category. */
 const DOMAIN_TO_CATEGORY = Object.freeze({
-  // the system watching itself
+  // the system watching itself, and the services it runs on (docs/guides/integrations.md §7)
   system_health: "system_health",
+  integration: "system_health",
 
   // who can do what
   auth: "security",

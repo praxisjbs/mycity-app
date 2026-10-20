@@ -39,4 +39,5 @@ export { CardPicker, type CardPickerProps, type CardPickerOption } from "./CardP
 export * from "./AddressField";
 export * from "./ChannelGrid";
 export * from "./RadioCards";
+export * from "./SecretField";
 export * from "./StepBar";

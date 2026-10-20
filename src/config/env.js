@@ -347,7 +347,7 @@ const ENTRIES = [
     str(""),
     {
       group: "Secrets",
-      doc: "64 hex characters (32 bytes). AES-256-GCM key for integration_secret (mailbox passwords).",
+      doc: "64 hex characters (32 bytes). AES-256-GCM key for integration_secret: mailbox passwords and every key and password on Settings, Integrations. It protects them, so it stays here, never on that page.",
       secret: true,
     },
   ],
@@ -426,34 +426,34 @@ const ENTRIES = [
     str(""),
     {
       group: "Mail",
-      doc: "SMTP server for system mail. Empty in development and test: mail is captured, never sent. Required on servers.",
+      doc: "SMTP server for system mail. Fallback for Settings, Integrations, System Sender: used until a sender is saved there. With neither, mail is captured on a laptop and held on a server.",
     },
   ],
   [
     "SMTP_PORT",
     int(587, { min: 1, max: 65535 }),
-    { group: "Mail", doc: "587 with STARTTLS, or 465 with SMTP_SECURE." },
+    { group: "Mail", doc: "587 with STARTTLS, or 465 with SMTP_SECURE. Fallback, as SMTP_HOST." },
   ],
   [
     "SMTP_SECURE",
     bool(false),
     {
       group: "Mail",
-      doc: "TLS from the first byte (port 465). Off: STARTTLS is required.",
+      doc: "TLS from the first byte (port 465). Off: STARTTLS is required. Fallback, as SMTP_HOST.",
     },
   ],
-  ["SMTP_USER", str(""), { group: "Mail", doc: "SMTP account." }],
+  ["SMTP_USER", str(""), { group: "Mail", doc: "SMTP account. Fallback, as SMTP_HOST." }],
   [
     "SMTP_PASSWORD",
     str(""),
-    { group: "Mail", doc: "SMTP password.", secret: true },
+    { group: "Mail", doc: "SMTP password. Fallback, as SMTP_HOST; Settings, Integrations keeps it encrypted instead.", secret: true },
   ],
   [
     "MAIL_FROM",
     str("MyCity App <no-reply@mycityapp.io>"),
     {
       group: "Mail",
-      doc: "From address for system mail. Its domain must pass SPF, DKIM and DMARC (services/mail/deliverability).",
+      doc: "From address for system mail. Its domain must pass SPF, DKIM and DMARC (services/mail/deliverability). Fallback, as SMTP_HOST.",
     },
   ],
   [
@@ -461,7 +461,7 @@ const ENTRIES = [
     str(""),
     {
       group: "Mail",
-      doc: "Optional Reply-To for system mail (the support inbox).",
+      doc: "Optional Reply-To for system mail (the support inbox). Fallback, as SMTP_HOST.",
     },
   ],
   [
@@ -469,7 +469,7 @@ const ENTRIES = [
     int(0, { min: 0, max: 100000 }),
     {
       group: "Mail",
-      doc: "System mail recipients per rolling hour (services/mail/pace.js); 0 sends unpaced. Production and staging share the mailbox's limit: 40 and 10 of the plan's 50. Required on servers.",
+      doc: "System mail recipients per rolling hour (services/mail/pace.js); 0 sends unpaced. Production and staging share the mailbox's limit: 40 and 10 of the plan's 50. Fallback, as SMTP_HOST.",
     },
   ],
   [
@@ -477,7 +477,7 @@ const ENTRIES = [
     str("mycityapp.io"),
     {
       group: "Mail",
-      doc: "Comma-separated domains whose mailboxes are on the SMTP server itself, behind the host's spam-filter MX. System mail to them is delivered there; every other domain is still route-checked. Empty: none.",
+      doc: "Comma-separated domains whose mailboxes are on the SMTP server itself, behind the host's spam-filter MX. System mail to them is delivered there; every other domain is still route-checked. Empty: none. Fallback, as SMTP_HOST.",
     },
   ],
   [
@@ -496,40 +496,40 @@ const ENTRIES = [
     str(""),
     {
       group: "Mailbox",
-      doc: "IMAP host for every mailbox. Empty: the address's own domain, which is MyCity's cPanel host and its certificate name.",
+      doc: "IMAP host for every mailbox. Empty: the address's own domain, which is MyCity's cPanel host and its certificate name. The MAILBOX_* values are the fallback for Settings, Integrations, Staff Mail Server: used until it is saved there.",
     },
   ],
-  ["MAILBOX_IMAP_PORT", int(993, { min: 1, max: 65535 }), { group: "Mailbox", doc: "IMAP port (993, TLS)." }],
+  ["MAILBOX_IMAP_PORT", int(993, { min: 1, max: 65535 }), { group: "Mailbox", doc: "IMAP port (993, TLS). Fallback, as MAILBOX_IMAP_HOST." }],
   [
     "MAILBOX_SMTP_HOST",
     str(""),
     {
       group: "Mailbox",
-      doc: "SMTP host for every mailbox. Empty: the address's own domain.",
+      doc: "SMTP host for every mailbox. Empty: the address's own domain. Fallback, as MAILBOX_IMAP_HOST.",
     },
   ],
-  ["MAILBOX_SMTP_PORT", int(465, { min: 1, max: 65535 }), { group: "Mailbox", doc: "SMTP port (465, TLS)." }],
+  ["MAILBOX_SMTP_PORT", int(465, { min: 1, max: 65535 }), { group: "Mailbox", doc: "SMTP port (465, TLS). Fallback, as MAILBOX_IMAP_HOST." }],
   [
     "MAILBOX_TLS",
     bool(true),
-    { group: "Mailbox", doc: "TLS to the mail host, with the certificate checked against its name. Off only for a local test server." },
+    { group: "Mailbox", doc: "TLS to the mail host, with the certificate checked against its name. Off only for a local test server; Settings, Integrations never turns it off." },
   ],
   [
     "MAILBOX_SEND_PER_HOUR",
     int(50, { min: 1, max: 10000 }),
-    { group: "Mailbox", doc: "Recipients one mailbox may send to in an hour; the send queue waits beyond it (the host's plan allows 50)." },
+    { group: "Mailbox", doc: "Recipients one mailbox may send to in an hour; the send queue waits beyond it (the host's plan allows 50). Fallback, as MAILBOX_IMAP_HOST." },
   ],
   [
     "MAILBOX_SYNC_EVERY_MIN",
     int(2, { min: 1, max: 60 }),
-    { group: "Mailbox", doc: "Minutes between syncs of every connected mailbox, the safety net behind IMAP IDLE." },
+    { group: "Mailbox", doc: "Minutes between syncs of every connected mailbox, the safety net behind IMAP IDLE. Fallback, as MAILBOX_IMAP_HOST." },
   ],
   [
     "MAILBOX_IDLE_MAX",
     intOrNull({ min: 0, max: 30 }),
     {
       group: "Mailbox",
-      doc: "Mailboxes held open on IMAP IDLE by the worker, so new mail arrives the moment it lands instead of at the next sync. The host allows 30 connections per IP for production and staging together. Empty: 24 on production, 4 on staging, 0 on laptops and in tests.",
+      doc: "Mailboxes held open on IMAP IDLE by the worker, so new mail arrives the moment it lands instead of at the next sync. The host allows 30 connections per IP for production and staging together. Empty: 24 on production, 4 on staging, 0 on laptops and in tests. Fallback, as MAILBOX_IMAP_HOST.",
     },
   ],
 
@@ -539,7 +539,7 @@ const ENTRIES = [
     str("mailto:jbspraxisllc@gmail.com"),
     {
       group: "Web push",
-      doc: "Who push services contact about this server's pushes: a mailto: or https: address.",
+      doc: "Who push services contact about this server's pushes: a mailto: or https: address. Fallback for Settings, Integrations, Web Push: used until a contact is saved there.",
     },
   ],
   [
@@ -547,7 +547,7 @@ const ENTRIES = [
     str(""),
     {
       group: "Web push",
-      doc: "Optional. The VAPID public key (base64url). Empty: the app makes a pair on first start and keeps it encrypted in the database. Set both keys or neither.",
+      doc: "Optional. The VAPID public key (base64url). A pair kept in the database (made by the app, or by Replace Keys on Settings, Integrations) wins over it; with neither, the app makes one. Set both keys or neither.",
     },
   ],
   [
@@ -555,7 +555,7 @@ const ENTRIES = [
     str(""),
     {
       group: "Web push",
-      doc: "Optional. The VAPID private key (base64url), with VAPID_PUBLIC_KEY. Empty: the pair kept in the database.",
+      doc: "Optional. The VAPID private key (base64url), with VAPID_PUBLIC_KEY. A pair kept in the database wins over it.",
       secret: true,
     },
   ],
@@ -566,7 +566,7 @@ const ENTRIES = [
     str(""),
     {
       group: "AI",
-      doc: 'Gemini API key. Empty: AI calls return the stub\'s placeholder (vendor "stub"), are recorded, and cost nothing.',
+      doc: 'Gemini API key. Fallback for Settings, Integrations, Gemini: used until a key is saved there. With neither, AI calls return the stub\'s placeholder (vendor "stub"), are recorded, and cost nothing.',
       secret: true,
     },
   ],
@@ -614,7 +614,7 @@ const ENTRIES = [
     str(""),
     {
       group: "Maps",
-      doc: "Geoapify API key for the address search behind every location field. Empty: the search answers 503 and the fields take a typed address and coordinates.",
+      doc: "Geoapify API key for the address search behind every location field. Fallback for Settings, Integrations, Geoapify: used until a key is saved there. With neither, the search answers 503 and the fields take a typed address and coordinates.",
       secret: true,
     },
   ],
@@ -792,14 +792,9 @@ function serverProblems(c) {
   }
   if (c.TRUST_PROXY_HOPS < 1)
     out.push("TRUST_PROXY_HOPS must be at least 1 behind the proxy");
-  if (!c.SMTP_HOST)
-    out.push(
-      `SMTP_HOST is required on ${c.APP_ENV} (A4: system mail is really sent)`,
-    );
-  if (!c.MAIL_SEND_PER_HOUR)
-    out.push(
-      `MAIL_SEND_PER_HOUR is required on ${c.APP_ENV} (the mailbox's hourly limit; docs/runbooks/dns-and-mail.md)`,
-    );
+  // SMTP_HOST and MAIL_SEND_PER_HOUR are no longer required: the system sender may be set
+  // on Settings, Integrations instead, and a server with neither holds its mail until one is
+  // (docs/guides/integrations.md §6.8; A4: nothing is faked or lost).
   if (!/<[^@\s]+@[^>\s]+>$|^[^@\s]+@[^@\s]+$/.test(c.MAIL_FROM))
     out.push("MAIL_FROM must be an address, or Name <address>");
   return out;
@@ -855,6 +850,11 @@ function parseEnv(source) {
 
   // Laptops and CI run without secrets; servers never do (serverProblems).
   const local = c.APP_ENV === "development" || c.APP_ENV === "test";
+
+  // System mail with no sender set up anywhere: captured in memory on a laptop or in CI,
+  // held in its queue on a server (docs/guides/integrations.md §6.8). Decided here, so
+  // nothing else reads APP_ENV for it.
+  c.MAIL_UNSET = local ? "capture" : "hold";
   if (local) {
     for (const [k, v] of Object.entries(DEV_SECRETS)) if (!c[k]) c[k] = v;
   }

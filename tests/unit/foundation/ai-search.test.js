@@ -563,6 +563,15 @@ describe("search's screens follow the shell", () => {
     expect(tabVisible({ module: "expenses", tab: "approvals" }, manager)).toBe(true);
     expect(tabVisible({ module: "expenses", tab: "approvals" }, { ...manager, manages_people: false })).toBe(false);
   });
+
+  test("Integrations is found by integrations viewers and the CEO, with or without Settings", () => {
+    const screen = { module: "settings", tab: "integrations" };
+    expect(tabVisible(screen, reader([], { grants: { settings: ["view", "edit"] } }))).toBe(false);
+    expect(tabVisible(screen, reader([], { grants: { settings: ["view"], integrations: ["view"] } }))).toBe(true);
+    expect(tabVisible(screen, reader([], { grants: { integrations: ["view"] } }))).toBe(true);
+    expect(tabVisible(screen, reader([], { grants: {}, is_ceo: true }))).toBe(true);
+    expect(tabVisible({ module: "settings", tab: "users" }, reader([], { grants: { integrations: ["view"] } }))).toBe(false);
+  });
 });
 
 describe("gates 9, 10 and 19, and the vendor guard", () => {

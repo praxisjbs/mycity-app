@@ -34,6 +34,31 @@ async function syncable(db) {
   return rows.map((r) => r.mail_account_id);
 }
 
+/**
+ * Every account with a saved password, and the host each is held open on: what a change of
+ * staff mail server moves, and what the IDLE loop compares its connections with
+ * (docs/guides/integrations.md §3 step 8).
+ */
+async function movable(db) {
+  const { rows } = await db.query(
+    `SELECT mail_account_id, email, status, incoming_host, incoming_port, tls FROM mail_account
+      WHERE status IN ('connected', 'needs_reconnect') AND integration_secret_id IS NOT NULL
+      ORDER BY mail_account_id
+      LIMIT 30 -- pagination:batch the host's plan holds 30 mailboxes; one pass moves them all`,
+  );
+  return rows;
+}
+
+/** Point one account at a mail server. One the old server refused is tried again there. */
+function repoint(db, id, s) {
+  return db.query(
+    `UPDATE mail_account SET incoming_host = $2, incoming_port = $3, outgoing_host = $4, outgoing_port = $5,
+            tls = $6, status = 'connected', consecutive_failures = 0, last_error_code = NULL
+      WHERE mail_account_id = $1`,
+    [id, s.incoming_host, s.incoming_port, s.outgoing_host, s.outgoing_port, s.tls !== false],
+  );
+}
+
 async function saveSecret(db, { key, ciphertext, by }) {
   const row = await one(
     db,
@@ -595,6 +620,8 @@ module.exports = {
   accountOf,
   accountById,
   syncable,
+  movable,
+  repoint,
   saveSecret,
   secretOf,
   retireSecret,

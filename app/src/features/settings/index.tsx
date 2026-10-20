@@ -18,7 +18,8 @@ import { Roles } from "./Roles";
 import { SecurityTab } from "./SecurityRules";
 import { FaultsTab, StatusTab } from "./SystemHealth";
 import { PerformanceTab } from "./Performance";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, Field, formatDateTime, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, StatusPill, Swatch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
+import { IntegrationsTab } from "./integrations";
+import { Button, Card, CardHeader, Chips, ChoiceField, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, Swatch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
@@ -38,7 +39,7 @@ export default function Settings({ tab }: ModuleScreenProps) {
     case "notifications": return <NotificationsTab />;
     case "appearance": return <AppearanceTab />;
     case "documents-and-numbering": return <NumberingTab />;
-    case "integrations": return <Integrations />;
+    case "integrations": return <IntegrationsTab />;
     case "security": return <SecurityTab />;
     case "audit-log": return <AuditLog />;
     case "imports":
@@ -297,41 +298,3 @@ function AppearanceTab() {
   );
 }
 
-/* ───────────── Integrations ───────────── */
-
-function Integrations() {
-  const i = useApi("GET /api/v1/settings/integrations");
-  const d = i.data;
-  const count = (t: string) => d?.items.filter((x) => x.status.text === t).length ?? 0;
-  return (
-    <>
-      <PageHeader title="Integrations" sub="Connected services" />
-      {d && <KpiTiles items={[{ label: "Connected", value: String(count("Connected")) }, { label: "Manual", value: String(count("Manual")) }, { label: "Not in Scope", value: String(count("Not connected")) }, { label: "Failures, 7 Days", value: String(d.health.reduce((a, h) => a + h.failures, 0)), tone: "ok" }]} />}
-      <Grid cols={3}>
-        {(d?.items ?? []).map((x) => (
-          <div key={x.key} className="rounded-box border border-border bg-card p-3.5">
-            <h2 data-copy="content" className="text-sm font-semibold">{x.name}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">{x.text}</p>
-            <div className="mt-2.5"><StatusPill s={x.status} /></div>
-          </div>
-        ))}
-      </Grid>
-      <Grid cols={2} className="mt-3">
-        <DataView
-          title="Health"
-          right={<span className="text-2xs text-subtle-foreground">Last 7 days</span>}
-          rows={d?.health ?? []}
-          rowKey={(h) => h.service}
-          loading={i.loading}
-          columns={[
-            { key: "s", label: "Service", render: (h) => h.service },
-            { key: "l", label: "Last Call", render: (h) => (h.last_call ? formatDateTime(h.last_call) : "Never") },
-            { key: "v", label: "Volume, 7d", align: "n", render: (h) => h.volume_7d.toLocaleString("en-NG") },
-            { key: "f", label: "Failures", align: "n", render: (h) => h.failures },
-            { key: "st", label: "Status", render: (h) => <StatusPill s={h.status} /> },
-          ]}
-        />
-      </Grid>
-    </>
-  );
-}

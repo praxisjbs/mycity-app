@@ -158,7 +158,8 @@ export function Modal({
               className={cn(
                 "fixed inset-0 z-50 grid bg-scrim",
                 blur && "backdrop-blur-md",
-                side ? "justify-items-end" : "place-items-center overflow-y-auto p-5",
+                // One row the height of the screen, so a long body scrolls inside the panel and its footer stays in view.
+                side ? "grid-rows-1 justify-items-end" : "place-items-center overflow-y-auto p-5",
               )}
             >
               <Dialog.Content

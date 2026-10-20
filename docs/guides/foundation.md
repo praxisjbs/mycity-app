@@ -84,7 +84,8 @@ These finish M0 and no prompt can do them:
 | Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export downloaded where it was asked for (§6.12), values masked per reader |
 | Settings · Approvals (#72) | Settings | `settings` view; edit to change | D | **Built** (17/10/2026) | Every flow, its stages and version; Edit Stages saves a new version |
 | ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
-| Settings · Integrations (#77), Appearance (#75), Notifications (#74) | Settings | | none | Mock | Coming Soon (#74 is M6) |
+| Settings · Integrations (#77) | Settings | `integrations` view, edit, delete (Implementation Team, System Administrator) | none | **Built** (20/10/2026) | Its own guide: `docs/guides/integrations.md` |
+| Settings · Appearance (#75), Notifications (#74) | Settings | | none | Mock | Coming Soon (#74 is M6) |
 | Settings · Attendance Policy (#73) | Settings | `settings` view; edit to change and publish | LA | **Built** (19/10/2026) | The attendance policy's versions, draft, publishing and acknowledgements: `docs/guides/attendance.md` §6.15 |
 
 ## 3 · How the screens relate
@@ -240,7 +241,7 @@ only under `src/modules/`; the work is `shared/search`.
 | `GET /maps/tiles/:z/:x/:y.png` (`TileParams`: zoom 0 to 20, a column and row that exist at it → the PNG, `no_content` in the contract, `Cache-Control: private, max-age=604800`) | everyone signed in (`self`) |
 | `GET /maps/reverse` (`PointQuery`: `lat`, `lon` as degrees → `PlaceAddress`: `formatted`, null when the provider knows none) | `people` create or edit: the address at a worksite's centre, and nothing else (§6.13) |
 
-503 `MAPS_OFF` when the environment has no `GEOAPIFY_API_KEY`, 429 `MAPS_BUSY` over the provider's
+503 `MAPS_OFF` when no Geoapify key is set (Settings · Integrations, else `GEOAPIFY_API_KEY`), 429 `MAPS_BUSY` over the provider's
 quota, 502 `MAPS_UNAVAILABLE` when the provider refuses, sends a tile that is not an image, or takes
 longer than 4.5 seconds.
 
@@ -488,7 +489,8 @@ As built (17/10/2026):
 
 ### 6.8 Settings screens not in this guide
 
-Integrations (#77), Appearance (#75) and Notifications (#74, M6) stay Coming Soon. Attendance Policy
+Integrations (#77) has its own guide, `docs/guides/integrations.md`. Appearance (#75) and
+Notifications (#74, M6) stay Coming Soon. Attendance Policy
 (#73) belongs to LA's attendance work and is described in `docs/guides/attendance.md` §6.15.
 
 ### 6.9 What a document's status means (TB, 17/10/2026)
@@ -632,6 +634,10 @@ The map's tiles and the address at a worksite's centre go through the same API.
   field of the answer coerced and capped, a result without a point or an address dropped, one
   suggestion per point, six at most; the same text answered from memory for ten minutes, so the
   day's quota goes on new addresses. Outside any transaction, and the key is never logged.
+- **The key** (20/10/2026): kept on Settings · Integrations, encrypted, with a daily limit, and read
+  at each call through `shared/integrations/settings.js`; the server file's `GEOAPIFY_API_KEY` is
+  the fallback. Each search, lookup and tile is counted against the limit, a tile as a quarter of a
+  credit (`docs/guides/integrations.md` §6.9).
 - **Nothing is stored** by the search, so it carries no event, audit row, AI read or ⌘K provider
   (`// ai:none`, `// search:none` in `maps.controller.js`). The save of each form checks its own
   grant as before.
@@ -661,8 +667,9 @@ fails with `MAIL_ROUTE_TRAPPED` and is reported in Settings · System Health.
 `mycityapp.io` has that shape and is not a trap: its MX is Namecheap's spam filter
 (`mx1-3-hosting.jellyfish.systems`), which passes mail back to the mailboxes on the same cPanel host
 that system mail is sent through and the Mailbox module reads (`docs/runbooks/dns-and-mail.md` §4).
-DNS cannot tell the two apart, so the domains whose mailboxes are on the relay are named in
-`SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) and are not checked. Every other domain still is, and a
+DNS cannot tell the two apart, so the domains whose mailboxes are on the relay are named in Local
+Domains on Settings · Integrations' System Sender (`SMTP_LOCAL_DOMAINS`, default `mycityapp.io`, is
+the fallback) and are not checked. Every other domain still is, and a
 trapped one is still refused. Today's failed digests are not sent again (a digest day already passed
 is not sent late, `notifications.md` §11).
 
@@ -978,3 +985,4 @@ screen.
   key, the routes and the data are unchanged; only which tab each section sits on changes. Their
   guide is `docs/guides/system-health.md`.
 - 20/10/2026 · TB · §6.14: system mail to `mycityapp.io` is no longer refused as a trapped route (System Health fault #1, every staging digest failing). Domains whose mailboxes are on the SMTP relay behind the host's spam-filter MX are named in `SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) and not route-checked; every other domain still is.
+- 20/10/2026 · TB · Settings · Integrations (#77) built with its own guide (`docs/guides/integrations.md`), brought forward from M9: §2 and §6.8 point there; Geoapify's key (§5, §6.13) and the local domains (§6.14) are kept there, with `GEOAPIFY_API_KEY` and `SMTP_LOCAL_DOMAINS` as the server file's fallback.

@@ -40,7 +40,9 @@ const CHECKS = [
   { key: "chromium", label: "PDFs", look: "Chromium is missing, so no PDF can be drawn." },
   { key: "ffmpeg", label: "Voice and Video", look: "Voice notes and video cannot be processed." },
   { key: "clamd", label: "Upload Scanning", look: "Uploads cannot be scanned, so they are refused." },
-  { key: "mail", label: "Mail", look: "Mail is not configured or the server refused. Queued mail waits." },
+  { key: "mail", label: "Mail", look: "Mail is not set up or the server refused. Queued mail waits. Open Settings, Integrations." },
+  { key: "mail_server", label: "Staff Mail Server", look: "Staff mailboxes cannot reach their mail server. Open Settings, Integrations." },
+  { key: "maps", label: "Maps", look: "Address search and maps are failing. Open Settings, Integrations." },
   { key: "ai", label: "AI", look: "No AI vendor answers, so the assistant falls back to its stub." },
   { key: "static", label: "Frontend Build", look: "A frontend build is missing from this release." },
   { key: "disk", label: "Disk Space", look: "The disk is filling up. Nothing can be uploaded or written once it is full." },
@@ -55,8 +57,23 @@ const BY_KEY = new Map(CHECKS.map((c) => [c.key, c]));
 const label = (key) => (BY_KEY.get(key) ? BY_KEY.get(key).label : key.replace(/_/g, " "));
 const lookAt = (key) => (BY_KEY.get(key) ? BY_KEY.get(key).look : "Open the logs for this service.");
 
+/** A connection's failure (Settings · Integrations), in a few words. */
+const CONNECTION_ERROR = {
+  SERVER_NOT_FOUND: "server not found",
+  NO_ANSWER: "no answer on its port",
+  TLS_FAILED: "secure connection failed",
+  CERTIFICATE_MISMATCH: "certificate is for another name",
+  AUTH_FAILED: "password refused",
+  KEY_REFUSED: "key refused",
+  OVER_QUOTA: "over today's quota",
+  SECRET_UNREADABLE: "saved key cannot be read",
+  TIMEOUT: "no answer in time",
+};
+
 /** What a probe is doing, in a line, from whatever it chose to report. */
 function detailOf(key, v) {
+  if ((key === "maps" || key === "mail_server") && v.error) return `Failing: ${CONNECTION_ERROR[v.error] || "not answering"}`;
+  if ((key === "maps" || key === "mail_server" || key === "mail") && v.mode === "not_set_up") return "Not set up";
   if (v.error) return String(v.error).slice(0, 200);
   const bits = [];
   if (key === "outbox" && v.backlog !== undefined) bits.push(`${v.backlog} waiting`);

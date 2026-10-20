@@ -17,8 +17,14 @@ const SERVER = {
 };
 
 describe("config/env parseEnv", () => {
-  test("a server must really send mail, from a real address", () => {
-    expect(parseEnv({ ...SERVER, SMTP_HOST: "" }).problems).toContain("SMTP_HOST is required on production (A4: system mail is really sent)");
+  test("a server starts without a mail sender, holding its mail, and still needs a real From", () => {
+    // The sender may be set on Settings, Integrations instead (docs/guides/integrations.md §6.8).
+    const unset = parseEnv({ ...SERVER, SMTP_HOST: "", MAIL_SEND_PER_HOUR: "" });
+    expect(unset.problems).toEqual([]);
+    expect(unset.config.MAIL_UNSET).toBe("hold");
+    expect(parseEnv({ ...SERVER, APP_ENV: "staging", DB_NAME: "mycity_stg", REDIS_URL: "redis://127.0.0.1:6379/1" }).config.MAIL_UNSET).toBe("hold");
+    expect(parseEnv({}).config.MAIL_UNSET).toBe("capture");
+    expect(parseEnv({ APP_ENV: "test" }).config.MAIL_UNSET).toBe("capture");
     expect(parseEnv({ ...SERVER, MAIL_FROM: "MyCity" }).problems).toContain("MAIL_FROM must be an address, or Name <address>");
   });
 
@@ -70,10 +76,8 @@ describe("config/env parseEnv", () => {
     ]));
   });
 
-  test("a server must pace its mail to the mailbox's hourly limit", () => {
-    expect(parseEnv({ ...SERVER, MAIL_SEND_PER_HOUR: "" }).problems).toContain(
-      "MAIL_SEND_PER_HOUR is required on production (the mailbox's hourly limit; docs/runbooks/dns-and-mail.md)",
-    );
+  test("the hourly mail limit is the file's fallback: empty is unpaced, never a refusal to start", () => {
+    expect(parseEnv({ ...SERVER, MAIL_SEND_PER_HOUR: "" }).problems).toEqual([]);
     expect(parseEnv({ MAIL_SEND_PER_HOUR: "" }).config.MAIL_SEND_PER_HOUR).toBe(0);
   });
 

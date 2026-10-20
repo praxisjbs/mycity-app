@@ -66,9 +66,12 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
 
 ## 4 · After the first run
 
-1. **Fill mail in both `.env` files** (`SMTP_*`; production and staging refuse to boot without it):
-   `sudoedit /srv/mycity/prod/shared/.env`, then the same for `stg`. `GEMINI_API_KEY` too, when
-   there is one (empty uses the stub).
+1. **Set mail and the keys on Settings · Integrations**, on each environment, once the app is up
+   (`docs/guides/integrations.md`; `docs/runbooks/dns-and-mail.md` §4 has the values): the System
+   Sender, the Staff Mail Server when its hosts differ from the defaults, Geoapify's key and
+   Gemini's (none uses the stub). Until a sender is set, system mail is held, not lost. The `.env`
+   lines (`SMTP_*`, `MAIL_SEND_PER_HOUR`, `GEOAPIFY_API_KEY`, `GEMINI_API_KEY`) still work as the
+   fallback, and a server starts without them.
 2. **Copy `/root/mycity-secrets/` somewhere safe**, off the server. It holds the database
    passwords and the two `ENCRYPTION_KEY`s; a lost encryption key loses every value encrypted
    with it (mailbox passwords, integration secrets).

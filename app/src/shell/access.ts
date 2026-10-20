@@ -6,18 +6,20 @@ import { MODULES, type ModuleDef, type TabDef } from "./catalogue";
  * grant does not allow, so a hidden button is never the protection.
  */
 export function visibleModules(me: Me): ModuleDef[] {
-  return MODULES.filter((m) => me.grants[m.key]?.includes("view") || (m.key === "settings" && healthView(me)));
+  return MODULES.filter((m) => me.grants[m.key]?.includes("view") || (m.key === "settings" && (healthView(me) || integrationsView(me))));
 }
 
 /**
  * Status, Performance and Faults sit in Settings but are held by system_health
- * (docs/guides/system-health.md §8): the Implementation Team and the System Administrator
- * see them, Operations & People and Management do not, and a person who holds System
- * Health without Settings still reaches them from a notice. ⌘K answers the same way
- * (src/shared/search/screens.js).
+ * (docs/guides/system-health.md §8), and Integrations by integrations
+ * (docs/guides/integrations.md §8): the Implementation Team and the System Administrator
+ * see them, Operations & People and Management do not, and a person who holds one of
+ * these keys without Settings still reaches its tabs from a notice. ⌘K answers the same
+ * way (src/shared/search/screens.js).
  */
 const SYSTEM_HEALTH_TABS = ["status", "performance", "faults"];
 const healthView = (me: Me) => me.is_ceo || !!me.grants.system_health?.includes("view");
+const integrationsView = (me: Me) => me.is_ceo || !!me.grants.integrations?.includes("view");
 
 /**
  * Does the person hold this capability, an authority inside a module beyond its six
@@ -39,6 +41,7 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
      * only ⌘K hides it (src/shared/search/screens.js tabVisible).
      */
     if (mod.key === "settings" && SYSTEM_HEALTH_TABS.includes(t.slug)) return healthView(me);
+    if (mod.key === "settings" && t.slug === "integrations") return integrationsView(me);
     if (mod.key === "settings") return !!FULL(me);
     if (mod.key === "people" && !FULL(me)) return t.slug === "attendance" || t.slug === "organogram";
     /* Announcements is the posting and read-tracking side; staff read them in #announcements. */

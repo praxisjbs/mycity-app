@@ -44,6 +44,18 @@ describe("shell access", () => {
     expect(tabs(person([], { is_ceo: true }))).toEqual(all);
   });
 
+  it("Settings shows Integrations only to integrations viewers and the CEO", () => {
+    const settings = MODULES.find((m) => m.key === "settings")!;
+    const has = (me: Me) => visibleTabs(me, settings).some((t) => t.slug === "integrations");
+    expect(has(person([], { grants: { settings: ["view"] } }))).toBe(false);
+    expect(has(person([], { grants: { settings: ["view"], integrations: ["view"] } }))).toBe(true);
+    expect(has(person([], { grants: { settings: ["view"] }, is_ceo: true }))).toBe(true);
+    // Integrations alone still reaches Settings, and only its own tab, so its notices land.
+    const itOnly = person([], { grants: { integrations: ["view"] } });
+    expect(visibleModules(itOnly).map((m) => m.key)).toEqual(["settings"]);
+    expect(visibleTabs(itOnly, settings).map((t) => t.slug)).toEqual(["integrations"]);
+  });
+
   it("a capability never opens a module the person cannot view", () => {
     const me = person(["home.team"], { grants: { people: ["view"] } });
     expect(visibleModules(me).map((m) => m.key)).toEqual(["people"]);
@@ -60,8 +72,8 @@ describe("shell access", () => {
     const ops = person([], { grants: { settings: ["view", "edit"] } });
     expect(visibleTabs(ops, settings).map((t) => t.slug).filter((s) => health.includes(s))).toEqual([]);
     expect(visibleTabs(ops, settings).map((t) => t.slug)).toContain("users");
-    // The System Administrator holds both: every tab.
-    const admin = person([], { grants: { settings: ["view"], system_health: ["view", "edit"] } });
+    // The System Administrator holds all three: every tab.
+    const admin = person([], { grants: { settings: ["view"], system_health: ["view", "edit"], integrations: ["view", "edit", "delete"] } });
     expect(visibleTabs(admin, settings)).toHaveLength(settings.tabs.length);
     // A person who holds System Health alone still reaches Settings, and sees only its three tabs.
     const healthOnly = person([], { grants: { system_health: ["view"] } });

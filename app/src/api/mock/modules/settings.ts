@@ -1,5 +1,4 @@
 import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, NumberingScheme, Organisation, RoleDetail, RoleGrant, RoleRow, RoleSave, UserRow, WorkingDay } from "@mycity/contract/contract.gen.ts";
-import type { Status } from "@/api/types/performance";
 import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { exportFile } from "./shared";
 import { CAPABILITIES, ROLE_CAPABILITIES } from "../data/access";
@@ -8,7 +7,6 @@ import { AUDIT, audit } from "../data/audit";
 import { waysOf } from "./security";
 import { ON_UPLOAD } from "../uploads";
 
-const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const admin = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 const who = (u: string) => byKey(u)!.display_name;
 
@@ -433,13 +431,6 @@ route("PUT /api/v1/settings/numbering/:doc_type", (req) => {
   audit(who(req.user!), "A setting was changed", `Numbering · ${s.label}`, before, s.next, null, "Settings");
   return ok(s);
 });
-
-route("GET /api/v1/settings/integrations", () =>
-  ok({
-    items: [["smtp", "SMTP, mycityapp.io", "Outbound mail for notifications and offer letters.", S("ok", "Connected")], ["imap", "IMAP mailbox", "Staff mailboxes on the MyCity domain. No Google, no Microsoft.", S("ok", "Connected")], ["model", "Gemini", "The model behind Praxis AI. Spend capped monthly.", S("ok", "Connected")], ["careers", "Careers page", "Vacancies publish to go.mycityapp.io.", S("ok", "Connected")], ["sheets", "Google Sheets import", "Download as xlsx and import. No API connection needed.", S("neutral", "Manual")], ["payments", "Payment gateway", "Not in scope. Disbursement is logged, not executed.", S("neutral", "Not connected")]].map(([key, name, text, status]) => ({ key: key as string, name: name as string, text: text as string, status: status as Status })),
-    health: [["SMTP", "09:14", 284], ["IMAP", "09:21", 1842], ["Gemini", "09:12", 84], ["Careers page", "08:02", 612]].map(([service, t, volume]) => ({ service: service as string, last_call: at(0, t as string), volume_7d: volume as number, failures: 0, status: S("ok", "Healthy") })),
-  }),
-);
 
 /* ── Security: rules within the .env floor, two-step by role, failed sign-ins, live sessions ── */
 const FLOOR = { session_max_age_min: 120, idle_lock_min: 30, password_min_length: 8 };

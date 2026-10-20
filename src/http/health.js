@@ -115,6 +115,15 @@ registerCheck("clamd", () => require("../services/media/scan").health());
 registerCheck("mail", () =>
   require("../services/mail/system-mail.service").health(),
 );
+// The connections on Settings · Integrations that have no live probe here, from their stored
+// state: no call out, so a readiness probe never spends Geoapify's credits
+// (docs/guides/integrations.md §3 step 12).
+registerCheck("maps", () =>
+  require("../shared/integrations/state").readiness(require("../config/db").pool, "geoapify"),
+);
+registerCheck("mail_server", () =>
+  require("../shared/integrations/state").readiness(require("../config/db").pool, "mailbox_server"),
+);
 // Which AI vendor answers (Gemini or the stub), from configuration only: no call out.
 registerCheck("ai", () =>
   require("../services/ai/governance").health(require("../config/db").pool),

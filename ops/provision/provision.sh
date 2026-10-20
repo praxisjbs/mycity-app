@@ -305,11 +305,14 @@ for e in "${ENVS[@]}"; do
     render "$OPS/systemd/$e.env.template" "$target" "$e"
     note "$target written"
   fi
+  # System mail may instead be set on Settings, Integrations, System Sender, which wins over
+  # these lines; with neither, ${APP_ENV[$e]} starts and holds its mail until one is set
+  # (docs/guides/integrations.md §6.8).
   if grep -q '^SMTP_HOST=$' "$target" || grep -q '^SMTP_PASSWORD=$' "$target"; then
-    later "fill SMTP_* in $target (${APP_ENV[$e]} refuses to boot without mail)"
+    later "set the system sender for ${APP_ENV[$e]}: Settings, Integrations, or SMTP_* in $target (mail is held until then)"
   fi
   if ! grep -q '^MAIL_SEND_PER_HOUR=[1-9]' "$target"; then
-    later "add MAIL_SEND_PER_HOUR to $target (production 40, staging 10; ${APP_ENV[$e]} refuses to boot without it)"
+    later "give ${APP_ENV[$e]}'s sender its hourly limit (production 40, staging 10): Settings, Integrations, or MAIL_SEND_PER_HOUR in $target"
   fi
 done
 
