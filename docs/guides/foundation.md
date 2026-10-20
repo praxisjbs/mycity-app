@@ -880,3 +880,4 @@ screen.
   Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
   Your import finished names its audience and takes no copies.
 - 20/10/2026 · GE · §6.1: the staff loader keeps a birthday the sheet gives as a day and month (`employee.birth_day`, `birth_month`, migration `1180`), on every deploy, so the Staff Community celebrations can post it.
+- 20/10/2026 · GE · The outbox dispatcher is woken by each commit (`emit()` sends a Postgres NOTIFY, delivered on commit; `src/jobs/loops/outbox-wake.js` LISTENs) instead of waiting up to a second for its tick, which stays as the safety net (SYSTEM_ARCHITECTURE §6). Measured locally: posting 12 ms, the handlers 5 ms, the reader's refetch 14 ms, so the tick was most of the wait.

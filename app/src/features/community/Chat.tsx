@@ -105,17 +105,20 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
     }
   };
 
+  /** A sent message shows from the server's answer at once; the page is read again behind it. */
+  const arrived = (m: Message) => setMsgs((list) => (list.some((x) => x.community_message_id === m.community_message_id) ? list : [...list, m]));
+
   const send = async (body: MessageCreate) => {
     if (!id) return;
-    await api.call("POST /api/v1/community/channels/:id/messages", { params: { id }, body, idempotencyKey: crypto.randomUUID() });
-    await reload();
+    arrived(await api.call("POST /api/v1/community/channels/:id/messages", { params: { id }, body, idempotencyKey: crypto.randomUUID() }));
+    void reload();
   };
 
   /** Files sent together (Send Files): posted one at a time, in order, then read back once. */
   const sendMany = async (bodies: MessageCreate[]) => {
     if (!id) return;
-    for (const body of bodies) await api.call("POST /api/v1/community/channels/:id/messages", { params: { id }, body, idempotencyKey: crypto.randomUUID() });
-    await reload();
+    for (const body of bodies) arrived(await api.call("POST /api/v1/community/channels/:id/messages", { params: { id }, body, idempotencyKey: crypto.randomUUID() }));
+    void reload();
   };
 
   /** A file or a voice note: uploaded to the conversation first, then posted. */

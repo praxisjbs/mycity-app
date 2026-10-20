@@ -7,6 +7,9 @@
  * claim already uses FOR UPDATE SKIP LOCKED, so two workers share the rows instead of
  * running one twice. A burst is drained in up to ten claims per tick.
  *
+ * A committed event also wakes it at once (jobs/loops/outbox-wake.js), so a chat message
+ * reaches the other screen without waiting for the tick; the tick stays as the safety net.
+ *
  * Once a day it also deletes finished outbox rows older than 30 days (the event itself
  * stays in event_log), under the cron lock so only one worker does it.
  */

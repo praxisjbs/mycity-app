@@ -176,6 +176,9 @@ function check(event) {
   return entry;
 }
 
+/** The Postgres channel a committed event wakes the dispatcher on. */
+const WAKE_CHANNEL = "mycity_outbox";
+
 /**
  * Record an event, its audit entry and its follow-on work, in the caller's transaction.
  * @param {import("pg").PoolClient} client  inside atomically()
@@ -225,7 +228,7 @@ async function emit(client, event) {
        SELECT ev.event_id, $1, $17 FROM ev
        ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING
      )
-     SELECT event_id, occurred_at FROM ev`,
+     SELECT event_id, occurred_at, pg_notify($18, '')::text AS woke FROM ev`,
     [
       event.key,
       moduleKey,
@@ -244,6 +247,9 @@ async function emit(client, event) {
       entry.security || entry.sensitive,
       json(event.metadata || {}),
       event.dedup_key || null,
+      // Wakes the worker's dispatcher the moment this commits (jobs/loops/outbox-wake.js):
+      // Postgres sends it only on COMMIT, once per transaction however many events it holds.
+      WAKE_CHANNEL,
     ],
   );
 
@@ -253,10 +259,11 @@ async function emit(client, event) {
     1,
     "Events emitted, by module.",
   );
-  return rows[0];
+  return { event_id: rows[0].event_id, occurred_at: rows[0].occurred_at };
 }
 
 module.exports = {
+  WAKE_CHANNEL,
   emit,
   withActor,
   redact,

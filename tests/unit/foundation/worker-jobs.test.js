@@ -57,6 +57,7 @@ describe("job registry", () => {
       "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",
+      "community-membership",
       "export-cleanup",
       "home-alert-sweeps",
       "import-cleanup",
