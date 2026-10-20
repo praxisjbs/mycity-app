@@ -90,6 +90,16 @@ export function useReturnFocus(open: boolean): (e: Event) => void {
 }
 
 /** Fields that take typing, so the phone's keyboard comes up when one has focus. */
+/**
+ * Esc pressed in a field whose own list is open (an AddressField's suggestions)
+ * closes that list, not the overlay around it. The dialog hears Esc first, on the
+ * document, so it is the one that has to step aside.
+ */
+export const escapeClosesList = (e: KeyboardEvent): boolean => {
+  const t = e.target;
+  return t instanceof HTMLElement && t.getAttribute("role") === "combobox" && t.getAttribute("aria-expanded") === "true";
+};
+
 export const TEXT_ENTRY = "input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, select, [contenteditable=true]";
 
 /**

@@ -31,7 +31,8 @@ const MOCK = import.meta.env.VITE_API_MODE === "mock";
 
 const FAILED = "That file could not be opened. Try again.";
 
-async function fetchBlob(url: string): Promise<Blob> {
+/** A gated file's bytes, fetched with the session's token (the map's tiles use it too). */
+export async function fetchBlob(url: string): Promise<Blob> {
   const res = await fetch(url, {
     credentials: "include",
     headers: session.token ? { Authorization: `Bearer ${session.token}` } : {},
