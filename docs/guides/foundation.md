@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 19/10/2026 |
+| Last changed | 20/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -651,6 +651,21 @@ The map's tiles and the address at a worksite's centre go through the same API.
   `people` create or edit, so a home's or a punch's coordinates are never sent to the provider;
   `LocationLabel` is not used on attendance screens for that reason.
 
+### 6.14 System mail to MyCity's own domain (TB, 20/10/2026)
+
+Before system mail goes out, each recipient's domain is route-checked
+(`services/mail/deliverability/route-check.js`): a relay that hosts a domain's website while its
+MX points elsewhere would keep the message in a local mailbox and report success, so that send
+fails with `MAIL_ROUTE_TRAPPED` and is reported in Settings · System Health.
+
+`mycityapp.io` has that shape and is not a trap: its MX is Namecheap's spam filter
+(`mx1-3-hosting.jellyfish.systems`), which passes mail back to the mailboxes on the same cPanel host
+that system mail is sent through and the Mailbox module reads (`docs/runbooks/dns-and-mail.md` §4).
+DNS cannot tell the two apart, so the domains whose mailboxes are on the relay are named in
+`SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) and are not checked. Every other domain still is, and a
+trapped one is still refused. Today's failed digests are not sent again (a digest day already passed
+is not sent late, `notifications.md` §11).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -954,3 +969,4 @@ screen.
   chart to reach the fault list, which is the part the IT team uses. The `system_health` permission
   key, the routes and the data are unchanged; only which tab each section sits on changes. Their
   guide is `docs/guides/system-health.md`.
+- 20/10/2026 · TB · §6.14: system mail to `mycityapp.io` is no longer refused as a trapped route (System Health fault #1, every staging digest failing). Domains whose mailboxes are on the SMTP relay behind the host's spam-filter MX are named in `SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) and not route-checked; every other domain still is.
