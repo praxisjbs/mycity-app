@@ -594,6 +594,9 @@ describeDb("identity against the real migrations", () => {
         /* 0300 added archiving: a record that was never archived carries neither. */
         "archive_reason",
         "archived_at",
+        /* 1180: a birthday known only as a day and month, filled by the staff loader. */
+        "birth_day",
+        "birth_month",
         "dotted_manager_id",
         "dotted_manager_seat_id",
         "left_on",
