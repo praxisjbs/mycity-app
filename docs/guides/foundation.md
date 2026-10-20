@@ -826,6 +826,14 @@ screen.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Settings' Status, Performance and Faults follow `system_health`, not
+  `settings`, in the shell (`app/src/shell/access.ts`) and ⌘K (`src/shared/search/screens.js`):
+  Operations & People no longer see them, and a holder of System Health without Settings reaches
+  Settings with those three tabs only. A route in `src/shared/route-map.js` may name the
+  `permission` a viewer must hold when its screen sits in another module's tabs; `moduleOf()`
+  answers it. The mock's full-access accounts gain `system_health` so the screen gates crawl the
+  three tabs (`docs/guides/system-health.md` §8).
+
 - 19/10/2026 · TB · §6.13: a field assignment's sites and a client visit's site show the same map as a worksite's form (`app/src/features/attendance/SiteMap.tsx`), without the address lookup.
 - 19/10/2026 · TB · Map tiles and a worksite's address (F21, §5, §6.13; decided 19/10/2026): `GET /maps/tiles/:z/:x/:y.png` (signed in, fetched by the map with the session through `MapView`'s new `loadTile`) and `GET /maps/reverse` (`people` create or edit, a worksite's centre only; homes and punches are never sent). People · Worksites shows the fence on a map in the form and the worksite's details, tapping the map moves the centre, and typed coordinates fill an empty address.
 - 19/10/2026 · TB · The address search (F21, §5, §6.13): `GET /maps/search` in a new `maps` module over `services/maps/geoapify.service.js` (`GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui`, now on every address a person types: People · Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation (§10.1) and a vacancy's location. On a worksite, a field site and a client visit the place picked fills Latitude and Longitude. Map tiles and the reverse lookup stay open.

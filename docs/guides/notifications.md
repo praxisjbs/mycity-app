@@ -54,7 +54,8 @@ left alone.
    with the channels their preferences allow (`categories.js`), and hands the rows to the
    `notification-deliver` job.
 2. `notification-deliver` sends `in_app` over the person's socket (`notification`, the contract's
-   `Notification`, with a link only when they may open its module), mails `email`, and queues one
+   `Notification`, with a link only when they may open it: the module the record's route in
+   `shared/route-map.js` names as its `permission`, or the screen's module), mails `email`, and queues one
    `notification-push` job per row carrying `push` (job id `push-<notification_id>`, so a retried
    delivery never queues it twice), at once: nothing waits while the person is in the app (TB,
    19/10/2026).
@@ -435,6 +436,13 @@ The design choices of Settings · Notifications (copies only on notices about so
 channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5, open to TB.
 
 ## 14 · Change log
+
+- 20/10/2026 · TB · A notice's link is offered by the permission its route names
+  (`routeMap.moduleOf`), not by the module its path sits in: System Health's Status, Performance
+  and Faults are Settings tabs held by `system_health`. Its `error_group`, `health_snapshot` and
+  `performance_target` records had no route at all, so every System Health notice opened nothing;
+  they now open Faults (with the fault's sheet), Status and Performance
+  (`docs/guides/system-health.md` §2, §8).
 
 - 19/10/2026 · TB · Guide written before the build, from TB's eight answers: web push, the banner,
   the pane on both shells and Notification Settings brought forward from M6.

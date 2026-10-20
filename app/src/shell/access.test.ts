@@ -5,6 +5,7 @@ import { hasCapability, visibleModules, visibleTabs } from "./access";
 
 const home = MODULES.find((m) => m.key === "home")!;
 const people = MODULES.find((m) => m.key === "people")!;
+const settings = MODULES.find((m) => m.key === "settings")!;
 
 function person(capabilities: string[], over: Partial<Me> = {}): Me {
   return {
@@ -51,5 +52,22 @@ describe("shell access", () => {
   it("every other module's tabs are gated as before", () => {
     expect(visibleTabs(person(["home.team"]), people).map((t) => t.slug)).toEqual(["organogram", "attendance"]);
     expect(visibleTabs(person([], { is_ceo: true }), people)).toHaveLength(people.tabs.length);
+  });
+
+  it("Status, Performance and Faults follow System Health, not Settings, so a notice always lands", () => {
+    const health = ["status", "performance", "faults"];
+    // Operations & People hold Settings but not System Health: the three tabs are not theirs.
+    const ops = person([], { grants: { settings: ["view", "edit"] } });
+    expect(visibleTabs(ops, settings).map((t) => t.slug).filter((s) => health.includes(s))).toEqual([]);
+    expect(visibleTabs(ops, settings).map((t) => t.slug)).toContain("users");
+    // The System Administrator holds both: every tab.
+    const admin = person([], { grants: { settings: ["view"], system_health: ["view", "edit"] } });
+    expect(visibleTabs(admin, settings)).toHaveLength(settings.tabs.length);
+    // A person who holds System Health alone still reaches Settings, and sees only its three tabs.
+    const healthOnly = person([], { grants: { system_health: ["view"] } });
+    expect(visibleModules(healthOnly).map((m) => m.key)).toEqual(["settings"]);
+    expect(visibleTabs(healthOnly, settings).map((t) => t.slug)).toEqual(health);
+    // The CEO passes every check.
+    expect(visibleTabs(person([], { is_ceo: true, grants: {} }), settings)).toHaveLength(settings.tabs.length);
   });
 });

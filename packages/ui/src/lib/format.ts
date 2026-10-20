@@ -147,12 +147,14 @@ export function initials(name: string | null | undefined): string {
   return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")).toUpperCase();
 }
 
-/** "84 KB", "1.1 MB" from a byte count. */
+/** "84 KB", "1.1 MB", "23.4 GB", "1.25 TB" from a byte count. */
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null) return "";
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 ** 2) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  if (bytes < 1024 ** 4) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  return `${(bytes / 1024 ** 4).toFixed(2)} TB`;
 }
 
 /** Plural with count: plural(3, "employee") → "3 employees". */

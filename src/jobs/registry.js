@@ -149,6 +149,7 @@ const SCHEDULERS = Object.freeze([
   "system-health",
   "system-health-digest",
   "system-health-purge",
+  "system-health-sample",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */
@@ -247,12 +248,15 @@ function defineSchedule(spec) {
  * `counts` adds several ticks in one write: an in-process schedule ticks every second,
  * and a row a second would be the busiest table in the database.
  * `failed_at` is when the latest of them failed, if one did.
+ * `total_ms` and `max_ms` give a job's mean and longest run (Settings · Performance); several
+ * ticks in one write each count at the latest tick's duration.
  */
 async function recordRun(name, startedAt, ok, note, { runs = 1, failures = ok ? 0 : 1, failed_at = null } = {}) {
   try {
     await require("../config/db").pool.query(
-      `INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, note, runs, failures, last_failure_at)
-       VALUES ($1, now(), $2, $3, $4, $5::bigint, $6::bigint, CASE WHEN $6::bigint > 0 THEN COALESCE($7::timestamptz, now()) END)
+      `INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, note, runs, failures, last_failure_at, total_ms, max_ms)
+       VALUES ($1, now(), $2::integer, $3, $4, $5::bigint, $6::bigint, CASE WHEN $6::bigint > 0 THEN COALESCE($7::timestamptz, now()) END,
+               $2::integer * $5::bigint, $2::integer)
        ON CONFLICT (name) DO UPDATE SET
          last_run_at = now(),
          duration_ms = EXCLUDED.duration_ms,
@@ -260,6 +264,8 @@ async function recordRun(name, startedAt, ok, note, { runs = 1, failures = ok ? 
          note = EXCLUDED.note,
          runs = schedule_run.runs + EXCLUDED.runs,
          failures = schedule_run.failures + EXCLUDED.failures,
+         total_ms = schedule_run.total_ms + EXCLUDED.total_ms,
+         max_ms = GREATEST(schedule_run.max_ms, EXCLUDED.max_ms),
          last_failure_at = COALESCE(EXCLUDED.last_failure_at, schedule_run.last_failure_at)`,
       [name, Date.now() - startedAt, ok, note ? String(note).slice(0, 500) : null, runs, failures, failed_at],
     );

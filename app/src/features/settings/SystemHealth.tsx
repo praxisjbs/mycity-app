@@ -5,7 +5,6 @@ import type {
   FaultDetail,
   FaultRow,
   HealthCheck,
-  PerformancePoint,
   QueueRow,
   SchedulerRow,
 } from "@mycity/contract/contract.gen.ts";
@@ -13,6 +12,7 @@ import { api } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
+import { useSearchParams } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import {
   Banner,
@@ -23,13 +23,12 @@ import {
   DataView,
   Details,
   DesktopOnly,
-  EmptyState,
   ErrorState,
   Field,
   FilterSelect,
+  formatDate,
   formatDateTime,
   FormFooter,
-  Grid,
   HelpTerm,
   KeyValue,
   LoadingRows,
@@ -37,7 +36,6 @@ import {
   PhoneOnly,
   Pill,
   SearchInput,
-  SegmentedControl,
   SidePanel,
   TextAreaField,
   Tick,
@@ -174,16 +172,6 @@ export function StatusTab() {
       <SidePanel open={!!open} onClose={() => setOpen(null)} title={open?.label ?? "Check"} size="wide">
         {open && <CheckSheet key={open.key} check={open} />}
       </SidePanel>
-    </>
-  );
-}
-
-/** Settings · Performance: how the app answered, and what the server has left. */
-export function PerformanceTab() {
-  return (
-    <>
-      <PageHeader title="Performance" sub="How the app answered" />
-      <Performance />
     </>
   );
 }
@@ -439,123 +427,33 @@ function CheckSheet({ check }: { check: HealthCheck }) {
   );
 }
 
-/* ───────────── Performance ───────────── */
-
-/**
- * A day or a week of snapshots: how the app answered, and what the server has left.
- *
- * The empty state is deliberate. "Nothing recorded yet" reads like good news, and the
- * first release of this screen showed exactly that for an hour while the job behind it
- * was never started. So an empty chart says which of the two it is.
- */
-function Performance() {
-  const [range, setRange] = useState<"24h" | "7d">("24h");
-  const p = useApi("GET /api/v1/system-health/performance", { query: { range } });
-  const d = p.data;
-  const span = range === "24h" ? "day" : "week";
-
-  if (p.error)
-    return (
-      <Card>
-        <ErrorState error={p.error} onRetry={p.reload} />
-      </Card>
-    );
-  if (!d)
-    return (
-      <Card>
-        <LoadingRows count={6} />
-      </Card>
-    );
-
-  const bars = (pick: (x: PerformancePoint) => number | null, unit: string) => {
-    const vals = d.points.map(pick).filter((v): v is number => v !== null);
-    const worst = Math.max(1, ...vals);
-    return d.points
-      .filter((x) => pick(x) !== null)
-      .slice(-14)
-      .map((x) => ({
-        label: formatDateTime(x.at),
-        value: `${pick(x)}${unit}`,
-        percent: Math.round(((pick(x) as number) * 100) / worst),
-      }));
-  };
-
-  const served = d.points.some((x) => x.requests !== null);
-  const resourced = d.points.some((x) => x.disk_free_pct !== null);
-  const latest = [...d.points].reverse().find((x) => x.disk_free_pct !== null);
-
-  return (
-    <>
-      <Card>
-        <CardHeader
-          title="Over Time"
-          right={<SegmentedControl value={range} onChange={(v) => setRange(v as "24h" | "7d")} options={[["24h", "Day"], ["7d", "Week"]]} />}
-        />
-        {!d.recording && (
-          <Banner tone="warn">
-            {d.last_snapshot_at
-              ? "The five minute job has stopped, so nothing is recording. See Status, Background Jobs."
-              : "No snapshot has ever been taken, so the job is not running. See Status, Background Jobs."}
-          </Banner>
-        )}
-        <KeyValue
-          items={[
-            ["Every check up", `${d.uptime_pct}% of the ${span}`],
-            ["Not recorded", d.gap_minutes ? `${d.gap_minutes} minutes` : "None"],
-            ["Disk free", latest?.disk_free_pct != null ? `${latest.disk_free_pct}%` : null],
-            ["Memory used", latest?.memory_used_pct != null ? `${latest.memory_used_pct}%` : null],
-            ["Database", latest?.database_mb != null ? `${latest.database_mb} MB` : null],
-          ]}
-        />
-      </Card>
-
-      {d.recording && d.points.length > 0 && (
-        <Grid cols={2} className="mt-3">
-          <Card>
-            <CardHeader title="Requests" />
-            {served ? (
-              <>
-                <Bars rows={bars((x) => x.mean_ms, " ms")} note={`Average response time, by ${range === "24h" ? "hour" : "day"}`} />
-                <Bars
-                  className="mt-3"
-                  rows={bars((x) => (x.error_pct === null ? null : Math.round(Number(x.error_pct))), "%")}
-                  note="Share of requests that failed"
-                />
-              </>
-            ) : (
-              <EmptyState icon="chart" title="No Traffic Yet" text="Figures appear once people use the app." />
-            )}
-          </Card>
-          <Card>
-            <CardHeader title="Server Resources" />
-            {resourced ? (
-              <>
-                <Bars rows={bars((x) => x.disk_free_pct, "%")} note="Disk free" />
-                <Bars className="mt-3" rows={bars((x) => x.memory_used_pct, "%")} note="Memory used" />
-              </>
-            ) : (
-              <EmptyState icon="chart" title="Not Recorded Yet" text="Resource figures start with the next snapshot." />
-            )}
-          </Card>
-        </Grid>
-      )}
-
-      {d.recording && d.points.length > 0 && (
-        <Grid cols={2} className="mt-3">
-          <Card>
-            <CardHeader title="Open Faults" />
-            <Bars rows={bars((x) => x.faults, "")} note={`By ${range === "24h" ? "hour" : "day"}`} />
-          </Card>
-        </Grid>
-      )}
-    </>
-  );
-}
-
 /* ───────────── Faults ───────────── */
 
 function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }) {
   const modal = useModal();
+  // A fault linked by id (a System Health notice, shared/route-map.js) opens its sheet.
+  const [params, setParams] = useSearchParams();
+  const linked = params.get("id");
+  useEffect(() => {
+    if (!linked) return;
+    let gone = false;
+    api
+      .call("GET /api/v1/system-health/faults/:id", { params: { id: linked } })
+      .then((f) => {
+        if (!gone)
+          modal.open({
+            title: f.title,
+            wide: true,
+            body: (close) => <Fault id={f.error_group_id} canEdit={canEdit} close={close} />,
+            onClose: () => setParams({ id: null }, { replace: true }),
+          });
+      })
+      .catch(() => toast("That fault is no longer kept"));
+    return () => {
+      gone = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per linked fault
+  }, [linked]);
   const [filters, setFilters] = useState<Filters>({ status: "active" });
   const [picked, setPicked] = useState<string[]>([]);
   const list = usePaged("GET /api/v1/system-health/faults", { filters });
@@ -735,7 +633,7 @@ function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: ()
       <DesktopOnly unmount>
         <Bars
           className="mt-3"
-          rows={d.daily.map((x) => ({ label: x.day, value: String(x.events), percent: Math.round((x.events * 100) / worst) }))}
+          rows={d.daily.map((x) => ({ label: formatDate(x.day), value: String(x.events), percent: Math.round((x.events * 100) / worst) }))}
           note="The last 14 days"
         />
       </DesktopOnly>

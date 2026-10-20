@@ -120,18 +120,23 @@ registerCheck("ai", () =>
   require("../services/ai/governance").health(require("../config/db").pool),
 );
 
-// What a person asks first when something is slow: how much room is left.
+// What a person asks first when something is slow: how much room is left. The levels are
+// the ones Settings · Performance's Edit Targets holds (kept a minute; the defaults when the
+// table cannot be read), so the screen and these checks always agree.
+const levels = () => require("../modules/system_health/system_health.targets").levels();
+
 // Degraded, never fatal: the app still answers on a full disk, it just cannot write.
 registerCheck("disk", async () => {
   const fs = require("node:fs/promises");
   const { config } = require("../config/env");
   const where = config.MEDIA_ROOT || process.cwd();
-  const st = await fs.statfs(where);
+  const [st, t] = await Promise.all([fs.statfs(where), levels()]);
   const total = st.blocks * st.bsize;
   const free = st.bavail * st.bsize;
   const freePct = total > 0 ? Math.round((free * 100) / total) : null;
   return {
-    status: freePct === null ? "degraded" : freePct < 5 ? "down" : freePct < 10 ? "degraded" : "up",
+    status:
+      freePct === null ? "degraded" : freePct < t.disk_down_free_pct ? "down" : freePct < t.disk_warn_free_pct ? "degraded" : "up",
     free_pct: freePct,
     free_gb: Math.round((free / 1024 ** 3) * 10) / 10,
     total_gb: Math.round((total / 1024 ** 3) * 10) / 10,
@@ -139,13 +144,17 @@ registerCheck("disk", async () => {
   };
 });
 
+// In use is total less what the kernel can hand back (MemAvailable): the disk cache is not
+// counted, or a healthy server would read 90% used all day.
 registerCheck("memory", async () => {
   const os = require("node:os");
-  const total = os.totalmem();
-  const used = total - os.freemem();
+  const host = require("../modules/system_health/system_health.host");
+  const [mem, t] = await Promise.all([host.memory(), levels()]);
+  const total = mem ? mem.total_mb * 1024 ** 2 : os.totalmem();
+  const used = mem ? mem.in_use_mb * 1024 ** 2 : total - os.freemem();
   const usedPct = total > 0 ? Math.round((used * 100) / total) : null;
   return {
-    status: usedPct === null ? "degraded" : usedPct >= 95 ? "down" : usedPct >= 90 ? "degraded" : "up",
+    status: usedPct === null ? "degraded" : usedPct >= t.memory_down_pct ? "down" : usedPct >= t.memory_warn_pct ? "degraded" : "up",
     used_pct: usedPct,
     used_gb: Math.round((used / 1024 ** 3) * 10) / 10,
     total_gb: Math.round((total / 1024 ** 3) * 10) / 10,
@@ -153,14 +162,30 @@ registerCheck("memory", async () => {
   };
 });
 
-// Load per core over one minute: 1.0 means the machine is exactly busy.
+/**
+ * How busy the processor is: busy time over all time since this check last ran in this
+ * process (a quarter second apart the first time). Steal and I/O wait are not busy. Where
+ * there is no /proc (a laptop) it reports the load and stays up.
+ */
+let lastCpu = null;
 registerCheck("cpu", async () => {
   const os = require("node:os");
+  const host = require("../modules/system_health/system_health.host");
   const cores = Math.max(1, os.cpus().length);
-  const load = os.loadavg()[0] / cores;
+  const load = Math.round((os.loadavg()[0] / cores) * 100) / 100;
+  let before = lastCpu;
+  if (!before) {
+    before = await host.cpuTimes();
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  const [now, t] = await Promise.all([host.cpuTimes(), levels()]);
+  lastCpu = now;
+  const total = before && now ? now.total - before.total : 0;
+  const busyPct = total > 0 ? Math.round(((now.busy - before.busy) * 1000) / total) / 10 : null;
   return {
-    status: load >= 4 ? "down" : load >= 2 ? "degraded" : "up",
-    load: Math.round(load * 100) / 100,
+    status: busyPct === null ? "up" : busyPct >= t.cpu_down_pct ? "down" : busyPct >= t.cpu_warn_pct ? "degraded" : "up",
+    busy_pct: busyPct,
+    load,
     cores,
   };
 });
@@ -169,15 +194,18 @@ registerCheck("cpu", async () => {
 // asks the pool for several things at once, and every extra round trip here is a
 // connection this endpoint holds while the app is trying to serve people.
 registerCheck("database_usage", async () => {
-  const { rows } = await require("../config/db").pool.query(
-    `SELECT pg_database_size(current_database()) AS bytes,
-            (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database())::int AS used,
-            current_setting('max_connections')::int AS allowed`,
-  );
+  const [{ rows }, t] = await Promise.all([
+    require("../config/db").pool.query(
+      `SELECT pg_database_size(current_database()) AS bytes,
+              (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database())::int AS used,
+              current_setting('max_connections')::int AS allowed`,
+    ),
+    levels(),
+  ]);
   const { bytes, used, allowed } = rows[0];
   const pct = allowed > 0 ? Math.round((used * 100) / allowed) : null;
   return {
-    status: pct === null ? "degraded" : pct >= 90 ? "down" : pct >= 80 ? "degraded" : "up",
+    status: pct === null ? "degraded" : pct >= t.connections_down_pct ? "down" : pct >= t.connections_warn_pct ? "degraded" : "up",
     size_mb: Math.round(Number(bytes) / 1024 ** 2),
     connections_used: used,
     connections_allowed: allowed,

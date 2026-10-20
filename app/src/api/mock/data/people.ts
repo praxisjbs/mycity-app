@@ -74,7 +74,12 @@ export const SIGN_INS: Record<string, { view: "operations" | "ceo" | "partnershi
   chidera: { view: "staff", role: "Staff" },
 };
 
-export const MODULES_ALL = ["home", "workspace", "ess", "community", "mailbox", "people", "performance", "queries", "recruitment", "payroll", "partnerships", "expenses", "knowledge", "praxis_ai", "settings"];
+/**
+ * Every module key, for the two accounts that open everything on the mock (the screen
+ * gates sign in as one of them). `system_health` holds Settings' Status, Performance and
+ * Faults tabs (app/src/shell/access.ts), so without it the crawl never reaches them.
+ */
+export const MODULES_ALL = ["home", "workspace", "ess", "community", "mailbox", "people", "performance", "queries", "recruitment", "payroll", "partnerships", "expenses", "knowledge", "praxis_ai", "settings", "system_health"];
 
 export function grantsFor(key: string): Record<string, string[]> {
   const all = ["view", "create", "edit", "delete", "approve", "export"];

@@ -1,0 +1,28 @@
+# MyCity host figures · docs/guides/system-health.md §7, docs/runbooks/system-health.md §7.
+# Installed by ops/provision/provision.sh; started by mycity-host-stats.timer every 15 minutes.
+# Run now:  sudo systemctl start mycity-host-stats     Logs: journalctl -u mycity-host-stats
+# What fills the disk (each environment's database and files, backups, logs), whether the
+# server wants a restart, and the updates waiting, into /var/lib/mycity/host-stats.json for
+# Settings · Performance. Reads everything, writes only that folder.
+
+[Unit]
+Description=MyCity host figures for Settings · Performance
+After=postgresql.service
+ConditionPathExists=/srv/mycity/bin/mycity-host-stats
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/srv/mycity/bin/mycity-host-stats
+TimeoutStartSec=10min
+Nice=10
+IOSchedulingClass=idle
+SyslogIdentifier=mycity-host-stats
+
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/mycity
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes

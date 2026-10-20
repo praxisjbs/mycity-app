@@ -11,3 +11,4 @@ export { DonutChart, type DonutChartProps, type DonutSlice } from "./DonutChart"
 export { BandChart, type BandChartProps, type BandChartRow } from "./BandChart";
 export { Sparkline, type SparklineProps } from "./Sparkline";
 export { SERIES, type Series } from "./lazy";
+export * from "./TrendChart";

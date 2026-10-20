@@ -102,6 +102,7 @@ describeDb("System Health against the real migrations", () => {
       get: (path) => auth(request(app).get(`/api/v1${path}`)),
       post: (path) => auth(request(app).post(`/api/v1${path}`)),
       patch: (path) => auth(request(app).patch(`/api/v1${path}`)),
+      put: (path) => auth(request(app).put(`/api/v1${path}`)),
     };
   };
 
@@ -321,6 +322,275 @@ describeDb("System Health against the real migrations", () => {
     });
   });
 
+  /* ------------------------------------------------------------------ */
+
+  describe("performance", () => {
+    const sampler = require("../../src/modules/system_health/system_health.sample");
+    const targets = require("../../src/modules/system_health/system_health.targets");
+    const stats = require("../../src/shared/observability/request-stats");
+
+    /** A minute of the server, `ago` minutes back, as the sampler would have written it. */
+    const sample = (ago, over = {}) =>
+      repo.addSample(pool, {
+        minute: new Date(Math.floor(Date.now() / 60_000) * 60_000 - ago * 60_000),
+        cores: 8,
+        cpu_busy_pct: 20,
+        cpu_steal_pct: 1,
+        cpu_iowait_pct: 2,
+        memory_total_mb: 18432,
+        memory_in_use_mb: 5100,
+        memory_cache_mb: 9800,
+        memory_free_mb: 3532,
+        disk_total_mb: 241000,
+        disk_used_mb: 24000,
+        disk_free_mb: 205000,
+        disk_read_kb: 600,
+        disk_written_kb: 1200,
+        network_in_kb: 6000,
+        network_out_kb: 3000,
+        tcp_connections: 40,
+        production_cpu_pct: 12,
+        production_memory_mb: 1900,
+        staging_cpu_pct: 3,
+        staging_memory_mb: 800,
+        database_cpu_pct: 4,
+        database_memory_mb: 1600,
+        redis_cpu_pct: 0.5,
+        redis_memory_mb: 200,
+        api_up: true,
+        users_online: 6,
+        ...over,
+      });
+
+    beforeEach(async () => {
+      await q("DELETE FROM perf_sample");
+      await q("DELETE FROM request_stat");
+      await q("DELETE FROM route_stat");
+      await q("DELETE FROM process_beat");
+      stats.__reset();
+      sampler.__reset();
+      targets.__reset();
+    });
+
+    test("only System Health's holders may read it, and only edit may change the targets", async () => {
+      for (const path of ["/performance", "/capacity", "/routes", "/database", "/database/tables", "/background", "/processes", "/targets"]) {
+        expect((await as("ops").get(`/system-health${path}`)).status).toBe(403);
+      }
+      expect((await as("ops").put("/system-health/targets").send(targets.DEFAULTS)).status).toBe(403);
+    });
+
+    test("an empty window says nothing is recording, rather than looking like good news", async () => {
+      const dead = await as("admin").get("/system-health/performance?range=hour");
+      expect(dead.status).toBe(200);
+      expect(dead.body.recording).toBe(false);
+      expect(dead.body.last_sample_at).toBeNull();
+      expect(dead.body.availability.state).toBe("none");
+      // A server with no sample yet has no gap to report either.
+      expect(dead.body.gap_minutes).toBe(0);
+
+      // The sampler runs: no API answers on this port, so the minute is a minute down.
+      const r = await sampler.sample({ wait: 0, port: 1 });
+      expect(r).toEqual(expect.objectContaining({ written: 1, held: 0, api_up: false }));
+      const live = await as("admin").get("/system-health/performance?range=hour");
+      expect(live.body.recording).toBe(true);
+      expect(live.body.down_minutes).toBe(1);
+      expect(live.body.availability).toEqual({ value: "0", target: "99.90", state: "missed" });
+    });
+
+    test("availability counts the minutes the API answered, and a new server is not a day of gaps", async () => {
+      for (let ago = 0; ago < 10; ago += 1) await sample(ago, { api_up: ago !== 4 });
+      const res = await as("admin").get("/system-health/performance?range=day");
+      expect(res.status).toBe(200);
+      expect(res.body.availability.value).toBe("90");
+      expect(res.body.availability.state).toBe("missed");
+      expect(res.body.down_minutes).toBe(1);
+      expect(res.body.gap_minutes).toBe(0);
+      expect(res.body.bucket_minutes).toBe(15);
+      const point = res.body.points[res.body.points.length - 1];
+      expect(point.cpu_busy_pct).toBe("20");
+      expect(point.disk_read_kbs).toBe(10);
+      expect(Number(point.memory_in_use_pct)).toBeCloseTo(27.67, 1);
+    });
+
+    test("a minute nobody sampled since the first sample is a gap, never a minute up or down", async () => {
+      await sample(30);
+      await sample(0);
+      const res = await as("admin").get("/system-health/performance?range=hour");
+      expect(res.body.availability.value).toBe("100");
+      expect(res.body.gap_minutes).toBeGreaterThanOrEqual(28);
+      expect(res.body.points.filter((p) => p.cpu_busy_pct !== null)).toHaveLength(2);
+    });
+
+    test("response time is read at the 95th percentile from the buckets, and failures are 500s only", async () => {
+      for (let i = 0; i < 95; i += 1) stats.record(40, 200, { method: "GET", route: "/api/v1/employees" });
+      for (let i = 0; i < 4; i += 1) stats.record(900, 200, { method: "POST", route: "/api/v1/leave" });
+      stats.record(4000, 500, { method: "POST", route: "/api/v1/leave" });
+      stats.record(5, 404, { method: "GET", route: "(no route)" });
+      await stats.flush();
+      await sample(0);
+
+      const res = await as("admin").get("/system-health/performance?range=hour");
+      expect(res.body.requests).toBe(101);
+      expect(Number(res.body.failed.value)).toBeCloseTo(0.99, 2);
+      expect(res.body.failed.state).toBe("met");
+      // 96 of 101 took at most 50 ms (95 at 40, one 404 at 5): the 95th percentile is 50.
+      expect(res.body.response_p95).toEqual({ value: "50", target: "800", state: "met" });
+      expect(res.body.response_mean_ms).toBe(Math.round((95 * 40 + 4 * 900 + 4000 + 5) / 101));
+      expect(res.body.peak_per_minute).toBe(101);
+
+      const routes = await as("admin").get("/system-health/routes?range=hour");
+      expect(routes.status).toBe(200);
+      expect(routes.body.data[0]).toEqual(
+        expect.objectContaining({ method: "POST", route: "/api/v1/leave", requests: 5, errors: 1, slow: 1, max_ms: 4000 }),
+      );
+      expect(routes.body.data[0].p95_ms).toBeGreaterThan(1000);
+      const busiest = await as("admin").get("/system-health/routes?range=hour&sort=-requests");
+      expect(busiest.body.data[0].route).toBe("/api/v1/employees");
+      expect(busiest.body.data.map((r) => r.route)).toContain("(no route)");
+      expect((await as("admin").get("/system-health/routes?range=year")).status).toBe(422);
+    });
+
+    test("the server's capacity is in real units, split by service, and judged at the targets' levels", async () => {
+      await sample(1);
+      await sample(0, { cpu_busy_pct: 90 });
+      const res = await as("admin").get("/system-health/capacity");
+      expect(res.status).toBe(200);
+      const { cpu, memory, disk, network, server } = res.body;
+      expect(res.body.supported).toBe(true);
+      expect(cpu.busy_pct).toBe("90");
+      expect(cpu.state).toBe("degraded");
+      expect(cpu.peak_pct).toBe("90");
+      expect(cpu.parts.map((p) => p.key)).toEqual(["production", "staging", "database", "redis", "other"]);
+      expect(memory).toEqual(expect.objectContaining({ total_mb: 18432, in_use_mb: 5100, cache_mb: 9800, free_mb: 3532, state: "up" }));
+      expect(memory.parts.find((p) => p.key === "other").mb).toBe(5100 - 1900 - 800 - 1600 - 200);
+      expect(disk).toEqual(expect.objectContaining({ total_mb: 241000, used_mb: 24000, free_mb: 205000, reserved_mb: 12000, state: "up" }));
+      // Less than a day of samples: no forecast rather than a wild one.
+      expect(disk.days_to_full).toBeNull();
+      expect(disk.read_kbs).toBe(10);
+      expect(network.in_kbs).toBe(100);
+      expect(network.connections).toBe(40);
+      expect(server.node).toBe(process.version);
+      expect(server.postgres).toMatch(/^\d+/);
+    });
+
+    test("the disk's growth over a week says when it will be full", async () => {
+      // 48 hours of hourly samples growing 500 MB a day.
+      for (let h = 48; h >= 0; h -= 1) {
+        await sample(h * 60, { disk_used_mb: 24000 - Math.round((h * 500) / 24), disk_free_mb: 100000 + Math.round((h * 500) / 24) });
+      }
+      const res = await as("admin").get("/system-health/capacity");
+      expect(res.body.disk.growth_mb_per_day).toBeGreaterThanOrEqual(495);
+      expect(res.body.disk.growth_mb_per_day).toBeLessThanOrEqual(505);
+      expect(res.body.disk.days_to_full).toBe(Math.floor(100000 / res.body.disk.growth_mb_per_day));
+    });
+
+    test("the targets start at the defaults, save whole, are audited, and refuse levels out of order", async () => {
+      const first = await as("admin").get("/system-health/targets");
+      expect(first.body).toEqual(expect.objectContaining({ availability_pct: "99.90", response_p95_ms: 800, error_pct: "1.00", updated_at: null }));
+
+      const wrong = await as("admin").put("/system-health/targets").send({ ...targets.DEFAULTS, memory_down_pct: 80 });
+      expect(wrong.status).toBe(422);
+      expect(JSON.stringify(wrong.body)).toMatch(/memory_down_pct/);
+
+      const body = { ...targets.DEFAULTS, availability_pct: "99.5", response_p95_ms: 1000, cpu_warn_pct: 70, cpu_down_pct: 90 };
+      const saved = await as("admin").put("/system-health/targets").send(body);
+      expect(saved.status).toBe(200);
+      expect(saved.body).toEqual(expect.objectContaining({ availability_pct: "99.50", response_p95_ms: 1000, cpu_warn_pct: 70 }));
+      expect(saved.body.updated_by_name).toBe("Femi Bello");
+      const { rows } = await q(
+        "SELECT before, after FROM audit_ledger WHERE entity_type = 'performance_target' ORDER BY occurred_at DESC LIMIT 1",
+      );
+      expect(rows[0].before.response_p95_ms).toBe(800);
+      expect(rows[0].after.response_p95_ms).toBe(1000);
+
+      // Status's checks read the new levels, and Performance judges against them.
+      expect((await targets.levels()).cpu_warn_pct).toBe(70);
+      await sample(0, { cpu_busy_pct: 75 });
+      expect((await as("admin").get("/system-health/capacity")).body.cpu.state).toBe("degraded");
+      await as("admin").put("/system-health/targets").send(targets.DEFAULTS);
+    });
+
+    test("the database says its size, connections and cache, and slow SQL is off until the server preloads it", async () => {
+      const db = await as("admin").get("/system-health/database");
+      expect(db.status).toBe(200);
+      expect(db.body.size_mb).toBeGreaterThan(0);
+      expect(db.body.connections_used).toBeGreaterThan(0);
+      expect(db.body.connections_max).toBeGreaterThan(0);
+      expect(typeof db.body.statements).toBe("boolean");
+
+      const tables = await as("admin").get("/system-health/database/tables");
+      expect(tables.status).toBe(200);
+      expect(tables.body.page.size).toBe(25);
+      expect(tables.body.data.length).toBeGreaterThan(0);
+      const sizes = tables.body.data.map((t) => t.total_bytes);
+      expect([...sizes].sort((a, b) => b - a)).toEqual(sizes);
+
+      const statements = await as("admin").get("/system-health/database/queries");
+      expect(statements.status).toBe(200);
+      if (!db.body.statements) expect(statements.body.data).toEqual([]);
+    });
+
+    test("background work lists every scheduler, with the ones that never ran saying so", async () => {
+      await q("DELETE FROM schedule_run");
+      await q("INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, runs, failures, total_ms, max_ms) VALUES ('system-health', now(), 40, true, 4, 0, 200, 90)");
+      const work = await as("admin").get("/system-health/background");
+      expect(work.status).toBe(200);
+      expect(work.body.outbox_waiting).toEqual(expect.any(Number));
+
+      const jobs = await as("admin").get("/system-health/background/jobs");
+      expect(jobs.status).toBe(200);
+      expect(jobs.body.page.total).toBe(require("../../src/jobs/registry").SCHEDULERS.length);
+      const all = [];
+      for (let page = 1; page <= jobs.body.page.pages; page += 1) {
+        all.push(...(await as("admin").get(`/system-health/background/jobs?page=${page}`)).body.data);
+      }
+      const health = all.find((j) => j.name === "system-health");
+      expect(health).toEqual(expect.objectContaining({ every: "Every 5 minutes", last_ms: 40, mean_ms: 50, max_ms: 90, state: "on_time" }));
+      // A run recorded the way the registry records it carries its time, and batched
+      // in-process ticks each count at the latest tick's duration.
+      const registry = require("../../src/jobs/registry");
+      await registry.recordRun("system-health-sample", Date.now() - 30, true, null);
+      await registry.recordRun("outbox-dispatch", Date.now() - 4, true, null, { runs: 10 });
+      const { rows } = await q("SELECT name, runs, total_ms, max_ms FROM schedule_run WHERE name IN ('system-health-sample', 'outbox-dispatch') ORDER BY name");
+      expect(rows.map((r) => [r.name, Number(r.runs)])).toEqual([["outbox-dispatch", 10], ["system-health-sample", 1]]);
+      expect(Number(rows[1].total_ms)).toBeGreaterThanOrEqual(30);
+      expect(Number(rows[0].total_ms)).toBeGreaterThanOrEqual(40);
+      expect(rows[1].max_ms).toBeGreaterThanOrEqual(30);
+      // Never run, and no started row: jobs/report.js judges it as Status does.
+      expect(all.find((j) => j.name === "system-health-digest")).toEqual(
+        expect.objectContaining({ every: "Daily at 08:00 (Lagos)", state: "late", runs: 0 }),
+      );
+    });
+
+    test("processes show who is online and count the starts of the week", async () => {
+      await q(
+        `INSERT INTO process_beat (instance, role, host, pid, started_at, last_beat_at, memory_mb, heap_mb, loop_delay_ms, cpu_pct, sockets, users_online)
+         VALUES ('api:h:1:1', 'api', 'h', 1, now() - interval '2 days', now(), 310, 120, 12, 3.5, 9, 6),
+                ('api:h:2:2', 'api', 'h', 2, now() - interval '3 days', now() - interval '2 days', 300, 110, 10, 2, 0, 0),
+                ('worker:h:3:3', 'worker', 'h', 3, now() - interval '1 day', now(), 520, 200, 30, 8, NULL, NULL)`,
+      );
+      const res = await as("admin").get("/system-health/processes");
+      expect(res.status).toBe(200);
+      expect(res.body.people_online).toBe(6);
+      expect(res.body.sockets).toBe(9);
+      expect(res.body.processes.map((p) => p.role).sort()).toEqual(["api", "worker"]);
+      expect(res.body.api_starts_7d).toBe(2);
+      expect(res.body.worker_starts_7d).toBe(1);
+      expect(await repo.usersOnline(pool)).toBe(6);
+    });
+
+    test("a beat is written by the process itself, and a restart is a new row", async () => {
+      const beat = require("../../src/shared/observability/process-beat");
+      const stop = beat.start({ role: "worker" });
+      await stop.beat();
+      await stop.beat();
+      await stop();
+      const { rows } = await q("SELECT role, pid, memory_mb FROM process_beat");
+      expect(rows).toEqual([expect.objectContaining({ role: "worker", pid: process.pid })]);
+      expect(rows[0].memory_mb).toBeGreaterThan(0);
+    });
+  });
+
   describe("snapshots, escalation and keeping", () => {
     test("the resources a person asks about first are checked and recorded", async () => {
       const res = await as("admin").get("/system-health/status");
@@ -358,18 +628,6 @@ describeDb("System Health against the real migrations", () => {
       expect(after.body.checks.find((c) => c.key === "schedulers").state).toBe("up");
     });
 
-    test("the chart says whether it is empty because nothing happened or nothing is running", async () => {
-      await q("DELETE FROM health_snapshot");
-      const dead = await as("admin").get("/system-health/performance?range=24h");
-      expect(dead.body.recording).toBe(false);
-      expect(dead.body.last_snapshot_at).toBeNull();
-
-      await rollup.snapshot();
-      const live = await as("admin").get("/system-health/performance?range=24h");
-      expect(live.body.recording).toBe(true);
-      expect(live.body.last_snapshot_at).not.toBeNull();
-    });
-
     test("response time and the share that failed come from the minutes the API wrote", async () => {
       const stats = require("../../src/shared/observability/request-stats");
       stats.__reset();
@@ -385,17 +643,11 @@ describeDb("System Health against the real migrations", () => {
       stats.__reset();
     });
 
-    test("a snapshot records every check and the figures the chart draws", async () => {
+    test("a snapshot records every check", async () => {
       const first = await rollup.snapshot();
       expect(["ready", "degraded", "unavailable"]).toContain(first.state);
       const last = await repo.lastSnapshot(pool);
       expect(Object.keys(last.checks)).toContain("postgres");
-
-      const res = await as("admin").get("/system-health/performance?range=24h");
-      expect(res.status).toBe(200);
-      expect(res.body.range).toBe("24h");
-      expect(res.body.points.length).toBeGreaterThan(0);
-      expect(res.body.uptime_pct).toMatch(/^\d{1,3}\.\d$/);
     });
 
     test("a fault open a day with nobody on it reaches email, once a day", async () => {
@@ -427,10 +679,19 @@ describeDb("System Health against the real migrations", () => {
       await q("UPDATE health_snapshot SET taken_at = now() - interval '40 days'");
       const before = (await q("SELECT count(*)::int AS n FROM error_group")).rows[0].n;
       await q("INSERT INTO request_stat (minute, requests) VALUES (now() - interval '40 days', 5)");
+      await q("INSERT INTO perf_sample (minute, api_up) VALUES (date_trunc('minute', now() - interval '40 days'), true)");
+      await q("INSERT INTO route_stat (bucket, method, route, requests) VALUES (now() - interval '40 days', 'GET', '/old', 1)");
+      await q(
+        `INSERT INTO process_beat (instance, role, host, pid, started_at, last_beat_at)
+         VALUES ('api:old:1:1', 'api', 'old', 1, now() - interval '41 days', now() - interval '40 days')`,
+      );
       const done = await repo.purge(pool);
       expect(done.events).toBeGreaterThan(0);
       expect(done.snapshots).toBeGreaterThan(0);
       expect(done.minutes).toBeGreaterThan(0);
+      expect(done.samples).toBe(1);
+      expect(done.routes).toBe(1);
+      expect(done.beats).toBe(1);
       expect((await q("SELECT count(*)::int AS n FROM error_group")).rows[0].n).toBe(before);
     });
   });

@@ -29,6 +29,7 @@ export * from "./Quote";
 export * from "./Result";
 export * from "./ShareBar";
 export * from "./Skeleton";
+export * from "./StackBar";
 export * from "./StatStrip";
 export * from "./Sub";
 export * from "./Swatch";

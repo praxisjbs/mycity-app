@@ -1,6 +1,7 @@
 "use strict";
 /**
- * Reading and writing faults and snapshots (migration 9100).
+ * Reading and writing faults and snapshots (migration 9100), and the performance
+ * samples, routes, processes and database figures (migration 9120).
  *
  * The one rule this file keeps: a group never stores a count. Today, In All and People
  * are aggregated from `error_event` for the window asked for, in the same query as the
@@ -369,49 +370,353 @@ function snapshotsAround(db, moments) {
   );
 }
 
+/* ------------------------------------------------------------------ *
+ * Performance (migration 9120)
+ * ------------------------------------------------------------------ */
+
 /**
- * The chart: snapshots bucketed into hours over a day, or days over a week. A bucket with
- * no snapshot is left out, so the screen can draw the gap rather than a flat line.
+ * The four windows: how far back, and how wide a bucket. Buckets start on Lagos
+ * boundaries (date_bin from a Lagos midnight), so a Month bucket is a Lagos day.
  */
-function series(db, range) {
-  const hours = range === "7d" ? 24 * 7 : 24;
-  const bucket = range === "7d" ? "day" : "hour";
-  return all(
-    db,
-    `SELECT date_trunc('${bucket}', taken_at) AS at,
-            CASE WHEN bool_or(status = 'unavailable') THEN 'unavailable'
-                 WHEN bool_or(status = 'degraded') THEN 'degraded'
-                 ELSE 'ready' END AS state,
-            max(faults_open)::int AS faults,
-            max(outbox_backlog)::int AS outbox_backlog,
-            max(worker_lag_s)::int AS worker_lag_s,
-            min(disk_free_pct)::int AS disk_free_pct,
-            max(memory_used_pct)::int AS memory_used_pct,
-            max(cpu_load)::numeric AS cpu_load,
-            max(database_mb)::int AS database_mb,
-            max(database_connections_pct)::int AS database_connections_pct,
-            sum(requests)::bigint AS requests,
-            max(error_pct)::numeric AS error_pct,
-            round(avg(mean_ms))::int AS mean_ms,
-            count(*)::int AS snapshots
-       FROM health_snapshot
-      WHERE taken_at > now() - make_interval(hours => $1)
-      GROUP BY 1
-      ORDER BY 1`,
-    [hours],
+const WINDOWS = Object.freeze({
+  hour: { minutes: 60, bucket: "1 minute", bucket_minutes: 1 },
+  day: { minutes: 24 * 60, bucket: "15 minutes", bucket_minutes: 15 },
+  week: { minutes: 7 * 24 * 60, bucket: "1 hour", bucket_minutes: 60 },
+  month: { minutes: 30 * 24 * 60, bucket: "1 day", bucket_minutes: 24 * 60 },
+});
+const ORIGIN = "TIMESTAMPTZ '2000-01-01 00:00:00+01'";
+const BIN = (col) => `date_bin($2::interval, ${col}, ${ORIGIN})`;
+
+/** One minute of the server, as system_health.sample.js built it. A minute already written stays. */
+function addSample(db, row) {
+  const keys = Object.keys(row);
+  return db.query(
+    `INSERT INTO perf_sample (${keys.join(", ")})
+     VALUES (${keys.map((_, i) => `$${i + 1}`).join(", ")})
+     ON CONFLICT (minute) DO NOTHING`,
+    keys.map((k) => row[k]),
   );
 }
 
-/** How much of the window every check was up, and how many minutes have no snapshot at all. */
-function uptime(db, range) {
-  const hours = range === "7d" ? 24 * 7 : 24;
+/** People connected to a live API process now: the sum of each process's own count. */
+async function usersOnline(db) {
+  const r = await one(
+    db,
+    `SELECT COALESCE(sum(users_online), 0)::int AS n
+       FROM process_beat
+      WHERE role = 'api' AND last_beat_at > now() - interval '2 minutes'`,
+  );
+  return r ? r.n : 0;
+}
+
+/**
+ * The window bucketed: the server from perf_sample, the traffic from request_stat, and
+ * each bucket's 95th percentile from its summed latency buckets. A bucket with neither is
+ * left out, so the screen draws a gap rather than a zero.
+ */
+function perfSeries(db, range, bounds) {
+  const w = WINDOWS[range];
+  return all(
+    db,
+    `WITH s AS (
+       SELECT ${BIN("minute")} AS at,
+              count(api_up)::int AS samples,
+              count(*) FILTER (WHERE api_up)::int AS up,
+              avg(cpu_busy_pct) AS cpu_busy_pct,
+              avg(cpu_steal_pct) AS cpu_steal_pct,
+              avg(cpu_iowait_pct) AS cpu_iowait_pct,
+              avg(memory_in_use_mb::numeric * 100 / NULLIF(memory_total_mb, 0)) AS memory_in_use_pct,
+              avg(disk_used_mb::numeric * 100 / NULLIF(disk_total_mb, 0)) AS disk_used_pct,
+              avg(disk_read_kb) / 60 AS disk_read_kbs,
+              avg(disk_written_kb) / 60 AS disk_write_kbs,
+              avg(network_in_kb) / 60 AS network_in_kbs,
+              avg(network_out_kb) / 60 AS network_out_kbs,
+              round(avg(users_online)) AS users_online
+         FROM perf_sample
+        WHERE minute > now() - make_interval(mins => $1)
+        GROUP BY 1),
+     t AS (
+       SELECT ${BIN("minute")} AS at,
+              sum(requests)::bigint AS requests,
+              sum(errors)::bigint AS errors,
+              sum(total_ms)::bigint AS total_ms
+         FROM request_stat
+        WHERE minute > now() - make_interval(mins => $1)
+        GROUP BY 1),
+     h AS (
+       SELECT ${BIN("r.minute")} AS at, u.i, sum(u.v)::bigint AS n
+         FROM request_stat r, unnest(r.buckets) WITH ORDINALITY AS u(v, i)
+        WHERE r.minute > now() - make_interval(mins => $1)
+        GROUP BY 1, 2),
+     hh AS (SELECT at, array_agg(n ORDER BY i) AS hist FROM h GROUP BY 1)
+     SELECT COALESCE(s.at, t.at) AS at, s.samples, s.up,
+            s.cpu_busy_pct, s.cpu_steal_pct, s.cpu_iowait_pct, s.memory_in_use_pct, s.disk_used_pct,
+            s.disk_read_kbs, s.disk_write_kbs, s.network_in_kbs, s.network_out_kbs, s.users_online,
+            t.requests, t.errors, t.total_ms,
+            perf_percentile(hh.hist, $3::int[], 0.95) AS p95_ms
+       FROM s
+       FULL JOIN t ON t.at = s.at
+       LEFT JOIN hh ON hh.at = COALESCE(s.at, t.at)
+      ORDER BY 1`,
+    [w.minutes, w.bucket, bounds],
+  );
+}
+
+/**
+ * The window's headline figures: availability and the minutes down, the traffic and its
+ * percentile over the whole window, the busiest minute, and how much of the window has
+ * no sample since the first sample ever (so a new server is not a day of gaps).
+ */
+function perfHeadline(db, range, bounds) {
+  const w = WINDOWS[range];
   return one(
     db,
-    `SELECT count(*)::int AS snapshots,
-            count(*) FILTER (WHERE status = 'ready')::int AS ready
+    `WITH first AS (SELECT min(minute) AS at FROM perf_sample),
+     since AS (SELECT GREATEST(now() - make_interval(mins => $1), (SELECT at FROM first)) AS at),
+     s AS (
+       SELECT count(api_up)::int AS samples,
+              count(*) FILTER (WHERE api_up)::int AS up,
+              count(*) FILTER (WHERE api_up = false)::int AS down,
+              count(*) FILTER (WHERE minute > (SELECT at FROM since))::int AS recorded
+         FROM perf_sample
+        WHERE minute > now() - make_interval(mins => $1)),
+     t AS (
+       SELECT COALESCE(sum(requests), 0)::bigint AS requests,
+              COALESCE(sum(errors), 0)::bigint AS errors,
+              COALESCE(sum(total_ms), 0)::bigint AS total_ms,
+              max(requests)::int AS peak,
+              min(minute) AS first_minute
+         FROM request_stat
+        WHERE minute > now() - make_interval(mins => $1)),
+     h AS (
+       SELECT u.i, sum(u.v)::bigint AS n
+         FROM request_stat r, unnest(r.buckets) WITH ORDINALITY AS u(v, i)
+        WHERE r.minute > now() - make_interval(mins => $1)
+        GROUP BY 1)
+     SELECT s.samples, s.up, s.down, s.recorded,
+            (SELECT at FROM first) AS first_sample_at,
+            (SELECT at FROM since) AS since,
+            (SELECT max(minute) FROM perf_sample) AS last_sample_at,
+            t.requests, t.errors, t.total_ms, t.peak, t.first_minute,
+            perf_percentile((SELECT array_agg(n ORDER BY i) FROM h), $2::int[], 0.95) AS p95_ms
+       FROM s, t`,
+    [w.minutes, bounds],
+  );
+}
+
+/** The latest minute of the server. */
+function latestSample(db) {
+  return one(db, "SELECT * FROM perf_sample ORDER BY minute DESC LIMIT 1");
+}
+
+/** The busiest minute of the last 24 hours. */
+function cpuPeak(db) {
+  return one(
+    db,
+    `SELECT minute, cpu_busy_pct
+       FROM perf_sample
+      WHERE minute > now() - interval '24 hours' AND cpu_busy_pct IS NOT NULL
+      ORDER BY cpu_busy_pct DESC, minute DESC
+      LIMIT 1`,
+  );
+}
+
+/** How fast the disk is filling: a least-squares line through 7 days of hourly averages, in MB a day. */
+function diskTrend(db) {
+  return one(
+    db,
+    `WITH h AS (
+       SELECT date_bin('1 hour', minute, ${ORIGIN}) AS at, avg(disk_used_mb) AS used
+         FROM perf_sample
+        WHERE minute > now() - interval '7 days' AND disk_used_mb IS NOT NULL
+        GROUP BY 1)
+     SELECT regr_slope(used, date_part('epoch', at) / 86400) AS mb_per_day, count(*)::int AS hours FROM h`,
+  );
+}
+
+/** Data in and out since the first of this month, Lagos time, in MB. */
+function networkMonth(db) {
+  return one(
+    db,
+    `SELECT (sum(network_in_kb) / 1024)::bigint AS in_mb, (sum(network_out_kb) / 1024)::bigint AS out_mb
+       FROM perf_sample
+      WHERE minute >= date_trunc('month', now() AT TIME ZONE '${TZ}') AT TIME ZONE '${TZ}'`,
+  );
+}
+
+/** Each route over the window, with its percentile, a page at a time. */
+const ROUTE_SORTS = { p95_ms: "p95_ms", requests: "t.requests", errors: "t.errors", mean_ms: "mean_ms" };
+
+function routesPage(db, query, bounds) {
+  const w = WINDOWS[query.range || "day"];
+  const sort = query.sort || { field: "p95_ms", dir: "desc" };
+  const since = `date_bin('15 minutes', now() - make_interval(mins => $1), ${ORIGIN})`;
+  return pageQuery(
+    db,
+    `WITH t AS (
+       SELECT method, route,
+              sum(requests)::bigint AS requests, sum(errors)::bigint AS errors,
+              sum(client_errors)::bigint AS client_errors, sum(slow)::bigint AS slow,
+              sum(total_ms)::bigint AS total_ms, max(max_ms) AS max_ms
+         FROM route_stat
+        WHERE bucket >= ${since}
+        GROUP BY 1, 2),
+     h AS (
+       SELECT r.method, r.route, u.i, sum(u.v)::bigint AS n
+         FROM route_stat r, unnest(r.buckets) WITH ORDINALITY AS u(v, i)
+        WHERE r.bucket >= ${since}
+        GROUP BY 1, 2, 3),
+     hh AS (SELECT method, route, array_agg(n ORDER BY i) AS hist FROM h GROUP BY 1, 2)
+     SELECT t.method, t.route, t.requests, t.errors, t.client_errors, t.slow, t.max_ms,
+            (t.total_ms / NULLIF(t.requests, 0))::int AS mean_ms,
+            COALESCE(perf_percentile(hh.hist, $2::int[], 0.95), 0) AS p95_ms,
+            ${TOTAL_COL}
+       FROM t
+       LEFT JOIN hh ON hh.method = t.method AND hh.route = t.route
+      ORDER BY ${orderBy({ sort }, ROUTE_SORTS, "t.method, t.route")}`,
+    [w.minutes, bounds],
+    query,
+  );
+}
+
+/** This database: its size, connections by state, cache, deadlocks and the oldest transaction. */
+function databaseSummary(db) {
+  return one(
+    db,
+    `SELECT current_setting('server_version') AS version,
+            pg_database_size(current_database()) AS bytes,
+            current_setting('max_connections')::int AS connections_max,
+            count(a.*)::int AS connections_used,
+            count(a.*) FILTER (WHERE a.state = 'active')::int AS active,
+            count(a.*) FILTER (WHERE a.state = 'idle')::int AS idle,
+            count(a.*) FILTER (WHERE a.state LIKE 'idle in transaction%')::int AS idle_in_transaction,
+            count(a.*) FILTER (WHERE a.wait_event_type = 'Lock')::int AS waiting,
+            extract(epoch FROM now() - min(a.xact_start) FILTER (WHERE a.pid <> pg_backend_pid()))::int AS oldest_transaction_s,
+            (SELECT blks_hit FROM pg_stat_database WHERE datname = current_database()) AS blks_hit,
+            (SELECT blks_read FROM pg_stat_database WHERE datname = current_database()) AS blks_read,
+            (SELECT deadlocks FROM pg_stat_database WHERE datname = current_database()) AS deadlocks,
+            (SELECT temp_bytes FROM pg_stat_database WHERE datname = current_database()) AS temp_bytes
+       FROM pg_stat_activity a
+      WHERE a.datname = current_database()`,
+  );
+}
+
+/** How fast this database is growing, in MB a day, from the snapshots of the last 7 days. */
+function databaseGrowth(db) {
+  return one(
+    db,
+    `SELECT regr_slope(database_mb, date_part('epoch', taken_at) / 86400) AS mb_per_day, count(*)::int AS snapshots
        FROM health_snapshot
-      WHERE taken_at > now() - make_interval(hours => $1)`,
-    [hours],
+      WHERE taken_at > now() - interval '7 days' AND database_mb IS NOT NULL`,
+  );
+}
+
+/** This database's tables, largest first. */
+const TABLE_SORTS = {
+  total_bytes: "pg_total_relation_size(s.relid)",
+  rows: "s.n_live_tup",
+  dead_pct: "dead_pct",
+};
+
+function tablesPage(db, query) {
+  const sort = query.sort || { field: "total_bytes", dir: "desc" };
+  return pageQuery(
+    db,
+    `SELECT s.relname AS name, s.n_live_tup AS rows,
+            pg_total_relation_size(s.relid) AS total_bytes,
+            pg_relation_size(s.relid) AS table_bytes,
+            pg_indexes_size(s.relid) AS index_bytes,
+            CASE WHEN s.n_live_tup + s.n_dead_tup > 0
+                 THEN round(s.n_dead_tup * 100.0 / (s.n_live_tup + s.n_dead_tup), 2) END AS dead_pct,
+            GREATEST(s.last_vacuum, s.last_autovacuum) AS last_vacuum_at,
+            ${TOTAL_COL}
+       FROM pg_stat_user_tables s
+      ORDER BY ${orderBy({ sort }, TABLE_SORTS, "s.relid")}`,
+    [],
+    query,
+  );
+}
+
+/**
+ * Whether pg_stat_statements can be read: the extension exists in this database and the
+ * server preloads its library. Either missing, and reading the view fails.
+ */
+async function statementsOn(db) {
+  try {
+    await db.query("SELECT 1 FROM pg_stat_statements LIMIT 1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The statements this environment's role ran in this database, by the time they took. */
+const QUERY_SORTS = { total_ms: "p.total_exec_time", mean_ms: "p.mean_exec_time", calls: "p.calls" };
+
+function queriesPage(db, query) {
+  const sort = query.sort || { field: "total_ms", dir: "desc" };
+  return pageQuery(
+    db,
+    `SELECT p.queryid::text AS query_id,
+            left(regexp_replace(p.query, '\\s+', ' ', 'g'), 400) AS query,
+            p.calls, p.total_exec_time AS total_ms, p.mean_exec_time AS mean_ms, p.max_exec_time AS max_ms, p.rows,
+            p.total_exec_time * 100 / NULLIF(sum(p.total_exec_time) OVER (), 0) AS share_pct,
+            ${TOTAL_COL}
+       FROM pg_stat_statements p
+      WHERE p.dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
+        AND p.userid = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+      ORDER BY ${orderBy({ sort }, QUERY_SORTS, "p.queryid")}`,
+    [],
+    query,
+  );
+}
+
+/** The outbox: waiting, the oldest waiting, failed for good, and done in the last hour. */
+function outboxFigures(db) {
+  return one(
+    db,
+    `SELECT count(*) FILTER (WHERE status IN ('pending', 'processing'))::int AS waiting,
+            extract(epoch FROM now() - min(created_at) FILTER (WHERE status = 'pending'))::int AS oldest_s,
+            count(*) FILTER (WHERE status = 'failed')::int AS failed,
+            count(*) FILTER (WHERE status = 'done' AND processed_at > now() - interval '1 hour')::int AS done_hour
+       FROM event_outbox`,
+  );
+}
+
+/** Every scheduler the code declares, with its runs; one the table has never seen has none. */
+const JOB_SORTS = { name: "s.name", last_ms: "r.duration_ms", failures: "r.failures" };
+
+function jobsPage(db, query, names) {
+  return pageQuery(
+    db,
+    `SELECT s.name, r.last_run_at, r.duration_ms, r.ok, r.runs, r.failures, r.total_ms, r.max_ms,
+            ${TOTAL_COL}
+       FROM unnest($1::text[]) AS s(name)
+       LEFT JOIN schedule_run r ON r.name = s.name
+      ORDER BY ${orderBy(query, JOB_SORTS, "s.name")}`,
+    [names],
+    query,
+  );
+}
+
+/** The processes that have beaten in the last 3 minutes: one row each, a handful at most. */
+function liveProcesses(db) {
+  return all(
+    db,
+    `SELECT * FROM process_beat
+      WHERE last_beat_at > now() - interval '3 minutes'
+      ORDER BY role, started_at DESC`,
+  );
+}
+
+/** How many times each role started in the last 7 days. */
+function startsThisWeek(db) {
+  return all(
+    db,
+    `SELECT role, count(*)::int AS starts
+       FROM process_beat
+      WHERE started_at > now() - interval '7 days'
+      GROUP BY role`,
   );
 }
 
@@ -564,8 +869,9 @@ function digestFigures(db) {
 }
 
 /**
- * Nightly: occurrences past KEEP_EVENT_DAYS, snapshots and the minutes of traffic past
- * KEEP_SNAPSHOT_DAYS. `schedule_run` is one row per job and is never purged.
+ * Nightly: occurrences past KEEP_EVENT_DAYS; snapshots, the minutes of traffic, the
+ * server's samples, the routes' quarter hours and silent processes past KEEP_SNAPSHOT_DAYS.
+ * `schedule_run` is one row per job and is never purged.
  */
 async function purge(db) {
   const events = await db.query(
@@ -580,7 +886,26 @@ async function purge(db) {
     `DELETE FROM request_stat WHERE minute < now() - make_interval(days => $1)`,
     [KEEP_SNAPSHOT_DAYS],
   );
-  return { events: events.rowCount, snapshots: snapshots.rowCount, minutes: minutes.rowCount };
+  const samples = await db.query(
+    `DELETE FROM perf_sample WHERE minute < now() - make_interval(days => $1)`,
+    [KEEP_SNAPSHOT_DAYS],
+  );
+  const routes = await db.query(
+    `DELETE FROM route_stat WHERE bucket < now() - make_interval(days => $1)`,
+    [KEEP_SNAPSHOT_DAYS],
+  );
+  const beats = await db.query(
+    `DELETE FROM process_beat WHERE last_beat_at < now() - make_interval(days => $1)`,
+    [KEEP_SNAPSHOT_DAYS],
+  );
+  return {
+    events: events.rowCount,
+    snapshots: snapshots.rowCount,
+    minutes: minutes.rowCount,
+    samples: samples.rowCount,
+    routes: routes.rowCount,
+    beats: beats.rowCount,
+  };
 }
 
 module.exports = {
@@ -607,8 +932,25 @@ module.exports = {
   changesOfAll,
   snapshotsAround,
   trafficSince,
-  series,
-  uptime,
+  WINDOWS,
+  addSample,
+  usersOnline,
+  perfSeries,
+  perfHeadline,
+  latestSample,
+  cpuPeak,
+  diskTrend,
+  networkMonth,
+  routesPage,
+  databaseSummary,
+  databaseGrowth,
+  tablesPage,
+  statementsOn,
+  queriesPage,
+  outboxFigures,
+  jobsPage,
+  liveProcesses,
+  startsThisWeek,
   recentFingerprints,
   upsertGroup,
   markReturned,

@@ -117,10 +117,13 @@ const SCREENS = Object.freeze({
 const screen = (module, tab) => ({ module, tab });
 
 /**
- * entity_type → { module, tab, self?, param? }. Types are the snake_case names modules pass
- * to emit() and store beside a notification, task or alert. `param` names the query value
- * that carries the record's id when its tab opens two kinds of record (an alert rule beside
- * the alerts it raises: `?rule=`; a report's run beside the reports: `?run=`); `id` otherwise.
+ * entity_type → { module, tab, self?, param?, permission? }. Types are the snake_case names
+ * modules pass to emit() and store beside a notification, task or alert. `param` names the
+ * query value that carries the record's id when its tab opens two kinds of record (an alert
+ * rule beside the alerts it raises: `?rule=`; a report's run beside the reports: `?run=`);
+ * `id` otherwise. `permission` is the module key a viewer must hold when the screen sits in
+ * another module's tabs (System Health's three tabs in Settings); the screen's module
+ * otherwise.
  */
 const ENTITY_ROUTES = Object.freeze({
   // Home
@@ -325,6 +328,12 @@ const ENTITY_ROUTES = Object.freeze({
   public_holiday: screen("settings", "organisation"),
   template: screen("settings", "documents-and-numbering"), // search:none not built yet (src/modules/templates)
   integration: screen("settings", "integrations"), // search:none not built yet (src/modules/integrations)
+  // Status, Performance and Faults sit in Settings but are held by system_health, not settings
+  // (docs/guides/system-health.md §8): `permission` is what a viewer must hold to open them.
+  // A fault opens its sheet on Faults; a check going down or coming back, and the digest, open Status.
+  error_group: { ...screen("settings", "faults"), permission: "system_health" }, // search:none faults are found on Settings · Faults with its filters, not by name: a fingerprint is not a word anybody types
+  health_snapshot: { ...screen("settings", "status"), permission: "system_health" }, // search:none a snapshot is a moment of the readiness checks; its notices open Status
+  performance_target: { ...screen("settings", "performance"), permission: "system_health" }, // search:none one row for the organisation, changed with Edit Targets on Performance
 });
 
 /** "praxis_ai" → "praxis-ai" */
@@ -341,6 +350,8 @@ function check() {
       throw new Error(`route-map: ${module} lists a tab twice`);
   }
   for (const [type, r] of Object.entries(ENTITY_ROUTES)) {
+    if (r.permission !== undefined && !catalog.isModule(r.permission))
+      throw new Error(`route-map: ${type} is held by "${r.permission}", which is not a module key`);
     if (r.param !== undefined && (!/^[a-z][a-z_]*$/.test(r.param) || ["tab", "id"].includes(r.param)))
       throw new Error(
         `route-map: ${type} carries its id as "${r.param}"; name a snake_case value other than tab and id`,
@@ -400,10 +411,13 @@ function linkFor(entityType, entityId, { self = false } = {}) {
   };
 }
 
-/** The module a record belongs to (its staff view), or null. Used to check the viewer may open it. */
+/**
+ * The module a viewer must hold to open a record (its staff view), or null. Used to check
+ * the viewer may open it: the screen's module, or the `permission` its route names.
+ */
 function moduleOf(entityType) {
   const r = ENTITY_ROUTES[entityType];
-  return r ? r.module : null;
+  return r ? r.permission || r.module : null;
 }
 
 const hasRoute = (entityType) =>

@@ -36,8 +36,48 @@ route(router, "post", "/status-briefs",
   exportFaults, controller.statusBrief);
 
 route(router, "get", "/performance",
-  { query: c.system_health.PerformanceQuery, response: c.system_health.PerformanceSeries, summary: "How the system behaved over a day or a week" },
+  { query: c.system_health.PerformanceQuery, response: c.system_health.PerformanceSeries, summary: "How the app and the server behaved over an hour, a day, a week or a month" },
   view, controller.performance);
+
+route(router, "get", "/capacity",
+  { response: c.system_health.PerformanceCapacity, summary: "The server now: processor, memory and disk in real units, split by what uses them" },
+  view, controller.capacity);
+
+route(router, "get", "/routes",
+  { query: c.system_health.RouteStatQuery, response: c.system_health.RouteStatPage, summary: "Each route over the window, slowest first" },
+  view, controller.routes);
+
+route(router, "get", "/database",
+  { response: c.system_health.DatabaseSummary, summary: "This database: size, growth, connections, cache and locks" },
+  view, controller.database);
+
+route(router, "get", "/database/tables",
+  { query: c.system_health.TableStatQuery, response: c.system_health.TableStatPage, summary: "This database's tables, largest first" },
+  view, controller.tables);
+
+route(router, "get", "/database/queries",
+  { query: c.system_health.QueryStatQuery, response: c.system_health.QueryStatPage, summary: "The statements that took the most time, from pg_stat_statements" },
+  view, controller.queries);
+
+route(router, "get", "/background",
+  { response: c.system_health.BackgroundWork, summary: "The queues, the outbox and the live workers" },
+  view, controller.background);
+
+route(router, "get", "/background/jobs",
+  { query: c.system_health.JobRunQuery, response: c.system_health.JobRunPage, summary: "Every scheduler and how its runs have gone" },
+  view, controller.jobs);
+
+route(router, "get", "/processes",
+  { response: c.system_health.ProcessList, summary: "People online and each live API and worker process" },
+  view, controller.processes);
+
+route(router, "get", "/targets",
+  { response: c.system_health.PerformanceTargets, summary: "What Performance is judged against, and the levels Status alarms at" },
+  view, controller.targets);
+
+route(router, "put", "/targets",
+  { body: c.system_health.PerformanceTargetsUpdate, response: c.system_health.PerformanceTargets, summary: "Set the targets and warning levels" },
+  edit, controller.saveTargets);
 
 route(router, "get", "/faults",
   { query: c.system_health.FaultListQuery, response: c.system_health.FaultPage, summary: "Faults, grouped, with the status the team shares" },

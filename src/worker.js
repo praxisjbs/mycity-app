@@ -143,6 +143,8 @@ async function start() {
   const workers = registry.startConsumers();
   const schedules = await registry.startSchedules();
   const stopHeartbeat = registry.startHeartbeat();
+  // Once a minute: this process's memory, event loop and CPU (Settings · Performance).
+  const stopBeat = require("./shared/observability/process-beat").start({ role: "worker" });
   // A commit wakes the outbox dispatcher at once; its one-second tick is the safety net.
   const outboxWake = require("./jobs/loops/outbox-wake").start();
   // Mailbox: IMAP IDLE on up to MAILBOX_IDLE_MAX inboxes (none on staging and laptops).
@@ -168,6 +170,7 @@ async function start() {
     await mailIdle.stop();
     await Promise.allSettled(workers.map((w) => w.close()));
     await stopHeartbeat();
+    await stopBeat();
     await require("./jobs/queues").closeQueues();
     await require("./services/pdf/chromium")
       .close()

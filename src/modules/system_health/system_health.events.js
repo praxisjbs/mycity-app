@@ -33,6 +33,7 @@ const EVENTS = defineEvents("system_health", {
   "system_health.digest": { summary: "The daily System Health summary" },
   "system_health.brief_requested": { summary: "A fault brief was downloaded" },
   "system_health.status_brief_requested": { summary: "A status brief was downloaded" },
+  "system_health.targets_changed": { summary: "The performance targets or warning levels were changed" },
 });
 
 /** The file a brief is kept in. Restricted: it carries stack traces. */
@@ -174,9 +175,9 @@ async function buildBrief(event, ctx) {
       });
     }
     // What the system looked like: now, and at each occurrence (guide §6). A snapshot is
-    // recent within two of its five-minute intervals, as the Performance chart reads it.
+    // recent within two of its five-minute intervals.
     const last = await repo.lastSnapshot(pool);
-    const recent = last && Date.now() - new Date(last.taken_at).getTime() < service.RECORDING_WITHIN_MS;
+    const recent = last && Date.now() - new Date(last.taken_at).getTime() < service.SNAPSHOT_RECENT_MS;
     const moments = faults.flatMap((f) => f.occurrences.map((o) => o.occurred_at));
     const around = await repo.snapshotsAround(pool, moments);
     let i = 0;
