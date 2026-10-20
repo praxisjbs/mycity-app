@@ -115,6 +115,7 @@ defineNotification(EVENTS.ANNOUNCEMENT_PUBLISHED, {
   // The level its poster chose; an urgent one closes only on Acknowledge (TB, 19/10/2026).
   urgency: (e) => e.payload.urgency || "normal",
   acknowledge: (e) => e.payload.urgency === "urgent",
+  who: "Its audience",
 });
 
 /** An important announcement reminds whoever has not opened it, once, 4 hours later. */
@@ -147,6 +148,7 @@ defineNotification(EVENTS.ANNOUNCEMENT_REMINDED, {
   to: [{ users: (e) => e.payload.user_ids || [] }],
   title: (e) => `Reminder: ${e.payload.title}`,
   body: "Please read it in #announcements.",
+  who: "Its audience who have not read it",
 });
 
 module.exports = { EVENTS };

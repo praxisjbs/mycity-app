@@ -5,10 +5,12 @@
  * names a `document_id`, and the bytes are reached only through a route that
  * checks who is asking.
  *
- * Three shapes travel:
+ * Four shapes travel:
  *
  *   DocumentRef    what an upload answers with: the id a record stores, and
  *                  enough to draw the file in the upload tray
+ *   MediaRef       a DocumentRef with what drawing it in place needs: its shape,
+ *                  pages, length and derived sizes (a chat message's file)
  *   Document       one document as a screen lists it, with its version chain
  *   DocumentRow    the Vault list on My Documents and an employee's record: a
  *                  document that is held, OR one that was asked for and not
@@ -102,6 +104,21 @@ const DocumentRef = z
     mime_type: z.string(),
   })
   .strict();
+
+/**
+ * A stored file as a screen draws it before opening it: a photo at its own shape, a
+ * video's poster and length, a PDF's first page and page count. `variants` are the
+ * derived files it has (GET /documents/:id/variant/:kind): `webp-320` and `webp-960` (a
+ * photo, or a PDF's first page), `poster` and `mp4-720` (a video), `opus` (a voice note).
+ * A chat message's file and the files a conversation shares travel as one.
+ */
+const MediaRef = DocumentRef.extend({
+  width: z.number().int().min(1).nullable(),
+  height: z.number().int().min(1).nullable(),
+  page_count: z.number().int().min(1).nullable(),
+  duration_ms: z.number().int().min(0).nullable(),
+  variants: z.array(z.string()).max(20),
+}).strict();
 
 /** One document. `storage_key` never crosses the wire. */
 const Document = z
@@ -225,6 +242,15 @@ const TABLES = {
       mime_type: "document.mime, named as the upload field reads it",
     },
   },
+  MediaRef: {
+    table: "document",
+    virtual: {
+      file_name: "document.original_name, as the upload tray shows it",
+      size_bytes: "document.bytes, named as the upload field reads it",
+      mime_type: "document.mime, named as the upload field reads it",
+      variants: "the kinds of its document_variant rows, the derived files it has",
+    },
+  },
   Document: {
     table: "document",
     virtual: {
@@ -280,6 +306,7 @@ module.exports = {
   DocumentUpload,
   EmployeeDocumentUpload,
   DocumentRef,
+  MediaRef,
   Document,
   ExportFile,
   DocumentVersionQuery,

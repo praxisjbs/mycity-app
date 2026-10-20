@@ -73,6 +73,8 @@ module.exports = {
       res,
       await service.storeMedia(p(req).id, readUpload(req), req.user),
     ),
+  linkPreview: async (req, res) =>
+    ok(res, await service.linkPreview(req.validated.body, req.user)),
   recognise: async (req, res) =>
     created(res, await service.recognise(req.validated.body, req.user)),
   react: async (req, res) => ok(res, await service.react(p(req).id, req.user)),
@@ -92,6 +94,10 @@ module.exports = {
     ok(res, await service.openDirect(req.validated.body.employee_id, req.user)),
   listColleagues: async (req, res) =>
     sendPaged(res, await service.listColleagues(req.validated.query, req.user)),
+  listForwardTargets: async (req, res) =>
+    sendPaged(res, await service.listForwardTargets(req.user, req.validated.query)),
+  forward: async (req, res) =>
+    created(res, await service.forward(req.validated.body, req.user)),
   profileCard: async (req, res) =>
     ok(res, await service.profileCard(p(req).id, req.user)),
 };

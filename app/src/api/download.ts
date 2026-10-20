@@ -13,8 +13,10 @@ import { session } from "./client";
  *
  *   await saveFile("/api/v1/imports/x/report", "IMP-0001.xlsx");   // a download
  *   const url = useFileUrl(doc ? `/api/v1/documents/${doc.id}/content` : null);
+ *   const { blob, href } = useFileBlob(url);                         // a PDF for PdfViewer
  *   const photo = usePhotos(rows.map((r) => r.employee.photo_url));  // people's faces
  *   <Who name={r.employee.display_name} src={photo(r.employee.photo_url)} />
+ *   <MediaViewer load={(item) => fetchFile(urlOf(item))} ... />      // the file viewer
  *
  * A download lands on the device that asked for it (docs/guides/foundation.md §6.12): the
  * browser's own download on a computer and on Android, into Downloads; on an iPhone or iPad
@@ -29,13 +31,23 @@ const MOCK = import.meta.env.VITE_API_MODE === "mock";
 
 const FAILED = "That file could not be opened. Try again.";
 
-async function fetchBlob(url: string): Promise<Blob> {
+/** A gated file's bytes, fetched with the session's token (the map's tiles use it too). */
+export async function fetchBlob(url: string): Promise<Blob> {
   const res = await fetch(url, {
     credentials: "include",
     headers: session.token ? { Authorization: `Bearer ${session.token}` } : {},
   });
   if (!res.ok) throw new Error(FAILED);
   return res.blob();
+}
+
+/**
+ * A gated file's bytes, fetched with the session: what the file viewer (MediaViewer) draws,
+ * downloads and shares. Refused in mock mode, which holds no bytes.
+ */
+export async function fetchFile(url: string): Promise<Blob> {
+  if (MOCK) throw new Error("Files open once the API is connected");
+  return fetchBlob(url);
 }
 
 /** An iPhone or iPad app opened from the home screen: it cannot save a download, but it can share a file. */
@@ -129,6 +141,36 @@ export function useFileUrl(url: string | null): string | null {
     };
   }, [url]);
   return href;
+}
+
+/**
+ * A gated file's bytes and a blob URL for them, for a preview that draws the bytes and
+ * links the URL (DocumentPreview: PdfViewer draws a PDF from its bytes, Open in Tab opens
+ * the URL). Both null while it is fetched, in mock mode, or when there is nothing to show.
+ */
+export function useFileBlob(url: string | null): { blob: Blob | null; href: string | null } {
+  const [got, setGot] = useState<{ blob: Blob; href: string } | null>(null);
+  useEffect(() => {
+    if (!url || MOCK) {
+      setGot(null);
+      return;
+    }
+    let live = true;
+    let made: string | null = null;
+    fetchBlob(url)
+      .then((blob) => {
+        if (!live) return;
+        made = URL.createObjectURL(blob);
+        setGot({ blob, href: made });
+      })
+      .catch(() => live && setGot(null));
+    return () => {
+      live = false;
+      if (made) URL.revokeObjectURL(made);
+      setGot(null);
+    };
+  }, [url]);
+  return { blob: got?.blob ?? null, href: got?.href ?? null };
 }
 
 /**
@@ -259,4 +301,12 @@ export function usePhotos(urls: ReadonlyArray<string | null | undefined>): (url:
 /** One person's photo, from the same cache as usePhotos. */
 export function usePhoto(url: string | null | undefined): string | null {
   return usePhotos([url])(url);
+}
+
+/**
+ * A picture already in the cache, read without asking for it: the file viewer shows a chat
+ * photo's bubble size at once while the full file arrives. Null when nobody has fetched it.
+ */
+export function cachedPhoto(url: string | null | undefined): string | null {
+  return url && !MOCK ? (PHOTOS.get(url)?.href ?? null) : null;
 }

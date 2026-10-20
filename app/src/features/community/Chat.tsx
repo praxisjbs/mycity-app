@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
-import type { Message, MessageCreate } from "@/api/types/community";
+import type { LinkPreview, Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { Button, cn, Field, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
-import { Post } from "./Posts";
+import { ActionGroup, Button, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
+import { AlbumPost, Post } from "./Posts";
+import { MessageLink, useViewer, viewerFilesOf } from "./Media";
+import { ForwardTo, forwardable } from "./Forward";
 
 /** A list row: a channel or a person. */
 export function Row({ on, unread, lead, title, sub, when, count, onClick, pinned, muted }: { on: boolean; unread: boolean; lead: ReactNode; title: ReactNode; sub: string; when: string; count: number; onClick: () => void; pinned?: boolean; muted?: boolean }) {
@@ -107,6 +109,13 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
     await reload();
   };
 
+  /** Files sent together (Send Files): posted one at a time, in order, then read back once. */
+  const sendMany = async (bodies: MessageCreate[]) => {
+    if (!id) return;
+    for (const body of bodies) await api.call("POST /api/v1/community/channels/:id/messages", { params: { id }, body, idempotencyKey: crypto.randomUUID() });
+    await reload();
+  };
+
   /** A file or a voice note: uploaded to the conversation first, then posted. */
   const sendFile = async (file: File, durationS?: number) => {
     if (!id) return;
@@ -115,7 +124,11 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
   };
 
   const replace = (m: Message) => setMsgs((list) => list.map((x) => (x.community_message_id === m.community_message_id ? m : x)));
-  return { id, msgs, page, q, setQ, loading, older, send, sendFile, reload, replace };
+
+  /** Messages picked to forward together (§3 step 19); null when not picking. A new conversation starts afresh. */
+  const [picking, setPicking] = useState<string[] | null>(null);
+  useEffect(() => setPicking(null), [id]);
+  return { id, msgs, page, q, setQ, loading, older, send, sendMany, sendFile, reload, replace, picking, setPicking };
 }
 
 /** Edit Message: the author's text, within 15 minutes of sending it. */
@@ -141,6 +154,92 @@ function EditMessage({ m, close, done }: { m: Message; close: () => void; done: 
   );
 }
 
+/** Forward To over messages of this conversation (§3 step 19); picking ends once they are sent. */
+export function useForward(t: ReturnType<typeof useThread>) {
+  const modal = useModal();
+  return (ids: string[]) =>
+    modal.open({ title: "Forward To", body: (close) => <ForwardTo source={{ message_ids: ids }} close={close} done={() => t.setPicking(null)} /> });
+}
+
+/** In place of the composer while picking (§3 step 19): how many, Copy for texts, Forward. */
+export function PickBar({ t }: { t: ReturnType<typeof useThread> }) {
+  const forward = useForward(t);
+  const ids = t.picking ?? [];
+  const picked = t.msgs.filter((m) => ids.includes(m.community_message_id));
+  const texts = picked.length > 0 && picked.every((m) => m.message_type === "text" && m.body);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(picked.map((m) => m.body).join("\n\n"));
+    } catch {
+      // The browser refused the clipboard: say so, and keep the messages picked to try again.
+      toast("Copy did not work. Try again.");
+      return;
+    }
+    toast("Copied");
+    t.setPicking(null);
+  };
+  return (
+    <div className="flex flex-none items-center gap-2 border-t border-border bg-card px-3 py-2.5 max-md:px-2 max-md:pb-safe-2">
+      <ActionGroup>
+        <IconButton icon="x" label="Cancel" onClick={() => t.setPicking(null)} />
+        <span aria-live="polite" className="flex-1 text-sm font-semibold">
+          {ids.length} Selected
+        </span>
+        {texts && <IconButton icon="copy" label="Copy" onClick={copy} />}
+        <Button variant="primary" icon="forward" onClick={() => forward(ids)}>
+          Forward
+        </Button>
+      </ActionGroup>
+    </div>
+  );
+}
+
+/** How long a press lasts before it picks a message on a phone, and how far it may wander. */
+const HOLD_MS = 450;
+const HOLD_SLOP_PX = 10;
+
+/**
+ * The click some phones send when the finger lifts after a long press opens nothing and ticks
+ * nothing. Phones that send none leave nothing waiting: the next tap is the person's own.
+ */
+function ignoreLiftClick() {
+  const off = new AbortController();
+  const opts = { capture: true, signal: off.signal };
+  window.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      off.abort();
+    },
+    opts,
+  );
+  const lifted = () => setTimeout(() => off.abort(), 400);
+  window.addEventListener("pointerup", lifted, opts);
+  window.addEventListener("pointercancel", lifted, opts);
+}
+
+/** A thread's rows: one message, or four or more photos and videos sent together (an album, §6). */
+type ThreadRow = { key: string; ms: Message[] };
+const inAlbum = (m: Message) => Boolean(m.album_key) && !m.deleted && (m.message_type === "image" || m.message_type === "video");
+
+function rowsOf(msgs: Message[]): ThreadRow[] {
+  const out: ThreadRow[] = [];
+  for (let i = 0; i < msgs.length; ) {
+    const m = msgs[i]!;
+    let j = i + 1;
+    if (inAlbum(m)) while (j < msgs.length && inAlbum(msgs[j]!) && msgs[j]!.album_key === m.album_key) j += 1;
+    if (j - i >= 4) {
+      out.push({ key: m.community_message_id, ms: msgs.slice(i, j) });
+      i = j;
+    } else {
+      out.push({ key: m.community_message_id, ms: [m] });
+      i += 1;
+    }
+  }
+  return out;
+}
+
 /** Messages, with a day marker wherever the date changes. */
 export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread>; dm?: boolean; editPoll?: (m: Message) => void }) {
   const modal = useModal();
@@ -154,6 +253,52 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
   const today = todayIso();
   const yesterday = todayIso(new Date(Date.now() - 86400000));
   let lastDay = "";
+  const rows = useMemo(() => rowsOf(t.msgs), [t.msgs]);
+  const files = useMemo(() => viewerFilesOf(t.msgs), [t.msgs]);
+  const forward = useForward(t);
+  const { open: view, viewer } = useViewer(files, (key) => forward([key]));
+  const phone = useIsMobile();
+  const { picking, setPicking } = t;
+  const toggle = (ids: string[]) =>
+    setPicking((p) => {
+      if (!p) return p;
+      const on = ids.every((id) => p.includes(id));
+      const next = on ? p.filter((id) => !ids.includes(id)) : [...p, ...ids.filter((id) => !p.includes(id))];
+      // Unticking the last one ends picking, as on WhatsApp.
+      return next.length ? next : null;
+    });
+  /* A long press on a phone starts picking. */
+  const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const letGo = () => {
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = null;
+  };
+  const pressFor = (ids: string[], canPick: boolean) =>
+    !phone || !canPick
+      ? {}
+      : {
+          // The phone's own long-press menu never opens on a message, picking or not.
+          onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
+          ...(picking
+            ? {}
+            : {
+                onPointerDown: (e: ReactPointerEvent) => {
+                  letGo();
+                  const timer = setTimeout(() => {
+                    hold.current = null;
+                    ignoreLiftClick();
+                    setPicking(ids);
+                  }, HOLD_MS);
+                  hold.current = { timer, x: e.clientX, y: e.clientY };
+                },
+                onPointerMove: (e: ReactPointerEvent) => {
+                  const h = hold.current;
+                  if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP_PX) letGo();
+                },
+                onPointerUp: letGo,
+                onPointerCancel: letGo,
+              }),
+        };
   const react = async (m: Message) => t.replace(await api.call("POST /api/v1/community/messages/:id/reactions", { params: { id: m.community_message_id }, body: {} }));
   const vote = async (m: Message, i: number) => t.replace(await api.call("POST /api/v1/community/messages/:id/vote", { params: { id: m.community_message_id }, body: { option_index: i } }));
   const failed = (e: unknown) => {
@@ -178,9 +323,40 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
       failed(e);
     }
   };
+  /** An album is deleted whole, asked once, when the caller may delete every photo in it. */
+  const removeAll = async (ms: Message[]) => {
+    if (!(await confirm({ title: "Delete Photos", body: `All ${ms.length} are removed for everyone in this conversation.`, confirmLabel: "Delete Photos", cancelLabel: "Keep Them", destructive: true }))) return;
+    try {
+      for (const m of ms) await api.call("DELETE /api/v1/community/messages/:id", { params: { id: m.community_message_id } });
+      await t.reload();
+      toast("Photos deleted");
+    } catch (e) {
+      failed(e);
+    }
+  };
+  const albumMenu = (ms: Message[]) => {
+    const ids = ms.map((m) => m.community_message_id);
+    const items: MenuItem[] = [];
+    if (ms.every(forwardable)) {
+      items.push({ label: "Forward", icon: "forward", onSelect: () => forward(ids) });
+      items.push({ label: "Select", icon: "tick", onSelect: () => setPicking(ids) });
+    }
+    if (ms.every((m) => m.can_delete)) items.push({ label: "Delete", icon: "trash", danger: true, onSelect: () => void removeAll(ms) });
+    if (!items.length) return undefined;
+    return (
+      <span className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+        <Menu label="Album actions" trigger={(p) => <IconButton {...p} icon="dots" label="Album actions" size="sm" />} items={items} />
+      </span>
+    );
+  };
+
   /** Only what the caller may do with this message; nothing when there is nothing. */
   const menuOf = (m: Message) => {
     const items: MenuItem[] = [];
+    if (forwardable(m)) {
+      items.push({ label: "Forward", icon: "forward", onSelect: () => forward([m.community_message_id]) });
+      items.push({ label: "Select", icon: "tick", onSelect: () => setPicking([m.community_message_id]) });
+    }
     if (m.can_edit && m.message_type === "text") items.push({ label: "Edit", icon: "edit", onSelect: () => modal.open({ title: "Edit Message", body: (close) => <EditMessage m={m} close={close} done={t.replace} /> }) });
     if (m.can_edit && m.message_type === "poll" && editPoll) items.push({ label: "Edit", icon: "edit", onSelect: () => editPoll(m) });
     if (m.can_close) items.push({ label: "Close Poll", icon: "lock", onSelect: () => void closePoll(m) });
@@ -199,18 +375,54 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
           Load Older
         </Button>
       )}
-      {t.msgs.map((m) => {
+      {rows.map(({ key, ms }) => {
+        const m = ms[0]!;
         const day = todayIso(new Date(m.sent_at));
         const marker = day !== lastDay ? (day === today ? "Today" : day === yesterday ? "Yesterday" : formatDate(day)) : null;
         lastDay = day;
+        const ids = ms.map((x) => x.community_message_id);
+        const canPick = ms.every(forwardable);
+        const on = Boolean(picking && ids.every((id) => picking.includes(id)));
         return (
-          <div key={m.community_message_id} className={cn("group flex flex-col gap-3", m.mine && m.message_type !== "announcement" && "items-end")}>
+          <div key={key} className="flex flex-col gap-3">
             {marker && <span className="self-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-2xs text-subtle-foreground">{marker}</span>}
-            <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} menu={menuOf(m)} />
+            <div
+              className={cn("group flex items-start gap-2", picking && canPick && "cursor-pointer", phone && "no-callout select-none")}
+              onClickCapture={(e) => {
+                if (picking && canPick) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggle(ids);
+                }
+              }}
+              {...pressFor(ids, canPick)}
+            >
+              {picking && (
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  aria-label={ms.length > 1 ? "Select photos" : "Select message"}
+                  className={cn("mt-1 flex size-5.5 flex-none items-center justify-center max-md:mt-0 max-md:size-tap", !canPick && "invisible")}
+                >
+                  <span className={cn("flex size-5.5 items-center justify-center rounded-full border-2", on ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                    {on && <Icon name="tick" className="size-3.5" />}
+                  </span>
+                </button>
+              )}
+              <div className={cn("flex min-w-0 flex-1 flex-col", m.mine && m.message_type !== "announcement" && "items-end")}>
+                {ms.length > 1 ? (
+                  <AlbumPost ms={ms} q={t.q} dm={dm} onView={view} menu={picking ? undefined : albumMenu(ms)} />
+                ) : (
+                  <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} onView={view} menu={picking ? undefined : menuOf(m)} />
+                )}
+              </div>
+            </div>
           </div>
         );
       })}
       {!t.msgs.length && !t.loading && <p className="m-auto text-xs text-subtle-foreground">{t.q ? "Nothing matches here." : "No messages yet. Say hello."}</p>}
+      {viewer}
     </div>
   );
 }
@@ -285,11 +497,50 @@ function recordingType(): string | undefined {
 /** Longest voice note (community.md §13, proposed 5 minutes). */
 const MAX_VOICE_S = 300;
 
+/**
+ * The composer's link card (§3 step 18): the card of the first link in what is being
+ * written, asked of the server once the typing settles and kept for the session, so
+ * the message gets the same card. Remove Preview keeps it off this message only.
+ */
+function useComposerLink(text: string) {
+  const url = useMemo(() => firstLink(text), [text]);
+  const [known, setKnown] = useState<Record<string, LinkPreview | null>>({});
+  const [asking, setAsking] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<string | null>(null);
+  const out = useRef(new Set<string>());
+  useEffect(() => {
+    if (!url || url === removed || url in known || out.current.has(url)) return;
+    const x = setTimeout(() => {
+      out.current.add(url);
+      setAsking(url);
+      const keep = (preview: LinkPreview | null) => setKnown((k) => ({ ...k, [url]: preview }));
+      api
+        .call("POST /api/v1/community/link-previews", { body: { url } })
+        .then((res) => keep(res.preview), () => keep(null))
+        .finally(() => {
+          out.current.delete(url);
+          setAsking((a) => (a === url ? null : a));
+        });
+    }, 600);
+    return () => clearTimeout(x);
+  }, [url, removed, known]);
+  const on = url !== null && url !== removed;
+  return {
+    loading: on && asking === url ? url : null,
+    preview: on ? (known[url] ?? null) : null,
+    remove: () => setRemoved(url),
+    /** Whether the message about to be sent leaves its card off. */
+    removedFrom: (body: string) => removed !== null && firstLink(body) === removed,
+    reset: () => setRemoved(null),
+  };
+}
+
 /** The composer for a channel or a conversation, with voice notes in both. */
 export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { placeholder: string; onSend: (b: MessageCreate) => Promise<void>; onVoice: (file: File, seconds: number) => Promise<void>; plus?: (cls: string) => ReactNode; readOnly?: string }) {
   const [text, setText] = useState("");
   const phone = useIsMobile();
   const box = useRef<HTMLTextAreaElement>(null);
+  const link = useComposerLink(text);
   /* Ctrl+Enter (Cmd+Enter on a Mac) starts a new line too; a textarea only does that for Shift+Enter by itself. */
   const newLine = () => {
     const el = box.current;
@@ -317,8 +568,10 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      await onSend({ message_type: "text", body: text.trim() });
+      const body = text.trim();
+      await onSend({ message_type: "text", body, ...(link.removedFrom(body) ? { no_link_preview: true } : {}) });
       setText("");
+      link.reset();
     } finally {
       setBusy(false);
     }
@@ -391,7 +644,9 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
       </div>
     );
   return (
-    <div className={base}>
+    <div className={cn(base, "flex-col items-stretch")}>
+      {link.loading ? <MessageLink link={null} loading={{ url: link.loading }} onRemove={link.remove} /> : link.preview && <MessageLink link={link.preview} onRemove={link.remove} />}
+      <div className="flex items-end gap-2">
       {plus?.(cbtn)}
       {/* Desktop: Enter sends; Shift+Enter or Ctrl+Enter starts a new line. A phone keeps Enter for a new line and sends with Send, as WhatsApp does. */}
       <InlineTextArea
@@ -413,6 +668,7 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
       <button type="button" disabled={busy} className={cn(cbtn, "on-primary border-primary bg-primary text-primary-foreground hover:bg-primary")} aria-label="Send" onClick={() => void send()}>
         <Icon name="send" />
       </button>
+      </div>
     </div>
   );
 }

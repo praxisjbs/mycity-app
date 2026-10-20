@@ -1,13 +1,13 @@
 /**
  * @component DocumentPreview
  * @group Documents
- * @summary A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both.
- * @use Looking at what someone attached: a receipt, a CV, a signed offer, a mail attachment, an imported sheet.
- * @avoid A document the product generated itself (use Paper, which prints right); shipping a PDF renderer of our own; a preview with no way out to the file.
- * @phone Shorter, and anything the browser will not draw inline becomes a Download card instead of an empty frame.
+ * @summary A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both.
+ * @use Looking at what someone attached beside a list: a receipt, a CV, a signed offer, a mail attachment, an imported sheet.
+ * @avoid A document the product generated itself (use Paper, which prints right); a file opened full screen (MediaViewer); a preview with no way out to the file.
+ * @phone Shorter; a PDF's pages scroll inside the frame, the same as on desktop, and anything else that cannot be drawn becomes a Download card instead of an empty frame.
  * @a11y The frame is named by the file, Open in Tab and Download are real links, and a file that cannot be shown says so in words.
  * @status stable
- * @example <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
+ * @example <DocumentPreview name="Receipt.pdf" mime="application/pdf" href={href} file={blob} />
  */
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
@@ -16,6 +16,7 @@ import { Button } from "../actions/Button";
 import { Icon, type IconName } from "../icons/Icon";
 import { EmptyState } from "../display/EmptyState";
 import { ImageViewer } from "./ImageViewer";
+import { PdfViewer } from "./PdfViewer";
 import { Tooltip } from "../overlay/Tooltip";
 
 /** What a glyph should be for a file we cannot draw. */
@@ -29,8 +30,10 @@ export interface DocumentPreviewProps {
   name: string;
   /** Its type, as the SERVER decided, not as the browser guessed. */
   mime: string;
-  /** Where the vault streams it (`/api/v1/documents/:id/file`). */
+  /** The file, ready for the browser (a blob URL the app fetched with the session): what Open in Tab and Download open. */
   href: string;
+  /** A PDF's bytes, for PdfViewer to draw; null while they arrive. */
+  file?: Blob | null;
   /** Its size, for the line under the name. */
   sizeBytes?: number;
   /** How tall the frame is; `md` unless a sheet wants it shorter or a page taller. */
@@ -41,9 +44,7 @@ export interface DocumentPreviewProps {
   className?: string;
 }
 
-const HEIGHT = { sm: "h-64", md: "h-96", lg: "h-168" } as const;
-
-export function DocumentPreview({ name, mime, href, sizeBytes, height = "md", actions, className }: DocumentPreviewProps) {
+export function DocumentPreview({ name, mime, href, file, sizeBytes, height = "md", actions, className }: DocumentPreviewProps) {
   const isPdf = mime === "application/pdf";
   const isImage = mime.startsWith("image/");
 
@@ -87,18 +88,9 @@ export function DocumentPreview({ name, mime, href, sizeBytes, height = "md", ac
   if (isImage) {
     body = <ImageViewer src={href} alt={name} height={height} noOpen />;
   } else if (isPdf) {
-    body = (
-      <object data={href} type="application/pdf" aria-label={name} className={cn("block w-full", HEIGHT[height])}>
-        {/*
-         * An <object>'s own children are what the browser shows when it will
-         * not draw the PDF here, iOS Safari included, and when the file itself
-         * does not arrive. That is the standard fallback and needs no script,
-         * so there is no error handler to go wrong. It offers the download
-         * rather than a second Open in Tab, which the bar already carries.
-         */}
-        {download("Cannot Show Here", "Download it, or open it in a tab.")}
-      </object>
-    );
+    // Drawn by PDF.js, not the browser: Android's browser draws no PDF in a page, and the
+    // security policy lets no <object> load (FRONTEND_FOUNDATION §5, PR 3 question 4).
+    body = <PdfViewer data={file ?? null} name={name} height={height} />;
   } else {
     body = download("Download To Read", "This file opens in its own app.");
   }

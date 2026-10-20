@@ -208,6 +208,14 @@ describe("Modal on desktop", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("blurs the screen behind only when asked", () => {
+    const { unmount } = render(<Modal open blur dismissible={false} onClose={() => undefined} title="Clock In" />);
+    expect(document.querySelector("[data-blur]")?.className).toContain("backdrop-blur-md");
+    unmount();
+    render(<Modal open onClose={() => undefined} title="New Rule" />);
+    expect(document.querySelector("[data-blur]")).toBeNull();
+  });
+
   it("has no accessibility violations", async () => {
     render(
       <Modal open onClose={() => undefined} title="New Rule" sub="Raised automatically on a schedule" footer={<Button variant="primary">Create Rule</Button>}>
@@ -229,6 +237,12 @@ describe("Modal on a phone", () => {
     expect(sheet.className).toContain("bottom-0");
     expect(sheet.querySelector('[data-ui="modal-footer"]')?.className).toContain("phone:flex-col");
     expect(sheet).toHaveFocus();
+  });
+
+  it("blurs the screen behind the sheet when asked", () => {
+    setViewport(390);
+    render(<Modal open blur dismissible={false} onClose={() => undefined} title="Clock In" />);
+    expect(document.querySelector("[data-blur]")?.className).toContain("backdrop-blur-md");
   });
 
   it("fills the screen when full", () => {

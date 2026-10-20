@@ -1,7 +1,9 @@
-import type { Announcement, AnnouncementStats, Channel, Conversation, Member, Message, ProfileCard } from "@/api/types/community";
+import type { Announcement, AnnouncementStats, Channel, Conversation, LinkPreview, MediaRef, Member, Message, ProfileCard } from "@/api/types/community";
+import { firstLink, hostOf } from "@mycity/ui";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, fold } from "../core";
 import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS } from "../data/people";
 import { UPLOADS } from "../uploads";
+import { attachmentOf } from "./mailbox";
 
 /**
  * Staff Community on the mock, in the contract's own shapes (packages/contract/schemas/
@@ -24,7 +26,7 @@ const person = (key: string): PersonRef => {
 const uid = (key: string) => sid(`user:${key}`);
 const keyOfUser = (userId: string) => PEOPLE.find((p) => uid(p.user_key) === userId)?.user_key;
 
-type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number> };
+type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _noLink?: boolean };
 let seq = 0;
 function msg(type: Message["message_type"], by: string | null, when: string, over: Partial<Message> = {}): MMsg {
   return {
@@ -36,6 +38,9 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     sent_at: when,
     body: null,
     document: null,
+    album_key: null,
+    link: null,
+    forwarded: false,
     duration_s: null,
     transcript: null,
     celebration: null,
@@ -54,7 +59,44 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     _votes: {},
   };
 }
-const fileRef = (name: string, kb: number, mime = "application/octet-stream") => ({ document_id: sid(`doc:${name}`), file_name: name, size_bytes: kb * 1024, mime_type: mime });
+/** A file as a message carries it: its shape and the sizes the worker made (a laptop holds no bytes, so the bubbles keep their places). */
+const fileRef = (name: string, kb: number, mime = "application/octet-stream", over: Partial<MediaRef> = {}): MediaRef => ({
+  document_id: sid(`doc:${name}`),
+  file_name: name,
+  size_bytes: kb * 1024,
+  mime_type: mime,
+  width: null,
+  height: null,
+  page_count: null,
+  duration_ms: null,
+  variants: [],
+  ...over,
+});
+const SIZES = ["webp-320", "webp-960"];
+const photoRef = (name: string, kb: number, width: number, height: number) => fileRef(name, kb, "image/jpeg", { width, height, variants: SIZES });
+const pdfRef = (name: string, kb: number, pages: number) => fileRef(name, kb, "application/pdf", { width: 960, height: 1358, page_count: pages, variants: SIZES });
+
+/*
+ * Link cards: what the server reads from a page's Open Graph tags, for the pages the sample
+ * messages link to. Any other page gets a card of its host and no picture, as a page with a
+ * title and nothing more would.
+ */
+const CARDS: Record<string, Omit<LinkPreview, "community_link_preview_id" | "url">> = {
+  "nfelia.com": { site_name: "Nfelia", title: "Nfelia: Fashion in Lagos", description: "Ready to wear from Lagos designers, delivered across Nigeria.", image: fileRef("nfelia-og.jpg", 96, "image/jpeg", { width: 1200, height: 630, variants: SIZES }) },
+  "mycityapp.io": { site_name: "MyCity App", title: "MyCity App: Events and Tickets", description: "Find what is on in your city this weekend.", image: fileRef("mycity-og.jpg", 80, "image/jpeg", { width: 1200, height: 630, variants: SIZES }) },
+};
+function cardFor(url: string | null): LinkPreview | null {
+  if (!url) return null;
+  const host = hostOf(url);
+  const known = CARDS[host];
+  return { community_link_preview_id: sid(`lp:${url}`), url, ...(known ?? { site_name: host, title: host.charAt(0).toUpperCase() + host.slice(1), description: null, image: null }) };
+}
+const linked = (by: string, when: string, body: string) => msg("text", by, when, { body, link: cardFor(firstLink(body)) });
+/** Photos sent together: one album key, the caption on the first. */
+const album = (by: string, when: string, names: string[], caption: string) => {
+  const key = sid(`album:${names[0]}`);
+  return names.map((n, i) => msg("image", by, when, { document: photoRef(n, 420, i % 3 === 1 ? 1080 : 1600, i % 3 === 1 ? 1350 : 1200), album_key: key, body: i === 0 ? caption : null }));
+};
 const card = (type: "birthday" | "anniversary", who: string, when: string, fans: string[], years: number | null): MMsg => {
   const m = msg(type, null, when, { body: (type === "birthday" ? BDAY : ANNIV)[0] });
   m._fans = fans;
@@ -156,7 +198,11 @@ const CHANNELS: Chan[] = [
     msg("audio", "tolu", at(0, "08:23"), { duration_s: 18, document: fileRef("voice-note.webm", 90, "audio/webm") }),
     msg("text", "ngozi", at(0, "09:02"), { body: "ProvidusBank want their logo on the ticket confirmation email. Raising it as a task against the partnership." }),
     msg("text", "cynthia", at(0, "09:08"), { body: "Good. Link it to the MOU so it shows on the 360." }),
-    msg("file", "seyi", at(0, "09:12"), { document: fileRef("ember-venue-list-v3.xlsx", 84) }),
+    msg("file", "seyi", at(0, "09:12"), { document: fileRef("ember-venue-list-v3.xlsx", 84, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") }),
+    msg("image", "adedotun", at(0, "09:15"), { document: photoRef("stage-build-lagos.jpg", 640, 1600, 1200), body: "Stage build at Tafawa Balewa Square, day two." }),
+    ...album("tolu", at(0, "09:17"), ["enugu-loc-1.jpg", "enugu-loc-2.jpg", "enugu-loc-3.jpg", "enugu-loc-4.jpg", "enugu-loc-5.jpg", "enugu-loc-6.jpg"], "The three Enugu locations, two angles each."),
+    msg("file", "ngozi", at(0, "09:19"), { document: pdfRef("providus-mou-signed.pdf", 1840, 12) }),
+    linked("ngozi", at(0, "09:20"), "Their lookbook is live on https://nfelia.com if anyone wants the styling references."),
     msg("text", "emeka", at(0, "09:21"), { body: "Studio is booked for the 22nd and 23rd. Equipment repair is still with Operations." }),
   ], { admins: ["cynthia"] }),
   chan0("operations", everyone, [msg("text", "cynthia", at(1, "16:10"), { body: "Generator service moved to Thursday. Please save your work before 14:00." })], { channel_type: "department", admins: ["cynthia"] }),
@@ -189,7 +235,7 @@ for (const [other, unread, rows] of DM_ROWS) {
     x.startsWith("vn:")
       ? msg("audio", who, at(d, t), { duration_s: Number(x.slice(3)), document: fileRef(`voice-${who}.webm`, 120, "audio/webm") })
       : x.startsWith("file:")
-        ? msg("file", who, at(d, t), { document: fileRef(x.slice(5), 3200, "application/pdf") })
+        ? msg("file", who, at(d, t), { document: pdfRef(x.slice(5), 3200, 14) })
         : msg("text", who, at(d, t), { body: x }),
   );
   CHANNELS.push(chan0(`dm-${other}`, ["cynthia", other], msgs, { channel_type: "direct", admins: [], unread: { cynthia: unread } }));
@@ -206,12 +252,15 @@ const canPost = (c: Chan, user: string) => (c.post_policy === "people_ceo" ? fal
 function lineOf(m: Message | undefined): string | null {
   if (!m) return null;
   const t = m.message_type;
-  return t === "audio" ? "Voice note" : t === "image" ? "Photo" : t === "video" ? "Video" : t === "file" ? "File" : t === "poll" ? `Poll: ${m.body}` : t === "recognition" ? "Recognition" : t === "birthday" ? "Birthday" : t === "anniversary" ? "Work anniversary" : m.body;
+  const caption = m.body ? m.body.replace(/\s+/g, " ").trim().slice(0, 120) : null;
+  const kind = t === "image" ? "Photo" : t === "video" ? "Video" : t === "file" ? "File" : null;
+  if (kind) return caption ? `${kind}: ${caption}` : kind;
+  return t === "audio" ? "Voice note" : t === "poll" ? `Poll: ${m.body}` : t === "recognition" ? "Recognition" : t === "birthday" ? "Birthday" : t === "anniversary" ? "Work anniversary" : m.body;
 }
 
 /** A message as `user` sees it: theirs or not, their reaction and vote, and the ticks. */
 function view(m: MMsg, user: string, c: Chan): Message {
-  const { _by, _fans, _votes, ...rest } = m;
+  const { _by, _fans, _votes, _noLink, ...rest } = m;
   const mine = _by === user;
   const voted = Object.keys(_votes).length > 0;
   const closed = Boolean(m.poll?.closed);
@@ -397,7 +446,13 @@ const isMsg = (m: MMsg | Record<string, string[]>): m is MMsg => typeof (m as MM
 function build(user: string, b: Record<string, unknown>): MMsg | Record<string, string[]> {
   const now = new Date().toISOString();
   const type = b.message_type as Message["message_type"];
-  if (type === "text") return String(b.body ?? "").trim() ? msg("text", user, now, { body: String(b.body).trim() }) : { body: ["Write something"] };
+  if (type === "text") {
+    const body = String(b.body ?? "").trim();
+    if (!body) return { body: ["Write something"] };
+    const m = msg("text", user, now, { body, link: b.no_link_preview ? null : cardFor(firstLink(body)) });
+    m._noLink = Boolean(b.no_link_preview);
+    return m;
+  }
   if (type === "poll") {
     const opts = (b.options as string[] | undefined) ?? [];
     if (!b.body) return { body: ["Add a question"] };
@@ -414,10 +469,12 @@ function build(user: string, b: Record<string, unknown>): MMsg | Record<string, 
     m.author = person(user);
     return m;
   }
-  const doc = UPLOADS.get(String(b.document_id));
-  if (!doc) return { document_id: ["Attach the file again"] };
+  const stored = UPLOADS.get(String(b.document_id));
+  if (!stored) return { document_id: ["Attach the file again"] };
+  const doc: MediaRef = { width: null, height: null, page_count: null, duration_ms: null, variants: [], ...stored };
   const kind = type === "audio" ? "audio" : /^image\//.test(doc.mime_type) ? "image" : /^audio\//.test(doc.mime_type) ? "audio" : /^video\//.test(doc.mime_type) ? "video" : "file";
-  return msg(kind, user, now, { document: doc, duration_s: kind === "audio" ? Number(b.duration_s ?? 1) : null, body: (b.body as string) || null });
+  const album_key = kind !== "audio" && typeof b.album_key === "string" ? b.album_key : null;
+  return msg(kind, user, now, { document: doc, album_key, duration_s: kind === "audio" ? Number(b.duration_s ?? 1) : null, body: (b.body as string) || null });
 }
 route("POST /api/v1/community/channels/:id/messages", (req) => {
   const c = chan(req.params.id);
@@ -431,6 +488,90 @@ route("POST /api/v1/community/channels/:id/messages", (req) => {
   c!.msgs.push(m);
   for (const k of c!.members) if (k !== req.user) c!.unread[k] = (c!.unread[k] ?? 0) + 1;
   return created(view(m, req.user!, c!));
+});
+/* Forwarding (community.md §3 step 19): where to, then a copy of each message in each chat. */
+const FORWARDABLE = new Set(["text", "image", "audio", "video", "file"]);
+const directOf = (a: string, b: string) => {
+  const pair = [...new Set([a, b])];
+  let c = CHANNELS.find((x) => x.channel_type === "direct" && x.members.length === pair.length && pair.every((k) => x.members.includes(k)));
+  if (!c) {
+    c = chan0(`dm-${pair.join("-")}`, pair, [], { channel_type: "direct", admins: [] });
+    CHANNELS.push(c);
+  }
+  return c;
+};
+route("GET /api/v1/community/forward-targets", (req) => {
+  const user = req.user!;
+  const last = (c: Chan) => String(c.msgs.at(-1)?.sent_at ?? "");
+  const mine = CHANNELS.filter((c) => isMember(c, user) && canPost(c, user) && (c.channel_type !== "direct" || c.msgs.length > 0)).sort((a, b) => last(b).localeCompare(last(a)));
+  const talked = new Set(mine.filter((c) => c.channel_type === "direct").map((c) => c.members.find((k) => k !== user) ?? user));
+  const rows = [
+    ...mine.map((c) => {
+      if (c.channel_type !== "direct") return { kind: "channel" as const, community_channel_id: c.community_channel_id, employee_id: null, name: c.name, person: null, members: c.members.length, is_self: false };
+      const other = c.members.find((k) => k !== user) ?? user;
+      return { kind: "direct" as const, community_channel_id: c.community_channel_id, employee_id: byKey(other)!.employee_id, name: byKey(other)!.display_name, person: person(other), members: null, is_self: other === user };
+    }),
+    ...PEOPLE.filter((p) => !talked.has(p.user_key)).map((p) => ({ kind: "person" as const, community_channel_id: null, employee_id: p.employee_id, name: p.display_name, person: person(p.user_key), members: null, is_self: p.user_key === user })),
+  ];
+  return paged(rows, req, { search: (t) => [t.name] });
+});
+route("POST /api/v1/community/forward", (req) => {
+  const user = req.user!;
+  const b = req.body as { message_ids?: string[]; mail_attachment_id?: string; channel_ids?: string[]; employee_ids?: string[] };
+  const chats: Chan[] = [];
+  for (const id of b.channel_ids ?? []) {
+    const c = chan(id);
+    if (!isMember(c, user)) return notFound();
+    if (!canPost(c!, user)) return fail(403, "CANNOT_POST", c!.name.startsWith("dm-") ? "You cannot post in this conversation" : `You cannot post in #${c!.name}`);
+    if (!chats.includes(c!)) chats.push(c!);
+  }
+  for (const id of b.employee_ids ?? []) {
+    const p = byId(id);
+    if (!p) return notFound();
+    const c = directOf(user, p.user_key);
+    if (!chats.includes(c)) chats.push(c);
+  }
+  if (!chats.length) return invalid({ channel_ids: ["Choose a chat"] });
+  if (chats.length > 5) return invalid({ channel_ids: ["At most 5 chats"] });
+  let items: MMsg[];
+  if (b.mail_attachment_id) {
+    const a = attachmentOf(user, b.mail_attachment_id);
+    if (!a) return notFound();
+    const doc: MediaRef = { document_id: sid(`fwd:${a.document_id}`), file_name: a.file_name, size_bytes: a.size_bytes, mime_type: a.mime_type, width: null, height: null, page_count: null, duration_ms: null, variants: [] };
+    items = [msg(/^image\//.test(a.mime_type) ? "image" : /^video\//.test(a.mime_type) ? "video" : "file", user, new Date().toISOString(), { document: doc })];
+  } else {
+    const found = (b.message_ids ?? []).map(located);
+    if (!found.length || found.some((f) => !f || f.m.deleted)) return fail(404, "MESSAGE_GONE", "A message was deleted");
+    if (found.some((f) => !isMember(f!.c, user))) return notFound();
+    if (found.some((f) => !FORWARDABLE.has(f!.m.message_type))) return fail(422, "NOT_FORWARDABLE", "Polls, cards and announcements are not forwarded");
+    items = found.map((f) => f!.m).sort((x, y) => x.sent_at.localeCompare(y.sent_at));
+  }
+  let sent = 0;
+  for (const c of chats) {
+    const albums = new Map<string, string>();
+    for (const it of items) {
+      const album_key = it.album_key ? (albums.get(it.album_key) ?? albums.set(it.album_key, crypto.randomUUID()).get(it.album_key)!) : null;
+      const copy = msg(it.message_type, user, new Date(Date.now() + sent).toISOString(), {
+        body: it.body,
+        document: it.document,
+        album_key,
+        link: it.link,
+        duration_s: it.duration_s,
+        transcript: it.transcript,
+        forwarded: true,
+      });
+      copy.community_channel_id = c.community_channel_id;
+      c.msgs.push(copy);
+      for (const k of c.members) if (k !== user) c.unread[k] = (c.unread[k] ?? 0) + 1;
+      sent += 1;
+    }
+  }
+  return created({ sent, community_channel_ids: chats.map((c) => c.community_channel_id) });
+});
+route("POST /api/v1/community/link-previews", (req) => {
+  const url = String(req.body.url ?? "").trim();
+  if (url.length < 4) return invalid({ url: ["Not a link"] });
+  return ok({ preview: cardFor(firstLink(url)) });
 });
 route("POST /api/v1/community/recognitions", (req) => {
   const to = byId(String(req.body.to_employee_id));
@@ -460,6 +601,7 @@ route("PUT /api/v1/community/messages/:id", (req) => {
   if (f.m.message_type === "text") {
     if (Date.now() - new Date(f.m.sent_at).getTime() >= 15 * 60 * 1000) return fail(409, "EDIT_WINDOW_PASSED", "Too late to edit this message", { body: ["Too late to edit"] });
     f.m.body = body;
+    f.m.link = f.m._noLink ? null : cardFor(firstLink(body));
   } else if (f.m.message_type === "poll" && f.m.poll) {
     if (f.m.poll.closed) return fail(409, "POLL_CLOSED", "This poll is closed");
     if (Object.keys(f.m._votes).length) return fail(409, "POLL_HAS_VOTES", "People have voted on this poll", { body: ["Already has votes"] });
@@ -478,6 +620,7 @@ route("DELETE /api/v1/community/messages/:id", (req) => {
   f.m.deleted = true;
   f.m.body = null;
   f.m.document = null;
+  f.m.link = null;
   f.m.celebration = null;
   f.m.recognition = null;
   f.m.poll = null;

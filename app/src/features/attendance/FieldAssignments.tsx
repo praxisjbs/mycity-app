@@ -5,8 +5,10 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { coordinatesOf, searchPlaces } from "@/features/shared/places";
+import { AddressField, Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { ASSIGNMENT_STATE } from "./labels";
+import { SiteMap } from "./SiteMap";
 
 /**
  * Field assignments (docs/guides/attendance.md §6.12, §10): People · Attendance's Field view, where a
@@ -259,7 +261,17 @@ export function NewAssignmentForm({ close }: { close: () => void }) {
         <TextField {...f.field(`s${n}_name`)} placeholder="Expo Hall" maxLength={120} />
       </Field>
       <Field label="Address" optional {...f.status(`s${n}_address`)}>
-        <TextField {...f.field(`s${n}_address`)} placeholder="Street, area, city" maxLength={300} />
+        <AddressField
+          {...f.field(`s${n}_address`)}
+          search={searchPlaces}
+          onPick={(place) => {
+            const at = coordinatesOf(place);
+            f.set(`s${n}_latitude`, at.latitude);
+            f.set(`s${n}_longitude`, at.longitude);
+          }}
+          placeholder="Street, area, city"
+          maxLength={300}
+        />
       </Field>
       <Grid cols={2}>
         <Field label="Latitude" {...f.status(`s${n}_latitude`)}>
@@ -272,6 +284,18 @@ export function NewAssignmentForm({ close }: { close: () => void }) {
       <Field label={<HelpTerm help="A punch within this distance of the site counts at the site. Between 100 and 500 metres.">Radius, Metres</HelpTerm>} {...f.status(`s${n}_radius`)}>
         <NumberField {...f.field(`s${n}_radius`)} />
       </Field>
+      <SiteMap
+        latitude={v[`s${n}_latitude`]}
+        longitude={v[`s${n}_longitude`]}
+        radius={v[`s${n}_radius`]}
+        min={100}
+        max={500}
+        label={v[`s${n}_address`] || v[`s${n}_name`]}
+        onMove={(latitude, longitude) => {
+          f.set(`s${n}_latitude`, latitude);
+          f.set(`s${n}_longitude`, longitude);
+        }}
+      />
     </Card>
   );
   return (

@@ -86,6 +86,8 @@
 /packages/contract/schemas/leads.js                @swizfcodes @tomblakeasaah196
 /src/modules/mailbox/                              @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/mailbox.js              @swizfcodes @tomblakeasaah196
+/src/modules/maps/                                 @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/maps.js                 @swizfcodes @tomblakeasaah196
 /src/modules/notifications/                        @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/notifications.js        @swizfcodes @tomblakeasaah196
 /src/modules/organisation/                         @swizfcodes @tomblakeasaah196

@@ -37,6 +37,8 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  FileSpreadsheet,
+  Forward,
   FileText,
   Filter,
   FingerprintPattern,
@@ -71,6 +73,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Presentation,
   Quote,
   Redo2,
   RefreshCw,
@@ -92,6 +95,7 @@ import {
   Undo2,
   User,
   Users,
+  Video,
   Wallet,
   WifiOff,
   X,
@@ -106,6 +110,7 @@ import { cn } from "../lib/cn";
  */
 export const ICONS = {
   pin: MapPin,
+  forward: Forward,
   grid: LayoutGrid,
   clock: Clock,
   user: User,
@@ -192,6 +197,9 @@ export const ICONS = {
   key: KeyRound,
   copy: Copy,
   phone: Smartphone,
+  video: Video,
+  sheet: FileSpreadsheet,
+  slides: Presentation,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

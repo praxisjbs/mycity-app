@@ -10,7 +10,6 @@ import { useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, toast, zoneClock } from "@mycity/ui";
 import { CardRow } from "./cards";
-import { claimClockPrompt } from "./clockPrompt";
 import { reloadsFor } from "./refresh";
 import { useCreateActions } from "./createActions";
 import { useKpiDetail } from "./KpiDetail";
@@ -44,20 +43,6 @@ export function greetingOf(now = new Date()): string {
 export function dateLineOf(o: Pick<HomeOverview, "date" | "clocked_in">): string {
   const day = `${weekdayOf(o.date)} ${formatDate(o.date)}`;
   return o.clocked_in ? `${day} · ${formatCount(o.clocked_in.present)} of ${formatCount(o.clocked_in.expected)} clocked in` : day;
-}
-
-/**
- * Opens Attendance's clock-in panel once when the server says it is due (`prompt_clock_in`):
- * Home decides when, the panel is Attendance's (decision O12). While a link has a card's
- * records open, the panel waits for them to close rather than taking their place.
- */
-function useClockInPrompt(overview: HomeOverview | undefined, waiting: boolean) {
-  const me = useMe();
-  const { open } = useClock();
-  const due = overview?.prompt_clock_in && !waiting ? overview.date : null;
-  useEffect(() => {
-    if (due && claimClockPrompt(me.user_id, due)) open();
-  }, [due, me.user_id, open]);
 }
 
 /** At most one read of the Overview in this long for other people's punches (the morning's arrivals). */
@@ -177,7 +162,6 @@ export function Overview({ linked }: { linked: string | null }) {
 
   /* A link straight to a card's records opens them once the Overview is in; closing them takes the link out of the address. */
   const asked = params.get("kpi") ?? linked;
-  useClockInPrompt(data, asked !== null);
   const shown = useRef<string | null>(null);
   useEffect(() => {
     if (!asked || !data || shown.current === asked) return;

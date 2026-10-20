@@ -9,8 +9,9 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportAction, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { searchPlaces } from "@/features/shared/places";
 import { toTrail } from "@/features/shared/wire";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
@@ -146,7 +147,7 @@ function VacancyForm({ close }: { close: () => void }) {
             <>
               <Field label="Role" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Content Producer" /></Field>
               <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
-              <Field label="Location" {...f.field("location")}><TextField {...f.field("location")} /></Field>
+              <Field label="Location" {...f.field("location")}><AddressField {...f.field("location")} search={searchPlaces} /></Field>
               <Field label="Arrangement"><ChoiceField value={f.values.arrangement} onChange={(v) => f.set("arrangement", v)} options={[["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]} /></Field>
             </>
           ),

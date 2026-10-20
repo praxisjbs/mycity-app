@@ -26,6 +26,10 @@
  * 3. ONE React. `dedupe` keeps the package's and the apps' React the same copy,
  *    so hooks in @mycity/ui never see a second React.
  *
+ * 4. PDF.js's own files (PdfViewer): its standard fonts, character maps, colour
+ *    profiles and decoders, served at /pdfjs/ in dev and copied there in a build
+ *    (pdfjsAssets), because the security policy lets it fetch from nowhere else.
+ *
  * And three readers both apps' configs call, so neither keeps a copy:
  * contractPageSize() (FRONTEND_GUIDE §4), apiMode() (§9.5) and deliveryPlan()
  * (F14, lib/plan.ts).
@@ -49,9 +53,49 @@ export function zodEntry() {
   return path.join(dir, entry);
 }
 
+const PDFJS_DIR = path.join(ROOT, "node_modules", "pdfjs-dist");
+const PDFJS_FOLDERS = ["standard_fonts", "cmaps", "wasm", "iccs"];
+const PDFJS_TYPES = { ".wasm": "application/wasm", ".js": "text/javascript", ".mjs": "text/javascript" };
+
+/**
+ * PDF.js's files at <base>pdfjs/<folder>/<file>, from the installed pdfjs-dist: served by
+ * the dev server, written into the build. A PDF fetches only the ones it needs, from our
+ * own origin, when it is opened (PdfViewer.draw.tsx reads them from BASE_URL + "pdfjs/").
+ */
+export function pdfjsAssets() {
+  const fileOf = (rel) => {
+    const [folder, ...rest] = rel.split("/");
+    if (!PDFJS_FOLDERS.includes(folder) || rest.length !== 1 || !/^[\w.-]+$/.test(rest[0])) return null;
+    const file = path.join(PDFJS_DIR, folder, rest[0]);
+    return fs.existsSync(file) ? file : null;
+  };
+  return {
+    name: "mycity-pdfjs-assets",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const m = /^(?:.*\/)?pdfjs\/(.+)$/.exec(decodeURIComponent((req.url || "").split("?")[0]));
+        const file = m && fileOf(m[1]);
+        if (!file) return next();
+        res.setHeader("Content-Type", PDFJS_TYPES[path.extname(file)] || "application/octet-stream");
+        fs.createReadStream(file).pipe(res);
+      });
+    },
+    generateBundle() {
+      for (const folder of PDFJS_FOLDERS) {
+        const dir = path.join(PDFJS_DIR, folder);
+        if (!fs.existsSync(dir)) throw new Error(`vite: ${dir} is missing; run npm ci at the repository root`);
+        for (const name of fs.readdirSync(dir)) {
+          this.emitFile({ type: "asset", fileName: `pdfjs/${folder}/${name}`, source: fs.readFileSync(path.join(dir, name)) });
+        }
+      }
+    },
+  };
+}
+
 /** The partial config both apps merge under their own. */
 export function sharedVite() {
   return {
+    plugins: [pdfjsAssets()],
     resolve: {
       // Exactly "zod": its subpaths ("zod/v4/core") resolve as published, because the
       // form resolver reads them to tell Zod builds apart. Our own source may not

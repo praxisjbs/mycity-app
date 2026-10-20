@@ -13,7 +13,9 @@
  *   email   system mail with templates/email/notification.html, linking to the record
  *           (shared/route-map). Sent only to active users.
  *   push    one `notification-push` job per row (jobs/handlers/notification-push.js), at once:
- *           every device of the person, whether or not they are in the app (TB, 19/10/2026).
+ *           every device of the person, whether or not they are in the app (TB, 19/10/2026);
+ *           held until their quiet hours end when they turned them on, unless the notice is
+ *           urgent or Security (the job skips a notice read meanwhile).
  *
  * Paced like all system mail (services/mail/pace.js): when the hourly limit is reached, the
  * emails already sent are recorded and the job is put back in the queue for the rest.
@@ -66,21 +68,28 @@ module.exports = async function notificationDeliver(job, token) {
     throw new UnrecoverableError(
       "notification-deliver: the job needs notifications",
     );
-  const out = { in_app: 0, email: 0, email_skipped: 0, push_queued: 0 };
+  const out = { in_app: 0, email: 0, email_skipped: 0, push_queued: 0, push_held: 0 };
   const has = (row, ch) =>
     Array.isArray(row.channels) && row.channels.includes(ch);
 
+  const now = new Date();
+  const quiet = await notifications.quietUntil(
+    rows.filter((r) => has(r, "push") && !notifications.passesQuiet(r)).map((r) => r.user_id),
+    now,
+  );
   for (const row of rows) {
     if (has(row, "in_app") && realtime.toUser(row.user_id, "notification", await notifications.asNotice(row)))
       out.in_app += 1;
     if (has(row, "push")) {
+      const until = notifications.passesQuiet(row) ? null : quiet.get(row.user_id);
       await queues.enqueue(
         "notification-push",
         "send",
         { notification_id: row.notification_id, push: job.data.push || null },
-        { ...PUSH_RETRY, jobId: `push-${row.notification_id}` },
+        { ...PUSH_RETRY, jobId: `push-${row.notification_id}`, ...(until ? { delay: until.getTime() - now.getTime() } : {}) },
       );
       out.push_queued += 1;
+      if (until) out.push_held += 1;
     }
   }
 

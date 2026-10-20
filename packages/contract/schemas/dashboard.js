@@ -324,11 +324,6 @@ const HomeOverview = z
     week: z.array(HomeWeekDay).max(7).nullable(),
     /** Open alerts the reader may clear; null for a reader who clears none. */
     alerts_to_clear: count.nullable(),
-    /**
-     * Open Attendance's clock-in prompt, once: an active employee, on a working day, not on
-     * approved leave, not clocked in, in their first session of the day (home.md §6).
-     */
-    prompt_clock_in: z.boolean(),
   })
   .strict();
 

@@ -9,6 +9,7 @@
  * Refuses to run unless the database name ends in "_test": it drops and rebuilds the
  * public schema.
  */
+const crypto = require("node:crypto");
 const request = require("supertest");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
@@ -17,6 +18,7 @@ const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
+const vault = require("../../src/shared/documents/vault");
 const realtime = require("../../src/services/realtime/emitter");
 const community = require("../../src/modules/community/community.service");
 const lagos = require("../../src/shared/time/lagos");
@@ -28,6 +30,15 @@ jest.mock("../../src/jobs/queues", () => ({
   DEFAULTS: {},
 }));
 const queues = require("../../src/jobs/queues");
+
+// Link cards never reach the internet in a test: the page's card is the test's own.
+jest.mock("../../src/services/web/page-card", () => ({
+  ...jest.requireActual("../../src/services/web/page-card"),
+  fetchCard: jest.fn(),
+}));
+const pageCard = require("../../src/services/web/page-card");
+const links = require("../../src/modules/community/community.links");
+const mediaDerive = require("../../src/jobs/handlers/media-derive");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -59,6 +70,30 @@ const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==",
   "base64",
 );
+
+/** A small PDF of `pages` A4 pages, each with a line of text in the standard Helvetica. */
+function pdfOf(pages) {
+  const objs = ["<< /Type /Catalog /Pages 2 0 R >>", null, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"];
+  const kids = [];
+  for (let i = 0; i < pages; i += 1) {
+    const text = `BT /F1 24 Tf 72 760 Td (Page ${i + 1}) Tj ET`;
+    objs.push(`<< /Length ${text.length} >>\nstream\n${text}\nendstream`);
+    const content = objs.length;
+    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${content} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`);
+    kids.push(`${objs.length} 0 R`);
+  }
+  objs[1] = `<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${pages} >>`;
+  let out = "%PDF-1.4\n";
+  const offsets = [];
+  objs.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, "latin1");
+}
 
 describeDb("Staff Community against the real migrations", () => {
   let app;
@@ -232,6 +267,18 @@ describeDb("Staff Community against the real migrations", () => {
 
     const img = await as("bola").post(`/community/channels/${id}/media`).attach("file", PNG, "set.png");
     expect(img.status).toBe(201);
+    // The file as a bubble draws it (MediaRef): its shape, and the sizes made so far (none for a photo this small).
+    expect(img.body).toEqual({
+      document_id: expect.any(String),
+      file_name: "set.png",
+      size_bytes: expect.any(Number),
+      mime_type: "image/png",
+      width: 1,
+      height: 1,
+      page_count: null,
+      duration_ms: null,
+      variants: [],
+    });
     const posted = await as("bola").post(`/community/channels/${id}/messages`).send({ message_type: "file", document_id: img.body.document_id });
     expect(posted.status).toBe(201);
     expect(posted.body.message_type).toBe("image");
@@ -677,5 +724,318 @@ describeDb("Staff Community against the real migrations", () => {
     expect(typeof t.body.transcript).toBe("string");
     const stored = await one("SELECT transcript FROM community_message WHERE community_message_id = $1", [note.community_message_id]);
     expect(stored.transcript).toBe(t.body.transcript);
+  });
+
+  describe("media and links (community.md §3 steps 17 and 18)", () => {
+    const READY = { status: "ready", title: "Nfelia: Fashion in Lagos", description: "Shop the latest.", site_name: "Nfelia" };
+    beforeEach(() => {
+      pageCard.fetchCard.mockReset();
+      queues.enqueue.mockClear();
+    });
+
+    test("the composer's card: fetched once, kept for everyone, its picture readable by any colleague", async () => {
+      pageCard.fetchCard.mockResolvedValue({ ...READY, url: "https://nfelia.com/", image: { buffer: PNG, name: "preview.png" } });
+      const first = await as("bola").post("/community/link-previews").send({ url: "Nfelia.com#top" });
+      expect(first.status).toBe(200);
+      expect(first.body.preview).toMatchObject({ url: "https://nfelia.com/", title: "Nfelia: Fashion in Lagos", site_name: "Nfelia", description: "Shop the latest." });
+      expect(first.body.preview.image).toMatchObject({ mime_type: "image/png" });
+      expect(pageCard.fetchCard).toHaveBeenCalledWith("https://nfelia.com/");
+
+      // Kept: the next person asking gets it without a fetch.
+      const again = await as("tunde").post("/community/link-previews").send({ url: "https://nfelia.com" });
+      expect(again.body.preview.community_link_preview_id).toBe(first.body.preview.community_link_preview_id);
+      expect(pageCard.fetchCard).toHaveBeenCalledTimes(1);
+      expect((await as("ceo").get(`/documents/${first.body.preview.image.document_id}/content`)).status).toBe(200);
+
+      // Nothing to fetch for an address that is not on the web, and no card for a page with no title.
+      expect((await as("bola").post("/community/link-previews").send({ url: "http://intranet:8080" })).body).toEqual({ preview: null });
+      pageCard.fetchCard.mockResolvedValue({ status: "empty" });
+      expect((await as("bola").post("/community/link-previews").send({ url: "https://blank.example.com" })).body).toEqual({ preview: null });
+      expect(pageCard.fetchCard).toHaveBeenCalledTimes(2);
+      const audit = await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'link_preview.fetched'");
+      expect(audit.n).toBe(2);
+    });
+
+    test("a text gets its first link's card at once when kept, after the post otherwise, and none when removed", async () => {
+      const g = await general("bola");
+      const post = (body) => as("bola").post(`/community/channels/${g.community_channel_id}/messages`).send(body);
+
+      const kept = await post({ message_type: "text", body: "New arrivals at https://nfelia.com/ today" });
+      expect(kept.status).toBe(201);
+      expect(kept.body.link).toMatchObject({ url: "https://nfelia.com/", title: "Nfelia: Fashion in Lagos" });
+
+      pageCard.fetchCard.mockResolvedValue({ ...READY, title: "MyCity App", site_name: "MyCity", url: "https://mycityapp.io/", image: null });
+      const fresh = await post({ message_type: "text", body: "Our site: mycityapp.io" });
+      expect(fresh.body.link).toBeNull();
+      await drain();
+      expect(queues.enqueue).toHaveBeenCalledWith(
+        "link-preview",
+        "card",
+        { community_message_id: fresh.body.community_message_id, url: "https://mycityapp.io/" },
+        expect.objectContaining({ jobId: expect.stringMatching(/^link-preview-/) }),
+      );
+      expect(await links.attach(fresh.body.community_message_id, "https://mycityapp.io/")).toMatchObject({ attached: true });
+      await drain();
+      expect(realtime.toUser).toHaveBeenCalledWith(
+        people.tunde.user.user_id,
+        "community.message_updated",
+        expect.objectContaining({ community_message_id: fresh.body.community_message_id }),
+      );
+      const page = await as("tunde").get(`/community/channels/${g.community_channel_id}/messages`);
+      expect(page.body.data.find((m) => m.community_message_id === fresh.body.community_message_id).link).toMatchObject({
+        title: "MyCity App",
+        image: null,
+      });
+      // The job running twice changes nothing.
+      expect(await links.attach(fresh.body.community_message_id, "https://mycityapp.io/")).toMatchObject({ attached: false });
+
+      queues.enqueue.mockClear();
+      const removed = await post({ message_type: "text", body: "See https://other.example.com", no_link_preview: true });
+      expect(removed.body.link).toBeNull();
+      await drain();
+      expect(queues.enqueue).not.toHaveBeenCalledWith("link-preview", expect.anything(), expect.anything(), expect.anything());
+
+      // Edited within its 15 minutes, a text follows its new first link.
+      const edited = await as("bola").put(`/community/messages/${kept.body.community_message_id}`).send({ body: "Moved to mycityapp.io" });
+      expect(edited.body.link).toMatchObject({ url: "https://mycityapp.io/" });
+      const plain = await as("bola").put(`/community/messages/${kept.body.community_message_id}`).send({ body: "No link now" });
+      expect(plain.body.link).toBeNull();
+    });
+
+    test("files sent together share an album key, the caption rides on the first, and the list line says it", async () => {
+      const ch = (await channelsOf("bola")).find((c) => c.name === "studio-crew");
+      const id = ch.community_channel_id;
+      const album = "7f8e2a3c-1b2d-4e5f-8a9b-0c1d2e3f4a5b";
+      const sent = [];
+      for (const [i, name] of ["a.png", "b.png"].entries()) {
+        const up = await as("bola").post(`/community/channels/${id}/media`).attach("file", PNG, name);
+        const res = await as("bola").post(`/community/channels/${id}/messages`).send({
+          message_type: "file",
+          document_id: up.body.document_id,
+          album_key: album,
+          ...(i === 0 ? { body: "Set for Friday" } : {}),
+        });
+        expect(res.status).toBe(201);
+        sent.push(res.body);
+      }
+      expect(sent.map((m) => [m.message_type, m.album_key, m.body])).toEqual([
+        ["image", album, "Set for Friday"],
+        ["image", album, null],
+      ]);
+      expect(sent[0].document).toMatchObject({ width: 1, height: 1, page_count: null, mime_type: "image/png" });
+      expect(Array.isArray(sent[0].document.variants)).toBe(true);
+      // A caption is searchable, and the list shows the last file's line.
+      expect((await as("tunde").get(`/community/channels/${id}/messages?q=friday`)).body.data).toHaveLength(1);
+      expect((await channelsOf("tunde")).find((c) => c.name === "studio-crew").last_text).toBe("Photo");
+    });
+
+    test("a PDF: queued for its first page, drawn with its pages counted, and its conversation told", async () => {
+      const ch = (await channelsOf("bola")).find((c) => c.name === "studio-crew");
+      const id = ch.community_channel_id;
+      const up = await as("bola").post(`/community/channels/${id}/media`).attach("file", pdfOf(3), "Call sheet.pdf");
+      expect(up.status).toBe(201);
+      const stored = await one("SELECT payload FROM event_log WHERE event_key = 'document.stored' AND entity_id = $1", [up.body.document_id]);
+      expect(stored.payload.needs).toEqual(["pdf"]);
+      const posted = await as("bola").post(`/community/channels/${id}/messages`).send({ message_type: "file", document_id: up.body.document_id });
+      expect(posted.body).toMatchObject({ message_type: "file", document: { page_count: null, variants: [] } });
+
+      const done = await mediaDerive({ data: { document_id: up.body.document_id } });
+      expect(done).toMatchObject({ page_count: 3, variants: ["webp-960", "webp-320"] });
+      await drain();
+      expect(realtime.toUser).toHaveBeenCalledWith(
+        people.tunde.user.user_id,
+        "community.message_updated",
+        expect.objectContaining({ community_message_id: posted.body.community_message_id }),
+      );
+      const page = await as("tunde").get(`/community/channels/${id}/messages`);
+      const card = page.body.data.find((m) => m.community_message_id === posted.body.community_message_id).document;
+      expect(card).toMatchObject({ file_name: "Call sheet.pdf", page_count: 3, width: 595, height: 842, variants: ["webp-320", "webp-960"] });
+      const picture = await as("tunde").get(`/documents/${up.body.document_id}/variant/webp-960`);
+      expect(picture.status).toBe(200);
+      expect(picture.headers["content-type"]).toBe("image/webp");
+
+      // A broken PDF fails at once and keeps its plain card.
+      const broken = await as("bola").post(`/community/channels/${id}/media`).attach("file", Buffer.from("%PDF-1.4\nnot really"), "broken.pdf");
+      await expect(mediaDerive({ data: { document_id: broken.body.document_id } })).rejects.toThrow(/could not be drawn/);
+    });
+  });
+  describe("forwarding (community.md §3 step 19)", () => {
+    const post = (who, id, body) => as(who).post(`/community/channels/${id}/messages`).send(body);
+    const channel = async (name, members) =>
+      (await as("bola").post("/community/channels").send({ name, member_ids: members.map((w) => people[w].employee.employee_id) })).body.community_channel_id;
+
+    test("where to forward: the chats the caller may post in, then colleagues with no conversation yet", async () => {
+      const res = await as("bola").get("/community/forward-targets");
+      expect(res.status).toBe(200);
+      const names = res.body.data.map((t) => `${t.kind}:${t.name}`);
+      expect(names).toContain("channel:general");
+      expect(names).not.toContain("channel:announcements");
+      const kinds = res.body.data.map((t) => t.kind);
+      expect(kinds.slice(kinds.indexOf("person")).every((k) => k === "person")).toBe(true);
+      const tunde = res.body.data.filter((t) => t.name === "Tunde Ola");
+      expect(tunde).toHaveLength(1);
+      expect(tunde[0]).toMatchObject({ kind: "direct", employee_id: people.tunde.employee.employee_id, is_self: false });
+      const found = await as("bola").get("/community/forward-targets?q=amaka");
+      expect(found.body.data.map((t) => t.name)).toEqual(["Amaka Eze"]);
+      // The caller's own chat is offered once, marked as theirs (the screen names it "You").
+      const self = (await as("bola").get("/community/forward-targets?q=bola")).body.data.filter((t) => t.employee_id === people.bola.employee.employee_id);
+      expect(self).toEqual([expect.objectContaining({ is_self: true })]);
+    });
+
+    test("messages go to a channel and a colleague in the order sent, marked forwarded, their files readable there", async () => {
+      const src = await channel("fwd-source", ["tunde"]);
+      const dest = await channel("fwd-dest", ["ceo"]);
+      const text = await post("tunde", src, { message_type: "text", body: "Call time is 08:00" });
+      const album = crypto.randomUUID();
+      const photos = [];
+      for (let i = 0; i < 4; i += 1) {
+        const up = await as("tunde").post(`/community/channels/${src}/media`).attach("file", PNG, `set-${i}.png`);
+        photos.push(await post("tunde", src, { message_type: "file", document_id: up.body.document_id, album_key: album, ...(i === 0 ? { body: "The set, day two" } : {}) }));
+      }
+      const note = await as("tunde").post(`/community/channels/${src}/media`).field("purpose", "voice_note").attach("file", WEBM, "note.webm");
+      const voice = await post("tunde", src, { message_type: "audio", document_id: note.body.document_id, duration_s: 7 });
+      await q("UPDATE community_message SET transcript = 'See you at eight' WHERE community_message_id = $1", [voice.body.community_message_id]);
+      const ids = [voice, ...photos, text].map((m) => m.body.community_message_id);
+
+      const res = await as("bola").post("/community/forward").send({ message_ids: ids, channel_ids: [dest], employee_ids: [people.ceo.employee.employee_id] });
+      expect(res.status).toBe(201);
+      expect(res.body.sent).toBe(12);
+      expect(res.body.community_channel_ids).toHaveLength(2);
+      expect(res.body.community_channel_ids[0]).toBe(dest);
+
+      for (const id of res.body.community_channel_ids) {
+        const page = (await as("ceo").get(`/community/channels/${id}/messages`)).body.data;
+        const copies = page.filter((m) => m.forwarded);
+        expect(copies.map((m) => m.message_type)).toEqual(["text", "image", "image", "image", "image", "audio"]);
+        expect(copies.every((m) => m.author.employee_id === people.bola.employee.employee_id)).toBe(true);
+        const keys = new Set(copies.filter((m) => m.message_type === "image").map((m) => m.album_key));
+        expect(keys.size).toBe(1);
+        expect(keys.has(album)).toBe(false);
+        expect(copies[1].body).toBe("The set, day two");
+        expect(copies[5]).toMatchObject({ duration_s: 7, transcript: "See you at eight" });
+        // The same file, read in the chat it was forwarded to by someone outside the first one.
+        expect(copies[1].document.document_id).toBe(photos[0].body.document.document_id);
+        expect((await as("ceo").get(`/documents/${copies[1].document.document_id}/content`)).status).toBe(200);
+      }
+
+      // Who first sent it is kept for the audit, never on screen.
+      await drain();
+      const audit = await one(
+        "SELECT payload FROM event_log WHERE event_key = 'channel_message.posted' AND payload->>'community_channel_id' = $1 AND payload->'forwarded_from' IS NOT NULL ORDER BY occurred_at LIMIT 1",
+        [dest],
+      );
+      expect(audit.payload.forwarded_from).toEqual({ community_message_id: text.body.community_message_id, sender_user_id: people.tunde.user.user_id });
+
+      // The first message deleted: the forwarded copy and its file stay.
+      expect((await as("tunde").del(`/community/messages/${photos[1].body.community_message_id}`)).status).toBe(204);
+      expect((await as("ceo").get(`/documents/${photos[1].body.document.document_id}/content`)).status).toBe(200);
+    });
+
+    test("refused whole: a poll, a deleted message, a chat the caller may not post in, a message from elsewhere", async () => {
+      const src = await channel("fwd-refusals", ["tunde"]);
+      const keep = await post("bola", src, { message_type: "text", body: "Keep this" });
+      const poll = await post("bola", src, { message_type: "poll", body: "Lunch?", options: ["Rice", "Beans"] });
+      const gone = await post("bola", src, { message_type: "text", body: "Oops" });
+      await as("bola").del(`/community/messages/${gone.body.community_message_id}`);
+      const g = await general("bola");
+      const ann = (await channelsOf("bola")).find((c) => c.name === "announcements");
+      const count = async () => (await one("SELECT count(*)::int AS n FROM community_message WHERE metadata->>'forwarded' = 'true'")).n;
+      const before = await count();
+
+      const asPoll = await as("bola").post("/community/forward").send({ message_ids: [keep.body.community_message_id, poll.body.community_message_id], channel_ids: [g.community_channel_id] });
+      expect(asPoll.status).toBe(422);
+      expect(asPoll.body.error.code).toBe("NOT_FORWARDABLE");
+      const asGone = await as("bola").post("/community/forward").send({ message_ids: [keep.body.community_message_id, gone.body.community_message_id], channel_ids: [g.community_channel_id] });
+      expect(asGone.status).toBe(404);
+      const toAnn = await as("bola").post("/community/forward").send({ message_ids: [keep.body.community_message_id], channel_ids: [g.community_channel_id, ann.community_channel_id] });
+      expect(toAnn.status).toBe(403);
+      expect(toAnn.body.error.message).toBe("You cannot post in #announcements");
+      const outsider = await as("ceo").post("/community/forward").send({ message_ids: [keep.body.community_message_id], channel_ids: [g.community_channel_id] });
+      expect(outsider.status).toBe(404);
+      const six = await as("bola").post("/community/forward").send({
+        message_ids: [keep.body.community_message_id],
+        channel_ids: Array.from({ length: 6 }, () => crypto.randomUUID()),
+      });
+      expect(six.status).toBe(422);
+      expect(await count()).toBe(before);
+    });
+
+    test("a PDF forwarded before its first page is drawn fills in where it was forwarded too", async () => {
+      const src = await channel("fwd-pdf-source", ["tunde"]);
+      const dest = await channel("fwd-pdf-dest", ["ceo"]);
+      const up = await as("tunde").post(`/community/channels/${src}/media`).attach("file", pdfOf(2), "Run of show.pdf");
+      const sent = await post("tunde", src, { message_type: "file", document_id: up.body.document_id });
+      const res = await as("bola").post("/community/forward").send({ message_ids: [sent.body.community_message_id], channel_ids: [dest] });
+      expect(res.status).toBe(201);
+      const copy = (await as("ceo").get(`/community/channels/${dest}/messages`)).body.data.at(-1);
+      expect(copy.document).toMatchObject({ page_count: null, variants: [] });
+
+      await mediaDerive({ data: { document_id: up.body.document_id } });
+      await drain();
+      expect(realtime.toUser).toHaveBeenCalledWith(
+        people.ceo.user.user_id,
+        "community.message_updated",
+        expect.objectContaining({ community_channel_id: dest, community_message_id: copy.community_message_id }),
+      );
+      const filled = (await as("ceo").get(`/community/channels/${dest}/messages`)).body.data.at(-1);
+      expect(filled.document).toMatchObject({ page_count: 2, variants: ["webp-320", "webp-960"] });
+    });
+
+    test("a mail attachment goes to a chat as a copy in Community, only from its mailbox's owner, once scanned and never from Spam", async () => {
+      const dest = await channel("fwd-mail", ["tunde"]);
+      const { attachment, document, account: mailAccountId, message: mailMessageId } = await tx(async (client) => {
+        const secret = await client.query("INSERT INTO integration_secret (provider, key, ciphertext) VALUES ('mail', 'mail_conn:fwd', 'x') RETURNING integration_secret_id");
+        const account = await client.query(
+          `INSERT INTO mail_account (user_id, email, incoming_protocol, incoming_host, incoming_port, outgoing_host, outgoing_port, username, integration_secret_id)
+           VALUES ($1, 'bola@mycity.test', 'imap', 'mycity.test', 993, 'mycity.test', 465, 'bola@mycity.test', $2) RETURNING mail_account_id`,
+          [people.bola.user.user_id, secret.rows[0].integration_secret_id],
+        );
+        const accountId = account.rows[0].mail_account_id;
+        const thread = await client.query("INSERT INTO mail_thread (mail_account_id, subject, last_message_at) VALUES ($1, 'Venues', now()) RETURNING mail_thread_id", [accountId]);
+        const message = await client.query(
+          "INSERT INTO mail_message (mail_thread_id, mail_account_id, from_address, subject, direction) VALUES ($1, $2, 'ops@partner.test', 'Venues', 'incoming') RETURNING mail_message_id",
+          [thread.rows[0].mail_thread_id, accountId],
+        );
+        const doc = await vault.store(client, {
+          file: { buffer: pdfOf(2), originalname: "Venues.pdf" },
+          purpose: "attachment",
+          doc_type: "mail_attachment",
+          entity: { type: "mail_message", id: message.rows[0].mail_message_id },
+          actor: people.bola.user,
+        });
+        const att = await client.query("INSERT INTO mail_attachment (mail_message_id, document_id) VALUES ($1, $2) RETURNING mail_attachment_id", [
+          message.rows[0].mail_message_id,
+          doc.document_id,
+        ]);
+        return { attachment: att.rows[0].mail_attachment_id, document: doc.document_id, account: accountId, message: message.rows[0].mail_message_id };
+      });
+
+      // Not the owner: nothing to send.
+      expect((await as("tunde").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest] })).status).toBe(404);
+      // Still being checked: not yet.
+      await q("UPDATE document SET scan_status = 'pending' WHERE document_id = $1", [document]);
+      expect((await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest] })).status).toBe(409);
+      await q("UPDATE document SET scan_status = 'clean' WHERE document_id = $1", [document]);
+      // A spam mail's attachment is never forwarded.
+      const spam = await q("INSERT INTO mail_folder (mail_account_id, remote_key, name, kind) VALUES ($1, 'Junk', 'Junk', 'spam') RETURNING mail_folder_id", [mailAccountId]);
+      await q("UPDATE mail_message SET mail_folder_id = $2 WHERE mail_message_id = $1", [mailMessageId, spam.rows[0].mail_folder_id]);
+      expect((await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest] })).status).toBe(404);
+      await q("UPDATE mail_message SET mail_folder_id = NULL WHERE mail_message_id = $1", [mailMessageId]);
+
+      const res = await as("bola").post("/community/forward").send({ mail_attachment_id: attachment, channel_ids: [dest], employee_ids: [people.tunde.employee.employee_id] });
+      expect(res.status).toBe(201);
+      expect(res.body.sent).toBe(2);
+      const copies = [];
+      for (const id of res.body.community_channel_ids) {
+        const m = (await as("tunde").get(`/community/channels/${id}/messages`)).body.data.at(-1);
+        expect(m).toMatchObject({ message_type: "file", forwarded: true, document: { file_name: "Venues.pdf", mime_type: "application/pdf" } });
+        copies.push(m.document.document_id);
+      }
+      // Copied once into Community, shared by both chats; the mail's own file stays the mailbox owner's.
+      expect(new Set(copies).size).toBe(1);
+      expect(copies[0]).not.toBe(document);
+      expect((await as("tunde").get(`/documents/${copies[0]}/content`)).status).toBe(200);
+      expect((await as("tunde").get(`/documents/${document}/content`)).status).toBe(404);
+    });
   });
 });

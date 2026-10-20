@@ -600,6 +600,9 @@ app/
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       download.ts             the other way: a gated file fetched with the session's token, as a
+                              download (saveFile), a blob URL a preview can draw (useFileUrl), the
+                              bytes and URL a PDF preview needs (useFileBlob), what the file viewer
+                              draws (fetchFile), and people's and chat photos, each fetched once (usePhotos)
                               download (saveFile) or a blob URL a preview can draw (useFileUrl); a
                               download lands on this device: Downloads, or the share sheet on an
                               iPhone app opened from the home screen
@@ -618,7 +621,7 @@ app/
                               layout-context
     features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
                               pickers (EmployeePicker), wire (the API's shapes to the components'),
-                              KpiTiles, Letter
+                              files (useFileViewer: MediaViewer on this app's session), KpiTiles, Letter
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
@@ -831,7 +834,9 @@ What a feature may still keep beside its screens is **wiring**, not components:
 `features/shared/sections.tsx` binds `DataView` and `ExportButton` to this app's endpoints
 (`PagedTable`, `ExportAction`), `features/shared/pickers.tsx` binds `PersonPicker` to the employees
 endpoint (`EmployeePicker`), `features/shared/wire.ts` maps what the API sends to what the
-components take, and `api/upload.ts` gives the upload engine this app's session.
+components take, `features/shared/files.tsx` binds `MediaViewer` to this app's session
+(`useFileViewer`, for My Documents and a mail's attachments), and `api/upload.ts` gives the
+upload engine this app's session.
 
 **Submit is never disabled** (§8.3). `Button`, `IconButton` and `BigButton` are busy while the work
 their handler returns runs (F26, §8.4), or while `busy` says so (a mutation's pending that the press

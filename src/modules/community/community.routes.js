@@ -9,6 +9,7 @@ const c = require("@mycity/contract");
 const { route } = require("../../http/route");
 const { requirePermission } = require("../../middleware/rbac");
 const upload = require("../../middleware/upload");
+const { forwardLimiter, linkPreviewLimiter } = require("../../middleware/rate-limit");
 const controller = require("./community.controller");
 
 const router = express.Router();
@@ -163,12 +164,25 @@ route(
   "/channels/:id/media",
   {
     body: c.documents.DocumentUpload,
-    response: c.documents.DocumentRef,
+    response: c.documents.MediaRef,
     summary: "Upload a file or voice note to post",
   },
   create(),
   upload.single("file", { purpose: "attachment" }),
   controller.uploadMedia,
+);
+route(
+  router,
+  "post",
+  "/link-previews",
+  {
+    body: cm.LinkPreviewRequest,
+    response: cm.LinkPreviewAnswer,
+    summary: "A link's card for the composer",
+  },
+  create(),
+  linkPreviewLimiter,
+  controller.linkPreview,
 );
 route(
   router,
@@ -273,6 +287,31 @@ route(
   },
   view(),
   controller.listColleagues,
+);
+route(
+  router,
+  "get",
+  "/forward-targets",
+  {
+    query: cm.ForwardTargetQuery,
+    response: cm.ForwardTargetPage,
+    summary: "Where I may forward to",
+  },
+  view(),
+  controller.listForwardTargets,
+);
+route(
+  router,
+  "post",
+  "/forward",
+  {
+    body: cm.ForwardRequest,
+    response: cm.ForwardResult,
+    summary: "Forward messages or a mail attachment to up to 5 chats",
+  },
+  create(),
+  forwardLimiter,
+  controller.forward,
 );
 route(
   router,

@@ -48,6 +48,9 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [KpiDetail](#kpidetail) | `KpiDetail` | The report model behind a KPI card: the records that make up the number, grouped, searchable and paged at 25. | stable |
 | Display | [KpiGrid](#kpigrid) | `KpiGrid` | The row of KPI cards: four across on desktop, two to a row on a phone. | stable |
 | Display | [LevelMeter](#levelmeter) | `LevelMeter` | A level drawn as a few short bars, filled up to the level: how much access a role has to a module. | stable |
+| Display | [LinkCard](#linkcard) | `LinkCard` | A link's card, as on WhatsApp: the page's picture, the site, the title and a line of its description, opening the page. | beta |
+| Display | [LinkText](#linktext) | `LinkText` | Text a person wrote, with every link in it clickable and, while searching, each match marked. | beta |
+| Display | [MediaTile](#mediatile) | `MediaTile`, `MediaAlbum` | A photo, a video's first frame or a file, drawn in place at its own shape before it has loaded; MediaAlbum puts four or more side by side, two by two. | beta |
 | Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
 | Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
 | Display | [ProfileHeader](#profileheader) | `ProfileHeader`, `BackButton` | The head of a record page: who or what it is, in their photo or big initials, with its chips and its actions. | stable |
@@ -83,6 +86,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [NotificationBanner](#notificationbanner) | `NotificationBanner` | The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere. | beta |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top. | stable |
 | Feedback | [UrgentBar](#urgentbar) | `UrgentBar` | The red bar under the top bar on every screen while an urgent notice waits on the person: its title, how many wait, and Acknowledge or Open. | beta |
+| Forms | [AddressField](#addressfield) | `AddressField` | An address typed with suggestions from our own address search; picking one fills the address and hands back its coordinates. | stable |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
@@ -118,10 +122,13 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
-| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both. | stable |
+| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
+| Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
+| Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
+| Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
 | Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
 | Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
@@ -1153,6 +1160,121 @@ A level drawn as a few short bars, filled up to the level: how much access a rol
 <LevelMeter value={level.rank} label={level.name} decorative />
 ```
 
+### LinkCard
+
+A link's card, as on WhatsApp: the page's picture, the site, the title and a line of its description, opening the page.
+
+| | |
+|---|---|
+| Use | The first link of a chat message, under its text; the composer's card while a message with a link is written, with Remove Preview. |
+| Avoid | A link the product makes itself (a Button or a router Link); a mail's links (EmailFrame keeps them); a card for every link in a message (only the first gets one). |
+| Phone | The same card, the width of its bubble: a wide picture runs across its top, a small or square one sits at its side; the whole card is the tap target. |
+| Accessibility | The card is one link named by the page's title that says it opens a new tab; the picture is decorative beside the title; Remove Preview is a named button; a loading card says so. |
+| Status | beta |
+| Exports | `LinkCard` |
+| Import | `import { LinkCard } from "@mycity/ui";` |
+| File | `packages/ui/src/display/LinkCard.tsx` |
+| Test | `packages/ui/src/display/LinkCard.test.tsx` |
+| Gallery | `packages/ui/src/display/LinkCard.gallery.tsx` (`npm run gallery`, `#/LinkCard`) |
+
+**LinkCard** props (`LinkCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `href` | `string` | yes | Where the card opens: the link as posted. |
+| `title` | `string` |  | The page's title. |
+| `site` | `string` |  | The site, as the page names itself, else its host. |
+| `description` | `string \| null` |  | A line of the page's description, when it has one. |
+| `image` | `string \| null` |  | The page's picture, ready to draw (fetched with the session); null while it loads. |
+| `hasImage` | `boolean` |  | Whether the card has a picture at all, so its place is kept while it loads. |
+| `imageWidth` | `number \| null` |  | The picture's width in pixels: a wide one runs across the top. |
+| `imageHeight` | `number \| null` |  | The picture's height in pixels. |
+| `loading` | `boolean` |  | The composer's card while the page is read: its shape, shimmering. |
+| `onRemove` | `() => void` |  | The composer's card: a card that does not open, with Remove Preview. |
+| `tone` | `"mine" \| "theirs" \| "plain"` |  | Where it sits: in the sender's own bubble, in another's, or on the page (the composer). |
+| `onSeen` | `() => void` |  | Called once when the card first comes near the screen, so its picture is fetched only then. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<LinkCard href="https://nfelia.com/" title="Nfelia: Fashion in Lagos" site="Nfelia" description="Shop the latest." image={src} imageWidth={1200} imageHeight={630} hasImage />
+```
+
+### LinkText
+
+Text a person wrote, with every link in it clickable and, while searching, each match marked.
+
+| | |
+|---|---|
+| Use | A chat message, a caption, an announcement's body: anything a person typed that may hold a link (https://nfelia.com, www.mycityapp.io, nfelia.com). |
+| Avoid | Interface copy (it has no links); a mail body (use EmailFrame, which keeps the sender's own links); a link the product makes itself (a Button with asChild, or a router Link). |
+| Phone | The same; a link is tapped like any other, and long addresses wrap instead of pushing the bubble wider. |
+| Accessibility | Links are real anchors that open in a new tab with no opener and say so to assistive technology; the text keeps its line breaks and is marked as content. |
+| Status | beta |
+| Exports | `LinkText` |
+| Import | `import { LinkText } from "@mycity/ui";` |
+| File | `packages/ui/src/display/LinkText.tsx` |
+| Test | `packages/ui/src/display/LinkText.test.tsx` |
+| Gallery | `packages/ui/src/display/LinkText.gallery.tsx` (`npm run gallery`, `#/LinkText`) |
+
+**LinkText** props (`LinkTextProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `text` | `string` | yes | The text, as the person wrote it. |
+| `highlight` | `string` |  | A search term: each match is marked (`mark.hit`, which the search steps between). |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<LinkText text="See https://nfelia.com today" highlight="nfelia" />
+```
+
+### MediaTile
+
+A photo, a video's first frame or a file, drawn in place at its own shape before it has loaded; MediaAlbum puts four or more side by side, two by two.
+
+| | |
+|---|---|
+| Use | A photo or a video in a chat message, an album of them sent together, the picks in Send Files, a conversation's shared files on a profile. |
+| Avoid | A document someone needs to read (FileCard opens it); a picture to inspect closely in a page (ImageViewer); decoration (Illustration). |
+| Phone | The bubble's own width (256 px), its height from the picture's shape, a very tall or very wide one cropped to fit; the whole tile is the tap target. |
+| Accessibility | Each tile is a button named Open with the file's name; a video says it is one and how long; "+N" is read as how many more; Remove is a named button. The picture itself is decorative beside that name. |
+| Status | beta |
+| Exports | `MediaTile`, `MediaAlbum` |
+| Import | `import { MediaTile, MediaAlbum } from "@mycity/ui";` |
+| File | `packages/ui/src/display/MediaTile.tsx` |
+| Test | `packages/ui/src/display/MediaTile.test.tsx` |
+| Gallery | `packages/ui/src/display/MediaTile.gallery.tsx` (`npm run gallery`, `#/MediaTile`) |
+
+**MediaTile** props (`MediaTileProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `src` | `string \| null` | yes | The picture, ready to draw (fetched with the session): a photo's 960 px size, a video's poster; null while it loads or when there is none. |
+| `alt` | `string` | yes | The file's name: what the tile is, in words. |
+| `width` | `number \| null` |  | The picture's width, so its place is kept before it loads; a square when unknown. |
+| `height` | `number \| null` |  | The picture's height. |
+| `kind` | `"photo" \| "video" \| "file"` |  | A photo, a video (a play mark and its length over it), or another file (its glyph and name). |
+| `glyph` | `IconName` |  | The glyph of another file (`doc`, `sheet`, `slides`). |
+| `duration` | `string \| null` |  | A video's length as it is read ("0:42"). |
+| `more` | `number` |  | How many more an album holds past this, its fourth tile: "+N" over it. |
+| `fit` | `"bubble" \| "square"` |  | In a bubble at its own shape, or a square tile (an album, a grid of picks). |
+| `onOpen` | `() => void` |  | Opens it full screen. |
+| `onRemove` | `() => void` |  | Takes it out (Send Files): a small X in its corner. |
+| `onSeen` | `() => void` |  | Called once when it first comes near the screen, so its picture is fetched only then. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**MediaAlbum** props (`MediaAlbumProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tiles` | `Array<Omit<MediaTileProps, "fit" \| "more" \| "className"> & { key: string }>` | yes | The photos and videos sent together, in order; four or more. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<MediaTile src={src} alt="Set.jpg" width={1600} height={1200} onOpen={open} />
+<MediaAlbum tiles={photos.map((p) => ({ key: p.id, src: p.src, alt: p.name }))} />
+```
+
 ### Money
 
 An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word.
@@ -1828,13 +1950,13 @@ The full-screen lock over the staff app when a session ends: who is signed in, w
 | `photo` | `string \| null` |  | Their photo, if they have one; the initials otherwise. |
 | `title` | `string` | yes | At most 4 words, Title Case ("Session Locked"). |
 | `reason` | `string` | yes | Why it locked, one short line ("Locked after 30 minutes idle"). |
-| `children` | `ReactNode` | yes | The password field (in a Form whose id the footer's submit button names). |
-| `footer` | `ReactNode` | yes | Buttons only: the way out (Sign Out), then the primary (Unlock). |
+| `children` | `ReactNode` | yes | The credential field (in a Form whose id the footer's submit button names). |
+| `footer` | `ReactNode` | yes | Buttons only, stacked full width down one centred column: the primary (Unlock) and any alternates first, then the way out (Sign Out) in red, set apart below a hairline. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its frame). |
 | `className` | `string` |  | Layout classes for the card only. |
 
 ```tsx
-<LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{passwordField}</LockScreen>
+<LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{pinField}</LockScreen>
 ```
 
 ### Menu
@@ -1901,6 +2023,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
 | `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
 | `dismissible` | `boolean` |  | false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation that must be answered. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -2030,6 +2153,7 @@ The phone's bottom sheet: slides up with a spring, closes by dragging down, a ta
 | `footer` | `ReactNode` |  | Buttons for the footer; the main action is last and full width at the bottom. |
 | `children` | `ReactNode` |  | The body. |
 | `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -2369,6 +2493,39 @@ The red bar under the top bar on every screen while an urgent notice waits on th
 ```
 
 ## Forms
+
+### AddressField
+
+An address typed with suggestions from our own address search; picking one fills the address and hands back its coordinates.
+
+| | |
+|---|---|
+| Use | Any address in a form: a worksite, a field site, a client visit, a home. Pass `onPick` where the place's latitude and longitude fill the form's own fields. |
+| Avoid | Calling the provider from the browser (the key stays on the server); a search box that only finds (PlaceSearch); the browser's own autofill list or a `<datalist>` (gate 21). |
+| Phone | 44 px tall with 16 px text; the suggestions open under the field as 44 px rows, inside the sheet's own scroll. |
+| Accessibility | A combobox over a listbox of addresses: arrows move through them, Enter picks, Esc closes; the count found is announced. Takes its label and error links from the Field around it. |
+| Status | stable |
+| Exports | `AddressField` |
+| Import | `import { AddressField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/AddressField.tsx` |
+| Test | `packages/ui/src/form/AddressField.test.tsx` |
+| Gallery | `packages/ui/src/form/AddressField.gallery.tsx` (`npm run gallery`, `#/AddressField`) |
+
+**AddressField** props (`AddressFieldProps`, extends `NativeInput`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The address, from form.field(name): what was typed, or the place picked. |
+| `onChange` | `(value: string) => void` | yes | Called with the new address as the person types or picks. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `search` | `SearchPlaces` | yes | Finds addresses; the app's own call through our proxy. |
+| `onPick` | `(place: Place) => void` |  | Called with the place picked, its coordinates included, after the address is set. |
+
+```tsx
+<AddressField {...f.field("address")} search={searchPlaces} onPick={(p) => { f.set("latitude", String(p.lat)); f.set("longitude", String(p.lon)); }} />
+```
 
 ### CardPicker
 
@@ -3212,6 +3369,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 | `kinds` | `string` |  | What kinds of file are wanted, lower case, for the line under the words ("PDF or Word"). |
 | `compact` | `boolean` |  | A tighter drop zone, inside a sheet or beside a form's footer. |
 | `trigger` | `(open: () => void) => ReactNode` |  | A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. |
+| `autoOpen` | `boolean` |  | Open the device's picker as soon as the field shows, where the browser allows it (a sheet opened from a menu, such as Send Files); otherwise the person taps the drop zone. |
 | `handOff` | `boolean` |  | The caller lists what arrived itself (a composer's attachment chips), so a finished file leaves the tray once it is handed over and is never shown twice. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -3719,13 +3877,13 @@ A bare trend line with no axes, for inside a table cell or beside a figure.
 
 ### DocumentPreview
 
-A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both.
+A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both.
 
 | | |
 |---|---|
-| Use | Looking at what someone attached: a receipt, a CV, a signed offer, a mail attachment, an imported sheet. |
-| Avoid | A document the product generated itself (use Paper, which prints right); shipping a PDF renderer of our own; a preview with no way out to the file. |
-| Phone | Shorter, and anything the browser will not draw inline becomes a Download card instead of an empty frame. |
+| Use | Looking at what someone attached beside a list: a receipt, a CV, a signed offer, a mail attachment, an imported sheet. |
+| Avoid | A document the product generated itself (use Paper, which prints right); a file opened full screen (MediaViewer); a preview with no way out to the file. |
+| Phone | Shorter; a PDF's pages scroll inside the frame, the same as on desktop, and anything else that cannot be drawn becomes a Download card instead of an empty frame. |
 | Accessibility | The frame is named by the file, Open in Tab and Download are real links, and a file that cannot be shown says so in words. |
 | Status | stable |
 | Exports | `DocumentPreview` |
@@ -3740,14 +3898,15 @@ A file from the vault as the browser draws it: a PDF inline, a picture in the im
 |---|---|---|---|
 | `name` | `string` | yes | The file's name, as the person uploaded it. |
 | `mime` | `string` | yes | Its type, as the SERVER decided, not as the browser guessed. |
-| `href` | `string` | yes | Where the vault streams it (`/api/v1/documents/:id/file`). |
+| `href` | `string` | yes | The file, ready for the browser (a blob URL the app fetched with the session): what Open in Tab and Download open. |
+| `file` | `Blob \| null` |  | A PDF's bytes, for PdfViewer to draw; null while they arrive. |
 | `sizeBytes` | `number` |  | Its size, for the line under the name. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller. |
 | `actions` | `ReactNode` |  | What sits beside Open in Tab (Replace, Remove). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
-<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
+<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={href} file={blob} />
 ```
 
 ### EmailFrame
@@ -3781,6 +3940,43 @@ One email body in a sealed frame: the sender's layout kept, scaled down to fit t
 <EmailFrame title="Client configuration settings" html={message.body_html} onMailto={(m) => compose(m)} />
 ```
 
+### FileCard
+
+A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download.
+
+| | |
+|---|---|
+| Use | A PDF, a Word, Excel or PowerPoint file, a CSV or a text file posted in a conversation; a file in a list someone opens or saves. |
+| Avoid | A photo or a video (MediaTile shows the picture itself); a document the product generated (Paper); reading the file in place (PdfViewer, DocumentPreview). |
+| Phone | The bubble's width (256 px); the card opens the file and Download saves it, each a 44 px target. |
+| Accessibility | The card's main button is named Open with the file's name and says its type; Download is a separate named button; the first page is decorative beside that name. |
+| Status | beta |
+| Exports | `FileCard` |
+| Import | `import { FileCard } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/FileCard.tsx` |
+| Test | `packages/ui/src/documents/FileCard.test.tsx` |
+| Gallery | `packages/ui/src/documents/FileCard.gallery.tsx` (`npm run gallery`, `#/FileCard`) |
+
+**FileCard** props (`FileCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The file's name, as it was sent. |
+| `mime` | `string` | yes | Its type, as the server decided. |
+| `sizeBytes` | `number \| null` |  | Its size. |
+| `pages` | `number \| null` |  | A PDF's pages, once the worker has counted them. |
+| `preview` | `string \| null` |  | A PDF's first page, ready to draw (fetched with the session); null while it loads or when there is none. |
+| `hasPreview` | `boolean` |  | Whether the first page exists, so its place is kept while it loads. |
+| `onOpen` | `() => void \| Promise<void>` |  | Opens the file: the viewer for a PDF, a download for a file the app does not show. |
+| `onDownload` | `() => void \| Promise<void>` |  | Saves the file to the device. |
+| `onSeen` | `() => void` |  | Called once when the card first comes near the screen, so its first page is fetched only then. |
+| `tone` | `"mine" \| "theirs" \| "plain"` |  | Where it sits: in the sender's own bubble, in another's, or on the page. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<FileCard name="Call sheet.pdf" mime="application/pdf" sizeBytes={245000} pages={3} preview={src} hasPreview onOpen={open} onDownload={save} />
+```
+
 ### ImageViewer
 
 A picture at a readable size, with zoom and a way to open it full size in a new tab.
@@ -3810,6 +4006,41 @@ A picture at a readable size, with zoom and a way to open it full size in a new 
 
 ```tsx
 <ImageViewer src={`/api/v1/documents/${id}/file`} alt="Receipt.jpg" />
+```
+
+### MediaViewer
+
+A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it.
+
+| | |
+|---|---|
+| Use | Opening a file someone sent or attached: a chat's photos, videos and PDFs, a conversation's shared files, a mail attachment, a document on My Documents. |
+| Avoid | A file the app cannot show (Word, Excel, PowerPoint: download it instead); a preview beside a list on desktop (DocumentPreview); a document the product generated (Paper). |
+| Phone | The whole screen on deep green: Close, who sent it and when, Forward, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it. |
+| Accessibility | A modal dialog named by the file: focus moves in and is trapped, Esc closes it and focus returns to what opened it; the arrow keys step on desktop; every control is a named button; a file that cannot be shown says so, with Download beside it. |
+| Status | beta |
+| Exports | `MediaViewer` |
+| Import | `import { MediaViewer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/MediaViewer.tsx` |
+| Test | `packages/ui/src/documents/MediaViewer.test.tsx` |
+| Gallery | `packages/ui/src/documents/MediaViewer.gallery.tsx` (`npm run gallery`, `#/MediaViewer`) |
+
+**MediaViewer** props (`MediaViewerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether it is showing. |
+| `items` | `ViewerItem[]` | yes | The files it steps through, in order. |
+| `index` | `number` | yes | Which one is showing. |
+| `onIndex` | `(index: number) => void` | yes | Called to show another: the arrows, the keyboard, a swipe. |
+| `onClose` | `() => void` | yes | Called to close it: Close, Esc, a swipe down, the phone's Back. |
+| `load` | `(item: ViewerItem) => Promise<Blob>` | yes | The file itself, fetched with the session: drawn here, and what Download and Share save. |
+| `save` | `(blob: Blob, name: string) => unknown` |  | How Download hands the file to this device (the app's own, which uses the share sheet where a download cannot land); the browser's download otherwise. |
+| `onForward` | `(item: ViewerItem) => void` |  | Forward the file on view to a chat; no Forward unless set. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<MediaViewer open={open} items={items} index={at} onIndex={setAt} onClose={close} load={(item) => fetchFile(item)} />
 ```
 
 ### Paper
@@ -3872,6 +4103,38 @@ A document the product generated, as it will print: white paper in both themes, 
 
 ```tsx
 <Paper note="This is how the letter will print"><PaperLogo reference="OFF/2026/0041" /><PaperTitle>Offer of Employment</PaperTitle></Paper>
+```
+
+### PdfViewer
+
+A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom.
+
+| | |
+|---|---|
+| Use | Reading a PDF someone uploaded or sent: a chat file in the file viewer, a document's preview on My Documents, a mail attachment. |
+| Avoid | A document the product generated and prints (Paper); a photo (ImageViewer); editing or signing a PDF (it only shows one). |
+| Phone | Fills its frame; pages fit the width and scroll, Zoom In and Zoom Out sit at the foot with the page number, each a 44 px target. |
+| Accessibility | The pages are one focusable document named by the file and the page in view, scrolled by the keyboard; zoom buttons are named and the page number is announced; a PDF that cannot be opened says so in words. |
+| Status | beta |
+| Exports | `PdfViewer` |
+| Import | `import { PdfViewer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/PdfViewer.tsx` |
+| Test | `packages/ui/src/documents/PdfViewer.test.tsx` |
+| Gallery | `packages/ui/src/documents/PdfViewer.gallery.tsx` (`npm run gallery`, `#/PdfViewer`) |
+
+**PdfViewer** props (`PdfViewerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `data` | `Blob \| ArrayBuffer \| Uint8Array \| null` | yes | The PDF's bytes, fetched with the session; null while they arrive. |
+| `name` | `string` | yes | The file's name: the document's accessible name. |
+| `height` | `"sm" \| "md" \| "lg" \| "fill"` |  | A frame of fixed height (`sm`, `md`, `lg`, as DocumentPreview's), or `fill` its parent (the full-screen viewer). |
+| `tone` | `"card" \| "deep"` |  | The page area's backdrop: the muted card (`card`), or the viewer's deep green (`deep`). |
+| `onError` | `(reason: "password" \| "invalid") => void` |  | Called when the file cannot be drawn: locked with a password, or damaged. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PdfViewer data={blob} name="Call sheet.pdf" height="md" />
 ```
 
 ### Reader
@@ -3974,6 +4237,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 | `zoom` | `number` |  | How close in; 15 unless set (a street), 11 for a city. |
 | `radiusMetres` | `number` |  | A circle around the first point, in metres: a worksite's geofence. |
 | `tileUrl` | `string` |  | Where the tiles come from; our own proxy unless a screen passes its own. |
+| `loadTile` | `LoadTile` |  | Fetches each tile with the app's session (our tile route is signed in); a plain image request otherwise. |
 | `onPick` | `(point: LatLon) => void` |  | Called with the point pressed, for choosing a place (setting up a worksite). |
 | `interactive` | `boolean` |  | Let the person drag and zoom. Off by default, so a map inside a page cannot swallow its scroll. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall; `sm` in a card, `md` on a page, `lg` on a screen of its own. |
@@ -3983,6 +4247,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 ```tsx
 <MapView markers={[{ key: "in", lat, lon, label: "Clocked in 07:52" }]} />
 <MapView centre={site} radiusMetres={site.radius_metres} onPick={setPoint} interactive />
+<MapView markers={[site]} radiusMetres={site.radius_m} loadTile={loadTile} />
 ```
 
 ### PlaceSearch
@@ -4595,6 +4860,12 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |
+| `LINK_ENDINGS` | `lib/links.ts` | What counts as a link in a message (docs/guides/community.md §6). |
+| `FoundLink` (type) | `lib/links.ts` | One link found in text: where it is, as written, and where it goes. |
+| `findLinks` | `lib/links.ts` | Every link in a text, in order. |
+| `normaliseLink` | `lib/links.ts` | The form a link's card is asked for in: https:// added, the host in lower case, the fragment dropped. |
+| `firstLink` | `lib/links.ts` | The first link in a text in its card form, or null when there is none or it may not have a card. |
+| `hostOf` | `lib/links.ts` | The host a link goes to, without www., for a card's last line. |
 | `PHONE_QUERY` | `lib/media.ts` | A phone: 760 px wide and below (gate 11). |
 | `useMediaQuery` | `lib/media.ts` | true while the media query matches; false before the first render on a server. |
 | `useIsPhone` | `lib/media.ts` | true on a phone: the phone shell renders (gate 11). |
@@ -4621,6 +4892,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `currentDensity` | `lib/preferences.ts` | The density in force: compact unless comfortable is set. |
 | `setDensity` | `lib/preferences.ts` | Applies and remembers a density. |
 | `useDensity` | `lib/preferences.ts` | Compact (the default on desktop) or Comfortable, remembered per person (F5). |
+| `useSeen` | `lib/seen.ts` | A ref that calls `onSeen` once, when its element first comes within `margin` of the screen: a chat's pictures are fetched as they scroll near, not all at once. |
 | `SLOTS` | `lib/slots.ts` | The slot names the screen gates read (five-second.js, two-shells.js): each shared component marks its text with `data-ui="<slot>"`, so a gate knows a page title from a button from a help text without guessing from markup. |
 | `Slot` (type) | `lib/slots.ts` | One slot name. |
 | `slot` | `lib/slots.ts` | Spread onto an element: `<h1 {...slot("page-title")}>`. |

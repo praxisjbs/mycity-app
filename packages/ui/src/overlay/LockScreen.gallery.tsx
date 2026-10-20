@@ -23,16 +23,22 @@ function Locks({ label, title, reason }: { label: string; title: string; reason:
         reason={reason}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Sign Out
-            </Button>
             <Button variant="primary" onClick={() => setOpen(false)}>
               Unlock
+            </Button>
+            <Button icon="fingerprint" onClick={() => setOpen(false)}>
+              Use Passkey
+            </Button>
+            <div role="separator" className="my-1 h-px w-full bg-border" />
+            <Button variant="danger" icon="logout" onClick={() => setOpen(false)}>
+              Sign Out
             </Button>
           </>
         }
       >
-        <LoginField id="gallery-lock-pass" label="Password" type="password" autoComplete="current-password" value={pass} onChange={setPass} onBlur={() => undefined} error="" good={pass.length >= 8} buzz={0} />
+        <div className="[&_label]:text-center">
+          <LoginField id="gallery-lock-pass" label="Password" type="password" autoComplete="current-password" value={pass} onChange={setPass} onBlur={() => undefined} error="" good={pass.length >= 8} buzz={0} />
+        </div>
       </LockScreen>
     </div>
   );

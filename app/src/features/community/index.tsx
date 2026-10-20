@@ -10,10 +10,10 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Composer, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
-import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
+import { Composer, PickBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
+import { SendFiles, SharedFiles } from "./Media";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
-import { upload } from "@/api/upload";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -166,8 +166,8 @@ function Channels() {
                 })
             } /> })}
       />
-      {/* #announcements takes nothing posted straight in: no composer, for anyone. */}
-      {current.post_policy !== "people_ceo" && (
+      {/* #announcements takes nothing posted straight in: no composer, for anyone. While picking, the bar takes its place. */}
+      {t.picking ? <PickBar t={t} /> : current.post_policy !== "people_ceo" && (
       <Composer
         key={current.community_channel_id}
         placeholder={`Message #${current.name}`}
@@ -182,7 +182,7 @@ function Channels() {
               { label: "Recognise a Colleague", icon: "thumb", onSelect: () => modal.open({ title: "Recognise a Colleague", body: (close) => <Recognise close={close} done={() => (t.reload(), reloadList())} /> }) },
               ...(current.can_moderate ? [{ label: "Celebrate", icon: "flag" as const, onSelect: () => modal.open({ title: "Celebrate", body: (close) => <Celebrate close={close} send={(b) => after(t.send(b))} /> }) }] : []),
               ...(current.can_poll ? [{ label: "Start a Poll", icon: "chart" as const, onSelect: () => modal.open({ title: "Start a Poll", body: (close) => <PollForm close={close} send={(b) => after(t.send(b))} /> }) }] : []),
-              { label: "Attach a File", icon: "clip", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
+              { label: "Attach a File", icon: "clip", onSelect: () => modal.open({ title: "Send Files", body: (close) => <SendFiles channelId={current.community_channel_id} close={close} send={(bs) => after(t.sendMany(bs))} /> }) },
             ]}
           />
         )}
@@ -422,25 +422,6 @@ function PollForm({ close, send, edit }: { close: () => void; send: (b: { messag
   );
 }
 
-/** A file goes to the conversation through the upload engine, then it is posted. */
-function Attach({ channelId, close, send }: { channelId: string; close: () => void; send: (b: { message_type: "file"; document_id: string }) => Promise<void> }) {
-  return (
-    <>
-      <UploadField
-        upload={upload}
-        purpose="attachment"
-        endpoint={`/api/v1/community/channels/${channelId}/media`}
-        multiple={false}
-        onUploaded={(docs) => {
-          close();
-          void Promise.all(docs.map((d) => send({ message_type: "file", document_id: d.document_id })));
-        }}
-      />
-      <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
-    </>
-  );
-}
-
 /* ───────────────────────── Direct messages ───────────────────────── */
 
 const seenLine = (c: { online: boolean; last_seen_at: string | null; is_self?: boolean }) => (c.is_self ? "Message yourself" : c.online ? "Online" : c.last_seen_at ? `Last seen ${formatWhen(c.last_seen_at)}` : "Offline");
@@ -587,7 +568,7 @@ function Direct() {
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
       <ThreadBody t={t} dm />
-      <Composer
+      {t.picking ? <PickBar t={t} /> : <Composer
         key={current.community_channel_id}
         placeholder={current.is_self ? "Message yourself" : `Message ${current.person.display_name.split(" ")[0]}`}
         onSend={(b) => after(t.send(b))}
@@ -597,12 +578,12 @@ function Direct() {
             align="start"
             trigger={(p) => <button {...p} type="button" className={cls} aria-label="Attach"><Icon name="clip" /></button>}
             items={[
-              { label: "Photo or Video", icon: "image", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
-              { label: "Document", icon: "doc", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
+              { label: "Photo or Video", icon: "image", onSelect: () => modal.open({ title: "Send Files", body: (close) => <SendFiles channelId={current.community_channel_id} accept="image/*,video/*" kinds="Photos or videos" close={close} send={(bs) => after(t.sendMany(bs))} /> }) },
+              { label: "Document", icon: "doc", onSelect: () => modal.open({ title: "Send Files", body: (close) => <SendFiles channelId={current.community_channel_id} accept=".pdf,.docx,.xlsx,.pptx,.csv,.txt" kinds="PDF, Word, Excel or PowerPoint" close={close} send={(bs) => after(t.sendMany(bs))} /> }) },
             ]}
           />
         )}
-      />
+      />}
     </>
   ) : (
     <p className="m-auto text-xs text-subtle-foreground">Pick a conversation.</p>
@@ -686,7 +667,7 @@ function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onM
       </div>
       <div className={sec}>
         <h3 data-ui="title" className={h4}>Shared in Conversation</h3>
-        {p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, `${Math.max(1, Math.round(f.size_bytes / 1024))} KB`)}</div>)}
+        <SharedFiles files={p.shared_files} />
         {p.voice_notes > 0 && line("mic", `${p.voice_notes} voice note${p.voice_notes > 1 ? "s" : ""}`)}
         {!p.shared_files.length && !p.voice_notes && <p className="text-2xs text-subtle-foreground">Nothing shared yet.</p>}
       </div>

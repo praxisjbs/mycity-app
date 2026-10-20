@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
-import { saveFile, useFileUrl } from "@/api/download";
+import { saveFile, useFileBlob } from "@/api/download";
+import { useFileViewer, viewableFile } from "@/features/shared/files";
 import type { DocumentRow } from "@mycity/contract/contract.gen.ts";
 import {
   Button,
@@ -47,6 +48,7 @@ export function MyDocumentsPage() {
   const summary = useApi("GET /api/v1/ess/documents/summary");
   const modal = useModal();
   const [chosen, setChosen] = useState<DocumentRow | null>(null);
+  const files = useFileViewer();
 
   const add = (row?: DocumentRow) =>
     modal.open({
@@ -64,6 +66,8 @@ export function MyDocumentsPage() {
 
   const open = (d: DocumentRow) => {
     setChosen(d);
+    const url = d.document_id ? `/api/v1/documents/${d.document_id}/content` : null;
+    const mime = d.mime ?? "application/octet-stream";
     modal.open({
       title: d.name,
       body: (
@@ -77,11 +81,17 @@ export function MyDocumentsPage() {
             ]}
           />
           <div className="mt-3 flex flex-wrap gap-2">
-            {d.document_id && (
+            {url && viewableFile(mime) && (
               <Button
-                icon="download"
-                onClick={() => saveFile(`/api/v1/documents/${d.document_id}/content`, d.name)}
+                variant="primary"
+                icon="eye"
+                onClick={() => files.view(url, { name: d.name, mime, at: d.uploaded_at ? `Uploaded ${formatDate(d.uploaded_at)}` : null })}
               >
+                View File
+              </Button>
+            )}
+            {url && (
+              <Button icon="download" onClick={() => saveFile(url, d.name)}>
                 Download
               </Button>
             )}
@@ -160,13 +170,14 @@ export function MyDocumentsPage() {
           <Preview row={chosen} />
         </Grid>
       </DesktopOnly>
+      {files.viewer}
     </>
   );
 }
 
-/** The chosen document, as the browser draws it. */
+/** The chosen document: a PDF's pages drawn in the app, a picture as it is. */
 function Preview({ row }: { row: DocumentRow | null }) {
-  const href = useFileUrl(row?.document_id ? `/api/v1/documents/${row.document_id}/content` : null);
+  const { blob, href } = useFileBlob(row?.document_id ? `/api/v1/documents/${row.document_id}/content` : null);
   if (!row || !row.document_id) {
     return (
       <Card>
@@ -189,6 +200,7 @@ function Preview({ row }: { row: DocumentRow | null }) {
       mime={row.mime ?? "application/octet-stream"}
       sizeBytes={row.bytes ?? undefined}
       href={href}
+      file={blob}
     />
   );
 }

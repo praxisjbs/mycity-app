@@ -3,7 +3,7 @@
  * Home · Overview end to end (docs/guides/home.md §5, §6, §7, §9): the real migrations and
  * reference seeds, the whole app over HTTP, every response parsed with its contract
  * (APP_ENV=test checks each one too). The Overview of each Home view, its sections on a
- * pinned day, Activity Today's allow-list and module filter, the clock-in prompt, the cards
+ * pinned day, Activity Today's allow-list and module filter, the cards
  * a person chooses and the ones a role opens on, the prune after an access change, the
  * records behind a card, and the assistant's and ⌘K's reads.
  *
@@ -42,7 +42,6 @@ const kpi = require("../../src/modules/dashboard/kpi-catalog");
 const resolve = require("../../src/modules/dashboard/kpi-catalog/resolve");
 const service = require("../../src/modules/dashboard/dashboard.service");
 const activity = require("../../src/modules/dashboard/dashboard.activity");
-const prompt = require("../../src/modules/dashboard/dashboard.prompt");
 
 // The queues and the socket emitter would hold Redis connections open past the run.
 jest.mock("../../src/jobs/queues", () => ({
@@ -116,16 +115,6 @@ describeDb("Home · Overview against the real migrations", () => {
       [employeeOf(who), type, at(date, hhmm), date, headOffice],
     );
     await reconcile.recomputeDay(pool, await attendanceRepo.person(pool, employeeOf(who)), date);
-  }
-
-  /** A session signed in at an instant, the way identity issues one. */
-  async function sessionAt(who, instant) {
-    const { session_id: id } = await one(
-      `INSERT INTO user_session (user_id, refresh_token_hash, issued_at, expires_at)
-       VALUES ($1, $2, $3, $3::timestamptz + interval '1 day') RETURNING session_id`,
-      [userIdOf(who), crypto.randomUUID(), instant],
-    );
-    return id;
   }
 
   /** An event in the log, as emit() writes one, at an instant. */
@@ -235,7 +224,6 @@ describeDb("Home · Overview against the real migrations", () => {
       for (const section of ["day_strip", "my_goals", "upcoming_leave"]) expect([section, o[section]]).toEqual([section, null]);
       expect(Array.isArray(o.week)).toBe(true);
       expect(Array.isArray(o.activity)).toBe(true);
-      expect(typeof o.prompt_clock_in).toBe("boolean");
     });
 
     test("the CEO: every live card is theirs to see, the goals chart and the Org KPI donut, each score null until M2", async () => {
@@ -754,64 +742,6 @@ describeDb("Home · Overview against the real migrations", () => {
       require("../../src/modules/community/community.events");
       for (const [key, { module }] of Object.entries(activity.ALLOWED))
         expect([key, catalogue.get(key) && catalogue.get(key).module]).toEqual([key, module]);
-    });
-  });
-
-  /* ---------------------------------------------------------------- *
-   * The clock-in prompt
-   * ---------------------------------------------------------------- */
-
-  describe("the clock-in prompt", () => {
-    const shouldPrompt = (who, sessionId, now) =>
-      prompt.shouldPrompt(pool, { ...users[who], session_id: sessionId }, { now, today: lagos.today(now) });
-
-    test("on the first session of a working day, with no clock-in and no leave: once, not on a later session", async () => {
-      const first = await sessionAt("other", at("2026-10-07", "07:30"));
-      const second = await sessionAt("other", at("2026-10-07", "08:15"));
-      expect(await shouldPrompt("other", first, at("2026-10-07", "08:30"))).toBe(true);
-      expect(await shouldPrompt("other", second, at("2026-10-07", "08:30"))).toBe(false);
-      // A session kept alive from yesterday is not today's first.
-      expect(await shouldPrompt("other", first, at("2026-10-08", "08:30"))).toBe(false);
-    });
-
-    // Each case makes its own state, on days in September no other block uses; the leave
-    // falls before the clock-in, which leaves a shift open into the day after it.
-    test("not once they have clocked in", async () => {
-      const day = "2026-09-15";
-      const first = await sessionAt("other", at(day, "07:00"));
-      expect(await shouldPrompt("other", first, at(day, "08:00"))).toBe(true);
-      await punch("other", "clock_in", day, "08:50");
-      expect(await shouldPrompt("other", first, at(day, "12:00"))).toBe(false);
-    });
-
-    test("not on granted leave", async () => {
-      const day = "2026-09-09";
-      const first = await sessionAt("other", at(day, "07:00"));
-      expect(await shouldPrompt("other", first, at(day, "08:00"))).toBe(true);
-      const { leave_type_id: annual } = await one("SELECT leave_type_id FROM leave_type WHERE code = 'annual'");
-      await q(
-        `INSERT INTO leave_request (employee_id, leave_type_id, starts_on, ends_on, amount, status, submitted_at, decided_at)
-         VALUES ($1, $2, $3, $3, 1, 'approved', now(), now())`,
-        [employeeOf("other"), annual, day],
-      );
-      expect(await shouldPrompt("other", first, at(day, "12:00"))).toBe(false);
-    });
-
-    test("not on a day that is not worked", async () => {
-      const sunday = await sessionAt("other", at("2026-10-11", "08:00"));
-      expect(await shouldPrompt("other", sunday, at("2026-10-11", "09:00"))).toBe(false);
-      const holiday = await sessionAt("other", at("2026-10-01", "08:00"));
-      expect(await shouldPrompt("other", holiday, at("2026-10-01", "09:00"))).toBe(false);
-    });
-
-    test("not without a session to compare", async () => {
-      expect(await prompt.firstSessionOn(pool, { user_id: userIdOf("other") }, "2026-10-07")).toBe(false);
-    });
-
-    test("the Overview carries the flag", async () => {
-      const first = await sessionAt("other", at("2026-10-06", "07:45"));
-      const o = await service.overview({ ...users.other, session_id: first }, { now: at("2026-10-06", "08:00") });
-      expect(o.prompt_clock_in).toBe(true);
     });
   });
 
