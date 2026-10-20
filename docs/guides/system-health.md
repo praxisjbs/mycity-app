@@ -56,8 +56,9 @@ one creates alarm without action.
 2. The `system-health` scheduler runs every 5 minutes in the worker. It upserts an `error_group`
    for each fingerprint it has not seen, refreshes the group's last seen time and release, detects
    a group that was marked Fixed and has fired again, and detects a spike.
-3. A new, returning or spiking group emits its event, which the fan-out turns into a notification
-   for `system_health` view holders: the bell, a banner, and push to every device they registered.
+3. A new, returning or spiking group of severity `fatal` or `error` emits its event, which the
+   fan-out turns into a notification for `system_health` view holders: the bell, a banner, and push
+   to every device they registered. A `warning` or `notice` group is counted, never told (§6).
 4. The same run takes a readiness snapshot (`src/http/health.js` `runChecks()`) into
    `health_snapshot`, and compares it with the run before: a check that moved off `up` emits
    `system_health.check_down`, and one that came back emits `system_health.check_recovered`.
@@ -169,13 +170,23 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   fingerprints anything itself, so the screen and the alert channel always agree on what one fault is.
 - A group's `severity` is the worst severity seen on it. `notice` (a 422) never alerts and never
   escalates: it is counted so form trouble can be seen, nothing more.
+- Only `fatal` and `error` are told. A `warning` or `notice` group is grouped, counted and reopened
+  when it comes back like any other, but never pushed as new, back again or happening fast, and
+  never escalates (TB, 20/10/2026, fault #1). The roll-up reads the reporter's `ALERT_SEVERITIES`,
+  so the alert channel and the notices agree.
+- An `AppError` may name its own severity (`err.severity`, `shared/errors.js`), which the error
+  handler records in place of `error`. An outside service not answering, whose outage a readiness
+  check already carries, is a `warning`: counted, never alerting or escalating. Geoapify's
+  `MAPS_UNAVAILABLE` is the first (TB, 20/10/2026, fault #1); the `maps` check and Settings ·
+  Integrations show the outage itself.
 - Status is `open`, `handling`, `fixed` or `ignored`. Only `open` escalates, and only `open` and
   `handling` are shown by default.
 - **Came back.** A group whose status is `fixed` and which has an event later than
   `status_changed_at` returns to `open`, `regressions` goes up by one, `regressed_at` is set, and
-  `system_health.fault_returned` is emitted. A group marked `ignored` never comes back on its own.
+  `system_health.fault_returned` is emitted for a `fatal` or `error`. A group marked `ignored` never
+  comes back on its own.
 - **A spike** is 10 or more events in the last hour and at least 5 times the group's mean hourly rate
-  over the previous 7 days. Told once per group per 6 hours.
+  over the previous 7 days, on a `fatal` or `error` group. Told once per group per 6 hours.
 - **Unattended** is a group still `open` whose severity is `fatal` or `error`, 24 hours after
   `first_seen_at`. It fires `system_health.fault_unattended`, which carries email among its default
   channels, and repeats every 24 hours until the status changes. `escalated_at` records the last
@@ -287,9 +298,9 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
 | `system_health.targets_changed` | Edit Targets is saved | Audit only; no notice |
 | `system_health.check_down` | a readiness check leaves `up` | Notifies, urgency `urgent` for `postgres`, `redis` and `worker`, `important` otherwise |
 | `system_health.check_recovered` | it returns to `up` | Notifies, urgency `normal` |
-| `system_health.fault_new` | a fingerprint is seen for the first time | Notifies, urgency from severity |
-| `system_health.fault_returned` | a fault marked Fixed fires again | Notifies, urgency `important` |
-| `system_health.fault_spiked` | the spike rule matches | Notifies, urgency `important`, at most once per 6 hours |
+| `system_health.fault_new` | a `fatal` or `error` fingerprint is seen for the first time | Notifies, urgency from severity |
+| `system_health.fault_returned` | a `fatal` or `error` fault marked Fixed fires again | Notifies, urgency `important` |
+| `system_health.fault_spiked` | the spike rule matches a `fatal` or `error` fault | Notifies, urgency `important`, at most once per 6 hours |
 | `system_health.fault_unattended` | still Open 24 hours after first seen | Notifies with email on, repeats daily |
 | `system_health.digest` | 08:00 Lagos | The day's summary |
 | `system_health.brief_requested` | Download Brief is pressed | Outbox: the worker writes the Markdown into the reserved export file |
@@ -490,3 +501,4 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   only; faults grouped on the existing fingerprint with a shared status; push and in-app to every
   registered device, email only after 24 hours unattended, an 08:00 digest, and no WhatsApp; a
   Markdown brief whose instructions require 4 to 10 clarity questions before any fix.
+- 20/10/2026 · TB · §3, §6, §7: only `fatal` and `error` are told. A new, returning or spiking `warning` or `notice` group no longer pushes (the roll-up pushed every new group whatever its severity, though §6 said a notice never alerts). An `AppError` may name its own severity, which the error handler records in place of `error`; Geoapify not answering (`MAPS_UNAVAILABLE`) is a `warning`, since the `maps` check carries the outage (fault #1 on staging; `docs/guides/addresses.md` §6.5).

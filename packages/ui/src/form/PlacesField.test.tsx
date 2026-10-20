@@ -84,7 +84,8 @@ describe("PlacesField", () => {
   });
 
   it("says when address search is unavailable and offers Try Again", async () => {
-    const search = vi.fn().mockRejectedValueOnce(Object.assign(new Error("down"), { status: 503 })).mockResolvedValue([ENUGU]);
+    const down = () => Object.assign(new Error("down"), { status: 503 });
+    const search = vi.fn().mockRejectedValueOnce(down()).mockRejectedValueOnce(down()).mockResolvedValue([ENUGU]);
     render(<Harness places={placesOf(search)} />);
     await userEvent.type(screen.getByRole("combobox"), "enugu");
     expect(await screen.findByText("Address search is unavailable")).toBeInTheDocument();

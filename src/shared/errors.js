@@ -12,6 +12,11 @@
  *
  * The fourth argument is `fields` because it is always a field → messages map,
  * which the frontend shows under each input.
+ *
+ * A 5xx is a fault: the error handler records it as an `error`, which alerts. An error that
+ * stands for an outside service not answering, whose outage a readiness check already carries,
+ * says so instead (`err.severity = "warning"`): counted on System Health, never alerting or
+ * escalating (docs/guides/system-health.md §6).
  */
 class AppError extends Error {
   /**

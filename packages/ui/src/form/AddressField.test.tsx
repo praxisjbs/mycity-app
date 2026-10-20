@@ -237,22 +237,46 @@ describe("AddressField", () => {
 
   it("says Location blocked when the device refuses, and Try Again searches once more", async () => {
     vi.stubGlobal("navigator", { ...navigator, geolocation: { getCurrentPosition: (_ok: PositionCallback, no: PositionErrorCallback) => no({ code: 1 } as GeolocationPositionError) } });
-    const search = vi.fn().mockRejectedValueOnce(down(502)).mockResolvedValue([ROAD]);
+    const search = vi.fn().mockRejectedValueOnce(down(502)).mockRejectedValueOnce(down(502)).mockResolvedValue([ROAD]);
     render(<Harness places={placesOf({ search })} />);
     await userEvent.type(screen.getByRole("combobox"), "admiralty");
     await userEvent.click(await screen.findByRole("button", { name: "Use Current Location" }));
     expect(await screen.findByText("Location blocked")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Try Again" }));
     expect(await screen.findByRole("option", { name: new RegExp(ROAD.formatted) })).toBeInTheDocument();
-    expect(search).toHaveBeenCalledTimes(2);
+    expect(search).toHaveBeenCalledTimes(3);
   });
 
-  it("asks a busy search once more before calling search down", async () => {
-    const search = vi.fn().mockRejectedValueOnce(down(429)).mockResolvedValue([ROAD]);
+  it.each([
+    ["busy", 429],
+    ["not answering", 502],
+  ])("asks a %s search once more before calling search down", async (_, status) => {
+    const search = vi.fn().mockRejectedValueOnce(down(status)).mockResolvedValue([ROAD]);
     render(<Harness places={placesOf({ search })} />);
     await userEvent.type(screen.getByRole("combobox"), "admiralty");
     expect(await screen.findByRole("option", { name: new RegExp(ROAD.formatted) }, { timeout: 1500 })).toBeInTheDocument();
     expect(search).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Address search is unavailable")).toBeNull();
+  });
+
+  it("calls search down only after a second failure, and then stops asking until Try Again", async () => {
+    const search = vi.fn().mockRejectedValue(down(502));
+    render(<Harness places={placesOf({ search })} />);
+    await userEvent.type(screen.getByRole("combobox"), "admiralty");
+    expect(await screen.findByText("Address search is unavailable")).toBeInTheDocument();
+    expect(search).toHaveBeenCalledTimes(2);
+    await userEvent.type(screen.getByRole("combobox"), " way");
+    await new Promise((r) => setTimeout(r, 600));
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks a pin that failed once more before calling search down", async () => {
+    const pin = vi.fn().mockRejectedValueOnce(down(502)).mockResolvedValue(PIN);
+    render(<Harness places={placesOf({ search: vi.fn().mockResolvedValue([]), pin })} />);
+    await userEvent.click(screen.getByRole("button", { name: "Drop a Pin" }));
+    await userEvent.click(screen.getByRole("button", { name: "Tap The Map" }));
+    expect(await screen.findByRole("button", { name: "Use This Address" }, { timeout: 1500 })).toBeInTheDocument();
+    expect(pin).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("Address search is unavailable")).toBeNull();
   });
 

@@ -14,7 +14,9 @@
  *   anything else       500 INTERNAL_ERROR, with the request id as a reference to quote
  *
  * 5xx are reported (observability/error-reporter.js: stored, and posted to the
- * alert channel). 4xx are logged at warn; validation failures are recorded at
+ * alert channel), at the severity an AppError gives itself, `error` unless it says
+ * otherwise (an outside service not answering is a `warning`, shared/errors.js). 4xx are
+ * logged at warn; validation failures are recorded at
  * `notice`, grouped by route and field names, so a form that keeps failing shows
  * up as one rising count rather than noise.
  *
@@ -104,9 +106,11 @@ function errorHandler(err, req, res, _next) {
   if (err instanceof AppError) {
     const status = err.status || 500;
     if (status >= 500) {
-      logger.error({ err }, err.message);
+      const severity = err.severity || "error";
+      logger[severity === "error" ? "error" : "warn"]({ err }, err.message);
       report(err, {
         origin: "server",
+        severity,
         route: routeOf(req),
         request_id: requestId,
       });
