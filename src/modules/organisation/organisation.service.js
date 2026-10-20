@@ -23,6 +23,10 @@ const routeMap = require("../../shared/route-map");
 const managerText = require("./manager-text");
 const { layout } = require("./org-chart.layout");
 const repo = require("./organisation.repo");
+const places = require("../../shared/places/places");
+
+/** A person's home address field (shared/places/owners.js). */
+const HOME = "employee.home_address";
 const { EVENTS, CHART_DOC_TYPE, CHART_EXPORT } = require("./organisation.events");
 
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
@@ -129,7 +133,13 @@ async function createEmployee(client, body, actor) {
     ? body.staff_number
     : (await numbering.allocate(client, "employee", { date: body.start_date })).number;
 
-  const employee = await repo.insertEmployee(client, { ...body, staff_number: staffNumber });
+  const home = body.home_address;
+  const employee = await repo.insertEmployee(client, {
+    ...body,
+    home_address: home ? places.lineOf(home) : null,
+    staff_number: staffNumber,
+  });
+  if (home) await places.save(client, HOME, employee.employee_id, home, { field: "home_address" });
   if (body.staff_number) await advanceStaffNumbers(client);
   if (employee.line_manager_id)
     await repo.recordReportingLine(
@@ -163,7 +173,11 @@ async function updateEmployee(client, employeeId, patch, actor) {
     throw new AppError("DEPARTMENT_NOT_FOUND", "Pick a department that exists.", 422, {
       department_id: ["Not a department"],
     });
-  const after = await repo.updateEmployee(client, employeeId, patch);
+  const change = { ...patch };
+  // The home address is a place (F27), kept through shared/places; the record keeps its line.
+  if (patch.home_address !== undefined)
+    change.home_address = (await places.save(client, HOME, employeeId, patch.home_address, { field: "home_address" })).line;
+  const after = await repo.updateEmployee(client, employeeId, change);
   await emit(client, {
     key: EVENTS.EMPLOYEE_UPDATED,
     entity: { type: "employee", id: employeeId },

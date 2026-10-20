@@ -22,6 +22,7 @@ const numbering = require("../../shared/numbering/numbering");
 const { scopeFor } = require("../../middleware/rbac");
 const lagos = require("../../shared/time/lagos");
 const repo = require("./attendance.repo");
+const places = require("../../shared/places/places");
 const { EVENTS } = require("./attendance.events");
 
 /** The longest an assignment runs, in calendar days, and how far ahead it may start. */
@@ -139,9 +140,12 @@ async function create(user, body, scope) {
       starts_on: body.starts_on,
       ends_on: body.ends_on,
       assigned_by: user.user_id,
-      sites: body.sites.map((x) => ({ ...x, address: x.address || null })),
+      sites: body.sites.map((x) => ({ ...x, address: x.address ? places.lineOf(x.address) : null })),
       employee_ids: ids,
     });
+    for (const [i, site] of body.sites.entries())
+      if (site.address)
+        await places.save(client, "attendance_field_site.address", row.site_ids[i], site.address, { field: `sites.${i}.address` });
     const facts = { ...row, number, name: body.name, starts_on: body.starts_on, ends_on: body.ends_on };
     for (const e of ids)
       await emit(client, {

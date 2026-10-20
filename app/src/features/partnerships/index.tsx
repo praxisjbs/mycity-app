@@ -8,8 +8,9 @@ import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportAction, KvCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AreaChart, BackButton, Button, Card, CardHeader, Chain, Chips, DataView, DateField, ErrorState, Field, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, FormFooter, Grid, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, Pill, ProfileHeader, rules, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { AddressField, AreaChart, BackButton, Button, Card, CardHeader, Chain, Chips, DataView, DateField, ErrorState, Field, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, FormFooter, Grid, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, Pill, ProfileHeader, rules, SelectField, StatStrip, StatusPill, PlacesField, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who, Wizard, type PlaceValue } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { places } from "@/features/shared/places";
 
 export default function Partnerships({ tab, id }: ModuleScreenProps) {
   if (id && (tab === "partners" || tab === "pipeline")) return <Partner360View id={id} back={tab} />;
@@ -125,13 +126,17 @@ function PartnerForm({ close }: { close: () => void }) {
   const { navigate } = useRouter();
   const [owner, setOwner] = useState<PersonRef[]>([]);
   const [tried, setTried] = useState(false);
-  const f = useContractForm({ name: "", legal_name: "", industry: "", type: "", value: "", hq: "Lagos", website: "" }, { name: (v) => (!v.trim() ? "Name the partner" : null), industry: (v) => (!v ? "Pick the industry" : null), type: (v) => (!v ? "Pick the type" : null) });
+  const f = useContractForm(
+    { name: "", legal_name: "", industry: "", type: "", value: "", hq: null as PlaceValue | null, website: "" },
+    { name: (v) => (!v.trim() ? "Name the partner" : null), industry: (v) => (!v ? "Pick the industry" : null), type: (v) => (!v ? "Pick the type" : null), hq: (v) => (!v ? "Pick a location" : null) },
+  );
   const save = useMutation("POST /api/v1/partnerships/partners");
   const submit = async () => {
     setTried(true);
     if (!f.check() || !owner.length) return;
     try {
-      const p = await save.run({ body: { ...f.values, value: f.values.value || "0.00", owner_id: owner[0].employee_id } });
+      // Checked above: the headquarters is picked.
+      const p = await save.run({ body: { ...f.values, hq: f.values.hq!, value: f.values.value || "0.00", owner_id: owner[0].employee_id } });
       invalidate("/api/v1/partnerships");
       close();
       toast(`${p.name} added at Prospect identified`);
@@ -164,7 +169,7 @@ function PartnerForm({ close }: { close: () => void }) {
           body: (
             <>
               <Field label="Expected Value" optional><MoneyField {...f.field("value")} /></Field>
-              <Field label="Headquarters"><TextField {...f.field("hq")} /></Field>
+              <Field label="Headquarters" {...f.status("hq")}><AddressField {...f.field("hq")} places={places} level="area" placeholder="Victoria Island" /></Field>
               <Field label="Website" optional><TextField {...f.field("website")} placeholder="example.com" /></Field>
               <Field label="Lead Owner" state={tried && !owner.length ? "bad" : undefined} message={tried && !owner.length ? "Pick the owner" : undefined}><EmployeePicker value={owner} onChange={setOwner} /></Field>
             </>
@@ -466,11 +471,11 @@ function Proposals() {
 
 function ProposalForm({ close, partner }: { close: () => void; partner: string }) {
   const partners = usePaged("GET /api/v1/partnerships/partners");
-  const f = useContractForm({ partner_id: partner, what: "", why_now: "", cities: "Lagos", weeks: "12", value: "", terms: "Half on signature, half on the first activation" }, {
+  const f = useContractForm({ partner_id: partner, what: "", why_now: "", cities: [] as PlaceValue[], weeks: "12", value: "", terms: "Half on signature, half on the first activation" }, {
     partner_id: (v) => (!v ? "Pick the partner" : null),
     what: (v) => (v.trim().length < 20 ? "Describe the proposal" : null),
     why_now: (v) => (v.trim().length < 10 ? "Why now" : null),
-    cities: (v) => (!v.trim() ? "Which cities" : null),
+    cities: (v) => (!v.length ? "Pick a city" : null),
     weeks: (v) => (!(Number(v) >= 1) ? "How many weeks" : null),
     value: (v) => (!(Number(v) > 0) ? "The value we ask" : null),
   });
@@ -509,7 +514,7 @@ function ProposalForm({ close, partner }: { close: () => void; partner: string }
           check: () => f.check(["cities", "weeks", "value"]),
           body: (
             <>
-              <Field label="Cities" {...f.field("cities")}><TextField {...f.field("cities")} /></Field>
+              <Field label="Cities" {...f.status("cities")}><PlacesField {...f.field("cities")} places={places} /></Field>
               <Field label="Weeks" {...f.field("weeks")}><TextField {...f.field("weeks")} inputMode="numeric" onChange={(v) => f.set("weeks", v.replace(/\D/g, "").slice(0, 2))} /></Field>
               <Field label="Value We Ask" {...f.field("value")}><MoneyField {...f.field("value")} /></Field>
               <Field label="Payment Terms"><TextField {...f.field("terms")} /></Field>

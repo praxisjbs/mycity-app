@@ -585,7 +585,7 @@ describeDb("identity against the real migrations", () => {
       const made = await tx((c) => createAdmin(c, buildAccount("build@mycity.test"), "Implement#2026x"));
       expect(made.role.code).toBe("implementation");
       // Every column is filled except the references a first, remote account has nothing to
-      // point at, and left_on.
+      // point at, left_on, and the home address (picked on My Profile, F27).
       const whole = await one(`SELECT to_jsonb(e) AS e FROM employee e WHERE employee_id = $1`, [
         made.employee.employee_id,
       ]);
@@ -599,6 +599,8 @@ describeDb("identity against the real migrations", () => {
         "birth_month",
         "dotted_manager_id",
         "dotted_manager_seat_id",
+        /* F27: picked on My Profile after sign-in; a terminal cannot pick an address. */
+        "home_address",
         "left_on",
         "line_manager_id",
         "line_manager_seat_id",
@@ -611,7 +613,7 @@ describeDb("identity against the real migrations", () => {
                 e.personal_email::text AS personal_email, e.job_title, e.employment_type, e.work_pattern,
                 e.phone, e.status, e.start_date::text AS start_date, e.contract_ends_on::text AS contract_ends_on,
                 e.confirmation_due_on::text AS confirmation_due_on, e.confirmed_on::text AS confirmed_on,
-                e.home_address, e.gender, e.date_of_birth::text AS date_of_birth, e.next_of_kin_name,
+                e.gender, e.date_of_birth::text AS date_of_birth, e.next_of_kin_name,
                 e.next_of_kin_phone, e.next_of_kin_relationship, e.bank_name, e.account_number,
                 e.gross_monthly::text AS gross_monthly, d.name AS department
            FROM employee e JOIN department d USING (department_id) WHERE e.employee_id = $1`,
@@ -633,7 +635,6 @@ describeDb("identity against the real migrations", () => {
         contract_ends_on: "2026-12-09",
         confirmation_due_on: "2026-10-09",
         confirmed_on: "2026-10-09",
-        home_address: "14 Adeola Odeku Street, Victoria Island, Lagos",
         gender: "male",
         date_of_birth: "1990-03-12",
         next_of_kin_name: "JBS Praxis Office",

@@ -3,10 +3,10 @@ import type { ApprovalDecision, LocationRequest, LocationRequestType } from "@my
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { coordinatesOf, searchPlaces } from "@/features/shared/places";
+import { coordinatesOf, lineOf, places, pointOf } from "@/features/shared/places";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { AddressField, Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, NumberField, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, Chain, ChoiceField, DataView, DateField, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, NumberField, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal, type PlaceValue } from "@mycity/ui";
 import { useClock } from "./ClockButton";
 import { ReadingStep, useReading } from "./HomeLocation";
 import { REQUEST_STATUS, REQUEST_TYPE, REQUEST_TYPE_HELP } from "./labels";
@@ -192,7 +192,7 @@ type Values = {
   request_type: LocationRequestType;
   starts_on: string;
   ends_on: string;
-  address: string;
+  address: PlaceValue | null;
   reason: string;
   home_latitude: number | null;
   home_longitude: number | null;
@@ -203,12 +203,12 @@ type Values = {
 };
 
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
-/** The body the API takes: the reading only for a temporary home, the site only for a client visit, the address only when written. */
+/** The body the API takes: the reading only for a temporary home, the site only for a client visit, the address only when picked. */
 const bodyOf = (v: Values) => ({
   request_type: v.request_type,
   starts_on: v.starts_on,
   ends_on: v.ends_on,
-  ...(v.address.trim() && { address: v.address.trim() }),
+  ...(v.address && { address: v.address }),
   reason: v.reason.trim(),
   ...(v.request_type === "temporary_home" && { home_latitude: v.home_latitude, home_longitude: v.home_longitude, accuracy_m: v.accuracy_m }),
   ...(v.request_type === "client_visit" && { site_latitude: num(v.site_latitude), site_longitude: num(v.site_longitude), site_radius_m: num(v.site_radius) }),
@@ -220,7 +220,7 @@ const fieldOf = (key: PropertyKey) => (key === "site_radius_m" ? "site_radius" :
 function RequestForm({ types, max, close }: { types: LocationRequestType[]; max: number; close: () => void }) {
   const f = useContractForm<Values>(
     {
-      request_type: types[0], starts_on: "", ends_on: "", address: "", reason: "", home_latitude: null, home_longitude: null, accuracy_m: null,
+      request_type: types[0], starts_on: "", ends_on: "", address: null, reason: "", home_latitude: null, home_longitude: null, accuracy_m: null,
       site_latitude: "", site_longitude: "", site_radius: "200",
     },
     {
@@ -276,14 +276,14 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
       <Field label="Address" optional={v.request_type === "remote_day"} {...f.status("address")}>
         <AddressField
           {...f.field("address")}
-          search={searchPlaces}
+          places={places}
+          near={visit ? pointOf(v.site_latitude, v.site_longitude) : null}
           onPick={(place) => {
             // The client site's centre; a temporary home keeps its own reading.
             const at = coordinatesOf(place);
             f.set("site_latitude", at.latitude);
             f.set("site_longitude", at.longitude);
           }}
-          placeholder="Street, area, city"
         />
       </Field>
       {visit && (
@@ -306,7 +306,7 @@ function RequestForm({ types, max, close }: { types: LocationRequestType[]; max:
             radius={v.site_radius}
             min={100}
             max={500}
-            label={v.address}
+            label={lineOf(v.address) ?? "Client site"}
             onMove={(latitude, longitude) => {
               f.set("site_latitude", latitude);
               f.set("site_longitude", longitude);

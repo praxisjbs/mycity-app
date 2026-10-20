@@ -89,6 +89,13 @@ const typed = (days: number) => {
 };
 const fill = (dialog: HTMLElement, label: string, value: string) => fireEvent.change(within(dialog).getByLabelText(label), { target: { value } });
 const pressIn = (dialog: HTMLElement, name: string) => fireEvent.click(within(dialog).getByRole("button", { name }));
+/** Picks an address the way a person does (F27): types to search, then presses the place found. */
+async function pickAddress(dialog: HTMLElement, text: string, option: RegExp) {
+  const box = within(dialog).getByRole("combobox", { name: /Address/ });
+  fireEvent.focus(box);
+  fireEvent.change(box, { target: { value: text } });
+  fireEvent.click(await within(dialog).findByRole("option", { name: option }, { timeout: 5000 }));
+}
 
 describe("work location requests", () => {
   it("a hybrid employee asks for a client visit with its site, sees it wait on their line manager and withdraws it", async () => {
@@ -111,12 +118,15 @@ describe("work location requests", () => {
 
     fill(dialog, "First Day", typed(5));
     fill(dialog, "Last Day", typed(6));
-    fill(dialog, "Address", "Client office, 9 Sample Close, Yaba");
+    await pickAddress(dialog, "herbert", /21 Herbert Macaulay Way, Yaba/);
+    fill(dialog, "Details", "Client office");
+    // The pick filled the site; it stays open to correct.
+    expect((within(dialog).getByLabelText("Latitude") as HTMLInputElement).value).toBe("6.509500");
     fill(dialog, "Latitude", "6.5095");
     fill(dialog, "Longitude", "3.3711");
     // The client's site on a map under its coordinates.
     await waitFor(() => expect(dialog.querySelector("[data-points]")?.getAttribute("data-points")).toBe("6.50950, 3.37110"));
-    expect(within(dialog).getByText("Client office, 9 Sample Close, Yaba: 6.50950, 3.37110")).toBeTruthy();
+    expect(within(dialog).getByText("Client office, 21 Herbert Macaulay Way, Yaba, Lagos: 6.50950, 3.37110")).toBeTruthy();
     fill(dialog, "Reason", "Setting up the client's new meeting rooms");
     pressIn(dialog, "Send Request");
     const row = await screen.findByText("WLR-0006 · Client Visit");
@@ -155,13 +165,14 @@ describe("work location requests", () => {
 
     fill(dialog, "First Day", typed(25));
     fill(dialog, "Last Day", typed(40));
-    fill(dialog, "Address", "House 4, 7 Example Lane, Surulere");
+    await pickAddress(dialog, "bourdillon", /Bourdillon Road, Ikoyi/);
+    fill(dialog, "Details", "House 4");
     fill(dialog, "Reason", "Looking after a relative for two weeks");
     pressIn(dialog, "Send Request");
     await waitFor(() => expect(screen.getAllByText(/· Temporary Home$/)).toHaveLength(2));
     // The server has the reading taken there, not one typed in.
     const mine = await api.call("GET /api/v1/attendance/me/requests", { query: {} });
-    expect(mine.data.find((r) => r.days === 16)).toMatchObject({ request_type: "temporary_home", status: "submitted", waiting_on: "Line Manager", home_latitude: 6.4521, home_longitude: 3.3912, accuracy_m: 12, days: 16 });
+    expect(mine.data.find((r) => r.days === 16)).toMatchObject({ request_type: "temporary_home", status: "submitted", waiting_on: "Line Manager", address: "House 4, Bourdillon Road, Ikoyi, Lagos", home_latitude: 6.4521, home_longitude: 3.3912, accuracy_m: 12, days: 16 });
   }, 30000);
 
   it("People decide the stage waiting on them: the line manager first, then Operations & People", async () => {

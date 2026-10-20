@@ -3,6 +3,7 @@ import type { Status, Trail } from "@/api/types/performance";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
 import { byId, refKey } from "../data/people";
 import { PARTNERS, STAGES, stageTone, type MockPartner, type Stage } from "../data/partners";
+import { placeOf } from "./maps";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const k = (m: string) => Math.round(Number(m) * 100);
@@ -75,15 +76,18 @@ route("GET /api/v1/partnerships/partners/:id", (req) => {
   return p ? ok(full(p)) : notFound();
 });
 route("POST /api/v1/partnerships/partners", (req) => {
-  const b = req.body as Record<string, string>;
+  const { hq, ...b } = req.body as Record<string, string> & { hq?: unknown };
+  // Picked at level area (F27): never typed.
+  const place = placeOf(hq);
   const f: Record<string, string[]> = {};
   if (!b.name?.trim()) f.name = ["Name the partner"];
   if (PARTNERS.some((p) => p.name.toLowerCase() === b.name?.trim().toLowerCase())) f.name = ["Already a partner. Open their 360 instead"];
   if (!b.industry) f.industry = ["Pick the industry"];
   if (!b.type) f.type = ["Pick the partnership type"];
   if (!byId(b.owner_id)) f.owner_id = ["Pick the owner"];
+  if (!place) f.hq = ["Pick a location"];
   if (Object.keys(f).length) return invalid(f);
-  const p: MockPartner = { partner_id: sid(`partner:${b.name}`), name: b.name.trim(), legal_name: b.legal_name || b.name.trim(), industry: b.industry, type: b.type, owner: byId(b.owner_id)!.user_key, stage: "Prospect identified", value: b.value || "0.00", quiet_days: 0, days_at_stage: 0, since: null, renewal: null, hq: b.hq || "Lagos", website: b.website || "" };
+  const p: MockPartner = { partner_id: sid(`partner:${b.name}`), name: b.name.trim(), legal_name: b.legal_name || b.name.trim(), industry: b.industry, type: b.type, owner: byId(b.owner_id)!.user_key, stage: "Prospect identified", value: b.value || "0.00", quiet_days: 0, days_at_stage: 0, since: null, renewal: null, hq: place!.line, website: b.website || "" };
   PARTNERS.unshift(p);
   return created(full(p));
 });
@@ -178,20 +182,22 @@ route("GET /api/v1/partnerships/proposals/:id/document", (req) => {
   return p ? ok(p._doc) : notFound();
 });
 route("POST /api/v1/partnerships/proposals", (req) => {
-  const b = req.body as Record<string, string | number>;
+  const { cities, ...b } = req.body as Record<string, string | number> & { cities?: unknown };
+  // Each city picked at level city (F27): never typed.
+  const picked = Array.isArray(cities) ? cities.map((c) => placeOf(c)) : [];
   const partner = find(String(b.partner_id));
   const f: Record<string, string[]> = {};
   if (!partner) f.partner_id = ["Pick the partner"];
   if (String(b.what ?? "").trim().length < 20) f.what = ["What we propose, in a sentence or two"];
   if (String(b.why_now ?? "").trim().length < 10) f.why_now = ["Why now"];
-  if (!String(b.cities ?? "").trim()) f.cities = ["Which cities"];
+  if (!picked.length || picked.some((c) => !c)) f.cities = ["Pick a city"];
   if (!(Number(b.weeks) >= 1)) f.weeks = ["How many weeks"];
   if (!(Number(b.value) > 0)) f.value = ["The value we ask"];
   if (Object.keys(f).length) return invalid(f);
   const n = 31 + PROPS.length - 4;
   const ref = `PRO-${String(n).padStart(4, "0")}`;
   const v = k(String(b.value));
-  const p = { proposal_id: sid(`prop:new:${n}`), number: ref, title: String(b.what).split(/[.,]/)[0].slice(0, 60), partner: partner!.name, value: String(b.value), status: S("neutral", "Draft"), _doc: doc(ref, partner!.name, `${String(b.what).trim()} ${String(b.why_now).trim()}`, [[`Placement in ${b.cities}, ${b.weeks} weeks`, m(Math.round(v * 0.7))], ["Activation and reporting", m(v - Math.round(v * 0.7))]], refKey(req.user!).display_name) };
+  const p = { proposal_id: sid(`prop:new:${n}`), number: ref, title: String(b.what).split(/[.,]/)[0].slice(0, 60), partner: partner!.name, value: String(b.value), status: S("neutral", "Draft"), _doc: doc(ref, partner!.name, `${String(b.what).trim()} ${String(b.why_now).trim()}`, [[`Placement in ${picked.map((c) => c!.line).join(", ")}, ${b.weeks} weeks`, m(Math.round(v * 0.7))], ["Activation and reporting", m(v - Math.round(v * 0.7))]], refKey(req.user!).display_name) };
   PROPS.unshift(p);
   const { _doc, ...out } = p;
   void _doc;

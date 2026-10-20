@@ -4,7 +4,7 @@
 |---|---|
 | Owner | TB |
 | Milestone | M0 |
-| Backend modules | `organisation`, `access`, `audit`, `settings`, `workflow`, `documents`, `imports`, `maps` (the address search, §6.13) |
+| Backend modules | `organisation`, `access`, `audit`, `settings`, `workflow`, `documents`, `imports` |
 | Frontend paths | `app/src/features/people/`, `app/src/features/settings/`, `app/src/shell/Search.tsx` |
 | Permission key(s) | `people`, `settings`, `ess` (own records) |
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
@@ -233,13 +233,14 @@ The `workflow` module mounts at the API root, because its halves live under `/wo
 `/settings/approvals`. `GET /search` lives in a module of its own, `search`, because routes are found
 only under `src/modules/`; the work is `shared/search`.
 
-**Maps, `maps`** (built 19/10/2026, §6.13)
+**Maps, `maps`** (built 19/10/2026, §6.13; every address picked, never typed, since 20/10/2026:
+`docs/guides/addresses.md` §5 is the full table)
 
 | Route | Permission |
 |---|---|
-| `GET /maps/search` (`q`, 3 to 200 characters → `PlaceMatches`: at most six `Place`s, each `place_id`, `formatted`, `lat`, `lon`) | everyone signed in (`self`); it reads no record and writes nothing |
+| `GET /maps/search` (`q`, 2 to 200 characters, `level` → `PlaceMatches`: at most six `Place`s, each `place_id`, `formatted`, `lat`, `lon`, `kind` and a signed `token`) | everyone signed in (`self`); it reads no record and writes nothing |
+| `GET /maps/pin` (`PinQuery`: `lat`, `lon` as degrees, `level` → `Place`: the nearest named address, signed, with the tapped point kept) | everyone signed in (`self`): a point a person pins as an address (addresses.md §6.7) |
 | `GET /maps/tiles/:z/:x/:y.png` (`TileParams`: zoom 0 to 20, a column and row that exist at it → the PNG, `no_content` in the contract, `Cache-Control: private, max-age=604800`) | everyone signed in (`self`) |
-| `GET /maps/reverse` (`PointQuery`: `lat`, `lon` as degrees → `PlaceAddress`: `formatted`, null when the provider knows none) | `people` create or edit: the address at a worksite's centre, and nothing else (§6.13) |
 
 503 `MAPS_OFF` when no Geoapify key is set (Settings · Integrations, else `GEOAPIFY_API_KEY`), 429 `MAPS_BUSY` over the provider's
 quota, 502 `MAPS_UNAVAILABLE` when the provider refuses, sends a tile that is not an image, or takes
@@ -608,54 +609,29 @@ device they pressed it on. Nothing pressed is emailed. Only a report schedule's 
   again. Who asked for what stays on the event log and the audit ledger. A report run's file is not
   an export: it stays on Recent Runs.
 
-### 6.13 Address search, maps and a worksite's address (F21, 19/10/2026)
+### 6.13 Address search, maps and a worksite's address (F21, 19/10/2026; F27, 20/10/2026)
 
-Every address a person types is an `AddressField` (`packages/ui/src/form/`): a text field that
-suggests places as it is typed, through our own API, so the Geoapify key never reaches a browser.
-The map's tiles and the address at a worksite's centre go through the same API.
+Every address a person enters is **picked, never typed**: `docs/guides/addresses.md` holds the rule,
+the inventory of every address field, the signed place, the instant search, the pin and the outage
+path (TB, 20/10/2026). What stays here is how maps first came in:
 
-- **Where**: People · Worksites, a field assignment's sites, a work location request (the client
-  visit's site, a temporary home), a remote employee's home, My Profile's home address, Settings ·
-  Organisation's address and a vacancy's location. Each app binds the search once
-  (`app/src/features/shared/places.ts`); a screen passes it to the field.
-- **What a pick fills**: the address always. Where the form holds a point (a worksite, a field site,
-  a client visit) `onPick` also fills Latitude and Longitude to six places, and the person may still
-  correct them. A home keeps the coordinates of its reading: a suggestion never moves the point a
-  punch is fenced on (attendance.md §6.10).
-- **The address stays the person's**: what they type is kept when nothing matches, and the address
-  a record already holds is never searched until they change it.
-- **When it asks**: after three characters and a 300 ms pause; a slower answer to text already
-  typed past is dropped (`maps/usePlaces.ts`, shared with `PlaceSearch`).
-- **Keys**: the arrows move through the suggestions, Enter picks, Esc closes the list. Inside a
-  modal or sheet, Esc on an open list closes the list only; the next Esc reaches the dialog
-  (`escapeClosesList` in `overlay/context.ts`, which `Modal` and `Sheet` both ask).
-- **The server** (`services/maps/geoapify.service.js`, called by `maps.controller`): Geoapify's
-  autocomplete, biased to Lagos and Nigeria but never filtered, so a site abroad is found; every
-  field of the answer coerced and capped, a result without a point or an address dropped, one
-  suggestion per point, six at most; the same text answered from memory for ten minutes, so the
-  day's quota goes on new addresses. Outside any transaction, and the key is never logged.
-- **The key** (20/10/2026): kept on Settings · Integrations, encrypted, with a daily limit, and read
-  at each call through `shared/integrations/settings.js`; the server file's `GEOAPIFY_API_KEY` is
-  the fallback. Each search, lookup and tile is counted against the limit, a tile as a quarter of a
-  credit (`docs/guides/integrations.md` §6.9).
-- **Nothing is stored** by the search, so it carries no event, audit row, AI read or ⌘K provider
-  (`// ai:none`, `// search:none` in `maps.controller.js`). The save of each form checks its own
-  grant as before.
+- **The key** stays on the server: the browser asks our API (`/api/v1/maps/...`), never Geoapify.
+  It is kept on Settings · Integrations, encrypted, with a daily limit, read at each call through
+  `shared/integrations/settings.js`; the server file's `GEOAPIFY_API_KEY` is the fallback, and
+  every search, pin and tile is counted (`docs/guides/integrations.md` §6.9).
 - **Tiles** (decided 19/10/2026): the tile route is signed in like every staff route, and an image
   request carries no token, so `MapView` takes `loadTile` and fetches each tile with the session
-  (`fetchBlob` in `app/src/api/download.ts`, the same way photos load), drawing it from the bytes.
-  Nothing about the map is public, so nobody outside spends the quota. One style, `osm-bright`, to
-  zoom 20; the server keeps about 300 tiles for a day and the browser keeps each for a week. On the
-  in-browser mock there are no tiles and the map draws its points alone. Maps today: a worksite's form
-  and details, a field assignment's sites and a client visit's site (`SiteMap.tsx` in attendance, a
-  tap moving the centre).
-- **A worksite's address from its point** (decided 19/10/2026, worksites only): when People type
-  a worksite's coordinates or tap its map and the address is still empty, the form asks
-  `GET /maps/reverse` after a 600 ms pause and fills the address; an address already written is never
-  replaced, each centre is asked about once (an address cleared on purpose stays clear), and an
-  existing worksite opened for a change is not looked up. The route answers only
-  `people` create or edit, so a home's or a punch's coordinates are never sent to the provider;
-  `LocationLabel` is not used on attendance screens for that reason.
+  (`fetchBlob` in `app/src/api/download.ts`), drawing it from the bytes. Nothing about the map is
+  public, so nobody outside spends the quota. One style, `osm-bright`, to zoom 20; the server keeps
+  about 300 tiles for a day and the browser keeps each for a week. On the in-browser mock there are
+  no tiles and the map draws its points alone.
+- **A worksite's address from its point**: when People type a worksite's coordinates or tap its map
+  and the address is still empty, the form asks `GET /maps/pin` after a 600 ms pause and fills the
+  address with the signed place it names; an address already chosen is never replaced, and an
+  existing worksite opened for a change is not looked up.
+- **A home keeps the coordinates of its reading**: a picked address never moves the point a punch
+  is fenced on (attendance.md §6.10). A clock-in's point is never sent to the provider, and
+  `LocationLabel` is not used on attendance screens.
 
 ### 6.14 System mail to MyCity's own domain (TB, 20/10/2026)
 
@@ -986,3 +962,4 @@ screen.
   guide is `docs/guides/system-health.md`.
 - 20/10/2026 · TB · §6.14: system mail to `mycityapp.io` is no longer refused as a trapped route (System Health fault #1, every staging digest failing). Domains whose mailboxes are on the SMTP relay behind the host's spam-filter MX are named in `SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) and not route-checked; every other domain still is.
 - 20/10/2026 · TB · Settings · Integrations (#77) built with its own guide (`docs/guides/integrations.md`), brought forward from M9: §2 and §6.8 point there; Geoapify's key (§5, §6.13) and the local domains (§6.14) are kept there, with `GEOAPIFY_API_KEY` and `SMTP_LOCAL_DOMAINS` as the server file's fallback.
+- 20/10/2026 · TB · §6.13: addresses are picked, never typed (F27), with their own guide, `docs/guides/addresses.md`, which now covers the `maps` module (taken off this guide's header). The reverse lookup became `GET /maps/pin`, open to everyone signed in for a point they pin as an address.

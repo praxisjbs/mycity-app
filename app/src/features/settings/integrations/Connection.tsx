@@ -86,6 +86,7 @@ function ConnectionPanel({ code, name, reopen }: { code: IntegrationCode; name: 
       </div>
       <SettingsCard c={c} />
       {canEdit && code === "geoapify" && c.settings && (
+        // address:none the text the Geoapify test searches once to try the key; nothing is kept
         <Field label="Address">
           <TextField value={address} onChange={setAddress} maxLength={200} />
         </Field>

@@ -70,6 +70,8 @@ export interface RawRequest {
   query: Record<string, unknown>;
   body: unknown;
   headers: Record<string, string>;
+  /** Cancels the request (a search a newer key overtook); the call then rejects with an AbortError. */
+  signal?: AbortSignal;
 }
 export interface RawResponse {
   status: number;
@@ -129,8 +131,11 @@ function fetchTransport(credentials: RequestCredentials, onHeaders?: (h: Headers
         headers: { Accept: "application/json", ...(req.body !== undefined ? { "Content-Type": "application/json" } : {}), ...req.headers },
         body: req.body !== undefined ? JSON.stringify(req.body) : undefined,
         credentials,
+        signal: req.signal,
       });
-    } catch {
+    } catch (err) {
+      // A request the caller cancelled is not the network failing: the caller drops it.
+      if (req.signal?.aborted) throw err;
       return OFFLINE;
     }
     onHeaders?.(res.headers);
@@ -218,6 +223,7 @@ export function createApi<E>(config: ApiConfig) {
         ...(config.auth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
       },
+      signal: opts.signal,
     };
   }
 

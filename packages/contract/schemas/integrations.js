@@ -374,7 +374,10 @@ const IntegrationSave = z.discriminatedUnion("code", [
   WebPushSave,
 ]);
 
-/** POST /integrations/:code/test. `address` is what Geoapify's search is tried with. */
+/**
+ * POST /integrations/:code/test. `address` is what Geoapify's search is tried with.
+ * address:none the text a test searches once to try the key; nothing is kept
+ */
 const IntegrationTestBody = z.object({ address: blank(text(200)) }).strict();
 
 /** `/:code` */

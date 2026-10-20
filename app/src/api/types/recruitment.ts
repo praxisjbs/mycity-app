@@ -1,3 +1,4 @@
+import type { PlaceValue } from "@mycity/ui";
 import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
 import type { Status, Step, Trail } from "./performance";
@@ -34,7 +35,8 @@ export interface VacancyCreate {
   title: string;
   department: string;
   openings: number;
-  location: string;
+  /** Picked from the address search at level area (F27): a district, a town or a city. */
+  location: PlaceValue;
   arrangement: "on_site" | "hybrid" | "remote";
   closes_on: IsoDate;
   description: string;

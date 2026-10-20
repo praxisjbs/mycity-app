@@ -152,6 +152,7 @@ const SCHEDULERS = Object.freeze([
   "system-health-sample",
   "integrations-watch",
   "integrations-purge",
+  "places-name",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

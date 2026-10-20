@@ -95,6 +95,7 @@ const GATES = [
   { id: "ai-no-writes", label: "19 AI read manifest only", script: "scripts/check/ai-no-writes.js" },
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
   { id: "native-ui", label: "21 Nothing the browser styles itself", script: "scripts/check/native-ui.js", group: "screens" },
+  { id: "addresses", label: "22 Addresses picked, never typed", script: "scripts/check/addresses.js" },
   // Pipeline guards
   { id: "contract", label: "Contract is generated and current", script: "scripts/gen/contract.js", args: ["--check"] },
   { id: "env-template", label: ".env.example matches the schema", script: "scripts/check/env-template.js" },

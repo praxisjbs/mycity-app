@@ -84,4 +84,9 @@ outbox.register(EVENTS.EMPLOYEE_ARCHIVED, "organisation.refresh_team_scope", bum
 outbox.register(EVENTS.EMPLOYEE_RESTORED, "organisation.refresh_team_scope", bumpTeams);
 outbox.register(EVENTS.ORG_SEAT_UPDATED, "organisation.refresh_team_scope", bumpTeams);
 
+/** A home address saved while search was down is named by the places-name job (F27). */
+require("../../shared/places/owners").owner("employee.home_address", {
+  rename: (client, id, line) => require("./organisation.repo").updateEmployee(client, id, { home_address: line }),
+});
+
 module.exports = { EVENTS, CHART_DOC_TYPE, CHART_EXPORT, PHOTO_DOC_TYPE, PHOTO_ENTITY };

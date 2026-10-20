@@ -52,6 +52,7 @@
  */
 const { pool } = require("../../config/db");
 const { defineEvents, WORKFLOW } = require("../../shared/events/catalogue");
+const places = require("../../shared/places/owners");
 const outbox = require("../../shared/events/outbox");
 const workflow = require("../../shared/workflow/engine");
 const { defineNotification, permissionHolders } = require("../../shared/notifications/fanout");
@@ -290,5 +291,9 @@ outbox.register(WORKFLOW.WORKFLOW_CANCELLED, "attendance.apply_request_withdrawa
   if (event.payload.definition_key !== REQUEST_DEFINITION_KEY) return;
   await settleRequest(event.entity.id, "cancelled");
 });
+
+/** Attendance addresses saved while search was down are named by the places-name job (F27). */
+for (const owner of Object.keys(require("./attendance.repo").ADDRESS_LINE))
+  places.owner(owner, { rename: (client, key, line) => require("./attendance.repo").renameAddress(client, owner, key, line) });
 
 module.exports = { EVENTS, WHAT, REQUEST_DEFINITION_KEY, pushUpdated };

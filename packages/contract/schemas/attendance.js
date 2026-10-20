@@ -28,6 +28,7 @@ const {
   Paged,
 } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
+const { PlaceInput } = require("./maps");
 
 const EventType = z.enum(["clock_in", "clock_out"]);
 const PunchState = z.enum(["accepted", "review", "rejected"]);
@@ -431,10 +432,13 @@ const MyHome = z
   })
   .strict();
 
-/** POST /attendance/me/home: one reading taken at home, and the address in the person's words. */
+/**
+ * POST /attendance/me/home: one reading taken at home, and the home's address, picked or pinned
+ * (F27). The fence is drawn on the reading, never on the address's point.
+ */
 const HomeRequestCreate = z
   .object({
-    home_address: text(300),
+    home_address: PlaceInput,
     home_latitude: z.number().min(-90).max(90),
     home_longitude: z.number().min(-180).max(180),
     accuracy_m: z.number().min(0).max(100000),
@@ -534,7 +538,8 @@ const LocationRequestCreate = z
     request_type: LocationRequestType,
     starts_on: isoDate,
     ends_on: isoDate,
-    address: optionalText(300),
+    /** Picked or pinned, never typed (F27). */
+    address: PlaceInput.optional(),
     reason: text(500).refine((v) => v.length >= 10, "At least 10 characters"),
     home_latitude: z.number().min(-90).max(90).nullable().optional(),
     home_longitude: z.number().min(-180).max(180).nullable().optional(),
@@ -662,7 +667,8 @@ const reasonText = text(500).refine(minLength(10), "At least 10 characters");
 const FieldSiteInput = z
   .object({
     name: text(120).refine(minLength(2), "At least 2 characters"),
-    address: optionalText(300),
+    /** Picked or pinned, never typed (F27). */
+    address: PlaceInput.optional(),
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
     radius_m: z.number().int().min(100, "At least 100 m").max(500, "At most 500 m"),

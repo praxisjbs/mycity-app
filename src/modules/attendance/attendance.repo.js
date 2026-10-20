@@ -1122,12 +1122,18 @@ async function insertAssignment(client, a) {
      RETURNING field_assignment_id`,
     [a.number, a.name, a.client, a.note, a.starts_on, a.ends_on, a.assigned_by],
   );
-  for (const [i, site] of a.sites.entries())
-    await client.query(
+  row.site_ids = [];
+  for (const [i, site] of a.sites.entries()) {
+    const {
+      rows: [made],
+    } = await client.query(
       `INSERT INTO attendance_field_site (field_assignment_id, position, name, address, latitude, longitude, radius_m)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING field_site_id`,
       [row.field_assignment_id, i + 1, site.name, site.address, site.latitude, site.longitude, site.radius_m],
     );
+    row.site_ids.push(made.field_site_id);
+  }
   await client.query(
     `INSERT INTO attendance_field_member (field_assignment_id, employee_id)
      SELECT $1, x FROM unnest($2::uuid[]) AS x`,
@@ -1645,7 +1651,21 @@ async function askedUsers(db, date) {
   return rows.map((r) => r.user_id);
 }
 
+/** Where each attendance address field keeps its readable line (shared/places/owners.js). */
+const ADDRESS_LINE = {
+  "attendance_home.address": "UPDATE attendance_home SET address = $2 WHERE attendance_home_id = $1",
+  "attendance_location_request.address": "UPDATE attendance_location_request SET address = $2 WHERE location_request_id = $1",
+  "attendance_field_site.address": "UPDATE attendance_field_site SET address = $2 WHERE field_site_id = $1",
+};
+
+/** Rewrite one record's address line (a place named by the places-name job, F27). */
+function renameAddress(client, owner, key, line) {
+  return client.query(ADDRESS_LINE[owner], [key, line]);
+}
+
 module.exports = {
+  ADDRESS_LINE,
+  renameAddress,
   WORKING_DAY,
   HOME_DAY,
   lockEmployee,

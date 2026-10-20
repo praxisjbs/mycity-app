@@ -8,17 +8,17 @@ import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { coordinatesOf, loadTile, pointOf, resolveWorksiteAddress, searchPlaces, zoomFor } from "@/features/shared/places";
+import { coordinatesOf, lineOf, loadTile, places, placeValue, pointOf, zoomFor } from "@/features/shared/places";
 import { useScreenAction } from "@/shell/screen-action";
-import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who, type PlaceValue } from "@mycity/ui";
 import { PATTERN } from "./labels";
 import { SiteMap } from "./SiteMap";
 
 /**
  * People · Worksites (#28, docs/guides/attendance.md §10): the offices a punch is matched to, each
  * a centre, a radius and a timezone, and who is assigned to each. People add, change, retire and
- * restore them; the address is searched as it is typed, and the place picked fills the centre,
- * drawn on a map with its fence.
+ * restore them; the address is picked from the search or pinned (F27), and the place picked fills
+ * the centre, drawn on a map with its fence.
  */
 export function Worksites() {
   const [params] = useSearchParams();
@@ -148,21 +148,21 @@ function WorksiteView({ id, close }: { id: string; close: () => void }) {
   );
 }
 
-type Values = { name: string; address: string; latitude: string; longitude: string; radius_m: string };
+type Values = { name: string; address: PlaceValue | null; latitude: string; longitude: string; radius_m: string };
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
-const bodyOf = (v: Values) => ({ name: v.name, address: v.address, latitude: num(v.latitude), longitude: num(v.longitude), radius_m: num(v.radius_m) });
+const bodyOf = (v: Values) => ({ name: v.name, ...(v.address ? { address: v.address } : {}), latitude: num(v.latitude), longitude: num(v.longitude), radius_m: num(v.radius_m) });
 
 /**
- * Add a worksite, or change one. The address searches as it is typed and the place picked
+ * Add a worksite, or change one. The address is picked or pinned (F27) and the place picked
  * fills Latitude and Longitude, which stay open to correct, by typing or by tapping the map.
- * Coordinates the person gives with no address yet are looked up for one. The numbers are
- * typed as text and checked as numbers by the contract.
+ * A centre the person gives with no address yet is named from a pin. The numbers are typed as
+ * text and checked as numbers by the contract.
  */
 function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   const f = useContractForm<Values>(
     {
       name: site?.name ?? "",
-      address: site?.address ?? "",
+      address: placeValue(site?.address_place),
       latitude: site ? String(site.latitude) : "",
       longitude: site ? String(site.longitude) : "",
       radius_m: site ? String(site.radius_m) : "100",
@@ -174,9 +174,9 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   const busy = create.pending || update.pending;
   const { set } = f;
   const point = pointOf(f.values.latitude, f.values.longitude);
-  // Only a centre the person moved is looked up: a picked place brings its own address, and
-  // an existing worksite opened for a change is left as it was. Each centre is asked about
-  // once, so an address cleared on purpose is not written back for the same point.
+  // Only a centre the person moved is named: a picked place brings its own address, and an
+  // existing worksite opened for a change is left as it was. Each centre is asked about once,
+  // so an address cleared on purpose is not written back for the same point.
   const moved = useRef(false);
   const asked = useRef<string | null>(null);
   const typed = (key: "latitude" | "longitude") => (value: string) => {
@@ -187,15 +187,16 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   const lat = point?.lat;
   const lon = point?.lon;
   useEffect(() => {
-    if (!moved.current || lat === undefined || lon === undefined || address.trim()) return;
+    if (!moved.current || lat === undefined || lon === undefined || address) return;
     const at = `${lat},${lon}`;
     if (asked.current === at) return;
     let live = true;
     const timer = setTimeout(() => {
       asked.current = at;
-      resolveWorksiteAddress({ lat, lon })
-        .then((found) => live && set("address", found))
-        // No address for that point, or the lookup is off: the field stays the person's to fill.
+      places
+        .pin({ lat, lon }, { level: "address" })
+        .then((found) => live && found.token && set("address", { token: found.token, details: null }))
+        // Address search is off or down: the field stays the person's to pick.
         .catch(() => undefined);
     }, 600);
     return () => {
@@ -205,9 +206,10 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
   }, [lat, lon, address, set]);
   const submit = async () => {
     if (!f.check()) return;
-    const b = bodyOf(f.values) as { name: string; address: string; latitude: number; longitude: number; radius_m: number };
+    const b = bodyOf(f.values) as { name: string; address?: PlaceValue; latitude: number; longitude: number; radius_m: number };
     try {
-      if (site) await update.run({ params: { id: site.worksite_id }, body: b });
+      // A change sends the address as it stands: null clears it, an untouched one goes back as it came.
+      if (site) await update.run({ params: { id: site.worksite_id }, body: { ...b, address: f.values.address } });
       else await create.run({ body: b });
       invalidate("/api/v1/worksites");
       close();
@@ -225,14 +227,13 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
       <Field label="Address" optional {...f.status("address")}>
         <AddressField
           {...f.field("address")}
-          search={searchPlaces}
+          places={places}
+          near={point}
           onPick={(place) => {
             const at = coordinatesOf(place);
             f.set("latitude", at.latitude);
             f.set("longitude", at.longitude);
           }}
-          placeholder="7 Admiralty Way"
-          maxLength={300}
         />
       </Field>
       <Grid cols={2}>
@@ -252,7 +253,7 @@ function WorksiteForm({ close, site }: { close: () => void; site?: Worksite }) {
         radius={f.values.radius_m}
         min={25}
         max={1000}
-        label={f.values.address || f.values.name}
+        label={lineOf(f.values.address) || f.values.name}
         onMove={(latitude, longitude) => {
           typed("latitude")(latitude);
           typed("longitude")(longitude);

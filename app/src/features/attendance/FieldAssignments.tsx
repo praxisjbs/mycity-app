@@ -5,8 +5,8 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { coordinatesOf, searchPlaces } from "@/features/shared/places";
-import { AddressField, Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { coordinatesOf, lineOf, places, pointOf } from "@/features/shared/places";
+import { AddressField, Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who, type PlaceValue } from "@mycity/ui";
 import { ASSIGNMENT_STATE } from "./labels";
 import { SiteMap } from "./SiteMap";
 
@@ -181,7 +181,7 @@ function ChangeForm({ a, employee, close }: { a: FieldAssignment; employee?: Per
   );
 }
 
-type SiteKey = "name" | "address" | "latitude" | "longitude" | "radius";
+type SiteKey = "name" | "latitude" | "longitude" | "radius";
 type Values = {
   name: string;
   client: string;
@@ -190,12 +190,13 @@ type Values = {
   ends_on: string;
   people: PersonRef[];
   count: "1" | "2";
-} & Record<`s${1 | 2}_${SiteKey}`, string>;
+} & Record<`s${1 | 2}_${SiteKey}`, string> &
+  Record<`s${1 | 2}_address`, PlaceValue | null>;
 
 const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
 const siteOf = (v: Values, n: 1 | 2) => ({
   name: v[`s${n}_name`],
-  ...(v[`s${n}_address`].trim() && { address: v[`s${n}_address`].trim() }),
+  ...(v[`s${n}_address`] && { address: v[`s${n}_address`] }),
   latitude: num(v[`s${n}_latitude`]),
   longitude: num(v[`s${n}_longitude`]),
   radius_m: num(v[`s${n}_radius`]),
@@ -222,7 +223,7 @@ const fieldOf = (path: PropertyKey[]): string => {
 const remap = (fields: Record<string, string[]>) =>
   Object.fromEntries(Object.entries(fields).map(([k, v]) => [k === "employee_ids" ? "people" : k, v]));
 
-const blankSite = (n: 1 | 2) => ({ [`s${n}_name`]: "", [`s${n}_address`]: "", [`s${n}_latitude`]: "", [`s${n}_longitude`]: "", [`s${n}_radius`]: "200" });
+const blankSite = (n: 1 | 2) => ({ [`s${n}_name`]: "", [`s${n}_address`]: null, [`s${n}_latitude`]: "", [`s${n}_longitude`]: "", [`s${n}_radius`]: "200" });
 
 /** New Assignment: who, where, which days. In force once saved; each person is told. */
 export function NewAssignmentForm({ close }: { close: () => void }) {
@@ -263,14 +264,13 @@ export function NewAssignmentForm({ close }: { close: () => void }) {
       <Field label="Address" optional {...f.status(`s${n}_address`)}>
         <AddressField
           {...f.field(`s${n}_address`)}
-          search={searchPlaces}
+          places={places}
+          near={pointOf(v[`s${n}_latitude`], v[`s${n}_longitude`])}
           onPick={(place) => {
             const at = coordinatesOf(place);
             f.set(`s${n}_latitude`, at.latitude);
             f.set(`s${n}_longitude`, at.longitude);
           }}
-          placeholder="Street, area, city"
-          maxLength={300}
         />
       </Field>
       <Grid cols={2}>
@@ -290,7 +290,7 @@ export function NewAssignmentForm({ close }: { close: () => void }) {
         radius={v[`s${n}_radius`]}
         min={100}
         max={500}
-        label={v[`s${n}_address`] || v[`s${n}_name`]}
+        label={lineOf(v[`s${n}_address`]) || v[`s${n}_name`]}
         onMove={(latitude, longitude) => {
           f.set(`s${n}_latitude`, latitude);
           f.set(`s${n}_longitude`, longitude);

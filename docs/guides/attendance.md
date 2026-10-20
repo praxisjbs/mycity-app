@@ -164,7 +164,7 @@ Policy Updates in plain sentences with what changed, and acknowledges it.
 | `attendance_location_request` (1320, 1350) | `number`, `employee_id`, `request_type` (`temporary_home`, `remote_day`, `client_visit`), `starts_on`, `ends_on`, `address`, `latitude`, `longitude`, `accuracy_m`, `site_latitude`, `site_longitude`, `site_radius_m`, `reason`, `status` (`submitted`, `approved`, `rejected`, `cancelled`), `workflow_instance_id`, `requested_by`, `decided_at`, `cancelled_at`, `cancel_reason` | A request to work somewhere else for some days, decided in its approval. `latitude`, `longitude` are a temporary home's reading only (both or neither); on the wire `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the person and to `people` scope all. `site_latitude`, `site_longitude`, `site_radius_m` (100 to 500) are a client visit's site only, all three or none: a client's venue, not personal data. A client visit sent before `1350` has none |
 | `attendance_schedule` (1340) | `employee_id`, `office_days` (ISO weekdays, 1 Monday to 7 Sunday), `effective_from`, `reason`, `set_by`, `set_at` | A hybrid employee's week: the days at their worksite, from a date. One row per person per `effective_from` (setting the same start again replaces it); the row in force on a date is the latest that started by then. Read only for `hybrid` staff |
 | `attendance_field_assignment` (1330) | `number`, `name`, `client`, `note`, `starts_on`, `ends_on` (at most 31 days), `status` (`active`, `cancelled`), `assigned_by`, `assigned_at`, `cancelled_at`, `cancelled_by`, `cancel_reason` | Sending people to work somewhere for some days. In force from the moment it is saved; cancelled, it stops applying to the days still to come. Never deleted |
-| `attendance_field_site` (1330) | `field_assignment_id`, `position` (1 or 2), `name`, `address`, `latitude`, `longitude`, `radius_m` (100 to 500) | An assignment's one or two sites, typed as a worksite is. A client's venue, not a person's: not personal data |
+| `attendance_field_site` (1330) | `field_assignment_id`, `position` (1 or 2), `name`, `address`, `latitude`, `longitude`, `radius_m` (100 to 500) | An assignment's one or two sites, set as a worksite is; `address` is the readable line of the place picked (`place`, owner `attendance_field_site.address`, `addresses.md` §4). A client's venue, not a person's: not personal data |
 | `attendance_field_member` (1330) | `field_assignment_id`, `employee_id`, `added_at`, `removed_at`, `removed_by`, `removed_reason` | The people on it, at most 25. Taking someone off keeps their row with `removed_at`; a person is on at most one active assignment a day (the service, under the person's lock) |
 | `attendance_clock_reminder` (1360) | `employee_id`, `work_date`, `kind` (`clock_in_due`), `sent_at` | One row per reminder sent, unique per person, day and kind, so the watch sends it once a day however often it runs; the notice is about this row, and clocking in marks it read. Nothing about a person but who and which day |
 
@@ -216,7 +216,7 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/me/records/:id` | → `AttendanceRecordRef` | self, own | no | The same for the person's own |
 | `POST /api/v1/attendance/export` | `RegisterExportRequest` (`from`, `to`, at most 31 days) → `ExportFile` (202) | `people` export · scope | no | The register's workbook, made after commit and downloaded on the device that asked |
 | `GET /api/v1/attendance/me/home` | → `MyHome` | self, own | no | The approved home, the one waiting and the last one rejected, with their own coordinates |
-| `POST /api/v1/attendance/me/home` | `HomeRequestCreate` (`home_address`, `home_latitude`, `home_longitude`, `accuracy_m`) → `MyHome` | self, own | no | Remote staff, and hybrid staff whose schedule has a home day (422 `HOME_NOT_NEEDED` otherwise); the reading within `max_accuracy_m` (422 `HOME_READING_WEAK`); supersedes a request still waiting |
+| `POST /api/v1/attendance/me/home` | `HomeRequestCreate` (`home_address`, a `PlaceInput`: picked, pinned or the device's location in an outage; `home_latitude`, `home_longitude`, `accuracy_m`) → `MyHome` | self, own | no | Remote staff, and hybrid staff whose schedule has a home day (422 `HOME_NOT_NEEDED` otherwise); the reading within `max_accuracy_m` (422 `HOME_READING_WEAK`); supersedes a request still waiting |
 | `GET /api/v1/attendance/homes` | `HomeListQuery` (`status`, `employee_id`, `q`, `sort`) → `HomeRequestPage` | `people` view · scope | yes, 25 | Waiting first; address and coordinates only for scope all, masked under `employee.personal` |
 | `GET /api/v1/attendance/homes/:id` | → `HomeRequest` | `people` view · scope | no | The home a link opens (`attendance_home`, `?home=` on People · Attendance); the same visibility as the list |
 | `GET /api/v1/attendance/me/requests` | `MyLocationRequestListQuery` (`status`, `sort`) → `LocationRequestPage` | self, own | yes, 25 | The person's own requests, newest first |
@@ -256,7 +256,7 @@ event a day) and needs none of its own.
 | `POST /api/v1/devices/:id/remove` | `DeviceRemove` (`reason`) → `Device` | `people` edit · scope | no | The person is told |
 | `GET /api/v1/worksites` | `WorksiteListQuery` (`active`, `q`, `sort`) → `WorksitePage` | `people` view | yes, 25 | |
 | `GET /api/v1/worksites/:id` | → `Worksite` | `people` view | no | |
-| `POST /api/v1/worksites` | `WorksiteCreate` → `Worksite` | `people` create | no | The address searches as it is typed and the place picked fills the coordinates (`GET /maps/search`, below); coordinates typed with no address are looked up for one (`GET /maps/reverse`) |
+| `POST /api/v1/worksites` | `WorksiteCreate` → `Worksite` | `people` create | no | The address is picked or pinned (`PlaceInput`, below) and the place picked fills the coordinates; a centre typed or tapped with no address is named from a pin (`GET /maps/pin`) |
 | `PATCH /api/v1/worksites/:id` | `WorksiteUpdate` → `Worksite` | `people` edit | no | `active: false` retires, `true` restores |
 | `GET /api/v1/worksites/:id/employees` | `PageQuery` → `WorksiteEmployeePage` | `people` view · scope | yes, 25 | |
 | `POST /api/v1/worksites/:id/employees` | `WorksiteAssign` → `WorksiteEmployee` | `people` edit · scope | no | Through `organisation.service.updateEmployee`; assigning someone to another worksite moves them |
@@ -267,14 +267,17 @@ The shared roster has no route of its own. It is a read Home's services call: `G
 agrees with them because it reads the same records the same way (§6.9). `page()` and `month()`
 answer in the list envelope at 25, filtered, searched and sorted in SQL.
 
-Every address on these screens is an `AddressField` over `GET /api/v1/maps/search` (`q`, three
-characters or more → `PlaceMatches`, at most six places with `lat` and `lon`; everyone signed in),
-the address search of `docs/guides/foundation.md` §6.13. It reads no record and writes nothing:
-picking a place fills the form's own address and, for a worksite, a field site or a client visit,
-its latitude and longitude, which the person can still correct. The routes above check what is
-saved as they always did. The worksite's maps load their tiles from `GET /api/v1/maps/tiles/...`
-with the session, and a worksite's centre is turned into an address by `GET /api/v1/maps/reverse`
-(`people` create or edit; worksites only, never a home or a punch).
+Every address on these screens is picked, never typed (F27, `docs/guides/addresses.md`): an
+`AddressField` over `GET /api/v1/maps/search` (from the second character; signed places) with Drop a
+Pin on its map (`GET /api/v1/maps/pin`), and the device's location while address search is down. A
+request carries the address as a `PlaceInput` (`home_address`, a request's `address`, each site's
+`address`), checked at the edge; the service keeps it through `shared/places` and writes its line
+(details first) into its own column, so every list, mask and search reads as before. Picking a
+place fills, for a worksite, a field site or a client visit, its latitude and longitude, which the
+person can still correct; on a home and a temporary home it fills the address only, and the fence
+stays on the reading. The worksite's maps load their tiles from `GET /api/v1/maps/tiles/...` with
+the session, and a centre typed or tapped with no address is named by `GET /api/v1/maps/pin`. A
+punch's point is never sent to the provider.
 
 ## 6 · Rules and calculations
 
@@ -490,8 +493,8 @@ Home and those screens never disagree.
     optional. Up to 5 days.
   - `client_visit`, anyone: a client's site. The address, as the client gave it, and the site's
     centre and radius: latitude, longitude and a radius of 100 to 500 m, all required (owner
-    decision, 19/10/2026). The address searches as it is typed and the place picked fills the
-    centre, which stays open to correct (foundation.md §6.13). Up to 14 days.
+    decision, 19/10/2026). The address is picked or pinned, never typed (F27, `addresses.md`), and
+    the place picked fills the centre, which stays open to correct. Up to 14 days.
 - **Dates**: the first day from today in Lagos (422 `REQUEST_IN_THE_PAST`) and within 90 days
   (422 `REQUEST_TOO_FAR`); the last day on or after the first and within the type's span (422
   `REQUEST_TOO_LONG`). A request may not share a day with another one of theirs still waiting or
@@ -538,9 +541,9 @@ one assignment. The limits below are LA's, to change on request.
   `NOT_EMPLOYED`), and never the reader (403 `OWN_RECORD`: someone else sends you out).
 - **What it holds**: a name (3 to 120 characters, "Venue Setup"), the client, event or campaign (2
   to 120), an optional note (up to 500), the first and last day, one or two sites and one to 25
-  people. A site is a name (2 to 120), an optional address (up to 300) and its centre and radius:
-  latitude, longitude and a radius of 100 to 500 m. As on a worksite, the address searches as it is
-  typed and the place picked fills the centre, which stays open to correct (foundation.md §6.13).
+  people. A site is a name (2 to 120), an optional address (picked or pinned, never typed: F27,
+  `addresses.md`) and its centre and radius: latitude, longitude and a radius of 100 to 500 m. As on
+  a worksite, the place picked fills the centre, which stays open to correct.
   Numbered `FA-0001` (`field_assignment`, never reset).
 - **Dates**: the first day from today in Lagos (422 `ASSIGNMENT_IN_THE_PAST`) and within 90 days
   (422 `ASSIGNMENT_TOO_FAR`); the last on or after the first and at most 31 days in all (422
@@ -1039,3 +1042,4 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   explanation and Home location to approve to other roles or people (`copy`). Nothing else changed.
 - 19/10/2026 · LA · Settings · Attendance Policy (#73) and ESS · Policy Updates (#89) built (owner decisions, 19/10/2026; §6.15): one organisation policy in numbered versions. People edit the clock checks (grace minutes; the location check for the office, a home and a field site, each off, warn or block; GPS accuracy; home radius; the device check), save them as a draft and publish it as `Version N` from a first day with a note; a version waiting can be withdrawn. Everyone at work with a login is told (bell and push), reads the version on Policy Updates as full sentences with what changed tagged, and acknowledges it; acknowledging never blocks the clock; a reminder goes once after 3 days; People see who has acknowledged. The location mode is now per place (§6.1, §6.5) and each punch keeps the version it was judged by. `1370` (versions, the place modes, `attendance_policy_acknowledgement`), `1395` (1099's Standard policy out, A26); twelve routes; six events; one reminder. §1 to §11 and §13 updated; §6.15 added.
 - 20/10/2026 · LA · The policy's 3-day reminder moves onto the reminder engine merged from main (`docs/guides/notifications.md` §7.1, "a module never writes its own clock"): `attendance_policy_unacknowledged` finds who is due and fires in the working day, in place of the `attendance-policy-reminder` scheduler, which is gone. Who is reminded, and once, is unchanged. §3 step 12, §6.15 and §7 updated.
+- 20/10/2026 · TB · Every address on these screens is picked, never typed (F27, `docs/guides/addresses.md`): a home's, a work location request's and each field site's address is a `PlaceInput` the service keeps through `shared/places` (owners `attendance_home.address`, `attendance_location_request.address`, `attendance_field_site.address`), writing its line, details first, into its own column, so lists, masks and search read as before; the places-name job rewrites a line through `renameAddress`. A worksite's centre with no address is named from `GET /maps/pin`, which replaces `/maps/reverse`. The fences still come from the readings and the typed centres. §4, §5 and §6.9 to §6.11 updated.

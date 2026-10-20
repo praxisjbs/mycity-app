@@ -6,7 +6,7 @@ React apps: the staff app (`app/`, `hub.mycityapp.io`) and the public site (`pub
 
 Status: **the rules here are settled. The foundation (§9) is one design system for both apps,
 `packages/ui` (`@mycity/ui`), owned by AJ (Adole Jerome), backup TB.** It is built in three PRs
-planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F26 are binding: where this guide
+planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F27 are binding: where this guide
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
@@ -35,7 +35,7 @@ the client has already accepted.
 Guides lead, gates confirm (F9). Every builder, person or AI, starts here, so the gates in §10
 confirm work that was built right instead of rejecting it at the end.
 
-1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F26 and where each foundation PR
+1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F27 and where each foundation PR
    stands. Then **read `docs/COMPONENTS.md`**, the catalogue of every shared component: what it is
    for, when not to use it, its props and how it behaves on a phone. It is generated from the code
    (`npm run gen:components`), so it is never out of date.
@@ -506,6 +506,23 @@ whose computed `appearance` is not `none`, and a toast sonner styled. A control 
 added in `packages/ui` with `npm run new:component`, drawn in tokens, never left to the browser.
 
 ---
+
+### 8.9 Addresses are picked, never typed (gate 22)
+
+Every address or location a person enters, in both apps and on every environment, is an
+`AddressField`, or a `PlacesField` for a list of cities (FRONTEND_FOUNDATION F27,
+`docs/guides/addresses.md`). There is no free address field: typing searches, and only a pick, a
+pin on the map or, while address search is down, the device's location becomes the address.
+
+| Never | Always |
+|---|---|
+| `TextField` for an address, a location, a headquarters, a venue or a city list | `AddressField` with the app's `places` (bound once in `features/shared/places.ts`) and the field's `level` (`address`, `area`, `city`); `PlacesField` for several cities |
+| Sending typed text as an address | The field's value as the body's field: it already is the contract's `PlaceInput`, `{ token, details }`, or `{ device, details }` in an outage |
+| Prefilling the field from the line a list shows | `placeValue(record.<field>_place)`, so an untouched address goes back as it came |
+| An instruction or a hint about how search works on the screen | The field's own states (§10 of the guide): Searching, No address found with Drop a Pin, Address search is unavailable with Use Current Location |
+
+A deliberate exception (a search box that is not an address kept, such as the Geoapify test on
+Settings · Integrations) carries `address:none <reason>` on the line or the line above.
 
 ## 9 · Foundation: `packages/ui` and the two apps
 
@@ -1022,6 +1039,7 @@ when a change touches it (F23). Several gates are lint rules in
 | 17 No dashes | `scripts/check/dashes.js` | An em dash, an en dash or a double hyphen in copy a person reads (§5.4) |
 | 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
 | 21 Nothing the browser styles itself | `scripts/check/native-ui.js` (source, and every gallery page and app screen in Chromium) | A native select, option, datalist, progress, meter or dialog; a browser-drawn input type; a `title` tooltip; a form without `noValidate`; a control the `base.css` reset missed; sonner outside the `Toaster`. No exemptions, `packages/ui` included (§8.8, F25) |
+| 22 Addresses picked, never typed | `scripts/check/addresses.js` (the routes the API mounts, and the source of `packages/ui`, `app` and `public-app`) | A request body field named like an address that is not the contract's `PlaceInput`; a `PlaceInput` no registered owner keeps; a Field labelled like an address, or a control bound to an address field, that is not an `AddressField` or a `PlacesField`. A deliberate exception carries `address:none <reason>` (§8.9, F27) |
 | F26 One press, one request | lint `no-void-press` (`packages/ui/eslint.shared.js`, tested in `packages/ui/src/testing/eslint-rules.test.ts`) | A press handler on `Button`, `IconButton`, `BigButton`, `Form`, `Wizard`, `ConfirmDialog` or `ExportButton` that throws its work away (`() => void save()`, or a local function it names that does), so the button cannot stay busy (§8.4) |
 | Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; ANY file in an app's `components/` (both folders are gone); a feature shadowing a shared component (§9.4) |
 | Mock-free (F12) | `scripts/check/mock-free.js` | A release build that contains the in-browser mock (§9.5) |
@@ -1056,6 +1074,8 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
   `() => void save()` and no `disabled={busy}` (F26, §8.4)
 - [ ] Nothing the browser draws in its own style: no native select or picker, no browser input
   type, no `title` tooltip, no validation bubble, no unbranded toast, on phone or desktop (gate 21, §8.8)
+- [ ] Every address picked, never typed: an `AddressField` (a `PlacesField` for cities) bound to
+  the contract's `PlaceInput`, prefilled with `placeValue(record.<field>_place)` (gate 22, §8.9)
 - [ ] `npm run ci` green, the whole suite, before pushing
 - [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked (UI, Mobile) and a note left

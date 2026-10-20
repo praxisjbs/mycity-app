@@ -24,6 +24,7 @@ const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
+const { picked } = require("../helpers/places");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
 const aiRegistry = require("../../src/shared/ai/registry");
 const authorise = require("../../src/shared/ai/authorise");
@@ -223,7 +224,7 @@ describeDb("attendance against the real migrations", () => {
     expect((await as("manager").post("/worksites", { name: "X", latitude: 6, longitude: 3, radius_m: 100 })).status).toBe(403);
     const res = await as("ops").post("/worksites", {
       name: "Testbed Office",
-      address: "1 Invented Street, Lagos",
+      address: picked("1 Invented Street, Lagos"),
       latitude: 6.5,
       longitude: 3.4,
       radius_m: 100,
@@ -904,7 +905,7 @@ describeDb("attendance against the real migrations", () => {
     const ADDRESS = "14 Invented Close, Testbed Estate";
     const MOVED = "3 Imaginary Road, Testbed Estate";
     const send = (who, at, address = ADDRESS, accuracy = 18) =>
-      as(who).post("/attendance/me/home", { home_address: address, home_latitude: at.latitude, home_longitude: at.longitude, accuracy_m: accuracy });
+      as(who).post("/attendance/me/home", { home_address: picked(address), home_latitude: at.latitude, home_longitude: at.longitude, accuracy_m: accuracy });
     const decide = (who, id, body) => as(who).post(`/attendance/homes/${id}/decision`, body);
     const homeRows = async () =>
       (await q("SELECT status, address FROM attendance_home WHERE employee_id = $1 ORDER BY requested_at, status", [people.remote.employee.employee_id])).rows;
@@ -923,9 +924,9 @@ describeDb("attendance against the real migrations", () => {
       const weak = await send("remote", home(0), ADDRESS, 250);
       expect(weak.status).toBe(422);
       expect(weak.body.error.code).toBe("HOME_READING_WEAK");
-      expect((await as("remote").post("/attendance/me/home", { home_address: ADDRESS, home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 10, employee_id: people.staff.employee.employee_id })).status).toBe(422);
+      expect((await as("remote").post("/attendance/me/home", { home_address: picked(ADDRESS), home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 10, employee_id: people.staff.employee.employee_id })).status).toBe(422);
 
-      const wrong = await send("remote", home(900), "Old address typed by mistake");
+      const wrong = await send("remote", home(900), "Old address picked by mistake");
       expect(wrong.status).toBe(201);
       const sent2 = await send("remote", home(0));
       expect(sent2.status).toBe(201);
@@ -934,7 +935,7 @@ describeDb("attendance against the real migrations", () => {
       expect(sent2.body.pending.home_latitude).toBeCloseTo(6.6, 5);
       first = sent2.body.pending.attendance_home_id;
       expect(await homeRows()).toEqual([
-        { status: "superseded", address: "Old address typed by mistake" },
+        { status: "superseded", address: "Old address picked by mistake" },
         { status: "pending", address: ADDRESS },
       ]);
       const now = await as("remote").get("/attendance/me/today");
@@ -1129,23 +1130,23 @@ describeDb("attendance against the real migrations", () => {
         expect(res.status).toBeGreaterThanOrEqual(400);
         return res;
       };
-      await no("staff", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: "1 Made Up Lane", home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 10 }, "REQUEST_TYPE_NOT_ALLOWED");
+      await no("staff", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: picked("1 Made Up Lane"), home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 10 }, "REQUEST_TYPE_NOT_ALLOWED");
       await no("remote", { request_type: "remote_day", starts_on: day(2), ends_on: day(2) }, "REQUEST_TYPE_NOT_ALLOWED");
       await no("staff", { request_type: "remote_day", starts_on: day(-1), ends_on: day(-1) }, "REQUEST_IN_THE_PAST");
       await no("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(7) }, "REQUEST_TOO_LONG");
       await no("staff", { request_type: "remote_day", starts_on: day(95), ends_on: day(95) }, "REQUEST_TOO_FAR");
       expect((await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), ...SITE })).status).toBe(422);
-      const noSite = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), address: "Partner office, Invented Way" });
+      const noSite = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), address: picked("Partner office, Invented Way") });
       expect([noSite.status, Object.keys(noSite.body.error.fields).sort()]).toEqual([
         422, ["site_latitude", "site_longitude", "site_radius_m"],
       ]);
-      const wide = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), address: "Partner office, Invented Way", ...SITE, site_radius_m: 900 });
+      const wide = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(2), address: picked("Partner office, Invented Way"), ...SITE, site_radius_m: 900 });
       expect(wide.status).toBe(422);
       expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), ...SITE })).status).toBe(422);
-      expect((await ask("remote", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: "1 Made Up Lane" })).status).toBe(422);
+      expect((await ask("remote", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: picked("1 Made Up Lane") })).status).toBe(422);
       expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), reason: "short" })).status).toBe(422);
       expect((await ask("staff", { request_type: "remote_day", starts_on: day(2), ends_on: day(2), employee_id: people.other.employee.employee_id })).status).toBe(422);
-      const weak = await ask("remote", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: "1 Made Up Lane", home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 250 });
+      const weak = await ask("remote", { request_type: "temporary_home", starts_on: day(2), ends_on: day(3), address: picked("1 Made Up Lane"), home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 250 });
       expect(weak.body.error.code).toBe("HOME_READING_WEAK");
       expect(await q("SELECT count(*)::int AS n FROM attendance_location_request", []).then((r) => r.rows[0].n)).toBe(0);
     });
@@ -1159,7 +1160,7 @@ describeDb("attendance against the real migrations", () => {
       const id = asked.body.location_request_id;
       const wid = asked.body.workflow_instance_id;
 
-      const clash = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(4), address: "Partner office, Invented Way", ...SITE });
+      const clash = await ask("staff", { request_type: "client_visit", starts_on: day(2), ends_on: day(4), address: picked("Partner office, Invented Way"), ...SITE });
       expect([clash.status, clash.body.error.code]).toEqual([409, "REQUEST_OVERLAPS"]);
 
       const byManager = await as("manager").get("/attendance/requests?status=submitted");
@@ -1196,7 +1197,7 @@ describeDb("attendance against the real migrations", () => {
 
     test("a client visit is fenced on its site: inside counts, outside is rejected under block, no reading is reviewed", async () => {
       await setPolicy("block", "off");
-      const asked = await ask("other", { request_type: "client_visit", starts_on: day(5), ends_on: day(6), address: "Client office, 4 Example Road", ...SITE });
+      const asked = await ask("other", { request_type: "client_visit", starts_on: day(5), ends_on: day(6), address: picked("Client office, 4 Example Road"), ...SITE });
       expect(asked.status).toBe(201);
       expect(asked.body).toMatchObject({ ...SITE, home_latitude: null, home_longitude: null });
       await approveBoth(asked.body.workflow_instance_id);
@@ -1217,7 +1218,7 @@ describeDb("attendance against the real migrations", () => {
 
     test("a client visit sent before sites were asked for keeps its approval as the check", async () => {
       await setPolicy("block", "off");
-      const asked = await ask("other", { request_type: "client_visit", starts_on: day(11), ends_on: day(11), address: "Client office, 4 Example Road", ...SITE });
+      const asked = await ask("other", { request_type: "client_visit", starts_on: day(11), ends_on: day(11), address: picked("Client office, 4 Example Road"), ...SITE });
       await q("UPDATE attendance_location_request SET site_latitude = NULL, site_longitude = NULL, site_radius_m = NULL WHERE location_request_id = $1", [
         asked.body.location_request_id,
       ]);
@@ -1234,7 +1235,7 @@ describeDb("attendance against the real migrations", () => {
       await grantsCache.bumpTeamVersion();
       try {
         const asked = await ask("remote", {
-          request_type: "temporary_home", starts_on: day(7), ends_on: day(9), address: "Flat 2, 9 Sample Crescent",
+          request_type: "temporary_home", starts_on: day(7), ends_on: day(9), address: picked("9 Sample Crescent", { details: "Flat 2" }),
           home_latitude: temp(0).latitude, home_longitude: temp(0).longitude, accuracy_m: 14,
         });
         expect(asked.status).toBe(201);
@@ -1260,18 +1261,18 @@ describeDb("attendance against the real migrations", () => {
     });
 
     test("withdrawn while waiting, cancelled before it starts, never once it has started", async () => {
-      const waiting = await ask("other", { request_type: "client_visit", starts_on: day(20), ends_on: day(20), address: "Client office, 4 Example Road", ...SITE });
+      const waiting = await ask("other", { request_type: "client_visit", starts_on: day(20), ends_on: day(20), address: picked("Client office, 4 Example Road"), ...SITE });
       const withdrawn = await as("other").post(`/attendance/me/requests/${waiting.body.location_request_id}/cancel`, { reason: "Meeting moved online" });
       expect(withdrawn.body).toMatchObject({ status: "cancelled", cancel_reason: "Meeting moved online", waiting_on: null });
       const instance = await q("SELECT state FROM workflow_instance WHERE workflow_instance_id = $1", [waiting.body.workflow_instance_id]);
       expect(instance.rows[0].state).toBe("cancelled");
       expect((await as("other").post(`/attendance/me/requests/${waiting.body.location_request_id}/cancel`, {})).status).toBe(409);
 
-      const later = await ask("other", { request_type: "client_visit", starts_on: day(22), ends_on: day(23), address: "Client office, 4 Example Road", ...SITE });
+      const later = await ask("other", { request_type: "client_visit", starts_on: day(22), ends_on: day(23), address: picked("Client office, 4 Example Road"), ...SITE });
       await approveBoth(later.body.workflow_instance_id);
       expect((await as("other").post(`/attendance/me/requests/${later.body.location_request_id}/cancel`, {})).body.status).toBe("cancelled");
 
-      const started = await ask("other", { request_type: "client_visit", starts_on: day(0), ends_on: day(1), address: "Client office, 4 Example Road", ...SITE });
+      const started = await ask("other", { request_type: "client_visit", starts_on: day(0), ends_on: day(1), address: picked("Client office, 4 Example Road"), ...SITE });
       await approveBoth(started.body.workflow_instance_id);
       const refused = await as("other").post(`/attendance/me/requests/${started.body.location_request_id}/cancel`, {});
       expect([refused.status, refused.body.error.code]).toEqual([409, "REQUEST_NOT_CANCELLABLE"]);
@@ -1315,8 +1316,8 @@ describeDb("attendance against the real migrations", () => {
     const day = (n) => lagos.addDays(today(), n);
     const ALL = { scope: "all", scope_ids: null };
     // Two invented venues, far from the office and from each other.
-    const HALL = { name: "Venue Hall", address: "12 Hidden Avenue", latitude: 6.731234, longitude: 3.481234, radius_m: 200 };
-    const YARD = { name: "Depot Yard", address: "3 Quiet Lane", latitude: 6.781234, longitude: 3.481234, radius_m: 300 };
+    const HALL = { name: "Venue Hall", address: picked("12 Hidden Avenue", { lat: 6.731234, lon: 3.481234 }), latitude: 6.731234, longitude: 3.481234, radius_m: 200 };
+    const YARD = { name: "Depot Yard", address: picked("3 Quiet Lane", { lat: 6.781234, lon: 3.481234 }), latitude: 6.781234, longitude: 3.481234, radius_m: 300 };
     const near = (venue, m) => ({ latitude: venue.latitude + m / 111_195, longitude: venue.longitude });
     const id = (who) => people[who].employee.employee_id;
     const send = (who, body) =>
@@ -1580,7 +1581,7 @@ describeDb("attendance against the real migrations", () => {
       expect(noHome.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none" });
 
       const homeSent = await as("staff").post("/attendance/me/home", {
-        home_address: "3 Example Close, Yaba", home_latitude: homeAt(0).latitude, home_longitude: homeAt(0).longitude, accuracy_m: 12,
+        home_address: picked("3 Example Close, Yaba"), home_latitude: homeAt(0).latitude, home_longitude: homeAt(0).longitude, accuracy_m: 12,
       });
       expect(homeSent.status).toBe(201);
       const decided = await as("ops").post(`/attendance/homes/${homeSent.body.pending.attendance_home_id}/decision`, { decision: "approve" });

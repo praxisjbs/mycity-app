@@ -126,15 +126,19 @@ describe("remote staff's homes", () => {
     await waitFor(() => expect(screen.getByLabelText("Address").getAttribute("aria-invalid")).toBe("true"));
     expect(screen.getByText("Location Found")).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Address"), { target: { value: "12 Sample Street, Yaba" } });
+    // The address is picked, never typed (F27).
+    const box = screen.getByRole("combobox", { name: /Address/ });
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: "herbert" } });
+    fireEvent.click(await screen.findByRole("option", { name: /21 Herbert Macaulay Way, Yaba/ }, { timeout: 5000 }));
     press("Send for Approval");
     await screen.findByText("Sent for Approval");
     expect(screen.getByText("Waiting")).toBeTruthy();
-    expect(screen.getByText("12 Sample Street, Yaba")).toBeTruthy();
+    expect(screen.getByText("21 Herbert Macaulay Way, Yaba, Lagos")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Update Home" })).toBeTruthy();
     // The server has the reading taken here, not one typed in.
     const mine = await api.call("GET /api/v1/attendance/me/home", {});
-    expect(mine.pending).toMatchObject({ home_address: "12 Sample Street, Yaba", home_latitude: 6.50012, home_longitude: 3.37008, accuracy_m: 14 });
+    expect(mine.pending).toMatchObject({ home_address: "21 Herbert Macaulay Way, Yaba, Lagos", home_latitude: 6.50012, home_longitude: 3.37008, accuracy_m: 14 });
     const today = await api.call("GET /api/v1/attendance/me/today", {});
     expect(today.location).toMatchObject({ kind: "remote", home_state: "pending" });
   }, 20000);

@@ -30,6 +30,7 @@ const lagos = require("../../shared/time/lagos");
 const engine = require("../../shared/workflow/engine");
 const calendar = require("./attendance.calendar");
 const repo = require("./attendance.repo");
+const places = require("../../shared/places/places");
 const { EVENTS, REQUEST_DEFINITION_KEY } = require("./attendance.events");
 
 /** The longest each type may run, in calendar days, and how far ahead a request may start. */
@@ -157,7 +158,7 @@ async function request(user, body) {
       request_type: body.request_type,
       starts_on: body.starts_on,
       ends_on: body.ends_on,
-      address: body.address || null,
+      address: body.address ? places.lineOf(body.address) : null,
       latitude: home ? body.home_latitude : null,
       longitude: home ? body.home_longitude : null,
       accuracy_m: home ? body.accuracy_m : null,
@@ -167,6 +168,7 @@ async function request(user, body) {
       reason: body.reason,
       requested_by: user.user_id,
     });
+    if (body.address) await places.save(client, "attendance_location_request.address", row.location_request_id, body.address);
     const facts = payloadOf({ ...row, number, request_type: body.request_type }, employeeId);
     await emit(client, {
       key: EVENTS.LOCATION_REQUEST_SUBMITTED,

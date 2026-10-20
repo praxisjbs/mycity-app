@@ -40,6 +40,7 @@ const lagos = require("../../src/shared/time/lagos");
 const approvers = require("../../src/shared/workflow/approvers");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
 const c = require("@mycity/contract");
+const { picked } = require("../helpers/places");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -158,7 +159,8 @@ describeDb("the organisation module against the real migrations", () => {
           bank_name: "Test Bank",
           account_number: "0123456789",
           date_of_birth: "1994-04-12",
-          home_address: "12 Test Close, Lagos",
+          // The service takes what the contract parsed: the place itself.
+          home_address: c.maps.PlaceInput.parse(picked("12 Test Close, Lagos")),
         },
         { user_id: null, source: "test" },
       );
@@ -448,7 +450,6 @@ describeDb("the organisation module against the real migrations", () => {
         bank_name: "",
         account_number: null,
         date_of_birth: "",
-        home_address: "",
       });
       expect(res.status).toBe(200);
       expect(res.body.job_title).toBe("Senior Analyst");

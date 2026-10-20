@@ -27,6 +27,7 @@ const {
   listQuery,
   Paged,
 } = require("./common");
+const { PlaceInput } = require("./maps");
 
 /**
  * PROPOSED values, to confirm with MyCity (Cynthia). Most MyCity staff are
@@ -96,8 +97,11 @@ const employeeCore = {
 
 /** Restricted fields (field-masked, BACKEND_STRUCTURE §9.4). Optional on create. */
 const employeeRestricted = {
-  /** Masked as personal details (field-mask.js employee.personal), as is personal_email. */
-  home_address: optionalText(300),
+  /**
+   * Masked as personal details (field-mask.js employee.personal), as is personal_email. Picked
+   * or pinned, never typed (F27); the person sets it on My Profile.
+   */
+  home_address: PlaceInput.optional(),
   personal_email: blank(email),
   bank_name: optionalText(100),
   account_number: blank(accountNumber),
@@ -306,7 +310,8 @@ const EmployeeUpdate = z
     next_of_kin_name: optionalText(150),
     next_of_kin_phone: blank(phone),
     next_of_kin_relationship: optionalText(50),
-    home_address: optionalText(300),
+    /** Picked or pinned, never typed (F27); left out, it stays as it is. No People form asks for it. */
+    home_address: PlaceInput.optional(),
     bank_name: optionalText(100),
     account_number: blank(accountNumber),
     gross_monthly: blank(money),

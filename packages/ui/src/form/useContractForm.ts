@@ -51,7 +51,8 @@ export function shortMessage(error: { type?: string; message?: string } | undefi
   const message = String(error.message ?? "");
   switch (error.type) {
     case "invalid_type":
-      return "Required";
+      // A schema's own message for a missing or wrong value ("Pick an address") over the generic one.
+      return message && !/^(Required|Expected )/.test(message) && words(message).length <= 4 ? sentence(message) : "Required";
     case "too_small":
       return /at least 1 /.test(message) ? "Required" : "Too short";
     case "too_big":

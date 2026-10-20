@@ -22,7 +22,7 @@ map, read §11 first.
 | `docs/DATABASE_SCHEMA.md` | **The database design**: the core every milestone attaches to, each milestone's tables as built and what it still owes, and what is not built and why. Read before any milestone's schema work |
 | `docs/MIGRATIONS.md` | **The migration and reference-seed conventions**: numbering, idempotency, DOWN, table shape, matching the code, what a seed may hold (A26), checks before the PR. Read before any migration |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
-| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F26 (binding) and the three PRs that build `packages/ui` |
+| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F27 (binding) and the three PRs that build `packages/ui` |
 | `docs/COMPONENTS.md` | Every shared component in `packages/ui`, generated from the code. Check it before building anything; a missing one is added with `npm run new:component` |
 | `docs/guides/<module>.md` | One full-stack engineering guide per feature: backend, API, events and every screen it touches, and how they relate. A change passes through its guide first |
 | `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
@@ -125,7 +125,7 @@ mycity-app/
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
 │   ├── MIGRATIONS.md         migration and reference-seed conventions (read before any migration)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
-│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F26, the three PRs
+│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F27, the three PRs
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
 │   ├── PROGRESS.md           93 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
@@ -201,6 +201,9 @@ src/
 │   ├── state/         state-history
 │   ├── dedup/         dedup
 │   ├── geo/           geo
+│   ├── places/        places (every address a person enters, kept per field of a record, and the
+│   │                  naming of locations saved while search was down) · token (the signature on
+│   │                  every place our search or pin hands out) · owners (every address field, F27)
 │   ├── notifications/ categories · fanout
 │   ├── integrations/  providers (the registry of Settings · Integrations' connections) · settings (the
 │   │                  one reader of a connection's values: saved here, else the server file) · state ·
@@ -225,7 +228,8 @@ src/
 │   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
-│   ├── maps/          geoapify.service (address search, map tiles and a worksite's address, F21)
+│   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
+│   │                  map tiles, cached and kept under the provider's rate; F21, F27)
 │   ├── qr/            qr
 │   ├── web/           links (what counts as a link, the first one's card form) · public-fetch (a page or a
 │   │                  picture from the public web only: private addresses refused, size and time capped) ·
@@ -344,7 +348,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (the reminder engine, Approvals Waiting, Probation Ending and the daily digest), `notifications.rules.js` (Settings · Notifications: the company's rule per notice and its reminders) | Caller's own inbox, preferences, quiet hours, digest and devices; Settings · Notifications (`docs/guides/notifications.md`) |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
-| `maps` | routes and controller only | `GET /maps/search` (the address search every location field types into), `/maps/tiles` (the map's tiles, signed in), `/maps/reverse` (a worksite's address) (`services/maps`; `docs/guides/foundation.md` §6.13) |
+| `maps` | `maps.service.js` (the places-name job's naming), `maps.events.js` (`place.named`) | `GET /maps/search` (the address search behind every address field, signed places, from the second character), `/maps/pin` (a pinned point's nearest address, signed), `/maps/tiles` (the map's tiles, signed in); every address is kept by its owner through `shared/places` (`services/maps`; `docs/guides/addresses.md`, F27) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
 
@@ -510,7 +514,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
-| M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit`, `reminders` (one person's daily digest; brought forward from M6) | `outbox-dispatch` (with the loop `loops/outbox-wake`: a commit runs it at once), `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup`, `urgent-repeats` (open urgent notices alerted again every 30 minutes, 08:00 to 18:00 Lagos), `reminders` (the reminder engine's tick every 5 minutes, and each person's daily digest queued; brought forward from M6) |
+| M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit`, `reminders` (one person's daily digest; brought forward from M6) | `outbox-dispatch` (with the loop `loops/outbox-wake`: a commit runs it at once), `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup`, `urgent-repeats` (open urgent notices alerted again every 30 minutes, 08:00 to 18:00 Lagos), `reminders` (the reminder engine's tick every 5 minutes, and each person's daily digest queued; brought forward from M6), `places-name` (the device locations saved while address search was down, named every 5 minutes, 25 a run; `docs/guides/addresses.md` §7) |
 | M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail), `link-preview` (a chat link's card, fetched after the message commits) | `celebrations`, `community-membership` (every active login in #general and #announcements, hourly), `announcement-release` (the safety net behind `announcement-publish`), `mail-sync` (every minute: due mail, then every mailbox at the staff mail server's interval), `attendance-day-close`, `attendance-clock-watch` (clock-in reminders and automatic clock-outs, every 5 minutes), `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `export-cleanup` (export files removed a day after they were made, every hour); loop `loops/mail-idle` |
 | M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
@@ -665,6 +669,12 @@ data, not code. Services call `openInstance()` inside their transaction and reac
     button is busy from the press until the work settles and refuses a second press, and the
     buttons beside it wait; never `() => void save()`, never `disabled={busy}`
     (FRONTEND_FOUNDATION F26, FRONTEND_GUIDE §8.4, lint `mycity/no-void-press`).
+20. **Addresses are picked, never typed.** Every address or location a person enters, in both apps
+    and on every environment, is an `AddressField` (a `PlacesField` for cities) bound to the
+    contract's `PlaceInput`, saved through `shared/places` by the owning service. The API accepts
+    only a place our address search or a pin signed, or the device's location while search is down;
+    the Details line (flat, gate) is the only free text, printed before the address
+    (FRONTEND_FOUNDATION F27, `docs/guides/addresses.md`, gate 22).
 
 ---
 
@@ -695,6 +705,7 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 | 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
 | 20 Money | M6 | `check/money.js` |
 | 21 Nothing the browser styles itself | M0 | `check/native-ui.js`: no native select, picker, spinner, checkbox, `title` tooltip, validation bubble or unbranded toast, in source and on every gallery page and app screen in Chromium (F25), no exemptions |
+| 22 Addresses picked, never typed | M0 | `check/addresses.js`: every request body field named like an address is the contract's `PlaceInput` and kept by a registered owner, every owner registers its rename, and every address field on a screen is an `AddressField` or a `PlacesField` (F27, `docs/guides/addresses.md` §6.10); a deliberate exception carries `address:none <reason>` |
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,

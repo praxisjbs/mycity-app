@@ -18,6 +18,7 @@ const outbox = require("../../src/shared/events/outbox");
 const realtime = require("../../src/services/realtime/emitter");
 const mailbox = require("../../src/modules/mailbox/mailbox.service");
 const signatures = require("../../src/modules/mailbox/signature/signature.service");
+const { picked } = require("../helpers/places");
 
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async () => undefined),
@@ -265,7 +266,7 @@ describeDb("Email signatures against the real migrations", () => {
       legal_name: "MyCity App Ltd",
       trading_name: "MyCity App",
       registration_number: "1234567",
-      address: "Lekki, Lagos",
+      address: picked("Admiralty Way, Lekki, Lagos"),
       website: "https://mycityapp.io",
     });
     expect(org.status).toBe(200);

@@ -38,7 +38,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F26, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F27, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -53,7 +53,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
-   frontend gates), decisions F1 to F26 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   frontend gates), decisions F1 to F27 in `docs/FRONTEND_FOUNDATION.md` §3 win over
    `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
 4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
 5. `README.MD` is the map of every file.
@@ -85,6 +85,12 @@ silently.
 - **Search reaches everything.** Every new screen, action and record type is findable from ⌘K
   (its module's `.search.js`, the route map, the screen's New action), or carries
   `search:none <reason>`; the search coverage gate fails it otherwise (`docs/guides/foundation.md` §6.7).
+- **Addresses are picked, never typed** (F27, gate 22; TB, 20/10/2026). Every address or location a
+  person enters, on hub and go, live and staging, is an `AddressField` (a `PlacesField` for a list
+  of cities) bound to the contract's `PlaceInput` and saved with `places.save()` in the owning
+  service. The API takes only a place our search or pin signed, or the device's location while
+  address search is down. No free address field, anywhere; a new one is a new owner
+  (`docs/guides/addresses.md` §6.9).
 - **Three tiers of screen text** (FRONTEND_GUIDE §5, gate 8). Operational content is open. Support
   text sits behind a help term (hover on desktop, tap on a phone) or a Details row, closed by
   default. How the system works or why it was built never reaches a screen: no explainer cards

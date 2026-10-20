@@ -3,8 +3,8 @@ import type { LocationError, MyHome } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
-import { searchPlaces } from "@/features/shared/places";
-import { AddressField, Button, Card, CardHeader, Field, FormFooter, KeyValue, Pill, Result, toast, useContractForm, useModal } from "@mycity/ui";
+import { places } from "@/features/shared/places";
+import { AddressField, Button, Card, CardHeader, Field, FormFooter, KeyValue, Pill, Result, toast, useContractForm, useModal, type PlaceValue } from "@mycity/ui";
 import { HOME_STATUS } from "./labels";
 
 /**
@@ -99,13 +99,13 @@ export function HomeLocationCard({ openOnLoad }: { openOnLoad: boolean }) {
   );
 }
 
-type HomeValues = { home_address: string; home_latitude: number | null; home_longitude: number | null; accuracy_m: number | null };
+type HomeValues = { home_address: PlaceValue | null; home_latitude: number | null; home_longitude: number | null; accuracy_m: number | null };
 
 /** The sheet: one reading taken here, the address, and Send for Approval. */
 export function SetHomeForm({ max, close }: { max: number; close: () => void }) {
   const f = useContractForm<HomeValues>(
-    { home_address: "", home_latitude: null, home_longitude: null, accuracy_m: null },
-    { safeParse: (v: unknown) => attendance.HomeRequestCreate.safeParse({ ...(v as HomeValues), home_address: (v as HomeValues).home_address.trim() }) },
+    { home_address: null, home_latitude: null, home_longitude: null, accuracy_m: null },
+    attendance.HomeRequestCreate,
   );
   const send = useMutation("POST /api/v1/attendance/me/home");
   const { reading, setReading, locate } = useReading(max, (fix) => {
@@ -118,7 +118,8 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
     if (!f.check()) return;
     const v = f.values;
     try {
-      await send.run({ body: { home_address: v.home_address.trim(), home_latitude: v.home_latitude!, home_longitude: v.home_longitude!, accuracy_m: v.accuracy_m! } });
+      // Checked against the contract above: the address is picked and the reading is taken.
+      await send.run({ body: { home_address: v.home_address!, home_latitude: v.home_latitude!, home_longitude: v.home_longitude!, accuracy_m: v.accuracy_m! } });
       invalidate("/api/v1/attendance");
       close();
       toast("Home location sent for approval");
@@ -136,7 +137,11 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
         <ReadingStep reading={reading} idle={{ title: "At Home Now", text: "Take the reading where you work from home." }} />
       </div>
       <Field label="Address" {...f.status("home_address")}>
-        <AddressField {...f.field("home_address")} search={searchPlaces} placeholder="12 Sample Street" maxLength={300} />
+        <AddressField
+          {...f.field("home_address")}
+          places={places}
+          near={f.values.home_latitude !== null && f.values.home_longitude !== null ? { lat: f.values.home_latitude, lon: f.values.home_longitude } : null}
+        />
       </Field>
       <FormFooter>
         {located ? (

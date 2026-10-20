@@ -66,6 +66,7 @@ describe("job registry", () => {
       "mail-sync",
       "media-reconcile",
       "outbox-dispatch",
+      "places-name",
       "reminders",
       "scheduled-reports",
       "system-health",

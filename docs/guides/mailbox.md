@@ -399,3 +399,4 @@ interface copy; the copy rules apply to the chrome around them.
   move there, with the `MAILBOX_*` variables as the fallback; a change re-points every mailbox
   (`mail_account.server_moved`) and syncs it as its retest (§3 step 11, §7, §11). The sync scheduler
   ticks every minute to honour a changed interval; `smtp-errors.js` moved to `services/mail/`.
+- 20/10/2026 · TB · Nothing in the mailbox changed. Always Show Images' `sender_address` is an email address, marked `address:none` in the contract so gate 22 (addresses picked, never typed, `docs/guides/addresses.md`) knows it is not a place.

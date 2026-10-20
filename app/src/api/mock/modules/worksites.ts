@@ -1,6 +1,7 @@
 import type { Worksite, WorksiteEmployee } from "@mycity/contract/contract.gen.ts";
 import { at, created, fail, fold, invalid, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, grantsFor, PEOPLE, SIGN_INS, teamOf, type MockPerson } from "../data/people";
+import { pickedPlace, pickAnAddress, placeOf } from "./maps";
 
 /**
  * People · Worksites on the mock, in the contract's shapes (packages/contract/schemas/worksites.js):
@@ -20,6 +21,7 @@ export const WORKSITES: Site[] = SEED.map(([code, name, address, latitude, longi
   code,
   name,
   address,
+  address_place: pickedPlace(address).view,
   latitude,
   longitude,
   radius_m,
@@ -101,13 +103,16 @@ route("POST /api/v1/worksites", (req) => {
   if (!peopleGrant(req.user!, "create").may) return forbidden();
   const fields = check(req.body, false);
   if (Object.keys(fields).length) return invalid(fields);
-  const b = req.body as { name: string; address?: string; latitude: number; longitude: number; radius_m: number; timezone?: string };
+  const b = req.body as { name: string; address?: unknown; latitude: number; longitude: number; radius_m: number; timezone?: string };
+  const kept = b.address === undefined ? null : placeOf(b.address);
+  if (b.address !== undefined && !kept) return pickAnAddress("address");
   const now = new Date().toISOString();
   const w: Site = {
     worksite_id: sid(`worksite:${b.name}:${now}`),
     code: codeOf(b.name),
     name: b.name.trim(),
-    address: b.address?.trim() || null,
+    address: kept?.line ?? null,
+    address_place: kept?.view ?? null,
     latitude: b.latitude,
     longitude: b.longitude,
     radius_m: b.radius_m,
@@ -127,10 +132,12 @@ route("PATCH /api/v1/worksites/:id", (req) => {
   if (!w) return notFound();
   const fields = check(req.body, true);
   if (Object.keys(fields).length) return invalid(fields);
-  const b = req.body as Partial<Site>;
+  const b = req.body as Omit<Partial<Site>, "address"> & { address?: unknown };
+  const kept = b.address ? placeOf(b.address) : null;
+  if (b.address && !kept) return pickAnAddress("address");
   Object.assign(w, {
     ...(b.name !== undefined && { name: String(b.name).trim() }),
-    ...(b.address !== undefined && { address: b.address || null }),
+    ...(b.address !== undefined && { address: kept?.line ?? null, address_place: kept?.view ?? null }),
     ...(b.latitude !== undefined && { latitude: b.latitude }),
     ...(b.longitude !== undefined && { longitude: b.longitude }),
     ...(b.radius_m !== undefined && { radius_m: b.radius_m }),

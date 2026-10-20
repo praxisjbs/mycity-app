@@ -87,7 +87,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [NotificationBanner](#notificationbanner) | `NotificationBanner` | The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere. | beta |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top. | stable |
 | Feedback | [UrgentBar](#urgentbar) | `UrgentBar` | The red bar under the top bar on every screen while an urgent notice waits on the person: its title, how many wait, and Acknowledge or Open. | beta |
-| Forms | [AddressField](#addressfield) | `AddressField` | An address typed with suggestions from our own address search; picking one fills the address and hands back its coordinates. | stable |
+| Forms | [AddressField](#addressfield) | `AddressField` | An address picked, never typed: suggestions from our own address search as the person types, a pin on the map, and the device's location while search is down. | stable |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
@@ -98,6 +98,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
+| Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
@@ -2533,14 +2534,14 @@ The red bar under the top bar on every screen while an urgent notice waits on th
 
 ### AddressField
 
-An address typed with suggestions from our own address search; picking one fills the address and hands back its coordinates.
+An address picked, never typed: suggestions from our own address search as the person types, a pin on the map, and the device's location while search is down.
 
 | | |
 |---|---|
-| Use | Any address in a form: a worksite, a field site, a client visit, a home. Pass `onPick` where the place's latitude and longitude fill the form's own fields. |
-| Avoid | Calling the provider from the browser (the key stays on the server); a search box that only finds (PlaceSearch); the browser's own autofill list or a `<datalist>` (gate 21). |
-| Phone | 44 px tall with 16 px text; the suggestions open under the field as 44 px rows, inside the sheet's own scroll. |
-| Accessibility | A combobox over a listbox of addresses: arrows move through them, Enter picks, Esc closes; the count found is announced. Takes its label and error links from the Field around it. |
+| Use | Every address or location a person enters, on both apps (F27, gate 22): a worksite, a field site, a client visit, a home, the company's address; `level="area"` for a vacancy's location or a partner's headquarters. `onPick` hands back the point where the form keeps its own. |
+| Avoid | A TextField for an address (gate 22); calling the provider from the browser (the key stays on the server); several cities (PlacesField); a search that keeps nothing (PlaceSearch). |
+| Phone | 44 px tall with 16 px text; the suggestions open under the field as 44 px rows inside the sheet's own scroll; the pin's map and its buttons fill the width. |
+| Accessibility | A combobox over a listbox: arrows move, Enter picks, Esc closes; the count found and an outage are announced. A held address is read out with its Change button, which the field's label names. Takes its label and error links from the Field around it. |
 | Status | stable |
 | Exports | `AddressField` |
 | Import | `import { AddressField } from "@mycity/ui";` |
@@ -2548,20 +2549,27 @@ An address typed with suggestions from our own address search; picking one fills
 | Test | `packages/ui/src/form/AddressField.test.tsx` |
 | Gallery | `packages/ui/src/form/AddressField.gallery.tsx` (`npm run gallery`, `#/AddressField`) |
 
-**AddressField** props (`AddressFieldProps`, extends `NativeInput`)
+**AddressField** props (`AddressFieldProps`)
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `value` | `string` | yes | The address, from form.field(name): what was typed, or the place picked. |
-| `onChange` | `(value: string) => void` | yes | Called with the new address as the person types or picks. |
+| `value` | `PlaceValue \| null \| undefined` | yes | The address, from form.field(name): a pick's token, the device's location in an outage, and the details. |
+| `onChange` | `(value: PlaceValue \| null) => void` | yes | Called with the new address: a pick, a pin, the device's location, new details, or null when cleared. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
 | `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
-| `search` | `SearchPlaces` | yes | Finds addresses; the app's own call through our proxy. |
-| `onPick` | `(place: Place) => void` |  | Called with the place picked, its coordinates included, after the address is set. |
+| `name` | `string` |  | The form field's name, on the search box. |
+| `id` | `string` |  | The control's id; the Field around it supplies one otherwise. |
+| `places` | `Places` | yes | The app's address search, pin and token reader, bound once (`features/shared/places.ts`). |
+| `level` | `PlaceLevel` |  | What a pick may be: a door (`address`, the default, with a Details line), anything to a city (`area`), a city. |
+| `onPick` | `(place: Place) => void` |  | Called with the place picked or pinned, its point included, after the address is set. |
+| `near` | `LatLon \| null` |  | Where the pin's map opens when the field holds no place: the form's own point. |
+| `placeholder` | `string` |  | A format example of at most 3 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
-<AddressField {...f.field("address")} search={searchPlaces} onPick={(p) => { f.set("latitude", String(p.lat)); f.set("longitude", String(p.lon)); }} />
+<AddressField {...f.field("address")} places={places} onPick={(p) => f.set("latitude", p.lat.toFixed(6))} />
+<AddressField {...f.field("location")} places={places} level="area" />
 ```
 
 ### CardPicker
@@ -2953,6 +2961,44 @@ Picks people the server searches: their name, job title and department, one page
 
 ```tsx
 <PersonPicker list={employees} value={panel} onChange={setPanel} multiple />
+```
+
+### PlacesField
+
+Several places picked from our own address search, each a chip with Remove: a proposal's cities.
+
+| | |
+|---|---|
+| Use | A list of cities (the default level) or areas a record covers, where each must be a real place (F27, gate 22). |
+| Avoid | One address (AddressField); city names typed into a TextField (gate 22); a short fixed list of options (ChoiceField, SelectField). |
+| Phone | The chips wrap above the field, each Remove a 44 px target; the suggestions open under the field as 44 px rows. |
+| Accessibility | A combobox over a listbox: arrows move, Enter adds, Esc closes; each chip's Remove names its place; the count found and an outage are announced. Takes its label and error links from the Field around it. |
+| Status | stable |
+| Exports | `PlacesField` |
+| Import | `import { PlacesField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/PlacesField.tsx` |
+| Test | `packages/ui/src/form/PlacesField.test.tsx` |
+| Gallery | `packages/ui/src/form/PlacesField.gallery.tsx` (`npm run gallery`, `#/PlacesField`) |
+
+**PlacesField** props (`PlacesFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `PlaceValue[]` | yes | The places picked, from form.field(name): each a token our search signed. |
+| `onChange` | `(value: PlaceValue[]) => void` | yes | Called with the new list, a place added or removed. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `name` | `string` |  | The form field's name, on the search box. |
+| `id` | `string` |  | The control's id; the Field around it supplies one otherwise. |
+| `places` | `Places` | yes | The app's address search and token reader, bound once (`features/shared/places.ts`). |
+| `level` | `Exclude<PlaceLevel, "address">` |  | What each pick may be: a city (the default), or anything to a city (`area`). |
+| `max` | `number` |  | How many may be picked; the box goes once that many are. |
+| `placeholder` | `string` |  | A format example of at most 3 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PlacesField {...f.field("cities")} places={places} />
 ```
 
 ### RadioCards
@@ -4368,8 +4414,8 @@ Finds an address through our own API and hands back the place with its coordinat
 
 | | |
 |---|---|
-| Use | Setting up a worksite, giving a partner an address, naming where a field visit happened. |
-| Avoid | Calling the provider from the browser (the key must stay on the server); a free-text address box where a point is needed; a list of every result. |
+| Use | Finding a place to look at on a map, where nothing is kept as anyone's address. |
+| Avoid | Any address a person enters (AddressField, F27, gate 22); calling the provider from the browser (the key must stay on the server); a list of every result. |
 | Phone | Full width, each result a 44 px row; the chosen address shows above the box. |
 | Accessibility | A search box over a listbox of addresses, each a real option, with the count of what was found announced. |
 | Status | stable |

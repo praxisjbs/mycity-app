@@ -603,6 +603,7 @@ describe("schedules and heartbeat", () => {
       "integrations-watch",
       "mail-sync",
       "media-reconcile",
+      "places-name",
       "reminders",
       "scheduled-reports",
       "system-health",

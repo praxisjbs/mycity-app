@@ -7,7 +7,8 @@
  * coordinates from the address search (`maps.js`, F21); they arrive here as numbers.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, isoDateTime, listQuery, Paged } = require("./common");
+const { PlaceInput, PlaceView } = require("./maps");
 const { WorkPattern } = require("./organisation");
 
 /** An IANA timezone name; the service checks the zone is one the server knows. */
@@ -30,6 +31,8 @@ const Worksite = z
     code: z.string(),
     name: z.string(),
     address: z.string().nullable(),
+    /** The address as an edit form reads it (F27): the place, with a token to send it back. */
+    address_place: PlaceView.nullable(),
     latitude: z.number(),
     longitude: z.number(),
     radius_m: z.number().int(),
@@ -49,7 +52,8 @@ const WorksiteListQuery = listQuery({ active: flag.optional() }, ["name", "creat
 const WorksiteCreate = z
   .object({
     name: text(120),
-    address: optionalText(300),
+    /** Picked or pinned, never typed (F27, docs/guides/addresses.md). */
+    address: PlaceInput.optional(),
     latitude,
     longitude,
     radius_m: radius,
@@ -61,7 +65,8 @@ const WorksiteCreate = z
 const WorksiteUpdate = z
   .object({
     name: text(120).optional(),
-    address: optionalText(300),
+    /** A new place, or null to clear it. */
+    address: PlaceInput.nullable().optional(),
     latitude: latitude.optional(),
     longitude: longitude.optional(),
     radius_m: radius.optional(),
@@ -93,7 +98,10 @@ const WorksiteAssign = z.object({ employee_id: uuid }).strict();
 const TABLES = {
   Worksite: {
     table: "worksite",
-    virtual: { assigned_count: "count of the active employees whose worksite it is" },
+    virtual: {
+      assigned_count: "count of the active employees whose worksite it is",
+      address_place: "the worksite's address as a place, from place (owner worksite.address)",
+    },
   },
   WorksitePage: { table: null, reason: "a page of worksites" },
   WorksiteListQuery: { table: null, reason: "list controls for the worksites" },

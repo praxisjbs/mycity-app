@@ -1,38 +1,44 @@
 "use strict";
 /**
- * Geoapify through our own API (FRONTEND_FOUNDATION F21): the address search behind
- * every location field, the map's tiles, and an address for a worksite's point.
+ * Geoapify through our own API (FRONTEND_FOUNDATION F21, F27): the address search behind
+ * every address field, the nearest named place to a point (a pin, a device location waiting to
+ * be named), and the map's tiles (docs/guides/addresses.md).
  *
- *   const places = await geoapify.searchPlaces("7 Admiralty Way");
- *   → [{ place_id, formatted, lat, lon }, ...]   at most MAX_PLACES
- *   const { bytes, type } = await geoapify.tile(15, 18_525, 15_632);   → one PNG
- *   const address = await geoapify.reverseGeocode(6.4321, 3.4219);    → "12 Admiralty Way, …" or null
+ *   const places = await geoapify.searchPlaces("7 Admiralty Way", { level: "address" });
+ *   → [{ place_id, formatted, lat, lon, kind, city, state, country_code }, ...]   at most MAX_PLACES
+ *   const near = await geoapify.nearest(6.4321, 3.4219, { level: "address" });   → a place, or null
+ *   const { bytes, type } = await geoapify.tile(15, 18_525, 15_632);              → one PNG
  *
- * The key stays on the server: the browser asks our API (`/api/v1/maps/...`), never
- * the provider. Nothing is stored; a form that picks a place saves the address and the
- * coordinates as its own fields, through its own module. The key is Settings ·
- * Integrations' (shared/integrations/settings.js: saved there, else GEOAPIFY_API_KEY in the
- * server file; docs/guides/integrations.md §6.3), read at each call, so a new key works at
- * once.
+ * The key stays on the server: the browser asks our API (`/api/v1/maps/...`), never the
+ * provider. Nothing is stored here: the maps module signs what it hands a browser, and the
+ * form that picks a place saves it through shared/places in its own module. The key is
+ * Settings · Integrations' (shared/integrations/settings.js: saved there, else
+ * GEOAPIFY_API_KEY in the server file; docs/guides/integrations.md §6.3), read at each call, so
+ * a new key works at once.
  *
  * Rules:
  *  - Call it outside any transaction: an HTTP wait must never hold a pooled connection.
- *  - Lagos first: results are biased to Lagos and Nigeria, never filtered, so a client
- *    site abroad is still found.
+ *  - Lagos first: results are biased to Lagos and Nigeria, never filtered, so a client site
+ *    abroad is still found.
+ *  - A level says what a pick may be (contract PlaceLevel): `address` drops areas, cities,
+ *    regions and countries; `area` drops regions and countries; `city` asks for cities only.
  *  - The provider's answer is untrusted: every field is coerced and capped, and a result
  *    without a usable point is dropped (a missing coordinate is not 0°, 0°).
  *  - The same building under two ids is one suggestion.
  *  - The key is never logged. The request URL carries it, so a failure is logged as its
  *    status and a short message, never as the error object.
- *  - An answer is kept for ten minutes per text, so the same address typed twice, or the
- *    same office typed by two people, spends one request of the day's quota. A tile is kept
- *    for a day (the map of an office is the same for everyone who opens it), an address
- *    for a point for a day; both stores are bounded.
- *  - Every request that reached the provider is counted (shared/integrations/usage.js):
- *    an answer from memory spent nothing and is not. A refusal carries the provider's
- *    status (`upstream`) so Settings · Integrations can tell a refused key from an outage.
+ *  - Fast and frugal (guide §6.4): an answer is kept ten minutes in this process and seven
+ *    days in Redis (shared by every process, across restarts), so the same text typed twice,
+ *    or by two people, spends one credit; the same text asked twice at once is one request;
+ *    and at most RATE requests a second go to the provider (its free plan's limit), a later
+ *    one waiting up to RATE_WAIT_MS before it is refused as busy.
+ *  - Every request that reached the provider is counted (shared/integrations/usage.js): an
+ *    answer from memory spent nothing and is not. A refusal carries the provider's status
+ *    (`upstream`) so Settings · Integrations can tell a refused key from an outage.
  */
+const crypto = require("node:crypto");
 const { logger } = require("../../config/logger");
+const { tryClient, rkey } = require("../../config/redis");
 const { AppError } = require("../../shared/errors");
 const integrations = require("../../shared/integrations/settings");
 const usage = require("../../shared/integrations/usage");
@@ -45,8 +51,16 @@ const TILE_URL = "https://maps.geoapify.com/v1/tile/osm-bright";
 /** Suggestions a field shows; a person picks from a handful, never a page. */
 const MAX_PLACES = 6;
 
-/** Below this many characters autocomplete answers with the whole of Lagos. */
-const MIN_CHARS = 3;
+/** The field searches from the second character (TB, 20/10/2026: instant, credit-aware). */
+const MIN_CHARS = 2;
+
+/** Requests a second to the provider: its free plan's limit. */
+const RATE = 5;
+/** How long a request over the rate waits for a slot before it is refused as busy. */
+const RATE_WAIT_MS = 300;
+
+/** How long Redis keeps an answer: addresses change slowly, and each one kept is a credit saved. */
+const SHARED_TTL_S = 7 * 24 * 60 * 60;
 
 /** The field waits on this; a stalled provider shows as a failed search, not a hung one. */
 const TIMEOUT_MS = 4500;
@@ -81,14 +95,36 @@ function store(max, ttlMs) {
 }
 
 const searches = store(500, 10 * 60 * 1000);
+const nearby = store(500, 10 * 60 * 1000);
 /** About 300 PNGs of 15 to 40 KB: a few offices' maps, at most around 12 MB. */
 const tiles = store(300, DAY_MS);
-const addresses = store(500, DAY_MS);
 
 const blank = (v) => v === null || v === undefined || v === "";
 const capped = (v, max) => (blank(v) ? null : String(v).slice(0, max));
 
-/** One provider result as a Place, or null when it has no usable point or address. */
+/** The provider's `result_type` as our PlaceKind (contract). */
+const KIND = {
+  building: "building",
+  street: "street",
+  amenity: "landmark",
+  suburb: "area",
+  district: "area",
+  postcode: "area",
+  locality: "area",
+  city: "city",
+  county: "region",
+  state: "region",
+  country: "country",
+};
+
+/** The kinds a level never offers (§ Rules). */
+const DROPPED = {
+  address: new Set(["area", "city", "region", "country"]),
+  area: new Set(["region", "country"]),
+  city: new Set(["building", "street", "landmark", "area", "region", "country"]),
+};
+
+/** One provider result as a place, or null when it has no usable point or address. */
 function toPlace(hit) {
   if (!hit || typeof hit !== "object") return null;
   if (blank(hit.lat) || blank(hit.lon)) return null;
@@ -98,26 +134,32 @@ function toPlace(hit) {
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
   const formatted = capped(hit.formatted, 300);
   if (!formatted) return null;
+  const country = capped(hit.country_code, 2);
   return {
     place_id: capped(hit.place_id, 300) || `${lat.toFixed(6)},${lon.toFixed(6)}`,
     formatted,
     lat,
     lon,
+    kind: KIND[String(hit.result_type || "").toLowerCase()] || "unknown",
+    city: capped(hit.city, 120),
+    state: capped(hit.state, 120),
+    country_code: country && /^[a-z]{2}$/i.test(country) ? country.toLowerCase() : null,
   };
 }
 
-/** The provider's answer as at most MAX_PLACES places, one per point. */
-function placesOf(data) {
+/** The provider's answer as at most MAX_PLACES places a level offers, one per point. */
+function placesOf(data, level = "address") {
   const raw = Array.isArray(data && data.results)
     ? data.results
     : Array.isArray(data && data.features)
       ? data.features.map((f) => (f && f.properties) || null)
       : [];
+  const dropped = DROPPED[level] || DROPPED.address;
   const out = [];
   const seen = new Set();
   for (const hit of raw) {
     const place = toPlace(hit);
-    if (!place) continue;
+    if (!place || dropped.has(place.kind)) continue;
     const point = `${place.lat.toFixed(5)},${place.lon.toFixed(5)}`;
     if (seen.has(point)) continue;
     seen.add(point);
@@ -150,6 +192,7 @@ function refusal(code, message, status, { upstream = null, timedOut = false } = 
  * @returns {Promise<Response>}
  */
 async function ask(url, what, fetchImpl, kind) {
+  await slot();
   let res;
   try {
     res = await fetchImpl(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -175,6 +218,51 @@ async function ask(url, what, fetchImpl, kind) {
   return res;
 }
 
+/** When the last RATE requests went out, oldest first. */
+const sent = [];
+
+/** Wait for a slot under the provider's rate, or refuse as busy past RATE_WAIT_MS. */
+async function slot(now = Date.now()) {
+  while (sent.length && now - sent[0] >= 1000) sent.shift();
+  if (sent.length >= RATE) {
+    const wait = sent[0] + 1000 - now;
+    if (wait > RATE_WAIT_MS) throw refusal("MAPS_BUSY", "Maps are busy. Try again shortly.", 429);
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    return slot(Date.now());
+  }
+  sent.push(now);
+}
+
+/** An answer kept in Redis, shared by every process; undefined when not kept or Redis is away. */
+async function shared(key) {
+  const redis = tryClient();
+  if (!redis) return undefined;
+  try {
+    const hit = await redis.get(key);
+    return hit === null ? undefined : JSON.parse(hit);
+  } catch {
+    return undefined;
+  }
+}
+
+function share(key, value) {
+  const redis = tryClient();
+  if (!redis) return;
+  redis.set(key, JSON.stringify(value), "EX", SHARED_TTL_S).catch(() => {});
+}
+
+/** The same question asked twice at once is one request: the second waits on the first. */
+const asking = new Map();
+function once(key, work) {
+  const known = asking.get(key);
+  if (known) return known;
+  const p = work().finally(() => asking.delete(key));
+  asking.set(key, p);
+  return p;
+}
+
+const hashOf = (s) => crypto.createHash("sha1").update(s).digest("hex");
+
 /** The key given (tests, a test before save), else the key in use; MAPS_OFF without one. */
 async function keyOf(apiKey) {
   const key = apiKey === undefined ? await integrations.secret("geoapify", "api_key") : apiKey;
@@ -191,33 +279,49 @@ async function jsonOf(res) {
 }
 
 /**
- * Places matching what a person typed.
+ * Places matching what a person typed, of the kinds a level offers.
  * @param {string} text
- * @param {{apiKey?: string, fetchImpl?: typeof fetch, fresh?: boolean}} [opts]
+ * @param {{level?: "address"|"area"|"city", apiKey?: string, fetchImpl?: typeof fetch, fresh?: boolean}} [opts]
  *   apiKey  a key to use instead of the one in use (a test before save; tests)
  *   fresh   ask the provider even when the answer is remembered (a test)
- * @returns {Promise<Array<{place_id: string, formatted: string, lat: number, lon: number}>>}
+ * @returns {Promise<Array<{place_id: string, formatted: string, lat: number, lon: number, kind: string,
+ *          city: string|null, state: string|null, country_code: string|null}>>}
  */
-async function searchPlaces(text, { apiKey, fetchImpl = fetch, fresh = false } = {}) {
+async function searchPlaces(text, { level = "address", apiKey, fetchImpl = fetch, fresh = false } = {}) {
   const query = String(text || "").trim().replace(/\s+/g, " ");
   if (query.length < MIN_CHARS) return [];
   const usedKey = await keyOf(apiKey);
 
-  const key = query.toLowerCase();
+  const key = `${level}|${query.toLowerCase()}`;
   const known = fresh ? undefined : searches.get(key);
   if (known) return known;
+  const redisKey = rkey("maps", "search", hashOf(key));
+  if (!fresh) {
+    const kept = await shared(redisKey);
+    if (kept) {
+      searches.set(key, kept);
+      return kept;
+    }
+  }
 
-  const url = new URL(AUTOCOMPLETE_URL);
-  url.searchParams.set("text", query);
-  url.searchParams.set("format", "json");
-  url.searchParams.set("lang", "en");
-  url.searchParams.set("limit", String(MAX_PLACES + 2));
-  url.searchParams.set("bias", `proximity:${LAGOS}|countrycode:ng`);
-  url.searchParams.set("apiKey", usedKey);
+  return once(`search|${key}|${fresh}`, async () => {
+    const url = new URL(AUTOCOMPLETE_URL);
+    url.searchParams.set("text", query);
+    url.searchParams.set("format", "json");
+    url.searchParams.set("lang", "en");
+    // More than a field shows, so the kinds a level drops still leave six.
+    url.searchParams.set("limit", String(level === "city" ? MAX_PLACES : MAX_PLACES + 4));
+    if (level === "city") url.searchParams.set("type", "city");
+    url.searchParams.set("bias", `proximity:${LAGOS}|countrycode:ng`);
+    url.searchParams.set("apiKey", usedKey);
 
-  const places = placesOf(await jsonOf(await ask(url, "address search", fetchImpl, "search")));
-  if (!fresh) searches.set(key, places);
-  return places;
+    const places = placesOf(await jsonOf(await ask(url, "address search", fetchImpl, "search")), level);
+    if (!fresh) {
+      searches.set(key, places);
+      share(redisKey, places);
+    }
+    return places;
+  });
 }
 
 /** True for a tile that exists at its zoom: 0 to 2^z - 1 across and down. */
@@ -254,33 +358,54 @@ async function tile(z, x, y, { apiKey, fetchImpl = fetch, fresh = false } = {}) 
 }
 
 /**
- * The address at a point, or null when the provider knows none. Used for a worksite's
- * centre only: a person's home or a punch is never sent (docs/guides/foundation.md §6.13).
+ * The named place nearest a point (a pin; a device location waiting to be named), or null when
+ * the provider knows none. At level city, the city round the point.
  * @param {number} lat  @param {number} lon
- * @param {{apiKey?: string, fetchImpl?: typeof fetch, fresh?: boolean}} [opts]  as searchPlaces
- * @returns {Promise<string|null>}
+ * @param {{level?: "address"|"area"|"city", apiKey?: string, fetchImpl?: typeof fetch, fresh?: boolean}} [opts]
+ * @returns {Promise<{place_id: string, formatted: string, lat: number, lon: number, kind: string,
+ *          city: string|null, state: string|null, country_code: string|null}|null>}
  */
-async function reverseGeocode(lat, lon, { apiKey, fetchImpl = fetch, fresh = false } = {}) {
+async function nearest(lat, lon, { level = "address", apiKey, fetchImpl = fetch, fresh = false } = {}) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180)
     throw new AppError("VALIDATION_FAILED", "Not a point.", 422);
   const usedKey = await keyOf(apiKey);
   // About a metre: two people on the same spot ask once.
-  const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
-  const known = fresh ? undefined : addresses.get(key);
+  const key = `${level}|${lat.toFixed(5)},${lon.toFixed(5)}`;
+  const known = fresh ? undefined : nearby.get(key);
   if (known !== undefined) return known;
+  const redisKey = rkey("maps", "near", hashOf(key));
+  if (!fresh) {
+    const kept = await shared(redisKey);
+    if (kept !== undefined) {
+      nearby.set(key, kept);
+      return kept;
+    }
+  }
 
-  const url = new URL(REVERSE_URL);
-  url.searchParams.set("lat", String(lat));
-  url.searchParams.set("lon", String(lon));
-  url.searchParams.set("format", "json");
-  url.searchParams.set("lang", "en");
-  url.searchParams.set("limit", "1");
-  url.searchParams.set("apiKey", usedKey);
-  const data = await jsonOf(await ask(url, "address lookup", fetchImpl, "reverse"));
-  const hit = (Array.isArray(data && data.results) && data.results[0]) || (Array.isArray(data && data.features) && data.features[0] && data.features[0].properties) || null;
-  const formatted = hit ? capped(hit.formatted, 300) : null;
-  if (!fresh) addresses.set(key, formatted);
-  return formatted;
+  return once(`near|${key}|${fresh}`, async () => {
+    const url = new URL(REVERSE_URL);
+    url.searchParams.set("lat", String(lat));
+    url.searchParams.set("lon", String(lon));
+    url.searchParams.set("format", "json");
+    url.searchParams.set("lang", "en");
+    url.searchParams.set("limit", "1");
+    if (level === "city") url.searchParams.set("type", "city");
+    url.searchParams.set("apiKey", usedKey);
+    const data = await jsonOf(await ask(url, "address lookup", fetchImpl, "reverse"));
+    const hit = (Array.isArray(data && data.results) && data.results[0]) || (Array.isArray(data && data.features) && data.features[0] && data.features[0].properties) || null;
+    const found = hit ? toPlace(hit) : null;
+    if (!fresh) {
+      nearby.set(key, found);
+      share(redisKey, found);
+    }
+    return found;
+  });
+}
+
+/** The address line at a point, or null: Settings · Integrations' lookup step. */
+async function reverseGeocode(lat, lon, opts) {
+  const found = await nearest(lat, lon, opts);
+  return found ? found.formatted : null;
 }
 
 /** The tile at zoom `z` that holds a point (the Web Mercator tiling every map uses). */
@@ -292,11 +417,13 @@ function tileOf(lat, lon, z) {
   return { z, x: Math.min(n - 1, Math.max(0, x)), y: Math.min(n - 1, Math.max(0, y)) };
 }
 
-/** Tests: forget every remembered answer. */
+/** Tests: forget every remembered answer, and the rate's recent requests. */
 function clearCache() {
   searches.clear();
+  nearby.clear();
   tiles.clear();
-  addresses.clear();
+  asking.clear();
+  sent.length = 0;
 }
 
-module.exports = { searchPlaces, tile, reverseGeocode, tileOf, codeOf, clearCache, MAX_PLACES, MIN_CHARS, MAX_ZOOM };
+module.exports = { searchPlaces, nearest, tile, reverseGeocode, tileOf, codeOf, clearCache, placesOf, MAX_PLACES, MIN_CHARS, MAX_ZOOM, RATE };

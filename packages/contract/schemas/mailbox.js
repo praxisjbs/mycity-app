@@ -103,6 +103,7 @@ const MailMessage = z
 /** POST /mailbox/image-trust: always show, or stop showing, web images from one sender. */
 const MailImageTrust = z
   .object({
+    // address:none an email address, not a place
     sender_address: email,
     trusted: z.boolean(),
   })

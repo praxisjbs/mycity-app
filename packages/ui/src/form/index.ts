@@ -38,6 +38,7 @@ export { SignatureField, type SignatureFieldProps, type SignatureFieldHandle } f
 export { CardPicker, type CardPickerProps, type CardPickerOption } from "./CardPicker";
 export * from "./AddressField";
 export * from "./ChannelGrid";
+export * from "./PlacesField";
 export * from "./RadioCards";
 export * from "./SecretField";
 export * from "./StepBar";

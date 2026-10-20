@@ -17,6 +17,7 @@
  * staff, the schedule People set (attendance guide §6.13).
  */
 const { pool } = require("../../config/db");
+const places = require("../../shared/places/places");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const workingWeek = require("../../shared/time/working-week");
@@ -33,7 +34,7 @@ const BANK_FIELDS = ["bank_name", "account_number"];
 /** The organisation's week, Monday first, as the calendar Settings keeps, and where the person works each day. */
 async function workingWeekOf(client, employeeId) {
   const cal = await workingWeek.loadCalendar(client);
-  const places = await schedules.weekOf(client, employeeId);
+  const days = await schedules.weekOf(client, employeeId);
   const out = [];
   for (let weekday = 1; weekday <= 7; weekday += 1) {
     const working = cal.days.has(weekday);
@@ -43,7 +44,7 @@ async function workingWeekOf(client, employeeId) {
       is_working_day: working,
       starts_at: working && hours ? hours.starts_at : null,
       ends_at: working && hours ? hours.ends_at : null,
-      place: places[weekday - 1].place,
+      place: days[weekday - 1].place,
     });
   }
   return out;
@@ -82,7 +83,10 @@ function profileOf(e, week, photoUrl = null) {
 
 async function get(user) {
   const me = meOf(user);
-  return profileOf(await employee360.get(pool, me), await workingWeekOf(pool, me), await photo.photoOf(pool, me));
+  return {
+    ...profileOf(await employee360.get(pool, me), await workingWeekOf(pool, me), await photo.photoOf(pool, me)),
+    home_address_place: await places.view(pool, "employee.home_address", me),
+  };
 }
 
 /**

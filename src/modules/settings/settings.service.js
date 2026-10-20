@@ -27,6 +27,7 @@ const { SCHEMES, DOC_TYPES, validateScheme } = require("../../shared/numbering/s
 const lagos = require("../../shared/time/lagos");
 const vault = require("../../shared/documents/vault");
 const organisationProfile = require("../../shared/organisation/profile");
+const places = require("../../shared/places/places");
 const workingWeek = require("../../shared/time/working-week");
 const access = require("../access/access.service");
 const policy = require("../identity/identity.session-policy");
@@ -51,6 +52,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
  * ------------------------------------------------------------------ */
 
 const PROFILE_FIELDS = organisationProfile.FIELDS;
+/** The company's address field (shared/places/owners.js). */
+const ADDRESS = "organisation.address";
 const { keyOf, BRAND } = organisationProfile;
 
 async function profileOf(db) {
@@ -81,6 +84,7 @@ async function brandOf(db) {
 async function organisation() {
   return {
     ...(await profileOf(pool)),
+    address_place: await places.view(pool, ADDRESS, "organisation"),
     ...(await brandOf(pool)),
     currency: "NGN",
     time_zone: "Africa/Lagos",
@@ -142,7 +146,15 @@ async function updateOrganisation(patch, actor) {
   await tx(async (client) => {
     const before = await profileOf(client);
     const after = { ...before };
-    for (const f of PROFILE_FIELDS) if (patch[f] !== undefined) after[f] = patch[f] === "" ? null : patch[f];
+    for (const f of PROFILE_FIELDS)
+      if (f !== "address" && patch[f] !== undefined) after[f] = patch[f] === "" ? null : patch[f];
+    // The address is a place, kept through shared/places; the profile keeps its line (F27).
+    if (patch.address === null) {
+      await places.remove(client, ADDRESS, "organisation");
+      after.address = null;
+    } else if (patch.address !== undefined) {
+      after.address = (await places.save(client, ADDRESS, "organisation", patch.address)).line;
+    }
     if (same(before, after)) return;
     for (const f of PROFILE_FIELDS)
       if (before[f] !== after[f]) await repo.putSetting(client, keyOf(f), after[f], actor.user_id);

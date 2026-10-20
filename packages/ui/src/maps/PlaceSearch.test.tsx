@@ -1,20 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { PlaceSearch } from "./PlaceSearch";
 import type { Place } from "./geoapify";
+import { forgetPlaces } from "./usePlaces";
 
 const PLACES: Place[] = [
   { place_id: "p1", formatted: "12 Admiralty Way, Lekki, Lagos", lat: 6.4321, lon: 3.4219 },
   { place_id: "p2", formatted: "4 Admiralty Road, Lekki, Lagos", lat: 6.4338, lon: 3.4255 },
 ];
 
+beforeEach(forgetPlaces);
+
 describe("PlaceSearch", () => {
-  it("waits for enough letters before asking the server", async () => {
+  it("waits for a second letter before asking the server", async () => {
     const search = vi.fn().mockResolvedValue(PLACES);
     render(<PlaceSearch search={search} onPick={vi.fn()} />);
-    await userEvent.type(screen.getByRole("searchbox"), "ad");
+    await userEvent.type(screen.getByRole("searchbox"), "a");
     await new Promise((r) => setTimeout(r, 400));
     expect(search).not.toHaveBeenCalled();
   });

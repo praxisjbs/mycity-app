@@ -6,13 +6,14 @@ import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
 import { waysOf } from "./security";
 import { ON_UPLOAD } from "../uploads";
+import { pickAnAddress, placeOf } from "./maps";
 
 const admin = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 const who = (u: string) => byKey(u)!.display_name;
 
 /* ── Organisation: the profile, the working week (A22), holidays (entered on screen, A26) ── */
-const PROFILE_KEYS = ["legal_name", "trading_name", "registration_number", "tax_id", "address", "phone", "email", "website"] as const;
-const ORG: Organisation = { legal_name: "MyCity App Ltd", trading_name: "MyCityApp", registration_number: null, tax_id: null, address: null, phone: null, email: "hello@mycityapp.io", website: "https://mycityapp.io", logo: null, logo_white: null, icon: null, currency: "NGN", time_zone: "Africa/Lagos" };
+const PROFILE_KEYS = ["legal_name", "trading_name", "registration_number", "tax_id", "phone", "email", "website"] as const;
+const ORG: Organisation = { legal_name: "MyCity App Ltd", trading_name: "MyCityApp", registration_number: null, tax_id: null, address: null, address_place: null, phone: null, email: "hello@mycityapp.io", website: "https://mycityapp.io", logo: null, logo_white: null, icon: null, currency: "NGN", time_zone: "Africa/Lagos" };
 route("GET /api/v1/settings/organisation", () => ok(ORG));
 
 /* The brand files (foundation.md §6.11): an upload lands through the mock upload engine, which tells us here. */
@@ -30,7 +31,10 @@ route("DELETE /api/v1/settings/organisation/brand/:slot", (req) => {
 });
 route("PATCH /api/v1/settings/organisation", (req) => {
   if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
-  const b = req.body as Partial<Record<(typeof PROFILE_KEYS)[number], string | null>>;
+  const b = req.body as Partial<Record<(typeof PROFILE_KEYS)[number], string | null>> & { address?: unknown };
+  // The address is picked, never typed (F27): a place, or null to clear it.
+  const kept = b.address ? placeOf(b.address) : null;
+  if (b.address && !kept) return pickAnAddress("address");
   if (b.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email)) return invalid({ email: ["Check the email"] });
   if (b.website && !/^https?:\/\//.test(b.website)) return invalid({ website: ["Not a web address"] });
   for (const k of PROFILE_KEYS) {
@@ -39,6 +43,10 @@ route("PATCH /api/v1/settings/organisation", (req) => {
     if (next !== ORG[k]) audit(who(req.user!), "A setting was changed", `Organisation · ${k.replace(/_/g, " ")}`, ORG[k], next, null, "Settings");
     ORG[k] = next as never;
   }
+  if (b.address !== undefined && (kept?.line ?? null) !== ORG.address) {
+    audit(who(req.user!), "A setting was changed", "Organisation · address", ORG.address, kept?.line ?? null, null, "Settings");
+  }
+  if (b.address !== undefined) Object.assign(ORG, { address: kept?.line ?? null, address_place: kept?.view ?? null });
   return ok(ORG);
 });
 

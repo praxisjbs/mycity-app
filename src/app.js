@@ -43,6 +43,8 @@ const { environmentMarker } = require("./middleware/environment-marker");
 const { errorHandler, notFound } = require("./middleware/error-handler");
 const { JSON_LIMIT } = require("./shared/http/body-limits");
 const { buildRoutes } = require("./http/routes");
+// Every address a body carries is checked against its signature at the edge (F27).
+require("./shared/places/token");
 const { hostGuard, staticSites } = require("./http/static");
 
 const CSP = {

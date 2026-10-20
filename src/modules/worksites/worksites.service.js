@@ -20,6 +20,10 @@ const { assertInScope } = require("../../shared/rbac/scope");
 const { isTimeZone } = require("../attendance/attendance.rules");
 const organisation = require("../organisation/organisation.service");
 const repo = require("./worksites.repo");
+const places = require("../../shared/places/places");
+
+/** The worksite's address field (shared/places/owners.js). */
+const ADDRESS = "worksite.address";
 const { EVENTS } = require("./worksites.events");
 
 async function tx(fn) {
@@ -58,12 +62,21 @@ async function freeCode(db, name) {
   throw new AppError("WORKSITE_CODE", "Give the worksite a different name", 409, { name: ["Name in use"] });
 }
 
-const list = (query) => repo.list(pool, query);
+/** Each worksite's address as a place, for the edit form (F27). */
+async function withPlaces(rows) {
+  const byId = await places.views(pool, ADDRESS, rows.map((w) => w.worksite_id));
+  return rows.map((w) => ({ ...w, address_place: byId.get(w.worksite_id) || null }));
+}
+
+async function list(query) {
+  const page = await repo.list(pool, query);
+  return { ...page, data: await withPlaces(page.data) };
+}
 
 async function get(id) {
   const row = await repo.get(pool, id);
   if (!row) throw notFound();
-  return row;
+  return (await withPlaces([row]))[0];
 }
 
 /** The active fence a punch is matched to, or null. In the caller's transaction or pool. */
@@ -73,7 +86,9 @@ async function create(actor, body) {
   assertZone(body.timezone);
   const id = await tx(async (client) => {
     const code = await freeCode(client, body.name);
-    const row = await repo.insert(client, { ...body, code });
+    const place = body.address;
+    const row = await repo.insert(client, { ...body, address: place ? places.lineOf(place) : "", code });
+    if (place) await places.save(client, ADDRESS, row.worksite_id, place);
     const after = await repo.get(client, row.worksite_id);
     await emit(client, {
       key: EVENTS.WORKSITE_CREATED,
@@ -92,7 +107,14 @@ async function update(actor, id, patch) {
   const before = await repo.get(pool, id);
   if (!before) throw notFound();
   await tx(async (client) => {
-    await repo.update(client, id, patch);
+    const change = { ...patch };
+    if (patch.address === null) {
+      await places.remove(client, ADDRESS, id);
+      change.address = "";
+    } else if (patch.address !== undefined) {
+      change.address = (await places.save(client, ADDRESS, id, patch.address)).line;
+    }
+    await repo.update(client, id, change);
     const after = await repo.get(client, id);
     await emit(client, {
       key: EVENTS.WORKSITE_UPDATED,

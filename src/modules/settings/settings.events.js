@@ -9,6 +9,8 @@
 const { defineEvents } = require("../../shared/events/catalogue");
 const { defineDocumentType } = require("../../shared/documents/types");
 const vault = require("../../shared/documents/vault");
+const places = require("../../shared/places/owners");
+const { keyOf } = require("../../shared/organisation/profile");
 
 const EVENTS = defineEvents("settings", {
   "settings.changed": { summary: "A setting was changed" },
@@ -24,5 +26,10 @@ defineDocumentType("brand_image", {
 
 /** Anyone signed in may see the company's logos: every letter and every signature carries them. */
 vault.defineAccess("brand", async () => true);
+
+/** The company's address saved while search was down is named by the places-name job (F27). */
+places.owner("organisation.address", {
+  rename: (client, _key, line) => require("./settings.repo").putSetting(client, keyOf("address"), line, null),
+});
 
 module.exports = { EVENTS };

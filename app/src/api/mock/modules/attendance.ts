@@ -8,6 +8,7 @@ import { HISTORY, TODAY } from "../data/attendance";
 import { lastDeviceOf, MAX_REGISTERED, registeredCount, sessionDevice } from "./devices";
 import { peopleGrant, siteOf } from "./worksites";
 import { exportFile } from "./shared";
+import { placeOf } from "./maps";
 
 /**
  * Attendance on the mock, in the contract's shapes (packages/contract/schemas/attendance.js): the
@@ -384,13 +385,15 @@ route("GET /api/v1/attendance/me/home", (req) => ok(myHome(req.user!)));
 
 route("POST /api/v1/attendance/me/home", (req) => {
   const key = req.user!;
-  const b = req.body as { home_address: string; home_latitude: number; home_longitude: number; accuracy_m: number };
+  const b = req.body as { home_address: unknown; home_latitude: number; home_longitude: number; accuracy_m: number };
   if (!needsHome(key)) return fail(422, "HOME_NOT_NEEDED", "Only staff who work from home set a home location.");
-  if (!b.home_address?.trim()) return invalid({ home_address: ["Required"] });
+  // Picked, pinned or the device's location (F27): never typed.
+  const place = placeOf(b.home_address);
+  if (!place) return invalid({ home_address: ["Pick an address"] });
   if (b.accuracy_m > POLICY_MODES.max_accuracy_m) return fail(422, "HOME_READING_WEAK", "The location reading was not accurate enough.", { accuracy_m: ["Reading too weak"] });
   const waiting = homeOf(key, "pending");
   if (waiting) waiting.status = "superseded";
-  HOMES.push({ id: sid(`home:${key}:${Date.now()}`), key, status: "pending", address: b.home_address.trim(), latitude: b.home_latitude, longitude: b.home_longitude, accuracy_m: b.accuracy_m, requested_at: new Date().toISOString(), decided_at: null, decided_by: null, reason: null });
+  HOMES.push({ id: sid(`home:${key}:${Date.now()}`), key, status: "pending", address: place.line, latitude: b.home_latitude, longitude: b.home_longitude, accuracy_m: b.accuracy_m, requested_at: new Date().toISOString(), decided_at: null, decided_by: null, reason: null });
   return created(myHome(key));
 });
 
@@ -994,14 +997,17 @@ route("GET /api/v1/attendance/me/requests/:id", (req) => {
 route("POST /api/v1/attendance/me/requests", (req) => {
   const key = req.user!;
   const b = req.body as {
-    request_type: ReqType; starts_on: string; ends_on: string; address?: string; reason: string; home_latitude?: number | null; home_longitude?: number | null; accuracy_m?: number | null;
+    request_type: ReqType; starts_on: string; ends_on: string; address?: unknown; reason: string; home_latitude?: number | null; home_longitude?: number | null; accuracy_m?: number | null;
     site_latitude?: number | null; site_longitude?: number | null; site_radius_m?: number | null;
   };
   const fields: Record<string, string[]> = {};
   if (!b.starts_on) fields.starts_on = ["Pick the first day"];
   if (!b.ends_on) fields.ends_on = ["Pick the last day"];
   if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) fields.ends_on = ["Ends before it starts"];
-  if (b.request_type !== "remote_day" && !b.address?.trim()) fields.address = ["Enter the address"];
+  // Picked, pinned or the device's location (F27): never typed.
+  const place = b.address === undefined ? null : placeOf(b.address);
+  if (b.address !== undefined && !place) fields.address = ["Pick an address"];
+  else if (b.request_type !== "remote_day" && !place) fields.address = ["Pick an address"];
   if (!b.reason || b.reason.trim().length < 10) fields.reason = ["At least 10 characters"];
   if (b.request_type === "temporary_home" && typeof b.home_latitude !== "number") fields.home_latitude = ["Take a reading there"];
   if (b.request_type === "client_visit") {
@@ -1022,7 +1028,7 @@ route("POST /api/v1/attendance/me/requests", (req) => {
   const home = b.request_type === "temporary_home";
   const visit = b.request_type === "client_visit";
   const r = addReq({
-    key, request_type: b.request_type, starts_on: b.starts_on, ends_on: b.ends_on, address: b.address?.trim() || null,
+    key, request_type: b.request_type, starts_on: b.starts_on, ends_on: b.ends_on, address: place?.line ?? null,
     latitude: home ? b.home_latitude! : null, longitude: home ? b.home_longitude! : null, accuracy_m: home ? b.accuracy_m! : null,
     site_latitude: visit ? b.site_latitude! : null, site_longitude: visit ? b.site_longitude! : null, site_radius_m: visit ? b.site_radius_m! : null,
     reason: b.reason.trim(), status: "submitted", stage: "line_manager", requested_at: new Date().toISOString(),
@@ -1211,7 +1217,7 @@ route("POST /api/v1/attendance/field-assignments", (req) => {
   const user = req.user!;
   const g = peopleGrant(user, "approve");
   if (!g.may) return fail(403, "PERMISSION_DENIED", "You need people approve to send people out.");
-  const b = req.body as { name: string; client: string; note?: string; starts_on: string; ends_on: string; employee_ids: string[]; sites: Array<Omit<MockSite, "id">> };
+  const b = req.body as { name: string; client: string; note?: string; starts_on: string; ends_on: string; employee_ids: string[]; sites: Array<Omit<MockSite, "id" | "address"> & { address?: unknown }> };
   const fields: Record<string, string[]> = {};
   if (!b.name || b.name.trim().length < 3) fields.name = ["At least 3 characters"];
   if (!b.client || b.client.trim().length < 2) fields.client = ["At least 2 characters"];
@@ -1220,6 +1226,11 @@ route("POST /api/v1/attendance/field-assignments", (req) => {
   if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) fields.ends_on = ["Ends before it starts"];
   if (!b.employee_ids?.length) fields.employee_ids = ["Pick someone"];
   if (!b.sites?.length) fields.sites = ["Add a site"];
+  // Each site's address, when given, is picked or pinned (F27): never typed.
+  const placesAt = (b.sites ?? []).map((x) => (x.address === undefined ? null : placeOf(x.address)));
+  (b.sites ?? []).forEach((x, i) => {
+    if (x.address !== undefined && !placesAt[i]) fields[`sites.${i}.address`] = ["Pick an address"];
+  });
   if (Object.keys(fields).length) return invalid(fields);
   const keys = b.employee_ids.map((id) => byId(id)?.user_key).filter((k): k is string => !!k);
   if (keys.includes(user)) return fail(403, "OWN_RECORD", "Someone else sends you out", { employee_ids: ["Not yourself"] });
@@ -1234,7 +1245,7 @@ route("POST /api/v1/attendance/field-assignments", (req) => {
   }
   const f = addField({
     keys, name: b.name.trim(), client: b.client.trim(), note: b.note?.trim() || null, starts_on: b.starts_on, ends_on: b.ends_on, by: user, assigned_at: new Date().toISOString(),
-    sites: b.sites.map((x, i) => ({ id: sid(`fa-site:${fieldSeq + 1}:${i + 1}`), name: x.name.trim(), address: x.address?.trim() || null, latitude: x.latitude, longitude: x.longitude, radius_m: x.radius_m })),
+    sites: b.sites.map((x, i) => ({ id: sid(`fa-site:${fieldSeq + 1}:${i + 1}`), name: x.name.trim(), address: placesAt[i]?.line ?? null, latitude: x.latitude, longitude: x.longitude, radius_m: x.radius_m })),
   });
   return created(fieldOut(f, user));
 });

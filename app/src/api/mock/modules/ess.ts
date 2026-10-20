@@ -4,12 +4,15 @@ import type { EmployeeHistoryEntry, EssProfile, ExportFile } from "@mycity/contr
 import { exportFile } from "./shared";
 import { byKey, managerOf } from "../data/people";
 import { weekOf } from "./attendance";
+import { pickAnAddress, placeOf, typedPlace, type KeptPlace } from "./maps";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
 
 /* My Profile, in the contract's shapes (packages/contract/schemas/ess.js EssProfile). */
 const AREA = ["Lekki Phase 1", "Surulere", "Gbagada", "Yaba", "Ikeja", "Ajah", "Magodo"];
 const PATCHES = new Map<string, Record<string, string>>();
+/** A home address each person picked on My Profile (F27); the roster's are typed before the rule. */
+const HOMES = new Map<string, KeptPlace>();
 const HISTORY = new Map<string, EmployeeHistoryEntry[]>();
 
 /** A person's phone as My Profile shows it; the signature mock reads and changes the same one. */
@@ -33,6 +36,7 @@ function profile(key: string): EssProfile {
   const m = managerOf(p);
   const x = PATCHES.get(key) ?? {};
   const idx = p.employee_id.charCodeAt(0) % AREA.length;
+  const home = HOMES.get(key) ?? typedPlace(`${AREA[idx]}, Lagos`);
   const [first, ...rest] = p.display_name.split(" ");
   return {
     employee_id: p.employee_id,
@@ -51,7 +55,8 @@ function profile(key: string): EssProfile {
     work_email: p.work_email,
     phone: x.phone ?? p.phone,
     date_of_birth: p.date_of_birth,
-    home_address: x.home_address ?? `${AREA[idx]}, Lagos`,
+    home_address: home?.line ?? null,
+    home_address_place: home?.view ?? null,
     next_of_kin_name: x.next_of_kin_name ?? p.next_of_kin,
     next_of_kin_relationship: x.next_of_kin_relationship ?? "Sibling",
     next_of_kin_phone: x.next_of_kin_phone ?? "+2348065542210",
@@ -74,15 +79,20 @@ function historyOf(key: string): EmployeeHistoryEntry[] {
 route("GET /api/v1/ess/profile", (req) => ok(profile(req.user!)));
 route("GET /api/v1/ess/profile/history", (req) => paged(historyOf(req.user!), req));
 route("PATCH /api/v1/ess/profile", (req) => {
-  const b = Object.fromEntries(Object.entries(req.body as Record<string, string>).filter(([, v]) => v !== undefined && v !== ""));
+  const { home_address, ...rest } = req.body as Record<string, unknown>;
+  // The home address is picked, never typed (F27); left out, it stays as it is.
+  const home = home_address === undefined ? null : placeOf(home_address);
+  if (home_address !== undefined && !home) return pickAnAddress("home_address");
+  const b = Object.fromEntries(Object.entries(rest as Record<string, string>).filter(([, v]) => v !== undefined && v !== ""));
   const f: Record<string, string[]> = {};
   if (b.phone !== undefined && !/^(\+?234|0)\d{10}$/.test(b.phone.replace(/[\s\-().]/g, ""))) f.phone = ["must be a Nigerian phone number"];
   if (b.next_of_kin_phone !== undefined && !/^(\+?234|0)\d{10}$/.test(b.next_of_kin_phone.replace(/[\s\-().]/g, ""))) f.next_of_kin_phone = ["must be a Nigerian phone number"];
   if (b.account_number !== undefined && !/^\d{10}$/.test(b.account_number)) f.account_number = ["must be a 10-digit NUBAN"];
   if (Object.keys(f).length) return invalid(f);
-  if (!Object.keys(b).length) return invalid({ phone: ["change at least one field"] });
+  if (!Object.keys(b).length && !home) return invalid({ phone: ["change at least one field"] });
   PATCHES.set(req.user!, { ...(PATCHES.get(req.user!) ?? {}), ...b });
-  const fields = Object.keys(b);
+  if (home) HOMES.set(req.user!, home);
+  const fields = [...Object.keys(b), ...(home ? ["home_address"] : [])];
   HISTORY.set(req.user!, [
     { event_id: sid(`hist:${req.user}:${Date.now()}`), occurred_at: new Date().toISOString(), action: "employee.updated", actor_name: byKey(req.user)!.display_name, changed_fields: fields, summary: `Record changed: ${fields.join(", ")}` },
     ...(HISTORY.get(req.user!) ?? []),

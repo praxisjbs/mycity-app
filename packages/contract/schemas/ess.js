@@ -20,6 +20,7 @@ const { uuid, optionalText, isoDate, listQuery, phone, blank } = require("./comm
 const { UploadPurpose } = require("./documents");
 const { LeaveStatus } = require("./leave");
 const { EmployeeStatus, EmploymentType, WorkPattern, ManagerRef } = require("./organisation");
+const { PlaceInput, PlaceView } = require("./maps");
 const { SchedulePlace } = require("./attendance");
 
 /* ------------------------------------------------------------------ *
@@ -68,6 +69,8 @@ const EssProfile = z
     phone: z.string().nullable(),
     date_of_birth: isoDate.nullable(),
     home_address: z.string().nullable(),
+    /** The address as Edit Profile reads it (F27): the place, with a token to send it back. */
+    home_address_place: PlaceView.nullable(),
     next_of_kin_name: z.string().nullable(),
     next_of_kin_relationship: z.string().nullable(),
     next_of_kin_phone: z.string().nullable(),
@@ -88,7 +91,8 @@ const EssProfile = z
 const EssProfileUpdate = z
   .object({
     phone: blank(phone),
-    home_address: optionalText(300),
+    /** Picked or pinned, never typed (F27); left out, it stays as it is, as every field here. */
+    home_address: PlaceInput.optional(),
     next_of_kin_name: optionalText(150),
     next_of_kin_relationship: optionalText(50),
     next_of_kin_phone: blank(phone),
@@ -158,6 +162,7 @@ const TABLES = {
   EssProfile: {
     table: "employee",
     virtual: {
+      home_address_place: "the home address as a place, from place (owner employee.home_address)",
       display_name: "first and last name together",
       department: "department.name",
       confirmed: "employee.confirmed_on is set",

@@ -18,6 +18,7 @@ import {
   Bold,
   Book,
   Briefcase,
+  Building2,
   Calendar,
   CalendarCheck,
   ChartLine,
@@ -51,6 +52,7 @@ import {
   Info,
   Italic,
   KeyRound,
+  Landmark,
   LayoutGrid,
   Link,
   List,
@@ -59,6 +61,8 @@ import {
   Lock,
   LogOut,
   Mail,
+  // Named apart from the global Map, which this file would otherwise shadow.
+  Map as MapGlyph,
   MapPin,
   Pin,
   Maximize2,
@@ -83,6 +87,7 @@ import {
   Settings,
   Share,
   Shield,
+  Signpost,
   Smartphone,
   Sparkles,
   SquarePlus,
@@ -200,6 +205,11 @@ export const ICONS = {
   video: Video,
   sheet: FileSpreadsheet,
   slides: Presentation,
+  /* What a place is, beside each address suggestion (F27). */
+  building: Building2,
+  street: Signpost,
+  landmark: Landmark,
+  map: MapGlyph,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

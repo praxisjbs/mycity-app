@@ -117,7 +117,10 @@ never sent twice · `0470` notice urgency (TB, 19/10/2026; `docs/guides/notifica
 `notification_rule_recipient` (the company's rule per notice and its copies),
 `notification_reminder_rule` (approvals, probation, digest), `notification_setting` (a person's
 quiet hours and digest) and `reminder` (one row per occurrence of a declared reminder)
-· `0499` the leave flow, `leave.approval` (the line manager, then Operations &
+· `0490` `place` (TB, 20/10/2026; `docs/guides/addresses.md` §4): every address a person enters, one
+row per address field of a record (`owner`, `owner_key`), picked, pinned, the device's location or
+typed before the rule, with its line, details, point, kind and whether it waits to be named;
+backfilled from every address already saved, as typed and unverified · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
 People over 5 days; §6.5).
 
 **Owes:**

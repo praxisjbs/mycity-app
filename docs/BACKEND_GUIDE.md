@@ -325,6 +325,7 @@ request, never inside a transaction, and what it returns is provisional until a 
 | An alert someone must clear | `shared/alerts` | A notification |
 | AI | `services/ai/llm.service.complete()` | A vendor SDK import (gate) |
 | Geofence maths | `shared/geo` | Haversine pasted into the module |
+| An address a person enters | `PlaceInput` in the contract (its token is checked at the edge), `places.save(client, owner, key, place)` in the service, an owner in `shared/places/owners.js` registered in `<module>.events.js` (`docs/guides/addresses.md` §6.9) | A text column filled from `optionalText`, geocoding in the module |
 | Realtime push | An outbox handler → `services/realtime/emitter` | `io.emit` from a controller |
 | A spreadsheet in or out | `shared/spreadsheet` (`buildWorkbook`, `parseUpload`, `buildCsv`), `shared/import` (`defineImporter` in `<module>.import.js`) | A new xlsx library |
 | A document from a template | `defineDocType` + `defineVariables`, then `documents.generate()` in the transaction | Rendering HTML yourself, calling Chromium |

@@ -16,6 +16,7 @@ const { rebuild } = require("./helpers/schema");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
+const { picked } = require("../helpers/places");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -144,7 +145,7 @@ describeDb("My Profile against the real migrations", () => {
   test("I change my contact and next of kin; nothing else is mine to change", async () => {
     const res = await as("staff").patch("/ess/profile", {
       phone: "0803 765 4321",
-      home_address: "12 Bode Thomas Street, Surulere",
+      home_address: picked("12 Bode Thomas Street, Surulere"),
       next_of_kin_name: "Aisha Danjuma",
       next_of_kin_relationship: "Sister",
       next_of_kin_phone: "08051112222",
@@ -159,7 +160,7 @@ describeDb("My Profile against the real migrations", () => {
     expect((await as("staff").patch("/ess/profile", {})).status).toBe(422);
     expect((await as("staff").patch("/ess/profile", { account_number: "123" })).status).toBe(422);
     // A field the form left empty changes nothing.
-    const kept = await as("staff").patch("/ess/profile", { phone: "", home_address: "", next_of_kin_name: "Aisha Danjuma" });
+    const kept = await as("staff").patch("/ess/profile", { phone: "", next_of_kin_name: "Aisha Danjuma" });
     expect(kept.status).toBe(200);
     expect(kept.body).toMatchObject({ phone: "+2348037654321", home_address: "12 Bode Thomas Street, Surulere" });
     expect((await as("staff").patch("/ess/profile", { phone: "", account_number: "" })).status).toBe(422);

@@ -407,8 +407,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   delivered, so after the move it goes through the new hosts.
 - **Live connections lowered below those open**: the extra connections close at once.
 - **Gemini key removed with no file key**: AI answers from the stub, as with no key before.
-- **Geoapify key removed with no file key**: address fields take a typed address and coordinates
-  (503 `MAPS_OFF`), as before.
+- **Geoapify key removed with no file key**: the maps stop (503 `MAPS_OFF`); address fields say
+  Address search is unavailable and offer Use Current Location (`addresses.md` §6.5), never a typed address.
 - **Push keys replaced**: a device subscribes again the next time the app starts; until then it gets
   no push. A device never opened again stays silent, as with any key change.
 - **No daily limit set**: use is still counted; nothing warns.
@@ -443,3 +443,4 @@ bound form here; nothing else is ported.
   the tests moved to the module (`integrations.testers.js`); the System Sender gained Local Domains
   (`SMTP_LOCAL_DOMAINS`, from main's route-check fix). New shared field `SecretField`; the shared
   side panel now keeps its footer in view when its body is long.
+- 20/10/2026 · TB · Every address field now searches from the second character and names a pin through `GET /maps/pin` (`docs/guides/addresses.md`), each counted here as a search or a lookup; answers kept in memory and in Redis spend nothing. The Geoapify test's Address stays a plain field, marked `address:none` (the text the test searches once; gate 22), and its body's `address` is marked the same in the contract.

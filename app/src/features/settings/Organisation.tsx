@@ -6,7 +6,7 @@ import { useFileUrl } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import { useAuth } from "@/auth/AuthProvider";
-import { searchPlaces } from "@/features/shared/places";
+import { places, placeValue } from "@/features/shared/places";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -229,7 +229,7 @@ function ProfileForm({ org, close }: { org: Organisation; close: () => void }) {
       trading_name: org.trading_name ?? "",
       registration_number: org.registration_number ?? "",
       tax_id: org.tax_id ?? "",
-      address: org.address ?? "",
+      address: placeValue(org.address_place),
       phone: org.phone ?? "",
       email: org.email ?? "",
       website: org.website ?? "",
@@ -264,7 +264,7 @@ function ProfileForm({ org, close }: { org: Organisation; close: () => void }) {
         </Field>
       </Grid>
       <Field label="Address" optional {...f.status("address")}>
-        <AddressField {...f.field("address")} search={searchPlaces} maxLength={500} />
+        <AddressField {...f.field("address")} places={places} />
       </Field>
       <Grid cols={2}>
         <Field label="Phone" optional {...f.status("phone")}>
