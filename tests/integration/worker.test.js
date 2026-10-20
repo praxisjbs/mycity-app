@@ -603,6 +603,9 @@ describe("schedules and heartbeat", () => {
       "media-reconcile",
       "reminders",
       "scheduled-reports",
+      "system-health",
+      "system-health-digest",
+      "system-health-purge",
       "urgent-repeats",
       "workflow-timeout",
     ]);

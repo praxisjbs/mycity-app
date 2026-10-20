@@ -256,7 +256,7 @@ function Performance() {
       {d.recording && d.points.length > 0 && (
         <Grid cols={2} className="mt-3">
           <Card>
-            <CardHeader title="How It Answered" />
+            <CardHeader title="Requests" />
             {served ? (
               <>
                 <Bars rows={bars((x) => x.mean_ms, " ms")} note={`Average response time, by ${range === "24h" ? "hour" : "day"}`} />
@@ -271,7 +271,7 @@ function Performance() {
             )}
           </Card>
           <Card>
-            <CardHeader title="What The Server Has" />
+            <CardHeader title="Server Resources" />
             {resourced ? (
               <>
                 <Bars rows={bars((x) => x.disk_free_pct, "%")} note="Disk free" />
