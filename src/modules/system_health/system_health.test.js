@@ -153,7 +153,7 @@ describe("how a check reads on screen", () => {
   test("every probe the health endpoint registers has words and somewhere to look", () => {
     const { runChecks } = require("../../http/health");
     expect(typeof runChecks).toBe("function");
-    for (const key of Object.keys(service.CHECKS)) {
+    for (const { key } of service.CHECKS) {
       expect(service.label(key)).not.toBe(key);
       expect(service.lookAt(key).length).toBeGreaterThan(10);
     }

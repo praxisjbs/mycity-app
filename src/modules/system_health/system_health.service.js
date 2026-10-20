@@ -21,26 +21,34 @@ const repo = require("./system_health.repo");
 const { explain } = require("./system_health.explain");
 const { EVENTS, BRIEF_DOC_TYPE } = require("./system_health.events");
 
-/** What each probe is called on screen, and where to look when it is not up. */
-const CHECKS = {
-  postgres: ["Database", "The database is not answering. Nothing can be read or written until it is back."],
-  redis: ["Cache and Sessions", "Sessions, queued jobs and live updates are down."],
-  worker: ["Worker", "No heartbeat. Mail, PDFs and notifications are waiting, not lost."],
-  modules: ["Modules", "A module failed to load, so its screens answer nothing."],
-  migrations: ["Migrations", "The migration ledger is missing or empty. The database is not at this build."],
-  numbering: ["Numbering", "A document type has no numbering scheme, so nothing of that type can be created."],
-  outbox: ["Events", "Events are piling up: the worker is behind or down."],
-  storage: ["File Storage", "The media folder is missing or cannot be written to. Uploads will fail."],
-  chromium: ["PDFs", "Chromium is missing, so no PDF can be drawn."],
-  ffmpeg: ["Voice and Video", "Voice notes and video cannot be processed."],
-  clamd: ["Upload Scanning", "Uploads cannot be scanned, so they are refused."],
-  mail: ["Mail", "Mail is not configured or the server refused. Queued mail waits."],
-  ai: ["AI", "No AI vendor answers, so the assistant falls back to its stub."],
-  static: ["Frontend Build", "A frontend build is missing from this release."],
-};
+/**
+ * What each probe is called on screen, and where to look when it is not up. A list of
+ * records rather than an object keyed by probe, as CATEGORIES is in
+ * shared/notifications/categories.js: it keeps each probe's name as data, so the
+ * `numbering` probe does not read as a document type being numbered
+ * (scripts/check/numbering-schemes.js looks for a `numbering:` key).
+ */
+const CHECKS = [
+  { key: "postgres", label: "Database", look: "The database is not answering. Nothing can be read or written until it is back." },
+  { key: "redis", label: "Cache and Sessions", look: "Sessions, queued jobs and live updates are down." },
+  { key: "worker", label: "Worker", look: "No heartbeat. Mail, PDFs and notifications are waiting, not lost." },
+  { key: "modules", label: "Modules", look: "A module failed to load, so its screens answer nothing." },
+  { key: "migrations", label: "Migrations", look: "The migration ledger is missing or empty. The database is not at this build." },
+  { key: "numbering", label: "Numbering", look: "A document type has no numbering scheme, so nothing of that type can be created." },
+  { key: "outbox", label: "Events", look: "Events are piling up: the worker is behind or down." },
+  { key: "storage", label: "File Storage", look: "The media folder is missing or cannot be written to. Uploads will fail." },
+  { key: "chromium", label: "PDFs", look: "Chromium is missing, so no PDF can be drawn." },
+  { key: "ffmpeg", label: "Voice and Video", look: "Voice notes and video cannot be processed." },
+  { key: "clamd", label: "Upload Scanning", look: "Uploads cannot be scanned, so they are refused." },
+  { key: "mail", label: "Mail", look: "Mail is not configured or the server refused. Queued mail waits." },
+  { key: "ai", label: "AI", look: "No AI vendor answers, so the assistant falls back to its stub." },
+  { key: "static", label: "Frontend Build", look: "A frontend build is missing from this release." },
+];
 
-const label = (key) => (CHECKS[key] ? CHECKS[key][0] : key.replace(/_/g, " "));
-const lookAt = (key) => (CHECKS[key] ? CHECKS[key][1] : "Open the logs for this service.");
+const BY_KEY = new Map(CHECKS.map((c) => [c.key, c]));
+
+const label = (key) => (BY_KEY.get(key) ? BY_KEY.get(key).label : key.replace(/_/g, " "));
+const lookAt = (key) => (BY_KEY.get(key) ? BY_KEY.get(key).look : "Open the logs for this service.");
 
 /** What a probe is doing, in a line, from whatever it chose to report. */
 function detailOf(key, v) {
