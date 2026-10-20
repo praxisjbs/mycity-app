@@ -1,11 +1,12 @@
 import { useState } from "react";
 import identity from "@mycity/contract/schemas/identity.js";
 import security from "@mycity/contract/schemas/security.js";
-import type { Passkey, SignIn, SignInMethods, TwoStepSetup } from "@mycity/contract/contract.gen.ts";
+import type { MyDevice, Passkey, SignIn, SignInMethods, TwoStepSetup } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { createPasskey, passkeyCancelled, passkeyProblem, passkeysWork } from "@/auth/passkey";
+import { DEVICE_STATUS } from "@/features/attendance/labels";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { PagedTable } from "@/features/shared/sections";
 import { hrefFor, useRouter } from "@/lib/router";
@@ -88,6 +89,7 @@ export function MySecurityPage() {
   const ways = useApi("GET /api/v1/security");
   const live = usePaged("GET /api/v1/auth/sessions", { filters: { status: "active" } });
   const all = usePaged("GET /api/v1/auth/sessions");
+  const devices = usePaged("GET /api/v1/devices/mine");
   const endOne = useMutation("POST /api/v1/auth/sessions/:id/end");
   const endOthers = useMutation("POST /api/v1/auth/sessions/end-others");
   const modal = useModal();
@@ -157,11 +159,36 @@ export function MySecurityPage() {
       ]}
     />
   );
+  // The devices used to clock in, registered or seen; managed on My Devices (attendance, LA).
+  const clockIn = (devices.rows as MyDevice[]).filter((d) => d.status !== "removed");
+  const registered = clockIn.filter((d) => d.status === "registered").length;
   const dev = (
     <Card>
       <CardHeader title="Clock-In Devices" />
+      {devices.error ? (
+        <ErrorState error={devices.error} onRetry={devices.reload} />
+      ) : devices.loading && !devices.rows.length ? (
+        <LoadingRows count={2} />
+      ) : clockIn.length ? (
+        <ul className="m-0 list-none p-0">
+          {clockIn.map((d) => (
+            <li key={d.attendance_device_id} className="flex flex-wrap items-center gap-2 border-b border-border py-2.5 last:border-b-0">
+              <span className="min-w-0 flex-1">
+                <b className="block text-sm">{d.label}{d.platform ? ` · ${d.platform}` : ""}</b>
+                <span className="text-2xs text-subtle-foreground">
+                  {d.last_punch_at ? `Last clock-in ${formatWhen(d.last_punch_at)}` : "Not used to clock in yet"}
+                </span>
+              </span>
+              {d.this_device && <Pill tone="info">This Device</Pill>}
+              <Pill tone={DEVICE_STATUS[d.status].tone}>{DEVICE_STATUS[d.status].text}</Pill>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">No clock-in devices yet. Your device is added the first time you clock in.</p>
+      )}
       <Button className="mt-3" iconRight="right" onClick={() => navigate(hrefFor("ess", "my-devices"))}>
-        Open My Devices
+        Manage My Devices
       </Button>
     </Card>
   );
@@ -177,7 +204,7 @@ export function MySecurityPage() {
           { icon: "key", title: "PIN", sub: w.pin.on ? "On" : "Off", body: <PinCard /> },
           { icon: "globe", title: "Signed In", sub: s.active_sessions === 1 ? "1 device" : `${s.active_sessions} devices`, body: sessions, wide: true },
           { icon: "clock", title: "Recent Sign-Ins", sub: "Every sign-in", body: history, wide: true },
-          { icon: "msg", title: "Clock-In Devices", sub: "In My Devices", body: dev },
+          { icon: "msg", title: "Clock-In Devices", sub: registered === 1 ? "1 registered" : `${registered} registered`, body: dev },
         ]}
       />
       <DesktopOnly>
