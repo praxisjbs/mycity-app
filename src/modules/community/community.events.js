@@ -158,6 +158,11 @@ for (const key of [
 }
 
 /* A PDF's first page or a video's poster is ready: the conversations holding the file redraw it. */
+/* Everyone is in #general and #announcements from the moment their login exists, not from their first visit. */
+const joinLogin = (event) => require("./community.service").joinLogin(event.entity && event.entity.id);
+outbox.register("app_user.created", "community.join_company", joinLogin);
+outbox.register("app_user.reactivated", "community.join_company_again", joinLogin);
+
 outbox.register(vault.EVENTS.DOCUMENT_DERIVED, "community.push_derived", async (event) => {
   if (event.payload.entity_type !== "community_channel") return;
   const { rows } = await pool.query(

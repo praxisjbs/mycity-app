@@ -181,6 +181,38 @@ describeDb("Staff Community against the real migrations", () => {
   const channelsOf = async (who) => (await as(who).get("/community/channels")).body.data;
   const general = async (who) => (await channelsOf(who)).find((c) => c.name === "general");
 
+  test("every login is in #general and #announcements before it ever opens Community; the hourly sweep adds the active only", async () => {
+    const systemOf = async (userId) =>
+      (
+        await pool.query(
+          `SELECT c.system_key FROM community_member m JOIN community_channel c USING (community_channel_id)
+            WHERE m.user_id = $1 AND c.system_key IS NOT NULL ORDER BY 1`,
+          [userId],
+        )
+      ).rows.map((r) => r.system_key);
+    // Nobody has opened Community yet: app_user.created put each login in both.
+    for (const who of ["ceo", "bola", "tunde"]) expect(await systemOf(people[who].user.user_id)).toEqual(["announcements", "general"]);
+
+    // A login that slipped out is put back by the sweep; a suspended one is not.
+    const late = await tx((client) =>
+      createAdmin(
+        client,
+        { employee: { first_name: "Kemi", last_name: "Ade", work_email: "kemi@mycity.test", phone: "08031234567", job_title: "Intern", department_name: "HR & Operations", start_date: "2024-01-05", employment_type: "full_time", work_pattern: "on_site" }, role_code: "employee", is_ceo: false },
+        PASSWORD,
+        { allowAdditional: true },
+      ),
+    );
+    await drain();
+    expect(await systemOf(late.user.user_id)).toEqual(["announcements", "general"]);
+    await pool.query("DELETE FROM community_member WHERE user_id = ANY($1::uuid[])", [[late.user.user_id, people.bola.user.user_id]]);
+    await pool.query("UPDATE app_user SET status = 'suspended' WHERE user_id = $1", [late.user.user_id]);
+    const { joined } = await community.joinEveryone();
+    expect(joined).toBe(2);
+    expect(await systemOf(people.bola.user.user_id)).toEqual(["announcements", "general"]);
+    expect(await systemOf(late.user.user_id)).toEqual([]);
+    expect((await community.joinEveryone()).joined).toBe(0);
+  });
+
   test("signed out is a 401", async () => {
     expect((await request(app).get("/api/v1/community/channels")).status).toBe(401);
   });

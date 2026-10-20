@@ -10,7 +10,8 @@
  * - Files sent together share an album key; a caption rides on the first. A text's first
  *   link gets its card from community.links.js, at once when one is kept, else after commit.
  * - #general and #announcements are made the first time they are needed, and every
- *   person who opens Community is a member of both.
+ *   active login is a member of both: from the moment the login is made, from an hourly
+ *   sweep for any that slipped through, and again when they open Community.
  *
  * Every write runs in one transaction with emit(); realtime pushes and notifications are
  * outbox handlers in community.events.js.
@@ -150,6 +151,22 @@ async function joinCompany(db, user) {
   await repo.addMembers(db, general.community_channel_id, [user.user_id]);
   await repo.addMembers(db, announcements.community_channel_id, [user.user_id]);
   return { general, announcements };
+}
+
+/** A new or reactivated login joins #general and #announcements at once (app_user.created). */
+async function joinLogin(userId) {
+  if (!userId) return;
+  await tx((client) => joinCompany(client, { user_id: userId }));
+}
+
+/** Every active login in #general and #announcements; the hourly sweep. Returns how many joined. */
+async function joinEveryone() {
+  return tx(async (client) => {
+    const general = await repo.systemChannel(client, "general");
+    const announcements = await repo.systemChannel(client, "announcements");
+    const joined = (await repo.addEveryone(client, general.community_channel_id)) + (await repo.addEveryone(client, announcements.community_channel_id));
+    return { joined };
+  });
 }
 
 /** The caller's membership of a channel, or a 404. */
@@ -1091,6 +1108,8 @@ function touchPresence(userId) {
 }
 
 module.exports = {
+  joinLogin,
+  joinEveryone,
   setPinned,
   isModerator,
   mayPoll,

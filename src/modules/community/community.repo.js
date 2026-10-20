@@ -77,6 +77,17 @@ async function addMembers(db, channelId, userIds, role = "member") {
   return rowCount;
 }
 
+/** Every active login into a channel (#general, #announcements); returns how many joined. */
+async function addEveryone(db, channelId) {
+  const { rowCount } = await db.query(
+    `INSERT INTO community_member (community_channel_id, user_id, member_role)
+     SELECT $1, u.user_id, 'member' FROM app_user u WHERE u.status = 'active'
+     ON CONFLICT (community_channel_id, user_id) DO NOTHING`,
+    [channelId],
+  );
+  return rowCount;
+}
+
 /** One member with their person, as the members list shows them. */
 function memberRow(db, channelId, userId) {
   return one(
@@ -851,6 +862,7 @@ module.exports = {
   setRole,
   PERSON,
   systemChannel,
+  addEveryone,
   channelById,
   membership,
   addMembers,

@@ -136,6 +136,7 @@ const SCHEDULERS = Object.freeze([
   "media-reconcile",
   "import-cleanup",
   "celebrations",
+  "community-membership",
   "announcement-release",
   "mail-sync",
   "attendance-day-close",
