@@ -41,9 +41,70 @@ function fence(text) {
 
 const when = (v) => (v ? new Date(v).toISOString().replace("T", " ").slice(0, 16) : "unknown");
 
+/*
+ * The standing instructions, in pieces both briefs share (system_health.status-brief.js
+ * takes the same ones), so the two files can never tell an AI two different things about
+ * this repository. Everything here is true of the repository whoever reads it, so it does
+ * not change with the faults.
+ */
+
+/** Read the repository first. `then` names what this brief's work needs read next. */
+const learnStep = (then) => `**Learn the repository before you touch it.** Read \`CLAUDE.md\` first and follow its five steps:
+   it decides what you read next and which document wins. ${then} For backend work read \`docs/BACKEND_GUIDE.md\` in full; for a screen,
+   \`docs/FRONTEND_GUIDE.md\` and \`docs/FRONTEND_FOUNDATION.md\`; for a schema change,
+   \`docs/MIGRATIONS.md\` and \`docs/DATABASE_SCHEMA.md\`. Do not guess how this repository is
+   written. It has rules that look arbitrary until you read why.`;
+
 /**
- * The standing instructions. Everything here is true of this repository whoever reads
- * it, so it does not change with the faults.
+ * Ask before acting. `wait` says what must not happen until the owner has answered;
+ * `things` is what the brief is about ("the faults", "the problems").
+ */
+const questionsStep = (wait, things = "the faults") => `**Ask the owner 4 to 10 questions, then wait.** Use the **AskUserQuestion** tool, as
+   \`CLAUDE.md\` requires: 2 to 4 concrete options per question, each with a one-line trade-off,
+   your recommendation first with \`(Recommended)\` in its label and why in its description. At most
+   4 questions in one call, so 4 to 10 questions is 1 to 3 calls.
+
+   **Four is the minimum, not the target.** This is a wide system: one fault can touch a module's
+   service, its contract, a notice rule, a permission and two shells, and the owner's answer
+   changes which of those you are allowed to move. Ask the questions whose answers change the fix:
+   behaviour a person will notice, a trade-off that is the owner's to make, how far the fix should
+   reach, what should happen to records already written wrong. Go past 4 only when ${things} are
+   separate enough that 4 cannot cover them, and say why you need more. Never ask what the code,
+   the git history, the guides or this file already answers. **${wait}** If AskUserQuestion is not available to you, ask the same questions in chat, in the
+   same shape, and still wait.`;
+
+/** The rules a fix may not bend, all of them in CLAUDE.md step 4. */
+const RULES = `The rules this repository does not bend, all of them in \`CLAUDE.md\` step 4:
+   - every list pages at 25 through \`src/shared/http/paged.js\`; no \`LIMIT\`/\`OFFSET\` in a repo;
+   - every request and response shape is a Zod schema in \`packages/contract\`, \`snake_case\`;
+     never edit \`contract.gen.ts\`;
+   - every write goes through the owning module's service, in a transaction, with \`emit()\`;
+     follow-on work is an outbox handler;
+   - money through \`shared/money\`, dates ISO on the wire, numbers from \`numbering.allocate()\`,
+     files through the vault;
+   - components only from \`@mycity/ui\`, styling by token only, nothing the browser styles itself;
+   - a migration goes in its milestone's number block with \`-- UP\` and \`-- DOWN\`, idempotent, and
+     a merged migration is never edited.
+   Add or extend a test that fails without your fix, beside the ones for that area.`;
+
+const CHECK_STEP = `**Check it before you push.** \`npm run ci\` is the whole suite and it must pass. Re-read your
+   own diff as a reviewer would, and ask what in it would turn CI red.`;
+
+const PAPERWORK_STEP = `**Finish the paperwork.** \`CLAUDE.md\` step 5: update \`docs/PROGRESS.md\` (ticks, Status,
+   Updated day-first, the summary counts, a note under the module), make the feature guide match
+   what you built with a Change log line, and list any new file in \`README.MD\`. A Stop hook checks
+   these and sends you back if they are missing.`;
+
+/** Open the pull request. `each` says what the description gives for each thing fixed. */
+const pullRequestStep = (each) => `**Open a draft pull request to \`main\` and drive it green.** Branch \`m<N>/<short-name>\`, where
+   N is the milestone of the area you changed (\`docs/PROGRESS.md\` gives it), title in
+   Conventional Commits form. In the description give, ${each}
+   A frontend change needs the **Native app feel**
+   section. Keep going until CI is green. **Do not merge:** merging deploys to staging, and
+   production waits for a person. That is the owner's call, not yours.`;
+
+/**
+ * The faults brief's instructions.
  */
 function instructions(count) {
   return `## Your job
@@ -52,13 +113,9 @@ You are fixing production faults in the **MyCity App ERP** (\`tomblakeasaah196/m
 Express and PostgreSQL backend with a worker, a staff React app in \`app/\` and a public React app in
 \`public-app/\`. Take ${count === 1 ? "this fault" : "these faults"} from report to a green pull request.
 
-1. **Learn the repository before you touch it.** Read \`CLAUDE.md\` first and follow its five steps:
-   it decides what you read next and which document wins. Then \`docs/guides/system-health.md\`
+1. ${learnStep(`Then \`docs/guides/system-health.md\`
    (where these faults come from and what the statuses mean) and the guide for the area each fault
-   is in (\`docs/guides/\`). For backend work read \`docs/BACKEND_GUIDE.md\` in full; for a screen,
-   \`docs/FRONTEND_GUIDE.md\` and \`docs/FRONTEND_FOUNDATION.md\`; for a schema change,
-   \`docs/MIGRATIONS.md\` and \`docs/DATABASE_SCHEMA.md\`. Do not guess how this repository is
-   written. It has rules that look arbitrary until you read why.
+   is in (\`docs/guides/\`).`)}
 
 2. **Rule out what is already done.** Before any root-cause work, sort every fault into
    **Already fixed**, **Not ours** or **To fix**:
@@ -78,42 +135,13 @@ Express and PostgreSQL backend with a worker, a staff React app in \`app/\` and 
    Say what causes it, the evidence, and how sure you are. Fix causes, not symptoms: catching an
    error and carrying on is not a fix unless the error is genuinely harmless, and then say why.
 
-4. **Ask the owner 4 to 10 questions, then wait.** Use the **AskUserQuestion** tool, as
-   \`CLAUDE.md\` requires: 2 to 4 concrete options per question, each with a one-line trade-off,
-   your recommendation first with \`(Recommended)\` in its label and why in its description. At most
-   4 questions in one call, so 4 to 10 questions is 1 to 3 calls.
+4. ${questionsStep("Change no code until the owner has answered.")}
 
-   **Four is the minimum, not the target.** This is a wide system: one fault can touch a module's
-   service, its contract, a notice rule, a permission and two shells, and the owner's answer
-   changes which of those you are allowed to move. Ask the questions whose answers change the fix:
-   behaviour a person will notice, a trade-off that is the owner's to make, how far the fix should
-   reach, what should happen to records already written wrong. Go past 4 only when the faults are
-   separate enough that 4 cannot cover them, and say why you need more. Never ask what the code,
-   the git history, the guides or this file already answers. **Change no code until the owner has
-   answered.** If AskUserQuestion is not available to you, ask the same questions in chat, in the
-   same shape, and still wait.
+5. **Fix it.** The smallest change that removes the cause, written like the code around it. ${RULES}
 
-5. **Fix it.** The smallest change that removes the cause, written like the code around it. The
-   rules this repository does not bend, all of them in \`CLAUDE.md\` step 4:
-   - every list pages at 25 through \`src/shared/http/paged.js\`; no \`LIMIT\`/\`OFFSET\` in a repo;
-   - every request and response shape is a Zod schema in \`packages/contract\`, \`snake_case\`;
-     never edit \`contract.gen.ts\`;
-   - every write goes through the owning module's service, in a transaction, with \`emit()\`;
-     follow-on work is an outbox handler;
-   - money through \`shared/money\`, dates ISO on the wire, numbers from \`numbering.allocate()\`,
-     files through the vault;
-   - components only from \`@mycity/ui\`, styling by token only, nothing the browser styles itself;
-   - a migration goes in its milestone's number block with \`-- UP\` and \`-- DOWN\`, idempotent, and
-     a merged migration is never edited.
-   Add or extend a test that fails without your fix, beside the ones for that area.
+6. ${CHECK_STEP}
 
-6. **Check it before you push.** \`npm run ci\` is the whole suite and it must pass. Re-read your
-   own diff as a reviewer would, and ask what in it would turn CI red.
-
-7. **Finish the paperwork.** \`CLAUDE.md\` step 5: update \`docs/PROGRESS.md\` (ticks, Status,
-   Updated day-first, the summary counts, a note under the module), make the feature guide match
-   what you built with a Change log line, and list any new file in \`README.MD\`. A Stop hook checks
-   these and sends you back if they are missing.
+7. ${PAPERWORK_STEP}
 
 8. **Commit, saying what it fixes.** End each fixing commit's message with a line of its own:
 
@@ -122,13 +150,9 @@ Express and PostgreSQL backend with a worker, a staff React app in \`app/\` and 
    using the numbers below. Put the same line in the pull request description, so whoever reads
    Settings · System Health later can tell which commit closed which fault.
 
-9. **Open a draft pull request to \`main\` and drive it green.** Branch \`m<N>/<short-name>\`, where
-   N is the milestone of the area you changed (\`docs/PROGRESS.md\` gives it), title in
-   Conventional Commits form. In the description give, for each fault: the root cause, the fix, and
+9. ${pullRequestStep(`for each fault: the root cause, the fix, and
    how the owner checks it on the running app (which screen, what to do, what they should now see).
-   List what was already fixed or not ours, and why. A frontend change needs the **Native app feel**
-   section. Keep going until CI is green. **Do not merge:** merging deploys to staging, and
-   production waits for a person. That is the owner's call, not yours.
+   List what was already fixed or not ours, and why.`)}
 
 10. **Report back in a few lines:** the pull request link, what each fault was, what was already
     fixed or not ours, and anything the owner must do. For a fault you judged **Not ours**, say so,
@@ -168,6 +192,7 @@ function faultSection(g, occurrences, n) {
   occurrences.forEach((o, i) => {
     out.push("");
     out.push(`**${i === 0 ? "Latest occurrence" : "Earlier"}:** ${when(o.occurred_at)} on \`${o.route || "unknown"}\` (${ORIGIN[o.origin] || o.origin}, build \`${o.release || "unknown"}\`${o.request_id ? `, request \`${o.request_id}\`` : ""})`);
+    if (o.system !== undefined) out.push("", `_System then:_ ${systemLine(o.system)}`);
     if (o.message && oneLine(o.message) !== oneLine(g.last_message)) {
       out.push("", fence(clip(o.message, 1000)));
     }
@@ -188,12 +213,49 @@ function faultSection(g, occurrences, n) {
 }
 
 /**
+ * The checks of one snapshot that were not up, as a line: what the system looked like.
+ * @param {{taken_at: Date|string, not_up: Array<{label: string, state: string, detail: string}>}|null} snap
+ */
+function systemLine(snap) {
+  if (!snap) return "no snapshot within 10 minutes of it, so the state is not known.";
+  const at = `(snapshot of ${when(snap.taken_at)} UTC)`;
+  if (!snap.not_up.length) return `every check was up ${at}.`;
+  return `${snap.not_up.map((c) => `**${c.label}** ${c.state} (${oneLine(c.detail)})`).join(", ")} ${at}.`;
+}
+
+/**
+ * The state header: the system as it stood when the brief was made. A few lines, never
+ * the whole status, which is the Status brief's.
+ * @param {{taken_at: Date|string, not_up: object[]}|null} now  the newest recent snapshot
+ */
+function systemSection(now) {
+  const out = ["## The system when this was downloaded", ""];
+  if (!now) {
+    out.push(
+      "No snapshot in the last 11 minutes: the five-minute job is not running, so whether a check was down is not known. Treat that as a finding of its own.",
+    );
+  } else if (!now.not_up.length) {
+    out.push(`Every check was up at the snapshot of ${when(now.taken_at)} UTC.`);
+  } else {
+    out.push(`Not up at the snapshot of ${when(now.taken_at)} UTC:`, "");
+    for (const c of now.not_up) out.push(`- **${c.label}** ${c.state}: ${oneLine(c.detail)}`);
+  }
+  out.push(
+    "",
+    "Each occurrence below says which checks were not up when it fired. A fault that only fires while the database, the cache or the worker is down is a symptom of that, not a bug of its own: say so before looking for one. For every check, every job and the commands to investigate them, download the Status brief (Settings · Status, Download Brief).",
+  );
+  return out;
+}
+
+/**
  * The whole file.
  * @param {{faults: Array<{group: object, occurrences: object[]}>, downloaded_by?: string|null,
- *          release?: string|null, at?: Date}} input
+ *          release?: string|null, at?: Date, system?: object|null}} input
+ *   system  the newest recent snapshot's checks not up (null: none recent). Left out, the
+ *           file has no state header; each occurrence's own state rides on it as `system`
  * @returns {string}
  */
-function build({ faults, downloaded_by: by = null, release = null, at = new Date() }) {
+function build({ faults, downloaded_by: by = null, release = null, at = new Date(), system = undefined }) {
   const list = faults.slice(0, MAX_FAULTS);
   const n = list.length;
   const md = [];
@@ -205,6 +267,10 @@ function build({ faults, downloaded_by: by = null, release = null, at = new Date
   md.push(`${n === 1 ? "This fault is" : "These faults are"} now marked Being Handled in the app, so nobody fixes ${n === 1 ? "it" : "them"} twice. This file is the whole brief: work through it to the end without waiting to be told more, except for the questions in step 4, where you stop and wait.`);
   md.push("");
   md.push("Nothing here names a person. Counts say how many people a fault hit, never who.");
+  if (system !== undefined) {
+    md.push("");
+    md.push(...systemSection(system));
+  }
   md.push("");
   md.push(instructions(n));
   md.push("");
@@ -222,4 +288,21 @@ function build({ faults, downloaded_by: by = null, release = null, at = new Date
   return md.join("\n");
 }
 
-module.exports = { build, instructions, faultSection, fence, clip, MAX_FAULTS };
+module.exports = {
+  build,
+  instructions,
+  faultSection,
+  systemLine,
+  systemSection,
+  learnStep,
+  questionsStep,
+  RULES,
+  CHECK_STEP,
+  PAPERWORK_STEP,
+  pullRequestStep,
+  fence,
+  clip,
+  oneLine,
+  when,
+  MAX_FAULTS,
+};

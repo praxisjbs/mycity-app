@@ -32,6 +32,7 @@ const EVENTS = defineEvents("system_health", {
   "system_health.fault_unattended": { summary: "A fault has been open for a day with nobody on it" },
   "system_health.digest": { summary: "The daily System Health summary" },
   "system_health.brief_requested": { summary: "A fault brief was downloaded" },
+  "system_health.status_brief_requested": { summary: "A status brief was downloaded" },
 });
 
 /** The file a brief is kept in. Restricted: it carries stack traces. */
@@ -39,6 +40,16 @@ const BRIEF_DOC_TYPE = "system_health_brief";
 
 defineDocumentType(BRIEF_DOC_TYPE, {
   label: "System Health brief",
+  module: "system_health",
+  sensitivity: "restricted",
+  export: true,
+});
+
+/** The file a status brief is kept in. Restricted: it names the server's paths and units. */
+const STATUS_BRIEF_DOC_TYPE = "system_health_status_brief";
+
+defineDocumentType(STATUS_BRIEF_DOC_TYPE, {
+  label: "System Health status brief",
   module: "system_health",
   sensitivity: "restricted",
   export: true,
@@ -153,6 +164,7 @@ async function buildBrief(event, ctx) {
     return exportFiles.fail(p.document_id, "The person who asked is no longer active.");
 
   await exportFiles.make(p.document_id, ctx, async () => {
+    const service = require("./system_health.service");
     const groups = await repo.getMany(pool, p.error_group_ids || []);
     const faults = [];
     for (const group of groups) {
@@ -161,11 +173,56 @@ async function buildBrief(event, ctx) {
         occurrences: await repo.occurrences(pool, group.fingerprint),
       });
     }
+    // What the system looked like: now, and at each occurrence (guide §6). A snapshot is
+    // recent within two of its five-minute intervals, as the Performance chart reads it.
+    const last = await repo.lastSnapshot(pool);
+    const recent = last && Date.now() - new Date(last.taken_at).getTime() < service.RECORDING_WITHIN_MS;
+    const moments = faults.flatMap((f) => f.occurrences.map((o) => o.occurred_at));
+    const around = await repo.snapshotsAround(pool, moments);
+    let i = 0;
+    for (const f of faults) {
+      for (const o of f.occurrences) {
+        const snap = around[i++];
+        o.system = snap && snap.taken_at ? { taken_at: snap.taken_at, not_up: service.notUpIn(snap.checks) } : null;
+      }
+    }
     return Buffer.from(
       brief.build({
         faults,
         downloaded_by: reader.display_name || null,
         release: config.BUILD_SHA || "local",
+        system: recent ? { taken_at: last.taken_at, not_up: service.notUpIn(last.checks) } : null,
+      }),
+      "utf8",
+    );
+  });
+}
+
+/**
+ * The status brief's outbox handler: the whole system written into the file the request
+ * reserved. The checks are the API's, carried in the event; everything else is read now.
+ * @param {object} event  system_health.status_brief_requested
+ * @param {{attempt: number, max_attempts: number}} ctx  the outbox's
+ */
+async function buildStatusBrief(event, ctx) {
+  const exportFiles = require("../../shared/documents/exports");
+  const grantsCache = require("../../shared/rbac/grants-cache");
+  const service = require("./system_health.service");
+  const statusBrief = require("./system_health.status-brief");
+
+  const p = event.payload || {};
+  if (!p.document_id) return;
+  const reader = await grantsCache.getAuthUser(pool, p.requested_by || event.actor_user_id);
+  if (!reader || reader.status !== "active")
+    return exportFiles.fail(p.document_id, "The person who asked is no longer active.");
+
+  await exportFiles.make(p.document_id, ctx, async () => {
+    const input = await service.statusBriefInput({ checks: p.checks || {} });
+    return Buffer.from(
+      statusBrief.build({
+        ...input,
+        now: p.checked_at ? new Date(p.checked_at) : input.now,
+        made: { how: "screen", by: reader.display_name || null },
       }),
       "utf8",
     );
@@ -176,4 +233,8 @@ outbox.register(EVENTS.SYSTEM_HEALTH_BRIEF_REQUESTED, "system_health.build_brief
   buildBrief(event, ctx),
 );
 
-module.exports = { EVENTS, BRIEF_DOC_TYPE, TO_IT, FATAL_CHECKS, buildBrief };
+outbox.register(EVENTS.SYSTEM_HEALTH_STATUS_BRIEF_REQUESTED, "system_health.build_status_brief", (event, ctx) =>
+  buildStatusBrief(event, ctx),
+);
+
+module.exports = { EVENTS, BRIEF_DOC_TYPE, STATUS_BRIEF_DOC_TYPE, TO_IT, FATAL_CHECKS, buildBrief, buildStatusBrief };

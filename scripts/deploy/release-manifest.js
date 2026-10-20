@@ -38,6 +38,7 @@ const FILES = [
   { path: "packages/contract", skip: /node_modules/ },
   { path: "scripts/db" },
   { path: "scripts/import" },
+  { path: "scripts/ops" },
   { path: "migrations" },
   { path: "seeds" },
   { path: "templates" },

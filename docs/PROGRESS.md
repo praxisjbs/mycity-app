@@ -1061,6 +1061,22 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 20/10/2026 · TB · Status (#95) made for investigating. It refreshes every 30 seconds; each check
+  opens a sheet (`GET /system-health/checks/:key`) with what its probe measured, since when, its 7
+  days of changes 25 a page, every scheduler for Background Jobs (what the code set it to, in words,
+  last run, result, error, next run, why it is late) and every queue for Worker. **Download Brief**
+  on Status writes the whole system as Markdown (`system_health.status-brief.js`) with instructions
+  that make an AI understand first, ask 4 to 10 questions, gather evidence with read-only SSH
+  commands pasted back, change the server only with a yes, open a draft PR for code and walk the
+  owner through the rest; the Faults brief shares those instructions and gains the system's state
+  at each occurrence. On the server, `npm run health:brief` (`scripts/ops/health-brief.js`) builds
+  the same file without the app, and `mycity-health-watch-<env>.timer` mails it every time
+  something is down to intelligence@jbspraxis.com, copying tomblakeasaah@gmail.com and
+  praxisjbs@gmail.com. Fixed: `outbox-dispatch` was never recorded (so it always read as not run),
+  a nightly job read as late before its first slot, a run that failed on its first try kept no
+  failure time, and Status failed outright while the database was down. Left: install the two
+  watch timers once on the server (`docs/runbooks/system-health.md` §7.3), and confirm the first
+  mail arrives.
 - 20/10/2026 · TB · System Health split into three tabs (#95 Status, #96 Performance, #97 Faults)
   after TB walked the first release on staging, and the engine behind it fixed. **The three
   schedulers were never registered in `src/jobs/registry.js`, so nothing ran for an hour and the

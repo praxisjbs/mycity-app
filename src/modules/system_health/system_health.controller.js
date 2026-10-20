@@ -12,6 +12,9 @@ const service = require("./system_health.service");
 
 module.exports = {
   status: async (_req, res) => ok(res, await service.status()),
+  check: async (req, res) => ok(res, await service.check(req.params.key)),
+  history: async (req, res) => sendPaged(res, await service.history(req.params.key, req.validated.query)),
+  statusBrief: async (req, res) => accepted(res, await service.requestStatusBrief(withActor(req))),
   performance: async (req, res) => ok(res, await service.performance(req.validated.query)),
   faults: async (req, res) => sendPaged(res, await service.faults(req.validated.query)),
   fault: async (req, res) => ok(res, await service.fault(req.params.id)),
