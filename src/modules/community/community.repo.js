@@ -161,12 +161,28 @@ async function userOfEmployee(db, employeeId) {
   return row ? row.user_id : null;
 }
 
-function nameTaken(db, name) {
+/** Whether another live channel has the name; `exceptId` is the channel being renamed. */
+function nameTaken(db, name, exceptId = null) {
   return one(
     db,
-    "SELECT 1 FROM community_channel WHERE name = $1 AND channel_type <> 'direct' AND archived_at IS NULL",
-    [name],
+    `SELECT 1 FROM community_channel
+      WHERE name = $1 AND channel_type <> 'direct' AND archived_at IS NULL
+        AND ($2::uuid IS NULL OR community_channel_id <> $2)`,
+    [name, exceptId],
   );
+}
+
+/** An admin renamed the channel or changed its description. */
+function updateChannel(db, id, { name, description }) {
+  return one(
+    db,
+    "UPDATE community_channel SET name = $2, description = $3 WHERE community_channel_id = $1 RETURNING *",
+    [id, name, description ?? null],
+  );
+}
+
+function channelRowForUpdate(db, id) {
+  return one(db, "SELECT * FROM community_channel WHERE community_channel_id = $1 FOR UPDATE", [id]);
 }
 
 function insertChannel(
@@ -871,6 +887,8 @@ module.exports = {
   userOfEmployee,
   nameTaken,
   insertChannel,
+  updateChannel,
+  channelRowForUpdate,
   listChannels,
   channelFor,
   listMembers,

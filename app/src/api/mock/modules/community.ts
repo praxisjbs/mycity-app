@@ -371,6 +371,17 @@ route("GET /api/v1/community/channels/:id", (req) => {
   const c = chan(req.params.id);
   return isMember(c, req.user!) && c!.channel_type !== "direct" ? ok(channelOut(c!, req.user!)) : notFound();
 });
+route("PUT /api/v1/community/channels/:id", (req) => {
+  const c = chan(req.params.id);
+  if (!isMember(c, req.user!)) return notFound();
+  if (!c!.admins.includes(req.user!)) return fail(403, "NOT_CHANNEL_ADMIN", "Only the channel's admins can do this");
+  const name = String(req.body.name ?? "").trim();
+  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(name)) return invalid({ name: ["Not a valid name"] });
+  if (CHANNELS.some((x) => x !== c && x.name === name)) return fail(409, "NAME_TAKEN", "A channel already has that name", { name: ["Name already taken"] });
+  c!.name = name;
+  c!.description = String(req.body.description ?? "").trim() || null;
+  return ok(channelOut(c!, req.user!));
+});
 route("GET /api/v1/community/channels/:id/members", (req) => {
   const c = chan(req.params.id);
   if (!isMember(c, req.user!)) return notFound();

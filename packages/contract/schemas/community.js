@@ -93,6 +93,14 @@ const ChannelCreate = z
   })
   .strict();
 
+/** PUT /community/channels/:id: an admin renames it and sets its description; a blank one clears it. */
+const ChannelUpdate = z
+  .object({
+    name: ChannelName,
+    description: optionalText(300),
+  })
+  .strict();
+
 /** A member of a channel. */
 const Member = z
   .object({
@@ -351,6 +359,7 @@ const TABLES = {
   },
   ChannelListQuery: { table: null, reason: "list controls for the caller's channels" },
   ChannelPage: { table: null, reason: "a page of channels" },
+  ChannelUpdate: { table: "community_channel" },
   ChannelCreate: {
     table: "community_channel",
     virtual: {
@@ -448,6 +457,7 @@ module.exports = {
   ChannelPage,
   ChannelName,
   ChannelCreate,
+  ChannelUpdate,
   Member,
   MemberListQuery,
   MemberPage,

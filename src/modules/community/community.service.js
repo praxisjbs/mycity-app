@@ -237,6 +237,29 @@ async function createChannel(body, user) {
   return getChannel(channel.community_channel_id, user);
 }
 
+/** A channel's admins rename it and write its description; #general and #announcements stay as they are. */
+async function updateChannel(channelId, body, user) {
+  await tx(async (client) => {
+    await assertAdmin(client, channelId, user);
+    const before = await repo.channelRowForUpdate(client, channelId);
+    if (await repo.nameTaken(client, body.name, channelId)) {
+      throw new AppError("NAME_TAKEN", "A channel already has that name", 409, {
+        name: ["Name already taken"],
+      });
+    }
+    const after = await repo.updateChannel(client, channelId, body);
+    await emit(client, {
+      key: EVENTS.CHANNEL_UPDATED,
+      entity: { type: "channel", id: channelId },
+      actor: user,
+      before,
+      after,
+      payload: { community_channel_id: channelId },
+    });
+  });
+  return getChannel(channelId, user);
+}
+
 async function listMembers(channelId, user, query) {
   await member(pool, channelId, user);
   return repo.listMembers(pool, channelId, query);
@@ -1123,6 +1146,7 @@ module.exports = {
   listChannels,
   getChannel,
   createChannel,
+  updateChannel,
   listMembers,
   addMembers,
   removeMember,

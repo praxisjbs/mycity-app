@@ -47,6 +47,14 @@ route(
 );
 route(
   router,
+  "put",
+  "/channels/:id",
+  { body: cm.ChannelUpdate, response: cm.Channel, summary: "Rename a channel or change its description" },
+  create(),
+  controller.updateChannel,
+);
+route(
+  router,
   "get",
   "/channels/:id/members",
   {

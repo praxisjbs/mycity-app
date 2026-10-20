@@ -261,6 +261,31 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("ceo").get(`/community/channels/${id}`)).status).toBe(404);
   });
 
+  test("a channel's admins rename it and write its purpose; names stay unique; the company channels stay fixed", async () => {
+    const made = await as("bola").post("/community/channels").send({ name: "field-ops", member_ids: [people.tunde.employee.employee_id] });
+    const id = made.body.community_channel_id;
+    await as("bola").post("/community/channels").send({ name: "field-sales" });
+
+    expect((await as("tunde").put(`/community/channels/${id}`).send({ name: "ops" })).status).toBe(403);
+    const taken = await as("bola").put(`/community/channels/${id}`).send({ name: "field-sales" });
+    expect(taken.status).toBe(409);
+    expect(taken.body.error.fields.name).toEqual(["Name already taken"]);
+    expect((await as("bola").put(`/community/channels/${id}`).send({ name: "Field Ops" })).status).toBe(422);
+
+    realtime.toUser.mockClear();
+    const renamed = await as("bola").put(`/community/channels/${id}`).send({ name: "field-team", description: "Site visits and installs" });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body).toMatchObject({ name: "field-team", description: "Site visits and installs" });
+    await drain();
+    expect(realtime.toUser).toHaveBeenCalledWith(people.tunde.user.user_id, "community.channels", expect.objectContaining({ community_channel_id: id }));
+    // Its own name again is fine, and a blank purpose clears it.
+    const cleared = await as("bola").put(`/community/channels/${id}`).send({ name: "field-team", description: "" });
+    expect(cleared.body.description).toBeNull();
+
+    const company = await general("ceo");
+    expect((await as("ceo").put(`/community/channels/${company.community_channel_id}`).send({ name: "everyone" })).status).toBe(422);
+  });
+
   test("admins are chosen in Edit Members: only an admin makes one, and the last admin cannot step down", async () => {
     const made = await as("bola").post("/community/channels").send({ name: "dev-hub", member_ids: [people.tunde.employee.employee_id], post_policy: "admins" });
     const id = made.body.community_channel_id;

@@ -13,6 +13,8 @@ module.exports = {
     ok(res, await service.getChannel(p(req).id, req.user)),
   createChannel: async (req, res) =>
     created(res, await service.createChannel(req.validated.body, req.user)),
+  updateChannel: async (req, res) =>
+    ok(res, await service.updateChannel(req.validated.params.id, req.validated.body, req.user)),
   listMembers: async (req, res) =>
     sendPaged(
       res,

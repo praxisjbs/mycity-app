@@ -23,6 +23,7 @@ const realtime = require("../../services/realtime/emitter");
 
 const EVENTS = defineEvents("community", {
   "channel.created": { summary: "A channel was created" },
+  "channel.updated": { summary: "A channel was renamed or its description changed" },
   "channel.members_changed": {
     summary: "People were added to or removed from a channel",
   },
@@ -129,6 +130,7 @@ for (const key of [EVENTS.DIRECT_THREAD_READ, EVENTS.DIRECT_THREAD_DELIVERED]) {
 }
 for (const key of [
   EVENTS.CHANNEL_CREATED,
+  EVENTS.CHANNEL_UPDATED,
   EVENTS.CHANNEL_MEMBERS_CHANGED,
   EVENTS.DIRECT_THREAD_OPENED,
 ]) {
