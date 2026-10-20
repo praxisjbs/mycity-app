@@ -13,6 +13,8 @@ module.exports = {
     ok(res, await service.getChannel(p(req).id, req.user)),
   createChannel: async (req, res) =>
     created(res, await service.createChannel(req.validated.body, req.user)),
+  updateChannel: async (req, res) =>
+    ok(res, await service.updateChannel(req.validated.params.id, req.validated.body, req.user)),
   listMembers: async (req, res) =>
     sendPaged(
       res,
@@ -58,6 +60,12 @@ module.exports = {
     await service.markDelivered(p(req).id, req.validated.body.up_to, req.user);
     noContent(res);
   },
+  listPins: async (req, res) =>
+    sendPaged(res, await service.listPins(p(req).id, req.user, req.validated.query)),
+  pinMessage: async (req, res) =>
+    ok(res, await service.pinMessage(p(req).id, req.validated.body, req.user)),
+  unpinMessage: async (req, res) =>
+    ok(res, await service.unpinMessage(p(req).id, req.user)),
   listMessages: async (req, res) =>
     sendPaged(
       res,

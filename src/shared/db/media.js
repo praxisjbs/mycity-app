@@ -5,7 +5,7 @@
  *   `SELECT ${mediaJson("doc")} AS document`, with document `doc` joined
  *
  * builds { document_id, file_name, size_bytes, mime_type, width, height, page_count,
- * duration_ms, variants } from document `doc`, or null when it joined nothing (a LEFT JOIN
+ * duration_ms, waveform, variants } from document `doc`, or null when it joined nothing (a LEFT JOIN
  * that missed). `variants` lists the kinds of its derived files (document_variant), so a
  * screen asks only for a size that exists: `webp-960` and `webp-320` for a photo or a PDF's
  * first page, `poster` and `mp4-720` for a video, `opus` for a voice note (services/media).
@@ -28,6 +28,7 @@ const mediaJson = (doc = "doc") =>
      'height', ${doc}.height,
      'page_count', ${doc}.page_count,
      'duration_ms', ${doc}.duration_ms,
+     'waveform', ${doc}.waveform,
      'variants', COALESCE((SELECT json_agg(v.kind ORDER BY v.kind) FROM document_variant v
                             WHERE v.document_id = ${doc}.document_id), '[]'::json)) END`;
 

@@ -26,7 +26,7 @@ const person = (key: string): PersonRef => {
 const uid = (key: string) => sid(`user:${key}`);
 const keyOfUser = (userId: string) => PEOPLE.find((p) => uid(p.user_key) === userId)?.user_key;
 
-type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _noLink?: boolean };
+type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _noLink?: boolean; _pinnedAt?: number };
 let seq = 0;
 function msg(type: Message["message_type"], by: string | null, when: string, over: Partial<Message> = {}): MMsg {
   return {
@@ -53,6 +53,8 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     can_edit: false,
     can_delete: false,
     can_close: false,
+    pinned_until: null,
+    can_pin: false,
     ...over,
     _by: by,
     _fans: [],
@@ -69,9 +71,17 @@ const fileRef = (name: string, kb: number, mime = "application/octet-stream", ov
   height: null,
   page_count: null,
   duration_ms: null,
+  waveform: null,
   variants: [],
   ...over,
 });
+/** A voice note as the worker leaves it: a speaking voice's rise and fall, steady for the same name. */
+const voiceRef = (name: string, kb: number, seconds: number) =>
+  fileRef(name, kb, "audio/webm", {
+    duration_ms: seconds * 1000,
+    variants: ["opus"],
+    waveform: Array.from({ length: 48 }, (_, i) => Math.round(25 + 70 * Math.abs(Math.sin((i + name.length) * 0.7) * Math.cos(i * 0.23)))),
+  });
 const SIZES = ["webp-320", "webp-960"];
 const photoRef = (name: string, kb: number, width: number, height: number) => fileRef(name, kb, "image/jpeg", { width, height, variants: SIZES });
 const pdfRef = (name: string, kb: number, pages: number) => fileRef(name, kb, "application/pdf", { width: 960, height: 1358, page_count: pages, variants: SIZES });
@@ -195,7 +205,7 @@ const CHANNELS: Chan[] = [
   chan0("ember-to-remember", everyone.slice(0, 18), [
     msg("text", "adedotun", at(0, "08:14"), { body: "Stage build for the Lagos leg is confirmed. MTN have signed off on the branding placement." }),
     msg("text", "tolu", at(0, "08:21"), { body: "Shot list for the Enugu segment is in the vault. Three locations, two days." }),
-    msg("audio", "tolu", at(0, "08:23"), { duration_s: 18, document: fileRef("voice-note.webm", 90, "audio/webm") }),
+    msg("audio", "tolu", at(0, "08:23"), { duration_s: 18, document: voiceRef("voice-note.webm", 90, 18) }),
     msg("text", "ngozi", at(0, "09:02"), { body: "ProvidusBank want their logo on the ticket confirmation email. Raising it as a task against the partnership." }),
     msg("text", "cynthia", at(0, "09:08"), { body: "Good. Link it to the MOU so it shows on the 360." }),
     msg("file", "seyi", at(0, "09:12"), { document: fileRef("ember-venue-list-v3.xlsx", 84, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") }),
@@ -233,7 +243,7 @@ const DM_ROWS: Array<[string, number, Array<[string, number, string, string]>]> 
 for (const [other, unread, rows] of DM_ROWS) {
   const msgs = rows.map(([who, d, t, x]) =>
     x.startsWith("vn:")
-      ? msg("audio", who, at(d, t), { duration_s: Number(x.slice(3)), document: fileRef(`voice-${who}.webm`, 120, "audio/webm") })
+      ? msg("audio", who, at(d, t), { duration_s: Number(x.slice(3)), document: voiceRef(`voice-${who}.webm`, 120, Number(x.slice(3))) })
       : x.startsWith("file:")
         ? msg("file", who, at(d, t), { document: pdfRef(x.slice(5), 3200, 14) })
         : msg("text", who, at(d, t), { body: x }),
@@ -260,7 +270,7 @@ function lineOf(m: Message | undefined): string | null {
 
 /** A message as `user` sees it: theirs or not, their reaction and vote, and the ticks. */
 function view(m: MMsg, user: string, c: Chan): Message {
-  const { _by, _fans, _votes, _noLink, ...rest } = m;
+  const { _by, _fans, _votes, _noLink, _pinnedAt, ...rest } = m;
   const mine = _by === user;
   const voted = Object.keys(_votes).length > 0;
   const closed = Boolean(m.poll?.closed);
@@ -271,6 +281,8 @@ function view(m: MMsg, user: string, c: Chan): Message {
     can_edit: !m.deleted && mine && ((m.message_type === "text" && fresh) || (m.message_type === "poll" && !closed && !voted)),
     can_delete: !m.deleted && m.message_type !== "announcement" && (mine || moderates(c, user)),
     can_close: !m.deleted && m.message_type === "poll" && !closed && (mine || moderates(c, user)),
+    pinned_until: !m.deleted && m.pinned_until && new Date(m.pinned_until).getTime() > Date.now() ? m.pinned_until : null,
+    can_pin: !m.deleted && (c.channel_type === "direct" || moderates(c, user)),
   };
   if (m.announcement) {
     const a = ANNOUNCEMENTS.find((x) => x.announcement_id === m.announcement!.announcement_id);
@@ -373,6 +385,17 @@ route("GET /api/v1/community/channels/:id", (req) => {
   const c = chan(req.params.id);
   return isMember(c, req.user!) && c!.channel_type !== "direct" ? ok(channelOut(c!, req.user!)) : notFound();
 });
+route("PUT /api/v1/community/channels/:id", (req) => {
+  const c = chan(req.params.id);
+  if (!isMember(c, req.user!)) return notFound();
+  if (!c!.admins.includes(req.user!)) return fail(403, "NOT_CHANNEL_ADMIN", "Only the channel's admins can do this");
+  const name = String(req.body.name ?? "").trim();
+  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(name)) return invalid({ name: ["Not a valid name"] });
+  if (CHANNELS.some((x) => x !== c && x.name === name)) return fail(409, "NAME_TAKEN", "A channel already has that name", { name: ["Name already taken"] });
+  c!.name = name;
+  c!.description = String(req.body.description ?? "").trim() || null;
+  return ok(channelOut(c!, req.user!));
+});
 route("GET /api/v1/community/channels/:id/members", (req) => {
   const c = chan(req.params.id);
   if (!isMember(c, req.user!)) return notFound();
@@ -471,7 +494,7 @@ function build(user: string, b: Record<string, unknown>): MMsg | Record<string, 
   }
   const stored = UPLOADS.get(String(b.document_id));
   if (!stored) return { document_id: ["Attach the file again"] };
-  const doc: MediaRef = { width: null, height: null, page_count: null, duration_ms: null, variants: [], ...stored };
+  const doc: MediaRef = { width: null, height: null, page_count: null, duration_ms: null, waveform: null, variants: [], ...stored };
   const kind = type === "audio" ? "audio" : /^image\//.test(doc.mime_type) ? "image" : /^audio\//.test(doc.mime_type) ? "audio" : /^video\//.test(doc.mime_type) ? "video" : "file";
   const album_key = kind !== "audio" && typeof b.album_key === "string" ? b.album_key : null;
   return msg(kind, user, now, { document: doc, album_key, duration_s: kind === "audio" ? Number(b.duration_s ?? 1) : null, body: (b.body as string) || null });
@@ -537,7 +560,7 @@ route("POST /api/v1/community/forward", (req) => {
   if (b.mail_attachment_id) {
     const a = attachmentOf(user, b.mail_attachment_id);
     if (!a) return notFound();
-    const doc: MediaRef = { document_id: sid(`fwd:${a.document_id}`), file_name: a.file_name, size_bytes: a.size_bytes, mime_type: a.mime_type, width: null, height: null, page_count: null, duration_ms: null, variants: [] };
+    const doc: MediaRef = { document_id: sid(`fwd:${a.document_id}`), file_name: a.file_name, size_bytes: a.size_bytes, mime_type: a.mime_type, width: null, height: null, page_count: null, duration_ms: null, waveform: null, variants: [] };
     items = [msg(/^image\//.test(a.mime_type) ? "image" : /^video\//.test(a.mime_type) ? "video" : "file", user, new Date().toISOString(), { document: doc })];
   } else {
     const found = (b.message_ids ?? []).map(located);
@@ -625,6 +648,32 @@ route("DELETE /api/v1/community/messages/:id", (req) => {
   f.m.recognition = null;
   f.m.poll = null;
   return noContent();
+});
+const PIN_HOURS: Record<string, number> = { "24h": 24, "7d": 168, "30d": 720 };
+const livePins = (c: Chan) =>
+  c.msgs.filter((m) => !m.deleted && m.pinned_until && new Date(m.pinned_until).getTime() > Date.now()).sort((a, b) => (b._pinnedAt ?? 0) - (a._pinnedAt ?? 0));
+route("GET /api/v1/community/channels/:id/pins", (req) => {
+  const c = chan(req.params.id);
+  if (!isMember(c, req.user!)) return notFound();
+  return paged(livePins(c!).map((m) => view(m, req.user!, c!)), req);
+});
+route("PUT /api/v1/community/messages/:id/pin", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (f.c.channel_type !== "direct" && !moderates(f.c, req.user!)) return fail(403, "NOT_MODERATOR", "Only the channel's moderators pin messages");
+  const hours = PIN_HOURS[String(req.body.period)];
+  if (!hours) return invalid({ period: ["Choose a period"] });
+  f.m.pinned_until = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+  f.m._pinnedAt = Date.now();
+  for (const old of livePins(f.c).slice(3)) old.pinned_until = null;
+  return ok(view(f.m, req.user!, f.c));
+});
+route("DELETE /api/v1/community/messages/:id/pin", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (f.c.channel_type !== "direct" && !moderates(f.c, req.user!)) return fail(403, "NOT_MODERATOR", "Only the channel's moderators pin messages");
+  f.m.pinned_until = null;
+  return ok(view(f.m, req.user!, f.c));
 });
 route("POST /api/v1/community/messages/:id/close", (req) => {
   const f = located(req.params.id);
@@ -787,6 +836,13 @@ route("POST /api/v1/community/announcements/:id/cancel", (req) => {
   if (!a) return err;
   ANNOUNCEMENTS.splice(ANNOUNCEMENTS.indexOf(a), 1);
   return ok({ ...announcementOut(a), status: "cancelled" as const });
+});
+route("POST /api/v1/community/announcements/:id/archive", (req) => {
+  if (!poster(req.user)) return denied();
+  const a = ANNOUNCEMENTS.find((x) => x.announcement_id === req.params.id && !x.scheduled);
+  if (!a) return notFound();
+  ANNOUNCEMENTS.splice(ANNOUNCEMENTS.indexOf(a), 1);
+  return ok({ ...announcementOut(a), status: "archived" as const });
 });
 route("GET /api/v1/community/announcements/:id/reads", (req) => {
   if (!poster(req.user)) return denied();

@@ -77,6 +77,17 @@ async function addMembers(db, channelId, userIds, role = "member") {
   return rowCount;
 }
 
+/** Every active login into a channel (#general, #announcements); returns how many joined. */
+async function addEveryone(db, channelId) {
+  const { rowCount } = await db.query(
+    `INSERT INTO community_member (community_channel_id, user_id, member_role)
+     SELECT $1, u.user_id, 'member' FROM app_user u WHERE u.status = 'active'
+     ON CONFLICT (community_channel_id, user_id) DO NOTHING`,
+    [channelId],
+  );
+  return rowCount;
+}
+
 /** One member with their person, as the members list shows them. */
 function memberRow(db, channelId, userId) {
   return one(
@@ -150,12 +161,28 @@ async function userOfEmployee(db, employeeId) {
   return row ? row.user_id : null;
 }
 
-function nameTaken(db, name) {
+/** Whether another live channel has the name; `exceptId` is the channel being renamed. */
+function nameTaken(db, name, exceptId = null) {
   return one(
     db,
-    "SELECT 1 FROM community_channel WHERE name = $1 AND channel_type <> 'direct' AND archived_at IS NULL",
-    [name],
+    `SELECT 1 FROM community_channel
+      WHERE name = $1 AND channel_type <> 'direct' AND archived_at IS NULL
+        AND ($2::uuid IS NULL OR community_channel_id <> $2)`,
+    [name, exceptId],
   );
+}
+
+/** An admin renamed the channel or changed its description. */
+function updateChannel(db, id, { name, description }) {
+  return one(
+    db,
+    "UPDATE community_channel SET name = $2, description = $3 WHERE community_channel_id = $1 RETURNING *",
+    [id, name, description ?? null],
+  );
+}
+
+function channelRowForUpdate(db, id) {
+  return one(db, "SELECT * FROM community_channel WHERE community_channel_id = $1 FOR UPDATE", [id]);
 }
 
 function insertChannel(
@@ -409,6 +436,7 @@ const LINK_PREVIEW = (lp = "lp", lpd = "lpd") => `
 const MESSAGE = `
   SELECT x.community_message_id, x.community_channel_id, x.message_type, x.sender_user_id, x.sent_at,
          x.body, x.metadata, x.transcript, x.deleted_at, x.edited_at, x.document_id,
+         CASE WHEN x.pinned_until > now() THEN x.pinned_until END AS pinned_until,
          x.community_link_preview_id,
          ${PERSON("e", "d")} AS author,
          ${mediaJson("doc")} AS document,
@@ -445,6 +473,43 @@ function listMessages(db, channelId, userId, query) {
     [userId, channelId, query.q ?? null],
     query,
   );
+}
+
+/** What is pinned in a conversation now, newest pin first; at most three, one page. */
+function listPins(db, channelId, userId, query) {
+  return pageQuery(
+    db,
+    `${MESSAGE}, ${TOTAL_COL} ${MESSAGE_FROM}
+      WHERE x.community_channel_id = $2 AND x.deleted_at IS NULL AND x.pinned_until > now()
+      ORDER BY x.pinned_at DESC, x.community_message_id`,
+    [userId, channelId],
+    query,
+  );
+}
+
+/** Pin a message until `until`, or unpin it with null. */
+function setPin(db, messageId, until, userId) {
+  return one(
+    db,
+    `UPDATE community_message
+        SET pinned_until = $2::timestamptz,
+            pinned_at = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE now() END,
+            pinned_by = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE $3::uuid END
+      WHERE community_message_id = $1 RETURNING *`,
+    [messageId, until, userId],
+  );
+}
+
+/** The conversation's live pins past the newest `keep`, oldest first: the ones a new pin pushes out. */
+async function pinsBeyond(db, channelId, keep) {
+  const { rows } = await db.query(
+    `SELECT community_message_id FROM community_message
+      WHERE community_channel_id = $1 AND deleted_at IS NULL AND pinned_until > now()
+      ORDER BY pinned_at DESC, community_message_id
+      OFFSET $2 -- pagination:batch the pins beyond the conversation's limit, at most a few`,
+    [channelId, keep],
+  );
+  return rows.map((r) => r.community_message_id);
 }
 
 function messageFor(db, messageId, userId) {
@@ -865,17 +930,20 @@ async function channelsInCommon(db, userA, userB) {
  * ------------------------------------------------------------------ */
 
 /**
- * Active employees whose birthday (day and month) or start-date anniversary falls on
- * `date`, with how many years. 29 February falls on 28 February in other years.
+ * Active employees whose birthday (day and month, from date_of_birth or, without one,
+ * birth_day and birth_month) or start-date anniversary falls on `date`, with how many
+ * years. 29 February falls on 28 February in other years.
  */
 async function celebrationsOn(db, date) {
   const { rows } = await db.query(
     `WITH day AS (SELECT $1::date AS d)
      SELECT e.employee_id, 'birthday' AS occasion, NULL::int AS years
-       FROM employee e, day
-      WHERE e.status = 'active' AND e.archived_at IS NULL AND e.date_of_birth IS NOT NULL
-        AND (to_char(e.date_of_birth, 'MM-DD') = to_char(day.d, 'MM-DD')
-             OR (to_char(e.date_of_birth, 'MM-DD') = '02-29' AND to_char(day.d, 'MM-DD') = '02-28'
+       FROM employee e, day,
+            LATERAL (SELECT COALESCE(to_char(e.date_of_birth, 'MM-DD'),
+                                     lpad(e.birth_month::text, 2, '0') || '-' || lpad(e.birth_day::text, 2, '0')) AS md) b
+      WHERE e.status = 'active' AND e.archived_at IS NULL AND b.md IS NOT NULL
+        AND (b.md = to_char(day.d, 'MM-DD')
+             OR (b.md = '02-29' AND to_char(day.d, 'MM-DD') = '02-28'
                  AND NOT (extract(year FROM day.d)::int % 4 = 0 AND (extract(year FROM day.d)::int % 100 <> 0 OR extract(year FROM day.d)::int % 400 = 0))))
      UNION ALL
      SELECT e.employee_id, 'anniversary', (extract(year FROM day.d) - extract(year FROM e.start_date))::int
@@ -918,6 +986,7 @@ module.exports = {
   setRole,
   PERSON,
   systemChannel,
+  addEveryone,
   channelById,
   membership,
   addMembers,
@@ -926,6 +995,8 @@ module.exports = {
   userOfEmployee,
   nameTaken,
   insertChannel,
+  updateChannel,
+  channelRowForUpdate,
   listChannels,
   channelFor,
   listMembers,
@@ -940,6 +1011,9 @@ module.exports = {
   directChannelsOf,
   otherPointers,
   listMessages,
+  listPins,
+  setPin,
+  pinsBeyond,
   messageFor,
   insertMessage,
   mediaRef,

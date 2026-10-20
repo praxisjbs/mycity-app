@@ -22,7 +22,8 @@ process.env.MYCITY_PROCESS = process.env.MYCITY_PROCESS || "mycity-worker";
  *   4. triggers          committed events that put jobs on queues (jobs/registry.js),
  *                        and the hand-over of notifications to notification-deliver
  *   5. markReady()       only now may the outbox dispatcher run (it refuses before)
- *   6. consumers, schedules, heartbeat
+ *   6. consumers, schedules, heartbeat, and the outbox wake (a commit runs the
+ *                        dispatcher at once; jobs/loops/outbox-wake.js)
  *
  * Shutdown on SIGTERM/SIGINT: stop the schedules, let running jobs finish (BullMQ waits
  * for them; forced after 30 seconds, and an unfinished job is picked up again by the next
@@ -142,6 +143,8 @@ async function start() {
   const workers = registry.startConsumers();
   const schedules = await registry.startSchedules();
   const stopHeartbeat = registry.startHeartbeat();
+  // A commit wakes the outbox dispatcher at once; its one-second tick is the safety net.
+  const outboxWake = require("./jobs/loops/outbox-wake").start();
   // Mailbox: IMAP IDLE on up to MAILBOX_IDLE_MAX inboxes (none on staging and laptops).
   const mailIdle = require("./jobs/loops/mail-idle").start();
   logger.info(
@@ -161,6 +164,7 @@ async function start() {
     const force = setTimeout(() => process.exit(1), FORCE_EXIT_MS);
     force.unref();
     schedules.stop();
+    await outboxWake.stop();
     await mailIdle.stop();
     await Promise.allSettled(workers.map((w) => w.close()));
     await stopHeartbeat();

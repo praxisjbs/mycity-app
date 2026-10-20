@@ -117,6 +117,8 @@ const MediaRef = DocumentRef.extend({
   height: z.number().int().min(1).nullable(),
   page_count: z.number().int().min(1).nullable(),
   duration_ms: z.number().int().min(0).nullable(),
+  /** A voice note's loudness in bars, each 0 to 100; null until the worker has measured it. */
+  waveform: z.array(z.number().int().min(0).max(100)).max(64).nullable(),
   variants: z.array(z.string()).max(20),
 }).strict();
 

@@ -720,8 +720,10 @@ async function completeAv(client, documentId, derived) {
     throw new Error("vault.completeAv must run inside atomically()");
   await insertVariants(client, documentId, derived.variants);
   await client.query(
-    "UPDATE document SET duration_ms = COALESCE($2, duration_ms), width = COALESCE($3, width), height = COALESCE($4, height) WHERE document_id = $1",
-    [documentId, derived.duration_ms, derived.width, derived.height],
+    `UPDATE document SET duration_ms = COALESCE($2, duration_ms), width = COALESCE($3, width), height = COALESCE($4, height),
+            waveform = COALESCE($5::smallint[], waveform)
+      WHERE document_id = $1`,
+    [documentId, derived.duration_ms, derived.width, derived.height, derived.waveform ?? null],
   );
   await derivedEvent(client, documentId, derived.variants);
 }

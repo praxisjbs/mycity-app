@@ -184,6 +184,10 @@ event_outbox    the work that must follow (dispatched after commit)
 
 The worker drains `event_outbox` (`FOR UPDATE SKIP LOCKED`, exponential backoff, per-handler
 completion so a retry skips handlers that already succeeded). Handlers are named and idempotent.
+It runs as soon as a transaction holding an event commits: `emit()` sends a Postgres `NOTIFY` on
+`mycity_outbox`, which Postgres delivers only on commit, and the worker's `jobs/loops/outbox-wake.js`
+LISTENs on its own connection. A one-second tick (`schedulers/outbox-dispatch.js`) is the safety
+net for a wake lost to a dropped connection (GE, 20/10/2026: a chat message waited up to a second).
 
 ```
 service tx ──► emit ──► COMMIT
@@ -212,7 +216,7 @@ Realtime is best effort; everything that changes state goes through the outbox.
 | `pdf-render` | worker | Chromium render | Praxis `services/pdf.service.js`, `chromium.js` |
 | `notification-deliver` | worker | Push + email fan-out | Praxis `jobs/handlers/notification-deliver` |
 | `workflow-timeout` (every 5 min) | worker | Applies stage `on_timeout` | Pixie engine `resolveTimeout` |
-| `celebrations` (05:00 Lagos) | worker | Birthday, anniversary posts (M1) | new |
+| `celebrations` (08:00 Lagos) | worker | Birthday, anniversary posts (M1) | new |
 | `mail-sync`, IMAP IDLE | worker | Mailbox (M1) | Praxis `jobs/mail-*` |
 
 BullMQ prefix `mycity:prod` / `mycity:stg` on separate Redis logical DBs. Queue names are the handler

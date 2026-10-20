@@ -183,6 +183,38 @@ describeDb("Staff Community against the real migrations", () => {
   const channelsOf = async (who) => (await as(who).get("/community/channels")).body.data;
   const general = async (who) => (await channelsOf(who)).find((c) => c.name === "general");
 
+  test("every login is in #general and #announcements before it ever opens Community; the hourly sweep adds the active only", async () => {
+    const systemOf = async (userId) =>
+      (
+        await pool.query(
+          `SELECT c.system_key FROM community_member m JOIN community_channel c USING (community_channel_id)
+            WHERE m.user_id = $1 AND c.system_key IS NOT NULL ORDER BY 1`,
+          [userId],
+        )
+      ).rows.map((r) => r.system_key);
+    // Nobody has opened Community yet: app_user.created put each login in both.
+    for (const who of ["ceo", "bola", "tunde"]) expect(await systemOf(people[who].user.user_id)).toEqual(["announcements", "general"]);
+
+    // A login that slipped out is put back by the sweep; a suspended one is not.
+    const late = await tx((client) =>
+      createAdmin(
+        client,
+        { employee: { first_name: "Kemi", last_name: "Ade", work_email: "kemi@mycity.test", phone: "08031234567", job_title: "Intern", department_name: "HR & Operations", start_date: "2024-01-05", employment_type: "full_time", work_pattern: "on_site" }, role_code: "employee", is_ceo: false },
+        PASSWORD,
+        { allowAdditional: true },
+      ),
+    );
+    await drain();
+    expect(await systemOf(late.user.user_id)).toEqual(["announcements", "general"]);
+    await pool.query("DELETE FROM community_member WHERE user_id = ANY($1::uuid[])", [[late.user.user_id, people.bola.user.user_id]]);
+    await pool.query("UPDATE app_user SET status = 'suspended' WHERE user_id = $1", [late.user.user_id]);
+    const { joined } = await community.joinEveryone();
+    expect(joined).toBe(2);
+    expect(await systemOf(people.bola.user.user_id)).toEqual(["announcements", "general"]);
+    expect(await systemOf(late.user.user_id)).toEqual([]);
+    expect((await community.joinEveryone()).joined).toBe(0);
+  });
+
   test("signed out is a 401", async () => {
     expect((await request(app).get("/api/v1/community/channels")).status).toBe(401);
   });
@@ -231,6 +263,31 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("ceo").get(`/community/channels/${id}`)).status).toBe(404);
   });
 
+  test("a channel's admins rename it and write its purpose; names stay unique; the company channels stay fixed", async () => {
+    const made = await as("bola").post("/community/channels").send({ name: "field-ops", member_ids: [people.tunde.employee.employee_id] });
+    const id = made.body.community_channel_id;
+    await as("bola").post("/community/channels").send({ name: "field-sales" });
+
+    expect((await as("tunde").put(`/community/channels/${id}`).send({ name: "ops" })).status).toBe(403);
+    const taken = await as("bola").put(`/community/channels/${id}`).send({ name: "field-sales" });
+    expect(taken.status).toBe(409);
+    expect(taken.body.error.fields.name).toEqual(["Name already taken"]);
+    expect((await as("bola").put(`/community/channels/${id}`).send({ name: "Field Ops" })).status).toBe(422);
+
+    realtime.toUser.mockClear();
+    const renamed = await as("bola").put(`/community/channels/${id}`).send({ name: "field-team", description: "Site visits and installs" });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body).toMatchObject({ name: "field-team", description: "Site visits and installs" });
+    await drain();
+    expect(realtime.toUser).toHaveBeenCalledWith(people.tunde.user.user_id, "community.channels", expect.objectContaining({ community_channel_id: id }));
+    // Its own name again is fine, and a blank purpose clears it.
+    const cleared = await as("bola").put(`/community/channels/${id}`).send({ name: "field-team", description: "" });
+    expect(cleared.body.description).toBeNull();
+
+    const company = await general("ceo");
+    expect((await as("ceo").put(`/community/channels/${company.community_channel_id}`).send({ name: "everyone" })).status).toBe(422);
+  });
+
   test("admins are chosen in Edit Members: only an admin makes one, and the last admin cannot step down", async () => {
     const made = await as("bola").post("/community/channels").send({ name: "dev-hub", member_ids: [people.tunde.employee.employee_id], post_policy: "admins" });
     const id = made.body.community_channel_id;
@@ -277,6 +334,7 @@ describeDb("Staff Community against the real migrations", () => {
       height: 1,
       page_count: null,
       duration_ms: null,
+      waveform: null,
       variants: [],
     });
     const posted = await as("bola").post(`/community/channels/${id}/messages`).send({ message_type: "file", document_id: img.body.document_id });
@@ -492,6 +550,55 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await channelsOf("bola")).find((c) => c.name === "pin-b").muted).toBe(false);
   });
 
+  test("a message pinned for a while: moderators in a channel, either person in a direct message, at most 3, gone when its time is up", async () => {
+    const made = await as("bola").post("/community/channels").send({ name: "pin-board", member_ids: [people.tunde.employee.employee_id] });
+    const id = made.body.community_channel_id;
+    const post = async (body) => (await as("tunde").post(`/community/channels/${id}/messages`).send({ message_type: "text", body })).body;
+    const first = await post("Gate code is 4412");
+
+    // Tunde is a member, not an admin: he sees no Pin and is refused.
+    expect(first).toMatchObject({ pinned_until: null, can_pin: false });
+    expect((await as("tunde").put(`/community/messages/${first.community_message_id}/pin`).send({ period: "7d" })).status).toBe(403);
+    expect((await as("bola").put(`/community/messages/${first.community_message_id}/pin`).send({ period: "1y" })).status).toBe(422);
+
+    realtime.toUser.mockClear();
+    const pinned = await as("bola").put(`/community/messages/${first.community_message_id}/pin`).send({ period: "7d" });
+    expect(pinned.status).toBe(200);
+    expect(pinned.body.can_pin).toBe(true);
+    const days = (new Date(pinned.body.pinned_until).getTime() - Date.now()) / 86400000;
+    expect(days).toBeGreaterThan(6.99);
+    expect(days).toBeLessThan(7.01);
+    await drain();
+    expect(realtime.toUser).toHaveBeenCalledWith(people.tunde.user.user_id, "community.message_updated", expect.objectContaining({ community_channel_id: id }));
+    const seen = await as("tunde").get(`/community/channels/${id}/pins`);
+    expect(seen.body.data.map((m) => m.body)).toEqual(["Gate code is 4412"]);
+
+    // A fourth pin takes the place of the oldest.
+    const more = [];
+    for (const body of ["Two", "Three", "Four"]) {
+      const m = await post(body);
+      more.push(m);
+      await as("bola").put(`/community/messages/${m.community_message_id}/pin`).send({ period: "24h" });
+    }
+    const now = await as("tunde").get(`/community/channels/${id}/pins`);
+    expect(now.body.data.map((m) => m.body)).toEqual(["Four", "Three", "Two"]);
+
+    // Its time passes: it is no longer pinned, with nothing run.
+    await q("UPDATE community_message SET pinned_until = now() - interval '1 second' WHERE community_message_id = $1", [more[0].community_message_id]);
+    expect((await as("tunde").get(`/community/channels/${id}/pins`)).body.data.map((m) => m.body)).toEqual(["Four", "Three"]);
+    const unpinned = await as("bola").del(`/community/messages/${more[2].community_message_id}/pin`);
+    expect(unpinned.status).toBe(200);
+    expect(unpinned.body.pinned_until).toBeNull();
+    expect((await as("tunde").get(`/community/channels/${id}/pins`)).body.data.map((m) => m.body)).toEqual(["Three"]);
+
+    // In a direct conversation either person pins.
+    const dm = await as("tunde").post("/community/direct").send({ employee_id: people.ceo.employee.employee_id });
+    const said = await as("tunde").post(`/community/channels/${dm.body.community_channel_id}/messages`).send({ message_type: "text", body: "Flight at 6" });
+    expect(said.body.can_pin).toBe(true);
+    expect((await as("ceo").put(`/community/messages/${said.body.community_message_id}/pin`).send({ period: "24h" })).status).toBe(200);
+    expect((await as("bola").get(`/community/channels/${dm.body.community_channel_id}/pins`)).status).toBe(404);
+  });
+
   test("direct messages: one conversation per pair, ticks from sent to delivered to read, private to the two", async () => {
     const opened = await as("bola").post("/community/direct").send({ employee_id: people.tunde.employee.employee_id });
     expect(opened.status).toBe(200);
@@ -666,6 +773,39 @@ describeDb("Staff Community against the real migrations", () => {
     // A normal one has no reminder of its own.
     const plain = await as("ceo").post("/community/announcements").send({ title: "Cake", body: "In the kitchen." });
     expect(await svc.remindUnread(plain.body.announcement_id)).toEqual({ reminded: 0 });
+  });
+
+  test("a published announcement is archived: it leaves #announcements and the tab, unopened notices go, reads stay", async () => {
+    const made = await as("ceo").post("/community/announcements").send({ title: "Wrong date", body: "Party on the 3rd.", urgency: "urgent" });
+    const id = made.body.announcement_id;
+    await drain();
+    const noticeOf = (who) =>
+      one("SELECT * FROM notification WHERE user_id = $1 AND event_key = 'announcement.published' AND entity_id = $2", [people[who].user.user_id, id]);
+    // Tunde acknowledges first; Bola never does.
+    expect((await as("tunde").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
+    const bola = await noticeOf("bola");
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).toContain(bola.notification_id);
+
+    expect((await as("bola").post(`/community/announcements/${id}/archive`).send({})).status).toBe(403);
+    const archived = await as("ceo").post(`/community/announcements/${id}/archive`).send({});
+    expect(archived.status).toBe(200);
+    expect(archived.body).toMatchObject({ announcement_id: id, status: "archived" });
+    await drain();
+
+    expect(await noticeOf("bola")).toBeUndefined();
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).not.toContain(bola.notification_id);
+    expect((await noticeOf("tunde")).acknowledged_at).not.toBeNull(); // what was answered stays
+    expect((await as("ceo").get("/community/announcements")).body.data.find((a) => a.announcement_id === id)).toBeUndefined();
+    const msg = await one(
+      "SELECT m.deleted_at FROM community_message m JOIN announcement a ON a.community_message_id = m.community_message_id WHERE a.announcement_id = $1",
+      [id],
+    );
+    expect(msg.deleted_at).not.toBeNull();
+    expect(await one("SELECT count(*)::int AS n FROM announcement_read WHERE announcement_id = $1", [id])).toEqual({ n: 3 });
+
+    expect((await as("ceo").post(`/community/announcements/${id}/archive`).send({})).status).toBe(404);
+    const sched = await as("ceo").post("/community/announcements").send({ title: "Later", body: "Later.", publish_at: new Date(Date.now() + 3_600_000).toISOString() });
+    expect((await as("ceo").post(`/community/announcements/${sched.body.announcement_id}/archive`).send({})).status).toBe(409);
   });
 
   test("a scheduled announcement is edited or cancelled until it goes out; a stale release does nothing", async () => {

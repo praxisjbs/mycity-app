@@ -66,40 +66,91 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
   );
 }
 
-function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
+/**
+ * A voice note plays the moment Play is pressed: its bytes are fetched as it is drawn (the
+ * playable Opus when the worker has made it), and the bars follow the audio's own position
+ * from its first sound, not from the press.
+ */
+function useVoicePlayer(m: Message) {
+  const secs = m.duration_s || 1;
+  const doc = m.document;
+  const live = import.meta.env.VITE_API_MODE !== "mock";
+  const url = doc && live ? `/api/v1/documents/${doc.document_id}/${doc.variants.includes("opus") ? "variant/opus" : "content"}` : null;
+  const href = useFileUrl(url);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const wanted = useRef(false);
+  const frame = useRef(0);
   const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!href) return;
+    const a = new Audio();
+    a.preload = "auto";
+    a.src = href;
+    const follow = () => {
+      const length = Number.isFinite(a.duration) && a.duration > 0 ? a.duration : secs;
+      setProgress(a.currentTime / length);
+      frame.current = requestAnimationFrame(follow);
+    };
+    a.onplaying = () => {
+      setPlaying(true);
+      cancelAnimationFrame(frame.current);
+      frame.current = requestAnimationFrame(follow);
+    };
+    a.onpause = () => {
+      cancelAnimationFrame(frame.current);
+      setPlaying(false);
+    };
+    a.onended = () => {
+      cancelAnimationFrame(frame.current);
+      setPlaying(false);
+      setProgress(0);
+    };
+    audio.current = a;
+    if (wanted.current) void a.play().catch(() => setPlaying(false));
+    return () => {
+      cancelAnimationFrame(frame.current);
+      a.pause();
+      audio.current = null;
+    };
+  }, [href, secs]);
+
+  /* The in-browser mock holds no bytes: the bars run over the note's length instead. */
+  const pretend = () => {
+    const from = performance.now();
+    setPlaying(true);
+    const step = (now: number) => {
+      const p = (now - from) / (secs * 1000);
+      if (p >= 1 || !wanted.current) {
+        wanted.current = false;
+        setPlaying(false);
+        return setProgress(0);
+      }
+      setProgress(p);
+      frame.current = requestAnimationFrame(step);
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+
+  const toggle = () => {
+    if (playing) {
+      wanted.current = false;
+      audio.current?.pause();
+      return;
+    }
+    wanted.current = true;
+    if (audio.current) void audio.current.play().catch(() => setPlaying(false));
+    else if (!live || !doc) pretend();
+  };
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  return { playing, progress, toggle, secs };
+}
+
+function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
   const [tr, setTr] = useState<"hidden" | "loading" | "shown">("hidden");
   const [text, setText] = useState(m.transcript ?? "");
-  const [wanted, setWanted] = useState(false);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const secs = m.duration_s || 1;
-  /* The note's bytes are gated: fetched with the session once Play is first pressed. */
-  const href = useFileUrl(wanted && m.document ? `/api/v1/documents/${m.document.document_id}/content` : null);
-  useEffect(
-    () => () => {
-      if (t.current) clearTimeout(t.current);
-      audio.current?.pause();
-    },
-    [],
-  );
-  useEffect(() => {
-    if (!href || audio.current) return;
-    audio.current = new Audio(href);
-    audio.current.onended = () => setPlaying(false);
-    void audio.current.play().catch(() => setPlaying(false));
-  }, [href]);
-  const play = () => {
-    if (playing) {
-      audio.current?.pause();
-      if (t.current) clearTimeout(t.current);
-      return setPlaying(false);
-    }
-    setPlaying(true);
-    if (audio.current) void audio.current.play().catch(() => setPlaying(false));
-    else if (m.document && import.meta.env.VITE_API_MODE !== "mock") setWanted(true);
-    else t.current = setTimeout(() => setPlaying(false), secs * 1000);
-  };
+  const { playing, progress, toggle: play, secs } = useVoicePlayer(m);
   const transcribe = async () => {
     if (tr === "shown") return setTr("hidden");
     if (text) return setTr("shown");
@@ -114,7 +165,7 @@ function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
         <button type="button" onClick={play} aria-label={playing ? "Pause voice note" : "Play voice note"} className={cn("flex size-7.5 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground", playing && "ring-4 ring-primary/25")}>
           <Icon name={playing ? "pause" : "play"} />
         </button>
-        <Waveform seconds={secs} playing={playing} />
+        <Waveform seconds={secs} peaks={m.document?.waveform} progress={progress} />
         <em className="text-2xs not-italic opacity-80">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}</em>
       </div>
       {tr === "loading" && <p className="shimmer mt-2 max-w-80 rounded-ctl px-2.5 py-2 text-xs leading-normal opacity-75">Transcribing…</p>}

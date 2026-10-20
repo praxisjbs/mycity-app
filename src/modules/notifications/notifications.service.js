@@ -174,6 +174,27 @@ async function markReadForRecord(client, user, entityType, entityId) {
   return ids.length;
 }
 
+/**
+ * A record taken down (an archived announcement): every notice about it that nobody has opened,
+ * or acknowledged when it needs Acknowledge, is withdrawn, so its urgent bar and repeats stop.
+ * Notices already read or acknowledged stay, as history.
+ */
+async function withdrawForRecord(entityType, entityId) {
+  return tx(async (client) => {
+    const rows = await repo.withdrawForRecord(client, entityType, entityId);
+    for (const r of rows) {
+      await emit(client, {
+        key: EVENTS.NOTIFICATION_WITHDRAWN,
+        entity: { type: "notification", id: r.notification_id },
+        actor: null,
+        payload: { user_id: r.user_id, notification_id: r.notification_id },
+        metadata: { by_record: `${entityType}:${entityId}` },
+      });
+    }
+    return rows.length;
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Acknowledge and the urgent repeats
  * ------------------------------------------------------------------ */
@@ -586,6 +607,7 @@ async function markReadFromDevice(body) {
 }
 
 module.exports = {
+  withdrawForRecord,
   list,
   asNotice,
   urgent,
