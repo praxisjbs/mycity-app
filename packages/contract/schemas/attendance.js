@@ -113,6 +113,7 @@ const AttendanceToday = z
         home_state: z.enum(["approved", "pending", "none"]).nullable(),
       })
       .strict(),
+    /** The policy in force today: `geofence_mode` is the location check for today's place (§6.1). */
     policy: z
       .object({ geofence_mode: PolicyMode, device_mode: PolicyMode, max_accuracy_m: z.number().int().min(1) })
       .strict(),
@@ -771,6 +772,141 @@ const WorkScheduleSet = z
   .strict();
 
 /* ------------------------------------------------------------------ *
+ * The attendance policy: one organisation policy in numbered versions that People publish from
+ * a first day, and that every employee reads and acknowledges (guide §6.15)
+ * ------------------------------------------------------------------ */
+
+/** A rule a version can change: the keys of PolicySettings. */
+const PolicyRule = z.enum([
+  "grace_minutes",
+  "office_geofence_mode",
+  "home_geofence_mode",
+  "site_geofence_mode",
+  "device_mode",
+  "max_accuracy_m",
+  "home_radius_m",
+]);
+
+/**
+ * A published version against today in Lagos: `waiting` (its first day is after today),
+ * `in_force` (today's punches are judged by it), `past` (a later one replaced it) or `withdrawn`
+ * (withdrawn before its first day; it never applied).
+ */
+const PolicyVersionState = z.enum(["waiting", "in_force", "past", "withdrawn"]);
+
+/**
+ * The rules People set. The location check has a mode for each kind of place: the office, a home
+ * (remote staff, a hybrid home day, a temporary home) and a field site (a field assignment's sites,
+ * a client visit's site). A reading at 50 m or better is good, so the accuracy limit starts there.
+ */
+const PolicySettings = z
+  .object({
+    grace_minutes: z.number().int().min(0, "At least 0").max(60, "At most 60"),
+    office_geofence_mode: PolicyMode,
+    home_geofence_mode: PolicyMode,
+    site_geofence_mode: PolicyMode,
+    device_mode: PolicyMode,
+    max_accuracy_m: z.number().int().min(50, "At least 50").max(250, "At most 250"),
+    home_radius_m: z.number().int().min(50, "At least 50").max(500, "At most 500"),
+  })
+  .strict();
+
+/** What every published version carries, for People and for staff. `changed` is against the version before it. */
+const versionFields = {
+  attendance_policy_id: uuid,
+  version: z.number().int().min(1),
+  state: PolicyVersionState,
+  effective_from: isoDate,
+  note: z.string(),
+  published_at: isoDateTime,
+  withdrawn_at: isoDateTime.nullable(),
+  changed: z.array(PolicyRule),
+};
+
+/** A version as People read it on Settings: who published it, and how many acknowledged it of the people asked now. */
+const PolicyVersion = PolicySettings.extend({
+  ...versionFields,
+  published_by_name: z.string().nullable(),
+  withdraw_reason: z.string().nullable(),
+  acknowledged: z.number().int().min(0),
+  asked: z.number().int().min(0),
+}).strict();
+
+const PolicyVersionPage = Paged(PolicyVersion);
+
+/** The draft: every rule as last saved, and which of them it changes against the version it would replace. */
+const PolicyDraft = PolicySettings.extend({
+  attendance_policy_id: uuid,
+  changed: z.array(PolicyRule),
+  updated_at: isoDateTime,
+  updated_by_name: z.string().nullable(),
+}).strict();
+
+/**
+ * GET /attendance/policy. `current` is the rules a punch today is judged by (the version in force,
+ * else a policy from before versions, else the code's defaults); `in_force` the version they come
+ * from, if any; `waiting` the newest version waiting to start; `draft` People's unpublished changes.
+ */
+const PolicyOverview = z
+  .object({
+    today: isoDate,
+    current: PolicySettings,
+    in_force: PolicyVersion.nullable(),
+    waiting: PolicyVersion.nullable(),
+    draft: PolicyDraft.nullable(),
+    can_edit: z.boolean(),
+  })
+  .strict();
+
+/** POST /attendance/policy/publish. The first day against today and any version waiting is the service's (§6.15). */
+const PolicyPublish = z.object({ effective_from: isoDate, note: reasonText }).strict();
+
+/** POST /attendance/policy/versions/:id/withdraw */
+const PolicyWithdraw = z.object({ reason: reasonText }).strict();
+
+const PolicyVersionListQuery = listQuery({ state: PolicyVersionState.optional() });
+
+/** One person's acknowledgement of a version: everyone at work with a login is asked. */
+const PolicyAck = z
+  .object({
+    employee: PersonRef,
+    acknowledged_at: isoDateTime.nullable(),
+    reminded_at: isoDateTime.nullable(),
+  })
+  .strict();
+
+const PolicyAckPage = Paged(PolicyAck);
+
+const PolicyAckListQuery = listQuery(
+  { status: z.enum(["acknowledged", "pending"]).optional() },
+  ["acknowledged_at", "display_name"],
+);
+
+/** A version as an employee reads it, with their own acknowledgement. */
+const MyPolicyVersion = PolicySettings.extend({
+  ...versionFields,
+  acknowledged_at: isoDateTime.nullable(),
+}).strict();
+
+const MyPolicyVersionPage = Paged(MyPolicyVersion);
+
+const MyPolicyVersionListQuery = listQuery();
+
+/**
+ * GET /attendance/me/policy. `current` is the rules in force today; `latest` the newest published
+ * version (in force or waiting), the one to acknowledge; `in_force_version` the number in force,
+ * null while no version has started.
+ */
+const MyPolicy = z
+  .object({
+    today: isoDate,
+    current: PolicySettings,
+    latest: MyPolicyVersion.nullable(),
+    in_force_version: z.number().int().min(1).nullable(),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
  * Exports
  * ------------------------------------------------------------------ */
 
@@ -885,6 +1021,49 @@ const TABLES = {
     },
   },
   FieldAssignmentPage: { table: null, reason: "a page of field assignments" },
+  PolicySettings: { table: "attendance_policy" },
+  PolicyVersion: {
+    table: "attendance_policy",
+    virtual: {
+      state: "waiting, in force or past against today in Lagos, else withdrawn",
+      changed: "the rules that differ from the previous published version",
+      published_by_name: "who published it, from app_user and employee",
+      acknowledged: "how many of the people asked have an acknowledged attendance_policy_acknowledgement row",
+      asked: "everyone at work with an active login, counted when read",
+    },
+  },
+  PolicyVersionPage: { table: null, reason: "a page of policy versions" },
+  PolicyDraft: {
+    table: "attendance_policy",
+    virtual: {
+      changed: "the rules that differ from the version it would replace",
+      updated_by_name: "who saved it last, from app_user and employee",
+    },
+  },
+  PolicyOverview: {
+    table: null,
+    reason: "the rules in force today, the version in force, the newest waiting and the draft, from attendance_policy",
+  },
+  PolicyPublish: { table: "attendance_policy" },
+  PolicyWithdraw: { table: null, reason: "why it is withdrawn; kept as attendance_policy.withdraw_reason" },
+  PolicyVersionListQuery: { table: null, reason: "list controls for the policy versions" },
+  PolicyAck: {
+    table: "attendance_policy_acknowledgement",
+    virtual: { employee: "the person, from employee and department" },
+  },
+  PolicyAckPage: { table: null, reason: "a page of the people asked to acknowledge a version" },
+  PolicyAckListQuery: { table: null, reason: "list controls for a version's acknowledgements" },
+  MyPolicyVersion: {
+    table: "attendance_policy",
+    virtual: {
+      state: "waiting, in force or past against today in Lagos, else withdrawn",
+      changed: "the rules that differ from the previous published version",
+      acknowledged_at: "the reader's attendance_policy_acknowledgement row",
+    },
+  },
+  MyPolicyVersionPage: { table: null, reason: "a page of policy versions for the reader" },
+  MyPolicyVersionListQuery: { table: null, reason: "list controls for the reader's policy versions" },
+  MyPolicy: { table: null, reason: "the rules in force today and the newest version, for the reader" },
   FieldSiteInput: { table: "attendance_field_site" },
   FieldAssignmentCreate: {
     table: "attendance_field_assignment",
@@ -1061,4 +1240,21 @@ module.exports = {
   WorkSchedule,
   ScheduleParams,
   WorkScheduleSet,
+  PolicyRule,
+  PolicyVersionState,
+  PolicySettings,
+  PolicyVersion,
+  PolicyVersionPage,
+  PolicyDraft,
+  PolicyOverview,
+  PolicyPublish,
+  PolicyWithdraw,
+  PolicyVersionListQuery,
+  PolicyAck,
+  PolicyAckPage,
+  PolicyAckListQuery,
+  MyPolicyVersion,
+  MyPolicyVersionPage,
+  MyPolicyVersionListQuery,
+  MyPolicy,
 };

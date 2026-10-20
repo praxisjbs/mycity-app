@@ -84,7 +84,8 @@ These finish M0 and no prompt can do them:
 | Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export downloaded where it was asked for (§6.12), values masked per reader |
 | Settings · Approvals (#72) | Settings | `settings` view; edit to change | D | **Built** (17/10/2026) | Every flow, its stages and version; Edit Stages saves a new version |
 | ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
-| Settings · Integrations (#77), Appearance (#75), Notifications (#74), Attendance Policy (#73) | Settings | | none | Mock | Coming Soon (#74 is M6; #73 is LA's attendance) |
+| Settings · Integrations (#77), Appearance (#75), Notifications (#74) | Settings | | none | Mock | Coming Soon (#74 is M6) |
+| Settings · Attendance Policy (#73) | Settings | `settings` view; edit to change and publish | LA | **Built** (19/10/2026) | The attendance policy's versions, draft, publishing and acknowledgements: `docs/guides/attendance.md` §6.15 |
 
 ## 3 · How the screens relate
 
@@ -488,7 +489,7 @@ As built (17/10/2026):
 ### 6.8 Settings screens not in this guide
 
 Integrations (#77), Appearance (#75) and Notifications (#74, M6) stay Coming Soon. Attendance Policy
-(#73) belongs to LA's attendance work.
+(#73) belongs to LA's attendance work and is described in `docs/guides/attendance.md` §6.15.
 
 ### 6.9 What a document's status means (TB, 17/10/2026)
 
@@ -939,6 +940,7 @@ screen.
   (`docs/guides/notifications.md` §6), each with wording for someone it is not waiting on; the new
   Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
   Your import finished names its audience and takes no copies.
+- 19/10/2026 · LA · Settings · Attendance Policy (#73) is built from the attendance guide, which owns it (§6.15): §2 and §6.8 point there.
 - 20/10/2026 · TB · Settings gains a second tab, **System Health** (`system-health`), after
   Organisation. It is the first screen with a permission key of its own rather than `settings`:
   `system_health`, held by the Implementation Team and the System Administrator only, so a stack

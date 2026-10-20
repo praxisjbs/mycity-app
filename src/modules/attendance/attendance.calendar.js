@@ -5,8 +5,12 @@
  * The I/O beside the pure rules in attendance.rules.js.
  *
  *   policy     their own active policy for the date (employee_attendance_policy), else the
- *              organisation's (the oldest active one), else the code's defaults. MyCity
- *              enters policies; none is seeded (A26)
+ *              organisation's: the published version in force that date, before any the oldest
+ *              row from before versions, else the code's defaults. MyCity publishes the policy;
+ *              none is seeded (A26). Its `geofence_mode` is the mode of the date's place (§6.1):
+ *              a field site's on a field assignment or a client visit, a home's when the date is
+ *              worked from home (remote staff, a hybrid home day, a temporary home, a remote day),
+ *              the office's otherwise
  *   fence      a field assignment the person is still on covering the date before anything
  *              (§6.12): its sites, the nearer judging the punch (attendance.geofence.js).
  *              Then an approved work location request covering the date (§6.11): its
@@ -31,17 +35,23 @@ const repo = require("./attendance.repo");
 
 /** The policy for a person on a date, defaults filled in. */
 async function policyFor(db, employeeId, date) {
-  const row = (await repo.assignedPolicy(db, employeeId, date)) || (await repo.defaultPolicy(db));
+  const row = (await repo.assignedPolicy(db, employeeId, date)) || (await repo.defaultPolicy(db, date));
   if (!row) return { ...rules.DEFAULT_POLICY, override_worksite_id: null };
+  const d = rules.DEFAULT_POLICY;
+  const office = row.office_geofence_mode || d.office_geofence_mode;
   return {
     attendance_policy_id: row.attendance_policy_id,
     name: row.name,
+    version: row.version === null || row.version === undefined ? null : Number(row.version),
     grace_minutes: Number(row.grace_minutes) || 0,
     latest_clock_out_minutes: Number(row.latest_clock_out_minutes),
-    geofence_mode: row.geofence_mode || rules.DEFAULT_POLICY.geofence_mode,
-    device_mode: row.device_mode || rules.DEFAULT_POLICY.device_mode,
-    max_accuracy_m: Number(row.max_accuracy_m) || rules.DEFAULT_POLICY.max_accuracy_m,
-    home_radius_m: Number(row.home_radius_m) || rules.DEFAULT_POLICY.home_radius_m,
+    office_geofence_mode: office,
+    home_geofence_mode: row.home_geofence_mode || d.home_geofence_mode,
+    site_geofence_mode: row.site_geofence_mode || d.site_geofence_mode,
+    geofence_mode: office,
+    device_mode: row.device_mode || d.device_mode,
+    max_accuracy_m: Number(row.max_accuracy_m) || d.max_accuracy_m,
+    home_radius_m: Number(row.home_radius_m) || d.home_radius_m,
     override_worksite_id: row.override_worksite_id || null,
   };
 }
@@ -87,17 +97,36 @@ async function contextFor(db, person, date) {
   const shift = rules.shiftFor(date, calendar, policy);
   const assignment = await repo.fieldAssignmentOn(db, person.employee_id, date);
   if (assignment)
-    return { policy, shift, timeZone: zoneOf(person), fence: fieldFence(assignment), approved: null, home_day: false };
+    return {
+      policy: rules.forPlace(policy, "site"),
+      shift,
+      timeZone: zoneOf(person),
+      fence: fieldFence(assignment),
+      approved: null,
+      home_day: false,
+    };
   const request = await repo.approvedRequestOn(db, person.employee_id, date);
   if (request)
-    return { policy, shift, timeZone: zoneOf(person), home_day: false, ...(await requestPlace(db, person, request, policy)) };
+    return {
+      policy: rules.forPlace(policy, request.request_type === "client_visit" ? "site" : "home"),
+      shift,
+      timeZone: zoneOf(person),
+      home_day: false,
+      ...(await requestPlace(db, person, request, policy)),
+    };
   if (person.work_pattern === "remote" || (await hybridHomeDay(db, person, date))) {
-    return { policy, fence: await homeFence(db, person, policy), timeZone: zoneOf(person), shift, home_day: true };
+    return {
+      policy: rules.forPlace(policy, "home"),
+      fence: await homeFence(db, person, policy),
+      timeZone: zoneOf(person),
+      shift,
+      home_day: true,
+    };
   }
   const fence =
     (await worksites.fenceFor(db, policy.override_worksite_id)) || (await worksites.fenceFor(db, person.worksite_id));
   return {
-    policy,
+    policy: rules.forPlace(policy, "office"),
     fence: fence
       ? {
           kind: "worksite",

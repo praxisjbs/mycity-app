@@ -131,8 +131,14 @@ describeDb("attendance against the real migrations", () => {
   /** Kemi clocked in today over HTTP: that day is in October's list only when today is in October. */
   const managerToday = () => (today().startsWith("2026-10") ? [today()] : []);
 
+  /** Every place's location check and the device check, on every policy row. */
   const setPolicy = (geofence, device) =>
-    q("UPDATE attendance_policy SET geofence_mode = $1, device_mode = $2", [geofence, device]);
+    q(
+      `UPDATE attendance_policy
+          SET geofence_mode = $1, office_geofence_mode = $1, home_geofence_mode = $1, site_geofence_mode = $1,
+              device_mode = $2`,
+      [geofence, device],
+    );
 
   async function signIn(who, { cookie = null } = {}) {
     ip += 1;
@@ -147,6 +153,9 @@ describeDb("attendance against the real migrations", () => {
   beforeAll(async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
     await rebuild(pool, config.DB_NAME);
+    // The organisation's policy, as a database's own row from before versions: no policy is
+    // seeded (A26), and setPolicy below changes this one.
+    await q("INSERT INTO attendance_policy (name) VALUES ('Organisation')");
     outbox.markReady();
     aiRegistry.load();
     ({ app } = buildApp({ strict: true, accessLog: false }));

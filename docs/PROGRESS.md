@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 12 | 4 | 0 | 8 | 0 | 0 |
+| M9 Settings & Governance | 12 | 2 | 0 | 10 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **95** | **57** | **0** | **38** | **0** | **0** |
+| **Total** | **95** | **55** | **0** | **40** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
@@ -729,12 +729,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 89 | Policy Updates | `policy-updates` | M9 | LA | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
+| 89 | Policy Updates | `policy-updates` | M9 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · LA · Policy Updates (#89) on the real API, built with Settings · Attendance Policy (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.15): the newest version of the attendance policy as full sentences, one a rule and mode with People's values filled in (`features/attendance/policy-text.ts`), under Clocking In, At the Office, Working From Home, At a Field Site, Your Location and Your Devices, a section the version changed tagged Changed; People's note, its first day and state (In Force, or Starts on a date), Acknowledge, and All Versions, each opening its own sentences; a notice opens its version by `?version=`. Acknowledging never blocks the clock; everyone at work with a login is told of a new version (bell and push) and reminded once after 3 days, in the working day (the reminder engine's `attendance_policy_unacknowledged`). Before any version, the default rules show with nothing to acknowledge. Checked by 3 screen tests and 5 sentence tests on the mock (desktop and 390 px), 8 integration tests on the real migrations, and on the real API in Chromium at 390 px with touch (20/10/2026): Version 1 published from Settings, its web push delivered to a local push service (VAPID-signed, aes128gcm, decrypting to the notice and its link), the push's link opening Policy Updates, Acknowledge (332 by 44 px) recorded and the notice read; the 3-day reminder pushed once to the person who had not acknowledged, and never to the one who had; the live build's service worker, given those pushes, showed the device notification (title, line, badge, icon, Mark Read) with no window open and left it to the in-app banner with one on screen, and the link a tap opens kept through sign-in to Policy Updates, marking the notice read. Left: a physical phone through a real push service (Google's or Apple's) and its notification shade; a staging seed publishing a first version (it would tell every member of staff on staging).
 - 19/10/2026 · TB · My Attendance (#9) and the clock panel: the three gaps against the 12 and 13 October rules closed (`docs/guides/attendance.md` §6.14). The sign-in prompt opens on whatever screen the day's first session lands on, Home or a link (`sign_in_prompt` on today, decided by Attendance); the start reminder's push is not sent to someone in front of the app, who has the start prompt instead, and reaches them if they leave it still not clocked in within the hour; every prompt opens over a blurred screen on both shells (`Modal` and `Sheet` take `blur`, also through `useModal().open`). Checked by 10 integration tests on the real migrations, 4 screen tests of the prompts at a held clock and 2 component tests of the blur. Left: nothing of the three; not yet seen on a phone with push on.
 - 19/10/2026 · TB · My Documents (#14): View File opens a PDF or a photo full screen in the file viewer shared with Staff Community (Download, Share on a phone), and the preview beside the list draws a PDF's pages in the app with PDF.js, where the browser's own viewer showed nothing on Android and was blocked by the security policy on staging and production. Checked in Chromium on the live build under the production policy (upload, preview, View File). Left: walk it on a phone once staging has it.
 - 19/10/2026 · AJ · My Security (#90): the Clock-In Devices card lists the person's registered and new devices (name and platform, status, last clock-in, This Device) from `GET /devices/mine`, with Manage My Devices; the phone tile counts the registered ones (the team lead, 19/10/2026).
@@ -1047,7 +1048,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1058,6 +1059,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · LA · Attendance Policy (#73) on the real API, brought forward from M9 with Policy Updates (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.15): one organisation policy in numbered versions. People with `settings` edit change the clock checks (Grace Minutes 0 to 60; the location check for the office, a home and a field site, each Off, Warn or Block; GPS Accuracy 50 to 250 m; Home Radius 50 to 500 m; the Device Check), Save Draft (each changed rule tagged), Discard Changes, and Publish Policy from a first day (today to 90 days, after any version waiting) with a note, which makes it `Version N` and tells everyone; a version waiting can be withdrawn with a reason, its rules going back to the draft. Versions list each one's first day, state and acknowledgements; a version opens with its rules and who has acknowledged it (Everyone, Acknowledged, Pending). The location mode is now per place on the clock, and each punch keeps the version it was judged by. `1370` (versions, place modes, `attendance_policy_acknowledgement`), `1395` (1099's Standard policy out, A26); 12 routes; 6 events; one job. Owner set to LA, as the 17/10 note says. Checked by 8 integration tests, 4 backend unit tests and 3 screen tests on the mock (desktop and 390 px), and on the real API in Chromium at 390 px (20/10/2026): Save Draft, Publish Policy and Versions with who acknowledged; with the office on Block, a clock-in 1 km away was refused and one 30 m away accepted, each recorded with Version 1. Left: the pay rules (lateness deduction, overtime) join the policy with payroll (M6) and the late-arrivals query rule with Queries (M3).
 - 20/10/2026 · TB · System Health (#95) built, second tab after Organisation, from TB's brief and
   answers (`docs/guides/system-health.md`): the readiness checks as they stand, a day or a week of
   snapshots, and every fault the code reports, grouped on the fingerprint the error reporter already

@@ -16,6 +16,7 @@ const homes = require("./attendance.home");
 const requests = require("./attendance.requests");
 const assignments = require("./attendance.assignments");
 const schedules = require("./attendance.schedule");
+const policy = require("./attendance.policy");
 
 const q = (req) => req.validated.query || {};
 const id = (req) => req.validated.params.id;
@@ -114,4 +115,29 @@ module.exports = {
     ),
 
   export: async (req, res) => accepted(res, await service.requestRegisterExport(withActor(req), req.validated.body)),
+
+  myPolicy: async (req, res) => ok(res, await policy.mine(req.user)),
+
+  myPolicyVersions: async (req, res) => sendPaged(res, await policy.myVersions(req.user, q(req))),
+
+  myPolicyVersion: async (req, res) => ok(res, await policy.myVersion(req.user, id(req))),
+
+  acknowledgePolicy: async (req, res) => ok(res, await policy.acknowledge(withActor(req), id(req))),
+
+  policy: async (req, res) => ok(res, await policy.overview(req.user)),
+
+  savePolicyDraft: async (req, res) => ok(res, await policy.saveDraft(withActor(req), req.validated.body)),
+
+  discardPolicyDraft: async (req, res) => ok(res, await policy.discardDraft(withActor(req))),
+
+  publishPolicy: async (req, res) => ok(res, await policy.publish(withActor(req), req.validated.body)),
+
+  policyVersions: async (req, res) => sendPaged(res, await policy.versions(q(req))),
+
+  policyVersion: async (req, res) => ok(res, await policy.version(id(req))),
+
+  withdrawPolicy: async (req, res) => ok(res, await policy.withdraw(withActor(req), id(req), req.validated.body)),
+
+  policyAcknowledgements: async (req, res) =>
+    sendPaged(res, await policy.acknowledgements(id(req), q(req), scopeOf(req))),
 };
