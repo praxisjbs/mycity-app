@@ -436,6 +436,7 @@ const LINK_PREVIEW = (lp = "lp", lpd = "lpd") => `
 const MESSAGE = `
   SELECT x.community_message_id, x.community_channel_id, x.message_type, x.sender_user_id, x.sent_at,
          x.body, x.metadata, x.transcript, x.deleted_at, x.edited_at, x.document_id,
+         CASE WHEN x.pinned_until > now() THEN x.pinned_until END AS pinned_until,
          x.community_link_preview_id,
          ${PERSON("e", "d")} AS author,
          ${mediaJson("doc")} AS document,
@@ -472,6 +473,43 @@ function listMessages(db, channelId, userId, query) {
     [userId, channelId, query.q ?? null],
     query,
   );
+}
+
+/** What is pinned in a conversation now, newest pin first; at most three, one page. */
+function listPins(db, channelId, userId, query) {
+  return pageQuery(
+    db,
+    `${MESSAGE}, ${TOTAL_COL} ${MESSAGE_FROM}
+      WHERE x.community_channel_id = $2 AND x.deleted_at IS NULL AND x.pinned_until > now()
+      ORDER BY x.pinned_at DESC, x.community_message_id`,
+    [userId, channelId],
+    query,
+  );
+}
+
+/** Pin a message until `until`, or unpin it with null. */
+function setPin(db, messageId, until, userId) {
+  return one(
+    db,
+    `UPDATE community_message
+        SET pinned_until = $2::timestamptz,
+            pinned_at = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE now() END,
+            pinned_by = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE $3::uuid END
+      WHERE community_message_id = $1 RETURNING *`,
+    [messageId, until, userId],
+  );
+}
+
+/** The conversation's live pins past the newest `keep`, oldest first: the ones a new pin pushes out. */
+async function pinsBeyond(db, channelId, keep) {
+  const { rows } = await db.query(
+    `SELECT community_message_id FROM community_message
+      WHERE community_channel_id = $1 AND deleted_at IS NULL AND pinned_until > now()
+      ORDER BY pinned_at DESC, community_message_id
+      OFFSET $2 -- pagination:batch the pins beyond the conversation's limit, at most a few`,
+    [channelId, keep],
+  );
+  return rows.map((r) => r.community_message_id);
 }
 
 function messageFor(db, messageId, userId) {
@@ -906,6 +944,9 @@ module.exports = {
   directChannelsOf,
   otherPointers,
   listMessages,
+  listPins,
+  setPin,
+  pinsBeyond,
   messageFor,
   insertMessage,
   mediaRef,

@@ -224,6 +224,9 @@ const Message = z
     can_edit: z.boolean(),
     can_delete: z.boolean(),
     can_close: z.boolean(),
+    /** While it is pinned at the top of the conversation; null once that time has passed. */
+    pinned_until: isoDateTime.nullable(),
+    can_pin: z.boolean(),
   })
   .strict();
 
@@ -283,6 +286,13 @@ const MessageEdit = z
     options: z.array(text(80)).min(2).max(4).optional(),
   })
   .strict();
+
+/** PUT /community/messages/:id/pin: how long it stays at the top (§3 step 16). */
+const PIN_PERIODS = ["24h", "7d", "30d"];
+const MessagePin = z.object({ period: z.enum(PIN_PERIODS) }).strict();
+
+/** GET /community/channels/:id/pins: what is pinned now, newest pin first (at most 3). */
+const PinListQuery = listQuery();
 
 const PollVote = z.object({ option_index: z.number().int().min(0).max(3) }).strict();
 
@@ -407,8 +417,14 @@ const TABLES = {
       can_edit: "whether the caller may edit it now: the author, text within 15 minutes or a poll before its first vote",
       can_delete: "whether the caller may delete it: the author or a moderator, never an announcement's post",
       can_close: "whether the caller may close it: an open poll, by its author or a moderator",
+      can_pin: "whether the caller may pin or unpin it: a moderator in a channel, either person in a direct conversation",
     },
   },
+  MessagePin: {
+    table: null,
+    reason: "a pin's period, written as community_message.pinned_until",
+  },
+  PinListQuery: { table: null, reason: "list controls for a conversation's pins" },
   MessageListQuery: { table: null, reason: "list controls for a conversation's messages" },
   MessageEdit: {
     table: "community_message",
@@ -477,6 +493,9 @@ module.exports = {
   MessageCreate,
   RecognitionCreate,
   MessageEdit,
+  PIN_PERIODS,
+  MessagePin,
+  PinListQuery,
   PollVote,
   Transcript,
   Conversation,

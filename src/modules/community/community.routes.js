@@ -160,6 +160,18 @@ route(
 );
 route(
   router,
+  "get",
+  "/channels/:id/pins",
+  {
+    query: cm.PinListQuery,
+    response: cm.MessagePage,
+    summary: "What is pinned at the top of a conversation",
+  },
+  view(),
+  controller.listPins,
+);
+route(
+  router,
   "post",
   "/channels/:id/messages",
   { body: cm.MessageCreate, response: cm.Message, summary: "Post a message" },
@@ -219,6 +231,22 @@ route(
   { no_content: true, summary: "Delete a message" },
   create(),
   controller.deleteMessage,
+);
+route(
+  router,
+  "put",
+  "/messages/:id/pin",
+  { body: cm.MessagePin, response: cm.Message, summary: "Pin a message for a while" },
+  view(),
+  controller.pinMessage,
+);
+route(
+  router,
+  "delete",
+  "/messages/:id/pin",
+  { response: cm.Message, summary: "Unpin a message" },
+  view(),
+  controller.unpinMessage,
 );
 route(
   router,

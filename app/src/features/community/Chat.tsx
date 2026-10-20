@@ -4,7 +4,7 @@ import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
 import type { LinkPreview, Message, MessageCreate } from "@/api/types/community";
 import type { PageMeta } from "@/api/types/common";
-import { Button, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
+import { Button, ChoiceField, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type MenuItem } from "@mycity/ui";
 import { AlbumPost, Post } from "./Posts";
 import { MessageLink, useViewer, viewerFilesOf } from "./Media";
 
@@ -44,6 +44,7 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
   const [page, setPage] = useState<PageMeta | null>(null);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pins, setPins] = useState<Message[]>([]);
   const pageNo = useRef(1);
 
   const fetchPage = useCallback(
@@ -62,6 +63,7 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
   const reload = useCallback(async () => {
     setLoading(true);
     try {
+      if (id) void api.call("GET /api/v1/community/channels/:id/pins", { params: { id }, query: {} }).then((r) => setPins(r.data), () => undefined);
       const res = await fetchPage(1, q);
       pageNo.current = 1;
       if (res) {
@@ -71,10 +73,11 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
     } finally {
       setLoading(false);
     }
-  }, [fetchPage, q]);
+  }, [fetchPage, q, id]);
 
   useEffect(() => {
     setMsgs([]);
+    setPins([]);
     void reload();
   }, [reload]);
 
@@ -123,7 +126,7 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
   };
 
   const replace = (m: Message) => setMsgs((list) => list.map((x) => (x.community_message_id === m.community_message_id ? m : x)));
-  return { id, msgs, page, q, setQ, loading, older, send, sendMany, sendFile, reload, replace };
+  return { id, msgs, page, q, setQ, loading, older, send, sendMany, sendFile, reload, replace, pins };
 }
 
 /** Edit Message: the author's text, within 15 minutes of sending it. */
@@ -146,6 +149,73 @@ function EditMessage({ m, close, done }: { m: Message; close: () => void; done: 
         <Button variant="primary" onClick={() => save()}>Save Changes</Button>
       </FormFooter>
     </>
+  );
+}
+
+/** Pin Message: how long it stays at the top of the conversation. */
+function PinMessage({ m, close, done }: { m: Message; close: () => void; done: () => Promise<void> }) {
+  const [period, setPeriod] = useState<"24h" | "7d" | "30d">("7d");
+  const pin = async () => {
+    try {
+      await api.call("PUT /api/v1/community/messages/:id/pin", { params: { id: m.community_message_id }, body: { period } });
+      close();
+      await done();
+      toast("Message pinned");
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+      else throw e;
+    }
+  };
+  return (
+    <>
+      <Field label="Pin For">
+        <ChoiceField value={period} onChange={setPeriod} options={[["24h", "24 Hours"], ["7d", "7 Days"], ["30d", "30 Days"]]} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="pinned" onClick={pin}>Pin Message</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/** One line for a pinned message: its text, or what kind of thing it is. */
+function pinLine(m: Message): string {
+  const kind: Partial<Record<Message["message_type"], string>> = { image: "Photo", video: "Video", file: "File", audio: "Voice note", poll: "Poll", recognition: "Recognition", birthday: "Birthday", anniversary: "Work anniversary" };
+  if (m.message_type === "announcement") return m.announcement?.title ?? "Announcement";
+  const k = kind[m.message_type];
+  if (k) return m.body ? `${k}: ${m.body}` : k;
+  return m.body ?? "";
+}
+
+/**
+ * What is pinned in a conversation, above its messages: the newest first, a tap steps to the
+ * next and brings the message into view when it is on the page; Unpin for those who may.
+ */
+export function PinnedBar({ t }: { t: ReturnType<typeof useThread> }) {
+  const [at, setAt] = useState(0);
+  const pins = t.pins;
+  if (!pins.length) return null;
+  const n = at % pins.length;
+  const m = pins[n]!;
+  const show = () => {
+    document.querySelector(`[data-message="${m.community_message_id}"]`)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    setAt(n + 1);
+  };
+  const unpin = async () => {
+    await api.call("DELETE /api/v1/community/messages/:id/pin", { params: { id: m.community_message_id } });
+    await t.reload();
+    toast("Message unpinned");
+  };
+  return (
+    <div className="flex flex-none items-center gap-2 border-b border-border bg-muted py-1.5 pr-2 pl-4 max-md:pl-3">
+      <Icon name="pinned" className="size-3.5 flex-none text-subtle-foreground" />
+      <button type="button" onClick={show} aria-label={`Pinned message ${n + 1} of ${pins.length}`} className="min-w-0 flex-1 text-left phone:min-h-tap">
+        <span className="block truncate text-xs">{pinLine(m)}</span>
+      </button>
+      {pins.length > 1 && <span className="flex-none text-2xs text-subtle-foreground tabular-nums">{n + 1} of {pins.length}</span>}
+      {m.can_pin && <IconButton icon="x" label="Unpin message" size="sm" onClick={unpin} />}
+    </div>
   );
 }
 
@@ -210,6 +280,15 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
       failed(e);
     }
   };
+  const unpin = async (m: Message) => {
+    try {
+      t.replace(await api.call("DELETE /api/v1/community/messages/:id/pin", { params: { id: m.community_message_id } }));
+      await t.reload();
+      toast("Message unpinned");
+    } catch (e) {
+      failed(e);
+    }
+  };
   /** An album is deleted whole, asked once, when the caller may delete every photo in it. */
   const removeAll = async (ms: Message[]) => {
     if (!(await confirm({ title: "Delete Photos", body: `All ${ms.length} are removed for everyone in this conversation.`, confirmLabel: "Delete Photos", cancelLabel: "Keep Them", destructive: true }))) return;
@@ -234,6 +313,8 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
     if (m.can_edit && m.message_type === "text") items.push({ label: "Edit", icon: "edit", onSelect: () => modal.open({ title: "Edit Message", body: (close) => <EditMessage m={m} close={close} done={t.replace} /> }) });
     if (m.can_edit && m.message_type === "poll" && editPoll) items.push({ label: "Edit", icon: "edit", onSelect: () => editPoll(m) });
     if (m.can_close) items.push({ label: "Close Poll", icon: "lock", onSelect: () => void closePoll(m) });
+    if (m.can_pin && !m.pinned_until) items.push({ label: "Pin Message", icon: "pinned", onSelect: () => modal.open({ title: "Pin Message", body: (close) => <PinMessage m={m} close={close} done={t.reload} /> }) });
+    if (m.can_pin && m.pinned_until) items.push({ label: "Unpin", icon: "pinned", onSelect: () => void unpin(m) });
     if (m.can_delete) items.push({ label: "Delete", icon: "trash", danger: true, onSelect: () => void remove(m) });
     if (!items.length) return undefined;
     return (
@@ -255,7 +336,7 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
         const marker = day !== lastDay ? (day === today ? "Today" : day === yesterday ? "Yesterday" : formatDate(day)) : null;
         lastDay = day;
         return (
-          <div key={key} className={cn("group flex flex-col gap-3", m.mine && m.message_type !== "announcement" && "items-end")}>
+          <div key={key} data-message={m.community_message_id} className={cn("group flex flex-col gap-3", m.mine && m.message_type !== "announcement" && "items-end")}>
             {marker && <span className="self-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-2xs text-subtle-foreground">{marker}</span>}
             {ms.length > 1 ? (
               <AlbumPost ms={ms} q={t.q} dm={dm} onView={view} menu={albumMenu(ms)} />

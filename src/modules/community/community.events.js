@@ -34,6 +34,9 @@ const EVENTS = defineEvents("community", {
   "channel_message.edited": {
     summary: "A message was edited, or a poll closed",
   },
+  "channel_message.pinned": {
+    summary: "A message was pinned at the top of its conversation, or unpinned",
+  },
   "channel_message.deleted": {
     summary: "A message was deleted by its author or a moderator",
   },
@@ -117,6 +120,7 @@ for (const key of [
   EVENTS.CHANNEL_MESSAGE_REACTED,
   EVENTS.CHANNEL_MESSAGE_EDITED,
   EVENTS.CHANNEL_MESSAGE_DELETED,
+  EVENTS.CHANNEL_MESSAGE_PINNED,
   EVENTS.CHANNEL_MESSAGE_LINK_PREVIEWED,
 ]) {
   outbox.register(key, `community.push_update.${key.split(".")[1]}`, (event) =>

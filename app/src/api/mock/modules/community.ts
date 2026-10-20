@@ -25,7 +25,7 @@ const person = (key: string): PersonRef => {
 const uid = (key: string) => sid(`user:${key}`);
 const keyOfUser = (userId: string) => PEOPLE.find((p) => uid(p.user_key) === userId)?.user_key;
 
-type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _noLink?: boolean };
+type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _noLink?: boolean; _pinnedAt?: number };
 let seq = 0;
 function msg(type: Message["message_type"], by: string | null, when: string, over: Partial<Message> = {}): MMsg {
   return {
@@ -51,6 +51,8 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     can_edit: false,
     can_delete: false,
     can_close: false,
+    pinned_until: null,
+    can_pin: false,
     ...over,
     _by: by,
     _fans: [],
@@ -266,7 +268,7 @@ function lineOf(m: Message | undefined): string | null {
 
 /** A message as `user` sees it: theirs or not, their reaction and vote, and the ticks. */
 function view(m: MMsg, user: string, c: Chan): Message {
-  const { _by, _fans, _votes, _noLink, ...rest } = m;
+  const { _by, _fans, _votes, _noLink, _pinnedAt, ...rest } = m;
   const mine = _by === user;
   const voted = Object.keys(_votes).length > 0;
   const closed = Boolean(m.poll?.closed);
@@ -277,6 +279,8 @@ function view(m: MMsg, user: string, c: Chan): Message {
     can_edit: !m.deleted && mine && ((m.message_type === "text" && fresh) || (m.message_type === "poll" && !closed && !voted)),
     can_delete: !m.deleted && m.message_type !== "announcement" && (mine || moderates(c, user)),
     can_close: !m.deleted && m.message_type === "poll" && !closed && (mine || moderates(c, user)),
+    pinned_until: !m.deleted && m.pinned_until && new Date(m.pinned_until).getTime() > Date.now() ? m.pinned_until : null,
+    can_pin: !m.deleted && (c.channel_type === "direct" || moderates(c, user)),
   };
   if (m.announcement) {
     const a = ANNOUNCEMENTS.find((x) => x.announcement_id === m.announcement!.announcement_id);
@@ -563,6 +567,32 @@ route("DELETE /api/v1/community/messages/:id", (req) => {
   f.m.recognition = null;
   f.m.poll = null;
   return noContent();
+});
+const PIN_HOURS: Record<string, number> = { "24h": 24, "7d": 168, "30d": 720 };
+const livePins = (c: Chan) =>
+  c.msgs.filter((m) => !m.deleted && m.pinned_until && new Date(m.pinned_until).getTime() > Date.now()).sort((a, b) => (b._pinnedAt ?? 0) - (a._pinnedAt ?? 0));
+route("GET /api/v1/community/channels/:id/pins", (req) => {
+  const c = chan(req.params.id);
+  if (!isMember(c, req.user!)) return notFound();
+  return paged(livePins(c!).map((m) => view(m, req.user!, c!)), req);
+});
+route("PUT /api/v1/community/messages/:id/pin", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (f.c.channel_type !== "direct" && !moderates(f.c, req.user!)) return fail(403, "NOT_MODERATOR", "Only the channel's moderators pin messages");
+  const hours = PIN_HOURS[String(req.body.period)];
+  if (!hours) return invalid({ period: ["Choose a period"] });
+  f.m.pinned_until = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+  f.m._pinnedAt = Date.now();
+  for (const old of livePins(f.c).slice(3)) old.pinned_until = null;
+  return ok(view(f.m, req.user!, f.c));
+});
+route("DELETE /api/v1/community/messages/:id/pin", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (f.c.channel_type !== "direct" && !moderates(f.c, req.user!)) return fail(403, "NOT_MODERATOR", "Only the channel's moderators pin messages");
+  f.m.pinned_until = null;
+  return ok(view(f.m, req.user!, f.c));
 });
 route("POST /api/v1/community/messages/:id/close", (req) => {
   const f = located(req.params.id);

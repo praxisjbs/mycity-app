@@ -548,6 +548,55 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await channelsOf("bola")).find((c) => c.name === "pin-b").muted).toBe(false);
   });
 
+  test("a message pinned for a while: moderators in a channel, either person in a direct message, at most 3, gone when its time is up", async () => {
+    const made = await as("bola").post("/community/channels").send({ name: "pin-board", member_ids: [people.tunde.employee.employee_id] });
+    const id = made.body.community_channel_id;
+    const post = async (body) => (await as("tunde").post(`/community/channels/${id}/messages`).send({ message_type: "text", body })).body;
+    const first = await post("Gate code is 4412");
+
+    // Tunde is a member, not an admin: he sees no Pin and is refused.
+    expect(first).toMatchObject({ pinned_until: null, can_pin: false });
+    expect((await as("tunde").put(`/community/messages/${first.community_message_id}/pin`).send({ period: "7d" })).status).toBe(403);
+    expect((await as("bola").put(`/community/messages/${first.community_message_id}/pin`).send({ period: "1y" })).status).toBe(422);
+
+    realtime.toUser.mockClear();
+    const pinned = await as("bola").put(`/community/messages/${first.community_message_id}/pin`).send({ period: "7d" });
+    expect(pinned.status).toBe(200);
+    expect(pinned.body.can_pin).toBe(true);
+    const days = (new Date(pinned.body.pinned_until).getTime() - Date.now()) / 86400000;
+    expect(days).toBeGreaterThan(6.99);
+    expect(days).toBeLessThan(7.01);
+    await drain();
+    expect(realtime.toUser).toHaveBeenCalledWith(people.tunde.user.user_id, "community.message_updated", expect.objectContaining({ community_channel_id: id }));
+    const seen = await as("tunde").get(`/community/channels/${id}/pins`);
+    expect(seen.body.data.map((m) => m.body)).toEqual(["Gate code is 4412"]);
+
+    // A fourth pin takes the place of the oldest.
+    const more = [];
+    for (const body of ["Two", "Three", "Four"]) {
+      const m = await post(body);
+      more.push(m);
+      await as("bola").put(`/community/messages/${m.community_message_id}/pin`).send({ period: "24h" });
+    }
+    const now = await as("tunde").get(`/community/channels/${id}/pins`);
+    expect(now.body.data.map((m) => m.body)).toEqual(["Four", "Three", "Two"]);
+
+    // Its time passes: it is no longer pinned, with nothing run.
+    await q("UPDATE community_message SET pinned_until = now() - interval '1 second' WHERE community_message_id = $1", [more[0].community_message_id]);
+    expect((await as("tunde").get(`/community/channels/${id}/pins`)).body.data.map((m) => m.body)).toEqual(["Four", "Three"]);
+    const unpinned = await as("bola").del(`/community/messages/${more[2].community_message_id}/pin`);
+    expect(unpinned.status).toBe(200);
+    expect(unpinned.body.pinned_until).toBeNull();
+    expect((await as("tunde").get(`/community/channels/${id}/pins`)).body.data.map((m) => m.body)).toEqual(["Three"]);
+
+    // In a direct conversation either person pins.
+    const dm = await as("tunde").post("/community/direct").send({ employee_id: people.ceo.employee.employee_id });
+    const said = await as("tunde").post(`/community/channels/${dm.body.community_channel_id}/messages`).send({ message_type: "text", body: "Flight at 6" });
+    expect(said.body.can_pin).toBe(true);
+    expect((await as("ceo").put(`/community/messages/${said.body.community_message_id}/pin`).send({ period: "24h" })).status).toBe(200);
+    expect((await as("bola").get(`/community/channels/${dm.body.community_channel_id}/pins`)).status).toBe(404);
+  });
+
   test("direct messages: one conversation per pair, ticks from sent to delivered to read, private to the two", async () => {
     const opened = await as("bola").post("/community/direct").send({ employee_id: people.tunde.employee.employee_id });
     expect(opened.status).toBe(200);

@@ -531,6 +531,8 @@ async function present(
         !deleted && r.message_type !== "announcement" && (mine || moderator),
       can_close:
         !deleted && r.message_type === "poll" && !closed && (mine || moderator),
+      pinned_until: deleted ? null : iso(r.pinned_until),
+      can_pin: !deleted && (direct || moderator),
     };
   });
 }
@@ -978,6 +980,58 @@ async function closePoll(messageId, user) {
   return messageView(pool, messageId, user);
 }
 
+/** How long each pin period lasts. */
+const PIN_MS = { "24h": 24 * 3600 * 1000, "7d": 7 * 24 * 3600 * 1000, "30d": 30 * 24 * 3600 * 1000 };
+
+/** At most this many messages are pinned at once in a conversation. */
+const MAX_PINS = 3;
+
+/** A moderator in a channel, either person in a direct conversation (§3 step 16). */
+function assertMayPin({ ch, moderator }) {
+  if (ch.channel_type !== "direct" && !moderator)
+    throw new AppError("NOT_MODERATOR", "Only the channel's moderators pin messages", 403);
+}
+
+/**
+ * Pin a message at the top of its conversation for a period; pinning it again starts the
+ * period again. A fourth pin takes the place of the oldest, as each person's own pins do.
+ */
+async function pinMessage(messageId, body, user) {
+  await tx(async (client) => {
+    const found = await lockedForChange(client, messageId, user);
+    assertMayPin(found);
+    const until = new Date(Date.now() + PIN_MS[body.period]).toISOString();
+    const after = await repo.setPin(client, messageId, until, user.user_id);
+    for (const old of await repo.pinsBeyond(client, found.row.community_channel_id, MAX_PINS)) {
+      const off = await repo.setPin(client, old, null, null);
+      await changed(client, EVENTS.CHANNEL_MESSAGE_PINNED, off, user, { pinned_until: null });
+    }
+    await changed(client, EVENTS.CHANNEL_MESSAGE_PINNED, after, user, { pinned_until: until, period: body.period });
+  });
+  return messageView(pool, messageId, user);
+}
+
+async function unpinMessage(messageId, user) {
+  await tx(async (client) => {
+    const found = await lockedForChange(client, messageId, user);
+    assertMayPin(found);
+    if (!found.row.pinned_until) return;
+    const after = await repo.setPin(client, messageId, null, null);
+    await changed(client, EVENTS.CHANNEL_MESSAGE_PINNED, after, user, { pinned_until: null });
+  });
+  return messageView(pool, messageId, user);
+}
+
+/** What is pinned in a conversation now, for the bar above its messages. */
+async function listPins(channelId, user, query) {
+  const m = await member(pool, channelId, user);
+  const page = await repo.listPins(pool, channelId, user.user_id, query);
+  const direct = m.channel_type === "direct";
+  const other = direct ? await repo.otherPointers(pool, channelId, user.user_id) : null;
+  const moderator = isModerator(m, await canAnnounce(pool, user));
+  return { ...page, data: await present(pool, page.data, user, { direct, other, moderator }) };
+}
+
 /** A voice note's transcript, asked for once and stored for everyone after (§3 step 11). */
 async function transcript(messageId, user) {
   const row = await repo.messageFor(pool, messageId, user.user_id);
@@ -1146,6 +1200,9 @@ module.exports = {
   listChannels,
   getChannel,
   createChannel,
+  pinMessage,
+  unpinMessage,
+  listPins,
   updateChannel,
   listMembers,
   addMembers,

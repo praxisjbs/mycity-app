@@ -10,7 +10,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Composer, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
+import { Composer, PinnedBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
 import { SendFiles, SharedFiles } from "./Media";
 import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
@@ -158,6 +158,7 @@ function Channels() {
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
+      <PinnedBar t={t} />
       <ThreadBody
         t={t}
         editPoll={(m) => modal.open({ title: "Edit Poll", body: (close) => <PollForm close={close} edit={m} send={(b) =>
@@ -608,6 +609,7 @@ function Direct() {
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
+      <PinnedBar t={t} />
       <ThreadBody t={t} dm />
       <Composer
         key={current.community_channel_id}
