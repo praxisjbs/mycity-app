@@ -25,7 +25,7 @@ section exists to stop.
 | Guide | Feature | Owner | Milestone | Written |
 |---|---|---|---|---|
 | `home.md` | Home: Overview, Team, Alerts, Reports (role-sensitive dashboard, KPI catalogue, alert rules, scheduled reports) | TB | M1 | ☑ |
-| `attendance.md` | Clock-in and clock-out across ESS, People, Settings and Devices | LA | M1 | ☐ |
+| `attendance.md` | Clock-in and clock-out across ESS, People, Home and Devices; the Attendance policy's rules, work schedules, temporary sites, deductions and overtime | LA | M1 | ☐ |
 | `ess.md` | Employee Self-Service: the seven approved tabs plus My Security; the attendance tabs inside ESS are LA's | AJ | M1 | ☐ |
 | `community.md` | Staff Community: Channels, Direct Messages, Announcements, recognition, celebrations | GE | M1 | ☑ |
 | `mailbox.md` | Mailbox client | GE | M1 | ☑ |
@@ -34,6 +34,7 @@ section exists to stop.
 | `organogram.md` | Organogram: People · Organogram (HR builder) and ESS · Org Chart (read-only viewer) over the live reporting tree | TB | M1 | ☐ |
 | `notifications.md` | Notifications: the bell's pane on both shells, the in-app banner, web push to phones and computers, Notification Settings (brought forward from M6) | TB | M0 | ☐ |
 | `system-health.md` | System Health: Settings tab for readiness checks, performance over time, grouped faults with a shared status, and the Markdown brief for an AI | GE | M9 | ☑ |
+| `policies.md` | Policies: Knowledge Hub · Policies for every company policy, documents and rules policies (Attendance first), versions, Applies To, approval and signatures, acknowledgement on ESS · Policy Updates (brought forward from M10) | TB | M1 | ☑ |
 | `addresses.md` | Addresses: every address across both apps picked from the address search, pinned on the map or, in an outage, taken from the device; never typed (F27, gate 22) | TB | M0 | ☑ |
 | `integrations.md` | Integrations: Settings tab for the system sender, the staff mail server, Geoapify, Gemini and web push, their keys encrypted, tested before save and watched (brought forward from M9) | TB | M9 | ☑ |
 

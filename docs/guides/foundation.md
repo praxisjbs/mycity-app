@@ -86,7 +86,7 @@ These finish M0 and no prompt can do them:
 | ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
 | Settings · Integrations (#77) | Settings | `integrations` view, edit, delete (Implementation Team, System Administrator) | none | **Built** (20/10/2026) | Its own guide: `docs/guides/integrations.md` |
 | Settings · Appearance (#75), Notifications (#74) | Settings | | none | Mock | Coming Soon (#74 is M6) |
-| Settings · Attendance Policy (#73) | Settings | `settings` view; edit to change and publish | LA | **Built** (19/10/2026) | The attendance policy's versions, draft, publishing and acknowledgements: `docs/guides/attendance.md` §6.15 |
+| Settings · Attendance Policy (#73) | Settings | Retired | LA | **Dropped** (TB, 20/10/2026) | The Attendance policy is a rules policy on Knowledge Hub · Policies: `docs/guides/policies.md`, its rules `docs/guides/attendance.md` §6.15 |
 
 ## 3 · How the screens relate
 
@@ -492,7 +492,11 @@ As built (17/10/2026):
 
 Integrations (#77) has its own guide, `docs/guides/integrations.md`. Appearance (#75) and
 Notifications (#74, M6) stay Coming Soon. Attendance Policy
-(#73) belongs to LA's attendance work and is described in `docs/guides/attendance.md` §6.15.
+(#73) is dropped (TB, 20/10/2026): every policy, the Attendance policy included, lives on Knowledge
+Hub · Policies (`docs/guides/policies.md`). Settings · Approvals lists the Policy Approval route
+(`policy.approval`, seeded in `1396`: one stage, the CEO) and, from attendance's PR 4, the Temporary
+Site route (`attendance.temporary_site`: one stage, Operations & People), both changed there like any
+other.
 
 ### 6.9 What a document's status means (TB, 17/10/2026)
 
@@ -963,3 +967,4 @@ screen.
 - 20/10/2026 · TB · §6.14: system mail to `mycityapp.io` is no longer refused as a trapped route (System Health fault #1, every staging digest failing). Domains whose mailboxes are on the SMTP relay behind the host's spam-filter MX are named in `SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) and not route-checked; every other domain still is.
 - 20/10/2026 · TB · Settings · Integrations (#77) built with its own guide (`docs/guides/integrations.md`), brought forward from M9: §2 and §6.8 point there; Geoapify's key (§5, §6.13) and the local domains (§6.14) are kept there, with `GEOAPIFY_API_KEY` and `SMTP_LOCAL_DOMAINS` as the server file's fallback.
 - 20/10/2026 · TB · §6.13: addresses are picked, never typed (F27), with their own guide, `docs/guides/addresses.md`, which now covers the `maps` module (taken off this guide's header). The reverse lookup became `GET /maps/pin`, open to everyone signed in for a point they pin as an address.
+- 20/10/2026 · TB · Settings · Attendance Policy (#73) is dropped: policies live on Knowledge Hub · Policies (`docs/guides/policies.md`), brought forward from M10; §2 and §6.8 say so, and Settings · Approvals gains the Policy Approval route (and the Temporary Site route with attendance's PR 4).

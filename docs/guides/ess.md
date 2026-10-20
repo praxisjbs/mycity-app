@@ -16,8 +16,9 @@ Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeti
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
 13 October to match this guide, and on 14 October to the screen conventions (FRONTEND_GUIDE §5, §7,
 §8); where they differ, this guide wins. Attendance inside ESS (My
-Attendance, Work Location Requests, My Devices, Policy Updates) is owned by LA and described in
-`docs/MyCity-ERP-Documents/attendance-guide.md`; this guide only says how those tabs sit in ESS.
+Attendance, Work Location Requests, My Devices) is owned by LA and described in
+`docs/guides/attendance.md`; Policy Updates is described in `docs/guides/policies.md` (TB); this
+guide only says how those tabs sit in ESS.
 
 ---
 
@@ -39,7 +40,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Attendance (`my-attendance`) | Staff app | Every employee, own record | Owned by LA: today, clock events, exceptions (attendance guide §1, §2) | Clock in and out, report an issue, export the month |
 | ESS · Work Location Requests (`work-location-requests`) | Staff app | Every employee | Owned by LA | Request a temporary location or exception |
 | ESS · My Devices (`my-devices`) | Staff app | Every employee | Owned by LA: devices used to clock in, up to 3 | Register this device |
-| ESS · Policy Updates (`policy-updates`) | Staff app | Every employee | Owned by LA: the attendance policy's versions in plain sentences, what changed, their acknowledgement (attendance guide §6.15) | Acknowledge the newest version |
+| ESS · Policy Updates (`policy-updates`) | Staff app | Every employee | Owned by TB (policies.md): every policy that applies to them, those to acknowledge first, as clean text or sentences with what changed; approvers, the versions waiting on them | Acknowledge, Later, Download PDF; an approver approves and signs |
 | ESS · My Performance (`my-performance`) | Staff app | Every employee | KPIs this month, the goal chain above them, reviews | Read; open a review; self rating opens with the review cycle (M2) |
 | ESS · My Payslips (`my-payslips`) | Staff app | Every employee | Payslips by year, gross, net, deductions, next payday, a preview | Change year, preview a month, download a PDF, email a copy, open the deductions breakdown |
 | ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, cancel a request while it waits or before it starts, open a request or a figure's list, open the leave calendar |
@@ -70,10 +71,11 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
    recognitions, the people pickers) and Home (Team, a card's records). Remove Photo clears the
    pointer and the initials return. `photo_url` is an API path fetched with the session, never a
    bare image link; the app fetches each one once and shares it between screens (`usePhotos`).
-2. **Work schedule.** People set the arrangement and weekly schedule in People · Employees ·
-   Attendance setup (LA) → My Profile shows it inside Employment, read only: each day Office,
-   Remote or Off, with hours from the attendance policy (09:00 to 17:00, Saturday 09:00 to 15:00)
-   and the place. Attendance judges lateness against the same schedule. One source.
+2. **Work schedule.** People set each person's work schedule on the record's Work Schedule tab, after
+   Job (attendance guide §6.13, its PR 3) → My Profile shows it, read only: each day Working or Off,
+   its hours and Office or Remote, or the Attendance policy's company hours when none is set (09:00
+   to 17:00, Saturday 09:00 to 15:00). The person is told when it changes. Attendance judges
+   lateness and absence against the same schedule. One source.
 3. **Lateness to payslip.** A late punch raises a query (attendance auto-query, LA) → it appears in
    My Queries · Open → the employee responds within 48 hours → if it is upheld a sanction is
    recorded (My Queries · Sanctions) and any deduction is accepted into the payroll run (M6) → the
@@ -288,7 +290,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | ESS · My Attendance (`my-attendance`) | Owned by LA: the attendance guide §1, §2 | The attendance guide | The attendance guide. ESS strips the "A correction never overwrites a punch" footnote from LA's page (attendance guide §5) |
 | ESS · Work Location Requests (`work-location-requests`) | Owned by LA: the attendance guide §6 | The attendance guide | The attendance guide §6 |
 | ESS · My Devices (`my-devices`) | Owned by LA: the attendance guide §1 | The attendance guide | The attendance guide §1, §7 (device rules) |
-| ESS · Policy Updates (`policy-updates`) | Owned by LA: the attendance guide §10.1 | The attendance guide | The attendance guide §6.15 |
+| ESS · Policy Updates (`policy-updates`) | Owned by TB: policies.md §10.1 | policies.md | policies.md §6 |
 | ESS · My Performance (`my-performance`) | "October 2026 · set by Ifeoma Chukwu" (desktop subtitle); KPI Score, On Track, Weight Assigned, Last Review, Next Cycle; My KPIs This Month (each KPI with its bar and progress); Rolls Up To (the goal chain from the organisational goal down to the employee's KPI); My Reviews (Cycle, Self Rating, Manager, Second Level, Status). A review opens Your Rating, Manager, Second Level, Status and, once closed, the Manager Comment | Help term on the KPI Score label: "Your KPIs, weighted to 100%. It updates as the tasks against each KPI close." | The chart caption "Weighted. Your score updates as tasks against each KPI close" became the KPI Score help; the "Five levels… you can see the whole chain" footnote: §6. "Click a review to open it" is removed: rows show as links |
 | ESS · My Payslips (`my-payslips`) | The year (‹ year ›), Email a Copy, Download All; Gross, Net Received, Payslips, Deductions (View Details), Next Payday; Payslips, 2026 (Month, Net, Status: Paid, Paid with a deduction, In the run); the selected payslip's PDF preview with Email a Copy and Download PDF. Deductions opens Salary Deductions (Month, Amount, Reason, Query, Outcome; Open My Queries). A month still in the run opens "In This Month's Run, Appears once the run is approved." | None | "This is the document the engine produces": §6. A deduction only from an upheld query, waived means nothing deducted: §3 step 3, §6. No PAYE or pension line: §6. Visible once Payroll approves, normally the 27th: §3 step 4. The Salary Deductions subtitle and "Click a month to preview it" are removed |
 | ESS · My Leave (`my-leave`) | "2026 entitlement" (desktop subtitle); Leave Calendar (a month of approved and waiting leave, the reader's own marked You and in yellow, waiting ones marked Waiting; this year and next) and Request Leave; Entitlement, Taken, Approved Upcoming, Remaining, each opening its list or request; My Requests (Type, From, To, Days, Approver, Status), a row opens the request with Cancel Request while it waits or before it starts; Entitlement by type (allowance, bar, taken, booked, pending, left; No set allowance for a type without one). Request Leave: Leave Type (the types People offer), First Day and Last Day (DD/MM/YYYY), Note (Optional); Cancel, Send Request | None | "Leave is approved by your line manager in one step" and "The calendar shows clashes before you submit": §3 step 5, §6 |
@@ -319,7 +321,7 @@ Coming Soon from the module's delivery state.
 | ESS · My Attendance (`my-attendance`) | As the attendance guide §10.2: Today's card, Field Assignments as cards when there are any, the four figures two to a row, then open exceptions and the days as cards | The subtitle; a day's punches and an exception's note, each in a bottom sheet | As the attendance guide | As My Profile |
 | ESS · Work Location Requests (`work-location-requests`) | As the attendance guide §10.2: request cards | As the attendance guide | New Request, as the attendance guide | As My Profile |
 | ESS · My Devices (`my-devices`) | As the attendance guide §10.2: the device cards with their status | The subtitle; a device's detail in a bottom sheet | Register This Device, as the attendance guide | As My Profile |
-| ESS · Policy Updates (`policy-updates`) | As the attendance guide §10.2: the newest version's card, the sentences as cards, then all versions as cards | The subtitle | Acknowledge, as the attendance guide | As My Profile |
+| ESS · Policy Updates (`policy-updates`) | As policies.md §10.2: To Acknowledge cards with Acknowledge full width, then policy cards | The subtitle | Acknowledge, as policies.md | As My Profile |
 | ESS · My Performance (`my-performance`) | The five stats two to a row (KPI Score's help opens as a sheet), then icon cards: My KPIs This Month, Rolls Up To, My Reviews | The subtitle; the reviews table (a list of reviews in the My Reviews sheet) | Tap a review: its sheet | As My Profile |
 | ESS · My Payslips (`my-payslips`) | The year switcher (44 px targets), Email a Copy, Download All; the stats two to a row; then the months as a list with a status pill | The subtitle and the preview beside the list: a month opens its preview as a sheet with Email a Copy and Download PDF | Download PDF, at the foot of the month's sheet | As My Profile |
 | ESS · My Leave (`my-leave`) | Request Leave; the four KPI cards two to a row, each opening its list as a sheet; icon cards My Requests and Entitlement | The subtitle; the requests table (a list in the My Requests sheet); the entitlement card (its sheet) | Request Leave opens the form as a full sheet, Send Request full width | As My Profile |
@@ -419,3 +421,4 @@ Deductions figure and every form open the shared modal.
 - 19/10/2026 · LA · Policy Updates (#89) is built on the real API from the attendance guide, which owns it (§6.15, §10): the newest version in plain sentences with what changed and Acknowledge, and all versions; §2, §10.1 and §10.2 rows follow it.
 - 19/10/2026 · AJ · My Security's Clock-In Devices card lists the person's devices (registered and new, not removed: name and platform, status, last clock-in, This Device) from `GET /devices/mine`, with Manage My Devices; the phone tile says how many are registered (the team lead, 19/10/2026). §10 updated.
 - 20/10/2026 · TB · My Profile's Home Address is picked, never typed (F27, `docs/guides/addresses.md`): Edit Profile opens it from `home_address_place` with Change and a Details line, sends it only when a new place was picked or its details changed, and the organisation service keeps it through `shared/places` (owner `employee.home_address`). Left out, it stays as it is, as every field here. §5 and §10.1 updated.
+- 20/10/2026 · TB · Policy Updates (#89) now serves every company policy and is described in `docs/guides/policies.md` (TB's decisions of 20/10/2026); the attendance guide no longer owns it. My Profile's week becomes the person's work schedule from the record's Work Schedule tab (attendance guide §6.13, its PR 3). The broken link to `attendance-guide.md` points at `docs/guides/attendance.md`.

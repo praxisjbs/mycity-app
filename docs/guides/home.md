@@ -422,6 +422,14 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   reader of those tables (§4.1), and the owning module updates the entry when it changes them. A
   breach is read in SQL, a batch at a time, so a sweep loads breaches, never the organisation; an
   alert on a partner, a budget or an application is about no one in particular.
+- **Attendance's thresholds are the Attendance policy's** (TB, 20/10/2026; `attendance.md` §6.16,
+  built in its PR 3). The policy is the one source of every attendance threshold: from PR 3 the Late
+  Arrivals and Missing Clock-Out alerts are raised by the policy's rules (Late Arrivals, Early
+  Departure, Absence, Forgotten Clock-Outs, Location Flags, each with its Alert switch), through
+  `attendance.rule_breached`, not by a Home rule. Home's own rules on `late_arrivals` and
+  `missing_clock_out` are switched off and Alert Rules lists the policy's rules read only, with Set in
+  Attendance Policy opening it; a changed threshold applies from its version's first day, with no
+  Home rule to change. The other metrics are unchanged.
 - **A count metric** breaches when its value reaches the threshold; `over_by` is the value less the
   threshold ("+1 over 3"). A window counts the last W days ("3 late arrivals in 30 days").
 - **A deadline metric** breaches when the days left reach the threshold or fewer; its threshold is
@@ -813,3 +821,4 @@ rows, and nothing in the code says where anything came from.
 - 19/10/2026 · AJ · Team (the roster and Attendance This Month) and a card's records show each person's photo: `HomeTeamRow.employee`, `HomeTeamAttendanceRow.employee` and a person cell are `PersonRef` with `photo_url` (the roster reads it, `kpi-catalog/shared.js` `PERSON` is now `shared/db/person.js`); initials when there is none. TB to review.
 - 19/10/2026 · TB · The clock-in prompt left Home (owner decision of 19/10/2026, replacing O12): Attendance decides it (`AttendanceToday.sign_in_prompt`, the same first-session rule `dashboard.prompt.js` held) and the shell opens it over a blurred screen on whatever screen comes first, so a sign-in through a link is prompted too. `dashboard.prompt.js`, `HomeOverview.prompt_clock_in` and the Overview's opener (`clockPrompt.ts`) are gone; §2, §3 step 1, §6, §10 and §11 say so. Nothing else on Home changed.
 - 19/10/2026 · TB · Run Now and the Overview's Export download on the device that pressed, never by email (`docs/guides/foundation.md` §6.12, TB's decision; §3 steps 7 and 8, §4, §5, §6, §7, §10): a run on demand is done once its file exists and is not emailed (`emailed_at` stays empty), the screens wait on the run and save its file (toast "RPT-0215 downloaded"), and `GET /home/overview/export/:id` lets every Home reader, Staff included, wait on their own Overview run. A schedule's runs are still emailed; the email's `scheduled` variable is gone with the branch it chose.
+- 20/10/2026 · TB · The Attendance policy becomes the one source of attendance thresholds (`attendance.md` §6.16, policies.md): from attendance's PR 3, Home's attendance alerts come from the policy's rules and their Home rules are read only; from its PR 4, Home · Overview gains an Add Work Site button beside New (and an entry in New) (`attendance.md` §6.11). Nothing else on Home changes.

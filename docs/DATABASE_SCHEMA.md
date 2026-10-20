@@ -217,11 +217,24 @@ acknowledged) · `1395` `1099`'s Standard policy removed while it is as seeded a
 by it (A26, §5).
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
-other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026).
+other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026). The
+attendance redesign of 20/10/2026 takes four ranges, one per PR (attendance.md §1.2): `1380` to
+`1389` clock fixes; `1400` to `1419` policies, brought forward from M10 (`policies`,
+`policy_version`, `policy_signature`, `policy_acknowledgement` in `1400`; the Attendance policy's
+versions and acknowledgements moved into them, keeping their ids, and
+`attendance_event.policy_version_id`, in `1405`; the `policy` numbering scheme, the
+`policy.approval` workflow and the `policies.manage` capability in `1396`); `1420` to `1449` rules
+and schedules (`attendance_work_schedule`, `attendance_rule_breach`, `attendance_pay_item`,
+`attendance_overtime_approval`); `1450` to `1479` places (`attendance_temporary_site` with its
+locations and members, `attendance_check_in`, the `temporary_site` numbering scheme and the
+`attendance.temporary_site` workflow). `attendance_policy` and `attendance_policy_acknowledgement`
+are read by nothing after `1405` and are dropped by a later release (MIGRATIONS §8); policies do not
+use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
-- Attendance (attendance.md §4, §13): a unique key for the auto-query upsert, the lateness
-  deduction amount; dropping the superseded booleans `require_geofence` and `require_known_device`
+- Attendance (attendance.md §4, §13): the redesign's tables above (PRs 2 to 4); dropping
+  `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
+  nothing reads them; dropping the superseded booleans `require_geofence` and `require_known_device`
   and `1300`'s one `geofence_mode`, superseded by the place modes of `1370` (MIGRATIONS §8).
 - Attendance, for Home (LA): the shared roster (`src/modules/attendance/attendance.roster.js`)
   reads `attendance_day` as `1300`'s code writes it (the punch, People's decisions, the day-close)
@@ -475,7 +488,8 @@ Security's two-step and PIN, which M1 owed until then.
    17/10/2026: `1199` removes each of `1099`'s three rules while it is as seeded and no alert points
    at it, and MyCity enters its own on Home, Alerts. The Standard attendance policy moved out on
    19/10/2026: `1395` removes it while it is as seeded and no punch was judged by it, and MyCity
-   publishes its own on Settings · Attendance Policy (attendance.md §6.15).
+   publishes its own Attendance policy on Knowledge Hub · Policies (policies.md, attendance.md
+   §6.15; Settings · Attendance Policy was retired on 20/10/2026).
 
 ## 6 · Changing this document
 
