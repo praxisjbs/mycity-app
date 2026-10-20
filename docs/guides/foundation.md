@@ -284,6 +284,11 @@ only under `src/modules/`; the work is `shared/search`.
   row: mapping either would fail every row instead of loading the person. A column with one good
   cell among bad ones is imported, and its bad cells are row problems as usual. Work Hours and S/N
   are not fields of a person at all (the working week is one organisation setting, A22).
+- **A birthday given as a day and month is kept anyway** (GE, 20/10/2026): on every deploy, loaded
+  sheet or not, each DOB cell like `03/07` (day first) is written to `employee.birth_day` and
+  `birth_month` (migration `1180`) through `organisation.setBirthday`, for the person it names by
+  work email, else staff number, only when they have no date of birth and no birthday yet. The
+  Staff Community celebrations read it (community guide §3 step 3). The log gives counts only.
 - The loader asks the import engine for things no person asks for, as batch options: **keep what
   the app already has** (an existing person is left exactly as People hold them, and the reporting
   line is filled only where it is empty), **the work email `roles.json` gives a post** whose
@@ -874,3 +879,4 @@ screen.
   (`docs/guides/notifications.md` §6), each with wording for someone it is not waiting on; the new
   Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
   Your import finished names its audience and takes no copies.
+- 20/10/2026 · GE · §6.1: the staff loader keeps a birthday the sheet gives as a day and month (`employee.birth_day`, `birth_month`, migration `1180`), on every deploy, so the Staff Community celebrations can post it.

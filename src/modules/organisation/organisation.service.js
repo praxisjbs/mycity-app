@@ -175,6 +175,25 @@ async function updateEmployee(client, employeeId, patch, actor) {
 }
 
 /**
+ * Record a birthday known only as a day and month, for the celebrations (migration 1180).
+ * A full date_of_birth wins wherever both exist.
+ *
+ * @param {import("pg").PoolClient} client  inside atomically()
+ */
+async function setBirthday(client, employeeId, { day, month }, actor) {
+  const change = await repo.setBirthday(client, employeeId, { day, month });
+  if (!change) throw new AppError("NOT_FOUND", "Not found", 404);
+  await emit(client, {
+    key: EVENTS.EMPLOYEE_UPDATED,
+    entity: { type: "employee", id: employeeId },
+    actor,
+    before: change.before,
+    after: change.after,
+  });
+  return change.after;
+}
+
+/**
  * Give a person the next free staff number, so the roster can take back a number its
  * sheet says belongs to somebody else. The counter is moved past every number already
  * in use first, so the new one is above them all; a number taken in the meantime is
@@ -755,6 +774,7 @@ function splitName(full) {
 }
 
 module.exports = {
+  setBirthday,
   findDepartmentByName,
   findOrCreateDepartment,
   createDepartment,

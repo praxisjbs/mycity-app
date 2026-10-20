@@ -825,17 +825,20 @@ async function channelsInCommon(db, userA, userB) {
  * ------------------------------------------------------------------ */
 
 /**
- * Active employees whose birthday (day and month) or start-date anniversary falls on
- * `date`, with how many years. 29 February falls on 28 February in other years.
+ * Active employees whose birthday (day and month, from date_of_birth or, without one,
+ * birth_day and birth_month) or start-date anniversary falls on `date`, with how many
+ * years. 29 February falls on 28 February in other years.
  */
 async function celebrationsOn(db, date) {
   const { rows } = await db.query(
     `WITH day AS (SELECT $1::date AS d)
      SELECT e.employee_id, 'birthday' AS occasion, NULL::int AS years
-       FROM employee e, day
-      WHERE e.status = 'active' AND e.archived_at IS NULL AND e.date_of_birth IS NOT NULL
-        AND (to_char(e.date_of_birth, 'MM-DD') = to_char(day.d, 'MM-DD')
-             OR (to_char(e.date_of_birth, 'MM-DD') = '02-29' AND to_char(day.d, 'MM-DD') = '02-28'
+       FROM employee e, day,
+            LATERAL (SELECT COALESCE(to_char(e.date_of_birth, 'MM-DD'),
+                                     lpad(e.birth_month::text, 2, '0') || '-' || lpad(e.birth_day::text, 2, '0')) AS md) b
+      WHERE e.status = 'active' AND e.archived_at IS NULL AND b.md IS NOT NULL
+        AND (b.md = to_char(day.d, 'MM-DD')
+             OR (b.md = '02-29' AND to_char(day.d, 'MM-DD') = '02-28'
                  AND NOT (extract(year FROM day.d)::int % 4 = 0 AND (extract(year FROM day.d)::int % 100 <> 0 OR extract(year FROM day.d)::int % 400 = 0))))
      UNION ALL
      SELECT e.employee_id, 'anniversary', (extract(year FROM day.d) - extract(year FROM e.start_date))::int

@@ -71,7 +71,9 @@ track who has read them.
    (`docs/guides/notifications.md` §6). Opening an urgent announcement does not count as read; its
    Acknowledge does.
 3. **Celebrations.** The `celebrations` scheduler runs at 08:00 Africa/Lagos, reads employees whose
-   `date_of_birth` (day and month) or `start_date` anniversary is today, and posts one celebration
+   `date_of_birth` (day and month; without one, `birth_day` and `birth_month` from migration
+   `1180`, which the staff loader fills from a DOB the sheet gives with no year) or `start_date`
+   anniversary is today, and posts one celebration
    card each to #general, as the system. The card uses the employee's avatar, or their initials when
    there is none, and a message rotated from a fixed list. Colleagues press Celebrate on it.
 4. **Recognition.** From the ＋ beside the composer, in any channel → Recognise a Colleague → pick a
@@ -515,3 +517,4 @@ fields, never in a toast.
 - 20/10/2026 · GE · From TB's review: a published announcement can be archived (§3 step 2, §4, §5, §6, §7, §10). Its unopened notices are withdrawn through a new `notifications.withdrawForRecord`; TB to review that addition to the notifications module.
 - 20/10/2026 · GE · From TB's review: a channel's admins rename it and change its purpose from Channel Details (Edit Channel), `PUT /channels/:id`; Channel Details shows the purpose, and the header shows it on desktop (§3 step 5, §5, §7, §10).
 - 20/10/2026 · GE · Celebrations post at 08:00 Africa/Lagos instead of 05:00 (TB's review, 19/10): §3 step 3, §6, §7.
+- 20/10/2026 · GE · A birthday known only as a day and month posts too (§3 step 3): migration `1180` adds `employee.birth_day` and `birth_month`, the staff loader fills them from the sheet's DOB on every deploy (by work email, else staff number; never over a date on screen), through `organisation.setBirthday`.

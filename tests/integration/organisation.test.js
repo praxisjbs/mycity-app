@@ -783,6 +783,23 @@ describeDb("the organisation module against the real migrations", () => {
         date_of_birth: null,
         phone: null,
       });
+
+      /* The DOB column's day and month are kept for the celebrations, matched by email, else staff number. */
+      expect(result.birthdays).toEqual({ set: 4, unmatched: 0 });
+      expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0001'")).toEqual({ birth_day: 12, birth_month: 12 });
+      expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0002'")).toEqual({ birth_day: 26, birth_month: 9 });
+      const due = await require("../../src/modules/community/community.repo").celebrationsOn(pool, "2026-09-17");
+      const sade = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0004'");
+      expect(due).toContainEqual({ employee_id: sade.employee_id, occasion: "birthday", years: null });
+    });
+
+    test("a day and month cell reads day first, and a full date or nonsense is not one", () => {
+      expect(loader.dayMonth("03/07")).toEqual({ day: 3, month: 7 });
+      expect(loader.dayMonth(" 29-2 ")).toEqual({ day: 29, month: 2 });
+      expect(loader.dayMonth("31/04")).toBeNull();
+      expect(loader.dayMonth("03/07/1991")).toBeNull();
+      expect(loader.dayMonth(new Date())).toBeNull();
+      expect(loader.dayMonth("")).toBeNull();
     });
 
     test("the post whose email the sheet leaves empty takes it from roles.json", async () => {
@@ -873,6 +890,7 @@ describeDb("the organisation module against the real migrations", () => {
       const before = await one("SELECT count(*)::int AS n FROM employee");
       const again = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile() });
       expect(again.status).toBe("already_loaded");
+      expect(again.birthdays).toEqual({ set: 0, unmatched: 0 }); // each one is written once
       expect(await one("SELECT count(*)::int AS n FROM employee")).toEqual(before);
       const kept = await one("SELECT job_title FROM employee WHERE staff_number = 'T0002'");
       expect(kept.job_title).toBe("Head of Trading and Settlement");
