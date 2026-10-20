@@ -934,3 +934,9 @@ screen.
   (`docs/guides/notifications.md` §6), each with wording for someone it is not waiting on; the new
   Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
   Your import finished names its audience and takes no copies.
+- 20/10/2026 · TB · Settings gains a second tab, **System Health** (`system-health`), after
+  Organisation. It is the first screen with a permission key of its own rather than `settings`:
+  `system_health`, held by the Implementation Team and the System Administrator only, so a stack
+  trace never reaches Operations & People, Management or the CEO. Its own guide is
+  `docs/guides/system-health.md`; nothing else in Settings changes, and the tab is routed through
+  the same `app/src/features/settings/index.tsx` switch as the rest.

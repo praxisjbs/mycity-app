@@ -117,6 +117,12 @@ const MODULE_CATALOG = [
     label: "Settings",
     description: "Organisation, users, roles, approvals and system settings",
   },
+  {
+    key: "system_health",
+    area: "system",
+    label: "System Health",
+    description: "Readiness checks, performance over time, and the faults the code reports",
+  },
 ];
 
 /** Every permission check names one of these. It is `edit`, never `update`. */
