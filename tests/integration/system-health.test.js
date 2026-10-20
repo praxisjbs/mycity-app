@@ -198,6 +198,29 @@ describeDb("System Health against the real migrations", () => {
       expect(told).not.toContain("ceo@mycity.test");
     });
 
+    // TB, 20/10/2026 (fault #1): only a fatal or an error is pushed; a warning or a notice is counted.
+    test("a warning is counted, never told: not when it is new, and not when it comes back", async () => {
+      const told = async (key) =>
+        (
+          await q(
+            `SELECT DISTINCT g.severity FROM notification n
+               JOIN error_group g ON g.error_group_id::text = n.entity_id
+              WHERE n.event_key = $1`,
+            [key],
+          )
+        ).rows.map((r) => r.severity);
+      expect(await told("system_health.fault_new")).toEqual(["error"]);
+
+      const smtp = (await as("admin").get("/system-health/faults?severity=warning")).body.data[0];
+      await as("admin").patch(`/system-health/faults/${smtp.error_group_id}`).send({ status: "fixed" });
+      await writeFault(fault({ fingerprint: "Error|SMTP refused|at mail", name: "Error", message: "SMTP command failed", origin: "worker", route: null, severity: "warning", request_id: "req-w2" }));
+      const done = await rollup.rollupFaults();
+      expect(done.returned).toBe(1);
+      expect((await repo.get(pool, smtp.error_group_id)).status).toBe("open");
+      await drain();
+      expect(await told("system_health.fault_returned")).toEqual([]);
+    });
+
     test("every System Health notice reaches the bell and the phone, and only the escalation reaches email", async () => {
       const { rows } = await q(
         `SELECT DISTINCT channels FROM notification WHERE event_key = 'system_health.fault_new'`,

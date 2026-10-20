@@ -35,6 +35,11 @@
  *  - Every request that reached the provider is counted (shared/integrations/usage.js): an
  *    answer from memory spent nothing and is not. A refusal carries the provider's status
  *    (`upstream`) so Settings · Integrations can tell a refused key from an outage.
+ *  - A dropped connection (closed, reset, refused, a failed lookup) is asked once more at once;
+ *    a request that ran out of time is not, so a person never waits twice the timeout.
+ *  - The provider not answering is its outage, not a defect of ours: Settings · Integrations
+ *    and the `maps` readiness check carry it, so System Health counts it as a warning, which
+ *    never alerts (TB, 20/10/2026, fault #1).
  */
 const crypto = require("node:crypto");
 const { logger } = require("../../config/logger");
@@ -183,8 +188,13 @@ function refusal(code, message, status, { upstream = null, timedOut = false } = 
   const err = new AppError(code, message, status);
   err.upstream = upstream;
   err.timed_out = timedOut;
+  // The provider's outage, recorded without alerting (§ Rules; shared/errors.js).
+  if (code === "MAPS_UNAVAILABLE") err.severity = "warning";
   return err;
 }
+
+/** Our own timeout, rather than the connection dropping. */
+const ranOut = (err) => !!err && (err.name === "TimeoutError" || err.name === "AbortError");
 
 /**
  * One request to the provider, its failures turned into the errors a screen can tell
@@ -192,16 +202,26 @@ function refusal(code, message, status, { upstream = null, timedOut = false } = 
  * @returns {Promise<Response>}
  */
 async function ask(url, what, fetchImpl, kind) {
-  await slot();
   let res;
-  try {
-    res = await fetchImpl(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-  } catch (err) {
-    const timedOut = err && (err.name === "TimeoutError" || err.name === "AbortError");
-    logger.warn({ provider: "geoapify", timed_out: timedOut, message: String((err && err.message) || "").slice(0, 200) }, `${what} failed`);
-    const e = refusal("MAPS_UNAVAILABLE", "Maps are not answering.", 502, { timedOut });
-    usage.record("geoapify", kind, { ok: false, error_code: codeOf(e) });
-    throw e;
+  for (let attempt = 1; ; attempt += 1) {
+    await slot();
+    try {
+      res = await fetchImpl(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      break;
+    } catch (err) {
+      const timedOut = ranOut(err);
+      // fetch says only "fetch failed"; the cause names the network's own error (UND_ERR_SOCKET,
+      // ECONNRESET, ENOTFOUND), which tells a dropped connection from a failed lookup.
+      const cause = (err && err.cause) || {};
+      logger.warn(
+        { provider: "geoapify", attempt, timed_out: timedOut, code: cause.code || (err && err.code) || null, message: String((err && err.message) || "").slice(0, 200) },
+        `${what} failed`,
+      );
+      if (!timedOut && attempt === 1) continue;
+      const e = refusal("MAPS_UNAVAILABLE", "Maps are not answering.", 502, { timedOut });
+      usage.record("geoapify", kind, { ok: false, error_code: codeOf(e) });
+      throw e;
+    }
   }
   if (res.status === 429) {
     logger.warn({ provider: "geoapify", status: 429 }, `${what} over its quota`);
@@ -280,7 +300,7 @@ async function jsonOf(res) {
   try {
     return await res.json();
   } catch {
-    throw new AppError("MAPS_UNAVAILABLE", "Maps are not answering.", 502);
+    throw refusal("MAPS_UNAVAILABLE", "Maps are not answering.", 502);
   }
 }
 
@@ -356,7 +376,7 @@ async function tile(z, x, y, { apiKey, fetchImpl = fetch, fresh = false } = {}) 
   // Only an image goes back to the browser: anything else from the provider is a failure.
   if (!/^image\/(png|jpeg|webp)$/.test(type.split(";")[0].trim())) {
     logger.warn({ provider: "geoapify", type: type.slice(0, 60) }, "map tile was not an image");
-    throw new AppError("MAPS_UNAVAILABLE", "Maps are not answering.", 502);
+    throw refusal("MAPS_UNAVAILABLE", "Maps are not answering.", 502);
   }
   const found = { bytes: Buffer.from(await res.arrayBuffer()), type: type.split(";")[0].trim() };
   if (!fresh) tiles.set(key, found);
