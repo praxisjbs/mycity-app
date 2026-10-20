@@ -10,6 +10,7 @@ import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { PoliciesTab } from "@/features/policies/PoliciesHub";
 import { Accordion, ArticleBody, Button, Card, Chips, ChoiceField, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, LoadingRows, Meter, PageHeader, Pill, Reader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
@@ -17,7 +18,7 @@ export default function Knowledge({ tab, id }: ModuleScreenProps) {
   if (tab === "faqs") return <Faqs />;
   if (tab === "training") return <Training />;
   if (tab === "announcements") return <Announcements />;
-  return <Articles kind="policy" id={id} />;
+  return <PoliciesTab />;
 }
 
 const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something went wrong");

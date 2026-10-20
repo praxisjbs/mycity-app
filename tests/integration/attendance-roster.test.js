@@ -2,8 +2,8 @@
 /**
  * The shared attendance roster (src/modules/attendance/attendance.roster.js) on the real
  * migrations and reference seeds: the seeded week (Monday to Friday 09:00, Saturday 09:00 to
- * 15:00, Sunday off), the seeded public holidays and the seeded organisation policy (no
- * grace), with punches recorded the way the attendance module records them: the event on its
+ * 15:00, Sunday off), the seeded public holidays and the Attendance policy's versions (ten
+ * minutes of grace to the end of August, none from September), with punches recorded the way the attendance module records them: the event on its
  * work date, then the day recalculated by the module's own reconcile.recomputeDay(), and the
  * days before Friday closed by its own day-close, as the 01:30 job would on Friday morning.
  *
@@ -22,6 +22,7 @@
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { rebuild } = require("./helpers/schema");
+const { attendanceVersion } = require("./helpers/policies");
 const lagos = require("../../src/shared/time/lagos");
 const workingWeek = require("../../src/shared/time/working-week");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
@@ -142,19 +143,6 @@ describeDb("the attendance roster against the real migrations", () => {
     }
   }
 
-  /** An attendance policy with this much grace, in force for the person over the dates. */
-  async function policy(key, name, grace, from, to = null) {
-    const { attendance_policy_id: id } = await one(
-      "INSERT INTO attendance_policy (name, grace_minutes) VALUES ($1, $2) RETURNING attendance_policy_id",
-      [name, grace],
-    );
-    await q(
-      `INSERT INTO employee_attendance_policy (employee_id, attendance_policy_id, effective_from, effective_to)
-       VALUES ($1, $2, $3, $4)`,
-      [people[key], id, from, to],
-    );
-  }
-
   /** Every row of a day's roster, page by page. */
   async function everyone(date, scope = ALL, filters = {}, client = pool) {
     const rows = [];
@@ -181,9 +169,10 @@ describeDb("the attendance roster against the real migrations", () => {
 
   beforeAll(async () => {
     await rebuild(pool, config.DB_NAME);
-    // The organisation's policy, with no grace: the oldest row from before versions, so a
-    // person's own policy below never becomes everyone's. No policy is seeded (A26).
-    await one("INSERT INTO attendance_policy (name, grace_minutes) VALUES ('Organisation', 0) RETURNING attendance_policy_id");
+    // The Attendance policy: ten minutes of grace, then none from September. No version is
+    // seeded (A26); these stand for MyCity's own.
+    await attendanceVersion(pool, { grace_minutes: 10 }, "2026-01-01");
+    await attendanceVersion(pool, { grace_minutes: 0 }, "2026-09-01");
     workingWeek.invalidateCalendar();
     ({ department_id: ops } = await one(
       "INSERT INTO department (code, name) VALUES ('ROSTER_OPS', 'Field Operations') RETURNING department_id",
@@ -225,10 +214,7 @@ describeDb("the attendance roster against the real migrations", () => {
     // Twelve more who are expected and have not come in, so the day runs to two pages.
     for (let n = 1; n <= 12; n += 1) await person(`filler${n}`, "Filler", `Number${String(n).padStart(2, "0")}`);
 
-    // Policies and leave first: a day is recalculated with what holds when the punch lands.
-    await policy("zainab", "Five Minutes", 5, "2026-01-01");
-    await policy("ifeanyi", "Five Minutes Too", 5, "2026-01-01");
-    await policy("bisi", "Ten Minutes Until September", 10, "2026-01-01", "2026-09-01");
+    // Leave first: a day is recalculated with what holds when the punch lands.
     await leave("jide", HOLIDAY, MONDAY, "approved");
     await leave("kunle", FRIDAY, FRIDAY, "submitted", "approved");
     await leave("lara", FRIDAY, FRIDAY, "rejected");
@@ -249,7 +235,7 @@ describeDb("the attendance roster against the real migrations", () => {
     await punch("kemi", "clock_in", FRIDAY, "08:50");
     await punch("kemi", "clock_out", FRIDAY, "17:05");
     await punch("tunde", "clock_in", FRIDAY, "09:03");
-    await punch("zainab", "clock_in", FRIDAY, "09:04");
+    await punch("zainab", "clock_in", FRIDAY, "09:00");
     await punch("ifeanyi", "clock_in", FRIDAY, "09:07");
     await punch("bisi", "clock_in", FRIDAY, "09:04");
     await punch("wale", "clock_in", FRIDAY, "09:00", { seconds: 59 });
@@ -359,18 +345,30 @@ describeDb("the attendance roster against the real migrations", () => {
   });
 
   describe("lateness, as the attendance module measures it", () => {
-    test("the organisation's policy has no grace: 09:03 is three minutes late", async () => {
+    test("the version in force has no grace: 09:03 is three minutes late", async () => {
       const rows = byName(await everyone(FRIDAY));
       expect(rows["Tunde Bakare"]).toMatchObject({ status: "late", late_minutes: 3 });
-    });
-
-    test("five minutes of grace: 09:04 is on time, 09:07 is late by the two minutes past it", async () => {
-      const rows = byName(await everyone(FRIDAY));
+      expect(rows["Ifeanyi Okafor"]).toMatchObject({ status: "late", late_minutes: 7 });
       expect(rows["Zainab Musa"]).toMatchObject({ status: "on_site", late_minutes: 0 });
-      expect(rows["Ifeanyi Okafor"]).toMatchObject({ status: "late", late_minutes: 2 });
     });
 
-    test("a policy no longer in force gives way to the organisation's", async () => {
+    test("a version from Friday with five minutes of grace: 09:03 is on time, 09:07 late by the two past it", async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await attendanceVersion(client, { grace_minutes: 5 }, FRIDAY);
+        await recompute("tunde", FRIDAY, client);
+        await recompute("ifeanyi", FRIDAY, client);
+        const rows = byName(await everyone(FRIDAY, ALL, {}, client));
+        expect(rows["Tunde Bakare"]).toMatchObject({ status: "on_site", late_minutes: 0 });
+        expect(rows["Ifeanyi Okafor"]).toMatchObject({ status: "late", late_minutes: 2 });
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
+      }
+    });
+
+    test("a version no longer in force gives way to the one after it", async () => {
       const rows = byName(await everyone(FRIDAY));
       expect(rows["Bisi Ojo"]).toMatchObject({ status: "late", late_minutes: 4 });
     });

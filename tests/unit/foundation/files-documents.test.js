@@ -276,6 +276,23 @@ describe("markdown and the template language", () => {
     expect(canonical.isSignable("EMPLOYMENT_CONTRACT")).toBe(true);
     expect(canonical.isSignable("toString")).toBe(false);
   });
+
+  test("a policy version's payload is pinned, and its rules hash the same in any key order", () => {
+    const version = {
+      number: "POL-0001",
+      version: 3,
+      title: "Attendance Policy",
+      effective_from: "2026-11-01",
+      applies_to: { everyone: false, department_ids: ["b", "a"], work_patterns: ["remote"], employee_ids: [] },
+      body_markdown: "",
+      rules: { home_radius_m: 150, grace_minutes: 5, late_rule: { on: true, count: 3 } },
+    };
+    expect(canonical.hash("POLICY_VERSION", version)).toBe("61d70174a1f769eda15540811f3c12668f973fa8c0e1a3e985e9b8318c0e512e");
+    const reordered = { ...version, rules: { late_rule: { count: 3, on: true }, grace_minutes: 5, home_radius_m: 150 } };
+    expect(canonical.hash("POLICY_VERSION", reordered)).toBe(canonical.hash("POLICY_VERSION", version));
+    expect(canonical.hash("POLICY_VERSION", { ...version, rules: { ...version.rules, grace_minutes: 10 } }))
+      .not.toBe(canonical.hash("POLICY_VERSION", version));
+  });
 });
 
 describe("document types, served types, derived file names", () => {

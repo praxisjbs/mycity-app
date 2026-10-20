@@ -223,6 +223,12 @@ const CAPABILITY_CATALOG = [
     description: "Post to the announcements channel and track who has read a post.",
   },
   {
+    code: "policies.manage",
+    module: "knowledge",
+    label: "Manage Policies",
+    description: "Write, publish, withdraw and archive company policies, and see who has acknowledged them.",
+  },
+  {
     code: "mailbox.signature",
     module: "mailbox",
     label: "Configure Signature",

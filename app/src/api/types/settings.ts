@@ -1,7 +1,7 @@
 /**
  * INTERIM shapes for the Settings screens still on the mock: Approvals (track D) and
  * Appearance (M9). Organisation, Roles & Permissions, Notifications, Documents & Numbering,
- * Integrations, Security, the Audit Log and the attendance policy (LA) are on the contract
+ * Integrations, Security and the Audit Log are on the contract
  * (contract.gen.ts).
  */
 export interface Appearance {

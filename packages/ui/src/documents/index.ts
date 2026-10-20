@@ -16,3 +16,4 @@ export * from "./EmailFrame";
 export * from "./FileCard";
 export * from "./MediaViewer";
 export * from "./PdfViewer";
+export * from "./RichText";

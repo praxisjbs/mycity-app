@@ -1,0 +1,31 @@
+<style>
+  .pol-meta { margin: 0 0 4mm 0; font-size: 9pt; color: #71717A; }
+  .pol-meta strong { color: #014339; font-weight: 600; }
+  .pol-note { margin: 0 0 6mm 0; padding: 3mm 4mm; font-size: 9.5pt; color: #3F3F46; background: #F8FAFA; border-left: 1mm solid #FFDF55; }
+  .pol-section h2 { margin: 6mm 0 2mm 0; font-size: 11.5pt; }
+  .pol-section p { margin: 0 0 2mm 0; }
+  .pol-signatures { margin-top: 10mm; page-break-inside: avoid; }
+  .pol-signatures h2 { font-size: 11pt; margin: 0 0 3mm 0; }
+  .pol-sign { display: inline-block; vertical-align: top; width: 56mm; margin: 0 6mm 6mm 0; }
+  .pol-sign img { display: block; height: 16mm; max-width: 56mm; margin-bottom: 1mm; }
+  .pol-sign .pol-line { border-top: 0.3mm solid #A1A1AA; padding-top: 1.5mm; font-size: 9pt; }
+  .pol-sign .pol-name { font-weight: 600; color: #09090B; }
+  .pol-sign .pol-role { color: #71717A; font-size: 8.5pt; }
+  .pol-hash { margin-top: 6mm; font-size: 7.5pt; color: #A1A1AA; word-break: break-all; }
+</style>
+<p class="pol-meta"><strong>{{ policy_number }}</strong> · Version {{ version }} · From {{ longdate effective_from }} · Applies to {{ applies_to_text }}</p>
+<p class="pol-note">{{ note }}</p>
+{{#if body_markdown}}{{ markdown body_markdown }}{{/if}}
+{{#each sections}}<div class="pol-section"><h2>{{ title }}</h2>{{#each sentences}}<p>{{ this }}</p>{{/each}}</div>{{/each}}
+{{#if signatures}}<div class="pol-signatures">
+  <h2>Signed</h2>
+  {{#each signatures}}<div class="pol-sign">
+    {{#if image}}<img src="{{ image }}" alt="Signature of {{ signer_name }}">{{/if}}
+    <div class="pol-line">
+      <div class="pol-name">{{ signer_name }}</div>
+      {{#if signer_title}}<div class="pol-role">{{ signer_title }}</div>{{/if}}
+      <div class="pol-role">{{ role }} · {{ datetime signed_at }}</div>
+    </div>
+  </div>{{/each}}
+</div>{{/if}}
+<p class="pol-hash">Content hash {{ content_hash }}</p>

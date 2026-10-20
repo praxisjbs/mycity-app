@@ -1,6 +1,6 @@
 import type { ModuleScreenProps } from "@/shell/screens";
 import { MyAttendancePage, MyDevicesPage } from "@/features/attendance/EssAttendance";
-import { PolicyUpdatesPage } from "@/features/attendance/PolicyUpdates";
+import { PolicyUpdatesPage } from "@/features/policies/PolicyUpdates";
 import { WorkLocationRequestsPage } from "@/features/attendance/WorkLocationRequests";
 import { OrgTree } from "@/features/organogram/OrgTree";
 import { MyDocumentsPage } from "./Documents";

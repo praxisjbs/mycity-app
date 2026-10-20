@@ -26,6 +26,7 @@ const {
   isoDateTime,
   listQuery,
   Paged,
+  money,
 } = require("./common");
 const { PersonRef, WorkPattern } = require("./organisation");
 const { PlaceInput } = require("./maps");
@@ -778,139 +779,178 @@ const WorkScheduleSet = z
   .strict();
 
 /* ------------------------------------------------------------------ *
- * The attendance policy: one organisation policy in numbered versions that People publish from
- * a first day, and that every employee reads and acknowledges (guide §6.15)
+ * The Attendance policy's rules: a rules policy on Knowledge Hub · Policies
+ * (docs/guides/policies.md), whose rules this module owns and enforces (guide §6.15).
+ * Its versions, approval and acknowledgement are the policies contract's.
  * ------------------------------------------------------------------ */
 
-/** A rule a version can change: the keys of PolicySettings. */
-const PolicyRule = z.enum([
-  "grace_minutes",
-  "office_geofence_mode",
-  "home_geofence_mode",
-  "site_geofence_mode",
-  "device_mode",
-  "max_accuracy_m",
-  "home_radius_m",
-]);
+/** How a consequence rule counts: a week (Monday to Sunday), the calendar month, or the last 30 days. */
+const RulePeriod = z.enum(["week", "month", "days_30"]);
+/** How a deduction is worked out (guide §6.17, T4). */
+const DeductionMethod = z.enum(["pro_rata", "per_hour", "per_day"]);
+/** Who approves overtime before it is paid (T6). */
+const OvertimeApproval = z.enum(["manager_after", "pre_approved", "automatic"]);
+/** How overtime is paid: a multiple of the hourly rate, or a fixed amount an hour. */
+const OvertimeMethod = z.enum(["multiplier", "per_hour"]);
 
-/**
- * A published version against today in Lagos: `waiting` (its first day is after today),
- * `in_force` (today's punches are judged by it), `past` (a later one replaced it) or `withdrawn`
- * (withdrawn before its first day; it never applied).
- */
-const PolicyVersionState = z.enum(["waiting", "in_force", "past", "withdrawn"]);
-
-/**
- * The rules People set. The location check has a mode for each kind of place: the office, a home
- * (remote staff, a hybrid home day, a temporary home) and a field site (a field assignment's sites,
- * a client visit's site). A reading at 50 m or better is good, so the accuracy limit starts there.
- */
-const PolicySettings = z
+/** One weekday of the company hours. A day that is worked has both times, the end after the start. */
+const HoursDay = z
   .object({
-    grace_minutes: z.number().int().min(0, "At least 0").max(60, "At most 60"),
-    office_geofence_mode: PolicyMode,
-    home_geofence_mode: PolicyMode,
-    site_geofence_mode: PolicyMode,
-    device_mode: PolicyMode,
-    max_accuracy_m: z.number().int().min(50, "At least 50").max(250, "At most 250"),
-    home_radius_m: z.number().int().min(50, "At least 50").max(500, "At most 500"),
+    weekday: Weekday,
+    working: z.boolean(),
+    starts_at: clockTime.nullable(),
+    ends_at: clockTime.nullable(),
   })
   .strict();
 
-/** What every published version carries, for People and for staff. `changed` is against the version before it. */
-const versionFields = {
-  attendance_policy_id: uuid,
-  version: z.number().int().min(1),
-  state: PolicyVersionState,
-  effective_from: isoDate,
-  note: z.string(),
-  published_at: isoDateTime,
-  withdrawn_at: isoDateTime.nullable(),
-  changed: z.array(PolicyRule),
+/** The company hours: the seven weekdays, Monday first. */
+const WorkingHours = z
+  .array(HoursDay)
+  .length(7, "All seven days")
+  .refine((days) => days.every((d, i) => d.weekday === i + 1), "Monday to Sunday, in order")
+  .refine((days) => days.some((d) => d.working), "At least one working day")
+  .refine(
+    (days) => days.every((d) => !d.working || (d.starts_at && d.ends_at && d.ends_at > d.starts_at)),
+    "Each working day ends after it starts",
+  );
+
+const count = z.number().int().min(1, "At least 1").max(31, "At most 31");
+const lateHours = z.number().min(0.5, "At least 0.5").max(40, "At most 40");
+const multiple = z.number().min(1, "At least 1").max(3, "At most 3");
+
+/** N in a period, with what reaching it does (guide §6.16). */
+const CountRule = z
+  .object({ on: z.boolean(), count, period: RulePeriod, alert: z.boolean(), query: z.boolean() })
+  .strict();
+/** N days, or H hours, in a period, whichever comes first. */
+const CountHoursRule = CountRule.extend({ hours: lateHours.nullable() }).strict();
+/** A deduction for a late or early day. A fixed method needs its amount. */
+const Deduction = z.object({ on: z.boolean(), method: DeductionMethod, amount: money.nullable() }).strict();
+const Overtime = z
+  .object({
+    on: z.boolean(),
+    after_minutes: z.number().int().min(0).max(120, "At most 120"),
+    approval: OvertimeApproval,
+    method: OvertimeMethod,
+    multiplier: multiple,
+    amount: money.nullable(),
+    rest_day_multiplier: multiple,
+    monthly_cap_hours: z.number().int().min(1, "At least 1").max(100, "At most 100"),
+  })
+  .strict();
+
+/** The rules a rule is off by, with the figures it takes when switched on. */
+const offCount = { on: false, count: 3, period: "month", alert: true, query: true };
+const DEFAULT_RULES = Object.freeze({
+  hours: null,
+  grace_minutes: 0,
+  late_rule: { ...offCount, hours: 5 },
+  late_deduction: { on: false, method: "pro_rata", amount: null },
+  early_grace_minutes: 0,
+  early_rule: { ...offCount, hours: null },
+  early_deduction: { on: false, method: "pro_rata", amount: null },
+  absence_rule: { ...offCount, count: 2 },
+  absence_deduction: { on: false },
+  forgotten_rule: { ...offCount, query: false },
+  location_rule: { ...offCount, query: false },
+  overtime: {
+    on: false,
+    after_minutes: 30,
+    approval: "manager_after",
+    method: "multiplier",
+    multiplier: 1.5,
+    amount: null,
+    rest_day_multiplier: 2,
+    monthly_cap_hours: 20,
+  },
+  office_geofence_mode: "warn",
+  home_geofence_mode: "warn",
+  site_geofence_mode: "warn",
+  home_radius_m: 150,
+  max_accuracy_m: 100,
+  device_mode: "off",
+  clock_out_reminder_minutes: 30,
+  system_clock_out_after_minutes: 90,
+});
+
+/** Every rule, each typed; `AttendanceRules` and `AttendanceRulesDraft` differ only in strictness. */
+const ruleShape = {
+  /** Null until a version sets them: the working week of Settings · Organisation applies (PR 3). */
+  hours: WorkingHours.nullable(),
+  grace_minutes: z.number().int().min(0, "At least 0").max(60, "At most 60"),
+  late_rule: CountHoursRule,
+  late_deduction: Deduction,
+  early_grace_minutes: z.number().int().min(0, "At least 0").max(60, "At most 60"),
+  early_rule: CountHoursRule,
+  early_deduction: Deduction,
+  absence_rule: CountRule,
+  absence_deduction: z.object({ on: z.boolean() }).strict(),
+  forgotten_rule: CountRule,
+  location_rule: CountRule,
+  overtime: Overtime,
+  office_geofence_mode: PolicyMode,
+  home_geofence_mode: PolicyMode,
+  site_geofence_mode: PolicyMode,
+  /** At least 150 on a new version (T9); an older version keeps what it set, down to 50. */
+  home_radius_m: z.number().int().min(50).max(500, "At most 500"),
+  max_accuracy_m: z.number().int().min(50, "At least 50").max(250, "At most 250"),
+  device_mode: PolicyMode,
+  clock_out_reminder_minutes: z.number().int().min(15, "At least 15").max(60, "At most 60"),
+  system_clock_out_after_minutes: z.number().int().min(30, "At least 30").max(240, "At most 240"),
 };
 
-/** A version as People read it on Settings: who published it, and how many acknowledged it of the people asked now. */
-const PolicyVersion = PolicySettings.extend({
-  ...versionFields,
-  published_by_name: z.string().nullable(),
-  withdraw_reason: z.string().nullable(),
-  acknowledged: z.number().int().min(0),
-  asked: z.number().int().min(0),
-}).strict();
-
-const PolicyVersionPage = Paged(PolicyVersion);
-
-/** The draft: every rule as last saved, and which of them it changes against the version it would replace. */
-const PolicyDraft = PolicySettings.extend({
-  attendance_policy_id: uuid,
-  changed: z.array(PolicyRule),
-  updated_at: isoDateTime,
-  updated_by_name: z.string().nullable(),
-}).strict();
+/** A rule a version can change: a key of AttendanceRules. */
+const AttendanceRule = z.enum(Object.keys(ruleShape));
 
 /**
- * GET /attendance/policy. `current` is the rules a punch today is judged by (the version in force,
- * else a policy from before versions, else the code's defaults); `in_force` the version they come
- * from, if any; `waiting` the newest version waiting to start; `draft` People's unpublished changes.
+ * A version's rules as read: a rule a version predates takes its default (off), and anything a
+ * version once held that is no longer a rule (`latest_clock_out_minutes`) is dropped.
  */
-const PolicyOverview = z
-  .object({
-    today: isoDate,
-    current: PolicySettings,
-    in_force: PolicyVersion.nullable(),
-    waiting: PolicyVersion.nullable(),
-    draft: PolicyDraft.nullable(),
-    can_edit: z.boolean(),
-  })
-  .strict();
+// Each key written out, so the generated types know every rule (a mapped object would lose them);
+// each default a fresh copy, so no two versions share an object.
+const AttendanceRules = z.object({
+  hours: ruleShape.hours.default(() => structuredClone(DEFAULT_RULES.hours)),
+  grace_minutes: ruleShape.grace_minutes.default(() => structuredClone(DEFAULT_RULES.grace_minutes)),
+  late_rule: ruleShape.late_rule.default(() => structuredClone(DEFAULT_RULES.late_rule)),
+  late_deduction: ruleShape.late_deduction.default(() => structuredClone(DEFAULT_RULES.late_deduction)),
+  early_grace_minutes: ruleShape.early_grace_minutes.default(() => structuredClone(DEFAULT_RULES.early_grace_minutes)),
+  early_rule: ruleShape.early_rule.default(() => structuredClone(DEFAULT_RULES.early_rule)),
+  early_deduction: ruleShape.early_deduction.default(() => structuredClone(DEFAULT_RULES.early_deduction)),
+  absence_rule: ruleShape.absence_rule.default(() => structuredClone(DEFAULT_RULES.absence_rule)),
+  absence_deduction: ruleShape.absence_deduction.default(() => structuredClone(DEFAULT_RULES.absence_deduction)),
+  forgotten_rule: ruleShape.forgotten_rule.default(() => structuredClone(DEFAULT_RULES.forgotten_rule)),
+  location_rule: ruleShape.location_rule.default(() => structuredClone(DEFAULT_RULES.location_rule)),
+  overtime: ruleShape.overtime.default(() => structuredClone(DEFAULT_RULES.overtime)),
+  office_geofence_mode: ruleShape.office_geofence_mode.default(() => structuredClone(DEFAULT_RULES.office_geofence_mode)),
+  home_geofence_mode: ruleShape.home_geofence_mode.default(() => structuredClone(DEFAULT_RULES.home_geofence_mode)),
+  site_geofence_mode: ruleShape.site_geofence_mode.default(() => structuredClone(DEFAULT_RULES.site_geofence_mode)),
+  home_radius_m: ruleShape.home_radius_m.default(() => structuredClone(DEFAULT_RULES.home_radius_m)),
+  max_accuracy_m: ruleShape.max_accuracy_m.default(() => structuredClone(DEFAULT_RULES.max_accuracy_m)),
+  device_mode: ruleShape.device_mode.default(() => structuredClone(DEFAULT_RULES.device_mode)),
+  clock_out_reminder_minutes: ruleShape.clock_out_reminder_minutes.default(() => structuredClone(DEFAULT_RULES.clock_out_reminder_minutes)),
+  system_clock_out_after_minutes: ruleShape.system_clock_out_after_minutes.default(() => structuredClone(DEFAULT_RULES.system_clock_out_after_minutes)),
+});
 
-/** POST /attendance/policy/publish. The first day against today and any version waiting is the service's (§6.15). */
-const PolicyPublish = z.object({ effective_from: isoDate, note: reasonText }).strict();
-
-/** POST /attendance/policy/versions/:id/withdraw */
-const PolicyWithdraw = z.object({ reason: reasonText }).strict();
-
-const PolicyVersionListQuery = listQuery({ state: PolicyVersionState.optional() });
-
-/** One person's acknowledgement of a version: everyone at work with a login is asked. */
-const PolicyAck = z
-  .object({
-    employee: PersonRef,
-    acknowledged_at: isoDateTime.nullable(),
-    reminded_at: isoDateTime.nullable(),
-  })
-  .strict();
-
-const PolicyAckPage = Paged(PolicyAck);
-
-const PolicyAckListQuery = listQuery(
-  { status: z.enum(["acknowledged", "pending"]).optional() },
-  ["acknowledged_at", "display_name"],
-);
-
-/** A version as an employee reads it, with their own acknowledgement. */
-const MyPolicyVersion = PolicySettings.extend({
-  ...versionFields,
-  acknowledged_at: isoDateTime.nullable(),
-}).strict();
-
-const MyPolicyVersionPage = Paged(MyPolicyVersion);
-
-const MyPolicyVersionListQuery = listQuery();
+/** Fixed methods name their amount. */
+const amountGiven = (d) => !d.on || d.method === "pro_rata" || Boolean(d.amount);
 
 /**
- * GET /attendance/me/policy. `current` is the rules in force today; `latest` the newest published
- * version (in force or waiting), the one to acknowledge; `in_force_version` the number in force,
- * null while no version has started.
+ * The rules as People save them in a draft: every rule given, and the rules a new version must
+ * meet (guide §6.15): a home and a temporary site are Flag or Refuse, never Off; a home's radius is
+ * at least 150 m; a fixed deduction or overtime paid per hour names its amount.
  */
-const MyPolicy = z
-  .object({
-    today: isoDate,
-    current: PolicySettings,
-    latest: MyPolicyVersion.nullable(),
-    in_force_version: z.number().int().min(1).nullable(),
-  })
-  .strict();
+const AttendanceRulesDraft = z
+  .object(ruleShape)
+  .strict()
+  .refine((r) => r.home_geofence_mode !== "off", { message: "Flag or Refuse", path: ["home_geofence_mode"] })
+  .refine((r) => r.site_geofence_mode !== "off", { message: "Flag or Refuse", path: ["site_geofence_mode"] })
+  .refine((r) => r.home_radius_m >= 150, { message: "At least 150", path: ["home_radius_m"] })
+  .refine((r) => amountGiven(r.late_deduction), { message: "Enter the amount", path: ["late_deduction", "amount"] })
+  .refine((r) => amountGiven(r.early_deduction), { message: "Enter the amount", path: ["early_deduction", "amount"] })
+  .refine((r) => !r.overtime.on || r.overtime.method === "multiplier" || Boolean(r.overtime.amount), {
+    message: "Enter the amount",
+    path: ["overtime", "amount"],
+  });
 
 /* ------------------------------------------------------------------ *
  * Exports
@@ -1027,49 +1067,6 @@ const TABLES = {
     },
   },
   FieldAssignmentPage: { table: null, reason: "a page of field assignments" },
-  PolicySettings: { table: "attendance_policy" },
-  PolicyVersion: {
-    table: "attendance_policy",
-    virtual: {
-      state: "waiting, in force or past against today in Lagos, else withdrawn",
-      changed: "the rules that differ from the previous published version",
-      published_by_name: "who published it, from app_user and employee",
-      acknowledged: "how many of the people asked have an acknowledged attendance_policy_acknowledgement row",
-      asked: "everyone at work with an active login, counted when read",
-    },
-  },
-  PolicyVersionPage: { table: null, reason: "a page of policy versions" },
-  PolicyDraft: {
-    table: "attendance_policy",
-    virtual: {
-      changed: "the rules that differ from the version it would replace",
-      updated_by_name: "who saved it last, from app_user and employee",
-    },
-  },
-  PolicyOverview: {
-    table: null,
-    reason: "the rules in force today, the version in force, the newest waiting and the draft, from attendance_policy",
-  },
-  PolicyPublish: { table: "attendance_policy" },
-  PolicyWithdraw: { table: null, reason: "why it is withdrawn; kept as attendance_policy.withdraw_reason" },
-  PolicyVersionListQuery: { table: null, reason: "list controls for the policy versions" },
-  PolicyAck: {
-    table: "attendance_policy_acknowledgement",
-    virtual: { employee: "the person, from employee and department" },
-  },
-  PolicyAckPage: { table: null, reason: "a page of the people asked to acknowledge a version" },
-  PolicyAckListQuery: { table: null, reason: "list controls for a version's acknowledgements" },
-  MyPolicyVersion: {
-    table: "attendance_policy",
-    virtual: {
-      state: "waiting, in force or past against today in Lagos, else withdrawn",
-      changed: "the rules that differ from the previous published version",
-      acknowledged_at: "the reader's attendance_policy_acknowledgement row",
-    },
-  },
-  MyPolicyVersionPage: { table: null, reason: "a page of policy versions for the reader" },
-  MyPolicyVersionListQuery: { table: null, reason: "list controls for the reader's policy versions" },
-  MyPolicy: { table: null, reason: "the rules in force today and the newest version, for the reader" },
   FieldSiteInput: { table: "attendance_field_site" },
   FieldAssignmentCreate: {
     table: "attendance_field_assignment",
@@ -1164,6 +1161,13 @@ const TABLES = {
   DayDetailQuery: { table: null, reason: "the day to open" },
   DayDetail: { table: null, reason: "one person's day with its shift and policy" },
   AttendanceRecordRef: { table: null, reason: "the person and day a link to a day or an exception opens" },
+  HoursDay: { table: null, reason: "one weekday of the Attendance policy's hours, kept in policy_version.rules" },
+  CountRule: { table: null, reason: "a consequence rule, kept in policy_version.rules" },
+  CountHoursRule: { table: null, reason: "a consequence rule counting days or hours, kept in policy_version.rules" },
+  Deduction: { table: null, reason: "a deduction rule, kept in policy_version.rules" },
+  Overtime: { table: null, reason: "the overtime rule, kept in policy_version.rules" },
+  AttendanceRules: { table: null, reason: "an Attendance policy version's rules, kept as policy_version.rules (jsonb)" },
+  AttendanceRulesDraft: { table: null, reason: "the Attendance policy's rules as a draft saves them, kept as policy_version.rules (jsonb)" },
   MyExportRequest: { table: null, reason: "the month to export" },
   RegisterExportRequest: { table: null, reason: "the register's filters for an export" },
 };
@@ -1246,21 +1250,18 @@ module.exports = {
   WorkSchedule,
   ScheduleParams,
   WorkScheduleSet,
-  PolicyRule,
-  PolicyVersionState,
-  PolicySettings,
-  PolicyVersion,
-  PolicyVersionPage,
-  PolicyDraft,
-  PolicyOverview,
-  PolicyPublish,
-  PolicyWithdraw,
-  PolicyVersionListQuery,
-  PolicyAck,
-  PolicyAckPage,
-  PolicyAckListQuery,
-  MyPolicyVersion,
-  MyPolicyVersionPage,
-  MyPolicyVersionListQuery,
-  MyPolicy,
+  RulePeriod,
+  DeductionMethod,
+  OvertimeApproval,
+  OvertimeMethod,
+  HoursDay,
+  WorkingHours,
+  CountRule,
+  CountHoursRule,
+  Deduction,
+  Overtime,
+  DEFAULT_RULES,
+  AttendanceRule,
+  AttendanceRules,
+  AttendanceRulesDraft,
 };

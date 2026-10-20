@@ -9,7 +9,6 @@ import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AttendancePolicyTab } from "@/features/attendance/AttendancePolicy";
 import { AuditLog } from "./AuditLog";
 import { NotificationsTab } from "./Notifications";
 import { NumberingTab } from "./Numbering";
@@ -35,7 +34,6 @@ export default function Settings({ tab }: ModuleScreenProps) {
     case "users": return <Users />;
     case "roles-and-permissions": return <Roles />;
     case "approvals": return <Approvals />;
-    case "attendance-policy": return <AttendancePolicyTab />;
     case "notifications": return <NotificationsTab />;
     case "appearance": return <AppearanceTab />;
     case "documents-and-numbering": return <NumberingTab />;

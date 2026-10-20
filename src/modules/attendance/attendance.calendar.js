@@ -4,10 +4,10 @@
  * is matched to, the shift and the zone (docs/guides/attendance.md §6.1, §6.5).
  * The I/O beside the pure rules in attendance.rules.js.
  *
- *   policy     their own active policy for the date (employee_attendance_policy), else the
- *              organisation's: the published version in force that date, before any the oldest
- *              row from before versions, else the code's defaults. MyCity publishes the policy;
- *              none is seeded (A26). Its `geofence_mode` is the mode of the date's place (§6.1):
+ *   policy     the Attendance policy's version in force that date, read through
+ *              policies.rulesFor (docs/guides/policies.md §6.8), else the type's defaults. MyCity
+ *              publishes it on Knowledge Hub · Policies; none is seeded (A26). Its
+ *              `geofence_mode` is the mode of the date's place (§6.1):
  *              a field site's on a field assignment or a client visit, a home's when the date is
  *              worked from home (remote staff, a hybrid home day, a temporary home, a remote day),
  *              the office's otherwise
@@ -19,8 +19,8 @@
  *              the day, the approval being the check. Then someone working from home that date
  *              (remote staff, or a hybrid employee's home day by their schedule, §6.13): their
  *              approved home, with the policy's home_radius_m, or none until People approve one.
- *              Everyone else: the policy row's worksite for the date when it names one, else the
- *              employee's own (employee.worksite_id); only an active worksite fences
+ *              Everyone else: the employee's own worksite (employee.worksite_id); only an active
+ *              worksite fences
  *   home_day   the date is worked from home by the pattern or the schedule, so having no fence
  *              means no approved home (no_home) rather than no office (no_worksite)
  *   zone       the worksite's timezone, else Africa/Lagos (a home has none of its own)
@@ -32,27 +32,22 @@ const lagos = require("../../shared/time/lagos");
 const worksites = require("../worksites/worksites.service");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const policies = require("../policies/policies.service");
+// The Attendance policy type registers itself with policies when it is loaded.
+require("./attendance.policy-type");
 
-/** The policy for a person on a date, defaults filled in. */
-async function policyFor(db, employeeId, date) {
-  const row = (await repo.assignedPolicy(db, employeeId, date)) || (await repo.defaultPolicy(db, date));
-  if (!row) return { ...rules.DEFAULT_POLICY, override_worksite_id: null };
-  const d = rules.DEFAULT_POLICY;
-  const office = row.office_geofence_mode || d.office_geofence_mode;
+/**
+ * The rules for a date, defaults filled in: the Attendance policy's version in force then. One
+ * organisation policy, so the person does not change them; `employeeId` is kept for the callers.
+ */
+async function policyFor(db, _employeeId, date) {
+  const { policy_version_id: versionId, version, rules: r } = await policies.rulesFor(db, "attendance", date);
   return {
-    attendance_policy_id: row.attendance_policy_id,
-    name: row.name,
-    version: row.version === null || row.version === undefined ? null : Number(row.version),
-    grace_minutes: Number(row.grace_minutes) || 0,
-    latest_clock_out_minutes: Number(row.latest_clock_out_minutes),
-    office_geofence_mode: office,
-    home_geofence_mode: row.home_geofence_mode || d.home_geofence_mode,
-    site_geofence_mode: row.site_geofence_mode || d.site_geofence_mode,
-    geofence_mode: office,
-    device_mode: row.device_mode || d.device_mode,
-    max_accuracy_m: Number(row.max_accuracy_m) || d.max_accuracy_m,
-    home_radius_m: Number(row.home_radius_m) || d.home_radius_m,
-    override_worksite_id: row.override_worksite_id || null,
+    policy_version_id: versionId,
+    version,
+    ...r,
+    geofence_mode: r.office_geofence_mode,
+    override_worksite_id: null,
   };
 }
 

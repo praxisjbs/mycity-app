@@ -106,7 +106,7 @@ async function writeDay(db, person, date, { now }) {
           occurred_at: punch.at,
           work_date: date,
           worksite_id: ctx.fence ? ctx.fence.worksite_id : null,
-          attendance_policy_id: ctx.policy.attendance_policy_id,
+          policy_version_id: ctx.policy.policy_version_id,
           source: "import",
           validation_state: "accepted",
           validation: { reasons: [] },

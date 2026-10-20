@@ -3,8 +3,7 @@
  * Attendance: the SQL. Writes only the attendance tables (attendance_event,
  * attendance_day, attendance_exception, attendance_home, attendance_location_request, the
  * field assignment tables attendance_field_assignment, _site and _member,
- * attendance_schedule, attendance_clock_reminder, attendance_policy and
- * attendance_policy_acknowledgement); reads
+ * attendance_schedule and attendance_clock_reminder); reads
  * employee, worksite, leave, approvals and the working week for what a day means. Never emits
  * (BACKEND_GUIDE §2).
  *
@@ -97,43 +96,6 @@ function person(db, employeeId) {
   );
 }
 
-const POLICY = `p.attendance_policy_id, p.name, p.version, p.grace_minutes, p.latest_clock_out_minutes,
-  p.office_geofence_mode, p.home_geofence_mode, p.site_geofence_mode, p.device_mode, p.max_accuracy_m,
-  p.home_radius_m`;
-
-/** The person's own policy and worksite for a date, when People set one (effective-dated). */
-function assignedPolicy(db, employeeId, date) {
-  return one(
-    db,
-    `SELECT ${POLICY}, ea.worksite_id AS override_worksite_id
-       FROM employee_attendance_policy ea
-       JOIN attendance_policy p ON p.attendance_policy_id = ea.attendance_policy_id
-                               AND p.active AND p.status = 'published'
-      WHERE ea.employee_id = $1 AND ea.effective_from <= $2::date
-        AND (ea.effective_to IS NULL OR ea.effective_to > $2::date)
-      ORDER BY ea.effective_from DESC
-      LIMIT 1`,
-    [employeeId, date],
-  );
-}
-
-/**
- * The organisation's policy on a date (guide §6.1): the published version whose first day is the
- * latest on or before it; before any version starts, the oldest active row from before versions.
- */
-function defaultPolicy(db, date) {
-  return one(
-    db,
-    `SELECT ${POLICY}, NULL::uuid AS override_worksite_id
-       FROM attendance_policy p
-      WHERE p.active AND p.status = 'published'
-        AND (p.version IS NULL OR p.effective_from <= $1::date)
-      ORDER BY (p.version IS NULL), p.effective_from DESC, p.version DESC, p.created_at, p.attendance_policy_id
-      LIMIT 1`,
-    [date],
-  );
-}
-
 /** Granted leave covering a date, or null. */
 function grantedLeave(db, employeeId, date) {
   return one(
@@ -192,7 +154,7 @@ async function insertEvent(client, e) {
     client,
     `INSERT INTO attendance_event
        (employee_id, event_type, occurred_at, work_date, device_at, worksite_id, known_device_id,
-        attendance_device_id, attendance_policy_id, latitude, longitude, accuracy_m, distance_m, source,
+        attendance_device_id, policy_version_id, latitude, longitude, accuracy_m, distance_m, source,
         validation_state, validation, request_id, idempotency_key, note, recorded_by, reason)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21)
      RETURNING attendance_event_id`,
@@ -205,7 +167,7 @@ async function insertEvent(client, e) {
       e.worksite_id || null,
       e.known_device_id || null,
       e.attendance_device_id || null,
-      e.attendance_policy_id || null,
+      e.policy_version_id || null,
       e.latitude ?? null,
       e.longitude ?? null,
       e.accuracy_m ?? null,
@@ -1328,329 +1290,6 @@ function upsertSchedule(client, x) {
   );
 }
 
-/* ------------------------------------------------------------------ *
- * The attendance policy's versions and acknowledgements (guide §6.15)
- * ------------------------------------------------------------------ */
-
-/** The rules a version holds, in PolicySettings' order. */
-const RULE_COLUMNS = [
-  "grace_minutes",
-  "office_geofence_mode",
-  "home_geofence_mode",
-  "site_geofence_mode",
-  "device_mode",
-  "max_accuracy_m",
-  "home_radius_m",
-];
-
-/** Who saved or published a row, by the user column given: their name, or null. */
-const NAME_OF = (userCol) => `(SELECT btrim(ne.first_name || ' ' || ne.last_name) FROM app_user nu
-   JOIN employee ne ON ne.employee_id = nu.employee_id WHERE nu.user_id = ${userCol})`;
-
-/** Everyone asked to acknowledge a version: at work on `dateExpr`, with an active login. */
-const ASKED = (alias, dateExpr) => `${alias}.status = 'active'
-   AND (${alias}.start_date IS NULL OR ${alias}.start_date <= ${dateExpr})
-   AND (${alias}.left_on IS NULL OR ${alias}.left_on > ${dateExpr})
-   AND EXISTS (SELECT 1 FROM app_user au WHERE au.employee_id = ${alias}.employee_id AND au.status = 'active')`;
-
-/** A version row: its rules, its publication and the rules of the published version before it. */
-const VERSION_SELECT = `p.attendance_policy_id, p.version, p.status, p.effective_from, p.note, p.published_at,
-       p.withdrawn_at, p.withdraw_reason, ${RULE_COLUMNS.map((c) => `p.${c}`).join(", ")},
-       ${NAME_OF("p.published_by")} AS published_by_name,
-       (SELECT json_build_object(${RULE_COLUMNS.map((c) => `'${c}', pv.${c}`).join(", ")})
-          FROM attendance_policy pv
-         WHERE pv.status = 'published'
-           AND pv.version = (SELECT max(px.version) FROM attendance_policy px
-                              WHERE px.status = 'published' AND px.version < p.version)) AS previous`;
-
-/** Only one policy change at a time: a publish, a withdrawal or a draft saved. */
-function lockPolicy(client) {
-  return client.query("SELECT pg_advisory_xact_lock(hashtext('attendance_policy'))");
-}
-
-/** The draft, with who saved it last, or null. */
-function policyDraft(db) {
-  return one(
-    db,
-    `SELECT p.attendance_policy_id, ${RULE_COLUMNS.map((c) => `p.${c}`).join(", ")}, p.updated_at,
-            ${NAME_OF("COALESCE(p.updated_by, p.created_by)")} AS updated_by_name
-       FROM attendance_policy p WHERE p.status = 'draft'`,
-    [],
-  );
-}
-
-/** The version in force on a date, or null while none has started. */
-function versionInForce(db, date) {
-  return one(
-    db,
-    `SELECT ${VERSION_SELECT}
-       FROM attendance_policy p
-      WHERE p.status = 'published' AND p.version IS NOT NULL AND p.effective_from <= $1::date
-      ORDER BY p.effective_from DESC, p.version DESC
-      LIMIT 1`,
-    [date],
-  );
-}
-
-/** The newest published version, waiting or in force, or null. */
-function newestVersion(db) {
-  return one(
-    db,
-    `SELECT ${VERSION_SELECT}
-       FROM attendance_policy p
-      WHERE p.status = 'published' AND p.version IS NOT NULL
-      ORDER BY p.version DESC
-      LIMIT 1`,
-    [],
-  );
-}
-
-/** One version (published or withdrawn) by id, or null; a draft is not a version. */
-function getVersion(db, id) {
-  return one(
-    db,
-    `SELECT ${VERSION_SELECT}
-       FROM attendance_policy p
-      WHERE p.attendance_policy_id = $1 AND p.version IS NOT NULL`,
-    [id],
-  );
-}
-
-/** The latest first day of a version still waiting after `date`, or null. */
-async function lastWaitingStart(db, date) {
-  const row = await one(
-    db,
-    `SELECT max(p.effective_from) AS starts
-       FROM attendance_policy p
-      WHERE p.status = 'published' AND p.version IS NOT NULL AND p.effective_from > $1::date`,
-    [date],
-  );
-  return row ? row.starts : null;
-}
-
-/** The number the next version takes: never one used before, withdrawn ones included. */
-async function nextVersion(db) {
-  const row = await one(db, "SELECT COALESCE(max(version), 0)::int + 1 AS next FROM attendance_policy", []);
-  return row.next;
-}
-
-/** A new draft with these rules; the rules no screen edits come from `base`. */
-function insertDraft(client, rules, base, userId) {
-  return one(
-    client,
-    `INSERT INTO attendance_policy (name, status, ${RULE_COLUMNS.join(", ")}, geofence_mode,
-                                    latest_clock_out_minutes, created_by, updated_by)
-     VALUES ('Draft', 'draft', ${RULE_COLUMNS.map((_, i) => `$${i + 1}`).join(", ")}, $2, $8, $9, $9)
-     RETURNING attendance_policy_id`,
-    [...RULE_COLUMNS.map((c) => rules[c]), Number(base.latest_clock_out_minutes), userId],
-  );
-}
-
-/** The draft's rules replaced. */
-function updateDraft(client, id, rules, userId) {
-  return one(
-    client,
-    `UPDATE attendance_policy
-        SET ${RULE_COLUMNS.map((c, i) => `${c} = $${i + 2}`).join(", ")}, geofence_mode = $3, updated_by = $9
-      WHERE attendance_policy_id = $1 AND status = 'draft'
-      RETURNING attendance_policy_id`,
-    [id, ...RULE_COLUMNS.map((c) => rules[c]), userId],
-  );
-}
-
-/** The draft deleted; nothing points at a draft. */
-async function deleteDraft(client, id) {
-  const { rowCount } = await client.query(
-    "DELETE FROM attendance_policy WHERE attendance_policy_id = $1 AND status = 'draft'",
-    [id],
-  );
-  return rowCount > 0;
-}
-
-/** The draft made `Version N`, from its first day. */
-function publishDraft(client, id, { version, effective_from: from, note, userId }) {
-  return one(
-    client,
-    `UPDATE attendance_policy
-        SET status = 'published', version = $2::int, name = 'Version ' || $2::int, effective_from = $3::date,
-            note = $4, published_at = now(), published_by = $5, updated_by = $5
-      WHERE attendance_policy_id = $1 AND status = 'draft'
-      RETURNING attendance_policy_id`,
-    [id, version, from, note, userId],
-  );
-}
-
-/** A version waiting to start withdrawn. */
-function withdrawVersion(client, id, { reason, userId, today }) {
-  return one(
-    client,
-    `UPDATE attendance_policy
-        SET status = 'withdrawn', active = false, withdrawn_at = now(), withdrawn_by = $2,
-            withdraw_reason = $3, updated_by = $2
-      WHERE attendance_policy_id = $1 AND status = 'published' AND version IS NOT NULL
-        AND effective_from > $4::date
-      RETURNING attendance_policy_id`,
-    [id, userId, reason, today],
-  );
-}
-
-/** How many people are asked to acknowledge, and how many of them did each version. */
-async function acknowledgedCounts(db, policyIds, date) {
-  // pagination:complete one count per version on the page, at most 25
-  const { rows } = await completeQuery(
-    db,
-    `SELECT a.attendance_policy_id, COUNT(*)::int AS acknowledged
-       FROM attendance_policy_acknowledgement a
-       JOIN employee e ON e.employee_id = a.employee_id
-      WHERE a.attendance_policy_id = ANY($1::uuid[]) AND a.acknowledged_at IS NOT NULL
-        AND ${ASKED("e", "$2::date")}
-      GROUP BY a.attendance_policy_id
-      ORDER BY a.attendance_policy_id`,
-    [policyIds, date],
-    { label: "acknowledgements of a page of policy versions" },
-  );
-  return new Map(rows.map((r) => [r.attendance_policy_id, r.acknowledged]));
-}
-
-/** Everyone asked on a date. */
-async function askedCount(db, date) {
-  const row = await one(db, `SELECT COUNT(*)::int AS asked FROM employee e WHERE ${ASKED("e", "$1::date")}`, [date]);
-  return row.asked;
-}
-
-/**
- * A page of versions, newest first, each with the reader's own acknowledgement when one is named.
- * `state` is worked out against `today` and the version in force (`inForceId`, null before any).
- */
-function listVersions(db, query, { employeeId = null, today, inForceId = null }) {
-  const params = [query.state || null, employeeId, today, inForceId];
-  return pageQuery(
-    db,
-    `SELECT ${VERSION_SELECT},
-            (SELECT a.acknowledged_at FROM attendance_policy_acknowledgement a
-              WHERE a.attendance_policy_id = p.attendance_policy_id AND a.employee_id = $2::uuid) AS acknowledged_at,
-            ${TOTAL_COL}
-       FROM attendance_policy p
-      WHERE p.version IS NOT NULL
-        AND ($1::text IS NULL
-             OR ($1 = 'withdrawn' AND p.status = 'withdrawn')
-             OR ($1 = 'waiting' AND p.status = 'published' AND p.effective_from > $3::date)
-             OR ($1 = 'in_force' AND p.attendance_policy_id = $4::uuid)
-             OR ($1 = 'past' AND p.status = 'published' AND p.effective_from <= $3::date
-                 AND p.attendance_policy_id IS DISTINCT FROM $4::uuid))
-      ORDER BY p.version DESC`,
-    params,
-    query,
-  );
-}
-
-/** One person's acknowledgement of a version, or null. */
-function acknowledgementOf(db, policyId, employeeId) {
-  return one(
-    db,
-    `SELECT attendance_policy_acknowledgement_id, reminded_at, acknowledged_at
-       FROM attendance_policy_acknowledgement
-      WHERE attendance_policy_id = $1 AND employee_id = $2`,
-    [policyId, employeeId],
-  );
-}
-
-/** Acknowledged now, once: null when it already was. */
-function acknowledge(client, policyId, employeeId) {
-  return one(
-    client,
-    `INSERT INTO attendance_policy_acknowledgement (attendance_policy_id, employee_id, acknowledged_at)
-     VALUES ($1, $2, now())
-     ON CONFLICT (attendance_policy_id, employee_id) DO UPDATE SET acknowledged_at = now()
-       WHERE attendance_policy_acknowledgement.acknowledged_at IS NULL
-     RETURNING attendance_policy_acknowledgement_id, acknowledged_at`,
-    [policyId, employeeId],
-  );
-}
-
-/** The sorts PolicyAckListQuery allow-lists. The first is the default order. */
-const ACK_SORTS = {
-  display_name: "e.first_name, e.last_name",
-  acknowledged_at: "a.acknowledged_at",
-};
-
-/** A page of everyone asked about a version, within the reader's scope, acknowledged or not. */
-function listAcknowledgements(db, policyId, query, scope, date) {
-  const params = [policyId, date, query.status || null, query.q || null];
-  const s = scopeClause(scope, { column: "e.employee_id" }, params);
-  return pageQuery(
-    db,
-    `SELECT ${PERSON()} AS employee, a.acknowledged_at, a.reminded_at, ${TOTAL_COL}
-       FROM employee e
-       LEFT JOIN department d ON d.department_id = e.department_id
-       LEFT JOIN attendance_policy_acknowledgement a
-              ON a.attendance_policy_id = $1 AND a.employee_id = e.employee_id
-      WHERE ${ASKED("e", "$2::date")}
-        AND ($3::text IS NULL
-             OR ($3 = 'acknowledged' AND a.acknowledged_at IS NOT NULL)
-             OR ($3 = 'pending' AND a.acknowledged_at IS NULL))
-        AND ($4::text IS NULL
-             OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($4) || '%')
-        ${s.and}
-      ORDER BY ${orderBy(query, ACK_SORTS, "e.employee_id")}`,
-    params,
-    query,
-  );
-}
-
-/** Whether a person is asked on a date: at work, with an active login. */
-async function isAsked(db, employeeId, date) {
-  return Boolean(await one(db, `SELECT 1 FROM employee e WHERE e.employee_id = $1 AND ${ASKED("e", "$2::date")}`, [employeeId, date]));
-}
-
-/** Everyone asked who has neither acknowledged a version nor been reminded of it. */
-async function dueForPolicyReminder(db, policyId, date) {
-  // pagination:complete the job reminds everyone who is due, not a page of them
-  const { rows } = await completeQuery(
-    db,
-    `SELECT e.employee_id
-       FROM employee e
-      WHERE ${ASKED("e", "$2::date")}
-        AND NOT EXISTS (SELECT 1 FROM attendance_policy_acknowledgement a
-                         WHERE a.attendance_policy_id = $1 AND a.employee_id = e.employee_id
-                           AND (a.acknowledged_at IS NOT NULL OR a.reminded_at IS NOT NULL))
-      ORDER BY e.employee_id`,
-    [policyId, date],
-    { label: "people due a policy reminder" },
-  );
-  return rows;
-}
-
-/** A reminder recorded, once: null when the person was already reminded or has acknowledged. */
-function recordPolicyReminder(client, policyId, employeeId) {
-  return one(
-    client,
-    `INSERT INTO attendance_policy_acknowledgement (attendance_policy_id, employee_id, reminded_at)
-     VALUES ($1, $2, now())
-     ON CONFLICT (attendance_policy_id, employee_id) DO UPDATE SET reminded_at = now()
-       WHERE attendance_policy_acknowledgement.reminded_at IS NULL
-         AND attendance_policy_acknowledgement.acknowledged_at IS NULL
-     RETURNING attendance_policy_acknowledgement_id`,
-    [policyId, employeeId],
-  );
-}
-
-/** The user ids of everyone asked: the audience a version's notices go to. */
-async function askedUsers(db, date) {
-  // pagination:complete a notice goes to everyone asked, not a page of them
-  const { rows } = await completeQuery(
-    db,
-    `SELECT u.user_id
-       FROM employee e
-       JOIN app_user u ON u.employee_id = e.employee_id AND u.status = 'active'
-      WHERE ${ASKED("e", "$1::date")}
-      ORDER BY u.user_id`,
-    [date],
-    { label: "everyone asked to acknowledge the attendance policy" },
-  );
-  return rows.map((r) => r.user_id);
-}
-
 /** Where each attendance address field keeps its readable line (shared/places/owners.js). */
 const ADDRESS_LINE = {
   "attendance_home.address": "UPDATE attendance_home SET address = $2 WHERE attendance_home_id = $1",
@@ -1670,8 +1309,6 @@ module.exports = {
   HOME_DAY,
   lockEmployee,
   person,
-  assignedPolicy,
-  defaultPolicy,
   grantedLeave,
   eventsOn,
   eventByKey,
@@ -1731,27 +1368,4 @@ module.exports = {
   scheduleAfter,
   scheduleFrom,
   upsertSchedule,
-  RULE_COLUMNS,
-  lockPolicy,
-  policyDraft,
-  versionInForce,
-  newestVersion,
-  getVersion,
-  lastWaitingStart,
-  nextVersion,
-  insertDraft,
-  updateDraft,
-  deleteDraft,
-  publishDraft,
-  withdrawVersion,
-  acknowledgedCounts,
-  askedCount,
-  listVersions,
-  acknowledgementOf,
-  acknowledge,
-  listAcknowledgements,
-  isAsked,
-  dueForPolicyReminder,
-  recordPolicyReminder,
-  askedUsers,
 };

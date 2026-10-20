@@ -26,23 +26,16 @@ const DELAY_FLAG_S = 300;
 const DEFAULT_TZ = "Africa/Lagos";
 
 /**
- * The defaults when MyCity has entered no policy (MILESTONES §6.2; A26). The location check has a
- * mode for each kind of place (guide §6.1); `geofence_mode` is the one for the place a date is
- * matched to, the office's until attendance.calendar.js contextFor knows the place.
+ * The rules when MyCity has published no Attendance policy version: the contract's defaults
+ * (AttendanceRules, guide §6.15; A26). The location check has a mode for each kind of place
+ * (guide §6.1); `geofence_mode` is the one for the place a date is matched to, the office's until
+ * attendance.calendar.js contextFor knows the place.
  */
 const DEFAULT_POLICY = Object.freeze({
-  attendance_policy_id: null,
-  name: null,
+  policy_version_id: null,
   version: null,
-  grace_minutes: 0,
-  latest_clock_out_minutes: 240,
-  office_geofence_mode: "warn",
-  home_geofence_mode: "warn",
-  site_geofence_mode: "warn",
+  ...require("@mycity/contract").attendance.AttendanceRules.parse({}),
   geofence_mode: "warn",
-  device_mode: "off",
-  max_accuracy_m: 100,
-  home_radius_m: 100,
 });
 
 /** The kinds of place a date is matched to, each with its own location mode (guide §6.1). */

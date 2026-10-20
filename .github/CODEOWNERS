@@ -138,6 +138,8 @@
 /packages/contract/schemas/interviews.js           @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
+/src/modules/policies/                             @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/policies.js             @tomblakeasaah196 @swizfcodes
 /src/modules/reports/                              @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/reports.js              @tomblakeasaah196 @swizfcodes
 /src/modules/vacancies/                            @tomblakeasaah196 @swizfcodes
@@ -219,4 +221,5 @@
 /docs/guides/system-health.md                      @swizfcodes @tomblakeasaah196
 /docs/guides/integrations.md                       @tomblakeasaah196 @swizfcodes
 /docs/guides/addresses.md                          @tomblakeasaah196 @swizfcodes
+/docs/guides/policies.md                           @tomblakeasaah196 @LovedataX @swizfcodes
 /docs/guides/ai-control.md                         @tomblakeasaah196 @swizfcodes

@@ -213,9 +213,12 @@ access) and `REUSE_MAP.md`; what is taken from them is decided when PR2 starts.
    still sends Daily Limit Near at 80% of a daily limit (`integrations.md` decision 10). TB to say if
    that stops for AI providers too.
 3. **How often Find Prices runs**: on request only, or also once a month.
+4. **Actions chosen before the registry exists**, to be registered when it is built: Tidy With AI
+   (`policy-tidy`, `policies.md` §9) on Default, carrying personal data, chosen by TB 20/10/2026.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · §13 lists the actions chosen before the registry exists: Tidy With AI (`policy-tidy`) on Default, personal data, from `docs/guides/policies.md` §9.
 - 20/10/2026 · TB · Written from TB's answers of 20/10/2026 (§1.1): AI Control under System with
   Actions, Models and Spend; jobs, actions and chains of up to three fallbacks; per-provider caps
   with no notifications; Find Prices confirmed by IT; Data Answers through reads; DeepSeek without

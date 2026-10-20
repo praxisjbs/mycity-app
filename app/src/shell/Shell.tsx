@@ -20,6 +20,7 @@ import {
 import { useApi } from "@/api/hooks";
 import { useAuth, useMe, useMyPhoto } from "@/auth/AuthProvider";
 import { ClockButton, ClockPrompts, useClockSync } from "@/features/attendance/ClockButton";
+import { AcknowledgePrompts } from "@/features/policies/AcknowledgeSheet";
 import { UrgentNotices, urgentModules, useUrgentNotices } from "@/features/notifications/UrgentNotices";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
@@ -128,6 +129,7 @@ export function Shell() {
         {phone ? <PhoneFrame {...frame} /> : <DesktopFrame {...frame} />}
         <Search open={search} onClose={() => setSearch(false)} />
         <ClockPrompts />
+        <AcknowledgePrompts />
       </ScreenActionProvider>
     </FitContext.Provider>
   );
