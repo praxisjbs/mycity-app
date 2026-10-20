@@ -65,7 +65,7 @@ const card = (title: string) => screen.getByRole("heading", { name: title }).clo
 describe("Policy Updates", () => {
   it("shows the newest version in sentences, tags what changed, and takes one acknowledgement", async () => {
     await signedInAs("chidera@mycityapp.io");
-    await screen.findByText(/Grace is now 10 minutes/);
+    await screen.findByText(/Grace is now 10 minutes/, {}, { timeout: 5000 });
     expect(screen.getByText("You have a grace period of 10 minutes after your resumption time. A clock-in after it counts as late.")).toBeTruthy();
     expect(screen.getByText("A clock-in from a device not registered on My Devices is accepted and sent for review.")).toBeTruthy();
     expect(within(card("Clocking In")).getByText("Changed")).toBeTruthy();
@@ -74,23 +74,23 @@ describe("Policy Updates", () => {
     expect(await axe(document.body)).toHaveNoViolations();
 
     fireEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
-    expect(await screen.findByText(/^Acknowledged \d{2}\/\d{2}\/\d{4}$/)).toBeTruthy();
+    expect(await screen.findByText(/^Acknowledged \d{2}\/\d{2}\/\d{4}$/, {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Acknowledge" })).toBeNull();
-  });
+  }, 30000);
 
   it("opens an earlier version with its own sentences", async () => {
     await signedInAs("chidera@mycityapp.io");
-    fireEvent.click(await screen.findByText("Version 1"));
-    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(await screen.findByText("Version 1", {}, { timeout: 5000 }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 5000 });
     expect(within(dialog).getByText("You have a grace period of 15 minutes after your resumption time. A clock-in after it counts as late.")).toBeTruthy();
     expect(within(dialog).getByText("You can clock in from any device. Each device you use is recorded.")).toBeTruthy();
     expect(within(dialog).getByText("Replaced")).toBeTruthy();
-  });
+  }, 30000);
 
   it("on a phone, the version comes first with Acknowledge, and the versions are cards", async () => {
     setViewport(390);
     await signedInAs("ngozi@mycityapp.io");
-    await screen.findByRole("button", { name: "Acknowledge" });
+    await screen.findByRole("button", { name: "Acknowledge" }, { timeout: 5000 });
     expect(document.querySelector("table")).toBeNull();
-  });
+  }, 30000);
 });

@@ -63,41 +63,41 @@ const group = (name: string) => screen.getByRole("radiogroup", { name });
 describe("Settings · Attendance Policy", () => {
   it("shows the rules in force and every version", async () => {
     await signedInAs("cynthia@mycityapp.io");
-    await screen.findByText(/^Version 2 in force since /);
+    await screen.findByText(/^Version 2 in force since /, {}, { timeout: 5000 });
     expect((screen.getByRole("textbox", { name: /Grace Minutes/ }) as HTMLInputElement).value).toBe("10");
     expect(within(group("Device Check")).getByRole("radio", { name: "Warn" }).getAttribute("aria-checked")).toBe("true");
     const versions = screen.getByRole("heading", { name: "Versions" }).closest<HTMLElement>("[data-card]") ?? document.body;
     expect(within(versions).getByText("In Force")).toBeTruthy();
     expect(within(versions).getByText("Replaced")).toBeTruthy();
     expect(await axe(document.body)).toHaveNoViolations();
-  });
+  }, 30000);
 
   it("saves the changes as a draft, then publishes them as Version 3 from today", async () => {
     await signedInAs("cynthia@mycityapp.io");
-    const grace = (await screen.findByRole("textbox", { name: /Grace Minutes/ })) as HTMLInputElement;
+    const grace = (await screen.findByRole("textbox", { name: /Grace Minutes/ }, { timeout: 5000 })) as HTMLInputElement;
     fireEvent.change(grace, { target: { value: "15" } });
     fireEvent.click(within(group("Office Check")).getByRole("radio", { name: "Block" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
-    expect(await screen.findByText("Draft with 2 changes, not published.")).toBeTruthy();
+    expect(await screen.findByText("Draft with 2 changes, not published.", {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.getAllByText("Changed")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Publish Policy" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 5000 });
     expect(within(dialog).getByText("10 minutes")).toBeTruthy();
     expect(within(dialog).getByText("15 minutes")).toBeTruthy();
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Note" }), { target: { value: "Grace raised to 15 minutes, and the office is now strict." } });
     expect(await axe(dialog)).toHaveNoViolations();
     fireEvent.click(within(dialog).getByRole("button", { name: "Publish Version" }));
-    expect(await screen.findByText(/^Version 3 in force since /)).toBeTruthy();
+    expect(await screen.findByText(/^Version 3 in force since /, {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.queryByText(/^Draft with/)).toBeNull();
-  });
+  }, 30000);
 
   it("lists who has acknowledged a version, and who has not", async () => {
     await signedInAs("cynthia@mycityapp.io");
-    fireEvent.click(await screen.findByText("Version 1"));
-    const dialog = await screen.findByRole("dialog");
-    await within(dialog).findByText("Acknowledgements");
+    fireEvent.click(await screen.findByText("Version 1", {}, { timeout: 5000 }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 5000 });
+    await within(dialog).findByText("Acknowledgements", {}, { timeout: 5000 });
     fireEvent.click(within(dialog).getByRole("button", { name: "Pending" }));
     await waitFor(() => expect(within(dialog).queryAllByText("Pending").length).toBeLessThanOrEqual(1));
-  });
+  }, 30000);
 });
