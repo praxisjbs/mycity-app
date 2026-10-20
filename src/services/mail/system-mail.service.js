@@ -306,7 +306,8 @@ async function sendPlain(msg) {
   if (to.length === 0) throw new Error("system mail: no recipient");
   const cc = msg.cc && [].concat(msg.cc).length ? addressList(msg.cc) : undefined;
   const all = [...to, ...(cc || [])].map((a) => (typeof a === "string" ? a : a.address));
-  if (config.SMTP_HOST) await routeCheck.assertRoutable({ smtpHost: config.SMTP_HOST, to: all });
+  if (config.SMTP_HOST)
+    await routeCheck.assertRoutable({ smtpHost: config.SMTP_HOST, to: all, localDomains: config.SMTP_LOCAL_DOMAINS });
   if (config.SMTP_HOST) {
     const slot = await pace.reserve(all.length);
     if (!slot.ok) throw new pace.MailPacedError(slot.wait_ms);
