@@ -204,6 +204,37 @@ async function cancel(id, user) {
 }
 
 /**
+ * Take a published announcement down (TB, 19/10/2026): it leaves #announcements (its message
+ * reads "Message deleted"), the Announcements tab and the stats, and its unopened notices are
+ * withdrawn after the commit. Its reads are kept for the record. Archived twice is a 404; a scheduled one is cancelled instead (409).
+ */
+async function archive(id, user) {
+  await tx(async (client) => {
+    const before = await repo.lockForUpdate(client, id);
+    if (!before || before.status === "cancelled" || before.status === "archived")
+      throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+    if (before.status !== "published")
+      throw new AppError("NOT_POSTED", "It has not gone out yet", 409);
+    const after = await repo.archivePublished(client, id);
+    if (before.community_message_id) await communityRepo.deleteMessage(client, before.community_message_id);
+    const channel = await communityRepo.systemChannel(client, "announcements");
+    await emit(client, {
+      key: EVENTS.ANNOUNCEMENT_ARCHIVED,
+      entity: { type: "announcement", id },
+      actor: user,
+      before,
+      after,
+      payload: {
+        announcement_id: id,
+        community_channel_id: channel.community_channel_id,
+        community_message_id: before.community_message_id,
+      },
+    });
+  });
+  return get(id);
+}
+
+/**
  * The delayed job and the scheduler's safety net call this. Only an announcement still
  * scheduled and due goes out: an edit may have moved it later, or it may be cancelled.
  */
@@ -340,6 +371,7 @@ module.exports = {
   create,
   update,
   cancel,
+  archive,
   publish,
   release,
   releaseDue,

@@ -698,6 +698,39 @@ describeDb("Staff Community against the real migrations", () => {
     expect(await svc.remindUnread(plain.body.announcement_id)).toEqual({ reminded: 0 });
   });
 
+  test("a published announcement is archived: it leaves #announcements and the tab, unopened notices go, reads stay", async () => {
+    const made = await as("ceo").post("/community/announcements").send({ title: "Wrong date", body: "Party on the 3rd.", urgency: "urgent" });
+    const id = made.body.announcement_id;
+    await drain();
+    const noticeOf = (who) =>
+      one("SELECT * FROM notification WHERE user_id = $1 AND event_key = 'announcement.published' AND entity_id = $2", [people[who].user.user_id, id]);
+    // Tunde acknowledges first; Bola never does.
+    expect((await as("tunde").post(`/community/announcements/${id}/acknowledge`).send({})).status).toBe(204);
+    const bola = await noticeOf("bola");
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).toContain(bola.notification_id);
+
+    expect((await as("bola").post(`/community/announcements/${id}/archive`).send({})).status).toBe(403);
+    const archived = await as("ceo").post(`/community/announcements/${id}/archive`).send({});
+    expect(archived.status).toBe(200);
+    expect(archived.body).toMatchObject({ announcement_id: id, status: "archived" });
+    await drain();
+
+    expect(await noticeOf("bola")).toBeUndefined();
+    expect((await as("bola").get("/notifications/urgent")).body.data.map((n) => n.notification_id)).not.toContain(bola.notification_id);
+    expect((await noticeOf("tunde")).acknowledged_at).not.toBeNull(); // what was answered stays
+    expect((await as("ceo").get("/community/announcements")).body.data.find((a) => a.announcement_id === id)).toBeUndefined();
+    const msg = await one(
+      "SELECT m.deleted_at FROM community_message m JOIN announcement a ON a.community_message_id = m.community_message_id WHERE a.announcement_id = $1",
+      [id],
+    );
+    expect(msg.deleted_at).not.toBeNull();
+    expect(await one("SELECT count(*)::int AS n FROM announcement_read WHERE announcement_id = $1", [id])).toEqual({ n: 3 });
+
+    expect((await as("ceo").post(`/community/announcements/${id}/archive`).send({})).status).toBe(404);
+    const sched = await as("ceo").post("/community/announcements").send({ title: "Later", body: "Later.", publish_at: new Date(Date.now() + 3_600_000).toISOString() });
+    expect((await as("ceo").post(`/community/announcements/${sched.body.announcement_id}/archive`).send({})).status).toBe(409);
+  });
+
   test("a scheduled announcement is edited or cancelled until it goes out; a stale release does nothing", async () => {
     const svc = require("../../src/modules/announcements/announcements.service");
     const at = (mins) => new Date(Date.now() + mins * 60_000).toISOString();

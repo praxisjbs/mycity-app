@@ -707,6 +707,13 @@ route("POST /api/v1/community/announcements/:id/cancel", (req) => {
   ANNOUNCEMENTS.splice(ANNOUNCEMENTS.indexOf(a), 1);
   return ok({ ...announcementOut(a), status: "cancelled" as const });
 });
+route("POST /api/v1/community/announcements/:id/archive", (req) => {
+  if (!poster(req.user)) return denied();
+  const a = ANNOUNCEMENTS.find((x) => x.announcement_id === req.params.id && !x.scheduled);
+  if (!a) return notFound();
+  ANNOUNCEMENTS.splice(ANNOUNCEMENTS.indexOf(a), 1);
+  return ok({ ...announcementOut(a), status: "archived" as const });
+});
 route("GET /api/v1/community/announcements/:id/reads", (req) => {
   if (!poster(req.user)) return denied();
   const a = ANNOUNCEMENTS.find((x) => x.announcement_id === req.params.id);

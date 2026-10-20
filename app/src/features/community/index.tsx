@@ -744,6 +744,20 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       if (e instanceof ApiError) toast(e.message);
     }
   };
+  /* A published one is taken down: it leaves #announcements and the tab, its reads kept for the record. */
+  const archive = useMutation("POST /api/v1/community/announcements/:id/archive");
+  const takeDown = async () => {
+    if (!(await confirm({ title: "Archive Announcement", body: `"${a.title}" leaves #announcements for everyone.`, confirmLabel: "Archive Announcement", cancelLabel: "Keep It", destructive: true }))) return;
+    try {
+      await archive.run({ params: { id: a.announcement_id }, body: {} });
+      invalidate("/api/v1/community");
+      close();
+      done();
+      toast("Announcement archived");
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+    }
+  };
   const notRead = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "not_read" }, enabled: live });
   const read = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "read" }, enabled: live });
   const remind = useMutation("POST /api/v1/community/announcements/:id/remind");
@@ -792,6 +806,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       )}
       <FormFooter>
         {!live && <Button variant="danger" busy={cancel.pending} onClick={() => callOff()}>Cancel Announcement</Button>}
+        {live && <Button variant="danger" icon="trash" busy={archive.pending} onClick={() => takeDown()}>Archive Announcement</Button>}
         {!live && <Button icon="edit" onClick={() => setEditing(true)}>Edit</Button>}
         <Button variant="primary" onClick={close}>Close</Button>
       </FormFooter>

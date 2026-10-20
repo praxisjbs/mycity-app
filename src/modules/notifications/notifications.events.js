@@ -23,6 +23,7 @@ const EVENTS = defineEvents("settings", {
   "notification.read": { summary: "A notification was marked read" },
   "notification.read_all": { summary: "Every notification was marked read" },
   "notification.acknowledged": { summary: "An urgent notification was acknowledged" },
+  "notification.withdrawn": { summary: "An unopened notification was withdrawn because its record was taken down" },
   "notification.preference_changed": { summary: "A person changed where a kind of notice reaches them" },
   "push_subscription.saved": { summary: "Notifications were turned on for a device" },
   "push_subscription.removed": { summary: "Notifications were turned off for one or more devices" },
@@ -43,6 +44,8 @@ function tellTheirTabs(event) {
 
 outbox.register(EVENTS.NOTIFICATION_READ, "notifications.sync_read", async (event) => tellTheirTabs(event));
 outbox.register(EVENTS.NOTIFICATION_READ_ALL, "notifications.sync_read_all", async (event) => tellTheirTabs(event));
+// A withdrawn notice leaves the bell and the urgent bar on every tab and device.
+outbox.register(EVENTS.NOTIFICATION_WITHDRAWN, "notifications.sync_withdrawn", async (event) => tellTheirTabs(event));
 // Acknowledge closes the urgent bar on every other tab and device too.
 outbox.register(EVENTS.NOTIFICATION_ACKNOWLEDGED, "notifications.sync_acknowledged", async (event) =>
   tellTheirTabs(event),
