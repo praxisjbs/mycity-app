@@ -1,0 +1,14 @@
+# Starts mycity-health-watch-stg.service every 5 minutes by the clock. A wall-clock schedule
+# rather than "5 minutes after the last run", so it keeps firing while the service is skipped
+# (no release with the script yet) and from the first slot after a reboot.
+# Next run:  systemctl list-timers 'mycity-*'
+
+[Unit]
+Description=MyCity health watch (staging), every 5 minutes
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

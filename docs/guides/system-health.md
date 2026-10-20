@@ -23,6 +23,17 @@ than a thousand rows. The IT team gives each fault a status the whole team share
 faults they want fixed to download one Markdown file that briefs an AI assistant well enough to
 diagnose and fix them without further explanation.
 
+When a check is not up, the Status tab says why in full: each check opens a sheet with what its
+probe measured, how long it has been in its state and its changes over 7 days, and for Background
+Jobs every scheduler with what it was set to, when it last ran, what it said and when it runs next.
+**Download Brief** on Status writes the whole system as one Markdown file, problems first, whose
+instructions make the receiving AI understand the problem before it touches anything, then gather
+evidence with read-only commands the owner pastes back, change the server only with a yes, fix a
+code bug through a draft pull request, and guide the owner by hand through what no command can do.
+When the API, the database, Redis or the worker is down, the screen cannot make that file, so the
+server makes it itself: `npm run health:brief` on demand, and a timer every 5 minutes that mails it
+to the JBS Praxis inbox the moment something is down.
+
 It is for the Implementation Team and the System Administrator. Operations & People, Management and
 the CEO do not receive its notifications: a stack trace is not theirs to act on, and waking them for
 one creates alarm without action.
@@ -31,7 +42,7 @@ one creates alarm without action.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Settings · Status (`status`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Every readiness check, including disk, memory, processor, database size and connections, and whether every background job has run | Read what is wrong and where to look |
+| Settings · Status (`status`) | staff app, second tab, after Organisation | `system_health` view (Implementation Team, System Administrator); the CEO passes every check by design | Every readiness check, including disk, memory, processor, database size and connections, and whether every background job has run; refreshed every 30 seconds | Read what is wrong and where to look; open a check's sheet (what it measured, since when, 7 days of changes, every scheduler or queue behind it); Download Brief (`system_health` export) |
 | Settings · Performance (`performance`) | staff app, third tab | the same | A day or a week: response time, the share of requests that failed, disk and memory, and open faults | Switch between Day and Week |
 | Settings · Faults (`faults`) | staff app, fourth tab | the same | Faults, grouped, 25 a page | Filter and search, open one, set its status, assign it, note it, tick several and Download Brief |
 | Settings · Notifications (`notifications`) | staff app | `settings` view | The six System Health notices in the System Health category, each with who it tells and its channels | Turn a notice off, change its urgency and channels |
@@ -61,6 +72,24 @@ one creates alarm without action.
    `system_health.brief_requested`, and the worker writes the Markdown. The browser saves it on the
    device that pressed. Every ticked fault still Open becomes Being Handled, assigned to whoever
    pressed if nobody holds it, exactly as Nfelia Ops does, so two people do not fix one bug twice.
+   The brief opens with the system's state when it was made, and each fault says which checks
+   were not up when it fired, so an error the database being down caused is not taken for a bug.
+9. Status refreshes itself every 30 seconds. Pressing a check opens its sheet: the probe's own
+   figures, how long it has been in its state, and its changes over 7 days read from the snapshots
+   in step 4, 25 a page. Background Jobs lists every scheduler and Worker every queue.
+10. Download Brief on Status reserves an export file with the checks exactly as the API saw them,
+    emits `system_health.status_brief_requested`, and the worker writes the Markdown: the problems
+    first with their evidence and the read-only commands to start from, then every check, every
+    scheduler, every queue, the 7 days of changes, the last 24 hours and each open fault as one
+    line. Stacks stay in the Faults brief (step 8), so the two files never repeat each other, and
+    both carry the same standing instructions, written once in `system_health.brief.js`.
+11. The screen needs the API, the database and the worker to make that file. The server does not:
+    `scripts/ops/health-brief.js` (`npm run health:brief`) builds the same brief on the server from
+    whatever still answers, and adds what only the server can see (systemd units and timers, cron,
+    recent journal warnings, listening ports, the release in use). `mycity-health-watch-<env>.timer`
+    runs it every 5 minutes in watch mode, and when something is down for two readings in a row it
+    mails the brief to `HEALTH_ALERT_TO`, copying `HEALTH_ALERT_CC`, again every hour while it stays
+    down, and once more when it is all clear.
 
 ## 4 · Data
 
@@ -70,7 +99,7 @@ one creates alarm without action.
 | `error_group_note` | `error_group_id`, `author_user_id`, `body`, `created_at` | What the team worked out about a fault. `author_user_id` null means the system wrote it (came back, spiking) |
 | `health_snapshot` | `taken_at`, `status`, `checks` jsonb, `outbox_backlog`, `worker_lag_s`, `faults_open`, `faults_new_24h`, `release` | One row every 5 minutes. Drawn as the Performance section; kept 30 days |
 | `error_event` | gains index `(fingerprint, occurred_at DESC)` | The table itself is unchanged. The index is what makes the grouped list and the 24 hour and 7 day counts cheap |
-| `schedule_run` | `name`, `last_run_at`, `duration_ms`, `ok`, `runs`, `failures` | One row per background job, written after every tick by `jobs/registry.js`. Without it a job that stops is invisible, which is exactly how the first release shipped |
+| `schedule_run` | `name`, `last_run_at`, `duration_ms`, `ok`, `note`, `runs`, `failures`, `last_failure_at`, `created_at` | One row per background job, written after every tick by `jobs/registry.js`. Without it a job that stops is invisible, which is exactly how the first release shipped. The worker inserts each scheduler's row when it starts the schedules, with `last_run_at` still empty, so `created_at` says when the job was first started and a daily job is not late before its first slot. A job the worker runs on its own timer (`outbox-dispatch`, every second) is written at most once a minute, its runs and failures added up in between |
 | `request_stat` | `minute`, `requests`, `errors`, `client_errors`, `slow`, `total_ms`, `max_ms` | A minute of traffic, written by the API. Counts are added, never replaced, so several processes and a restart inside one minute land in one row. Sums, not a percentile: a mean adds across processes, a p95 does not |
 | `health_snapshot` | gains `disk_free_pct`, `memory_used_pct`, `cpu_load`, `database_mb`, `database_connections_pct`, `requests`, `error_pct`, `mean_ms` | What the Performance tab draws |
 
@@ -94,6 +123,9 @@ somebody took on it outlive the events that raised it.
 | `POST /api/v1/system-health/faults/:id/notes` | `FaultNoteCreate` to `FaultNote` | `system_health` edit · all | no | |
 | `POST /api/v1/system-health/faults/bulk` | `FaultBulkStatus` to `FaultBulkResult` | `system_health` edit · all | no | Up to 50 ids, one status |
 | `POST /api/v1/system-health/briefs` | `BriefRequest` to `ExportFile` | `system_health` export · all | no | Up to 25 fault ids. Answers 202 with the file pending; the worker writes it |
+| `GET /api/v1/system-health/checks/:key` | `CheckDetail` | `system_health` view · all | no | One check run now: its state, since when, the probe's figures, and for `schedulers` every job, for `worker` every queue. 404 for a key no probe has |
+| `GET /api/v1/system-health/checks/:key/history` | `CheckHistoryQuery` to `CheckChangePage` | `system_health` view · all | yes, 25 | Every change of state over 7 days, newest first, read from `health_snapshot` |
+| `POST /api/v1/system-health/status-briefs` | `EmptyBody` to `ExportFile` | `system_health` export · all | no | The whole system as a Markdown brief. Answers 202; the worker writes it. Changes no fault |
 
 Every list is paged at 25 (BACKEND_STRUCTURE §16). The screen waits on `GET /api/v1/exports/:id` and
 downloads `GET /api/v1/documents/:id/content`, as every other export does.
@@ -120,9 +152,46 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
 - **Recording, not quiet.** A chart with no snapshot in the last 11 minutes (two intervals) says
   the five-minute job has stopped, rather than showing a neutral empty state. The same fact is a
   `schedulers` readiness check, so it is visible from Status as well as from the chart.
-- **A scheduler is late** when it has not run for three of its own intervals, or for 3 hours when
-  its cron runs hourly and 26 hours when it runs daily. Degraded, never fatal: the API serves
-  without background work.
+- **A scheduler is late** when it has not run for three of its own intervals (at least 15 minutes),
+  or for 3 hours when its cron runs hourly and 26 hours when it runs daily, counted from its last
+  run or, before its first, from when the worker first started it. It is also late when the worker
+  never started it (no `schedule_run` row), when a queue-ticked job is missing from the queue, and
+  when its next tick was due more than 10 minutes ago and nobody picked it up. **Failing** is a
+  last run that threw. **Not due yet** is a job started less than its allowance ago that has not
+  reached its first slot: a nightly job deployed at noon is not late at 13:00. Late and failing
+  are degraded, never fatal: the API serves without background work. Not due yet is up.
+- **What a job was set to** is shown both ways: as the code declared it (`every 300000 ms`, `cron
+  30 2 * * * Africa/Lagos`) and in words (`Every 5 minutes`, `Daily at 02:30 (Lagos)`).
+- **Since** is when a check entered its current state, read from the snapshots. When the latest
+  snapshot disagrees with the live probe, the state changed within the last 5 minutes and the
+  screen says Just Now.
+- **The Status brief** is problems first: each check not up, with since when, what its probe
+  measured, what it means and the read-only commands to start from, written for this environment
+  (its units, paths, port and database). Then every check, every scheduler, every queue, the newest
+  25 changes of the 7 days, the last 24 hours, and each open fault as one line (25 at most). It
+  carries no stacks: those are the Faults brief's, which the Status brief points to.
+- **The Status brief's instructions**, in this order, and the receiving AI may not skip one:
+  understand first (each problem in a line, the evidence, the likely causes ranked with how sure it
+  is, and one cause behind several symptoms looked for before anything else); ask the owner 4 to 10
+  questions, as the Faults brief does; gather evidence with read-only commands in numbered blocks
+  the owner pastes into SSH and pastes the output back from, never printing a secret; put any
+  command that changes the server in its own block labelled as such, with the risk, the way back
+  and the proof, and run nothing in it before the owner says yes; fix a code bug through a draft
+  pull request exactly as the Faults brief says; walk the owner through by hand, click by click,
+  what no command can do (DNS, the mail provider, GitHub, the hosting console); prove it is fixed;
+  write it up. Production data is never dropped or truncated, and migrations run only from the
+  deploy gate.
+- **The Faults brief's state header.** The checks not up when it was downloaded (from the newest
+  snapshot, or a line saying no snapshot is recent), and on each fault the checks that were not up
+  in the snapshot nearest each of its occurrences. A few lines, never the whole status.
+- **The watcher mails only for red**: the API not answering, a check reporting `down`, or no worker
+  heartbeat. Degraded (amber) stays on the screen and the bell. It mails after two readings in a
+  row (10 minutes), so a deploy's restart never sends one; again at once when something else goes
+  down; every hour while anything stays down; and once with All Clear after two clean readings. It
+  needs neither the database nor Redis: it sends through the system mailer's own SMTP transport
+  without a template, and when even that fails it falls back to the infrastructure alert
+  (`shared/observability/alert.js`). Staging mails too, its subject marked `[STAGING]`; an empty
+  `HEALTH_ALERT_TO` turns an environment's mail off.
 - **Thresholds.** Disk: degraded under 10% free, down under 5%. Memory: degraded at 90% used, down
   at 95%. Processor: degraded at load 2 per core, down at 4. Database connections: degraded at 80%
   of `max_connections`, down at 90%. First guesses; they want a week of real numbers.
@@ -150,6 +219,8 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
 | `system_health.fault_unattended` | still Open 24 hours after first seen | Notifies with email on, repeats daily |
 | `system_health.digest` | 08:00 Lagos | The day's summary |
 | `system_health.brief_requested` | Download Brief is pressed | Outbox: the worker writes the Markdown into the reserved export file |
+| `system_health.status_brief_requested` | Download Brief on Status is pressed | Outbox: the worker writes the Status brief from the checks the API saw, the schedulers, the queues, the snapshots and the open faults |
+| `mycity-health-watch-<env>.timer` (systemd, every 5 minutes) | the server, outside the app | Runs `scripts/ops/health-brief.js --watch`. Mails the Status brief when something is down (§6). Its state is one file in `/var/lib/mycity-health-watch-<env>/` |
 
 All six notices sit in a new **System Health** notification category: `locked` like Security, so push
 and the bell cannot be switched off for production faults, with email off by default. Only
@@ -159,7 +230,9 @@ fan-out, so `docs/guides/notifications.md` changes with it.
 
 WhatsApp is deliberately not used. `ALERT_WHATSAPP_URLS` stays exactly as it is for the
 infrastructure alerts that have nothing to do with the app's own notification engine (the uptime
-probe, the nightly backup, the restore drill); nothing in this module writes to it.
+probe, the nightly backup, the restore drill); nothing in this module writes to it. The server's
+health watcher is one of those infrastructure tools, and it still mails rather than messages: only
+when the mail itself cannot be sent does it post to `ALERT_WEBHOOK_URL`, and never to WhatsApp.
 
 ## 8 · Permissions and visibility by role
 
@@ -195,7 +268,8 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Settings · Status | Four tiles (Checks Down, Open Faults, New Today, Came Back); the check list with a state pill each, including disk, memory, processor, database and background jobs | Details row on a check that is not up: where to look | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used: §6 and §7 here, and `docs/runbooks/system-health.md` |
+| Settings · Status | Four tiles (Checks Down, Open Faults, New Today, Came Back); the check list with a state pill each, including disk, memory, processor, database and background jobs, and how long a check that is not up has been so; Download Brief | Details row on a check that is not up: where to look | Fingerprinting, the spike formula, the escalation clock, why WhatsApp is not used, how a job is judged late, the watcher's mail rules: §6 and §7 here, and `docs/runbooks/system-health.md` |
+| Check sheet | State pill, since when, what it said; the probe's figures; for Background Jobs every scheduler (Job, Set As, Last Run, Result, Next, State); for Worker every queue (Waiting, Active, Delayed, Failed); the changes over 7 days, 25 a page | Help term on Set As: what the code declared. Help term on Not Due Yet: started, first slot still to come. Help term on Failed: failed jobs still kept, not today's. A job's last error is content, under its name | The read-only commands and the AI instructions: the downloaded brief |
 | Settings · Performance | Uptime and gap for the window; disk free, memory used and database size; response time, failure share, disk and memory over time; open faults. A banner when nothing is recording | Nothing | The threshold numbers and how a scheduler is judged late: §6 here |
 | Settings · Faults | The fault table with severity, Today, In All, People, Last Seen, Status and who holds it; Set Status, Assign, Add Note, Download Brief | Help term on Came Back: a fault marked fixed that has happened again. Help term on People: how many different people hit it | The brief's full text: the downloaded file |
 | Fault sheet | Title, severity, where, first and last seen with release, the last 5 occurrences with stack, 14 days of bars, notes, history | Help term on Release: the build the fault was last seen on | The brief's full text, the AI instructions: the downloaded file |
@@ -204,7 +278,8 @@ No restricted fields. The whole screen is restricted instead, which is why the p
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Settings · Status | The state pill, then the four tiles two to a row, then checks that are not up as cards | The full check list when everything is up | Nothing; Status is for reading | Bottom bar More, then Settings; the tabs scroll sideways |
+| Settings · Status | The state pill, then the four tiles two to a row, then checks that are not up as cards | The full check list when everything is up | Download Brief, in the page header | Bottom bar More, then Settings; the tabs scroll sideways |
+| Check sheet | State pill, since when, what it said, then the jobs or queues that are not well as cards | The figures and the history, behind Show More; jobs that are on time | None; the sheet is for reading | Opens as a sheet over Status, back closes it |
 | Settings · Performance | The banner when nothing is recording, then uptime and the resource figures | Every chart: a trend is not a phone screen | Day or Week | As above |
 | Settings · Faults | Search, then fault cards with a severity pill | The In All and People columns | Download Brief, full width in the sheet after faults are ticked | As above |
 | Fault sheet | Severity pill, title, when it was last seen, Set Status | The stack trace, collapsed behind Show Stack | Set Status, full width in the sheet's footer | Opens as a sheet over the list, back closes it |
@@ -229,6 +304,23 @@ No restricted fields. The whole screen is restricted instead, which is why the p
   standard export message. The `worker` check being down is itself what says why.
 - **A deploy.** `release` changes. A fault first seen on an earlier release and still firing shows
   both, which is how the AI is told what to compare against.
+- **The worker is down and somebody presses Download Brief on Status.** The file waits on the worker
+  like every export and fails after 5 minutes with the standard message. That is the case the
+  watcher's mail already covers: no heartbeat is red, so the brief is in the inbox within 10
+  minutes, and `npm run health:brief` makes one on the server at once.
+- **The API is down.** The watcher cannot ask it, so it runs the probes in its own process, says
+  the API is not answering, and reports Modules as not checked (only the API mounts them).
+- **The release itself is broken** so badly the watcher's script cannot load. The timer's run fails
+  and shows in `systemctl --failed`; nothing is mailed. The uptime probe from outside still alerts.
+- **The whole server is off.** Nothing on it can mail. The uptime probe from outside
+  (`ops/monitoring/uptime-probe.js`) is what notices, through its own webhook and WhatsApp alerts;
+  it sends no mail (TB, 20/10/2026).
+- **Mail itself is down.** The watcher posts one line to `ALERT_WEBHOOK_URL` when it is set and
+  tries the mail again at the next reading.
+- **A flapping check** (down, up, down within minutes). Two readings in a row are needed either
+  way, so it mails at most once an hour while it flaps.
+- **A history longer than a page.** The sheet shows 25 changes and Show More fetches the next page;
+  the brief carries the newest 25 and says how many more there are.
 
 ## 12 · Donor code
 
@@ -249,6 +341,19 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · Investigate from the screen, and from the inbox when the screen cannot help.
+  Status refreshes every 30 seconds and each check opens a sheet: what its probe measured, since
+  when, 7 days of changes 25 a page, and for Background Jobs every scheduler with what it was set
+  to, its last run, result, error and next run (for Worker, every queue). Download Brief on Status
+  writes the whole system as Markdown with investigation instructions (understand, ask, read-only
+  commands pasted back, changes only with a yes, a pull request for code, a guided walk for the
+  rest); the Faults brief gains the system's state, and the standing instructions are shared.
+  `scripts/ops/health-brief.js` builds the same brief on the server without the app, and
+  `mycity-health-watch-<env>.timer` mails it when something is down, to intelligence@jbspraxis.com
+  copying tomblakeasaah@gmail.com and praxisjbs@gmail.com (TB's choices: red only, no mail from the
+  uptime probe). Two faults in the jobs check fixed: `outbox-dispatch` runs on the worker's own
+  timer and was never recorded, so it always read as not run; and a nightly job read as late
+  before its first slot. §1, §2, §3, §4, §5, §6, §7, §10 and §11 updated.
 - 20/10/2026 · TB · Split into three tabs (#95 Status, #96 Performance, #97 Faults) and the engine
   behind it fixed, after TB walked the first release on staging. The three schedulers were never in
   `SCHEDULERS` (`src/jobs/registry.js`), so nothing ran and the chart read "Nothing Recorded Yet",

@@ -243,26 +243,50 @@ function defineSchedule(spec) {
  * Best effort by design: a tick must never fail because its bookkeeping did. The row
  * is written after the run, whether or not this process held the cron lock, because a
  * tick another process ran is still a tick that happened.
+ *
+ * `counts` adds several ticks in one write: an in-process schedule ticks every second,
+ * and a row a second would be the busiest table in the database.
+ * `failed_at` is when the latest of them failed, if one did.
  */
-async function recordRun(name, startedAt, ok, note) {
+async function recordRun(name, startedAt, ok, note, { runs = 1, failures = ok ? 0 : 1, failed_at = null } = {}) {
   try {
     await require("../config/db").pool.query(
-      `INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, note, runs, failures)
-       VALUES ($1, now(), $2, $3, $4, 1, $5)
+      `INSERT INTO schedule_run (name, last_run_at, duration_ms, ok, note, runs, failures, last_failure_at)
+       VALUES ($1, now(), $2, $3, $4, $5::bigint, $6::bigint, CASE WHEN $6::bigint > 0 THEN COALESCE($7::timestamptz, now()) END)
        ON CONFLICT (name) DO UPDATE SET
          last_run_at = now(),
          duration_ms = EXCLUDED.duration_ms,
          ok = EXCLUDED.ok,
          note = EXCLUDED.note,
-         runs = schedule_run.runs + 1,
+         runs = schedule_run.runs + EXCLUDED.runs,
          failures = schedule_run.failures + EXCLUDED.failures,
-         last_failure_at = CASE WHEN EXCLUDED.ok THEN schedule_run.last_failure_at ELSE now() END`,
-      [name, Date.now() - startedAt, ok, note ? String(note).slice(0, 500) : null, ok ? 0 : 1],
+         last_failure_at = COALESCE(EXCLUDED.last_failure_at, schedule_run.last_failure_at)`,
+      [name, Date.now() - startedAt, ok, note ? String(note).slice(0, 500) : null, runs, failures, failed_at],
     );
   } catch (err) {
     logger.warn({ err, scheduler: name }, "a scheduler ran but its run was not recorded");
   }
 }
+
+/**
+ * A row for every scheduler this build starts, before any has run. Its `created_at` is
+ * when the job was first started, so a nightly job deployed at noon reads as not due yet
+ * rather than late (jobs/report.js). An existing row is left as it is. Best effort.
+ * @param {string[]} names
+ */
+async function registerRuns(names) {
+  try {
+    await require("../config/db").pool.query(
+      "INSERT INTO schedule_run (name) SELECT unnest($1::text[]) ON CONFLICT (name) DO NOTHING",
+      [names],
+    );
+  } catch (err) {
+    logger.warn({ err }, "the schedulers started but their rows were not written");
+  }
+}
+
+/** How often an in-process schedule writes its row: its ticks are added up in between. */
+const IN_PROCESS_RECORD_MS = 60_000;
 
 /** Every scheduler, loaded and checked. */
 function schedules() {
@@ -541,20 +565,39 @@ async function startSchedules() {
     }
   }
 
+  await registerRuns(specs.map((s) => s.name));
+
   const timers = [];
   for (const s of specs.filter((x) => x.inProcess)) {
     let running = false;
+    // Ticks since the row was last written. It is written when the result changes and
+    // otherwise once a minute, so the first tick writes at once and a tick failing every
+    // second (the database is down) does not try to write every second.
+    const since = { runs: 0, failures: 0, failed_at: null, note: null, recorded: 0, ok: undefined };
     const tick = async () => {
       if (running) return;
       running = true;
+      const started = Date.now();
+      let ok = true;
       try {
         await s.run();
       } catch (err) {
+        ok = false;
+        since.failures += 1;
+        since.failed_at = new Date();
+        since.note = String((err && err.message) || err);
         logger.error(
           { err, scheduler: s.name },
           "in-process scheduler tick failed",
         );
       } finally {
+        since.runs += 1;
+        if (ok !== since.ok || Date.now() - since.recorded >= IN_PROCESS_RECORD_MS) {
+          const counts = { runs: since.runs, failures: since.failures, failed_at: since.failed_at };
+          const note = ok ? null : since.note;
+          Object.assign(since, { runs: 0, failures: 0, failed_at: null, note: null, recorded: Date.now(), ok });
+          await recordRun(s.name, started, ok, note, counts);
+        }
         running = false;
       }
     };
@@ -646,6 +689,9 @@ module.exports = {
   defineSchedule,
   schedules,
   isLastAttempt,
+  recordRun,
+  registerRuns,
+  IN_PROCESS_RECORD_MS,
   registerTriggers,
   registerDelivery,
   startConsumers,

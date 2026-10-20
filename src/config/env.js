@@ -659,6 +659,22 @@ const ENTRIES = [
     },
   ],
   [
+    "HEALTH_ALERT_TO",
+    str("intelligence@jbspraxis.com"),
+    {
+      group: "Observability",
+      doc: "Who the server's health watch mails the Status brief to when something is down (scripts/ops/health-brief.js, docs/runbooks/system-health.md). Addresses separated by commas or spaces. Empty: it mails nobody.",
+    },
+  ],
+  [
+    "HEALTH_ALERT_CC",
+    str("tomblakeasaah@gmail.com, praxisjbs@gmail.com"),
+    {
+      group: "Observability",
+      doc: "Who the health watch copies on that mail. Addresses separated by commas or spaces.",
+    },
+  ],
+  [
     "METRICS_TOKEN",
     str(""),
     {

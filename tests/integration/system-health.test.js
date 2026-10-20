@@ -434,4 +434,149 @@ describeDb("System Health against the real migrations", () => {
       expect((await q("SELECT count(*)::int AS n FROM error_group")).rows[0].n).toBe(before);
     });
   });
+
+  describe("investigating", () => {
+    const registry = require("../../src/jobs/registry");
+    const minutesAgo = (m) => new Date(Date.now() - m * 60_000).toISOString();
+    const snap = (at, checks, status = "degraded") =>
+      q("INSERT INTO health_snapshot (taken_at, status, checks) VALUES ($1, $2, $3)", [at, status, JSON.stringify(checks)]);
+
+    test("a job started but not yet at its first slot is not due yet, not late", async () => {
+      await q("DELETE FROM schedule_run");
+      await registry.registerRuns(registry.SCHEDULERS);
+      const res = await as("admin").get("/system-health/checks/schedulers");
+      expect(res.status).toBe(200);
+      expect(res.body.jobs).toHaveLength(registry.SCHEDULERS.length);
+      const byName = Object.fromEntries(res.body.jobs.map((j) => [j.name, j]));
+      expect(byName["media-reconcile"]).toEqual(
+        expect.objectContaining({ state: "waiting", cadence: "Daily at 02:30 (Lagos)", set_as: "cron 30 2 * * * Africa/Lagos", runs_in: "queue" }),
+      );
+      expect(byName["outbox-dispatch"]).toEqual(expect.objectContaining({ runs_in: "worker", cadence: "Every second" }));
+      expect(res.body.state).toBe("up");
+      expect(res.body.detail).toMatch(/not due yet/);
+
+      // The same job, started two days ago and never run, is late.
+      await q("UPDATE schedule_run SET created_at = now() - interval '2 days' WHERE name = 'media-reconcile'");
+      const late = await as("admin").get("/system-health/checks/schedulers");
+      const job = late.body.jobs.find((j) => j.name === "media-reconcile");
+      expect(job.state).toBe("late");
+      expect(job.reason).toBe("Has never run");
+      expect(late.body.state).toBe("degraded");
+      expect(late.body.detail).toMatch(/1 of \d+ have not run: media-reconcile/);
+    });
+
+    test("a job's failure is kept with what it said, and the ticks of an in-process job add up", async () => {
+      await registry.recordRun("system-health-purge", Date.now() - 20, false, "connect ECONNREFUSED postgres://mycity:hunter2@db:5432");
+      await registry.recordRun("outbox-dispatch", Date.now() - 3, true, null, { runs: 60, failures: 2, failed_at: new Date() });
+      const res = await as("admin").get("/system-health/checks/schedulers");
+      const byName = Object.fromEntries(res.body.jobs.map((j) => [j.name, j]));
+      expect(byName["system-health-purge"].state).toBe("failing");
+      expect(byName["system-health-purge"].last_error).toContain("ECONNREFUSED");
+      // Scrubbed on the way out: the password never reaches the screen.
+      expect(byName["system-health-purge"].last_error).not.toContain("hunter2");
+      expect(byName["outbox-dispatch"]).toEqual(expect.objectContaining({ state: "on_time", runs: 60, failures: 2 }));
+      expect(byName["outbox-dispatch"].last_failure_at).not.toBeNull();
+      expect(byName["outbox-dispatch"].next_run_at).not.toBeNull();
+    });
+
+    test("a check's sheet carries what its probe measured, and only System Health opens it", async () => {
+      const res = await as("admin").get("/system-health/checks/disk");
+      expect(res.status).toBe(200);
+      expect(res.body.facts.map((f) => f.label)).toEqual(expect.arrayContaining(["Free", "Total"]));
+      expect(res.body.jobs).toBeNull();
+      expect((await as("admin").get("/system-health/checks/worker")).body.queues).not.toBeNull();
+      expect((await as("admin").get("/system-health/checks/no_such_check")).status).toBe(404);
+      expect((await as("ops").get("/system-health/checks/disk")).status).toBe(403);
+    });
+
+    test("a check's history is its changes of state, newest first, 25 a page", async () => {
+      await q("DELETE FROM health_snapshot");
+      // 30 snapshots, Redis flipping between down and up on each: 29 changes.
+      for (let i = 30; i >= 1; i -= 1) {
+        await snap(minutesAgo(i * 5), { redis: { status: i % 2 ? "down" : "up", error: "not connected" }, disk: { status: "up", free_pct: 50 } });
+      }
+      const first = await as("admin").get("/system-health/checks/redis/history");
+      expect(first.status).toBe(200);
+      expect(first.body.page.total).toBe(29);
+      expect(first.body.data).toHaveLength(25);
+      expect(new Date(first.body.data[0].at) > new Date(first.body.data[1].at)).toBe(true);
+      // The newest snapshot has it down, so the newest change is up to down.
+      expect(first.body.data[0]).toEqual(expect.objectContaining({ from: "up", to: "down" }));
+      const second = await as("admin").get("/system-health/checks/redis/history?page=2");
+      expect(second.body.data).toHaveLength(4);
+      // Disk never changed: no history, and its since is the window's first snapshot.
+      expect((await as("admin").get("/system-health/checks/disk/history")).body.page.total).toBe(0);
+    });
+
+    test("Status says since when a check has been in its state", async () => {
+      await q("DELETE FROM health_snapshot");
+      await snap(minutesAgo(60), { cpu: { status: "degraded", load: 3, cores: 1 } });
+      await snap(minutesAgo(30), { cpu: { status: "up", load: 0.1, cores: 1 } });
+      await snap(minutesAgo(5), { cpu: { status: "up", load: 0.1, cores: 1 } });
+      const res = await as("admin").get("/system-health/status");
+      const cpu = res.body.checks.find((c) => c.key === "cpu");
+      if (cpu.state === "up") {
+        expect(Math.abs(new Date(cpu.since).getTime() - Date.parse(minutesAgo(30)))).toBeLessThan(60_000);
+      } else {
+        // The machine running the tests is busy: the snapshots disagree with the live probe.
+        expect(cpu.since).toBeNull();
+      }
+    });
+
+    test("Download Brief on Status: the worker writes the whole system, problems first", async () => {
+      expect((await as("ops").post("/system-health/status-briefs").send({})).status).toBe(403);
+      const res = await as("admin").post("/system-health/status-briefs").send({});
+      expect(res.status).toBe(202);
+      expect(res.body).toEqual({
+        document_id: expect.any(String),
+        file_name: expect.stringMatching(/^mycity-status-.+\.md$/),
+        status: "pending",
+      });
+      await drain();
+      const doc = await q("SELECT * FROM document WHERE document_id = $1", [res.body.document_id]);
+      expect(doc.rows[0].render_status).toBe("done");
+      expect(doc.rows[0].mime).toBe("text/markdown");
+      const md = (await storage.get(doc.rows[0].storage_key)).toString("utf8");
+      const flat = md.replace(/\s+/g, " ");
+
+      expect(md).toMatch(/^# MyCity system status, test: /);
+      expect(flat).toContain("Understand it before you do anything");
+      expect(flat).toContain("Ask the owner 4 to 10 questions, then wait");
+      expect(flat).toContain("Run no command that changes anything, and change no code, until the owner has answered");
+      expect(flat).toContain("headed **Read-only**");
+      expect(flat).toContain("headed **Changes the server**");
+      expect(flat).toContain("never run a migration by hand");
+      for (const section of ["## The server", "## At a glance", "## What is wrong", "## Every check", "## Background jobs", "## Queues", "## Changes over the last 7 days", "## The last 24 hours", "## Open faults"]) {
+        expect(md).toContain(section);
+      }
+      expect(md).toContain("`outbox-dispatch`");
+      expect(md).toContain("cron 30 2 * * * Africa/Lagos");
+      // A fault is one line: its stack is the Faults brief's.
+      expect(md).toContain("Faults brief");
+      expect(md).not.toContain("leave.service.js:40:11");
+      expect(md).not.toContain("ops@mycity.test");
+      expect(md).not.toContain("hunter2");
+      expect(md).not.toContain("\u2014");
+      // The person who pressed may download it; nobody else.
+      expect((await as("admin").get(`/exports/${res.body.document_id}`)).status).toBe(200);
+      expect((await as("ops").get(`/exports/${res.body.document_id}`)).status).toBe(404);
+    });
+
+    test("the Faults brief says what the system looked like when each fault fired", async () => {
+      await q("DELETE FROM health_snapshot");
+      await writeFault(fault({ fingerprint: "Error|db gone|x", message: "connect ECONNREFUSED 127.0.0.1:5432", occurred_at: minutesAgo(2) }));
+      await rollup.rollupFaults();
+      await snap(minutesAgo(1), { postgres: { status: "down", error: "connect ECONNREFUSED" }, redis: { status: "up" } }, "unavailable");
+      const group = await q("SELECT error_group_id FROM error_group WHERE fingerprint = 'Error|db gone|x'");
+      const res = await as("admin").post("/system-health/briefs").send({ error_group_ids: [group.rows[0].error_group_id] });
+      expect(res.status).toBe(202);
+      await drain();
+      const doc = await q("SELECT * FROM document WHERE document_id = $1", [res.body.document_id]);
+      const md = (await storage.get(doc.rows[0].storage_key)).toString("utf8");
+      expect(md).toContain("## The system when this was downloaded");
+      expect(md).toContain("**Database** down");
+      expect(md).toContain("_System then:_ **Database** down");
+      expect(md.replace(/\s+/g, " ")).toContain("is a symptom of that, not a bug of its own");
+    });
+  });
 });

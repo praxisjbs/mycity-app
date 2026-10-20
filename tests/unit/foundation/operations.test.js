@@ -237,3 +237,117 @@ const tools = process.platform !== "win32" && ["bash", "jq", "rsync"].every((t) 
     expect(r.stdout).toMatch(/run ops\/provision\/provision\.sh first/);
   });
 });
+
+describe("health watch (scripts/ops/health-brief.js)", () => {
+  const watch = require("../../../scripts/ops/health-brief");
+  const DB = [{ key: "postgres", label: "Database", detail: "not answering" }];
+  const MIN = 60_000;
+
+  /** Readings one after another, five minutes apart, as the timer takes them. */
+  function readings(list, start = Date.parse("2026-10-20T10:00:00Z")) {
+    let state = {};
+    return list.map((red, i) => {
+      const now = start + i * 5 * MIN;
+      const r = watch.decide(state, red, now);
+      state = r.mail ? watch.afterMail(r.state, r.mail, red, now) : r.state;
+      return r.mail;
+    });
+  }
+
+  test("one red reading is not enough: a deploy's restart never mails", () => {
+    expect(readings([DB, [], [], []])).toEqual([null, null, null, null]);
+  });
+
+  test("two red readings mail, then hourly while it stays down, then all clear after two clean readings", () => {
+    const down = Array.from({ length: 14 }, () => DB);
+    const mails = readings([...down, [], []]);
+    expect(mails[1]).toBe("down");
+    // Readings 2 to 12 are within the hour of that mail; reading 13 is an hour after it.
+    expect(mails.slice(2, 13).every((m) => m === null)).toBe(true);
+    expect(mails[13]).toBe("still");
+    expect(mails[14]).toBe(null);
+    expect(mails[15]).toBe("clear");
+  });
+
+  test("something else going down mails at once", () => {
+    const worker = { key: "worker", label: "Worker", detail: "no heartbeat" };
+    expect(readings([DB, DB, [...DB, worker]])).toEqual([null, "down", "worse"]);
+  });
+
+  test("nothing was mailed, nothing to clear", () => {
+    expect(readings([DB, [], [], []])).toEqual([null, null, null, null]);
+  });
+
+  test("red is the API silent, a check down or no worker; amber is never mailed", () => {
+    const red = watch.redOf({
+      api: { answering: false, error: "ECONNREFUSED" },
+      checks: {
+        postgres: { status: "down", error: "connect ECONNREFUSED" },
+        worker: { status: "degraded", workers: 0, error: "redis not connected" },
+        disk: { status: "degraded", free_pct: 8 },
+        cpu: { status: "up" },
+      },
+    });
+    expect(red.map((r) => r.key)).toEqual(["api", "postgres", "worker"]);
+    expect(red.find((r) => r.key === "worker").detail).toMatch(/no heartbeat/);
+  });
+
+  test("the mail says what is down, since when, and what to do with the brief", () => {
+    const config = { APP_ENV: "production", STAFF_ORIGIN: "https://hub.mycityapp.io", PORT: 7000 };
+    const server = require("../../../src/modules/system_health/system_health.status-brief").serverOf(config);
+    const now = Date.parse("2026-10-20T10:20:00Z");
+    const state = { down_since: now - 15 * MIN, mailed: null };
+    const m = watch.mailOf("down", { red: DB, state, config, server, now });
+    expect(m.subject).toBe("MyCity production is down: Database");
+    expect(m.text).toContain("- Database: not answering");
+    expect(m.text).toContain("15 minutes");
+    expect(m.text).toContain("It changes nothing on the server without your yes");
+    expect(m.text).toContain("sudo node --env-file=/srv/mycity/prod/shared/.env scripts/ops/health-brief.js");
+    expect(m.text).not.toContain("—");
+    const clear = watch.mailOf("clear", { red: [], state: { ...state, mailed: { keys: ["postgres"], labels: ["Database"], at: now } }, config, server, now });
+    expect(clear.subject).toBe("MyCity production all clear: Database answering again");
+  });
+
+  test("addresses split on commas and spaces", () => {
+    expect(watch.addresses("a@x.io, b@y.io  c@z.io;d@w.io")).toEqual(["a@x.io", "b@y.io", "c@z.io", "d@w.io"]);
+    expect(watch.addresses("")).toEqual([]);
+  });
+
+  test("its mail needs neither a template nor the database", async () => {
+    const systemMail = require("../../../src/services/mail/system-mail.service");
+    systemMail.__reset();
+    await systemMail.sendPlain({
+      to: ["intelligence@jbspraxis.com"],
+      cc: ["tomblakeasaah@gmail.com", "praxisjbs@gmail.com"],
+      subject: "MyCity production is down: Database",
+      text: "Down now",
+      attachments: [{ filename: "mycity-status.md", content: "# brief", contentType: "text/markdown" }],
+    });
+    const [sent] = systemMail.capturedMail();
+    expect(sent.template).toBe("plain");
+    expect(sent.subject).toBe("MyCity production is down: Database");
+    expect(sent.cc).toEqual(["tomblakeasaah@gmail.com", "praxisjbs@gmail.com"]);
+    expect(sent.attachments[0].filename).toBe("mycity-status.md");
+    systemMail.__reset();
+  });
+
+  test("the watch's recipients default to the JBS Praxis inbox, copying the two named", () => {
+    const { config } = require("../../../src/config/env");
+    expect(config.HEALTH_ALERT_TO).toBe("intelligence@jbspraxis.com");
+    expect(watch.addresses(config.HEALTH_ALERT_CC)).toEqual(["tomblakeasaah@gmail.com", "praxisjbs@gmail.com"]);
+  });
+
+  test("the timers are provisioned, the units run the script as the environment's user, and releases ship it", () => {
+    const provision = fs.readFileSync(path.join(ROOT, "ops", "provision", "provision.sh"), "utf8");
+    expect(provision).toMatch(/TIMERS=\([^)]*mycity-health-watch-prod mycity-health-watch-stg\)/);
+    for (const env of ["prod", "stg"]) {
+      const unit = fs.readFileSync(path.join(ROOT, "ops", "systemd", `mycity-health-watch-${env}.service`), "utf8");
+      expect(unit).toContain(`User=mycity-${env}`);
+      expect(unit).toContain(`EnvironmentFile=/srv/mycity/${env}/shared/.env`);
+      expect(unit).toContain("scripts/ops/health-brief.js --watch --state=");
+      expect(unit).toContain(`StateDirectory=mycity-health-watch-${env}`);
+      expect(fs.readFileSync(path.join(ROOT, "ops", "systemd", `mycity-health-watch-${env}.timer`), "utf8")).toContain("OnCalendar=*:0/5");
+    }
+    expect(fs.readFileSync(path.join(ROOT, "scripts", "deploy", "release-manifest.js"), "utf8")).toContain('{ path: "scripts/ops" }');
+  });
+});

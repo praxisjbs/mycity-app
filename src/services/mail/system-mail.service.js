@@ -291,6 +291,49 @@ async function send(msg) {
   };
 }
 
+/**
+ * Send a plain-text message with no template and no database: the one sender for mail
+ * that must go out when the database itself may be down, which is the server's health
+ * watch (scripts/ops/health-brief.js) and nothing else. Same transport, the same route
+ * check and the same pacing as send() (without Redis, pacing counts in this process);
+ * the subject is marked [STAGING] on staging as every system mail's is.
+ * @param {{to: string|string[], cc?: string|string[], subject: string, text: string,
+ *          attachments?: Array<{filename: string, content: string|Buffer, contentType?: string}>}} msg
+ * @returns {Promise<{message_id: string, accepted: string[], rejected: string[]}>}
+ */
+async function sendPlain(msg) {
+  const to = addressList(msg.to);
+  if (to.length === 0) throw new Error("system mail: no recipient");
+  const cc = msg.cc && [].concat(msg.cc).length ? addressList(msg.cc) : undefined;
+  const all = [...to, ...(cc || [])].map((a) => (typeof a === "string" ? a : a.address));
+  if (config.SMTP_HOST)
+    await routeCheck.assertRoutable({ smtpHost: config.SMTP_HOST, to: all, localDomains: config.SMTP_LOCAL_DOMAINS });
+  if (config.SMTP_HOST) {
+    const slot = await pace.reserve(all.length);
+    if (!slot.ok) throw new pace.MailPacedError(slot.wait_ms);
+  }
+  const subject = `${config.APP_ENV === "staging" ? "[STAGING] " : ""}${String(msg.subject).replace(/\s+/g, " ").trim()}`;
+  const info = await getTransport().sendMail({
+    from: config.MAIL_FROM,
+    replyTo: config.MAIL_REPLY_TO || undefined,
+    to,
+    cc,
+    subject,
+    text: String(msg.text),
+    attachments: (msg.attachments || []).map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
+    headers: { "X-MyCity-Template": "plain", "Auto-Submitted": "auto-generated" },
+  });
+  if (!config.SMTP_HOST) {
+    captured.push({ template: "plain", to, cc, subject, html: null, text: String(msg.text), attachments: msg.attachments || [] });
+    if (captured.length > CAPTURE_LIMIT) captured.shift();
+  }
+  return {
+    message_id: info.messageId,
+    accepted: (info.accepted || []).map(String),
+    rejected: (info.rejected || []).map(String),
+  };
+}
+
 /** Messages kept instead of sent (no SMTP_HOST). Tests only. */
 function capturedMail() {
   return captured.slice();
@@ -320,4 +363,4 @@ async function health() {
   }
 }
 
-module.exports = { send, renderEmail, textOf, capturedMail, health, __reset };
+module.exports = { send, sendPlain, renderEmail, textOf, capturedMail, health, __reset };

@@ -5,7 +5,8 @@ broken (`docs/guides/system-health.md`). Almost all of it needs nothing from the
 arrive with the migration and the work runs in the worker that is already there.
 
 This page is what is left for GE: **four checks after the deploy, one of which may need a change to
-the `.env`**, and what to do when the screen says something is wrong.
+the `.env`**, **one command once to start the health watch** (§7), and what to do when the screen
+says something is wrong.
 
 ---
 
@@ -125,7 +126,10 @@ list; these are the ones that reach somebody's phone.
 | Memory | `free -h` | Amber at 90% used, red at 95%. A process that runs out is killed |
 | Processor | `uptime` | Amber at load 2 per core over one minute, red at 4 |
 | Database Usage | `sudo -u postgres psql -d mycity_prod -c "SELECT count(*) FROM pg_stat_activity"` | Amber at 80% of `max_connections`. Something is holding connections open, or the pool is too large |
-| Background Jobs | the `schedule_run` query in §2 | A job that has stopped. Reminders, snapshots and clean-ups are waiting |
+| Background Jobs | the `schedule_run` query in §2 | A job that has stopped. Reminders, snapshots and clean-ups are waiting. Press the line on Settings · Status: its sheet lists every job with what it was set to, its last run, its error and its next run. **Not due yet** is a job started less than a day ago that has not reached its first slot: that is fine |
+
+You rarely need this table by hand any more: **Download Brief** on Settings · Status writes all of
+it for this server, with the commands already filled in, into a file you paste into an AI (§7).
 
 ## 5 · Keeping and space
 
@@ -156,3 +160,71 @@ system is throwing far more than it should: open the screen and look at what is 
 Do not edit the seed and do not deploy. `system_health` is a module key like any other, so in the
 app: **Settings · Roles & Permissions**, open the role, tick System Health, save. That is the whole
 reason it is a permission and not a hard-coded role test.
+
+## 7 · Investigating with an AI, and the mail when something is down
+
+### 7.1 From the screen
+
+Settings · Status, **Download Brief**. The Markdown file is the whole system, problems first, with
+read-only commands written for this server. Paste it into Claude Code (with the repository checked
+out, ideally) and follow it: the AI explains what is wrong first, asks you 4 to 10 questions, gives
+you read-only commands to run over SSH and paste back, and changes nothing on the server until you
+say yes to a block headed **Changes the server**. A bug in the code becomes a draft pull request; a
+DNS, mail provider or GitHub change is walked through click by click.
+
+The screen needs the API, the database and the worker to make that file. When one of them is down,
+use one of the two below.
+
+### 7.2 On the server, at once
+
+```
+cd /srv/mycity/prod/current
+sudo node --env-file=/srv/mycity/prod/shared/.env scripts/ops/health-brief.js > ~/status.md
+```
+
+(`stg` for staging.) It builds the same file from whatever still answers, and adds what only the
+server can see: the services, the timers with their last and next runs, cron, the last two hours of
+warnings in the journal, the listening ports and the release in use. Copy `~/status.md` to your
+computer (`scp`) and paste it into the AI. It prints nothing secret and changes nothing.
+
+### 7.3 By mail, without running anything
+
+`mycity-health-watch-prod.timer` and `mycity-health-watch-stg.timer` run that script every 5
+minutes. When something is **down** (the API not answering, a check down, or no worker
+heartbeat; amber never mails) for two readings in a row, it mails the brief to
+`intelligence@jbspraxis.com`, copying `tomblakeasaah@gmail.com` and `praxisjbs@gmail.com`; again at
+once if something else goes down; every hour while it stays down; and once with **All Clear** when
+it recovers. Staging's subjects start `[STAGING]`.
+
+**Once, to start it** (the timers are new; provisioning installs them, deploys do not). From the
+checkout you provisioned from, after `git pull`:
+
+```
+sudo install -m 644 ops/systemd/mycity-health-watch-{prod,stg}.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mycity-health-watch-prod.timer mycity-health-watch-stg.timer
+systemctl list-timers 'mycity-health-watch-*'
+```
+
+Or run `sudo bash ops/provision/provision.sh` again, which is safe to repeat and now installs them.
+Each one skips itself until a release carrying `scripts/ops/health-brief.js` is deployed.
+
+**Who it mails** is `HEALTH_ALERT_TO` and `HEALTH_ALERT_CC` in the environment's `.env`; left out,
+they are the addresses above. Set `HEALTH_ALERT_TO=` (empty) to stop an environment mailing.
+
+**Checking it is alive:**
+
+```
+sudo journalctl -u mycity-health-watch-prod -n 20 --no-pager
+sudo cat /var/lib/mycity-health-watch-prod/state.json
+```
+
+Each run logs one line, `nothing red` or what was red. The state file is what it remembers between
+runs (how many red readings in a row, and when it last mailed). Deleting it is safe: the next run
+starts afresh.
+
+**When mail itself fails**, it posts one line to `ALERT_WEBHOOK_URL` if that is set (never to
+WhatsApp) and tries the mail again at the next reading.
+
+**What it cannot cover:** the whole server being off or unreachable. Nothing on it can mail then;
+the uptime probe from outside (`docs/runbooks/monitoring.md` §2) is what notices (TB, 20/10/2026).

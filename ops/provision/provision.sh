@@ -18,7 +18,8 @@
 #   files      /srv/mycity/<prod|stg>/{releases,shared/.env,media}, /srv/mycity/bin,
 #              /srv/mycity/backups/<prod|stg>
 #   systemd    mycity-{api,worker}-{prod,stg}, enabled; deploy-gate starts them
-#              mycity-backup.timer (nightly) and mycity-restore-drill.timer (Sundays), started
+#              mycity-backup.timer (nightly) and mycity-restore-drill.timer (Sundays), started;
+#              mycity-health-watch-{prod,stg}.timer (every 5 minutes), started
 #
 # Run it from a checkout of the repository, as root:
 #
@@ -45,7 +46,7 @@ ENVS=(prod stg)
 declare -A APP_ENV=([prod]=production [stg]=staging)
 declare -A HOSTS=([prod]="hub.mycityapp.io go.mycityapp.io" [stg]="hub.staging.mycityapp.io go.staging.mycityapp.io")
 UNITS=(mycity-api-prod mycity-worker-prod mycity-api-stg mycity-worker-stg)
-TIMERS=(mycity-backup mycity-restore-drill)
+TIMERS=(mycity-backup mycity-restore-drill mycity-health-watch-prod mycity-health-watch-stg)
 NODE_MAJOR=20
 NODE_MIN=20.19.0
 
@@ -315,7 +316,7 @@ systemctl daemon-reload
 systemctl enable "${UNITS[@]/%/.service}" >/dev/null
 note "units enabled; they start with the first deploy (no release in /srv/mycity/*/current yet)"
 systemctl enable --now "${TIMERS[@]/%/.timer}" >/dev/null
-note "backup nightly at 02:30 and restore drill on Sundays at 04:00 (Lagos): systemctl list-timers 'mycity-*'"
+note "backup nightly at 02:30, restore drill on Sundays at 04:00 (Lagos), health watch every 5 minutes: systemctl list-timers 'mycity-*'"
 
 # Where the nightly backup sends its offsite copy. Written once, commented out, for the operator
 # to fill (docs/runbooks/backup-restore.md §2); never overwritten.

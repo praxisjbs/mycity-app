@@ -269,6 +269,106 @@ function lastSnapshot(db) {
   return one(db, "SELECT * FROM health_snapshot ORDER BY taken_at DESC LIMIT 1");
 }
 
+/** How far back a check's history and its "since" read. The screen draws a week too. */
+const HISTORY_DAYS = 7;
+
+/** A probe's status as the screen names it: anything but up or degraded is down. */
+const STATE_OF = (expr) => `CASE WHEN ${expr} IN ('up', 'degraded') THEN ${expr} ELSE 'down' END`;
+
+/**
+ * For every check, when it entered the state the newest snapshot has it in: the last
+ * change in the window, or the window's first snapshot when it has not changed since.
+ * @returns {Promise<Array<{key: string, state: string, since: Date}>>}
+ */
+function lastChanges(db) {
+  return all(
+    db,
+    `WITH seen AS (
+       SELECT s.taken_at, k.key, ${STATE_OF("k.value->>'status'")} AS state
+         FROM health_snapshot s
+         CROSS JOIN LATERAL jsonb_each(s.checks) k
+        WHERE s.taken_at > now() - make_interval(days => $1)
+     ), marked AS (
+       SELECT key, taken_at, state, LAG(state) OVER (PARTITION BY key ORDER BY taken_at) AS before
+         FROM seen
+     )
+     SELECT key,
+            (array_agg(state ORDER BY taken_at DESC))[1] AS state,
+            max(taken_at) FILTER (WHERE before IS NULL OR before <> state) AS since
+       FROM marked
+      GROUP BY key`,
+    [HISTORY_DAYS],
+  );
+}
+
+/**
+ * One page of a check's changes of state over the window, newest first. The window's
+ * first snapshot is where reading starts, not a change, so it is never a row.
+ */
+function changes(db, key, query) {
+  return pageQuery(
+    db,
+    `SELECT t.at, t.before AS "from", t.state AS "to", t.value, ${TOTAL_COL}
+       FROM (
+         SELECT s.health_snapshot_id, s.taken_at AS at, s.checks->($1::text) AS value,
+                ${STATE_OF("s.checks->($1::text)->>'status'")} AS state,
+                LAG(${STATE_OF("s.checks->($1::text)->>'status'")}) OVER (ORDER BY s.taken_at) AS before
+           FROM health_snapshot s
+          WHERE s.taken_at > now() - make_interval(days => $2)
+            AND s.checks ? ($1::text)
+       ) t
+      WHERE t.before IS NOT NULL AND t.before <> t.state
+      ORDER BY t.at DESC, t.health_snapshot_id`,
+    [key, HISTORY_DAYS],
+    query,
+  );
+}
+
+/** The same as changes(), for every check at once: the Status brief's table. */
+function changesOfAll(db, query) {
+  return pageQuery(
+    db,
+    `SELECT t.key, t.at, t.before AS "from", t.state AS "to", t.value, ${TOTAL_COL}
+       FROM (
+         SELECT s.health_snapshot_id, s.taken_at AS at, k.key, k.value,
+                ${STATE_OF("k.value->>'status'")} AS state,
+                LAG(${STATE_OF("k.value->>'status'")}) OVER (PARTITION BY k.key ORDER BY s.taken_at) AS before
+           FROM health_snapshot s
+           CROSS JOIN LATERAL jsonb_each(s.checks) k
+          WHERE s.taken_at > now() - make_interval(days => $1)
+       ) t
+      WHERE t.before IS NOT NULL AND t.before <> t.state
+      ORDER BY t.at DESC, t.key, t.health_snapshot_id`,
+    [HISTORY_DAYS],
+    query,
+  );
+}
+
+/**
+ * The snapshot nearest each moment, within ten minutes before it and five after: what
+ * the system looked like when a fault fired (the Faults brief's state header).
+ * @param {Date[]|string[]} moments
+ * @returns {Promise<Array<{at: Date, taken_at: Date|null, checks: object|null}>>}  one row per
+ *   moment, in the order given
+ */
+function snapshotsAround(db, moments) {
+  if (!moments.length) return Promise.resolve([]);
+  return all(
+    db,
+    `SELECT m.at, s.taken_at, s.checks
+       FROM unnest($1::timestamptz[]) WITH ORDINALITY AS m(at, n)
+       LEFT JOIN LATERAL (
+         SELECT taken_at, checks
+           FROM health_snapshot
+          WHERE taken_at BETWEEN m.at - interval '10 minutes' AND m.at + interval '5 minutes'
+          ORDER BY abs(date_part('epoch', taken_at - m.at))
+          LIMIT 1
+       ) s ON true
+      ORDER BY m.n`,
+    [moments.map((m) => new Date(m).toISOString())],
+  );
+}
+
 /**
  * The chart: snapshots bucketed into hours over a day, or days over a week. A bucket with
  * no snapshot is left out, so the screen can draw the gap rather than a flat line.
@@ -501,6 +601,11 @@ module.exports = {
   faultCounts,
   addSnapshot,
   lastSnapshot,
+  HISTORY_DAYS,
+  lastChanges,
+  changes,
+  changesOfAll,
+  snapshotsAround,
   trafficSince,
   series,
   uptime,

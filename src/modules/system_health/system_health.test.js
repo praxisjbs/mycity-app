@@ -329,3 +329,211 @@ describe("saying when nothing is recording", () => {
     expect(service.RECORDING_WITHIN_MS).toBe(11 * 60_000);
   });
 });
+
+describe("the Status brief", () => {
+  const statusBrief = require("./system_health.status-brief");
+  const NOW = new Date("2026-10-20T12:00:00.000Z");
+  const job = (over = {}) => ({
+    name: "media-reconcile",
+    summary: "Finds files without a record",
+    runs_in: "queue",
+    cadence: "Daily at 02:30 (Lagos)",
+    set_as: "cron 30 2 * * * Africa/Lagos",
+    late_after: "26 hours",
+    state: "on_time",
+    reason: null,
+    started_at: "2026-10-01T00:00:00.000Z",
+    last_run_at: "2026-10-20T01:30:00.000Z",
+    duration_ms: 120,
+    last_ok: true,
+    last_error: null,
+    runs: 19,
+    failures: 0,
+    last_failure_at: null,
+    next_run_at: "2026-10-21T01:30:00.000Z",
+    ...over,
+  });
+  const input = (over = {}) => ({
+    now: NOW,
+    config: { APP_ENV: "production", PORT: 7000, DB_NAME: "mycity_prod", MEDIA_ROOT: "/srv/mycity/prod/media", REDIS_URL: "redis://:x@127.0.0.1:6379/0", STAFF_ORIGIN: "https://hub.mycityapp.io" },
+    release: "abc1234",
+    deployed_at: "2026-10-20T09:00:00.000Z",
+    state: "degraded",
+    checks: [
+      { key: "postgres", label: "Database", state: "up", detail: "answered in 3 ms", look_at: null, since: "2026-10-13T12:00:00.000Z", facts: [] },
+      {
+        key: "schedulers",
+        label: "Background Jobs",
+        state: "degraded",
+        detail: "1 of 19 have not run: outbox-dispatch",
+        look_at: service.lookAt("schedulers"),
+        since: "2026-10-20T10:05:00.000Z",
+        facts: [{ label: "Late", value: "outbox-dispatch" }],
+      },
+      { key: "disk", label: "Disk Space", state: "down", detail: "3% free, 7 GB of 240 GB", look_at: service.lookAt("disk"), since: null, facts: [{ label: "Free", value: "3%" }] },
+    ],
+    api: null,
+    jobs: {
+      jobs: [
+        job({ name: "outbox-dispatch", runs_in: "worker", set_as: "every 1000 ms", cadence: "Every second", state: "late", reason: "Has not run for 2 hours", last_ok: false, last_error: "ENOSPC: no space left on device", last_failure_at: "2026-10-20T10:00:00.000Z" }),
+        job(),
+      ],
+      db_error: null,
+      queue_error: null,
+    },
+    queues: { queues: [{ queue: "email-send", summary: null, concurrency: 3, waiting: 40, active: 0, delayed: 0, failed: 2, paused: 0, last_failed_at: "2026-10-20T10:00:00.000Z", last_failure: "ENOSPC" }], error: null },
+    changes: { rows: [{ at: "2026-10-20T10:00:00.000Z", key: "disk", label: "Disk Space", from: "degraded", to: "down", detail: "3% free" }], total: 1 },
+    last24: { uptime_pct: "91.0", gap_minutes: 0, recording: true, last_snapshot_at: "2026-10-20T11:55:00.000Z", points: [] },
+    faults: { rows: [{ title: "Error: ENOSPC: no space left on device", severity: "error", origin: "worker", route: null, today: 12, total: 30, last_seen_at: "2026-10-20T11:50:00.000Z", status: "open", came_back: false }], total: 1 },
+    host: null,
+    unread: [],
+    made: { how: "screen", by: "Ada Obi" },
+    ...over,
+  });
+
+  test("problems first, worst first, each with what it means and read-only commands for this server", () => {
+    const md = statusBrief.build(input());
+    expect(md.split("\n")[0]).toBe("# MyCity system status, production: 2 problems: Background Jobs, Disk Space");
+    const wrong = md.slice(md.indexOf("## What is wrong"), md.indexOf("## Every check"));
+    // Down before degraded.
+    expect(wrong.indexOf("### 1 · Disk Space: down")).toBeGreaterThan(-1);
+    expect(wrong.indexOf("### 2 · Background Jobs: degraded, since 2026-10-20 10:05 UTC (2 hours)")).toBeGreaterThan(-1);
+    expect(wrong).toContain("sudo du -xh --max-depth=2 /srv/mycity");
+    expect(wrong).toContain('sudo -u postgres psql -d mycity_prod -c "SELECT name, last_run_at');
+    expect(wrong).toContain("ENOSPC: no space left on device");
+    expect(wrong).toContain("| `outbox-dispatch` | `every 1000 ms` | Every second |");
+  });
+
+  test("its instructions: understand, ask, read-only evidence, changes only with a yes, a pull request for code, a guided walk", () => {
+    const text = statusBrief.build(input()).replace(/\s+/g, " ");
+    expect(text).toContain("Understand it before you do anything");
+    expect(text).toContain("Fix the first domino, not the last");
+    expect(text).toContain("Propose no fix yet");
+    expect(text).toContain("Ask the owner 4 to 10 questions, then wait");
+    expect(text).toContain("Run no command that changes anything, and change no code, until the owner has answered");
+    expect(text).toContain("each in its own numbered fenced block headed **Read-only**");
+    expect(text).toContain("paste back what they print");
+    expect(text).toContain("Never `cat` a `.env`");
+    expect(text).toContain("headed **Changes the server**, with what it changes, what could go wrong, how to undo it");
+    expect(text).toContain("run nothing in it until the owner says yes");
+    expect(text).toContain("never run a migration by hand");
+    expect(text).toContain("never edit a file under `/srv/mycity/prod/current`");
+    expect(text).toContain("A bug in the code is fixed in the code");
+    expect(text).toContain("Open a draft pull request to `main` and drive it green");
+    expect(text).toContain("walk the owner through by hand");
+    expect(text).toContain("Prove it is well");
+  });
+
+  test("the server's names are this environment's", () => {
+    const md = statusBrief.build(input());
+    for (const s of ["`mycity-api-prod`", "`mycity-worker-prod`", "`mycity-health-watch-prod.timer`", "`/srv/mycity/prod/shared/.env`", "`mycity_prod`", "`http://localhost:7000`", "database 0"]) {
+      expect(md).toContain(s);
+    }
+    const stg = statusBrief.build(input({ config: { APP_ENV: "staging", PORT: 7100, DB_NAME: "mycity_stg", REDIS_URL: "redis://127.0.0.1:6379/1" } }));
+    expect(stg).toContain("`mycity-worker-stg`");
+    expect(stg).not.toContain("mycity-worker-prod");
+  });
+
+  test("every scheduler with what it was set to, every queue, the changes, the faults as one line each", () => {
+    const md = statusBrief.build(input());
+    expect(md).toContain("## Background jobs");
+    expect(md).toContain("| `media-reconcile` | Finds files without a record | `cron 30 2 * * * Africa/Lagos` | Daily at 02:30 (Lagos) | queue | 26 hours |");
+    expect(md).toContain("| `email-send` | 40 | 0 | 0 | 2 |");
+    expect(md).toContain("| 2026-10-20 10:00 UTC | Disk Space | Degraded | Down |");
+    expect(md).toContain("| Error: ENOSPC: no space left on device | Error | Worker | 12 | 30 |");
+    expect(md).toContain("Faults brief");
+  });
+
+  test("it says what it could not read, and where it came from", () => {
+    const md = statusBrief.build(input({ unread: ["Queues: Redis is not connected"], api: { answering: false, error: "ECONNREFUSED" }, made: { how: "watch" } }));
+    expect(md).toContain("## What could not be read");
+    expect(md).toContain("- Queues: Redis is not connected");
+    expect(md).toContain("**API:** not answering (ECONNREFUSED)");
+    expect(md).toContain("Mailed by the server's health watch (`mycity-health-watch-prod.timer`)");
+  });
+
+  test("a since nobody knows is not claimed", () => {
+    const md = statusBrief.build(input({ last24: { uptime_pct: "0.0", gap_minutes: 1440, recording: false, last_snapshot_at: null, points: [] } }));
+    expect(md).toContain("### 1 · Disk Space: down, since not known: nothing has been recorded recently");
+    const recording = statusBrief.build(input());
+    expect(recording).toContain("### 1 · Disk Space: down, changed within the last 5 minutes");
+  });
+
+  test("nothing down is said plainly; no em dash, no stack, no secret", () => {
+    const md = statusBrief.build(input({ checks: [input().checks[0]], state: "ready" }));
+    expect(md.split("\n")[0]).toBe("# MyCity system status, production: nothing down");
+    expect(md).toContain("Every check is up.");
+    const all = statusBrief.build(input());
+    expect(all).not.toContain("—");
+    expect(all).not.toMatch(/redis:\/\/:x@/);
+  });
+});
+
+describe("the Faults brief's state header", () => {
+  test("the system now, and at each occurrence", () => {
+    const md = brief.build({
+      faults: [
+        {
+          group: fault(),
+          occurrences: [
+            { ...occurrence(), system: { taken_at: "2026-10-20T04:00:00.000Z", not_up: [{ label: "Database", state: "down", detail: "connect ECONNREFUSED" }] } },
+            { ...occurrence({ occurred_at: "2026-10-19T04:00:00.000Z" }), system: null },
+          ],
+        },
+      ],
+      release: "bbbbbbb",
+      at: new Date("2026-10-20T06:30:00.000Z"),
+      system: { taken_at: "2026-10-20T06:25:00.000Z", not_up: [] },
+    });
+    expect(md).toContain("## The system when this was downloaded");
+    expect(md).toContain("Every check was up at the snapshot of 2026-10-20 06:25 UTC.");
+    expect(md).toContain("_System then:_ **Database** down (connect ECONNREFUSED) (snapshot of 2026-10-20 04:00 UTC).");
+    expect(md).toContain("_System then:_ no snapshot within 10 minutes of it");
+    expect(md.replace(/\s+/g, " ")).toContain("is a symptom of that, not a bug of its own");
+  });
+
+  test("no recent snapshot is a finding of its own; left out, the header is not written", () => {
+    expect(brief.build({ faults: [{ group: fault(), occurrences: [occurrence()] }], system: null })).toContain(
+      "No snapshot in the last 11 minutes",
+    );
+    expect(build()).not.toContain("## The system when this was downloaded");
+  });
+});
+
+describe("a check's figures", () => {
+  test("labelled with units, lists joined, nested objects left out, scrubbed", () => {
+    const facts = service.factsOf({
+      status: "degraded",
+      free_pct: 8,
+      total_gb: 240.1,
+      path: "/srv/mycity/prod/media",
+      late: ["a", "b"],
+      waiting: [],
+      nested: { x: 1 },
+      error: "connect postgres://mycity:hunter2@db:5432",
+    });
+    expect(facts).toEqual([
+      { label: "Free", value: "8%" },
+      { label: "Total", value: "240.1 GB" },
+      { label: "Measured At", value: "/srv/mycity/prod/media" },
+      { label: "Late", value: "a, b" },
+      { label: "Not Due Yet", value: "None" },
+      { label: "Error", value: "connect postgres://<credentials>@db:5432" },
+    ]);
+  });
+
+  test("Background Jobs names the late, the failing and the ones not due yet", () => {
+    expect(service.detailOf("schedulers", { status: "degraded", schedulers: 19, late: ["a", "b", "c", "d"], failing: ["e"], waiting: ["f"] })).toBe(
+      "4 of 19 have not run: a, b, c and 1 more, 1 failing: e, 1 not due yet",
+    );
+    expect(service.detailOf("schedulers", { status: "up", schedulers: 19, late: [], failing: [], waiting: ["f", "g"] })).toBe(
+      "all 17 on time, 2 not due yet",
+    );
+  });
+
+  test("the new shapes are in the contract", () => {
+    for (const name of ["CheckDetail", "CheckChangePage", "SchedulerRow", "QueueRow", "CheckHistoryQuery"]) {
+      expect(c.system_health[name]).toBeDefined();
+    }
+  });
+});

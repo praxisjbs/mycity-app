@@ -49,8 +49,90 @@ const HealthCheck = z
     /** Where to look when it is not up. Null when it is up. */
     look_at: z.string().nullable(),
     latency_ms: z.number().int().min(0).nullable(),
+    /**
+     * When it entered the state it is in, from the last 7 days of snapshots: the oldest
+     * of them when it has not changed in that time. Null when no snapshot has seen this
+     * state yet: it changed within the last five minutes.
+     */
+    since: isoDateTime.nullable(),
   })
   .strict();
+
+/** One figure a probe reported, as a person reads it: "Free" "9%". */
+const CheckFact = z.object({ label: z.string(), value: z.string() }).strict();
+
+/** How a background job is doing (src/jobs/report.js). */
+const JobState = z.enum(["on_time", "failing", "late", "waiting"]);
+
+/** One scheduler: what the code set it to, and what it has done. */
+const SchedulerRow = z
+  .object({
+    name: z.string(),
+    summary: z.string().nullable(),
+    /** `queue`: ticked by BullMQ once across processes. `worker`: a timer inside every worker. */
+    runs_in: z.enum(["queue", "worker"]),
+    /** In words: "Daily at 02:30 (Lagos)". */
+    cadence: z.string(),
+    /** As the code declared it: "cron 30 2 * * * Africa/Lagos". */
+    set_as: z.string(),
+    /** How long it may be silent before it is late, in words. */
+    late_after: z.string(),
+    state: JobState,
+    reason: z.string().nullable(),
+    started_at: isoDateTime.nullable(),
+    last_run_at: isoDateTime.nullable(),
+    duration_ms: z.number().int().min(0).nullable(),
+    last_ok: z.boolean().nullable(),
+    last_error: z.string().nullable(),
+    runs: z.number().int().min(0),
+    failures: z.number().int().min(0),
+    last_failure_at: isoDateTime.nullable(),
+    next_run_at: isoDateTime.nullable(),
+  })
+  .strict();
+
+/** One queue the worker consumes. `failed` is every failed job still kept, not today's. */
+const QueueRow = z
+  .object({
+    queue: z.string(),
+    summary: z.string().nullable(),
+    concurrency: z.number().int().min(0),
+    waiting: z.number().int().min(0),
+    active: z.number().int().min(0),
+    delayed: z.number().int().min(0),
+    failed: z.number().int().min(0),
+    paused: z.number().int().min(0),
+    last_failed_at: isoDateTime.nullable(),
+    last_failure: z.string().nullable(),
+  })
+  .strict();
+
+/**
+ * GET /system-health/checks/:key: one probe run now, with everything it reported. Jobs
+ * for Background Jobs and queues for Worker; null on every other check. `unread` says
+ * which source could not be read, so an empty table is never mistaken for an empty system.
+ */
+const CheckDetail = HealthCheck.extend({
+  facts: z.array(CheckFact),
+  jobs: z.array(SchedulerRow).nullable(),
+  queues: z.array(QueueRow).nullable(),
+  unread: z.array(z.string()),
+}).strict();
+
+/** GET /system-health/checks/:key/history: newest first, 25 a page. */
+const CheckHistoryQuery = listQuery({});
+
+/** A check changing state, as the five-minute snapshots saw it. */
+const CheckChange = z
+  .object({
+    at: isoDateTime,
+    from: CheckState,
+    to: CheckState,
+    /** What it said on that snapshot. */
+    detail: z.string(),
+  })
+  .strict();
+const CheckChangePage = Paged(CheckChange);
 
 /** GET /system-health/status */
 const SystemHealthStatus = z
@@ -217,9 +299,44 @@ const FaultBulkResult = z.object({ changed: z.number().int().min(0) }).strict();
  */
 const BriefRequest = z.object({ error_group_ids: z.array(uuid).min(1).max(25) }).strict();
 
+/*
+ * POST /system-health/status-briefs takes common EmptyBody: the whole system, as the
+ * API sees it at the press, written by the worker into an ExportFile like the faults'.
+ */
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   HealthCheck: { table: null, reason: "one readiness probe, run in process by src/http/health.js" },
+  CheckFact: { table: null, reason: "one figure a readiness probe reported, labelled" },
+  SchedulerRow: {
+    table: "schedule_run",
+    virtual: {
+      summary: "what the scheduler does, from its defineSchedule() file",
+      runs_in: "whether the schedule queue or the worker's own timer runs it, from its file",
+      cadence: "its every or pattern, in words",
+      set_as: "its every or pattern, as declared",
+      late_after: "how long it may be silent, from jobs/report.js",
+      state: "on time, failing, late or waiting, judged by jobs/report.js",
+      reason: "why it is in that state",
+      started_at: "created_at: when the worker first started it",
+      last_ok: "ok",
+      last_error: "note, scrubbed, when the last run failed",
+      next_run_at: "the schedule queue's next tick, or the last run plus its interval",
+    },
+  },
+  QueueRow: { table: null, reason: "a BullMQ queue's counts, read from Redis" },
+  CheckDetail: { table: null, reason: "one readiness probe run now, with the jobs or queues behind it" },
+  CheckHistoryQuery: { table: null, reason: "list controls for a check's history" },
+  CheckChange: {
+    table: "health_snapshot",
+    virtual: {
+      at: "taken_at of the snapshot where the state changed",
+      from: "the check's status on the snapshot before, from checks",
+      to: "the check's status on this snapshot, from checks",
+      detail: "what the check said on this snapshot, in words",
+    },
+  },
+  CheckChangePage: { table: null, reason: "a page of a check's changes" },
   SystemHealthStatus: { table: null, reason: "the readiness probes and fault counts, neither of them stored" },
   PerformanceQuery: { table: null, reason: "which window the chart draws" },
   PerformancePoint: {
@@ -278,6 +395,14 @@ module.exports = {
   CheckState,
   ServiceState,
   HealthCheck,
+  CheckFact,
+  JobState,
+  SchedulerRow,
+  QueueRow,
+  CheckDetail,
+  CheckHistoryQuery,
+  CheckChange,
+  CheckChangePage,
   SystemHealthStatus,
   PerformanceQuery,
   PerformancePoint,

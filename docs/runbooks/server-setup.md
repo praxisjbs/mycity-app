@@ -75,7 +75,7 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
 3. If it says a reboot is wanted: `sudo reboot`. Everything comes back on its own.
 4. **Set up the offsite backup copy**: `docs/runbooks/backup-restore.md` §2.
 5. Check: `systemctl status postgresql redis-server clamav-daemon nginx` all active;
-   `systemctl list-timers 'mycity-*'` lists the backup and the drill;
+   `systemctl list-timers 'mycity-*'` lists the backup, the drill and the two health watches;
    `sudo ufw status` shows only SSH, 80 and 443; `curl -sI http://hub.staging.mycityapp.io`
    gives a 301 to https.
 

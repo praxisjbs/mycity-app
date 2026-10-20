@@ -1,5 +1,14 @@
-import { useState } from "react";
-import type { FaultDetail, FaultRow, HealthCheck, PerformancePoint } from "@mycity/contract/contract.gen.ts";
+import { useEffect, useState } from "react";
+import type {
+  CheckChange,
+  CheckDetail,
+  FaultDetail,
+  FaultRow,
+  HealthCheck,
+  PerformancePoint,
+  QueueRow,
+  SchedulerRow,
+} from "@mycity/contract/contract.gen.ts";
 import { api } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
@@ -29,10 +38,12 @@ import {
   Pill,
   SearchInput,
   SegmentedControl,
+  SidePanel,
   TextAreaField,
   Tick,
   toast,
   Toolbar,
+  useIsPhone,
   useModal,
 } from "@mycity/ui";
 
@@ -67,7 +78,33 @@ const ORIGIN: Record<FaultRow["origin"], string> = {
   browser: "Browser",
 };
 
+const JOB_STATE: Record<SchedulerRow["state"], { tone: Tone; text: string }> = {
+  on_time: { tone: "ok", text: "On Time" },
+  failing: { tone: "err", text: "Failing" },
+  late: { tone: "warn", text: "Late" },
+  waiting: { tone: "neutral", text: "Not Due Yet" },
+};
+
 const CAME_BACK = "A fault somebody marked fixed that has happened again.";
+const SET_AS = "What the code declared: an interval in milliseconds, or a cron pattern read in Lagos time.";
+const NOT_DUE = "Started recently and not yet at its first slot. Not late.";
+const FAILED_KEPT = "Failed jobs still kept, up to the last 5,000, not only today's.";
+
+/** Status and an open check read again this often, while the page is on screen. */
+const REFRESH_MS = 30_000;
+
+/** Calls `read` every `ms` while the tab is visible, so the screen follows the system without a press. */
+function useEvery(ms: number, read: () => void) {
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") read();
+    }, ms);
+    return () => clearInterval(t);
+  }, [ms, read]);
+}
+
+/** When a check entered its state, as a line a person reads. */
+const sinceText = (since: string | null) => (since ? `Since ${formatDateTime(since)}` : "Changed Just Now");
 const PEOPLE = "How many different people hit this fault. Never who they are.";
 const BRIEF = "One Markdown file with everything an AI needs to fix the ticked faults.";
 
@@ -79,8 +116,18 @@ const BRIEF = "One Markdown file with everything an AI needs to fix the ticked f
  * Only the Implementation Team and the System Administrator hold `system_health`.
  */
 export function StatusTab() {
+  const { can } = useAuth();
   const status = useApi("GET /api/v1/system-health/status");
+  useEvery(REFRESH_MS, status.reload);
+  const [open, setOpen] = useState<HealthCheck | null>(null);
   const s = status.data;
+
+  // The worker writes the file; when the worker is what is down, the server's own watch
+  // has already mailed one (docs/runbooks/system-health.md §7).
+  const brief = async () => {
+    await saveExport(api.call("POST /api/v1/system-health/status-briefs", { body: {} }));
+    toast("Status brief ready");
+  };
 
   if (status.error)
     return (
@@ -97,7 +144,20 @@ export function StatusTab() {
       <PageHeader
         title="Status"
         sub={s ? `Build ${s.release.slice(0, 12)}` : " "}
-        actions={s ? <Pill tone={s.state === "ready" ? "ok" : s.state === "degraded" ? "warn" : "err"}>{s.state === "ready" ? "All Up" : s.state === "degraded" ? "Degraded" : "Unavailable"}</Pill> : undefined}
+        actions={
+          s ? (
+            <>
+              <Pill tone={s.state === "ready" ? "ok" : s.state === "degraded" ? "warn" : "err"}>
+                {s.state === "ready" ? "All Up" : s.state === "degraded" ? "Degraded" : "Unavailable"}
+              </Pill>
+              {can("system_health", "export") && (
+                <Button icon="download" onClick={brief}>
+                  Download Brief
+                </Button>
+              )}
+            </>
+          ) : undefined
+        }
       />
       {s && (
         <KpiTiles
@@ -110,7 +170,10 @@ export function StatusTab() {
           ]}
         />
       )}
-      <Checks checks={s?.checks} loading={status.loading} />
+      <Checks checks={s?.checks} loading={status.loading} onOpen={setOpen} />
+      <SidePanel open={!!open} onClose={() => setOpen(null)} title={open?.label ?? "Check"} size="wide">
+        {open && <CheckSheet key={open.key} check={open} />}
+      </SidePanel>
     </>
   );
 }
@@ -142,7 +205,7 @@ export function FaultsTab() {
  * The readiness checks. Everything up is one quiet line, because a wall of green
  * teaches people to stop reading it; anything not up is a card with where to look.
  */
-function Checks({ checks, loading }: { checks?: HealthCheck[]; loading: boolean }) {
+function Checks({ checks, loading, onOpen }: { checks?: HealthCheck[]; loading: boolean; onOpen: (c: HealthCheck) => void }) {
   const [showAll, setShowAll] = useState(false);
   if (loading && !checks)
     return (
@@ -172,14 +235,207 @@ function Checks({ checks, loading }: { checks?: HealthCheck[]; loading: boolean 
               <Pill tone={STATE[c.state].tone}>{STATE[c.state].text}</Pill>
               <div className="min-w-0 flex-1">
                 <div data-copy="content" className="text-sm font-semibold">{c.label}</div>
-                <div className="text-xs text-muted-foreground">{c.detail}</div>
+                <div data-copy="content" className="text-xs text-muted-foreground">{c.detail}</div>
+                {c.state !== "up" && (
+                  <div data-copy="content" className="text-xs text-subtle-foreground">
+                    {sinceText(c.since)}
+                  </div>
+                )}
                 {c.look_at && <Details title="Where to Look">{c.look_at}</Details>}
               </div>
+              <Button size="sm" variant="ghost" onClick={() => onOpen(c)}>
+                Open
+              </Button>
             </div>
           ))}
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * One check, opened: what its probe measured, since when, the jobs or queues behind it,
+ * and its changes over 7 days. On a phone it starts with what is not well; the figures,
+ * the history and the jobs on time wait behind Show More (guide §10.2).
+ */
+function CheckSheet({ check }: { check: HealthCheck }) {
+  const phone = useIsPhone();
+  const [more, setMore] = useState(false);
+  const read = useApi("GET /api/v1/system-health/checks/:key", { params: { key: check.key } });
+  useEvery(REFRESH_MS, read.reload);
+  const history = usePaged("GET /api/v1/system-health/checks/:key/history", { params: { key: check.key } });
+  const d: CheckDetail | undefined = read.data;
+
+  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
+  if (!d) return <LoadingRows count={6} />;
+
+  const full = !phone || more;
+  const jobs = d.jobs && (full ? d.jobs : d.jobs.filter((j) => j.state === "late" || j.state === "failing"));
+  const queues = d.queues && (full ? d.queues : d.queues.filter((q) => q.waiting || q.active || q.delayed || q.last_failure));
+
+  return (
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Pill tone={STATE[d.state].tone}>{STATE[d.state].text}</Pill>
+        <span data-copy="content" className="text-xs text-subtle-foreground">
+          {sinceText(d.since)}
+        </span>
+      </div>
+      <p data-copy="content" className="text-sm">{d.detail}</p>
+      {d.look_at && <Details title="Where to Look">{d.look_at}</Details>}
+      {d.unread.length > 0 && (
+        <Banner tone="warn" className="mt-3">
+          <span data-copy="content">{d.unread.join(". ")}</span>
+        </Banner>
+      )}
+
+      {full && d.facts.length > 0 && <KeyValue className="mt-3" items={d.facts.map((f) => [f.label, f.value])} />}
+
+      {jobs && (
+        <DataView<SchedulerRow>
+          className="mt-3"
+          title="Jobs"
+          wide
+          rows={jobs}
+          rowKey={(j) => j.name}
+          noun="job"
+          empty={{ title: "All On Time", icon: "check" }}
+          columns={[
+            {
+              key: "job",
+              label: "Job",
+              render: (j) => (
+                <div className="min-w-0">
+                  <b data-copy="content" className="block truncate">{j.name}</b>
+                  {j.summary && (
+                    <span data-copy="content" className="block text-xs text-subtle-foreground">
+                      {j.summary}
+                    </span>
+                  )}
+                  {j.last_error && (
+                    <span data-copy="content" className="wrap-any block text-xs text-destructive line-clamp-3">
+                      {j.last_error}
+                    </span>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: "set",
+              label: <HelpTerm help={SET_AS}>Set As</HelpTerm>,
+              render: (j) => (
+                <div className="min-w-0">
+                  <span data-copy="content" className="block">{j.cadence}</span>
+                  <span data-copy="content" className="block text-2xs text-subtle-foreground">{j.set_as}</span>
+                </div>
+              ),
+            },
+            { key: "last", label: "Last Run", render: (j) => (j.last_run_at ? formatDateTime(j.last_run_at) : "Never") },
+            {
+              key: "result",
+              label: "Result",
+              desktop: true,
+              render: (j) => (j.last_ok === null ? null : <Pill tone={j.last_ok ? "ok" : "err"}>{j.last_ok ? "Ran" : "Failed"}</Pill>),
+            },
+            { key: "next", label: "Next Run", desktop: true, render: (j) => (j.next_run_at ? formatDateTime(j.next_run_at) : null) },
+            {
+              key: "state",
+              label: "State",
+              render: (j) => (
+                <div className="min-w-0">
+                  {j.state === "waiting" ? (
+                    <HelpTerm help={NOT_DUE}>
+                      <Pill tone={JOB_STATE.waiting.tone}>{JOB_STATE.waiting.text}</Pill>
+                    </HelpTerm>
+                  ) : (
+                    <Pill tone={JOB_STATE[j.state].tone}>{JOB_STATE[j.state].text}</Pill>
+                  )}
+                  {j.reason && j.state !== "waiting" && (
+                    <span data-copy="content" className="block text-xs text-subtle-foreground">{j.reason}</span>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+        />
+      )}
+
+      {queues && (
+        <DataView<QueueRow>
+          className="mt-3"
+          title="Queues"
+          wide
+          rows={queues}
+          rowKey={(q) => q.queue}
+          noun="queue"
+          empty={{ title: "Nothing Waiting", icon: "check" }}
+          columns={[
+            {
+              key: "queue",
+              label: "Queue",
+              render: (q) => (
+                <div className="min-w-0">
+                  <b data-copy="content" className="block truncate">{q.queue}</b>
+                  {q.summary && (
+                    <span data-copy="content" className="block text-xs text-subtle-foreground">
+                      {q.summary}
+                    </span>
+                  )}
+                </div>
+              ),
+            },
+            { key: "waiting", label: "Waiting", align: "n", render: (q) => q.waiting.toLocaleString("en-NG") },
+            { key: "active", label: "Active", align: "n", desktop: true, render: (q) => q.active.toLocaleString("en-NG") },
+            { key: "delayed", label: "Delayed", align: "n", desktop: true, render: (q) => q.delayed.toLocaleString("en-NG") },
+            { key: "failed", label: <HelpTerm help={FAILED_KEPT}>Failed</HelpTerm>, align: "n", render: (q) => q.failed.toLocaleString("en-NG") },
+            {
+              key: "last",
+              label: "Newest Failure",
+              desktop: true,
+              render: (q) =>
+                q.last_failure ? (
+                  <span data-copy="content" className="wrap-any block text-xs line-clamp-2">
+                    {q.last_failed_at ? `${formatDateTime(q.last_failed_at)}: ` : ""}
+                    {q.last_failure}
+                  </span>
+                ) : null,
+            },
+          ]}
+        />
+      )}
+
+      {full && (
+        <DataView<CheckChange>
+          className="mt-3"
+          title="Changes"
+          list={history}
+          rowKey={(r) => `${r.at}-${r.to}`}
+          noun="change"
+          empty={{ title: "No Changes", text: "Same state all week.", icon: "check" }}
+          columns={[
+            { key: "at", label: "When", render: (r) => formatDateTime(r.at) },
+            {
+              key: "to",
+              label: "Became",
+              render: (r) => (
+                <div className="flex flex-wrap items-center gap-1">
+                  <Pill tone={STATE[r.from].tone}>{STATE[r.from].text}</Pill>
+                  <Pill tone={STATE[r.to].tone}>{STATE[r.to].text}</Pill>
+                </div>
+              ),
+            },
+            { key: "detail", label: "It Said", desktop: true, render: (r) => <span data-copy="content">{r.detail}</span> },
+          ]}
+        />
+      )}
+
+      {!full && (
+        <Button className="mt-3 w-full" onClick={() => setMore(true)}>
+          Show More
+        </Button>
+      )}
+    </>
   );
 }
 
