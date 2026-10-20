@@ -122,7 +122,8 @@ Express and PostgreSQL backend with a worker, a staff React app in \`app/\` and 
    using the numbers below. Put the same line in the pull request description, so whoever reads
    Settings · System Health later can tell which commit closed which fault.
 
-9. **Open a draft pull request to \`main\` and drive it green.** Branch \`m9/<short-name>\`, title in
+9. **Open a draft pull request to \`main\` and drive it green.** Branch \`m<N>/<short-name>\`, where
+   N is the milestone of the area you changed (\`docs/PROGRESS.md\` gives it), title in
    Conventional Commits form. In the description give, for each fault: the root cause, the fix, and
    how the owner checks it on the running app (which screen, what to do, what they should now see).
    List what was already fixed or not ours, and why. A frontend change needs the **Native app feel**

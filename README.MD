@@ -122,7 +122,8 @@ mycity-app/
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
 │   ├── PROGRESS.md           93 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
-│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
+│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, system-health,
+│   │                         add-a-module,
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
 │   │                         first-accounts (the first two logins on a server),
 │   │                         staff-roster (MyCity's staff onto a server that has none),
