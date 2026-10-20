@@ -1568,6 +1568,11 @@ function listAcknowledgements(db, policyId, query, scope, date) {
   );
 }
 
+/** Whether a person is asked on a date: at work, with an active login. */
+async function isAsked(db, employeeId, date) {
+  return Boolean(await one(db, `SELECT 1 FROM employee e WHERE e.employee_id = $1 AND ${ASKED("e", "$2::date")}`, [employeeId, date]));
+}
+
 /** Everyone asked who has neither acknowledged a version nor been reminded of it. */
 async function dueForPolicyReminder(db, policyId, date) {
   // pagination:complete the job reminds everyone who is due, not a page of them
@@ -1700,6 +1705,7 @@ module.exports = {
   acknowledgementOf,
   acknowledge,
   listAcknowledgements,
+  isAsked,
   dueForPolicyReminder,
   recordPolicyReminder,
   askedUsers,

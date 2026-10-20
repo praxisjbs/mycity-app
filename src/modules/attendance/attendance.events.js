@@ -43,8 +43,9 @@
  *   attendance.policy_withdrawn     People withdrew a version waiting to start: the same people are
  *                                   told it will not apply
  *   attendance.policy_acknowledged  someone acknowledged the newest version
- *   attendance.policy_reminder_due  the reminder job found someone who had not acknowledged a
- *                                   version 3 days after it was published: they are reminded once
+ *   attendance.policy_reminder_due  the reminder engine's attendance_policy_unacknowledged found
+ *                                   someone who had not acknowledged a version 3 days after it was
+ *                                   published: they are reminded once, in the working day
  *
  * Payloads carry ids, dates, results and exception types (a field assignment's number and
  * name too): never coordinates, an address, a device identifier or the evidence itself.
@@ -54,6 +55,7 @@ const { defineEvents, WORKFLOW } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
 const workflow = require("../../shared/workflow/engine");
 const { defineNotification, permissionHolders } = require("../../shared/notifications/fanout");
+const reminders = require("../notifications/notifications.reminders");
 const { defineDocumentType } = require("../../shared/documents/types");
 const { formatDate } = require("../../shared/time/day-first");
 
@@ -188,12 +190,14 @@ const everyoneAsked = (_event, client) =>
 
 defineNotification(EVENTS.ATTENDANCE_POLICY_PUBLISHED, {
   to: [{ users: everyoneAsked }],
+  who: "Everyone at work with a login",
   title: "Attendance policy updated",
   body: (e) => `Version ${e.payload.version} applies from ${formatDate(e.payload.effective_from)}. Read and acknowledge it.`,
 });
 
 defineNotification(EVENTS.ATTENDANCE_POLICY_WITHDRAWN, {
   to: [{ users: everyoneAsked }],
+  who: "Everyone at work with a login",
   title: "Attendance policy version withdrawn",
   body: (e) => `Version ${e.payload.version} will not apply from ${formatDate(e.payload.effective_from)}.`,
 });
@@ -202,6 +206,18 @@ defineNotification(EVENTS.ATTENDANCE_POLICY_REMINDER_DUE, {
   to: [{ subject: true }],
   title: "Acknowledge the attendance policy",
   body: (e) => `Version ${e.payload.version} is waiting for your acknowledgement.`,
+});
+
+/*
+ * The reminder (guide §6.15) runs on the one reminder engine (docs/guides/notifications.md §7.1):
+ * from 3 days after a version is published, once a person, in the working day. The policy service
+ * is required when the engine calls it: it requires this file for its event keys.
+ */
+reminders.defineReminder("attendance_policy_unacknowledged", {
+  event: EVENTS.ATTENDANCE_POLICY_REMINDER_DUE,
+  module: "people",
+  find: (db, ctx) => require("./attendance.policy").remindersDue(db, ctx),
+  check: (client, row, ctx) => require("./attendance.policy").reminderCheck(client, row, ctx),
 });
 
 defineNotification(EVENTS.ATTENDANCE_SCHEDULE_SET, {

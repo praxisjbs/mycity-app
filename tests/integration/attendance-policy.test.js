@@ -22,10 +22,10 @@ const grantsCache = require("../../src/shared/rbac/grants-cache");
 const aiRegistry = require("../../src/shared/ai/registry");
 const lagos = require("../../src/shared/time/lagos");
 const service = require("../../src/modules/attendance/attendance.service");
-const policy = require("../../src/modules/attendance/attendance.policy");
 const calendar = require("../../src/modules/attendance/attendance.calendar");
 const repo = require("../../src/modules/attendance/attendance.repo");
 const realtime = require("../../src/services/realtime/emitter");
+const reminders = require("../../src/modules/notifications/notifications.reminders");
 
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async () => ({ id: "1" })),
@@ -305,11 +305,19 @@ describeDb("the attendance policy against the real migrations", () => {
     expect(all.body.data).toEqual([expect.objectContaining({ version: 2, acknowledged: 1, asked: 3 })]);
   });
 
-  test("the reminder goes once, 3 days after publishing, to whoever has not acknowledged", async () => {
-    expect(await policy.remind({ now: new Date() })).toEqual({ reminded: 0 });
-    const later = new Date(Date.now() + 4 * 86_400_000);
-    expect(await policy.remind({ now: later })).toEqual({ reminded: 2 });
-    expect(await policy.remind({ now: later })).toEqual({ reminded: 0 });
+  test("the reminder goes once, 3 days after publishing, in the working day, to whoever has not acknowledged", async () => {
+    const policyReminders = async () =>
+      (await q("SELECT state, fired_count FROM reminder WHERE reminder_key = 'attendance_policy_unacknowledged' ORDER BY occurrence")).rows;
+    await reminders.tick({ now: lagos.instant(day(1), "10:00") });
+    expect(await policyReminders()).toEqual([]);
+
+    // Due on the fourth day, but found at night: it waits for 08:00.
+    await reminders.tick({ now: lagos.instant(day(4), "20:00") });
+    expect((await policyReminders()).map((r) => r.fired_count)).toEqual([0, 0]);
+    await reminders.tick({ now: lagos.instant(day(5), "08:05") });
+    expect((await policyReminders()).map((r) => r.fired_count)).toEqual([1, 1]);
+    await reminders.tick({ now: lagos.instant(day(5), "10:00") });
+    expect((await policyReminders()).map((r) => r.fired_count)).toEqual([1, 1]);
 
     await drain();
     const [notice] = await noticesOf("remote", "attendance.policy_reminder_due");

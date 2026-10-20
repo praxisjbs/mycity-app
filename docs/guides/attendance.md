@@ -141,7 +141,8 @@ Policy Updates in plain sentences with what changed, and acknowledges it.
     employee with a login (the bell, and a push as their Attendance and Leave preference allows).
     Policy Updates shows the newest version in sentences, with what changed tagged and People's
     note, and Acknowledge. Acknowledging never blocks the clock. Three days after a version is
-    published, the `attendance-policy-reminder` job reminds once whoever has not acknowledged it.
+    published, the reminder engine (`docs/guides/notifications.md` §7.1) reminds once, in the
+    working day, whoever has not acknowledged it.
     People see who has and who has not on the version.
 
 ## 4 · Data
@@ -693,10 +694,14 @@ as full sentences.
 - **Who is asked**: everyone at work (active, started, not left) with an active login, counted when
   read, so someone who joins after a version is published is asked too. The version's report lists
   them within the reader's `settings` scope, acknowledged or pending.
-- **The reminder** (job `attendance-policy-reminder`, daily at 10:00 Lagos): for the newest version
-  published at least 3 days before, everyone asked who has not acknowledged it and was not reminded
-  of it is reminded once (`attendance.policy_reminder_due`, the bell and a push as their preference
-  allows; `reminded_at` decides once).
+- **The reminder** (`attendance_policy_unacknowledged` on the reminder engine,
+  `docs/guides/notifications.md` §7.1; no clock of its own): from 3 days after the newest version
+  was published, its `find` adds one occurrence for each person asked who has neither acknowledged
+  it nor been reminded of it, and the `reminders` tick (every 5 minutes) fires it between 08:00 and
+  18:00 Lagos. Its `check` fires only while that version is still the newest and the person still
+  asked and not acknowledged, recording `reminded_at` (`attendance.policy_reminder_due`, the bell and
+  a push as their preference allows). One occurrence is one person and one version, so a retried
+  tick reminds nobody twice. People can switch the notice off in Settings · Notifications.
 - **The sentences** staff read are the app's (`app/src/features/attendance/policy-text.ts`), one per
   rule and mode, the values filled in, so a changed value changes the sentence; the server sends
   the values, never prose.
@@ -733,8 +738,8 @@ as full sentences.
 | `attendance.policy_published` | People publish a version (§6.15) | Audit; notifies every employee at work with a login ("Attendance policy updated", its number and first day; push as their Attendance and Leave preference allows); the notice opens Policy Updates on that version |
 | `attendance.policy_withdrawn` | People withdraw a version waiting to start | Audit; notifies the same people that it will not apply |
 | `attendance.policy_acknowledged` | Someone acknowledges the newest version | Audit; their notices about it are read |
-| `attendance.policy_reminder_due` | The reminder job finds someone who has not acknowledged a version 3 days after it was published | Notifies the person, once a version |
-| Job `attendance-policy-reminder` (scheduler, 10:00 Africa/Lagos) | Daily | Sends the acknowledgement reminders (§6.15), under the cron lock; idempotent (`reminded_at`) |
+| `attendance.policy_reminder_due` | The reminder engine fires `attendance_policy_unacknowledged` for someone who has not acknowledged a version 3 days after it was published | Notifies the person, once a version |
+| Reminder `attendance_policy_unacknowledged` (the reminder engine, fired by the `reminders` scheduler every 5 minutes, 08:00 to 18:00 Lagos) | From 3 days after a version is published | Finds who has not acknowledged the newest version and reminds each once (§6.15); idempotent (one occurrence a person a version, `reminded_at`) |
 
 ## 8 · Permissions and visibility by role
 
@@ -993,4 +998,5 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - 19/10/2026 · TB · Attendance's notices are listed in Settings · Notifications (`docs/guides/notifications.md` §6):
   People may switch any of them off company-wide, and copy Attendance needs review, Attendance
   explanation and Home location to approve to other roles or people (`copy`). Nothing else changed.
-- 19/10/2026 · LA · Settings · Attendance Policy (#73) and ESS · Policy Updates (#89) built (owner decisions, 19/10/2026; §6.15): one organisation policy in numbered versions. People edit the clock checks (grace minutes; the location check for the office, a home and a field site, each off, warn or block; GPS accuracy; home radius; the device check), save them as a draft and publish it as `Version N` from a first day with a note; a version waiting can be withdrawn. Everyone at work with a login is told (bell and push), reads the version on Policy Updates as full sentences with what changed tagged, and acknowledges it; acknowledging never blocks the clock; the `attendance-policy-reminder` job reminds once after 3 days; People see who has acknowledged. The location mode is now per place (§6.1, §6.5) and each punch keeps the version it was judged by. `1370` (versions, the place modes, `attendance_policy_acknowledgement`), `1395` (1099's Standard policy out, A26); twelve routes; five events; one job. §1 to §11 and §13 updated; §6.15 added.
+- 19/10/2026 · LA · Settings · Attendance Policy (#73) and ESS · Policy Updates (#89) built (owner decisions, 19/10/2026; §6.15): one organisation policy in numbered versions. People edit the clock checks (grace minutes; the location check for the office, a home and a field site, each off, warn or block; GPS accuracy; home radius; the device check), save them as a draft and publish it as `Version N` from a first day with a note; a version waiting can be withdrawn. Everyone at work with a login is told (bell and push), reads the version on Policy Updates as full sentences with what changed tagged, and acknowledges it; acknowledging never blocks the clock; a reminder goes once after 3 days; People see who has acknowledged. The location mode is now per place (§6.1, §6.5) and each punch keeps the version it was judged by. `1370` (versions, the place modes, `attendance_policy_acknowledgement`), `1395` (1099's Standard policy out, A26); twelve routes; six events; one reminder. §1 to §11 and §13 updated; §6.15 added.
+- 20/10/2026 · LA · The policy's 3-day reminder moves onto the reminder engine merged from main (`docs/guides/notifications.md` §7.1, "a module never writes its own clock"): `attendance_policy_unacknowledged` finds who is due and fires in the working day, in place of the `attendance-policy-reminder` scheduler, which is gone. Who is reminded, and once, is unchanged. §3 step 12, §6.15 and §7 updated.

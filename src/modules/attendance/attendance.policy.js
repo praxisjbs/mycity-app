@@ -13,8 +13,9 @@
  *                 become the draft
  *   acknowledge   an employee acknowledges the newest version; their notices about it are read.
  *                 A record, never a gate: the clock judges a punch the same either way
- *   remind        the daily job reminds once whoever has not acknowledged a version 3 days after
- *                 it was published
+ *   reminders     the reminder engine's find and check for `attendance_policy_unacknowledged`
+ *                 (attendance.events.js): once, 3 days after a version is published, each person
+ *                 asked who has not acknowledged it (docs/guides/notifications.md §7.1)
  *
  * The rules in force on a date are attendance.calendar.js policyFor's (§6.1); a punch keeps the
  * version it was judged by. Changes run one at a time under the policy's lock. Events carry the
@@ -399,38 +400,50 @@ async function acknowledge(user, id) {
   return mine(user);
 }
 
-/** Remind one person of a version, once: false when they were already reminded or acknowledged it. */
-async function sendReminder(row, employeeId) {
-  return tx(async (client) => {
-    if (!(await repo.recordPolicyReminder(client, row.attendance_policy_id, employeeId))) return false;
-    await emit(client, {
-      key: EVENTS.ATTENDANCE_POLICY_REMINDER_DUE,
-      entity: { type: "attendance_policy", id: row.attendance_policy_id },
-      actor: null,
-      payload: {
-        attendance_policy_id: row.attendance_policy_id,
-        version: Number(row.version),
-        employee_id: employeeId,
-        subject_employee_id: employeeId,
-      },
-    });
-    return true;
-  });
+/**
+ * The reminder's `find` (attendance.events.js): from REMIND_AFTER_DAYS days after the newest version
+ * was published, one occurrence for each person asked who has neither acknowledged it nor been
+ * reminded of it, fired in the working day. The engine adds each once.
+ * @param {{query: Function}} db
+ * @param {{now: Date}} ctx
+ */
+async function remindersDue(db, { now }) {
+  const newest = await repo.newestVersion(db);
+  if (!newest) return [];
+  const dueAt = new Date(new Date(newest.published_at).getTime() + REMIND_AFTER_DAYS * 86_400_000);
+  if (dueAt > now) return [];
+  return (await repo.dueForPolicyReminder(db, newest.attendance_policy_id, lagos.today(now))).map((p) => ({
+    entity_type: "attendance_policy",
+    entity_id: newest.attendance_policy_id,
+    occurrence: p.employee_id,
+    due_at: dueAt,
+    work_hours: true,
+  }));
 }
 
 /**
- * The daily reminder (job attendance-policy-reminder): the newest version, once it was published
- * REMIND_AFTER_DAYS days ago, to everyone asked who has neither acknowledged it nor been reminded.
+ * The reminder's `check`, in the firing's transaction: fire only while the version is still the
+ * newest and the person still asked and not acknowledged, recording that they were reminded;
+ * otherwise end it.
+ * @param {import("pg").PoolClient} client
+ * @param {{entity_id: string, occurrence: string}} row  the engine's occurrence: a version and a person
+ * @param {{now: Date}} ctx
  */
-async function remind({ now = new Date() } = {}) {
-  const newest = await repo.newestVersion(pool);
-  if (!newest) return { reminded: 0 };
-  if (now.getTime() - new Date(newest.published_at).getTime() < REMIND_AFTER_DAYS * 86_400_000)
-    return { reminded: 0 };
-  let reminded = 0;
-  for (const { employee_id: employeeId } of await repo.dueForPolicyReminder(pool, newest.attendance_policy_id, lagos.today(now)))
-    if (await sendReminder(newest, employeeId)) reminded += 1;
-  return { reminded };
+async function reminderCheck(client, row, { now }) {
+  const newest = await repo.newestVersion(client);
+  if (!newest || newest.attendance_policy_id !== row.entity_id) return null;
+  const employeeId = row.occurrence;
+  if (!(await repo.isAsked(client, employeeId, lagos.today(now)))) return null;
+  if (!(await repo.recordPolicyReminder(client, row.entity_id, employeeId))) return null;
+  return {
+    entity: { type: "attendance_policy", id: row.entity_id },
+    payload: {
+      attendance_policy_id: row.entity_id,
+      version: Number(newest.version),
+      employee_id: employeeId,
+      subject_employee_id: employeeId,
+    },
+  };
 }
 
 module.exports = {
@@ -451,5 +464,6 @@ module.exports = {
   publish,
   withdraw,
   acknowledge,
-  remind,
+  remindersDue,
+  reminderCheck,
 };
