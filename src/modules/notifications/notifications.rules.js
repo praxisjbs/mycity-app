@@ -70,8 +70,16 @@ function present(notice, rule, roles = [], people = []) {
     enabled: notice.locked || !rule ? true : rule.enabled,
     urgency,
     urgency_default: notice.urgency_default,
-    channels: three((ch) => categories.isOn(notice.category, ch, undefined, rule ? rule[ch] : null)),
-    defaults: three((ch) => categories.defaultOn(notice.category, ch)),
+    channels: three((ch) =>
+      categories.isOn(notice.category, ch, undefined, rule ? rule[ch] : null, notice.channels ? notice.channels[ch] : null),
+    ),
+    // What the notice falls back to with no company rule: its own declared channels
+    // where it has them (the 24 hour escalation declares email), else its category's.
+    defaults: three((ch) =>
+      notice.channels && notice.channels[ch] !== undefined && notice.channels[ch] !== null
+        ? notice.channels[ch] === true
+        : categories.defaultOn(notice.category, ch),
+    ),
     roles: roles.map((r) => ({ code: r.code, name: r.name })),
     people,
     changed: Boolean(rule),

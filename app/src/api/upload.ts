@@ -30,7 +30,7 @@ function pretend({ endpoint, file, onProgress }: UploadOptions): Promise<Documen
         document_id: id,
         ...(endpoint.includes("/mailbox/") ? { attachment_id: id } : {}),
         /* A conversation's upload answers its MediaRef: the shape and sizes, none made on a laptop. */
-        ...(endpoint.includes("/community/") ? { width: null, height: null, page_count: null, duration_ms: null, variants: [] } : {}),
+        ...(endpoint.includes("/community/") ? { width: null, height: null, page_count: null, duration_ms: null, waveform: null, variants: [] } : {}),
         file_name: file.name,
         size_bytes: file.size,
         mime_type: file.type || "application/octet-stream",

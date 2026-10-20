@@ -112,6 +112,8 @@
 /packages/contract/schemas/security.js             @swizfcodes @tomblakeasaah196
 /src/modules/settings/                             @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/settings.js             @swizfcodes @tomblakeasaah196
+/src/modules/system_health/                        @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/system_health.js        @swizfcodes @tomblakeasaah196
 /src/modules/templates/                            @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/templates.js            @swizfcodes @tomblakeasaah196
 /src/modules/users/                                @swizfcodes @tomblakeasaah196
@@ -214,3 +216,4 @@
 /docs/guides/identity.md                           @swizfcodes @tomblakeasaah196
 /docs/guides/foundation.md                         @swizfcodes @tomblakeasaah196
 /docs/guides/notifications.md                      @swizfcodes @tomblakeasaah196
+/docs/guides/system-health.md                      @swizfcodes @tomblakeasaah196

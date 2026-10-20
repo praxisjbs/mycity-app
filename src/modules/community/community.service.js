@@ -10,7 +10,8 @@
  * - Files sent together share an album key; a caption rides on the first. A text's first
  *   link gets its card from community.links.js, at once when one is kept, else after commit.
  * - #general and #announcements are made the first time they are needed, and every
- *   person who opens Community is a member of both.
+ *   active login is a member of both: from the moment the login is made, from an hourly
+ *   sweep for any that slipped through, and again when they open Community.
  *
  * Every write runs in one transaction with emit(); realtime pushes and notifications are
  * outbox handlers in community.events.js.
@@ -158,6 +159,22 @@ async function joinCompany(db, user) {
   return { general, announcements };
 }
 
+/** A new or reactivated login joins #general and #announcements at once (app_user.created). */
+async function joinLogin(userId) {
+  if (!userId) return;
+  await tx((client) => joinCompany(client, { user_id: userId }));
+}
+
+/** Every active login in #general and #announcements; the hourly sweep. Returns how many joined. */
+async function joinEveryone() {
+  return tx(async (client) => {
+    const general = await repo.systemChannel(client, "general");
+    const announcements = await repo.systemChannel(client, "announcements");
+    const joined = (await repo.addEveryone(client, general.community_channel_id)) + (await repo.addEveryone(client, announcements.community_channel_id));
+    return { joined };
+  });
+}
+
 /** The caller's membership of a channel, or a 404. */
 async function member(db, channelId, user) {
   const m = await repo.membership(db, channelId, user.user_id);
@@ -224,6 +241,29 @@ async function createChannel(body, user) {
     return made;
   });
   return getChannel(channel.community_channel_id, user);
+}
+
+/** A channel's admins rename it and write its description; #general and #announcements stay as they are. */
+async function updateChannel(channelId, body, user) {
+  await tx(async (client) => {
+    await assertAdmin(client, channelId, user);
+    const before = await repo.channelRowForUpdate(client, channelId);
+    if (await repo.nameTaken(client, body.name, channelId)) {
+      throw new AppError("NAME_TAKEN", "A channel already has that name", 409, {
+        name: ["Name already taken"],
+      });
+    }
+    const after = await repo.updateChannel(client, channelId, body);
+    await emit(client, {
+      key: EVENTS.CHANNEL_UPDATED,
+      entity: { type: "channel", id: channelId },
+      actor: user,
+      before,
+      after,
+      payload: { community_channel_id: channelId },
+    });
+  });
+  return getChannel(channelId, user);
 }
 
 async function listMembers(channelId, user, query) {
@@ -498,6 +538,8 @@ async function present(
         !deleted && r.message_type !== "announcement" && (mine || moderator),
       can_close:
         !deleted && r.message_type === "poll" && !closed && (mine || moderator),
+      pinned_until: deleted ? null : iso(r.pinned_until),
+      can_pin: !deleted && (direct || moderator),
     };
   });
 }
@@ -625,7 +667,7 @@ async function postMessage(channelId, body, user) {
       if (!persons.has(body.subject_employee_id))
         throw new AppError("NOT_FOUND", "There is no such colleague", 404);
       metadata.subject_employee_id = body.subject_employee_id;
-      // A hand-posted anniversary carries its years, as the 05:00 ones do.
+      // A hand-posted anniversary carries its years, as the 08:00 ones do.
       if (type === "anniversary")
         metadata.years = await repo.yearsServed(
           client,
@@ -945,6 +987,58 @@ async function closePoll(messageId, user) {
   return messageView(pool, messageId, user);
 }
 
+/** How long each pin period lasts. */
+const PIN_MS = { "24h": 24 * 3600 * 1000, "7d": 7 * 24 * 3600 * 1000, "30d": 30 * 24 * 3600 * 1000 };
+
+/** At most this many messages are pinned at once in a conversation. */
+const MAX_PINS = 3;
+
+/** A moderator in a channel, either person in a direct conversation (§3 step 16). */
+function assertMayPin({ ch, moderator }) {
+  if (ch.channel_type !== "direct" && !moderator)
+    throw new AppError("NOT_MODERATOR", "Only the channel's moderators pin messages", 403);
+}
+
+/**
+ * Pin a message at the top of its conversation for a period; pinning it again starts the
+ * period again. A fourth pin takes the place of the oldest, as each person's own pins do.
+ */
+async function pinMessage(messageId, body, user) {
+  await tx(async (client) => {
+    const found = await lockedForChange(client, messageId, user);
+    assertMayPin(found);
+    const until = new Date(Date.now() + PIN_MS[body.period]).toISOString();
+    const after = await repo.setPin(client, messageId, until, user.user_id);
+    for (const old of await repo.pinsBeyond(client, found.row.community_channel_id, MAX_PINS)) {
+      const off = await repo.setPin(client, old, null, null);
+      await changed(client, EVENTS.CHANNEL_MESSAGE_PINNED, off, user, { pinned_until: null });
+    }
+    await changed(client, EVENTS.CHANNEL_MESSAGE_PINNED, after, user, { pinned_until: until, period: body.period });
+  });
+  return messageView(pool, messageId, user);
+}
+
+async function unpinMessage(messageId, user) {
+  await tx(async (client) => {
+    const found = await lockedForChange(client, messageId, user);
+    assertMayPin(found);
+    if (!found.row.pinned_until) return;
+    const after = await repo.setPin(client, messageId, null, null);
+    await changed(client, EVENTS.CHANNEL_MESSAGE_PINNED, after, user, { pinned_until: null });
+  });
+  return messageView(pool, messageId, user);
+}
+
+/** What is pinned in a conversation now, for the bar above its messages. */
+async function listPins(channelId, user, query) {
+  const m = await member(pool, channelId, user);
+  const page = await repo.listPins(pool, channelId, user.user_id, query);
+  const direct = m.channel_type === "direct";
+  const other = direct ? await repo.otherPointers(pool, channelId, user.user_id) : null;
+  const moderator = isModerator(m, await canAnnounce(pool, user));
+  return { ...page, data: await present(pool, page.data, user, { direct, other, moderator }) };
+}
+
 /** A voice note's transcript, asked for once and stored for everyone after (§3 step 11). */
 async function transcript(messageId, user) {
   const row = await repo.messageFor(pool, messageId, user.user_id);
@@ -1179,7 +1273,7 @@ async function profileCard(employeeId, user) {
 }
 
 /* ------------------------------------------------------------------ *
- * Celebrations (A20), the 05:00 job
+ * Celebrations (A20), the 08:00 job
  * ------------------------------------------------------------------ */
 
 /**
@@ -1233,6 +1327,8 @@ function touchPresence(userId) {
 }
 
 module.exports = {
+  joinLogin,
+  joinEveryone,
   setPinned,
   isModerator,
   mayPoll,
@@ -1246,6 +1342,10 @@ module.exports = {
   listChannels,
   getChannel,
   createChannel,
+  pinMessage,
+  unpinMessage,
+  listPins,
+  updateChannel,
   listMembers,
   addMembers,
   removeMember,

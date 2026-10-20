@@ -262,6 +262,7 @@ it on again reminds what is still waiting at the next tick.
 | `urgent-repeats` (scheduler, every 5 minutes) | 08:00 to 18:00 Lagos | Alerts again each open urgent notice due (§6): socket `notification` with its `repeat`, and `notification-push` for the next round |
 | `notification.read`, `notification.read_all` | A read mark | Tells the person's other tabs (`notification_read`) |
 | `notification.acknowledged` | Acknowledge on the urgent bar | Tells the person's other tabs (`notification_read`); the record's module hears it (an announcement records the acknowledgement) |
+| `notification.withdrawn` | The record a notice is about was taken down (`withdrawForRecord`, called by the record's module: an archived announcement) | Deletes the notices nobody has opened (acknowledged, when it needs Acknowledge), their push rows with them; tells each person's tabs (`notification_read`) so the bell and the urgent bar refresh. Opened or acknowledged notices stay |
 | `announcement.acknowledged` (community) | Acknowledge on the announcement in #announcements | Marks the person's notices of that announcement acknowledged and read, and tells their other tabs |
 | `notification.preference_changed` | A switch in Notification Settings | Audit |
 | `push_subscription.saved`, `push_subscription.removed`, `push_subscription.renewed` | Turn On, a re-sync that adds or moves a device; Turn Off, a removed or refused device; a service worker's renewal | Audit |
@@ -470,3 +471,11 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
   Edit Notice opens in a modal on desktop and a sheet on a phone; Notification Settings gains a
   Quiet Hours and Digest card. Checked by the `notifications-rules` integration suite and the
   whole `npm run ci`.
+- 20/10/2026 · TB · A notice may now declare its own default channels, where its category's are
+  wrong for it: `defineNotification(key, { channels: { email: true } })`, which sits between the
+  company's rule and the category's default in `categories.isOn()`. A person's own preference and
+  the company's rule still win over it, and Settings · Notifications shows it as the notice's
+  default. Added for Settings · System Health, whose category leaves email off so that only the 24
+  hour escalation reaches an inbox (`docs/guides/system-health.md` §7). No existing notice declares
+  one, so nothing already sent changes.
+- 20/10/2026 · GE · §7: `notification.withdrawn`. `service.withdrawForRecord(entityType, entityId)` takes down the unopened notices of a record that was itself taken down; Staff Community calls it when a published announcement is archived (TB's review, 19/10). TB to review.

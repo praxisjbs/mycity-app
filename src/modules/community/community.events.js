@@ -23,6 +23,7 @@ const realtime = require("../../services/realtime/emitter");
 
 const EVENTS = defineEvents("community", {
   "channel.created": { summary: "A channel was created" },
+  "channel.updated": { summary: "A channel was renamed or its description changed" },
   "channel.members_changed": {
     summary: "People were added to or removed from a channel",
   },
@@ -32,6 +33,9 @@ const EVENTS = defineEvents("community", {
   },
   "channel_message.edited": {
     summary: "A message was edited, or a poll closed",
+  },
+  "channel_message.pinned": {
+    summary: "A message was pinned at the top of its conversation, or unpinned",
   },
   "channel_message.deleted": {
     summary: "A message was deleted by its author or a moderator",
@@ -124,6 +128,7 @@ for (const key of [
   EVENTS.CHANNEL_MESSAGE_REACTED,
   EVENTS.CHANNEL_MESSAGE_EDITED,
   EVENTS.CHANNEL_MESSAGE_DELETED,
+  EVENTS.CHANNEL_MESSAGE_PINNED,
   EVENTS.CHANNEL_MESSAGE_LINK_PREVIEWED,
 ]) {
   outbox.register(key, `community.push_update.${key.split(".")[1]}`, (event) =>
@@ -137,6 +142,7 @@ for (const key of [EVENTS.DIRECT_THREAD_READ, EVENTS.DIRECT_THREAD_DELIVERED]) {
 }
 for (const key of [
   EVENTS.CHANNEL_CREATED,
+  EVENTS.CHANNEL_UPDATED,
   EVENTS.CHANNEL_MEMBERS_CHANGED,
   EVENTS.DIRECT_THREAD_OPENED,
 ]) {
@@ -164,6 +170,11 @@ for (const key of [
     );
   });
 }
+
+/* Everyone is in #general and #announcements from the moment their login exists, not from their first visit. */
+const joinLogin = (event) => require("./community.service").joinLogin(event.entity && event.entity.id);
+outbox.register("app_user.created", "community.join_company", joinLogin);
+outbox.register("app_user.reactivated", "community.join_company_again", joinLogin);
 
 /*
  * A PDF's first page or a video's poster is ready: every conversation holding the file redraws

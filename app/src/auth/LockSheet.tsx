@@ -124,21 +124,26 @@ export function LockSheet() {
   };
 
   const mark = touched && err ? "bad" : undefined;
+  // Everything on the card sits on one centred axis: the label and the boxes centre with it.
   const field =
     step.kind === "code" ? (
       step.recovery ? (
-        <LoginField id="unlock-recovery" label="Recovery Code" type="text" autoComplete="off" value={value} onChange={(v) => (setValue(v), setProblem(null))} onBlur={leave} error={touched ? err : ""} good={!err} buzz={touched && err ? buzz : 0} />
+        <div className="[&_label]:text-center">
+          <LoginField id="unlock-recovery" label="Recovery Code" type="text" autoComplete="off" value={value} onChange={(v) => (setValue(v), setProblem(null))} onBlur={leave} error={touched ? err : ""} good={!err} buzz={touched && err ? buzz : 0} />
+        </div>
       ) : (
-        <Field label="Sign-In Code" htmlFor="unlock-code" state={mark} message={err} className="mt-4">
+        <Field label="Sign-In Code" htmlFor="unlock-code" state={mark} message={err} className="mt-5 [&>*]:justify-center">
           <OtpField id="unlock-code" label="Sign-In Code" value={value} onChange={(v) => (setValue(v), setProblem(null))} onComplete={(v) => void submit(v)} />
         </Field>
       )
     ) : using === "pin" ? (
-      <Field label="PIN" htmlFor="unlock-pin" state={mark} message={err} className="mt-4">
+      <Field label="PIN" htmlFor="unlock-pin" state={mark} message={err} className="mt-5 [&>*]:justify-center">
         <OtpField id="unlock-pin" label="PIN" length={4} secret value={value} onChange={(v) => (setValue(v), setProblem(null))} onComplete={(v) => void submit(v)} />
       </Field>
     ) : (
-      <LoginField id="unlock-pass" label="Password" type="password" autoComplete="current-password" value={value} onChange={(v) => (setValue(v), setProblem(null))} onBlur={leave} error={touched ? err : ""} good={!err} buzz={touched && err ? buzz : 0} />
+      <div className="[&_label]:text-center">
+        <LoginField id="unlock-pass" label="Password" type="password" autoComplete="current-password" value={value} onChange={(v) => (setValue(v), setProblem(null))} onBlur={leave} error={touched ? err : ""} good={!err} buzz={touched && err ? buzz : 0} />
+      </div>
     );
 
   return (
@@ -151,8 +156,8 @@ export function LockSheet() {
       reason={step.kind === "code" ? "From your authenticator app" : WHY[reason]}
       footer={
         <>
-          <Button variant="ghost" icon="logout" onClick={() => signOut()}>
-            Sign Out
+          <Button variant="primary" type="submit" form="unlock" icon="lock" busy={busy}>
+            Unlock
           </Button>
           {step.kind === "code" ? (
             <Button variant="ghost" onClick={() => reset({ step: { ...step, recovery: !step.recovery } })}>
@@ -172,8 +177,10 @@ export function LockSheet() {
               )}
             </>
           )}
-          <Button variant="primary" type="submit" form="unlock" icon="lock" busy={busy}>
-            Unlock
+          {/* The exit is a different kind of action from getting back in: a hairline sets the red Sign Out apart. */}
+          <div role="separator" className="my-1 h-px w-full bg-border" />
+          <Button variant="danger" icon="logout" onClick={() => signOut()}>
+            Sign Out
           </Button>
         </>
       }

@@ -335,6 +335,11 @@ async function dispatchDue({
   }
 }
 
+/** Whether this process is running a dispatch now (a wake that finds it busy tries again). */
+function busy() {
+  return dispatching;
+}
+
 /**
  * Readiness for /api/health/ready: pending rows older than a minute, and failed rows.
  * @param {{query: Function}} db
@@ -403,6 +408,7 @@ module.exports = {
   markReady,
   isReady,
   dispatchDue,
+  busy,
   health,
   retryFailed,
   prune,

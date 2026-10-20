@@ -23,6 +23,18 @@ const COLUMNS = `n.notification_id, n.category, n.priority, n.urgency, n.acknowl
 const OPEN_URGENT = `n.urgency = 'urgent'
   AND CASE WHEN n.acknowledge_required THEN n.acknowledged_at IS NULL ELSE n.read_at IS NULL END`;
 
+/** Remove a record's notices nobody has opened (or acknowledged, where Acknowledge closes them); returns who held them. */
+async function withdrawForRecord(db, entityType, entityId) {
+  const { rows } = await db.query(
+    `DELETE FROM notification n
+      WHERE n.entity_type = $1 AND n.entity_id = $2
+        AND CASE WHEN n.acknowledge_required THEN n.acknowledged_at IS NULL ELSE n.read_at IS NULL END
+      RETURNING n.notification_id, n.user_id`,
+    [entityType, entityId],
+  );
+  return rows;
+}
+
 /** Newest first; `status` narrows to unread or read. */
 function list(db, userId, query) {
   return pageQuery(
@@ -920,6 +932,7 @@ function digestPage(db, userId, { from, until }) {
 }
 
 module.exports = {
+  withdrawForRecord,
   list,
   unreadCount,
   unreadByEntityType,

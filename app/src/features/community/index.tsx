@@ -10,7 +10,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Composer, PickBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
+import { Composer, PickBar, PinnedBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
 import { SendFiles, SharedFiles } from "./Media";
 import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
@@ -139,14 +139,17 @@ function Channels() {
         {mobile && <IconButton icon="menu" label="Switch channel" onClick={() => setDrawer(true)} />}
         <span className="min-w-0 flex-1">
           <b className="flex items-center gap-1.5 truncate text-base font-strong"># {current.name}{!current.can_post && <Pill>Read Only</Pill>}</b>
-          <span className="block text-2xs text-subtle-foreground">{current.members} {current.members === 1 ? "member" : "members"}</span>
+          <span className="block truncate text-2xs text-subtle-foreground">
+            {current.members} {current.members === 1 ? "member" : "members"}
+            {!mobile && current.description && <> · {current.description}</>}
+          </span>
         </span>
         <Menu
           trigger={(p) => <IconButton {...p} icon="dots" label="Channel menu" />}
           items={[
             { label: "View Members", icon: "users", onSelect: () => modal.open({ title: "Channel Members", body: (close) => <Members c={current} close={close} /> }) },
             ...(current.is_admin ? [{ label: "Edit Members", icon: "user" as const, onSelect: () => modal.open({ title: "Edit Members", body: (close) => <Members c={current} close={close} edit onChanged={reloadList} /> }) }] : []),
-            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: "Channel Details", body: (close) => <><KeyValue items={[["Channel", `#${current.name}`], ["Members", current.members], ["Who Can Post", WHO_POSTS[current.post_policy]]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
+            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: "Channel Details", body: (close) => <ChannelDetails c={current} close={close} onChanged={reloadList} /> }) },
             { label: "Search in Channel", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
             ...(current.pin_locked ? [] : [{ label: current.pinned ? "Unpin" : "Pin to Top", icon: "pinned" as const, onSelect: () => void pinChannel(current) }]),
@@ -155,6 +158,7 @@ function Channels() {
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
+      <PinnedBar t={t} />
       <ThreadBody
         t={t}
         editPoll={(m) => modal.open({ title: "Edit Poll", body: (close) => <PollForm close={close} edit={m} send={(b) =>
@@ -313,6 +317,44 @@ function PeopleList({ people, right }: { people: PersonRef[]; right?: (p: Person
       ))}
       {!people.length && <p className="p-3 text-2xs text-subtle-foreground">Nobody here.</p>}
     </div>
+  );
+}
+
+/** What a channel is; its admins rename it and write its purpose here. #general and #announcements stay fixed. */
+function ChannelDetails({ c, close, onChanged }: { c: Channel; close: () => void; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const f = useContractForm({ name: c.name, purpose: c.description ?? "" }, { name: (v) => (/^[a-z0-9][a-z0-9-]{1,29}$/.test(v) ? null : "Not a valid name") });
+  const save = useMutation("PUT /api/v1/community/channels/:id");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id: c.community_channel_id }, body: { name: f.values.name, description: f.values.purpose.trim() } });
+      onChanged();
+      close();
+      toast("Channel saved");
+    } catch {
+      f.setServerErrors(save.fields);
+    }
+  };
+  if (editing)
+    return (
+      <>
+        <Field label={<HelpTerm help="Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name.">Channel Name</HelpTerm>} {...f.field("name")}><TextField {...f.field("name")} autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
+        <Field label="Purpose" optional><TextAreaField {...f.field("purpose")} /></Field>
+        <FormFooter>
+          <Button onClick={() => setEditing(false)}>Cancel</Button>
+          <Button variant="primary" busy={save.pending} onClick={submit}>Save Changes</Button>
+        </FormFooter>
+      </>
+    );
+  return (
+    <>
+      <KeyValue items={[["Channel", `#${c.name}`], ["Purpose", c.description ?? "None"], ["Members", c.members], ["Who Can Post", WHO_POSTS[c.post_policy]]]} />
+      <FormFooter>
+        {c.is_admin && !c.pin_locked && <Button icon="edit" onClick={() => setEditing(true)}>Edit Channel</Button>}
+        <Button variant="primary" onClick={close}>Close</Button>
+      </FormFooter>
+    </>
   );
 }
 
@@ -567,6 +609,7 @@ function Direct() {
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
+      <PinnedBar t={t} />
       <ThreadBody t={t} dm />
       {t.picking ? <PickBar t={t} /> : <Composer
         key={current.community_channel_id}
@@ -744,6 +787,20 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       if (e instanceof ApiError) toast(e.message);
     }
   };
+  /* A published one is taken down: it leaves #announcements and the tab, its reads kept for the record. */
+  const archive = useMutation("POST /api/v1/community/announcements/:id/archive");
+  const takeDown = async () => {
+    if (!(await confirm({ title: "Archive Announcement", body: `"${a.title}" leaves #announcements for everyone.`, confirmLabel: "Archive Announcement", cancelLabel: "Keep It", destructive: true }))) return;
+    try {
+      await archive.run({ params: { id: a.announcement_id }, body: {} });
+      invalidate("/api/v1/community");
+      close();
+      done();
+      toast("Announcement archived");
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+    }
+  };
   const notRead = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "not_read" }, enabled: live });
   const read = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "read" }, enabled: live });
   const remind = useMutation("POST /api/v1/community/announcements/:id/remind");
@@ -792,6 +849,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       )}
       <FormFooter>
         {!live && <Button variant="danger" busy={cancel.pending} onClick={() => callOff()}>Cancel Announcement</Button>}
+        {live && <Button variant="danger" icon="trash" busy={archive.pending} onClick={() => takeDown()}>Archive Announcement</Button>}
         {!live && <Button icon="edit" onClick={() => setEditing(true)}>Edit</Button>}
         <Button variant="primary" onClick={close}>Close</Button>
       </FormFooter>

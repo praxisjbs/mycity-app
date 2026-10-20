@@ -80,6 +80,15 @@ function updateScheduled(db, id, a) {
   );
 }
 
+/** Take a published announcement down; it keeps its reads for the record. */
+function archivePublished(db, id) {
+  return one(
+    db,
+    "UPDATE announcement SET status = 'archived' WHERE announcement_id = $1 AND status = 'published' RETURNING *",
+    [id],
+  );
+}
+
 function cancelScheduled(db, id) {
   return one(
     db,
@@ -235,6 +244,7 @@ async function due(db) {
 }
 
 module.exports = {
+  archivePublished,
   stats,
   updateScheduled,
   cancelScheduled,

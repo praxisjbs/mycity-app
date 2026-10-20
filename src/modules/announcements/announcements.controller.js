@@ -23,6 +23,8 @@ module.exports = {
     ),
   cancel: async (req, res) =>
     ok(res, await service.cancel(req.validated.params.id, req.user)),
+  archive: async (req, res) =>
+    ok(res, await service.archive(req.validated.params.id, req.user)),
   readers: async (req, res) =>
     sendPaged(
       res,

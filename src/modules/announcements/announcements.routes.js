@@ -79,6 +79,19 @@ route(
 );
 route(
   router,
+  "post",
+  "/:id/archive",
+  {
+    body: c.common.EmptyBody,
+    response: an.Announcement,
+    summary: "Take a published announcement down",
+  },
+  requirePermission("community", "create"),
+  poster(),
+  controller.archive,
+);
+route(
+  router,
   "get",
   "/:id/reads",
   {

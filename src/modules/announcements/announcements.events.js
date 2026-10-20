@@ -26,6 +26,9 @@ const EVENTS = defineEvents("community", {
   "announcement.cancelled": {
     summary: "A scheduled announcement was called off",
   },
+  "announcement.archived": {
+    summary: "A published announcement was taken down",
+  },
   "announcement.published": {
     summary: "An announcement went out to its audience",
   },
@@ -149,6 +152,21 @@ defineNotification(EVENTS.ANNOUNCEMENT_REMINDED, {
   title: (e) => `Reminder: ${e.payload.title}`,
   body: "Please read it in #announcements.",
   who: "Its audience who have not read it",
+});
+
+/* Taken down: its unopened notices go (the urgent bar and its repeats stop), and #announcements updates live. */
+outbox.register(EVENTS.ANNOUNCEMENT_ARCHIVED, "announcements.withdraw_notices", (event) =>
+  require("../notifications/notifications.service").withdrawForRecord("announcement", event.payload.announcement_id),
+);
+outbox.register(EVENTS.ANNOUNCEMENT_ARCHIVED, "announcements.push_archived", async (event) => {
+  const { rows } = await pool.query("SELECT user_id FROM community_member WHERE community_channel_id = $1", [
+    event.payload.community_channel_id,
+  ]);
+  for (const r of rows)
+    realtime.toUser(r.user_id, "community.message_updated", {
+      community_channel_id: event.payload.community_channel_id,
+      community_message_id: event.payload.community_message_id ?? null,
+    });
 });
 
 module.exports = { EVENTS };

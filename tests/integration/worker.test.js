@@ -595,6 +595,7 @@ describe("schedules and heartbeat", () => {
       "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",
+      "community-membership",
       "export-cleanup",
       "home-alert-sweeps",
       "import-cleanup",
@@ -605,6 +606,35 @@ describe("schedules and heartbeat", () => {
       "urgent-repeats",
       "workflow-timeout",
     ]);
+  });
+
+  test("a commit wakes the outbox dispatcher at once, with no tick; a rollback does not", async () => {
+    const run = jest.fn(() => outbox.dispatchDue({ limit: 50 }));
+    const wake = require("../../src/jobs/loops/outbox-wake").start({ run });
+    try {
+      await until(() => run.mock.calls.length > 0); // the catch-up run on connect
+      await until(async () => !outbox.busy());
+      run.mockClear();
+      const docId = crypto.randomUUID();
+      const ev = await tx((c) =>
+        emit(c, { key: "document.stored", entity: { type: "document", id: docId }, module: "settings", actor: null, payload: { document_id: docId, kind: "file", needs: [] } }),
+      );
+      await until(async () => (await one("SELECT status FROM event_outbox WHERE event_id = $1", [ev.event_id])).status === "done", 2000);
+      await until(() => run.mock.calls.length > 0, 2000);
+      const calls = run.mock.calls.length;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT pg_notify('mycity_outbox', '')");
+        await client.query("ROLLBACK");
+      } finally {
+        client.release();
+      }
+      await sleep(300);
+      expect(run.mock.calls.length).toBe(calls);
+    } finally {
+      await wake.stop();
+    }
   });
 
   test("a schedule tick runs its sweep under the lock", async () => {
