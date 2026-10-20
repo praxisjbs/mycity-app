@@ -814,6 +814,11 @@ screen.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · AI Control is its own module under System (`docs/guides/ai-control.md`), beside
+  Praxis AI, with its own `ai_control` key. Settings · Integrations opens a connection named in the
+  address (`?id=` its code), for AI Control · Models' Open Connection, and each AI connection links to
+  AI Control.
+
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) left the shell (`catalogue.ts`, `coming-soon.ts`, `features/settings/index.tsx`); Knowledge Hub · Policies is shown only to holders of `policies.manage` (`shell/access.ts`, as `src/shared/search/screens.js`); the shell mounts the acknowledge sheet beside the clock prompts (`docs/guides/policies.md` §6.7).
 - 20/10/2026 · TB · Settings · Integrations gains the AI providers (Groq, OpenAI, Anthropic,
   DeepSeek beside Gemini) with their model lists, Exchange Rates, and a Free or Paid plan on every

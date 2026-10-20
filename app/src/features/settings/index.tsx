@@ -26,7 +26,7 @@ import { Approvals } from "./Approvals";
 import { useScreenAction } from "@/shell/screen-action";
 import { useSearchParams } from "@/lib/router";
 
-export default function Settings({ tab }: ModuleScreenProps) {
+export default function Settings({ tab, id }: ModuleScreenProps) {
   switch (tab) {
     case "status": return <StatusTab />;
     case "performance": return <PerformanceTab />;
@@ -37,7 +37,7 @@ export default function Settings({ tab }: ModuleScreenProps) {
     case "notifications": return <NotificationsTab />;
     case "appearance": return <AppearanceTab />;
     case "documents-and-numbering": return <NumberingTab />;
-    case "integrations": return <IntegrationsTab />;
+    case "integrations": return <IntegrationsTab id={id} />;
     case "security": return <SecurityTab />;
     case "audit-log": return <AuditLog />;
     case "imports":

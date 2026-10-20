@@ -117,8 +117,9 @@ export const PROBLEM: Record<NonNullable<CheckStep["code"]>, string> = {
 export const HELP = {
   file: "Set in the server's environment file. Saving here takes over from it.",
   daily: "Your plan's allowance a day. IT is warned at 80%.",
-  dailyGroq: "Seconds of audio a day, each request counted as at least ten. IT is warned at 80%.",
-  plan: "Free stops at the daily limit and the next provider answers. Paid counts and warns.",
+  dailyAi: "Your plan's allowance a day.",
+  dailyGroq: "Seconds of audio a day, each request counted as at least ten.",
+  plan: "Free stops at the daily limit and the next provider answers. Paid only counts.",
   rateDay: "Fetched after midnight, Lagos, each day.",
   hourly: "Recipients the mail host accepts an hour. Production and staging share the plan's 50.",
   perPerson: "Messages each person may send from their mailbox in an hour.",
@@ -129,3 +130,9 @@ export const HELP = {
   sync: "Minutes between syncs of every mailbox, behind live mail.",
   local: "Domains whose mailboxes are on this server, comma separated. Mail to them skips the route check.",
 } as const;
+
+/** The AI connections: they warn nobody at 80% (docs/guides/ai-control.md decision 26). */
+const AI_CONNECTIONS: readonly string[] = ["gemini", "groq", "openai", "anthropic", "deepseek"];
+
+/** The Daily Limit's help for a connection. */
+export const dailyHelp = (code: string) => (code === "groq" ? HELP.dailyGroq : AI_CONNECTIONS.includes(code) ? HELP.dailyAi : HELP.daily);

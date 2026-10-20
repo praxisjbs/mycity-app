@@ -1,11 +1,12 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "fe99d1a62f6b02969008112ef503003abcee553aaa7e0bd683a96682b2868748",
-  "schemas": 737,
-  "endpoints": 383,
+  "source_hash": "942880b61522146a78f045ff0559c53ff6702ee33e5f5ec60887ff589660ffb2",
+  "schemas": 770,
+  "endpoints": 399,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "packages/contract/schemas/ai_control.js": "649b53377997a39a4f9af1d95bb7aa1466d4a83d6eadfd03f9937249c4f0fd80",
     "packages/contract/schemas/ai_governance.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/alerts.js": "9e2480e20d306d136159ccc834a40cf8ecff14c072807651415babfbcc0bbddf",
     "packages/contract/schemas/announcements.js": "fd6e37d081b609ad75ee98a84357db39b3b07fa995369f55100a0d2d4f727af5",
@@ -73,6 +74,7 @@
     "packages/contract/schemas/worksites.js": "697c11c14f67c7dc8a8263e35f8695ea84ee141d6b4d62f751fd00c3aa8236ab",
     "packages/contract/schemas/workspace.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "src/modules/access/access.routes.js": "b2701c9c63b01069e391675c0d49cd3ab308ecff22e2dbab8e6a77746e2bf4e5",
+    "src/modules/ai_governance/ai_governance.routes.js": "bc58cdfc1d57f83488037e389b883c747fb713c6e739d351cdfeef5842231ed3",
     "src/modules/alerts/alerts.routes.js": "45a8797d46acfb6a814cb09d990829758da9f9d296f671dd2262ab0afb8faa73",
     "src/modules/announcements/announcements.routes.js": "16d40da16fb015f27cafb6fb5095c5f582da6e019ca4237d7f5cfd88f01b3cce",
     "src/modules/attendance/attendance.routes.js": "0263c471ff5e5ee98fb63c0457c0612f618ea200d8f37dd1645d2296d95deef4",

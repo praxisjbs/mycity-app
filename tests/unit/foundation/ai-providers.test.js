@@ -11,6 +11,7 @@ const anthropic = require("../../../src/services/ai/vendors/anthropic");
 const catalogue = require("../../../src/services/ai/catalogue");
 const jobs = require("../../../src/services/ai/jobs");
 const skips = require("../../../src/services/ai/skips");
+const prices = require("../../../src/services/ai/prices");
 const governance = require("../../../src/services/ai/governance");
 const ledger = require("../../../src/services/ai/ledger");
 const transcription = require("../../../src/services/ai/transcription");
@@ -153,10 +154,19 @@ describe("voice note transcription: Groq, then Gemini, then the browser", () => 
     { provider: "gemini", model: "gemini-3.8-flash" },
   ];
   const quotaError = () => Object.assign(new Error("groq 429: Rate limit reached"), { kind: "rate_limited", status: 429, retryAfterMs: 3_600_000 });
+  /** The chain jobs.resolve answers: every model Ready, as AI Control would show it. */
+  const chainOf = (links) => ({
+    scope: "job",
+    key: "transcription",
+    stored: false,
+    links: links.map((l, i) => ({ ...l, display_name: l.model, position: i + 1, state: "ready", until: null })),
+  });
   let steps;
+  let recorded;
 
   beforeEach(async () => {
     steps = [];
+    recorded = [];
     usage.__reset();
     await skips.clear("groq");
     await skips.clear("gemini");
@@ -164,8 +174,11 @@ describe("voice note transcription: Groq, then Gemini, then the browser", () => 
     jest.spyOn(ledger, "startRun").mockResolvedValue("run-1");
     jest.spyOn(ledger, "recordStep").mockImplementation(async (_db, _id, s) => {
       steps.push([s.vendor, s.outcome]);
+      recorded.push(s);
       return "0.00";
     });
+    jest.spyOn(jobs, "resolve").mockResolvedValue(chainOf(CHAIN));
+    jest.spyOn(prices, "forStep").mockResolvedValue(prices.zero());
     jest.spyOn(ledger, "finishRun").mockResolvedValue(undefined);
     jest.spyOn(ledger, "refused").mockResolvedValue("run-refused");
     jest.spyOn(integrations, "secret").mockResolvedValue("key");
@@ -174,8 +187,10 @@ describe("voice note transcription: Groq, then Gemini, then the browser", () => 
   afterEach(() => jest.restoreAllMocks());
 
   const vendorsWith = (g, m) => ({ groq: { transcribe: g }, gemini: { transcribe: m }, stub: { transcribe: async () => ({ text: "[AI placeholder]", usage: {} }) } });
-  const run = (vendors, over = {}) =>
-    transcription.transcribe({ document_id: "d1", module: "community", actor: null, db, audio, chain: CHAIN, vendors, ...over });
+  const run = (vendors, { chain, ...over } = {}) => {
+    if (chain) jobs.resolve.mockResolvedValue(chainOf(chain));
+    return transcription.transcribe({ document_id: "d1", module: "community", actor: null, db, audio, vendors, ...over });
+  };
 
   test("Groq answers: the original recording goes, its billed seconds count toward its daily limit", async () => {
     const g = jest.fn(async () => ({ text: "All on track for Friday.", billed_s: 10, model: "whisper-large-v3" }));
@@ -185,6 +200,9 @@ describe("voice note transcription: Groq, then Gemini, then the browser", () => 
     expect(g.mock.calls[0][0]).toMatchObject({ mime: "audio/webm", filename: "voice-note.webm", timeoutMs: 30_000 });
     expect(m).not.toHaveBeenCalled();
     expect(usage.pending()).toEqual([expect.objectContaining({ code: "groq", kind: "transcribe", calls: 1, units: 10 })]);
+    // The billed seconds are kept on the step, Free plan or not (ai-control.md decision 19).
+    expect(recorded[0]).toMatchObject({ vendor: "groq", usage: { audio_seconds: 10 } });
+    expect(jobs.resolve).toHaveBeenCalledWith("voice-note-transcription", expect.anything());
   });
 
   test("Groq's quota spent: Gemini answers from MP3, and Groq is skipped until its reset", async () => {

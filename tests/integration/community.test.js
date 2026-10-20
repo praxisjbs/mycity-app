@@ -880,7 +880,12 @@ describeDb("Staff Community against the real migrations", () => {
     const jobs = require("../../src/services/ai/jobs");
     const settings = require("../../src/shared/integrations/settings");
     const transcription = require("../../src/services/ai/transcription");
-    jest.spyOn(jobs, "chain").mockResolvedValue([{ provider: "groq", model: "whisper-large-v3", display_name: "Whisper Large v3", position: 1 }]);
+    jest.spyOn(jobs, "resolve").mockResolvedValue({
+      scope: "job",
+      key: "transcription",
+      stored: false,
+      links: [{ provider: "groq", model: "whisper-large-v3", display_name: "Whisper Large v3", position: 1, state: "ready", until: null }],
+    });
     jest.spyOn(settings, "secret").mockResolvedValue("gsk_test_key_0001");
     jest.spyOn(transcription.DEFAULT_AUDIO, "forGroq").mockResolvedValue({ audio: Buffer.from("x"), mime: "audio/webm", filename: "voice-note.webm" });
     const groq = jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ text: "Quick update from the studio.", duration: 3.1 }));

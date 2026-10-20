@@ -3,6 +3,8 @@ import type { Integration, IntegrationCheck, IntegrationCode, SecretState } from
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
+import { useRouter } from "@/lib/router";
+import { hrefFor } from "@/lib/routes";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import {
   Bars,
@@ -36,7 +38,7 @@ import {
 } from "@mycity/ui";
 import { carriesSecret, EditSettings } from "./EditSettings";
 import { Models } from "./Models";
-import { HELP, JOB, KIND, PLAN, PROBLEM, STATE, STEP } from "./words";
+import { dailyHelp, HELP, JOB, KIND, PLAN, PROBLEM, STATE, STEP } from "./words";
 import { Where } from "./Where";
 
 /** The AI connections: each keeps a model list, shown whether or not its key is set yet. */
@@ -74,6 +76,8 @@ export function useConnection() {
 
 function ConnectionPanel({ code, name, reopen }: { code: IntegrationCode; name: string; reopen: () => void }) {
   const { can } = useAuth();
+  const modal = useModal();
+  const { navigate } = useRouter();
   const read = useApi("GET /api/v1/integrations/:code", { params: { code } });
   const c = read.data;
   const [address, setAddress] = useState(LAGOS_ADDRESS);
@@ -92,6 +96,20 @@ function ConnectionPanel({ code, name, reopen }: { code: IntegrationCode; name: 
       <SettingsCard c={c} />
       {code === "exchange_rates" && <Rates c={c} />}
       {AI_CODES.includes(code) && <Models code={code} reopen={reopen} />}
+      {AI_CODES.includes(code) && can("ai_control", "view") && (
+        // Which model answers each feature is chosen there (docs/guides/ai-control.md §2).
+        <div>
+          <Button
+            icon="right"
+            onClick={() => {
+              modal.close();
+              navigate(hrefFor("ai_control", "actions"));
+            }}
+          >
+            Open AI Control
+          </Button>
+        </div>
+      )}
       {canEdit && code === "geoapify" && c.settings && (
         // address:none the text the Geoapify test searches once to try the key; nothing is kept
         <Field label="Address">
@@ -226,7 +244,7 @@ function InUse({ items }: { items: Array<{ job: keyof typeof JOB; position: numb
 function settingsOf(c: Integration): KeyValueItem[] {
   const secret = (key: SecretState["key"]) => c.secrets.find((x) => x.key === key);
   const s = c.settings;
-  const daily: KeyValueItem = [term("Daily Limit", c.code === "groq" ? HELP.dailyGroq : HELP.daily), c.daily_limit ? formatCount(c.daily_limit) : null];
+  const daily: KeyValueItem = [term("Daily Limit", dailyHelp(c.code)), c.daily_limit ? formatCount(c.daily_limit) : null];
   const plan: KeyValueItem = [term("Plan", HELP.plan), c.plan ? PLAN[c.plan] : null];
   const key: KeyValueItem = ["API Key", <Secret key="k" s={secret("api_key")} />];
   switch (s?.code) {
