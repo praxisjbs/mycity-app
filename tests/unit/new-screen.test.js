@@ -53,12 +53,12 @@ describe("new:screen", () => {
     const progress = read("docs/PROGRESS.md");
     expect(progress).toContain("| 98 | Work Patterns | `work-patterns` | M1 | LA | ☐ | ☐ | ☐ | Not started | |");
     expect(progress).toMatch(/- \d{2}\/\d{2}\/\d{4} · LA · Work Patterns added with npm run new:screen/);
-    expect(progress).toContain("98 screens (92 in the staff app");
+    expect(progress).toContain("97 screens (91 in the staff app");
     // The total and its Not started count each go up by one, whatever the tracker held before.
     const [, screens, notStarted] = /\| \*\*Total\*\* \| \*\*(\d+)\*\* \| \*\*(\d+)\*\* \|/.exec(fs.readFileSync(path.join(ROOT, "docs/PROGRESS.md"), "utf8"));
     expect(progress).toContain(`| **Total** | **${Number(screens) + 1}** | **${Number(notStarted) + 1}** |`);
     expect(read("scripts/check/progress.js")).toContain("const SCREENS = 98;");
-    expect(read("tests/unit/foundation/events-workflow.test.js")).toContain(".toHaveLength(92)");
+    expect(read("tests/unit/foundation/events-workflow.test.js")).toContain(".toHaveLength(91)");
   });
 
   test("keeps a multi-line list multi-line", () => {

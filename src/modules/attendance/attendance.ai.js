@@ -5,8 +5,9 @@
  *   attendance.my_days      the asker's own days of a month (anyone; their own only)
  *   attendance.register     a day's register, within the asker's `people` scope
  *   attendance.exceptions   the exceptions, within the same scope
- *   attendance.policy       the attendance policy's versions, newest first: each rule, its first
- *                           day and the asker's acknowledgement (anyone: every employee reads it)
+ *
+ * The Attendance policy's rules are read through policies.read and policies.mine
+ * (src/modules/policies/policies.ai.js).
  *
  * Every read is a page of 25 through the same service and scope as the screen. A row
  * carries the day, the times, the status and the worksite's name: never a coordinate,
@@ -19,7 +20,6 @@
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const service = require("./attendance.service");
-const policy = require("./attendance.policy");
 
 const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
 
@@ -58,14 +58,6 @@ module.exports = defineManifest({
         label: `${row.employee.display_name}, ${row.work_date}`,
       }),
     },
-    {
-      key: "attendance.policy",
-      description: "List the versions of the attendance policy, newest first: grace minutes, the location and device checks, the first day and whether I acknowledged it",
-      params: c.attendance.MyPolicyVersionListQuery,
-      permission: ["ess", "view"],
-      run: (_client, params, actor) => (actor.employee_id ? policy.myVersions(actor, params) : EMPTY),
-      cite: (row) => ({ type: "attendance_policy", id: row.attendance_policy_id, label: `Version ${row.version}` }),
-    },
   ],
   routes: [
     { intent: "clock in or out", screen: "ess.my-attendance" },
@@ -80,6 +72,5 @@ module.exports = defineManifest({
     { intent: "set a hybrid employee's office days", screen: "people.employees" },
     { intent: "see my work week", screen: "ess.my-profile" },
     { intent: "read or acknowledge the attendance policy", screen: "ess.policy-updates" },
-    { intent: "change the attendance policy", screen: "settings.attendance-policy" },
   ],
 });

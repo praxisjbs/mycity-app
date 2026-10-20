@@ -18,7 +18,8 @@
  * Operations & People when the request is over 5 days, a number Operations & People
  * change on Settings, Approvals.
  * M1 adds `attendance.location_request` (docs/guides/attendance.md §6.11, seeded in
- * 1392): a work location request, the line manager then Operations & People.
+ * 1392): a work location request, the line manager then Operations & People; and
+ * `policy.approval` (docs/guides/policies.md §6.4, seeded in 1396): a policy version, the CEO.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -100,6 +101,15 @@ const DEFAULTS = Object.freeze({
         sla_hours: 48,
       },
     ],
+  },
+  // M1, seeded in 1396 (docs/guides/policies.md §6.4).
+  "policy.approval": {
+    key: "policy.approval",
+    module: "knowledge",
+    name: "Policy Approval",
+    description: "The CEO approves and signs a policy version before it can start.",
+    context: {},
+    stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
   },
 });
 

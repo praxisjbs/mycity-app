@@ -505,7 +505,7 @@ describe("the routes", () => {
   /** A body's fields, through any refinements around it. */
   const shapeOf = (schema) => (schema.shape ? schema.shape : shapeOf(schema._def.schema));
 
-  test("the person's own routes are self and name no employee; People's carry the people grant, the policy's settings", () => {
+  test("the person's own routes are self and name no employee; People's carry the people grant", () => {
     expect(routes.length).toBeGreaterThan(10);
     for (const r of routes) {
       if (r.path.startsWith("/me") || r.path === "/punches") {
@@ -513,7 +513,7 @@ describe("the routes", () => {
         expect(r.path).not.toMatch(/employee_id/);
         if (r.contract.body) expect(Object.keys(shapeOf(r.contract.body))).not.toContain("employee_id");
       } else {
-        expect(r.permission && r.permission.key).toBe(r.path.startsWith("/policy") ? "settings" : "people");
+        expect(r.permission && r.permission.key).toBe("people");
       }
     }
   });
@@ -560,15 +560,8 @@ describe("the routes", () => {
     expect(Object.keys(by("POST", "/schedules/:employee_id").contract.body.shape).sort()).toEqual(["effective_from", "office_days", "reason"]);
   });
 
-  test("the policy is read under settings view and changed under settings edit; staff read and acknowledge their own", () => {
-    const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
-    for (const path of ["/policy", "/policy/versions", "/policy/versions/:id", "/policy/versions/:id/acknowledgements"])
-      expect(by("GET", path).permission).toMatchObject({ key: "settings", action: "view" });
-    expect(by("PUT", "/policy/draft").permission).toMatchObject({ key: "settings", action: "edit" });
-    for (const path of ["/policy/draft/discard", "/policy/publish", "/policy/versions/:id/withdraw"])
-      expect(by("POST", path).permission).toMatchObject({ key: "settings", action: "edit" });
-    for (const [method, path] of [["GET", "/me/policy"], ["GET", "/me/policy/versions"], ["POST", "/me/policy/versions/:id/acknowledge"]])
-      expect(by(method, path).contract.self).toBe(true);
+  test("the policy is no longer this module's to serve: it lives under /policies", () => {
+    expect(routes.some((r) => r.path.startsWith("/policy") || r.path.startsWith("/me/policy"))).toBe(false);
   });
 
   test("lists page through the contract's controls, with no page size", () => {
@@ -581,19 +574,19 @@ describe("the routes", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * The policy's versions (§6.1, §6.15)
+ * The Attendance policy's rules (§6.1, §6.15)
  * ------------------------------------------------------------------ */
 
-describe("the policy's versions", () => {
-  const policy = require("./attendance.policy");
+describe("the Attendance policy's rules", () => {
+  const type = require("./attendance.policy-type");
+  const c = require("@mycity/contract");
   const RULES = {
+    ...c.attendance.AttendanceRules.parse({}),
     grace_minutes: 10,
     office_geofence_mode: "block",
     home_geofence_mode: "warn",
     site_geofence_mode: "off",
     device_mode: "warn",
-    max_accuracy_m: 100,
-    home_radius_m: 100,
   };
 
   test("each place has its own location mode; an unknown place is a bug", () => {
@@ -604,17 +597,46 @@ describe("the policy's versions", () => {
     expect(() => rules.forPlace(RULES, "garden")).toThrow(/not a place/);
   });
 
-  test("what changed is the rules that differ, in their order; nothing against no version", () => {
-    expect(policy.changedRules({ ...RULES, home_radius_m: 150, grace_minutes: 5 }, RULES)).toEqual(["grace_minutes", "home_radius_m"]);
-    expect(policy.changedRules(RULES, { ...RULES })).toEqual([]);
-    expect(policy.changedRules(RULES, null)).toEqual([]);
+  test("before any version the defaults apply: Flag everywhere, devices off, a 150 m home", () => {
+    expect(rules.DEFAULT_POLICY).toMatchObject({
+      policy_version_id: null,
+      grace_minutes: 0,
+      office_geofence_mode: "warn",
+      home_geofence_mode: "warn",
+      device_mode: "off",
+      home_radius_m: 150,
+      max_accuracy_m: 100,
+    });
   });
 
-  test("a version is waiting before its first day, in force or past after it, and withdrawn whatever its date", () => {
-    const row = (id, from, status = "published") => ({ attendance_policy_id: id, effective_from: from, status });
-    expect(policy.stateOf(row("a", "2026-10-26"), "2026-10-19", "b")).toBe("waiting");
-    expect(policy.stateOf(row("b", "2026-10-19"), "2026-10-19", "b")).toBe("in_force");
-    expect(policy.stateOf(row("c", "2026-10-01"), "2026-10-19", "b")).toBe("past");
-    expect(policy.stateOf(row("d", "2026-10-26", "withdrawn"), "2026-10-19", "b")).toBe("withdrawn");
+  test("what changed is the visible rules that differ, in the worksheet's order, as lines", () => {
+    const next = { ...RULES, home_radius_m: 200, grace_minutes: 5 };
+    expect(type.changed(RULES, next)).toEqual(["grace_minutes", "home_radius_m"]);
+    expect(type.changeLines(RULES, next)).toEqual([
+      "Grace Minutes: 10 minutes to 5 minutes",
+      "Home Radius: 150 m to 200 m",
+    ]);
+    expect(type.changed(null, next)).toEqual([]);
+    // A rule PR 3 enforces is not shown yet, so changing it is not listed either.
+    expect(type.changed(RULES, { ...RULES, late_rule: { ...RULES.late_rule, on: true } })).toEqual([]);
+  });
+
+  test("staff read every section as sentences, the values filled in and a changed section tagged", () => {
+    const sections = type.sections({ ...RULES, office_geofence_mode: "warn" }, ["grace_minutes"]);
+    expect(sections.map((s) => s.title)).toEqual([
+      "Clocking In",
+      "At the Office",
+      "Working From Home",
+      "At a Field Site",
+      "Your Location",
+      "Your Devices",
+    ]);
+    expect(sections[0].sentences[0]).toMatchObject({ text: expect.stringContaining("10 minutes"), changed: true });
+    expect(sections[1].sentences[0].changed).toBe(false);
+    expect(type.sections({ ...RULES, office_geofence_mode: "block" })[1].sentences[0].text).toMatch(/refused/);
+  });
+
+  test("a first draft starts from the suggested values", () => {
+    expect(type.suggestions()).toMatchObject({ grace_minutes: 5, device_mode: "warn", home_radius_m: 150 });
   });
 });

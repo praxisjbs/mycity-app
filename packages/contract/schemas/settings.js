@@ -163,6 +163,7 @@ const DOC_TYPES = [
   "report_run",
   "location_request",
   "field_assignment",
+  "policy",
   "query",
   "sanction",
   "letter",

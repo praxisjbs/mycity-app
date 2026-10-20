@@ -138,6 +138,8 @@
 /packages/contract/schemas/interviews.js           @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
+/src/modules/policies/                             @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/policies.js             @tomblakeasaah196 @swizfcodes
 /src/modules/reports/                              @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/reports.js              @tomblakeasaah196 @swizfcodes
 /src/modules/vacancies/                            @tomblakeasaah196 @swizfcodes

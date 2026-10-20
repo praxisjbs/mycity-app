@@ -104,7 +104,14 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
     const s = await scopeFor(user, module, "view");
     if (s) scopes.set(module, s);
   }
-  const run = candidates.filter((p) => scopes.has(p.module));
+  // A provider behind a capability runs only for its holders (the CEO holds every one).
+  const caps =
+    candidates.some((p) => p.capability) && !(user && user.is_ceo === true)
+      ? await grantsCache.getCapabilities(db, user && user.user_id)
+      : [];
+  const run = candidates.filter(
+    (p) => scopes.has(p.module) && (!p.capability || (user && user.is_ceo === true) || caps.includes(p.capability)),
+  );
   if (run.length === 0) return out;
 
   const client = await db.connect();

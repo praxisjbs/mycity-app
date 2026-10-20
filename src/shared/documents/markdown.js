@@ -172,7 +172,194 @@ function markdownToText(md) {
     .trim();
 }
 
+/* ------------------------------------------------------------------ *
+ * The same grammar as blocks, for a screen that draws text itself
+ * ------------------------------------------------------------------ */
+
+const SPAN_RE = /\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
+
+/** A line's text as runs with their marks: links (safe targets only), **bold**, *italic*. */
+function spansOf(raw) {
+  const textOf = String(raw || "");
+  const spans = [];
+  const push = (text, marks = {}) => {
+    if (text) spans.push({ text, bold: Boolean(marks.bold), italic: Boolean(marks.italic), href: marks.href || null });
+  };
+  let at = 0;
+  for (const m of textOf.matchAll(SPAN_RE)) {
+    push(textOf.slice(at, m.index));
+    if (m[1] !== undefined) push(m[1], { href: SAFE_HREF.test(m[2]) ? m[2] : null });
+    else if (m[3] !== undefined) push(m[3], { bold: true });
+    else push(m[4], { italic: true });
+    at = m.index + m[0].length;
+  }
+  push(textOf.slice(at));
+  return spans;
+}
+
+/**
+ * Markdown to blocks (contract policies.RichTextBlock): the forms markdownToHtml draws, for a
+ * screen that renders text as elements rather than HTML. A table's rows become paragraphs, its cells
+ * joined; a rule is dropped.
+ */
+function markdownToBlocks(md) {
+  const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  const para = [];
+  const flush = () => {
+    if (para.length) out.push({ kind: "paragraph", spans: spansOf(para.join(" ")) });
+    para.length = 0;
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trimEnd();
+    if (!line.trim() || /^---+$/.test(line.trim()) || TABLE_RULE.test(line.trim())) {
+      flush();
+      i += 1;
+      continue;
+    }
+    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (h) {
+      flush();
+      out.push({ kind: "heading", level: Math.max(2, h[1].length), spans: spansOf(h[2].trim()) });
+      i += 1;
+      continue;
+    }
+    if (TABLE_ROW.test(line)) {
+      flush();
+      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()).filter(Boolean);
+      out.push({ kind: "paragraph", spans: spansOf(cells.join(" · ")) });
+      i += 1;
+      continue;
+    }
+    if (BULLET.test(line) || NUMBERED.test(line)) {
+      flush();
+      const re = BULLET.test(line) ? BULLET : NUMBERED;
+      const items = [];
+      while (i < lines.length && re.test(lines[i])) {
+        items.push(spansOf(lines[i].replace(re, "").trim()));
+        i += 1;
+      }
+      out.push({ kind: re === BULLET ? "bullets" : "numbered", items });
+      continue;
+    }
+    para.push(line.trim());
+    i += 1;
+  }
+  flush();
+  return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * HTML from an editor (or pasted from Word or Google Docs) to Markdown
+ * ------------------------------------------------------------------ */
+
+/** A line that would read as a Markdown form, kept as text by a zero-width space in front. */
+const LOOKS_LIKE_FORM = /^(#|[-*]\s|\d+\.\s|\||---)/;
+const BLOCK_TAGS = new Set(["p", "div", "section", "article", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "pre", "figure", "header", "footer"]);
+const SKIP_TAGS = new Set(["script", "style", "head", "title", "noscript", "template", "svg", "math", "iframe", "object"]);
+
+/**
+ * HTML to the Markdown markdownToHtml reads, keeping only headings (h1 and h2 as ##, h3 as ###,
+ * h4 to h6 as ####), paragraphs, bullet and numbered lists (nested lists flattened), **bold**,
+ * *italic* and links with a safe target; everything else becomes its text (a table's cells joined
+ * on one line, an image dropped). Nothing from the input reaches the output as markup, so the result
+ * is safe whatever was pasted.
+ */
+function htmlToMarkdown(html) {
+  const { Parser } = require("htmlparser2");
+  const blocks = [];
+  let buf = "";
+  let kind = "p";
+  const lists = [];
+  let listCount = 0;
+  let skip = 0;
+  const marks = [];
+  let link = null;
+  const end = () => {
+    const text = buf.replace(/\s+/g, " ").trim();
+    buf = "";
+    if (!text) return;
+    if (kind === "li") {
+      const list = lists[lists.length - 1];
+      const marker = list && list.tag === "ol" ? `${(list.n += 1)}.` : "-";
+      // Items of one list (nested ones flattened into it) sit together; the next list starts apart.
+      blocks.push({ list: lists.length ? lists[0].serial : 0, text: `${marker} ${text}` });
+    } else if (/^h[1-6]$/.test(kind)) {
+      const level = Math.min(4, Math.max(2, Number(kind[1])));
+      blocks.push({ text: `${"#".repeat(level)} ${text}` });
+    } else blocks.push({ text: LOOKS_LIKE_FORM.test(text) ? `\u200b${text}` : text });
+  };
+  const parser = new Parser(
+    {
+      onopentag(name, attrs) {
+        if (SKIP_TAGS.has(name)) skip += 1;
+        if (skip) return;
+        if (name === "ul" || name === "ol") {
+          end();
+          lists.push({ tag: name, n: 0, serial: lists.length ? lists[0].serial : (listCount += 1) });
+          return;
+        }
+        if (BLOCK_TAGS.has(name)) {
+          end();
+          kind = name === "li" ? "li" : /^h[1-6]$/.test(name) ? name : "p";
+          return;
+        }
+        if (name === "br") buf += " ";
+        else if (name === "td" || name === "th") buf += buf.trim() ? " · " : "";
+        else if (name === "strong" || name === "b") {
+          marks.push("**");
+          buf += "**";
+        } else if (name === "em" || name === "i") {
+          marks.push("*");
+          buf += "*";
+        } else if (name === "a" && attrs.href && SAFE_HREF.test(attrs.href.trim())) {
+          link = { href: attrs.href.trim(), start: buf.length };
+        }
+      },
+      ontext(t) {
+        if (!skip) buf += t.replace(/\*/g, "\u2217");
+      },
+      onclosetag(name) {
+        if (SKIP_TAGS.has(name)) {
+          skip = Math.max(0, skip - 1);
+          return;
+        }
+        if (skip) return;
+        if (name === "ul" || name === "ol") {
+          end();
+          lists.pop();
+          kind = lists.length ? "li" : "p";
+        } else if (BLOCK_TAGS.has(name)) {
+          end();
+          kind = lists.length ? "li" : "p";
+        } else if ((name === "strong" || name === "b" || name === "em" || name === "i") && marks.length) {
+          const mark = marks.pop();
+          // An empty pair of marks says nothing; drop it rather than leave stray asterisks.
+          buf = buf.endsWith(mark) ? buf.slice(0, -mark.length) : `${buf}${mark}`;
+        } else if (name === "a" && link) {
+          const label = buf.slice(link.start).trim();
+          buf = label ? `${buf.slice(0, link.start)}[${label}](${link.href})` : buf.slice(0, link.start);
+          link = null;
+        }
+      },
+    },
+    { decodeEntities: true, lowerCaseTags: true },
+  );
+  parser.write(String(html || ""));
+  parser.end();
+  end();
+  const out = [];
+  blocks.forEach((b, i) => {
+    if (i > 0 && !(b.list && b.list === blocks[i - 1].list)) out.push("");
+    out.push(b.text);
+  });
+  return out.join("\n").trim();
+}
+
 module.exports = {
+  markdownToBlocks,
+  htmlToMarkdown,
   markdownToHtml,
   markdownToText,
   stripTrailingAcceptanceBlock,

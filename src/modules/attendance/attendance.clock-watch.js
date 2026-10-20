@@ -156,7 +156,7 @@ async function clockOutAutomatically(employeeId, workDate, { at, reason, end, la
         event_type: "clock_out",
         occurred_at: at,
         work_date: workDate,
-        attendance_policy_id: ctx.policy.attendance_policy_id,
+        policy_version_id: ctx.policy.policy_version_id,
         source: "system",
         validation_state: "accepted",
         validation: {

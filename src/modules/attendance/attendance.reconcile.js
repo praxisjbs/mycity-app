@@ -184,7 +184,7 @@ async function decide(actor, scope, id, body) {
           occurred_at: at,
           work_date: x.work_date,
           worksite_id: ctx.fence ? ctx.fence.worksite_id : null,
-          attendance_policy_id: ctx.policy.attendance_policy_id,
+          policy_version_id: ctx.policy.policy_version_id,
           source: "admin",
           validation_state: "accepted",
           validation: { correction: { attendance_exception_id: id }, reasons: [] },

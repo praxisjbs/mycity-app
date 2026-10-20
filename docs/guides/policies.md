@@ -76,9 +76,10 @@ changed marked, and acknowledge each new version with one tap.
    as staff will read it, the note, the publisher's signature. Approve Policy takes their signature
    and moves the approval on; the last approval publishes the version (§6.4). Reject Policy needs a
    reason; the version returns to the draft and the submitter is told.
-5. **After commit** the outbox renders the version's PDF on the letterhead with every signature
-   (`documents.generate`, doc type `policy_version`), and notifies the people asked (bell, push as
-   their Knowledge Hub preference allows).
+5. **After commit** the outbox notifies the people asked (bell, push as their Knowledge Hub
+   preference allows). Download PDF makes the version's PDF on the letterhead with every signature
+   when it is pressed (`documents.generate`, doc type `policy_pdf`, an export downloaded on the
+   device that asked, foundation.md §6.12).
 6. **Staff acknowledge.** After the person's clock-in (or, on a day they do not clock in, once the
    sign-in prompt is answered) the shell opens the acknowledge sheet for each version they owe,
    oldest due first. Acknowledge records it; Later closes it for the day until the due date, after
@@ -95,15 +96,17 @@ changed marked, and acknowledge each new version with one tap.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `policy` (1400) | `number` (`POL-0001`), `kind` (`document`, `attendance`), `title`, `status` (`active`, `archived`), `archived_at`, `archived_by`, `created_by`, `updated_by` | One row per policy. One `attendance` policy at most (partial unique index); it is created by the service the first time it is opened or saved, never seeded (A26) |
-| `policy_version` (1400) | `policy_id`, `status` (`draft`, `submitted`, `published`, `withdrawn`), `version` (null until published), `effective_from`, `note`, `body_html` (documents), `rules` (jsonb, rules types), `applies_to` (jsonb), `needs_acknowledgement`, `acknowledge_within_days`, `needs_approval`, `content_hash`, `workflow_instance_id`, `document_id` (the PDF), `submitted_at`, `submitted_by`, `published_at`, `published_by`, `withdrawn_at`, `withdrawn_by`, `withdraw_reason`, `created_by`, `updated_by` | At most one draft and one submitted version per policy; version numbers unique per policy and never reused. A published version is never edited. `rules` is checked by the type's contract on every write and read with the type's defaults, so a rule added later reads as its default (off) on older versions. `applies_to` is `{ everyone, department_ids, work_patterns, employee_ids }` |
+| `policy` (1400) | `number` (`POL-0001`), `kind` (`document`, `attendance`), `title`, `status` (`active`, `archived`), `archived_at`, `archived_by`, `archive_reason`, `created_by`, `updated_by` | One row per policy. One `attendance` policy at most (partial unique index), created by `1405` with no version so it is always listed; its rules are MyCity's, entered on the worksheet (A26) |
+| `policy_version` (1400) | `policy_id`, `status` (`draft`, `submitted`, `published`, `withdrawn`), `version` (null until published), `effective_from`, `note`, `title`, `body_markdown` (documents), `rules` (jsonb, rules types), `applies_to_everyone`, `needs_acknowledgement`, `acknowledge_within_days`, `needs_approval`, `content_hash`, `workflow_instance_id`, `document_id` (the PDF), `submitted_at`, `submitted_by`, `published_at`, `published_by`, `withdrawn_at`, `withdrawn_by`, `withdraw_reason`, `created_by`, `updated_by` | At most one draft and one submitted version per policy; version numbers unique per policy and never reused. A published version is never edited. `rules` is checked by the type's contract on every write and read with the type's defaults, so a rule added later reads as its default (off) on older versions; it is read whole, never filtered, so jsonb. The text is Markdown, the one renderer's (§6.6) |
+| `policy_audience` (1400) | `policy_version_id`, one of `department_id`, `work_pattern`, `employee_id` | Applies To beyond everyone; rows, because who is asked is filtered in SQL |
 | `policy_signature` (1400) | `policy_version_id`, `role` (`publisher`, `approver`), `stage_key`, `user_id`, `employee_id`, `signer_name`, `signer_title`, `signed_at`, `signature_document_id`, `content_hash` | One per signer per version. The drawn signature is a PNG in the vault, kept only for this version (COMPONENTS, SignatureField); name and title are copied at signing |
 | `policy_acknowledgement` (1400) | `policy_version_id`, `employee_id`, `acknowledged_at`, `reminded_at`, `deferred_on`, `content_hash`, `known_device_id` | One per person and version (unique). `deferred_on` is the day Later was last pressed |
 
 Schema migrations: `migrations/1400_policies.sql` (the four tables) and
 `migrations/1405_policies_from_attendance.sql` (the Attendance policy's versions and acknowledgements
 moved from `attendance_policy` and `attendance_policy_acknowledgement`, keeping their ids, and
-`attendance_event.policy_version_id` filled from `attendance_policy_id`). Reference data:
+`attendance_event.policy_version_id` for punches from then on; an older punch keeps the same id in
+`attendance_policy_id`, since the table is append-only). Reference data:
 `seeds/reference/1396_seed_policies.sql` (the `policy` numbering scheme, `POL-0001`, and version 1
 of the `policy.approval` workflow: one stage, the CEO; People change it on Settings · Approvals, and
 the `policies.manage` capability for Operations & People and Implementation). Nothing about a
@@ -120,7 +123,7 @@ FAQs and training; policies do not use them.
 |---|---|---|---|---|
 | `GET /api/v1/policies` | `PolicyListQuery` (`kind`, `state`, `q`, `sort`) → `PolicyPage` | `knowledge` view, `policies.manage` | yes, 25 | The Attendance policy is listed even before it has a row (`policy_id` null, Default Rules) |
 | `POST /api/v1/policies` | `PolicyCreate` (`title`, `applies_to`, `needs_acknowledgement`, `acknowledge_within_days`, `needs_approval`) → `Policy` | `knowledge` create, `policies.manage` | no | A document policy with an empty draft; numbered |
-| `GET /api/v1/policies/:id` | → `Policy` | `knowledge` view, `policies.manage` | no | The policy, its version in force, a version waiting, the draft with what it changes, the submission in flight, `can_edit`. `attendance` in place of the id opens the Attendance policy |
+| `GET /api/v1/policies/:id` | → `Policy` | `knowledge` view, `policies.manage` | no | The policy, its version in force, a version waiting, the draft with what it changes, the submission in flight, `can_edit`. The Attendance policy always has a row (1405); a link that names `attendance` (`?policy=attendance`) is resolved by the screen from the list filtered to that type |
 | `PUT /api/v1/policies/:id/draft` | `PolicyDraftSave` (`title`, `applies_to`, the switches, and `body_html` or `rules`) → `Policy` | `knowledge` edit, `policies.manage` | no | Creates the draft when there is none; `body_html` is sanitised (§6.6); `rules` checked by the type |
 | `POST /api/v1/policies/:id/draft/discard` | `EmptyBody` → `Policy` | `knowledge` edit, `policies.manage` | no | 409 `NO_DRAFT` |
 | `POST /api/v1/policies/tidy` | `PolicyTidy` (`body_html`) → `PolicyTidyResult` (`body_html`) | `knowledge` edit, `policies.manage` | no | A suggestion only; nothing is saved (§6.6). 503 `AI_UNAVAILABLE` with no AI connection |
@@ -139,8 +142,8 @@ FAQs and training; policies do not use them.
 | `POST /api/v1/policies/me/versions/:id/acknowledge` | `EmptyBody` → `MyPolicyVersion` | self, own | no | The newest published version of a policy that applies to them (409 `POLICY_NOT_LATEST`); again is a no-op |
 | `POST /api/v1/policies/me/versions/:id/later` | `EmptyBody` → `MyPolicyDue` | self, own | no | Until the due date (409 `ACKNOWLEDGEMENT_OVERDUE` after) |
 | `POST /api/v1/policies/me/versions/:id/pdf` | `EmptyBody` → `ExportFile` (202) | self, own | no | |
-| `POST /api/v1/policies/me/versions/:id/approve` | `PolicyApprove` (`signature`) → `MyPolicyVersion` | the stage's approvers | no | Signs and approves the stage through the engine (`shared/workflow` `act`); 403 when it does not wait on them |
-| `POST /api/v1/policies/me/versions/:id/reject` | `PolicyReason` → `MyPolicyVersion` | the stage's approvers | no | The version returns to the draft |
+| `POST /api/v1/policies/me/versions/:id/approve` | `PolicyApprove` (`signature`) → 204 | the stage's approvers | no | Signs and approves the stage through the engine (`shared/workflow` `act`); 403 when it does not wait on them |
+| `POST /api/v1/policies/me/versions/:id/reject` | `PolicyReason` → 204 | the stage's approvers | no | The version returns to the draft |
 
 The attendance module's policy routes (`/attendance/policy...`, `/attendance/me/policy...`) are
 removed with Settings · Attendance Policy; what the clock reads is unchanged (§6.8).
@@ -149,8 +152,8 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
 
 ### 6.1 Types
 
-- A policy's `kind` is fixed when it is created. `document` policies hold `body_html`; a rules type
-  holds `rules`. The types are a registry in code (`policies.types.js`): each names its contract
+- A policy's `kind` is fixed when it is created. `document` policies hold `body_markdown`; a rules
+  type holds `rules`. The types are a registry in code (`policies.types.js`): each names its contract
   schema (checked on save), its defaults and suggestions, its sections and the sentence for each
   rule, and the module that enforces it. `attendance` is registered by the attendance module
   (`attendance.policy-type.js`), which owns its rules (`attendance.md` §6.15).
@@ -162,7 +165,7 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
 ### 6.2 The draft
 
 - One draft per policy at a time. Save Draft writes every field; the first save creates it. A
-  document's `body_html` is sanitised (§6.6) and must hold some text; a rules draft is checked by the
+  document's text is turned into Markdown (§6.6) and must hold some text to publish; a rules draft is checked by the
   type's draft schema (stricter than its read schema: the Attendance home radius is at least 150 m
   on a new version, though older versions keep theirs).
 - `changed` lists what the draft changes against the version it would replace (the newest
@@ -213,15 +216,18 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
 - The editor is `RichTextField` (TipTap): headings (h2, h3), paragraphs, bold, italic, bullet and
   numbered lists, quotes and links. Text pasted from Word or Google Docs keeps those and drops fonts,
   colours and tables (a table's cells become paragraphs).
-- The server sanitises every saved body with the one sanitiser (`shared/html/sanitise.js`, lifted
-  from the mailbox's, which then uses it): only those tags and `https:` and `mailto:` links survive.
+- The server keeps the text as **Markdown**, the one renderer's grammar (`shared/documents/markdown.js`):
+  `htmlToMarkdown` turns the editor's HTML into it keeping only headings, paragraphs, lists, bold,
+  italic and links with a safe target (nothing pasted reaches the output as markup), and
+  `markdownToBlocks` gives the reader its blocks (`RichTextBlock`), drawn by the shared `RichText`
+  component, so no screen injects HTML. The editor loads `markdownToHtml`'s output.
 - **Tidy With AI** (`POST /policies/tidy`) sends the body to `services/ai/llm.service.complete`
   (purpose `policy-tidy`, prompt `services/ai/prompts/policy-tidy.md`) on the person's press, never
   inside a transaction. It may add headings, number clauses, turn runs of lines into lists and fix
   spacing and capitals; it never changes, adds or drops wording. What comes back is sanitised and
   shown beside the original; nothing is saved until HR saves the draft (A18's pattern; A23 holds:
   the AI writes no record). The model is chosen under the AI area convention (§13).
-- On paper (`documents.generate`, doc type `policy_version`): the letterhead, the title, number,
+- On paper (`documents.generate`, doc type `policy_pdf`, made on Download PDF): the letterhead, the title, number,
   version, first day and Applies To, the body (or the rules' sections and sentences), then a
   signature block per signer (signature, name, title, date) and the content hash.
 
@@ -267,7 +273,7 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
 | `policy.submitted` | Submit for Approval | Audit; the approval tells its first approver ("Policy waiting for approval") |
 | `policy.recalled` | HR recalls a submission | Audit; the approval is cancelled |
 | `policy.rejected` | An approver rejects | Audit; notifies the submitter with the reason |
-| `policy.published` | A version is published (directly or on the last approval) | Audit; outbox `policies.render_pdf` (the PDF with every signature) and `policies.notify_published` (everyone asked: "New policy" or "Policy updated", its title, version and first day; push as their Knowledge Hub preference allows); a rules type's own handler (attendance reloads its rules) |
+| `policy.published` | A version is published (directly or on the last approval) | Audit; outbox `policies.notify_published` (everyone asked: "New policy" or "Policy updated", its title, version and first day; push as their Knowledge Hub preference allows); a rules type's own handler (attendance reloads its rules) |
 | `policy.withdrawn` | A waiting version is withdrawn | Audit; notifies the same people that it will not apply |
 | `policy.archived` | A document policy is archived | Audit |
 | `policy.acknowledged` | Someone acknowledges | Audit; their notices about it are read |

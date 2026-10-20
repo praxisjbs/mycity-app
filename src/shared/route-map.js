@@ -103,7 +103,6 @@ const SCREENS = Object.freeze({
     "users",
     "roles-and-permissions",
     "approvals",
-    "attendance-policy",
     "notifications",
     "appearance",
     "documents-and-numbering",
@@ -221,13 +220,17 @@ const ENTITY_ROUTES = Object.freeze({
     param: "assignment",
     self: screen("ess", "my-attendance"),
   },
-  // A version of the attendance policy: its notice opens it on Policy Updates (`?version=`); Settings ·
-  // Attendance Policy lists the same versions for People.
-  // search:none one policy; ⌘K finds Policy Updates and Attendance Policy, which list every version
+  // A version of the attendance policy from before policies (its notices kept from then): the same id
+  // is a policy_version now (migration 1405), so it opens on Policy Updates (`?version=`).
+  // search:none kept for old notices; versions are found as policy_version
   attendance_policy: {
     ...screen("ess", "policy-updates"),
     param: "version",
   },
+  // A policy: Knowledge Hub · Policies opens it (`?policy=`), for those who write policies.
+  policy: { ...screen("knowledge", "policies"), param: "policy" },
+  // A version of a policy, as the people it applies to and its approvers read it: Policy Updates (`?version=`).
+  policy_version: { ...screen("ess", "policy-updates"), param: "version" },
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),
@@ -308,7 +311,6 @@ const ENTITY_ROUTES = Object.freeze({
   expense_category: screen("expenses", "categories"), // search:none not built yet (src/modules/expense_categories)
 
   // Knowledge Hub
-  policy: screen("knowledge", "policies"), // search:none not built yet (src/modules/knowledge)
   sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
   faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
   training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)

@@ -21,6 +21,7 @@ const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { rebuild } = require("./helpers/schema");
+const { attendanceVersion } = require("./helpers/policies");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -132,14 +133,19 @@ describeDb("attendance against the real migrations", () => {
   /** Kemi clocked in today over HTTP: that day is in October's list only when today is in October. */
   const managerToday = () => (today().startsWith("2026-10") ? [today()] : []);
 
-  /** Every place's location check and the device check, on every policy row. */
+  /**
+   * The Attendance policy's rules from now on: a new version over the last, from a first day before
+   * every date here, so the newest version is the one in force. Homes keep the 100 m an older
+   * version may hold (the 150 m minimum binds new drafts only).
+   */
+  let rulesNow = { home_radius_m: 100 };
+  const setRules = (changes) => {
+    rulesNow = { ...rulesNow, ...changes };
+    return attendanceVersion(pool, rulesNow, "2026-01-01");
+  };
+  /** Every place's location check and the device check. */
   const setPolicy = (geofence, device) =>
-    q(
-      `UPDATE attendance_policy
-          SET geofence_mode = $1, office_geofence_mode = $1, home_geofence_mode = $1, site_geofence_mode = $1,
-              device_mode = $2`,
-      [geofence, device],
-    );
+    setRules({ office_geofence_mode: geofence, home_geofence_mode: geofence, site_geofence_mode: geofence, device_mode: device });
 
   async function signIn(who, { cookie = null } = {}) {
     ip += 1;
@@ -154,9 +160,9 @@ describeDb("attendance against the real migrations", () => {
   beforeAll(async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
     await rebuild(pool, config.DB_NAME);
-    // The organisation's policy, as a database's own row from before versions: no policy is
-    // seeded (A26), and setPolicy below changes this one.
-    await q("INSERT INTO attendance_policy (name) VALUES ('Organisation')");
+    // The Attendance policy's first version: no version is seeded (A26), and setPolicy below
+    // publishes the next.
+    await setRules({});
     outbox.markReady();
     aiRegistry.load();
     ({ app } = buildApp({ strict: true, accessLog: false }));
@@ -564,13 +570,13 @@ describeDb("attendance against the real migrations", () => {
    * ---------------------------------------------------------------- */
 
   test("lateness is read on the workplace's clock against the working week and the policy's grace", async () => {
-    await q("UPDATE attendance_policy SET grace_minutes = 5");
+    await setRules({ grace_minutes: 5 });
     // Monday 5 October 2026: 09:20 Lagos is 08:20Z, 15 minutes past 09:05.
     const r = await punchAt("ops", "2026-10-05T08:20:00Z");
     const day = await repo.getDay(pool, people.ops.employee.employee_id, "2026-10-05");
     expect(r.work_date).toBe("2026-10-05");
     expect(day).toMatchObject({ status: "late", late_minutes: 15 });
-    await q("UPDATE attendance_policy SET grace_minutes = 0");
+    await setRules({ grace_minutes: 0 });
   });
 
   test("a Saturday is judged against 09:00 to 15:00, and a Sunday or a public holiday is never late", async () => {

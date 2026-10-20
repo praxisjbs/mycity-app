@@ -295,7 +295,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
 
     const validation = {
       policy: {
-        attendance_policy_id: ctx.policy.attendance_policy_id,
+        policy_version_id: ctx.policy.policy_version_id,
         geofence_mode: ctx.policy.geofence_mode,
         device_mode: ctx.policy.device_mode,
         max_accuracy_m: ctx.policy.max_accuracy_m,
@@ -338,7 +338,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         worksite_id: geofence.worksite_id,
         known_device_id: knownDeviceId,
         attendance_device_id: device ? device.attendance_device_id : null,
-        attendance_policy_id: ctx.policy.attendance_policy_id,
+        policy_version_id: ctx.policy.policy_version_id,
         latitude: point ? point.latitude : null,
         longitude: point ? point.longitude : null,
         accuracy_m: body.accuracy_m,

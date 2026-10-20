@@ -66,6 +66,14 @@ const int = (v) => {
   const n = Number(v);
   return Number.isInteger(n) ? n : 0;
 };
+const sortedStrings = (list) => (Array.isArray(list) ? list.map(str).sort() : []);
+/** A JSON value with every object's keys in sorted order, so stored jsonb hashes the same however it was read back. */
+const sortedKeys = (v) => {
+  if (Array.isArray(v)) return v.map(sortedKeys);
+  if (v && typeof v === "object")
+    return Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortedKeys(v[k])]));
+  return v;
+};
 
 // One builder per doc type. Key order below is the hashed order: JSON.stringify
 // preserves insertion order for string keys, and these objects are built from
@@ -108,6 +116,28 @@ const BUILDER_SOURCE = Object.assign(Object.create(null), {
     clauses: (Array.isArray(d.clauses) ? d.clauses : []).map((c) =>
       str(c && c.heading ? c.heading : c),
     ),
+  }),
+
+  /**
+   * A policy version as staff read it and its signers sign it (docs/guides/policies.md §6.3):
+   * the policy, the version, its first day, who it applies to and what it says. `rules` is the
+   * rules document AS STORED, its keys sorted at every depth, never the rules parsed with today's
+   * defaults: a rule added to the code later must not make an older version read as amended.
+   * Who signed, the note and the dates of publication are about the version, not in it.
+   */
+  POLICY_VERSION: (d) => ({
+    v: 1,
+    type: "POLICY_VERSION",
+    number: str(d.number),
+    version: int(d.version),
+    title: str(d.title),
+    effective_from: str(d.effective_from),
+    everyone: Boolean(d.applies_to && d.applies_to.everyone),
+    department_ids: sortedStrings(d.applies_to && d.applies_to.department_ids),
+    work_patterns: sortedStrings(d.applies_to && d.applies_to.work_patterns),
+    employee_ids: sortedStrings(d.applies_to && d.applies_to.employee_ids),
+    body_markdown: str(d.body_markdown),
+    rules: d.rules ? sortedKeys(d.rules) : null,
   }),
 });
 
