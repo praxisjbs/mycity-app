@@ -36,6 +36,16 @@
  *   attendance.clocked_out_automatically
  *                                   the clock watch closed a shift left open once it ended and
  *                                   the person was away from the app: they are told when
+ *   attendance.policy_draft_saved,  People saved or discarded the policy's draft: the audit line,
+ *   attendance.policy_draft_discarded  with the rules before and after; nobody is told
+ *   attendance.policy_published     People published a version: everyone at work with a login is
+ *                                   told its number and first day (guide §6.15)
+ *   attendance.policy_withdrawn     People withdrew a version waiting to start: the same people are
+ *                                   told it will not apply
+ *   attendance.policy_acknowledged  someone acknowledged the newest version
+ *   attendance.policy_reminder_due  the reminder engine's attendance_policy_unacknowledged found
+ *                                   someone who had not acknowledged a version 3 days after it was
+ *                                   published: they are reminded once, in the working day
  *
  * Payloads carry ids, dates, results and exception types (a field assignment's number and
  * name too): never coordinates, an address, a device identifier or the evidence itself.
@@ -45,6 +55,7 @@ const { defineEvents, WORKFLOW } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
 const workflow = require("../../shared/workflow/engine");
 const { defineNotification, permissionHolders } = require("../../shared/notifications/fanout");
+const reminders = require("../notifications/notifications.reminders");
 const { defineDocumentType } = require("../../shared/documents/types");
 const { formatDate } = require("../../shared/time/day-first");
 
@@ -67,6 +78,12 @@ const EVENTS = defineEvents("people", {
   "attendance.schedule_set": { summary: "A hybrid employee's work schedule was set" },
   "attendance.clock_in_due": { summary: "An employee was reminded to clock in" },
   "attendance.clocked_out_automatically": { summary: "An open shift was clocked out automatically" },
+  "attendance.policy_draft_saved": { summary: "The attendance policy's draft was saved" },
+  "attendance.policy_draft_discarded": { summary: "The attendance policy's draft was discarded" },
+  "attendance.policy_published": { summary: "A version of the attendance policy was published" },
+  "attendance.policy_withdrawn": { summary: "A version of the attendance policy was withdrawn" },
+  "attendance.policy_acknowledged": { summary: "An employee acknowledged the attendance policy" },
+  "attendance.policy_reminder_due": { summary: "An employee was reminded to acknowledge the attendance policy" },
 });
 
 /** The approval every work location request opens (docs/guides/attendance.md §6.11). */
@@ -161,6 +178,46 @@ defineNotification(EVENTS.ATTENDANCE_CLOCKED_OUT_AUTOMATICALLY, {
   to: [{ subject: true }],
   title: "Clocked out automatically",
   body: (e) => `${formatDate(e.payload.work_date)}: clocked out at ${e.payload.clock_out_time}.`,
+});
+
+/*
+ * A version of the policy is everyone's: the people asked to acknowledge it (at work, with a
+ * login) are told when it is published or withdrawn. The repo is required when a notice is
+ * written: this file is loaded before it by the worker.
+ */
+const everyoneAsked = (_event, client) =>
+  require("./attendance.repo").askedUsers(client || pool, require("../../shared/time/lagos").today());
+
+defineNotification(EVENTS.ATTENDANCE_POLICY_PUBLISHED, {
+  to: [{ users: everyoneAsked }],
+  who: "Everyone at work with a login",
+  title: "Attendance policy updated",
+  body: (e) => `Version ${e.payload.version} applies from ${formatDate(e.payload.effective_from)}. Read and acknowledge it.`,
+});
+
+defineNotification(EVENTS.ATTENDANCE_POLICY_WITHDRAWN, {
+  to: [{ users: everyoneAsked }],
+  who: "Everyone at work with a login",
+  title: "Attendance policy version withdrawn",
+  body: (e) => `Version ${e.payload.version} will not apply from ${formatDate(e.payload.effective_from)}.`,
+});
+
+defineNotification(EVENTS.ATTENDANCE_POLICY_REMINDER_DUE, {
+  to: [{ subject: true }],
+  title: "Acknowledge the attendance policy",
+  body: (e) => `Version ${e.payload.version} is waiting for your acknowledgement.`,
+});
+
+/*
+ * The reminder (guide §6.15) runs on the one reminder engine (docs/guides/notifications.md §7.1):
+ * from 3 days after a version is published, once a person, in the working day. The policy service
+ * is required when the engine calls it: it requires this file for its event keys.
+ */
+reminders.defineReminder("attendance_policy_unacknowledged", {
+  event: EVENTS.ATTENDANCE_POLICY_REMINDER_DUE,
+  module: "people",
+  find: (db, ctx) => require("./attendance.policy").remindersDue(db, ctx),
+  check: (client, row, ctx) => require("./attendance.policy").reminderCheck(client, row, ctx),
 });
 
 defineNotification(EVENTS.ATTENDANCE_SCHEDULE_SET, {

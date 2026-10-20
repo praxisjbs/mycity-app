@@ -205,16 +205,21 @@ per reminder to clock in sent, unique per person, day and kind), the `automatic_
 type, and 1300's one-active index split in two: one active event of each type a day among the
 person's and People's punches, and one automatic clock-out (`source = 'system'`) a day beside it,
 so People's correction of its time is written next to it · `1394` Automatic Clock-Out in the code
-list.
+list · `1370` the attendance policy's versions: on `attendance_policy` its `status` (draft,
+published, withdrawn; at most one draft), `version` (never used twice), `effective_from`, `note`,
+who published or withdrew it and why, who saved it, and the location check per place
+(`office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode`, taking a row's one
+`geofence_mode`); `attendance_policy_acknowledgement` (one row per person and version: reminded,
+acknowledged) · `1395` `1099`'s Standard policy removed while it is as seeded and nothing was judged
+by it (A26, §5).
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
 other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026).
 
 **Owes:**
-- Attendance (attendance.md §4, §13): policy versions and acknowledgements (#89), a unique key
-  for the auto-query
-  upsert, the lateness deduction amount; dropping the superseded booleans `require_geofence` and
-  `require_known_device` (MIGRATIONS §8).
+- Attendance (attendance.md §4, §13): a unique key for the auto-query upsert, the lateness
+  deduction amount; dropping the superseded booleans `require_geofence` and `require_known_device`
+  and `1300`'s one `geofence_mode`, superseded by the place modes of `1370` (MIGRATIONS §8).
 - Attendance, for Home (LA): the shared roster (`src/modules/attendance/attendance.roster.js`)
   reads `attendance_day` as `1300`'s code writes it (the punch, People's decisions, the day-close)
   and a day with no record by the register's rules, through `1300`'s and `1200`'s indexes; it needs
@@ -455,7 +460,9 @@ Security's two-step and PIN, which M1 owed until then.
    Standard attendance policy, alert thresholds, knowledge categories) move out of the seeds under
    A26, each when its milestone builds the screen that manages it. The alert thresholds moved out on
    17/10/2026: `1199` removes each of `1099`'s three rules while it is as seeded and no alert points
-   at it, and MyCity enters its own on Home, Alerts.
+   at it, and MyCity enters its own on Home, Alerts. The Standard attendance policy moved out on
+   19/10/2026: `1395` removes it while it is as seeded and no punch was judged by it, and MyCity
+   publishes its own on Settings · Attendance Policy (attendance.md §6.15).
 
 ## 6 · Changing this document
 

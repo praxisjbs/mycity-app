@@ -505,7 +505,7 @@ describe("the routes", () => {
   /** A body's fields, through any refinements around it. */
   const shapeOf = (schema) => (schema.shape ? schema.shape : shapeOf(schema._def.schema));
 
-  test("the person's own routes are self and name no employee; People's carry the people grant", () => {
+  test("the person's own routes are self and name no employee; People's carry the people grant, the policy's settings", () => {
     expect(routes.length).toBeGreaterThan(10);
     for (const r of routes) {
       if (r.path.startsWith("/me") || r.path === "/punches") {
@@ -513,7 +513,7 @@ describe("the routes", () => {
         expect(r.path).not.toMatch(/employee_id/);
         if (r.contract.body) expect(Object.keys(shapeOf(r.contract.body))).not.toContain("employee_id");
       } else {
-        expect(r.permission && r.permission.key).toBe("people");
+        expect(r.permission && r.permission.key).toBe(r.path.startsWith("/policy") ? "settings" : "people");
       }
     }
   });
@@ -560,11 +560,61 @@ describe("the routes", () => {
     expect(Object.keys(by("POST", "/schedules/:employee_id").contract.body.shape).sort()).toEqual(["effective_from", "office_days", "reason"]);
   });
 
+  test("the policy is read under settings view and changed under settings edit; staff read and acknowledge their own", () => {
+    const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
+    for (const path of ["/policy", "/policy/versions", "/policy/versions/:id", "/policy/versions/:id/acknowledgements"])
+      expect(by("GET", path).permission).toMatchObject({ key: "settings", action: "view" });
+    expect(by("PUT", "/policy/draft").permission).toMatchObject({ key: "settings", action: "edit" });
+    for (const path of ["/policy/draft/discard", "/policy/publish", "/policy/versions/:id/withdraw"])
+      expect(by("POST", path).permission).toMatchObject({ key: "settings", action: "edit" });
+    for (const [method, path] of [["GET", "/me/policy"], ["GET", "/me/policy/versions"], ["POST", "/me/policy/versions/:id/acknowledge"]])
+      expect(by(method, path).contract.self).toBe(true);
+  });
+
   test("lists page through the contract's controls, with no page size", () => {
     for (const r of routes.filter((x) => x.method === "GET" && x.contract.response && x.contract.response.shape && x.contract.response.shape.page)) {
       const keys = Object.keys(r.contract.query.shape);
       expect(keys).toContain("page");
       for (const k of ["limit", "offset", "per_page", "page_size"]) expect(keys).not.toContain(k);
     }
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * The policy's versions (§6.1, §6.15)
+ * ------------------------------------------------------------------ */
+
+describe("the policy's versions", () => {
+  const policy = require("./attendance.policy");
+  const RULES = {
+    grace_minutes: 10,
+    office_geofence_mode: "block",
+    home_geofence_mode: "warn",
+    site_geofence_mode: "off",
+    device_mode: "warn",
+    max_accuracy_m: 100,
+    home_radius_m: 100,
+  };
+
+  test("each place has its own location mode; an unknown place is a bug", () => {
+    expect(rules.forPlace(RULES, "office").geofence_mode).toBe("block");
+    expect(rules.forPlace(RULES, "home").geofence_mode).toBe("warn");
+    expect(rules.forPlace(RULES, "site").geofence_mode).toBe("off");
+    expect(rules.forPlace(rules.DEFAULT_POLICY, "home").geofence_mode).toBe("warn");
+    expect(() => rules.forPlace(RULES, "garden")).toThrow(/not a place/);
+  });
+
+  test("what changed is the rules that differ, in their order; nothing against no version", () => {
+    expect(policy.changedRules({ ...RULES, home_radius_m: 150, grace_minutes: 5 }, RULES)).toEqual(["grace_minutes", "home_radius_m"]);
+    expect(policy.changedRules(RULES, { ...RULES })).toEqual([]);
+    expect(policy.changedRules(RULES, null)).toEqual([]);
+  });
+
+  test("a version is waiting before its first day, in force or past after it, and withdrawn whatever its date", () => {
+    const row = (id, from, status = "published") => ({ attendance_policy_id: id, effective_from: from, status });
+    expect(policy.stateOf(row("a", "2026-10-26"), "2026-10-19", "b")).toBe("waiting");
+    expect(policy.stateOf(row("b", "2026-10-19"), "2026-10-19", "b")).toBe("in_force");
+    expect(policy.stateOf(row("c", "2026-10-01"), "2026-10-19", "b")).toBe("past");
+    expect(policy.stateOf(row("d", "2026-10-26", "withdrawn"), "2026-10-19", "b")).toBe("withdrawn");
   });
 });

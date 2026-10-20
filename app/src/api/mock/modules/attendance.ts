@@ -1,9 +1,9 @@
-import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow, ScheduleDay, ScheduleVersion, WorkSchedule } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, MyPolicy, MyPolicyVersion, PolicyAck, PolicyOverview, PolicyRule, PolicySettings, PolicyVersion, PolicyVersionState, PunchResult, PunchState, RegisterRow, ScheduleDay, ScheduleVersion, WorkSchedule } from "@mycity/contract/contract.gen.ts";
 import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { audit } from "../data/audit";
-import type { AttendancePolicy, PolicySetting } from "@/api/types/attendance";
+import attendanceContract from "@mycity/contract/schemas/attendance.js";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
-import { byId, byKey, PEOPLE, refKey, SIGN_INS, type MockPerson } from "../data/people";
+import { byId, byKey, grantsFor, PEOPLE, refKey, SIGN_INS, type MockPerson } from "../data/people";
 import { HISTORY, TODAY } from "../data/attendance";
 import { lastDeviceOf, MAX_REGISTERED, registeredCount, sessionDevice } from "./devices";
 import { peopleGrant, siteOf } from "./worksites";
@@ -17,8 +17,8 @@ import { exportFile } from "./shared";
  * reading sent, the accuracy, the device of the session, the policy's modes, one shift a day, and
  * the Idempotency-Key.
  *
- * The policy is a business choice; the mock runs the geofence on warn and the device on warn,
- * so a laptop sees both warnings.
+ * The policy is the version in force below (version 2: the location on warn and the device on
+ * warn, so a laptop sees both warnings, and 10 minutes' grace).
  */
 
 /* ------------------------------------------------------------------ *
@@ -26,7 +26,18 @@ import { exportFile } from "./shared";
  * ------------------------------------------------------------------ */
 const TZ = "Africa/Lagos";
 const GRACE = 10;
-const POLICY_MODES = { geofence_mode: "warn", device_mode: "warn", max_accuracy_m: 100 } as const;
+/** The office's location mode, the device mode and the accuracy limit of the version in force (below). */
+const POLICY_MODES = {
+  get geofence_mode() {
+    return inForceRules().office_geofence_mode;
+  },
+  get device_mode() {
+    return inForceRules().device_mode;
+  },
+  get max_accuracy_m() {
+    return inForceRules().max_accuracy_m;
+  },
+};
 const GOOD_ACCURACY_M = 50;
 const FUTURE_TOLERANCE_S = 120;
 
@@ -1314,84 +1325,224 @@ route("POST /api/v1/attendance/schedules/:employee_id", (req) => {
 });
 
 /* ------------------------------------------------------------------ *
- * Policy: versions, a draft, publishing, acknowledgment
+ * The policy: versions, the draft, publishing, acknowledgement (guide §6.15)
  * ------------------------------------------------------------------ */
-const POLICY_START = 4;
-const SETTINGS: PolicySetting[] = [
-  { key: "wk_start", section: "Working Day", label: "Shift Start", help: "The default start time. A person's schedule can differ.", kind: "time", value: "09:00" },
-  { key: "grace", section: "Working Day", label: "Grace Minutes", help: "Minutes after the start before a clock-in counts as late.", kind: "number", value: 10, min: 0, max: 60 },
-  { key: "sat_half", section: "Working Day", label: "Saturday Half Day", help: "The working week is set per day (A22).", kind: "bool", value: true },
-  { key: "late_rule", section: "Lateness", label: "Lates Before a Query", help: "How many late arrivals in 30 days raise a query automatically in Queries & Sanctions.", kind: "number", value: 3, min: 1, max: 10 },
-  { key: "mode_remote", section: "Location Verification", label: "Remote Outside Home", help: "What happens when a remote employee clocks in outside the 100 m home geofence.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
-  { key: "mode_hybrid", section: "Location Verification", label: "Hybrid Outside Location", help: "Office days check the office, remote days check the home.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
-  { key: "mode_office", section: "Location Verification", label: "Office-Only Outside Office", help: "Office-only staff must be inside their assigned office geofence.", kind: "mode", value: "block", options: ["record", "warn", "block"] },
-  { key: "mode_field", section: "Location Verification", label: "Field Outside Assignment", help: "An approved field assignment overrides office and home for its window.", kind: "mode", value: "warn", options: ["record", "warn", "block"] },
-  { key: "radius_remote", section: "Location Verification", label: "Home Geofence Radius", help: "Fixed at 100 m for registered and temporary homes.", kind: "locked", value: "100 m · fixed" },
-  { key: "good_acc", section: "Location Verification", label: "GPS Accuracy, Metres", help: "A reading at or better than this is used as it is.", kind: "number", value: 50, min: 10, max: 200 },
-  { key: "dev_record", section: "Devices", label: "Record Device on Punch", help: "Devices are recorded so the policy can be tightened later without losing history.", kind: "bool", value: true },
-  { key: "dev_warn_new", section: "Devices", label: "Warn on New Device", help: "Accept the punch from an unenrolled device with a warning, and send it for review.", kind: "bool", value: true },
-  { key: "dev_block_unenrolled", section: "Devices", label: "Block Unenrolled Devices", help: "Refuse punches from a device People have not enrolled.", kind: "bool", value: false },
-  { key: "deduction_tiers", section: "Payroll", label: "Lateness Deduction Tiers", help: "When on, reviewed late arrivals carry a computed deduction (10%, 20%, 30% of the day by the hour). A person still accepts each one in Payroll.", kind: "bool", value: false },
-  { key: "ack_blocks", section: "Acknowledgment", label: "Read Before Clock-In", help: "When on, Clock In waits until the employee acknowledges the latest version.", kind: "bool", value: false },
-];
-const POLICY = {
-  current: {
-    version: POLICY_START, published_at: at(6, "11:20"), published_by: "Cynthia Osakunih", summary: "Saturday half day added; Office-only staff now blocked outside the office.",
-    changes: ["Saturday is a half day, 09:00 to 15:00", "Office-only: outside the office is now blocked, not warned", "Grace period stays at 10 minutes"],
-    settings: SETTINGS, acknowledged_at: null as string | null, draft: null as AttendancePolicy["draft"],
-  } as AttendancePolicy,
-  acknowledged: new Set(["cynthia", "ifeoma", "tolu", "bashir", "seyi"]),
-  history: [
-    { version: 3, published_at: at(48, "10:00"), published_by: "Cynthia Osakunih", summary: "Device recording switched on for everyone.", changes: ["Record Device on Punch"] },
-    { version: 2, published_at: at(96, "09:30"), published_by: "Cynthia Osakunih", summary: "Field assignments introduced.", changes: ["An approved field assignment overrides office and home"] },
-    { version: 1, published_at: at(140, "12:00"), published_by: "Ifeoma Chukwu", summary: "First attendance policy.", changes: ["Geofenced clock-in for every arrangement"] },
-  ],
+const RULE_KEYS: PolicyRule[] = ["grace_minutes", "office_geofence_mode", "home_geofence_mode", "site_geofence_mode", "device_mode", "max_accuracy_m", "home_radius_m"];
+const DEFAULT_RULES: PolicySettings = { grace_minutes: 0, office_geofence_mode: "warn", home_geofence_mode: "warn", site_geofence_mode: "warn", device_mode: "off", max_accuracy_m: 100, home_radius_m: 100 };
+type PolicyRow = PolicySettings & {
+  attendance_policy_id: string;
+  version: number | null;
+  status: "draft" | "published" | "withdrawn";
+  effective_from: string | null;
+  note: string | null;
+  published_at: string | null;
+  published_by_name: string | null;
+  withdrawn_at: string | null;
+  withdraw_reason: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
 };
-const withAck = (user: string, p: AttendancePolicy): AttendancePolicy => ({ ...p, acknowledged_at: POLICY.acknowledged.has(user) && p.version === POLICY.current.version ? at(5, "09:02") : p.version < POLICY.current.version ? at(50, "09:00") : null });
-route("GET /api/v1/attendance/policies/current", (req) => ok(withAck(req.user!, POLICY.current)));
-route("GET /api/v1/attendance/policies", (req) =>
-  paged([POLICY.current, ...POLICY.history.map((h) => ({ ...h, settings: [], acknowledged_at: null, draft: null }))].map((p) => withAck(req.user!, p as AttendancePolicy)), req, { search: (r) => [r.summary, String(r.version)] }),
+
+const rulesOf = (r: PolicySettings): PolicySettings => Object.fromEntries(RULE_KEYS.map((k) => [k, r[k]])) as PolicySettings;
+const changedOf = (next: PolicySettings, base: PolicySettings | null): PolicyRule[] => (base ? RULE_KEYS.filter((k) => String(next[k]) !== String(base[k])) : []);
+const version = (n: number, daysBack: number, by: string, note: string, rules: Partial<PolicySettings>): PolicyRow => ({
+  ...DEFAULT_RULES,
+  ...rules,
+  attendance_policy_id: sid(`attendance-policy-${n}`),
+  version: n,
+  status: "published",
+  effective_from: isoDaysAgo(daysBack),
+  note,
+  published_at: at(daysBack + 2, "11:20"),
+  published_by_name: by,
+  withdrawn_at: null,
+  withdraw_reason: null,
+  updated_at: at(daysBack + 2, "11:20"),
+  updated_by_name: by,
+});
+/** Version 2 is in force: the grace (10) and the modes the clock above judges by. */
+const POLICIES: PolicyRow[] = [
+  version(1, 140, "Ifeoma Chukwu", "First written attendance policy.", { grace_minutes: 15 }),
+  version(2, 6, "Cynthia Osakunih", "Grace is now 10 minutes, and devices you have not registered are sent for review.", { grace_minutes: 10, device_mode: "warn" }),
+];
+/** Acknowledgements by version, then sign-in key. */
+const ACKS = new Map<string, Map<string, { acknowledged_at: string | null; reminded_at: string | null }>>([
+  [POLICIES[0].attendance_policy_id, new Map(PEOPLE.map((p) => [p.user_key, { acknowledged_at: at(135, "09:00"), reminded_at: null }]))],
+  [POLICIES[1].attendance_policy_id, new Map(["cynthia", "ifeoma", "tolu", "bashir", "seyi"].map((k) => [k, { acknowledged_at: at(5, "09:02"), reminded_at: null }]))],
+]);
+
+const versions = () => POLICIES.filter((p) => p.version !== null).sort((a, b) => b.version! - a.version!);
+const published = () => versions().filter((p) => p.status === "published");
+const draftRow = () => POLICIES.find((p) => p.status === "draft") ?? null;
+const newest = () => published()[0] ?? null;
+function inForce(today = todayIso()) {
+  return published().filter((p) => p.effective_from! <= today).sort((a, b) => b.effective_from!.localeCompare(a.effective_from!) || b.version! - a.version!)[0] ?? null;
+}
+/** The rules a punch today is judged by; the clock above reads its modes from here. */
+function inForceRules(): PolicySettings {
+  const v = inForce();
+  return v ? rulesOf(v) : DEFAULT_RULES;
+}
+const asked = () => PEOPLE.filter((p) => p.status !== "suspended");
+const previousOf = (row: PolicyRow) => published().find((p) => p.version! < row.version!) ?? null;
+const policyStateOf = (row: PolicyRow): PolicyVersionState =>
+  row.status === "withdrawn" ? "withdrawn" : row.effective_from! > todayIso() ? "waiting" : row.attendance_policy_id === inForce()?.attendance_policy_id ? "in_force" : "past";
+const baseOf = (row: PolicyRow) => ({
+  ...rulesOf(row),
+  attendance_policy_id: row.attendance_policy_id,
+  version: row.version!,
+  state: policyStateOf(row),
+  effective_from: row.effective_from!,
+  note: row.note!,
+  published_at: row.published_at!,
+  withdrawn_at: row.withdrawn_at,
+  changed: changedOf(row, previousOf(row)),
+});
+const asVersion = (row: PolicyRow): PolicyVersion => ({
+  ...baseOf(row),
+  published_by_name: row.published_by_name,
+  withdraw_reason: row.withdraw_reason,
+  acknowledged: asked().filter((p) => ACKS.get(row.attendance_policy_id)?.get(p.user_key)?.acknowledged_at).length,
+  asked: asked().length,
+});
+const asMine = (row: PolicyRow, user: string): MyPolicyVersion => ({ ...baseOf(row), acknowledged_at: ACKS.get(row.attendance_policy_id)?.get(user)?.acknowledged_at ?? null });
+
+const canEditPolicy = (user: string) => !!grantsFor(user).settings?.includes("edit");
+const canViewPolicy = (user: string) => !!grantsFor(user).settings?.includes("view");
+const noPolicyAccess = () => fail(403, "FORBIDDEN", "You do not have access to this.");
+function refused(issues: Array<{ path: PropertyKey[]; message: string }>) {
+  const fields: Record<string, string[]> = {};
+  for (const i of issues) fields[i.path.map(String).join(".") || "_"] ??= [i.message];
+  return invalid(fields);
+}
+
+function overview(user: string): PolicyOverview {
+  const today = todayIso();
+  const current = inForce(today);
+  const top = newest();
+  const waiting = top && top.effective_from! > today ? top : null;
+  const d = draftRow();
+  return {
+    today,
+    current: inForceRules(),
+    in_force: current ? asVersion(current) : null,
+    waiting: waiting ? asVersion(waiting) : null,
+    draft: d
+      ? { ...rulesOf(d), attendance_policy_id: d.attendance_policy_id, changed: changedOf(d, top ?? inForceRules()), updated_at: d.updated_at, updated_by_name: d.updated_by_name }
+      : null,
+    can_edit: canEditPolicy(user),
+  };
+}
+
+route("GET /api/v1/attendance/policy", (req) => (canViewPolicy(req.user!) ? ok(overview(req.user!)) : noPolicyAccess()));
+
+route("PUT /api/v1/attendance/policy/draft", (req) => {
+  if (!canEditPolicy(req.user!)) return noPolicyAccess();
+  const body = attendanceContract.PolicySettings.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
+  const who = byKey(req.user)!.display_name;
+  const d = draftRow();
+  if (d) Object.assign(d, body.data, { updated_at: new Date().toISOString(), updated_by_name: who });
+  else POLICIES.push({ ...body.data, attendance_policy_id: sid(`attendance-policy-draft-${POLICIES.length}`), version: null, status: "draft", effective_from: null, note: null, published_at: null, published_by_name: null, withdrawn_at: null, withdraw_reason: null, updated_at: new Date().toISOString(), updated_by_name: who });
+  audit(who, "Policy draft saved", "Attendance policy draft", null, null, "Not published, nobody told", "Attendance");
+  return ok(overview(req.user!));
+});
+
+route("POST /api/v1/attendance/policy/draft/discard", (req) => {
+  if (!canEditPolicy(req.user!)) return noPolicyAccess();
+  const d = draftRow();
+  if (!d) return fail(409, "NO_DRAFT", "There are no draft changes");
+  POLICIES.splice(POLICIES.indexOf(d), 1);
+  return ok(overview(req.user!));
+});
+
+route("POST /api/v1/attendance/policy/publish", (req) => {
+  if (!canEditPolicy(req.user!)) return noPolicyAccess();
+  const body = attendanceContract.PolicyPublish.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
+  const today = todayIso();
+  const from = body.data.effective_from;
+  if (from < today) return fail(422, "POLICY_IN_THE_PAST", "The first day is today or later.", { effective_from: ["Today or later"] });
+  if (from > isoDaysAhead(90)) return fail(422, "POLICY_TOO_FAR", "The first day is within 90 days.", { effective_from: ["Within 90 days"] });
+  const d = draftRow();
+  if (!d) return fail(409, "NO_DRAFT", "Save the changes as a draft first");
+  const top = newest();
+  if (top && changedOf(d, top).length === 0) return fail(409, "NO_CHANGES", "The draft changes nothing");
+  const waitingStart = published().filter((p) => p.effective_from! > today).map((p) => p.effective_from!).sort().pop();
+  if (waitingStart && from <= waitingStart) return fail(422, "POLICY_BEFORE_WAITING", "Start it after the version waiting to start.", { effective_from: ["After the waiting version"] });
+  const who = byKey(req.user)!.display_name;
+  const n = Math.max(0, ...POLICIES.map((p) => p.version ?? 0)) + 1;
+  Object.assign(d, { status: "published", version: n, effective_from: from, note: body.data.note, published_at: new Date().toISOString(), published_by_name: who });
+  ACKS.set(d.attendance_policy_id, new Map());
+  audit(who, "Policy published", "Attendance policy", top ? `Version ${top.version}` : null, `Version ${n}`, body.data.note, "Attendance");
+  return ok(overview(req.user!));
+});
+
+route("GET /api/v1/attendance/policy/versions", (req) =>
+  canViewPolicy(req.user!)
+    ? paged(versions().map(asVersion), req, { filters: { state: (v, x) => v.state === x } })
+    : noPolicyAccess(),
 );
-route("PATCH /api/v1/attendance/policies/draft", (req) => {
-  const changes = (req.body.settings ?? {}) as Record<string, string | number | boolean>;
-  const base = POLICY.current.draft?.settings ?? SETTINGS.map((s) => ({ ...s }));
-  const next = base.map((s) => (s.key in changes && s.kind !== "locked" ? { ...s, value: changes[s.key] } : s));
-  const changed = next.filter((s) => SETTINGS.find((o) => o.key === s.key)!.value !== s.value).map((s) => s.key);
-  POLICY.current.draft = changed.length ? { changed_keys: changed, settings: next } : null;
-  Object.keys(changes).forEach((k) => {
-    const f = SETTINGS.find((o) => o.key === k);
-    if (f) audit(byKey(req.user)!.display_name, "Policy draft changed", `Attendance policy draft · ${f.label}`, String(f.value), String(changes[k]), "Not published, nobody notified", "Attendance");
+
+route("GET /api/v1/attendance/policy/versions/:id", (req) => {
+  if (!canViewPolicy(req.user!)) return noPolicyAccess();
+  const row = versions().find((p) => p.attendance_policy_id === req.params.id);
+  return row ? ok(asVersion(row)) : notFound();
+});
+
+route("POST /api/v1/attendance/policy/versions/:id/withdraw", (req) => {
+  if (!canEditPolicy(req.user!)) return noPolicyAccess();
+  const body = attendanceContract.PolicyWithdraw.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
+  const row = versions().find((p) => p.attendance_policy_id === req.params.id);
+  if (!row) return notFound();
+  if (policyStateOf(row) !== "waiting") return fail(409, "POLICY_NOT_WAITING", "Only a version waiting to start can be withdrawn");
+  const who = byKey(req.user)!.display_name;
+  Object.assign(row, { status: "withdrawn", withdrawn_at: new Date().toISOString(), withdraw_reason: body.data.reason });
+  if (!draftRow())
+    POLICIES.push({ ...rulesOf(row), attendance_policy_id: sid(`attendance-policy-draft-${POLICIES.length}`), version: null, status: "draft", effective_from: null, note: null, published_at: null, published_by_name: null, withdrawn_at: null, withdraw_reason: null, updated_at: new Date().toISOString(), updated_by_name: who });
+  return ok(overview(req.user!));
+});
+
+route("GET /api/v1/attendance/policy/versions/:id/acknowledgements", (req) => {
+  if (!canViewPolicy(req.user!)) return noPolicyAccess();
+  const row = versions().find((p) => p.attendance_policy_id === req.params.id);
+  if (!row) return notFound();
+  const acks = ACKS.get(row.attendance_policy_id) ?? new Map();
+  const rows: PolicyAck[] = asked().map((p) => ({ employee: refKey(p.user_key), acknowledged_at: acks.get(p.user_key)?.acknowledged_at ?? null, reminded_at: acks.get(p.user_key)?.reminded_at ?? null }));
+  return paged(rows, req, {
+    search: (r) => [r.employee.display_name],
+    filters: { status: (r, x) => (x === "acknowledged" ? !!r.acknowledged_at : !r.acknowledged_at) },
+    sort: {
+      display_name: (a, b) => a.employee.display_name.localeCompare(b.employee.display_name),
+      acknowledged_at: (a, b) => (a.acknowledged_at ?? "").localeCompare(b.acknowledged_at ?? ""),
+    },
   });
-  return ok(POLICY.current);
-});
-route("POST /api/v1/attendance/policies/draft/discard", () => {
-  POLICY.current.draft = null;
-  return ok(POLICY.current);
-});
-route("POST /api/v1/attendance/policies/publish", (req) => {
-  const d = POLICY.current.draft;
-  if (!d) return fail(409, "NO_DRAFT", "There is nothing to publish.");
-  const summary = String(req.body.summary ?? "").trim();
-  if (summary.length < 10) return invalid({ summary: ["Write at least 10 characters"] });
-  POLICY.history.unshift({ version: POLICY.current.version, published_at: POLICY.current.published_at, published_by: POLICY.current.published_by, summary: POLICY.current.summary, changes: POLICY.current.changes });
-  d.settings.forEach((s) => (SETTINGS.find((o) => o.key === s.key)!.value = s.value));
-  POLICY.current = { ...POLICY.current, version: POLICY.current.version + 1, published_at: new Date().toISOString(), published_by: byKey(req.user)!.display_name, summary, changes: d.changed_keys.map((k) => SETTINGS.find((s) => s.key === k)!.label), draft: null };
-  POLICY.acknowledged = new Set([req.user!]);
-  audit(byKey(req.user)!.display_name, "Policy published", "Attendance policy", `v${POLICY.current.version - 1}`, `v${POLICY.current.version}`, summary, "Attendance");
-  return ok(POLICY.current);
-});
-route("GET /api/v1/attendance/policies/:version/acknowledgements", (req) =>
-  paged(
-    PEOPLE.filter((p) => p.status !== "suspended").map((p, i) => ({ employee: refKey(p.user_key), read_at: POLICY.acknowledged.has(p.user_key) || i % 3 === 0 ? at(5, "09:00") : null, acknowledged_at: POLICY.acknowledged.has(p.user_key) ? at(5, "09:02") : null })).sort((a, b) => Number(!!b.acknowledged_at) - Number(!!a.acknowledged_at)),
-    req,
-    { search: (r) => [r.employee.display_name] },
-  ),
-);
-route("POST /api/v1/attendance/policies/:version/acknowledge", (req) => {
-  POLICY.acknowledged.add(req.user!);
-  return ok(withAck(req.user!, POLICY.current));
 });
 
+route("GET /api/v1/attendance/me/policy", (req) => {
+  const top = newest();
+  return ok({ today: todayIso(), current: inForceRules(), latest: top ? asMine(top, req.user!) : null, in_force_version: inForce()?.version ?? null } satisfies MyPolicy);
+});
 
-/** Read by Payroll: is the lateness tier setting on in the published policy? */
-export const deductionTiersOn = () => SETTINGS.find((x) => x.key === "deduction_tiers")?.value === true;
+route("GET /api/v1/attendance/me/policy/versions", (req) => paged(versions().map((p) => asMine(p, req.user!)), req));
+
+route("GET /api/v1/attendance/me/policy/versions/:id", (req) => {
+  const row = versions().find((p) => p.attendance_policy_id === req.params.id);
+  return row ? ok(asMine(row, req.user!)) : notFound();
+});
+
+route("POST /api/v1/attendance/me/policy/versions/:id/acknowledge", (req) => {
+  const row = versions().find((p) => p.attendance_policy_id === req.params.id);
+  if (!row) return notFound();
+  if (row.attendance_policy_id !== newest()?.attendance_policy_id) return fail(409, "POLICY_NOT_LATEST", "Acknowledge the newest version of the policy");
+  const acks = ACKS.get(row.attendance_policy_id) ?? new Map();
+  ACKS.set(row.attendance_policy_id, acks);
+  const mine = acks.get(req.user!);
+  if (!mine?.acknowledged_at) acks.set(req.user!, { acknowledged_at: new Date().toISOString(), reminded_at: mine?.reminded_at ?? null });
+  const top = newest()!;
+  return ok({ today: todayIso(), current: inForceRules(), latest: asMine(top, req.user!), in_force_version: inForce()?.version ?? null } satisfies MyPolicy);
+});
+
+/** Read by Payroll's mock. The pay rules join the policy with payroll (M6): no deduction tiers are on yet. */
+export const deductionTiersOn = () => false;

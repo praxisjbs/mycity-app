@@ -218,6 +218,13 @@ const ENTITY_ROUTES = Object.freeze({
     param: "assignment",
     self: screen("ess", "my-attendance"),
   },
+  // A version of the attendance policy: its notice opens it on Policy Updates (`?version=`); Settings ·
+  // Attendance Policy lists the same versions for People.
+  // search:none one policy; ⌘K finds Policy Updates and Attendance Policy, which list every version
+  attendance_policy: {
+    ...screen("ess", "policy-updates"),
+    param: "version",
+  },
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),
