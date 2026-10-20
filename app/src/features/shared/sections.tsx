@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { api } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { useApi, type PagedResult } from "@/api/hooks";
 import "@/api/types/organisation";
 import "@/api/types/shared";
@@ -49,16 +50,13 @@ export function TrailCard({ title, items }: { title: string; items: WireTrailIte
 }
 
 /**
- * The shared ExportButton bound to this app's export route. Export goes to the
- * worker and the file arrives in the Mailbox (FRONTEND_GUIDE §4: never a
+ * The shared ExportButton bound to this app's export route. The worker makes the
+ * file and it downloads on this device (api/exports.ts; FRONTEND_GUIDE §4: never a
  * client-side dump of the rows on screen).
  */
 export function ExportAction({ source, filters, label }: { source: string; filters?: Record<string, unknown>; label?: string }) {
   return (
-    <ExportButton
-      message="Export queued, check your Mailbox"
-      onExport={() => api.call("POST /api/v1/exports", { body: { source, filters: filters ?? {} } })}
-    >
+    <ExportButton onExport={() => saveExport(api.call("POST /api/v1/exports", { body: { source, filters: filters ?? {} } }))}>
       {label}
     </ExportButton>
   );

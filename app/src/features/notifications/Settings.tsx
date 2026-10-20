@@ -5,6 +5,7 @@ import {
   CardHeader,
   ChannelGrid,
   EmptyState,
+  Field,
   formatWhen,
   HelpTerm,
   IconButton,
@@ -12,10 +13,12 @@ import {
   Pager,
   PhonePage,
   Pill,
+  TimeField,
   toast,
   ToggleRow,
   useIsPhone,
 } from "@mycity/ui";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useInstallApp } from "@/shell/Notices";
 import { disablePush, enablePush, sendTestPush, thisDeviceId, usePushState, type PushState } from "./push";
@@ -66,6 +69,7 @@ function SettingsBody() {
       <ThisDevice />
       <OtherDevices />
       <Categories />
+      <QuietAndDigest />
     </>
   );
 }
@@ -205,6 +209,59 @@ function Categories() {
           }
         />
       </div>
+    </Card>
+  );
+}
+
+/**
+ * Quiet hours (off until the person turns them on, TB 19/10/2026) and the daily digest, while the
+ * company sends one. Each change saves on its own, as the switches above do.
+ */
+function QuietAndDigest() {
+  const prefs = useApi("GET /api/v1/notifications/preferences");
+  const quiet = useMutation("PUT /api/v1/notifications/preferences/quiet-hours");
+  const digest = useMutation("PUT /api/v1/notifications/preferences/digest");
+  const s = prefs.data?.settings;
+  if (!s) return null;
+  const saveQuiet = (patch: Partial<Pick<typeof s, "quiet_enabled" | "quiet_from" | "quiet_to">>) =>
+    quiet
+      .run({ body: { quiet_enabled: s.quiet_enabled, quiet_from: s.quiet_from, quiet_to: s.quiet_to, ...patch } })
+      .then((next) => prefs.set(next))
+      // The same time twice is refused on `quiet_to`: say that, not the form's general line.
+      .catch((e) => toast.error(e instanceof ApiError ? (Object.values(e.fields)[0]?.[0] ?? e.message) : "Could not save that"));
+  return (
+    <Card>
+      <CardHeader title="Quiet Hours and Digest" />
+      <ToggleRow
+        title={<HelpTerm help="Pushes wait until these hours end. Urgent notices and security alerts still come through.">Quiet Hours</HelpTerm>}
+        checked={s.quiet_enabled}
+        onChange={(on) => saveQuiet({ quiet_enabled: on })}
+      />
+      {s.quiet_enabled && (
+        <div className="mt-2 grid grid-cols-2 gap-3">
+          <Field label="From">
+            <TimeField value={s.quiet_from} onChange={(t) => (t && t !== s.quiet_from ? saveQuiet({ quiet_from: t }) : undefined)} />
+          </Field>
+          <Field label="To">
+            <TimeField value={s.quiet_to} onChange={(t) => (t && t !== s.quiet_to ? saveQuiet({ quiet_to: t }) : undefined)} />
+          </Field>
+        </div>
+      )}
+      {s.digest_offered && (
+        <div className="mt-2">
+          <ToggleRow
+            title="Daily Digest"
+            text={`Each day at ${s.digest_at}`}
+            checked={s.digest}
+            onChange={(on) =>
+              digest
+                .run({ body: { digest: on } })
+                .then((next) => prefs.set(next))
+                .catch(() => toast.error("Could not save that"))
+            }
+          />
+        </div>
+      )}
     </Card>
   );
 }

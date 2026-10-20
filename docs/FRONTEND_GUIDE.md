@@ -600,7 +600,15 @@ app/
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       download.ts             the other way: a gated file fetched with the session's token, as a
-                              download (saveFile) or a blob URL a preview can draw (useFileUrl)
+                              download (saveFile), a blob URL a preview can draw (useFileUrl), the
+                              bytes and URL a PDF preview needs (useFileBlob), what the file viewer
+                              draws (fetchFile), and people's and chat photos, each fetched once (usePhotos)
+                              download (saveFile) or a blob URL a preview can draw (useFileUrl); a
+                              download lands on this device: Downloads, or the share sheet on an
+                              iPhone app opened from the home screen
+      exports.ts              every Export and Download button's file: asked for, waited on while the
+                              worker makes it, then saved on this device (saveExport, saveRun); never
+                              emailed (docs/guides/foundation.md §6.12)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
     auth/                     AuthProvider (useAuth, useMe; the session clock and the locked state; every way in),
                               Login (with the code step and the PIN), LockSheet, passkey (the browser's WebAuthn
@@ -613,7 +621,7 @@ app/
                               layout-context
     features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
                               pickers (EmployeePicker), wire (the API's shapes to the components'),
-                              KpiTiles, Letter
+                              files (useFileViewer: MediaViewer on this app's session), KpiTiles, Letter
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
@@ -826,7 +834,9 @@ What a feature may still keep beside its screens is **wiring**, not components:
 `features/shared/sections.tsx` binds `DataView` and `ExportButton` to this app's endpoints
 (`PagedTable`, `ExportAction`), `features/shared/pickers.tsx` binds `PersonPicker` to the employees
 endpoint (`EmployeePicker`), `features/shared/wire.ts` maps what the API sends to what the
-components take, and `api/upload.ts` gives the upload engine this app's session.
+components take, `features/shared/files.tsx` binds `MediaViewer` to this app's session
+(`useFileViewer`, for My Documents and a mail's attachments), and `api/upload.ts` gives the
+upload engine this app's session.
 
 **Submit is never disabled** (§8.3). `Button`, `IconButton` and `BigButton` are busy while the work
 their handler returns runs (F26, §8.4), or while `busy` says so (a mutation's pending that the press
@@ -909,8 +919,8 @@ and reconnects. A refused refresh leaves it closed and the session sheet takes o
 `useRealtime(event, handler)` hands an event to the components listening while they are mounted;
 `usePresence(userId)` keeps who is online from `presence` events. While the tab is on screen and was
 touched in the last 5 minutes the socket says `presence:active` every 30 seconds, and
-`presence:idle` when that stops: the server holds a push to the person's devices for a minute while
-they are looking at the app. Realtime is best effort: everything also arrives over HTTP, so a
+`presence:idle` when that stops (attendance's clock watch reads it; a push is never held for it, TB
+19/10/2026). Realtime is best effort: everything also arrives over HTTP, so a
 dropped socket only means the bell refreshes when it is opened. The in-browser mock has no server, so
 nothing connects in mock mode; it answers every notification route in the contract's shapes.
 
@@ -925,14 +935,16 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   `Modal` on desktop). It reloads its dot, its list and the badge counts
   (`GET /api/v1/notifications/unread-count`, `GET /api/v1/notifications`,
   `GET /api/v1/notifications/badges`) on `notification` (a new one) and `notification_read` (a read
-  mark made in another tab or on another device). Open marks a notice read before it navigates.
+  mark or an Acknowledge made in another tab or on another device). Open marks a notice read before
+  it navigates. A row is red for an urgent notice and amber for an important one.
   Whether the pane and Notification Settings are open is one store (`features/notifications/state.ts`),
   so the bell, ⌘K and a `pane=notifications` link open the same ones.
 - **Arrivals** (`features/notifications/arrivals.ts`, `useArrivals`): a notice reaching a window on
   screen, over the socket or from the service worker, shows the banner (`notify()` from
   `@mycity/ui`, on the second, top `Toaster`, for 3 seconds) and chimes or vibrates (`sound.ts`):
-  once per notice whichever way it came, never for the record already on screen. A window in the
-  background only reloads its bell; the device's own notification sounds. A link from a notification
+  once per notice whichever way it came, and again on each urgent repeat, never for the record
+  already on screen. A window in the background only reloads its bell. The device shows its own
+  notification as well, the one in the person's hand included (`app/src/sw.ts`, TB 19/10/2026). A link from a notification
   carries `n=<ids>` (marked read, then dropped from the address) or `pane=notifications`. When the
   app comes to the front it closes the notifications in the shade whose notices are read, and the
   app icon's count follows the unread count (`setAppBadge`, where the platform has one).
@@ -942,6 +954,11 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   The device's id, token and key id live in IndexedDB (`device-store.ts`, database `mycity-push`),
   where the service worker reads them. The one-time Turn On offer is a `ShellNotice`
   (`shell/Notices.tsx`); the browser's own prompt never shows unasked.
+- **The urgent bar** (`features/notifications/UrgentNotices.tsx`, `UrgentBar` from `@mycity/ui`,
+  the shells' `alert` slot): the person's open urgent notices (`GET /api/v1/notifications/urgent`)
+  under the top bar on every screen of both shells, red and pulsing slowly, with Acknowledge (an
+  urgent announcement, `POST /api/v1/notifications/:id/acknowledge`) or Open. The modules they are
+  about show their nav count in red (`urgent` on `Rail` and `BottomBar` items).
 - **⌘K** runs Notification Settings, Turn On Notifications, Send Test Notification and Mark All Read
   in the app itself (`shell/Search.tsx`, `src/shared/search/actions.js`).
 

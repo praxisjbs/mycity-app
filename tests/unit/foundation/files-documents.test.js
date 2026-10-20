@@ -295,6 +295,51 @@ describe("document types, served types, derived file names", () => {
     expect(types.typeOf("import_source")).toMatchObject({ sensitivity: "restricted", module: null });
   });
 
+  test("an export type is kept a day and never locked; reserving one needs a transaction, an export type and a file type", async () => {
+    const exportFiles = require("../../../src/shared/documents/exports");
+    const { DEPTH } = require("../../../src/shared/db/tx");
+    types.defineDocumentType("unit_export", { label: "Unit export", module: "settings", sensitivity: "restricted", export: true });
+    expect(types.isExport("unit_export")).toBe(true);
+    expect(types.isExport("unit_offer_letter")).toBe(false);
+    expect(types.isExport("constructor")).toBe(false);
+    expect(types.exportTypes()).toContain("unit_export");
+    expect(types.exportTypes()).not.toContain("unit_offer_letter");
+    expect(exportFiles.KEPT_HOURS).toBe(24);
+
+    const rows = [];
+    const query = async (sql, params) => {
+      const cols = /\(([^)]*)\) VALUES/.exec(sql)[1].split(", ");
+      rows.push(Object.fromEntries(cols.map((c, i) => [c, params[i]])));
+      return { rows: [rows[rows.length - 1]] };
+    };
+    const client = { [DEPTH]: 1, query };
+    const asked = { doc_type: "unit_export", entity: { type: "unit_export", id: "e1" }, file_name: "unit-log-2026-10-19.xlsx", actor: { user_id: "u1" } };
+    await expect(exportFiles.reserve({ query }, asked)).rejects.toThrow(/inside atomically/);
+    await expect(exportFiles.reserve(client, { ...asked, doc_type: "unit_offer_letter" })).rejects.toThrow(/export: true/);
+    await expect(exportFiles.reserve(client, { ...asked, file_name: "unit-log.exe" })).rejects.toThrow(/no file type/);
+    await expect(exportFiles.reserve(client, { ...asked, actor: null })).rejects.toThrow(/person asking/);
+    expect(rows).toEqual([]);
+
+    const doc = await exportFiles.reserve(client, asked);
+    expect(doc).toMatchObject({
+      doc_type: "unit_export",
+      original_name: "unit-log-2026-10-19.xlsx",
+      mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      bytes: 0,
+      sensitivity: "restricted",
+      source: "generated",
+      scan_status: "skipped",
+      render_status: "pending",
+      entity_type: "unit_export",
+      entity_id: "e1",
+      uploaded_by: "u1",
+    });
+    expect(doc.storage_key).toMatch(/^generated\/\d{4}\/\d{2}\/[0-9a-f-]{36}\.xlsx$/);
+    // What the screen reads while it waits; a file stored whole before exports were reserved is done.
+    expect(exportFiles.present(doc)).toEqual({ document_id: doc.document_id, file_name: "unit-log-2026-10-19.xlsx", status: "pending" });
+    expect(exportFiles.present({ ...doc, render_status: null }).status).toBe("done");
+  });
+
   test("only allow-listed types are served as themselves", () => {
     expect(mimePolicy.servedType("application/pdf")).toBe("application/pdf");
     expect(mimePolicy.servedType("text/html")).toBe("application/octet-stream");

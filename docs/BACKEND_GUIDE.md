@@ -312,6 +312,7 @@ request, never inside a transaction, and what it returns is provisional until a 
 | Working days | `shared/time/working-week` | A hard-coded Monday to Friday |
 | A file | `middleware/upload.single(field, { purpose })` + `shared/documents/vault`; store a `document_id` | A path column, a module file table, a base64 field |
 | A PDF | `documents.generate()` (outbox → worker → Chromium) | Rendering in the request |
+| A file someone pressed Export or Download for | `shared/documents/exports`: `reserve()` (or `documents.generate()` for a PDF) in the request with the module's event, answered 202 as `ExportFile`; `make()` in the outbox handler; the screen waits and downloads it (docs/guides/foundation.md §6.12) | Emailing it; building it inside the request |
 | Mail | `services/mail/system-mail.service` via an outbox handler | nodemailer in a module |
 | Something to happen after save | An outbox handler in `<module>.events.js` | Doing it inside the transaction |
 | An event key | `defineEvents(module, { "thing.created": { summary } })` in `<module>.events.js` (`shared/events/catalogue`); use the constant it returns | A string typed at the call site |

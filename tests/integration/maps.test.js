@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Maps end to end (docs/guides/foundation.md §6.12): the address search, the tiles and a
+ * Maps end to end (docs/guides/foundation.md §6.13): the address search, the tiles and a
  * worksite's address on the real migrations, through HTTP. Anyone signed in may search and
  * load a tile; nobody else; only those who set worksites up may look an address up for a
  * point; the contract refuses a short search, a tile that cannot exist and a point that is

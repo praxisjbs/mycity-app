@@ -178,7 +178,7 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/me/exceptions` | `MyExceptionListQuery` → `AttendanceExceptionPage` | self, own | yes, 25 | |
 | `POST /api/v1/attendance/me/exceptions/:id/explanation` | `ExceptionExplanation` → `AttendanceException` | self, own | no | While the exception is open |
 | `POST /api/v1/attendance/me/events/:id/explanation` | `ExceptionExplanation` → `AttendanceException` | self, own | no | An automatic clock-out of the person's own (§6.14): opens its `automatic_clock_out` exception with the note. 404 for anyone else's punch, 422 `NOT_AUTOMATIC` for a punch that is not one, 409 `ALREADY_EXPLAINED` once it has an exception |
-| `POST /api/v1/attendance/me/export` | `MyExportRequest` (`month`) → `ExportQueued` | self, own | no | The month's workbook arrives by email |
+| `POST /api/v1/attendance/me/export` | `MyExportRequest` (`month`) → `ExportFile` (202) | self, own | no | The month's workbook, made after commit and downloaded on the device that asked (`docs/guides/foundation.md` §6.12) |
 | `GET /api/v1/attendance/register` | `RegisterQuery` (`date`, `status`, `department_id`, `q`, `sort`) → `RegisterPage` | `people` view · all/team/own | yes, 25 | One row per active employee in scope; status worked out in SQL before the page is cut |
 | `GET /api/v1/attendance/summary` | `RegisterSummaryQuery` (`date`) → `RegisterSummary` | `people` view · scope | no | |
 | `GET /api/v1/attendance/register/:employee_id` | `DayDetailQuery` (`date`) → `DayDetail` | `people` view · scope | no | 404 outside scope |
@@ -187,7 +187,7 @@ event a day) and needs none of its own.
 | `POST /api/v1/attendance/exceptions/:id/decision` | `ExceptionDecision` → `AttendanceException` | `people` approve · all | no | Reason required; never your own; a correction appends an event |
 | `GET /api/v1/attendance/records/:id` | → `AttendanceRecordRef` | `people` view · scope | no | A day's id or an exception's, to the person and day a link opens (⌘K, the bell) |
 | `GET /api/v1/attendance/me/records/:id` | → `AttendanceRecordRef` | self, own | no | The same for the person's own |
-| `POST /api/v1/attendance/export` | `RegisterExportRequest` (`from`, `to`, at most 31 days) → `ExportQueued` | `people` export · scope | no | The register's workbook arrives by email |
+| `POST /api/v1/attendance/export` | `RegisterExportRequest` (`from`, `to`, at most 31 days) → `ExportFile` (202) | `people` export · scope | no | The register's workbook, made after commit and downloaded on the device that asked |
 | `GET /api/v1/attendance/me/home` | → `MyHome` | self, own | no | The approved home, the one waiting and the last one rejected, with their own coordinates |
 | `POST /api/v1/attendance/me/home` | `HomeRequestCreate` (`home_address`, `home_latitude`, `home_longitude`, `accuracy_m`) → `MyHome` | self, own | no | Remote staff, and hybrid staff whose schedule has a home day (422 `HOME_NOT_NEEDED` otherwise); the reading within `max_accuracy_m` (422 `HOME_READING_WEAK`); supersedes a request still waiting |
 | `GET /api/v1/attendance/homes` | `HomeListQuery` (`status`, `employee_id`, `q`, `sort`) → `HomeRequestPage` | `people` view · scope | yes, 25 | Waiting first; address and coordinates only for scope all, masked under `employee.personal` |
@@ -230,7 +230,7 @@ answer in the list envelope at 25, filtered, searched and sorted in SQL.
 
 Every address on these screens is an `AddressField` over `GET /api/v1/maps/search` (`q`, three
 characters or more → `PlaceMatches`, at most six places with `lat` and `lon`; everyone signed in),
-the address search of `docs/guides/foundation.md` §6.12. It reads no record and writes nothing:
+the address search of `docs/guides/foundation.md` §6.13. It reads no record and writes nothing:
 picking a place fills the form's own address and, for a worksite, a field site or a client visit,
 its latitude and longitude, which the person can still correct. The routes above check what is
 saved as they always did. The worksite's maps load their tiles from `GET /api/v1/maps/tiles/...`
@@ -416,7 +416,7 @@ Home and those screens never disagree.
   The reading is taken on the
   person's device when they press Use This Location, and must be within the policy's
   `max_accuracy_m` (422 `HOME_READING_WEAK`, the panel offers Retry Location). The address is their
-  own words, up to 300 characters, with addresses suggested as they type (foundation.md §6.12); a
+  own words, up to 300 characters, with addresses suggested as they type (foundation.md §6.13); a
   suggestion picked fills the address only, never the coordinates, which are the reading's.
 - A request is `pending` until People decide. A second request while one waits supersedes it. The
   approved home stays the fence until a newer one is approved; approving supersedes it.
@@ -442,7 +442,7 @@ Home and those screens never disagree.
   - `client_visit`, anyone: a client's site. The address, as the client gave it, and the site's
     centre and radius: latitude, longitude and a radius of 100 to 500 m, all required (owner
     decision, 19/10/2026). The address searches as it is typed and the place picked fills the
-    centre, which stays open to correct (foundation.md §6.12). Up to 14 days.
+    centre, which stays open to correct (foundation.md §6.13). Up to 14 days.
 - **Dates**: the first day from today in Lagos (422 `REQUEST_IN_THE_PAST`) and within 90 days
   (422 `REQUEST_TOO_FAR`); the last day on or after the first and within the type's span (422
   `REQUEST_TOO_LONG`). A request may not share a day with another one of theirs still waiting or
@@ -491,7 +491,7 @@ one assignment. The limits below are LA's, to change on request.
   to 120), an optional note (up to 500), the first and last day, one or two sites and one to 25
   people. A site is a name (2 to 120), an optional address (up to 300) and its centre and radius:
   latitude, longitude and a radius of 100 to 500 m. As on a worksite, the address searches as it is
-  typed and the place picked fills the centre, which stays open to correct (foundation.md §6.12).
+  typed and the place picked fills the centre, which stays open to correct (foundation.md §6.13).
   Numbered `FA-0001` (`field_assignment`, never reset).
 - **Dates**: the first day from today in Lagos (422 `ASSIGNMENT_IN_THE_PAST`) and within 90 days
   (422 `ASSIGNMENT_TOO_FAR`); the last on or after the first and at most 31 days in all (422
@@ -585,7 +585,7 @@ request.
   counts and no clock-out) on a work date not yet closed (today, or yesterday before the
   day-close), once the workplace's clock is past that date's shift end:
   - in front of the app now on any of their logins (a tab on screen and touched in the last 5
-    minutes, as the push hold reads it, `services/realtime/active.js`): nothing; they have the
+    minutes, as `services/realtime/active.js` reads it): nothing; they have the
     closing prompt.
   - away for at least 15 minutes since the last moment they were in front of it, or never seen:
     clocked out at the later of the shift's end and that last moment, never before the clock-in
@@ -619,7 +619,7 @@ request.
 | `attendance.exception_explained` | The person explains an exception | Notifies `people` approve holders within scope |
 | `attendance.exception_decided` | People decide an exception | Notifies the person; realtime refresh |
 | `attendance.day_closed` | The day-close job closes a person's day | Audit; realtime refresh; outbox `alerts.person-signal` (Home): re-reads that person's (`employee_id`) Late Arrivals and Missing Clock-Out rules |
-| `attendance.export_requested` | My Attendance or the register asks for a workbook | Outbox `attendance.send_export`: gathered 25 at a time, kept in the vault, emailed |
+| `attendance.export_requested` | My Attendance or the register asks for a workbook | Outbox `attendance.build_export`: gathered 25 at a time into the file the request reserved, which the screen that asked downloads; nothing is emailed, and the file is removed a day later |
 | `device.registered`, `device.removed` | My Devices, People · Devices | Notifies the person when People removed it |
 | `worksite.created`, `worksite.updated` | People · Worksites | Audit |
 | `attendance.home_requested` | A remote employee sets their home location | Audit; notifies `people` approve holders with scope over the person |
@@ -699,7 +699,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 | ESS · My Devices | The devices with status, first seen, last punch and This Device; Register This Device, Remove | Status header: what New, Registered and Removed mean | "How device checks work", the three-device reason: §6.6 |
 | People · Attendance | The date, Expected, Present, Late, Absent, On Leave, Not In, Open Exceptions; Register, Exceptions, Homes (status chips; person, address, accuracy, requested, distance from the approved home, status; a home opens with Approve and Reject) and Requests (status chips; person, number, type, dates, waiting on, status; a request opens with its details, its approval route and the decisions so far, and Record Decision, Approve or Reject with a reason, when it waits on the reader) and Field (state chips; number and name, client, people, dates, sites, state; New Assignment: Name, Client, People, First Day, Last Day, Site with Address (suggestions as it is typed, the one picked filling Latitude and Longitude), Latitude, Longitude and Radius, then a map of the site and its fence once both coordinates are real (a tap on it moves the centre), a second site, Note, Save Assignment; an assignment opens with its details, its sites and people, Take Off on a person and Cancel Assignment, each with a reason); the register (person, arrangement, clock in, clock out, location, device, status, review); a day's evidence, each punch's Source (Clock, Added by People, Automatic); Decide, an Automatic Clock-Out offering Accept and Correct Time; Export | Open Exceptions: what waits on People; Outcome on the decision form: accept, reject or add the clock-out, or for an automatic one keep or correct its time; From Approved Home: how far a new home is from the one in force; Radius on a site: a punch within it counts at the site | The page explainer, "what a manager can and cannot do", reconciliation mechanics: §3, §6.8, §8 |
 | People · Devices | Device list with employee, device, status, first seen, last punch; Remove Device | Status header: as on My Devices | "devices register on every punch": §6.6 |
-| People · Worksites | Worksites with code, address, radius, assigned and status; Add Worksite and Edit Worksite (Name, Address with suggestions as it is typed, the one picked filling Latitude and Longitude, Radius, Metres, then a map of the centre and its fence once both coordinates are real; tapping the map moves the centre; coordinates given with no address fill it); a worksite's details with the same map, Edit, Retire or Restore, its employees with Assign Employee; under the address while typing, a spinner, "No address matches" or "Could not search addresses" | Radius: punches inside count as on site | "How the geofence behaves": §6.5; where the suggestions come from: foundation.md §6.12 |
+| People · Worksites | Worksites with code, address, radius, assigned and status; Add Worksite and Edit Worksite (Name, Address with suggestions as it is typed, the one picked filling Latitude and Longitude, Radius, Metres, then a map of the centre and its fence once both coordinates are real; tapping the map moves the centre; coordinates given with no address fill it); a worksite's details with the same map, Edit, Retire or Restore, its employees with Assign Employee; under the address while typing, a spinner, "No address matches" or "Could not search addresses" | Radius: punches inside count as on site | "How the geofence behaves": §6.5; where the suggestions come from: foundation.md §6.13 |
 | People · Employees, the record's Attendance tab | A Work Setup card: Work Pattern, Office (the worksite and its radius, or No Office Assigned), Home Location (Approved, Waiting or Not Set, for remote staff and hybrid staff with a home day); a Work Week card: each day of the week with an Office, Remote or Off pill, From (the schedule's first day) and Next (a schedule waiting to start, its days and first day); Set Schedule for a hybrid employee when `can_edit` (a sheet: one Office or Remote choice for each working day, From, Reason, Save Schedule) | Office: a punch on an office day is matched here; Work Week: the days at the office, the other working days from home | How a home day is fenced, the version rules: §6.13 |
 | Settings · Attendance Policy | M9 (MILESTONES §18) | | |
 
@@ -799,7 +799,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 | pixie | `src/shared/hr_payroll/lateness.calc.js` (`minutesLate`, `minutesOvertime`) | Lateness after start plus grace, overtime after the end, on the work date's wall clock; the money half (daily rate, tiers) waits for M6 |
 | pixie | `src/shared/hr_payroll/hr_ops.service.js` (`selfClock`) and `migrations/000303` | The per-day unique index on active events, the advisory lock first; location is not mandatory (praxis's "always record" with the policy deciding) |
 | praxis-ls | `src/modules/hr/attendance/attendance.rules.js` (`wallClock`, `localDate`, `reconcileDay`) | Statuses `present`, `late`, `absent`, `leave` (no weekend or holiday rows); grace as pixie measures it (§6.4); no deductions |
-| praxis-ls | `src/modules/hr/attendance/attendance.export.js` | The register and the month as workbooks through `shared/spreadsheet`, gathered 25 at a time, emailed |
+| praxis-ls | `src/modules/hr/attendance/attendance.export.js` | The register and the month as workbooks through `shared/spreadsheet`, gathered 25 at a time, downloaded on the device that asked (never emailed) |
 | praxis-ls | `doc/CLOCKIN_REVAMP_ENGINEERING_GUIDE.md` §1.2 (the policy model) | `block` rejects, as MyCity asked; praxis holds every punch instead |
 
 ## 13 · Open questions
@@ -815,7 +815,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   no office assigned goes to review (19/10/2026). Still open: adding people to an assignment or
   changing its sites and dates (cancel and set a new one); a temporary home for hybrid staff (today
   remote staff only).
-- The address search and the maps are built (19/10/2026, foundation.md §6.12): every address on
+- The address search and the maps are built (19/10/2026, foundation.md §6.13): every address on
   these screens suggests places as it is typed, and on a worksite, a field site or a client visit
   the place picked fills the centre; a worksite's form and details show its fence on a map. A
   worksite's coordinates typed with no address are looked up for one; a home's or a punch's never
@@ -866,6 +866,10 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - 19/10/2026 · AJ · The person on the register, exceptions, devices and a worksite's people carries `photo_url` (`PersonRef`, `WorksiteEmployee`; `attendance.repo.js` and `devices.repo.js` now read the person through `shared/db/person.js`, the roster adds it to its rows): People · Attendance, Devices and Worksites show faces, initials when there is none. Download My Data reads a person's days and punches through `listDays` and `listEvents` without coordinates (`docs/guides/ess.md` §3 step 8). LA to review.
 - 19/10/2026 · LA · The client's attendance rules (owner decisions, 19/10/2026): hybrid staff's weekly schedule (§6.13): People set the office days from a date on the employee record's Attendance tab, the other working days are home days fenced on the approved home (hybrid staff with a home day now set a home too), and a present home day counts as remote on Home's roster and the register; the week, Office, Remote or Off, reaches My Profile. A client visit carries its site's centre and radius (100 to 500 m) and is fenced on it (§6.11). A day at the office with no office assigned is `unverified` (`no_worksite`) and goes to review instead of being accepted unchecked (§6.5). `1340`, `1350`; two routes; one event. §1 to §11 and §13 updated; §6.13 added.
 - 19/10/2026 · TB · Clock prompts, reminders and the automatic clock-out (owner decisions, 19/10/2026, from the 12 and 13 October meetings; §6.14): the clock panel opens by itself at the shift's start for someone not clocked in and at its end for someone still in (Remind Me in 15 minutes, 30 minutes or an hour), never over an open dialog and never dismissed by the scrim; job `attendance-clock-watch` (every 5 minutes) sends one reminder a day in the first hour after the start (`attendance.clock_in_due`, bell and push, marked read on clock-in) and clocks out an open shift once its end has passed and the person has been away from the app for 15 minutes, at the shift's end or the last moment they were in front of it (`source = 'system'`, accepted, read as Automatic, `attendance.clocked_out_automatically` tells them). The person explains one from the day (`POST /attendance/me/events/:id/explanation`), which opens an `automatic_clock_out` exception People accept or correct; the day-close's missing clock-out stays for what the watch cannot judge. `attendance_clock_reminder`, the new type and the unique indexes in `1360`, its label in `1394`; one route; two events; one job. §2 to §11 and §13 updated.
-- 19/10/2026 · TB · Every address on these screens searches as it is typed (`AddressField` over `GET /maps/search`, foundation.md §6.12): on People · Worksites, a field assignment's sites and a client visit the place picked fills Latitude and Longitude, which stay open to correct; on a home and a temporary home it fills the address only, the coordinates staying the reading's. §5, §6.10, §6.11, §6.12, §10 and §13 updated; the map tiles and the reverse lookup stay open.
+- 19/10/2026 · TB · Every address on these screens searches as it is typed (`AddressField` over `GET /maps/search`, foundation.md §6.13): on People · Worksites, a field assignment's sites and a client visit the place picked fills Latitude and Longitude, which stay open to correct; on a home and a temporary home it fills the address only, the coordinates staying the reading's. §5, §6.10, §6.11, §6.13, §10 and §13 updated; the map tiles and the reverse lookup stay open.
 - 19/10/2026 · TB · People · Worksites draws the centre and its fence on a map, in the form and the worksite's details (tiles through `GET /maps/tiles`, fetched with the session); a tap on the form's map moves the centre, and coordinates typed with no address fill it from `GET /maps/reverse`, for worksites only (decided 19/10/2026: a home's or a punch's coordinates are never sent to the provider). §5, §10 and §13 updated.
 - 19/10/2026 · TB · A field assignment's sites (People · Attendance, New Assignment) and a client visit's site (ESS · Work Location Requests, New Request) show the site and its fence on a map under the radius once both coordinates are real; a tap moves the centre. One piece, `SiteMap.tsx`, draws it on all three forms (worksites too). No address lookup on these two (worksites only, decided 19/10/2026). §10 and §13 updated.
+- 19/10/2026 · TB · Exports download on the device that pressed (`docs/guides/foundation.md` §6.12, TB's decision): Export Month and Export Register answer 202 with the file pending (`ExportFile`) instead of the email they would reach, `attendance.build_export` makes the workbook into that file, and the screens wait and save it (Downloads on Android and desktop, the share sheet on an iPhone app). Export Register's sheet closes once the request is taken and the file arrives wherever the person is in the app. A login with no email is no longer refused. The `attendance-export` email template is gone.
+- 19/10/2026 · TB · Attendance's notices are listed in Settings · Notifications (`docs/guides/notifications.md` §6):
+  People may switch any of them off company-wide, and copy Attendance needs review, Attendance
+  explanation and Home location to approve to other roles or people (`copy`). Nothing else changed.

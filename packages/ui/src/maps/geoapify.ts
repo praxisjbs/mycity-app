@@ -4,7 +4,7 @@
  * our own API, so the Geoapify key never reaches a browser.
  *
  * These are the paths our API answers on (the `maps` module, docs/guides/foundation.md
- * §6.12); a screen may pass its own. The tile route is signed in like every staff
+ * §6.13); a screen may pass its own. The tile route is signed in like every staff
  * route, so a screen hands the map a `LoadTile` that fetches with its session.
  */
 

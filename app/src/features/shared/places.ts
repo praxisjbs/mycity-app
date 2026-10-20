@@ -3,7 +3,7 @@ import { api } from "@/api/client";
 import { fetchBlob } from "@/api/download";
 
 /**
- * The maps bound to this app's API (F21, docs/guides/foundation.md §6.12): every call
+ * The maps bound to this app's API (F21, docs/guides/foundation.md §6.13): every call
  * goes through our own routes, so the provider's key never reaches the browser.
  */
 

@@ -15,12 +15,15 @@
 const crypto = require("node:crypto");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
+const documents = require("../../shared/documents/generate");
+const exportFiles = require("../../shared/documents/exports");
 const numbering = require("../../shared/numbering/numbering");
 const lagos = require("../../shared/time/lagos");
 const routeMap = require("../../shared/route-map");
 const managerText = require("./manager-text");
+const { layout } = require("./org-chart.layout");
 const repo = require("./organisation.repo");
-const { EVENTS, CHART_EXPORT } = require("./organisation.events");
+const { EVENTS, CHART_DOC_TYPE, CHART_EXPORT } = require("./organisation.events");
 
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
 const findEmployeeByWorkEmail = (client, email) => repo.findEmployeeByWorkEmail(client, email);
@@ -514,21 +517,28 @@ async function orgChart(client, { view = "viewer" } = {}) {
 }
 
 /**
- * POST /org-chart/exports, Download PDF: queue the whole chart, in the view asked for, for the
- * worker, which draws it as the person asking and emails it (org-chart.export.js;
- * docs/guides/organogram.md §5, §7). In the caller's transaction, with its event.
- * @returns {Promise<{queued: true, email: string}>}
+ * POST /org-chart/exports, Download PDF: the whole chart, in the view asked for, read and laid
+ * out now (org-chart.layout.js) and queued through documents.generate, so the pdf-render job
+ * draws it after commit; the screen that asked waits for it and downloads it there
+ * (docs/guides/organogram.md §5, §7). Nothing is emailed. In the caller's transaction, with
+ * its event.
+ * @returns {Promise<object>} the ExportFile, pending
  */
 async function requestOrgChartExport(client, { view = "viewer" } = {}, actor) {
-  if (!actor || !actor.email)
-    throw new AppError("NO_EMAIL", "Your login has no email to send the PDF to.", 422);
+  const tree = await orgChart(client, { view });
+  const doc = await documents.generate(client, {
+    doc_type: CHART_DOC_TYPE,
+    entity: { type: CHART_EXPORT, id: crypto.randomUUID() },
+    data: { ...layout(tree.nodes), seats: tree.seats, filled: tree.filled, open: tree.open },
+    actor,
+  });
   await emit(client, {
     key: EVENTS.ORG_CHART_EXPORT_REQUESTED,
-    entity: { type: CHART_EXPORT, id: crypto.randomUUID() },
+    entity: { type: CHART_EXPORT, id: doc.entity_id },
     actor,
-    payload: { view, requested_by: actor.user_id },
+    payload: { view, requested_by: actor.user_id, document_id: doc.document_id },
   });
-  return { queued: true, email: actor.email };
+  return exportFiles.present(doc);
 }
 
 /* ------------------------------------------------------------------ *

@@ -33,6 +33,8 @@
  *     sensitivity: "personal",
  *     title: (data) => `Query: ${data.subject}`,
  *     signable: false,                   // M5 offer letters and contracts: true
+ *     export: false,                     // a file somebody pressed Download for: true, kept a
+ *                                        // day and never locked (shared/documents/exports.js)
  *   });
  *   defineVariables("document", "query-letter", c.queries.QueryLetterVars);
  *
@@ -67,7 +69,8 @@ const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
 /**
  * @param {string} docType  snake_case
  * @param {{template: string, numbering?: string|null, sensitivity?: string, title: (data: object) => string,
- *          landscape?: boolean, label?: string, module?: string|null, signable?: boolean, wet?: boolean}} spec
+ *          landscape?: boolean, label?: string, module?: string|null, signable?: boolean, wet?: boolean,
+ *          export?: boolean}} spec
  */
 function defineDocType(docType, spec) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(docType))
@@ -105,6 +108,7 @@ function defineDocType(docType, spec) {
     sensitivity: spec.sensitivity || "normal",
     signable: spec.signable === true,
     wet: spec.wet === true,
+    export: spec.export === true,
   });
 }
 
@@ -288,7 +292,8 @@ async function generate(
 
 /**
  * Turn a pending document into its PDF. Called by the pdf-render job after commit;
- * safe to call twice (a document already rendered is left alone).
+ * safe to call twice (a document already rendered is left alone). The PDF is locked, unless
+ * it is an export: a copy made for one person, removed after a day (exports.js).
  * @param {string} documentId
  * @param {{db?: import("pg").Pool, renderPdf?: (html: string, opts: object) => Promise<Buffer>}} [opts]
  * @returns {Promise<object|null>} the rendered document, or null when there was nothing to do
@@ -323,10 +328,11 @@ async function renderPending(
     return await atomically(client, async () => {
       const { rows: up } = await client.query(
         `UPDATE document
-            SET render_status = 'done', render_html = NULL, render_error = NULL, bytes = $2, content_hash = $3, locked_at = now()
+            SET render_status = 'done', render_html = NULL, render_error = NULL, bytes = $2, content_hash = $3,
+                locked_at = CASE WHEN $4::boolean THEN NULL ELSE now() END
           WHERE document_id = $1 AND render_status = 'pending'
           RETURNING ${vault.COLUMNS}`,
-        [documentId, bytes.length, sha256(bytes)],
+        [documentId, bytes.length, sha256(bytes), docTypes.isExport(row.doc_type)],
       );
       if (!up[0]) return null;
       await emit(client, {

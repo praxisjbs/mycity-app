@@ -69,7 +69,12 @@ const JOBS = Object.freeze([
   {
     queue: "media-derive",
     concurrency: 1,
-    summary: "A stored document's derived files made again",
+    summary: "A stored document's derived files: a PDF's first page, or any file's made again",
+  },
+  {
+    queue: "link-preview",
+    concurrency: 2,
+    summary: "A link's card fetched and added to a message posted before it had one",
   },
   {
     queue: "import-validate",
@@ -116,6 +121,11 @@ const JOBS = Object.freeze([
     concurrency: 2,
     summary: "A report schedule's slot: a run for each recipient and format",
   },
+  {
+    queue: "reminders",
+    concurrency: 2,
+    summary: "One person's daily digest of what they have not read",
+  },
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -132,7 +142,9 @@ const SCHEDULERS = Object.freeze([
   "attendance-clock-watch",
   "home-alert-sweeps",
   "scheduled-reports",
-  "data-export-cleanup",
+  "export-cleanup",
+  "urgent-repeats",
+  "reminders",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */
@@ -167,6 +179,13 @@ const TRIGGERS = Object.freeze([
     name: "jobs.av-transcode",
     queue: "av-transcode",
     when: needs("av"),
+    data: (e) => ({ document_id: documentIdOf(e) }),
+  },
+  {
+    event: "document.stored",
+    name: "jobs.media-derive",
+    queue: "media-derive",
+    when: needs("pdf"),
     data: (e) => ({ document_id: documentIdOf(e) }),
   },
 ]);

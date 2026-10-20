@@ -1,7 +1,7 @@
 import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, NumberingScheme, Organisation, RoleDetail, RoleGrant, RoleRow, RoleSave, UserRow, WorkingDay } from "@mycity/contract/contract.gen.ts";
-import type { NotificationPref } from "@/api/types/settings";
 import type { Status } from "@/api/types/performance";
-import { accepted, at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { exportFile } from "./shared";
 import { CAPABILITIES, ROLE_CAPABILITIES } from "../data/access";
 import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
@@ -378,28 +378,6 @@ route("DELETE /api/v1/settings/roles/:id", (req) => {
   return noContent();
 });
 
-const PREFS = new Map<string, NotificationPref[]>();
-const prefsOf = (u: string) => {
-  let p = PREFS.get(u);
-  if (!p) {
-    p = [["approvals", "Approvals pending", "When something is waiting on you", true, true, false], ["query", "Query raised against you", "You are always told. There is no setting for it", true, true, true], ["payslip", "Payslip ready", "When a run is locked", true, true, false], ["task", "Task assigned to you", "", true, false, false], ["community", "Community messages", "Keep these in app only", true, false, false], ["announcement", "Announcements", "", true, true, false], ["recognition", "Recognition received", "", true, false, false], ["celebration", "Birthday and anniversary", "", true, false, false], ["alert_cleared", "Alert cleared", "", false, false, false]].map(([key, label, help, in_app, email, locked]) => ({ key: key as string, label: label as string, help: help as string, in_app: in_app as boolean, email: email as boolean, locked: locked as boolean }));
-    PREFS.set(u, p);
-  }
-  return p;
-};
-route("GET /api/v1/settings/notifications", (req) => ok(prefsOf(req.user!)));
-route("PATCH /api/v1/settings/notifications", (req) => {
-  const p = prefsOf(req.user!);
-  for (const [k, v] of Object.entries(req.body as Record<string, { in_app: boolean; email: boolean }>)) {
-    const x = p.find((y) => y.key === k);
-    if (!x) return invalid({ [k]: ["Not a notification category"] });
-    if (x.locked && (!v.in_app || !v.email)) return fail(409, "LOCKED", `${x.label} cannot be switched off.`);
-    x.in_app = !!v.in_app;
-    x.email = !!v.email;
-  }
-  return ok(p);
-});
-
 let THEME: "system" | "light" | "dark" = "system";
 const APPEAR = () => ({ theme_default: THEME, palette: [["Primary Yellow", "--primary"], ["Yellow Tint", "--accent"], ["City Green", "--secondary"], ["Deep Green", "--sidebar"]].map(([name, token]) => ({ name, token })), dark: [["Background", "--background", "Deep Green, darkened"], ["Card", "--card", "Deep Green exactly"], ["Text", "--foreground", "Clears AA against the background"], ["Muted text", "--muted-foreground", "Clears AA"], ["Primary", "--primary", "The brand yellow, unchanged"]].map(([name, token, note]) => ({ name, token, note })), typeface: "Geist" });
 route("GET /api/v1/settings/appearance", () => ok(APPEAR()));
@@ -541,4 +519,4 @@ route("GET /api/v1/audit", (req) =>
       })
     : fail(403, "PERMISSION_DENIED", "You do not have access to this"),
 );
-route("POST /api/v1/audit/exports", (req) => (admin(req.user!) ? { ...accepted(), body: { queued: true, email: byKey(req.user!)!.work_email } } : fail(403, "PERMISSION_DENIED", "You do not have access to this")));
+route("POST /api/v1/audit/exports", (req) => (admin(req.user!) ? exportFile(req.user!, "audit-log") : fail(403, "PERMISSION_DENIED", "You do not have access to this")));

@@ -14,6 +14,19 @@ describe("Card", () => {
     expect(container.firstElementChild?.className).not.toContain("p-3.5");
   });
 
+  it("draws a notice's level: amber when important, red and pulsing when urgent", () => {
+    const { container, rerender } = render(<Card urgency="important">Body</Card>);
+    const card = () => container.firstElementChild as HTMLElement;
+    expect(card().dataset.urgency).toBe("important");
+    expect(card().className).toContain("border-warning");
+    rerender(<Card urgency="urgent">Body</Card>);
+    expect(card().dataset.urgency).toBe("urgent");
+    expect(card().className).toContain("animate-urgent");
+    rerender(<Card>Body</Card>);
+    expect(card().dataset.urgency).toBeUndefined();
+    expect(card().className).not.toContain("animate-urgent");
+  });
+
   it("renders as a section and carries its Details row at the foot", () => {
     const { container } = render(
       <Card as="section" aria-label="Leave balance" details={<p>Carry over up to 5 days</p>}>

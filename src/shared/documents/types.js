@@ -19,6 +19,10 @@
  *     wet: false,                 // may be printed and signed in ink
  *   });
  *
+ * `export: true` marks a file somebody pressed Export or Download for
+ * (shared/documents/exports.js): made for them, downloaded on the device they pressed it on,
+ * never locked, and removed from the vault after exports.KEPT_HOURS.
+ *
  * `module` decides who may open the file: reading follows the module that owns
  * the document, never a Settings grant. Leave it out and reading follows the
  * record the document is attached to (its entity type's module in the route
@@ -46,7 +50,7 @@ const TYPES = new Map();
 /**
  * @param {string} docType  snake_case
  * @param {{label: string, module?: string|null, sensitivity?: "normal"|"personal"|"restricted",
- *          signable?: boolean, wet?: boolean}} spec
+ *          signable?: boolean, wet?: boolean, export?: boolean}} spec
  */
 function defineDocumentType(docType, spec) {
   if (!DOC_TYPE_RE.test(String(docType || "")))
@@ -74,6 +78,7 @@ function defineDocumentType(docType, spec) {
     sensitivity: spec.sensitivity || "normal",
     signable: spec.signable === true,
     wet: spec.wet === true,
+    export: spec.export === true,
   });
   const existing = TYPES.get(docType);
   if (existing) {
@@ -123,6 +128,19 @@ function all() {
   return [...TYPES.values()];
 }
 
+/** Whether a doc type's files are exports: downloaded by whoever asked, kept a day, never locked. */
+function isExport(docType) {
+  const spec = typeOf(docType);
+  return Boolean(spec && spec.export);
+}
+
+/** Every export doc type, for the export-cleanup job. */
+function exportTypes() {
+  return all()
+    .filter((t) => t.export)
+    .map((t) => t.doc_type);
+}
+
 /* The types the shared layer itself stores. */
 defineDocumentType("import_source", {
   label: "Imported spreadsheet",
@@ -135,4 +153,6 @@ module.exports = {
   assertDocType,
   signatureCeiling,
   all,
+  isExport,
+  exportTypes,
 };

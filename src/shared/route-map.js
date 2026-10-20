@@ -141,6 +141,7 @@ const ENTITY_ROUTES = Object.freeze({
   direct_message: screen("community", "direct-messages"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
   announcement: screen("community", "announcements"),
   recognition: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  community_link_preview: screen("community", "channels"), // search:none a page's card, kept once per address; found through the message that posts the link
   mail_thread: screen("mailbox", "inbox"), // opens the conversation by id, whichever folder it is in
   mail_message: screen("mailbox", "inbox"), // search:none a message is found through its conversation (mailbox.search.js)
   mail_signature: screen("mailbox", "signature"), // search:none one per person, their own; ⌘K finds the Signature tab (shared/search/screens.js)
@@ -159,11 +160,11 @@ const ENTITY_ROUTES = Object.freeze({
     self: screen("ess", "my-profile"),
   },
   // A Download My Data workbook (ess.export.js): its record opens My Profile, where it is asked for.
-  data_export: screen("ess", "my-profile"), // search:none a file that is emailed to whoever asked and removed after seven days; nothing to look up
+  data_export: screen("ess", "my-profile"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
-  // A Download PDF request: its notice opens the Org Chart, where it can be asked for again.
-  org_chart_export: screen("ess", "org-chart"), // search:none a request for a file that is emailed to the person who asked; nothing to look up
+  // A Download PDF file: its record opens the Org Chart, where it is asked for.
+  org_chart_export: screen("ess", "org-chart"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   import_batch: screen("settings", "imports"),
   // A file opens where its record is: on the employee's own My Documents, or on
   // the record's Documents tab for whoever may see it.

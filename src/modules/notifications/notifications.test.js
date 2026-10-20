@@ -68,7 +68,8 @@ describe("how an event's notices group on a device", () => {
     const fanout = require("../../shared/notifications/fanout");
     require("../community/community.events");
     const style = fanout.pushStyleOf({ key: "channel_message.posted", payload: { community_channel_id: "c-1" } });
-    expect(style).toEqual({ tag: "community_channel:c-1", mode: "quiet" });
+    // Every channel post alerts (TB, 19/10/2026).
+    expect(style).toEqual({ tag: "community_channel:c-1", mode: "alert" });
     expect(fanout.pushStyleOf({ key: "direct_message.sent", payload: { community_channel_id: "c-2" } })).toEqual({ tag: "community_channel:c-2", mode: "alert" });
     expect(fanout.pushStyleOf({ key: "no.such_event" })).toBeNull();
   });
@@ -87,5 +88,53 @@ describe("the environment's push and mail defaults", () => {
     expect(local.config.VAPID_SUBJECT).toBe("mailto:jbspraxisllc@gmail.com");
     expect(parseEnv({ APP_ENV: "test", VAPID_PUBLIC_KEY: "BPublic" }).problems).toContain("VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are set together, or neither");
     expect(parseEnv({ APP_ENV: "test", VAPID_SUBJECT: "someone" }).problems).toContain("VAPID_SUBJECT must be a mailto: or https: address");
+  });
+});
+
+describe("Settings · Notifications, reminders and quiet hours (no database)", () => {
+  const lagos = require("../../shared/time/lagos");
+  const categories = require("../../shared/notifications/categories");
+  const at = (day, time) => lagos.instant(day, time);
+
+  test("a channel: the person's switch, else the company's default for the notice, else the category's", () => {
+    expect(categories.isOn("people", "email", undefined, null)).toBe(false);
+    expect(categories.isOn("people", "email", undefined, true)).toBe(true);
+    expect(categories.isOn("people", "email", false, true)).toBe(false);
+    expect(categories.isOn("people", "push", true, false)).toBe(true);
+    // Security's channels that are on by default stay on, whoever says otherwise.
+    expect(categories.isOn("security", "email", false, false)).toBe(true);
+  });
+
+  test("quiet hours: when they end, across midnight or not, Lagos time", () => {
+    const { quietEnd } = require("./notifications.service");
+    expect(quietEnd(at("2026-10-19", "23:00"), "21:00", "07:00").toISOString()).toBe(at("2026-10-20", "07:00").toISOString());
+    expect(quietEnd(at("2026-10-20", "06:59"), "21:00", "07:00").toISOString()).toBe(at("2026-10-20", "07:00").toISOString());
+    expect(quietEnd(at("2026-10-20", "07:00"), "21:00", "07:00")).toBeNull();
+    expect(quietEnd(at("2026-10-20", "13:30"), "13:00", "14:00").toISOString()).toBe(at("2026-10-20", "14:00").toISOString());
+    expect(quietEnd(at("2026-10-20", "12:59"), "13:00", "14:00")).toBeNull();
+  });
+
+  test("working hours: 08:00 to 18:00 Lagos, else the next 08:00", () => {
+    const { inWorkHours } = require("./notifications.reminders");
+    expect(inWorkHours(at("2026-10-19", "07:10")).toISOString()).toBe(at("2026-10-19", "08:00").toISOString());
+    expect(inWorkHours(at("2026-10-19", "12:00")).toISOString()).toBe(at("2026-10-19", "12:00").toISOString());
+    expect(inWorkHours(at("2026-10-19", "18:00")).toISOString()).toBe(at("2026-10-20", "08:00").toISOString());
+  });
+
+  test("a declaration names its audience and says whether it takes copies", () => {
+    const fanout = require("../../shared/notifications/fanout");
+    const { defineEvents } = require("../../shared/events/catalogue");
+    defineEvents("settings", { "rules_test.copied": { summary: "A test notice about someone else" } });
+    expect(() => fanout.defineNotification("rules_test.copied", { to: [{ users: () => [] }], title: "T", copy: { note: "x" } })).toThrow(/copy is true or/);
+    expect(() => fanout.defineNotification("rules_test.copied", { to: [{ users: () => [] }], title: "T", who: "" })).toThrow(/who is/);
+    fanout.defineNotification("rules_test.copied", {
+      to: [{ users: () => [] }, { permission: ["people", "approve"] }, { ceo: true }],
+      title: "T",
+      who: "Its owners",
+      copy: { body: "About someone else." },
+    });
+    const notice = fanout.notices().find((n) => n.event_key === "rules_test.copied");
+    expect(notice).toMatchObject({ name: "A test notice about someone else", category: "system", copies: true, locked: false, urgency_default: "normal" });
+    expect(notice.who).toEqual(["Its owners", "People · Approve", "CEO"]);
   });
 });

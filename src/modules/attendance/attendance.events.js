@@ -11,8 +11,9 @@
  *   attendance.exception_explained  the person wrote why: People are told
  *   attendance.exception_decided    People decided: the person is told
  *   attendance.day_closed           the day-close closed a person's day
- *   attendance.export_requested     a month or the register asked for as a workbook,
- *                                   built here after commit and emailed (attendance.export.js)
+ *   attendance.export_requested     a month or the register asked for as a workbook, made
+ *                                   after commit into the file the screen that asked is
+ *                                   waiting on, and downloaded there (attendance.export.js)
  *   attendance.home_requested       a remote employee sent a home location: People
  *                                   (approve, within scope) are told
  *   attendance.home_decided         People approved or rejected it: the person is told, and
@@ -39,14 +40,12 @@
  * Payloads carry ids, dates, results and exception types (a field assignment's number and
  * name too): never coordinates, an address, a device identifier or the evidence itself.
  */
-const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { defineEvents, WORKFLOW } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
 const workflow = require("../../shared/workflow/engine");
 const { defineNotification, permissionHolders } = require("../../shared/notifications/fanout");
 const { defineDocumentType } = require("../../shared/documents/types");
-const { defineVariables } = require("../../shared/templates/variables");
 const { formatDate } = require("../../shared/time/day-first");
 
 const EVENTS = defineEvents("people", {
@@ -77,9 +76,8 @@ defineDocumentType("attendance_export", {
   label: "Attendance export",
   module: "people",
   sensitivity: "restricted",
+  export: true,
 });
-
-defineVariables("email", "attendance-export", c.attendance.AttendanceExportEmailVars);
 
 /** "Outside the worksite" for the notification line, by exception type. */
 const WHAT = Object.freeze({
@@ -98,12 +96,14 @@ defineNotification(EVENTS.ATTENDANCE_REVIEW_REQUIRED, {
   title: "Attendance needs review",
   body: (e) => `${e.payload.employee_name}, ${formatDate(e.payload.work_date)}: ${whatOf(e.payload.types)}.`,
   include_actor: true,
+  copy: true,
 });
 
 defineNotification(EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED, {
   to: [{ permission: ["people", "approve"] }],
   title: "Attendance explanation",
   body: (e) => `${e.payload.employee_name} explained ${formatDate(e.payload.work_date)}.`,
+  copy: true,
 });
 
 defineNotification(EVENTS.ATTENDANCE_EXCEPTION_DECIDED, {
@@ -116,6 +116,7 @@ defineNotification(EVENTS.ATTENDANCE_HOME_REQUESTED, {
   to: [{ permission: ["people", "approve"] }],
   title: "Home location to approve",
   body: (e) => `${e.payload.employee_name} sent a home location.`,
+  copy: true,
 });
 
 defineNotification(EVENTS.ATTENDANCE_HOME_DECIDED, {
@@ -205,8 +206,8 @@ for (const key of [
   outbox.register(key, "attendance.push_updated", pushUpdated);
 
 /* The service and the export are required when a handler runs: they require this file. */
-outbox.register(EVENTS.ATTENDANCE_EXPORT_REQUESTED, "attendance.send_export", (event) =>
-  require("./attendance.export").sendExport(event),
+outbox.register(EVENTS.ATTENDANCE_EXPORT_REQUESTED, "attendance.build_export", (event, ctx) =>
+  require("./attendance.export").buildExport(event, ctx),
 );
 
 /** The request status an approval's end state means. */

@@ -221,7 +221,7 @@ async function tile(z, x, y, { apiKey = config.GEOAPIFY_API_KEY, fetchImpl = fet
 
 /**
  * The address at a point, or null when the provider knows none. Used for a worksite's
- * centre only: a person's home or a punch is never sent (docs/guides/foundation.md §6.12).
+ * centre only: a person's home or a punch is never sent (docs/guides/foundation.md §6.13).
  * @param {number} lat  @param {number} lon
  * @param {{apiKey?: string, fetchImpl?: typeof fetch}} [opts]  tests
  * @returns {Promise<string|null>}

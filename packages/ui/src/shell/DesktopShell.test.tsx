@@ -43,6 +43,17 @@ describe("DesktopShell", () => {
     expect(page).not.toHaveClass("hidehead");
   });
 
+  it("draws the urgent bar under the top bar, before the tabs and outside the page", () => {
+    render(
+      <DesktopShell rail={null} topBar={<TopBar search={<SearchButton onClick={() => undefined} />} />} tabs={<div role="tablist" aria-label="People" />} alert={<div role="alert">Fire drill at 11</div>}>
+        <h1>Employees</h1>
+      </DesktopShell>,
+    );
+    const alert = screen.getByRole("alert");
+    expect(screen.getByRole("main")).not.toContainElement(alert);
+    expect(alert.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("draws no main landmark inside another page", () => {
     render(<DesktopShell landmarks={false} rail={null} topBar={null}><p>Page</p></DesktopShell>);
     expect(screen.queryByRole("main")).toBeNull();

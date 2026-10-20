@@ -42,23 +42,24 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 30 items below: 29 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 29 | 0 | 0 | 29 | 0 | 0 |
+| M0 Foundation | 32 items below: 31 done, 1 open | | | | | |
+| M1 Core Operations & Employee Management | 30 | 0 | 0 | 30 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
-| M6 Payroll & Notifications | 7 | 7 | 0 | 0 | 0 | 0 |
+| M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 11 | 4 | 0 | 7 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 7 | 7 | 0 | 0 | 0 | 0 |
-| **Total** | **94** | **58** | **0** | **36** | **0** | **0** |
+| **Total** | **94** | **57** | **0** | **37** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6); Policy
 Updates (M9) is built with Settings · Attendance Policy (owner decision, 19/10/2026). M4 and M5 include their public-site
-pages. Settings → Notifications is counted in M6, where it is built.
+pages. Settings → Notifications was brought forward to M0 by TB on 19/10/2026 and is counted with
+M1, like the other M0 screens.
 
 ---
 
@@ -81,7 +82,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Sign-in and sessions: `identity`, `access`, `users`; session rules, lock screen, credential links, the seven roles, the four-city sign-in screen (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | Two-step sign-in, passkeys and the PIN: the `security` module, the code step, PIN and passkey sign-in, the lock screen's PIN and passkey, the fresh-sign-in window, Reset Two-Step (`docs/guides/identity.md`) | TB | ☑ | 16/10/2026 |
 | `create-admin` seeds a full employee, login and role (§17) | GE | ☑ | 13/10/2026 |
-| Documents, media, uploads, PDF generation | GE | ☑ | 17/10/2026 |
+| Documents, media, uploads, PDF generation | GE | ☑ | 19/10/2026 |
 | Import engine + staff importer; real staff sheet imported on staging | GE · LA · TB | ☑ | 17/10/2026 |
 | AI foundation: `services/ai`, manifests, registry, gate 9 | GE | ☑ | 15/10/2026 |
 | CI wiring: `package.json`, lockfile, ESLint, Jest, `ci-local.js`, `ci.yml` | GE | ☑ | 13/10/2026 |
@@ -99,12 +100,30 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Gate 21 · nothing the browser styles itself (F25): branded `SelectMenu` behind every select, `Tooltip` for every hover label, the `base.css` reset, `check/native-ui.js` in source and on every rendered screen | AJ | ☑ | 18/10/2026 |
 | One press, one request (F26): every button busy from the press until its work settles, a second press refused, its `ActionGroup` waiting, no modal dismissed mid-save, Enter twice sends one form, a Reload that always reloads; lint `mycity/no-void-press` | AJ | ☑ | 18/10/2026 |
 | Notifications brought forward from M6 (TB, 19/10/2026): web push to phones and computers, the in-app banner, the pane on both shells, Notification Settings, live mail (`docs/guides/notifications.md`, build plan `docs/handoff/push-notifications.md`) | TB | ☑ | 19/10/2026 |
+| Notifications everywhere (TB, 19/10/2026): every device at once, every channel post alerting, urgency with Acknowledge, the urgent bar and urgent repeats (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☑ | 19/10/2026 |
+| Notification rules and reminders (TB, 19/10/2026): Settings · Notifications brought forward from M6 (#74), the reminder engine with approval and probation reminders, the daily digest, quiet hours (`docs/guides/notifications.md`, build plan `docs/handoff/notifications-everywhere.md`) | TB | ☑ | 19/10/2026 |
 | Maps (F21): `GET /maps/search`, `/maps/tiles`, `/maps/reverse` (Geoapify through our API, `GEOAPIFY_API_KEY`), `AddressField` on every address a person types, `MapView` tiles fetched with the session | TB | ☑ | 19/10/2026 |
 
 **Notes**
 
-- 19/10/2026 · TB · Map tiles and a worksite's address (decided 19/10/2026; `docs/guides/foundation.md` §5, §6.12): `GET /api/v1/maps/tiles/:z/:x/:y.png` (signed in; `MapView` takes `loadTile` and the app fetches each tile with the session, as photos load, so no public route spends the quota; kept a day on the server, a week in the browser) and `GET /api/v1/maps/reverse` (`people` create or edit; a worksite's centre only, never a home or a punch). Left: `GEOAPIFY_API_KEY` on staging and production (GE).
-- 19/10/2026 · TB · Address search (F21; `docs/guides/foundation.md` §6.12): `GET /api/v1/maps/search` in a new `maps` module (`self`, reads and writes nothing) over `services/maps/geoapify.service.js` (Geoapify autocomplete with the key on the server, biased to Lagos, six places at most, answers kept ten minutes; 503 `MAPS_OFF` with no `GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui` (a combobox that suggests places as it is typed and hands back the place picked; `maps/usePlaces.ts` now shared with `PlaceSearch`). On every address a person types: Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation, a vacancy's location. Left: `GEOAPIFY_API_KEY` set on staging and production (GE); the map tiles and the reverse lookup through our API (`MapView`, `LocationLabel`), whose tiles load without the session's token.
+- 19/10/2026 · TB · Map tiles and a worksite's address (decided 19/10/2026; `docs/guides/foundation.md` §5, §6.13): `GET /api/v1/maps/tiles/:z/:x/:y.png` (signed in; `MapView` takes `loadTile` and the app fetches each tile with the session, as photos load, so no public route spends the quota; kept a day on the server, a week in the browser) and `GET /api/v1/maps/reverse` (`people` create or edit; a worksite's centre only, never a home or a punch). Left: `GEOAPIFY_API_KEY` on staging and production (GE).
+- 19/10/2026 · TB · Address search (F21; `docs/guides/foundation.md` §6.13): `GET /api/v1/maps/search` in a new `maps` module (`self`, reads and writes nothing) over `services/maps/geoapify.service.js` (Geoapify autocomplete with the key on the server, biased to Lagos, six places at most, answers kept ten minutes; 503 `MAPS_OFF` with no `GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui` (a combobox that suggests places as it is typed and hands back the place picked; `maps/usePlaces.ts` now shared with `PlaceSearch`). On every address a person types: Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation, a vacancy's location. Left: `GEOAPIFY_API_KEY` set on staging and production (GE); the map tiles and the reverse lookup through our API (`MapView`, `LocationLabel`), whose tiles load without the session's token.
+- 19/10/2026 · TB · Documents and media: a PDF's pages are drawn in the app by PDF.js (`PdfViewer`, its own chunk; its fonts, character maps and decoders served from `/pdfjs/`, never precached), replacing the browser's own viewer, which drew nothing on Android and was blocked by the security policy (`object-src 'none'`) on staging and production (FRONTEND_FOUNDATION §5, PR 3 question 4). `MediaViewer` opens a photo, a video or a PDF full screen everywhere a file is opened (Staff Community, My Documents, a mail's attachments), with Download and Share on a phone; `MediaRef` carries a file's shape, page count, length and sizes; the worker counts a PDF's pages and draws its first page (`document.page_count`, migration 1147, `document.derived`). Checked in Chromium on the live build under the production policy, desktop and an emulated Pixel 7: a three-page PDF, a JPEG 2000 photo (WebAssembly refused by the policy, PDF.js's plain decoder used) and Japanese text (character maps from `/pdfjs/cmaps`). Left: Share on a real phone; the worker's first page shows boxes for Japanese or Chinese text in a PDF that does not carry its fonts (no such fonts on the servers).
+- 19/10/2026 · TB · Notification rules and reminders built (PR 2 of
+  `docs/handoff/notifications-everywhere.md`, after PR 1 merged as #81): Settings · Notifications
+  (#74) brought forward from M6; the fan-out applies the company's rule per notice (Off, copies,
+  urgency, default channels); one reminder engine (`notifications.reminders.js`, the `reminders`
+  scheduler every 5 minutes) with Approvals Waiting and Probation Ending; the daily digest email
+  (the `reminders` job, `templates/email/digest.html`); quiet hours holding pushes (urgent and
+  Security pass). Left: TB's view on the design choices in the handoff's §5.
+- 19/10/2026 · TB · Exports download on the device that pressed, never by email (TB's four answers, 19/10/2026; `docs/guides/foundation.md` §6.12). One path for every Export and Download button: `src/shared/documents/exports.js` reserves the file in the request (or `documents.generate` for a PDF), the module's outbox handler makes it, `GET /exports/:id` answers while the screen waits, and `GET /documents/:id/content` downloads it; `ExportFile` in the contract replaces the four "queued, and the email it goes to" shapes. The app's `api/exports.ts` waits and saves wherever the person is in the app; `api/download.ts` saves into Downloads (Android, desktop) or opens the share sheet with Save to Files on an iPhone app; `ExportButton` stays busy until the file is saved. Export files are kept 24 hours (`export-cleanup`, hourly, replaces `data-export-cleanup`), never locked. Only a report schedule's files are still emailed. The integration suite passes locally (80 suites, 1,726 tests), and every frontend test (UI 823, app 260). Left: the M6 payslips screen's Email a Copy is still in its plan (`docs/guides/ess.md` §2), for TB to confirm against this decision.
+- 19/10/2026 · TB · Notifications everywhere, started from TB's twelve answers
+  (`docs/handoff/notifications-everywhere.md`). An announcement GE posted from the build account
+  reached no device signed in as that account, by design: nobody is told of their own action.
+  Built in PR 1: every device at once, every channel post alerting, urgency with Acknowledge, the
+  urgent bar on both shells, urgent repeats (`0470`, `1145`); the whole `npm run ci` passes locally
+  and Chromium shows the pushes as designed. Left: PR 2 (Settings · Notifications brought forward
+  from M6, the reminder engine, the digest, quiet hours).
 - 19/10/2026 · AJ · CI runs as four jobs side by side (`.github/workflows/ci.yml`: backend, frontend, screens, checks, and the `ci` check over them; `npm run ci -- --group=<name>`), the three frontend workspaces' tests at once (`scripts/fe-test.js`: 430 s to 254 s here), Chromium and ffmpeg's packages cached. Left: compare a week of run times and Actions minutes; four jobs bill more minutes than one.
 - 19/10/2026 · AJ · Frontend foundation: a module's tab strip on a narrow desktop window keeps the tabs that fit (the active one always) and folds the rest into More Tabs, a ⋯ menu, instead of scrolling sideways (`packages/ui` `Tabs`; every module). Phones unchanged.
 - 19/10/2026 · TB · CI does only what a change needs (`.github/workflows/ci.yml`,
@@ -591,13 +610,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
-| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Overview (#1) and Reports (#3): the Overview's Export and Run Now download their file on the device that pressed instead of emailing it (`docs/guides/home.md` §3, §5 to §7, §10; foundation.md §6.12). The button is busy while the run's file is made, Recent Runs shows it Pending meanwhile, and the toast reads "RPT-0215 downloaded". `GET /home/overview/export/:id` lets Staff, who hold no `home.reports`, wait on their own Overview run. A schedule's runs are still emailed. Left: nothing.
 - 19/10/2026 · LA · Home · Team (#86) and Clocked In Today: the roster's `field` status (`docs/guides/attendance.md` §6.9, §6.12; `docs/guides/home.md` §6): someone present on a field assignment's day reads Field, counted in Present Today and Clocked In Today, with a Field chip on Team and in Clocked In Today's groups, and the site in the Worksite column. Team's four cards are unchanged. Left: nothing.
 - 18/10/2026 · TB · Home PR 5 (`m1/home-reports`): Reports #3 built on the real API, desktop and
   phone, which completes Home. `src/modules/reports`: the source registry (Daily Attendance, Leave,
@@ -705,7 +725,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 89 | Policy Updates | `policy-updates` | M9 | LA | ☐ | ☐ | ☐ | Not started | 19/10/2026 |
@@ -714,6 +734,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 19/10/2026 · TB · My Documents (#14): View File opens a PDF or a photo full screen in the file viewer shared with Staff Community (Download, Share on a phone), and the preview beside the list draws a PDF's pages in the app with PDF.js, where the browser's own viewer showed nothing on Android and was blocked by the security policy on staging and production. Checked in Chromium on the live build under the production policy (upload, preview, View File). Left: walk it on a phone once staging has it.
+- 19/10/2026 · TB · My Profile (#8), My Attendance (#9) and Org Chart (#91): Download My Data, Export Month and Download PDF save the file on the device that pressed, never by email (`docs/guides/ess.md` §3 step 8, §5 to §7; attendance.md §5, §7; organogram.md §5 to §7; foundation.md §6.12). Download My Data pressed again the same day gives the same file; the CEO is refused for that person that day as before; a failed file does not count; the file is kept a day, not seven. Left: nothing.
 - 19/10/2026 · TB · My Attendance (#9) and the clock panel: clock prompts, reminders and the automatic clock-out (owner decisions, 19/10/2026, from the 12 and 13 October meetings; `docs/guides/attendance.md` §6.14). On both shells the panel opens by itself at the shift's start for someone not clocked in (once a day on each device, not after the sign-in prompt or Clock In already showed it) and at its end for someone still in, with Remind Me (15 minutes, 30 minutes, 1 hour); Esc, the scrim and a drag leave it open, and it never replaces a dialog that is open. Job `attendance-clock-watch` (every 5 minutes) sends one reminder a day in the first hour after the start (the bell and push, read on clock-in) and clocks out a shift left open once its end has passed and the person has been away from the app 15 minutes, at the end or the last moment they were on it; the person is told. My Days and a day's punches read Automatic, and Explain Time sends a note that People keep or correct. `1360`, `1394`; `POST /attendance/me/events/:id/explanation`; `useModal().open` takes `dismissible`. Checked by 8 integration tests on the real migrations, 3 backend unit tests, 5 tests of the prompts' timing and 3 of the prompts on the mock at a held clock. Left: configurable reminder rules stay M6 (#74); a cap on Remind Me is not decided; not yet seen on a phone with push on.
 - 19/10/2026 · AJ · My Profile (#8): the photo now also shows on the employee record's header (People · Employees) and on Settings · Users and a role's people. Left: the organogram PDF still draws initials.
 - 19/10/2026 · LA · The client's clock-in rules (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.5, §6.11, §6.13). My Profile (#8): the Work Schedule shows each day's place, Office, Remote or Off (`EssWorkDay.place`, from attendance's week). My Attendance (#9): the Home Location card shows for hybrid staff whose schedule has home days too, and they set a home as remote staff do; the clock panel names a client visit's site (Client Visit · 200 m), says No Office Assigned for someone expected at an office with none (and still takes a reading, the punch going to review), and matches a hybrid home day to the approved home. Work Location Requests (#87): a client visit carries its site, a Client Site card with Latitude, Longitude and Radius (100 to 500 m), checked by the contract, and the request shows it. Checked by screen tests on the mock (the request form, the record's tab at 1440 and 390 px, the clock panel with no office) and integration tests on the real migrations. Left: picking a client's site from an address once address search exists (F21).
@@ -772,12 +794,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Media and links in Channels (#15) and Direct Messages (#16), from TB's four answers (`docs/guides/community.md` §3 steps 17 and 18, §6). Photos show in place at their own shape, 4 or more sent together as one 2 by 2 album with "+N"; a video shows its poster and length; a PDF its first page (drawn by the worker), its name and "N pages · PDF · size"; any other file its name, type and size; captions under their media; every link clickable. Send Files (＋ Attach a File; Attach → Photo or Video, Document) opens the device's picker at once, takes up to 10 files with a percentage each, shows them as tiles in the order picked, a caption, and posts them in that order under one album key. A photo, video or PDF opens the file viewer (zoom, step, Download, Share on a phone; a PDF's pages drawn by PDF.js), and so does the profile's Shared in Conversation. The first link gets a card the server fetches (`POST /community/link-previews`, 30 a minute; the public web only, private addresses refused, 1 MB and 8 seconds; its picture copied into the vault; kept a week), shown above the composer with Remove Preview and on the message; job `link-preview` attaches it after the commit when it was not ready. Migration 1147 (`community_link_preview`, `community_message.community_link_preview_id`, `document.page_count`); `MediaRef` on messages and the upload's answer. 48 unit tests of the link rules and the fetcher, 20 integration tests on the real migrations (a card fetched once and kept, a private address refused, the job attaching and idempotent, Remove Preview, an edit following its link, an album and its caption, a real three-page PDF drawn by the worker, a broken one failing at once, the upload's answer), and the components' tests. Walked in Chromium on the live build with the production security policy, desktop and an emulated Pixel 7: albums, captions, the composer's card and Remove Preview, the viewer on photos and PDFs, Send Files as a sheet. Fixed on the way: files sent together kept the order they finished uploading in, not the order picked; a caption widened its photo's bubble; the viewer opened with Close's tooltip showing, so the first Esc closed only the tooltip. Left: Share on a real phone; the link fetch from staging (this environment cannot reach the web); the worker's first page shows boxes for Japanese or Chinese text in a PDF that does not carry its fonts.
 - 17/10/2026 · GE · Fixed on a phone: picking a channel from the Channels drawer switched channel but left the drawer open (the drawer opened the shared sheet and never closed it; the only place in the app that did this). Fixed: a celebration posted by hand showed "years at MyCity" with no number; it now carries the years from the start date, and "Another year" when there is none. Left: nothing.
 - 17/10/2026 · GE · #announcements has no composer (announcements come only from the tab; the server refuses a plain post there, People and the CEO included) and a lock on its row. The Announcements tab's figures come from the server (`GET /community/announcements/stats`): Audience is the active staff an all-staff announcement reaches, where it read 0 until one was published; the other figures were counted from the first page only. Polls sit on the sender's side up to 560 px as in the demo; announcements read as a feed on the left. Ctrl+Enter (Cmd+Enter) starts a new line on desktop too. Left: nothing.
 - 17/10/2026 · GE · Each person pins up to 3 channels or conversations for themselves (migration 1140; ⋮ Pin to Top, Unpin; under #general and #announcements, which stay pinned for everyone). Muted and pinned rows show a bell and a pin. Fixed: a muted channel always read as unmuted (pg returns 'infinity' as Infinity), so it could not be unmuted from the screen; notifications were correctly held back throughout. Messages and announcements keep their line breaks, and the composer is a box that grows (Enter sends and Shift+Enter is a new line on desktop; on a phone Enter is a new line). Left: nothing.
@@ -792,16 +815,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 18 | Inbox | `inbox` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 19 | Sent | `sent` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 20 | Drafts | `drafts` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 21 | Archive | `archive` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 22 | Spam | `spam` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 23 | Trash | `trash` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 18 | Inbox | `inbox` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 19 | Sent | `sent` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 20 | Drafts | `drafts` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 21 | Archive | `archive` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 22 | Spam | `spam` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 23 | Trash | `trash` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 94 | Signature | `signature` | M1 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · The reader in every folder (#18 to #23): a photo, a video or a PDF attached to a mail opens in the file viewer shared with Staff Community (a PDF's pages drawn by PDF.js on a phone as on desktop, Download, Share on a phone), with each attachment's own glyph; any other attachment downloads as before. Typechecked and linted; not walked on a live mailbox here (no mail server in this environment). Left: walk it on staging.
 - 19/10/2026 · TB · Signature (#94) built, from TB's brief and answers (design B, Street Sign, chosen on the design canvas from three): one signature for everyone, drawn from the employee record, the mailbox and Settings · Organisation, never designed by hand. Backend: contract (`MySignature`, `MySignatureSave`, `SignaturePreview*`, `SignatureConfig*`), migration 1127 (`mail_signature`, `mail_signature_config`), seed 1129 (`mailbox.signature` for System Administrator and Implementation), `mailbox/signature/` (the model, the email-safe full signature and slim line in HTML and text, the pictures drawn at 2x and stored once by hash, placement above the quoted mail), five routes, and `send()` baking the signature into the queued message with its pictures sent inline (`cid:`) and kept on the Sent copy. The slim line goes on replies and on mail only for colleagues. Screens: the tab shows it as it sends (New Mail or Reply) with Copy Signature, the person's numbers (the mobile through the organisation service, as Edit Profile) and two switches; Configure for holders (app links, six social links as icons, what shows); the composer previews it behind Show Signature. 21 unit tests (the model, the drawings, placement, the full-or-slim rule, the pictures) and 7 integration tests on the real migrations (the tab, numbers through the employee record, the preview rule, Configure's capability, sending with inline pictures and the Sent copy, a reply's placement, a queued message keeping its signature, a failed bake leaving without it); the brand files' test in `tests/integration/settings.test.js`. Left: walk it on a phone once staging has it; the brand files are uploaded by MyCity in Settings · Organisation.
 - 19/10/2026 · GE · Signature added with npm run new:screen (catalogue, route map, screen file, Coming Soon); not started.
 - 18/10/2026 · GE · Reader brought level with the reference client: remote content held back by every route it can fetch (images, `srcset`, posters, `background`, style `url()`), so Load Images is offered whenever anything was held; Always Show Images per sender (`mail_image_trust`, migration 1125, `POST /mailbox/image-trust`, Stop Showing Images in the thread menu); signature logos (`cid:` inline parts) drawn from the vault; quoted history folded behind Show Quoted Text, in English and French, from a blockquote, an "On … wrote:" line or trailing `>` lines. Also fixed: the frame's spacing came out of its measured height and clipped the last lines of every message. Checked in the mock app at 390 px and with the integration suite (12 of 12). Left: walk it on a phone once staging has it.
@@ -828,7 +852,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 - 19/10/2026 · TB · Attendance (#25), New Assignment, and Work Location Requests (#87), a client visit: each site shows its centre and fence on a map under the radius once both coordinates are real, a tap moving the centre (`SiteMap.tsx`, shared with Worksites #28; `docs/guides/attendance.md` §10). No address lookup on these two (worksites only). Nothing left on maps for these forms.
 - 19/10/2026 · TB · Worksites (#28): the form and a worksite's details draw the centre and its fence on a map; a tap on the form's map moves the centre, and coordinates typed with no address fill it from the reverse lookup (worksites only). Left: the same map on a field site's and a client visit's form (`docs/guides/attendance.md` §13).
-- 19/10/2026 · TB · Worksites (#28): Add Worksite and Edit Worksite search the address as it is typed and the place picked fills Latitude and Longitude, which stay open to correct; the same on a field assignment's sites on Attendance (#25) and a client visit's site on Work Location Requests (#87). A home's address (My Attendance #9, a temporary home) suggests addresses too, the coordinates staying the reading's (`docs/guides/attendance.md` §5, §10; `docs/guides/foundation.md` §6.12). Left: a map of the fence on the worksite's form, with the map tiles.
+- 19/10/2026 · TB · Worksites (#28): Add Worksite and Edit Worksite search the address as it is typed and the place picked fills Latitude and Longitude, which stay open to correct; the same on a field assignment's sites on Attendance (#25) and a client visit's site on Work Location Requests (#87). A home's address (My Attendance #9, a temporary home) suggests addresses too, the coordinates staying the reading's (`docs/guides/attendance.md` §5, §10; `docs/guides/foundation.md` §6.13). Left: a map of the fence on the worksite's form, with the map tiles.
+- 19/10/2026 · TB · Attendance (#25), Employees (#24) and Organogram (#92): Export Register, the CEO's Download Their Data and Download PDF save the file on the device that pressed, never by email (`docs/guides/attendance.md` §5, §7; ess.md §5; organogram.md §5 to §7, §11; foundation.md §6.12). Export Register's sheet closes once the request is taken and the file arrives wherever the person is in the app. Left: nothing.
 - 19/10/2026 · TB · People · Attendance (#25): automatic clock-outs (`docs/guides/attendance.md` §6.14). A day's evidence names a punch's source Automatic, and the register keeps the person's own punch's location and device after one. An explained automatic clock-out is an Automatic Clock-Out exception, decided Accept or Correct Time (People's time stands in its place and the automatic one stops counting; Reject is refused). Left: nothing.
 - 19/10/2026 · LA · Hybrid staff's weekly schedule (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.13): Employees (#24) gains an Attendance tab on the record (Work Setup: pattern, office and radius or No Office Assigned, home state; Work Week: each day Office, Remote or Off, From and Next), and Set Schedule for a hybrid employee (`people` edit within scope, never your own): one Office or Remote choice per working day, From (today to 90 days), Reason; at least one working day left for home. `attendance_schedule` in `1340`; `GET` and `POST /attendance/schedules/:employee_id`; event `attendance.schedule_set` (Record History: Work schedule set; the person is told). On the clock a hybrid home day is fenced on the approved home (100 m) as a remote day is, an office day on the worksite; Home's roster and the register (#25) read a present home day as remote. An office day with no office assigned now goes to review (`no_worksite`) instead of being accepted unchecked; a client visit is fenced on its site (`1350`). The INTERIM `EmployeeDetails.tsx` and setup types are deleted. 4 integration tests, 3 screen tests. Left: People still need to add MTN Plaza on Worksites with its coordinates and assign the hybrid staff (data, not code); a temporary home for hybrid staff.
 - 19/10/2026 · LA · People · Attendance (#25): Field beside Requests, field assignments (owner decisions, 19/10/2026; `docs/guides/attendance.md` §6.12). A line manager (their team) or People (anyone) send one to 25 people to one or two sites, typed with a centre and a radius of 100 to 500 m, for up to 31 days from today: New Assignment, numbered `FA-0001`, in force at once, each person told. Never yourself; one active assignment a person a day. An assignment opens with its details, sites and people; Take Off (a reason, never the last) and Cancel Assignment (a reason) while it runs. On its days it decides the place before anything else; beyond every site is outside the worksite, named with the nearer. Search finds one by number, name, client or person. `1330`, `1393`; seven routes; three events. Checked by 5 integration tests, 2 screen tests and on the mock at 390 and 1440 px (Cynthia). Left: adding people to an assignment or changing its sites and dates (cancel and set a new one); fencing a site from its address once address search exists (F21).
@@ -1010,16 +1035,27 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 74 | Notifications | `notifications` | M6 | LA | ☐ | ☐ | ☐ | Not started | |
+| 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 77 | Integrations | `integrations` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 19/10/2026 · TB · Notifications (#74), brought forward from M6 to M0 by TB with the rest of the
+  notifications work (`docs/handoff/notifications-everywhere.md`, PR 2), built on both shells: the
+  Reminders card (Approvals Waiting, Probation Ending, Daily Digest; Edit Reminders) and every
+  notice the code sends, 25 a page, searched and filtered by category, each with who it goes to,
+  its channels and its level; Edit Notice sets On or Off, the level, the default channels and
+  copies to roles and people where the notice is about someone else, or resets it
+  (`GET /notifications/rules`, `PUT /rules/:key`, `POST /rules/:key/reset`, `GET` and `PUT
+  /reminders`; `0480`). Each person's Notification Settings gains Quiet Hours and the Daily Digest.
+  Tested: `notifications-rules` (10 integration tests), unit tests, the app's form tests. Left:
+  nothing; M2's tasks and calendars declare their reminders from the guide's §7.1.
+- 19/10/2026 · TB · Audit Log (#79): Export saves the whole filtered log as a workbook on the device that pressed, never by email (`docs/guides/foundation.md` §5, §6.12, §7); its cover now says the filters, how many entries and what Restricted means, which the email used to say. A login with no email is no longer refused. Left: nothing.
 - 19/10/2026 · TB · Organisation (#69): the brand files (`docs/guides/foundation.md` §6.11). A Brand card takes the Logo, the White Logo (shown on Deep Green) and the Icon, each one upload that applies at once (`POST`, `DELETE /settings/organisation/brand/:slot`, purpose `brand`: PNG or WebP, kept a PNG, colours untouched), and Remove. Letterheads and PDFs draw the Logo, system mail's header the White Logo inside the message, email signatures the White Logo or the Icon. One reader of the profile for all of them (`shared/organisation/profile.js`) also fixes letterheads and system mail, which read an `organisation.profile` row nothing wrote and so always printed the defaults; the letterhead's footer now carries the RC number. Left: MyCity uploads its files.
 - 19/10/2026 · TB · Imports (#93): a row saved with something missing (a warning: a person left
   without a Line Manager, say) is a problem beside the errors and duplicates. The preview lists

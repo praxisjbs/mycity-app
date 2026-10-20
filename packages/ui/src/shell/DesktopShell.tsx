@@ -25,6 +25,8 @@ export interface DesktopShellProps {
   fit?: boolean;
   /** A notice floating at the foot of the page (ShellNotice: the update prompt, the install offer). */
   notice?: ReactNode;
+  /** The urgent bar (UrgentBar), under the top bar on every screen while something urgent waits on the person. */
+  alert?: ReactNode;
   /** false draws the page without its main landmark, inside another page (the gallery). Default true. */
   landmarks?: boolean;
 }
@@ -39,7 +41,7 @@ function paneOf(target: EventTarget | null, page: HTMLElement): HTMLElement | nu
   return null;
 }
 
-export function DesktopShell({ rail, topBar, tabs, children, fit = false, notice, landmarks = true }: DesktopShellProps) {
+export function DesktopShell({ rail, topBar, tabs, children, fit = false, notice, alert, landmarks = true }: DesktopShellProps) {
   const Main = landmarks ? "main" : "div";
   const [hideHead, setHideHead] = useState(false);
   useEffect(() => {
@@ -61,6 +63,7 @@ export function DesktopShell({ rail, topBar, tabs, children, fit = false, notice
       {rail}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-muted">
         {topBar}
+        {alert != null && <div className="flex-none">{alert}</div>}
         {tabs != null && (
           <nav aria-label="Screens" className="flex-none border-b border-border bg-background px-4">
             {tabs}

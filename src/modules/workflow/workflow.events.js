@@ -20,6 +20,7 @@ defineNotification(EVENTS.WORKFLOW_REASSIGNED, {
   to: [{ approvers: true }],
   title: (e) => `Approval needed: ${e.payload.definition_name || "A request"}`,
   body: (e) => `${e.payload.stage_name || "A stage"} is now waiting on you.`,
+  copy: { body: (e) => `${e.payload.stage_name || "A stage"} was given to someone else.` },
 });
 
 module.exports = { EVENTS };

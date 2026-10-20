@@ -146,6 +146,7 @@ const WORKFLOW = defineEvents("settings", {
     summary: "An approval passed its time limit and was escalated",
   },
   "workflow.cancelled": { summary: "An approval was withdrawn" },
+  "workflow.reminded": { summary: "An approval still waiting was brought back to its approvers" },
 });
 
 /** The alert engine (shared/alerts). Home owns the screen and the tables. */

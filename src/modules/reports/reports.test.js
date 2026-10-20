@@ -376,7 +376,7 @@ describe("the file", () => {
   test("the email names the report, its number and its format, and only declared variables", async () => {
     const template = store.shipped("email", "scheduled-report");
     expect(() => variables.assertTemplate("email", "scheduled-report", `${template.subject}\n${template.body}`)).not.toThrow();
-    const data = contract.HomeReportEmailVars.parse({ report_name: "Late Today", run_number: "RPT-0042", format: "Excel", scheduled: true });
+    const data = contract.HomeReportEmailVars.parse({ report_name: "Late Today", run_number: "RPT-0042", format: "Excel" });
     expect(render.render(template.subject, data)).toBe("Late Today (RPT-0042)");
     expect(render.render(template.body, { ...data, recipient: { first_name: "Kemi" } })).toContain(
       "Your scheduled report, Late Today, is attached as Excel.",

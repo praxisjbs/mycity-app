@@ -883,28 +883,45 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(res.body.modules).toHaveLength(15);
     });
 
-    test("the export is the whole filtered log, built by the worker, kept and emailed", async () => {
+    test("the export is the whole filtered log, made by the worker into the file the Audit Log downloads", async () => {
       expect((await as("viewer").post("/audit/exports").send({ module: "settings" })).status).toBe(202);
       const res = await as("admin").post("/audit/exports").send({ action: "settings.changed" });
       expect(res.status).toBe(202);
-      expect(res.body).toEqual({ queued: true, email: "femi@mycity.test" });
+      expect(res.body).toEqual({ document_id: expect.any(String), file_name: expect.stringMatching(/^audit-log-.+\.xlsx$/), status: "pending" });
       expect((await as("staff").post("/audit/exports").send({})).status).toBe(403);
 
       sent.length = 0;
       await drain();
-      const mails = sent.filter((s) => s.data && s.data.template === "audit-export");
-      expect(mails).toHaveLength(2);
-      const mine = mails.find((m) => m.data.to.email === "femi@mycity.test");
-      expect(mine.data.data).toEqual(expect.objectContaining({ capped: false, filters: "action = settings.changed" }));
-      expect(mine.data.data.entries).toBeGreaterThan(0);
-      const doc = await one("SELECT doc_type, sensitivity, mime FROM document WHERE document_id = $1", [
-        mine.data.attachments[0].document_id,
-      ]);
+      // Nothing is emailed: the screen that asked downloads the file.
+      expect(sent.filter((s) => s.queue === "email-send")).toEqual([]);
+      const file = await as("admin").get(`/exports/${res.body.document_id}`);
+      expect(file.body).toEqual({ ...res.body, status: "done" });
+      const doc = await one("SELECT doc_type, sensitivity, mime, uploaded_by FROM document WHERE document_id = $1", [res.body.document_id]);
       expect(doc).toEqual({
         doc_type: "audit_export",
         sensitivity: "restricted",
         mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        uploaded_by: people.admin.user.user_id,
       });
+      const content = await as("admin")
+        .get(`/documents/${res.body.document_id}/content`)
+        .buffer(true)
+        .parse((stream, done) => {
+          const chunks = [];
+          stream.on("data", (chunk) => chunks.push(chunk));
+          stream.on("end", () => done(null, Buffer.concat(chunks)));
+        });
+      expect(content.status).toBe(200);
+      // Its cover says what it holds: the filters, and how many entries.
+      const ExcelJS = require("exceljs");
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(content.body);
+      const cover = [];
+      wb.getWorksheet("Cover").eachRow((row) => cover.push(row.values.slice(1).join(" ")));
+      expect(cover.join("\n")).toContain("action = settings.changed");
+      expect(cover.join("\n")).toMatch(/Entries \d+/);
+      // The other export waits for its own asker alone.
+      expect((await as("viewer").get(`/exports/${res.body.document_id}`)).status).toBe(404);
     });
 
     test("the ledger cannot be edited", async () => {

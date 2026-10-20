@@ -1,6 +1,7 @@
-import type { Announcement, AnnouncementStats, Channel, Conversation, Member, Message, ProfileCard } from "@/api/types/community";
+import type { Announcement, AnnouncementStats, Channel, Conversation, LinkPreview, MediaRef, Member, Message, ProfileCard } from "@/api/types/community";
+import { firstLink, hostOf } from "@mycity/ui";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, fold } from "../core";
-import { byId, byKey, DEPARTMENTS, PEOPLE } from "../data/people";
+import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS } from "../data/people";
 import { UPLOADS } from "../uploads";
 
 /**
@@ -24,7 +25,7 @@ const person = (key: string): PersonRef => {
 const uid = (key: string) => sid(`user:${key}`);
 const keyOfUser = (userId: string) => PEOPLE.find((p) => uid(p.user_key) === userId)?.user_key;
 
-type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number> };
+type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _noLink?: boolean };
 let seq = 0;
 function msg(type: Message["message_type"], by: string | null, when: string, over: Partial<Message> = {}): MMsg {
   return {
@@ -36,6 +37,8 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     sent_at: when,
     body: null,
     document: null,
+    album_key: null,
+    link: null,
     duration_s: null,
     transcript: null,
     celebration: null,
@@ -54,7 +57,44 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     _votes: {},
   };
 }
-const fileRef = (name: string, kb: number, mime = "application/octet-stream") => ({ document_id: sid(`doc:${name}`), file_name: name, size_bytes: kb * 1024, mime_type: mime });
+/** A file as a message carries it: its shape and the sizes the worker made (a laptop holds no bytes, so the bubbles keep their places). */
+const fileRef = (name: string, kb: number, mime = "application/octet-stream", over: Partial<MediaRef> = {}): MediaRef => ({
+  document_id: sid(`doc:${name}`),
+  file_name: name,
+  size_bytes: kb * 1024,
+  mime_type: mime,
+  width: null,
+  height: null,
+  page_count: null,
+  duration_ms: null,
+  variants: [],
+  ...over,
+});
+const SIZES = ["webp-320", "webp-960"];
+const photoRef = (name: string, kb: number, width: number, height: number) => fileRef(name, kb, "image/jpeg", { width, height, variants: SIZES });
+const pdfRef = (name: string, kb: number, pages: number) => fileRef(name, kb, "application/pdf", { width: 960, height: 1358, page_count: pages, variants: SIZES });
+
+/*
+ * Link cards: what the server reads from a page's Open Graph tags, for the pages the sample
+ * messages link to. Any other page gets a card of its host and no picture, as a page with a
+ * title and nothing more would.
+ */
+const CARDS: Record<string, Omit<LinkPreview, "community_link_preview_id" | "url">> = {
+  "nfelia.com": { site_name: "Nfelia", title: "Nfelia: Fashion in Lagos", description: "Ready to wear from Lagos designers, delivered across Nigeria.", image: fileRef("nfelia-og.jpg", 96, "image/jpeg", { width: 1200, height: 630, variants: SIZES }) },
+  "mycityapp.io": { site_name: "MyCity App", title: "MyCity App: Events and Tickets", description: "Find what is on in your city this weekend.", image: fileRef("mycity-og.jpg", 80, "image/jpeg", { width: 1200, height: 630, variants: SIZES }) },
+};
+function cardFor(url: string | null): LinkPreview | null {
+  if (!url) return null;
+  const host = hostOf(url);
+  const known = CARDS[host];
+  return { community_link_preview_id: sid(`lp:${url}`), url, ...(known ?? { site_name: host, title: host.charAt(0).toUpperCase() + host.slice(1), description: null, image: null }) };
+}
+const linked = (by: string, when: string, body: string) => msg("text", by, when, { body, link: cardFor(firstLink(body)) });
+/** Photos sent together: one album key, the caption on the first. */
+const album = (by: string, when: string, names: string[], caption: string) => {
+  const key = sid(`album:${names[0]}`);
+  return names.map((n, i) => msg("image", by, when, { document: photoRef(n, 420, i % 3 === 1 ? 1080 : 1600, i % 3 === 1 ? 1350 : 1200), album_key: key, body: i === 0 ? caption : null }));
+};
 const card = (type: "birthday" | "anniversary", who: string, when: string, fans: string[], years: number | null): MMsg => {
   const m = msg(type, null, when, { body: (type === "birthday" ? BDAY : ANNIV)[0] });
   m._fans = fans;
@@ -70,14 +110,17 @@ interface MockAnnouncement {
   publish_at: string;
   scheduled: boolean;
   departments: string[];
+  /** Who has read it; for an urgent one, who has acknowledged it. */
   read: Set<string>;
   reminded: string | null;
+  urgency: Announcement["urgency"];
 }
 const ANNOUNCEMENTS: MockAnnouncement[] = [
+  ["Fire drill at 11", "Leave by the east stairs and meet at the car park. Wardens wear the yellow vests.", "ifeoma", 0, false, 12, "urgent"],
   ["Q4 review cycle opens", "Self ratings open on the 20th. Managers review from the 27th.", "cynthia", -6, true, 0],
   ["New faces in Enugu", "Two content roles join on the 20th. Say hello in #enugu-launch.", "cynthia", 8, false, 19],
   ["Saturday hours confirmed", "Saturdays are 09:00 to 15:00 for all departments. Clock in applies as on weekdays.", "cynthia", 13, false, 24],
-  ["NDPA refresher due", "Everyone must complete the data protection refresher before 30 November.", "cynthia", 16, false, 23],
+  ["NDPA refresher due", "Everyone must complete the data protection refresher before 30 November.", "cynthia", 16, false, 23, "important"],
   ["Ember to Remember kicks off", "The 100 day calendar runs to 31 December. All hands on the Lagos leg.", "ifeoma", 22, false, 25],
 ].map((a, i) => ({
   announcement_id: sid(`ann:${i}`),
@@ -87,8 +130,13 @@ const ANNOUNCEMENTS: MockAnnouncement[] = [
   publish_at: at(a[3] as number, "09:00"),
   scheduled: a[4] as boolean,
   departments: [],
-  read: new Set(PEOPLE.slice(0, a[5] as number).map((p) => p.user_key)),
+  // An urgent one waits on the demonstration accounts, so the bar and Acknowledge show; its poster has it.
+  read:
+    a[6] === "urgent"
+      ? new Set([a[2] as string, ...PEOPLE.filter((p) => !(p.user_key in SIGN_INS)).slice(0, a[5] as number).map((p) => p.user_key)])
+      : new Set(PEOPLE.slice(0, a[5] as number).map((p) => p.user_key)),
   reminded: null,
+  urgency: (a[6] as Announcement["urgency"] | undefined) ?? "normal",
 }));
 
 interface Chan {
@@ -112,7 +160,13 @@ const chan0 = (name: string, members: string[], msgs: MMsg[], over: Partial<Chan
   for (const m of c.msgs) m.community_channel_id = c.community_channel_id;
   return c;
 };
-const annMsg = (a: MockAnnouncement) => msg("announcement", a.by, a.publish_at, { body: a.body, announcement: { announcement_id: a.announcement_id, title: a.title } });
+const annMsg = (a: MockAnnouncement) =>
+  msg("announcement", a.by, a.publish_at, {
+    body: a.body,
+    announcement: { announcement_id: a.announcement_id, title: a.title, urgency: a.urgency, in_audience: false, acknowledged_at: null },
+  });
+/** Whether `user` is in an announcement's audience: everyone, or its departments' people. */
+const inAudience = (a: MockAnnouncement, user: string) => !a.departments.length || a.departments.includes(PEOPLE.find((p) => p.user_key === user)?.department ?? "");
 
 const rec = msg("recognition", "cynthia", at(0, "07:10"), { body: "Turned the Enugu shot list around in a day." });
 rec.recognition = { to: person("tolu"), count: 6, mine: false };
@@ -142,7 +196,11 @@ const CHANNELS: Chan[] = [
     msg("audio", "tolu", at(0, "08:23"), { duration_s: 18, document: fileRef("voice-note.webm", 90, "audio/webm") }),
     msg("text", "ngozi", at(0, "09:02"), { body: "ProvidusBank want their logo on the ticket confirmation email. Raising it as a task against the partnership." }),
     msg("text", "cynthia", at(0, "09:08"), { body: "Good. Link it to the MOU so it shows on the 360." }),
-    msg("file", "seyi", at(0, "09:12"), { document: fileRef("ember-venue-list-v3.xlsx", 84) }),
+    msg("file", "seyi", at(0, "09:12"), { document: fileRef("ember-venue-list-v3.xlsx", 84, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") }),
+    msg("image", "adedotun", at(0, "09:15"), { document: photoRef("stage-build-lagos.jpg", 640, 1600, 1200), body: "Stage build at Tafawa Balewa Square, day two." }),
+    ...album("tolu", at(0, "09:17"), ["enugu-loc-1.jpg", "enugu-loc-2.jpg", "enugu-loc-3.jpg", "enugu-loc-4.jpg", "enugu-loc-5.jpg", "enugu-loc-6.jpg"], "The three Enugu locations, two angles each."),
+    msg("file", "ngozi", at(0, "09:19"), { document: pdfRef("providus-mou-signed.pdf", 1840, 12) }),
+    linked("ngozi", at(0, "09:20"), "Their lookbook is live on https://nfelia.com if anyone wants the styling references."),
     msg("text", "emeka", at(0, "09:21"), { body: "Studio is booked for the 22nd and 23rd. Equipment repair is still with Operations." }),
   ], { admins: ["cynthia"] }),
   chan0("operations", everyone, [msg("text", "cynthia", at(1, "16:10"), { body: "Generator service moved to Thursday. Please save your work before 14:00." })], { channel_type: "department", admins: ["cynthia"] }),
@@ -175,7 +233,7 @@ for (const [other, unread, rows] of DM_ROWS) {
     x.startsWith("vn:")
       ? msg("audio", who, at(d, t), { duration_s: Number(x.slice(3)), document: fileRef(`voice-${who}.webm`, 120, "audio/webm") })
       : x.startsWith("file:")
-        ? msg("file", who, at(d, t), { document: fileRef(x.slice(5), 3200, "application/pdf") })
+        ? msg("file", who, at(d, t), { document: pdfRef(x.slice(5), 3200, 14) })
         : msg("text", who, at(d, t), { body: x }),
   );
   CHANNELS.push(chan0(`dm-${other}`, ["cynthia", other], msgs, { channel_type: "direct", admins: [], unread: { cynthia: unread } }));
@@ -192,12 +250,15 @@ const canPost = (c: Chan, user: string) => (c.post_policy === "people_ceo" ? fal
 function lineOf(m: Message | undefined): string | null {
   if (!m) return null;
   const t = m.message_type;
-  return t === "audio" ? "Voice note" : t === "image" ? "Photo" : t === "video" ? "Video" : t === "file" ? "File" : t === "poll" ? `Poll: ${m.body}` : t === "recognition" ? "Recognition" : t === "birthday" ? "Birthday" : t === "anniversary" ? "Work anniversary" : m.body;
+  const caption = m.body ? m.body.replace(/\s+/g, " ").trim().slice(0, 120) : null;
+  const kind = t === "image" ? "Photo" : t === "video" ? "Video" : t === "file" ? "File" : null;
+  if (kind) return caption ? `${kind}: ${caption}` : kind;
+  return t === "audio" ? "Voice note" : t === "poll" ? `Poll: ${m.body}` : t === "recognition" ? "Recognition" : t === "birthday" ? "Birthday" : t === "anniversary" ? "Work anniversary" : m.body;
 }
 
 /** A message as `user` sees it: theirs or not, their reaction and vote, and the ticks. */
 function view(m: MMsg, user: string, c: Chan): Message {
-  const { _by, _fans, _votes, ...rest } = m;
+  const { _by, _fans, _votes, _noLink, ...rest } = m;
   const mine = _by === user;
   const voted = Object.keys(_votes).length > 0;
   const closed = Boolean(m.poll?.closed);
@@ -209,6 +270,11 @@ function view(m: MMsg, user: string, c: Chan): Message {
     can_delete: !m.deleted && m.message_type !== "announcement" && (mine || moderates(c, user)),
     can_close: !m.deleted && m.message_type === "poll" && !closed && (mine || moderates(c, user)),
   };
+  if (m.announcement) {
+    const a = ANNOUNCEMENTS.find((x) => x.announcement_id === m.announcement!.announcement_id);
+    const acked = !!a && a.urgency === "urgent" && a.read.has(user);
+    out.announcement = { ...m.announcement, in_audience: !!a && inAudience(a, user), acknowledged_at: acked ? m.sent_at : null };
+  }
   if (m.celebration) out.celebration = { ...m.celebration, count: _fans.length, mine: _fans.includes(user), fans: _fans.slice(0, 3).map(person) };
   if (m.recognition) out.recognition = { ...m.recognition, count: _fans.length, mine: _fans.includes(user) };
   if (m.poll) {
@@ -378,7 +444,13 @@ const isMsg = (m: MMsg | Record<string, string[]>): m is MMsg => typeof (m as MM
 function build(user: string, b: Record<string, unknown>): MMsg | Record<string, string[]> {
   const now = new Date().toISOString();
   const type = b.message_type as Message["message_type"];
-  if (type === "text") return String(b.body ?? "").trim() ? msg("text", user, now, { body: String(b.body).trim() }) : { body: ["Write something"] };
+  if (type === "text") {
+    const body = String(b.body ?? "").trim();
+    if (!body) return { body: ["Write something"] };
+    const m = msg("text", user, now, { body, link: b.no_link_preview ? null : cardFor(firstLink(body)) });
+    m._noLink = Boolean(b.no_link_preview);
+    return m;
+  }
   if (type === "poll") {
     const opts = (b.options as string[] | undefined) ?? [];
     if (!b.body) return { body: ["Add a question"] };
@@ -395,10 +467,12 @@ function build(user: string, b: Record<string, unknown>): MMsg | Record<string, 
     m.author = person(user);
     return m;
   }
-  const doc = UPLOADS.get(String(b.document_id));
-  if (!doc) return { document_id: ["Attach the file again"] };
+  const stored = UPLOADS.get(String(b.document_id));
+  if (!stored) return { document_id: ["Attach the file again"] };
+  const doc: MediaRef = { width: null, height: null, page_count: null, duration_ms: null, variants: [], ...stored };
   const kind = type === "audio" ? "audio" : /^image\//.test(doc.mime_type) ? "image" : /^audio\//.test(doc.mime_type) ? "audio" : /^video\//.test(doc.mime_type) ? "video" : "file";
-  return msg(kind, user, now, { document: doc, duration_s: kind === "audio" ? Number(b.duration_s ?? 1) : null, body: (b.body as string) || null });
+  const album_key = kind !== "audio" && typeof b.album_key === "string" ? b.album_key : null;
+  return msg(kind, user, now, { document: doc, album_key, duration_s: kind === "audio" ? Number(b.duration_s ?? 1) : null, body: (b.body as string) || null });
 }
 route("POST /api/v1/community/channels/:id/messages", (req) => {
   const c = chan(req.params.id);
@@ -412,6 +486,11 @@ route("POST /api/v1/community/channels/:id/messages", (req) => {
   c!.msgs.push(m);
   for (const k of c!.members) if (k !== req.user) c!.unread[k] = (c!.unread[k] ?? 0) + 1;
   return created(view(m, req.user!, c!));
+});
+route("POST /api/v1/community/link-previews", (req) => {
+  const url = String(req.body.url ?? "").trim();
+  if (url.length < 4) return invalid({ url: ["Not a link"] });
+  return ok({ preview: cardFor(firstLink(url)) });
 });
 route("POST /api/v1/community/recognitions", (req) => {
   const to = byId(String(req.body.to_employee_id));
@@ -441,6 +520,7 @@ route("PUT /api/v1/community/messages/:id", (req) => {
   if (f.m.message_type === "text") {
     if (Date.now() - new Date(f.m.sent_at).getTime() >= 15 * 60 * 1000) return fail(409, "EDIT_WINDOW_PASSED", "Too late to edit this message", { body: ["Too late to edit"] });
     f.m.body = body;
+    f.m.link = f.m._noLink ? null : cardFor(firstLink(body));
   } else if (f.m.message_type === "poll" && f.m.poll) {
     if (f.m.poll.closed) return fail(409, "POLL_CLOSED", "This poll is closed");
     if (Object.keys(f.m._votes).length) return fail(409, "POLL_HAS_VOTES", "People have voted on this poll", { body: ["Already has votes"] });
@@ -459,6 +539,7 @@ route("DELETE /api/v1/community/messages/:id", (req) => {
   f.m.deleted = true;
   f.m.body = null;
   f.m.document = null;
+  f.m.link = null;
   f.m.celebration = null;
   f.m.recognition = null;
   f.m.poll = null;
@@ -550,6 +631,7 @@ function announcementOut(a: MockAnnouncement): Announcement {
     published_at: a.scheduled ? null : a.publish_at,
     reads: a.scheduled ? 0 : a.read.size,
     audience_size: a.scheduled ? 0 : audience,
+    urgency: a.urgency,
   };
 }
 const poster = (user: string | null) => !!user && ANN_POSTERS.has(user);
@@ -581,7 +663,9 @@ route("POST /api/v1/community/announcements", (req) => {
   if (when && when <= new Date().toISOString()) f.publish_at = ["Time already passed"];
   if (Object.keys(f).length) return invalid(f);
   const departments = audience.kind === "departments" ? DEPARTMENTS.filter((d) => audience.department_ids!.includes(sid(`dept:${d}`))) : [];
-  const a: MockAnnouncement = { announcement_id: sid(`ann:${Date.now()}`), title: String(req.body.title), body: String(req.body.body), by: req.user!, publish_at: when ?? new Date().toISOString(), scheduled: !!when, departments, read: new Set(), reminded: null };
+  const urgency = (req.body.urgency as Announcement["urgency"] | undefined) ?? "normal";
+  // The poster has read what they posted (acknowledged it, when urgent).
+  const a: MockAnnouncement = { announcement_id: sid(`ann:${Date.now()}`), title: String(req.body.title), body: String(req.body.body), by: req.user!, publish_at: when ?? new Date().toISOString(), scheduled: !!when, departments, read: new Set(when ? [] : [req.user!]), reminded: null, urgency };
   ANNOUNCEMENTS.unshift(a);
   if (!a.scheduled) {
     const m = annMsg(a);
@@ -612,6 +696,7 @@ route("PUT /api/v1/community/announcements/:id", (req) => {
   a.title = String(req.body.title);
   a.body = String(req.body.body);
   a.publish_at = when;
+  if (req.body.urgency) a.urgency = req.body.urgency as Announcement["urgency"];
   a.departments = audience.kind === "departments" ? DEPARTMENTS.filter((d) => audience.department_ids!.includes(sid(`dept:${d}`))) : [];
   return ok(announcementOut(a));
 });
@@ -627,7 +712,10 @@ route("GET /api/v1/community/announcements/:id/reads", (req) => {
   const a = ANNOUNCEMENTS.find((x) => x.announcement_id === req.params.id);
   if (!a) return notFound();
   const audience = a.departments.length ? PEOPLE.filter((p) => a.departments.includes(p.department)) : PEOPLE;
-  const rows = audience.map((p, i) => ({ person: person(p.user_key), read_at: a.read.has(p.user_key) ? at(Math.max(0, 3 - (i % 4)), `0${8 + (i % 2)}:${String(10 + i).padStart(2, "0")}`) : null }));
+  const rows = audience.map((p, i) => {
+    const when = a.read.has(p.user_key) ? at(Math.max(0, 3 - (i % 4)), `0${8 + (i % 2)}:${String(10 + i).padStart(2, "0")}`) : null;
+    return { person: person(p.user_key), read_at: when, acknowledged_at: a.urgency === "urgent" ? when : null };
+  });
   return paged(rows, req, { search: (r) => [r.person.display_name], filters: { read: (r, v) => (v === "read" ? !!r.read_at : !r.read_at) } });
 });
 route("POST /api/v1/community/announcements/:id/remind", (req) => {
@@ -638,4 +726,11 @@ route("POST /api/v1/community/announcements/:id/remind", (req) => {
   if (a.reminded === today) return fail(429, "ALREADY_REMINDED", "Already reminded today");
   a.reminded = today;
   return ok({ reminded: PEOPLE.length - a.read.size });
+});
+route("POST /api/v1/community/announcements/:id/acknowledge", (req) => {
+  const a = ANNOUNCEMENTS.find((x) => x.announcement_id === req.params.id && !x.scheduled);
+  if (!a || !inAudience(a, req.user!)) return notFound();
+  if (a.urgency !== "urgent") return fail(422, "NOT_URGENT", "Only an urgent announcement is acknowledged");
+  a.read.add(req.user!);
+  return noContent();
 });

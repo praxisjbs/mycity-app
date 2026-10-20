@@ -1,7 +1,8 @@
 "use strict";
 /**
- * Staff Community's SQL (migrations 1000 and 1010): channels and direct conversations,
- * their members, messages, reactions, poll votes, recognitions and presence.
+ * Staff Community's SQL (migrations 1000, 1110, 1140 and 1147): channels and direct
+ * conversations, their members, messages, reactions, poll votes, recognitions, presence and
+ * link cards.
  *
  * Membership is the authorisation boundary (community.md §6): every read of a channel's
  * contents joins community_member on the caller, so a channel the caller is not in reads
@@ -10,6 +11,7 @@
  */
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
+const { mediaJson } = require("../../shared/db/media");
 
 const one = async (db, sql, params) =>
   (await db.query(sql, params)).rows[0] || null;
@@ -394,27 +396,41 @@ function otherPointers(db, channelId, userId) {
  * Messages
  * ------------------------------------------------------------------ */
 
+/** A ready link card as the contract's LinkPreview, from card `lp` and its picture `lpd`; null otherwise. */
+const LINK_PREVIEW = (lp = "lp", lpd = "lpd") => `
+  CASE WHEN ${lp}.community_link_preview_id IS NULL OR ${lp}.status <> 'ready' THEN NULL ELSE json_build_object(
+    'community_link_preview_id', ${lp}.community_link_preview_id,
+    'url', ${lp}.url,
+    'site_name', ${lp}.site_name,
+    'title', ${lp}.title,
+    'description', ${lp}.description,
+    'image', ${mediaJson(lpd)}) END`;
+
 const MESSAGE = `
   SELECT x.community_message_id, x.community_channel_id, x.message_type, x.sender_user_id, x.sent_at,
          x.body, x.metadata, x.transcript, x.deleted_at, x.edited_at, x.document_id,
+         x.community_link_preview_id,
          ${PERSON("e", "d")} AS author,
-         CASE WHEN doc.document_id IS NULL THEN NULL ELSE json_build_object(
-           'document_id', doc.document_id,
-           'file_name', COALESCE(doc.original_name, doc.title, 'file'),
-           'size_bytes', doc.bytes,
-           'mime_type', doc.mime) END AS document,
+         ${mediaJson("doc")} AS document,
+         ${LINK_PREVIEW("lp", "lpd")} AS link,
          (SELECT count(*)::int FROM community_reaction r WHERE r.community_message_id = x.community_message_id) AS reactions,
          EXISTS (SELECT 1 FROM community_reaction r WHERE r.community_message_id = x.community_message_id AND r.user_id = $1) AS reacted,
          pr.to_employee_id AS recognised_employee_id,
-         a.announcement_id, a.title AS announcement_title`;
+         a.announcement_id, a.title AS announcement_title, a.urgency AS announcement_urgency,
+         (ar.user_id IS NOT NULL) AS announcement_in_audience,
+         ar.acknowledged_at AS announcement_acknowledged_at`;
+/** $1 is the reader: their own reads row of an announcement says whether they acknowledged it. */
 const MESSAGE_FROM = `
     FROM community_message x
     LEFT JOIN app_user u ON u.user_id = x.sender_user_id
     LEFT JOIN employee e ON e.employee_id = u.employee_id
     LEFT JOIN department d ON d.department_id = e.department_id
     LEFT JOIN document doc ON doc.document_id = x.document_id
+    LEFT JOIN community_link_preview lp ON lp.community_link_preview_id = x.community_link_preview_id
+    LEFT JOIN document lpd ON lpd.document_id = lp.image_document_id
     LEFT JOIN peer_recognition pr ON pr.community_message_id = x.community_message_id
-    LEFT JOIN announcement a ON a.community_message_id = x.community_message_id`;
+    LEFT JOIN announcement a ON a.community_message_id = x.community_message_id
+    LEFT JOIN announcement_read ar ON ar.announcement_id = a.announcement_id AND ar.user_id = $1`;
 
 /** A page of a channel's messages, newest first; with `q`, only those that match. */
 function listMessages(db, channelId, userId, query) {
@@ -448,11 +464,12 @@ function lockMessage(db, messageId) {
   );
 }
 
-function editMessage(db, messageId, { body, metadata }) {
+function editMessage(db, messageId, { body, metadata, community_link_preview_id = null }) {
   return one(
     db,
-    "UPDATE community_message SET body = $2, metadata = $3, edited_at = now() WHERE community_message_id = $1 RETURNING *",
-    [messageId, body, metadata],
+    `UPDATE community_message SET body = $2, metadata = $3, community_link_preview_id = $4, edited_at = now()
+      WHERE community_message_id = $1 RETURNING *`,
+    [messageId, body, metadata, community_link_preview_id],
   );
 }
 
@@ -492,8 +509,9 @@ async function voteCount(db, messageId) {
 function insertMessage(db, m) {
   return one(
     db,
-    `INSERT INTO community_message (community_channel_id, sender_user_id, message_type, body, document_id, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    `INSERT INTO community_message (community_channel_id, sender_user_id, message_type, body, document_id, metadata,
+                                    community_link_preview_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
     [
       m.community_channel_id,
       m.sender_user_id ?? null,
@@ -501,7 +519,93 @@ function insertMessage(db, m) {
       m.body ?? null,
       m.document_id ?? null,
       m.metadata ?? {},
+      m.community_link_preview_id ?? null,
     ],
+  );
+}
+
+/** A stored file as the contract's MediaRef: its shape, pages, length and the sizes it has. */
+async function mediaRef(db, documentId) {
+  const row = await one(db, `SELECT ${mediaJson("doc")} AS media FROM document doc WHERE doc.document_id = $1`, [documentId]);
+  return row ? row.media : null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Link cards (community.links.js)
+ * ------------------------------------------------------------------ */
+
+/** The card kept for an address, if any; `lock` holds it for the rest of the transaction. */
+function linkPreviewByUrl(db, url, { lock = false } = {}) {
+  return one(
+    db,
+    `SELECT * FROM community_link_preview WHERE url = $1${lock ? " FOR UPDATE" : ""}`,
+    [url],
+  );
+}
+
+function linkPreviewById(db, previewId, { lock = false } = {}) {
+  return one(
+    db,
+    `SELECT * FROM community_link_preview WHERE community_link_preview_id = $1${lock ? " FOR UPDATE" : ""}`,
+    [previewId],
+  );
+}
+
+/** Keep what a page said about itself, replacing what was kept for that address before. */
+function saveLinkPreview(db, card) {
+  return one(
+    db,
+    `INSERT INTO community_link_preview (url, status, site_name, title, description, image_document_id, fetched_at)
+     VALUES ($1, $2, $3, $4, $5, NULL, now())
+     ON CONFLICT (url) DO UPDATE
+       SET status = EXCLUDED.status, site_name = EXCLUDED.site_name, title = EXCLUDED.title,
+           description = EXCLUDED.description, image_document_id = NULL, fetched_at = now()
+     RETURNING *`,
+    [card.url, card.status, card.site_name ?? null, card.title ?? null, card.description ?? null],
+  );
+}
+
+function setLinkPreviewImage(db, previewId, documentId) {
+  return one(
+    db,
+    "UPDATE community_link_preview SET image_document_id = $2 WHERE community_link_preview_id = $1 RETURNING *",
+    [previewId, documentId],
+  );
+}
+
+/** A card as the contract's LinkPreview; null when it is not ready. */
+async function linkPreviewView(db, previewId) {
+  const row = await one(
+    db,
+    `SELECT ${LINK_PREVIEW("lp", "lpd")} AS preview
+       FROM community_link_preview lp
+       LEFT JOIN document lpd ON lpd.document_id = lp.image_document_id
+      WHERE lp.community_link_preview_id = $1`,
+    [previewId],
+  );
+  return row ? row.preview : null;
+}
+
+/** Attach a card to a text message that still shows that link and has none yet. */
+function attachLinkPreview(db, messageId, previewId) {
+  return one(
+    db,
+    `UPDATE community_message SET community_link_preview_id = $2
+      WHERE community_message_id = $1 AND message_type = 'text' AND deleted_at IS NULL
+        AND community_link_preview_id IS DISTINCT FROM $2
+      RETURNING community_message_id, community_channel_id`,
+    [messageId, previewId],
+  );
+}
+
+/** What the link-preview job needs to know about a message. */
+function messageForCard(db, messageId) {
+  return one(
+    db,
+    `SELECT community_message_id, community_channel_id, sender_user_id, message_type, body, metadata,
+            deleted_at, community_link_preview_id
+       FROM community_message WHERE community_message_id = $1`,
+    [messageId],
   );
 }
 
@@ -659,11 +763,7 @@ async function shared(db, userA, userB) {
   const direct = await findDirect(db, userA, userB);
   if (!direct) return { files: [], voice_notes: 0 };
   const { rows } = await db.query(
-    `SELECT x.message_type, json_build_object(
-              'document_id', doc.document_id,
-              'file_name', COALESCE(doc.original_name, doc.title, 'file'),
-              'size_bytes', doc.bytes,
-              'mime_type', doc.mime) AS document
+    `SELECT x.message_type, ${mediaJson("doc")} AS document
        FROM community_message x JOIN document doc ON doc.document_id = x.document_id
       WHERE x.community_channel_id = $1 AND x.deleted_at IS NULL
       ORDER BY x.sent_at DESC
@@ -775,6 +875,14 @@ module.exports = {
   listMessages,
   messageFor,
   insertMessage,
+  mediaRef,
+  linkPreviewByUrl,
+  linkPreviewById,
+  saveLinkPreview,
+  setLinkPreviewImage,
+  linkPreviewView,
+  attachLinkPreview,
+  messageForCard,
   setTranscript,
   people,
   fans,
