@@ -67,9 +67,17 @@ const fileRef = (name: string, kb: number, mime = "application/octet-stream", ov
   height: null,
   page_count: null,
   duration_ms: null,
+  waveform: null,
   variants: [],
   ...over,
 });
+/** A voice note as the worker leaves it: a speaking voice's rise and fall, steady for the same name. */
+const voiceRef = (name: string, kb: number, seconds: number) =>
+  fileRef(name, kb, "audio/webm", {
+    duration_ms: seconds * 1000,
+    variants: ["opus"],
+    waveform: Array.from({ length: 48 }, (_, i) => Math.round(25 + 70 * Math.abs(Math.sin((i + name.length) * 0.7) * Math.cos(i * 0.23)))),
+  });
 const SIZES = ["webp-320", "webp-960"];
 const photoRef = (name: string, kb: number, width: number, height: number) => fileRef(name, kb, "image/jpeg", { width, height, variants: SIZES });
 const pdfRef = (name: string, kb: number, pages: number) => fileRef(name, kb, "application/pdf", { width: 960, height: 1358, page_count: pages, variants: SIZES });
@@ -193,7 +201,7 @@ const CHANNELS: Chan[] = [
   chan0("ember-to-remember", everyone.slice(0, 18), [
     msg("text", "adedotun", at(0, "08:14"), { body: "Stage build for the Lagos leg is confirmed. MTN have signed off on the branding placement." }),
     msg("text", "tolu", at(0, "08:21"), { body: "Shot list for the Enugu segment is in the vault. Three locations, two days." }),
-    msg("audio", "tolu", at(0, "08:23"), { duration_s: 18, document: fileRef("voice-note.webm", 90, "audio/webm") }),
+    msg("audio", "tolu", at(0, "08:23"), { duration_s: 18, document: voiceRef("voice-note.webm", 90, 18) }),
     msg("text", "ngozi", at(0, "09:02"), { body: "ProvidusBank want their logo on the ticket confirmation email. Raising it as a task against the partnership." }),
     msg("text", "cynthia", at(0, "09:08"), { body: "Good. Link it to the MOU so it shows on the 360." }),
     msg("file", "seyi", at(0, "09:12"), { document: fileRef("ember-venue-list-v3.xlsx", 84, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") }),
@@ -231,7 +239,7 @@ const DM_ROWS: Array<[string, number, Array<[string, number, string, string]>]> 
 for (const [other, unread, rows] of DM_ROWS) {
   const msgs = rows.map(([who, d, t, x]) =>
     x.startsWith("vn:")
-      ? msg("audio", who, at(d, t), { duration_s: Number(x.slice(3)), document: fileRef(`voice-${who}.webm`, 120, "audio/webm") })
+      ? msg("audio", who, at(d, t), { duration_s: Number(x.slice(3)), document: voiceRef(`voice-${who}.webm`, 120, Number(x.slice(3))) })
       : x.startsWith("file:")
         ? msg("file", who, at(d, t), { document: pdfRef(x.slice(5), 3200, 14) })
         : msg("text", who, at(d, t), { body: x }),
@@ -480,7 +488,7 @@ function build(user: string, b: Record<string, unknown>): MMsg | Record<string, 
   }
   const stored = UPLOADS.get(String(b.document_id));
   if (!stored) return { document_id: ["Attach the file again"] };
-  const doc: MediaRef = { width: null, height: null, page_count: null, duration_ms: null, variants: [], ...stored };
+  const doc: MediaRef = { width: null, height: null, page_count: null, duration_ms: null, waveform: null, variants: [], ...stored };
   const kind = type === "audio" ? "audio" : /^image\//.test(doc.mime_type) ? "image" : /^audio\//.test(doc.mime_type) ? "audio" : /^video\//.test(doc.mime_type) ? "video" : "file";
   const album_key = kind !== "audio" && typeof b.album_key === "string" ? b.album_key : null;
   return msg(kind, user, now, { document: doc, album_key, duration_s: kind === "audio" ? Number(b.duration_s ?? 1) : null, body: (b.body as string) || null });

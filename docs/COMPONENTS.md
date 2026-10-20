@@ -65,7 +65,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [TapList](#taplist) | `TapList` | A stack of rows that each open something: the phone's way into a record when a table would be wrong. | stable |
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
-| Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, which fill as it plays. | stable |
+| Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, drawn from its measured loudness, which fill as it plays. | stable |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
@@ -1745,12 +1745,12 @@ What happened to a record, newest or oldest first: a rail of dated events, each 
 
 ### Waveform
 
-A voice note's bars, which fill as it plays.
+A voice note's bars, drawn from its measured loudness, which fill as it plays.
 
 | | |
 |---|---|
 | Use | Beside the play button on a voice note: a community message, a review's dictated comment. |
-| Avoid | A real reading of the audio (these bars are a shape, not the sound); a progress figure a person reads (use ProgressBar). |
+| Avoid | A progress figure a person reads (use ProgressBar); measuring the audio in the browser (the worker measures it once, as `waveform`). |
 | Phone | The same bars at the width the bubble gives them; the play button beside it keeps its 44 px. |
 | Accessibility | Decorative: the length is said in words beside it and the button says whether it is playing, so nothing here needs reading. |
 | Status | stable |
@@ -1764,12 +1764,14 @@ A voice note's bars, which fill as it plays.
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `seconds` | `number` | yes | How long the note is, in seconds: it sets how fast the bars fill. |
-| `playing` | `boolean` |  | It is playing: the bars light in turn over the note's length. |
+| `seconds` | `number` | yes | How long the note is, in seconds: without `progress`, it sets how fast the bars fill. |
+| `peaks` | `number[] \| null` |  | The note's loudness, each 0 to 100 (the worker's `waveform`); a steady shape stands in until it is measured. |
+| `progress` | `number` |  | How far it has played, 0 to 1, read from the audio itself; the bars up to it are lit. |
+| `playing` | `boolean` |  | It is playing: without `progress`, the bars light in turn over the note's length. |
 | `className` | `string` |  | Layout classes only (width, height). |
 
 ```tsx
-<Waveform seconds={42} playing={playing} />
+<Waveform seconds={42} peaks={note.document.waveform} progress={position / 42} />
 ```
 
 ## Navigation

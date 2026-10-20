@@ -177,7 +177,7 @@ capabilities `home.team`, `home.reports` and `alerts.manage` with their role gra
 (`RPT-0001`), and `1099`'s three alert thresholds removed (A26, §5) · `1200` leave requests as the
 leave module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list
 indexes) · `1170` `employee.photo_document_id`, the photo an employee uses (a vault document;
-cleared if it is deleted) · `1180` `employee.birth_day` and `birth_month`, a birthday known only as a day and month (both or neither, a real day of that month), read by the celebrations when `date_of_birth` is empty · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
+cleared if it is deleted) · `1180` `employee.birth_day` and `birth_month`, a birthday known only as a day and month (both or neither, a real day of that month), read by the celebrations when `date_of_birth` is empty · `1190` `document.waveform`, a voice note's loudness in at most 64 bars of 0 to 100, measured by the worker · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
 leave types · `1300` attendance as the clock writes it: the policy's `geofence_mode`,
 `device_mode` and `max_accuracy_m`; `attendance_device` (a person's clock-in devices on
 `known_device`, observed, registered or removed); the event's `work_date`, `device_at`, device,

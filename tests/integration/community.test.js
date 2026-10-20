@@ -332,6 +332,7 @@ describeDb("Staff Community against the real migrations", () => {
       height: 1,
       page_count: null,
       duration_ms: null,
+      waveform: null,
       variants: [],
     });
     const posted = await as("bola").post(`/community/channels/${id}/messages`).send({ message_type: "file", document_id: img.body.document_id });

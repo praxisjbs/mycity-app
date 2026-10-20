@@ -111,7 +111,10 @@ track who has read them.
     opened the conversation (read). Channels show no ticks.
 11. **Voice notes** are recorded from the mic beside Send, in channels and in direct messages alike
     (the M1 definition of done asks for a voice note in a department channel; GE, 17/10/2026). They
-    play inline with a progress waveform. **Transcribe** under a voice note asks the
+    play inline. Their bars are the note's own loudness, measured by the worker when it makes the
+    Opus copy (`document.waveform`, migration `1190`; a steady shape until then), and they fill
+    from the audio's real position, starting with its first sound. The note is fetched as its
+    bubble is drawn, so Play starts at once (TB's review, 19/10/2026). **Transcribe** under a voice note asks the
     server for a transcript, shows "Transcribing…" and then the text, which can be hidden again.
     The transcript is stored once per voice note, so the second person to ask gets it at once.
 12. **Announcement read tracking** (Announcements tab): each card shows its title, an "N of 25 read"
@@ -214,7 +217,8 @@ channel's members read them, whoever they are. Audio and video are made playable
 `av-transcode` (a video gets `mp4-720` and its `poster`). A photo's `webp-320` and `webp-960` are
 made when it is stored; a PDF's are its first page, drawn by `media-derive` with PDF.js, which
 also writes `document.page_count`. A message's file travels as a `MediaRef`: the `DocumentRef`
-with its width, height, page count, length and the derived sizes it has, so a screen draws it
+with its width, height, page count, length, a voice note's `waveform` (48 bars, 0 to 100) and
+the derived sizes it has, so a screen draws it
 at its own shape before a byte of it arrives. A link card's picture is a vault document too (doc
 type `link_preview_image`, entity `community_link_preview`), readable by every member of staff:
 it came from a public page.
@@ -518,3 +522,4 @@ fields, never in a toast.
 - 20/10/2026 · GE · From TB's review: a channel's admins rename it and change its purpose from Channel Details (Edit Channel), `PUT /channels/:id`; Channel Details shows the purpose, and the header shows it on desktop (§3 step 5, §5, §7, §10).
 - 20/10/2026 · GE · Celebrations post at 08:00 Africa/Lagos instead of 05:00 (TB's review, 19/10): §3 step 3, §6, §7.
 - 20/10/2026 · GE · A birthday known only as a day and month posts too (§3 step 3): migration `1180` adds `employee.birth_day` and `birth_month`, the staff loader fills them from the sheet's DOB on every deploy (by work email, else staff number; never over a date on screen), through `organisation.setBirthday`.
+- 20/10/2026 · GE · Voice notes from TB's review (§3 step 11, §4): the bars are the note's measured loudness (`document.waveform`, migration `1190`, written by `av-transcode` and `media-derive`) and follow the audio's position from its first sound; the note's Opus copy is fetched as the bubble is drawn, so Play no longer waits about 2 seconds for the download. Notes sent before this keep the steady shape until `media-derive` is run for them.
