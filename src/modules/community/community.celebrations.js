@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Celebrations (MILESTONES A20): each morning at 05:00 Lagos the scheduler posts one card
+ * Celebrations (MILESTONES A20): each morning at 08:00 Lagos the scheduler posts one card
  * to #general for every active employee whose birthday or start-date anniversary is that
  * day, read from the employee record. Nothing is entered in Community for it.
  *

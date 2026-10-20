@@ -70,7 +70,7 @@ track who has read them.
    until each person presses **Acknowledge**, on the card in #announcements or on the bar
    (`docs/guides/notifications.md` §6). Opening an urgent announcement does not count as read; its
    Acknowledge does.
-3. **Celebrations.** The `celebrations` scheduler runs at 05:00 Africa/Lagos, reads employees whose
+3. **Celebrations.** The `celebrations` scheduler runs at 08:00 Africa/Lagos, reads employees whose
    `date_of_birth` (day and month) or `start_date` anniversary is today, and posts one celebration
    card each to #general, as the system. The card uses the employee's avatar, or their initials when
    there is none, and a message rotated from a fixed list. Colleagues press Celebrate on it.
@@ -138,7 +138,7 @@ track who has read them.
 15. **Who posts what.** Recognition is open to every member of staff, always (A19). A poll in
     #general is posted by People and the CEO only; in any other channel it follows Who Can Post. A
     celebration posted by hand (Celebrate) comes from the channel's admins, or People and the CEO in
-    #general; the 05:00 posts (step 3) need nobody. The ＋ menu offers only what the caller may post.
+    #general; the 08:00 posts (step 3) need nobody. The ＋ menu offers only what the caller may post.
 16. **Pinning and muting.** #general and #announcements are pinned for everyone and cannot be
     unpinned. Anyone may also pin up to 3 channels or direct conversations **for themselves**
     (⋮ → Pin to Top, Unpin), as on WhatsApp: they sit under the two company channels, the most
@@ -292,7 +292,7 @@ in #announcements, which every member of staff reads.
 - A person pins at most 3 other conversations, channels and direct ones together, for themselves.
 - A recognition note left blank is written by the system ("Thank you for the great work this week").
   A recognition to oneself is refused.
-- Celebrations post at 05:00 Africa/Lagos, every day of the week, one card per person per occasion.
+- Celebrations post at 08:00 Africa/Lagos, every day of the week, one card per person per occasion.
   An employee with no `date_of_birth` gets no birthday post. Only the day and month are ever shown.
 - A poll has 2 to 4 options and one vote per person; voting again moves the vote. A closed poll takes
   no votes.
@@ -344,7 +344,7 @@ in #announcements, which every member of staff reads.
 | `announcement.archived` | A published announcement archived | Withdraws its unopened notices (`notifications.withdrawForRecord`, which emits `notification.withdrawn` so the person's bell and urgent bar refresh on every tab); the "Message deleted" update to #announcements' members; audit |
 | `community.channel.members_changed` | Members added or removed, or an admin made or unmade | Audit; the channel list refreshes for those affected |
 | `community.channel.updated` | A channel renamed or its purpose changed | Audit; the channel list refreshes for its members |
-| `celebrations` (scheduler + handler) | 05:00 Africa/Lagos daily | Birthday and anniversary cards in #general |
+| `celebrations` (scheduler + handler) | 08:00 Africa/Lagos daily | Birthday and anniversary cards in #general |
 | `app_user.created`, `app_user.reactivated` (identity) | A login is made or comes back | `community.join_company`: the login joins #general and #announcements at once, so a new employee receives announcements before they ever open Community |
 | `community-membership` (scheduler) | Hourly, at minute 7 | Every active login added to #general and #announcements; idempotent |
 | `av-transcode`, `media-scan` | After an upload | Voice note to Opus, video to MP4 and its poster; a file from outside scanned. Image variants are made at upload; `media-derive` makes a file's variants again on request |
@@ -514,3 +514,4 @@ fields, never in a toast.
 - 20/10/2026 · GE · From TB's review: everyone is in #general and #announcements from the moment their login exists (`app_user.created`), with an hourly `community-membership` sweep, instead of from their first visit, so a new employee gets announcements at once (§4, §7).
 - 20/10/2026 · GE · From TB's review: a published announcement can be archived (§3 step 2, §4, §5, §6, §7, §10). Its unopened notices are withdrawn through a new `notifications.withdrawForRecord`; TB to review that addition to the notifications module.
 - 20/10/2026 · GE · From TB's review: a channel's admins rename it and change its purpose from Channel Details (Edit Channel), `PUT /channels/:id`; Channel Details shows the purpose, and the header shows it on desktop (§3 step 5, §5, §7, §10).
+- 20/10/2026 · GE · Celebrations post at 08:00 Africa/Lagos instead of 05:00 (TB's review, 19/10): §3 step 3, §6, §7.

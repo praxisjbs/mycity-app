@@ -658,7 +658,7 @@ async function postMessage(channelId, body, user) {
       if (!persons.has(body.subject_employee_id))
         throw new AppError("NOT_FOUND", "There is no such colleague", 404);
       metadata.subject_employee_id = body.subject_employee_id;
-      // A hand-posted anniversary carries its years, as the 05:00 ones do.
+      // A hand-posted anniversary carries its years, as the 08:00 ones do.
       if (type === "anniversary")
         metadata.years = await repo.yearsServed(
           client,
@@ -1077,7 +1077,7 @@ async function profileCard(employeeId, user) {
 }
 
 /* ------------------------------------------------------------------ *
- * Celebrations (A20), the 05:00 job
+ * Celebrations (A20), the 08:00 job
  * ------------------------------------------------------------------ */
 
 /**
