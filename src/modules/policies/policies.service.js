@@ -14,6 +14,7 @@
  *   withdraw       a version waiting to start never applies; with no draft its content becomes one
  *   acknowledge    a person acknowledges the newest version of a policy that applies to them
  *   rulesFor       the port a module reads its rules policy through (§6.8)
+ *   rulesOfVersion the rules of the version something was judged by (§6.8)
  *
  * Every change to one policy runs under its lock. Events carry ids, the number, the version, the
  * title and the first day, never the text.
@@ -1089,6 +1090,24 @@ async function rulesFor(db, kind, date) {
 }
 
 /**
+ * The rules of one version of a rules policy (§6.8): the version something was judged by, parsed
+ * with the type's defaults whatever is in force since; the defaults and no version when the id is
+ * null, or names no version of this kind. The second way a module reads its rules, beside rulesFor.
+ * @param {{query: Function}} db
+ * @param {string} kind  a rules type ("attendance")
+ * @param {string|null} policyVersionId
+ * @returns {Promise<{policy_version_id: string|null, version: number|null, rules: object}>}
+ */
+async function rulesOfVersion(db, kind, policyVersionId) {
+  const row = policyVersionId ? await repo.rulesOfVersion(db, kind, policyVersionId) : null;
+  return {
+    policy_version_id: row ? row.policy_version_id : null,
+    version: row && row.version !== null ? Number(row.version) : null,
+    rules: rulesOf(kind, row ? row.rules : null),
+  };
+}
+
+/**
  * The reminder's `find` (policies.events.js): for each newest version published REMIND_AFTER_DAYS
  * days ago or more that needs acknowledging, one occurrence for each person asked who has neither
  * acknowledged nor been reminded. Fired in the working day; the engine adds each once.
@@ -1161,6 +1180,7 @@ module.exports = {
   later,
   requestPdf,
   rulesFor,
+  rulesOfVersion,
   remindersDue,
   reminderCheck,
   canManage,

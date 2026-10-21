@@ -16,12 +16,17 @@ const homes = require("./attendance.home");
 const requests = require("./attendance.requests");
 const assignments = require("./attendance.assignments");
 const schedules = require("./attendance.schedule");
+const pay = require("./attendance.pay");
 const sites = require("./attendance.sites");
 const checkIns = require("./attendance.check-ins");
 
 const q = (req) => req.validated.query || {};
 const id = (req) => req.validated.params.id;
 const masked = (req, data) => maskForUser(pool, req.user, data);
+
+/** A pay item's amount is masked as the salary is, never on the reader's own (field-mask.js). */
+const maskedItem = (req, item) => (item.employee.employee_id === req.user.employee_id ? item : masked(req, item));
+const maskedItems = async (req, page) => ({ ...page, data: await Promise.all(page.data.map((x) => maskedItem(req, x))) });
 
 module.exports = {
   today: async (req, res) => ok(res, await service.today(req.user)),
@@ -111,6 +116,23 @@ module.exports = {
       await schedules.set(withActor(req), req.validated.params.employee_id, req.validated.body, scopeOf(req)),
     ),
 
+  mySchedule: async (req, res) => ok(res, await schedules.mine(req.user)),
+
+  myPayItems: async (req, res) => sendPaged(res, await pay.mine(req.user, q(req))),
+
+  payItems: async (req, res) => sendPaged(res, await maskedItems(req, await pay.list(req.user, q(req), scopeOf(req)))),
+
+  waive: async (req, res) => {
+    const out = await pay.waive(withActor(req), scopeOf(req), req.validated.body);
+    ok(res, { ...out, waived: await Promise.all(out.waived.map((x) => maskedItem(req, x))) });
+  },
+
+  decideOvertime: async (req, res) =>
+    ok(res, await maskedItem(req, await pay.decideOvertime(withActor(req), scopeOf(req), id(req), req.validated.body))),
+
+  approveOvertime: async (req, res) =>
+    created(res, await pay.approveOvertime(withActor(req), scopeOf(req), req.validated.body)),
+
   export: async (req, res) => accepted(res, await service.requestRegisterExport(withActor(req), req.validated.body)),
 
   // Temporary sites and check-ins (PR 4). The person's own read their own Temporary Home unmasked.
@@ -145,16 +167,4 @@ module.exports = {
     ok(res, await masked(req, await sites.remove(withActor(req), id(req), req.validated.body, scopeOf(req)))),
 
   checkIns: async (req, res) => sendPaged(res, await masked(req, await checkIns.list(q(req), scopeOf(req)))),
-
-
-
-
-
-
-
-
-
-
-
-
 };

@@ -5,22 +5,25 @@ import { api, ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth, useMe } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
+import { useScreenAction } from "@/shell/screen-action";
 import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, PATTERN, PUNCH_STATE, REGISTER_STATUS, VERDICT } from "./labels";
 import { DayRoute } from "./TemporarySites";
+import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
 
 /**
  * People · Attendance (#25, docs/guides/attendance.md §10): one day's register for everyone in the
  * reader's `people` scope, with its figures, each person's day and the evidence of every punch
  * (and on a temporary site's day each check-in between them), the exceptions waiting on People and
- * remote staff's home locations. A manager sees their team; the coordinates, the home addresses and
- * the home decisions are for People with scope all, which the API enforces. Temporary sites, and
- * the requests and field assignments made before them, are on People · Worksites, Temporary.
+ * remote staff's home locations, and the pending deductions and overtime (waived, confirmed and cut
+ * here, §6.17). A manager sees their team; the coordinates, the home addresses and the home
+ * decisions are for People with scope all, which the API enforces. Temporary sites, and the
+ * requests and field assignments made before them, are on People · Worksites, Temporary.
  */
 
-type View = "register" | "exceptions" | "homes";
+type View = "register" | "exceptions" | "homes" | "deductions" | "overtime";
 const STATUS_CHIPS: Array<[RegisterStatus | "all", string]> = [
   ["all", "All"],
   ["present", "Present"],
@@ -45,6 +48,11 @@ export function PeopleAttendance() {
   useRecordLink(id, openDay);
   const openHome = useCallback((h: HomeRequest) => modal.open({ title: h.employee.display_name, body: (close) => <HomeView h={h} close={close} /> }), [modal]);
   useHomeLink(homeId, openHome, () => setView("homes"));
+  // Deductions ticked on the Deductions view put Waive Selected in the phone's floating button.
+  const waiveRef = useRef<(() => void) | null>(null);
+  const [canWaive, setCanWaive] = useState(false);
+  // search:none Waive Selected acts on the deductions ticked on the list, never from search
+  useScreenAction(canWaive ? { label: "Waive Selected", icon: "check", onSelect: () => waiveRef.current?.() } : null);
 
   const exportRange = () => modal.open({ title: "Export Register", body: (close) => <ExportForm close={close} date={date} status={status} /> });
   const tile = (title: string, value: number | undefined, filter: RegisterStatus | null, tone?: "ok" | "warn" | "err", help?: string) => (
@@ -81,12 +89,19 @@ export function PeopleAttendance() {
         />
       </Grid>
       <div className="my-3">
-        <SegmentedControl label="View" value={view} onChange={setView} options={[["register", "Register"], ["exceptions", "Exceptions"], ["homes", "Homes"]]} />
+        <SegmentedControl
+          label="View"
+          value={view}
+          onChange={setView}
+          options={[["register", "Register"], ["exceptions", "Exceptions"], ["homes", "Homes"], ["deductions", "Deductions"], ["overtime", "Overtime"]]}
+        />
       </div>
       {view === "register" ? (
         <Register date={date} status={status} setStatus={setStatus} openDay={openDay} />
       ) : view === "exceptions" ? (
         <Exceptions date={date} />
+      ) : view === "deductions" || view === "overtime" ? (
+        <PayItemsView key={view} group={view} waiveRef={waiveRef} onCanWaive={setCanWaive} />
       ) : (
         <Homes openHome={openHome} />
       )}
@@ -145,10 +160,15 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
   const exceptions = usePaged("GET /api/v1/attendance/exceptions", { filters: { employee_id: employeeId, date } });
   const checkIns = usePaged("GET /api/v1/attendance/check-ins", { filters: { employee_id: employeeId, date } });
   const modal = useModal();
+  const me = useMe();
+  const { can } = useAuth();
   const d = day.data;
   if (day.error) return <ErrorState error={day.error} onRetry={day.reload} />;
   if (!d) return <LoadingRows />;
   const decideOne = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
+  // Overtime is approved beforehand, for today or a day to come, never for one's own day (§6.17).
+  const mayApprove = can("people", "approve") && d.employee.employee_id !== me.employee_id && d.date >= todayIso();
+  const approveOvertime = () => modal.open({ title: "Approve Overtime", body: (close) => <ApproveOvertimeForm employeeId={d.employee.employee_id} date={d.date} close={close} /> });
   return (
     <>
       <Card>
@@ -162,9 +182,18 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
             ["Clock Out", d.clock_out_at ? formatTime(d.clock_out_at) : null],
             ["Hours", d.worked_minutes ? hours(d.worked_minutes) : null],
             ["Late By", d.late_minutes ? lateBy(d.late_minutes) : null],
-            ["Overtime", d.overtime_minutes ? `${d.overtime_minutes} min` : null],
+            ["Left Early By", d.early_minutes ? lateBy(d.early_minutes) : null],
+            ["Overtime", d.overtime_minutes ? lateBy(d.overtime_minutes) : null],
+            ...(d.overtime_approval ? ([["Overtime Approved", `${lateBy(d.overtime_approval.minutes)}${d.overtime_approval.approved_by_name ? ` by ${d.overtime_approval.approved_by_name}` : ""}`]] as Array<[string, string]>) : []),
           ]}
         />
+        {mayApprove && (
+          <div className="mt-3 flex justify-end">
+            <Button className="phone:w-full" icon="clock" onClick={approveOvertime}>
+              Approve Overtime
+            </Button>
+          </div>
+        )}
       </Card>
       <DataView
         className="mt-3"
@@ -202,7 +231,7 @@ const evidenceColumns = [
   { key: "c", label: "Accuracy", desktop: true, render: (e: AttendanceEvent) => (e.accuracy_m !== null ? `${Math.round(e.accuracy_m)} m` : null) },
   { key: "g", label: "Coordinates", desktop: true, render: (e: AttendanceEvent) => (e.latitude !== null && e.longitude !== null ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}` : null) },
   { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
-  { key: "s", label: "Source", desktop: true, render: (e: AttendanceEvent) => (e.source === "admin" ? `Added by ${e.recorded_by_name ?? "People"}` : e.source === "system" ? "Automatic" : "Clock") },
+  { key: "s", label: "Source", desktop: true, render: (e: AttendanceEvent) => (e.source === "admin" ? `Added by ${e.recorded_by_name ?? "People"}` : e.source === "system" ? "System Clock-Out" : "Clock") },
 ];
 
 /** An exception's columns; `photo` (from usePhotos) puts the person's face beside their name. */
@@ -258,6 +287,7 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
             ["Detail", x.detail],
             ["Severity", x.severity === "high" ? "High" : x.severity === "medium" ? "Medium" : "Low"],
             ["Their Note", x.employee_note],
+            ...(x.real_time ? ([["Real Time", x.real_time]] as Array<[string, string]>) : []),
             ...(x.status === "resolved"
               ? ([
                   ["Decided By", x.reviewed_by_name],
@@ -296,7 +326,7 @@ function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendanc
     return {
       options: ["accept", "add_clock_out"],
       label: (d) => (d === "add_clock_out" ? "Correct Time" : DECISIONS[d]),
-      help: "Accept keeps the automatic time. Correct Time records when the person really left.",
+      help: "Accept keeps the System Clock-Out's time. Correct Time records when the person really left.",
     };
   return {
     options: type === "missing_clock_out" ? ["add_clock_out", "accept"] : ["accept", "reject"],
@@ -305,10 +335,12 @@ function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendanc
   };
 }
 
-/** Decide: accept the punch, stop it counting, add the missing clock-out or correct an automatic one. The punch itself never changes. */
+/** Decide: accept the punch, stop it counting, add the missing clock-out or correct a System Clock-Out. The punch itself never changes. */
 function DecisionForm({ x, close }: { x: AttendanceException; close: () => void }) {
   const { options, label, help } = decisionsFor(x);
-  const f = useContractForm({ decision: options[0], resolution: "", clock_out_time: "" }, {
+  // A System Clock-Out whose real time the person gave starts from Correct Time at that time.
+  const given = x.exception_type === "automatic_clock_out" && x.real_time;
+  const f = useContractForm({ decision: given ? ("add_clock_out" as const) : options[0], resolution: "", clock_out_time: given ? (x.real_time ?? "") : "" }, {
     safeParse: (v: { decision: ExceptionDecision["decision"]; resolution: string; clock_out_time: string }) =>
       attendance.ExceptionDecision.safeParse({ decision: v.decision, resolution: v.resolution, ...(v.decision === "add_clock_out" && v.clock_out_time ? { clock_out_time: v.clock_out_time } : {}) }),
   });

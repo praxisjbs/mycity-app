@@ -10,7 +10,7 @@
 | Capabilities | `policies.manage` (write, publish, withdraw and archive policies, and see who has acknowledged them; Knowledge Hub · Policies) |
 | Screens (PROGRESS.md rows) | #62 Policies, #89 Policy Updates; the acknowledge sheet over any screen; #73 Settings · Attendance Policy is dropped, its worksheet is the Attendance policy here |
 | Status | Built |
-| Last changed | 20/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1), which
 bring Knowledge Hub · Policies forward from M10 and retire Settings · Attendance Policy (MILESTONES
@@ -89,8 +89,9 @@ changed marked, and acknowledge each new version with one tap.
    has not acknowledged (`policy_unacknowledged`, notifications.md §7.1).
 8. **Rules take effect.** A rules policy's version in force on a date is what its module reads for
    that date (`policies.rulesFor(client, kind, date)`, §6.8). The Attendance policy's version in
-   force judges each punch and each day; Home's alerts and the query rules read their thresholds
-   from it (`attendance.md` §6.15, `home.md` §6).
+   force judges each punch, and a day is judged once, by the version its first clock-in was judged
+   by, which a recalculation reads again (`policies.rulesOfVersion`), never a newer one; Home's
+   alerts and the query rules read their thresholds from it (`attendance.md` §6.4, §6.15, `home.md` §6).
 
 ## 4 · Data
 
@@ -257,10 +258,17 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
 
 - `policies.rulesFor(client, kind, date)` gives the rules of the version in force on that date (the
   latest published version whose first day is on or before it), parsed with the type's defaults,
-  with the version's id; before any version, the type's defaults and no id. It is the only way a
-  module reads its policy.
-- A module records the version it applied (`attendance_event.policy_version_id`); a new version
-  never re-judges what an older one judged.
+  with the version's id; before any version, the type's defaults and no id. It is how a module
+  reads the rules for something being judged now.
+- `policies.rulesOfVersion(client, kind, policy_version_id)` gives one version's rules, parsed the
+  same way, with its id and number; the type's defaults and no id when the id is null. It is the
+  second way a module reads its rules: for something judged by a version recorded on it, whatever is
+  in force since (attendance's day, judged by the version on its first clock-in, `attendance.md`
+  §6.4). A module never reads `policy_version` itself.
+- A module records the version it applied (`attendance_event.policy_version_id`,
+  `attendance_day.policy_version_id`); a new version never re-judges what an older one judged.
+- A module caches no rules: each call reads the version, so a new version applies from its first day
+  with nothing to reload (attendance has no `policy.published` handler).
 - A type's suggestions fill a first draft when no version exists; they are the code's, not seeded,
   and HR changes any of them before publishing (A26).
 
@@ -273,7 +281,7 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
 | `policy.submitted` | Submit for Approval | Audit; the approval tells its first approver ("Policy waiting for approval") |
 | `policy.recalled` | HR recalls a submission | Audit; the approval is cancelled |
 | `policy.rejected` | An approver rejects | Audit; notifies the submitter with the reason |
-| `policy.published` | A version is published (directly or on the last approval) | Audit; outbox `policies.notify_published` (everyone asked: "New policy" or "Policy updated", its title, version and first day; push as their Knowledge Hub preference allows); a rules type's own handler (attendance reloads its rules) |
+| `policy.published` | A version is published (directly or on the last approval) | Audit; outbox `policies.notify_published` (everyone asked: "New policy" or "Policy updated", its title, version and first day; push as their Knowledge Hub preference allows). No rules type has a handler: the modules read the version on each call (§6.8), so the version applies from its first day |
 | `policy.withdrawn` | A waiting version is withdrawn | Audit; notifies the same people that it will not apply |
 | `policy.archived` | A document policy is archived | Audit |
 | `policy.acknowledged` | Someone acknowledges | Audit; their notices about it are read |
@@ -375,6 +383,7 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · Attendance's PR 3 built: the worksheet shows every rule (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts; `worksheet.ts` keeps one flat value per control), and the sentences staff read cover each (`attendance.policy-type.js`, the mock word for word). A draft compares rules whatever order their keys came in.
 - 20/10/2026 · TB · Attendance's PR 4: the Attendance policy's `site_geofence_mode` reads Temporary Site Check on the worksheet, and its section At a Temporary Site (once At a Field Site) covers a temporary site's addresses and its check-ins and ends with T14's fixed sentence, "Working somewhere else? Add it from Home, or ask People." (attendance.md §6.15). A version's rules and acknowledgements are unchanged; the sentences of every version read the new words.
 - 20/10/2026 · TB · Tidy With AI's job chosen under the AI convention merged from main (#101): Default, carrying personal data, never DeepSeek (§9); the open question on its model is closed.
 - 20/10/2026 · TB · Built (PR 1): migrations 1400 and 1405, seed 1396, the `policies` module and its contract; Knowledge Hub · Policies (`PoliciesHub.tsx`: the list, a policy opened with `?policy=`, its draft in `PolicyDraft.tsx` with the editor and Tidy With AI or the Attendance worksheet, the publish, submit and reason sheets in `PolicyForms.tsx`, its versions and acknowledgements), ESS · Policy Updates (`PolicyUpdates.tsx`) and the acknowledge sheet (`AcknowledgeSheet.tsx`, mounted by the shell beside the clock prompts); `RichText` added to `packages/ui`. The draft carries the people Applies To names (`applies_to_people`) and a rules policy its type's suggestions (`suggested_rules`). Left: nothing in PR 1.

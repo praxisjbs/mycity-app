@@ -9,6 +9,7 @@
  *   POST  /alerts/:id/clear      `home` view, `alerts.clear`: clear or dismiss it, when the
  *                                rule's grant also reaches the person it is about
  *   GET   /alert-rules           `home` view, `alerts.manage`: a page of 25
+ *   GET   /alert-rules/policy    as above: the Attendance policy's five rules in force, read only
  *   GET   /alert-rules/:id       as above
  *   POST  /alert-rules           as above: a new rule, its key made by the server
  *   PATCH /alert-rules/:id       as above: any field but the metric; off dismisses its open alerts
@@ -46,6 +47,10 @@ route(router, "post", "/alerts/:id/clear",
 route(router, "get", "/alert-rules",
   { query: a.HomeAlertRuleQuery, response: a.HomeAlertRulePage, summary: "The alert rules" },
   view, requireCapability("alerts.manage"), controller.rules);
+
+route(router, "get", "/alert-rules/policy",
+  { response: a.HomeAlertPolicyRules, summary: "The Attendance policy's alert rules in force" },
+  view, requireCapability("alerts.manage"), controller.policyRules);
 
 route(router, "get", "/alert-rules/:id",
   { params: c.common.IdParams, response: a.HomeAlertRule, summary: "One alert rule" },

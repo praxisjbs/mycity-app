@@ -10,7 +10,7 @@
  *   GET   /me/events                     one of my days' punches
  *   GET   /me/exceptions                 my exceptions
  *   POST  /me/exceptions/:id/explanation say why
- *   POST  /me/events/:id/explanation     say why an automatic clock-out's time is wrong
+ *   POST  /me/events/:id/explanation     Give Real Time: the real leaving time of a System Clock-Out
  *   POST  /me/export                     my month as a workbook, downloaded where I asked (202)
  *   GET   /me/records/:id                the day a link to my day or exception opens
  *   GET   /me/home, POST /me/home        my home location, and a new one for People (remote)
@@ -18,6 +18,8 @@
  *   GET   /me/requests/:id               one of mine
  *   POST  /me/requests/:id/cancel        withdraw or cancel one of mine
  *   GET   /me/field-assignments, /me/field-assignments/:id  the field assignments I am or was on
+ *   GET   /me/schedule                   my work week (My Profile)
+ *   GET   /me/pay-items                  my pending deductions and overtime for a month
  *   GET   /me/temporary-sites, POST /me/temporary-sites    my temporary sites, and Add Work Site
  *                                                          (for me and colleagues; approval)
  *   GET   /me/temporary-sites/:id        one I submitted or am or was on
@@ -46,7 +48,13 @@
  *   POST  /temporary-sites/:id/cancel, /remove  cancel one, or take someone off (approve, scope all)
  *   GET   /check-ins                     one person's check-ins on a day (view)
  *   GET   /schedules/:employee_id        a person's week, office and home state (view)
- *   POST  /schedules/:employee_id        set a hybrid employee's office days (edit; never your own)
+ *   POST  /schedules/:employee_id        set anyone's work schedule from a day (edit; never your own)
+ *   GET   /pay-items                     pending deductions and overtime (view; amounts masked
+ *                                        as the salary is)
+ *   POST  /pay-items/waive               waive up to 25 deductions (approve, scope all; never your own)
+ *   POST  /pay-items/:id/overtime        confirm or cut overtime (approve, within scope; never your own)
+ *   POST  /overtime-approvals            approve overtime for a person's day beforehand (approve,
+ *                                        within scope; never your own)
  *   POST  /export                        the register over up to 31 days as a workbook, downloaded
  *                                        where it was asked for (export; 202)
  *
@@ -93,8 +101,8 @@ route(router, "post", "/me/exceptions/:id/explanation",
   controller.explain);
 
 route(router, "post", "/me/events/:id/explanation",
-  { params: c.common.IdParams, body: a.ExceptionExplanation, response: a.AttendanceException, self: true,
-    summary: "Explain one of my automatic clock-outs" },
+  { params: c.common.IdParams, body: a.RealTimeGiven, response: a.AttendanceException, self: true,
+    summary: "Give the real time of one of my System Clock-Outs" },
   controller.explainAutomatic);
 
 route(router, "post", "/me/export",
@@ -135,6 +143,14 @@ route(router, "get", "/me/field-assignments",
 route(router, "get", "/me/field-assignments/:id",
   { params: c.common.IdParams, response: a.FieldAssignment, self: true, summary: "One of my field assignments" },
   controller.myAssignment);
+
+route(router, "get", "/me/schedule",
+  { response: a.WorkSchedule, self: true, summary: "My work week" },
+  controller.mySchedule);
+
+route(router, "get", "/me/pay-items",
+  { query: a.MyPayItemListQuery, response: a.PayItemPage, self: true, summary: "My deductions and overtime" },
+  controller.myPayItems);
 
 route(router, "get", "/register",
   { query: a.RegisterQuery, response: a.RegisterPage, summary: "The attendance register for a day" },
@@ -210,8 +226,24 @@ route(router, "get", "/schedules/:employee_id",
 
 route(router, "post", "/schedules/:employee_id",
   { params: a.ScheduleParams, body: a.WorkScheduleSet, response: a.WorkSchedule,
-    summary: "Set a hybrid employee's office days" },
+    summary: "Set someone's work schedule from a day" },
   requirePermission("people", "edit"), controller.setSchedule);
+
+route(router, "get", "/pay-items",
+  { query: a.PayItemListQuery, response: a.PayItemPage, summary: "Pending deductions and overtime" },
+  requirePermission("people", "view"), controller.payItems);
+
+route(router, "post", "/pay-items/waive",
+  { body: a.PayItemWaive, response: a.PayItemBatchResult, summary: "Waive deductions" },
+  requirePermission("people", "approve"), controller.waive);
+
+route(router, "post", "/pay-items/:id/overtime",
+  { params: c.common.IdParams, body: a.OvertimeDecision, response: a.PayItem, summary: "Confirm or cut overtime" },
+  requirePermission("people", "approve"), controller.decideOvertime);
+
+route(router, "post", "/overtime-approvals",
+  { body: a.OvertimePreApprovalCreate, response: a.OvertimePreApproval, summary: "Approve overtime beforehand" },
+  requirePermission("people", "approve"), controller.approveOvertime);
 
 route(router, "post", "/export",
   { body: a.RegisterExportRequest, response: c.documents.ExportFile, summary: "Export the register" },

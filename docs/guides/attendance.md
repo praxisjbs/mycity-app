@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #9 My Attendance, #87 Work Location Requests, #88 My Devices, #25 Attendance, #27 Devices, #28 Worksites, the Work Schedule tab of the employee record (#24 Employees), Home · Overview's Add Work Site (#1), and the Attendance policy's worksheet on Knowledge Hub · Policies (#62, `policies.md`). #89 Policy Updates moved to `policies.md`; #73 Settings · Attendance Policy is dropped (TB, 20/10/2026) |
 | Status | Agreed |
-| Last changed | 20/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1);
 MILESTONES §6.2 and A22, A26; REUSE_MAP §2.2 (the policy model and the donor files); the 12 and 13
@@ -75,7 +75,7 @@ takes its migrations from its own part of the M1 block, so the four never collid
 |---|---|---|---|---|
 | 1 · Policies foundation | Knowledge Hub · Policies and ESS · Policy Updates for every policy (`policies.md`); the Attendance policy moved into it with today's rules; the clock reads its rules through `policies.rulesFor`; Settings · Attendance Policy retired | §6.1, §6.15 (the worksheet's existing rules, and the contract for every rule) | 1400 to 1419 | Built |
 | 2 · Clock fixes | The audit of 20/10/2026: the location reading, Location Unclear, Refuse opening an exception, a rejected punch freeing its slot, leave on the work date, the clock panel's location reader | §6.2, §6.3, §6.5, §6.7, §6.8, §11 | 1380 to 1389 | Not started |
-| 3 · Rules and schedules | Hours in the policy and work schedules; lateness from the start; the consequence rules (alerts, queries); pending deductions and overtime; reminders and the system clock-out; each day judged by its own version | §6.4, §6.13, §6.14, §6.15 (the rules' effects), §6.16, §6.17 | 1420 to 1449 | Not started |
+| 3 · Rules and schedules | Hours in the policy and work schedules; lateness from the start; the consequence rules (alerts, queries); pending deductions and overtime; reminders and the system clock-out; each day judged by its own version | §6.4, §6.13, §6.14, §6.15 (the rules' effects), §6.16, §6.17 | 1420 to 1449 | Built (21/10/2026) |
 | 4 · Places | Permanent and temporary sites, Add Work Site on Home, HR's approval, Check In at each stop; work location requests and field assignments retired | §6.11, §6.12 | 1450 to 1479 | Built |
 
 Until a PR lands, the behaviour its sections replace is what runs; the sections say what stood before.
@@ -110,14 +110,13 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
 2. **People set up places and people.** Permanent sites (People · Worksites, Permanent) carry a
    centre, radius and timezone, and the employees assigned (`employee.worksite_id`, through the
    organisation service). Each employee works the company hours unless People set them a work
-   schedule (the record's Work Schedule tab, Set Schedule, PR 3): each weekday Working or Off, its
+   schedule (the record's Work Schedule tab, Set Schedule): each weekday Working or Off, its
    hours, and Office or Remote, from a date, with a reason (§6.13). The person is told, and My
-   Profile shows it. Before PR 3, only a hybrid employee's office days are set, on the record's
-   Attendance tab.
+   Profile shows it.
 3. **The employee registers their device and, working from home, their home.** The browser they
    clock in from (ESS · My Devices, Register This Device) is the device identity sign-in already
    keeps (`known_device`), confirmed by a fresh sign-in, at most three at a time. Anyone whose
-   schedule has a remote day sets their home from home (ESS · My Attendance, Set Home Location): one
+   week has a Remote day sets their home from home (ESS · My Attendance, Set Home Location): one
    reading and their address, picked; People approve or reject it (People · Attendance, Homes),
    never their own. The approved home is their fence on remote days (§6.5, §6.10).
 4. **Working somewhere else** (PR 4, §6.11). Anyone presses Add Work Site on Home: a purpose from the
@@ -139,35 +138,40 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
 6. **The service decides the punch** (§6): the clock guard, the place against the day's fence, the
    device, the device's time. It records an `accepted`, `review` or `rejected` event with its
    evidence and the policy version, updates the day (`attendance_day`), opens exceptions (a refused
-   punch included, PR 2), and emits `attendance.punched` in the same transaction.
+   punch included, PR 2), counts the day against the policy's rules and settles its pay items
+   (§6.16, §6.17: a breach is recorded and `attendance.rule_breached` emitted here, with the punch),
+   and emits `attendance.punched` in the same transaction.
 7. After commit the outbox pushes `attendance.updated` to the employee and to People within scope,
-   `attendance.review_required` notifies People and the employee, and the rule counter (PR 3, §6.16)
-   counts the punch against the policy's rules.
+   `attendance.review_required` notifies People and the employee, and a breach's alert is raised
+   (`attendance.raise_breach_alert`, §6.16).
 8. **People review.** They open the person's day from the register, read the evidence and decide
    the exception: accept, reject (the punch stops counting and frees its slot, PR 2), or add the
    missing clock-out time. The source event is never edited; a correction is a new event with
-   `source = 'admin'`.
+   `source = 'admin'`. The decision recalculates the day, its pay items and its rule counts in its
+   own transaction (§6.16, §6.17).
 9. **The clock asks at sign-in, at the start and at the end** (§6.14). The panel opens by itself
    over a blurred screen: at the day's first sign-in for someone not clocked in, at the shift's start
-   and at its end. A reminder goes to anyone not in within the first hour. From the shift's end,
-   anyone still clocked in is reminded every 30 minutes, and 90 minutes after the end the system
-   clocks them out (PR 3; before it, the 15-minutes-away rule of §6.14).
+   and at its end, each by the person's own shift. A reminder goes to anyone not in within the
+   first hour. From the shift's end, anyone still clocked in is reminded every 30 minutes, and 90
+   minutes after the end the system clocks them out (System Clock-Out; both figures the policy's).
 10. **The day closes** at 01:30 Lagos (the day-close job): an open clock-in becomes a missing
     clock-out exception, an expected working day with no clock-in becomes absent, approved leave
-    becomes leave. From PR 3 the day's late, early and absent minutes are counted against the rules
-    (§6.16) and pending deductions and overtime are added (§6.17).
-11. **Rules act** (PR 3, §6.16). When a rule the policy switched on is reached (three late arrivals
-    in a month, five absences, two forgotten clock-outs), the breach raises the alert on Home ·
-    Alerts when Alert is on, and, when Raise Query is on, the query (Queries & Sanctions, M3; until
-    it exists, the alert reads Query Due). The count restarts.
-12. **Money** (PR 3, §6.17). A late, early or absent day under a deduction rule that is on adds a
-    pending deduction the person sees on My Attendance; People waive any before the payroll run is
-    locked (M6 takes the rest). Overtime past the policy's minimum is confirmed as the policy says
-    and then waits for the run.
+    becomes leave, each by the person's own schedule (an Off day is never absent, and nor is anyone
+    with no active login). The day's late, early and absent days are counted against the rules
+    (§6.16) and pending deductions and overtime are added (§6.17), in the same transaction.
+11. **Rules act** (§6.16). When a rule the policy switched on is reached (three late arrivals in a
+    month, two absences, three forgotten clock-outs), the breach is recorded in the transaction that
+    crossed it; after commit it raises the alert on Home · Alerts when Alert is on, and, when Raise
+    Query is on, the query (Queries & Sanctions, M3; until it exists, the alert reads Query Due and
+    is raised even with Alert off). The count restarts.
+12. **Money** (§6.17). A late, early or absent day under a deduction rule that is on adds a
+    pending deduction the person sees on My Attendance; People waive any before payroll takes it
+    into a run (M6 takes the rest). Overtime past the policy's minimum is confirmed as the policy
+    says (the line manager afterwards, a pre-approval, or at once) and then waits for the run.
 13. **Home reads a day's attendance** through the shared roster (`attendance.roster.js`, §6.9): the
     Clocked In Today card and the list behind it, the Team tab and a person's own month, so a figure
-    on Home is the figure on People · Attendance and My Attendance. Home's attendance alerts read
-    their thresholds from the policy (PR 3, home.md §6); before PR 3 their own rules count them.
+    on Home is the figure on People · Attendance and My Attendance. Home's attendance alerts are
+    the policy's breaches (§6.16, home.md §6); Home has no attendance rules of its own.
 
 ## 4 · Data
 
@@ -177,22 +181,22 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
 | `attendance_policy_acknowledgement` (1370) | `attendance_policy_id`, `employee_id`, `reminded_at`, `acknowledged_at` | **Frozen from PR 1**: moved to `policy_acknowledgement` (`1405`) |
 | `employee_attendance_policy` (1000) | `employee_id`, `attendance_policy_id`, `worksite_id`, `effective_from`, `effective_to` | Never written, and from PR 1 not read: one organisation policy (§6.1), and a person's own hours are their work schedule (§6.13). Dropped with `attendance_policy` |
 | `attendance_event` (1000, 1300, 1360) | `employee_id`, `event_type` (`clock_in`, `clock_out`), `work_date`, `occurred_at` (server time), `device_at`, `latitude`, `longitude`, `accuracy_m`, `distance_m`, `worksite_id`, `known_device_id`, `attendance_device_id`, `source` (`pwa`; `admin`, People's correction; `system`, an automatic clock-out, §6.14), `validation_state` (`accepted`, `review`, `rejected`), `validation` (evidence), `idempotency_key`, `attendance_policy_id` (to PR 1), `policy_version_id` (from PR 1, `1405`; a punch from before keeps its version in `attendance_policy_id`, the same id, since the table is append-only: read `COALESCE(policy_version_id, attendance_policy_id)`), `note`, `recorded_by`, `reason` | Append-only. Unique: one active (`accepted` or `review`) event of each type per person per work date among the person's and People's punches, and one automatic clock-out per person per work date (`1360`), so People's correction stands beside the automatic one it replaces; one event per person per idempotency key |
-| `attendance_day` (1000, 1300) | `employee_id`, `attendance_date`, `status` (`present`, `late`, `absent`, `leave`, or none while nothing on an open day counts), `first_clock_in_at`, `last_clock_out_at`, `worked_minutes`, `late_minutes`, `overtime_minutes`, `closed_at` | The projection, recalculated from the day's events in the punch's transaction and by the day-close job |
+| `attendance_day` (1000, 1300, 1425) | `employee_id`, `attendance_date`, `status` (`present`, `late`, `absent`, `leave`, or none while nothing on an open day counts), `first_clock_in_at`, `last_clock_out_at`, `worked_minutes`, `late_minutes`, `early_minutes` (1425), `overtime_minutes`, `closed_at`; what judged it (1425): `policy_version_id` (the version its first clock-in was judged by, or for a day with none the version in force on its date when it closed; null for the type's defaults), `attendance_work_schedule_id` (the schedule in force, null for the company hours), `shift_working`, `shift_starts_at`, `shift_ends_at` (the shift it was judged against) and `judged_at` (when they were recorded: the first clock-in, or the day-close) | The projection, recalculated from the day's events in the punch's transaction and by the day-close job. A day is judged once (§6.4): once `judged_at` is set, a recalculation reads the recorded version (`policies.rulesOfVersion`) and shift, never a newer one |
 | `attendance_exception` (1000, 1300, 1310, 1360) | `attendance_day_id`, `attendance_event_id`, `exception_type` (`outside_worksite`, `outside_home`, `location_unverified`, `unknown_device`, `suspicious_timestamp`, `missing_clock_out`, `automatic_clock_out`: opened only when the person explains one, §6.14), `severity`, `status` (`open`, `resolved`), `outcome` (`accepted`, `rejected`, `corrected`), `evidence`, `employee_note`, `reviewed_by`, `reviewed_at`, `resolution` | One per event and type, one day-level `missing_clock_out` per day (partial unique indexes), so a retried job adds none |
 | `attendance_device` (1300) | `employee_id`, `known_device_id` (unique), `label`, `status` (`observed`, `registered`, `removed`), `first_seen_at`, `last_punch_at`, `registered_at`, `removed_at`, `removed_by`, `removal_reason` | Owned by `devices`. A device first seen on a punch is `observed`; the employee registers it; a removed one may be registered again. The device cookie and its hash never leave identity |
 | `worksite` (0040) | `code`, `name`, `address` (jsonb `{ text }`), `latitude`, `longitude`, `radius_m`, `timezone`, `active` | Written by `worksites` from this delivery; the employee's assignment is `employee.worksite_id` |
 | `attendance_home` (1310) | `employee_id`, `address`, `latitude`, `longitude`, `accuracy_m`, `status` (`pending`, `approved`, `rejected`, `superseded`), `requested_by`, `requested_at`, `decided_by`, `decided_at`, `decision_reason` | A remote employee's home location. At most one `pending` and one `approved` per person (partial unique indexes); approving supersedes the old approved one, a new request supersedes the one still waiting. Personal data: on the wire as `home_address`, `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the person and to `people` scope all |
 
 | `attendance_location_request` (1320, 1350) | `number`, `employee_id`, `request_type` (`temporary_home`, `remote_day`, `client_visit`), `starts_on`, `ends_on`, `address`, `latitude`, `longitude`, `accuracy_m`, `site_latitude`, `site_longitude`, `site_radius_m`, `reason`, `status` (`submitted`, `approved`, `rejected`, `cancelled`), `workflow_instance_id`, `requested_by`, `decided_at`, `cancelled_at`, `cancel_reason` | A request to work somewhere else for some days, decided in its approval. `latitude`, `longitude` are a temporary home's reading only (both or neither); on the wire `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the person and to `people` scope all. `site_latitude`, `site_longitude`, `site_radius_m` (100 to 500) are a client visit's site only, all three or none: a client's venue, not personal data. A client visit sent before `1350` has none |
-| `attendance_schedule` (1340) | `employee_id`, `office_days` (ISO weekdays, 1 Monday to 7 Sunday), `effective_from`, `reason`, `set_by`, `set_at` | A hybrid employee's week: the days at their worksite, from a date. One row per person per `effective_from` (setting the same start again replaces it); the row in force on a date is the latest that started by then. Read only for `hybrid` staff |
+| `attendance_schedule` (1340) | `employee_id`, `office_days` (ISO weekdays, 1 Monday to 7 Sunday), `effective_from`, `reason`, `set_by`, `set_at` | **Frozen from PR 3**: its rows were copied into `attendance_work_schedule` (`1420`). Read by nothing; a later release drops it (MIGRATIONS §8) |
 | `attendance_field_assignment` (1330) | `number`, `name`, `client`, `note`, `starts_on`, `ends_on` (at most 31 days), `status` (`active`, `cancelled`), `assigned_by`, `assigned_at`, `cancelled_at`, `cancelled_by`, `cancel_reason` | Sending people to work somewhere for some days. In force from the moment it is saved; cancelled, it stops applying to the days still to come. Never deleted |
 | `attendance_field_site` (1330) | `field_assignment_id`, `position` (1 or 2), `name`, `address`, `latitude`, `longitude`, `radius_m` (100 to 500) | An assignment's one or two sites, set as a worksite is; `address` is the readable line of the place picked (`place`, owner `attendance_field_site.address`, `addresses.md` §4). A client's venue, not a person's: not personal data |
 | `attendance_field_member` (1330) | `field_assignment_id`, `employee_id`, `added_at`, `removed_at`, `removed_by`, `removed_reason` | The people on it, at most 25. Taking someone off keeps their row with `removed_at`; a person is on at most one active assignment a day (the service, under the person's lock) |
-| `attendance_clock_reminder` (1360) | `employee_id`, `work_date`, `kind` (`clock_in_due`), `sent_at` | One row per reminder sent, unique per person, day and kind, so the watch sends it once a day however often it runs; the notice is about this row, and clocking in marks it read. Nothing about a person but who and which day |
-| `attendance_work_schedule` (PR 3) | `employee_id`, `days` (jsonb: each ISO weekday `working`, `starts_at`, `ends_at`, `place` `office` or `remote`), `effective_from`, `reason`, `set_by`, `set_at` | A person's own week, from a date (§6.13); the latest started by a date is in force; none means the company hours of the policy in force. Replaces `attendance_schedule`, whose rows become schedules with the company hours and their office days. Not personal data beyond the person's hours |
-| `attendance_rule_breach` (PR 3) | `employee_id`, `rule` (`late`, `early_departure`, `absence`, `forgotten_clock_out`, `location_flag`), `policy_version_id`, `period_start`, `period_end`, `count`, `minutes`, `days` (the dates counted), `breached_at`, `home_alert_id`, `employee_query_id` (M3) | One row per breach (§6.16); the days it counted are not counted again. Unique on the person, the rule and its last counted day, so a retried count adds none |
-| `attendance_pay_item` (PR 3) | `employee_id`, `work_date`, `kind` (`late`, `early_departure`, `absence`, `overtime`), `minutes`, `method`, `amount` (numeric(18,2), null with no salary set), `policy_version_id`, `status` (`pending`, `waived`, `confirmed`, `cut`, `in_run`), `decided_by`, `decided_at`, `reason`, `confirmed_minutes`, `payroll_run_id` (M6) | One per person, day and kind (§6.17). Money through `shared/money`. Salary-derived amounts are restricted fields, masked as the salary is |
-| `attendance_overtime_approval` (PR 3) | `employee_id`, `work_date`, `minutes`, `approved_by`, `approved_at`, `reason` | Overtime approved for a day beforehand, read only under the Pre-Approved method (§6.17); unique per person and day |
+| `attendance_clock_reminder` (1360, 1440) | `employee_id`, `work_date`, `kind` (`clock_in_due`, `clock_out_due`, 1440), `slot` (1440: 0 for the reminder to clock in; 1, 2, 3 for each reminder to clock out, every `clock_out_reminder_minutes` from the shift's end), `due_at` (1440: the reminder's time), `sent_at` | One row per reminder sent, unique per person, day, kind and slot (1440), so the watch sends each once however often it runs; the notice is about this row, and clocking in (or out) marks it read. Nothing about a person but who and which day |
+| `attendance_work_schedule` (1420) | `employee_id`, `days` (jsonb: the seven ISO weekdays in order, each `weekday`, `working`, `starts_at`, `ends_at` and `place` `office` or `remote`; an Off day has neither times nor place, a working day with no times takes the company hours), `effective_from`, `reason`, `set_by`, `set_at` | A person's own week, from a date (§6.13); the latest started by a date is in force (unique per person and first day); none means the company hours of the policy in force. Replaces `attendance_schedule`: `1420` copies its rows with blank hours, Working on the weekdays the working week worked when it ran, their office days Office and the rest Remote (§6.13). Not personal data beyond the person's hours |
+| `attendance_rule_breach` (1430) | `employee_id`, `rule` (`late`, `early_departure`, `absence`, `forgotten_clock_out`, `location_flag`), `policy_version_id` (the version in force on the crossing day), `period` (`week`, `month`, `days_30`), `period_start`, `period_end`, `count`, `minutes`, `reached` (`count` or `hours`: which came first), `days` (the dates counted), `last_day`, `alert`, `raise_query` (as the version said), `breached_at`, `home_alert_id` (the Home alert it raised, set after commit), `employee_query_id` (M3: a nullable uuid with no foreign key until M3's `employee_query` exists; M3 adds the key) | One row per breach (§6.16); a breach's days are not counted again. Unique on the person, the rule and its last counted day, so a retried count adds none |
+| `attendance_pay_item` (1435) | `employee_id`, `attendance_day_id`, `work_date`, `kind` (`late`, `early_departure`, `absence`, `overtime`), `minutes`, `rest_day` (overtime on a day not worked), `method` (`pro_rata`, `per_hour`, `per_day`, `daily_rate`, `multiplier`), `amount` (numeric(18,2), null with no salary set; on the wire `pay_amount`), `policy_version_id` (the version that judged the day), `status` (`pending`, `waived`, `confirmed`, `cut`, `in_run`), `decided_by` (null when the system decided), `decided_at`, `reason`, `confirmed_minutes`, `payroll_run_id` (M6: a nullable uuid with no foreign key until M6's run table exists; M6 adds the key) | One per person, day and kind (§6.17). Money through `shared/money`. Salary-derived amounts are restricted fields, masked as the salary is (`pay_amount` under `employee.salary`) |
+| `attendance_overtime_approval` (1435) | `employee_id`, `work_date`, `minutes`, `approved_by`, `approved_at`, `reason` | Overtime approved for a day beforehand (Approve Overtime), read only under the Pre-Approved method (§6.17); unique per person and day, the same day again replacing it |
 | `attendance_temporary_site` (`1450`) | `number` (`TS-0001`, unique), `purpose` (the contract's `TemporarySitePurpose`), `name` (3 to 120), `description` (30 to 1,000), `starts_on`, `ends_on` (at most 90 days in all), `status` (`submitted`, `approved`, `rejected`, `withdrawn`, `cancelled`), `submitted_by` (the login that added it), `workflow_instance_id` (none when People add it directly), `approved_at`, `approved_by` (the approval's last approver, or whoever added it directly), `cancelled_at`, `cancelled_by`, `cancel_reason` | A place to work for some days (§6.11). A withdrawal is status `withdrawn` with `cancelled_at`, `cancelled_by` (the submitter) and `cancel_reason` (theirs); a cancellation by People the same with `cancelled`. Replaces `attendance_location_request` and `attendance_field_assignment` for new entries; theirs keep applying until their last day. Never deleted |
 | `attendance_temporary_site_location` (`1450`) | `temporary_site_id`, `position` (1 to 8), `name` (an optional label, up to 60), `place_id` (the `place` picked, F27, owner `attendance_temporary_site_location.address`), `address` (its readable line), `latitude`, `longitude` (the place's point, the fence's centre), `radius_m` (150 to 500), `timezone` (the place's, Africa/Lagos when unknown) | Its addresses. A Temporary Home's is personal data: on the wire as `home_address`, `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the people on it, its submitter and `people` scope all; every other is a venue, `address`, `latitude`, `longitude` |
 | `attendance_temporary_site_member` (`1450`) | `temporary_site_id`, `employee_id`, `added_at`, `removed_at`, `removed_by`, `removed_reason` | Up to 25 people. Taking someone off keeps their row with `removed_at`; a person is on at most one approved or waiting site a day (the service, under the person's lock) |
@@ -230,6 +234,14 @@ approval, one stage, Operations & People). The purposes are the contract's enum;
 person, a site or a place is seeded. `attendance_location_request` and the field assignment tables
 take no new rows from PR 4; nothing is migrated or dropped.
 
+PR 3's, built: `migrations/1420_attendance_work_schedule.sql` (work schedules, `1340`'s rows copied
+in), `migrations/1425_attendance_day_judged.sql` (what judged a day, and `early_minutes`),
+`migrations/1430_attendance_rule_breach.sql` (rule breaches),
+`migrations/1435_attendance_pay_item.sql` (pay items and overtime approvals),
+`migrations/1440_attendance_clock_out_reminder.sql` (the clock-out reminders' kind, slot and time)
+and `migrations/1445_home_attendance_rules_off.sql` (Home's own attendance alert rules switched off,
+`home.md` §4). PR 3 seeds nothing.
+
 **The shared roster** (§6.9) reads `attendance_day` as the punch, the decision and the day-close
 write it; the day's one active clock-in on `attendance_event` (by `work_date`, for the worksite it
 was judged against); `employee`, `department` and `worksite`; granted `leave_request` with its
@@ -250,7 +262,7 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/me/check-ins` (PR 4) | `MyCheckInListQuery` (`date`) → `CheckInPage` | self, own | yes, 25 | One day's check-ins in time order, each with its address and verdict, no coordinates. A route of its own beside `me/events` (which stays punches only), so My Attendance merges the two into the day's route |
 | `GET /api/v1/attendance/me/exceptions` | `MyExceptionListQuery` → `AttendanceExceptionPage` | self, own | yes, 25 | |
 | `POST /api/v1/attendance/me/exceptions/:id/explanation` | `ExceptionExplanation` → `AttendanceException` | self, own | no | While the exception is open |
-| `POST /api/v1/attendance/me/events/:id/explanation` | `ExceptionExplanation` → `AttendanceException` | self, own | no | An automatic clock-out of the person's own (§6.14): opens its `automatic_clock_out` exception with the note. 404 for anyone else's punch, 422 `NOT_AUTOMATIC` for a punch that is not one, 409 `ALREADY_EXPLAINED` once it has an exception |
+| `POST /api/v1/attendance/me/events/:id/explanation` | `RealTimeGiven` (`employee_note`, `real_time`, HH:MM) → `AttendanceException` | self, own | no | Give Real Time on a System Clock-Out of the person's own (§6.14): opens its `automatic_clock_out` exception with the note and the real leaving time, which People read on the decision (`real_time`) and Correct Time starts from. The time is after the clock-in and not in the future (422 `REAL_TIME_INVALID` on `real_time`). 404 for anyone else's punch, 422 `NOT_AUTOMATIC` for a punch that is not one, 409 `ALREADY_EXPLAINED` once it has an exception |
 | `POST /api/v1/attendance/me/export` | `MyExportRequest` (`month`) → `ExportFile` (202) | self, own | no | The month's workbook, made after commit and downloaded on the device that asked (`docs/guides/foundation.md` §6.12) |
 | `GET /api/v1/attendance/register` | `RegisterQuery` (`date`, `status`, `department_id`, `q`, `sort`) → `RegisterPage` | `people` view · all/team/own | yes, 25 | One row per active employee in scope; status worked out in SQL before the page is cut |
 | `GET /api/v1/attendance/summary` | `RegisterSummaryQuery` (`date`) → `RegisterSummary` | `people` view · scope | no | |
@@ -263,7 +275,7 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/me/records/:id` | → `AttendanceRecordRef` | self, own | no | The same for the person's own |
 | `POST /api/v1/attendance/export` | `RegisterExportRequest` (`from`, `to`, at most 31 days) → `ExportFile` (202) | `people` export · scope | no | The register's workbook, made after commit and downloaded on the device that asked |
 | `GET /api/v1/attendance/me/home` | → `MyHome` | self, own | no | The approved home, the one waiting and the last one rejected, with their own coordinates |
-| `POST /api/v1/attendance/me/home` | `HomeRequestCreate` (`home_address`, a `PlaceInput`: picked, pinned or the device's location in an outage; `home_latitude`, `home_longitude`, `accuracy_m`) → `MyHome` | self, own | no | Remote staff, and hybrid staff whose schedule has a home day (422 `HOME_NOT_NEEDED` otherwise); the reading within `max_accuracy_m` (422 `HOME_READING_WEAK`); supersedes a request still waiting |
+| `POST /api/v1/attendance/me/home` | `HomeRequestCreate` (`home_address`, a `PlaceInput`: picked, pinned or the device's location in an outage; `home_latitude`, `home_longitude`, `accuracy_m`) → `MyHome` | self, own | no | Anyone whose week, in force or waiting to start, has a Remote day, a remote employee with no schedule included (§6.10; 422 `HOME_NOT_NEEDED` otherwise); the reading within `max_accuracy_m` (422 `HOME_READING_WEAK`); supersedes a request still waiting |
 | `GET /api/v1/attendance/homes` | `HomeListQuery` (`status`, `employee_id`, `q`, `sort`) → `HomeRequestPage` | `people` view · scope | yes, 25 | Waiting first; address and coordinates only for scope all, masked under `employee.personal` |
 | `GET /api/v1/attendance/homes/:id` | → `HomeRequest` | `people` view · scope | no | The home a link opens (`attendance_home`, `?home=` on People · Attendance); the same visibility as the list |
 | `GET /api/v1/attendance/me/requests` | `MyLocationRequestListQuery` (`status`, `sort`) → `LocationRequestPage` | self, own | yes, 25 | The person's own requests, newest first |
@@ -281,8 +293,6 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/me/field-assignments/:id` | → `FieldAssignment` | self, own | no | One they are or were on; anyone else's is a 404 |
 | The policy's routes | `policies.md` §5 | | | Removed from this module in PR 1 (`/attendance/policy...`, `/attendance/me/policy...`): the Attendance policy is read and changed through `/policies`, and the clock reads it through `policies.rulesFor` (§6.1) |
 | `POST /api/v1/workflow/instances/:id/approve`, `/reject` | the approval's own routes (foundation.md §5) | the stage's approvers | no | How a request and a temporary site are decided; never by a route of this module. The engine refuses anyone on the site (`excluded_employee_ids`, 403 `PERMISSION_DENIED`) |
-| `GET /api/v1/attendance/schedules/:employee_id` | `ScheduleParams` → `WorkSchedule` | `people` view · scope | no | The person's pattern, office, home state, the week day by day, the schedule in force and the one waiting to start; `can_edit` for the reader. 404 outside scope |
-| `POST /api/v1/attendance/schedules/:employee_id` | `ScheduleParams`, `WorkScheduleSet` (`office_days`, `effective_from`, `reason`) → `WorkSchedule` | `people` edit · scope | no | Hybrid staff only (422 `SCHEDULE_NOT_NEEDED`); never your own (403 `OWN_RECORD`); the checks of §6.13 |
 | `POST /api/v1/attendance/homes/:id/decision` | `HomeDecision` (`decision`, `reason`) → `HomeRequest` | `people` approve · all | no | Never your own (403 `OWN_RECORD`); a rejection needs a reason of 10 or more characters; 409 once decided |
 | `GET /api/v1/devices/mine` | `PageQuery` → `MyDevicePage` | self, own | yes, 25 | |
 | `POST /api/v1/devices/mine` | `DeviceRegister` → `MyDevice` | self, own | no | This session's device; fresh sign-in (403 `REAUTH_REQUIRED`); 409 past three |
@@ -296,13 +306,14 @@ event a day) and needs none of its own.
 | `PATCH /api/v1/worksites/:id` | `WorksiteUpdate` → `Worksite` | `people` edit | no | `active: false` retires, `true` restores |
 | `GET /api/v1/worksites/:id/employees` | `PageQuery` → `WorksiteEmployeePage` | `people` view · scope | yes, 25 | |
 | `POST /api/v1/worksites/:id/employees` | `WorksiteAssign` → `WorksiteEmployee` | `people` edit · scope | no | Through `organisation.service.updateEmployee`; assigning someone to another worksite moves them |
-| `GET /api/v1/attendance/schedules/:employee_id` (PR 3) | `ScheduleParams` → `WorkSchedule` | `people` view · scope | no | Widened from hybrid staff to everyone: the week in force (each day Working or Off, hours, Office or Remote), the one waiting, Company Hours when none |
-| `POST /api/v1/attendance/schedules/:employee_id` (PR 3) | `WorkScheduleSet` (`days`, `effective_from`, `reason`) → `WorkSchedule` | `people` edit · scope | no | Anyone's (no longer only hybrid staff); never your own (403 `OWN_RECORD`); the checks of §6.13 |
-| `GET /api/v1/attendance/me/schedule` (PR 3) | → `WorkSchedule` | self, own | no | My Profile's week |
-| `GET /api/v1/attendance/pay-items` (PR 3) | `PayItemListQuery` (`kind`, `status`, `month`, `employee_id`, `q`, `sort`) → `PayItemPage` | `people` view · scope | yes, 25 | Amounts masked as the salary is |
-| `POST /api/v1/attendance/pay-items/waive` (PR 3) | `PayItemWaive` (`pay_item_ids`, at most 25, `reason`) → `PayItemBatchResult` | `people` approve · all | no | Deductions only, pending only; never your own |
-| `POST /api/v1/attendance/pay-items/:id/overtime` (PR 3) | `OvertimeDecision` (`decision` confirm or cut, `minutes`, `reason`) → `PayItem` | `people` approve · scope (the line manager for their team, People for anyone, as the policy's method says) | no | Overtime only, pending only; never your own |
-| `GET /api/v1/attendance/me/pay-items` (PR 3) | `MyPayItemListQuery` (`month`, `kind`) → `PayItemPage` | self, own | yes, 25 | |
+| `GET /api/v1/attendance/schedules/:employee_id` (PR 3) | `ScheduleParams` → `WorkSchedule` | `people` view · scope | no | For anyone: the person's pattern, office, home state, the week in force today day by day (Working or Off, its hours, Office or Remote, and whether the hours are the company's), the schedule in force (`current`, null for the company hours) and the one waiting to start (`next`); `can_edit` for the reader. 404 outside scope |
+| `POST /api/v1/attendance/schedules/:employee_id` (PR 3) | `ScheduleParams`, `WorkScheduleSet` (`days`, the seven weekdays; `effective_from`; `reason`) → `WorkSchedule` | `people` edit · scope | no | Anyone's, whatever their work pattern; never your own (403 `OWN_RECORD`); the checks of §6.13 (422 `SCHEDULE_IN_THE_PAST`, `SCHEDULE_TOO_FAR`, `SCHEDULE_HOURS_NEEDED`) |
+| `GET /api/v1/attendance/me/schedule` (PR 3) | → `WorkSchedule` | self, own | no | My Profile's week; `can_edit` is false |
+| `GET /api/v1/attendance/pay-items` (PR 3) | `PayItemListQuery` (`group` deductions or overtime, `kind`, `status`, `month`, `employee_id`, `q`, `sort`) → `PayItemPage` | `people` view · scope | yes, 25 | Pending first, then the newest day. Amounts (`pay_amount`) masked as the salary is; `can_decide` says whether the reader may waive it or confirm and cut it |
+| `POST /api/v1/attendance/pay-items/waive` (PR 3) | `PayItemWaive` (`pay_item_ids`, 1 to 25, `reason`, 10 to 500) → `PayItemBatchResult` | `people` approve · all (403 `FORBIDDEN` for a narrower scope) | no | Deductions only (422 `NOT_A_DEDUCTION`); never your own (403 `OWN_RECORD`); an item no longer pending (waived, or taken into a run) is skipped and named in `skipped` |
+| `POST /api/v1/attendance/pay-items/:id/overtime` (PR 3) | `OvertimeDecision` (`decision` confirm or cut, `minutes` to confirm fewer, `reason`, needed to cut) → `PayItem` | `people` approve · scope (the line manager above the person, People for anyone) | no | Overtime only (422 `NOT_OVERTIME`), pending only (409 `OVERTIME_DECIDED`): only Line Manager After leaves one pending; never your own (403 `OWN_RECORD`); `minutes` at most the item's (422); confirmed minutes held to the monthly cap (§6.17) |
+| `POST /api/v1/attendance/overtime-approvals` (PR 3) | `OvertimePreApprovalCreate` (`employee_id`, `work_date`, `minutes`, 1 to 720, `reason`, 10 to 500) → `OvertimePreApproval` | `people` approve · scope (the line manager above the person, People for anyone) | no | Approve Overtime, beforehand: the day from today in Lagos (422 `OVERTIME_IN_THE_PAST`) to 90 days ahead (422 `OVERTIME_TOO_FAR`); never your own (403 `OWN_RECORD`); the same person and day again replaces it. Read only under Pre-Approved (§6.17) |
+| `GET /api/v1/attendance/me/pay-items` (PR 3) | `MyPayItemListQuery` (`month`, `group`, `kind`) → `PayItemPage` | self, own | yes, 25 | The person's own, newest day first, with their amounts (never masked for themselves) |
 | `GET /api/v1/attendance/temporary-sites` (PR 4) | `TemporarySiteListQuery` (`status`, `state`, `purpose`, `employee_id`, `q`, `sort`) → `TemporarySitePage` | `people` view · scope | yes, 25 | Every site with someone in the reader's scope on it (or once on it). Waiting first, then in progress, upcoming and the rest; `can_decide` on each (the approval's stage waits on the reader and they are not on it), `can_change` (People with `people` approve, scope all, not on it, until its last day). `q` finds the number, name or anyone on it, never an address |
 | `GET /api/v1/attendance/temporary-sites/:id` (PR 4) | → `TemporarySite` | `people` view · scope | no | `?site=` on People · Worksites; 404 outside scope |
 | `POST /api/v1/attendance/temporary-sites` (PR 4) | `TemporarySiteCreate` (`purpose`, `name`, `description`, `starts_on`, `ends_on`, `locations` of `PlaceInput`, an optional `name` and `radius_m`, `employee_ids`) → `TemporarySite` | `people` approve · all | no | People's own: in force at once (status `approved`), whoever adds it its approver; never with themselves on it (403 `OWN_RECORD`: they use Add Work Site). The checks of §6.11 |
@@ -351,9 +362,10 @@ punch's point is never sent to the provider.
   `employee_attendance_policy` is no longer read, and a person's own hours are their work schedule
   (§6.13).
 - Each punch records the version it was judged by (`attendance_event.policy_version_id`); a new
-  version never re-judges a punch already made. From PR 3 a day is judged by the version on its
-  first clock-in, and a day with none by the version in force on its date, however late it is
-  recalculated (§6.4).
+  version never re-judges a punch already made. A day is judged by the version on its first
+  clock-in, and a day with none by the version in force on its date, however late it is
+  recalculated (§6.4). Attendance caches no rules: `rulesFor` reads the version on each call, so a
+  new version applies from its first day with no `policy.published` handler here.
 - The location check has a mode for each kind of place (owner decision, 19/10/2026): the office
   (`office_geofence_mode`: a permanent site, or no site on an office day), a home
   (`home_geofence_mode`: a remote day matched to the approved home, a temporary home) and a temporary
@@ -362,8 +374,9 @@ punch's point is never sent to the provider.
   an exception) and **Refuse** (`block`). A new version offers Flag and Refuse only for a home and a
   temporary site (Cynthia: the home is mandatory); older versions keep what they set.
 - Grace is the policy's `grace_minutes`. The day's start and end are the person's work schedule for
-  that weekday, else the policy's company hours (PR 3; before it, the working week of Settings ·
-  Organisation, A22); public holidays stay in Settings · Organisation (`shared/time/working-week`).
+  that weekday, else the policy's company hours, else the working week of Settings · Organisation
+  (A22) while no version sets `hours`; public holidays stay in Settings · Organisation
+  (`shared/time/working-week`).
 
 ### 6.2 The clock guard (`attendance.clock-guard.js`, pure)
 
@@ -415,27 +428,37 @@ punch's point is never sent to the provider.
   with a `suspicious_timestamp` exception. A device time more than 5 minutes behind is a delayed
   submission: recorded with both times, judged on the server's.
 - **The day's shift** is the person's work schedule for the weekday (§6.13), else the policy's
-  company hours (PR 3). A day the schedule marks Off, a public holiday and a weekday the hours do not
-  work are not working days for that person: no lateness, no absence, no prompts.
-- **Lateness** (PR 3, T2): when the first clock-in is later than the start plus grace, the minutes
-  from the **start** (grace 5, in at 09:12: 12 minutes late); within grace, 0. On a working day only.
-  Before PR 3: the minutes past the start plus grace (7 in the example).
-- **Early departure** (PR 3, T5): when the last clock-out the person made is earlier than the end
-  less `early_grace_minutes`, the minutes to the **end**; a system clock-out is never early.
+  company hours, else Settings · Organisation's working week while no version sets `hours`. A day
+  the schedule marks Off, a public holiday and a weekday the hours do not work are not working days
+  for that person: no lateness, no absence, no prompts, no reminders.
+- **Lateness** (T2): when the first clock-in is later than the start plus grace, the minutes from
+  the **start** (grace 5, in at 09:12: 12 minutes late); within grace, 0. On a working day only.
+- **Early departure** (T5): when the person's own last clock-out is earlier than the end less
+  `early_grace_minutes`, the minutes to the **end** (early grace 5, out at 16:50: 10 minutes early);
+  within it, 0. On a working day only; a system clock-out is never early.
+- **A clock-out People add** (Correct Time on a System Clock-Out, Add Clock-Out on a missing one,
+  `source = 'admin'`) stands in for the person's own: People confirmed the time, so it counts for
+  worked minutes, early departure and overtime, and the decision's recalculation adds, changes or
+  waives the day's pay items (§6.17). A system clock-out never does (T13).
 - **Worked minutes**: last clock-out minus first clock-in, except that a system clock-out counts only
-  to the shift's end (PR 3, T13).
-- **Overtime minutes** (PR 3): on a working day, the minutes from the end to the person's own last
-  clock-out, counted once they pass the policy's `after_minutes`; on a day that is not worked for
-  them (Sunday, a holiday, an Off day), every worked minute, at the rest-day rate (§6.17). Never from
-  a system clock-out. Before PR 3: minutes after the end on a working day only.
-- **A day is judged once** (PR 3): its lateness, early departure and overtime use the policy version
-  and the work schedule in force on its date, recorded on its first clock-in; recalculating it later
-  (a decision, the day-close, a system clock-out) never applies a newer version or schedule. Before
-  PR 3 a recalculation read the rules in force at that moment.
+  to the shift's end (T13): a clock-in after the end has none.
+- **Overtime minutes**: on a working day, every minute from the end to the person's own last
+  clock-out, counted once they pass the version's `overtime.after_minutes` (after 30: out at 17:45 is
+  45 minutes, out at 17:20 none); on a day that is not worked for them (Sunday, a holiday, an Off
+  day), every worked minute, at the rest-day rate (§6.17). Never from a system clock-out.
+- **A day is judged once**: its lateness, early departure and overtime use the policy version and the
+  shift recorded on the day (`attendance_day.policy_version_id`, `attendance_work_schedule_id`,
+  `shift_working`, `shift_starts_at`, `shift_ends_at`, `judged_at`): on its first clock-in, the
+  version that clock-in was judged by (`COALESCE(policy_version_id, attendance_policy_id)` on the
+  event) and the schedule in force on the date; for a day with no clock-in, the version and schedule
+  in force on its date when the day-close closes it. The version's rules are read back through
+  `policies.rulesOfVersion` (`policies.md` §6.8), so a version published today from today never
+  re-judges a day whose clock-in came before it. A recalculation (a decision, the day-close, a
+  system clock-out) never applies a newer version or schedule (§6.1, §11).
 - A day's status: approved leave first (`leave`), then a clock-in (`late` when late minutes are
   above 0, else `present`), then, once closed, an expected working day with no clock-in (`absent`).
-  A day that is not worked with no punch has no day row. An employee with no login is not expected to
-  clock in and is never absent (PR 3).
+  A day that is not worked with no punch has no day row. An employee with no active login is never
+  expected to clock in and is never absent: the register reads their day Off.
 
 ### 6.5 The geofence (`attendance.geofence.js`, pure, distances from `shared/geo`)
 
@@ -513,10 +536,12 @@ punch's point is never sent to the provider.
 - `accept`: the punch stands. `reject`: the punch stops counting for the day (still shown, marked
   excluded). `add_clock_out` (missing clock-out only): an `admin` clock-out at the time given, after
   the clock-in, on the work date. Each recalculates the day and is audited with before and after.
-- An `automatic_clock_out` (the person explained an automatic clock-out, §6.14) takes `accept`, the
-  automatic time stands, or `add_clock_out`, shown as Correct Time: an `admin` clock-out at the time
-  given, as above, and the automatic one stops counting (marked excluded, outcome `corrected`).
-  `reject` is refused (422 `DECISION_INVALID`): it would leave the shift open.
+- An `automatic_clock_out` (the person gave the real time of a System Clock-Out, §6.14) takes
+  `accept`, the system's time stands, or `add_clock_out`, shown as Correct Time and starting from the
+  time the person gave: an `admin` clock-out at the time given, as above, and the system's stops
+  counting (marked excluded, outcome `corrected`). People's clock-out stands in for the person's own
+  (§6.4), so the day's worked minutes, early departure, overtime and pay items follow it. `reject` is
+  refused (422 `DECISION_INVALID`): it would leave the shift open.
 - An exception on a rejected punch (PR 2) takes `accept`, which keeps the refusal as it was and
   records that People saw it, or `reject`, which marks the refusal itself as wrong for the record;
   neither turns a refused punch into one that counts: the person punches again.
@@ -545,10 +570,18 @@ Home and those screens never disagree.
 
 - **A day's record is the source.** Status, first clock-in, last clock-out and late minutes are
   `attendance_day` as §6.4 to §6.8 write it: counted punches only (accepted or in review, not
-  excluded by a decision), on the work date, late by the whole minutes past the start plus the
-  policy's grace (§6.1, §6.4). The roster never re-reads the punches to decide any of these.
+  excluded by a decision), on the work date, late by the whole minutes from the start once past the
+  grace of the version that judged the day (§6.1, §6.4). The roster never re-reads the punches to
+  decide any of these.
+- **Each person's own day.** Whether a day is worked, and so expected, is the person's: by the work
+  schedule in force on the date, else the company hours in force on the date, else the working week
+  (§6.13); a public holiday is never worked, and nobody without an active login is expected (§6.4).
+  The register's status, `off`, `expected` and Not In are worked out per person in SQL before the
+  page is cut (`attendance.repo.js` `EXPECTED_ON`); the company hours enter the SQL as a parameter
+  the service reads through `policies.rulesFor` for each date it covers (one date for the register,
+  each day of `personal()`'s range), so attendance's SQL never reads `policy_version`.
 - **A day with no record** reads as the register reads it: granted leave, else nothing on a day
-  that is not worked, else not in.
+  that is not worked for that person, else not in.
 - **Who is on the day:** anyone with a record that day, and everyone active, started and not yet
   left (the register's people).
 - **Home's words** for the register's statuses (the contract's `HomeRosterStatus`):
@@ -557,15 +590,15 @@ Home and those screens never disagree.
   |---|---|
   | `leave` | `on_leave` |
   | `late` | `late` |
-  | `present` | `field` when an approved temporary site the person is still on covers the date, a Temporary Home aside (PR 4, §6.11), or a field assignment made before PR 4 does (§6.12); else `remote` when the person's work pattern is `remote` (as §6.5 and the clock panel read it), an approved Temporary Home covers the date (PR 4), an approved remote day made before PR 4 does (§6.11), or the date is a hybrid employee's home day by the schedule in force then (§6.13); else `on_site` (TB, 20/10/2026) |
+  | `present` | `field` when an approved temporary site the person is still on covers the date, a Temporary Home aside (PR 4, §6.11), or a field assignment made before PR 4 does (§6.12); else `remote` when the date is a Remote day of the work schedule in force then (§6.13), or, with no schedule working that day, the person's work pattern is `remote`, or an approved Temporary Home (PR 4) or a remote day approved before PR 4 covers the date (§6.11); else `on_site` |
   | `absent` | `absent` (a working day the day-close closed with no clock-in) |
   | `not_in` | `not_in` (a working day not closed, no clock-in yet) |
   | `off` | none |
 
 - **The counts** are the register summary's: `expected` is everyone on the register but those on
-  leave, on a working day only (0 on a day that is not worked); `present` is late plus on site plus
-  remote plus field, a clock-in that counts on any day, so a Sunday clock-in is present with nobody
-  expected.
+  leave whose own day is worked (none on a day that is not worked for anyone); `present` is late
+  plus on site plus remote plus field, a clock-in that counts on any day, so a Sunday clock-in is
+  present with nobody expected.
 - **No clock-out yesterday:** the person's last working day (Saturday, read on a Monday; the day
   before a holiday, read after it) has a clock-in and no clock-out on its record: the open shift the
   day-close turns into a missing clock-out.
@@ -583,18 +616,18 @@ Home and those screens never disagree.
   and pages by it); `tests/integration/attendance-roster.test.js` holds them to each other and both
   to `repo.register`, `repo.registerSummary`, `repo.listDays` and `repo.daysSummary` on every kind of
   day. A change to the register's statuses changes the roster's mapping in the same PR.
-- **The one other reader.** Home's alert metrics (`src/modules/alerts/alerts.metrics.js`, home.md
-  §4.1) read `attendance_day.status = 'late'` (Late Arrivals) and the day-close's
-  `missing_clock_out` exception with no event, or a day still open before today with a clock-in and
-  no clock-out (Missing Clock-Out), in their own SQL. A change to the register's statuses or to
-  that exception changes those two entries in the same PR, as it does the roster's mapping.
+- **No other reader.** Home's alert metrics no longer read `attendance_day` or
+  `attendance_exception` (PR 3): attendance's alerts are the Attendance policy's breaches, raised by
+  this module (§6.16). Home's day strip reads the reader's own shift through `schedules.dayOn` and
+  their day through the roster (home.md §6).
 
 ### 6.10 Home locations (`attendance.home.js`)
 
-- A `remote` employee sets one, and so does a `hybrid` employee whose schedule in force, or the one
-  waiting to start, has a home day (422 `HOME_NOT_NEEDED` otherwise; `MyHome.needed` says which).
-  From PR 3, anyone whose work schedule has a Remote day (§6.13). The fence round it is the policy's
-  `home_radius_m`, at least 150 m on a new version (T9).
+- Anyone whose week, in force or waiting to start, has a Remote day sets one (§6.13), a remote
+  employee with no schedule included (their pattern makes every working day Remote): 422
+  `HOME_NOT_NEEDED` otherwise; `MyHome.needed` says which, and My Attendance shows the Home Location
+  card by it. The fence round it is the policy's `home_radius_m`, at least 150 m on a new version
+  (T9).
   The reading is taken on the
   person's device when they press Use This Location, and must be within the policy's
   `max_accuracy_m` (422 `HOME_READING_WEAK`, the panel offers Retry Location). The address is their
@@ -824,18 +857,26 @@ one assignment. The limits below are LA's, to change on request.
   are or were on. `can_change` tells a reader whether they may cancel it or take someone off.
   Events carry ids, the number, the name and the dates: never a site's address or centre.
 
-### 6.13 Work schedules (PR 3, `attendance.schedule.js`)
+### 6.13 Work schedules (`attendance.schedule.js`)
 
 Owner decisions of 20/10/2026 (T7, T8): the policy holds the company hours; a person's own work
-schedule overrides them; the Work Schedule tab sits after Job on the employee record.
+schedule overrides them; the Work Schedule tab sits after Job on the employee record. They replace
+the hybrid office days of 19/10/2026 (`attendance_schedule`, `1340`).
 
 - **What one holds** (`attendance_work_schedule`): for each ISO weekday, Working or Off; for a
   working day its start and end (`HH:MM`, the end after the start, the same day) and its place,
   Office or Remote; from a first day; a reason of 10 to 500 characters. At least one working day.
-  A working day with no hours takes the policy's company hours for that weekday.
-- **Company hours**: someone with no schedule works the policy's hours (§6.15, Working Hours) at the
-  place their work pattern gives (on site: Office; remote: Remote; hybrid: Office every day until a
-  schedule sets Remote days).
+  A schedule may work any weekday, all at the office or all remote.
+- **A working day with no hours** takes the company hours for that weekday. The service refuses one
+  on a weekday the company hours in force on its first day do not work (422
+  `SCHEDULE_HOURS_NEEDED` on that day's start: Sunday under the suggested hours, or a Saturday for a
+  consultant when the company hours stop at Friday, T8); a blank working day that a later version
+  stops working reads as Off from that version's first day.
+- **Company hours**: the policy's `hours` (§6.15, Working Hours) in force on the date, else the
+  working week of Settings · Organisation while no version sets them (A22). Someone with no
+  schedule works the company hours at the place their work pattern gives (on site: Office; remote:
+  Remote; hybrid: Office every day until a schedule sets Remote days). Public holidays are never
+  worked.
 - **Who sets it**: `people` edit, within its scope; never on their own record (403 `OWN_RECORD`). For
   anyone, whatever their work pattern: a part-time consultant on Tuesday, Thursday and Saturday is
   expected on those days only.
@@ -845,68 +886,44 @@ schedule overrides them; the Work Schedule tab sits after Job on the employee re
 - **On the clock and the day**: the schedule in force on a date gives the shift (§6.4), whether the
   day is worked (no lateness, absence, prompts or reminders on an Off day), and the place: an Office
   day is matched to the permanent site, a Remote day to the approved home (`outside_home` beyond it;
-  no approved home is `unverified`, `no_home`). A temporary site on the day comes first (§6.5).
+  no approved home is `unverified`, `no_home`). A punch on a day that is not worked is matched by the
+  work pattern. A temporary site on the day comes first (§6.5, PR 4).
 - **Pay**: the working days of a month by the person's schedule, less public holidays, divide their
   monthly gross into a daily rate; that day's hours divide it into an hourly rate (§6.17).
-- **The week** (`weekOf`): each weekday Working (with its hours and Office or Remote) or Off. The
-  record's Work Schedule tab and ESS · My Profile show it; Home's roster and the register read a
-  present Remote day as remote (§6.9).
+- **The week** (`weekOf`): each weekday Working (with its hours, Office or Remote, and whether the
+  hours are the company's) or Off. The record's Work Schedule tab and ESS · My Profile show it;
+  Home's roster and the register read a present Remote day as remote (§6.9), and Home's day strip
+  and Your Week read the reader's own hours (`dayOn`, home.md §6).
 - **Told, not acknowledged**: setting a schedule notifies the person (`attendance.schedule_set`) with
   its first day; it is not a policy and needs no acknowledgement (T8).
-- `attendance_schedule`'s rows (hybrid office days) become schedules with the company hours: their
-  office days Office, the other working days Remote.
+- **From the hybrid office days**: `1420` copies each `attendance_schedule` row into a schedule from
+  the same first day, with the same reason and author: hours blank (the company hours), Working on
+  the weekdays the working week of Settings · Organisation worked when it ran, the office days
+  Office and the other working days Remote. `attendance_schedule` is then read by nothing.
 - **Who sees what**: the person, on My Profile; anyone whose `people` view reaches them, on the
-  record. Hours and days are not personal data.
-
-#### Until PR 3: hybrid staff's office days (`attendance.schedule.js`)
-
-Owner decisions of 19/10/2026: People set which working days a hybrid employee spends at the
-office (MyCity's three at MTN Plaza, 100 m); the other working days are worked from home and fenced
-like a remote employee's. Set on the employee record (ess.md §3 step 2, "Attendance setup").
-
-- **Who sets it**: `people` edit, within its scope; never on their own record (403 `OWN_RECORD`).
-  Only for a `hybrid` employee (422 `SCHEDULE_NOT_NEEDED`); remote staff are home every day and
-  on-site staff at the office every day, so neither has one.
-- **What it holds**: the office days, ISO weekdays (1 Monday to 7 Sunday), each once; from a first
-  day; a reason of 10 to 500 characters. Every office day is a working day of the organisation's
-  week (422 `SCHEDULE_DAY_NOT_WORKED`), and at least one working day is left for home (422
-  `SCHEDULE_NO_HOME_DAY`: all of them at the office is on site, a change of work pattern instead).
-- **Dates**: the first day from today in Lagos (422 `SCHEDULE_IN_THE_PAST`) and within 90 days (422
-  `SCHEDULE_TOO_FAR`). Setting one from the same first day again replaces it; a later first day adds
-  the next version and the one in force stays until then. Days already worked keep their punches as
-  they were judged.
-- **On the clock** (`attendance.calendar.js` `contextFor`): after a field assignment and an approved
-  request, a hybrid employee's date is a home day when the schedule in force that date leaves its
-  weekday out. A home day is fenced at the approved home with `home_radius_m`, judged as a remote
-  employee's (`outside_home` beyond it; no approved home is `unverified`, `no_home`). Any other day,
-  and every day with no schedule yet, is matched to the worksite as before (§6.5).
-- **The week** (`weekOf`): for anyone, each weekday is `off` when the organisation's week does not
-  work it, else `office` or `remote` by the pattern (on site: office; remote: remote; hybrid: by the
-  schedule in force, office every day without one). My Profile and the record's Attendance tab show
-  it; Home's roster and the register read a present hybrid home day as remote (§6.9).
-- **Who sees what**: the person reads their week on My Profile; anyone whose `people` view reaches
-  them reads it on their record. `can_edit` tells the reader whether Set Schedule is theirs. The
-  event carries the office days and the first day, which are not personal data.
+  record. Hours and days are not personal data. `can_edit` tells the reader whether Set Schedule is
+  theirs. The event carries the days and the first day.
 
 ### 6.14 Clock prompts, reminders and the system clock-out (`attendance.clock-watch.js`)
 
 Agreed at the 12 and 13 October meetings and settled by the owner on 19/10/2026: a pop-up the
 person must answer, not a toast, over a blurred screen, at the first sign-in of the day, before
 the screen they asked for, and at the shift's start and end; a push reminder to whoever is not on
-the app; an open shift closed at the shift's end, or at the last moment the person was on the app
-when they stayed on after it; an automatic clock-out counts at once, reads Automatic, and the
-person can explain it. The sign-in prompt is Attendance's, opened by the shell, in place of Home's
-(owner decision O12, home.md §6). The times below (5, 15 and 60 minutes, the three Remind Me
-choices) are the code's, to change on request.
+the app. TB's decisions of 20/10/2026 (T13) replace the automatic clock-out of 19/10/2026: from the
+shift's end a reminder every 30 minutes, and 90 minutes after the end the system clocks the person
+out (both figures the policy's). The sign-in prompt is Attendance's, opened by the shell, in place
+of Home's (owner decision O12, home.md §6). The 60 minutes of the start reminder and the three
+Remind Me choices are the code's, to change on request. Every prompt and reminder follows the
+person's own shift (§6.13): a day that is not worked for them has none.
 
 - **The sign-in prompt** (the server's `sign_in_prompt` on today, the app's `ClockPrompts`): true
   when the session reading it is the first the person signed in with that Lagos day (the earliest
-  `user_session` issued that day is the caller's) and they are not clocked in on a working day
-  (active, no granted leave, no clock-in that counts, no shift still open from yesterday). The
-  shell opens the panel on whatever screen the session lands on, Home or a link to anything
-  else, once a day on each device. A session kept from yesterday or a second device that day is
-  not prompted at sign-in (the start prompt still reaches it in the first hour). Not Now closes
-  it, as for the start prompt.
+  `user_session` issued that day is the caller's) and they are not clocked in on a working day of
+  their schedule (active, no granted leave, no clock-in that counts, no shift still open from
+  yesterday). The shell opens the panel on whatever screen the session lands on, Home or a link to
+  anything else, once a day on each device. A session kept from yesterday or a second device that
+  day is not prompted at sign-in (the start prompt still reaches it in the first hour). Not Now
+  closes it, as for the start prompt.
 - **The start prompt** (the app, `features/attendance/prompts.ts`): on a working day, when the
   workplace's clock (kept to the server's) reaches the shift's start and the person is not clocked
   in, the clock panel opens over whatever screen is open, as Start Your Day. Once a day on each
@@ -917,67 +934,57 @@ choices) are the code's, to change on request.
 - **The closing prompt**: when the clock passes the shift's end and the person is still clocked
   in, the panel opens as Finish Your Day. Clock Out or Remind Me (in 15 minutes, 30 minutes or 1
   hour) answers it; after Remind Me it opens again at that time while they are still clocked in,
-  and closing it unanswered counts as the shortest Remind Me. A day that is not worked has no end
-  and no closing prompt.
+  and closing it unanswered counts as the shortest Remind Me. Remind Me never moves the system
+  clock-out. A day that is not worked has no end and no closing prompt.
 - Neither prompt replaces a dialog that is open, or opens while the session is locked: it waits
   until that one closes, so a half-filled form is never lost.
-- **The start reminder** (job `attendance-clock-watch`, every 5 minutes): on a working day of the
-  organisation's week (Lagos), in the first 60 minutes after the start, everyone active and
-  started, with a login, not on granted leave and with no clock-in that counts that day, is sent
-  one reminder (`attendance.clock_in_due`): in the bell, and pushed to their devices as their
+- **The start reminder** (job `attendance-clock-watch`, every 5 minutes): in the first 60 minutes
+  after the start of their own shift (Lagos), everyone active and started, with a login, not on
+  granted leave and with no clock-in that counts that day, on a working day of their schedule, is
+  sent one reminder (`attendance.clock_in_due`): in the bell, and pushed to their devices as their
   Attendance and Leave preference allows. Not while they are in front of the app on any login
   (the push hold's reading, `services/realtime/active.js`): the start prompt asks them there, and
   a later run reminds them once they are away, still not clocked in, within the hour. When
   presence cannot be read (no Redis) the reminder goes. One a day (`attendance_clock_reminder`,
-  unique per person, day and kind); a run after the first hour sends none. Clocking in marks it
-  read.
-- **From PR 3: reminders to clock out, and the system clock-out** (T13; the policy's
-  `clock_out_reminder_minutes`, suggested 30, and `system_clock_out_after_minutes`, suggested 90).
-  For a person with an open shift on a working day of their schedule:
-  - from the shift's end, every `clock_out_reminder_minutes` while still clocked in, a reminder
-    (`attendance.clock_out_due`: the bell, and a push as their preference allows; in front of the app,
-    the closing prompt instead). One row per reminder (`attendance_clock_reminder`, kind
-    `clock_out_due` with its time), so a retried run sends none twice;
-  - at the shift's end plus `system_clock_out_after_minutes` (18:30 for a 17:00 end), still clocked
-    in: a **system clock-out** at that moment (`source = 'system'`, accepted, no location, its
-    evidence naming the shift's end and the rule), read as **System Clock-Out** on every screen. The
-    day's worked minutes count only to the shift's end; it is never early and never overtime
-    (§6.4). It counts toward Forgotten Clock-Outs (§6.16);
-  - the person gives their real leaving time from the day on My Attendance (Give Real Time, which
-    opens the `automatic_clock_out` exception with their note and time); People accept the system's
-    time or Correct Time (§6.8);
-  - presence no longer decides anything: whether the person was in front of the app changes only
-    whether the reminder is a push or the closing prompt. Remind Me stays on the closing prompt and
-    never moves the system clock-out.
-  The automatic clock-out below is what runs until PR 3.
-- **Until PR 3, the automatic clock-out** (the same job): for a person with an open shift (a clock-in that
-  counts and no clock-out) on a work date not yet closed (today, or yesterday before the
-  day-close), once the workplace's clock is past that date's shift end:
-  - in front of the app now on any of their logins (a tab on screen and touched in the last 5
-    minutes, as `services/realtime/active.js` reads it): nothing; they have the
-    closing prompt.
-  - away for at least 15 minutes since the last moment they were in front of it, or never seen:
-    clocked out at the later of the shift's end and that last moment, never before the clock-in
-    and never after now.
-  - when the presence store cannot answer (no Redis), nothing: the day-close's missing clock-out
-    is the backstop.
-  - The punch: a `clock_out` with `source = 'system'`, `accepted`, no location, device or device
-    time; its evidence names `automatic` with the shift's end and the last moment in front of the
-    app. The day is recalculated, `attendance.punched` and `attendance.clocked_out_automatically`
-    are emitted in the same transaction, and the person is told ("Clocked out automatically", the
-    date and time); their clock and People's register reload. Under the person's lock, so a
-    clock-out they make at that moment is either first or refused.
-- **Explaining it**: the person explains an automatic clock-out from the day on My Attendance
-  (`POST /attendance/me/events/:id/explanation`, Explain Time). An `automatic_clock_out` exception
-  (severity low) opens with their note, once per punch, People are told
-  (`attendance.exception_explained`) and decide it as §6.8 says. Until then nothing waits on
-  People: an automatic clock-out nobody explains needs no decision.
-- **On Home and the register** it is a clock-out like any other: the day's hours, overtime and the
-  roster read it. `clock_out_automatic` on the day (My Days) and on today (the panel) says it was
-  the system's; a punch's `source` says the same in the day's evidence.
-- **Who sees what**: the reminder and the notice go to the person alone. Whether and when someone
+  slot 0); a run after the first hour sends none. Clocking in marks it read.
+- **The reminders to clock out** (the same job, T13): for a person with an open shift (a clock-in
+  that counts and no clock-out) on a working day of their schedule, from the shift's end, every
+  `clock_out_reminder_minutes` (the version that judged the day; suggested 30), a reminder
+  (`attendance.clock_out_due`: the bell, and a push as their preference allows) while they are
+  still clocked in and the system clock-out has not come: with a 17:00 end and 30 minutes, at
+  17:00, 17:30 and 18:00, each within the 5 minutes the watch runs in. One row per reminder
+  (`attendance_clock_reminder`, kind `clock_out_due`, its slot and time), so a retried run sends
+  none twice. In front of the app at a reminder's time, they have the closing prompt instead and
+  no push; a later run in the same interval sends it once they are away. A reminder whose time came
+  before the clock-in is not sent. Clocking out marks the day's reminders read.
+- **The system clock-out** (the same job, T13): at the shift's end plus
+  `system_clock_out_after_minutes` (suggested 90: 18:30 for a 17:00 end), anyone still clocked in is
+  clocked out by the system at that moment, whenever the run reaches it: `source = 'system'`,
+  accepted, no location, device or device time, its evidence naming the shift's end, the rule and
+  its minutes (`validation.system`). Under the person's lock, in one transaction with the day, its
+  pay items and its rule counts, as a person's punch is; `attendance.punched` and
+  `attendance.clocked_out_automatically` are emitted with it, and the person is told ("System
+  Clock-Out", the date and time). It reads **System Clock-Out** on every screen. The day's worked
+  minutes count only to the shift's end; it is never early and never overtime; it counts toward
+  Forgotten Clock-Outs (§6.16). Presence no longer decides anything: whether the person was in
+  front of the app changes only whether a reminder is a push or the closing prompt.
+- **An evening start**: a clock-in at or after the end plus `system_clock_out_after_minutes` is never
+  clocked out by the system and gets no reminders: the shift stays open for the day-close's missing
+  clock-out, as on a day that is not worked. A clock-in between the end and that moment is clocked
+  out at that moment like any other, with no worked minutes past the end. The system never writes a
+  clock-out timed before the clock-in.
+- **Give Real Time**: the person gives their real leaving time from the day on My Attendance
+  (`POST /attendance/me/events/:id/explanation`, a note and the time, after the clock-in and not in
+  the future). An `automatic_clock_out` exception (severity low, shown as System Clock-Out) opens
+  with them, once per punch; People are told (`attendance.exception_explained`) and accept the
+  system's time or use Correct Time, which starts from the time given (§6.8). Until then nothing
+  waits on People: a system clock-out nobody explains needs no decision.
+- **On Home and the register** it is a clock-out like any other, counted to the shift's end:
+  `clock_out_automatic` on the day (My Days) and on today (the panel) says it was the system's; a
+  punch's `source` says the same in the day's evidence.
+- **Who sees what**: the reminders and the notice go to the person alone. Whether and when someone
   was in front of the app is read on the server and never sent to a screen, an event payload or a
-  notice; the punch's evidence keeps the moment its time came from, for the audit.
+  notice.
 
 ### 6.15 The Attendance policy (`attendance.policy-type.js`)
 
@@ -990,36 +997,41 @@ version, and to a rule a version predates (a new rule reads as off on an older v
 
 | Section | Rule (`AttendanceRules` key) | Control and range | Suggested | Default | Enforced by |
 |---|---|---|---|---|---|
-| Working Hours | `hours`: each ISO weekday `working`, `starts_at`, `ends_at` | A row per weekday: Working or Off, start and end | Monday to Friday 09:00 to 17:00, Saturday 09:00 to 15:00, Sunday Off (A22) | None: Settings · Organisation's week | PR 3 (§6.13) |
-| Lateness | `grace_minutes` | 0 to 60 minutes | 5 | 0 | Built; counted from the start from PR 3 (T2) |
-| Late Arrivals | `late_rule`: `on`, `count`, `hours`, `period`, `alert`, `query` | A switch; then N late arrivals (1 to 31) or H late hours (0.5 to 40, optional) in a Week, Month or 30 Days; Alert and Raise Query switches | 3 in a month or 5 hours; Alert on, Raise Query on | Off | PR 3 (§6.16) |
-| Late Arrivals | `late_deduction`: `on`, `method`, `amount` | A switch; Pro-Rata by Minute, Fixed per Hour (an hour or part), Fixed per Late Day; the amount for a fixed method (₦1 to ₦1,000,000) | Pro-Rata | Off | PR 3 (§6.17) |
-| Early Departure | `early_grace_minutes` | 0 to 60 minutes | 5 | 0 | PR 3 |
-| Early Departure | `early_rule`, `early_deduction` | As Late Arrivals | 3 in a month; Pro-Rata | Off | PR 3 |
-| Absence | `absence_rule`: `on`, `count`, `period`, `alert`, `query` | A switch; N absences (1 to 31) in a period; Alert and Raise Query | 2 in a month; both on | Off | PR 3 |
-| Absence | `absence_deduction`: `on` | A switch: a day's pay for each absent day | On when switched | Off | PR 3 |
-| Forgotten Clock-Outs | `forgotten_rule`: `on`, `count`, `period`, `alert`, `query` | A switch; N system clock-outs or missing clock-outs (1 to 31) in a period | 3 in a month; Alert on | Off | PR 3 |
-| Location Flags | `location_rule`: `on`, `count`, `period`, `alert`, `query` | A switch; N punches or check-ins outside a fence (1 to 31) in a period | 3 in a month; Alert on | Off | PR 3 |
-| Overtime | `overtime`: `on`, `after_minutes`, `approval`, `method`, `multiplier`, `amount`, `rest_day_multiplier`, `monthly_cap_hours` | A switch; counts after 0 to 120 minutes; approved by Line Manager After, Pre-Approved or Automatic; paid at a multiple of the hourly rate (1.0 to 3.0) or a fixed amount per hour; Sundays and holidays at a multiple (1.0 to 3.0); a monthly cap (1 to 100 hours) | 30 minutes; Line Manager After; 1.5 times; 2.0 times on rest days; 20 hours | Off | PR 3 (§6.17) |
+| Working Hours | `hours`: each ISO weekday `working`, `starts_at`, `ends_at` | A row per weekday: Working or Off, start and end | Monday to Friday 09:00 to 17:00, Saturday 09:00 to 15:00, Sunday Off (A22) | None: Settings · Organisation's week | Built (§6.13) |
+| Lateness | `grace_minutes` | 0 to 60 minutes | 5 | 0 | Built; lateness counted from the start (T2) |
+| Late Arrivals | `late_rule`: `on`, `count`, `hours`, `period`, `alert`, `query` | A switch; then N late arrivals (1 to 31) or H late hours (0.5 to 40, optional) in a Week, Month or 30 Days; Alert and Raise Query switches | 3 in a month or 5 hours; Alert on, Raise Query on | Off | Built (§6.16) |
+| Late Arrivals | `late_deduction`: `on`, `method`, `amount` | A switch; Pro-Rata by Minute, Fixed per Hour (an hour or part), Fixed per Late Day; the amount for a fixed method (₦1 to ₦1,000,000) | Pro-Rata | Off | Built (§6.17) |
+| Early Departure | `early_grace_minutes` | 0 to 60 minutes | 5 | 0 | Built (§6.4) |
+| Early Departure | `early_rule`, `early_deduction` | As Late Arrivals | 3 in a month; Alert on, Raise Query on; Pro-Rata | Off | Built (§6.16, §6.17) |
+| Absence | `absence_rule`: `on`, `count`, `period`, `alert`, `query` | A switch; N absences (1 to 31) in a period; Alert and Raise Query | 2 in a month; both on | Off | Built (§6.16) |
+| Absence | `absence_deduction`: `on` | A switch: a day's pay for each absent day | On when switched | Off | Built (§6.17) |
+| Forgotten Clock-Outs | `forgotten_rule`: `on`, `count`, `period`, `alert`, `query` | A switch; N system clock-outs or missing clock-outs (1 to 31) in a period | 3 in a month; Alert on | Off | Built (§6.16) |
+| Location Flags | `location_rule`: `on`, `count`, `period`, `alert`, `query` | A switch; N punches or check-ins outside a fence (1 to 31) in a period | 3 in a month; Alert on | Off | Built (§6.16) |
+| Overtime | `overtime`: `on`, `after_minutes`, `approval`, `method`, `multiplier`, `amount`, `rest_day_multiplier`, `monthly_cap_hours` | A switch; counts after 0 to 120 minutes; approved by Line Manager After, Pre-Approved or Automatic; paid at a multiple of the hourly rate (1.0 to 3.0) or a fixed amount per hour (₦1 to ₦1,000,000); Sundays and holidays at a multiple (1.0 to 3.0); a monthly cap (1 to 100 hours) | 30 minutes; Line Manager After; 1.5 times; 2.0 times on rest days; 20 hours | Off | Built (§6.17) |
 | Location Checks | `office_geofence_mode` | Off, Flag, Refuse | Flag | Flag | Built |
 | Location Checks | `home_geofence_mode` (Home Check), `site_geofence_mode` (Temporary Site Check) | Flag, Refuse (Off only on an older version) | Flag | Flag | Built; Off removed from new versions in PR 1; from PR 4 the site's applies to a temporary site's addresses and its check-ins |
 | Location Checks | `home_radius_m` | 150 to 500 m (a new version) | 150 | 150 | Built; the minimum in PR 1 (T9) |
 | Location Checks | `max_accuracy_m` | 50 to 250 m | 100 | 100 | Built; its meaning in PR 2 (§6.5) |
 | Devices | `device_mode` | Off, Flag, Refuse | Flag | Off | Built |
-| Clock Prompts | `clock_out_reminder_minutes` | 15 to 60 minutes | 30 | 30 | PR 3 (§6.14) |
-| Clock Prompts | `system_clock_out_after_minutes` | 30 to 240 minutes | 90 | 90 | PR 3 (§6.14) |
+| Clock Prompts | `clock_out_reminder_minutes` | 15 to 60 minutes | 30 | 30 | Built (§6.14) |
+| Clock Prompts | `system_clock_out_after_minutes` | 30 to 240 minutes | 90 | 90 | Built (§6.14) |
 
 - **The contract** (`packages/contract/schemas/attendance.js`): `AttendanceRules` reads a version
   (every key optional, each filled with its default); `AttendanceRulesDraft` checks a draft (every key
   present; a switch that is on needs its figures: a count or hours, an amount for a fixed method;
   hours end after they start, at least one working day; a home and a temporary site Flag or Refuse;
-  the home radius at least 150). PR 1 writes both in full, so PRs 3 and 4 add behaviour, not keys.
+  the home radius at least 150; from PR 3, a fixed deduction's amount and overtime's amount per hour
+  from ₦1.00 to ₦1,000,000.00, each refused on its own field). PR 1 writes both in full, so PRs 3
+  and 4 add behaviour, not keys.
   `latest_clock_out_minutes` is not carried into the rules: the system clock-out replaces it.
 - **The worksheet** (Knowledge Hub · Policies, the Attendance policy): one card per section, a row
   per rule (its label with a help term, the control, Changed when the draft changes it); a switch
-  that is on opens its figures beneath it. PR 1 shows the rules already enforced (Lateness, Location
-  Checks, Devices); PR 3 adds its sections, each when its effect is built, so no switch is shown
-  that does nothing.
+  that is on opens its figures beneath it, its Alert and Raise Query among them. PR 1 showed the
+  rules then enforced (Lateness, Location Checks, Devices); PR 3 adds the rest, each in the commit
+  that makes it do something, so no switch is shown that does nothing. The cards, in order:
+  Working Hours (a row per weekday: Working, Starts, Ends), Lateness, Late Arrivals, Early
+  Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices,
+  Clock Prompts.
 - **The sentences** staff read, one per rule, values filled in, under the same sections; a rule that
   is off says so ("Late arrivals do not lead to a deduction."). Fixed sentences also say: "Where your
   own work schedule differs, your schedule applies." and "Working somewhere else? Add it from Home,
@@ -1031,73 +1043,126 @@ version, and to a rule a version predates (a new rule reads as off on an older v
   is recorded with each clock-in and check-in. Nothing is flagged." The section always ends with
   T14's fixed sentence. The same words are in `attendance.policy-type.js`, the worksheet's labels
   (`app/src/features/policies/labels.ts`) and the mock (`app/src/api/mock/modules/policies.ts`).
-- **When a version starts**, the attendance module reloads its rules (`policy.published` handler),
-  and from PR 3 Home's attendance alerts read the new thresholds from its first day.
+- **When a version starts** nothing is reloaded: attendance caches no rules. `policies.rulesFor`
+  reads the version on each call (`attendance.calendar.js` `policyFor`), so a new version applies
+  from its first day, and the rules engine and Home's attendance alerts read its thresholds the same
+  way; a day already judged keeps its version (§6.4). Attendance has no `policy.published` handler.
 
-### 6.16 Consequence rules (PR 3, `attendance.rules-engine.js`)
+### 6.16 Consequence rules (`attendance.rules-engine.js`)
 
-- **What each rule counts**, per person: Late Arrivals, the days recorded late and their late
-  minutes; Early Departure, the days with early minutes and those minutes; Absence, the days closed
-  absent; Forgotten Clock-Outs, the system clock-outs and the day-close's missing clock-outs; Location
-  Flags, the punches and check-ins with an outside exception still open or rejected (one People
-  accepted, or a temporary site's approval resolved, drops out).
+Owner decisions of 20/10/2026 (T1, T3, T5). The rules are the policy's (§6.15); this file counts
+them, per person, in the transaction of the punch, decision, system clock-out or day-close that
+recalculated the day (§3 step 6), so a breach is recorded and emitted with what crossed it.
+
+- **What each rule counts**, per person:
+  - **Late Arrivals**: the days recorded late, and their late minutes;
+  - **Early Departure**: the days with early minutes, and those minutes;
+  - **Absence**: the days closed absent;
+  - **Forgotten Clock-Outs**: the days with a system clock-out that counts, or with the day-close's
+    missing clock-out (once a day);
+  - **Location Flags**: outside exceptions (`outside_worksite`, `outside_home`), read from
+    `attendance_exception`, each dated by its day (`attendance_day_id`, never its event: a check-in's
+    exception has none, PR 4). An exception whose punch was refused at the clock
+    (`attendance_event.validation_state = 'rejected'`, PR 2) counts while open or accepted (Accept
+    keeps the refusal, §6.8) and drops out once rejected; every other one (a punch under review,
+    PR 4's check-in) counts while open or rejected, and drops out once People accept it or a
+    temporary site's approval resolves it (§6.11). So PR 2's refused punches and PR 4's check-ins
+    count without a change here.
 - **The period**: a Week (Monday to Sunday), a Month (the calendar month) or 30 Days (the 30 days
   ending on the day counted), in Lagos.
-- **A breach**: counting only what came after the person's last breach of the same rule in the same
-  period (T3: the count restarts), the count reaching N, or the minutes reaching H hours, whichever
-  first. It is recorded once (`attendance_rule_breach`, with the days it counted) and
-  `attendance.rule_breached` is emitted in the transaction of the punch, decision or day-close that
-  crossed it. Counted with `shared/rules/window-counter`.
-- **What it does**, as the version in force on the day that crossed it says:
-  - **Alert** on: a Home alert (`shared/alerts`) on the person ("3 late arrivals this month", the
-    days), cleared by People (`people` approve). The alert's rule is the policy's: Home · Alerts
-    lists it read only, Set in Attendance Policy, and its own Late Arrivals and Missing Clock-Out
-    rules are switched off (home.md §6).
-  - **Raise Query** on: Queries & Sanctions (M3) raises one query per breach with its days as
-    evidence. Until M3 is built, the breach's alert reads Query Due and is raised even when Alert is
-    off, so People raise it by hand. With Raise Query off, no query is ever raised for that rule (T3).
+- **A breach** (T3): counting only what came after the person's last breach of the same rule in the
+  same period (the count restarts: three late arrivals give exactly one breach, the sixth the
+  next), the count reaching N, or the minutes reaching H hours, whichever first. It is recorded once
+  (`attendance_rule_breach`, with the days it counted and which came first, unique on the person,
+  the rule and the last counted day, so a recalculation or a retried run adds none) and
+  `attendance.rule_breached` is emitted in the same transaction. Counted with
+  `shared/rules/window-counter` (`periodBounds` for the week, month and 30 days; `breaches` for the
+  count or the summed minutes, restarting after the last one).
+- **What it does**, as the version in force on the crossing day says, after commit
+  (`attendance.raise_breach_alert`):
+  - **Alert** on: a Home alert (`shared/alerts`) on the person ("Ada Obi: 3 late arrivals this
+    month", the days as its trigger), cleared by People (`people` approve, with `alerts.clear`). The
+    alert's rule is the policy's (TB, 20/10/2026): each of the five rules raises through one Home
+    rule the system keeps (`home_alert_rule` with metric `attendance_policy` and key
+    `attendance_policy.<rule>`, made on its first breach: threshold 1, one breach is one alert;
+    severity medium; Who Can Clear People Approvers). Its subject is the breach
+    (`attendance_rule_breach`, its id), with `subject_employee_id` the person, so a second breach
+    raises its own alert while the first is still open; the alert opens the breach's last day on
+    People · Attendance. Home · Alerts lists the five rules read only on Alert Rules, as the version
+    in force today sets them, with Set in Attendance Policy; the kept rows are never edited there and
+    the morning sweep never reads them (home.md §6).
+  - **Raise Query** on: Queries & Sanctions (M3) subscribes to `attendance.rule_breached` and raises
+    one query per breach with its days as evidence (`raise_query` on the event). Until M3 is built,
+    the breach's alert reads Query Due ("Query Due: Ada Obi, 3 late arrivals this month") and is
+    raised even when Alert is off, so People raise it by hand. With Raise Query off, no query is
+    ever raised for that rule (T3).
 - Switching a rule off stops new breaches from its version's first day; breaches already made stay.
+- A breach already recorded keeps its days and its alert when one of them stops counting (leave
+  granted for a day closed absent, People rejecting the clock-in that made a day late): the day
+  only stops counting toward the next breach, as a rule switched off keeps its breaches.
 - Waiving a deduction (§6.17) restores the pay, not the day: the day still counts.
+- Home's own Late Arrivals and Missing Clock-Out rules are gone (T1): the metrics `late_arrivals` and
+  `missing_clock_out` left Home's metric list, `1445` switched every rule on them off and dismissed
+  their open alerts ("Rule switched off"), and Home no longer re-reads them on `attendance.punched`
+  and `attendance.day_closed` (home.md §4.1, §7).
 
-### 6.17 Pending deductions and overtime (PR 3, `attendance.pay.js`)
+### 6.17 Pending deductions and overtime (`attendance.pay.js`)
+
+Owner decisions of 20/10/2026 (T4, T6). The items are settled in the same transaction as the day
+(§3 step 6), from the version that judged the day (§6.4).
 
 - **A deduction** is added, as a pay item (`attendance_pay_item`), for each late, early or absent day
-  whose rule's deduction switch is on in the version that judged the day. Never for leave, an Off day
-  or a public holiday.
+  whose rule's deduction switch is on in the version that judged the day. Never for leave, an Off
+  day or a public holiday.
 - **The amount** (T4), through `shared/money`, rounded to the kobo:
   - the **daily rate** is the person's monthly gross (`employee.gross_monthly`) over their working
     days that month (their schedule, less public holidays); the **hourly rate** is the daily rate
-    over that day's scheduled hours (a Saturday of 09:00 to 15:00 is 6 hours);
+    over that day's scheduled hours (a Saturday of 09:00 to 15:00 is 6 hours). On a day that is not
+    worked (overtime on a rest day) the hourly rate is the daily rate over the average scheduled
+    hours of that month's working days;
   - **Pro-Rata by Minute**: the hourly rate times the minutes over 60; **Fixed per Hour**: the amount
-    times the started hours; **Fixed per Late Day**: the amount; **Absence**: the daily rate.
+    times the started hours (61 minutes is 2); **Fixed per Late Day**: the amount; **Absence**: the
+    daily rate, its minutes the day's scheduled minutes.
   - With no gross set, the item keeps its minutes and its amount is empty (No Salary Set).
-- **Pending until** People waive it (with a reason; one, or up to 25 at once) or payroll takes it
-  into a run (M6, `in_run`), after which it cannot be waived. The person sees each on My Attendance
-  as it is added, and is told when one is waived.
-- **Overtime** (when the policy's switch is on): a pay item for each worked day with overtime
-  minutes (§6.4), at the hourly rate times the multiplier (the rest-day multiplier on a day that is
-  not worked) or the fixed amount per hour, prorated to the minute. By the policy's approval:
-  - **Line Manager After**: pending until the person's line manager (or People) confirms all of it,
-    confirms fewer minutes, or cuts it, with a reason when cutting;
-  - **Pre-Approved**: confirmed only on a day a line manager or People approved overtime for that
-    person beforehand (Approve Overtime on the register, a day and the hours, PR 3); otherwise cut,
-    "Not pre-approved";
+- **Pending until** People waive it (`people` approve, scope all, with a reason of 10 to 500
+  characters; one, or up to 25 at once; never their own) or payroll takes it into a run (M6,
+  `in_run`), after which it cannot be waived. The person sees each on My Attendance as it is added,
+  and is told when one is added or waived.
+- **When the day changes** (a decision, a clock-out People add, the day-close, leave granted for a
+  closed day): an item still pending, or one the system decided, follows the day: its minutes and
+  amount change with it, and when the day stops qualifying the system waives a deduction (or cuts
+  overtime) with the reason ("Leave granted", "No longer late", "No longer early", "No longer
+  absent", "No overtime"), keeping the trail and adding no status. An item a person decided, or one
+  payroll took, stays as it is.
+- **Overtime** (when the policy's switch is on): a pay item for each worked day with overtime minutes
+  (§6.4), at the hourly rate times the multiplier (the rest-day multiplier on a day that is not
+  worked) or the fixed amount per hour, prorated to the minute. By the policy's approval:
+  - **Line Manager After**: pending until the person's line manager (or People: `people` approve
+    within scope) confirms all of it, confirms fewer minutes, or cuts it, with a reason when cutting.
+    The approvers are told when it is added (`attendance.pay_item_added`);
+  - **Pre-Approved**: confirmed up to the minutes a line manager or People approved for that person
+    and day beforehand (Approve Overtime: `POST /attendance/overtime-approvals`, a day from today in
+    Lagos to 90 days ahead, the minutes and a reason; never their own; the same day again replaces
+    it); minutes beyond it are cut, "Beyond pre-approval"; with no approval the item is cut, "Not
+    pre-approved";
   - **Automatic**: confirmed at once.
   Confirmed overtime in a month never passes `monthly_cap_hours`; minutes beyond it are cut, "Monthly
-  cap". Never from a system clock-out; nobody confirms their own.
+  cap". Never from a system clock-out; nobody confirms their own. A clock-out People add stands in
+  for the person's own (§6.4), so its overtime is counted.
 - **Who sees what**: amounts derived from a salary are restricted as the salary is (field visibility,
-  `employee.salary`): the person sees their own; People with the salary grant see amounts, others the
-  minutes only.
+  `employee.salary`): on the wire the amount is `pay_amount`, masked under `employee.salary` (never
+  `amount` itself, which would mask every amount in the product); the person sees their own; People
+  with the salary grant see amounts, others the minutes only.
 
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
 |---|---|---|
-| `attendance.punched` | A punch commits (any result) | Audit; outbox `attendance.push_updated`: `attendance.updated` to the person and to `people` view holders above them; outbox `alerts.person-signal` (Home): a clock-in (`event_type`) re-reads that person's (`employee_id`) Late Arrivals rules |
+| `attendance.punched` | A punch commits (any result, the system's included) | Audit; outbox `attendance.push_updated`: `attendance.updated` to the person and to `people` view holders above them. Home no longer reads it (§6.16) |
 | `attendance.review_required` | A punch or the day-close opens an exception | Notifies the person and `people` approve holders within scope |
 | `attendance.exception_explained` | The person explains an exception | Notifies `people` approve holders within scope |
 | `attendance.exception_decided` | People decide an exception | Notifies the person; realtime refresh |
-| `attendance.day_closed` | The day-close job closes a person's day | Audit; realtime refresh; outbox `alerts.person-signal` (Home): re-reads that person's (`employee_id`) Late Arrivals and Missing Clock-Out rules |
+| `attendance.day_closed` | The day-close job closes a person's day | Audit; realtime refresh |
 | `attendance.export_requested` | My Attendance or the register asks for a workbook | Outbox `attendance.build_export`: gathered 25 at a time into the file the request reserved, which the screen that asked downloads; nothing is emailed, and the file is removed a day later |
 | `device.registered`, `device.removed` | My Devices, People · Devices | Notifies the person when People removed it |
 | `worksite.created`, `worksite.updated` | People · Worksites | Audit |
@@ -1109,15 +1174,17 @@ version, and to a rule a version predates (a new rule reads as off on an older v
 | `field_assignment.assigned` | A field assignment is set (one event for each person on it) | Audit; notifies the person; realtime refresh |
 | `field_assignment.cancelled` | It is cancelled (one for each person still on it) | Audit; notifies the person with the reason; realtime refresh |
 | `field_assignment.member_removed` | Someone is taken off it | Audit; notifies the person with the reason; realtime refresh |
-| `attendance.schedule_set` | People set a work schedule (anyone's from PR 3) | Audit on the employee (Record History: Work schedule set); notifies the person with the office days and the first day; realtime refresh |
-| `attendance.clock_in_due` | The watch finds someone expected, not clocked in and away from the app, in the first hour after the start (§6.14) | Notifies the person ("Time to clock in", on the `attendance_clock_reminder` row; push as their preference allows); marked read when they clock in |
-| `attendance.clocked_out_automatically` | The watch clocks out an open shift (§6.14; from PR 3 the system clock-out, read System Clock-Out) | Audit; notifies the person with the date and time (the day opens on My Attendance); the punch's own `attendance.punched` reloads the screens |
-| Job `attendance-day-close` (scheduler, 01:30 Africa/Lagos; queue of the same name for a given date) | Daily | Closes every open day before today within 14 days, under the cron lock; idempotent |
-| Job `attendance-clock-watch` (scheduler, every 5 minutes) | All day | Sends the start reminders and makes the automatic clock-outs (§6.14), under the cron lock; idempotent (one reminder a day, one automatic clock-out a shift) |
-| The policy's events | `policies.md` §7 | Moved in PR 1: `policy.published`, `policy.acknowledged` and the rest; attendance's own `policy.published` handler reloads the rules |
-| `attendance.clock_out_due` (PR 3) | From the shift's end, every `clock_out_reminder_minutes`, for someone still clocked in (§6.14) | Notifies the person (the bell; push as their preference allows; the closing prompt instead in front of the app) |
-| `attendance.rule_breached` (PR 3) | A consequence rule is reached (§6.16) | Audit; outbox `attendance.raise_breach_alert` (a Home alert when Alert is on, Query Due until M3); Queries (M3) subscribes when Raise Query is on |
-| `attendance.pay_item_added`, `attendance.pay_item_waived`, `attendance.overtime_decided` (PR 3) | A deduction or overtime is added, waived, confirmed or cut (§6.17) | Audit; notifies the person (an overtime item waiting notifies the line manager or People, as the policy's method says); realtime refresh |
+| `attendance.schedule_set` | People set anyone's work schedule | Audit on the employee (Record History: Work schedule set), with the days; notifies the person with the first day (the notice opens their own record, My Profile); realtime refresh |
+| `attendance.clock_in_due` | The watch finds someone expected, not clocked in and away from the app, in the first hour after the start of their own shift (§6.14) | Notifies the person ("Time to clock in", on the `attendance_clock_reminder` row; push as their preference allows); marked read when they clock in |
+| `attendance.clocked_out_automatically` | The watch's System Clock-Out of an open shift, at the end plus `system_clock_out_after_minutes` (§6.14) | Audit; notifies the person ("System Clock-Out", the date and time; the day opens on My Attendance); the punch's own `attendance.punched` reloads the screens |
+| Job `attendance-day-close` (scheduler, 01:30 Africa/Lagos; queue of the same name for a given date) | Daily | Closes every open day before today within 14 days, under the cron lock, each by the person's own schedule: absences, missing clock-outs, the rule counts and the pay items, in each day's transaction; idempotent |
+| Job `attendance-clock-watch` (scheduler, every 5 minutes) | All day | Sends the reminders to clock in and to clock out and makes the System Clock-Outs (§6.14), under the cron lock; idempotent (one row per reminder, one system clock-out a shift) |
+| The policy's events | `policies.md` §7 | Moved in PR 1: `policy.published`, `policy.acknowledged` and the rest. Attendance has no `policy.published` handler: it caches no rules, and reads the version in force on each call (§6.15) |
+| `attendance.clock_out_due` | From the shift's end, every `clock_out_reminder_minutes`, for someone still clocked in, until the system clock-out (§6.14) | Notifies the person ("Time to clock out", the shift's end; the bell, push as their preference allows; none while they are in front of the app, who have the closing prompt); marked read when they clock out |
+| `attendance.rule_breached` | A consequence rule is reached, in the transaction that crossed it (§6.16) | Audit; outbox `attendance.raise_breach_alert`: the Home alert when Alert is on, or Query Due while Raise Query is on until M3, its id kept on the breach; Queries (M3) subscribes when `raise_query` is true |
+| `attendance.pay_item_added`, `attendance.pay_item_waived`, `attendance.overtime_decided` | A deduction or overtime is added, waived (by People, or by the system when its day stops qualifying), confirmed or cut (by a person, or by the method, §6.17) | Audit; notifies the person (an overtime item waiting under Line Manager After also notifies `people` approve holders over them: their line managers and People); realtime refresh. The notice opens My Attendance on its day (the person) or People · Attendance (the approvers) |
+| `attendance.pay_item_changed` | A pending or system-decided item follows its day: its minutes or amount changed (§6.17) | Audit; realtime refresh; nobody is told |
+| `attendance.overtime_approved` | A line manager or People approve overtime for a person's day beforehand (Approve Overtime, §6.17) | Audit; notifies the person with the day and the minutes |
 | `temporary_site.submitted` (PR 4) | Add Work Site saves one (§6.11) | Audit; the approval (`attendance.temporary_site`) tells its approvers, never someone on the site; each person on it but the submitter is told they are put on it (Put on a Temporary Site); realtime refresh |
 | `temporary_site.approved` (PR 4) | Its approval ends approved (copied on by `attendance.apply_temporary_site_decision`), or People add one directly (`direct`) | Audit; each person on it but the submitter (whom the approval already told) is told, or, added directly, told they are on it; outbox `attendance.resolve_covered_exceptions` resolves the open location exceptions it covers (§6.11); realtime refresh |
 | `temporary_site.rejected` (PR 4) | Its approval ends rejected | Audit; each person on it but the submitter is told, with the approver's reason; realtime refresh |
@@ -1137,13 +1204,12 @@ and on ESS · Work Location Requests (`?site=`) for everyone else on it (notific
 
 | Role | Sees | Can do |
 |---|---|---|
-| Employee | Own clock, days, punches, check-ins, exceptions, devices, home location, temporary sites, work location requests and field assignments made before PR 4, and week; every published version of the attendance policy | Clock in and out, check in at each stop on a temporary site's day, explain an exception, export the month, register and remove own devices; remote staff, and hybrid staff with a home day, set their home location; withdraw or cancel a work location request made before PR 4; acknowledge the newest policy version |
-| Line Manager, Head of Department (`people` team) | The register, days, check-ins, devices, exceptions and home statuses of their reporting tree, its temporary sites (no Temporary Home's line or point), its work location requests (no temporary home's point) and its weekly schedules; no coordinates or home addresses | Decide the first stage of a direct report's work location request still waiting from before PR 4; cancel a field assignment made before PR 4 for people in their reporting tree, or take someone off it (`people` approve); set a hybrid report's schedule where their role holds `people` edit; otherwise read only; export (heads). From PR 4 they no longer set field assignments: anyone adds a temporary site from Home |
-| Operations & People, Management (`people` all) | Everyone, with the punch coordinates, home locations, temporary sites (a Temporary Home's line and point masked under `employee.personal` where the role masks personal details) and work location requests | Decide exceptions, a check-in's included, and home locations (approve); approve or reject a temporary site, the stage's approvers (Operations & People by default), never one they are on; add a temporary site directly, never with themselves on it, cancel one or take someone off (approve, scope all); decide a waiting work location request's Operations & People stage; cancel and change field assignments made before PR 4 (approve); remove devices and set hybrid staff's schedules (edit), manage worksites (create, edit), export |
+| Employee | Own clock, days, punches, check-ins, exceptions, devices, home location, temporary sites, work location requests and field assignments made before PR 4, work schedule and week, and their own deductions and overtime with their amounts; every published version of the attendance policy | Clock in and out, check in at each stop on a temporary site's day, explain an exception, give the real time of a System Clock-Out, export the month, register and remove own devices; anyone whose week has a Remote day sets their home location; withdraw or cancel a work location request made before PR 4; acknowledge the newest policy version |
+| Line Manager, Head of Department (`people` team) | The register, days, check-ins, devices, exceptions and home statuses of their reporting tree, its temporary sites (no Temporary Home's line or point), its work location requests (no temporary home's point), its work schedules, and its deductions and overtime (amounts only with the salary grant); no coordinates or home addresses | Decide the first stage of a direct report's work location request still waiting from before PR 4; cancel a field assignment made before PR 4 for people in their reporting tree, or take someone off it (`people` approve); confirm or cut a report's overtime under Line Manager After and approve it beforehand under Pre-Approved (`people` approve); set a report's work schedule where their role holds `people` edit; otherwise read only; export (heads). From PR 4 they no longer set field assignments: anyone adds a temporary site from Home |
+| Operations & People, Management (`people` all) | Everyone, with the punch coordinates, home locations, temporary sites (a Temporary Home's line and point masked under `employee.personal` where the role masks personal details), work location requests, deductions and overtime | Decide exceptions, a check-in's included, and home locations (approve); approve or reject a temporary site, the stage's approvers (Operations & People by default), never one they are on; add a temporary site directly, never with themselves on it, cancel one or take someone off (approve, scope all); decide a waiting work location request's Operations & People stage; cancel and change field assignments made before PR 4 (approve); waive deductions and confirm, cut or approve overtime (approve); remove devices and set anyone's work schedule (edit), manage worksites (create, edit), export |
 | CEO | Everything, as the access rules give the CEO | The same as `people` all, never on their own exception; may decide any approval's stage, a temporary site they are on included (A11) |
 | Anyone (from PR 4) | Their own temporary sites: those they submitted or are or were on | Add Work Site for themselves and colleagues; withdraw one they submitted while it waits; check in on its days |
-| Line Manager (from PR 3) | Their team's pending overtime | Confirm or cut it under Line Manager After; approve overtime beforehand under Pre-Approved |
-| People with the salary grant (from PR 3) | Deduction and overtime amounts | Waive deductions (`people` approve, all) |
+| People with the salary grant | Deduction and overtime amounts (`pay_amount`, masked under `employee.salary` for everyone else) | As their grant allows |
 | `policies.manage` (policies.md §8) | The Attendance policy's worksheet, versions and acknowledgements | Change and publish the rules (formerly `settings` edit on Settings · Attendance Policy) |
 
 The shared roster reads within the scope the caller's grant gives (`scopeClause` on the employee):
@@ -1159,9 +1225,9 @@ never leave identity, and no log line carries them.
 
 - **AI reads** (`attendance.ai.js`): `attendance.my_days` (ess view, own), `attendance.register`
   and `attendance.exceptions` (`people` view, the caller's scope); the rules in force are read through
-  `policies.text` (`policies.md` §9; `attendance.policy` is removed in PR 1); from PR 3
-  `attendance.my_pay_items` (own) and `attendance.pay_items` (`people` view, amounts masked as the
-  salary is); from PR 4 `attendance.temporary_sites` (the reader's scope, no addresses); `devices.ai.js`: `devices.mine`,
+  `policies.text` (`policies.md` §9; `attendance.policy` is removed in PR 1);
+  `attendance.my_pay_items` (ess view, own) and `attendance.pay_items` (`people` view, the caller's
+  scope, `pay_amount` masked as the salary is, the assistant's own reads included); from PR 4 `attendance.temporary_sites` (the reader's scope, no addresses); `devices.ai.js`: `devices.mine`,
   `devices.list`; `worksites.ai.js`: `worksites.list`. Every list is a page of 25, through the same
   service and scope as the screen; no coordinates, no device identifier, no evidence blob.
 - **AI routes**: clock in or see my attendance → ESS · My Attendance; review attendance → People ·
@@ -1172,13 +1238,13 @@ never leave identity, and no log line carries them.
   Knowledge Hub · Policies (`?policy=attendance`); work somewhere else → ESS · Work Location Requests,
   where Add Work Site is (PR 4; a manifest names no action, A23); approve a temporary site → People · Worksites
   (PR 4); my temporary sites → ESS · Work Location Requests; my deductions or overtime → ESS · My
-  Attendance (PR 3); set a hybrid employee's office days → People · Employees (the record's
-  Attendance tab); my work week → ESS · My Profile. The routes to send people out on a field
-  assignment and to ask for a work location went in PR 4. `attendance.temporary_sites` (PR 4) reads
-  a page of 25 of the reader's `people` scope, as the list does, with the number, purpose, name,
-  dates, state and people, never an address, a point or a description. No AI read touches a home
-  location, a work location request, a field assignment or a schedule. Nothing in PR 4 calls a
-  model, so no AI job is chosen.
+  Attendance; waive deductions or confirm overtime → People · Attendance; set someone's work
+  schedule → People · Employees (the record's Work Schedule tab); my work week → ESS · My Profile.
+  The routes to send people out on a field assignment and to ask for a work location went in PR 4.
+  `attendance.temporary_sites` (PR 4) reads a page of 25 of the reader's `people` scope, as the list
+  does, with the number, purpose, name, dates, state and people, never an address, a point or a
+  description. No AI read touches a home location, a work location request, a field assignment or a
+  schedule. Nothing in PR 3 or PR 4 calls a model, so no AI job is chosen.
 - **Search**: `attendance.search.js` finds attendance days and exceptions by the person's name;
   `devices.search.js` devices by label or owner; `worksites.search.js` worksites by name or code;
   `attendance.search.js` also finds home locations by the person's name (never by the address), and
@@ -1189,9 +1255,14 @@ never leave identity, and no log line carries them.
   Worksites, Temporary, by `?assignment=`,
   and a person's own on My Attendance. ⌘K's New Request (`request_work_location`) and New Assignment
   (`new_field_assignment`) went in PR 4 with their sheets. A
-  schedule is not a record of its own: it is found through the employee (⌘K's employee results
-  open the record, whose Attendance tab holds it), and its notice opens the person's own record
-  (`employee`, My Profile). A clock-in reminder is not a record to look up
+  schedule is not a record of its own: its event is the employee's (`attendance.schedule_set` on the
+  `employee` entity, which the route map already opens), so it is found through the employee (⌘K's
+  employee results open the record, whose Work Schedule tab holds it), and its notice opens the
+  person's own record (My Profile). A rule breach
+  (`attendance_rule_breach`) is not looked up either: its Home alert opens its last day on People ·
+  Attendance; an overtime approval (`attendance_overtime_approval`) opens its day the same way, the
+  person's own on My Attendance. A reminder to clock out opens My Attendance with the clock panel,
+  as a reminder to clock in does. A clock-in reminder is not a record to look up
   (`attendance_clock_reminder`, `search:none` in the route map): its notice opens My Attendance with
   the clock panel (`?clock=`). The Attendance policy is found as a policy (`policies.md` §9); the route map's
   `attendance_policy` entry goes in PR 1. From PR 4, temporary sites by their number, name, purpose
@@ -1215,40 +1286,38 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Clock In / Clock Out panel | For someone working from home that day (remote, or a hybrid home day) with no approved home, a banner (No Approved Home) with Set Home; for someone expected at an office with none assigned, a banner (No Office Assigned); the date and the workplace's current time, the state pill (Clocked Out, Clocked In with its time, Review Required), Shift, Work Arrangement, Clock Location with its radius (on a field assignment's day, its site), This Device with its status; the step before the browser asks (Location Check, one line naming the worksite); Clock In or Clock Out, Allow Location, Retry Location, Register Device, Not Now; the result after a punch with its reasons; Add Note when it is under review; opened by itself over a blurred screen, Start Your Day at the day's first sign-in and at the start and Finish Your Day at the end, with Remind Me (In 15 Minutes, In 30 Minutes, In 1 Hour) beside Clock Out; after an automatic clock-out, Automatic Clock-Out with the day's times | Clock Location: the punch is matched to this place; This Device: why an unregistered device is flagged under the current policy | "location is read only and not continuously tracked", how block and warn decide, idempotency, how the watch decides who is away and when: §6 here |
-| ESS · My Attendance | For remote staff, and hybrid staff with a home day, a Home Location card: the status (Approved, Waiting, Not Set, Rejected with People's reason), the address, Set Home Location or Update Home (a sheet: Use This Location with the reading's accuracy, Address, Send for Approval); Today's card, Temporary Sites when the person has any waiting, in progress or to come (number and name, purpose, dates, state; one opens on ESS · Work Location Requests), and beside them Field Assignments made before PR 4 while one is in progress or to come (number and name, dates, the site; one opens with the client, its sites with their address and radius, and who else is on it), the month picker beside Export Month (arrows a month at a time; the month's name opens a year and its months, back two years), Days Present, Late Days (with the share of days present), Absent, Hours Worked, each of the first three opening its days paged at 25, the days with clock in, clock out, hours, status and Review or as a chart of hours (late days stand out), a day's punches, open exceptions with Explain; a clock-out the system made reads Automatic in My Days and the day's punches, and the day offers Explain Time (a sheet: Your Note, Send Note); Export Month | Hours Worked: from the first clock-in to the last clock-out | "a correction never overwrites a punch", how the automatic time is chosen: §6.8, §6.14 |
+| Clock In / Clock Out panel | For someone working from home that day (a Remote day of their week) with no approved home, a banner (No Approved Home) with Set Home; for someone expected at an office with none assigned, a banner (No Office Assigned); the date and the workplace's current time, the state pill (Clocked Out, Clocked In with its time, Review Required), Shift, Work Arrangement, Clock Location with its radius (on a field assignment's day, its site), This Device with its status; the step before the browser asks (Location Check, one line naming the worksite); Clock In or Clock Out, Allow Location, Retry Location, Register Device, Not Now; the result after a punch with its reasons; Add Note when it is under review; opened by itself over a blurred screen, Start Your Day at the day's first sign-in and at the start and Finish Your Day at the end, with Remind Me (In 15 Minutes, In 30 Minutes, In 1 Hour) beside Clock Out; Shift is the person's own (from their work schedule); after a system clock-out, System Clock-Out with the day's times | Clock Location: the punch is matched to this place; This Device: why an unregistered device is flagged under the current policy | "location is read only and not continuously tracked", how block and warn decide, idempotency, when the system clocks you out: §6 here |
+| ESS · My Attendance | When their week, in force or waiting to start, has a Remote day (`MyHome.needed`), a Home Location card: the status (Approved, Waiting, Not Set, Rejected with People's reason), the address, Set Home Location or Update Home (a sheet: Use This Location with the reading's accuracy, Address, Send for Approval); Today's card, Temporary Sites when the person has any waiting, in progress or to come (number and name, purpose, dates, state; one opens on ESS · Work Location Requests), and beside them Field Assignments made before PR 4 while one is in progress or to come (number and name, dates, the site; one opens with the client, its sites with their address and radius, and who else is on it), the month picker beside Export Month (arrows a month at a time; the month's name opens a year and its months, back two years), Days Present, Late Days (with the share of days present), Absent, Hours Worked, each of the first three opening its days paged at 25, the days with clock in, clock out, hours, status and Review or as a chart of hours (late days stand out), a day's punches, open exceptions with Explain; a clock-out the system made reads System Clock-Out in My Days and the day's punches, and the day offers Give Real Time (a sheet: Real Time, Your Note, Send Time); Export Month | Hours Worked: from the first clock-in to the last clock-out; a System Clock-Out counts to the shift's end | "a correction never overwrites a punch", when the system clocks you out: §6.8, §6.14 |
 | ESS · Work Location Requests | Add Work Site; My Temporary Sites with number, purpose and name, dates and state (Awaiting Approval, Upcoming, In Progress, Done, Rejected, Withdrawn, Cancelled); a site opens with its details (purpose, first and last day, days, its addresses with their radius on a map, the people on it, the description, who added it), its approval trail, and Withdraw Submission while it waits; the Add Work Site sheet, as Home's; under them, while any is listed, My Requests made before PR 4 with number, type, dates and status, each opening with its details, its approval trail and Withdraw Request or Cancel Request | Description: People approve from this; name an out-of-station letter if you have one. Radius: a punch within it counts here | How the approval routes and what the clock does on an approved day: §6.11 |
 | ESS · My Devices | The devices with status, first seen, last punch and This Device; Register This Device, Remove | Status header: what New, Registered and Removed mean | "How device checks work", the three-device reason: §6.6 |
-| People · Attendance | The date, Expected, Present, Late, Absent, On Leave, Not In, Open Exceptions; Register, Exceptions and Homes (status chips; person, address, accuracy, requested, distance from the approved home, status; a home opens with Approve and Reject); the register (person, arrangement, clock in, clock out, location, device, status, review); a day's evidence, each punch's Source (Clock, Added by People, Automatic), and from PR 4 its route: the clock-in, each Check-In with its address and verdict, then the clock-out, in time order; Decide, an Automatic Clock-Out offering Accept and Correct Time, a check-in's flag offering Accept and Reject; Export. Requests and Field (with New Assignment) left in PR 4 for People · Worksites, Temporary | Open Exceptions: what waits on People; Outcome on the decision form: accept, reject or add the clock-out, or for an automatic one keep or correct its time; From Approved Home: how far a new home is from the one in force | The page explainer, "what a manager can and cannot do", reconciliation mechanics: §3, §6.8, §8 |
+| People · Attendance | The date, Expected, Present, Late, Absent, On Leave, Not In, Open Exceptions; Register, Exceptions and Homes (status chips; person, address, accuracy, requested, distance from the approved home, status; a home opens with Approve and Reject); the register (person, arrangement, clock in, clock out, location, device, status, review); a day's evidence, each punch's Source (Clock, Added by People, System Clock-Out), and from PR 4 its route: the clock-in, each Check-In with its address and verdict, then the clock-out, in time order; Decide, a System Clock-Out offering Accept and Correct Time (starting from the time the person gave, with their note), a check-in's flag offering Accept and Reject; Export. Requests and Field (with New Assignment) left in PR 4 for People · Worksites, Temporary | Open Exceptions: what waits on People; Outcome on the decision form: accept, reject or add the clock-out, or for a System Clock-Out keep or correct its time; From Approved Home: how far a new home is from the one in force | The page explainer, "what a manager can and cannot do", reconciliation mechanics: §3, §6.8, §8 |
 | People · Devices | Device list with employee, device, status, first seen, last punch; Remove Device | Status header: as on My Devices | "devices register on every punch": §6.6 |
 | People · Worksites | Worksites with code, address, radius, assigned and status; Add Worksite and Edit Worksite (Name, Address with suggestions as it is typed, the one picked filling Latitude and Longitude, Radius, Metres, then a map of the centre and its fence once both coordinates are real; tapping the map moves the centre; coordinates given with no address fill it); a worksite's details with the same map, Edit, Retire or Restore, its employees with Assign Employee; under the address while typing, a spinner, "No address matches" or "Could not search addresses" | Radius: punches inside count as on site | "How the geofence behaves": §6.5; where the suggestions come from: foundation.md §6.13 |
-| People · Employees, the record's Attendance tab | A Work Setup card: Work Pattern, Office (the worksite and its radius, or No Office Assigned), Home Location (Approved, Waiting or Not Set, for remote staff and hybrid staff with a home day); a Work Week card: each day of the week with an Office, Remote or Off pill, From (the schedule's first day) and Next (a schedule waiting to start, its days and first day); Set Schedule for a hybrid employee when `can_edit` (a sheet: one Office or Remote choice for each working day, From, Reason, Save Schedule) | Office: a punch on an office day is matched here; Work Week: the days at the office, the other working days from home | How a home day is fenced, the version rules: §6.13 |
 | Clock In / Clock Out panel, from PRs 2 to 4 | A rough reading names its fix as a banner: Precise Location Off with how to turn it on (iPhone, Android), Use Your Phone (a computer), Location Blocked with how to allow it, Secure Address Needed; Clock In Anyway; the location step always ends, so Not Now works while it reads (PR 2). Finish Your Day with Clock Out and Remind Me; a day ended by the system reads System Clock-Out (PR 3). On a temporary site's day, the site's name and addresses, and Check In after clocking in, with Check-Ins under it: each stop's time, address and Inside or Flagged (Recorded when the policy checks nothing) (PR 4) | Location Unclear: the reading could not prove where you were | How the fence and the reading are judged, when the system clocks you out: §6.5, §6.14 |
-| ESS · My Attendance, from PRs 3 and 4 | Deductions and Overtime cards for the month: each day, its minutes, its amount (or No Salary Set) and status (Pending, Waived, Confirmed, Cut); Give Real Time on a System Clock-Out; a day's route of check-ins (PR 4) | Amount: worked out from your monthly gross | The formulas, the cap, who confirms: §6.17 |
-| People · Attendance, from PR 3 | Deductions and Overtime views: person, day, kind, minutes, amount, status; Waive Selected (a reason, up to 25), Confirm and Cut on overtime; Approve Overtime on a person's day (Pre-Approved) | Waive: the pay is restored, the day still counts | The rules engine: §6.16 |
+| ESS · My Attendance, from PRs 3 and 4 | Deductions and Overtime cards for the month: each day, its kind, its minutes, its amount (or No Salary Set) and status (Pending, Waived, Confirmed, Cut, In Payroll), a waived or cut one with its reason; Give Real Time on a System Clock-Out; a day's route of check-ins (PR 4) | Amount: worked out from your monthly gross | The formulas, the cap, who confirms: §6.17 |
+| People · Attendance, from PR 3 | Deductions and Overtime in the view switch: person, day, kind, minutes, amount (Restricted without the salary grant, or No Salary Set), status, the status chips (Pending, Waived or Confirmed, Cut, All); Waive Selected (a sheet: Reason, Waive Deductions; up to 25 ticked), Confirm and Cut on a pending overtime item (Minutes for fewer, Reason to cut); Approve Overtime on a person's day (a sheet: Minutes, Reason, Approve Overtime) | Deductions (the list's title): Waive Selected restores the pay, the day still counts | The rules engine and the methods: §6.16, §6.17 |
 | People · Worksites, from PR 4 | Permanent or Temporary, a switch; Permanent is the worksites alone, as above. Temporary: the status chips (All, Awaiting Approval, In Progress, Upcoming, Done, Rejected, Cancelled) over the sites in the reader's scope: number and name, purpose, dates, people, state, Awaiting Approval first; Add Temporary Site (`people` approve, scope all), the same sheet as Home's with People from the employee list and Save Site; a site opens with its details (number, purpose, first and last day, days, added by, approved), its addresses on a map with their radius, its description, its people (Take Off on a person, with a reason), its approval trail, and Approve or Reject (a reason) when it waits on the reader, Cancel Site (a reason) while it is in force; while any made before PR 4 still waits or is in force, Requests and Field beside the sites: a request opens with its details, its approval route and Record Decision when it waits on the reader; an assignment opens with its details, sites and people, Take Off and Cancel Assignment | Description: why it is needed. Radius: a punch within it counts here | The approval route, who on a site may not decide it: §6.11 |
 | Home · Overview, Add Work Site (PR 4) | The sheet: Purpose (search the list), Name, Addresses (picked; Add Address, up to eight, each with its Label, its Radius and a small map; Remove on all but the first), First Day, Last Day, People (you and colleagues, you first), Description, Submit for Approval; toast "TS-0001 sent for approval"; a site that overlaps another names it on First Day | Description: People approve from this; name an out-of-station letter if you have one. Radius: a punch within it counts here | Who approves and what happens on the day: §6.11 |
-| People · Employees, the Work Schedule tab (PR 3) | Work Setup (Work Pattern, Office, Home Location); Work Schedule: each weekday Working or Off with its hours and Office or Remote, From, Next (one waiting), or Company Hours; Set Schedule (a sheet: a row per weekday, From, Reason, Save Schedule) | Work Schedule: lateness and absence follow these days and hours | How a day is judged: §6.4, §6.13 |
-| Knowledge Hub · Policies, the Attendance worksheet | One card per section (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts), each rule a row with its control and Changed; a switch that is on shows its figures; PR 1 shows Lateness, Location Checks and Devices, PR 3 the rest | Each rule's label: what it decides ("Flag: accepted, sent to People to review") | Versions, approval and acknowledgement: policies.md §6 |
+| People · Employees, the Work Schedule tab | After Job, in place of the Attendance tab: a Work Setup card (Work Pattern, Office with its radius or No Office Assigned, Home Location: Approved, Waiting or Not Set for someone whose week has a Remote day); a Work Schedule card: the week as seven rows, each Working or Off with its hours (Company Hours when they are the company's) and an Office or Remote pill, From (the schedule's first day, or Company Hours when none is set) and Next (a schedule waiting to start, from its first day); Set Schedule when `can_edit` (a sheet: a row per weekday with Working, Starts, Ends and Office or Remote, then From, Reason, Save Schedule) | Work Schedule: lateness and absence follow these days and hours; Days (the sheet's header): leave Starts and Ends empty for the company hours of that day | How a day is judged: §6.4, §6.13 |
+| Knowledge Hub · Policies, the Attendance worksheet | One card per section (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts), each rule a row with its control and Changed; a switch that is on shows its figures; every rule since PR 3 | Each rule's label: what it decides ("Flag: accepted, sent to People to review") | Versions, approval and acknowledgement: policies.md §6 |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Clock In / Clock Out panel | A bottom sheet: the state, the time, the shift and location, then the result (no toast over it); opened by itself, it does not drag away | Nothing | Clock In or Clock Out, full width at the foot; Remind Me above it at the shift's end, its choices an action sheet | The floating button's Clock In or Out (F18); the top bar's clock on desktop; it opens by itself on the first screen of the day's first sign-in, at the shift's start and at its end (§6.14), and from the reminder's notice |
-| ESS · My Attendance | For remote staff, and hybrid staff with a home day, the Home Location card first, then Today's card, Temporary Sites as cards when there are any (then Field Assignments made before PR 4), the four figures two to a row, then days as cards | Subtitle | Export Month in the header; Set Home Location full width in its card, its sheet's Send for Approval at the foot | Bottom bar Self-Service; ESS tabs scroll sideways |
+| ESS · My Attendance | When their week has a Remote day, the Home Location card first, then Today's card, Temporary Sites as cards when there are any (then Field Assignments made before PR 4), the four figures two to a row, then days as cards | Subtitle | Export Month in the header; Set Home Location full width in its card, its sheet's Send for Approval at the foot | Bottom bar Self-Service; ESS tabs scroll sideways |
 | ESS · Work Location Requests | Site cards with number and name, purpose, dates and state; then, while any is listed, request cards made before PR 4 | Subtitle; a site's people and description (in its sheet) | Add Work Site, full width at the foot and in the floating button's fan; the sheet's Submit for Approval at its foot; Withdraw Submission in the site's sheet | ESS tabs |
 | ESS · My Devices | Device cards with their status | Subtitle | Register This Device, full width | ESS tabs |
 | People · Attendance | The figures two to a row (a figure filters the register), the view switch (Register, Exceptions, Homes), the status chips scrolling sideways, then register cards with status, clock in and clock out; Homes as cards with the person, status and distance | Subtitle; the arrangement, location, device and review columns (in the day's sheet) | A card opens the day's evidence in a sheet, its check-ins in time order between the punches (PR 4) | More, then People |
 | People · Devices | Device cards with status | Subtitle | A card opens it; Remove Device in its sheet | People tabs |
 | People · Worksites | Worksite cards; the Add Worksite sheet with the address first after the name, its suggestions as 44 px rows under it inside the sheet's scroll, and the small map under Radius; a worksite's sheet shows its map under the details | Subtitle | Add Worksite, full width; picking a suggestion fills Latitude and Longitude, so a phone types neither; a tap on the map moves the centre (the map never drags, so the sheet keeps its scroll) | People tabs |
-| People · Employees, the record's Attendance tab | Work Setup, then Work Week, one under the other | Nothing | Set Schedule, full width under Work Week; its sheet's Save Schedule at the foot | The record's tabs scroll sideways |
 | Clock In / Clock Out panel, from PRs 2 to 4 | The banner for a rough reading above Clock In Anyway; Check In full width on a temporary site's day | Nothing | Clock In or Clock Out; Check In | As above |
-| ESS · My Attendance, from PRs 3 and 4 | Deductions and Overtime as cards under the figures, then the days; a day's sheet shows its route, the punches and check-ins in time order (PR 4) | The Method column (in the item's sheet) | Give Real Time in the day's sheet | ESS tabs |
-| People · Attendance, from PR 3 | Deductions and Overtime in the view switch, as cards with a tick to select | The Method column | Waive Selected in the floating button | More, then People |
+| ESS · My Attendance, from PRs 3 and 4 | Deductions and Overtime as cards under the figures (the date, then the kind and minutes on one line, the amount and the status), then the days; a day's sheet shows its route, the punches and check-ins in time order (PR 4) | The Method column (in the item's sheet) | Give Real Time in the day's sheet, Send Time at the sheet's foot | ESS tabs |
+| People · Attendance, from PR 3 | Deductions and Overtime in the view switch, as cards with a tick to select: the person, then the day, kind and minutes on one line, the amount and the status (Sort keeps Date and Minutes) | The Method column (in the item's sheet) | Waive Selected in the floating button; Confirm and Cut at the foot of an overtime item's sheet | More, then People |
 | People · Worksites, from PR 4 | Permanent and Temporary as a switch; on Temporary the status chips scrolling sideways, then site cards with name, purpose, dates and state; Requests and Field cards while any made before PR 4 waits or is in force | The People column (in the site's sheet) | Add Temporary Site in the floating button, its sheet a full sheet; Approve and Reject at the foot of the site's sheet | People tabs |
 | Home · Overview, Add Work Site (PR 4) | A full sheet: Purpose first, then Name, Addresses with a small map each, dates, People, Description | Nothing | Submit for Approval at the foot | Add Work Site in the floating button's fan beside New; ⌘K's Add Work Site |
-| People · Employees, the Work Schedule tab (PR 3) | Work Setup, then the week as seven rows | Nothing | Set Schedule full width; its sheet's Save Schedule at the foot | The record's tabs scroll sideways |
+| People · Employees, the Work Schedule tab | Work Setup, then the week as seven rows | Nothing | Set Schedule full width under the week; its sheet (full screen) a card per weekday, Save Schedule at the foot | The record's tabs scroll sideways |
 | Knowledge Hub · Policies, the Attendance worksheet | The section cards one under another, each rule a 44 px row, Save Draft at the foot | Nothing | Save Draft; Publish Policy in the draft's banner | More, then Knowledge Hub |
 
 ## 11 · Edge cases
@@ -1257,13 +1326,13 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   `NOT_EMPLOYED`.
 - Approved leave covering the work date: clock-in and clock-out are refused with the leave's dates
   (422 `ON_LEAVE`); the day is `leave`.
-- No worksite on a day at the office (on-site staff, a hybrid office day or a hybrid with no
-  schedule): the punch is recorded with its reading and goes to review (`location_unverified`,
+- No worksite on a day at the office (an Office day, or anyone with no schedule who is not remote):
+  the punch is recorded with its reading and goes to review (`location_unverified`,
   `no_worksite`) under warn and block, accepted under off; the panel says No Office Assigned.
-- A hybrid employee on a home day: matched to the approved home (100 m) as a remote employee is;
-  with no approved home, review (`no_home`). An approved remote day on a home day changes nothing
+- A Remote day of someone's schedule: matched to the approved home as a remote employee's is;
+  with no approved home, review (`no_home`). An approved remote day on a Remote day changes nothing
   but the evidence's place.
-- A hybrid employee with no schedule yet: every day is an office day, as before §6.13.
+- A hybrid employee with no schedule yet: every day is an Office day at the company hours (§6.13).
 - A schedule changed part way through a week: days already worked keep their judgement; the new
   one decides from its first day.
 - A client visit with a site: outside its radius is `outside_worksite` (warn reviews, block
@@ -1303,22 +1372,29 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   after midnight closes yesterday's shift until the day-close runs.
 - A fourth device: refused; the person removes one first.
 - The day-close run twice, or a run that died half way: no second exception, no second absence.
-- The watch run twice, or late: one reminder a day; a shift clocked out once (the person's lock and
-  the one automatic clock-out a day); a run after the first hour of the day sends no reminder.
+- The watch run twice, or late: one row per reminder, so none twice; a shift clocked out once (the
+  person's lock and the one system clock-out a day), at the end plus
+  `system_clock_out_after_minutes` whenever the run reaches it; a run after the first hour of the
+  day sends no reminder to clock in.
 - Still at work after the shift's end, the app open: the closing prompt, Remind Me as often as they
-  like; no automatic clock-out while they are in front of the app. Working elsewhere with the app
-  behind other windows counts as away: clock out, or keep the app in front.
-- Left the office before the shift's end and never clocked out: clocked out at the shift's end
-  (the agreed default); the person explains it and People correct the time.
-- Clocked in after the shift's end (an evening start on a working day): clocked out once away 15
-  minutes, at the last moment they were in front of the app, never before the clock-in.
-- A day that is not worked (a Sunday clock-in, a holiday): no shift end, so no closing prompt and no
-  automatic clock-out; the day-close's missing clock-out as before.
-- No Redis (the presence store cannot answer): no automatic clock-out that run; reminders still go.
-- Two logins for one person: in front of the app on either counts; the later last moment is used.
+  like, and no push while they are in front of it; at the end plus 90 minutes the System Clock-Out
+  all the same (Remind Me never moves it). They give the real time and People confirm it.
+- Left the office before the shift's end and never clocked out: reminded from the end, then clocked
+  out by the system at the end plus 90 minutes; the day's hours count to the end; the person gives
+  the real time and People correct it, and the corrected time decides early departure.
+- Clocked in after the shift's end (an evening start on a working day): a clock-in between the end
+  and the end plus 90 minutes is clocked out at that moment, with no worked minutes past the end; a
+  clock-in at or after it is never clocked out by the system and gets no reminders: the day-close's
+  missing clock-out, as on a day that is not worked.
+- A day that is not worked (a Sunday clock-in, a holiday, an Off day): no shift end, so no closing
+  prompt, no reminders and no system clock-out; the day-close's missing clock-out as before.
+- No Redis (the presence store cannot answer): reminders go as pushes; the system clock-out happens
+  on time, since presence no longer decides it.
+- Two logins for one person: in front of the app on either holds the push for that reminder.
 - A clock-out the person makes while the job is clocking them out: the person's lock decides; the
   second is `ALREADY_CLOCKED_OUT` (the person) or skipped (the job).
-- Explaining an automatic clock-out twice: 409 `ALREADY_EXPLAINED`; the note is on the first.
+- Giving the real time of a System Clock-Out twice: 409 `ALREADY_EXPLAINED`; the note and time are on
+  the first.
 - Push turned off for Attendance and Leave: the reminder still reaches the bell; the prompt still
   opens in the app.
 - No version of the Attendance policy yet: the type's defaults judge every punch (§6.1); Knowledge
@@ -1326,26 +1402,35 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   policy's other edge cases are `policies.md` §11.
 - A version published today from today: punches before it was published keep the version they were
   judged by; the next punch is judged by it.
-- A day whose clock-in came before a new version started that day and whose clock-out came after
-  (PR 3): the day is judged by the version on its clock-in.
+- A day whose clock-in came before a new version started that day and whose clock-out came after:
+  the day is judged by the version on its clock-in, recorded on the day (§6.4).
 - A rough reading (approximate location, a laptop): never refused; Location Unclear for People with
   the fix shown to the person (PR 2).
 - A punch People reject (PR 2): the person clocks in again that day; a rejected clock-out leaves the
   day open for Add Clock-Out, also after the day closed.
-- Leave granted for a past day already closed absent (PR 2): the day becomes leave, and from PR 3 its
-  absence deduction and count go with it.
-- A part-time person on an Off day of their schedule (PR 3): no prompt, no reminder, no absence; a
+- Leave granted for a past day already closed absent (PR 2): the day becomes leave; its pending
+  absence deduction is waived by the system ("Leave granted"), and it stops counting toward the next
+  Absence breach; a breach already recorded that counted it stays (§6.16, §6.17).
+- People reject the clock-in that made a day late (PR 2 lets the person clock in again): the day's
+  pending deduction follows it ("No longer late", or new minutes for a later clock-in), and a breach
+  already recorded stays.
+- A part-time person on an Off day of their schedule: no prompt, no reminder, no absence; a
   punch that day is recorded, is never late, and counts as overtime at the rest-day rate when
   overtime is on.
-- Still clocked in at the end plus 90 minutes (PR 3): System Clock-Out; hours count to the end; the
+- Still clocked in at the end plus 90 minutes: System Clock-Out; hours count to the end; the
   person gives the real time if they worked on and People confirm it.
-- A deduction for a person with no monthly gross (PR 3): kept with its minutes and No Salary Set; it
-  gains its amount when payroll prices it.
-- A waived deduction (PR 3): the pay is restored; the day still counts toward its rule.
-- Three late arrivals, then a query, then three more in the same month (PR 3): a second breach and,
-  with Raise Query on, a second query (the count restarts); five late arrivals give one.
-- A rule switched off mid-month (PR 3): no breach from that version's first day; earlier breaches
-  stay.
+- A deduction for a person with no monthly gross: kept with its minutes and No Salary Set; it gains
+  its amount when payroll prices it.
+- A waived deduction: the pay is restored; the day still counts toward its rule.
+- Three late arrivals, then a query, then three more in the same month: a second breach with its own
+  alert and, with Raise Query on, a second query (the count restarts); five late arrivals give one.
+- A rule switched off mid-month: no breach from that version's first day; earlier breaches stay.
+- An employee with no active login: never expected, never absent; their day reads Off.
+- A schedule's blank working day on a weekday a later version of the company hours stops working:
+  Off from that version's first day (§6.13).
+- Overtime above the monthly cap: confirmed up to the cap, the rest cut "Monthly cap".
+- Overtime pre-approved for fewer minutes than worked: confirmed up to the approval, the rest cut
+  "Beyond pre-approval"; none approved: cut "Not pre-approved".
 - A temporary site approved after its first day (PR 4): the location exceptions it covers on those
   days resolve themselves ("Covered by TS-0001"); punches keep their judgement; an exception with no
   reading, or a reading outside every address, stays for People.
@@ -1381,9 +1466,9 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 | pixie | `src/shared/hr_payroll/device.guard.js` (`evaluateDeviceRecognition`) | No CEO exemption and no "no device enrolled yet means neutral": an unregistered device is unknown, judged by `device_mode`; the device is the session's `known_device`, never a client fingerprint |
 | pixie | `src/shared/hr_payroll/devices.service.js`, `devices.repo.js` | Cap 3 (MyCity's meetings), not 2; registration confirmed by a fresh sign-in, not an email code; no change log table (the event log and audit ledger carry every change) |
 | pixie | `src/shared/attendance/geo.calc.js` | Already in `shared/geo` (M0); the policy decision is `attendance.geofence.js` |
-| pixie | `src/shared/hr_payroll/lateness.calc.js` (`minutesLate`, `minutesOvertime`) | Lateness after start plus grace, overtime after the end, on the work date's wall clock; the money half (daily rate, tiers) waits for M6 |
+| pixie | `src/shared/hr_payroll/lateness.calc.js` (`minutesLate`, `minutesOvertime`) | Lateness counted from the start once past grace (T2), early departure to the end, overtime after the end once past `after_minutes`, on the work date's wall clock (`attendance.lateness.js`); the money half is used now (`attendance.pay.js`): daily pay pro-rated over the person's working days that month, with T4's three methods (pro-rata by minute, fixed per started hour, fixed per late day) in place of its tiers |
 | pixie | `src/shared/hr_payroll/hr_ops.service.js` (`selfClock`) and `migrations/000303` | The per-day unique index on active events, the advisory lock first; location is not mandatory (praxis's "always record" with the policy deciding) |
-| praxis-ls | `src/modules/hr/attendance/attendance.rules.js` (`wallClock`, `localDate`, `reconcileDay`) | Statuses `present`, `late`, `absent`, `leave` (no weekend or holiday rows); grace as pixie measures it (§6.4); no deductions |
+| praxis-ls | `src/modules/hr/attendance/attendance.rules.js` (`wallClock`, `localDate`, `reconcileDay`) | Statuses `present`, `late`, `absent`, `leave` (no weekend or holiday rows); lateness from the start once past grace (T2, §6.4); the shift from the person's own schedule (§6.13); deductions in `attendance.pay.js` |
 | praxis-ls | `src/modules/hr/attendance/attendance.export.js` | The register and the month as workbooks through `shared/spreadsheet`, gathered 25 at a time, downloaded on the device that asked (never emailed) |
 | praxis-ls | `doc/CLOCKIN_REVAMP_ENGINEERING_GUIDE.md` §1.2 (the policy model) | `block` rejects, as MyCity asked; praxis holds every punch instead |
 
@@ -1409,6 +1494,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · PR 3 built (rules and schedules): the company hours in the policy and each person's work schedule (`attendance.schedule.js`, People · Employees' Work Schedule tab after Job, in place of the Attendance tab); each day judged once against its own shift and version (`attendance.reconcile.js` `judgementOf`, `1425`); lateness from the start, early departures, overtime past `after_minutes`; the five consequence rules counted per person (`attendance.rules-engine.js`, `attendance_rule_breach`), each breach a Home alert on the rule the system keeps for it (Query Due while M3's query is not in); pending deductions and overtime priced from the monthly gross (`attendance.pay.js`, `attendance_pay_item`), waived, confirmed or cut by People and Approve Overtime beforehand; reminders to clock out every 30 minutes and the System Clock-Out 90 minutes after the end, with Give Real Time (`attendance.clock-watch.js`, `1440`); the worksheet shows every rule. PR 2 is not built yet, so §6.2, §6.3, §6.5, §6.7 and §6.8 still describe what stands. Help on a text field inside a sheet moved to the sheet's own header (Days) or the list's title (Deductions): a help-labelled field fails the a11y check inside a dialog (noted for the frontend foundation).
 - 20/10/2026 · TB · PR 4 (Places) built: temporary sites (`attendance.sites.js`, `1450`, `1470`): Add Work Site from Home and ESS · Work Location Requests for oneself and colleagues, numbered `TS-0001` and approved through `attendance.temporary_site` (Operations & People; nobody on it decides it, through the engine's new per-instance exclusion, `1455`), People adding one directly, withdraw, cancel and take off, one site a person a day, the site first in `contextFor` and its zone for the work date and the wall clock, flags cleared by a late approval; check-ins at each stop (`attendance.check-ins.js`, `1460`: 20 a day, 5 minutes, flagged and decided as a punch's are, never the shift); People · Worksites' Permanent and Temporary switch, the old requests and assignments shown there while live (TB, 20/10/2026); a Temporary Home reads remote on the roster and any other site field (TB, 20/10/2026); the policy's Temporary Site Check and the T14 sentence. Work location requests and field assignments take no new entries. §1.2, §2 to §11 updated; the "Until PR 4" sections kept as history.
 - 20/10/2026 · TB · PR 1 built: the clock reads its rules through `policies.rulesFor` (`attendance.calendar.js`) and each punch keeps `policy_version_id`; `attendance.policy.js` and the `/attendance/policy` routes, events and reminder are gone, and `attendance.policy-type.js` registers the Attendance type. Settings · Attendance Policy's screen and its sentences left `app/src/features/attendance/` for `app/src/features/policies/`; `prompts.ts` gained `signInAsked`, which the acknowledge sheet waits on.
 

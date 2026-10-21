@@ -3,7 +3,7 @@ import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } fr
 import type { EmployeeHistoryEntry, EssProfile, ExportFile } from "@mycity/contract/contract.gen.ts";
 import { exportFile } from "./shared";
 import { byKey, managerOf } from "../data/people";
-import { weekOf } from "./attendance";
+import { workWeekOf } from "./attendance";
 import { pickAnAddress, placeOf, typedPlace, type KeptPlace } from "./maps";
 
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
@@ -20,15 +20,9 @@ export const phoneOf = (key: string): string | null => PATCHES.get(key)?.phone ?
 export function setPhone(key: string, phone: string) {
   PATCHES.set(key, { ...(PATCHES.get(key) ?? {}), phone });
 }
-/** The organisation's week with where this person works each day (the attendance mock's week). */
+/** The person's week as worked today, with their hours and where (the attendance mock's week). */
 const weekFor = (key: string): EssProfile["working_week"] =>
-  weekOf(key).map(({ weekday, place }) => ({
-    weekday,
-    is_working_day: weekday <= 6,
-    starts_at: weekday <= 6 ? "09:00" : null,
-    ends_at: weekday === 6 ? "15:00" : weekday <= 5 ? "17:00" : null,
-    place,
-  }));
+  workWeekOf(key).map((d) => ({ weekday: d.weekday, is_working_day: d.working, starts_at: d.starts_at, ends_at: d.ends_at, place: d.working ? d.place! : "off" }));
 const TYPES: EssProfile["employment_type"][] = ["full_time", "part_time", "contractor", "consultant"];
 
 function profile(key: string): EssProfile {

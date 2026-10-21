@@ -116,8 +116,6 @@ describe("age", () => {
 describe("rules", () => {
   it("reads each rule as a person says it", () => {
     const line = (metric: string, threshold: string, window_days: number | null = null) => ruleLine({ metric, threshold, window_days });
-    expect(line("late_arrivals", "3.00", 30)).toBe("3 late in 30 days");
-    expect(line("missing_clock_out", "2", 1)).toBe("2 missing in 1 day");
     expect(line("approval_ageing", "1")).toBe("Waiting 1 day");
     expect(line("document_expiry", "30")).toBe("30 days before expiry");
     expect(line("confirmation_due", "14")).toBe("14 days before confirmation");
@@ -125,7 +123,9 @@ describe("rules", () => {
     expect(line("partner_inactivity", "30")).toBe("30 days without contact");
     expect(line("budget_threshold", "90.50")).toBe("90.5% spent");
     expect(line("recruitment_sla", "5")).toBe("5 days at one stage");
-    expect(line("attendance.rule_breached", "3")).toBe("3");
+    // A rule kept from before the metric list, or the Attendance policy's (home.md §6): its number alone.
+    expect(line("late_arrivals", "3.00", 30)).toBe("3");
+    expect(line("attendance_policy", "1")).toBe("1");
   });
 
   it("words who clears from the grant: the module's name and who holds the action", () => {
@@ -137,24 +137,24 @@ describe("rules", () => {
 
   it("offers each metric's own grant once, in the metric list's order, and a rule's other grant in the server's words", () => {
     const defaults = [...new Set(Object.values(alerts.HOME_ALERT_METRICS).map((m) => m.permission_key))];
-    expect(clearerOptions("people.view").map(([key]) => key)).toEqual(defaults);
-    expect(clearerOptions("people.view").map(([, words]) => words)).toEqual(["People Viewers", "People Approvers", "People Editors", "Partnerships Editors", "Expenses Approvers", "Recruitment Editors"]);
+    expect(clearerOptions("people.approve").map(([key]) => key)).toEqual(defaults);
+    expect(clearerOptions("people.approve").map(([, words]) => words)).toEqual(["People Approvers", "People Editors", "Partnerships Editors", "Expenses Approvers", "Recruitment Editors"]);
     expect(clearerOptions("queries.approve", "Queries & Sanctions Approvers").at(-1)).toEqual(["queries.approve", "Queries & Sanctions Approvers"]);
     expect(clearerOptions("queries.approve").at(-1)).toEqual(["queries.approve", "Queries & Sanctions Approvers"]);
   });
 });
 
 describe("Alert Sources", () => {
-  it("is one bar per metric, most first, a metric no longer listed counted as Other", () => {
+  it("is one bar per metric, most first, the Attendance policy's breaches as one, a metric no longer listed counted as Other", () => {
     expect(
       sourceRows([
         { metric: "partner_inactivity", count: 4 },
-        { metric: "late_arrivals", count: 9 },
-        { metric: "attendance.rule_breached", count: 2 },
+        { metric: "attendance_policy", count: 9 },
+        { metric: "late_arrivals", count: 2 },
         { metric: "budget.threshold", count: 3 },
       ]),
     ).toEqual([
-      { label: "Late Arrivals", count: 9 },
+      { label: "Attendance Policy", count: 9 },
       { label: "Other", count: 5 },
       { label: "Partner Inactivity", count: 4 },
     ]);

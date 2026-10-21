@@ -109,7 +109,10 @@ describeDb("Home · Team against the real migrations", () => {
     }
   }
 
-  /** Someone with no login, as People · Employees adds them. */
+  /**
+   * Someone People · Employees added, with a login of their own that never signs in here: someone with
+   * no active login is never expected to clock in (attendance.md §6.4).
+   */
   async function person(key, first, last, { department = "Operations", manager = null, pattern = "on_site" } = {}) {
     staffNumber += 1;
     const row = await one(
@@ -128,6 +131,10 @@ describeDb("Home · Team against the real migrations", () => {
       ],
     );
     ids[key] = row.employee_id;
+    await q("INSERT INTO app_user (employee_id, email, password_hash) VALUES ($1, $2, 'not-a-hash')", [
+      row.employee_id,
+      `${first}.${last}.${staffNumber}@login.team.mycity.test`.toLowerCase(),
+    ]);
   }
 
   /** A punch as the attendance service records one: the event on its work date, then the day recalculated. */

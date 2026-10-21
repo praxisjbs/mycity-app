@@ -52,8 +52,6 @@ const HomeAlertOverBy = z.enum(["over", "days_left"]);
  * and the milestone that owns its tables); a test holds its keys equal to these.
  */
 const HOME_ALERT_METRICS = Object.freeze({
-  late_arrivals: Object.freeze({ category: "attendance", kind: "count", window: true, permission_key: "people.view" }),
-  missing_clock_out: Object.freeze({ category: "attendance", kind: "count", window: true, permission_key: "people.view" }),
   approval_ageing: Object.freeze({ category: "approval", kind: "count", window: false, permission_key: "people.approve" }),
   document_expiry: Object.freeze({ category: "document", kind: "deadline", window: false, permission_key: "people.edit" }),
   confirmation_due: Object.freeze({ category: "people", kind: "deadline", window: false, permission_key: "people.edit" }),
@@ -63,6 +61,18 @@ const HOME_ALERT_METRICS = Object.freeze({
   recruitment_sla: Object.freeze({ category: "recruitment", kind: "count", window: false, permission_key: "recruitment.edit" }),
 });
 const HomeAlertMetric = z.enum(Object.keys(HOME_ALERT_METRICS));
+
+/**
+ * The metric of the rules the system keeps for the Attendance policy's consequence rules (home.md
+ * §6 Alerts; attendance.md §6.16): one rule per policy rule, never offered on New Rule, never
+ * edited or switched off on Alert Rules, never read by the sweep. Their alerts are the policy's
+ * breaches, in the attendance category, with no Over By.
+ */
+const HOME_ALERT_POLICY_METRIC = "attendance_policy";
+
+/** The Attendance policy's consequence rules, by their key in its rules (AttendanceRules). */
+const HOME_ALERT_POLICY_RULES = Object.freeze(["late_rule", "early_rule", "absence_rule", "forgotten_rule", "location_rule"]);
+const HomeAlertPolicyRuleKey = z.enum(HOME_ALERT_POLICY_RULES);
 
 /** Open, or closed by a person: cleared (dealt with) or dismissed (not a real issue, or its rule was switched off). */
 const HomeAlertState = z.enum(["open", "cleared", "dismissed"]);
@@ -265,6 +275,35 @@ const HomeAlertRuleUpdate = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
 
+/**
+ * GET /home/alert-rules/policy: the Attendance policy's five consequence rules, read only, as the
+ * version in force today sets them. `figures` is the rule in words ("3 late arrivals in a month or 5
+ * hours"), null while it is off. `can_set` says whether the reader may open the policy to change
+ * them (`policies.manage`).
+ */
+const HomeAlertPolicyRules = z
+  .object({
+    policy_version_id: uuid.nullable(),
+    version: z.number().int().min(1).nullable(),
+    rules: z
+      .array(
+        z
+          .object({
+            rule: HomeAlertPolicyRuleKey,
+            name: z.string(),
+            on: z.boolean(),
+            figures: z.string().nullable(),
+            alert: z.boolean(),
+            query: z.boolean(),
+            open_alerts: count,
+          })
+          .strict(),
+      )
+      .length(HOME_ALERT_POLICY_RULES.length),
+    can_set: z.boolean(),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   HomeAlert: {
@@ -299,6 +338,10 @@ const TABLES = {
   HomeAlertRulePage: { table: null, reason: "a page of alert rules" },
   HomeAlertRuleCreate: { table: "home_alert_rule" },
   HomeAlertRuleUpdate: { table: "home_alert_rule" },
+  HomeAlertPolicyRules: {
+    table: null,
+    reason: "the Attendance policy's consequence rules in force today, from its version, with their open alerts",
+  },
 };
 
 module.exports = {
@@ -306,6 +349,9 @@ module.exports = {
   HOME_ALERT_SEVERITIES,
   HOME_ALERT_CATEGORIES,
   HOME_ALERT_METRICS,
+  HOME_ALERT_POLICY_METRIC,
+  HOME_ALERT_POLICY_RULES,
+  HomeAlertPolicyRuleKey,
   HomeAlertSeverity,
   HomeAlertCategory,
   HomeAlertKind,
@@ -322,4 +368,5 @@ module.exports = {
   HomeAlertRulePage,
   HomeAlertRuleCreate,
   HomeAlertRuleUpdate,
+  HomeAlertPolicyRules,
 };

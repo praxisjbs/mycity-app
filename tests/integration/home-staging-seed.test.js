@@ -207,8 +207,10 @@ describeDb("Home's staging seed against the real migrations", () => {
          JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id`,
     );
     const metrics = new Set(alerts.rows.map((a) => a.metric));
-    for (const metric of ["late_arrivals", "missing_clock_out", "partner_inactivity", "budget_threshold"])
-      expect([metric, metrics.has(metric)]).toEqual([metric, true]);
+    for (const metric of ["partner_inactivity", "budget_threshold"]) expect([metric, metrics.has(metric)]).toEqual([metric, true]);
+    // Attendance's alerts are the Attendance policy's breaches: no version is seeded (A26), so none.
+    expect(rules.rows.map((r) => r.metric)).not.toContain("late_arrivals");
+    expect(rules.rows.map((r) => r.metric)).not.toContain("missing_clock_out");
     expect(alerts.rows.every((a) => a.outcome === null)).toBe(true);
     expect(alerts.rows.some((a) => a.severity === "high")).toBe(true);
   });

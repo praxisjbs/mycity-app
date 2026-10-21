@@ -447,9 +447,9 @@ describeDb("shared layer against Postgres", () => {
     beforeAll(async () => {
       await q(
         `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key)
-         VALUES ('attendance.late_arrivals', 'Late Arrivals', 'late_arrivals', 3, 30, 'high', 'people.approve')`,
+         VALUES ('approval_ageing.engine', 'Waiting Approvals', 'approval_ageing', 3, NULL, 'high', 'people.approve')`,
       );
-      rule = await tx((c) => alerts.ruleByKey(c, "attendance.late_arrivals"));
+      rule = await tx((c) => alerts.ruleByKey(c, "approval_ageing.engine"));
     });
     const raise = (value) =>
       tx((c) =>
@@ -575,10 +575,10 @@ describeDb("shared layer against Postgres", () => {
     test("switching a rule off dismisses its open alerts as the rule change, once, needing no clearing right", async () => {
       const { home_alert_rule_id: ruleId } = await one(
         `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key)
-         VALUES ('missing_clock_out.engine', 'Missing Clock-Outs', 'missing_clock_out', 2, 30, 'low', 'people.approve')
+         VALUES ('approval_ageing.engine_off', 'Waiting Approvals Off', 'approval_ageing', 2, NULL, 'low', 'people.approve')
          RETURNING home_alert_rule_id`,
       );
-      const off = await tx((c) => alerts.ruleByKey(c, "missing_clock_out.engine"));
+      const off = await tx((c) => alerts.ruleByKey(c, "approval_ageing.engine_off"));
       for (const who of ["chidi", "eze", "dayo"])
         await tx((c) =>
           alerts.raise(c, {
@@ -609,7 +609,7 @@ describeDb("shared layer against Postgres", () => {
       ]);
       const audited = await q(
         `SELECT payload->>'outcome' AS outcome, payload->>'rule_off' AS rule_off, actor_user_id FROM event_log
-          WHERE event_key = 'home.alert_cleared' AND payload->>'rule_key' = 'missing_clock_out.engine'
+          WHERE event_key = 'home.alert_cleared' AND payload->>'rule_key' = 'approval_ageing.engine_off'
           ORDER BY occurred_at`,
       );
       expect(audited.rows).toEqual([
@@ -637,11 +637,11 @@ describeDb("shared layer against Postgres", () => {
     test("a raise reads its rule again: a switch-off saved first wins over the rule a sweep loaded before it", async () => {
       const { home_alert_rule_id: ruleId } = await one(
         `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key)
-         VALUES ('late_arrivals.stale', 'Late Arrivals', 'late_arrivals', 3, 30, 'medium', 'people.approve')
+         VALUES ('approval_ageing.stale', 'Waiting Approvals Stale', 'approval_ageing', 3, NULL, 'medium', 'people.approve')
          RETURNING home_alert_rule_id`,
       );
       // The rule as a sweep loaded it, switched on.
-      const stale = await tx((c) => alerts.ruleByKey(c, "late_arrivals.stale"));
+      const stale = await tx((c) => alerts.ruleByKey(c, "approval_ageing.stale"));
       const raiseStale = () =>
         tx((c) =>
           alerts.raise(c, {

@@ -247,31 +247,50 @@ describeDb("Home schema and reference data against the real migrations", () => {
     test("a rule needs a name; who made it and who changed it are users", async () => {
       await refused(
         q(`INSERT INTO home_alert_rule (key, metric, threshold, severity, permission_key)
-           VALUES ('attendance.nameless', 'late_arrivals', 3, 'low', 'people.view')`),
+           VALUES ('approval_ageing.nameless', 'approval_ageing', 3, 'low', 'people.view')`),
         "23502",
         "name",
       );
       await refused(
         q(`INSERT INTO home_alert_rule (key, name, metric, threshold, severity, permission_key, created_by)
-           VALUES ('attendance.orphan', 'Orphan', 'late_arrivals', 3, 'low', 'people.view', gen_random_uuid())`),
+           VALUES ('approval_ageing.orphan', 'Orphan', 'approval_ageing', 3, 'low', 'people.view', gen_random_uuid())`),
         "23503",
         "home_alert_rule_created_by_fkey",
       );
     });
 
+    test("Home's own attendance rules stay off (1445): the Attendance policy raises attendance's alerts", async () => {
+      for (const metric of ["late_arrivals", "missing_clock_out"])
+        await refused(
+          q(
+            `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key)
+             VALUES ($1, 'Kept From Before', $2, 3, 30, 'low', 'people.view')`,
+            [`${metric}.again`, metric],
+          ),
+          "23514",
+          "home_alert_rule_attendance_retired_check",
+        );
+      // Switched off, a rule from before is kept with its alerts.
+      await q(
+        `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key, enabled)
+         VALUES ('late_arrivals.kept', 'Kept From Before', 'late_arrivals', 3, 30, 'low', 'people.view', false)`,
+      );
+      await refused(q("UPDATE home_alert_rule SET enabled = true WHERE key = 'late_arrivals.kept'"), "23514", "home_alert_rule_attendance_retired_check");
+    });
+
     test("alerts.raise still raises, and the alert keeps the employee it is about", async () => {
       await q(
         `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key, created_by)
-         VALUES ('attendance.late_arrivals', 'Late Arrivals', 'late_arrivals', 3, 30, 'high', 'people.approve', $1)`,
+         VALUES ('approval_ageing.schema', 'Waiting Approvals', 'approval_ageing', 3, NULL, 'high', 'people.approve', $1)`,
         [people.ada.user_id],
       );
-      const rule = await tx((c) => alerts.ruleByKey(c, "attendance.late_arrivals"));
+      const rule = await tx((c) => alerts.ruleByKey(c, "approval_ageing.schema"));
       const out = await tx((c) =>
         alerts.raise(c, {
           rule,
           subject: { type: "employee", id: people.bola.employee_id },
           value: 4,
-          title: "Bola Ade: 4 late arrivals in 30 days",
+          title: "Bola Ade: waiting 4 days",
           subject_employee_id: people.bola.employee_id,
         }),
       );

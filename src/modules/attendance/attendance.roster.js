@@ -4,10 +4,10 @@
  * who came in, how, and who did not.
  *
  * Home's screens read attendance only through this file (the Clocked In Today card and the
- * list behind it, the Team tab and its month, a person's own month). The one other reader in
- * Home is its alert metrics (src/modules/alerts/alerts.metrics.js: the days recorded late, and
- * the day-close's missing clock-out exception or a day still open), which a change to those
- * updates in the same PR (attendance.md §6.9). This file writes nothing, emits nothing and
+ * list behind it, the Team tab and its month, a person's own month), and the reader's own shift
+ * through attendance.schedule.js dayOn (the day strip, Your Week). Home's alerts no longer read
+ * attendance: they are the Attendance policy's breaches, raised by the attendance module
+ * (attendance.md §6.9, §6.16). This file writes nothing, emits nothing and
  * decides nothing: every fact is the attendance module's own (docs/guides/attendance.md §6),
  * read the way People · Attendance and My Attendance read it, so a figure on Home is the
  * figure on those screens.
@@ -24,12 +24,16 @@
  *                      its status, first clock-in, last clock-out and late minutes. Which
  *                      punches count, the work date, the shift, the grace and lateness are
  *                      decided there, once, and never again here
- *   a day with none    granted leave, else nothing on a day that is not worked, else not in:
- *                      the register's own order (attendance.repo.js REGISTER)
+ *   a day with none    granted leave, else nothing on a day that is not worked for that person,
+ *                      else not in: the register's own order (attendance.repo.js REGISTER)
  *   who is on the day  anyone with a record that day, and everyone active, started and not
  *                      yet left: the register's people
  *   leave              granted as attendance.repo.js and the leave module read it
- *   working days       shared/time/working-week through rules.shiftFor, as the day-close reads them
+ *   working days       each person's own (attendance.md §6.13): by the work schedule in force on the
+ *                      date, else the company hours in force then (the service reads them through
+ *                      policies.rulesFor and passes them to the SQL), else the working week; never a
+ *                      public holiday, and nobody without an active login (repo.EXPECTED_ON). The
+ *                      "yesterday" of the open-shift flag is the organisation's last working day
  *   the clock-in       the day's one active clock-in, for the worksite it was judged against
  *   a person's totals  repo.daysSummary(), the figures My Attendance shows; month() counts
  *                      every person's days the same way, in one query
@@ -40,10 +44,9 @@
  *   late      late
  *   present   field on a day an approved temporary site they are still on covers, a Temporary
  *             Home aside (attendance.md §6.11, PR 4), or a field assignment made before PR 4
- *             (§6.12); else remote for someone who works remotely (work_pattern remote, as the
- *             geofence, the clock panel and the register read it), is on an approved Temporary
- *             Home, an approved remote day made before PR 4 (§6.11) or a hybrid home day by their
- *             schedule (§6.13); else on_site (TB, 20/10/2026)
+ *             (§6.12); else remote on a Remote day of the work schedule in force then (§6.13), or,
+ *             with no schedule working that day, for a remote work pattern, or on an approved
+ *             Temporary Home or a remote day approved before PR 4 (§6.11); else on_site
  *   absent    absent: a working day the day-close closed with no clock-in
  *   not_in    not_in: a working day not closed, no clock-in yet
  *   off       none: a day that is not worked, with nothing recorded
@@ -64,6 +67,7 @@ const { scopeClause } = require("../../shared/rbac/scope");
 const { photoUrlSql } = require("../../shared/db/person");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
+const calendar = require("./attendance.calendar");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
 
@@ -109,8 +113,9 @@ function yesterdayOf(date, cal) {
  *          remote_day?: boolean, field_day?: boolean}} f
  *   day_status  attendance_day.status for the day, null when there is no record or it has none
  *   on_leave    granted leave covers the day
- *   remote_day  an approved Temporary Home or remote day covers the day, or it is a hybrid home
- *               day (§6.13)
+ *   working_day the day is worked for the person, and they are expected (repo.EXPECTED_ON)
+ *   remote_day  a Remote day of their schedule, or with no schedule working it a remote pattern
+ *               (repo.PLACE_REMOTE), or an approved Temporary Home or remote day covers it
  *   field_day   an approved temporary site (not a home) or a field assignment the person is still
  *               on covers the day
  */
@@ -122,7 +127,7 @@ function statusOf(f) {
       return "late";
     case "present":
       if (f.field_day) return "field";
-      return f.work_pattern === "remote" || f.remote_day ? "remote" : "on_site";
+      return f.remote_day ? "remote" : "on_site";
     case "absent":
       return "absent";
     default:
@@ -183,15 +188,16 @@ const siteDay = (employee, day, home) => `EXISTS (
      AND ts.starts_on <= ${day} AND ts.ends_on >= ${day})`;
 
 /**
- * Whether `day` is worked remotely for `employee` beyond their pattern (SQL): an approved Temporary
- * Home covers it (PR 4), or an approved remote day made before PR 4 (attendance.md §6.11), or it is
- * a hybrid employee's home day by the schedule in force then (§6.13, repo.HOME_DAY over the employee `e`).
+ * Whether `day` is worked remotely by `employee` (SQL): an approved Temporary Home covers it
+ * (PR 4), or an approved remote day made before PR 4 (attendance.md §6.11), or it is a Remote day of
+ * the work schedule in force then, or with no schedule working that day a remote work pattern
+ * (§6.13, repo.PLACE_REMOTE over the employee `e`).
  */
 const remoteDay = (employee, day) => `(${siteDay(employee, day, true)} OR EXISTS (
   SELECT 1 FROM attendance_location_request lr
    WHERE lr.employee_id = ${employee} AND lr.status = 'approved' AND lr.request_type = 'remote_day'
      AND lr.starts_on <= ${day} AND lr.ends_on >= ${day})
-  OR ${repo.HOME_DAY(employee, "e.work_pattern", day)})`;
+  OR ${repo.PLACE_REMOTE(employee, "e.work_pattern", day)})`;
 
 /**
  * Whether an approved temporary site (a Temporary Home aside) or a field assignment made before PR 4
@@ -226,7 +232,7 @@ const STATUS = `CASE f.day_status
   WHEN 'leave' THEN 'on_leave'
   WHEN 'late' THEN 'late'
   WHEN 'present' THEN CASE WHEN f.field_day THEN 'field'
-                           WHEN f.work_pattern = 'remote' OR f.remote_day THEN 'remote' ELSE 'on_site' END
+                           WHEN f.remote_day THEN 'remote' ELSE 'on_site' END
   WHEN 'absent' THEN 'absent'
   ELSE CASE WHEN f.on_leave THEN 'on_leave' WHEN f.working_day THEN 'not_in' END
 END`;
@@ -263,7 +269,7 @@ const binder = (params) => (value) => {
  * field assignment's day the site it was judged against; it shows only while the day's record has a clock-in, so a
  * punch a decision excluded names none.
  *
- * @param {ReturnType<typeof dayOf>} day
+ * @param {ReturnType<typeof dayOf> & {hours: Array|null}} day  with the company hours in force then
  * @param {ReturnType<typeof dayOf>} yesterday
  * @param {{scope: string, scope_ids: string[]|null}} scope
  * @param {Array} params  the query's parameters; this appends its own
@@ -272,23 +278,22 @@ const binder = (params) => (value) => {
 function rosterSql(day, yesterday, scope, params, filters = {}) {
   const bind = binder(params);
   const date = `${bind(day.date)}::date`;
-  // Worked out in SQL, as the register does: a holiday entered a moment ago already counts.
-  const working = repo.WORKING_DAY(date);
+  // Worked out in SQL, per person, as the register does: a holiday entered a moment ago already counts.
+  const working = repo.EXPECTED_ON("e.employee_id", date, `${bind(hoursParam(day.hours))}::jsonb`);
   const yDate = `${bind(yesterday.date)}::date`;
   const narrowed = personFilters(bind, filters);
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
+  // A materialised CTE is a fence: each person's flags are worked out once, not again in every
+  // count and filter that reads the status (which also cost the query a JIT compile on every call).
   return `
-    SELECT f.*, ${STATUS} AS status,
-           CASE WHEN f.clock_in_at IS NOT NULL AND (f.field_day OR (f.work_pattern <> 'remote' AND NOT f.remote_day))
-                THEN f.clock_in_worksite END AS worksite
-      FROM (
+    WITH f AS MATERIALIZED (
         SELECT e.employee_id, e.first_name, e.last_name, e.job_title, e.department_id,
                d.name AS department, ${photoUrlSql("e")} AS photo_url, e.work_pattern, ${remoteDay("e.employee_id", date)} AS remote_day,
                ${fieldDay("e.employee_id", date)} AS field_day,
                ${working} AS working_day,
                ad.status AS day_status, ${grantedLeave("e.employee_id", date)} AS on_leave,
                ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
-               COALESCE(ad.late_minutes, 0) AS late_minutes,
+               COALESCE(ad.late_minutes, 0) AS late_minutes, COALESCE(ad.worked_minutes, 0) AS worked_minutes,
                COALESCE(w.name, CASE WHEN ci.validation #>> '{geofence,place}' IN ('field', 'temporary_site')
                                      THEN ci.validation #>> '{geofence,worksite_name}' END) AS clock_in_worksite,
                (yd.first_clock_in_at IS NOT NULL AND yd.last_clock_out_at IS NULL) AS no_clock_out_yesterday
@@ -303,7 +308,11 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
          WHERE ${onRegister(date)}
            AND ${narrowed}
            ${s.and}
-      ) f`;
+    )
+    SELECT f.*, ${STATUS} AS status,
+           CASE WHEN f.clock_in_at IS NOT NULL AND (f.field_day OR NOT f.remote_day)
+                THEN f.clock_in_worksite END AS worksite
+      FROM f`;
 }
 
 /**
@@ -324,11 +333,17 @@ function assertRange(from, to) {
     });
 }
 
-/** The day asked for (today in Lagos when none is) and the day before it, as the roster reads them. */
+/** The company hours as the SQL takes them: a jsonb array, or null for the working week. */
+const hoursParam = (hours) => (Array.isArray(hours) ? JSON.stringify(hours) : null);
+
+/**
+ * The day asked for (today in Lagos when none is), with the company hours in force then, and the
+ * day before it, as the roster reads them.
+ */
 async function dayAndYesterday(client, date) {
   const cal = await workingWeek.loadCalendar(client);
   const on = date || lagos.today();
-  return { day: dayOf(on, cal), yesterday: yesterdayOf(on, cal) };
+  return { day: { ...dayOf(on, cal), hours: await calendar.companyHoursOn(client, on) }, yesterday: yesterdayOf(on, cal) };
 }
 
 /* ------------------------------------------------------------------ *
@@ -339,8 +354,8 @@ async function dayAndYesterday(client, date) {
  * The counts for one day, within the reader's scope, as the register counts them
  * (repo.registerSummary), with `present` split by where people work.
  *
- *   expected  on a working day, everyone on the register but those on leave
- *             (present + absent + not_in); 0 on a day that is not worked
+ *   expected  everyone on the register whose own day is worked, but those on leave
+ *             (present + absent + not_in); 0 on a day that is not worked for anyone
  *   present   late + on_site + remote + field: a clock-in that counts, on any day
  *   flagged   the people late or with no clock-out yesterday, each once: at most
  *             late + no_clock_out_yesterday, less when someone carries both
@@ -365,7 +380,7 @@ async function summary(client, { date }, scope) {
             count(*) FILTER (WHERE r.status = 'not_in')::int AS not_in,
             count(*) FILTER (WHERE r.no_clock_out_yesterday)::int AS no_clock_out_yesterday,
             count(*) FILTER (WHERE ${FLAGGED})::int AS flagged,
-            ${repo.WORKING_DAY(`$${params.push(day.date)}::date`)} AS working_day
+            COALESCE(bool_or(r.working_day), false) AS working_day
        FROM (${roster}) r`,
     params,
   );
@@ -384,7 +399,7 @@ const yesNo = (value) => (typeof value === "boolean" ? value : null);
 
 /**
  * One page of the people on the register on a day, within the reader's scope, each with
- * their status, clock-in and clock-out, late minutes, the worksite of their clock-in (null
+ * their status, clock-in and clock-out, late and worked minutes, the worksite of their clock-in (null
  * when they work remotely or are not in), the yesterday flag and whether they are flagged.
  * Filtered, searched and sorted in SQL. The filters combine: `flagged` with `status` "late"
  * keeps the late, with `no_clock_out_yesterday` the open shifts.
@@ -410,7 +425,7 @@ async function page(client, filters, scope, query = {}) {
     client,
     `SELECT r.employee_id, r.first_name, r.last_name, r.job_title, r.department_id, r.department,
             r.photo_url, r.work_pattern, r.status, r.clock_in_at, r.clock_out_at, r.late_minutes,
-            r.worksite, r.no_clock_out_yesterday, ${FLAGGED} AS flagged, ${TOTAL_COL}
+            r.worked_minutes, r.worksite, r.no_clock_out_yesterday, ${FLAGGED} AS flagged, ${TOTAL_COL}
        FROM (${roster}) r
       WHERE (${wanted}::text IS NULL OR r.status = ${wanted}::text)
         AND (${noClockOut}::boolean IS NULL OR r.no_clock_out_yesterday = ${noClockOut}::boolean)
@@ -514,9 +529,12 @@ async function personal(client, { employee_id: employeeId, from, to, today = lag
 
   const dates = [];
   for (let d = from; d <= to; d = lagos.addDays(d, 1)) dates.push(d);
+  // The company hours in force on each date, keyed by the date: a new version can start mid-range.
+  const hours = await calendar.companyHoursBetween(client, from, to);
 
   const { rows } = await client.query(
-    `SELECT dy.on_date, ${repo.WORKING_DAY("dy.on_date")} AS working_day, e.work_pattern,
+    `SELECT dy.on_date, ${repo.EXPECTED_ON("e.employee_id", "dy.on_date", "($3::jsonb -> dy.on_date::text)")} AS working_day,
+            e.work_pattern,
             ${remoteDay("e.employee_id", "dy.on_date")} AS remote_day,
             ${fieldDay("e.employee_id", "dy.on_date")} AS field_day,
             ${onRegister("dy.on_date")} AS on_register,
@@ -528,7 +546,7 @@ async function personal(client, { employee_id: employeeId, from, to, today = lag
        LEFT JOIN attendance_day ad ON ad.employee_id = e.employee_id AND ad.attendance_date = dy.on_date
       WHERE e.employee_id = $1
       ORDER BY dy.on_date`,
-    [employeeId, dates],
+    [employeeId, dates, JSON.stringify(hours)],
   );
   if (rows.length === 0) throw new AppError("NOT_FOUND", "That employee does not exist", 404);
 

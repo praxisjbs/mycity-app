@@ -1,25 +1,33 @@
 "use strict";
 /**
  * What a day comes to, and the loop that settles it (docs/guides/attendance.md §6.4,
- * §6.8, §7): the day recalculated from its punches, People's decision on an exception,
- * the person's explanation, and the day-close.
+ * §6.8, §6.16, §6.17, §7): the day recalculated from its punches, People's decision on an
+ * exception, the person's explanation, and the day-close.
  *
  * The source punch is never edited (attendance_event is append-only). A decision is
  * written on the exception; a rejected punch stops counting because its exception says
  * so; a missing clock-out People supply is a new `admin` event, and so is the time they
- * give in place of an automatic clock-out, which then stops counting (its exception is
+ * give in place of a system clock-out, which then stops counting (its exception is
  * corrected). Every change recalculates the day in the same transaction and is audited
  * with before and after.
  *
- * An automatic clock-out (attendance.clock-watch.js) opens nothing by itself: the person
- * explains one they think wrong (explainAutomatic), and only then do People decide it.
+ * A day is judged once (§6.4): on its first clock-in, by the policy version that clock-in was
+ * judged by and the work schedule in force on the date; for a day with none, by the version and
+ * schedule in force on its date when the day-close closes it. Both, and the shift, are recorded
+ * on the day, and every later recalculation reads them back (policies.rulesOfVersion), never a
+ * newer version or schedule. A recalculation then settles what follows from the day, in the same
+ * transaction (settle): its pending deductions and overtime (attendance.pay.js) and the
+ * consequence rules it counts toward (attendance.rules-engine.js).
+ *
+ * A system clock-out (attendance.clock-watch.js) opens nothing by itself: the person gives the
+ * real time of one they think wrong (explainAutomatic), and only then do People decide it.
  *
  * The day-close (jobs/schedulers/attendance-day-close.js, 01:30 Lagos) closes every day
  * before today within 14 days that is still open: an open shift becomes one
- * missing_clock_out exception, an expected working day with no clock-in becomes absent,
- * granted leave becomes leave. It never invents a clock-out time. Run twice, or
- * stopped half way and run again, it closes nothing twice and opens no exception twice:
- * a closed day is skipped, and each exception has a unique key.
+ * missing_clock_out exception, an expected working day of the person's own schedule with no
+ * clock-in becomes absent, granted leave becomes leave. It never invents a clock-out time. Run
+ * twice, or stopped half way and run again, it closes nothing twice and opens no exception
+ * twice: a closed day is skipped, and each exception has a unique key.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -28,9 +36,12 @@ const { emit } = require("../../shared/events/emit");
 const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
+const policies = require("../policies/policies.service");
 const calendar = require("./attendance.calendar");
 const guard = require("./attendance.clock-guard");
 const lateness = require("./attendance.lateness");
+const pay = require("./attendance.pay");
+const rulesEngine = require("./attendance.rules-engine");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
 const { EVENTS } = require("./attendance.events");
@@ -53,29 +64,100 @@ const notFound = () => new AppError("NOT_FOUND", "That exception does not exist"
 const counted = (events) => events.filter((e) => !e.excluded);
 
 /**
- * Recalculate a person's day from its punches, in the caller's transaction (after the
- * person's lock). A day with nothing to say (no counted punch, not closed, no leave) gets
- * no row; one that has a row keeps it.
- * @returns {Promise<{day: object|null, events: object[], ctx: object, leave: object|null}>}
+ * What judges a day (§6.4): the version and shift recorded on it once judged; else, on its first
+ * clock-in or when the day-close closes it, the version that clock-in was judged by (or the one in
+ * force on the date) and the schedule in force on the date, to be recorded now (`record`); else,
+ * not yet judged, what is in force on the date.
+ * @returns {Promise<{rules: object, policy_version_id: string|null, shift: object, record: object|null}>}
  */
-async function recomputeDay(client, person, date, { close = false } = {}) {
+async function judgementOf(client, person, date, { existing, events, close, ctx }) {
+  if (existing && existing.judged_at) {
+    const v = await policies.rulesOfVersion(client, "attendance", existing.policy_version_id);
+    return { rules: v.rules, policy_version_id: existing.policy_version_id, shift: rules.recordedShift(existing, v.rules), record: null };
+  }
+  const clockIn = counted(events).find((e) => e.event_type === "clock_in") || null;
+  if (!clockIn && !close) return { rules: ctx.policy, policy_version_id: ctx.policy.policy_version_id, shift: ctx.shift, record: null };
+  const v = clockIn
+    ? await policies.rulesOfVersion(client, "attendance", clockIn.policy_version_id)
+    : await policies.rulesFor(client, "attendance", date);
+  const schedule = await repo.workScheduleOn(client, person.employee_id, date);
+  const shift = rules.shiftFor(date, await workingWeek.loadCalendar(client), v.rules, { schedule, pattern: person.work_pattern });
+  return {
+    rules: v.rules,
+    policy_version_id: v.policy_version_id,
+    shift,
+    record: {
+      policy_version_id: v.policy_version_id,
+      attendance_work_schedule_id: shift.attendance_work_schedule_id,
+      shift_working: shift.working_day,
+      shift_starts_at: shift.starts_at,
+      shift_ends_at: shift.ends_at,
+    },
+  };
+}
+
+/**
+ * Recalculate a person's day from its punches, in the caller's transaction (after the
+ * person's lock), and settle what follows from it (settle) unless `settle` is false: the caller
+ * then settles once it has opened the day's exceptions, which the rules count. A day with
+ * nothing to say (no counted punch, not closed, no leave) gets no row; one that has a row
+ * keeps it.
+ * @returns {Promise<{day: object|null, events: object[], ctx: object, leave: object|null, judged: object}>}
+ */
+async function recomputeDay(client, person, date, { close = false, settle: settleNow = true } = {}) {
   const ctx = await calendar.contextFor(client, person, date);
   const leave = await repo.grantedLeave(client, person.employee_id, date);
   const existing = await repo.getDay(client, person.employee_id, date);
   const events = await repo.eventsOn(client, person.employee_id, date);
+  const judged = await judgementOf(client, person, date, { existing, events, close, ctx });
   const projection = rules.projectDay({
     events: counted(events),
-    shift: ctx.shift,
+    shift: judged.shift,
     date,
     timeZone: ctx.timeZone,
     onLeave: Boolean(leave),
     closed: close || Boolean(existing && existing.closed_at),
+    expected: person.has_login !== false,
+    overtimeAfter: judged.rules.overtime.after_minutes,
     late: lateness.minutesLate,
+    early: lateness.minutesEarly,
     overtime: lateness.minutesOvertime,
   });
-  if (!existing && projection.status === null) return { day: null, events, ctx, leave };
-  const day = await repo.upsertDay(client, person.employee_id, date, projection, { closed: close });
-  return { day, events, ctx, leave };
+  if (!existing && projection.status === null) return { day: null, events, ctx, leave, judged };
+  const day = await repo.upsertDay(client, person.employee_id, date, projection, { closed: close, judged: judged.record });
+  const r = { day, events, ctx, leave, judged };
+  if (settleNow) await settle(client, person, r);
+  return r;
+}
+
+/**
+ * What judges a person's day as it stands, without writing it: the clock watch reads the shift and
+ * the reminder figures of an open shift's day from it (§6.14).
+ * @returns {Promise<{judged: object, timeZone: string, ctx: object}>}
+ */
+async function judgedOn(db, person, date) {
+  const ctx = await calendar.contextFor(db, person, date);
+  const existing = await repo.getDay(db, person.employee_id, date);
+  const events = await repo.eventsOn(db, person.employee_id, date);
+  const judged = await judgementOf(db, person, date, { existing, events, close: false, ctx });
+  return { judged, timeZone: ctx.timeZone, ctx };
+}
+
+/**
+ * What follows from a recalculated day, in its transaction: its pay items follow it under the
+ * version that judged it (§6.17), and the rules in force on the date count it (§6.16).
+ * @param {import("pg").PoolClient} client
+ * @param {object} person  repo.person()
+ * @param {{day: object|null, judged: object}} r  recomputeDay()'s answer
+ */
+async function settle(client, person, r) {
+  if (!r.day) return;
+  await pay.settleDay(client, person, r.day, {
+    rules: r.judged.rules,
+    shift: r.judged.shift,
+    policy_version_id: r.judged.policy_version_id,
+  });
+  await rulesEngine.countDay(client, person, String(r.day.attendance_date).slice(0, 10));
 }
 
 /* ------------------------------------------------------------------ *
@@ -114,20 +196,20 @@ function detailOf(type, evidence = {}) {
       return ev.clock_in_at
         ? `Clocked in ${rules.localTime(ev.clock_in_at, ev.timezone || rules.DEFAULT_TZ)}, no clock-out`
         : "No clock-out";
-    case "automatic_clock_out":
-      return ev.clock_out_at
-        ? `Clocked out automatically at ${rules.localTime(ev.clock_out_at, ev.timezone || rules.DEFAULT_TZ)}`
-        : "Clocked out automatically";
+    case "automatic_clock_out": {
+      const at = ev.clock_out_at ? `System Clock-Out at ${rules.localTime(ev.clock_out_at, ev.timezone || rules.DEFAULT_TZ)}` : "System Clock-Out";
+      return ev.real_time ? `${at}; real time ${ev.real_time}` : at;
+    }
     default:
       return type;
   }
 }
 
-/** A repo row as the contract's AttendanceException. */
+/** A repo row as the contract's AttendanceException: the real time a person gave is kept in its evidence. */
 function present(row) {
   if (!row) return row;
   const { evidence, employee_id: _e, ...out } = row;
-  return { ...out, detail: detailOf(row.exception_type, evidence) };
+  return { ...out, detail: detailOf(row.exception_type, evidence), real_time: (evidence && evidence.real_time) || null };
 }
 
 const presentPage = (page) => ({ ...page, data: page.data.map(present) });
@@ -138,7 +220,7 @@ const OUTCOME_TEXT = Object.freeze({
   rejected: "the punch does not count",
   corrected: "a clock-out was added",
 });
-/** The exception types a clock-out time decides: the missing one, or the real one in place of the automatic. */
+/** The exception types a clock-out time decides: the missing one, or the real one in place of the system's. */
 const TAKES_TIME = new Set(["missing_clock_out", "automatic_clock_out"]);
 /** What a decision on a check-in's flag means to the person: it clears, or it stands. */
 const CHECK_IN_TEXT = Object.freeze({ accepted: "the check-in's flag is cleared", rejected: "the check-in's flag stands" });
@@ -164,9 +246,9 @@ async function decide(actor, scope, id, body) {
   // A check-in's flag is rejected as a punch's is: it stays counted toward Location Flags (§6.8, PR 4).
   if (body.decision === "reject" && !x.attendance_event_id && !x.attendance_check_in_id)
     throw new AppError("DECISION_INVALID", "There is no punch to reject", 422, { decision: ["Not for this"] });
-  // Rejecting an automatic clock-out would leave the shift open: keep its time or correct it.
+  // Rejecting a system clock-out would leave the shift open: keep its time or correct it.
   if (body.decision === "reject" && x.exception_type === "automatic_clock_out")
-    throw new AppError("DECISION_INVALID", "Keep or correct an automatic clock-out", 422, { decision: ["Not for this"] });
+    throw new AppError("DECISION_INVALID", "Keep or correct a System Clock-Out", 422, { decision: ["Not for this"] });
 
   const outcome = OUTCOME[body.decision];
   await tx(async (client) => {
@@ -252,26 +334,41 @@ async function explain(user, id, body) {
 }
 
 /**
- * The person explains an automatic clock-out of their own: its exception opens with the note, for
- * People to keep or correct its time (§6.8, §6.14). Once per punch.
+ * Give Real Time: the person gives the real leaving time of a System Clock-Out of their own, with a
+ * note. Its exception opens with both, for People to keep the system's time or correct it from the
+ * one given (§6.8, §6.14). Once per punch; the time is after the clock-in and not in the future.
+ * @param {object} user
+ * @param {string} eventId  the system clock-out
+ * @param {{employee_note: string, real_time: string}} body  RealTimeGiven
  */
-async function explainAutomatic(user, eventId, body) {
+async function explainAutomatic(user, eventId, body, { now = new Date() } = {}) {
   const ev = await repo.eventFor(pool, eventId);
   if (!ev || ev.employee_id !== user.employee_id || !ev.attendance_day_id)
     throw new AppError("NOT_FOUND", "Not found", 404);
   if (ev.source !== "system" || ev.event_type !== "clock_out")
-    throw new AppError("NOT_AUTOMATIC", "Only an automatic clock-out is explained here", 422);
-  const already = () => new AppError("ALREADY_EXPLAINED", "You have already explained this clock-out", 409);
+    throw new AppError("NOT_AUTOMATIC", "Only a System Clock-Out takes a real time", 422);
+  const already = () => new AppError("ALREADY_EXPLAINED", "You have already given the real time", 409);
   const id = await tx(async (client) => {
     await repo.lockEmployee(client, ev.employee_id);
     if (await repo.hasException(client, eventId, "automatic_clock_out")) throw already();
     const person = await repo.person(client, ev.employee_id);
+    const zone = ev.timezone || rules.DEFAULT_TZ;
+    const clockIn = counted(await repo.eventsOn(client, ev.employee_id, ev.work_date)).find((e) => e.event_type === "clock_in");
+    const realAt = rules.zonedInstant(ev.work_date, body.real_time, zone);
+    if (!clockIn || realAt <= new Date(clockIn.occurred_at) || realAt > now)
+      throw new AppError("REAL_TIME_INVALID", "Give a time after your clock-in", 422, { real_time: ["After your clock-in"] });
     const x = await repo.insertException(client, {
       attendance_day_id: ev.attendance_day_id,
       attendance_event_id: eventId,
       exception_type: "automatic_clock_out",
       severity: "low",
-      evidence: { clock_out_at: ev.occurred_at, timezone: ev.timezone || rules.DEFAULT_TZ, event_type: "clock_out" },
+      evidence: {
+        clock_out_at: ev.occurred_at,
+        timezone: zone,
+        event_type: "clock_out",
+        real_time: body.real_time,
+        real_at: realAt.toISOString(),
+      },
     });
     if (!x) throw already();
     await repo.explainException(client, x.attendance_exception_id, body.employee_note);
@@ -279,7 +376,7 @@ async function explainAutomatic(user, eventId, body) {
       key: EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED,
       entity: { type: "attendance_exception", id: x.attendance_exception_id },
       actor: user,
-      after: { exception_type: "automatic_clock_out", employee_note: body.employee_note },
+      after: { exception_type: "automatic_clock_out", employee_note: body.employee_note, real_time: body.real_time },
       payload: {
         attendance_exception_id: x.attendance_exception_id,
         employee_id: ev.employee_id,
@@ -307,7 +404,9 @@ async function getFor(id, scope) {
 
 /**
  * Close one person's day, once. In its own transaction, after the person's lock, so a
- * late clock-out arriving at the same moment is either in the day or refused.
+ * late clock-out arriving at the same moment is either in the day or refused. The day is judged
+ * now if no clock-in judged it, and settled once its missing clock-out is open: it counts toward
+ * Forgotten Clock-Outs (§6.16).
  * @returns {Promise<null|{status: string|null, missing_clock_out: boolean}>}
  */
 async function closeDay(employeeId, date) {
@@ -317,7 +416,7 @@ async function closeDay(employeeId, date) {
     if (existing && existing.closed_at) return null;
     const person = await repo.person(client, employeeId);
     if (!person) return null;
-    const r = await recomputeDay(client, person, date, { close: true });
+    const r = await recomputeDay(client, person, date, { close: true, settle: false });
     if (!r.day) return null;
 
     const active = counted(r.events);
@@ -349,6 +448,7 @@ async function closeDay(employeeId, date) {
         });
       }
     }
+    await settle(client, person, r);
     await emit(client, {
       key: EVENTS.ATTENDANCE_DAY_CLOSED,
       entity: { type: "attendance_record", id: r.day.attendance_day_id },
@@ -362,8 +462,9 @@ async function closeDay(employeeId, date) {
 }
 
 /**
- * Close every open day before today (Lagos) within the lookback, and the working days
- * people did not come in, from the first day anyone punched. Idempotent.
+ * Close every open day before today (Lagos) within the lookback, and the days people did not come
+ * in on that were worked for them (their schedule, else the company hours in force that day; §6.13),
+ * from the first day anyone punched. Idempotent.
  * @param {{now?: Date}} [opts]
  */
 async function closeDays({ now = new Date() } = {}) {
@@ -382,10 +483,9 @@ async function closeDays({ now = new Date() } = {}) {
 
   const start = await repo.attendanceStart(pool);
   if (start) {
-    const cal = await workingWeek.loadCalendar(pool);
     for (let d = start > since ? start : since; d < today; d = lagos.addDays(d, 1)) {
-      if (!workingWeek.isWorkingDay(d, cal)) continue;
-      for (const e of await repo.withoutDay(pool, d)) count(await closeDay(e.employee_id, d));
+      const hours = await calendar.companyHoursOn(pool, d);
+      for (const e of await repo.withoutDay(pool, d, { hours })) count(await closeDay(e.employee_id, d));
     }
   }
   return { today, ...tally };
@@ -393,7 +493,10 @@ async function closeDays({ now = new Date() } = {}) {
 
 module.exports = {
   CLOSE_LOOKBACK_DAYS,
+  judgementOf,
+  judgedOn,
   recomputeDay,
+  settle,
   detailOf,
   present,
   presentPage,

@@ -39,6 +39,7 @@ const routeMap = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const roster = require("../attendance/attendance.roster");
+const schedules = require("../attendance/attendance.schedule");
 const leave = require("../leave/leave.service");
 const organisation = require("../organisation/organisation.service");
 const calendar = require("./sources/calendar.source");
@@ -251,29 +252,26 @@ async function pipeline(client, { today, scopes }) {
  * ------------------------------------------------------------------ */
 
 /**
- * The day strip: today's hours, and the reader's own row of today's roster (its status,
- * clock-in, clock-out and the worksite of the clock-in, none when they work remotely or are
- * not in). Hours Today is the record's span, first clock-in to last clock-out, as Attendance
- * counts worked minutes: none until they clock out.
+ * The day strip: today's hours by the reader's own work schedule (attendance.schedule.js dayOn,
+ * none on a day they do not work), and their own row of today's roster (its status, clock-in,
+ * clock-out and the worksite of the clock-in, none when they work remotely or are not in). Hours
+ * Today is the day's worked minutes as Attendance records them: a System Clock-Out counts only to
+ * the shift's end, and there are none until they clock out.
  */
 async function dayStrip(client, { user, today }) {
-  const cal = await workingWeek.loadCalendar(client);
-  const day = roster.dayOf(today, cal);
+  const shift = user.employee_id ? await schedules.dayOn(client, user.employee_id, today) : null;
   const own = { scope: "own", scope_ids: [user.employee_id] };
   const row =
     (await roster.page(client, { date: today }, own, { page: 1 })).data[0] ||
     null;
-  const inAt = row && row.clock_in_at ? new Date(row.clock_in_at) : null;
-  const outAt = row && row.clock_out_at ? new Date(row.clock_out_at) : null;
   return {
-    starts_at: day.starts_at,
-    ends_at: day.ends_at,
-    clock_in_at: iso(inAt),
-    clock_out_at: iso(outAt),
+    starts_at: shift ? shift.starts_at : null,
+    ends_at: shift ? shift.ends_at : null,
+    clock_in_at: iso(row && row.clock_in_at ? new Date(row.clock_in_at) : null),
+    clock_out_at: iso(row && row.clock_out_at ? new Date(row.clock_out_at) : null),
     status: row ? row.status : null,
     worksite: row ? row.worksite : null,
-    worked_minutes:
-      inAt && outAt && outAt > inAt ? Math.floor((outAt - inAt) / 60_000) : 0,
+    worked_minutes: row && row.clock_out_at ? Number(row.worked_minutes) || 0 : 0,
   };
 }
 
@@ -335,21 +333,36 @@ const byTime = (a, b) =>
   (a.at || "").localeCompare(b.at || "") || a.title.localeCompare(b.title);
 
 /**
- * This week's working days, Monday first (the days the working week works, a public holiday
- * among them named and given no hours), each with its hours, whether the reader's granted
- * leave covers it, and their own calendar events and the tasks due on it (the M2 sources;
- * only for a reader who may view My Workspace). Each day reads its own page of events and
- * of tasks, the days side by side, so a busy Monday never takes Friday's place: an event
- * shows on the day it starts, one that began before Monday on Monday.
+ * This week's working days of the reader's own schedule, Monday first (the days their work
+ * schedule, else the company hours, works: attendance.schedule.js dayOn; a public holiday among
+ * them named and given no hours), each with its hours, whether the reader's granted leave
+ * covers it, and their own calendar events and the tasks due on it (the M2 sources; only for a
+ * reader who may view My Workspace). Each day reads its own page of events and of tasks, the
+ * days side by side, so a busy Monday never takes Friday's place: an event shows on the day it
+ * starts, one that began before Monday on Monday.
  */
 async function week(client, { user, today, scopes }) {
   const cal = await workingWeek.loadCalendar(client);
   const monday = lagos.addDays(today, 1 - lagos.weekday(today));
   const sunday = lagos.addDays(monday, 6);
   const workspace = scopes.has("workspace");
+  // A public holiday stays in the week, named and given no hours, on a day the person's week works.
+  const noHolidays = { ...cal, holidays: new Set(), holidayNames: new Map() };
   const dates = [];
-  for (let d = monday; d <= sunday; d = lagos.addDays(d, 1))
-    if (cal.days.has(lagos.weekday(d))) dates.push(d);
+  const shifts = new Map();
+  for (let d = monday; d <= sunday; d = lagos.addDays(d, 1)) {
+    if (!user.employee_id) {
+      if (cal.days.has(lagos.weekday(d))) dates.push(d);
+      continue;
+    }
+    const shift = await schedules.dayOn(client, user.employee_id, d, { calendar: cal });
+    const works =
+      shift.working_day ||
+      (cal.holidays.has(d) && (await schedules.dayOn(client, user.employee_id, d, { calendar: noHolidays })).working_day);
+    if (!works) continue;
+    dates.push(d);
+    shifts.set(d, shift);
+  }
 
   /** One working day's events and tasks, at most a page of each. */
   async function itemsOn(d) {
@@ -403,7 +416,7 @@ async function week(client, { user, today, scopes }) {
     everyDay(),
   ]);
   return dates.map((d, i) => {
-    const hours = roster.dayOf(d, cal);
+    const hours = shifts.get(d) || roster.dayOf(d, cal);
     return {
       date: d,
       starts_at: hours.starts_at,
@@ -501,5 +514,6 @@ module.exports = {
   quarterOf,
   attendanceDays,
   guarded,
+  dayStrip,
   sectionsFor,
 };

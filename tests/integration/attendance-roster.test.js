@@ -65,7 +65,10 @@ describeDb("the attendance roster against the real migrations", () => {
   let headOffice;
   let staffNumber = 0;
 
-  /** An active employee in the Test department unless told otherwise. */
+  /**
+   * An active employee in the Test department unless told otherwise, with a login: someone with no
+   * active login is never expected to clock in (attendance.md §6.4), so `login: false` makes one.
+   */
   async function person(key, first, last, opts = {}) {
     staffNumber += 1;
     const row = await one(
@@ -86,6 +89,11 @@ describeDb("the attendance roster against the real migrations", () => {
       ],
     );
     people[key] = row.employee_id;
+    if (opts.login !== false)
+      await q("INSERT INTO app_user (employee_id, email, password_hash) VALUES ($1, $2, 'not-a-hash')", [
+        row.employee_id,
+        `${first}.${last}.${staffNumber}@login.roster.mycity.test`.toLowerCase(),
+      ]);
     return row.employee_id;
   }
 
@@ -154,10 +162,10 @@ describeDb("the attendance roster against the real migrations", () => {
   }
 
   /** Every row of the attendance register for a day, page by page. */
-  async function register(date, scope = ALL) {
+  async function register(date, scope = ALL, client = pool) {
     const rows = [];
     for (let n = 1; ; n += 1) {
-      const result = await repo.register(pool, date, { page: n }, scope);
+      const result = await repo.register(client, date, { page: n }, scope);
       rows.push(...result.data);
       if (!result.page.has_next) return rows;
     }
@@ -352,16 +360,20 @@ describeDb("the attendance roster against the real migrations", () => {
       expect(rows["Zainab Musa"]).toMatchObject({ status: "on_site", late_minutes: 0 });
     });
 
-    test("a version from Friday with five minutes of grace: 09:03 is on time, 09:07 late by the two past it", async () => {
+    test("late from the start (T2); a version from Friday published after its clock-ins never re-judges the day", async () => {
+      const before = byName(await everyone(FRIDAY));
+      expect(before["Tunde Bakare"]).toMatchObject({ status: "late", late_minutes: 3 }); // 09:03, no grace
+      expect(before["Ifeanyi Okafor"]).toMatchObject({ status: "late", late_minutes: 7 }); // 09:07
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         await attendanceVersion(client, { grace_minutes: 5 }, FRIDAY);
         await recompute("tunde", FRIDAY, client);
         await recompute("ifeanyi", FRIDAY, client);
+        // A day is judged once, by the version its first clock-in was judged by (§6.4).
         const rows = byName(await everyone(FRIDAY, ALL, {}, client));
-        expect(rows["Tunde Bakare"]).toMatchObject({ status: "on_site", late_minutes: 0 });
-        expect(rows["Ifeanyi Okafor"]).toMatchObject({ status: "late", late_minutes: 2 });
+        expect(rows["Tunde Bakare"]).toMatchObject({ status: "late", late_minutes: 3 });
+        expect(rows["Ifeanyi Okafor"]).toMatchObject({ status: "late", late_minutes: 7 });
       } finally {
         await client.query("ROLLBACK");
         client.release();
@@ -475,8 +487,8 @@ describeDb("the attendance roster against the real migrations", () => {
       const rows = byName(await everyone(SATURDAY));
       expect(rows["Kemi Adeyemi"]).toMatchObject({ status: "late", late_minutes: 2 });
 
-      // Settings move Saturday's start to 10:00. The record stands until the attendance module
-      // recalculates the day; then the same 09:02 is on time, on the roster as on the register.
+      // Settings move Saturday's start to 10:00. The day was judged on its first clock-in against
+      // the shift it recorded, so a recalculation keeps the 09:02 late (§6.4).
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -486,7 +498,7 @@ describeDb("the attendance roster against the real migrations", () => {
         expect(before.data[0]).toMatchObject({ status: "late", late_minutes: 2 });
         await recompute("kemi", SATURDAY, client);
         const after = await roster.page(client, { date: SATURDAY, q: "Adeyemi" }, ALL, {});
-        expect(after.data[0]).toMatchObject({ status: "on_site", late_minutes: 0 });
+        expect(after.data[0]).toMatchObject({ status: "late", late_minutes: 2 });
       } finally {
         await client.query("ROLLBACK");
         client.release();
@@ -548,6 +560,76 @@ describeDb("the attendance roster against the real migrations", () => {
       } finally {
         await q("DELETE FROM public_holiday WHERE holiday_date = $1", [WEDNESDAY]);
         workingWeek.invalidateCalendar();
+      }
+    });
+  });
+
+  describe("each person's own day (§6.13)", () => {
+    const day = (working, place = "office", starts_at = null, ends_at = null) => ({
+      working,
+      starts_at: working ? starts_at : null,
+      ends_at: working ? ends_at : null,
+      place: working ? place : null,
+    });
+    /** A work schedule from September, Monday first. */
+    const schedule = (client, key, days) =>
+      client.query(
+        `INSERT INTO attendance_work_schedule (employee_id, days, effective_from, reason)
+         VALUES ($1, $2::jsonb, '2026-09-01', 'Set by a test for its week')`,
+        [people[key], JSON.stringify(days.map((d, i) => ({ weekday: i + 1, ...d })))],
+      );
+
+    test("a part-timer's Off day, a Remote day and someone with no login: the roster, the register and their days agree", async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Hassan works Monday to Thursday only: his Friday is Off.
+        await schedule(client, "hassan", [day(true), day(true), day(true), day(true), day(false), day(false), day(false)]);
+        // Emeka works from home on Fridays: his Friday clock-in is a remote day.
+        await schedule(client, "emeka", [day(true), day(true), day(true), day(true), day(true, "remote"), day(true), day(false)]);
+        // Lara's login is suspended: nobody expects her to clock in.
+        await client.query("UPDATE app_user SET status = 'suspended' WHERE employee_id = $1", [people.lara]);
+
+        const before = await roster.summary(pool, { date: FRIDAY }, ALL);
+        const rows = byName(await everyone(FRIDAY, ALL, {}, client));
+        expect(rows["Hassan Bello"].status).toBeNull();
+        expect(rows["Emeka Nnamdi"]).toMatchObject({ status: "remote", worksite: null });
+        expect(rows["Lara Obi"].status).toBeNull();
+        const s = await roster.summary(client, { date: FRIDAY }, ALL);
+        expect(s.expected).toBe(before.expected - 2);
+        expect(s.not_in).toBe(before.not_in - 2);
+        expect(s.remote).toBe(before.remote + 1);
+        expect(s.on_site).toBe(before.on_site - 1);
+
+        const theirs = Object.fromEntries((await register(FRIDAY, ALL, client)).map((r) => [r.employee.display_name, r]));
+        expect([theirs["Hassan Bello"].status, theirs["Lara Obi"].status, theirs["Emeka Nnamdi"].status]).toEqual(["off", "off", "present"]);
+        const summary = await repo.registerSummary(client, FRIDAY, ALL);
+        expect({ expected: s.expected, not_in: s.not_in }).toEqual({ expected: summary.expected, not_in: summary.not_in });
+
+        const hassan = await roster.personal(client, { employee_id: people.hassan, from: MONDAY_BEFORE, to: MONDAY, today: MONDAY });
+        expect(hassan.days.find((d) => d.date === FRIDAY)).toMatchObject({ working_day: false, status: null });
+        expect(hassan.days.find((d) => d.date === MONDAY)).toMatchObject({ working_day: true });
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
+      }
+    });
+
+    test("the company hours of a version, as a parameter: a Saturday the version does not work is nobody's", async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const hours = [1, 2, 3, 4, 5, 6, 7].map((weekday) =>
+          weekday <= 5 ? { weekday, working: true, starts_at: "09:00", ends_at: "17:00" } : { weekday, working: false, starts_at: null, ends_at: null },
+        );
+        await attendanceVersion(client, { grace_minutes: 0, hours }, SATURDAY);
+        const s = await roster.summary(client, { date: SATURDAY }, ALL);
+        expect(s).toMatchObject({ working_day: false, expected: 0, not_in: 0 });
+        const theirs = await repo.registerSummary(client, SATURDAY, ALL, { hours });
+        expect(theirs.expected).toBe(0);
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
       }
     });
   });
