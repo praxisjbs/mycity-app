@@ -837,7 +837,7 @@ screen.
 ## 14 · Change log
 
 - 21/10/2026 · TB · From the 21/10 System Health brief. Documents & Numbering (#76, fault #3): a scheme's three rules are the contract's, so the form marks them as it is filled, and Each Year or Each Month ticks Period (§10, §11; "Add digits or a period" is now "Add digits or period", four words). Request Leave, shared by My Leave and People · Leave (faults #1 and #2): the types show what is left of the First Day's year and New Year is marked as typed (`ess.md` §6, §10). The API records a refused form under the rule that refused it, at the route as declared (`system-health.md` §6).
-
+- 21/10/2026 · AJ · Settings · Documents & Numbering names the Project and Task schemes (M2 My Workspace; `settings.service.js`, `schemas/settings.js`).
 - 21/10/2026 · TB · §6.14 and Settings · Integrations (`docs/guides/integrations.md` §1.3, §6.15, §6.16): system mail can be paused on the System Sender (only invitations, password resets and the test email go out; notices are pushed instead), and an address the mail server refuses for good is not retried but listed as Refused Addresses. The screen's change is on the Integrations tab only.
 
 - 21/10/2026 · TB · §10, §13: the employee record's Attendance tab becomes Work Schedule, after Job (attendance's PR 3, `attendance.md` §6.13): Work Setup and the person's week, each weekday Working or Off with its hours and place, and Set Schedule for anyone (`people` edit, never their own).

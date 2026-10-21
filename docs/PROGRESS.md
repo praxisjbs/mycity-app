@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 32 items below: 31 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 10 | 0 | 0 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 6 | 0 | 4 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 1 | 0 | 11 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
-| **Total** | **99** | **53** | **0** | **46** | **0** | **0** |
+| **Total** | **99** | **49** | **0** | **50** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -739,13 +739,18 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | Today | `today` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 5 | Tasks | `tasks` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 6 | Calendar | `calendar` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 7 | Analytics | `analytics` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 21/10/2026 · AJ · My Workspace (#4 to #7), the CI run after the second merge with `main` (7 failures in 4 suites, all from Workspace meeting `main`'s tests): Settings · Documents & Numbering lists 23 schemes, 3 resetting (Project and Task added; `settings.test.js`); `task-recurrence` is on the worker's scheduler list (`worker.test.js`); New Event no longer answers "invite", which is Invite User's (`search.test.js`); the Workspace seed takes the run's date as Home's does, sets Operations and the head's first report an overdue task and puts this week's meetings on its Monday, so Home's seed tests read them on their fixed day (`home-staging-seed.test.js`). Settings and search pass here on PGlite; worker and Home's seed suites take longer than this harness allows, checked by what they read; CI decides.
+- 21/10/2026 · AJ · My Workspace (#4 to #7) after the merge with `main`: a task due on a day off failed to save (the working week now keeps no hours for a day off, and `shared/time/working-week.js` loadCalendar hands that back as the text "null"; GE to look at the loader), so a day with no closing time now closes at 17:00 (`tasks.recurrence.js`, with a unit test). An event's Location is marked `address:none` for gate 22 (a room or call link, not an address). Checks, backend and frontend groups pass (typecheck, lint, 359 app tests, build, no mock); the workspace, home-schema and home-team integration suites pass on PGlite, bar the known Postgres 17 error code in home-schema; the staging seed lands and re-runs clean. Not run here: Home's overview and staging-seed suites and the browser screen gates (CI).
+- 21/10/2026 · AJ · My Workspace (#4 to #7) after Performance left M2's PR: the task form's Counts Towards field is gone until a KPIs API exists; the staging seed is `seeds/staging/40_workspace.js` (tasks by the CEO, the head and the line manager for their people and people's own, this week's meetings, through the services), which runs before Home's and takes Home's forward rows out of `task` and `calendar_event`; Home keeps its forward goals, targets and review cycle. Merged with `main` (21/10/2026).
+- 21/10/2026 · AJ · My Workspace (#4 to #7): AJ stays owner; TB (the lead) takes what is left on these four: the click-through on the live API and the final checks. The code ships in the one M2 PR from `m2/perf-goals` after `main` is pulled.
+- 19/10/2026 · AJ · My Workspace on the real API (#4 to #7; `docs/guides/workspace.md`). Tasks: a manager sets a task for anyone in their workspace scope and the employee adds their own beside it (A24), Cadence Daily or Weekly due at the end of that working day or week (Saturday 15:00), numbers from `numbering` (`TSK-0001`), the board moves by drag and Move To (`POST /tasks/:id/move`, fractional order within a column), Mark Blocked, Cancel Task with a reason (the setter only; Show Cancelled lists them), comments and history on the panel, repeats made by the morning `task-recurrence` sweep with due-today and due-tomorrow reminders. Calendar: events with attendees, visibility and Accept or Decline, the reader's task deadlines and approved leave on the month. Today and Analytics (completion rate, overdue, average completion time, done per week, workload by person, by priority) over the same scope. Migration 2010, seed 2090, contracts `tasks`, `calendar`, `workspace`; screens on `contract.gen.ts`, INTERIM `api/types/workspace.ts` deleted, mock in the contract's shapes; ⌘K New Task and New Event; Home's task and calendar adapters count cancelled and invitations. 10 integration tests on the real migrations; screen gates green. Left: Counts Towards on the task form waits for the KPIs API (#31); the staging seed (with Home's forward rows taken away); a click-through on the live API.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/workspace/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/workspace.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Employee Self-Service
@@ -754,7 +759,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 10 | My Performance | `my-performance` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
@@ -980,14 +985,15 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 29 | Goals | `goals` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 30 | Targets | `targets` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 31 | KPIs | `kpis` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 32 | Reviews | `reviews` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 33 | Analytics | `analytics` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
+| 29 | Goals | `goals` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 30 | Targets | `targets` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 31 | KPIs | `kpis` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 32 | Reviews | `reviews` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 33 | Analytics | `analytics` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 21/10/2026 · AJ · Performance (#29 to #33, #10) left out of M2's PR, as the lead asked (21/10/2026): it is new, the donors do not have it, and TB builds it from MyCity's sheets on the Google Drive. The API, migrations 2020 and 2030, seed 2091, contracts and screens built on 19 and 20/10 are removed from the branch (they stay in its history, commit d820732); the screens are back on the mock. Rows back to Not started, owner TB.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/performance/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/performance.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Queries & Sanctions

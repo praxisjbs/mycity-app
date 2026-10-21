@@ -12,10 +12,11 @@
  *
  *   attendance     today and the 14 working days before it, through the attendance module's
  *                  own day writer and day-close (lib/attendance.js)
- *   forward rows   tasks, the calendar, goals and targets, a review cycle, partners and their
- *                  pipeline, expenses and budgets, and vacancies for the open seats, by SQL with
- *                  fixed ids listed in HOME_STAGING_ROWS (lib/home-staging-rows.js), which says
- *                  how each owning milestone takes them away when its own seed lands
+ *   forward rows   goals and targets, a review cycle, partners and their pipeline, expenses
+ *                  and budgets, and vacancies for the open seats, by SQL with fixed ids
+ *                  listed in HOME_STAGING_ROWS (lib/home-staging-rows.js), which says
+ *                  how each owning milestone takes them away when its own seed lands (M2's
+ *                  tasks and calendar come from 40_workspace.js)
  *   alert rules    two rules through the alerts service, made by this seed (the audit says so).
  *                  Attendance's alerts are the Attendance policy's breaches, raised by the
  *                  attendance module as they happen, so no attendance rule is made here

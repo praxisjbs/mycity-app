@@ -139,30 +139,7 @@ const BUDGETS = [
   },
 ];
 
-/** Tasks (M2): `due` days from today at 17:00, or `week` for this week's last working day. */
-const TASKS = [
-  { key: "review-shortlist", title: "Review the partnerships shortlist", who: "operations", by: "ceo", due: -2, priority: "normal" },
-  { key: "payroll-preview", title: "Sign off the payroll preview", who: "operations", by: "ceo", week: true, priority: "high" },
-  { key: "close-out-targets", title: "Close out departmental targets", who: "management:1", by: "ceo", due: -1, priority: "normal" },
-  { key: "q4-social-calendar", title: "Prepare the social calendar", who: "head_team:1", by: "head", due: -3, priority: "normal" },
-  { key: "partner-pitch-deck", title: "Design the partner pitch deck", who: "head_team:1", by: "head", week: true, priority: "normal" },
-  { key: "partner-contact-log", title: "Update the partner contact log", who: "head_team:2", by: "head", week: true, priority: "normal" },
-  { key: "chase-eko-proposal", title: "Chase the Eko Hotels proposal", who: "head_team:3", by: "head", due: -5, priority: "high" },
-  { key: "enugu-listings", title: "Update listings for the Enugu launch", who: "manager_team:1", by: "manager", due: -1, priority: "normal" },
-  { key: "android-clock-in", title: "Fix clock-in retry on Android", who: "management:2", by: "ceo", week: true, priority: "urgent", status: "in_progress" },
-];
-
-/** This week's calendar (M2): `day` 1 is Monday. */
-const EVENTS = [
-  { key: "management-meeting:ceo", title: "Management Meeting", who: "ceo", day: 1, from: "10:00", to: "11:00" },
-  { key: "management-meeting:operations", title: "Management Meeting", who: "operations", day: 1, from: "10:00", to: "11:00" },
-  { key: "management-meeting:management-1", title: "Management Meeting", who: "management:1", day: 1, from: "10:00", to: "11:00" },
-  { key: "management-meeting:management-2", title: "Management Meeting", who: "management:2", day: 1, from: "10:00", to: "11:00" },
-  { key: "partnerships-standup", title: "Partnerships Standup", who: "head", day: 1, from: "09:30", to: "10:00" },
-  { key: "mtn-venue-walkthrough", title: "MTN Venue Walkthrough", who: "head", day: 3, from: "11:00", to: "12:00" },
-  { key: "team-check-in", title: "Team Check-In", who: "head_team:1", day: 2, from: "14:00", to: "14:30" },
-  { key: "listings-review", title: "Listings Review", who: "manager", day: 4, from: "11:00", to: "12:00" },
-];
+/* Tasks and the calendar are M2's own staging seed now (40_workspace.js). */
 
 /** The organisation's goals this year (M2). */
 const GOALS = [
@@ -286,39 +263,6 @@ const ROWS = Object.freeze([
       status: "active",
       due_on: x.inQuarter(x.daysFrom(t.due)),
     }),
-  })),
-  ...TASKS.map((t) => ({
-    table: "task",
-    key: t.key,
-    needs: [t.who, t.by],
-    values: (x, [person, by]) =>
-      by.user_id
-        ? {
-            title: t.title,
-            status: t.status || "todo",
-            priority: t.priority,
-            created_by: by.user_id,
-            primary_assignee_id: person.employee_id,
-            due_at: t.week ? x.dueThisWeek : x.at(x.daysFrom(t.due), "17:00"),
-          }
-        : null,
-  })),
-  ...EVENTS.map((e) => ({
-    table: "calendar_event",
-    key: e.key,
-    needs: [e.who],
-    values: (x, [person]) =>
-      person.user_id
-        ? {
-            title: e.title,
-            event_type: "meeting",
-            owner_employee_id: person.employee_id,
-            starts_at: x.at(x.weekDay(e.day), e.from),
-            ends_at: x.at(x.weekDay(e.day), e.to),
-            all_day: false,
-            created_by: person.user_id,
-          }
-        : null,
   })),
   ...BUDGETS.flatMap((b, i) => [
     {

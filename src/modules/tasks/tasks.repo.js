@@ -1,0 +1,420 @@
+"use strict";
+/**
+ * Tasks: the SQL. Reads tasks with the people and the KPI they name, and writes only
+ * the tasks module's own rows (task, task_assignee, task_comment, task_activity).
+ * Never emits (BACKEND_GUIDE §2).
+ *
+ * Whose a task is. Its primary assignee owns it for scope: a manager with `team`
+ * scope sees the tasks of everyone under them (scopeClause on primary_assignee_id).
+ * Under `mine` a person sees what they are assigned, what they set for someone else,
+ * and what they share as a co-assignee (docs/guides/workspace.md §6).
+ *
+ * Open means not done, not cancelled and not archived.
+ */
+const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { scopeClause } = require("../../shared/rbac/scope");
+const { personJson } = require("../../shared/db/person");
+
+/** Every task with what the board and the panel show. */
+const ROWS = `
+  SELECT t.task_id, t.number::text AS number, t.title, t.description, t.status, t.priority,
+         t.cadence, t.due_at, t.started_at, t.completed_at, t.cancelled_at, t.cancel_reason,
+         t.blocked_reason, t.blocked_at, t.employee_target_id, t.entity_type, t.entity_id,
+         t.recurrence, t.sort_order, t.created_at, t.updated_at, t.archived_at,
+         t.primary_assignee_id, t.set_by_employee_id, t.created_by,
+         ${personJson("ae", "ad")} AS assignee,
+         ${personJson("se", "sd")} AS set_by,
+         et.title AS target_title,
+         (SELECT count(*)::int FROM task_comment c
+           WHERE c.task_id = t.task_id AND c.deleted_at IS NULL) AS comment_count,
+         search_fold(t.title || ' ' || COALESCE(t.number::text, '') || ' ' ||
+                     COALESCE(ae.first_name || ' ' || ae.last_name, '')) AS haystack
+    FROM task t
+    LEFT JOIN employee ae ON ae.employee_id = t.primary_assignee_id
+    LEFT JOIN department ad ON ad.department_id = ae.department_id
+    LEFT JOIN employee se ON se.employee_id = t.set_by_employee_id
+    LEFT JOIN department sd ON sd.department_id = se.department_id
+    LEFT JOIN employee_target et ON et.employee_target_id = t.employee_target_id`;
+
+const OPEN = `v.status NOT IN ('done', 'cancelled') AND v.archived_at IS NULL`;
+
+/** The keys the service turns into Task, and nothing the filters only needed. */
+const OUT = `v.task_id, v.number, v.title, v.description, v.status, v.priority, v.cadence,
+  v.due_at, v.started_at, v.completed_at, v.cancelled_at, v.cancel_reason, v.blocked_reason,
+  v.blocked_at, v.employee_target_id, v.entity_type, v.entity_id, v.recurrence, v.sort_order,
+  v.created_at, v.updated_at, v.primary_assignee_id, v.set_by_employee_id, v.created_by,
+  v.assignee, v.set_by, v.target_title, v.comment_count`;
+
+/** The SQL for each field TaskListQuery allow-lists. The first is the default order. */
+const SORTS = {
+  sort_order: "v.sort_order",
+  due_at: "v.due_at",
+  priority: `CASE v.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END`,
+  created_at: "v.created_at",
+};
+
+/**
+ * Who may see a row: under `mine` the caller's own, set or shared tasks; under `team`
+ * the reader's workspace scope on the assignee, plus their own set and shared ones.
+ * @returns {string} an AND clause
+ */
+function audience(listScope, scope, params) {
+  params.push(scope.employee_id || null);
+  const me = `$${params.length}::uuid`;
+  const mine = `(v.primary_assignee_id = ${me} OR v.set_by_employee_id = ${me}
+     OR EXISTS (SELECT 1 FROM task_assignee ta WHERE ta.task_id = v.task_id AND ta.employee_id = ${me}))`;
+  if (listScope !== "team") return `AND ${mine}`;
+  const s = scopeClause(scope, { column: "v.primary_assignee_id" }, params);
+  if (!s.and) return "";
+  return `AND (${s.and.slice(4)} OR ${mine})`;
+}
+
+/**
+ * One page of tasks.
+ * @param {{query: Function}} db
+ * @param {object} query   TaskListQuery
+ * @param {{scope: string, scope_ids: string[]|null, employee_id: string}} scope
+ * @param {{now: Date, today: {from: Date, to: Date}, week: {from: Date, to: Date}}} at
+ */
+function list(db, query, scope, at) {
+  const params = [
+    query.status || null,
+    query.assignee_id || null,
+    query.cadence || null,
+    query.priority || null,
+    query.employee_target_id || null,
+    query.q || null,
+    query.due || null,
+    at.now,
+    at.today.from,
+    at.today.to,
+    at.week.from,
+    at.week.to,
+  ];
+  const who = audience(query.scope, scope, params);
+  return pageQuery(
+    db,
+    `SELECT ${OUT}, ${TOTAL_COL}
+       FROM (${ROWS}) v
+      WHERE v.archived_at IS NULL
+        AND (($1::text IS NULL AND v.status <> 'cancelled') OR v.status = $1)
+        AND ($2::uuid IS NULL OR v.primary_assignee_id = $2)
+        AND ($3::text IS NULL OR v.cadence = $3)
+        AND ($4::text IS NULL OR v.priority = $4)
+        AND ($5::uuid IS NULL OR v.employee_target_id = $5)
+        AND ($6::text IS NULL OR v.haystack LIKE '%' || search_fold($6) || '%')
+        AND ($7::text IS NULL
+             OR ($7 = 'overdue' AND ${OPEN} AND v.due_at < $8)
+             OR ($7 = 'today' AND v.due_at >= $9 AND v.due_at < $10)
+             OR ($7 = 'week' AND v.due_at >= $11 AND v.due_at < $12))
+        ${who}
+      ORDER BY ${orderBy(query, SORTS, "v.task_id")}`,
+    params,
+    query,
+  );
+}
+
+/** The four figures above the board, for `mine` or `team`. */
+async function summary(db, listScope, scope, at) {
+  const params = [at.now, at.week.from, at.week.to];
+  const who = audience(listScope, scope, params);
+  const { rows } = await db.query(
+    `SELECT count(*) FILTER (WHERE ${OPEN})::int AS open,
+            count(*) FILTER (WHERE ${OPEN} AND v.due_at >= $2 AND v.due_at < $3)::int AS due_this_week,
+            count(*) FILTER (WHERE ${OPEN} AND v.due_at < $1)::int AS overdue,
+            count(*) FILTER (WHERE v.status = 'done' AND v.completed_at >= $2 AND v.completed_at < $3)::int AS done_this_week
+       FROM (${ROWS}) v
+      WHERE v.archived_at IS NULL ${who}`,
+    params,
+  );
+  return rows[0];
+}
+
+/** One task, or null. */
+async function get(db, id) {
+  const { rows } = await db.query(`SELECT ${OUT} FROM (${ROWS}) v WHERE v.task_id = $1`, [id]);
+  return rows[0] || null;
+}
+
+/** Is the employee a co-assignee of the task? */
+async function sharedWith(db, taskId, employeeId) {
+  if (!employeeId) return false;
+  const { rows } = await db.query(
+    "SELECT 1 FROM task_assignee WHERE task_id = $1 AND employee_id = $2",
+    [taskId, employeeId],
+  );
+  return rows.length > 0;
+}
+
+/** Lock a task's row for a change. */
+async function lock(client, id) {
+  const { rows } = await client.query(
+    "SELECT task_id, status, sort_order FROM task WHERE task_id = $1 FOR UPDATE",
+    [id],
+  );
+  return rows[0] || null;
+}
+
+const WRITABLE = [
+  "number",
+  "title",
+  "description",
+  "status",
+  "priority",
+  "cadence",
+  "created_by",
+  "set_by_employee_id",
+  "primary_assignee_id",
+  "due_at",
+  "started_at",
+  "completed_at",
+  "cancelled_at",
+  "cancel_reason",
+  "blocked_reason",
+  "blocked_at",
+  "employee_target_id",
+  "entity_type",
+  "entity_id",
+  "recurrence",
+  "sort_order",
+];
+
+/** Insert a task; returns its id. */
+async function insert(client, row) {
+  const keys = WRITABLE.filter((k) => row[k] !== undefined);
+  const vals = keys.map((k) => (k === "recurrence" && row[k] ? JSON.stringify(row[k]) : row[k]));
+  const { rows } = await client.query(
+    `INSERT INTO task (${keys.join(", ")}) VALUES (${keys.map((_, i) => `$${i + 1}`).join(", ")})
+     RETURNING task_id`,
+    vals,
+  );
+  return rows[0].task_id;
+}
+
+/** Change the given columns of a task. */
+async function update(client, id, changes) {
+  const keys = WRITABLE.filter((k) => changes[k] !== undefined);
+  if (!keys.length) return;
+  const vals = keys.map((k) =>
+    k === "recurrence" && changes[k] ? JSON.stringify(changes[k]) : changes[k],
+  );
+  await client.query(
+    `UPDATE task SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(", ")} WHERE task_id = $1`,
+    [id, ...vals],
+  );
+}
+
+/**
+ * The sort_order a card takes in a column: between the card it goes above and the one
+ * before that, or after the last card when it goes to the foot. Null `between` means
+ * the gap is too small and the column needs renumbering first.
+ */
+async function slotIn(client, { assigneeId, status, beforeId, movingId }) {
+  if (beforeId) {
+    const { rows } = await client.query(
+      `SELECT b.sort_order AS before_order, b.status AS before_status,
+              (SELECT max(p.sort_order) FROM task p
+                WHERE p.primary_assignee_id IS NOT DISTINCT FROM b.primary_assignee_id
+                  AND p.status = b.status AND p.archived_at IS NULL
+                  AND p.task_id <> $2
+                  AND (p.sort_order, p.task_id) < (b.sort_order, b.task_id)) AS prev_order
+         FROM task b WHERE b.task_id = $1`,
+      [beforeId, movingId],
+    );
+    if (!rows[0] || rows[0].before_status !== status) return null;
+    const before = Number(rows[0].before_order);
+    const prev = rows[0].prev_order === null ? before - 1 : Number(rows[0].prev_order);
+    if (before - prev < 0.000002) return { between: null };
+    return { between: Math.round(((prev + before) / 2) * 1e6) / 1e6 };
+  }
+  const { rows } = await client.query(
+    `SELECT COALESCE(max(sort_order), 0) + 1 AS next FROM task
+      WHERE primary_assignee_id IS NOT DISTINCT FROM $1 AND status = $2 AND archived_at IS NULL
+        AND task_id <> $3`,
+    [assigneeId, status, movingId],
+  );
+  return { between: Number(rows[0].next) };
+}
+
+/** Renumber one person's column 1, 2, 3 … in its current order, when its gaps run out. */
+async function renumber(client, assigneeId, status) {
+  await client.query(
+    `UPDATE task t SET sort_order = r.n
+       FROM (SELECT task_id, row_number() OVER (ORDER BY sort_order, task_id) AS n
+               FROM task WHERE primary_assignee_id IS NOT DISTINCT FROM $1 AND status = $2
+                 AND archived_at IS NULL) r
+      WHERE t.task_id = r.task_id`,
+    [assigneeId, status],
+  );
+}
+
+/** The foot of a person's column, for a new task. */
+async function nextOrder(client, assigneeId, status) {
+  const { rows } = await client.query(
+    `SELECT COALESCE(max(sort_order), 0) + 1 AS next FROM task
+      WHERE primary_assignee_id IS NOT DISTINCT FROM $1 AND status = $2 AND archived_at IS NULL`,
+    [assigneeId, status],
+  );
+  return Number(rows[0].next);
+}
+
+/* ------------------------------------------------------------------ *
+ * History and comments
+ * ------------------------------------------------------------------ */
+
+async function addActivity(client, a) {
+  await client.query(
+    `INSERT INTO task_activity (task_id, actor_user_id, kind, from_status, to_status, detail)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [a.task_id, a.actor_user_id || null, a.kind, a.from_status || null, a.to_status || null, a.detail || null],
+  );
+}
+
+const ACTIVITY = `
+  SELECT a.task_activity_id, a.task_id, t.title AS task_title,
+         ${personJson("e", "d")} AS actor,
+         a.kind, a.from_status, a.to_status, a.detail, a.created_at
+    FROM task_activity a
+    JOIN task t ON t.task_id = a.task_id
+    LEFT JOIN app_user u ON u.user_id = a.actor_user_id
+    LEFT JOIN employee e ON e.employee_id = u.employee_id
+    LEFT JOIN department d ON d.department_id = e.department_id`;
+
+/** One page of a task's history, oldest first by default. */
+function activity(db, taskId, query) {
+  return pageQuery(
+    db,
+    `SELECT v.*, ${TOTAL_COL} FROM (${ACTIVITY} WHERE a.task_id = $1) v
+      ORDER BY ${orderBy(query, { created_at: "v.created_at" }, "v.task_activity_id")}`,
+    [taskId],
+    query,
+  );
+}
+
+/**
+ * Since You Were Away: what other people did to the reader's tasks after `since`, newest
+ * first, at most one page.
+ */
+function activitySince(db, employeeId, userId, since) {
+  return pageQuery(
+    db,
+    `SELECT v.task_id, v.task_title, v.actor, v.kind, v.to_status, v.created_at, ${TOTAL_COL}
+       FROM (${ACTIVITY}
+              WHERE (t.primary_assignee_id = $1 OR t.set_by_employee_id = $1)
+                AND a.created_at > $3
+                AND a.actor_user_id IS DISTINCT FROM $2) v
+      ORDER BY v.created_at DESC, v.task_activity_id`,
+    [employeeId, userId, since],
+    { page: 1 },
+  );
+}
+
+async function addComment(client, { task_id, author_user_id, body }) {
+  const { rows } = await client.query(
+    `INSERT INTO task_comment (task_id, author_user_id, body) VALUES ($1, $2, $3)
+     RETURNING task_comment_id`,
+    [task_id, author_user_id, body],
+  );
+  return rows[0].task_comment_id;
+}
+
+const COMMENTS = `
+  SELECT c.task_comment_id, c.task_id, ${personJson("e", "d")} AS author, c.body, c.created_at
+    FROM task_comment c
+    LEFT JOIN app_user u ON u.user_id = c.author_user_id
+    LEFT JOIN employee e ON e.employee_id = u.employee_id
+    LEFT JOIN department d ON d.department_id = e.department_id
+   WHERE c.deleted_at IS NULL`;
+
+async function comment(db, id) {
+  const { rows } = await db.query(`${COMMENTS} AND c.task_comment_id = $1`, [id]);
+  return rows[0] || null;
+}
+
+function comments(db, taskId, query) {
+  return pageQuery(
+    db,
+    `SELECT v.*, ${TOTAL_COL} FROM (${COMMENTS} AND c.task_id = $1) v
+      ORDER BY ${orderBy(query, { created_at: "v.created_at" }, "v.task_comment_id")}`,
+    [taskId],
+    query,
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * What other modules ask of tasks
+ * ------------------------------------------------------------------ */
+
+/** An active KPI of the person, with its month, or null. */
+async function targetOf(db, targetId) {
+  const { rows } = await db.query(
+    `SELECT employee_target_id, employee_id, title, status FROM employee_target
+      WHERE employee_target_id = $1`,
+    [targetId],
+  );
+  return rows[0] || null;
+}
+
+/** Is the employee on the staff now (not suspended, not left)? */
+async function employeeActive(db, employeeId) {
+  const { rows } = await db.query(
+    "SELECT status FROM employee WHERE employee_id = $1",
+    [employeeId],
+  );
+  return rows[0] ? rows[0].status === "active" : false;
+}
+
+/**
+ * Repeating tasks whose next occurrence is due (done, or past their due day) and not
+ * yet made: one batch. Making the next occurrence takes a task out of this set.
+ */
+async function dueToRepeat(db, now, batch) {
+  const { rows } = await db.query(
+    `SELECT task_id FROM task t
+      WHERE t.recurrence IS NOT NULL AND t.archived_at IS NULL AND t.status <> 'cancelled'
+        AND (t.status = 'done' OR t.due_at < $1)
+        AND NOT EXISTS (SELECT 1 FROM task n WHERE n.parent_task_id = t.task_id AND n.recurrence IS NOT NULL)
+      ORDER BY t.task_id
+      LIMIT $2 -- pagination:batch one tick of the recurrence job`,
+    [now, batch],
+  );
+  return rows.map((r) => r.task_id);
+}
+
+/** Open tasks due in a window, for the reminders: one batch after the cursor. */
+async function dueBetween(db, from, to, after, batch) {
+  const { rows } = await db.query(
+    `SELECT task_id, number::text AS number, title, primary_assignee_id, due_at FROM task
+      WHERE status NOT IN ('done', 'cancelled') AND archived_at IS NULL
+        AND primary_assignee_id IS NOT NULL AND due_at >= $1 AND due_at < $2
+        AND ($3::timestamptz IS NULL OR (due_at, task_id) > ($3::timestamptz, $4::uuid))
+      ORDER BY due_at, task_id
+      LIMIT $5 -- pagination:batch one tick of the reminder job`,
+    [from, to, after ? after.due_at : null, after ? after.task_id : null, batch],
+  );
+  return rows;
+}
+
+module.exports = {
+  SORTS,
+  list,
+  summary,
+  get,
+  sharedWith,
+  lock,
+  insert,
+  update,
+  slotIn,
+  renumber,
+  nextOrder,
+  addActivity,
+  activity,
+  activitySince,
+  addComment,
+  comment,
+  comments,
+  targetOf,
+  employeeActive,
+  dueToRepeat,
+  dueBetween,
+};

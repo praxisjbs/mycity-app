@@ -137,8 +137,8 @@ const ENTITY_ROUTES = Object.freeze({
   home_kpi: screen("home", "overview"),
 
   // My Workspace
-  task: screen("workspace", "tasks"), // search:none not built yet (src/modules/tasks)
-  calendar_event: screen("workspace", "calendar"), // search:none not built yet (src/modules/calendar)
+  task: screen("workspace", "tasks"),
+  calendar_event: screen("workspace", "calendar"),
 
   // Staff Community and Mailbox
   channel: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone

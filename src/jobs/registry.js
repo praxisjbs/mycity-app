@@ -122,6 +122,11 @@ const JOBS = Object.freeze([
     summary: "A report schedule's slot: a run for each recipient and format",
   },
   {
+    queue: "task-recurrence",
+    concurrency: 1,
+    summary: "The morning's repeating tasks and due reminders, run again by hand",
+  },
+  {
     queue: "reminders",
     concurrency: 2,
     summary: "One person's daily digest of what they have not read",
@@ -149,6 +154,7 @@ const SCHEDULERS = Object.freeze([
   "home-alert-sweeps",
   "scheduled-reports",
   "export-cleanup",
+  "task-recurrence",
   "urgent-repeats",
   "reminders",
   "system-health",

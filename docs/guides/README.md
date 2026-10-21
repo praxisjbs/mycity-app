@@ -33,6 +33,7 @@ section exists to stop.
 | `foundation.md` | Foundation completion: People · Employees and the staff roster, imports, documents, roles and permissions, settings, audit, approvals, ⌘K search, in four tracks | TB | M0 | ☑ |
 | `organogram.md` | Organogram: People · Organogram (HR builder) and ESS · Org Chart (read-only viewer) over the live reporting tree | TB | M1 | ☐ |
 | `notifications.md` | Notifications: the bell's pane on both shells, the in-app banner, web push to phones and computers, Notification Settings (brought forward from M6) | TB | M0 | ☐ |
+| `workspace.md` | My Workspace: Today, Tasks (the board, manager-set weekly and daily tasks, A24), Calendar, Analytics | AJ | M2 | ☑ |
 | `system-health.md` | System Health: Settings tab for readiness checks, performance over time, grouped faults with a shared status, and the Markdown brief for an AI | GE | M9 | ☑ |
 | `policies.md` | Policies: Knowledge Hub · Policies for every company policy, documents and rules policies (Attendance first), versions, Applies To, approval and signatures, acknowledgement on ESS · Policy Updates (brought forward from M10) | TB | M1 | ☑ |
 | `addresses.md` | Addresses: every address across both apps picked from the address search, pinned on the map or, in an outage, taken from the device; never typed (F27, gate 22) | TB | M0 | ☑ |

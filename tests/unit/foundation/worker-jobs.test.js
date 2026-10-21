@@ -30,7 +30,7 @@ describe("job registry", () => {
     }
   });
 
-  test("the queue list is the README §5.15 list: M0, and the M1 jobs built so far", () => {
+  test("the queue list is the README §5.15 list: M0, and the M1 and M2 jobs built so far", () => {
     expect(registry.JOBS.map((j) => j.queue).sort()).toEqual([
       "ai-find-prices",
       "announcement-publish",
@@ -51,6 +51,7 @@ describe("job registry", () => {
       "pdf-render",
       "reminders",
       "scheduled-report",
+      "task-recurrence",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
       "alert-ageing",
@@ -75,6 +76,7 @@ describe("job registry", () => {
       "system-health-digest",
       "system-health-purge",
       "system-health-sample",
+      "task-recurrence",
       "urgent-repeats",
       "workflow-timeout",
     ]);

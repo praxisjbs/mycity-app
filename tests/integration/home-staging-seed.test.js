@@ -31,6 +31,7 @@ const realtime = require("../../src/services/realtime/emitter");
 const dashboard = require("../../src/modules/dashboard/dashboard.service");
 const staffSeed = require("../../seeds/staging/10_staff");
 const home = require("../../seeds/staging/60_home");
+const workspaceSeed = require("../../seeds/staging/40_workspace");
 const forward = require("../../seeds/staging/lib/forward-rows");
 const { removeHomeStagingRows } = require("../../seeds/staging/lib/home-staging-rows");
 const { realStaff } = require("../../seeds/staging/lib/staff");
@@ -103,6 +104,8 @@ describeDb("Home's staging seed against the real migrations", () => {
     workingWeek.invalidateCalendar();
     outbox.markReady();
     await runFile(staffSeed);
+    // Tasks and the calendar come from My Workspace's own seed, which runs before Home's.
+    await runFile(workspaceSeed, { now: NOW });
     staff = await realStaff(pool);
     await runFile(home, { now: NOW });
     first = await counts();
@@ -127,7 +130,7 @@ describeDb("Home's staging seed against the real migrations", () => {
   });
 
   test("every id the manifest lists is there, in the column it names", async () => {
-    for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS) {
+    for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS.filter((e) => !workspaceSeed.M2_TABLES.includes(e.table))) {
       const { n } = await one(`SELECT count(*)::int AS n FROM ${table} WHERE ${idColumn} = ANY($1::uuid[])`, [ids]);
       expect([table, n]).toEqual([table, ids.length]);
     }

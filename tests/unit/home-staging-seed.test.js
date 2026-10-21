@@ -182,7 +182,6 @@ describe("the rows", () => {
         expect(values.due_on <= x.quarter.to).toBe(true);
       }
       if (row.table === "partnership_agreement") expect(values.starts_on >= "2026-01-01").toBe(true);
-      if (row.table === "calendar_event") expect(values.starts_at < values.ends_at).toBe(true);
     }
   });
 
@@ -190,8 +189,7 @@ describe("the rows", () => {
     const vacancy = forward.ROWS.find((r) => r.table === "vacancy" && r.key === "open-seat-2");
     const withoutSeats = { ...x, seats: x.seats.slice(0, 1) };
     expect(vacancy.values(withoutSeats, [staff.operations])).toBeNull();
-    const task = forward.ROWS.find((r) => r.table === "task");
-    expect(task.values(x, [staff.operations, { ...staff.ceo, user_id: null }])).toBeNull();
+    expect(vacancy.values(x, [{ ...staff.operations, user_id: null }])).toBeNull();
     const line = forward.ROWS.find((r) => r.table === "budget_line");
     expect(line.values({ ...x, categories: new Map() }, [])).toBeNull();
     expect(() => forward.personOf(staff, "chairman")).toThrow(/no post/);

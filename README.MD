@@ -63,7 +63,8 @@ mycity-app/
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
-│                             (60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
+│                             (40_workspace.js: My Workspace's tasks and calendar through their
+│                             services; 60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
@@ -405,7 +406,7 @@ for this device), tested in `app/src/features/attendance/location.test.ts`.
 
 | Module | Files beyond the template |
 |---|---|
-| `tasks` | `.audience` (reporting line scope), `.blockage`, `.recurrence` |
+| `tasks` | `.audience` (reporting line scope), `.recurrence` |
 | `calendar` | |
 | `workspace` | `.today`, `.analytics` (aggregator) |
 | `goals` | `.cascade`, `.trace` (KPI → organisational goal), `.approval` (A16) |

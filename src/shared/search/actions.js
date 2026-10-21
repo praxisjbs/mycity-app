@@ -150,6 +150,18 @@ const ACTIONS = Object.freeze([
     params: { action: "new" },
     words: ["device", "my phone", "clock-in device", "new phone", "trusted device"],
   }),
+  a("new_task", "New Task", {
+    screen: "workspace.tasks",
+    params: { action: "new" },
+    need: ["workspace", "create"],
+    words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
+  }),
+  a("new_event", "New Event", {
+    screen: "workspace.calendar",
+    params: { action: "new" },
+    need: ["workspace", "create"],
+    words: ["event", "meeting", "book a meeting", "calendar", "schedule a meeting"],
+  }),
   a("request_leave", "Request Leave", {
     screen: "ess.my-leave",
     params: { action: "new" },

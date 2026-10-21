@@ -297,17 +297,17 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 ### M2 Productivity & Performance · 2000 to 2999 · AJ
 
 **Built:** `2000` projects, tasks, assignees, comments, calendar events, goals, KPIs, targets,
-performance cycles, reviews and review items · `2099` seed.
+performance cycles, reviews and review items · `2010` a task's number, setter (`set_by_employee_id`),
+cadence, KPI (`employee_target_id`), record pointer (`entity_type`, `entity_id`), the cancelled
+status, blockers and `task_activity`; calendar visibility, record pointer, called-off events and
+`calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2090` the
+`task` numbering scheme and the cancelled status · `2099` seed.
 
 **Owes:**
 - Goals cascade as A16 sets it (organisational, annual, monthly, departmental, individual KPI),
   with code, strategic theme, success measure, baseline and the CEO's final approval.
-- Tasks: the record a task points at (`entity_type`, `entity_id`), the KPI it counts towards,
-  manager-set weekly and daily cadence (A24), the cancelled status.
-- Calendar: attendees, visibility, the interview it belongs to.
 - Reviews: the second-level and HR stages and their workflow; dictation transcript, cleaned text
   and `ai_run_id` (A18).
-- Numbering: `project` has `number NOT NULL` and no scheme in `schemes.js`.
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,
