@@ -2,7 +2,8 @@
 /**
  * Queue `notification-push`: one notice pushed to its person's phones and computers, or a
  * test (docs/guides/notifications.md §3, §6). Queued by notification-deliver, one job per
- * row carrying push (`jobId` push-<notification_id>); by the urgent repeats, one per repeat
+ * row carrying push, or due by email while system mail is paused (`instead_of_email`; `jobId`
+ * push-<notification_id>); by the urgent repeats, one per repeat
  * (`round`, `jobId` push-<notification_id>-r<round>); and by Send Test.
  *
  * Idempotent per device (push_delivery): a retry sends only to the devices still owed. A
@@ -15,7 +16,7 @@ module.exports = async function notificationPush(job) {
   const d = job.data || {};
   const out = d.test
     ? await sender.pushTest(d.user_id, d.push_subscription_id || null)
-    : await sender.pushNotice(d.notification_id, d.push || null, Number(d.round) || 0);
+    : await sender.pushNotice(d.notification_id, d.push || null, Number(d.round) || 0, { insteadOfEmail: d.instead_of_email === true });
   if (out.retry) throw new Error(`notification-push: ${out.retry} device(s) to try again`);
   return out;
 };

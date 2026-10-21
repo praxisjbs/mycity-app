@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #74 Settings · Notifications (brought forward from M6); the bell, its pane, the banner, the urgent bar and Notification Settings are shell parts on every screen |
 | Status | Built |
-| Last changed | 20/10/2026 |
+| Last changed | 21/10/2026 |
 
 TB's decisions of 19/10/2026 and their build logs are in `docs/handoff/push-notifications.md` (web
 push, the banner, the pane) and `docs/handoff/notifications-everywhere.md` (urgency, every device,
@@ -210,6 +210,14 @@ Reference-data file(s): none.
   the one saved there, else `VAPID_SUBJECT` (`mailto:jbspraxisllc@gmail.com`). Replace Keys changes
   the key id, so every device subscribes again the next time the app starts (§3).
 
+- **System mail paused** (`docs/guides/integrations.md` §6.15, TB 21/10/2026). While IT has paused
+  system mail, nothing is emailed: a notice due by email is pushed to the person's devices instead,
+  even where their push switch for its category is off, and it is never emailed later. The bell is
+  unchanged. A delivery job more than a day old (one that waited for the hourly limit) does not push
+  in place of its email: that is old news by then.
+- **A refused address** (`integrations.md` §6.16): a notice's email the mail server refuses for good
+  is marked done and not tried again; the address shows on the System Sender's Refused Addresses.
+
 **Settings · Notifications (TB, 19/10/2026)**
 
 - **The notices.** Every `defineNotification` declaration is a notice, and so is every Security
@@ -243,7 +251,7 @@ Reference-data file(s): none.
 |---|---|---|---|
 | Approvals Waiting | On, every 24 hours (1 to 168), 08:00 to 18:00 Lagos | The approvers of the stage it waits on (copies as People add them) | "Reminder: Leave request", "Line manager has waited 2 days on you." Important (amber). Stops when the approval is decided, withdrawn or moves on; a new stage starts its own count |
 | Probation Ending | On, 14 days ahead (1 to 90), at 09:00 Lagos | Holders of People · Approve over the person: People (scope all) and the line managers above them | "Probation ending: Ada Okafor", "Confirmation is due on 02/11/2026." Once per due date; a new due date reminds again; none once confirmed or archived |
-| Daily Digest | On, at 07:30 Lagos | Each person, by email, unless they turned it off | Up to 25 notices that arrived in the last 24 hours and are still unread, newest first, with how many more; nothing is sent when there are none |
+| Daily Digest | On, at 07:30 Lagos | Each person who has signed in at least once, by email, unless they turned it off; nobody while system mail is paused (`integrations.md` §6.15) | Up to 25 notices that arrived in the last 24 hours and are still unread, newest first, with how many more; nothing is sent when there are none |
 
 A reminder is an ordinary notice (`workflow.reminded`, `employee.probation_ending`): People can
 switch it off, copy it, change its urgency and channels like any other. A changed approval interval
@@ -275,7 +283,7 @@ it on again reminds what is still waiting at the next tick.
 | `push.test_requested` | Send Test | Outbox queues the test on `notification-push` (`push-test-<event_id>`) |
 | `app_user.suspended`, `employee.archived`, `auth.session_ended` (Sign Out Everywhere, Sign Out Others) | Suspension, leaving, every session ended at once | Revoke the person's subscriptions (`suspended`, `left`, `signed_out`); Sign Out Others keeps the device it was pressed on (`kept_session_id`) |
 | `reminders` (scheduler, every 5 minutes) | Always | Each declared reminder's `find` adds what has come due (Approvals Waiting, Probation Ending); every due occurrence is checked and fired in its own transaction (§7.1); from the digest time on, each person's digest for the day is queued once (`digest-<user>-<day>`) |
-| `reminders` (job, `digest`) | Per person and Lagos day | Emails the digest (`templates/email/digest.html`) when something arrived unread in the last 24 hours; paced like all system mail |
+| `reminders` (job, `digest`) | Per person and Lagos day | Emails the digest (`templates/email/digest.html`) when something arrived unread in the last 24 hours; paced like all system mail. Queued only for people who have signed in; while system mail is paused the day's digest is dropped (`mail_paused`), and an address refused for good ends it (`refused`) |
 | `workflow.reminded` | An approval has waited its interval | The stage's approvers: "Reminder: <approval>" (important) |
 | `employee.probation_ending` | The probation reminder's day | People · Approve holders over the person |
 | `notification_rule.changed` | Save or Reset to Default on a notice | Audit (the notice, what it is now, who changed it) |
@@ -426,6 +434,9 @@ listed here as tier 1 or tier 2.
   goes at 07:00 too. Turning quiet hours off does not bring held pushes forward; they go at the old
   end time.
 - **Nothing unread in the last day.** No digest. A person who reads everything never receives one.
+- **Invited, never signed in.** No digest: they cannot open what it lists (TB, 21/10/2026).
+- **System mail paused.** No email of any notice; each is pushed instead, and the day's digest is
+  dropped, not sent on Resume.
 - **The digest's time changed after today's was sent.** Tomorrow's goes at the new time.
 
 ## 12 · Donor code
@@ -444,6 +455,8 @@ The design choices of Settings · Notifications (copies only on notices about so
 channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5, open to TB.
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · With Pause Mail (`docs/guides/integrations.md` §6.15): while system mail is paused a notice due by email is pushed instead (`instead_of_email` on `notification-push`, past the person's push switch for the category) and never emailed later, and the day's digest is dropped. The daily digest goes only to people who have signed in at least once. A notice's email refused for good is done, not retried (§6, §7, §11).
 
 - 20/10/2026 · TB · A notice whose record's screen the reader cannot open falls back to the
   record's own screen for the people it concerns (`routeMap.linkFor(..., { self: true })`) when

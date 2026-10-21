@@ -766,6 +766,23 @@ async function sendCredentialLink(event) {
   );
 }
 
+/**
+ * Does the link in a queued invitation or reset still work? The mail queue drops one that a
+ * newer link replaced, or that expired while it waited (docs/guides/integrations.md §6.15), so
+ * nobody is sent a link that only says it has expired. A link this code cannot read is sent.
+ * @param {string} url  the message's link_url
+ */
+async function linkStillOpen(url) {
+  let token;
+  try {
+    token = new URL(url).searchParams.get("token");
+  } catch {
+    return true;
+  }
+  if (!token) return true;
+  return Boolean(await repo.findOpenLink(pool, cookies.hashToken(token)));
+}
+
 /** POST /auth/link: is this reset or invitation link still good? */
 async function checkLink(token) {
   const link = await repo.findOpenLink(pool, cookies.hashToken(token));
@@ -1105,6 +1122,7 @@ module.exports = {
   changePassword,
   forgot,
   sendCredentialLink,
+  linkStillOpen,
   checkLink,
   resetPassword,
   listSessions,

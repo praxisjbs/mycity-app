@@ -7,7 +7,7 @@
  *
  *   const mail = await settings.of("mail_sender");
  *   //  { code, source: "saved" | "file", values: { host, port, ... },
- *   //    secrets: { password }, unreadable: [], saved_at, integration_connection_id }
+ *   //    secrets: { password }, unreadable: [], saved_at, paused_at, integration_connection_id }
  *   //  or null: nothing is saved here and the server file has nothing (not set up)
  *   const key = await settings.secret("geoapify", "api_key");      // a string, or null
  *
@@ -23,6 +23,8 @@
  *  - Cached per process. Each read compares the version kept in Redis, read at most once a
  *    second; a save, a removal and Replace Keys call bump() after their commit, so the API
  *    and the worker reload within a second. Without Redis an answer is kept 30 seconds.
+ *  - `paused_at`: when system mail was paused on the System Sender (guide §6.15), whatever the
+ *    values come from; null when it is not. Pause and Resume bump the version like a save.
  *  - Before migration 9200 runs (a test database, a deploy mid-way) the saved settings
  *    read as none and the file applies.
  */
@@ -65,7 +67,7 @@ const notMigrated = (err) => err && (err.code === "42P01" || err.code === "42703
 async function rowOf(db, code) {
   try {
     const { rows } = await db.query(
-      `SELECT integration_connection_id, configuration, saved_at
+      `SELECT integration_connection_id, configuration, saved_at, paused_at
          FROM integration_connection WHERE code = $1`,
       [code],
     );
@@ -106,6 +108,7 @@ async function storedSecrets(db, def) {
 async function load(def, db) {
   const row = await rowOf(db, def.code);
   const savedAt = row && row.saved_at ? new Date(row.saved_at).toISOString() : null;
+  const pausedAt = row && row.paused_at ? new Date(row.paused_at).toISOString() : null;
   const id = row ? row.integration_connection_id : null;
   const file = def.fromFile(config);
 
@@ -126,6 +129,7 @@ async function load(def, db) {
       secrets,
       unreadable: kept.unreadable,
       saved_at: savedAt,
+      paused_at: pausedAt,
       integration_connection_id: id,
     };
   }
@@ -140,6 +144,7 @@ async function load(def, db) {
       secrets,
       unreadable,
       saved_at: savedAt,
+      paused_at: pausedAt,
       integration_connection_id: id,
     };
   }
@@ -152,6 +157,7 @@ async function load(def, db) {
     secrets: { ...file.secrets },
     unreadable: [],
     saved_at: null,
+    paused_at: pausedAt,
     integration_connection_id: id,
   };
 }

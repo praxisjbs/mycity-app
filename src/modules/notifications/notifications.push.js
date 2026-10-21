@@ -100,10 +100,15 @@ const stillOpen = (row) =>
  * @param {string} notificationId
  * @param {{tag?: string|null, mode?: string|null}|null} [style]  from the event's declaration
  * @param {number} [round]
+ * @param {{insteadOfEmail?: boolean}} [opts]
+ *   insteadOfEmail  system mail is paused, so a notice due by email is pushed in its place
+ *                   (docs/guides/integrations.md §6.15), whatever its push switch says
  */
-async function pushNotice(notificationId, style = null, round = 0) {
+async function pushNotice(notificationId, style = null, round = 0, { insteadOfEmail = false } = {}) {
   const row = await repo.forPush(pool, notificationId);
-  if (!row || !row.reachable || !(row.channels || []).includes("push")) return { skipped: "unreachable" };
+  const channels = (row && row.channels) || [];
+  const wanted = channels.includes("push") || (insteadOfEmail && channels.includes("email"));
+  if (!row || !row.reachable || !wanted) return { skipped: "unreachable" };
   const subs = await repo.liveSubscriptions(pool, row.user_id);
   if (subs.length === 0) return { skipped: "no_device" };
   if (round > 0 ? !stillOpen(row) : row.read_at && row.category !== "security" && !stillOpen(row)) {

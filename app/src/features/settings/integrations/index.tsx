@@ -78,7 +78,16 @@ export function IntegrationsTab({ id = null }: { id?: string | null }) {
         empty={{ title: "No Connections", icon: "link" }}
         columns={[
           { key: "name", label: "Connection", render: (r) => <span data-copy="content">{r.display_name}</span> },
-          { key: "state", label: "State", render: (r) => <Pill tone={STATE[r.state].tone}>{STATE[r.state].text}</Pill> },
+          {
+            key: "state",
+            label: "State",
+            render: (r) => (
+              <span className="inline-flex flex-wrap gap-1">
+                <Pill tone={STATE[r.state].tone}>{STATE[r.state].text}</Pill>
+                {r.paused_at && <Pill tone="warn">Paused</Pill>}
+              </span>
+            ),
+          },
           { key: "source", label: "Source", render: (r) => <Where row={r} /> },
           { key: "plan", label: "Plan", desktop: true, render: (r) => (r.plan ? <Pill tone={r.plan === "free" ? "neutral" : "info"}>{PLAN[r.plan]}</Pill> : null) },
           { key: "group", label: "Group", desktop: true, render: (r) => GROUP[r.group] },

@@ -10,6 +10,7 @@ const m = vi.hoisted(() => ({
   invalidate: vi.fn(),
   rows: [] as unknown[],
   models: [] as unknown[],
+  refusals: [] as unknown[],
   detail: null as unknown,
   can: ((_module: string, _action?: string) => true) as (module: string, action?: string) => boolean,
   navigate: vi.fn(),
@@ -24,7 +25,7 @@ vi.mock("@/api/hooks", () => ({
     set: () => undefined,
   }),
   usePaged: (key: string) => {
-    const rows = key.endsWith("/checks") ? [] : key.endsWith("/models") ? m.models : m.rows;
+    const rows = key.endsWith("/checks") ? [] : key.endsWith("/models") ? m.models : key.endsWith("/refusals") ? m.refusals : m.rows;
     return { rows, page: { number: 1, size: 25, total: rows.length, pages: 1, has_next: false }, loading: false, error: null, q: "", setQ: () => undefined, setPage: () => undefined };
   },
 }));
@@ -57,6 +58,7 @@ const row = (over: Partial<IntegrationRow> = {}): IntegrationRow => ({
   plan: "free",
   units_today: 120,
   watched: false,
+  paused_at: null,
   ...over,
 });
 
@@ -64,6 +66,7 @@ const geoapify = (over: Partial<Integration> = {}): Integration => ({
   ...row(),
   saved_at: "2026-10-20T08:00:00.000Z",
   saved_by_name: "Godwin-Okoh Elisha",
+  paused_by_name: null,
   settings: { code: "geoapify" },
   secrets: [{ key: "api_key", set: true, hint: "1a2b", set_by_name: "Godwin-Okoh Elisha", set_at: "2026-10-20T08:00:00.000Z" }],
   last_check: null,
@@ -154,6 +157,7 @@ describe("Settings · Integrations", () => {
     ...row({ code: "groq", display_name: "Groq", group: "ai", daily_limit: 23040 }),
     saved_at: "2026-10-20T08:00:00.000Z",
     saved_by_name: "Godwin-Okoh Elisha",
+    paused_by_name: null,
     settings: { code: "groq", in_use: [{ job: "transcription", position: 1, model: "whisper-large-v3", display_name: "Whisper Large v3" }], models: 3, available: 2 },
     secrets: [{ key: "api_key", set: true, hint: "Qp4w", set_by_name: "Godwin-Okoh Elisha", set_at: "2026-10-20T08:00:00.000Z" }],
     last_check: null,
@@ -214,6 +218,7 @@ describe("Settings · Integrations", () => {
       ...row({ code: "exchange_rates", display_name: "Exchange Rates", group: "finance", daily_limit: 40 }),
       saved_at: "2026-10-20T08:00:00.000Z",
       saved_by_name: "Godwin-Okoh Elisha",
+      paused_by_name: null,
       settings: { code: "exchange_rates", base: "USD", usd_ngn: "1534.2100000000", rate_day: "2026-10-20", fetched_at: "2026-10-20T00:01:00.000Z", currencies: 161 },
       secrets: [{ key: "api_key", set: true, hint: "7c1d", set_by_name: null, set_at: null }],
       last_check: null,
@@ -227,5 +232,81 @@ describe("Settings · Integrations", () => {
     expect(within(panel).getByText("20/10/2026")).toBeTruthy();
     await user.click(within(panel).getByRole("button", { name: "Sync Rates" }));
     await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/integrations/exchange_rates/sync", { body: {} }));
+  });
+
+  const sender = (over: Partial<Integration> = {}): Integration => ({
+    ...row({ code: "mail_sender", display_name: "System Sender", group: "mail", daily_limit: null, plan: null, units_today: 14 }),
+    saved_at: null,
+    saved_by_name: null,
+    paused_by_name: null,
+    settings: {
+      code: "mail_sender",
+      host: "mycityapp.io",
+      port: 465,
+      security: "tls",
+      username: "no-reply@mycityapp.io",
+      from: "MyCity App <no-reply@mycityapp.io>",
+      reply_to: null,
+      per_hour: 10,
+      local_domains: "mycityapp.io",
+    },
+    secrets: [{ key: "password", set: true, hint: null, set_by_name: null, set_at: null }],
+    last_check: null,
+    usage: [],
+    ...over,
+  });
+
+  it("pauses system mail from the System Sender, and shows Paused on its row", async () => {
+    const user = userEvent.setup();
+    m.rows = [row({ code: "mail_sender", display_name: "System Sender", group: "mail", paused_at: "2026-10-21T06:40:00.000Z" })];
+    m.detail = sender();
+    m.call.mockResolvedValueOnce(sender({ paused_at: "2026-10-21T06:40:00.000Z", paused_by_name: "Femi Bello" }));
+    render(<ModalProvider><IntegrationsTab /></ModalProvider>);
+    expect(screen.getAllByText("Paused").length).toBeGreaterThan(0);
+    await user.click(screen.getAllByText("System Sender")[0]);
+    const panel = await screen.findByRole("dialog");
+    await user.click(within(panel).getByRole("button", { name: "Pause Mail" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/integrations/mail_sender/pause", { body: {} }));
+    expect(m.invalidate).toHaveBeenCalledWith("/api/v1/integrations");
+  });
+
+  it("a paused sender says who paused it and when, offers Resume Mail, and lists refused addresses", async () => {
+    const user = userEvent.setup();
+    m.rows = [row({ code: "mail_sender", display_name: "System Sender", group: "mail" })];
+    m.detail = sender({ paused_at: "2026-10-21T06:40:00.000Z", paused_by_name: "Femi Bello" });
+    m.refusals = [
+      {
+        mail_refusal_id: "00000000-0000-4000-8000-0000000000b1",
+        email: "ada.obi@gmial.com",
+        person_name: "Ada Obi",
+        template: "digest",
+        smtp_code: 550,
+        reply: "550 No such domain",
+        refusals: 2,
+        first_refused_at: "2026-10-20T08:00:00.000Z",
+        last_refused_at: "2026-10-21T00:04:00.000Z",
+      },
+    ];
+    m.call.mockResolvedValueOnce(sender());
+    render(<ModalProvider><IntegrationsTab /></ModalProvider>);
+    await user.click(screen.getAllByText("System Sender")[0]);
+    const panel = await screen.findByRole("dialog");
+    expect(within(panel).getByText("Mail paused")).toBeTruthy();
+    expect(within(panel).getByText(/by Femi Bello/)).toBeTruthy();
+    expect(within(panel).getAllByText("ada.obi@gmial.com").length).toBeGreaterThan(0);
+    expect(within(panel).getAllByText("Daily Digest").length).toBeGreaterThan(0);
+    await user.click(within(panel).getByRole("button", { name: "Resume Mail" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/integrations/mail_sender/resume", { body: {} }));
+  });
+
+  it("offers neither Pause Mail nor Resume Mail to someone who may only look", async () => {
+    const user = userEvent.setup();
+    m.rows = [row({ code: "mail_sender", display_name: "System Sender", group: "mail" })];
+    m.detail = sender();
+    m.can = (_module, action = "view") => action === "view";
+    render(<ModalProvider><IntegrationsTab /></ModalProvider>);
+    await user.click(screen.getAllByText("System Sender")[0]);
+    const panel = await screen.findByRole("dialog");
+    expect(within(panel).queryByRole("button", { name: "Pause Mail" })).toBeNull();
   });
 });

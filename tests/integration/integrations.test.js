@@ -334,6 +334,60 @@ describeDb("Settings · Integrations against the real migrations", () => {
     });
   });
 
+  describe("system mail paused (guide §6.15), and the addresses refused (§6.16)", () => {
+    test("IT pauses it: only invitations, resets and the test email go out, and Status says so", async () => {
+      expect((await as("ops").post("/integrations/mail_sender/pause").send({})).status).toBe(403);
+      const res = await as("admin").post("/integrations/mail_sender/pause").send({});
+      expect(res.status).toBe(200);
+      expect(res.body.paused_at).toEqual(expect.any(String));
+      expect(res.body.paused_by_name).toBe("Femi Bello");
+      // Pressed again: nothing changes, and IT is not told twice.
+      const again = await as("admin").post("/integrations/mail_sender/pause").send({});
+      expect(again.body.paused_at).toBe(res.body.paused_at);
+      expect((await one("SELECT count(*)::int AS n FROM event_outbox WHERE event_key = 'integration.mail_paused'")).n).toBe(1);
+      const audit = await one("SELECT before, after FROM audit_ledger WHERE action = 'integration.mail_paused'");
+      expect(audit).toMatchObject({ before: { paused: false }, after: { paused: true } });
+
+      const rows = (await as("admin").get("/integrations")).body.data;
+      expect(rows.find((r) => r.code === "mail_sender").paused_at).toBe(res.body.paused_at);
+      expect(rows.find((r) => r.code === "geoapify").paused_at).toBeNull();
+      expect(await systemMail.paused()).toBe(true);
+      await expect(systemMail.send({ to: "ada@mycity.test", template: "notification", data: {} })).rejects.toMatchObject({ code: "MAIL_PAUSED" });
+      expect(await systemMail.health()).toMatchObject({ status: "degraded", mode: "paused" });
+    });
+
+    test("Resume: mail goes out again, and what waited is released", async () => {
+      expect((await as("ops").post("/integrations/mail_sender/resume").send({})).status).toBe(403);
+      const res = await as("admin").post("/integrations/mail_sender/resume").send({});
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ paused_at: null, paused_by_name: null });
+      expect(await systemMail.paused()).toBe(false);
+      await drain();
+      const resumed = await one("SELECT status FROM event_outbox WHERE event_key = 'integration.mail_resumed'");
+      expect(resumed.status).toBe("done");
+    });
+
+    test("a refused address is listed with whoever holds it, and leaves once mail to it is accepted", async () => {
+      const refusals = require("../../src/shared/integrations/refusals");
+      await refusals.record({ emails: ["femi@mycity.test"], template: "digest", smtp_code: 550, reply: "550 No such user" });
+      await refusals.record({ emails: ["FEMI@mycity.test", "nobody@gheil.test"], template: "notification", smtp_code: 550, reply: "550 No such user" });
+      expect((await as("ops").get("/integrations/mail_sender/refusals")).status).toBe(403);
+      const res = await as("admin").get("/integrations/mail_sender/refusals");
+      expect(res.status).toBe(200);
+      expect(res.body.page.total).toBe(2);
+      expect(res.body.data.find((r) => r.email === "femi@mycity.test")).toMatchObject({
+        person_name: "Femi Bello",
+        refusals: 2,
+        template: "notification",
+        smtp_code: 550,
+      });
+      expect(res.body.data.find((r) => r.email === "nobody@gheil.test").person_name).toBeNull();
+      expect((await as("admin").get("/integrations/mail_sender/refusals?q=gheil")).body.page.total).toBe(1);
+      await refusals.accepted(["femi@mycity.test"]);
+      expect((await as("admin").get("/integrations/mail_sender/refusals")).body.page.total).toBe(1);
+    });
+  });
+
   describe("testing what is in use", () => {
     test("Geoapify's test runs the typed address and shows what it found", async () => {
       const res = await as("admin").post("/integrations/geoapify/test").send({ address: "Admiralty Way" });

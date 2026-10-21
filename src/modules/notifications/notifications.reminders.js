@@ -385,7 +385,9 @@ const linkOf = (row) => {
 /**
  * One person's digest (the `reminders` job `digest`): the bell notices that arrived in the 24
  * hours before it was queued and are still unread, newest first, at most 25 listed. Nothing is
- * sent when there are none, or when the person or the company turned the digest off meanwhile.
+ * sent when there are none, when the person or the company turned the digest off meanwhile,
+ * to someone who has never signed in, or while system mail is paused (the day's digest is
+ * dropped, not kept: docs/guides/integrations.md §6.15).
  * @returns {Promise<{sent: boolean, count?: number, reason?: string}>}
  */
 async function sendDigest({ user_id: userId, until }, { db = pool } = {}) {
@@ -394,10 +396,12 @@ async function sendDigest({ user_id: userId, until }, { db = pool } = {}) {
   const person = await repo.digestPerson(db, userId);
   if (!person || !person.email) return { sent: false, reason: "no_person" };
   if (!person.digest) return { sent: false, reason: "person_off" };
+  if (!person.signed_in) return { sent: false, reason: "never_signed_in" };
+  const systemMail = require("../../services/mail/system-mail.service");
+  if (await systemMail.paused()) return { sent: false, reason: "mail_paused" };
   const end = until ? new Date(until) : new Date();
   const page = await repo.digestPage(db, userId, { from: new Date(end.getTime() - DIGEST_WINDOW_MS), until: end });
   if (page.data.length === 0) return { sent: false, reason: "nothing_unread" };
-  const systemMail = require("../../services/mail/system-mail.service");
   await systemMail.send({
     to: { name: `${person.first_name} ${person.last_name}`.trim(), email: person.email },
     recipient: { first_name: person.first_name, last_name: person.last_name, email: person.email },

@@ -76,3 +76,41 @@ they are kept, win over the `.env` lines and apply within a second, with no rest
 lines in the table stay as the fallback when nothing is saved; a server no longer refuses to start
 without them: with neither, system mail is held (not lost) until a sender is set, and goes out the
 moment one is saved.
+
+## 5 · Paused mail and refused addresses (21/10/2026)
+
+**Pause Mail** (Settings · Integrations → System Sender, IT only; `docs/guides/integrations.md`
+§6.15). Press it on each environment. Until Resume Mail only invitations, password resets, Send Test
+Email and the server's health alarm are sent; notices reach people by push and the bell, digests are
+dropped, other mail waits. Staff sending from Mailbox is not affected. Settings · Status reads Mail
+as Paused.
+
+**After the hosting upgrade** (Stellar Business, 10,000 an hour): on each environment, System Sender
+→ Edit Settings → Hourly Limit (production and staging together at most the plan's limit), Save
+Settings, then Resume Mail. When the sender is still read from the server file, the first save asks
+for its password: `sudo grep '^SMTP_PASSWORD=' /srv/mycity/<env>/shared/.env`.
+
+**A refused address** (cPanel's 550, "The mail server could not deliver mail to … The account or
+domain may not exist") is listed on the System Sender as a Refused Address and not tried again
+(§6.16). Mail between `mycityapp.io` addresses is delivered on the host itself, so:
+
+| The address | Cure |
+|---|---|
+| `name@mycityapp.io` | cPanel → Email Accounts → Create the mailbox (or Forwarders, to send it on), or correct the work email in People |
+| Another domain | A typo (`gmial.com`) or a domain that takes no mail: correct the work email in People |
+
+A login's sign-in email is fixed when the login is made, so a wrong one is corrected on the server,
+in one transaction with the employee's work email, as `administrator`:
+
+```sh
+sudo -u postgres psql -d mycity_<stg|prod> -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+UPDATE employee SET work_email = 'right@example.com', updated_at = now() WHERE work_email = 'wrong@exmaple.com';
+UPDATE app_user SET email = 'right@example.com', updated_at = now() WHERE email = 'wrong@exmaple.com';
+COMMIT;
+SQL
+```
+
+Each UPDATE should say `UPDATE 1`. Then Resend Invitation on Settings · Users. The change has no
+audit row, because it does not go through the app.
+

@@ -62,10 +62,13 @@ function fingerprint(err, meta = {}) {
     )
     .replace(/\b\d+\b/g, "<n>")
     .slice(0, 200);
+  // The first "at" line, not the stack's second line: a message of several lines (a mail
+  // server's 550 reply) would otherwise put its own second line where the code's place goes.
   const frame =
-    String((err && err.stack) || "")
-      .split("\n")[1]
-      ?.trim()
+    (String((err && err.stack) || "")
+      .split("\n")
+      .find((l) => /^\s+at /.test(l)) || "")
+      .trim()
       .replace(/:\d+:\d+\)?$/, ")")
       .slice(0, 120) ||
     meta.route ||
