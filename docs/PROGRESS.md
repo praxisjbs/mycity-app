@@ -1124,7 +1124,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 69 | Organisation | `organisation` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 95 | Status | `status` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 96 | Performance | `performance` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
-| 97 | Faults | `faults` | M9 | GE | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 97 | Faults | `faults` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 70 | Users | `users` | M9 | GE | ☑ | ☑ | ☑ | Built | 16/10/2026 |
 | 71 | Roles & Permissions | `roles-and-permissions` | M9 | GE | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1139,6 +1139,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · Faults (#97) on a phone: a tap on a row's tick opened the fault instead of picking
+  it, so nothing could be picked for Download Brief. The phone card's open button is stretched over the
+  whole card and covered the tick (`DataView`, since Faults moved to the list's own selection on
+  20/10); the tick now sits above it, kept inside its card. Attendance · Pay Items had the same fault
+  and is fixed with it. Left: nothing.
 - 21/10/2026 · TB · Integrations (#77): Pause Mail and Resume Mail on the System Sender, for the Milestone 1
   handover on the 50-an-hour plan (`docs/guides/integrations.md` §1.3, §6.15, §6.16; TB's answers of
   21/10/2026). While paused only invitations, password resets, Send Test Email and the server's health alarm

@@ -185,6 +185,20 @@ describe("DataView on a phone", () => {
     await userEvent.click(screen.getByRole("button", { name: "Ada Obi" }));
     expect(onRowClick).toHaveBeenCalledWith(ROWS[0]);
   });
+
+  it("a tick on a card that opens its row picks the row, never opens it", async () => {
+    phone();
+    const onRowClick = vi.fn();
+    const onChange = vi.fn();
+    view({ list: list(), onRowClick, selection: { keys: [], onChange, actions: null } });
+    const tick = screen.getByRole("checkbox", { name: "Select Ada Obi" });
+    // jsdom does no hit-testing, so the classes stand in for it: the tick sits above the card's stretched button, inside the card.
+    expect(tick).toHaveClass("relative", "z-10");
+    expect(tick.closest("li")).toHaveClass("relative", "isolate");
+    await userEvent.click(tick);
+    expect(onChange).toHaveBeenCalledWith(["e1"]);
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
 });
 
 describe("DataView states", () => {
