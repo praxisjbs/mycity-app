@@ -222,11 +222,13 @@ describeDb("Home schema and reference data against the real migrations", () => {
 
     test("Activity Today reads the day's events through an index; the roster reads a day through the attendance module's", async () => {
       const { rows } = await q("SELECT tablename, indexdef FROM pg_indexes WHERE indexname = ANY($1) ORDER BY tablename, indexname", [
-        ["attendance_event_occurred_idx", "event_log_occurred_idx", "attendance_day_date_status_idx", "attendance_event_one_active_person_uq"],
+        ["attendance_event_occurred_idx", "event_log_occurred_idx", "attendance_day_date_status_idx", "attendance_event_one_active_slot_uq"],
       ]);
+      // The day's clock-in is read through attendance's one-active index, which leads with the person, the
+      // day and the type; since 1380 it holds one punch a slot, so a punch People rejected frees its place.
       expect(rows.map((r) => [r.tablename, r.indexdef.replace(/^.* USING btree /, "")])).toEqual([
         ["attendance_day", "(attendance_date, status)"],
-        ["attendance_event", "(employee_id, work_date, event_type) WHERE ((validation_state = ANY (ARRAY['accepted'::text, 'review'::text])) AND (source <> 'system'::text))"],
+        ["attendance_event", "(employee_id, work_date, event_type, slot) WHERE ((validation_state = ANY (ARRAY['accepted'::text, 'review'::text])) AND (source <> 'system'::text))"],
         ["event_log", "(occurred_at DESC)"],
       ]);
     });

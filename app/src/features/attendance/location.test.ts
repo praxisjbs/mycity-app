@@ -57,7 +57,7 @@ describe("reading the location", () => {
   it("watches with high accuracy and no cached position, and stops at the first fix of 50 m or better", async () => {
     const reading = readLocation();
     await started();
-    expect(watchPosition.mock.calls[0][2]).toMatchObject({ enableHighAccuracy: true, maximumAge: 0 });
+    expect((watchPosition.mock.calls[0] as unknown[])[2]).toMatchObject({ enableHighAccuracy: true, maximumAge: 0 });
     onFix!(at(400));
     onFix!(at(48));
     await expect(reading).resolves.toEqual({ fix: { latitude: 6.5, longitude: 3.4, accuracy_m: 48 }, error: null });
