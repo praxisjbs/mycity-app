@@ -246,11 +246,14 @@ export function DataView<R>({
           <li
             key={key}
             className={cn(
-              "relative flex w-full items-start gap-2.5 border-b border-border px-3.5 py-3 text-left last:border-b-0",
+              "relative isolate flex w-full items-start gap-2.5 border-b border-border px-3.5 py-3 text-left last:border-b-0",
               (selectedKey === key || keys.includes(key)) && "bg-muted",
             )}
           >
-            {selection && <Tick checked={keys.includes(key)} onChange={() => toggleRow(key)} label={`Select ${typeof headCell === "string" ? headCell : "row"}`} />}
+            {/* Above the card's stretched open button (kept inside the card by `isolate`): a tap on the tick picks the row, never opens it. */}
+            {selection && (
+              <Tick className="relative z-10" checked={keys.includes(key)} onChange={() => toggleRow(key)} label={`Select ${typeof headCell === "string" ? headCell : "row"}`} />
+            )}
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="text-sm font-semibold wrap-any">
                 {onRowClick ? (
