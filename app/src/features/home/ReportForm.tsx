@@ -1,6 +1,6 @@
 import reports from "@mycity/contract/schemas/reports.js";
 import { useMemo, useRef, useState } from "react";
-import type { HomeReport, HomeReportFilters, HomeReportFormat, HomeReportRecurrence, Me } from "@mycity/contract/contract.gen.ts";
+import type { HomeReport, HomeReportFilters, HomeReportFormat, HomeReportRecurrence, HomeReportRosterDay, HomeRosterStatus, Me } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
@@ -67,7 +67,8 @@ export interface ReportValues extends Record<string, unknown> {
   name: string;
   report_key: string;
   department_id: string;
-  roster_status: string;
+  roster_day: HomeReportRosterDay;
+  roster_statuses: HomeRosterStatus[];
   leave_status: string;
   leave_type_id: string;
   category: string;
@@ -87,7 +88,15 @@ export interface ReportValues extends Record<string, unknown> {
 /** The time a new schedule runs at: the end of the working day. */
 const DEFAULT_TIME = "18:00";
 
-const NO_FILTERS = Object.fromEntries(FILTER_KEYS.map((k) => [k, ""])) as Record<FilterKey, string>;
+/** Every filter off: Daily Attendance reads today, for everyone. */
+const NO_FILTERS = {
+  ...(Object.fromEntries(FILTER_KEYS.map((k) => [k, ""])) as Record<FilterKey, string>),
+  roster_day: "today",
+  roster_statuses: [],
+} as Pick<ReportValues, FilterKey>;
+
+/** A filter chosen on the form: a choice other than its default, or at least one status ticked. */
+const chosen = (key: FilterKey, value: unknown) => (Array.isArray(value) ? value.length > 0 : Boolean(value) && value !== NO_FILTERS[key]);
 
 const FORMATS: Record<FormatChoice, HomeReportFormat[]> = { pdf: ["pdf"], xlsx: ["xlsx"], both: ["pdf", "xlsx"] };
 const formatChoiceOf = (formats: readonly HomeReportFormat[]): FormatChoice => (formats.length > 1 ? "both" : formats[0]);
@@ -145,7 +154,7 @@ export function newReportValues(me: Pick<Me, "user_id" | "display_name" | "emplo
 export function reportValues(report: HomeReport, me: Pick<Me, "user_id" | "display_name" | "employee_id">, today = todayIso()): ReportValues {
   const s = report.schedule;
   const start = newReportValues(me, report.report_key, today);
-  const filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, report.filters[k] ?? ""])) as Record<FilterKey, string>;
+  const filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, report.filters[k] ?? NO_FILTERS[k]])) as Pick<ReportValues, FilterKey>;
   if (!s) return { ...start, name: report.name, ...filters, shared: report.shared, repeats: "on_demand" };
   const r = s.recurrence;
   return {
@@ -180,7 +189,7 @@ function scheduleBody(v: ReportValues) {
 
 /** The report as POST /home/reports takes it: only the filters its source takes, and only those chosen. */
 export function reportBody(v: ReportValues) {
-  const filters = Object.fromEntries(filtersOf(v.report_key).flatMap((k) => (v[k] ? [[k, v[k]]] : []))) as HomeReportFilters;
+  const filters = Object.fromEntries(filtersOf(v.report_key).flatMap((k) => (chosen(k, v[k]) ? [[k, v[k]]] : []))) as HomeReportFilters;
   return { name: v.name.trim(), report_key: v.report_key, filters, shared: v.shared, schedule: scheduleBody(v) };
 }
 
@@ -337,7 +346,7 @@ function ReportForm({ report, close }: { report?: HomeReport; close: () => void 
               />
             </Field>
           )}
-          <SourceFilters takes={takes} field={f.field} status={f.status} />
+          <SourceFilters takes={takes} field={f.field} status={f.status} values={v} set={f.set} />
           <CheckboxField {...f.field("shared")} label="Share With Managers" />
         </>
       ),
@@ -416,20 +425,66 @@ function serverFields(fields: Record<string, string[] | undefined>): Record<stri
   return out;
 }
 
-type FieldBindings = Pick<ReturnType<typeof useContractForm<ReportValues>>, "field" | "status">;
+type FieldBindings = Pick<ReturnType<typeof useContractForm<ReportValues>>, "field" | "status" | "set"> & { values: ReportValues };
 
-/** Each filter as the form offers it: its label, the choice that leaves it off, and its own choices. */
-const FILTER_FIELDS: Record<FilterKey, { label: string; all: string; options: Array<[string, string]> }> = {
+/** Each filter a select offers: its label, the choice that leaves it off, and its own choices. */
+const FILTER_FIELDS: Record<Exclude<FilterKey, "roster_day" | "roster_statuses">, { label: string; all: string; options: Array<[string, string]> }> = {
   department_id: { label: "Department", all: "All Departments", options: [] },
-  roster_status: { label: "Status", all: "Every Status", options: Object.entries(ROSTER_STATUS).map(([k, s]) => [k, s.text]) },
   leave_status: { label: "Status", all: "Every Status", options: Object.entries(LEAVE_STATUS) },
   leave_type_id: { label: "Leave Type", all: "Every Type", options: [] },
   category: { label: "Category", all: "Every Category", options: Object.entries(ALERT_CATEGORY) },
   severity: { label: "Severity", all: "Every Severity", options: Object.entries(SEVERITY).map(([k, s]) => [k, s.text]) },
 };
 
+/** Daily Attendance's days: the day so far, or the closed day before it. */
+const ROSTER_DAYS: Array<[HomeReportRosterDay, string]> = [
+  ["today", "Today So Far"],
+  ["last_working_day", "Last Working Day"],
+];
+
+/** The statuses in the order the form lists them. */
+const ROSTER_ORDER: HomeRosterStatus[] = ["on_site", "remote", "field", "late", "not_in", "absent", "on_leave"];
+
+/**
+ * Daily Attendance's Day and Statuses. Absent is offered only on the Last Working Day and Not In
+ * only Today, as the contract holds them (ROSTER_STATUSES_ON); a new day drops a ticked status it
+ * cannot hold. None ticked is everyone.
+ */
+function RosterFilters({ field, status, values, set }: FieldBindings) {
+  const day = values.roster_day;
+  const offered = ROSTER_ORDER.filter((s) => (reports.ROSTER_STATUSES_ON[day] as readonly string[]).includes(s));
+  return (
+    <>
+      <Field label="Day" {...status("roster_day")}>
+        <ChoiceField
+          label="Day"
+          options={ROSTER_DAYS}
+          {...field("roster_day")}
+          onChange={(next) => {
+            set("roster_day", next);
+            const holds = reports.ROSTER_STATUSES_ON[next] as readonly string[];
+            set("roster_statuses", values.roster_statuses.filter((s) => holds.includes(s)));
+          }}
+        />
+      </Field>
+      <Field label="Statuses" optional {...status("roster_statuses")}>
+        <Inline gap={1}>
+          {offered.map((s) => (
+            <CheckboxField
+              key={s}
+              label={ROSTER_STATUS[s].text}
+              value={values.roster_statuses.includes(s)}
+              onChange={(on) => set("roster_statuses", on ? [...values.roster_statuses, s] : values.roster_statuses.filter((x) => x !== s))}
+            />
+          ))}
+        </Inline>
+      </Field>
+    </>
+  );
+}
+
 /** The filters the chosen source takes; the departments and leave types are read only when one is offered. */
-function SourceFilters({ takes, field, status }: { takes: readonly FilterKey[] } & FieldBindings) {
+function SourceFilters({ takes, field, status, values, set }: { takes: readonly FilterKey[] } & FieldBindings) {
   const departments = useApi("GET /api/v1/departments", { query: { active: "true" }, enabled: takes.includes("department_id") });
   const types = useApi("GET /api/v1/leave/types", { query: { active: "true" }, enabled: takes.includes("leave_type_id") });
   const read: Partial<Record<FilterKey, Array<[string, string]>>> = {
@@ -438,7 +493,9 @@ function SourceFilters({ takes, field, status }: { takes: readonly FilterKey[] }
   };
   return (
     <>
+      {takes.includes("roster_day") && <RosterFilters field={field} status={status} values={values} set={set} />}
       {takes.map((key) => {
+        if (key === "roster_day" || key === "roster_statuses") return null;
         const spec = FILTER_FIELDS[key];
         return (
           <Field key={key} label={spec.label} {...status(key)}>

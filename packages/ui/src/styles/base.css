@@ -15,7 +15,7 @@
     margin: 0;
     background: var(--background);
     color: var(--foreground);
-    font-family: var(--font-sans);
+    font-family: var(--face-body);
     font-size: var(--text-body);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -28,6 +28,8 @@
   /* On the Deep Green panels the ring is the brand yellow, as in the dark theme. */
   .on-dark :focus-visible { outline-color: var(--primary); }
   h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -.016em; }
+  /* Titles in Settings · Appearance's heading face (F30): headings, and the title slots the copy gates read. */
+  h1, h2, h3, h4, [data-ui="page-title"], [data-ui="title"] { font-family: var(--face-heading); }
   p { margin: 0; }
   summary { list-style: none; }
   summary::-webkit-details-marker { display: none; }
@@ -559,6 +561,6 @@
   background: var(--foreground);
   color: var(--background);
   box-shadow: var(--shadow-2);
-  font: 600 var(--text-xs) / 1.5 var(--font-sans);
+  font: 600 var(--text-xs) / 1.5 var(--face-body);
 }
 .leaflet-container .leaflet-tooltip.map-tip::before { display: none; }

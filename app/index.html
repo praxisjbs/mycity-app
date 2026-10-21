@@ -9,12 +9,8 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>MyCity App</title>
-    <script>
-      /* Staging is marked from the first paint (lib/environment.ts in @mycity/ui). */
-      if (/(^|\.)staging\./.test(location.hostname)) { document.documentElement.setAttribute("data-env", "staging"); var i = document.querySelector('link[rel="icon"]'); if (i) i.href = "/favicon-staging.svg"; }
-      /* Theme and density before first paint, so a dark-mode user never sees a white flash (lib/preferences in @mycity/ui). */
-      try { var t = localStorage.getItem("mc-theme"); if (t) document.documentElement.setAttribute("data-theme", t); var d = localStorage.getItem("mc-density"); if (d) document.documentElement.setAttribute("data-density", d); } catch (e) {}
-    </script>
+    <!-- Theme, density, text size and the saved appearance before first paint (public/boot.js). -->
+    <script src="/boot.js"></script>
   </head>
   <body>
     <div id="root"></div>

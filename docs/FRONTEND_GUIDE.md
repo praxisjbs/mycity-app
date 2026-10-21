@@ -587,7 +587,8 @@ packages/ui/
                               theme and variants), base.css (element defaults, focus ring, reduced motion)
     lib/                      history (the window's history: keyed steps, Back closing a phone's
                               overlays, F29), hold (press and hold), cn, format, media (useIsPhone,
-                              useInstalled), preferences (theme, density), slots, ids,
+                              useInstalled), preferences (theme, density, text size), fonts and
+                              appearance (Settings · Appearance applied, F30), slots, ids,
                               environment (the staging marks), plan (what opens where, F14)
     icons/                    Icon (Lucide underneath)
     actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
@@ -625,7 +626,7 @@ catalogue, `docs/COMPONENTS.md`, is the list.
 
 ```
 app/
-  index.html                  theme and density set before first paint (localStorage mc-theme, mc-density)
+  index.html                  loads public/boot.js: theme, density, text size and the saved appearance before first paint
   vite.config.ts              the shared Vite settings, page size from the contract, API mode, PWA manifest, /api proxy
   eslint.config.js            extends @mycity/ui/eslint
   public/                     favicon, PWA icons, badge-96.png (the pin in a phone's status bar)
@@ -843,7 +844,14 @@ pair in both themes.
 
 **Themes.** Light is `:root`; dark is `[data-theme=dark]` on `<html>`, or the device setting when no
 choice is stored. The choice is kept per person (`mc-theme`; `mc-public-theme` on the public site)
-and set before first paint. `useTheme` and `setTheme` from `@mycity/ui` read and change it.
+and set before first paint (the staff app's `public/boot.js`: a file, since the security policy runs
+no inline script). `useTheme` and `setTheme` from `@mycity/ui` read and change it.
+
+**Appearance** (F30, `docs/guides/foundation.md` §6.15). In the hub, Settings · Appearance may replace
+the dark palette (four colours, the rest derived by the contract within AA), name the two faces and set
+the theme and density a person starts on. `/auth/me` carries it and `applyAppearance` from
+`@mycity/ui` writes it into one `<style>` over tokens.css, kept on the device for the next first paint.
+A screen never reads it: it styles with tokens as before. Colours stay out of source (gate 13).
 
 **The Tailwind theme** (`theme.css`) turns each token into a utility (`bg-card`,
 `text-muted-foreground`, `border-input`) and gives the named scales:
@@ -855,7 +863,10 @@ and set before first paint. `useTheme` and `setTheme` from `@mycity/ui` read and
 | Radius | `rounded-ctl` 9 · `rounded-box` 10 · `rounded-card` 14 · `rounded-sheet` 16 px |
 | Variants | `phone:` (760 px and below, the phone shell) · `desk:` (761 px and above) · `dark:` |
 
-Typeface Geist (`@fontsource-variable/geist`), one family.
+Typeface Geist (`@fontsource-variable/geist`) by default. The faces are tokens, `--face-body` and
+`--face-heading` (`font-sans`, `font-heading`; titles take the heading face by themselves), so Settings ·
+Appearance can pick others from a vetted, self-hosted list (`lib/fonts.ts`); documents keep Geist
+(`--face-paper`, `font-paper`).
 
 **Styling (F4).** Inside `packages/ui`: Tailwind utilities on token classes; a `style` prop may set
 a CSS **variable** that a class reads (`w-(--fill)`), which is how every measured bar, pane and
@@ -869,6 +880,10 @@ Anything visual beyond that is a shared component.
 default (36, 40, 14, 14 and 36 px), `[data-density=comfortable]` (40, 48, 15, 15 and 40 px). At
 760 px and below fields are always 16 px and controls, rows and targets at least 44 px. The choice
 is kept per person (`useDensity`, `mc-density`).
+
+**Text size (F30).** Each person's Small, Default, Large or Largest (`useTextSize`, `mc-text-size`,
+`[data-text-size]`) multiplies the type scale and, on desktop, the density sizes by `--text-scale`
+(.93, 1, 1.08, 1.16). A phone keeps its 16 px fields and 44 px targets.
 
 **Motion (F6).** `--ease-out`, `--ease-spring`, `--dur-fast` (120 ms) and `--dur` (200 ms); all
 durations are 0 under `prefers-reduced-motion`.

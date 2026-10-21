@@ -37,6 +37,7 @@ const RUNS = new Set([
   "theme_dark",
   "theme_light",
   "density",
+  "text_size",
   "install",
   "refresh",
   "reload",
@@ -219,6 +220,11 @@ const ACTIONS = Object.freeze([
     run: "density",
     need: null,
     words: ["compact", "comfortable", "spacing", "bigger rows", "smaller rows"],
+  }),
+  a("text_size", "Change Text Size", {
+    run: "text_size",
+    need: null,
+    words: ["text size", "font size", "bigger text", "larger text", "smaller text", "zoom", "readability"],
   }),
   a("install_app", "Install App", {
     run: "install",

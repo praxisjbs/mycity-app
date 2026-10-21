@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 32 items below: 31 done, 1 open | | | | | |
+| M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
 | M2 Productivity & Performance | 10 | 6 | 0 | 4 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -51,9 +51,9 @@ saying who agreed and when.
 | M6 Payroll & Notifications | 6 | 6 | 0 | 0 | 0 | 0 |
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
-| M9 Settings & Governance | 12 | 1 | 0 | 11 | 0 | 0 |
+| M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
-| **Total** | **99** | **49** | **0** | **50** | **0** | **0** |
+| **Total** | **99** | **48** | **0** | **51** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -106,9 +106,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Maps (F21): `GET /maps/search`, `/maps/tiles`, `/maps/reverse` (Geoapify through our API, `GEOAPIFY_API_KEY`), `AddressField` on every address a person types, `MapView` tiles fetched with the session | TB | ☑ | 19/10/2026 |
 | Addresses picked, never typed (F27, gate 22; TB, 20/10/2026): every address a person enters is a pick from the search, a pin, or the device's location while search is down, signed by our API and kept in `place` with its naming job (`docs/guides/addresses.md`) | TB | ☑ | 20/10/2026 |
 | Refresh and history in the hub (F28, F29; TB, 20/10/2026): pull to refresh with two depths (the Pin Drop), the desktop capsule with the Hold Ring, back and forward in the installed app, Back closing a phone's sheets first, this device's trail (8 back, 1 ahead), the installed app reopening where the person was, ⌘K Refresh Screen and Reload App (`docs/FRONTEND_FOUNDATION.md` §3, §5) | TB | ☑ | 20/10/2026 |
+| Appearance in the hub (F30; TB, 21/10/2026): the dark palette derived from four colours in the contract (`appearance.js`, tokens.css's dark block its Deep Green), applied before first paint from `app/public/boot.js` (the theme script left `index.html`, which the security policy never ran), two fonts from a vetted self-hosted list, each person's Text Size, the organisation's default theme and density, `ColorField` and `ThemePreview` (`docs/guides/foundation.md` §6.15) | TB | ☑ | 21/10/2026 |
 
 **Notes**
 
+- 21/10/2026 · TB · Appearance in the hub (F30), from the Milestone 1 handover (Edidiong and Cynthia asked for the dark theme off its green background) and TB's twelve answers (`docs/FRONTEND_FOUNDATION.md` §5): the dark palette is four colours (Background, Card, Brand Green, Primary Yellow) and the contract works out every other dark token (`packages/contract/schemas/appearance.js` `deriveDark`), lightening an ink or darkening a tint until every pair the screens use keeps 4.5:1 and naming what it moved; the pair table and the ratio maths moved there from `tokens.test.ts`, which now holds tokens.css's dark block equal to the derivation of MILESTONES' own four (popover, accent, the muted and subtle inks, the lines and the soft tints moved by a shade; the rail takes the card's colour in dark). `lib/appearance.ts` writes a saved palette and the two faces over the shipped ones, `lib/fonts.ts` loads Inter, IBM Plex Sans, Plus Jakarta Sans, Source Sans 3 or Open Sans only when chosen (none precached), titles take the heading face and documents stay Geist (`--face-paper`). Text Size (Small, Default, Large, Largest) per person on this device scales the type and, on desktop, controls and rows (`--text-scale`; phones keep 16 px fields and 44 px targets), from the account menu, More and ⌘K. `app/index.html`'s inline theme script never ran on staging or production (`script-src 'self'`), so theme, density, text size and the saved palette are now set before first paint by `app/public/boot.js`. New in `@mycity/ui`: `ColorField` (Forms), `ThemePreview` (Display), the `textsize` glyph. Samples for MyCity: `docs/MyCity-ERP-Documents/dark-theme-samples.html` (`scripts/gen/dark-theme-samples.js`). Left: other people's hubs repaint at their next sign-in or reload, not at once.
 - 21/10/2026 · TB · The form system (PR 1 · Ground), from the 21/10 System Health brief (fault #2): `DateField` keeps what is typed. It had rewritten its text from the value it had just handed over, so at 28/10/20 the year read 2020 and a typed 28/10/2026 left the form as 2020-10-28 while the field showed red; the leave server refused it as Already Past. The form now holds only the date the text shows (none while it is half typed or outside `min` and `max`), and a control tells the form what only it can see through the binding's new `onProblem`: "Not a real date" after the pause, "Pick 21/10/2026 or later" at once for a whole date outside the range, and check() refuses both. `DateRangeField` passes either end's. Tests beside each (`DateField.test.tsx`, `useContractForm.test.tsx`). Left: nothing; every `DateField` bound with `f.field` has it, and People · Attendance's Export passes its Period's.
 - 21/10/2026 · TB · `BarChart` (Build kit) copes with a month of days, found on AI Control · Spend (#100): its
   drawing is laid out in the card's own pixels at the chart's height (the placeholder's), so labels stay 11 px
@@ -641,11 +643,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 
 **Notes**
 
+- 21/10/2026 · TB · Reports (#3), from the Milestone 1 handover (a Daily Attendance report filtered to Absent came back empty: nobody is Absent until the 01:30 day-close has closed the day, so a same-day report could never list them): Daily Attendance takes a Day (Today So Far, or Last Working Day, the closed day before) and Statuses, any of them ticked (Absent only on the Last Working Day, Not In only Today; the contract's `ROSTER_STATUSES_ON`), the roster reads `statuses` together, and the file names its day and date. `1152` turns a saved report's one status into a list. Tests: `reports.test.js`, `home-contract.test.js`, `home-reports.test.js` (an absentee on the last working day is in the file), `Reports.test.tsx`. Left: nothing.
 - 21/10/2026 · TB · Overview (#1): Add Work Site's sheet opens on Hours (Usual Shift or Site Hours); on a day of a site with its own hours the Staff day strip's Shift Today shows the site's hours (`docs/guides/home.md` §3 step 10, §6). Left: nothing.
 - 21/10/2026 · TB · Attendance's PR 3 (rules and schedules, `docs/guides/attendance.md` §1.2): Alerts (#2) shows attendance's alerts as the Attendance policy's breaches on the five rules the system keeps (People Approvers, no Over By, Query Due while M3's query is not in), Alert Rules opens with the read-only Attendance Policy card and Set in Attendance Policy, and Home's own Late Arrivals and Missing Clock-Outs rules are switched off with their open alerts dismissed (`1445`; the staging seed keeps two rules). Overview (#1): the day strip and Your Week read the person's own shift (their work schedule, else the company hours). Team (#86): the roster counts only people with a login as expected. Left: nothing on Home for PR 3.
 - 20/10/2026 · TB · Overview (#1): Add Work Site (attendance's PR 4, `docs/guides/home.md` §3 step 10, `docs/guides/attendance.md` §6.11): a button beside New, an entry in New and, on a phone, the floating button's second action, each opening Attendance's temporary site sheet over the Overview (`?action=work-site`, also ⌘K's). The Purpose list is searchable (`SelectField searchable`, packages/ui). A present day on an approved site reads Field on the roster and Team, a Temporary Home Remote. Left: nothing.
@@ -1158,7 +1161,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 72 | Approvals | `approvals` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Dropped | 20/10/2026 |
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
+| 75 | Appearance | `appearance` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -1167,6 +1170,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · Appearance (#75) built, brought forward from M9 by TB (owner GE → TB) after the Milestone 1 handover (`docs/guides/foundation.md` §6.15): the Dark Theme card (Deep Green, Charcoal, Black and Dark Grey as presets, the four colours as `ColorField`s, Save Palette, Restore Previous), the live Preview (`ThemePreview`) drawn from the contract's maths as it is typed, Contrast (the lowest pair, the pairs checked, what was adjusted), Fonts (Heading Font, Body Font, Save Fonts) and Defaults (Theme for Everyone, Density for Everyone, saved as picked). `GET` and `PATCH /settings/appearance`, `POST /settings/appearance/restore` (`settings.appearance.js`, `setting` rows `appearance.*`, no migration), a fresh sign-in for every change, `settings.changed` for the Audit Log; `/auth/me` carries `appearance` for every screen. The INTERIM `app/src/api/types/settings.ts` is gone. Phone: the cards one under another, the preset chips scrolling in their row, the fields full width, Save Palette at the foot of its card. Tests: `settings.test.js` (integration), `appearance-contract.test.js`, `Appearance.test.tsx`. Left: Edidiong to pick a palette from the samples, then paste it on staging and production.
 - 21/10/2026 · TB · From the 21/10 System Health brief. Documents & Numbering (#76), fault #3: a scheme's three rules are the contract's (`NumberingSchemeSave`), so the form marks them as it is filled rather than on Save ("Needed when it resets", "Add sequence digits", "Add digits or period"), and Each Year or Each Month ticks Period. Faults (#97): a refused form is recorded under its own rule and the route as declared (`LEAVE_SPANS_YEARS: ends_on` at `POST /api/v1/ess/leave`, where three lines had read `VALIDATION_FAILED` at `POST /leave`). Of the brief's other faults, #5 and #6 were already fixed (Find Prices as a job, #107; refused addresses, #111) and #4 is Geoapify's outage (Ignore it). Tests: `app/src/features/settings/Numbering.test.tsx`, `domain.test.js`, `middleware.test.js`. Left: mark #1 to #3 Fixed and #4 Ignored once this is on staging.
 - 21/10/2026 · TB · Faults (#97) on a phone: a tap on a row's tick opened the fault instead of picking
   it, so nothing could be picked for Download Brief. The phone card's open button is stretched over the

@@ -85,7 +85,8 @@ These finish M0 and no prompt can do them:
 | Settings · Approvals (#72) | Settings | `settings` view; edit to change | D | **Built** (17/10/2026) | Every flow, its stages and version; Edit Stages saves a new version |
 | ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
 | Settings · Integrations (#77) | Settings | `integrations` view, edit, delete (Implementation Team, System Administrator) | none | **Built** (20/10/2026) | Its own guide: `docs/guides/integrations.md` |
-| Settings · Appearance (#75), Notifications (#74) | Settings | | none | Mock | Coming Soon (#74 is M6) |
+| Settings · Appearance (#75) | Settings | `settings` view; edit to change | none | **Built** (21/10/2026, brought forward from M9 by TB) | The hub's dark palette from four colours, a live preview, contrast, two fonts, the theme and density everyone starts on (§6.15) |
+| Settings · Notifications (#74) | Settings | | none | Built with the notification engine | `docs/guides/notifications.md` |
 | Settings · Attendance Policy (#73) | Settings | Retired | LA | **Dropped** (TB, 20/10/2026) | The Attendance policy is a rules policy on Knowledge Hub · Policies: `docs/guides/policies.md`, its rules `docs/guides/attendance.md` §6.15 |
 
 ## 3 · How the screens relate
@@ -205,6 +206,7 @@ are drawn in the app by PDF.js (FRONTEND_FOUNDATION §5, PR 3 question 4).
 | `GET /settings/roles` (search; sort), `/roles/catalogue`, `/roles/matrix`, `/roles/:id` | `settings` view |
 | `POST /settings/roles`, `PUT /settings/roles/:id`, `DELETE /settings/roles/:id` | `settings` create, edit, delete |
 | `GET /settings/numbering` (search; sort), `/numbering/summary`, `PUT /settings/numbering/:doc_type` | `settings` view, edit |
+| `GET /settings/appearance`, `PATCH /settings/appearance` (any of `dark`, `fonts`, `theme_default`, `density_default`; `dark: null` is MyCity's own), `POST /settings/appearance/restore` (the palette the last change replaced) | `settings` view, edit; a change needs a fresh sign-in (403 `REAUTH_REQUIRED`), §6.15 |
 | `GET /settings/security`, `PATCH /settings/security` | `settings` view, edit |
 | `GET /settings/security/failed-logins` (days; sort), `/security/sessions` (search; sort), `POST /settings/security/sessions/:id/end` | `settings` view, edit |
 | `GET /audit` (module, action, actor, record, dates; search; sort), `/audit/summary` | `settings` view with scope all, or the CEO |
@@ -502,8 +504,8 @@ As built (17/10/2026):
 
 ### 6.8 Settings screens not in this guide
 
-Integrations (#77) has its own guide, `docs/guides/integrations.md`. Appearance (#75) and
-Notifications (#74, M6) stay Coming Soon. Attendance Policy
+Integrations (#77) has its own guide, `docs/guides/integrations.md`, and Notifications (#74)
+`docs/guides/notifications.md`. Appearance (#75) is §6.15 here. Attendance Policy
 (#73) is dropped (TB, 20/10/2026): every policy, the Attendance policy included, lives on Knowledge
 Hub · Policies (`docs/guides/policies.md`). Settings · Approvals lists the Policy Approval route
 (`policy.approval`, seeded in `1396`: one stage, the CEO) and, from attendance's PR 4, the Temporary
@@ -672,6 +674,57 @@ as a mailbox or a forwarder (TB, 21/10/2026). One that does not is refused at on
 System Sender lists as a Refused Address and never retries (`integrations.md` §6.16); the cure is the
 mailbox in cPanel, or the right address in People (`docs/runbooks/dns-and-mail.md` §5).
 
+### 6.15 Appearance (TB, 21/10/2026; FRONTEND_FOUNDATION F30)
+
+At the Milestone 1 handover (21/10/2026) Edidiong and Cynthia asked for the dark theme on charcoal,
+black or dark grey, the green kept as a highlight, and samples to choose from first. TB's twelve
+answers that day decided what Settings · Appearance is. It changes **the hub only**: the public site,
+documents (PDFs print in Geist on paper) and email are untouched, and the light theme stays
+MILESTONES §5.1.
+
+- **The dark palette is four colours**, pasted as `#RRGGBB` (or without the `#`, any case):
+  Background, Card, Brand Green (links, highlights, the selected item's text) and Primary Yellow
+  (buttons, the focus ring). Everything else is worked out by fixed maths in the contract,
+  `packages/contract/schemas/appearance.js` `deriveDark()`, never by a model: a menu a step above the
+  card, the hover two steps above, a recess below the page; near-white inks tinted by the background's
+  hue; dividers faintly in the green and control outlines at 3:1; the rail in the card's colour; each
+  status colour on a dark tint of its own hue. Each ink is then lightened, and each tint darkened, half
+  a point at a time until every pair the screens use (`pairs("dark")`, the table gate 14 reads) keeps
+  4.5:1; what moved is listed with the value it started from. A background or card too light for white
+  text (luminance over 0.04 or 0.06) reads "Too light for dark", a yellow too dark to carry text "Too
+  dark for buttons", a value that is not a colour "Use #RRGGBB", each on its own field.
+- **The presets** are Deep Green (MILESTONES §5.2's own four, and tokens.css's dark block, which
+  `tokens.test.ts` holds equal to `deriveDark()` of them), Charcoal, Black and Dark Grey, the samples
+  in `docs/MyCity-ERP-Documents/dark-theme-samples.html` (written by `scripts/gen/dark-theme-samples.js`
+  from the same maths, and held current by `tests/unit/appearance-contract.test.js`). Picking one fills
+  the four fields; Deep Green saved is MyCity's own again.
+- **Kept as `setting` rows**, no table of their own: `appearance.dark` (the four; none is Deep Green),
+  `appearance.dark_previous` (`{ seeds, replaced_at }`, what Restore Previous brings back; a restore
+  swaps the two), `appearance.fonts` (`{ heading, body }`; none is Geist for both),
+  `appearance.theme_default` and `appearance.density_default` (none is Follow the Device and Compact).
+  The derived tokens are never stored: they are worked out on every read, so a token the maths gains
+  later reaches a palette saved before it. `settings.appearance.js` is the one reader and writer.
+- **Fonts** are a vetted list, each self-hosted in `packages/ui` (`lib/fonts.ts`): Geist, Inter, IBM
+  Plex Sans, Plus Jakarta Sans, Source Sans 3 and Open Sans, every one covering 400 to 700 with
+  tabular figures. Lato, offered in the questions, was left out: it has no 600, the weight every title
+  uses. A face other than Geist loads only when chosen, as its own CSS chunk, and is never precached.
+  Titles (headings and the copy gates' title slots) take the Heading Font, everything else the Body Font.
+- **The defaults**, Theme for Everyone and Density for Everyone, apply to a person who has chosen
+  neither on this device; a person's own choice always wins (`applyDefaults`).
+- **Text Size** is each person's own (Small, Default, Large, Largest; `mc-text-size` on the device, as
+  density is): it scales the type, and on desktop the controls and rows with it (`--text-scale`); a
+  phone keeps 16 px fields and 44 px targets. It is chosen from the account menu, More and ⌘K, never on
+  Settings · Appearance. Corner radius is not configurable.
+- **Who**: anyone who may open Settings sees it; `settings` edit changes it, after a fresh sign-in
+  (`security.assertFresh`, as a key on Integrations), since one save repaints the hub for everyone. Each
+  change is `settings.changed` (entity `appearance`, the parts before and after) for the Audit Log;
+  saving what is there records nothing.
+- **Reaching every screen**: `/auth/me` carries `appearance` (the dark tokens when the palette is not
+  Deep Green, else null; the fonts; the defaults). `lib/appearance.ts` writes them into one `<style>`
+  whose selectors outrank tokens.css's, and keeps that CSS on the device, so `app/public/boot.js`
+  paints it before the bundle loads. Someone else's hub picks up a new palette at their next sign-in
+  or reload.
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -683,7 +736,7 @@ mailbox in cPanel, or the right address in People (`docs/runbooks/dns-and-mail.m
 | `document.requested` | B | The employee it is about is told; the notice opens My Documents |
 | `document.verified`, `document.request_cancelled` | B | Audit only |
 | `role.*`, `permission.changed`, `field_visibility.changed`, `capability.changed`, `settings.security_changed` | C | `security: true`: the watchers are told; the grants cache cleared |
-| `settings.changed` (organisation, working week, holidays, numbering) | C | Audit only; the working week and holidays clear the calendar cache |
+| `settings.changed` (organisation, working week, holidays, numbering, appearance) | C | Audit only; the working week and holidays clear the calendar cache; an appearance change reaches each hub through `/auth/me` (§6.15) |
 | `audit.export_requested` | C | `audit.build_export` makes the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked) into the file the request reserved, which the Audit Log downloads (§6.12); nothing is emailed |
 | `export-cleanup` (scheduler, every hour at twenty past) | B | Removes every export file 24 hours after it was made (`vault.remove`, `document.removed`; §6.12) |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
@@ -741,6 +794,8 @@ screen.
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address (suggestions as it is typed, §6.13), phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give, Period ticked once it starts again, each rule's mark as the scheme is filled; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
+| Settings · Appearance (#75) | Dark Theme: the presets (Deep Green, Charcoal, Black, Dark Grey, and Custom while the colours are none of them), Background, Card, Brand Green, Primary Yellow, Undo Changes, Save Palette, Restore Previous when there is one; errors "Use #RRGGBB", "Too light for dark", "Too dark for buttons"; Preview, the hub drawn in the colours and fonts as they are typed; Contrast: Lowest Contrast (the ratio, and the text colour it is), Pairs Checked, Adjusted; Fonts: Heading Font, Body Font, Undo Changes, Save Fonts; Defaults: Theme for Everyone (Follow the Device, Light, Dark), Density for Everyone (Compact, Comfortable), each saved as picked; toasts "Dark palette saved", "Previous palette restored", "Fonts saved", "Default theme saved", "Default density saved"; Confirm It's You before a change when the session needs it | Help terms on the Dark Theme title ("The hub's dark theme, for everyone. The light theme stays MyCity's own."), on Brand Green, Primary Yellow, Contrast and Defaults; a Details row on Contrast listing each adjusted colour, from and to | How the palette is worked out, why a pair is 4.5:1, where it is stored and how it reaches each hub: §6.15 |
+| Text Size (account menu, More, ⌘K) | Title "Text Size"; Small, Default, Large, Largest; toast "Text size: Large" | None | That it is kept per device and what it scales: §6.15 |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
 | Settings · Audit Log | Today, This Week, This Month, Sensitive; who, what, record, module, when; Module and Dates filters, search; an entry opens its fields before and after with Open Record; Entries by Module; Export | Restricted values masked with a help term | How `emit()` writes the ledger: BACKEND_STRUCTURE |
 | Settings · Approvals | Flows, Open Requests, Overdue, Needs Fixing; the flows (Flow, Stages, Version, Open Requests, Status); a flow's route and each stage's Approver, Applies When, Time Limit; Edit Stages, then per stage Move Up, Move Down, Edit, Remove, Add Stage, Save Stages; a stage's Stage Name, Approver, Role or Person, Applies When, Comparison and value, Time Limit, Hours | Help term on Applies When | Versioning of open requests, who decides: §6.5 |
@@ -757,6 +812,8 @@ screen.
 | Settings · Organisation (#69) | Company card, the Brand card (the three pictures in a row, each with its upload as a 44 px icon button and Remove under it), then holiday cards by year, then the week | None | New Holiday in the floating button | More, Settings |
 | Settings · Roles & Permissions | Role cards; a role opens full screen with its modules as chips grouped by level, and a chip (while editing) opens a sheet with the level, records, Approve and Export | The Matrix view and its switch, the Record Scope column | New Role in the floating button; Edit Role, then Save Role, full width | More, Settings; Back closes the role |
 | Settings · Documents & Numbering (#76) | Counts as cards, then document cards: next number, when it starts again | Prefix and Issued columns | A card opens its scheme in a sheet | More, Settings |
+| Settings · Appearance (#75) | The Dark Theme card (the preset chips scrolling in their row, the four colours full width, Save Palette at its foot), then the Preview, Contrast (cards two to a row), Fonts and Defaults one under another | The page subtitle | Save Palette, full width at the foot of its card | More, Settings |
+| Text Size | A bottom sheet with the four sizes as one segmented row | None | A tap applies it | More's row (the text size button), ⌘K |
 | Settings · Security | Counts as cards, the three rules, two-step by role as switches | Method and address of a session, the person and address of a failed sign-in | Save Rules, full width | More, Settings |
 | Settings · Audit Log | Entry cards: who, what, when | Export, Entries by Module, the Module column | Filter in a sheet | More, Settings |
 | Settings · Approvals | KPI cards two to a row, then flow cards (name, stages, version, open requests) | The Status column | Edit Stages in the flow's full sheet; Save Stages full width | More, Settings |
@@ -835,6 +892,8 @@ screen.
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · Settings · Appearance (#75) built (§6.15, §2, §5, §7, §10): the hub's dark palette from four colours derived by the contract's maths with every pair at AA, presets with the samples file, a live preview, contrast, two fonts from a vetted list, the theme and density everyone starts on; `/auth/me` carries it, `app/public/boot.js` paints it before first paint; each person's Text Size from the account menu, More and ⌘K.
 
 - 21/10/2026 · TB · From the 21/10 System Health brief. Documents & Numbering (#76, fault #3): a scheme's three rules are the contract's, so the form marks them as it is filled, and Each Year or Each Month ticks Period (§10, §11; "Add digits or a period" is now "Add digits or period", four words). Request Leave, shared by My Leave and People · Leave (faults #1 and #2): the types show what is left of the First Day's year and New Year is marked as typed (`ess.md` §6, §10). The API records a refused form under the rule that refused it, at the route as declared (`system-health.md` §6).
 - 21/10/2026 · AJ · Settings · Documents & Numbering names the Project and Task schemes (M2 My Workspace; `settings.service.js`, `schemas/settings.js`).

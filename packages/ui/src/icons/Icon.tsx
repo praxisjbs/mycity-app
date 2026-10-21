@@ -12,6 +12,7 @@
  */
 import type { LucideIcon } from "lucide-react";
 import {
+  ALargeSmall,
   ArrowUpDown,
   Bell,
   BellOff,
@@ -171,6 +172,8 @@ export const ICONS = {
   help: CircleHelp,
   logout: LogOut,
   rows: Rows3,
+  /* A person's text size (F30). */
+  textsize: ALargeSmall,
   share: Share,
   addbox: SquarePlus,
   panel: PanelLeft,

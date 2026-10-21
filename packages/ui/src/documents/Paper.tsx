@@ -33,7 +33,7 @@ export function Paper({ children, note, className }: PaperProps) {
           {note}
         </p>
       )}
-      <div {...content} className="mx-auto max-w-prose rounded-box border border-border bg-paper px-7 py-6 text-xs leading-relaxed text-paper-ink shadow-2 phone:px-4 phone:py-4">
+      <div {...content} className="mx-auto max-w-prose rounded-box border border-border bg-paper px-7 py-6 font-paper text-xs leading-relaxed text-paper-ink shadow-2 phone:px-4 phone:py-4">
         {children}
       </div>
     </div>

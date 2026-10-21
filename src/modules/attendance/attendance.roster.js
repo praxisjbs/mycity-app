@@ -402,23 +402,26 @@ const yesNo = (value) => (typeof value === "boolean" ? value : null);
  * their status, clock-in and clock-out, late and worked minutes, the worksite of their clock-in (null
  * when they work remotely or are not in), the yesterday flag and whether they are flagged.
  * Filtered, searched and sorted in SQL. The filters combine: `flagged` with `status` "late"
- * keeps the late, with `no_clock_out_yesterday` the open shifts.
+ * keeps the late, with `no_clock_out_yesterday` the open shifts. `statuses` keeps anyone in
+ * one of them (a report's Late and Absent together).
  *
  * @param {{query: Function}} client
- * @param {{date?: string, status?: string, department_id?: string, q?: string,
+ * @param {{date?: string, status?: string, statuses?: string[], department_id?: string, q?: string,
  *          no_clock_out_yesterday?: boolean, flagged?: boolean}} filters
  * @param {{scope: string, scope_ids: string[]|null}} scope
  * @param {{page?: number, sort?: {field: string, dir: string}}} query  the validated list query
  */
 async function page(client, filters, scope, query = {}) {
   const f = filters || {};
-  if (f.status !== undefined && f.status !== null && !STATUSES.includes(f.status))
-    throw new TypeError(`roster: "${f.status}" is not a roster status`);
+  for (const s of [f.status, ...(f.statuses || [])])
+    if (s !== undefined && s !== null && !STATUSES.includes(s))
+      throw new TypeError(`roster: "${s}" is not a roster status`);
   const { day, yesterday } = await dayAndYesterday(client, f.date);
   const params = [];
   const roster = rosterSql(day, yesterday, scope, params, f);
   const bind = binder(params);
   const wanted = bind(f.status || null);
+  const wantedAny = bind(f.statuses && f.statuses.length ? f.statuses : null);
   const noClockOut = bind(yesNo(f.no_clock_out_yesterday));
   const flagged = bind(yesNo(f.flagged));
   return pageQuery(
@@ -428,6 +431,7 @@ async function page(client, filters, scope, query = {}) {
             r.worked_minutes, r.worksite, r.no_clock_out_yesterday, ${FLAGGED} AS flagged, ${TOTAL_COL}
        FROM (${roster}) r
       WHERE (${wanted}::text IS NULL OR r.status = ${wanted}::text)
+        AND (${wantedAny}::text[] IS NULL OR r.status = ANY(${wantedAny}::text[]))
         AND (${noClockOut}::boolean IS NULL OR r.no_clock_out_yesterday = ${noClockOut}::boolean)
         AND (${flagged}::boolean IS NULL OR ${FLAGGED} = ${flagged}::boolean)
       ORDER BY ${orderBy(query, SORTS, "r.employee_id")}`,

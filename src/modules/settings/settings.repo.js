@@ -22,6 +22,29 @@ async function settingsByKey(db, keys) {
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 
+/**
+ * The newest change among the keys asked for: when, and the name of who made it (null for a
+ * row the system wrote). Null when none of them is set.
+ */
+async function lastChangeOf(db, keys) {
+  return one(
+    db,
+    `SELECT s.updated_at, trim(e.first_name || ' ' || e.last_name) AS updated_by
+       FROM setting s
+       LEFT JOIN app_user u ON u.user_id = s.updated_by
+       LEFT JOIN employee e ON e.employee_id = u.employee_id
+      WHERE s.key = ANY($1::text[])
+      ORDER BY s.updated_at DESC, s.key
+      LIMIT 1`,
+    [keys],
+  );
+}
+
+/** Takes the setting rows asked for until the transaction ends, so two saves take turns. */
+async function lockSettings(db, keys) {
+  await db.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`setting:${[...keys].sort().join(",")}`]);
+}
+
 /** Write one setting; a null value removes it, so "not set" reads as absent. */
 async function putSetting(db, key, value, userId) {
   if (value === null || value === undefined) {
@@ -238,6 +261,8 @@ function failedSignIns(db, query) {
 
 module.exports = {
   settingsByKey,
+  lastChangeOf,
+  lockSettings,
   putSetting,
   workingWeek,
   putDay,

@@ -6,9 +6,11 @@
  * Every text pair the screens use keeps WCAG AA (4.5:1) in both themes: light,
  * dark as chosen ([data-theme=dark]) and dark from the device setting, which
  * must also equal the chosen dark. The pair table and the ratio maths live in
- * ONE place, the token test packages/ui/src/styles/tokens.test.ts, which reads
- * tokens.css itself; this gate runs exactly that test, so a token edited
- * without its pair holding fails here by name, not in an axe run on one screen.
+ * ONE place, the contract (packages/contract/schemas/appearance.js, which also
+ * derives a palette saved on Settings · Appearance); the token test
+ * packages/ui/src/styles/tokens.test.ts reads tokens.css against them, and this
+ * gate runs exactly that test, so a token edited without its pair holding fails
+ * here by name, not in an axe run on one screen.
  *
  * Refuses: a failing pair (text token, surface token, the two values and the
  * ratio are printed), a token a pair needs that is missing, a device-dark

@@ -180,6 +180,8 @@ async function me(db, userId) {
     roles: roles.map((r) => ({ code: r.code, name: r.name })),
     home_view: view,
     manages_people: row.manages_people === true,
+    // Required here, not at the top: settings.appearance reads security, which reads this file.
+    appearance: await require("../settings/settings.appearance").applied(db),
   };
 }
 

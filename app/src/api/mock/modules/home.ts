@@ -1381,7 +1381,7 @@ interface ReportSeed {
  */
 const REPORT_SEEDS: ReportSeed[] = [
   { name: "Daily Attendance", owner: "cynthia", source: "daily_attendance", shared: true, made: 60, schedule: { recurrence: { freq: "daily", working_days_only: true }, time: "18:00", formats: ["pdf"], to: ["cynthia", "ifeoma", "damilola"] } },
-  { name: "Late Arrivals", owner: "cynthia", source: "daily_attendance", filters: { roster_status: "late" }, shared: false, made: 40, schedule: { recurrence: { freq: "weekly", by_weekday: [1] }, time: "09:30", formats: ["xlsx"], to: ["cynthia"] } },
+  { name: "Late Arrivals", owner: "cynthia", source: "daily_attendance", filters: { roster_day: "last_working_day", roster_statuses: ["late", "absent"] }, shared: false, made: 40, schedule: { recurrence: { freq: "weekly", by_weekday: [1] }, time: "09:30", formats: ["xlsx"], to: ["cynthia"] } },
   { name: "Leave This Month", owner: "cynthia", source: "leave", filters: { leave_status: "approved" }, shared: true, made: 90, schedule: { recurrence: { freq: "monthly", by_month_day: 1 }, time: "08:00", formats: ["pdf", "xlsx"], to: ["cynthia", "ngozi", "musa"] } },
   { name: "Open High Alerts", owner: "ifeoma", source: "open_alerts", filters: { severity: "high" }, shared: true, made: 30, schedule: { recurrence: { freq: "weekly", by_weekday: [1] }, time: "07:45", formats: ["pdf"], to: ["ifeoma", "cynthia"], active: false } },
   { name: "Headcount by Department", owner: "cynthia", source: "headcount", shared: true, made: 20 },

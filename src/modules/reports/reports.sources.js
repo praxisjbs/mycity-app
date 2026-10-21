@@ -51,7 +51,8 @@ const grantsCache = require("../../shared/rbac/grants-cache");
 const fieldMask = require("../../shared/rbac/field-mask");
 const catalogue = require("../../shared/events/catalogue");
 const lagos = require("../../shared/time/lagos");
-const { formatLongDate, formatMonth } = require("../../shared/time/day-first");
+const workingWeek = require("../../shared/time/working-week");
+const { formatDate, formatLongDate, formatMonth } = require("../../shared/time/day-first");
 const money = require("../../shared/money/money");
 const roster = require("../attendance/attendance.roster");
 const leave = require("../leave/leave.service");
@@ -84,6 +85,21 @@ const col = (key, header, kind = "text") => Object.freeze({ key, header, kind })
  * The sources built on M0 and M1 tables
  * ------------------------------------------------------------------ */
 
+/**
+ * The day Daily Attendance reads at `at` (Lagos): today, or the last working day before it,
+ * as the roster's own No Clock-Out Yesterday reads it (Saturday on a Monday, the day before a
+ * holiday after one). The day-close has closed that day by its 01:30 run.
+ * @param {{query: Function}} db
+ * @param {object} filters  saved_report.definition.filters
+ * @param {Date} at
+ * @returns {Promise<string>} YYYY-MM-DD
+ */
+async function rosterDate(db, filters, at) {
+  const today = lagos.today(at);
+  if ((filters && filters.roster_day) !== "last_working_day") return today;
+  return roster.yesterdayOf(today, await workingWeek.loadCalendar(db)).date;
+}
+
 const dailyAttendance = {
   label: "Daily Attendance",
   capabilities: null,
@@ -98,10 +114,10 @@ const dailyAttendance = {
     col("worksite", "Worksite"),
     col("no_clock_out_yesterday", "No Clock-Out Yesterday"),
   ],
-  read: (db, reader, filters, page, at) =>
+  read: async (db, reader, filters, page, at) =>
     roster.page(
       db,
-      { date: lagos.today(at), status: filters.roster_status, department_id: filters.department_id },
+      { date: await rosterDate(db, filters, at), statuses: filters.roster_statuses, department_id: filters.department_id },
       reader.scope,
       { page },
     ),
@@ -596,13 +612,18 @@ async function allPages(read) {
  * they are, read from the rows when they say it; a filter is shown even when it matched none.
  * @param {string} key
  * @param {object} filters  saved_report.definition.filters
- * @param {{departmentName?: string|null, leaveTypeName?: string|null}} [names]
+ * Daily Attendance always names its day, with the date it read when the caller knows it.
+ * @param {{departmentName?: string|null, leaveTypeName?: string|null, rosterOn?: string|null}} [names]
  */
-function describeFilters(key, filters, { departmentName = null, leaveTypeName = null } = {}) {
+function describeFilters(key, filters, { departmentName = null, leaveTypeName = null, rosterOn = null } = {}) {
   const out = [];
   const f = filters || {};
+  if (key === "daily_attendance") {
+    const day = f.roster_day === "last_working_day" ? "Last Working Day" : "Today So Far";
+    out.push({ label: "Day", value: rosterOn ? `${day}, ${formatDate(rosterOn)}` : day });
+  }
   if (f.department_id) out.push({ label: "Department", value: departmentName || "One department" });
-  if (f.roster_status) out.push({ label: "Status", value: words(f.roster_status) });
+  if (f.roster_statuses) out.push({ label: "Status", value: f.roster_statuses.map(words).join(", ") });
   if (f.leave_status) out.push({ label: "Status", value: words(f.leave_status) });
   if (f.leave_type_id) out.push({ label: "Leave Type", value: leaveTypeName || "One leave type" });
   if (f.category) out.push({ label: "Category", value: words(f.category) });
@@ -649,5 +670,6 @@ module.exports = {
   scopeOn,
   openTo,
   gather,
+  rosterDate,
   describeFilters,
 };

@@ -1,4 +1,4 @@
-/** The helpers every screen uses: classes, formats, the phone and installed-app queries, the window's history, press and hold, preferences, the gate slots, control ids, the environment, the delivery plan, a mail body made ready for EmailFrame, the links in a message and the browser's captions while recording. */
+/** The helpers every screen uses: classes, formats, the phone and installed-app queries, the window's history, press and hold, preferences, the typefaces and the saved appearance, the gate slots, control ids, the environment, the delivery plan, a mail body made ready for EmailFrame, the links in a message and the browser's captions while recording. */
 export { cn } from "./cn";
 export * from "./format";
 export { INSTALLED_QUERY, PHONE_QUERY, isInstalled, useInstalled, useIsMobile, useIsPhone, useMediaQuery } from "./media";
@@ -17,6 +17,8 @@ export {
 } from "./history";
 export { useHold, type HoldHandlers, type HoldOptions } from "./hold";
 export * from "./preferences";
+export { fontStack, loadFont, FONT_IDS, type FontId } from "./fonts";
+export { applyAppearance, appearanceCss, tokenDeclarations, APPEARANCE_STYLE_ID, type AppliedAppearance } from "./appearance";
 export { SLOTS, content, slot, type Slot } from "./slots";
 export { describedBy, useControlIds, type ControlIds } from "./ids";
 export * from "./environment";

@@ -1,7 +1,7 @@
 "use strict";
 /**
- * /api/v1/settings: Organisation, Roles & Permissions, Documents & Numbering and
- * Security. Reading needs `settings` view; a change needs create, edit or delete as
+ * /api/v1/settings: Organisation, Roles & Permissions, Documents & Numbering,
+ * Appearance and Security. Reading needs `settings` view; a change needs create, edit or delete as
  * it says. Users (/users) and Approvals (workflow) are served by their own modules.
  */
 const express = require("express");
@@ -107,6 +107,20 @@ route(router, "put", "/numbering/:doc_type",
     summary: "Change a numbering scheme",
   },
   edit, controller.saveScheme);
+
+/* Appearance (foundation.md §6.15): a change repaints the hub for everyone, so it needs a fresh sign-in too */
+
+route(router, "get", "/appearance",
+  { response: c.appearance.Appearance, summary: "The hub's dark palette, fonts and defaults" },
+  view, controller.appearance);
+
+route(router, "patch", "/appearance",
+  { body: c.appearance.AppearancePatch, response: c.appearance.Appearance, summary: "Change the dark palette, the fonts or the defaults" },
+  edit, controller.updateAppearance);
+
+route(router, "post", "/appearance/restore",
+  { body: c.common.EmptyBody, response: c.appearance.Appearance, summary: "Bring back the dark palette the last change replaced" },
+  edit, controller.restoreAppearance);
 
 /* Security */
 

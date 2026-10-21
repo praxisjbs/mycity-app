@@ -138,17 +138,26 @@
   color-scheme: light;
 }
 
-/* Shape, density and motion: on <html> only, so a themed frame keeps the page's density. */
+/* Shape, type, density and motion: on <html> only, so a themed frame keeps the page's density. */
 :root {
   /* ---- Shape ---- */
   --radius: 0.5rem;
 
+  /* ---- Typefaces (F30): Settings · Appearance's two, Geist until it names others (lib/appearance.ts) ---- */
+  --face-body: "Geist Variable", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --face-heading: var(--face-body);
+  /* Documents print in Geist whatever the screen's faces are, so a preview reads as the file. */
+  --face-paper: "Geist Variable", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* ---- Text size (F30), per person: the type scale, and on desktop the controls and rows with it ---- */
+  --text-scale: 1;
+
   /* ---- Density (F5): compact is the default ---- */
-  --control-h: 36px;
-  --row-h: 40px;
-  --text-body: 14px;
-  --text-field: 14px;
-  --tap: 36px;
+  --control-h: calc(36px * var(--text-scale));
+  --row-h: calc(40px * var(--text-scale));
+  --text-body: calc(14px * var(--text-scale));
+  --text-field: calc(14px * var(--text-scale));
+  --tap: calc(36px * var(--text-scale));
 
   /* ---- Motion (F6) ---- */
   --ease-out: cubic-bezier(.2, .8, .2, 1);
@@ -158,12 +167,17 @@
 }
 
 [data-density="comfortable"] {
-  --control-h: 40px;
-  --row-h: 48px;
-  --text-body: 15px;
-  --text-field: 15px;
-  --tap: 40px;
+  --control-h: calc(40px * var(--text-scale));
+  --row-h: calc(48px * var(--text-scale));
+  --text-body: calc(15px * var(--text-scale));
+  --text-field: calc(15px * var(--text-scale));
+  --tap: calc(40px * var(--text-scale));
 }
+
+/* A person's text size (lib/preferences.ts, mc-text-size); Default is no attribute. */
+[data-text-size="small"] { --text-scale: .93; }
+[data-text-size="large"] { --text-scale: 1.08; }
+[data-text-size="largest"] { --text-scale: 1.16; }
 
 /*
  * A phone: 16 px in fields (no zoom on focus) and 44 px targets, in either density.
@@ -191,41 +205,54 @@
 }
 
 /*
- * Dark (MILESTONES §5.2): surfaces on the brand's own hue (171°). Written twice,
- * identically: for a person who chose dark, and for the device setting when no
- * choice is stored.
+ * Dark (MILESTONES §5.2): surfaces on the brand's own hue (171°). Every value but the
+ * chart series, the lines and the shadows is deriveDark() of MILESTONES' four dark
+ * colours (packages/contract/schemas/appearance.js DEFAULT_DARK), the same maths that
+ * Settings · Appearance uses for a palette someone pastes; tokens.test.ts holds the two
+ * equal. A palette saved there is written over these at run time (lib/appearance.ts).
+ * Written twice, identically: for a person who chose dark, and for the device setting
+ * when no choice is stored.
  */
 [data-theme="dark"] {
   --background: #01110E;
-  --foreground: #E6EDEB;              /* 16.25:1 on background, 14.17:1 on card */
+  --foreground: #E6EDEB;              /* 10.56:1 or more, lowest on accent */
   --card: #01221D;
-  --card-foreground: #E6EDEB;         /* 14.17:1 */
-  --popover: #012B24;
-  --popover-foreground: #E6EDEB;      /* 12.88:1 */
-  --muted: #010C0A;                   /* derived: recessed surface; muted-foreground on it 9.64:1 */
-  --muted-foreground: #A9B8B4;        /* 8.18:1 on card, 6.02:1 on accent */
-  --subtle-foreground: #8EA09B;       /* derived: 7.03:1 on background, 6.13:1 on card, 5.58:1 on popover, 4.51:1 on accent */
-  --accent: #013C33;
-  --accent-foreground: #45C8B0;       /* derived: 5.98:1 on accent, 8.13:1 on card, 9.32:1 on background */
-  --eyebrow: #BD9743;                 /* derived, the eyebrow amber lightened: 6.15:1 on card, 4.52:1 on accent */
-  --border: #125A4D;
-  --input: #1A6B5C;                   /* 3.04:1 on background (a boundary, not text) */
-  --ring: #FFDF55;                    /* 14.65:1 on background */
-  --success: #32D583;                 /* 8.80:1 on card */
-  --success-soft: #042117;            /* derived: success on it 8.89:1 */
-  --warning: #FDB022;                 /* 9.14:1 on card */
-  --warning-soft: #241703;            /* derived: warning on it 9.52:1 */
-  --destructive: #F97066;             /* 6.04:1 on card */
-  --destructive-soft: #260D0B;        /* derived: destructive on it 6.58:1 */
-  --info: #84ADFF;                    /* 7.54:1 on card */
-  --info-soft: #081529;               /* derived: info on it 8.18:1 */
+  --card-foreground: #E6EDEB;
+  --popover: #012C25;
+  --popover-foreground: #E6EDEB;
+  --muted: #010C0A;
+  --muted-foreground: #A6B9B6;        /* 6.11:1 or more, lowest on accent */
+  --subtle-foreground: #8BA29E;       /* 4.63:1 or more, lowest on accent */
+  --accent: #023B32;
+  --accent-foreground: #45C8B0;       /* 6.06:1 or more, lowest on accent */
+  --eyebrow: #BD9743;                 /* 4.58:1 or more, lowest on accent */
+  --border: #0A594D;
+  --input: #0C7564;                   /* 3.44:1 on background (a boundary, not text) */
+  --ring: #FFDF55;
+  --primary: #FFDF55;
+  --primary-foreground: #01221D;      /* 12.77:1 or more, lowest on primary */
+  --sidebar: #01221D;
+  --sidebar-foreground: #FFFFFF;      /* 16.83:1 or more, lowest on sidebar */
+  --sidebar-muted: #A1B5B1;           /* 5.83:1 or more, lowest on sidebar-accent */
+  --sidebar-accent: #023B32;
+  --sidebar-accent-foreground: #FFFFFF; /* 12.54:1 or more, lowest on sidebar-accent */
+  --sidebar-primary: #FFDF55;
+  --sidebar-primary-foreground: #01221D;
+  --success: #32D583;                 /* 8.80:1 or more, lowest on card */
+  --success-soft: #072013;
+  --warning: #FDB022;                 /* 9.14:1 or more, lowest on card */
+  --warning-soft: #211706;
+  --destructive: #F97066;             /* 6.04:1 or more, lowest on card */
+  --destructive-soft: #210806;
+  --info: #84ADFF;                    /* 7.54:1 or more, lowest on card */
+  --info-soft: #060F21;
+  --glass: rgba(1, 34, 29, .82);
   --chart-1: #45C8B0;
   --chart-2: #FFDF55;
   --chart-3: #7CC4FA;
   --chart-4: #FF9B85;
   --chart-5: #C3B5FD;
   --chart-6: #E8D7A8;                 /* the dark series is 8:1 or more on the card */
-  --glass: rgba(1, 34, 29, .82);
   --glass-border: rgba(255, 255, 255, .12);
   --sb: rgba(255, 255, 255, .14);
   --sb-hover: rgba(255, 255, 255, .26);
@@ -241,32 +268,41 @@
     --foreground: #E6EDEB;
     --card: #01221D;
     --card-foreground: #E6EDEB;
-    --popover: #012B24;
+    --popover: #012C25;
     --popover-foreground: #E6EDEB;
     --muted: #010C0A;
-    --muted-foreground: #A9B8B4;
-    --subtle-foreground: #8EA09B;
-    --accent: #013C33;
+    --muted-foreground: #A6B9B6;
+    --subtle-foreground: #8BA29E;
+    --accent: #023B32;
     --accent-foreground: #45C8B0;
     --eyebrow: #BD9743;
-    --border: #125A4D;
-    --input: #1A6B5C;
+    --border: #0A594D;
+    --input: #0C7564;
     --ring: #FFDF55;
+    --primary: #FFDF55;
+    --primary-foreground: #01221D;
+    --sidebar: #01221D;
+    --sidebar-foreground: #FFFFFF;
+    --sidebar-muted: #A1B5B1;
+    --sidebar-accent: #023B32;
+    --sidebar-accent-foreground: #FFFFFF;
+    --sidebar-primary: #FFDF55;
+    --sidebar-primary-foreground: #01221D;
     --success: #32D583;
-    --success-soft: #042117;
+    --success-soft: #072013;
     --warning: #FDB022;
-    --warning-soft: #241703;
+    --warning-soft: #211706;
     --destructive: #F97066;
-    --destructive-soft: #260D0B;
+    --destructive-soft: #210806;
     --info: #84ADFF;
-    --info-soft: #081529;
+    --info-soft: #060F21;
+    --glass: rgba(1, 34, 29, .82);
     --chart-1: #45C8B0;
     --chart-2: #FFDF55;
     --chart-3: #7CC4FA;
     --chart-4: #FF9B85;
     --chart-5: #C3B5FD;
     --chart-6: #E8D7A8;
-    --glass: rgba(1, 34, 29, .82);
     --glass-border: rgba(255, 255, 255, .12);
     --sb: rgba(255, 255, 255, .14);
     --sb-hover: rgba(255, 255, 255, .26);

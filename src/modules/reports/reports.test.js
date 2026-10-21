@@ -92,11 +92,15 @@ describe("the source registry", () => {
   });
 
   test("a report's filters read as words on the file", () => {
-    expect(sources.describeFilters("daily_attendance", { roster_status: "not_in", department_id: ID }, {
+    expect(sources.describeFilters("daily_attendance", { roster_statuses: ["not_in", "late"], department_id: ID }, {
       departmentName: "Programmes",
     })).toEqual([
+      { label: "Day", value: "Today So Far" },
       { label: "Department", value: "Programmes" },
-      { label: "Status", value: "Not In" },
+      { label: "Status", value: "Not In, Late" },
+    ]);
+    expect(sources.describeFilters("daily_attendance", { roster_day: "last_working_day" }, { rosterOn: "2026-10-17" })).toEqual([
+      { label: "Day", value: "Last Working Day, 17/10/2026" },
     ]);
     expect(sources.describeFilters("open_alerts", { category: "attendance", severity: "high" })).toEqual([
       { label: "Category", value: "Attendance" },
@@ -141,10 +145,10 @@ describe("gathering a report as its reader", () => {
       };
     });
     const at = lagos.instant("2026-10-19", "18:00");
-    const out = await sources.gather({}, CEO, "daily_attendance", { roster_status: "late" }, { at });
+    const out = await sources.gather({}, CEO, "daily_attendance", { roster_statuses: ["late"] }, { at });
 
     expect(asked).toHaveLength(sources.ROW_CEILING / 25);
-    expect(asked[0]).toEqual({ filters: { date: "2026-10-19", status: "late", department_id: undefined }, scope: "all", page: 1 });
+    expect(asked[0]).toEqual({ filters: { date: "2026-10-19", statuses: ["late"], department_id: undefined }, scope: "all", page: 1 });
     expect(out.lines).toEqual([]);
     expect(out.tables).toHaveLength(1);
     const [t] = out.tables;
@@ -161,6 +165,20 @@ describe("gathering a report as its reader", () => {
     const out = await sources.gather({}, CEO, "daily_attendance", {}, { at: new Date() });
     expect(roster.page).toHaveBeenCalledTimes(1);
     expect(out.tables[0]).toMatchObject({ total: 1, rows: [expect.objectContaining({ employee: "Ada Obi", status: "On Site" })] });
+  });
+
+  test("Daily Attendance on the last working day reads the closed day before: Saturday on a Monday, past a holiday", async () => {
+    const days = [];
+    jest.spyOn(workingWeek, "loadCalendar").mockResolvedValue(CALENDAR);
+    jest.spyOn(roster, "page").mockImplementation(async (_db, filters) => {
+      days.push(filters.date);
+      return { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
+    });
+    const last = { roster_day: "last_working_day", roster_statuses: ["absent"] };
+    await sources.gather({}, CEO, "daily_attendance", last, { at: lagos.instant("2026-10-19", "18:00") });
+    await sources.gather({}, CEO, "daily_attendance", last, { at: lagos.instant("2026-10-02", "18:00") });
+    await sources.gather({}, CEO, "daily_attendance", { roster_day: "today" }, { at: lagos.instant("2026-10-19", "18:00") });
+    expect(days).toEqual(["2026-10-17", "2026-09-30", "2026-10-19"]);
   });
 });
 
@@ -233,7 +251,7 @@ describe("a report and a run on the wire", () => {
     saved_report_id: OTHER,
     name: "Daily Attendance",
     report_key: "daily_attendance",
-    definition: { filters: { roster_status: "late" } },
+    definition: { filters: { roster_statuses: ["late"] } },
     shared: true,
     owner_user_id: ID,
     owner_name: "Kemi Alade",
@@ -256,7 +274,7 @@ describe("a report and a run on the wire", () => {
 
   test("a report with no schedule runs on demand; its owner may change it, a reader who shares it may not", () => {
     const r = contract.HomeReport.parse(wire(service.present(row(), owner)));
-    expect(r).toMatchObject({ status: "on_demand", schedule: null, can_edit: true, filters: { roster_status: "late" } });
+    expect(r).toMatchObject({ status: "on_demand", schedule: null, can_edit: true, filters: { roster_statuses: ["late"] } });
     expect(service.present(row(), { user: { user_id: OTHER }, ceo: false }).can_edit).toBe(false);
     expect(service.present(row(), { user: { user_id: OTHER }, ceo: true }).can_edit).toBe(true);
   });

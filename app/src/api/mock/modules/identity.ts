@@ -1,6 +1,7 @@
 import type { Me, SignIn } from "@mycity/contract/contract.gen.ts";
 import { at, fail, invalid, mockSession, ok, noContent, paged, route } from "../core";
 import { capabilitiesOf } from "../data/access";
+import { appearanceApplied } from "../data/appearance";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { searchResult } from "../data/search";
 import { codeGiven, codeOk, markFresh, needsCode, passkeyOwner, waysOf } from "./security";
@@ -40,6 +41,7 @@ export function me(key: string): Me {
     roles: [role],
     home_view: SIGN_INS[key]?.view ?? "staff",
     manages_people: teamOf(key).length > 0,
+    appearance: appearanceApplied(),
   };
 }
 

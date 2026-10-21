@@ -11,6 +11,7 @@ import { useRouter } from "@/lib/router";
 import { useInstallApp } from "./Notices";
 import { usePwa } from "./pwa";
 import { refreshScreen, useReloadApp } from "./refresh";
+import { useTextSizeSheet } from "./TextSize";
 
 /**
  * Search, everywhere in the staff app: ⌘K or Ctrl K, the top bar's search
@@ -45,6 +46,7 @@ const RUN_ICONS: Record<string, IconName> = {
   theme_dark: "moon",
   theme_light: "sun",
   density: "rows",
+  text_size: "textsize",
   install: "download",
   refresh: "rotate",
   reload: "refresh",
@@ -62,6 +64,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
   const clock = useClock();
   const { setTheme } = useTheme();
   const density = useDensity();
+  const textSize = useTextSizeSheet();
   const { canInstall } = usePwa();
   const installApp = useInstallApp();
   const reloadApp = useReloadApp();
@@ -89,6 +92,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
     if (hit?.run === "theme_dark") return setTheme("dark");
     if (hit?.run === "theme_light") return setTheme("light");
     if (hit?.run === "density") return density.toggle();
+    if (hit?.run === "text_size") return textSize();
     if (hit?.run === "install") return installApp();
     if (hit?.run === "refresh") return refreshScreen();
     if (hit?.run === "reload") return reloadApp();

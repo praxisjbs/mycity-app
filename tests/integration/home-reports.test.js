@@ -341,7 +341,7 @@ describeDb("Home · Reports against the real migrations", () => {
       const body = {
         name: "Late Today",
         report_key: "daily_attendance",
-        filters: { roster_status: "late" },
+        filters: { roster_statuses: ["late"] },
         shared: true,
         schedule: daily({ recipient_user_ids: [userId("manager"), userId("ops")] }),
       };
@@ -354,7 +354,7 @@ describeDb("Home · Reports against the real migrations", () => {
       expect(made.late).toMatchObject({
         name: "Late Today",
         report_key: "daily_attendance",
-        filters: { roster_status: "late" },
+        filters: { roster_statuses: ["late"] },
         shared: true,
         owner_user_id: userId("manager"),
         owner_name: "Kemi Alade",
@@ -541,7 +541,7 @@ describeDb("Home · Reports against the real migrations", () => {
       const updated = await countEvents("home.report_updated");
       const res = await as("manager").patch(path(), {
         name: "Late Today",
-        filters: { roster_status: "late" },
+        filters: { roster_statuses: ["late"] },
         shared: true,
         schedule: daily({ recipient_user_ids: [userId("manager"), userId("ops")] }),
       });
@@ -717,6 +717,38 @@ describeDb("Home · Reports against the real migrations", () => {
       expect(opsFile.rows.slice(1).map((row) => row[3])).toEqual(["Late", "Late"]);
     });
 
+    test("Daily Attendance on the last working day lists who was absent, which today's roster never can", async () => {
+      const roster = require("../../src/modules/attendance/attendance.roster");
+      const lastDay = roster.yesterdayOf(lagos.today(), await workingWeek.loadCalendar(pool)).date;
+      // As the day-close leaves it: Musa never came in, Bisi came in late.
+      for (const [who, status, late, inAt] of [
+        ["staff", "absent", 0, null],
+        ["outsider", "late", 12, lagos.instant(lastDay, "09:12")],
+      ])
+        await q(
+          `INSERT INTO attendance_day (employee_id, attendance_date, status, first_clock_in_at, late_minutes)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (employee_id, attendance_date) DO UPDATE SET status = EXCLUDED.status,
+             first_clock_in_at = EXCLUDED.first_clock_in_at, late_minutes = EXCLUDED.late_minutes`,
+          [ids[who], lastDay, status, inAt, late],
+        );
+      const absent = await build("ops", {
+        name: "Absent and Late",
+        report_key: "daily_attendance",
+        filters: { roster_day: "last_working_day", roster_statuses: ["absent", "late"] },
+      });
+      const absentToday = await as("ops").post("/home/reports", { name: "Absent Today", report_key: "daily_attendance", filters: { roster_statuses: ["absent"] } });
+      expect([absentToday.status, absentToday.body.error.fields]).toEqual([422, { "filters.roster_statuses": ["Absent needs Last Working Day"] }]);
+
+      const run = await runNow("ops", absent, "xlsx");
+      await drain();
+      const file = await sheetRows((await runRow(run.home_report_run_id)).document_id);
+      const byName = Object.fromEntries(file.rows.slice(1).map((row) => [row[0], row[3]]));
+      expect(byName).toEqual({ "Musa Danjuma": "Absent", "Bisi Ojo": "Late" });
+      const cover = await sheetRows((await runRow(run.home_report_run_id)).document_id, "Cover");
+      expect(cover.rows.flat().join(" ")).toContain(`Last Working Day, ${lastDay.slice(8, 10)}/${lastDay.slice(5, 7)}/${lastDay.slice(0, 4)}`);
+    });
+
     test("the same Idempotency-Key answers the same run, even once its file is made", async () => {
       expect(await runRow(runs.managerXlsx.home_report_run_id)).toMatchObject({ status: "done" });
       const queued = await countEvents("home.report_run");
@@ -774,7 +806,7 @@ describeDb("Home · Reports against the real migrations", () => {
       // A filter no form can send, so the roster refuses it: the build throws every time.
       await q("UPDATE saved_report SET definition = $2 WHERE saved_report_id = $1", [
         broken.saved_report_id,
-        JSON.stringify({ filters: { roster_status: "asleep" } }),
+        JSON.stringify({ filters: { roster_statuses: ["asleep"] } }),
       ]);
       const run = await runNow("ops", broken, "xlsx");
       await expect(generate.generate(run.home_report_run_id, { attempt: 1, max_attempts: 8 })).rejects.toThrow(

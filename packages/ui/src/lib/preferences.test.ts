@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { configurePreferences, currentDensity, setDensity, setTheme, themeChoice, useDensity, useTheme } from "./preferences";
+import { configurePreferences, currentDensity, currentTextSize, setDensity, setTextSize, setTheme, TEXT_SIZES, themeChoice, useDensity, useTextSize, useTheme } from "./preferences";
 
 describe("theme", () => {
   it("sets the attribute and remembers the choice", () => {
@@ -39,5 +39,21 @@ describe("density", () => {
     act(() => result.current.toggle());
     expect(result.current.density).toBe("compact");
     expect(localStorage.getItem("mc-density")).toBeNull();
+  });
+});
+
+describe("text size", () => {
+  it("is Default with nothing stored, and remembers the others on this device", () => {
+    expect(currentTextSize()).toBe("default");
+    setTextSize("large");
+    expect(document.documentElement.getAttribute("data-text-size")).toBe("large");
+    expect(localStorage.getItem("mc-text-size")).toBe("large");
+    const { result } = renderHook(() => useTextSize());
+    expect(result.current.size).toBe("large");
+    act(() => result.current.setTextSize("default"));
+    expect(result.current.size).toBe("default");
+    expect(document.documentElement.hasAttribute("data-text-size")).toBe(false);
+    expect(localStorage.getItem("mc-text-size")).toBeNull();
+    expect(TEXT_SIZES.map(([, name]) => name)).toEqual(["Small", "Default", "Large", "Largest"]);
   });
 });

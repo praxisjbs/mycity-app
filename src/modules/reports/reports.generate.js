@@ -170,6 +170,7 @@ async function build(run, person) {
     filters: sources.describeFilters(run.report_key, filters, {
       departmentName: names.department,
       leaveTypeName: names.leave_type,
+      rosterOn: run.report_key === "daily_attendance" ? await sources.rosterDate(pool, filters, at) : null,
     }),
   };
   const entity = { type: ENTITY, id: run.home_report_run_id };

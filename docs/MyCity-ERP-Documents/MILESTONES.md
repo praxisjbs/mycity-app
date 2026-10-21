@@ -39,7 +39,7 @@ Settled 9 October. These are binding. If the code disagrees with this table, the
 | A5 | **Three data postures.** Build = synthetic seed. Staging = realistic demonstration data. **Live = clean. No seed, no fixtures, no demo rows, ever.** | A seed script that can reach `mycity_prod` is a defect |
 | A6 | **4 vCPU / 8 GB / 80 GB NVMe to 50 users; 12 GB RAM above 50.** | Headroom for two Node processes, Postgres, Redis, nginx, headless Chromium |
 | A7 | **Gates from day one**, including the three agreed 8 October and the two AI gates. | §3 |
-| A8 | **New design system on MyCity's brand.** Praxis LS primitive engineering, simplified; MyCity's own palette, logo and type so the operator feels inside their brand. Tokens in §5.1. | Dark theme is derived (§5.2), not taken — they have none |
+| A8 | **New design system on MyCity's brand.** Praxis LS primitive engineering, simplified; MyCity's own palette, logo and type so the operator feels inside their brand. Tokens in §5.1. | Dark theme is derived (§5.2), not taken — they have none. **Amended 21/10/2026 (TB):** the hub's dark palette is configurable on Settings · Appearance from four colours, derived within AA (§5.2, FRONTEND_FOUNDATION F30) |
 | A9 | **A public surface on its own subdomain.** Every public URL — careers, assessment, offer signing, document verification — served from one lightweight public app. | Third deployable. Not a marketing site |
 | A10 | **Blind panel assessment plus weighted scorecard.** | M4 |
 | A11 | **Pixie's workflow engine, ported.** `pixie-girl-hub/src/workflows/engine.js` + `conditions.js` + `default-definitions.js`, per `REUSE_MAP.md` §1.2. | M0 stands it up; M3, M5, M6, M8 consume it |
@@ -344,12 +344,21 @@ Ratios computed, not estimated:
 |---|---|---|---|
 | `--background` | `#01110E` | 169 89% 4% | page base |
 | `--card` | `#01221D` | 171 94% 7% | Deep Green, their own footer colour |
-| `--popover` | `#012B24` | 170 95% 9% | menus, drawers |
-| `--accent` (hover/selected) | `#013C33` | 171 97% 12% | — |
+| `--popover` | `#012C25` | the card, 2 points lighter | menus, drawers |
+| `--accent` (hover/selected) | `#023B32` | the card, 5 points lighter | — |
 | `--foreground` | `#E6EDEB` | — | **14.17:1** on card |
-| `--muted-foreground` | `#A9B8B4` | — | **8.18:1** on card |
-| `--border` / `--input` | `#125A4D` / `#1A6B5C` | — | input outline **3.04:1** on base |
+| `--muted-foreground` | `#A6B9B6` | — | **6.11:1** or more, lowest on accent |
+| `--border` / `--input` | `#0A594D` / `#0C7564` | — | input outline **3.44:1** on base |
 | `--primary` | `#FFDF55` | unchanged | **12.77:1** on card |
+
+**Amended 21/10/2026 (TB; FRONTEND_FOUNDATION F30).** These are now worked out, not picked: four
+colours (Background `#01110E`, Card `#01221D`, Brand Green `#45C8B0`, Primary Yellow `#FFDF55`) go
+through the contract's `deriveDark()` (`packages/contract/schemas/appearance.js`), which writes every
+other dark token and lightens an ink or darkens a tint until each pair keeps 4.5:1; tokens.css's dark
+block is that result (the popover, accent, muted inks, lines and soft tints moved by a shade from the
+first values). Settings · Appearance lets MyCity paste another four (presets Charcoal, Black and Dark
+Grey were sampled after the Milestone 1 handover, where the green background was found too strong),
+held to the same pairs. The light theme (§5.1) is not configurable.
 
 Status on dark needs lighter shades than the light theme: success `#32D583` (8.80:1), warning
 `#FDB022` (9.14:1), error `#F97066` (6.04:1), info `#84ADFF` (7.54:1).
@@ -1129,7 +1138,8 @@ the UI hides what the user cannot open. The API enforces regardless. That equali
 becomes a gate here.
 
 Configurable approval hierarchies, notification rules and terminology all resolve to data, editable
-from Settings. MFA (TOTP) enrolment and enforcement by role. Session and device management with
+from Settings. **Settings · Appearance came forward to M1 (TB, 21/10/2026)**: the hub's dark palette,
+fonts and starting theme and density (§5.2, FRONTEND_FOUNDATION F30). MFA (TOTP) enrolment and enforcement by role. Session and device management with
 remote kill. Audit log searchable by actor, entity, action and date. **Amended 16/10/2026 (TB):**
 personal two-step enrolment (with passkeys and the PIN) is brought forward to the second sign-in
 PR in M0, on ESS · My Security; enforcement by role stays here, with Settings · Security.

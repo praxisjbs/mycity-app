@@ -23,6 +23,7 @@ const SearchKind = z.enum(["screen", "action", "record"]);
  *   read_all     marks every notification read
  *   theme_dark   the dark theme;  theme_light  the light theme
  *   density      Compact or Comfortable, whichever is not on
+ *   text_size    opens Text Size: Small, Default, Large or Largest (F30)
  *   install      installs the app (offered only where the browser can)
  *   refresh      every read on the screen asks again, in place (FRONTEND_FOUNDATION F28)
  *   reload       the whole app starts again on the same screen (F28)
@@ -37,6 +38,7 @@ const SearchRun = z.enum([
   "theme_dark",
   "theme_light",
   "density",
+  "text_size",
   "install",
   "refresh",
   "reload",

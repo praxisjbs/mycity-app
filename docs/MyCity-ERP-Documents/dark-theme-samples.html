@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en-NG">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dark Theme Samples</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0B0C0D;color:#E9E9EA;font:14px/1.5 "Geist",ui-sans-serif,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1500px;margin:0 auto;padding:32px 24px 64px}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:28px}
+.head h1{margin:0;font-size:28px;letter-spacing:-.02em}
+.head p{margin:6px 0 0;color:#A9ABB0;max-width:70ch}
+.view{display:flex;gap:6px;flex-wrap:wrap}
+.view button{font:inherit;font-size:13px;font-weight:600;border:1px solid #33363A;background:#17181A;color:#E9E9EA;border-radius:999px;padding:7px 14px;cursor:pointer}
+.view button[aria-pressed="true"]{background:#FFDF55;color:#01221D;border-color:#FFDF55}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}
+.grid.one{grid-template-columns:minmax(0,1fr)}
+.grid.one .sample:not(.chosen){display:none}
+.sample{border:1px solid #2A2C30;border-radius:18px;overflow:hidden;background:#121315}
+.meta{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #2A2C30}
+.meta h2{margin:0;font-size:18px}
+.meta p{margin:2px 0 0;color:#A9ABB0;font-size:13px}
+.codes{display:flex;flex-wrap:wrap;gap:8px}
+.code{display:flex;align-items:center;gap:8px;border:1px solid #2F3136;border-radius:10px;padding:6px 8px 6px 6px;background:#18191C;color:#E9E9EA;font:inherit;cursor:pointer}
+.code i{width:22px;height:22px;border-radius:6px;border:1px solid rgba(255,255,255,.18)}
+.code span{display:flex;flex-direction:column;line-height:1.2;text-align:left}
+.code small{color:#A9ABB0;font-size:11px}
+.code b{font:600 13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.code.done b::after{content:"  copied";color:#45C8B0;font-family:"Geist",system-ui,sans-serif;font-weight:500}
+.stats{padding:10px 18px;border-top:1px solid #2A2C30;color:#A9ABB0;font-size:12px}
+.stats b{color:#E9E9EA}
+.frame{padding:18px}
+/* The sample: every colour below is a token, set per preset */
+.app{display:flex;min-height:560px;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--background);color:var(--foreground);font-size:13px}
+.rail{width:58px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0;background:var(--sidebar);color:var(--sidebar-muted)}
+.rail .brand{color:var(--sidebar-primary);margin-bottom:10px}
+.rail a{display:grid;place-items:center;width:38px;height:38px;border-radius:10px}
+.rail a.on{background:var(--sidebar-accent);color:var(--sidebar-accent-foreground)}
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--card)}
+.search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:1px solid var(--input);border-radius:9px;background:var(--popover);color:var(--subtle-foreground);font-size:12px;white-space:nowrap;overflow:hidden}
+.bell{color:var(--muted-foreground)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:999px;background:var(--primary);color:var(--primary-foreground);font-weight:650;font-size:12.5px}
+.page{padding:16px;display:flex;flex-direction:column;gap:12px}
+.eyebrow{color:var(--eyebrow);font-size:11px;font-weight:650;letter-spacing:.09em;text-transform:uppercase}
+.page h1{margin:-6px 0 0;font-size:20px;letter-spacing:-.016em}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border)}
+.tabs span{padding:6px 10px;color:var(--muted-foreground);font-weight:600;font-size:12.5px;border-bottom:2px solid transparent}
+.tabs span.on{color:var(--foreground);border-color:var(--primary)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kpi{display:flex;flex-direction:column;gap:2px;padding:11px 12px;border:1px solid var(--border);border-radius:14px;background:var(--card);min-height:96px}
+.kt{color:var(--muted-foreground);font-size:11px;font-weight:600}
+.kpi b{font-size:22px;line-height:1.2}
+.kpi b small{font-size:12px;color:var(--muted-foreground);font-weight:500}
+.kc{margin-top:auto;font-size:11px;font-weight:650}
+.ok{color:var(--success)}.warn{color:var(--warning)}.err{color:var(--destructive)}.info{color:var(--info)}
+.split{display:grid;grid-template-columns:1.25fr 1fr;gap:10px}
+.card{border:1px solid var(--border);border-radius:14px;background:var(--card);padding:12px}
+.card h2{margin:0 0 8px;font-size:13px}
+.bars{display:flex;align-items:flex-end;gap:5px;height:110px;padding-top:6px}
+.bars i{flex:1;border-radius:4px 4px 1px 1px;background:var(--chart-1)}
+.bars i.sat{background:var(--chart-2)}
+.legend{display:flex;gap:14px;margin-top:8px;color:var(--subtle-foreground);font-size:11px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.legend .c1{background:var(--chart-1)}.legend .c2{background:var(--chart-2)}
+.row{display:flex;align-items:center;gap:9px;padding:7px 6px;border-bottom:1px solid var(--border);border-radius:8px}
+.row:last-of-type{border-bottom:0}
+.row.on{background:var(--accent)}
+.row.on .rw b{color:var(--accent-foreground)}
+.av{display:grid;place-items:center;width:26px;height:26px;border-radius:999px;background:var(--muted);color:var(--muted-foreground);font-size:10.5px;font-weight:650;flex:none}
+.rw{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.rw b{font-size:12.5px;font-weight:600}
+.rw span{color:var(--subtle-foreground);font-size:11px}
+.pill{flex:none;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:650}
+.pill.ok{background:var(--success-soft)}.pill.warn{background:var(--warning-soft)}.pill.err{background:var(--destructive-soft)}.pill.info{background:var(--info-soft)}
+.link{display:inline-block;margin-top:6px;color:var(--accent-foreground);font-weight:650;font-size:12px}
+.field{display:flex;align-items:center;gap:7px;height:30px;margin-bottom:6px;padding:0 9px;border:1px solid var(--input);border-radius:9px;color:var(--subtle-foreground);font-size:11.5px}
+.foot{margin-top:28px;color:#8A8D93;font-size:12px}
+@media (max-width:1100px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:700px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:minmax(0,1fr)}.wrap{padding:20px 12px}.frame{padding:10px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>MyCity Hub · Dark Theme Samples</h1>
+      <p>Four dark themes for the hub, each shown on Home. Pick one, then paste its four colours into Settings · Appearance and press Save Palette; the hub works out every other shade and keeps all text readable. The light theme does not change. Click a colour to copy it.</p>
+    </div>
+    <div class="view" role="group" aria-label="Show"><button type="button" data-key="all" aria-pressed="true">All Four</button><button type="button" data-key="deep_green" aria-pressed="false">Deep Green</button><button type="button" data-key="charcoal" aria-pressed="false">Charcoal</button><button type="button" data-key="black" aria-pressed="false">Black</button><button type="button" data-key="dark_grey" aria-pressed="false">Dark Grey</button></div>
+  </div>
+  <div class="grid">
+<article class="sample" id="deep_green">
+      <div class="meta">
+        <div><h2>Deep Green</h2><p>Today's dark theme, on the brand's own hue.</p></div>
+        <div class="codes"><button class="code" type="button" data-hex="#01110E" title="Copy Background"><i style="background:#01110E"></i><span><small>Background</small><b>#01110E</b></span></button><button class="code" type="button" data-hex="#01221D" title="Copy Card"><i style="background:#01221D"></i><span><small>Card</small><b>#01221D</b></span></button><button class="code" type="button" data-hex="#45C8B0" title="Copy Brand Green"><i style="background:#45C8B0"></i><span><small>Brand Green</small><b>#45C8B0</b></span></button><button class="code" type="button" data-hex="#FFDF55" title="Copy Primary Yellow"><i style="background:#FFDF55"></i><span><small>Primary Yellow</small><b>#FFDF55</b></span></button></div>
+      </div>
+      <div class="frame" style="--primary:#FFDF55;--primary-foreground:#01221D;--primary-tint:#FFEFAA;--secondary:#014339;--secondary-foreground:#FFFFFF;--deep:#01221D;--background:#01110E;--foreground:#E6EDEB;--card:#01221D;--card-foreground:#E6EDEB;--popover:#012C25;--popover-foreground:#E6EDEB;--muted:#010C0A;--muted-foreground:#A6B9B6;--subtle-foreground:#8BA29E;--accent:#023B32;--accent-foreground:#45C8B0;--eyebrow:#BD9743;--border:#0A594D;--input:#0C7564;--ring:#FFDF55;--sidebar:#01221D;--sidebar-foreground:#FFFFFF;--sidebar-muted:#A1B5B1;--sidebar-accent:#023B32;--sidebar-accent-foreground:#FFFFFF;--sidebar-primary:#FFDF55;--sidebar-primary-foreground:#01221D;--sidebar-border:rgba(255, 255, 255, .10);--sidebar-hover:rgba(255, 255, 255, .07);--sidebar-badge:rgba(255, 255, 255, .14);--on-primary-badge:rgba(1, 34, 29, .18);--success:#32D583;--success-soft:#072013;--warning:#FDB022;--warning-soft:#211706;--destructive:#F97066;--destructive-soft:#210806;--info:#84ADFF;--info-soft:#060F21;--chart-1:#45C8B0;--chart-2:#FFDF55;--chart-3:#7CC4FA;--chart-4:#FF9B85;--chart-5:#C3B5FD;--chart-6:#E8D7A8;--scrim:rgba(1, 17, 14, .46);--glass:rgba(1, 34, 29, .82);--glass-border:rgba(255, 255, 255, .12);--sb:rgba(255, 255, 255, .14);--sb-hover:rgba(255, 255, 255, .26);--sb-on-dark:rgba(255, 255, 255, .14);--paper:#FFFFFF;--paper-foreground:#14201D;--paper-heading:#0A1412;--paper-muted:#566662;--paper-faint:#657470;--paper-head:#F4F7F6;--paper-line:#E2E9E7;--paper-rule:#EDF2F0;--paper-dash:#D5DEDB;--paper-brand:#014339;--paper-gold:#FFDF55;--on-deep:#FFFFFF;--on-deep-muted:#CCCFCE;--on-deep-faint:#9FB3AE;--on-deep-soft:#D7E2DF;--on-deep-dim:#B9C8C4;--scene-night-top:#010F0D;--scene-night-bottom:#0A4A40;--scene-dawn-top:#0E3B4A;--scene-dawn-bottom:#F4B97A;--scene-day-top:#2C8C84;--scene-day-bottom:#CDEDE4;--scene-dusk-top:#03231E;--scene-dusk-bottom:#F0A440;--scene-far:#0D5247;--scene-mid:#043A31;--scene-near:#011A16;--scene-water:#022B25;--scene-glint:#9FD9CC;--scene-sun:#FFE98A;--scene-moon:#F1F4E4;--scene-light:#FFFFFF;--scene-window:#FFDF55"><div class="app">
+    <nav class="rail">
+      <span class="brand"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="10" r="2.6"/></svg></span>
+      <a class="on"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></a>
+    </nav>
+    <main>
+      <header class="top">
+        <span class="search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people, screens, records</span>
+        <span class="bell"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></span>
+        <span class="btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Clock In</span>
+      </header>
+      <div class="page">
+        <div class="eyebrow">Wednesday 21 October</div>
+        <h1>Good afternoon, Cynthia</h1>
+        <div class="tabs"><span class="on">Overview</span><span>Team</span><span>Alerts</span><span>Reports</span></div>
+        <div class="kpis">
+          <div class="kpi"><span class="kt">Clocked In Today</span><b>37<small> of 41</small></b><span class="kc warn">4 late</span></div>
+          <div class="kpi"><span class="kt">Leave Pending</span><b>3</b><span class="kc info">1 waiting on you</span></div>
+          <div class="kpi"><span class="kt">Open Alerts</span><b>2</b><span class="kc err">1 high</span></div>
+          <div class="kpi"><span class="kt">Proposals Out</span><b>5</b><span class="kc ok">2 more than last month</span></div>
+        </div>
+        <div class="split">
+          <section class="card chart">
+            <h2>Attendance, 14 Working Days</h2>
+            <div class="bars"><i style="height:92%" class="" title="Day 1"></i><i style="height:88%" class="" title="Day 2"></i><i style="height:95%" class="" title="Day 3"></i><i style="height:64%" class="sat" title="Day 4"></i><i style="height:90%" class="" title="Day 5"></i><i style="height:86%" class="" title="Day 6"></i><i style="height:97%" class="" title="Day 7"></i><i style="height:61%" class="sat" title="Day 8"></i><i style="height:89%" class="" title="Day 9"></i><i style="height:93%" class="" title="Day 10"></i><i style="height:87%" class="" title="Day 11"></i><i style="height:66%" class="sat" title="Day 12"></i><i style="height:91%" class="" title="Day 13"></i><i style="height:90%" class="" title="Day 14"></i></div>
+            <div class="legend"><span><i class="c1"></i>Present</span><span><i class="c2"></i>Saturday, half day</span></div>
+          </section>
+          <section class="card">
+            <h2>Need You</h2>
+            <div class="row"><span class="av">AO</span><span class="rw"><b>Ada Obi</b><span>Annual leave, 7 days</span></span><span class="pill warn">Approve</span></div>
+            <div class="row on"><span class="av">TB</span><span class="rw"><b>Tunde Bello</b><span>Lagos conference site</span></span><span class="pill info">Waiting</span></div>
+            <div class="row"><span class="av">NE</span><span class="rw"><b>Ngozi Eze</b><span>Clocked out at 13:10</span></span><span class="pill err">Early</span></div>
+            <a class="link">View All</a>
+          </section>
+        </div>
+        <section class="card">
+          <h2>Team Roster</h2>
+          <div class="field"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people</div>
+          <div class="row"><span class="av">MD</span><span class="rw"><b>Musa Danjuma</b><span>Programmes · 08:52</span></span><span class="pill ok">On Time</span></div>
+          <div class="row"><span class="av">BO</span><span class="rw"><b>Bisi Ojo</b><span>Operations · 09:14</span></span><span class="pill warn">Late</span></div>
+          <div class="row"><span class="av">ZA</span><span class="rw"><b>Zainab Ali</b><span>Marketing · not in</span></span><span class="pill err">Absent</span></div>
+        </section>
+      </div>
+    </main>
+  </div></div>
+      <div class="stats">Every text pair at <b>4.5:1</b> or more · lowest <b>4.58:1</b> (eyebrow on accent) · 54 pairs checked</div>
+    </article>
+<article class="sample" id="charcoal">
+      <div class="meta">
+        <div><h2>Charcoal</h2><p>Cool charcoal, the green kept for highlights.</p></div>
+        <div class="codes"><button class="code" type="button" data-hex="#141517" title="Copy Background"><i style="background:#141517"></i><span><small>Background</small><b>#141517</b></span></button><button class="code" type="button" data-hex="#1E2023" title="Copy Card"><i style="background:#1E2023"></i><span><small>Card</small><b>#1E2023</b></span></button><button class="code" type="button" data-hex="#45C8B0" title="Copy Brand Green"><i style="background:#45C8B0"></i><span><small>Brand Green</small><b>#45C8B0</b></span></button><button class="code" type="button" data-hex="#FFDF55" title="Copy Primary Yellow"><i style="background:#FFDF55"></i><span><small>Primary Yellow</small><b>#FFDF55</b></span></button></div>
+      </div>
+      <div class="frame" style="--primary:#FFDF55;--primary-foreground:#01221D;--primary-tint:#FFEFAA;--secondary:#014339;--secondary-foreground:#FFFFFF;--deep:#01221D;--background:#141517;--foreground:#E8E9EB;--card:#1E2023;--card-foreground:#E8E9EB;--popover:#232528;--popover-foreground:#E8E9EB;--muted:#121314;--muted-foreground:#AAAEB5;--subtle-foreground:#8F949E;--accent:#2A2D31;--accent-foreground:#45C8B0;--eyebrow:#BD9743;--border:#334647;--input:#526F70;--ring:#FFDF55;--sidebar:#1E2023;--sidebar-foreground:#FFFFFF;--sidebar-muted:#A5A9B1;--sidebar-accent:#2A2D31;--sidebar-accent-foreground:#FFFFFF;--sidebar-primary:#FFDF55;--sidebar-primary-foreground:#01221D;--sidebar-border:rgba(255, 255, 255, .10);--sidebar-hover:rgba(255, 255, 255, .07);--sidebar-badge:rgba(255, 255, 255, .14);--on-primary-badge:rgba(1, 34, 29, .18);--success:#32D583;--success-soft:#0A331E;--warning:#FDB022;--warning-soft:#36260A;--destructive:#F97066;--destructive-soft:#360D0A;--info:#84ADFF;--info-soft:#0A1836;--chart-1:#45C8B0;--chart-2:#FFDF55;--chart-3:#7CC4FA;--chart-4:#FF9B85;--chart-5:#C3B5FD;--chart-6:#E8D7A8;--scrim:rgba(1, 17, 14, .46);--glass:rgba(30, 32, 35, .82);--glass-border:rgba(255, 255, 255, .12);--sb:rgba(255, 255, 255, .14);--sb-hover:rgba(255, 255, 255, .26);--sb-on-dark:rgba(255, 255, 255, .14);--paper:#FFFFFF;--paper-foreground:#14201D;--paper-heading:#0A1412;--paper-muted:#566662;--paper-faint:#657470;--paper-head:#F4F7F6;--paper-line:#E2E9E7;--paper-rule:#EDF2F0;--paper-dash:#D5DEDB;--paper-brand:#014339;--paper-gold:#FFDF55;--on-deep:#FFFFFF;--on-deep-muted:#CCCFCE;--on-deep-faint:#9FB3AE;--on-deep-soft:#D7E2DF;--on-deep-dim:#B9C8C4;--scene-night-top:#010F0D;--scene-night-bottom:#0A4A40;--scene-dawn-top:#0E3B4A;--scene-dawn-bottom:#F4B97A;--scene-day-top:#2C8C84;--scene-day-bottom:#CDEDE4;--scene-dusk-top:#03231E;--scene-dusk-bottom:#F0A440;--scene-far:#0D5247;--scene-mid:#043A31;--scene-near:#011A16;--scene-water:#022B25;--scene-glint:#9FD9CC;--scene-sun:#FFE98A;--scene-moon:#F1F4E4;--scene-light:#FFFFFF;--scene-window:#FFDF55"><div class="app">
+    <nav class="rail">
+      <span class="brand"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="10" r="2.6"/></svg></span>
+      <a class="on"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></a>
+    </nav>
+    <main>
+      <header class="top">
+        <span class="search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people, screens, records</span>
+        <span class="bell"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></span>
+        <span class="btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Clock In</span>
+      </header>
+      <div class="page">
+        <div class="eyebrow">Wednesday 21 October</div>
+        <h1>Good afternoon, Cynthia</h1>
+        <div class="tabs"><span class="on">Overview</span><span>Team</span><span>Alerts</span><span>Reports</span></div>
+        <div class="kpis">
+          <div class="kpi"><span class="kt">Clocked In Today</span><b>37<small> of 41</small></b><span class="kc warn">4 late</span></div>
+          <div class="kpi"><span class="kt">Leave Pending</span><b>3</b><span class="kc info">1 waiting on you</span></div>
+          <div class="kpi"><span class="kt">Open Alerts</span><b>2</b><span class="kc err">1 high</span></div>
+          <div class="kpi"><span class="kt">Proposals Out</span><b>5</b><span class="kc ok">2 more than last month</span></div>
+        </div>
+        <div class="split">
+          <section class="card chart">
+            <h2>Attendance, 14 Working Days</h2>
+            <div class="bars"><i style="height:92%" class="" title="Day 1"></i><i style="height:88%" class="" title="Day 2"></i><i style="height:95%" class="" title="Day 3"></i><i style="height:64%" class="sat" title="Day 4"></i><i style="height:90%" class="" title="Day 5"></i><i style="height:86%" class="" title="Day 6"></i><i style="height:97%" class="" title="Day 7"></i><i style="height:61%" class="sat" title="Day 8"></i><i style="height:89%" class="" title="Day 9"></i><i style="height:93%" class="" title="Day 10"></i><i style="height:87%" class="" title="Day 11"></i><i style="height:66%" class="sat" title="Day 12"></i><i style="height:91%" class="" title="Day 13"></i><i style="height:90%" class="" title="Day 14"></i></div>
+            <div class="legend"><span><i class="c1"></i>Present</span><span><i class="c2"></i>Saturday, half day</span></div>
+          </section>
+          <section class="card">
+            <h2>Need You</h2>
+            <div class="row"><span class="av">AO</span><span class="rw"><b>Ada Obi</b><span>Annual leave, 7 days</span></span><span class="pill warn">Approve</span></div>
+            <div class="row on"><span class="av">TB</span><span class="rw"><b>Tunde Bello</b><span>Lagos conference site</span></span><span class="pill info">Waiting</span></div>
+            <div class="row"><span class="av">NE</span><span class="rw"><b>Ngozi Eze</b><span>Clocked out at 13:10</span></span><span class="pill err">Early</span></div>
+            <a class="link">View All</a>
+          </section>
+        </div>
+        <section class="card">
+          <h2>Team Roster</h2>
+          <div class="field"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people</div>
+          <div class="row"><span class="av">MD</span><span class="rw"><b>Musa Danjuma</b><span>Programmes · 08:52</span></span><span class="pill ok">On Time</span></div>
+          <div class="row"><span class="av">BO</span><span class="rw"><b>Bisi Ojo</b><span>Operations · 09:14</span></span><span class="pill warn">Late</span></div>
+          <div class="row"><span class="av">ZA</span><span class="rw"><b>Zainab Ali</b><span>Marketing · not in</span></span><span class="pill err">Absent</span></div>
+        </section>
+      </div>
+    </main>
+  </div></div>
+      <div class="stats">Every text pair at <b>4.5:1</b> or more · lowest <b>4.54:1</b> (subtle-foreground on accent) · 54 pairs checked · adjusted for contrast: input</div>
+    </article>
+<article class="sample" id="black">
+      <div class="meta">
+        <div><h2>Black</h2><p>True black, cards a step above it.</p></div>
+        <div class="codes"><button class="code" type="button" data-hex="#000000" title="Copy Background"><i style="background:#000000"></i><span><small>Background</small><b>#000000</b></span></button><button class="code" type="button" data-hex="#111312" title="Copy Card"><i style="background:#111312"></i><span><small>Card</small><b>#111312</b></span></button><button class="code" type="button" data-hex="#45C8B0" title="Copy Brand Green"><i style="background:#45C8B0"></i><span><small>Brand Green</small><b>#45C8B0</b></span></button><button class="code" type="button" data-hex="#FFDF55" title="Copy Primary Yellow"><i style="background:#FFDF55"></i><span><small>Primary Yellow</small><b>#FFDF55</b></span></button></div>
+      </div>
+      <div class="frame" style="--primary:#FFDF55;--primary-foreground:#01221D;--primary-tint:#FFEFAA;--secondary:#014339;--secondary-foreground:#FFFFFF;--deep:#01221D;--background:#000000;--foreground:#E9E9E9;--card:#111312;--card-foreground:#E9E9E9;--popover:#161817;--popover-foreground:#E9E9E9;--muted:#000000;--muted-foreground:#B0B0B0;--subtle-foreground:#969696;--accent:#1D201F;--accent-foreground:#45C8B0;--eyebrow:#BD9743;--border:#283C37;--input:#496860;--ring:#FFDF55;--sidebar:#111312;--sidebar-foreground:#FFFFFF;--sidebar-muted:#ABABAB;--sidebar-accent:#1D201F;--sidebar-accent-foreground:#FFFFFF;--sidebar-primary:#FFDF55;--sidebar-primary-foreground:#01221D;--sidebar-border:rgba(255, 255, 255, .10);--sidebar-hover:rgba(255, 255, 255, .07);--sidebar-badge:rgba(255, 255, 255, .14);--on-primary-badge:rgba(1, 34, 29, .18);--success:#32D583;--success-soft:#03110A;--warning:#FDB022;--warning-soft:#110C03;--destructive:#F97066;--destructive-soft:#110403;--info:#84ADFF;--info-soft:#030811;--chart-1:#45C8B0;--chart-2:#FFDF55;--chart-3:#7CC4FA;--chart-4:#FF9B85;--chart-5:#C3B5FD;--chart-6:#E8D7A8;--scrim:rgba(1, 17, 14, .46);--glass:rgba(17, 19, 18, .82);--glass-border:rgba(255, 255, 255, .12);--sb:rgba(255, 255, 255, .14);--sb-hover:rgba(255, 255, 255, .26);--sb-on-dark:rgba(255, 255, 255, .14);--paper:#FFFFFF;--paper-foreground:#14201D;--paper-heading:#0A1412;--paper-muted:#566662;--paper-faint:#657470;--paper-head:#F4F7F6;--paper-line:#E2E9E7;--paper-rule:#EDF2F0;--paper-dash:#D5DEDB;--paper-brand:#014339;--paper-gold:#FFDF55;--on-deep:#FFFFFF;--on-deep-muted:#CCCFCE;--on-deep-faint:#9FB3AE;--on-deep-soft:#D7E2DF;--on-deep-dim:#B9C8C4;--scene-night-top:#010F0D;--scene-night-bottom:#0A4A40;--scene-dawn-top:#0E3B4A;--scene-dawn-bottom:#F4B97A;--scene-day-top:#2C8C84;--scene-day-bottom:#CDEDE4;--scene-dusk-top:#03231E;--scene-dusk-bottom:#F0A440;--scene-far:#0D5247;--scene-mid:#043A31;--scene-near:#011A16;--scene-water:#022B25;--scene-glint:#9FD9CC;--scene-sun:#FFE98A;--scene-moon:#F1F4E4;--scene-light:#FFFFFF;--scene-window:#FFDF55"><div class="app">
+    <nav class="rail">
+      <span class="brand"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="10" r="2.6"/></svg></span>
+      <a class="on"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></a>
+    </nav>
+    <main>
+      <header class="top">
+        <span class="search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people, screens, records</span>
+        <span class="bell"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></span>
+        <span class="btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Clock In</span>
+      </header>
+      <div class="page">
+        <div class="eyebrow">Wednesday 21 October</div>
+        <h1>Good afternoon, Cynthia</h1>
+        <div class="tabs"><span class="on">Overview</span><span>Team</span><span>Alerts</span><span>Reports</span></div>
+        <div class="kpis">
+          <div class="kpi"><span class="kt">Clocked In Today</span><b>37<small> of 41</small></b><span class="kc warn">4 late</span></div>
+          <div class="kpi"><span class="kt">Leave Pending</span><b>3</b><span class="kc info">1 waiting on you</span></div>
+          <div class="kpi"><span class="kt">Open Alerts</span><b>2</b><span class="kc err">1 high</span></div>
+          <div class="kpi"><span class="kt">Proposals Out</span><b>5</b><span class="kc ok">2 more than last month</span></div>
+        </div>
+        <div class="split">
+          <section class="card chart">
+            <h2>Attendance, 14 Working Days</h2>
+            <div class="bars"><i style="height:92%" class="" title="Day 1"></i><i style="height:88%" class="" title="Day 2"></i><i style="height:95%" class="" title="Day 3"></i><i style="height:64%" class="sat" title="Day 4"></i><i style="height:90%" class="" title="Day 5"></i><i style="height:86%" class="" title="Day 6"></i><i style="height:97%" class="" title="Day 7"></i><i style="height:61%" class="sat" title="Day 8"></i><i style="height:89%" class="" title="Day 9"></i><i style="height:93%" class="" title="Day 10"></i><i style="height:87%" class="" title="Day 11"></i><i style="height:66%" class="sat" title="Day 12"></i><i style="height:91%" class="" title="Day 13"></i><i style="height:90%" class="" title="Day 14"></i></div>
+            <div class="legend"><span><i class="c1"></i>Present</span><span><i class="c2"></i>Saturday, half day</span></div>
+          </section>
+          <section class="card">
+            <h2>Need You</h2>
+            <div class="row"><span class="av">AO</span><span class="rw"><b>Ada Obi</b><span>Annual leave, 7 days</span></span><span class="pill warn">Approve</span></div>
+            <div class="row on"><span class="av">TB</span><span class="rw"><b>Tunde Bello</b><span>Lagos conference site</span></span><span class="pill info">Waiting</span></div>
+            <div class="row"><span class="av">NE</span><span class="rw"><b>Ngozi Eze</b><span>Clocked out at 13:10</span></span><span class="pill err">Early</span></div>
+            <a class="link">View All</a>
+          </section>
+        </div>
+        <section class="card">
+          <h2>Team Roster</h2>
+          <div class="field"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people</div>
+          <div class="row"><span class="av">MD</span><span class="rw"><b>Musa Danjuma</b><span>Programmes · 08:52</span></span><span class="pill ok">On Time</span></div>
+          <div class="row"><span class="av">BO</span><span class="rw"><b>Bisi Ojo</b><span>Operations · 09:14</span></span><span class="pill warn">Late</span></div>
+          <div class="row"><span class="av">ZA</span><span class="rw"><b>Zainab Ali</b><span>Marketing · not in</span></span><span class="pill err">Absent</span></div>
+        </section>
+      </div>
+    </main>
+  </div></div>
+      <div class="stats">Every text pair at <b>4.5:1</b> or more · lowest <b>5.55:1</b> (subtle-foreground on accent) · 54 pairs checked · adjusted for contrast: input</div>
+    </article>
+<article class="sample" id="dark_grey">
+      <div class="meta">
+        <div><h2>Dark Grey</h2><p>Soft dark grey, the lightest of the four.</p></div>
+        <div class="codes"><button class="code" type="button" data-hex="#1C1C1E" title="Copy Background"><i style="background:#1C1C1E"></i><span><small>Background</small><b>#1C1C1E</b></span></button><button class="code" type="button" data-hex="#2A2A2D" title="Copy Card"><i style="background:#2A2A2D"></i><span><small>Card</small><b>#2A2A2D</b></span></button><button class="code" type="button" data-hex="#45C8B0" title="Copy Brand Green"><i style="background:#45C8B0"></i><span><small>Brand Green</small><b>#45C8B0</b></span></button><button class="code" type="button" data-hex="#FFDF55" title="Copy Primary Yellow"><i style="background:#FFDF55"></i><span><small>Primary Yellow</small><b>#FFDF55</b></span></button></div>
+      </div>
+      <div class="frame" style="--primary:#FFDF55;--primary-foreground:#01221D;--primary-tint:#FFEFAA;--secondary:#014339;--secondary-foreground:#FFFFFF;--deep:#01221D;--background:#1C1C1E;--foreground:#E9E9EA;--card:#2A2A2D;--card-foreground:#E9E9EA;--popover:#2F2F32;--popover-foreground:#E9E9EA;--muted:#1A1A1B;--muted-foreground:#ADADB3;--subtle-foreground:#9E9EA4;--accent:#36363A;--accent-foreground:#45C8B0;--eyebrow:#BF9A49;--border:#3F4F4F;--input:#60787A;--ring:#FFDF55;--sidebar:#2A2A2D;--sidebar-foreground:#FFFFFF;--sidebar-muted:#A8A8AE;--sidebar-accent:#36363A;--sidebar-accent-foreground:#FFFFFF;--sidebar-primary:#FFDF55;--sidebar-primary-foreground:#01221D;--sidebar-border:rgba(255, 255, 255, .10);--sidebar-hover:rgba(255, 255, 255, .07);--sidebar-badge:rgba(255, 255, 255, .14);--on-primary-badge:rgba(1, 34, 29, .18);--success:#32D583;--success-soft:#0C3D25;--warning:#FDB022;--warning-soft:#432F0C;--destructive:#F97066;--destructive-soft:#430F0C;--info:#84ADFF;--info-soft:#0C1E43;--chart-1:#45C8B0;--chart-2:#FFDF55;--chart-3:#7CC4FA;--chart-4:#FF9B85;--chart-5:#C3B5FD;--chart-6:#E8D7A8;--scrim:rgba(1, 17, 14, .46);--glass:rgba(42, 42, 45, .82);--glass-border:rgba(255, 255, 255, .12);--sb:rgba(255, 255, 255, .14);--sb-hover:rgba(255, 255, 255, .26);--sb-on-dark:rgba(255, 255, 255, .14);--paper:#FFFFFF;--paper-foreground:#14201D;--paper-heading:#0A1412;--paper-muted:#566662;--paper-faint:#657470;--paper-head:#F4F7F6;--paper-line:#E2E9E7;--paper-rule:#EDF2F0;--paper-dash:#D5DEDB;--paper-brand:#014339;--paper-gold:#FFDF55;--on-deep:#FFFFFF;--on-deep-muted:#CCCFCE;--on-deep-faint:#9FB3AE;--on-deep-soft:#D7E2DF;--on-deep-dim:#B9C8C4;--scene-night-top:#010F0D;--scene-night-bottom:#0A4A40;--scene-dawn-top:#0E3B4A;--scene-dawn-bottom:#F4B97A;--scene-day-top:#2C8C84;--scene-day-bottom:#CDEDE4;--scene-dusk-top:#03231E;--scene-dusk-bottom:#F0A440;--scene-far:#0D5247;--scene-mid:#043A31;--scene-near:#011A16;--scene-water:#022B25;--scene-glint:#9FD9CC;--scene-sun:#FFE98A;--scene-moon:#F1F4E4;--scene-light:#FFFFFF;--scene-window:#FFDF55"><div class="app">
+    <nav class="rail">
+      <span class="brand"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="10" r="2.6"/></svg></span>
+      <a class="on"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.6 7.4L3 21l1.6-5.2A8.5 8.5 0 1 1 21 12Z"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></a><a><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></a>
+    </nav>
+    <main>
+      <header class="top">
+        <span class="search"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people, screens, records</span>
+        <span class="bell"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></span>
+        <span class="btn"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Clock In</span>
+      </header>
+      <div class="page">
+        <div class="eyebrow">Wednesday 21 October</div>
+        <h1>Good afternoon, Cynthia</h1>
+        <div class="tabs"><span class="on">Overview</span><span>Team</span><span>Alerts</span><span>Reports</span></div>
+        <div class="kpis">
+          <div class="kpi"><span class="kt">Clocked In Today</span><b>37<small> of 41</small></b><span class="kc warn">4 late</span></div>
+          <div class="kpi"><span class="kt">Leave Pending</span><b>3</b><span class="kc info">1 waiting on you</span></div>
+          <div class="kpi"><span class="kt">Open Alerts</span><b>2</b><span class="kc err">1 high</span></div>
+          <div class="kpi"><span class="kt">Proposals Out</span><b>5</b><span class="kc ok">2 more than last month</span></div>
+        </div>
+        <div class="split">
+          <section class="card chart">
+            <h2>Attendance, 14 Working Days</h2>
+            <div class="bars"><i style="height:92%" class="" title="Day 1"></i><i style="height:88%" class="" title="Day 2"></i><i style="height:95%" class="" title="Day 3"></i><i style="height:64%" class="sat" title="Day 4"></i><i style="height:90%" class="" title="Day 5"></i><i style="height:86%" class="" title="Day 6"></i><i style="height:97%" class="" title="Day 7"></i><i style="height:61%" class="sat" title="Day 8"></i><i style="height:89%" class="" title="Day 9"></i><i style="height:93%" class="" title="Day 10"></i><i style="height:87%" class="" title="Day 11"></i><i style="height:66%" class="sat" title="Day 12"></i><i style="height:91%" class="" title="Day 13"></i><i style="height:90%" class="" title="Day 14"></i></div>
+            <div class="legend"><span><i class="c1"></i>Present</span><span><i class="c2"></i>Saturday, half day</span></div>
+          </section>
+          <section class="card">
+            <h2>Need You</h2>
+            <div class="row"><span class="av">AO</span><span class="rw"><b>Ada Obi</b><span>Annual leave, 7 days</span></span><span class="pill warn">Approve</span></div>
+            <div class="row on"><span class="av">TB</span><span class="rw"><b>Tunde Bello</b><span>Lagos conference site</span></span><span class="pill info">Waiting</span></div>
+            <div class="row"><span class="av">NE</span><span class="rw"><b>Ngozi Eze</b><span>Clocked out at 13:10</span></span><span class="pill err">Early</span></div>
+            <a class="link">View All</a>
+          </section>
+        </div>
+        <section class="card">
+          <h2>Team Roster</h2>
+          <div class="field"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search people</div>
+          <div class="row"><span class="av">MD</span><span class="rw"><b>Musa Danjuma</b><span>Programmes · 08:52</span></span><span class="pill ok">On Time</span></div>
+          <div class="row"><span class="av">BO</span><span class="rw"><b>Bisi Ojo</b><span>Operations · 09:14</span></span><span class="pill warn">Late</span></div>
+          <div class="row"><span class="av">ZA</span><span class="rw"><b>Zainab Ali</b><span>Marketing · not in</span></span><span class="pill err">Absent</span></div>
+        </section>
+      </div>
+    </main>
+  </div></div>
+      <div class="stats">Every text pair at <b>4.5:1</b> or more · lowest <b>4.51:1</b> (subtle-foreground on accent) · 54 pairs checked · adjusted for contrast: subtle-foreground, eyebrow, input</div>
+    </article>
+  </div>
+  <p class="foot">Generated by scripts/gen/dark-theme-samples.js from the same maths the hub uses (packages/contract/schemas/appearance.js). Names and figures are invented for the picture.</p>
+</div>
+<script>
+document.querySelectorAll(".code").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var hex = b.getAttribute("data-hex");
+    var done = function () { b.classList.add("done"); setTimeout(function () { b.classList.remove("done"); }, 1400); };
+    if (navigator.clipboard) navigator.clipboard.writeText(hex).then(done, done); else done();
+  });
+});
+var grid = document.querySelector(".grid");
+document.querySelectorAll(".view button").forEach(function (b) {
+  b.addEventListener("click", function () {
+    document.querySelectorAll(".view button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+    var key = b.getAttribute("data-key");
+    grid.classList.toggle("one", key !== "all");
+    document.querySelectorAll(".sample").forEach(function (s) { s.classList.toggle("chosen", s.id === key); });
+  });
+});
+</script>
+</body>
+</html>

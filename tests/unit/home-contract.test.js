@@ -236,11 +236,26 @@ describe("reports", () => {
   test("a new report runs a source the form offers, with filters that source takes", () => {
     const base = { name: "Daily Attendance", report_key: "daily_attendance", schedule: schedule() };
     const reportIssues = (over) => issues(reports.HomeReportCreate.safeParse({ ...base, ...over }));
-    expect(reportIssues({ filters: { roster_status: "late", department_id: ID } })).toEqual([]);
+    expect(reportIssues({ filters: { roster_statuses: ["late", "not_in"], department_id: ID } })).toEqual([]);
     expect(reportIssues({ filters: { category: "people" } })).toEqual(["filters.category: Not for this source"]);
     expect(reportIssues({ report_key: "overview" })).toEqual(["report_key: Choose a source"]);
-    expect(reportIssues({ filters: { roster_status: "elsewhere" } })).toHaveLength(1);
+    expect(reportIssues({ filters: { roster_statuses: ["elsewhere"] } })).toHaveLength(1);
+    expect(reportIssues({ filters: { roster_statuses: [] } })).toEqual(["filters.roster_statuses: Pick a status"]);
+    expect(reportIssues({ filters: { roster_statuses: ["late", "late"] } })).toEqual(["filters.roster_statuses: Each status once"]);
     expect(reportIssues({ filters: { owner: ID } })).toHaveLength(1);
+  });
+
+  test("Daily Attendance is Absent only on the closed day before, and Not In only today", () => {
+    const base = { name: "Daily Attendance", report_key: "daily_attendance", schedule: schedule() };
+    const reportIssues = (filters) => issues(reports.HomeReportCreate.safeParse({ ...base, filters }));
+    expect(reportIssues({ roster_statuses: ["absent"] })).toEqual(["filters.roster_statuses: Absent needs Last Working Day"]);
+    expect(reportIssues({ roster_day: "today", roster_statuses: ["late", "absent"] })).toEqual(["filters.roster_statuses: Absent needs Last Working Day"]);
+    expect(reportIssues({ roster_day: "last_working_day", roster_statuses: ["late", "absent"] })).toEqual([]);
+    expect(reportIssues({ roster_day: "last_working_day", roster_statuses: ["not_in"] })).toEqual(["filters.roster_statuses: Not In needs Today"]);
+    expect(reportIssues({ roster_day: "yesterday" })).toHaveLength(1);
+    const change = (filters) => issues(reports.HomeReportUpdate.safeParse({ filters }));
+    expect(change({ roster_statuses: ["absent"] })).toEqual(["filters.roster_statuses: Absent needs Last Working Day"]);
+    expect(change({ roster_day: "last_working_day", roster_statuses: ["absent"] })).toEqual([]);
   });
 
   test("a schedule goes to one to 25 people, each once, in at least one format", () => {

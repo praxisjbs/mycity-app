@@ -15,7 +15,7 @@ import { ScreenActionProvider, useRegisteredAction } from "@/shell/screen-action
 import copy from "../../../../scripts/check/lib/copy.js";
 import Home from "./index";
 import { audienceLine, isoWeekday, scheduleLine } from "./labels";
-import { changeBody, fieldOf, newReportValues, offeredSources, reportBody, reportValues, type ReportValues } from "./ReportForm";
+import { changeBody, fieldOf, firstProblem, newReportValues, offeredSources, reportBody, reportValues, type ReportValues } from "./ReportForm";
 import { awaited, runFormats } from "./Reports";
 
 /**
@@ -255,7 +255,7 @@ describe("what the screen sends", () => {
   });
 
   it("sends only the filters the source takes and the person chose, the weekly days in order, and no schedule on demand", () => {
-    const v: ReportValues = { ...newReportValues(READER, "leave", "2026-10-21"), name: "Leave", leave_status: "approved", roster_status: "late", department_id: "", repeats: "weekly", by_weekday: [5, 1], working_days_only: false, formats: "both" };
+    const v: ReportValues = { ...newReportValues(READER, "leave", "2026-10-21"), name: "Leave", leave_status: "approved", roster_statuses: ["late"], department_id: "", repeats: "weekly", by_weekday: [5, 1], working_days_only: false, formats: "both" };
     const body = reportBody(v);
     expect(body.filters).toEqual({ leave_status: "approved" });
     expect(body.schedule).toMatchObject({ recurrence: { freq: "weekly", by_weekday: [1, 5] }, formats: ["pdf", "xlsx"] });
@@ -265,6 +265,17 @@ describe("what the screen sends", () => {
     const opened = newReportValues(READER, "leave", "2026-10-21");
     expect(changeBody(v, opened)).not.toHaveProperty("report_key");
     expect(reports.HomeReportUpdate.safeParse(changeBody(v, opened)).success).toBe(true);
+  });
+
+  it("sends Daily Attendance's day only when it is the Last Working Day, and the statuses ticked", () => {
+    const start = { ...newReportValues(READER, "daily_attendance", "2026-10-21"), name: "Late and Absent" };
+    expect(reportBody(start).filters).toEqual({});
+    const last = { ...start, roster_day: "last_working_day" as const, roster_statuses: ["late" as const, "absent" as const] };
+    expect(reportBody(last).filters).toEqual({ roster_day: "last_working_day", roster_statuses: ["late", "absent"] });
+    expect(reports.HomeReportCreate.safeParse(reportBody(last)).success).toBe(true);
+    // Absent cannot be read on the day so far: the contract marks it on Statuses.
+    expect(firstProblem({ ...last, roster_day: "today" })).toBe("roster_statuses");
+    expect(fieldOf(["filters", "roster_statuses"])).toBe("roster_statuses");
   });
 
   it("sends Edit Report's schedule only when the person changed it, so a name or sharing alone leaves it as saved", () => {

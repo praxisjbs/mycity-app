@@ -77,7 +77,8 @@ mycity-app/
 ├── scripts/
 │   ├── ci-local.js           runs every CI gate locally, full report
 │   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
-│   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md
+│   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
+│   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30)
 │   ├── new-component.js      npm run new:component: a shared component with header, test and gallery page
 │   ├── new-screen.js         npm run new:screen: a staff-app screen in its module, the route map, PROGRESS and the gates
 │   ├── check/                the CI gates (§8); frontend: components (palette, contrast and more in PR 1)

@@ -64,6 +64,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Sub](#sub) | `Sub` | The faint line under a heading or beside a value: the smallest secondary text there is. | stable |
 | Display | [Swatch](#swatch) | `Swatch` | A square of one palette token's colour, beside its name and its value. | stable |
 | Display | [TapList](#taplist) | `TapList` | A stack of rows that each open something: the phone's way into a record when a table would be wrong. | stable |
+| Display | [ThemePreview](#themepreview) | `ThemePreview` | A small copy of the hub drawn in a dark palette and two faces: the rail, a page title, two KPI cards, a list with a selected row, status pills, a field and the yellow button. | beta |
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
 | Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, drawn from its measured loudness, which fill as it plays. | stable |
@@ -90,6 +91,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [AddressField](#addressfield) | `AddressField` | An address picked, never typed: suggestions from our own address search as the person types, a pin on the map, and the device's location while search is down. | stable |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
+| Forms | [ColorField](#colorfield) | `ColorField` | A colour as #RRGGBB, pasted or typed, with a square of it beside the value. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
 | Forms | [Field](#field) | `Field`, `FormRow`, `FormError` | A form field's frame: the label above, an Optional tag, the control, and the error on the field as it is filled. | stable |
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
@@ -1724,6 +1726,36 @@ A stack of rows that each open something: the phone's way into a record when a t
 <TapList items={[{ key: "p1", title: "September 2026", sub: "Paid 25/09/2026", onSelect: open }]} />
 ```
 
+### ThemePreview
+
+A small copy of the hub drawn in a dark palette and two faces: the rail, a page title, two KPI cards, a list with a selected row, status pills, a field and the yellow button.
+
+| | |
+|---|---|
+| Use | Settings · Appearance's live preview of a dark palette and its fonts before they are saved, beside the fields that set them. |
+| Avoid | Showing a real screen's records (it draws sample shapes, never data); the light theme (it previews the dark one only); a palette already applied (look at the page). |
+| Phone | Fills the width at the same proportions; the rail keeps to its icons; nothing scrolls sideways. |
+| Accessibility | One image named by `label` ("Preview, Charcoal"); the sample inside is hidden from assistive technology, so its shapes and words are not read out. |
+| Status | beta |
+| Exports | `ThemePreview` |
+| Import | `import { ThemePreview } from "@mycity/ui";` |
+| File | `packages/ui/src/display/ThemePreview.tsx` |
+| Test | `packages/ui/src/display/ThemePreview.test.tsx` |
+| Gallery | `packages/ui/src/display/ThemePreview.gallery.tsx` (`npm run gallery`, `#/ThemePreview`) |
+
+**ThemePreview** props (`ThemePreviewProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What the picture is, for assistive technology: "Preview, Charcoal". |
+| `tokens` | `Record<string, string> \| null` |  | The dark tokens to draw with (the contract's deriveDark), by name without the dashes; none draws the dark theme in force. |
+| `faces` | `{ heading: string; body: string }` |  | The two faces as CSS font-family lists (fontStack); none keeps the page's. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<ThemePreview label="Preview, Charcoal" tokens={derived.tokens} />
+```
+
 ### Tile
 
 A small bordered tile: a heading, a line, and whatever sits under them.
@@ -2639,6 +2671,37 @@ Switches in a grid: one row per kind of thing (a notification category), one col
 
 ```tsx
 <ChannelGrid columns={[{ key: "in_app", label: "In App" }, { key: "push", label: "Push" }]} rows={rows} onChange={(row, column, on) => save(row, column, on)} />
+```
+
+### ColorField
+
+A colour as #RRGGBB, pasted or typed, with a square of it beside the value.
+
+| | |
+|---|---|
+| Use | A colour a person sets, such as a dark palette on Settings · Appearance, inside a Field, bound with form.field(name); the contract checks the value. |
+| Avoid | The browser's colour picker (gate 21); showing a colour a token already names (use Swatch). |
+| Phone | 44 px tall with 16 px text; the square stays beside the value; a plain keyboard, nothing corrected or capitalised for the person. |
+| Accessibility | Takes its id, label and error links from the Field around it; the square is decorative, so the value is always read as text; aria-invalid follows the mark. |
+| Status | beta |
+| Exports | `ColorField` |
+| Import | `import { ColorField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/ColorField.tsx` |
+| Test | `packages/ui/src/form/ColorField.test.tsx` |
+| Gallery | `packages/ui/src/form/ColorField.gallery.tsx` (`npm run gallery`, `#/ColorField`) |
+
+**ColorField** props (`ColorFieldProps`, extends `NativeInput`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | The colour as typed, from form.field(name): #RRGGBB or RRGGBB, any case. |
+| `onChange` | `(value: string) => void` | yes | Called with the new text, as typed or pasted. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+
+```tsx
+<ColorField {...form.field("background")} />
 ```
 
 ### DateField
@@ -5116,6 +5179,11 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 
 | Export | File | What it does |
 |---|---|---|
+| `AppliedAppearance` (type) | `lib/appearance.ts` | The contract's AppearanceApplied, as the shell receives it on /auth/me. |
+| `APPEARANCE_STYLE_ID` | `lib/appearance.ts` | The element and the keys the boot script reads; change them together. |
+| `tokenDeclarations` | `lib/appearance.ts` | A palette as CSS declarations, each token a colour the contract writes; anything else is left out. |
+| `appearanceCss` | `lib/appearance.ts` | The CSS for an appearance: the faces always, the dark palette when there is one. |
+| `applyAppearance` | `lib/appearance.ts` | Applies an appearance to the page and keeps it for the next first paint. |
 | `captionsSupported` | `lib/captions.ts` | Whether this browser can caption a recording. |
 | `Captions` (type) | `lib/captions.ts` | A running caption: stop() ends it and answers what it heard. |
 | `startCaptions` | `lib/captions.ts` | Start captioning the microphone, in the person's language (Nigerian English when the browser names none). |
@@ -5145,6 +5213,10 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `noteEnvironmentHeader` | `lib/environment.ts` | Called with each API response's X-Mycity-Environment value. |
 | `initEnvironment` | `lib/environment.ts` | Reads the address once at start. |
 | `useEnvironment` | `lib/environment.ts` | The environment in force, re-rendering when the API reveals staging. |
+| `FontId` (type) | `lib/fonts.ts` | The typefaces Settings · Appearance offers (F30), each self-hosted: no font service is asked, so the security policy's `font-src 'self'` holds. |
+| `FONT_IDS` | `lib/fonts.ts` | The ids, in the order the contract lists them. |
+| `fontStack` | `lib/fonts.ts` | The font-family a face is drawn with, the system's sans after it; Geist for an id it does not know. |
+| `loadFont` | `lib/fonts.ts` | Loads a face once; a face that fails to load leaves the fallback showing, and is tried again next time. |
 | `formatDate` | `lib/format.ts` | "2026-10-13" or a full ISO timestamp → "13/10/2026". |
 | `formatTime` | `lib/format.ts` | ISO timestamp → "09:14" in Lagos time. |
 | `formatDateTime` | `lib/format.ts` | ISO timestamp → "13/10/2026 09:14". |
@@ -5207,6 +5279,8 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `Theme` (type) | `lib/preferences.ts` | The theme in force: light or dark. |
 | `ThemeChoice` (type) | `lib/preferences.ts` | What a person may choose: light, dark, or the device's setting. |
 | `Density` (type) | `lib/preferences.ts` | Compact (the default) or Comfortable. |
+| `TextSize` (type) | `lib/preferences.ts` | A person's text size: the type scale, and on desktop the controls and rows with it (F30). |
+| `TEXT_SIZES` | `lib/preferences.ts` | The text sizes in the order a picker offers them, with their names. |
 | `configurePreferences` | `lib/preferences.ts` | Sets the storage keys. |
 | `themeChoice` | `lib/preferences.ts` | What the person chose: light, dark, or the device's setting. |
 | `currentTheme` | `lib/preferences.ts` | The theme in force now: the choice, or the device's setting. |
@@ -5215,6 +5289,10 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `currentDensity` | `lib/preferences.ts` | The density in force: compact unless comfortable is set. |
 | `setDensity` | `lib/preferences.ts` | Applies and remembers a density. |
 | `useDensity` | `lib/preferences.ts` | Compact (the default on desktop) or Comfortable, remembered per person (F5). |
+| `currentTextSize` | `lib/preferences.ts` | The text size in force: Default unless one is set. |
+| `setTextSize` | `lib/preferences.ts` | Applies and remembers a text size; Default clears the stored one. |
+| `useTextSize` | `lib/preferences.ts` | Small, Default, Large or Largest, remembered per person on this device (F30). |
+| `applyDefaults` | `lib/preferences.ts` | The organisation's theme and density (Settings · Appearance) for a person who has chosen neither on this device: a person's own choice always wins, and is never stored by this. |
 | `useSeen` | `lib/seen.ts` | A ref that calls `onSeen` once, when its element first comes within `margin` of the screen: a chat's pictures are fetched as they scroll near, not all at once. |
 | `SLOTS` | `lib/slots.ts` | The slot names the screen gates read (five-second.js, two-shells.js): each shared component marks its text with `data-ui="<slot>"`, so a gate knows a page title from a button from a help text without guessing from markup. |
 | `Slot` (type) | `lib/slots.ts` | One slot name. |

@@ -1,9 +1,9 @@
 "use strict";
 /**
  * The Settings screens' HTTP edge: Organisation (the profile, the working week,
- * holidays), Roles & Permissions (access), Documents & Numbering, and Security (the
- * rules, failed sign-ins, everyone's live sessions). Each call goes to the module that
- * owns the data: settings, access, or security for sessions.
+ * holidays), Roles & Permissions (access), Documents & Numbering, Appearance, and
+ * Security (the rules, failed sign-ins, everyone's live sessions). Each call goes to the
+ * module that owns the data: settings, access, or security for sessions.
  */
 const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
@@ -12,6 +12,7 @@ const { readUpload } = require("../../middleware/upload");
 const access = require("../access/access.service");
 const sessions = require("../security/security.sessions");
 const service = require("./settings.service");
+const appearance = require("./settings.appearance");
 
 const id = (req) => req.validated.params.id;
 
@@ -53,6 +54,11 @@ module.exports = {
   numberingSummary: async (_req, res) => ok(res, await service.numberingSummary()),
   saveScheme: async (req, res) =>
     ok(res, await service.saveScheme(req.validated.params.doc_type, req.validated.body, withActor(req))),
+
+  // Appearance
+  appearance: async (_req, res) => ok(res, await appearance.appearance()),
+  updateAppearance: async (req, res) => ok(res, await appearance.updateAppearance(req.validated.body, withActor(req))),
+  restoreAppearance: async (req, res) => ok(res, await appearance.restorePrevious(withActor(req))),
 
   // Security
   security: async (_req, res) => ok(res, await service.securityPolicy()),

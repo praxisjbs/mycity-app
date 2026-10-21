@@ -33,6 +33,21 @@ const HOME_REPORT_FORMATS = ["pdf", "xlsx"];
 const HomeReportFormat = z.enum(HOME_REPORT_FORMATS);
 
 /**
+ * The day Daily Attendance reads (home.md §6 Reports): `today`, the day so far, which nobody
+ * is Absent on yet (the day-close marks a working day with no clock-in Absent only after it
+ * ends; until then that person is Not In), or `last_working_day`, the working day before the
+ * report's moment, closed by then, so Absent is real and nobody is Not In.
+ */
+const HomeReportRosterDay = z.enum(["today", "last_working_day"]);
+const HOME_REPORT_ROSTER_DAYS = HomeReportRosterDay.options;
+
+/** The roster statuses a day can hold: Absent only once the day is closed, Not In only while it is open. */
+const ROSTER_STATUSES_ON = Object.freeze({
+  today: Object.freeze(HomeRosterStatus.options.filter((s) => s !== "absent")),
+  last_working_day: Object.freeze(HomeRosterStatus.options.filter((s) => s !== "not_in")),
+});
+
+/**
  * The filters a source can take, each meaning one thing whichever source takes it. A
  * report keeps them in saved_report.definition and hands them to its source's query;
  * only the ones its source takes (HOME_REPORT_SOURCES) are accepted.
@@ -40,8 +55,15 @@ const HomeReportFormat = z.enum(HOME_REPORT_FORMATS);
 const HomeReportFilters = z
   .object({
     department_id: uuid.optional(),
-    /** Daily Attendance: one status on the day's roster. */
-    roster_status: HomeRosterStatus.optional(),
+    /** Daily Attendance: the day it reads; none is `today`. */
+    roster_day: HomeReportRosterDay.optional(),
+    /** Daily Attendance: the statuses on that day's roster, any of them; none is everyone. */
+    roster_statuses: z
+      .array(HomeRosterStatus)
+      .min(1, "Pick a status")
+      .max(HomeRosterStatus.options.length)
+      .refine(distinct, "Each status once")
+      .optional(),
     leave_status: LeaveStatus.optional(),
     leave_type_id: uuid.optional(),
     /** Open Alerts. */
@@ -59,7 +81,7 @@ const HomeReportFilters = z
  * a test holds its keys equal to these.
  */
 const HOME_REPORT_SOURCES = Object.freeze({
-  daily_attendance: Object.freeze({ module: "people", filters: Object.freeze(["department_id", "roster_status"]), offered: true }),
+  daily_attendance: Object.freeze({ module: "people", filters: Object.freeze(["roster_day", "department_id", "roster_statuses"]), offered: true }),
   leave: Object.freeze({ module: "people", filters: Object.freeze(["leave_status", "leave_type_id"]), offered: true }),
   open_alerts: Object.freeze({ module: "home", filters: Object.freeze(["category", "severity"]), offered: true }),
   headcount: Object.freeze({ module: "people", filters: Object.freeze(["department_id"]), offered: true }),
@@ -214,6 +236,20 @@ function sourceFits(v, ctx) {
     if (v.filters[key] !== undefined && !source.filters.includes(key))
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["filters", key], message: "Not for this source" });
   }
+  rosterDayFits(v.filters, ctx);
+}
+
+/** Daily Attendance's statuses are ones its day can hold: Absent on the last working day, Not In today. */
+function rosterDayFits(filters, ctx) {
+  const statuses = filters && filters.roster_statuses;
+  if (!statuses) return;
+  const day = filters.roster_day || "today";
+  if (statuses.some((s) => !ROSTER_STATUSES_ON[day].includes(s)))
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["filters", "roster_statuses"],
+      message: day === "today" ? "Absent needs Last Working Day" : "Not In needs Today",
+    });
 }
 
 /**
@@ -244,7 +280,8 @@ const HomeReportUpdate = z
   })
   .partial()
   .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" });
+  .refine((v) => Object.keys(v).length > 0, { message: "Change at least one field" })
+  .superRefine((v, ctx) => rosterDayFits(v.filters, ctx));
 
 /** PATCH /home/reports/:id/schedule: Pause or Resume. */
 const HomeReportScheduleState = z.object({ active: z.boolean() }).strict();
@@ -446,6 +483,9 @@ module.exports = {
   HOME_REPORT_MAX_RECIPIENTS,
   HOME_REPORT_FORMATS,
   HOME_REPORT_SOURCES,
+  HOME_REPORT_ROSTER_DAYS,
+  ROSTER_STATUSES_ON,
+  HomeReportRosterDay,
   HomeReportFormat,
   HomeReportSource,
   HomeReportStatus,

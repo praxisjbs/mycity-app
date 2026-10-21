@@ -4,7 +4,9 @@ import { exportFile } from "./shared";
 import { CAPABILITIES, ROLE_CAPABILITIES } from "../data/access";
 import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
-import { waysOf } from "./security";
+import { stale, waysOf } from "./security";
+import appearanceSchemas from "@mycity/contract/schemas/appearance.js";
+import { appearanceView, restorePrevious, updateAppearance } from "../data/appearance";
 import { ON_UPLOAD } from "../uploads";
 import { pickAnAddress, placeOf } from "./maps";
 
@@ -384,16 +386,26 @@ route("DELETE /api/v1/settings/roles/:id", (req) => {
   return noContent();
 });
 
-let THEME: "system" | "light" | "dark" = "system";
-const APPEAR = () => ({ theme_default: THEME, palette: [["Primary Yellow", "--primary"], ["Yellow Tint", "--accent"], ["City Green", "--secondary"], ["Deep Green", "--sidebar"]].map(([name, token]) => ({ name, token })), dark: [["Background", "--background", "Deep Green, darkened"], ["Card", "--card", "Deep Green exactly"], ["Text", "--foreground", "Clears AA against the background"], ["Muted text", "--muted-foreground", "Clears AA"], ["Primary", "--primary", "The brand yellow, unchanged"]].map(([name, token, note]) => ({ name, token, note })), typeface: "Geist" });
-route("GET /api/v1/settings/appearance", () => ok(APPEAR()));
+/* ── Appearance (foundation.md §6.15): the palette derived by the contract, as on the server ── */
+route("GET /api/v1/settings/appearance", () => ok(appearanceView()));
 route("PATCH /api/v1/settings/appearance", (req) => {
-  if (!admin(req.user!)) return fail(403, "FORBIDDEN", "Operations and the CEO set the default theme.");
-  const t = String(req.body.theme_default);
-  if (!["system", "light", "dark"].includes(t)) return invalid({ theme_default: ["Light, dark or follow the device"] });
-  audit(who(req.user!), "Default theme changed", "Appearance", THEME, t, null, "Settings");
-  THEME = t as typeof THEME;
-  return ok(APPEAR());
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const refused = stale(req.user!);
+  if (refused) return refused;
+  const parsed = appearanceSchemas.AppearancePatch.safeParse(req.body);
+  if (!parsed.success) return invalid(Object.fromEntries(parsed.error.issues.map((i) => [i.path.join("."), [i.message]])));
+  const before = appearanceView();
+  const changed = updateAppearance(parsed.data, who(req.user!));
+  if (changed.length) audit(who(req.user!), "Appearance changed", "Appearance", changed.map((k) => `${k}: ${JSON.stringify(k === "dark" ? before.dark.seeds : before[k as "fonts"])}`).join("; "), changed.join(", "), null, "Settings");
+  return ok(appearanceView());
+});
+route("POST /api/v1/settings/appearance/restore", (req) => {
+  if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
+  const refused = stale(req.user!);
+  if (refused) return refused;
+  if (!restorePrevious(who(req.user!))) return fail(409, "NOTHING_TO_RESTORE", "There is no earlier palette");
+  audit(who(req.user!), "Appearance changed", "Appearance", "Previous palette", "Restored", null, "Settings");
+  return ok(appearanceView());
 });
 
 /* ── Numbering: a scheme per numbered document type (shared/numbering/schemes.js) ── */

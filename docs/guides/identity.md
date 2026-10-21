@@ -420,6 +420,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · `/auth/me` (and the sign-in answer's `user`) carries `appearance`: Settings · Appearance as every screen of the hub applies it, the dark tokens when the palette is not MyCity's own, the two fonts and the starting theme and density (`docs/guides/foundation.md` §6.15).
 - 21/10/2026 · TB · §6 Links: a queued invitation or reset is sent only while its link still works (`identity.linkStillOpen`, checked by the `email-send` job), and both still go while system mail is paused (`docs/guides/integrations.md` §6.15).
 
 - 16/10/2026 · TB · First version, with the build: sessions to the donor rules, the lock screen,

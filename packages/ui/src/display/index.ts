@@ -34,6 +34,7 @@ export * from "./StatStrip";
 export * from "./Sub";
 export * from "./Swatch";
 export * from "./TapList";
+export * from "./ThemePreview";
 export * from "./Tile";
 export * from "./Timeline";
 export * from "./Waveform";

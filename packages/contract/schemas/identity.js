@@ -10,6 +10,7 @@
  */
 const { z } = require("zod");
 const { uuid, email, isoDateTime, listQuery, Paged } = require("./common");
+const { AppearanceApplied } = require("./appearance");
 
 /** Seconds, whole. */
 const seconds = z.number().int().min(0);
@@ -95,6 +96,8 @@ const Me = z
     home_view: HomeView,
     /** Does anyone report to this person? Opens the manager views (My Team, approvals). */
     manages_people: z.boolean(),
+    /** Settings · Appearance as every screen of the hub applies it (appearance.js). */
+    appearance: AppearanceApplied,
   })
   .strict();
 

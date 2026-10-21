@@ -51,13 +51,13 @@ app's session on the upload engine.
 
 ---
 
-## 3 · Decisions (15/10/2026, TB; F25 and F26 added 18/10/2026; F27 to F29 added 20/10/2026)
+## 3 · Decisions (15/10/2026, TB; F25 and F26 added 18/10/2026; F27 to F29 added 20/10/2026; F30 added 21/10/2026)
 
 | # | Decision |
 |---|---|
 | F1 | **One design system for both apps**: the workspace package `packages/ui` (`@mycity/ui`). The public site imports it, never `app/` (A9 holds: no app imports the other app). No component, token or helper is copied between apps |
 | F2 | **Today's agreements are the source of truth** over #18 where they differ. #18's screens are kept and moved onto `packages/ui`; its component and hook APIs are kept where they serve, upgraded underneath |
-| F3 | **Tokens are MILESTONES §5.1 and §5.2.** Values the demo added that MILESTONES lacks (subtle ink, paper tones, status tints) stay as derived tokens, each listed with its contrast ratio. Gate 14 checks every text pair in both themes |
+| F3 | **Tokens are MILESTONES §5.1 and §5.2.** Values the demo added that MILESTONES lacks (subtle ink, paper tones, status tints) stay as derived tokens, each listed with its contrast ratio. Gate 14 checks every text pair in both themes. Since F30 (21/10/2026) the dark block is the contract's `deriveDark()` of §5.2's four colours, and a palette saved on Settings · Appearance replaces it at run time, held to the same pairs as it is saved |
 | F4 | **Styling is tokens only, gated.** Features compose `packages/ui` components and may use Tailwind layout and spacing utilities from the token scale. No colour outside a token class, no arbitrary value (`w-[317px]`, `bg-[#…]`), no inline `style`, no raw hex. Anything visual beyond that is a shared component |
 | F5 | **Density.** Compact is the default on desktop (14 px body, 40 px table rows, 36 px controls); a person may switch to Comfortable (15 px, 48 px rows, 40 px controls), remembered per person. A phone always uses 16 px in fields and 44 px targets |
 | F6 | **Motion is native.** Bottom sheets slide with a spring and close by dragging down (Vaul over Radix Dialog); toasts and popovers fade briefly; everything is instant under reduced motion. A sheet stays above the phone's keyboard with its header in view, and once it holds a text field it closes only on purpose: its close button, Cancel or Esc, never a drag or a tap on the scrim, which puts the keyboard away instead (18/10/2026) |
@@ -84,6 +84,7 @@ app's session on the upload engine.
 | F26 | **One press, one request** (added 18/10/2026). A button answers the moment it is pressed. Its handler hands back the work (a promise), and the button is busy until that settles: its own colour and label, softened, with a spinner where its icon was (centred over the label when it has none, so its size never changes), and a second press refused at once, before the screen redraws. The buttons beside it wait with it (a modal, a form, a form footer, a card or page header, a shell notice, or an `ActionGroup`), and a modal cannot be dismissed mid-save. Busy stays focusable and named (`aria-busy`, `aria-disabled`), never `disabled`. A `Form` refuses a second submit while its save runs. The lint rule `mycity/no-void-press` refuses a handler that throws its work away (`() => void save()`) on `Button`, `IconButton`, `BigButton`, `Form`, `Wizard`, `ConfirmDialog` and `ExportButton` (FRONTEND_GUIDE §8.4, §9.4) |
 | F28 | **Refresh in place, reload on purpose** (added 20/10/2026, TB; the hub only). Refresh asks every read on the screen again where it is: scroll, filters, the open record and anything typed stay, nothing turns back into a skeleton, and it ends when the last read lands (the data client's `refresh`). **Phone:** pull down at the top of the page, the Pin Drop. The pin drops in a disc under the header while a yellow ring fills; at 64 px the ring closes and the pin lands (a tick on Android), and letting go refreshes, the ring spinning until the reads are in. Pulled on past 136 px the disc turns Deep Green with the reload mark, and letting go restarts the app on the same screen (two depths). The pull only listens and never holds up scrolling: it starts only when the page and every list under the finger are at their top, after a clear move down, never on a fit page (Chat, Mailbox) or over anything marked `data-pull="off"` (a map, the signature pad, a document), and the hub turns the browser's own pull off. **Desktop:** the refresh button at the start of the top bar, the Hold Ring: a click refreshes, its arrow turning until the reads are in; held, a yellow ring closes around it in 0.6 s and the app reloads; Shift and Enter reload from the keyboard. Refresh shows in a browser tab as well as in the installed app. A reload hands over to a waiting new version; F5 and Ctrl R keep the browser's own full reload. ⌘K offers Refresh Screen and Reload App (FRONTEND_GUIDE §7, §9.5) |
 | F29 | **Back and forward, one history** (added 20/10/2026, TB; the hub only). The window's own history is the only record of where a person has been, so Android's Back, the iPhone's edge swipe, a mouse's side buttons, Alt and an arrow key, and the hub's own controls always agree. A new screen, tab or opened record (`id`) is a step; filters, search, sort and the page change that step in place, so Back returns to a list as it was left. On a phone an open sheet, page, menu, search or viewer takes a step of its own, so Back closes it first; one holding unsaved work asks, as Esc does. Each device keeps its own trail, never sent to the server or shared with the person's other devices: the installed app reopens where they were, Back still working, when they left it within the last 12 hours, and Sign Out wipes it. **Desktop, installed app only:** back and forward join the refresh button in one capsule at the start of the top bar; hovering an arrow names where it goes; holding an arrow, right clicking it or holding the pin opens the trail, the last 8 places and the 1 ahead, to jump straight to one. **Phone:** no back button. Android's Back and the iPhone's edge swipe go back, and in the installed app holding the pin opens the trail as a sheet. A browser tab keeps the browser's own back and forward (FRONTEND_GUIDE §7, §9.2) |
+| F30 | **Appearance is configurable, in the hub, within AA** (added 21/10/2026, TB, after the Milestone 1 handover). Settings · Appearance sets the hub's dark palette from four pasted colours (Background, Card, Brand Green, Primary Yellow); every other dark token is worked out by fixed maths in the contract (`packages/contract/schemas/appearance.js` `deriveDark`), never by a model, each ink lightened and tint darkened until every pair keeps 4.5:1, and a colour no nudge can save refused on its field. Presets: Deep Green (§5.2, shipped), Charcoal, Black, Dark Grey. Two fonts (heading, body) from a vetted self-hosted list; the theme and density a person starts on. Each person's Text Size (Small to Largest) on their device. Saved by `settings` edit after a fresh sign-in, audited, with Restore Previous; a live preview first. The light theme, corner radius, the public site, documents and email do not change. Raw hex stays out of source (gate 13): a palette is data, applied by `lib/appearance.ts` (`docs/guides/foundation.md` §6.15) |
 
 ---
 
@@ -218,6 +219,30 @@ app's session on the upload engine.
    `mycity/no-void-press` refuses the pattern from now on, inline or in the local function a button
    names.
 
+**F30 · Appearance** (21/10/2026, TB). Twelve questions after the Milestone 1 handover, where Edidiong
+Etudor and Cynthia Osakunih asked for the dark theme off its green background, with samples first.
+
+1. What does a Daily Attendance report do about Absent, when the day closes at 01:30? **A Day
+   choice**: Today So Far (Not In, never Absent) or Last Working Day (closed, so Absent is real). Not In
+   counted as Absent after the shift, and always the last closed day, were turned down.
+2. One status or several? **Several**, ticked; none is everyone.
+3. What ships, given samples were asked for? **Samples in an HTML file, and the palette configurable**,
+   so the one MyCity accepts is pasted on Settings · Appearance.
+4. Which colours are pasted? **The dark theme's only, everything else derived; the light theme stays**.
+5. Derived how? **Code, no AI**: the same answer every time, contrast proven on every save.
+6. Which four? **Background, Card, Brand Green, Primary Yellow**.
+7. A pasted colour that fails contrast? **The derived shades are nudged and listed**; a pasted one that
+   cannot be saved is refused on its field.
+8. Record it against A8, §5.2 and F3? **Yes**, as TB's decision of 21/10/2026.
+9. Who changes it? **`settings` edit, audited**, after a fresh sign-in, with Restore Previous; no
+   approval chain.
+10. How is it seen first? **A live preview, then Save**.
+11. What do the samples show? **Home in four presets**: Deep Green, Charcoal, Black, Dark Grey, each
+    with its four codes.
+12. Where does it apply? **The hub only**. Then, asked for: fonts from a **vetted self-hosted list for
+    everyone** (heading and body); **the organisation's default theme and density, and each person's
+    Text Size**; corner radius **kept fixed**; **one dark palette for everybody**.
+
 **F28 and F29 · Refresh and history** (20/10/2026, TB). Eight questions, each asked with a live design
 board of the options (pull them, hold them), for the hub only, production and staging alike.
 
@@ -256,6 +281,15 @@ board of the options (pull them, hold them), for the hub only, production and st
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 21/10/2026 · TB · F30, Appearance in the hub (§5's twelve answers; `docs/guides/foundation.md` §6.15). The
+  pair table and the contrast maths moved from `tokens.test.ts` into the contract, where the dark palette is
+  derived; tokens.css's dark block is now that derivation of MILESTONES §5.2's four colours, and the test
+  holds them equal (popover, accent, the muted and subtle inks, the lines and the soft tints moved by a shade;
+  the rail takes the card's colour in dark). New: `ColorField` (Forms), `ThemePreview` (Display), the
+  `textsize` glyph, `lib/fonts.ts`, `lib/appearance.ts`, Text Size in `lib/preferences.ts` and
+  `applyDefaults`, `--face-body`, `--face-heading`, `--face-paper` and `--text-scale` in tokens.css.
+  `app/index.html`'s inline first-paint script was refused by the security policy on every server, so it is
+  `app/public/boot.js` now. Left: other people's hubs repaint at their next sign-in or reload.
 - 20/10/2026 · TB · F28 and F29, refresh and history in the hub (the eight answers in §5). The data
   client's `refresh` (quiet: data stays, `loading` stays false; settles when the last read lands) is what
   the pull, the refresh button and ⌘K's Refresh Screen run. New in the Shell group: `PullIndicator` (the

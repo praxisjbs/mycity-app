@@ -1,12 +1,16 @@
 /**
- * Theme and density, per person (F5). Each is an attribute on <html>
- * (`data-theme`, `data-density`) that tokens.css reads, and a localStorage key
- * that index.html reads before first paint, so nobody sees a flash of the
- * wrong theme. Storage is a per-device convenience; when it is blocked the
- * choice still applies for the visit.
+ * Theme, density and text size, per person (F5, F30). Each is an attribute on
+ * <html> (`data-theme`, `data-density`, `data-text-size`) that tokens.css reads,
+ * and a localStorage key that the staff app's boot script reads before first
+ * paint, so nobody sees a flash of the wrong theme. Storage is a per-device
+ * convenience; when it is blocked the choice still applies for the visit.
  *
- *   theme    "light" | "dark" | "system" (the device's setting; nothing stored)
- *   density  "compact" (the default) | "comfortable"
+ *   theme      "light" | "dark" | "system" (the device's setting; nothing stored)
+ *   density    "compact" (the default) | "comfortable"
+ *   text size  "small" | "default" (nothing stored) | "large" | "largest"
+ *
+ * Settings · Appearance may set the theme and density a person starts with
+ * (applyDefaults): they apply only while that person has chosen none here.
  */
 import { useCallback, useSyncExternalStore } from "react";
 
@@ -16,8 +20,18 @@ export type Theme = "light" | "dark";
 export type ThemeChoice = Theme | "system";
 /** Compact (the default) or Comfortable. */
 export type Density = "compact" | "comfortable";
+/** A person's text size: the type scale, and on desktop the controls and rows with it (F30). */
+export type TextSize = "small" | "default" | "large" | "largest";
 
-const keys = { theme: "mc-theme", density: "mc-density" };
+/** The text sizes in the order a picker offers them, with their names. */
+export const TEXT_SIZES: ReadonlyArray<readonly [TextSize, string]> = [
+  ["small", "Small"],
+  ["default", "Default"],
+  ["large", "Large"],
+  ["largest", "Largest"],
+];
+
+const keys = { theme: "mc-theme", density: "mc-density", textSize: "mc-text-size" };
 
 /**
  * Sets the storage keys. The staff app uses the defaults (mc-theme, mc-density);
@@ -40,6 +54,14 @@ function store(key: string, value: string | null) {
     else localStorage.setItem(key, value);
   } catch {
     /* storage can be blocked; the choice still applies for this visit */
+  }
+}
+
+function read(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
   }
 }
 
@@ -100,4 +122,40 @@ export function useDensity() {
   const density = useSyncExternalStore(subscribe, currentDensity, () => "compact" as Density);
   const toggle = useCallback(() => setDensity(currentDensity() === "compact" ? "comfortable" : "compact"), []);
   return { density, toggle, setDensity };
+}
+
+/** The text size in force: Default unless one is set. */
+export function currentTextSize(): TextSize {
+  const v = root().getAttribute("data-text-size");
+  return v === "small" || v === "large" || v === "largest" ? v : "default";
+}
+
+/** Applies and remembers a text size; Default clears the stored one. */
+export function setTextSize(size: TextSize): void {
+  if (size === "default") root().removeAttribute("data-text-size");
+  else root().setAttribute("data-text-size", size);
+  store(keys.textSize, size === "default" ? null : size);
+  notify();
+}
+
+/** Small, Default, Large or Largest, remembered per person on this device (F30). */
+export function useTextSize() {
+  const size = useSyncExternalStore(subscribe, currentTextSize, () => "default" as TextSize);
+  return { size, setTextSize };
+}
+
+/**
+ * The organisation's theme and density (Settings · Appearance) for a person who has chosen
+ * neither on this device: a person's own choice always wins, and is never stored by this.
+ */
+export function applyDefaults(defaults: { theme: ThemeChoice; density: Density }): void {
+  if (read(keys.theme) === null) {
+    if (defaults.theme === "system") root().removeAttribute("data-theme");
+    else root().setAttribute("data-theme", defaults.theme);
+  }
+  if (read(keys.density) === null) {
+    if (defaults.density === "comfortable") root().setAttribute("data-density", "comfortable");
+    else root().removeAttribute("data-density");
+  }
+  notify();
 }

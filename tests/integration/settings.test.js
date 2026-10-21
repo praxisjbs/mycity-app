@@ -602,6 +602,82 @@ describeDb("access, settings and audit against the real migrations", () => {
 
   /* ------------------------------------------------------------------ */
 
+  describe("appearance", () => {
+    const c = require("@mycity/contract");
+    const A = c.appearance;
+    const charcoal = A.DARK_PRESETS.find((p) => p.key === "charcoal").seeds;
+
+    test("ships MyCity's own dark theme, every pair at AA, and hands the hub nothing to repaint", async () => {
+      const res = await as("ops").get("/settings/appearance");
+      expect(res.status).toBe(200);
+      c.appearance.Appearance.parse(res.body);
+      expect(res.body.dark).toEqual(expect.objectContaining({ seeds: A.DEFAULT_DARK, preset: "deep_green" }));
+      expect(res.body.dark.pairs.every((p) => p.ratio >= 4.5)).toBe(true);
+      expect(res.body).toEqual(expect.objectContaining({ previous: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact", updated_at: null }));
+      const me = await as("staff").get("/auth/me");
+      expect(me.body.appearance).toEqual({ dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" });
+    });
+
+    test("only a holder of settings edit changes it, and a colour that cannot carry the palette is refused on its field", async () => {
+      const denied = await as("staff").patch("/settings/appearance").send({ theme_default: "dark" });
+      expect(denied.status).toBe(403);
+      const bad = await as("ops").patch("/settings/appearance").send({ dark: { ...charcoal, background: "#F4F4F4", primary_yellow: "#3A2E00" } });
+      expect(bad.status).toBe(422);
+      expect(bad.body.error.fields).toEqual({ "dark.background": ["Too light for dark"], "dark.primary_yellow": ["Too dark for buttons"] });
+      const typo = await as("ops").patch("/settings/appearance").send({ dark: { ...charcoal, card: "#12345" } });
+      expect(typo.body.error.fields).toEqual({ "dark.card": ["Use #RRGGBB"] });
+    });
+
+    test("a pasted palette repaints the hub for everyone, keeps the one it replaced, and is in the Audit Log", async () => {
+      const res = await as("ops").patch("/settings/appearance").send({ dark: { ...charcoal, background: "141517", card: "#1e2023" } });
+      expect(res.status).toBe(200);
+      expect(res.body.dark).toEqual(expect.objectContaining({ seeds: charcoal, preset: "charcoal" }));
+      expect(res.body.previous).toEqual(expect.objectContaining({ seeds: A.DEFAULT_DARK, preset: "deep_green" }));
+      expect(res.body.updated_by).toBe("Ada Obi");
+      const me = await as("staff").get("/auth/me");
+      expect(me.body.appearance.dark).toEqual(A.deriveDark(charcoal).tokens);
+      await drain();
+      const audit = await one("SELECT before, after FROM audit_ledger WHERE action = 'settings.changed' AND entity_id = 'appearance' ORDER BY occurred_at DESC LIMIT 1");
+      expect(audit).toEqual({ before: { dark: A.DEFAULT_DARK }, after: { dark: charcoal } });
+    });
+
+    test("saving what is there records nothing; fonts and the defaults save on their own", async () => {
+      const count = async () => Number((await one("SELECT count(*) AS n FROM event_log WHERE event_key = 'settings.changed' AND entity_id = 'appearance'")).n);
+      const before = await count();
+      expect((await as("ops").patch("/settings/appearance").send({ dark: charcoal })).status).toBe(200);
+      expect(await count()).toBe(before);
+      const res = await as("ops").patch("/settings/appearance").send({ fonts: { heading: "plus_jakarta_sans", body: "inter" }, theme_default: "dark", density_default: "comfortable" });
+      expect(res.body).toEqual(expect.objectContaining({ fonts: { heading: "plus_jakarta_sans", body: "inter" }, theme_default: "dark", density_default: "comfortable" }));
+      expect(res.body.previous.preset).toBe("deep_green");
+      expect(await count()).toBe(before + 1);
+      const me = await as("staff").get("/auth/me");
+      expect(me.body.appearance).toEqual(expect.objectContaining({ fonts: { heading: "plus_jakarta_sans", body: "inter" }, theme_default: "dark", density_default: "comfortable" }));
+    });
+
+    test("Restore Previous swaps the palette back, and a stale session confirms it is them first", async () => {
+      await q("UPDATE user_session SET issued_at = now() - interval '1 hour', reauthenticated_at = NULL WHERE user_id = $1", [people.ops.user.user_id]);
+      try {
+        const stale = await as("ops").post("/settings/appearance/restore").send({});
+        expect(stale.status).toBe(403);
+        expect(stale.body.error.code).toBe("REAUTH_REQUIRED");
+      } finally {
+        await q("UPDATE user_session SET issued_at = now() WHERE user_id = $1", [people.ops.user.user_id]);
+      }
+      const back = await as("ops").post("/settings/appearance/restore").send({});
+      expect(back.status).toBe(200);
+      expect(back.body.dark.preset).toBe("deep_green");
+      expect(back.body.previous.preset).toBe("charcoal");
+      expect((await as("staff").get("/auth/me")).body.appearance.dark).toBeNull();
+      // MyCity's own again, from Reset: the dark row goes, the previous one stays.
+      const reset = await as("ops").patch("/settings/appearance").send({ dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" });
+      expect(reset.body.dark.preset).toBe("deep_green");
+      const rows = (await q("SELECT key FROM setting WHERE key LIKE 'appearance.%' ORDER BY key")).rows.map((r) => r.key);
+      expect(rows).toEqual(["appearance.dark_previous"]);
+    });
+  });
+
+  /* ------------------------------------------------------------------ */
+
   describe("numbering", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");

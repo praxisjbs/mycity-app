@@ -6,9 +6,10 @@ import type { ModuleDef } from "./catalogue";
 import { moreGroups } from "./nav";
 import { useInstallApp } from "./Notices";
 import { usePwa } from "./pwa";
+import { useTextSizeSheet } from "./TextSize";
 
 /**
- * The phone's More (F17): the person's row with Theme, Density and Settings,
+ * The phone's More (F17): the person's row with Theme, Density, Text Size and Settings,
  * the search bar, the modules they may open as tiles grouped Work, People,
  * Business and System, Install App while the app is not installed, Sign Out.
  */
@@ -19,6 +20,7 @@ export function More({ open, onClose, modules, badges, current, onSearch }: { op
   const { navigate } = useRouter();
   const { theme, toggle } = useTheme();
   const density = useDensity();
+  const textSize = useTextSizeSheet();
   const { canInstall } = usePwa();
   const installApp = useInstallApp();
   return (
@@ -30,6 +32,14 @@ export function More({ open, onClose, modules, badges, current, onSearch }: { op
         <>
           <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Light Theme" : "Dark Theme"} onClick={toggle} />
           <IconButton icon="rows" label={density.density === "compact" ? "Comfortable Density" : "Compact Density"} onClick={density.toggle} />
+          <IconButton
+            icon="textsize"
+            label="Text Size"
+            onClick={() => {
+              onClose();
+              textSize();
+            }}
+          />
           <IconButton
             icon="cog"
             label="Settings"

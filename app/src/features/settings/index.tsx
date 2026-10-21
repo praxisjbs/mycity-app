@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/settings";
 import type { UserRow } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
@@ -18,7 +17,8 @@ import { SecurityTab } from "./SecurityRules";
 import { FaultsTab, StatusTab } from "./SystemHealth";
 import { PerformanceTab } from "./Performance";
 import { IntegrationsTab } from "./integrations";
-import { Button, Card, CardHeader, Chips, ChoiceField, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, Swatch, TextAreaField, toast, useConfirm, useModal, useTheme, Who } from "@mycity/ui";
+import { AppearanceTab } from "./Appearance";
+import { Button, Card, Chips, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, TextAreaField, toast, useConfirm, useModal, Who } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
@@ -232,67 +232,3 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
     </>
   );
 }
-
-/* ───────────── Appearance ───────────── */
-
-/** The value of a design token as the stylesheet resolves it now. */
-function useTokenValues(tokens: string[], theme: string) {
-  const [vals, setVals] = useState<Record<string, string>>({});
-  const key = tokens.join(",");
-  useEffect(() => {
-    const cs = getComputedStyle(document.documentElement);
-    setVals(Object.fromEntries(key.split(",").map((t) => [t, cs.getPropertyValue(t).trim().toUpperCase()])));
-  }, [key, theme]);
-  return vals;
-}
-
-function AppearanceTab() {
-  const a = useApi("GET /api/v1/settings/appearance");
-  const save = useMutation("PATCH /api/v1/settings/appearance");
-  const { theme } = useTheme();
-  const { can } = useAuth();
-  const d = a.data;
-  const vals = useTokenValues([...(d?.palette ?? []), ...(d?.dark ?? [])].map((x) => x.token), String(theme));
-  if (!d) return (<><PageHeader title="Appearance" /><Card><LoadingRows count={6} /></Card></>);
-  return (
-    <>
-      <PageHeader title="Appearance" sub="MyCityApp brand" />
-      <Grid cols={2}>
-        <Card>
-          <CardHeader title="Palette" />
-          {d.palette.map((c) => (
-            <div key={c.name} data-copy="content" className="flex items-center gap-2.5 py-1.5">
-              <Swatch token={c.token} />
-              <div className="flex-1"><div className="text-sm font-semibold">{c.name}</div><div className="text-2xs text-subtle-foreground">{vals[c.token]}</div></div>
-            </div>
-          ))}
-        </Card>
-        <Card>
-          <CardHeader title="Typography and Theme" />
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-0.5 text-sm md:cols-term-value md:gap-y-2">
-            {[["Typeface", d.typeface], ["Money figures", "Tabular figures, 2dp"], ["Dates", "Day first, 09/10/2026"], ["Logo", "MyCityApp lockup"], ["Favicon", "Map pin mark"]].map(([k, v]) => (
-              <div key={k} className="contents"><dt className="text-xs text-subtle-foreground">{k}</dt><dd className="font-semibold">{v}</dd></div>
-            ))}
-          </dl>
-          <div className="mt-3 border-t border-border pt-3">
-            <div className="mb-1.5 text-xs text-subtle-foreground">Default theme for everyone</div>
-            <ChoiceField value={d.theme_default} onChange={async (v) => { if (!can("settings", "edit")) return toast("Only Operations and the CEO set the default"); await save.run({ body: { theme_default: v } }); invalidate("/api/v1/settings/appearance"); toast("Default theme saved"); }} options={[["system", "Follow the Device"], ["light", "Light"], ["dark", "Dark"]]} />
-          </div>
-        </Card>
-      </Grid>
-      <Grid cols={2}>
-        <Card>
-          <CardHeader title="Dark Theme" />
-          {d.dark.map((r) => (
-            <div key={r.name} className="flex items-center gap-2.5 border-b border-border py-1.5 last:border-b-0">
-              <Swatch token={r.token} size="sm" />
-              <span className="min-w-0 flex-1 text-xs font-semibold">{r.name} <span className="font-normal text-subtle-foreground">{vals[r.token]}</span></span>
-              <span className="flex-none text-2xs text-subtle-foreground">{r.note}</span>
-            </div>
-          ))}
-        </Card>
-      </Grid>
-    </>
-  );
-}
-

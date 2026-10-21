@@ -92,8 +92,9 @@ export default defineConfig(({ mode }) =>
         // the API left to the network (FRONTEND_GUIDE §8) are in src/sw.ts.
         injectManifest: {
           globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-          // PDF.js's fonts, maps and decoders are fetched only by a PDF that needs them, never precached.
-          globIgnores: ["pdfjs/**"],
+          // PDF.js's fonts, maps and decoders are fetched only by a PDF that needs them, never precached;
+          // so are the typefaces Settings · Appearance may choose instead of Geist (F30), until one is.
+          globIgnores: ["pdfjs/**", "**/{inter,ibm-plex-sans,plus-jakarta-sans,source-sans-3,open-sans}-*.woff2"],
           rollupFormat: "iife",
         },
         devOptions: { enabled: false },

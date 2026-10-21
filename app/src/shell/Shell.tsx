@@ -46,6 +46,7 @@ import { SCREENS } from "./screens";
 import { ScreenActionProvider } from "./screen-action";
 import { Search } from "./Search";
 import { nameOfPlace, trailItems } from "./trail-items";
+import { useTextSizeSheet } from "./TextSize";
 
 /**
  * The staff app's frame, on the Shell group of @mycity/ui. Two shells, not one
@@ -282,12 +283,13 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, op
   );
 }
 
-/** The desktop account menu: the person's own screens, theme, density, Install App, Sign Out. */
+/** The desktop account menu: the person's own screens, theme, density, text size, Install App, Sign Out. */
 function useAccountMenu(): MenuItem[] {
   const { signOut } = useAuth();
   const { navigate } = useRouter();
   const { theme, toggle } = useTheme();
   const density = useDensity();
+  const textSize = useTextSizeSheet();
   const { canInstall } = usePwa();
   const installApp = useInstallApp();
   return [
@@ -296,6 +298,7 @@ function useAccountMenu(): MenuItem[] {
     "sep",
     { label: theme === "dark" ? "Light Theme" : "Dark Theme", icon: theme === "dark" ? "sun" : "moon", onSelect: toggle },
     { label: density.density === "compact" ? "Comfortable Density" : "Compact Density", icon: "rows", onSelect: density.toggle },
+    { label: "Text Size", icon: "textsize", onSelect: textSize },
     ...(canInstall ? [{ label: "Install App", icon: "download" as const, onSelect: installApp }] : []),
     "sep",
     { label: "Sign Out", icon: "logout", onSelect: () => void signOut() },

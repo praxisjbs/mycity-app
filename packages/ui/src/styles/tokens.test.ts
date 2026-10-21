@@ -2,57 +2,48 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import appearanceSchemas from "@mycity/contract/schemas/appearance.js";
 
 /**
  * Every text pair the screens use keeps WCAG AA (4.5:1) in both themes. The
  * values are read from tokens.css itself, so a changed token that breaks a pair
- * fails here, not in an axe run on one screen.
+ * fails here, not in an axe run on one screen. The pair table and the ratio
+ * maths are the contract's (packages/contract/schemas/appearance.js), the ones
+ * Settings · Appearance holds a pasted dark palette to, so there is one copy.
  */
+
+/** The contract's colour helpers, typed for this test (the schema file is CommonJS). */
+const appearance = appearanceSchemas as unknown as {
+  pairs: (theme: "light" | "dark") => Array<[string, string]>;
+  contrast: (a: string, b: string) => number;
+  deriveDark: (seeds: Record<string, string>) => { tokens: Record<string, string>; problems: Record<string, string> };
+  DEFAULT_DARK: Record<string, string>;
+  DARK_PRESETS: ReadonlyArray<{ key: string; seeds: Record<string, string> }>;
+  AA_TEXT: number;
+};
 
 /** Read from disk: the test run does not process CSS imports. */
 const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "tokens.css"), "utf8");
 
-/** The `--name: #RRGGBB` declarations of the first block whose selector matches. */
-function block(selector: RegExp): Record<string, string> {
+/** The `--name: value` declarations of the first block whose selector matches. */
+function declarations(selector: RegExp): Record<string, string> {
   const m = selector.exec(css);
   if (!m) throw new Error(`no block ${selector}`);
   const body = css.slice(m.index + m[0].length, css.indexOf("}", m.index));
   const out: Record<string, string> = {};
-  for (const d of body.matchAll(/--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})\b/g)) out[d[1]!] = d[2]!;
+  for (const d of body.matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) out[d[1]!] = d[2]!.trim();
   return out;
 }
 
-const lum = (hex: string) => {
-  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
-};
-const ratio = (a: string, b: string) => {
-  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p) as [number, number];
-  return (x + 0.05) / (y + 0.05);
-};
+/** Only the #RRGGBB values: the ones a text pair can be measured on. */
+const hexOnly = (all: Record<string, string>) => Object.fromEntries(Object.entries(all).filter(([, v]) => /^#[0-9A-Fa-f]{6}$/.test(v)));
+const block = (selector: RegExp) => hexOnly(declarations(selector));
+
+const { pairs, contrast: ratio } = appearance;
 
 const light = block(/:root,\s*\[data-theme="light"\]\s*\{/);
 const dark = { ...light, ...block(/\n\[data-theme="dark"\]\s*\{/) };
 const systemDark = { ...light, ...block(/:root:not\(\[data-theme="light"\]\)\s*\{/) };
-
-const SOFT = ["success", "warning", "destructive", "info"] as const;
-const SURFACES = ["background", "card", "popover", "muted"];
-const INKS = ["foreground", "muted-foreground", "subtle-foreground", "accent-foreground", "eyebrow"];
-
-/** [text, surface] pairs that must reach AA in the given theme. */
-function pairs(theme: "light" | "dark"): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
-  for (const s of SURFACES) for (const t of INKS) out.push([t, s]);
-  out.push(["foreground", "accent"], ["subtle-foreground", "accent"], ["accent-foreground", "accent"]);
-  if (theme === "dark") out.push(["muted-foreground", "accent"], ["eyebrow", "accent"]);
-  for (const s of SOFT) {
-    out.push([s, `${s}-soft`], [s, "background"], [s, "card"]);
-    for (const t of ["foreground", "muted-foreground", "subtle-foreground"]) out.push([t, `${s}-soft`]);
-  }
-  out.push(["primary-foreground", "primary"], ["secondary-foreground", "secondary"], ["sidebar-foreground", "sidebar"], ["sidebar-muted", "sidebar"], ["sidebar-accent-foreground", "sidebar-accent"], ["sidebar-muted", "sidebar-accent"]);
-  out.push(["paper-foreground", "paper"], ["paper-muted", "paper"], ["paper-faint", "paper"], ["paper-faint", "paper-head"], ["paper-brand", "paper"]);
-  return out;
-}
 
 describe("tokens.css contrast", () => {
   for (const [name, theme, values] of [
@@ -76,6 +67,21 @@ describe("tokens.css contrast", () => {
 
   it("writes the device dark block the same as the chosen one", () => {
     expect(systemDark).toEqual(dark);
+    expect(declarations(/:root:not\(\[data-theme="light"\]\)\s*\{/)).toEqual(declarations(/\n\[data-theme="dark"\]\s*\{/));
+  });
+
+  it("ships the dark theme Settings · Appearance derives from MyCity's own four colours", () => {
+    const derived = appearance.deriveDark(appearance.DEFAULT_DARK);
+    expect(derived.problems).toEqual({});
+    expect(declarations(/\n\[data-theme="dark"\]\s*\{/)).toMatchObject(derived.tokens);
+  });
+
+  it("keeps every pair at AA for each dark preset, light tokens beneath it", () => {
+    for (const preset of appearance.DARK_PRESETS) {
+      const values = { ...light, ...hexOnly(appearance.deriveDark(preset.seeds).tokens) };
+      const failing = pairs("dark").filter(([t, s]) => values[t] && values[s] && ratio(values[t]!, values[s]!) < appearance.AA_TEXT);
+      expect([preset.key, failing]).toEqual([preset.key, []]);
+    }
   });
 
   it("keeps the phone sizes in either density", () => {

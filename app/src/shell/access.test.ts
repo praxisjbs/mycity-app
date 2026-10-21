@@ -23,6 +23,7 @@ function person(capabilities: string[], over: Partial<Me> = {}): Me {
     roles: [{ code: "employee", name: "Staff" }],
     home_view: "staff",
     manages_people: false,
+    appearance: { dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" },
     ...over,
   };
 }

@@ -7,7 +7,7 @@ import type { Me, Session } from "@/api/types/identity";
 import type { SignInResult } from "@mycity/contract/contract.gen.ts";
 import { hrefFor } from "@/lib/routes";
 import { forgetTrail } from "@/lib/trail";
-import { toast } from "@mycity/ui";
+import { applyAppearance, toast } from "@mycity/ui";
 import { passkeyCancelled, signWithPasskey } from "./passkey";
 
 /**
@@ -125,6 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     current.current = { status, me };
   }, [status, me]);
+  /* Settings · Appearance for every screen, from the person's /me (foundation.md §6.15). */
+  useEffect(() => {
+    if (me?.appearance) applyAppearance(me.appearance);
+  }, [me]);
 
   const clock = useRef({ accessUntil: 0, sessionUntil: Number.POSITIVE_INFINITY, idleMs: 30 * 60_000, renewedAt: 0 });
   const lastActive = useRef(Date.now());
