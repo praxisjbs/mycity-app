@@ -98,6 +98,7 @@ const CalendarEventCreate = z
     starts_at: isoDateTime,
     ends_at: isoDateTime,
     all_day: z.boolean().default(false),
+    // address:none a meeting's room or call link, not a street address
     location: optionalText(200),
     visibility: CalendarVisibility.default("attendees"),
     attendee_ids: z.array(uuid).max(50).default([]),
@@ -114,6 +115,7 @@ const CalendarEventEdit = z
     starts_at: isoDateTime.optional(),
     ends_at: isoDateTime.optional(),
     all_day: z.boolean().optional(),
+    // address:none a meeting's room or call link, not a street address
     location: z.string().trim().max(200).nullable().optional(),
     visibility: CalendarVisibility.optional(),
     attendee_ids: z.array(uuid).max(50).optional(),

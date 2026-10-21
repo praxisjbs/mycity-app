@@ -38,6 +38,12 @@ describe("when a task is due", () => {
   test("no day and no cadence is no due date", () => {
     expect(recurrence.dueFor({}, "2026-10-19", cal)).toBeNull();
   });
+
+  test("a day off has no hours, so a task due on one closes at 17:00", () => {
+    // The working-week loader hands a day off's empty closing time back as the text "null".
+    const offDay = workingWeek.makeCalendar({ days: [1, 2, 3, 4, 5, 6], hours: { ...hours, 7: { starts_at: "null", ends_at: "null" } } });
+    expect(recurrence.dueFor({ due_on: "2026-10-18" }, "2026-10-21", offDay).toISOString()).toBe("2026-10-18T16:00:00.000Z");
+  });
 });
 
 describe("when a repeat comes round", () => {

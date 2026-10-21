@@ -24,10 +24,14 @@ const workingWeek = require("../../shared/time/working-week");
 
 const FALLBACK_CLOSE = "17:00";
 
-/** The closing time of a working day, "HH:MM". */
+/**
+ * The closing time of a day, "HH:MM". A day off has none (the working week stores no hours for
+ * it, and the loader then hands back the text "null"), so a task due on one closes at 17:00.
+ */
 function closeOf(date, cal) {
   const h = cal.hours && cal.hours[lagos.weekday(date)];
-  return (h && h.ends_at) || FALLBACK_CLOSE;
+  const end = h && h.ends_at;
+  return typeof end === "string" && /^\d{2}:\d{2}$/.test(end) ? end : FALLBACK_CLOSE;
 }
 
 /** The instant a task due on `date` is due: that day's close, Lagos time. */

@@ -701,6 +701,7 @@ function EventForm({ close, title = "" }: { close: () => void; title?: string })
       </Grid>
       <Field label="Kind"><SelectField options={[["meeting", "Meeting"], ["deadline", "Deadline"], ["campaign", "Campaign"], ["event", "Event"]]} {...f.field("event_type")} /></Field>
       <Field label="Attendees" optional><EmployeePicker value={who} onChange={setWho} multiple /></Field>
+      {/* address:none a meeting's room or call link, not a street address */}
       <Field label="Location" optional><TextField {...f.field("location")} /></Field>
       <Field label="Who Can See"><SelectField options={[["attendees", "Attendees"], ["everyone", "Everyone"], ["private", "Only Me"]]} {...f.field("visibility")} /></Field>
       <FormFooter>
