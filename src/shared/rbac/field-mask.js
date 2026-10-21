@@ -53,6 +53,8 @@ const FIELDS = Object.freeze({
       "total_allowances",
       "total_deductions",
       "salary_grade_amount",
+      // An attendance deduction or overtime priced from the salary (docs/guides/attendance.md §6.17).
+      "pay_amount",
     ],
   },
   "employee.bank": {

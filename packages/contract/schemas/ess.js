@@ -31,10 +31,10 @@ const { SchedulePlace } = require("./attendance");
 const clock = z.string().regex(/^\d{2}:\d{2}$/);
 
 /**
- * One day of the week as the organisation works it (Settings, the working week:
- * Monday to Friday 09:00 to 17:00 and Saturday 09:00 to 15:00, A22), and where the
- * person works it: `place` is office, remote or off, from their work pattern and, for
- * hybrid staff, the schedule People set (attendance guide §6.13). Weekday 1 is Monday.
+ * One day of the person's own week (attendance guide §6.13): worked or not, its hours, and where
+ * they work it (`place` office, remote or off), by the work schedule People set, else the company
+ * hours (the Attendance policy's, else Settings' working week, A22) at the place their work pattern
+ * gives. Weekday 1 is Monday.
  */
 const EssWorkDay = z
   .object({
@@ -157,7 +157,7 @@ const TABLES = {
   },
   EssWorkDay: {
     table: "working_week",
-    virtual: { place: "the person's place that weekday, from the work pattern and attendance_schedule" },
+    virtual: { place: "the person's place that weekday, from attendance_work_schedule or the work pattern" },
   },
   EssProfile: {
     table: "employee",

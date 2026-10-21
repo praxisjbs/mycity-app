@@ -52,6 +52,19 @@ async function drain() {
   }
 }
 
+/** The ai-find-prices jobs the outbox queued, run here as the worker would; returns how many ran. */
+async function runFindPricesJobs() {
+  const queues = require("../../src/jobs/queues");
+  const job = require("../../src/jobs/handlers/ai-find-prices");
+  const due = queues.enqueue.mock.calls.filter(([queue]) => queue === "ai-find-prices");
+  queues.enqueue.mockClear();
+  for (const [, , data, opts] of due) {
+    expect(opts).toMatchObject({ jobId: `ai-find-prices-${data.ai_price_run_id}`, attempts: 1 });
+    await job({ data });
+  }
+  return due.length;
+}
+
 async function tx(fn) {
   const client = await pool.connect();
   try {
@@ -74,14 +87,16 @@ function fakeGemini(text = "Tidied.") {
 }
 
 /** Google Search's answer to Find Prices, as Gemini's native endpoint sends it. */
-const FOUND = {
+let FOUND = {
   prices: [
-    { model: "gemini-2.5-flash", input_usd_per_million: "0.30", output_usd_per_million: "2.50", audio_usd_per_million: "1.00", source_url: "https://ai.google.dev/gemini-api/docs/pricing" },
+    // Priced already, so not asked about: left alone.
+    { model: "gemini-2.5-flash", input_usd_per_million: "0.25", output_usd_per_million: "2.00", source_url: "https://ai.google.dev/gemini-api/docs/pricing" },
     // A number, and a page off Google's site: the price is kept, the page replaced by the search's.
     { model: "gemini-3.8-flash", input_usd_per_million: 0.5, output_usd_per_million: 3, source_url: "https://example.com/gemini-prices" },
-    // Not ours, and nothing priced: neither is proposed.
+    // Not ours: not proposed.
     { model: "gemini-9-ultra", input_usd_per_million: "9.00", output_usd_per_million: "90.00", source_url: "https://ai.google.dev/x" },
-    { model: "gemini-2.5-pro", input_usd_per_million: null, output_usd_per_million: null, source_url: "https://ai.google.dev/x" },
+    // Asked about, and the page prices nothing: Not Listed.
+    { model: "gemini-3.5-flash-lite", input_usd_per_million: null, output_usd_per_million: null, source_url: "https://ai.google.dev/x" },
   ],
 };
 const searched = [];
@@ -92,7 +107,7 @@ async function fakeFetch(input, init) {
     return Response.json({
       candidates: [
         {
-          content: { parts: [{ text: JSON.stringify(FOUND) }] },
+          content: { parts: [{ text: typeof FOUND === "string" ? FOUND : JSON.stringify(FOUND) }] },
           finishReason: "STOP",
           groundingMetadata: {
             webSearchQueries: ["gemini api pricing", "gemini 3.8 flash price"],
@@ -349,43 +364,212 @@ describeDb("AI Control against the real migrations", () => {
   });
 
   describe("Find Prices (§6.4)", () => {
-    test("searched in the worker, proposed with their pages, accepted or dismissed by IT", async () => {
+    const summary = async () => (await as("admin").get("/ai-control/models/summary")).body;
+
+    test("the unpriced models, in the worker, proposed with their pages; one the page leaves out is Not Listed", async () => {
       jest.spyOn(global, "fetch").mockImplementation(fakeFetch);
+      // Gemini's seeded models with no price: 3.8 Flash and 3.5 Flash-Lite.
+      expect(await summary()).toMatchObject({ finding: false, run: null, to_price: 2, not_listed: 0 });
       const res = await as("admin").post("/ai-control/prices/find").send({});
       expect(res.status).toBe(202);
-      expect((await as("admin").get("/ai-control/models/summary")).body).toMatchObject({ finding: true, proposals: 0 });
+      expect(await summary()).toMatchObject({ finding: true, run: { status: "running", batches_done: 0 }, proposals: 0 });
       expect((await as("admin").post("/ai-control/prices/find").send({})).status).toBe(409);
       await drain();
+      expect(await runFindPricesJobs()).toBe(1);
 
-      // One grounded request for Gemini, the provider set up, through Deep Reasoning's Pro.
+      // One grounded request for Gemini, the provider set up, through Deep Reasoning's Pro,
+      // asking only about the two with no price, with thinking kept low.
       expect(searched).toHaveLength(1);
       expect(searched[0].url.pathname).toContain("gemini-2.5-pro");
       expect(searched[0].body.tools).toEqual([{ google_search: {} }]);
-      const run = await one("SELECT r.purpose, r.status, s.kind, s.searches FROM ai_run r JOIN ai_run_step s ON s.run_id = r.run_id WHERE r.purpose = 'find-prices'");
-      expect(run).toEqual({ purpose: "find-prices", status: "ok", kind: "search", searches: 2 });
+      expect(searched[0].body.generationConfig).toMatchObject({ maxOutputTokens: 16384, thinkingConfig: { thinkingBudget: 1024 } });
+      const asked = JSON.stringify(searched[0].body.contents);
+      expect(asked).toContain("gemini-3.8-flash");
+      expect(asked).toContain("gemini-3.5-flash-lite");
+      expect(asked).not.toContain("gemini-2.5");
+      // Delivered again (at least once): the run is claimed, nothing is asked twice.
+      const runId = (await one("SELECT ai_price_run_id FROM ai_price_run ORDER BY started_at DESC LIMIT 1")).ai_price_run_id;
+      await require("../../src/jobs/handlers/ai-find-prices")({ data: { ai_price_run_id: runId, actor: null } });
+      expect(searched).toHaveLength(1);
+      const step = await one("SELECT r.purpose, r.status, s.kind, s.searches FROM ai_run r JOIN ai_run_step s ON s.run_id = r.run_id WHERE r.purpose = 'find-prices'");
+      expect(step).toEqual({ purpose: "find-prices", status: "ok", kind: "search", searches: 2 });
 
-      const summary = (await as("admin").get("/ai-control/models/summary")).body;
-      expect(summary).toMatchObject({ finding: false, proposals: 2, last_found_at: expect.any(String) });
+      expect(await summary()).toMatchObject({
+        finding: false,
+        run: { status: "done", batches_total: 1, batches_done: 1, proposals: 1, not_listed: 1, error_code: null, finished_at: expect.any(String) },
+        last_found_at: expect.any(String),
+        proposals: 1,
+        to_price: 0,
+        not_listed: 1,
+      });
       const proposals = (await as("ops").get("/ai-control/prices")).body.data;
       expect(proposals.map((p) => [p.model, p.input_usd_per_million, p.source_url])).toEqual([
-        ["gemini-2.5-flash", "0.3000", "https://ai.google.dev/gemini-api/docs/pricing"],
         ["gemini-3.8-flash", "0.5000", "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc"],
       ]);
+      const models = (await as("ops").get("/ai-control/models?provider=gemini")).body.data;
+      expect(models.find((m) => m.model === "gemini-3.5-flash-lite")).toMatchObject({ not_listed: true, proposed: false });
+      expect(models.find((m) => m.model === "gemini-3.8-flash")).toMatchObject({ not_listed: false, proposed: true });
+      expect(models.find((m) => m.model === "gemini-2.5-flash")).toMatchObject({ input_usd_per_million: "0.3000" });
 
       // Accept, edited: the model takes IT's prices.
-      const flash38 = proposals.find((p) => p.model === "gemini-3.8-flash");
       const accepted = await as("admin")
-        .post(`/ai-control/prices/${flash38.ai_price_proposal_id}/accept`)
+        .post(`/ai-control/prices/${proposals[0].ai_price_proposal_id}/accept`)
         .send({ input_usd_per_million: "0.45", output_usd_per_million: "3.00", audio_usd_per_million: "", usd_per_audio_hour: "", usd_per_thousand_searches: "14.00" });
       expect(accepted.status).toBe(200);
       expect(accepted.body).toMatchObject({ model: "gemini-3.8-flash", input_usd_per_million: "0.4500", usd_per_thousand_searches: "14.0000", proposed: false });
       const audit = await one("SELECT payload FROM event_log WHERE event_key = 'ai_control.price_set' ORDER BY occurred_at DESC LIMIT 1");
       expect(audit.payload).toMatchObject({ source: "proposal_edited", model: "gemini-3.8-flash" });
-
-      const flash25 = proposals.find((p) => p.model === "gemini-2.5-flash");
-      expect((await as("admin").post(`/ai-control/prices/${flash25.ai_price_proposal_id}/dismiss`).send({})).status).toBe(204);
-      expect((await as("admin").post(`/ai-control/prices/${flash25.ai_price_proposal_id}/accept`).send({})).status).toBe(404);
+      expect((await as("admin").post(`/ai-control/prices/${proposals[0].ai_price_proposal_id}/accept`).send({})).status).toBe(404);
       expect((await as("admin").get("/ai-control/prices")).body.data).toEqual([]);
+    });
+
+    test("an unreadable answer fails the run with its reason; Find More asks again; Accept All saves the lot", async () => {
+      jest.spyOn(global, "fetch").mockImplementation(fakeFetch);
+      // A week on, the Not Listed mark lapses and the model is asked about again.
+      await q("UPDATE ai_model SET price_not_listed_at = now() - interval '8 days' WHERE model = 'gemini-3.5-flash-lite'");
+      expect(await summary()).toMatchObject({ to_price: 1, not_listed: 0 });
+
+      FOUND = "The prices are on the page.";
+      expect((await as("admin").post("/ai-control/prices/find").send({})).status).toBe(202);
+      await drain();
+      expect(await runFindPricesJobs()).toBe(1);
+      expect(await summary()).toMatchObject({ run: { status: "failed", error_code: "ANSWER_UNREADABLE", batches_done: 1, proposals: 0 }, to_price: 1 });
+
+      FOUND = { prices: [{ model: "gemini-3.5-flash-lite", input_usd_per_million: "0.10", output_usd_per_million: "0.40", audio_usd_per_million: "0.30", source_url: "https://ai.google.dev/gemini-api/docs/pricing" }] };
+      expect((await as("admin").post("/ai-control/prices/find").send({})).status).toBe(202);
+      await drain();
+      expect(await runFindPricesJobs()).toBe(1);
+      expect(await summary()).toMatchObject({ run: { status: "done", proposals: 1, not_listed: 0 }, proposals: 1, to_price: 0 });
+
+      expect((await as("ops").post("/ai-control/prices/accept-all").send({})).status).toBe(403);
+      const all = await as("admin").post("/ai-control/prices/accept-all").send({});
+      expect(all.status).toBe(200);
+      expect(all.body).toEqual({ accepted: 1 });
+      const lite = (await as("ops").get("/ai-control/models?provider=gemini&q=3.5 flash-lite")).body.data[0];
+      expect(lite).toMatchObject({ model: "gemini-3.5-flash-lite", input_usd_per_million: "0.1000", audio_usd_per_million: "0.3000", proposed: false });
+      const audit = await one("SELECT payload FROM event_log WHERE event_key = 'ai_control.price_set' ORDER BY occurred_at DESC LIMIT 1");
+      expect(audit.payload).toMatchObject({ source: "proposal", model: "gemini-3.5-flash-lite", source_url: "https://ai.google.dev/gemini-api/docs/pricing" });
+      expect((await as("admin").post("/ai-control/prices/accept-all").send({})).body).toEqual({ accepted: 0 });
+      expect(await summary()).toMatchObject({ proposals: 0, to_price: 0 });
+    });
+
+    test("a Not Listed model priced by hand is no longer counted; a run is lost only after 15 minutes without progress", async () => {
+      const lite = await modelId("gemini", "gemini-3.5-flash-lite");
+      await q("UPDATE ai_model SET input_usd_per_million = NULL, output_usd_per_million = NULL, audio_usd_per_million = NULL, price_not_listed_at = now() WHERE ai_model_id = $1", [lite]);
+      expect(await summary()).toMatchObject({ to_price: 0, not_listed: 1 });
+      const res = await as("admin").put(`/ai-control/models/${lite}/prices`).send({
+        input_usd_per_million: "0.10",
+        output_usd_per_million: "0.40",
+        audio_usd_per_million: "",
+        usd_per_audio_hour: "",
+        usd_per_thousand_searches: "",
+      });
+      expect(res.body).toMatchObject({ not_listed: false });
+      expect(await summary()).toMatchObject({ not_listed: 0 });
+
+      // Started 20 minutes ago and still moving: running. No progress for 16 minutes: lost.
+      await q("UPDATE ai_price_run SET started_at = started_at - interval '1 day'");
+      const run = await one("INSERT INTO ai_price_run (status, batches_total, batches_done, started_at, claimed_at) VALUES ('running', 6, 4, now() - interval '20 minutes', now() - interval '20 minutes') RETURNING ai_price_run_id");
+      expect((await summary()).run).toMatchObject({ status: "running", batches_done: 4 });
+      expect((await as("admin").post("/ai-control/prices/find").send({})).status).toBe(409);
+      await q("ALTER TABLE ai_price_run DISABLE TRIGGER ai_price_run_set_updated_at");
+      await q("UPDATE ai_price_run SET updated_at = now() - interval '16 minutes' WHERE ai_price_run_id = $1", [run.ai_price_run_id]);
+      await q("ALTER TABLE ai_price_run ENABLE TRIGGER ai_price_run_set_updated_at");
+      expect(await summary()).toMatchObject({ finding: false, run: { status: "failed", error_code: "LOST" } });
+
+      // Find Prices again: the lost run is ended, so its job, if it wakes, writes nothing more.
+      expect((await as("admin").post("/ai-control/prices/find").send({})).status).toBe(202);
+      expect(await one("SELECT status, error_code FROM ai_price_run WHERE ai_price_run_id = $1", [run.ai_price_run_id])).toEqual({ status: "failed", error_code: "LOST" });
+      await drain();
+      expect(await runFindPricesJobs()).toBe(1);
+      expect(await summary()).toMatchObject({ run: { status: "done", batches_total: 0 } });
+
+      // A run ended while its request was out (taken as lost, pressed again) keeps nothing from it.
+      await q("UPDATE ai_model SET input_usd_per_million = NULL, output_usd_per_million = NULL, price_not_listed_at = NULL WHERE ai_model_id = $1", [lite]);
+      expect((await as("admin").post("/ai-control/prices/find").send({})).status).toBe(202);
+      const ended = (await one("SELECT ai_price_run_id FROM ai_price_run WHERE status = 'running'")).ai_price_run_id;
+      const service = require("../../src/modules/ai_governance/ai_governance.service");
+      const llm = {
+        search: async () => {
+          await q("UPDATE ai_price_run SET status = 'failed', error_code = 'LOST', finished_at = now() WHERE ai_price_run_id = $1", [ended]);
+          return { text: JSON.stringify({ prices: [{ model: "gemini-3.5-flash-lite", input_usd_per_million: "0.10", output_usd_per_million: "0.40", source_url: "https://ai.google.dev/x" }] }), sources: [], run_id: null };
+        },
+      };
+      await service.runFindPrices({ runId: ended, llm });
+      expect(await one("SELECT status, error_code, batches_done, proposals FROM ai_price_run WHERE ai_price_run_id = $1", [ended])).toEqual({ status: "failed", error_code: "LOST", batches_done: 0, proposals: 0 });
+      expect((await as("admin").get("/ai-control/prices")).body.data).toEqual([]);
+      require("../../src/jobs/queues").enqueue.mockClear();
+    });
+
+    test("a run ended mid-way asks nothing more, on an answer or an error; a late job ends its run; one run at a time", async () => {
+      const service = require("../../src/modules/ai_governance/ai_governance.service");
+      const { AppError } = require("../../src/shared/errors");
+      // 21 more unpriced Gemini models: two requests' worth.
+      await q(
+        "INSERT INTO ai_model (provider, model, display_name, capabilities, source) SELECT 'gemini', 'gemini-zz-' || n, 'Gemini ZZ ' || n, ARRAY['text'], 'added' FROM generate_series(1, 21) n",
+      );
+      const ask = async (onSearch) => {
+        expect((await as("admin").post("/ai-control/prices/find").send({})).status).toBe(202);
+        const id = (await one("SELECT ai_price_run_id FROM ai_price_run WHERE status = 'running'")).ai_price_run_id;
+        const end = () => q("UPDATE ai_price_run SET status = 'failed', error_code = 'LOST', finished_at = now() WHERE ai_price_run_id = $1", [id]);
+        let calls = 0;
+        await service.runFindPrices({
+          runId: id,
+          llm: {
+            search: async () => {
+              calls += 1;
+              await end();
+              return onSearch();
+            },
+          },
+        });
+        return { calls, run: await one("SELECT status, error_code, batches_total, batches_done, proposals FROM ai_price_run WHERE ai_price_run_id = $1", [id]) };
+      };
+      const answered = await ask(() => ({ text: JSON.stringify({ prices: [] }), sources: [], run_id: null }));
+      expect(answered).toEqual({ calls: 1, run: { status: "failed", error_code: "LOST", batches_total: 2, batches_done: 0, proposals: 0 } });
+      const refused = await ask(() => {
+        throw new AppError("AI_UNAVAILABLE", "No model answered", 503);
+      });
+      expect(refused).toEqual({ calls: 1, run: { status: "failed", error_code: "LOST", batches_total: 2, batches_done: 0, proposals: 0 } });
+
+      // A job that comes after 15 minutes without progress ends its run as LOST and asks nothing.
+      await q("UPDATE ai_price_run SET started_at = started_at - interval '1 day'");
+      const late = await one("INSERT INTO ai_price_run (status) VALUES ('running') RETURNING ai_price_run_id");
+      await q("ALTER TABLE ai_price_run DISABLE TRIGGER ai_price_run_set_updated_at");
+      await q("UPDATE ai_price_run SET updated_at = now() - interval '16 minutes' WHERE ai_price_run_id = $1", [late.ai_price_run_id]);
+      await q("ALTER TABLE ai_price_run ENABLE TRIGGER ai_price_run_set_updated_at");
+      const never = { search: async () => Promise.reject(new Error("a late job must not search")) };
+      await service.runFindPrices({ runId: late.ai_price_run_id, llm: never });
+      expect(await one("SELECT status, error_code, claimed_at FROM ai_price_run WHERE ai_price_run_id = $1", [late.ai_price_run_id])).toEqual({ status: "failed", error_code: "LOST", claimed_at: null });
+
+      // A run left running under a newer one (two presses in one instant): the second press is refused.
+      await q("INSERT INTO ai_price_run (status, started_at) VALUES ('running', now() - interval '2 days')");
+      await q("INSERT INTO ai_price_run (status, finished_at) VALUES ('done', now())");
+      const twice = await as("admin").post("/ai-control/prices/find").send({});
+      expect(twice.status).toBe(409);
+      expect(twice.body.error.code).toBe("ALREADY_FINDING");
+
+      await q("DELETE FROM ai_price_run WHERE status = 'running'");
+      await q("DELETE FROM ai_model WHERE model LIKE 'gemini-zz-%'");
+      require("../../src/jobs/queues").enqueue.mockClear();
+    });
+
+    test("the models open on those in a chain; Show picks the usable, those not on the key, or all", async () => {
+      await q("UPDATE ai_model SET available = false WHERE provider = 'gemini' AND model = 'gemini-3.5-flash-lite'");
+      // In no chain, and first by name: it still comes after every chained model.
+      await q("INSERT INTO ai_model (provider, model, display_name, capabilities, source) VALUES ('gemini', 'gemini-aa-mini', 'Gemini AA Mini', ARRAY['text'], 'provider')");
+      const list = async (path) => (await as("ops").get(path)).body.data;
+      const usable = await list("/ai-control/models?provider=gemini");
+      const firstFree = usable.findIndex((m) => m.in_chains.length === 0);
+      expect(usable[firstFree].model).toBe("gemini-aa-mini");
+      expect(firstFree).toBeGreaterThan(0);
+      expect(usable.slice(firstFree).every((m) => m.in_chains.length === 0)).toBe(true);
+      expect(usable.map((m) => m.model)).not.toContain("gemini-3.5-flash-lite");
+      expect((await list("/ai-control/models?provider=gemini&show=not_on_key")).map((m) => m.model)).toEqual(["gemini-3.5-flash-lite"]);
+      expect((await list("/ai-control/models?provider=gemini&show=all")).map((m) => m.model)).toContain("gemini-3.5-flash-lite");
+      expect((await as("ops").get("/ai-control/models?show=some")).status).toBe(422);
+      await q("UPDATE ai_model SET available = NULL WHERE provider = 'gemini' AND model = 'gemini-3.5-flash-lite'");
+      await q("DELETE FROM ai_model WHERE model = 'gemini-aa-mini'");
     });
   });
 });

@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 19/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -49,7 +49,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · My Security (`my-security`) | Staff app | Every employee | Password (when it was changed), two-step sign-in, the PIN, passkeys, where they are signed in, recent sign-ins with how each began; a link to My Devices | Change password; set up, change or turn off two-step (no Turn Off while a role they hold requires it) and choose how often it asks; new recovery codes; set, change or remove the PIN; add, rename or remove a passkey; sign out one device or all the others; open My Devices |
 | Shell avatar (rail, phone top bar, More) | Staff app | Every employee | The photo from My Profile, or initials | |
 | People · Employees (employee record) | Staff app | People; Download Their Data the CEO only | The same employee record | Where People edit the fields an employee cannot; the CEO asks for a copy of one person's data (Download Their Data) |
-| People · Employees · Attendance setup | Staff app | People | Owned by LA: arrangement and weekly schedule | Where the work schedule shown in My Profile is set |
+| People · Employees · Work Schedule tab | Staff app | People | Owned by LA: Work Setup and the person's work schedule | Where the work schedule shown in My Profile is set |
 | People · Leave (`leave`) | Staff app | `people` view: Operations & People everyone, a line manager their team | Everyone's requests within that scope, the figures above them, who else in the department is away, this month's calendar | Approve or reject a request that waits on them, record leave for someone (`people` create), cancel granted leave before it ends (`people` edit) |
 | Payroll · Payslips (M6) | Staff app | Payroll | The payslips ESS shows | Approving a run is what makes a payslip visible in ESS |
 | Queries & Sanctions (M3) | Staff app | Managers, People, CEO | The queries and sanctions ESS shows | Raising and deciding them |
@@ -375,6 +375,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · Built with attendance's PR 3: My Profile's Work Schedule reads the person's own week (`GET /attendance/me/schedule` beside the profile's `working_week`): each day Working or Off with its hours and place, the company hours when none is set. My Attendance (#9) gains the month's Deductions and Overtime and Give Real Time on a System Clock-Out (`attendance.md` §10).
 - 20/10/2026 · TB · Policy Updates (#89) built on `app/src/features/policies/PolicyUpdates.tsx` (every policy that applies to the person: To Acknowledge, All Policies, Waiting On You for an approver), described in `docs/guides/policies.md`; `features/ess/index.tsx` points there.
 - 13/10/2026 · AJ · First version, from the 12 October internal workflow meeting, MILESTONES §6.3 and the 13 October demo update.
 - 13/10/2026 · AJ · §10: phone layout for the four attendance tabs (icon cards that open the modal), built from LA's page.

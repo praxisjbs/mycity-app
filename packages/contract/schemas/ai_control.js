@@ -176,21 +176,54 @@ const AiControlModel = z
     in_chains: z.array(ModelChainRef).max(50),
     /** An open Find Prices proposal waits for this model. */
     proposed: z.boolean(),
+    /** Not Listed: the pricing page did not price it in the last 7 days, and it still has no price and is on the key. */
+    not_listed: z.boolean(),
   })
   .strict();
 
 /** `capability`: only the models that can do it (Edit Chain's pickers ask for their job's). */
-const AiControlModelListQuery = listQuery({ provider: AiProvider.optional(), capability: ModelCapability.optional() });
+/**
+ * `show`: `usable` (the default) the models the key can use or not checked yet; `not_on_key` the
+ * ones it no longer names; `all`. The models in a chain come first.
+ */
+const AiControlModelListQuery = listQuery({
+  provider: AiProvider.optional(),
+  capability: ModelCapability.optional(),
+  show: z.enum(["usable", "not_on_key", "all"]).optional(),
+});
 
 const AiControlModelPage = Paged(AiControlModel);
 
 /** GET /models/summary: what the Models tab shows above its list. */
+/** One Find Prices run: its progress and how it ended (§6.4). */
+const AiPriceRun = z
+  .object({
+    ai_price_run_id: uuid,
+    status: z.enum(["running", "done", "failed"]),
+    batches_total: z.number().int().min(0),
+    batches_done: z.number().int().min(0),
+    proposals: z.number().int().min(0),
+    not_listed: z.number().int().min(0),
+    /** Why the run stopped short (a failed run, or a done run that missed some requests): NO_SEARCH_MODEL, AI_UNAVAILABLE, AI_DISABLED, AI_MODULE_DISABLED, AI_CAP_REACHED, ANSWER_UNREADABLE, RUN_FAILED, LOST. */
+    error_code: z.string().nullable(),
+    started_at: isoDateTime,
+    finished_at: isoDateTime.nullable(),
+  })
+  .strict();
+
 const AiModelsSummary = z
   .object({
-    /** A Find Prices request is running. */
+    /** A Find Prices run is going. */
     finding: z.boolean(),
+    /** The newest run, going or ended; null before the first. */
+    run: AiPriceRun.nullable(),
     last_found_at: isoDateTime.nullable(),
+    /** Proposals waiting for IT. */
     proposals: z.number().int().min(0),
+    /** Models the next run would ask about: on a set-up key, no price, nothing waiting, not Not Listed. */
+    to_price: z.number().int().min(0),
+    /** Models Not Listed: marked in the last 7 days, still without a price and on the key. */
+    not_listed: z.number().int().min(0),
     rate: AiRate.nullable(),
   })
   .strict();
@@ -253,11 +286,14 @@ const FindPricesAnswer = z.object({
         source_url: z.string().max(500).nullable().optional().default(null),
       }),
     )
-    .max(60),
+    .max(100),
 });
 
 /** POST /prices/find: 202, the search runs in the worker. */
 const AiFindPrices = z.object({ requested_at: isoDateTime }).strict();
+
+/** POST /prices/accept-all: how many proposals were saved. */
+const AiAcceptAll = z.object({ accepted: z.number().int().min(0) }).strict();
 
 /* ------------------------------------------------------------------ *
  * Spend and caps (§6.3)
@@ -347,12 +383,14 @@ const TABLES = {
       output_ngn_per_million: "the output price times the day's rate",
       ngn_per_audio_hour: "the audio hour price times the day's rate",
       in_chains: "the chains it is in, stored or from code",
+      not_listed: "price_not_listed_at within the last 7 days, no price yet, on the key",
       proposed: "an open ai_price_proposal names it",
     },
   },
-  AiControlModelListQuery: { table: null, reason: "list controls and the provider and capability filters" },
+  AiControlModelListQuery: { table: null, reason: "list controls and the provider, capability and show filters" },
   AiControlModelPage: { table: null, reason: "a page of every provider's models" },
-  AiModelsSummary: { table: null, reason: "the newest find-prices run, the open proposals and the day's rate" },
+  AiPriceRun: { table: "ai_price_run" },
+  AiModelsSummary: { table: null, reason: "the newest ai_price_run, the open proposals, the models still to price and the day's rate" },
   AiIdParams: { table: null, reason: "the :id path parameter" },
   AiPricesSave: { table: "ai_model" },
   AiPriceProposal: {
@@ -366,6 +404,7 @@ const TABLES = {
   AiPriceProposalPage: { table: null, reason: "a page of open proposals" },
   FindPricesAnswer: { table: null, reason: "the model's answer to Find Prices, checked before a proposal is kept" },
   AiFindPrices: { table: null, reason: "when the request was made; the search runs in the worker" },
+  AiAcceptAll: { table: null, reason: "how many open proposals Accept All saved" },
   AiProviderSpend: { table: null, reason: "ai_run_step summed per provider for the Lagos month, against ai_provider_cap" },
   AiSpendDay: { table: null, reason: "ai_run_step summed per Lagos day" },
   AiSpend: { table: null, reason: "this Lagos month's spend, summed from ai_run_step" },
@@ -396,6 +435,7 @@ module.exports = {
   AiControlModel,
   AiControlModelListQuery,
   AiControlModelPage,
+  AiPriceRun,
   AiModelsSummary,
   AiIdParams,
   AiPricesSave,
@@ -403,6 +443,7 @@ module.exports = {
   AiPriceProposalPage,
   FindPricesAnswer,
   AiFindPrices,
+  AiAcceptAll,
   AiProviderSpend,
   AiSpendDay,
   AiSpend,

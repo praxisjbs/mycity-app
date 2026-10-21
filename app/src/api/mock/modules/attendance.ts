@@ -1,4 +1,5 @@
-import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, FieldAssignment, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceToday, CheckIn, CheckInResult, DayDetail, DeviceState, EventType, ExceptionType, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, PunchResult, PunchState, RegisterRow, ScheduleDay, ScheduleVersion, TemporarySite, WorkSchedule } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, AttendanceDay, AttendanceEvent, AttendanceException, AttendanceRecordRef, AttendanceRules, AttendanceToday, CheckIn, CheckInResult, DayDetail, DeviceState, EventType, ExceptionType, FieldAssignment, GeofenceVerdict, HomeLocation, HomeRequest, HomeStatus, LocationRequest, MyHome, OvertimePreApproval, PayItem, PayItemKind, PunchResult, PunchState, RegisterRow, ScheduleDayInput, ScheduleVersion, TemporarySite, WorkDay, WorkSchedule } from "@mycity/contract/contract.gen.ts";
+import attendanceContract from "@mycity/contract/schemas/attendance.js";
 import { formatDate, formatTime, todayIso } from "@mycity/ui";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, SIGN_INS, type MockPerson } from "../data/people";
@@ -7,25 +8,26 @@ import { lastDeviceOf, MAX_REGISTERED, registeredCount, sessionDevice } from "./
 import { peopleGrant, siteOf } from "./worksites";
 import { exportFile } from "./shared";
 import { placeOf } from "./maps";
-import { attendanceRulesInForce } from "./policies";
+import { attendanceRulesInForce, attendanceRulesOn } from "./policies";
 
 /**
  * Attendance on the mock, in the contract's shapes (packages/contract/schemas/attendance.js): the
  * clock, the person's days, punches and exceptions, People's register, a day's evidence and the
- * decisions. The punch is judged here the way the API judges it (docs/guides/attendance.md §6):
- * the server's time, the distance to the worksite (for remote staff, the approved home) from the
- * reading sent, the accuracy, the device of the session, the policy's modes, one shift a day, and
- * the Idempotency-Key.
+ * decisions, work schedules, and the pending deductions and overtime. The punch is judged here the
+ * way the API judges it (docs/guides/attendance.md §6): the server's time, the distance to the
+ * worksite (for remote staff, the approved home) from the reading sent, the accuracy, the device
+ * of the session, the policy's modes, one shift a day, and the Idempotency-Key. A day is judged
+ * against the person's own shift (their work schedule, else the company hours) by the policy
+ * version in force that day, and priced from their monthly gross (§6.13, §6.17).
  *
- * The policy is the version in force below (version 2: the location on warn and the device on
- * warn, so a laptop sees both warnings, and 10 minutes' grace).
+ * The policy is the version in force (policies' mock: version 2, the location and the device on
+ * warn, 10 minutes' grace, the consequence rules, the late deduction and overtime on).
  */
 
 /* ------------------------------------------------------------------ *
  * The policy, the shift and the clock
  * ------------------------------------------------------------------ */
 const TZ = "Africa/Lagos";
-const GRACE = 10;
 /** The office's location mode, the device mode and the accuracy limit of the version in force (below). */
 const POLICY_MODES = {
   get geofence_mode() {
@@ -47,23 +49,100 @@ type Ex = AttendanceException & { key: string };
 
 const person = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null });
 
-/** A day's shift on the working week: Monday to Friday 09:00 to 17:00, Saturday to 15:00, Sunday off. */
-export function shiftOf(date: string) {
-  const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
-  if (dow === 0) return { working_day: false, starts_at: null, ends_at: null, grace_minutes: GRACE, off_reason: "Sunday" };
-  return { working_day: true, starts_at: "09:00", ends_at: dow === 6 ? "15:00" : "17:00", grace_minutes: GRACE, off_reason: null };
+/** An ISO weekday: 1 is Monday, 7 is Sunday. */
+const weekdayOf = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
+const OFF = { working: false, starts_at: null, ends_at: null } as const;
+type Hours = { working: boolean; starts_at: string | null; ends_at: string | null };
+
+/** The company hours on a weekday: the policy's, else the working week (Monday to Friday 09:00 to 17:00, Saturday to 15:00). */
+function companyDay(weekday: number, r: AttendanceRules): Hours {
+  if (r.hours) {
+    const h = r.hours[weekday - 1];
+    return h?.working ? { working: true, starts_at: h.starts_at, ends_at: h.ends_at } : OFF;
+  }
+  if (weekday === 7) return OFF;
+  return { working: true, starts_at: "09:00", ends_at: weekday === 6 ? "15:00" : "17:00" };
 }
-type Shift = ReturnType<typeof shiftOf>;
+
+type DayShift = { working_day: boolean; starts_at: string | null; ends_at: string | null; grace_minutes: number; off_reason: string | null };
 /**
  * A temporary site's own hours for a person's day (§6.11), or null. Set once the sites below are
  * built: the demonstration history, worked out before them, has none.
  */
-let siteShift: (key: string, date: string) => Shift | null = () => null;
-/** A person's shift on a day: a site's own hours, else the working week's. */
-const shiftFor = (key: string, date: string): Shift => siteShift(key, date) ?? shiftOf(date);
+let siteShift: (key: string, date: string) => DayShift | null = () => null;
+
+/**
+ * A day's shift (§6.13): the person's work schedule in force that day, else the company hours of
+ * the policy version in force then; with no person, the company hours. A schedule's working day
+ * with no times takes the company hours, and is Off when they do not work it.
+ */
+export function shiftOf(date: string, key?: string): DayShift {
+  // A temporary site with its own hours sets the day (§6.11).
+  const site = key ? siteShift(key, date) : null;
+  if (site) return site;
+  const r = attendanceRulesOn(date);
+  const company = companyDay(weekdayOf(date), r);
+  const d = key ? scheduleOn(key, date)?.days[weekdayOf(date) - 1] : undefined;
+  const day: Hours = !d ? company : !d.working ? OFF : d.starts_at && d.ends_at ? { working: true, starts_at: d.starts_at, ends_at: d.ends_at } : company;
+  return {
+    working_day: day.working,
+    starts_at: day.working ? day.starts_at : null,
+    ends_at: day.working ? day.ends_at : null,
+    grace_minutes: r.grace_minutes,
+    off_reason: day.working ? null : "Day Off",
+  };
+}
+type Shift = ReturnType<typeof shiftOf>;
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
-const lateOf = (s: Shift, iso: string) => (s.starts_at ? Math.max(0, minutesOf(formatTime(iso)) - (minutesOf(s.starts_at) + GRACE)) : 0);
-const overtimeOf = (s: Shift, iso: string) => (s.ends_at ? Math.max(0, minutesOf(formatTime(iso)) - minutesOf(s.ends_at)) : 0);
+/** Minutes from a shift time to a punch on the wall clock: negative before it. */
+const offsetOf = (hhmm: string | null, iso: string) => (hhmm ? minutesOf(formatTime(iso)) - minutesOf(hhmm) : null);
+/** Late from the start, once past the start plus grace (§6.4). */
+const lateOf = (s: Shift, iso: string) => {
+  const a = offsetOf(s.starts_at, iso);
+  return a !== null && a > s.grace_minutes ? a : 0;
+};
+/** Early to the end, once before the end less the early grace. */
+const earlyOf = (s: Shift, grace: number, iso: string) => {
+  const a = offsetOf(s.ends_at, iso);
+  return a !== null && -a > grace ? -a : 0;
+};
+/** Overtime from the end, once past it by more than the policy's minutes. */
+const overtimeOf = (s: Shift, after: number, iso: string) => {
+  const a = offsetOf(s.ends_at, iso);
+  return a !== null && a > 0 && a > after ? a : 0;
+};
+const shiftMinutes = (s: Shift) => (s.working_day && s.starts_at && s.ends_at ? Math.max(0, minutesOf(s.ends_at) - minutesOf(s.starts_at)) : 0);
+
+/* ------------------------------------------------------------------ *
+ * Work schedules: a person's own week from a first day (§6.13)
+ * ------------------------------------------------------------------ */
+type MockSchedule = { id: string; key: string; days: ScheduleDayInput[]; effective_from: string; reason: string; set_by: string; set_at: string };
+const SCHEDULES: MockSchedule[] = [];
+/** Monday to Saturday on the company hours, at the office on `office` and from home on the others; Sunday off. */
+const hybridWeek = (office: number[]): ScheduleDayInput[] =>
+  [1, 2, 3, 4, 5, 6, 7].map((weekday) =>
+    weekday === 7 ? { weekday, working: false, starts_at: null, ends_at: null, place: null } : { weekday, working: true, starts_at: null, ends_at: null, place: office.includes(weekday) ? "office" : "remote" },
+  );
+/** Invented schedules: three hybrid weeks for people who do not sign in, one waiting to start, and a later shift. */
+(() => {
+  const add = (key: string, days: ScheduleDayInput[], from: string, reason: string, n: number) =>
+    SCHEDULES.push({ id: sid(`schedule:${key}:${from}`), key, days, effective_from: from, reason, set_by: "cynthia", set_at: at(n, "10:00") });
+  add("tolu", hybridWeek([1, 2, 4]), isoDaysAgo(30), "Team planning days at the office", 31);
+  add("bashir", hybridWeek([2, 4]), isoDaysAgo(20), "Partner meetings mid-week", 21);
+  add("grace", hybridWeek([1, 3, 5]), isoDaysAgo(14), "Office on partner review days", 15);
+  add("tolu", hybridWeek([1, 2, 3]).map((d) => (d.weekday === 6 ? { ...d, working: false, place: null } : d)), isoDaysAhead(7), "Planning moves to Wednesday", 1);
+  add(
+    "damilola",
+    [1, 2, 3, 4, 5, 6, 7].map((weekday) => (weekday <= 5 ? { weekday, working: true, starts_at: "10:00", ends_at: "18:00", place: "office" } : { weekday, working: false, starts_at: null, ends_at: null, place: null })),
+    isoDaysAhead(3),
+    "Covers the evening client desk",
+    1,
+  );
+})();
+const scheduleOn = (key: string, date: string) =>
+  SCHEDULES.filter((x) => x.key === key && x.effective_from <= date).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0] ?? null;
+const scheduleAfter = (key: string, date: string) =>
+  SCHEDULES.filter((x) => x.key === key && x.effective_from > date).sort((a, b) => a.effective_from.localeCompare(b.effective_from))[0] ?? null;
 
 /** Metres between two points, on a sphere the size of the Earth. */
 function distanceM(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
@@ -102,33 +181,45 @@ const dk = (key: string, date: string) => `${key}|${date}`;
 let seq = 0;
 
 function dayOf(key: string, date: string): Day {
-  let d = DAYS.get(dk(key, date));
-  if (!d) {
-    d = { key, attendance_day_id: sid(`day:${key}:${date}`), attendance_date: date, status: null, first_clock_in_at: null, last_clock_out_at: null, clock_out_automatic: false, worked_minutes: 0, late_minutes: 0, overtime_minutes: 0, closed_at: null, open_exceptions: 0 };
-    DAYS.set(dk(key, date), d);
-  }
+  const found = DAYS.get(dk(key, date));
+  if (found) return found;
+  const d: Day = { key, attendance_day_id: sid(`day:${key}:${date}`), attendance_date: date, status: null, first_clock_in_at: null, last_clock_out_at: null, clock_out_automatic: false, worked_minutes: 0, late_minutes: 0, early_minutes: 0, overtime_minutes: 0, closed_at: null, open_exceptions: 0 };
+  DAYS.set(dk(key, date), d);
   return d;
 }
 
 const isActive = (e: Ev) => !e.excluded && (e.validation_state === "accepted" || e.validation_state === "review");
 const activeOn = (key: string, date: string) => EVENTS.filter((e) => e.key === key && e.work_date === date && isActive(e)).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
 const openCount = (dayId: string) => EXCS.filter((x) => x.attendance_day_id === dayId && x.status === "open").length;
+/** A shift time on a work date, as an instant in Lagos. */
+const instantOf = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+01:00`).toISOString();
 
-/** A day worked out again from its punches, the way the API's projection does it. */
+/**
+ * A day worked out again from its punches, the way the API's projection does it (§6.4): late from
+ * the start once past the grace, early to the end once past the early grace, a System Clock-Out
+ * counted only to the end and never early or overtime; then its deductions and overtime (§6.17).
+ */
 function recompute(key: string, date: string) {
   const d = dayOf(key, date);
+  const r = attendanceRulesOn(date);
+  const shift = shiftOf(date, key);
   const evs = activeOn(key, date);
   const first = evs.find((e) => e.event_type === "clock_in") ?? null;
   const last = [...evs].reverse().find((e) => e.event_type === "clock_out") ?? null;
+  const system = last?.source === "system";
+  const end = shift.ends_at ? instantOf(date, shift.ends_at) : null;
+  const countedOut = last && system && end && last.occurred_at > end ? end : (last?.occurred_at ?? null);
   d.first_clock_in_at = first?.occurred_at ?? null;
   d.last_clock_out_at = last?.occurred_at ?? null;
-  d.clock_out_automatic = last?.source === "system";
-  const shift = shiftFor(key, date);
-  d.late_minutes = first ? lateOf(shift, first.occurred_at) : 0;
-  d.worked_minutes = first && last ? Math.max(0, Math.floor((Date.parse(last.occurred_at) - Date.parse(first.occurred_at)) / 60000)) : 0;
-  d.overtime_minutes = last ? overtimeOf(shift, last.occurred_at) : 0;
+  d.clock_out_automatic = system;
+  d.late_minutes = first && shift.working_day ? lateOf(shift, first.occurred_at) : 0;
+  d.early_minutes = last && shift.working_day && !system ? earlyOf(shift, r.early_grace_minutes, last.occurred_at) : 0;
+  d.worked_minutes = first && countedOut ? Math.max(0, Math.floor((Date.parse(countedOut) - Date.parse(first.occurred_at)) / 60000)) : 0;
+  d.overtime_minutes = last && !system ? (shift.working_day ? overtimeOf(shift, r.overtime.after_minutes, last.occurred_at) : d.worked_minutes) : 0;
   if (d.status !== "leave") d.status = first ? (d.late_minutes > 0 ? "late" : "present") : d.closed_at && shift.working_day ? "absent" : null;
+  if (d.status === "leave") Object.assign(d, { worked_minutes: 0, late_minutes: 0, early_minutes: 0, overtime_minutes: 0 });
   d.open_exceptions = openCount(d.attendance_day_id);
+  settle(key, date, d, r, shift);
   return d;
 }
 
@@ -184,6 +275,7 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
     detail,
     employee_note: null,
     employee_noted_at: null,
+    real_time: null,
     resolution: decided?.resolution ?? null,
     reviewed_at: decided ? new Date(Date.parse(ev?.occurred_at ?? `${date}T12:00:00Z`) + 3 * 3600_000).toISOString() : null,
     reviewed_by_name: decided ? (byKey(decided.by)?.display_name ?? null) : null,
@@ -193,13 +285,139 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
   return x;
 }
 
-/** An automatic clock-out: the system's, with no location, device or device time (§6.14). */
+/** A System Clock-Out: the system's, with no location, device or device time (§6.14). */
 const AUTOMATIC: Partial<Ev> = { source: "system", device_at: null, skew_seconds: null, latitude: null, longitude: null, accuracy_m: null, distance_m: null, worksite_name: null, geofence: "not_applied", location_reason: null, device_label: null, device_state: "none" };
+/** "System Clock-Out at 18:30", with the real time the person gave. */
+const systemDetail = (ev: Ev, realTime: string | null) => `System Clock-Out at ${formatTime(ev.occurred_at)}${realTime ? `; real time ${realTime}` : ""}`;
+
+/* ------------------------------------------------------------------ *
+ * Pending deductions and overtime (§6.17)
+ * ------------------------------------------------------------------ */
+type Pay = Omit<PayItem, "can_decide"> & { key: string; by_system: boolean };
+const PAY: Pay[] = [];
+/** Overtime approved beforehand (Approve Overtime): person and day to the approval. */
+const OT_APPROVALS = new Map<string, OvertimePreApproval>();
+const KINDS: PayItemKind[] = ["late", "early_departure", "absence", "overtime"];
+const NO_LONGER: Record<PayItemKind, string> = { late: "No longer late", early_departure: "No longer early", absence: "No longer absent", overtime: "No overtime" };
+const money = (n: number | null) => (n === null || !Number.isFinite(n) ? null : n.toFixed(2));
+
+/** A person's working days and scheduled minutes in a month, kept until a schedule is set. */
+const MONTHS = new Map<string, { days: number; minutes: number }>();
+function monthOfShifts(key: string, date: string) {
+  const at = `${key}|${date.slice(0, 7)}`;
+  const kept = MONTHS.get(at);
+  if (kept) return kept;
+  const [y, m] = date.split("-").map(Number);
+  const last = new Date(Date.UTC(y!, m!, 0)).getUTCDate();
+  const out = { days: 0, minutes: 0 };
+  for (let i = 1; i <= last; i += 1) {
+    const s = shiftOf(`${date.slice(0, 8)}${String(i).padStart(2, "0")}`, key);
+    if (!s.working_day) continue;
+    out.days += 1;
+    out.minutes += shiftMinutes(s);
+  }
+  MONTHS.set(at, out);
+  return out;
+}
+
+/** The person's daily and hourly rates for a day, from their gross over the month's working days by their own shifts. */
+function ratesOf(key: string, date: string, shift: Shift) {
+  const p = byKey(key)!;
+  const gross = Number(p.gross_monthly);
+  if (!gross) return { daily: null, hourly: null };
+  const { days, minutes } = monthOfShifts(key, date);
+  if (!days) return { daily: null, hourly: null };
+  const daily = gross / days;
+  const dayMinutes = shift.working_day ? shiftMinutes(shift) : Math.round(minutes / days);
+  return { daily, hourly: dayMinutes ? (daily * 60) / dayMinutes : null };
+}
+
+/** Confirmed overtime minutes in the month of a date, but one item's. */
+const confirmedIn = (key: string, date: string, except: string | null) =>
+  PAY.filter((x) => x.key === key && x.kind === "overtime" && x.status === "confirmed" && x.work_date.slice(0, 7) === date.slice(0, 7) && x.attendance_pay_item_id !== except).reduce((a, x) => a + (x.confirmed_minutes ?? 0), 0);
+
+/** Minutes held to what the month's cap has left. */
+function capped(minutes: number, left: number, reason: string | null = null) {
+  if (left <= 0) return { status: "cut" as const, confirmed_minutes: 0, reason: "Monthly cap" };
+  if (minutes > left) return { status: "confirmed" as const, confirmed_minutes: left, reason: "Monthly cap" };
+  return { status: "confirmed" as const, confirmed_minutes: minutes, reason };
+}
+
+/** The items a day qualifies for under the rules that judged it. */
+function qualifies(d: Day, shift: Shift, r: AttendanceRules) {
+  const out: Partial<Record<PayItemKind, { minutes: number; method: PayItem["method"]; rest_day: boolean; amount: string | null }>> = {};
+  if (d.status === "leave") return out;
+  const worked = d.status === "present" || d.status === "late";
+  if (shift.working_day) {
+    if (d.status === "late" && d.late_minutes > 0 && r.late_deduction.on) out.late = { minutes: d.late_minutes, method: r.late_deduction.method, rest_day: false, amount: r.late_deduction.amount };
+    if (d.early_minutes > 0 && r.early_deduction.on && worked) out.early_departure = { minutes: d.early_minutes, method: r.early_deduction.method, rest_day: false, amount: r.early_deduction.amount };
+    if (d.status === "absent" && r.absence_deduction.on) out.absence = { minutes: shiftMinutes(shift), method: "daily_rate", rest_day: false, amount: null };
+  }
+  if (r.overtime.on && d.overtime_minutes > 0 && worked) out.overtime = { minutes: d.overtime_minutes, method: r.overtime.method, rest_day: !shift.working_day, amount: r.overtime.amount };
+  return out;
+}
+
+/** Settle a day's items: one per kind it qualifies for, priced now; one the system keeps follows the day. */
+function settle(key: string, date: string, d: Day, r: AttendanceRules, shift: Shift) {
+  const want = qualifies(d, shift, r);
+  for (const kind of KINDS) {
+    const row = PAY.find((x) => x.key === key && x.work_date === date && x.kind === kind) ?? null;
+    if (row && (row.status === "in_run" || !row.by_system)) continue;
+    const w = want[kind];
+    if (!w) {
+      if (row && row.status !== "waived" && row.status !== "cut")
+        Object.assign(row, { status: kind === "overtime" ? "cut" : "waived", reason: d.status === "leave" ? "Leave granted" : NO_LONGER[kind], confirmed_minutes: kind === "overtime" ? 0 : row.confirmed_minutes, decided_at: new Date().toISOString() });
+      continue;
+    }
+    const { daily, hourly } = ratesOf(key, date, shift);
+    let status: PayItem["status"] = "pending";
+    let confirmed: number | null = null;
+    let reason: string | null = null;
+    let amount: string | null;
+    if (kind !== "overtime") {
+      amount =
+        w.method === "per_day" ? w.amount : w.method === "per_hour" ? money(w.amount ? Number(w.amount) * Math.ceil(w.minutes / 60) : null) : w.method === "daily_rate" ? money(daily) : money(hourly === null ? null : (hourly * w.minutes) / 60);
+    } else {
+      const o = r.overtime;
+      if (o.approval !== "manager_after") {
+        const pre = OT_APPROVALS.get(dk(key, date))?.minutes ?? null;
+        const left = o.monthly_cap_hours * 60 - confirmedIn(key, date, row?.attendance_pay_item_id ?? null);
+        const out = o.approval === "pre_approved" && !pre ? { status: "cut" as const, confirmed_minutes: 0, reason: "Not pre-approved" } : capped(o.approval === "pre_approved" && pre! < w.minutes ? pre! : w.minutes, left, o.approval === "pre_approved" && pre! < w.minutes ? "Beyond pre-approval" : null);
+        [status, confirmed, reason] = [out.status, out.confirmed_minutes, out.reason];
+      }
+      const paid = status === "pending" ? w.minutes : (confirmed ?? 0);
+      const multiplier = w.rest_day ? o.rest_day_multiplier : o.multiplier;
+      amount = w.method === "per_hour" ? money(w.amount ? (Number(w.amount) * paid) / 60 : null) : money(hourly === null ? null : (hourly * multiplier * paid) / 60);
+    }
+    const figures = { minutes: w.minutes, rest_day: w.rest_day, method: w.method, pay_amount: amount, status, confirmed_minutes: confirmed, reason };
+    if (row) Object.assign(row, figures);
+    else
+      PAY.push({
+        key,
+        attendance_pay_item_id: sid(`pay:${key}:${date}:${kind}`),
+        attendance_day_id: d.attendance_day_id,
+        employee: person(byKey(key)!),
+        work_date: date,
+        kind,
+        salary_set: !!Number(byKey(key)!.gross_monthly),
+        decided_by_name: null,
+        decided_at: status === "pending" ? null : new Date().toISOString(),
+        created_at: d.last_clock_out_at ?? d.closed_at ?? new Date().toISOString(),
+        by_system: true,
+        ...figures,
+      });
+  }
+}
 
 /** The demonstration history: 45 days of punches, the exceptions they opened, and today so far. */
 (() => {
   const today = isoDaysAgo(0);
   const signedIn = new Set(["cynthia", "ifeoma", "ngozi", "chidera"]);
+  const back = (date: string) => Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${date}T12:00:00Z`)) / 86400_000);
+  /** A person's most recent day worked at least `from` days back: where a System Clock-Out lands, whatever today's weekday. */
+  const workedFrom = (key: string, from: number) =>
+    HISTORY.filter((h) => h.person.user_key === key && h.clock_in_at && h.clock_out_at && back(h.date) >= from).sort((a, b) => b.date.localeCompare(a.date))[0]?.date ?? null;
+  const systemDays = new Set([`cynthia|${workedFrom("cynthia", 2)}`, `bashir|${workedFrom("bashir", 3)}`]);
   for (const h of HISTORY) {
     const key = h.person.user_key;
     const daysBack = Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${h.date}T12:00:00Z`)) / 86400_000);
@@ -220,14 +438,15 @@ const AUTOMATIC: Partial<Ev> = { source: "system", device_at: null, skew_seconds
       addException(key, h.date, "outside_worksite", inEv, `260 m from ${site?.name ?? "the office"}, radius ${site?.radius_m ?? 100} m`, daysBack > 7 ? { outcome: "accepted", by: "cynthia", resolution: "Client meeting agreed in advance" } : undefined);
     }
     const missedOut = key === "emeka" && daysBack === 1;
-    // Two shifts the clock watch closed: Cynthia's, and Bashir's, which he has explained (§6.14).
-    const automatic = (key === "cynthia" && daysBack === 2) || (key === "bashir" && daysBack === 3);
+    // Two System Clock-Outs: Cynthia's, and Bashir's, whose real time he has given (§6.14).
+    const automatic = systemDays.has(`${key}|${h.date}`);
     if (h.clock_out_at && !missedOut && !automatic) addEvent(key, h.date, "clock_out", h.clock_out_at);
     if (automatic) {
-      const out = addEvent(key, h.date, "clock_out", new Date(`${h.date}T${shiftOf(h.date).ends_at ?? "17:00"}:00+01:00`).toISOString(), AUTOMATIC);
+      const end = instantOf(h.date, shiftOf(h.date, key).ends_at ?? "17:00");
+      const out = addEvent(key, h.date, "clock_out", new Date(Date.parse(end) + attendanceRulesOn(h.date).system_clock_out_after_minutes * 60000).toISOString(), AUTOMATIC);
       if (key === "bashir") {
-        const x = addException(key, h.date, "automatic_clock_out", out, `Clocked out automatically at ${formatTime(out.occurred_at)}`);
-        Object.assign(x, { employee_note: "I left at four for the bank", employee_noted_at: out.occurred_at });
+        const x = addException(key, h.date, "automatic_clock_out", out, systemDetail(out, "16:00"));
+        Object.assign(x, { employee_note: "I left at four for the bank", employee_noted_at: out.occurred_at, real_time: "16:00" });
       }
     }
     if (missedOut) addException(key, h.date, "missing_clock_out", null, `Clocked in ${formatTime(h.clock_in_at)}, no clock-out`);
@@ -260,6 +479,12 @@ const AUTOMATIC: Partial<Ev> = { source: "system", device_at: null, skew_seconds
  * Remote staff's homes (docs/guides/attendance.md §6.10)
  * ------------------------------------------------------------------ */
 const forbidden = () => fail(403, "FORBIDDEN", "You do not have access to this.");
+/** A body the contract refuses, as the API answers it: each field's first message. */
+function refused(issues: Array<{ path: PropertyKey[]; message: string }>) {
+  const fields: Record<string, string[]> = {};
+  for (const i of issues) fields[i.path.map(String).join(".") || "_"] ??= [i.message];
+  return invalid(fields);
+}
 const HOME_RADIUS_M = 100;
 type Home = { id: string; key: string; status: HomeStatus; address: string; latitude: number; longitude: number; accuracy_m: number | null; requested_at: string; decided_at: string | null; decided_by: string | null; reason: string | null };
 const HOMES: Home[] = [];
@@ -281,47 +506,37 @@ const newestHome = (key: string) => HOMES.filter((h) => h.key === key).sort((a, 
 const isRemote = (key: string) => byKey(key)?.work_pattern === "remote";
 
 /* ------------------------------------------------------------------ *
- * Hybrid staff's weekly schedule (docs/guides/attendance.md §6.13)
+ * Where each weekday is worked (§6.13)
  * ------------------------------------------------------------------ */
-type MockSchedule = { id: string; key: string; office_days: number[]; effective_from: string; reason: string; set_by: string; set_at: string };
-const SCHEDULES: MockSchedule[] = [];
-/** Invented schedules for three hybrid people who do not sign in, and one waiting to start. */
-(() => {
-  const add = (key: string, office_days: number[], from: string, reason: string, n: number) =>
-    SCHEDULES.push({ id: sid(`schedule:${key}:${from}`), key, office_days, effective_from: from, reason, set_by: "cynthia", set_at: at(n, "10:00") });
-  add("tolu", [1, 2, 4], isoDaysAgo(30), "Team planning days at the office", 31);
-  add("bashir", [2, 4], isoDaysAgo(20), "Partner meetings mid-week", 21);
-  add("grace", [1, 3, 5], isoDaysAgo(14), "Office on partner review days", 15);
-  add("tolu", [1, 2, 3], isoDaysAhead(7), "Planning moves to Wednesday", 1);
-})();
-/** The weekdays the organisation works: Monday to Saturday (shiftOf). */
-const WORKING = [1, 2, 3, 4, 5, 6];
-const weekdayOf = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
-const scheduleOn = (key: string, date: string) =>
-  SCHEDULES.filter((x) => x.key === key && x.effective_from <= date).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0] ?? null;
-const scheduleAfter = (key: string, date: string) =>
-  SCHEDULES.filter((x) => x.key === key && x.effective_from > date).sort((a, b) => a.effective_from.localeCompare(b.effective_from))[0] ?? null;
-/** A hybrid employee's home day: the schedule in force then leaves its weekday out. */
+/** Each weekday as worked (Monday first): the schedule's day, else the company hours at the place the pattern gives. */
+function weekFrom(days: ScheduleDayInput[] | null, pattern: MockPerson["work_pattern"], r: AttendanceRules): WorkDay[] {
+  return [1, 2, 3, 4, 5, 6, 7].map((weekday) => {
+    const company = companyDay(weekday, r);
+    const d = days?.[weekday - 1];
+    const off = (company_hours: boolean): WorkDay => ({ weekday, working: false, starts_at: null, ends_at: null, place: null, company_hours });
+    if (d) {
+      if (!d.working) return off(false);
+      if (d.starts_at && d.ends_at) return { weekday, working: true, starts_at: d.starts_at, ends_at: d.ends_at, place: d.place ?? "office", company_hours: false };
+      return company.working ? { weekday, working: true, starts_at: company.starts_at, ends_at: company.ends_at, place: d.place ?? "office", company_hours: true } : off(false);
+    }
+    if (!company.working) return off(true);
+    return { weekday, working: true, starts_at: company.starts_at, ends_at: company.ends_at, place: pattern === "remote" ? "remote" : "office", company_hours: true };
+  });
+}
+const weekOn = (key: string, date: string, x = scheduleOn(key, date)) => weekFrom(x?.days ?? null, byKey(key)!.work_pattern, attendanceRulesOn(x && x.effective_from > date ? x.effective_from : date));
+/** A person works from home on a date: that weekday of their week is Remote. */
 function homeDay(key: string, date: string) {
-  if (byKey(key)?.work_pattern !== "hybrid") return false;
-  const x = scheduleOn(key, date);
-  return !!x && !x.office_days.includes(weekdayOf(date));
+  const d = weekOn(key, date)[weekdayOf(date) - 1]!;
+  return d.working && d.place === "remote";
 }
-/** Each weekday's place (office, remote, off), as My Profile and the employee record show it. */
-export function weekOf(key: string): ScheduleDay[] {
-  const p = byKey(key)!;
-  const x = p.work_pattern === "hybrid" ? scheduleOn(key, todayIso()) : null;
-  return [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
-    weekday,
-    place: !WORKING.includes(weekday) ? "off" : p.work_pattern === "remote" || (x && !x.office_days.includes(weekday)) ? "remote" : "office",
-  }));
-}
-/** Remote staff, and hybrid staff whose schedule leaves a working day for home, need an approved home. */
+/** Each weekday as worked today, as My Profile and the employee record show it. */
+export const workWeekOf = (key: string): WorkDay[] => weekOn(key, todayIso());
+/** Someone whose week today, or the schedule waiting to start, has a Remote working day needs an approved home. */
 function needsHome(key: string) {
-  const p = byKey(key);
-  if (!p || p.work_pattern === "on_site") return false;
-  if (p.work_pattern === "remote") return true;
-  return [scheduleOn(key, todayIso()), scheduleAfter(key, todayIso())].some((x) => x && WORKING.some((d) => !x.office_days.includes(d)));
+  if (!byKey(key)) return false;
+  const remote = (w: WorkDay[]) => w.some((d) => d.working && d.place === "remote");
+  const next = scheduleAfter(key, todayIso());
+  return remote(workWeekOf(key)) || (!!next && remote(weekOn(key, next.effective_from, next)));
 }
 
 /** Where a person's punch is judged: their approved home when they work remotely, else their worksite. */
@@ -472,9 +687,9 @@ export function todayOf(key: string): AttendanceToday {
     clock_out_at: outEv?.occurred_at ?? null,
     clock_out_automatic: outEv?.source === "system",
     // The mock has no sessions: every session it serves is the day's first (§6.14), and the device's mark keeps it to once.
-    sign_in_prompt: !onLeave && !inEv && shiftFor(key, date).working_day,
+    sign_in_prompt: !onLeave && !inEv && shiftOf(date, key).working_day,
     review: evs.some((e) => e.validation_state === "review"),
-    shift: shiftFor(key, date),
+    shift: shiftOf(date, key),
     work_pattern: p.work_pattern,
     location: approvedDay
       ? { kind: "approved_day", name: approvedDay.name, radius_m: null, home_state: homeState }
@@ -727,13 +942,17 @@ route("POST /api/v1/attendance/me/exceptions/:id/explanation", (req) => {
 route("POST /api/v1/attendance/me/events/:id/explanation", (req) => {
   const ev = EVENTS.find((e) => e.attendance_event_id === req.params.id && e.key === req.user);
   if (!ev) return notFound();
-  if (ev.source !== "system" || ev.event_type !== "clock_out") return fail(422, "NOT_AUTOMATIC", "Only an automatic clock-out is explained here");
+  if (ev.source !== "system" || ev.event_type !== "clock_out") return fail(422, "NOT_AUTOMATIC", "Only a System Clock-Out takes a real time");
+  const body = attendanceContract.RealTimeGiven.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
   if (EXCS.some((x) => x.attendance_event_id === ev.attendance_event_id && x.exception_type === "automatic_clock_out"))
-    return fail(409, "ALREADY_EXPLAINED", "You have already explained this clock-out");
-  const note = String(req.body.employee_note ?? "").trim();
-  if (!note) return invalid({ employee_note: ["Required"] });
-  const x = addException(ev.key, ev.work_date, "automatic_clock_out", ev, `Clocked out automatically at ${formatTime(ev.occurred_at)}`);
-  Object.assign(x, { employee_note: note, employee_noted_at: new Date().toISOString(), created_at: new Date().toISOString() });
+    return fail(409, "ALREADY_EXPLAINED", "You have already given the real time");
+  const clockIn = activeOn(ev.key, ev.work_date).find((e) => e.event_type === "clock_in");
+  const realAt = instantOf(ev.work_date, body.data.real_time);
+  if (!clockIn || realAt <= clockIn.occurred_at || Date.parse(realAt) > Date.now())
+    return fail(422, "REAL_TIME_INVALID", "Give a time after your clock-in", { real_time: ["After your clock-in"] });
+  const x = addException(ev.key, ev.work_date, "automatic_clock_out", ev, systemDetail(ev, body.data.real_time));
+  Object.assign(x, { employee_note: body.data.employee_note, employee_noted_at: new Date().toISOString(), real_time: body.data.real_time, created_at: new Date().toISOString() });
   recompute(ev.key, ev.work_date);
   return created(exOut(x));
 });
@@ -755,8 +974,7 @@ route("GET /api/v1/attendance/me/records/:id", (req) => {
 function registerRows(date: string, viewer: string): Array<RegisterRow & { key: string; working: boolean }> {
   const g = peopleGrant(viewer, "view");
   return PEOPLE.filter((p) => g.sees(p.user_key) && p.start_date <= date).map((p) => {
-    // A site with its own hours works its days for its people (§6.11).
-    const shift = shiftFor(p.user_key, date);
+    const shift = shiftOf(date, p.user_key);
     const day = DAYS.get(dk(p.user_key, date));
     // The person's own latest punch: an automatic clock-out has no location or device to show.
     const evs = activeOn(p.user_key, date).filter((e) => e.source !== "system");
@@ -827,7 +1045,8 @@ route("GET /api/v1/attendance/register/:employee_id", (req) => {
   if (!row) return notFound();
   const day = DAYS.get(dk(p.user_key, date));
   const fence = fenceOf(p.user_key);
-  const { grace_minutes, working_day, starts_at, ends_at } = shiftFor(p.user_key, date);
+  const { grace_minutes, working_day, starts_at, ends_at } = shiftOf(date, p.user_key);
+  const approval = OT_APPROVALS.get(dk(p.user_key, date)) ?? null;
   const out: DayDetail = {
     employee: row.employee,
     date,
@@ -839,11 +1058,13 @@ route("GET /api/v1/attendance/register/:employee_id", (req) => {
     clock_out_at: row.clock_out_at,
     worked_minutes: row.worked_minutes,
     late_minutes: row.late_minutes,
+    early_minutes: day?.early_minutes ?? 0,
     overtime_minutes: day?.overtime_minutes ?? 0,
     closed: !!day?.closed_at,
     expected_location: fence ? { name: fence.name, radius_m: fence.radius_m } : approvedDayOf(p.user_key) ? { name: approvedDayOf(p.user_key)!.name, radius_m: null } : null,
     policy: { geofence_mode: POLICY_MODES.geofence_mode, device_mode: POLICY_MODES.device_mode },
     open_exceptions: row.open_exceptions,
+    overtime_approval: approval && { minutes: approval.minutes, approved_by_name: approval.approved_by_name, reason: approval.reason },
   };
   return ok(out);
 });
@@ -1265,7 +1486,9 @@ const onSite = (t: MockTemp, key: string) => t.members.some((m) => m.key === key
 const siteOn = (key: string, date: string) => TEMP.find((t) => t.status === "approved" && t.starts_on <= date && t.ends_on >= date && onSite(t, key)) ?? null;
 siteShift = (key, date) => {
   const t = siteOn(key, date);
-  return t && t.hours === "site" && t.starts_at && t.ends_at ? { working_day: true, starts_at: t.starts_at, ends_at: t.ends_at, grace_minutes: GRACE, off_reason: null } : null;
+  return t && t.hours === "site" && t.starts_at && t.ends_at
+    ? { working_day: true, starts_at: t.starts_at, ends_at: t.ends_at, grace_minutes: attendanceRulesOn(date).grace_minutes, off_reason: null }
+    : null;
 };
 /** An address's name on the punch and the check-in: Temporary Home, the site's name, or the site and the address's label. */
 const nameOfAddress = (t: MockTemp, l: MockLoc) => (t.purpose === "temporary_home" ? "Temporary Home" : t.locations.length === 1 ? t.name : `${t.name}, ${l.name ?? `Address ${l.position}`}`);
@@ -1555,26 +1778,26 @@ route("GET /api/v1/attendance/check-ins", (req) => {
 });
 
 /* ------------------------------------------------------------------ *
- * A person's week: People · Employees, the record's Attendance tab (§6.13)
+ * A person's week: People · Employees, the record's Work Schedule tab (§6.13)
  * ------------------------------------------------------------------ */
 const versionOut = (x: MockSchedule | null): ScheduleVersion | null =>
-  x && { attendance_schedule_id: x.id, office_days: [...x.office_days].sort((a, b) => a - b), effective_from: x.effective_from, reason: x.reason, set_by_name: byKey(x.set_by)?.display_name ?? null, set_at: x.set_at };
-function scheduleOut(key: string, viewer: string): WorkSchedule {
+  x && { attendance_work_schedule_id: x.id, days: x.days.map((d) => ({ ...d })), effective_from: x.effective_from, reason: x.reason, set_by_name: byKey(x.set_by)?.display_name ?? null, set_at: x.set_at };
+function scheduleOut(key: string, viewer: string, editable = true): WorkSchedule {
   const p = byKey(key)!;
   const site = siteOf(key);
-  const hybrid = p.work_pattern === "hybrid";
   const edit = peopleGrant(viewer, "edit");
   return {
     employee: person(p),
     work_pattern: p.work_pattern,
     worksite: site ? { worksite_id: site.worksite_id, name: site.name, radius_m: site.radius_m } : null,
     home_state: needsHome(key) ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null,
-    week: weekOf(key),
-    current: hybrid ? versionOut(scheduleOn(key, todayIso())) : null,
-    next: hybrid ? versionOut(scheduleAfter(key, todayIso())) : null,
-    can_edit: hybrid && key !== viewer && edit.may && edit.sees(key),
+    week: workWeekOf(key),
+    current: versionOut(scheduleOn(key, todayIso())),
+    next: versionOut(scheduleAfter(key, todayIso())),
+    can_edit: editable && key !== viewer && edit.may && edit.sees(key),
   };
 }
+route("GET /api/v1/attendance/me/schedule", (req) => ok(scheduleOut(req.user!, req.user!, false)));
 route("GET /api/v1/attendance/schedules/:employee_id", (req) => {
   const g = peopleGrant(req.user!, "view");
   if (!g.may) return forbidden();
@@ -1586,25 +1809,136 @@ route("POST /api/v1/attendance/schedules/:employee_id", (req) => {
   if (!g.may) return forbidden();
   const p = byId(req.params.employee_id);
   if (!p || !g.sees(p.user_key)) return notFound();
-  const b = req.body as { office_days?: number[]; effective_from?: string; reason?: string };
-  const days = Array.isArray(b.office_days) ? b.office_days : [];
-  const fields: Record<string, string[]> = {};
-  if (!days.length) fields.office_days = ["Pick an office day"];
-  else if (new Set(days).size !== days.length) fields.office_days = ["Each day once"];
-  if (!b.effective_from) fields.effective_from = ["Pick the first day"];
-  if (String(b.reason ?? "").trim().length < 10) fields.reason = ["At least 10 characters"];
-  if (Object.keys(fields).length) return invalid(fields);
+  const body = attendanceContract.WorkScheduleSet.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
+  const b = body.data;
   if (p.user_key === req.user) return fail(403, "OWN_RECORD", "Someone else sets your work schedule");
-  if (p.work_pattern !== "hybrid") return fail(422, "SCHEDULE_NOT_NEEDED", "Only hybrid staff have a weekly schedule.", { office_days: ["Not hybrid"] });
-  if (b.effective_from! < todayIso()) return fail(422, "SCHEDULE_IN_THE_PAST", "Pick a first day from today on", { effective_from: ["Already past"] });
-  if (b.effective_from! > isoDaysAhead(90)) return fail(422, "SCHEDULE_TOO_FAR", "Pick a first day within 90 days", { effective_from: ["Too far ahead"] });
-  if (days.some((d) => !WORKING.includes(d))) return fail(422, "SCHEDULE_DAY_NOT_WORKED", "Pick office days the organisation works", { office_days: ["Not a working day"] });
-  if (WORKING.every((d) => days.includes(d))) return fail(422, "SCHEDULE_NO_HOME_DAY", "Every working day at the office is on site: change the work pattern", { office_days: ["Leave a home day"] });
+  if (["suspended", "exited", "archived"].includes(p.status)) return fail(422, "NOT_EMPLOYED", "Only people who work here now have a schedule.");
+  if (b.effective_from < todayIso()) return fail(422, "SCHEDULE_IN_THE_PAST", "Pick a first day from today on", { effective_from: ["Already past"] });
+  if (b.effective_from > isoDaysAhead(90)) return fail(422, "SCHEDULE_TOO_FAR", "Pick a first day within 90 days", { effective_from: ["Too far ahead"] });
+  const r = attendanceRulesOn(b.effective_from);
+  const blank: Record<string, string[]> = {};
+  b.days.forEach((d, i) => {
+    if (d.working && !d.starts_at && !companyDay(d.weekday, r).working) blank[`days.${i}.starts_at`] = ["Give the hours"];
+  });
+  if (Object.keys(blank).length) return fail(422, "SCHEDULE_HOURS_NEEDED", "Give the hours of a day the company does not work", blank);
   const same = SCHEDULES.find((x) => x.key === p.user_key && x.effective_from === b.effective_from);
-  const row = { office_days: [...days].sort((a, c) => a - c), reason: String(b.reason).trim(), set_by: req.user!, set_at: new Date().toISOString() };
+  const row = { days: b.days.map((d) => ({ ...d })), reason: b.reason, set_by: req.user!, set_at: new Date().toISOString() };
   if (same) Object.assign(same, row);
-  else SCHEDULES.push({ id: sid(`schedule:${p.user_key}:${b.effective_from}`), key: p.user_key, effective_from: b.effective_from!, ...row });
+  else SCHEDULES.push({ id: sid(`schedule:${p.user_key}:${b.effective_from}`), key: p.user_key, effective_from: b.effective_from, ...row });
+  MONTHS.clear();
   return created(scheduleOut(p.user_key, req.user!));
+});
+
+/* ------------------------------------------------------------------ *
+ * Pending deductions and overtime: My Attendance, People · Attendance (§6.17)
+ * ------------------------------------------------------------------ */
+/** What the reader may decide: a deduction with `people` approve over everyone, overtime over the person; never their own. */
+function canDecidePay(x: Pay, viewer: string) {
+  if (x.status !== "pending" || x.key === viewer) return false;
+  const g = peopleGrant(viewer, "approve");
+  if (!g.may) return false;
+  return x.kind === "overtime" ? g.sees(x.key) : g.all;
+}
+/** As the reader reads it: the amount only with the salary grant (field mask employee.salary), and their own. */
+const payOut = ({ key, by_system: _b, ...x }: Pay, viewer: string): PayItem => ({
+  ...x,
+  pay_amount: key === viewer || ["operations", "ceo"].includes(SIGN_INS[viewer]?.view ?? "") ? x.pay_amount : null,
+  can_decide: canDecidePay({ key, by_system: _b, ...x }, viewer),
+});
+const queue = (a: PayItem, b: PayItem) => Number(b.status === "pending") - Number(a.status === "pending") || b.work_date.localeCompare(a.work_date);
+const groupOf = (x: PayItem, v: string) => (v === "overtime") === (x.kind === "overtime");
+
+route("GET /api/v1/attendance/me/pay-items", (req) => {
+  const month = monthOf(req.query);
+  const rows = PAY.filter((x) => x.key === req.user && x.work_date.startsWith(month)).map((x) => payOut(x, req.user!)).sort((a, b) => b.work_date.localeCompare(a.work_date));
+  const { month: _m, ...query } = req.query;
+  return paged(rows, { ...req, query }, { filters: { group: groupOf, kind: (x, v) => x.kind === v }, sort: { work_date: (a, b) => a.work_date.localeCompare(b.work_date) } });
+});
+
+route("GET /api/v1/attendance/pay-items", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  const month = req.query.month;
+  const rows = PAY.filter((x) => g.sees(x.key) && (!month || x.work_date.startsWith(month))).map((x) => payOut(x, req.user!)).sort(queue);
+  const { month: _m, ...query } = req.query;
+  return paged(rows, { ...req, query }, {
+    search: (x) => [x.employee.display_name],
+    filters: { group: groupOf, kind: (x, v) => x.kind === v, status: (x, v) => x.status === v, employee_id: (x, v) => x.employee.employee_id === v },
+    sort: { work_date: (a, b) => a.work_date.localeCompare(b.work_date), minutes: (a, b) => a.minutes - b.minutes },
+  });
+});
+
+route("POST /api/v1/attendance/pay-items/waive", (req) => {
+  const g = peopleGrant(req.user!, "approve");
+  if (!g.may) return forbidden();
+  const body = attendanceContract.PayItemWaive.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
+  if (!g.all) return fail(403, "FORBIDDEN", "Only People with access to everyone waive deductions");
+  const rows = body.data.pay_item_ids.map((id) => PAY.find((x) => x.attendance_pay_item_id === id));
+  if (rows.some((x) => !x)) return fail(404, "NOT_FOUND", "A deduction does not exist");
+  const items = rows as Pay[];
+  if (items.some((x) => x.key === req.user)) return fail(403, "OWN_RECORD", "Someone else waives your own deductions");
+  if (items.some((x) => x.kind === "overtime")) return fail(422, "NOT_A_DEDUCTION", "Only deductions are waived; confirm or cut overtime", { pay_item_ids: ["Deductions only"] });
+  const waived: PayItem[] = [];
+  const skipped: Array<{ attendance_pay_item_id: string; code: "NOT_PENDING" | "IN_RUN" }> = [];
+  for (const x of items) {
+    if (x.status !== "pending") {
+      skipped.push({ attendance_pay_item_id: x.attendance_pay_item_id, code: x.status === "in_run" ? "IN_RUN" : "NOT_PENDING" });
+      continue;
+    }
+    Object.assign(x, { status: "waived", reason: body.data.reason, decided_by_name: byKey(req.user)!.display_name, decided_at: new Date().toISOString(), by_system: false });
+    waived.push(payOut(x, req.user!));
+  }
+  return ok({ waived, skipped });
+});
+
+route("POST /api/v1/attendance/pay-items/:id/overtime", (req) => {
+  const g = peopleGrant(req.user!, "approve");
+  if (!g.may) return forbidden();
+  const body = attendanceContract.OvertimeDecision.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
+  const x = PAY.find((r) => r.attendance_pay_item_id === req.params.id);
+  if (!x || !g.sees(x.key)) return notFound();
+  if (x.key === req.user) return fail(403, "OWN_RECORD", "Someone else confirms your own overtime");
+  if (x.kind !== "overtime") return fail(422, "NOT_OVERTIME", "Only overtime is confirmed or cut");
+  if (x.status !== "pending") return fail(409, "OVERTIME_DECIDED", "This overtime was already decided");
+  const b = body.data;
+  let out: { status: PayItem["status"]; confirmed_minutes: number; reason: string | null } = { status: "cut", confirmed_minutes: 0, reason: b.reason || null };
+  if (b.decision === "confirm") {
+    const want = b.minutes ?? x.minutes;
+    if (want > x.minutes) return fail(422, "OVERTIME_MINUTES", `At most ${x.minutes} minutes`, { minutes: [`At most ${x.minutes}`] });
+    const o = attendanceRulesOn(x.work_date).overtime;
+    out = capped(want, o.monthly_cap_hours * 60 - confirmedIn(x.key, x.work_date, x.attendance_pay_item_id), b.reason || null);
+    if (out.confirmed_minutes !== x.minutes && x.pay_amount) x.pay_amount = money((Number(x.pay_amount) * out.confirmed_minutes) / x.minutes);
+  }
+  Object.assign(x, out, { decided_by_name: byKey(req.user)!.display_name, decided_at: new Date().toISOString(), by_system: false });
+  return ok(payOut(x, req.user!));
+});
+
+route("POST /api/v1/attendance/overtime-approvals", (req) => {
+  const g = peopleGrant(req.user!, "approve");
+  if (!g.may) return forbidden();
+  const body = attendanceContract.OvertimePreApprovalCreate.safeParse(req.body);
+  if (!body.success) return refused(body.error.issues);
+  const b = body.data;
+  if (b.work_date < todayIso()) return fail(422, "OVERTIME_IN_THE_PAST", "Approve overtime for today or later", { work_date: ["Already past"] });
+  if (b.work_date > isoDaysAhead(90)) return fail(422, "OVERTIME_TOO_FAR", "Pick a day within 90 days", { work_date: ["Too far ahead"] });
+  const p = byId(b.employee_id);
+  if (!p || !g.sees(p.user_key)) return notFound();
+  if (p.user_key === req.user) return fail(403, "OWN_RECORD", "Someone else approves your own overtime");
+  if (["suspended", "exited", "archived"].includes(p.status)) return fail(422, "NOT_EMPLOYED", "Only people who work here now are approved overtime.");
+  const row: OvertimePreApproval = {
+    attendance_overtime_approval_id: OT_APPROVALS.get(dk(p.user_key, b.work_date))?.attendance_overtime_approval_id ?? sid(`ot-approval:${p.user_key}:${b.work_date}`),
+    employee: person(p),
+    work_date: b.work_date,
+    minutes: b.minutes,
+    reason: b.reason,
+    approved_by_name: byKey(req.user)!.display_name,
+    approved_at: new Date().toISOString(),
+  };
+  OT_APPROVALS.set(dk(p.user_key, b.work_date), row);
+  return created(row);
 });
 
 /** The rules a punch today is judged by: the Attendance policy's version in force (policies' mock). */

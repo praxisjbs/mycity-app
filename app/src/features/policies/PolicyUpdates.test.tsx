@@ -81,7 +81,14 @@ describe("Policy Updates", () => {
     fireEvent.click(await screen.findByRole("radio", { name: "All Policies" }, { timeout: 5000 }));
     fireEvent.click(await screen.findByText("Attendance Policy", {}, { timeout: 5000 }));
     const dialog = await screen.findByRole("dialog", {}, { timeout: 5000 });
-    expect(within(dialog).getByText("You have a grace period of 10 minutes after your resumption time. A clock-in after it counts as late.")).toBeTruthy();
+    expect(within(dialog).getByText("You have a grace period of 10 minutes after your start time.")).toBeTruthy();
+    expect(within(dialog).getByText("A clock-in after it counts as late from your start time.")).toBeTruthy();
+    // The rules PR 3 enforces read as sentences too: the hours, a limit, a deduction, overtime and the clock prompts.
+    expect(within(dialog).getByText("Monday to Friday, 09:00 to 17:00.")).toBeTruthy();
+    expect(within(dialog).getByText("3 late arrivals in a month, or 5 hours late, reach the limit.")).toBeTruthy();
+    expect(within(dialog).getByText("Each late arrival is deducted from your pay by the minute.")).toBeTruthy();
+    expect(within(dialog).getByText("Your line manager confirms it after the day.")).toBeTruthy();
+    expect(within(dialog).getByText("90 minutes after your end time, the system clocks you out. Your hours count to your end time.")).toBeTruthy();
     expect(within(dialog).getByText("Grace Minutes: 15 minutes to 10 minutes")).toBeTruthy();
     const clocking = within(dialog).getByRole("heading", { name: "Clocking In" }).closest<HTMLElement>("[data-card]")!;
     expect(within(clocking).getByText("Changed")).toBeTruthy();

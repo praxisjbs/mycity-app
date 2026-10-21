@@ -64,7 +64,30 @@ export const HELP = {
   cap: "Once reached, this provider is skipped for the rest of the month and the next model in each chain answers.",
   overall: "Once reached, no AI call is made until the month ends, whatever the chains say.",
   ownChain: "This action has a chain of its own; Use Job Chain puts it back on its job's.",
+  notListed: "Models the provider's pricing page did not price. Find Prices asks about them again after 7 days.",
 };
+
+/** Why a Find Prices run stopped short, as its pill reads (§6.4). */
+export const RUN_REASON: Record<string, string> = {
+  NO_SEARCH_MODEL: "No Search Model",
+  AI_DISABLED: "AI Switched Off",
+  AI_MODULE_DISABLED: "AI Switched Off",
+  AI_CAP_REACHED: "Monthly Cap Reached",
+  AI_UNAVAILABLE: "Search Not Answering",
+  ANSWER_UNREADABLE: "Answer Not Readable",
+  RUN_FAILED: "Search Failed",
+  LOST: "Search Stopped",
+};
+
+/** A run's reason, or Search Stopped for a code this screen does not know. */
+export const reasonOf = (code: string | null | undefined) => (code ? (RUN_REASON[code] ?? "Search Stopped") : null);
+
+/** The Models tab's Show filter (decision 32). */
+export const SHOW: Array<["usable" | "not_on_key" | "all", string]> = [
+  ["usable", "On Key"],
+  ["not_on_key", "Not on Key"],
+  ["all", "Any"],
+];
 
 /** A dollar price as the provider writes it: "$0.30", "$0.075". */
 export function usd(price: string | null): string | null {

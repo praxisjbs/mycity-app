@@ -10,7 +10,8 @@
  *
  *   subject     the type of record an alert is about
  *   owner       the module whose tables the metric reads, its milestone and its owner
- *   per_person  the metric can be read for one employee (an attendance signal re-reads one person)
+ *   per_person  the metric can be read for one employee (none is, since attendance's alerts became the
+ *               Attendance policy's: home.md §6)
  *   evaluate    (client, rule, { today, after, employee_id }) → { readings, next }: the subjects
  *               at or past the rule's threshold on a Lagos day, a batch at a time. `after` is the
  *               cursor the previous batch returned as `next` (null when it was the last), so a
@@ -19,9 +20,6 @@
  *               for shared/alerts raise(): `value` meets the threshold as the metric's kind says,
  *               and `since` is the breach's latest evidence; a deadline's also has `due_on`, its date.
  *
- *   late_arrivals       attendance_day: days the attendance module recorded late, in the window
- *   missing_clock_out   attendance_day: days with a missing clock-out exception, or still open
- *                       before today with a clock-in and no clock-out, in the window
  *   approval_ageing     workflow_instance: whole days a pending request has waited at its stage
  *   document_expiry     document: days left before a current document expires
  *   confirmation_due    employee: days left before an active employee's confirmation is due
@@ -30,24 +28,28 @@
  *   budget_threshold    the budgets source adapter: the share of a running budget spent, in percent
  *   recruitment_sla     the vacancies source adapter: whole days an application has spent at its stage
  *
- * The four over M0 tables raise real alerts from M1; the attendance pair reads what the
- * attendance module records; the last three read their milestones' tables through Home's source
- * adapters (src/modules/dashboard/sources) and find nothing until those milestones are used.
+ * The four over M0 tables raise real alerts from M1; the last three read their milestones' tables
+ * through Home's source adapters (src/modules/dashboard/sources) and find nothing until those
+ * milestones are used.
  *
- * READING OTHER MODULES' TABLES. The six over M0 and M1 tables are the one place Home reads
+ * ATTENDANCE. Its thresholds are the Attendance policy's (TB, 20/10/2026; home.md §6 Alerts):
+ * the attendance module counts its consequence rules and raises each breach through
+ * alerts.service raisePolicyBreach, on a rule the system keeps for the policy rule (metric
+ * `attendance_policy`, POLICY below). That metric is not in this registry: the sweep never reads
+ * it and New Rule never offers it; categoryOf() files its alerts under attendance.
+ *
+ * READING OTHER MODULES' TABLES. The four over M0 tables are the one place Home reads
  * them in its own SQL rather than through the owning module's functions (home.md §4.1): each
  * entry's query reads its owner's tables (`owner` above) under that module's own conditions,
  * a batch at a time. It is coupled to them the way a source adapter is to its milestone's
  * tables: the owning module updates its entry here in the same PR when it changes what the
- * entry reads (attendance_day.status and the day-close's missing_clock_out exception for
- * attendance; workflow_instance and workflow_definition for the workflow engine; document's
+ * entry reads (workflow_instance and workflow_definition for the workflow engine; document's
  * is_current, scan_status and expires_on for documents; employee's status and dates for the
  * staff register), and tests/integration/home-alerts.test.js raises each from real rows.
  *
  * A breach is read against the rule's threshold in SQL, so a sweep only ever loads breaches,
- * never the organisation. Every day is a Lagos day (shared/time/lagos); a window is the last W
- * days, today the last. Titles and triggers are what a person reads on Home, Alerts: dates are
- * day-first and money is Naira.
+ * never the organisation. Every day is a Lagos day (shared/time/lagos). Titles and triggers are
+ * what a person reads on Home, Alerts: dates are day-first and money is Naira.
  */
 const c = require("@mycity/contract");
 const lagos = require("../../shared/time/lagos");
@@ -66,21 +68,6 @@ const nameOf = (first, last) => `${first || ""} ${last || ""}`.trim();
 
 /** "1 late arrival", "3 late arrivals" */
 const counted = (n, word) => `${n} ${word}${Number(n) === 1 ? "" : "s"}`;
-
-/** "Late on 09/10/2026, 12/10/2026 and 14/10/2026", or for many days "Late on 6 days, last on 14/10/2026". */
-function onDays(lead, dates) {
-  const shown = dates.map(formatDate);
-  if (shown.length > 3) return `${lead} ${shown.length} days, last on ${shown[shown.length - 1]}`;
-  if (shown.length === 1) return `${lead} ${shown[0]}`;
-  return `${lead} ${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
-}
-
-/** The first day of a rule's window ending today: the last `window_days` days, today the last. */
-function windowStart(rule, today) {
-  const days = Number(rule.window_days);
-  if (!Number.isInteger(days) || days < 1) throw new Error(`alerts.metrics: rule ${rule.key} has no window`);
-  return lagos.addDays(today, -(days - 1));
-}
 
 /** A threshold in whole days, rounded up: 2.5 days waiting is first reached on day 3. */
 const wholeDays = (rule) => Math.max(0, Math.ceil(Number(rule.threshold)));
@@ -102,88 +89,6 @@ const batchOf = (rows, cursor, read) => ({
   readings: rows.map(read),
   next: rows.length === BATCH ? cursor(rows[rows.length - 1]) : null,
 });
-
-/* ------------------------------------------------------------------ *
- * Attendance (LA, M1)
- * ------------------------------------------------------------------ */
-
-const ATTENDANCE = Object.freeze({ module: "attendance", milestone: "M1", by: "LA" });
-
-/** Days the attendance module recorded late (attendance_day.status), as My Attendance counts them. */
-async function lateArrivals(client, rule, { today, after = null, employee_id: employeeId = null }) {
-  const { rows } = await client.query(
-    `SELECT ad.employee_id, e.first_name, e.last_name, count(*)::int AS value,
-            array_agg(ad.attendance_date::text ORDER BY ad.attendance_date) AS dates,
-            max(ad.first_clock_in_at) AS since
-       FROM attendance_day ad
-       JOIN employee e ON e.employee_id = ad.employee_id
-      WHERE ad.status = 'late' AND e.status = 'active'
-        AND ad.attendance_date BETWEEN $1::date AND $2::date
-        AND ($3::uuid IS NULL OR ad.employee_id = $3::uuid)
-        AND ($4::uuid IS NULL OR ad.employee_id > $4::uuid)
-      GROUP BY ad.employee_id, e.first_name, e.last_name
-     HAVING count(*) >= $5::numeric
-      ORDER BY ad.employee_id
-      LIMIT $6 -- pagination:batch the people one step of a sweep raises late arrivals for`,
-    [windowStart(rule, today), today, employeeId, after, rule.threshold, BATCH],
-  );
-  return batchOf(
-    rows,
-    (r) => r.employee_id,
-    (r) => ({
-      subject: { type: "employee", id: r.employee_id },
-      subject_employee_id: r.employee_id,
-      value: r.value,
-      title: `${nameOf(r.first_name, r.last_name)}: ${counted(r.value, "late arrival")} in ${counted(rule.window_days, "day")}`,
-      trigger: onDays("Late on", r.dates),
-      since: r.since || lagos.startOfDay(r.dates[r.dates.length - 1]),
-    }),
-  );
-}
-
-/**
- * Days a person did not clock out: the day-close raised a missing clock-out exception on
- * it, or it is still open before today with a clock-in and no clock-out (the day-close has
- * not reached it yet). Its evidence is the day's end (00:00 Lagos the next day) whether or
- * not the day-close has reached it, so a day-close that runs after a person cleared the
- * alert does not make the same missed clock-out new.
- */
-async function missingClockOut(client, rule, { today, after = null, employee_id: employeeId = null }) {
-  const { rows } = await client.query(
-    `SELECT ad.employee_id, e.first_name, e.last_name, count(*)::int AS value,
-            array_agg(ad.attendance_date::text ORDER BY ad.attendance_date) AS dates,
-            max((ad.attendance_date + 1)::timestamp AT TIME ZONE 'Africa/Lagos') AS since
-       FROM attendance_day ad
-       JOIN employee e ON e.employee_id = ad.employee_id
-       LEFT JOIN attendance_exception x
-         ON x.attendance_day_id = ad.attendance_day_id AND x.exception_type = 'missing_clock_out'
-            AND x.attendance_event_id IS NULL
-      WHERE e.status = 'active'
-        AND ad.attendance_date BETWEEN $1::date AND $2::date
-        AND (x.attendance_exception_id IS NOT NULL
-             OR (ad.closed_at IS NULL AND ad.attendance_date < $2::date
-                 AND ad.first_clock_in_at IS NOT NULL AND ad.last_clock_out_at IS NULL))
-        AND ($3::uuid IS NULL OR ad.employee_id = $3::uuid)
-        AND ($4::uuid IS NULL OR ad.employee_id > $4::uuid)
-      GROUP BY ad.employee_id, e.first_name, e.last_name
-     HAVING count(*) >= $5::numeric
-      ORDER BY ad.employee_id
-      LIMIT $6 -- pagination:batch the people one step of a sweep raises missing clock-outs for`,
-    [windowStart(rule, today), today, employeeId, after, rule.threshold, BATCH],
-  );
-  return batchOf(
-    rows,
-    (r) => r.employee_id,
-    (r) => ({
-      subject: { type: "employee", id: r.employee_id },
-      subject_employee_id: r.employee_id,
-      value: r.value,
-      title: `${nameOf(r.first_name, r.last_name)}: ${counted(r.value, "missing clock-out")} in ${counted(rule.window_days, "day")}`,
-      trigger: onDays("No clock-out on", r.dates),
-      since: r.since,
-    }),
-  );
-}
 
 /* ------------------------------------------------------------------ *
  * Approvals (the workflow engine, M0)
@@ -390,8 +295,6 @@ async function recruitmentSla(client, rule, { today, after = null }) {
  * ------------------------------------------------------------------ */
 
 const SERVER = {
-  late_arrivals: { subject: "employee", owner: ATTENDANCE, per_person: true, evaluate: lateArrivals },
-  missing_clock_out: { subject: "employee", owner: ATTENDANCE, per_person: true, evaluate: missingClockOut },
   approval_ageing: {
     subject: "the record awaiting approval",
     owner: { module: "workflow", milestone: "M0", by: "GE" },
@@ -447,10 +350,39 @@ function check() {
 }
 check();
 
-/** The metric a rule watches, or null for a rule kept from before the list. */
+/** The metric a rule watches, or null for a rule kept from before the list (and the policy's). */
 const metricOf = (key) => (Object.prototype.hasOwnProperty.call(METRICS, key) ? METRICS[key] : null);
 
-/** The metrics in a category, for the category filters. */
-const metricsIn = (category) => Object.values(METRICS).filter((m) => m.category === category).map((m) => m.key);
+/**
+ * The rules the system keeps for the Attendance policy's consequence rules (home.md §6 Alerts):
+ * their metric, their category, and how each is named and raised. One breach is one alert.
+ */
+const POLICY = Object.freeze({
+  metric: c.alerts.HOME_ALERT_POLICY_METRIC,
+  category: "attendance",
+  rules: c.alerts.HOME_ALERT_POLICY_RULES,
+  names: Object.freeze({
+    late_rule: "Late Arrivals",
+    early_rule: "Early Departure",
+    absence_rule: "Absence",
+    forgotten_rule: "Forgotten Clock-Outs",
+    location_rule: "Location Flags",
+  }),
+  threshold: "1",
+  severity: "medium",
+  permission_key: "people.approve",
+});
 
-module.exports = { METRICS, BATCH, metricOf, metricsIn, onDays, windowStart };
+/** Is this the metric of a rule the system keeps for the Attendance policy? */
+const isPolicy = (key) => key === POLICY.metric;
+
+/** A metric's category: the registry's, attendance for the policy's, null for one kept from before. */
+const categoryOf = (key) => (isPolicy(key) ? POLICY.category : metricOf(key) ? metricOf(key).category : null);
+
+/** The metrics in a category, for the category filters (the policy's among attendance's). */
+const metricsIn = (category) => [
+  ...Object.values(METRICS).filter((m) => m.category === category).map((m) => m.key),
+  ...(category === POLICY.category ? [POLICY.metric] : []),
+];
+
+module.exports = { METRICS, BATCH, POLICY, metricOf, isPolicy, categoryOf, metricsIn };

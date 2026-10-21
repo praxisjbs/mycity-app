@@ -69,7 +69,7 @@ erDiagram
 | Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `notification_rule`, `notification_rule_recipient`, `notification_reminder_rule`, `notification_setting`, `reminder`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
-| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model`, `ai_chain`, `ai_provider_cap`, `ai_price_proposal` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
+| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model`, `ai_chain`, `ai_provider_cap`, `ai_price_proposal`, `ai_price_run` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
 
 Every core table above was checked against the shared code that writes it by running
 `tests/integration` on the real migrations (#26, #27): the code and the schema agree, and CI keeps
@@ -214,7 +214,21 @@ who published or withdrew it and why, who saved it, and the location check per p
 (`office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode`, taking a row's one
 `geofence_mode`); `attendance_policy_acknowledgement` (one row per person and version: reminded,
 acknowledged) · `1395` `1099`'s Standard policy removed while it is as seeded and nothing was judged
-by it (A26, §5) · `1450` temporary sites (attendance.md §6.11, PR 4): `attendance_temporary_site`
+by it (A26, §5) · `1420` a person's own work schedule: `attendance_work_schedule` (the seven ISO
+weekdays, each Working or Off with its hours, blank for the company hours, and Office or Remote, from
+a first day; one row per person per first day), `1340`'s rows copied in with blank hours; `1340`'s
+table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes` and what judged it
+(`policy_version_id`, `attendance_work_schedule_id`, `shift_working`, `shift_starts_at`,
+`shift_ends_at`, `judged_at`) · `1430` `attendance_rule_breach` (one row per breach of the Attendance
+policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
+alert it raised; `employee_query_id` for M3, no key yet) · `1435` `attendance_pay_item` (one pending
+deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
+`payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
+beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
+`kind` widened to `clock_out_due`, a `slot` and `due_at`, unique per person, day, kind and slot ·
+`1445` Home's `late_arrivals` and `missing_clock_out` rules switched off and their open alerts
+dismissed as the rule change, with a check that keeps them off (the Attendance policy raises
+attendance's alerts, `docs/guides/home.md` §6) · `1450` temporary sites (attendance.md §6.11, PR 4): `attendance_temporary_site`
 (numbered `TS-0001`, a purpose of seventeen, a name, a description, one to 90 days, its status and
 approval, who submitted, approved or cancelled it and why), `attendance_temporary_site_location` (one
 to eight picked addresses, each its `place`, point, radius of 150 to 500 m and time zone) and
@@ -245,9 +259,12 @@ are read by nothing after `1405` and are dropped by a later release (MIGRATIONS 
 use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
-- Attendance (attendance.md §4, §13): the redesign's tables above (PRs 2 and 3; PR 4's places are
-  built in `1450` to `1475`); dropping `attendance_location_request` and the field assignment
-  tables once no request or assignment made before PR 4 is still read (MIGRATIONS §8); dropping
+- Attendance (attendance.md §4, §13): the redesign's tables above (PR 2; PR 3's are built in `1420`
+  to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
+  `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
+  their tables exist; dropping `attendance_location_request` and the field assignment tables once no
+  request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
+  (MIGRATIONS §8); dropping
   `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
   nothing reads them; dropping the superseded booleans `require_geofence` and `require_known_device`
   and `1300`'s one `geofence_mode`, superseded by the place modes of `1370` (MIGRATIONS §8).
@@ -257,7 +274,7 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
   no index of its own, so `1150` no longer adds `attendance_event (occurred_at)`. Its statuses are
   the register's (`present`, `late`, `absent`, `leave`, checked by `1300`) in Home's words, with
   `present` split into on site, remote (by `employee.work_pattern`, an approved remote day or a
-  hybrid home day by `attendance_schedule`, `1340`) and
+  Remote day of the person's work schedule, `attendance_work_schedule`, `1420`) and
   field (a field assignment covering the day, `1330`). When the register's statuses change, the
   roster's mapping changes in the same PR (`tests/integration/attendance-roster.test.js` holds the
   two together).
@@ -470,7 +487,11 @@ messages, citations · `10099` seed · `10200` AI Control, brought forward (`doc
 §4): `ai_chain` (each job's and action's chain, a row per model), `ai_provider_cap` (a paid provider's
 monthly cap), `ai_price_proposal` (Find Prices' proposals, one open per model), `ai_model`'s price of a
 thousand searches, and on `ai_run_step` the audio seconds, searches, naira prices and rate a step was
-charged at, with kind `search` · `10290` seed: the `ai_control` grants.
+charged at, with kind `search` · `10210` Find Prices in batches (`docs/guides/ai-control.md` §4,
+decisions 29 to 31): `ai_price_run` (one per Find Prices press: its progress, counts, outcome and the
+job's claim), `ai_model.price_not_listed_at` (asked again after 7 days), and the provider-listed
+`ai_model` rows decision 29 leaves off (`-latest` aliases, Gemma, repeated snapshots no chain uses)
+deleted · `10290` seed: the `ai_control` grants.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

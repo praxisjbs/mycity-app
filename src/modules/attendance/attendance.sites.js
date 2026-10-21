@@ -54,7 +54,8 @@ async function tx(fn) {
   }
 }
 
-const notFound = () => new AppError("NOT_FOUND", "That temporary site does not exist", 404);
+const notFound = () =>
+  new AppError("NOT_FOUND", "That temporary site does not exist", 404);
 const iso = (t) => (t ? new Date(t).toISOString() : null);
 const ENTITY = (id) => ({ type: "attendance_temporary_site", id });
 const isHome = (site) => site.purpose === "temporary_home";
@@ -69,8 +70,16 @@ function present(row) {
     submitted_at: iso(row.submitted_at),
     approved_at: iso(row.approved_at),
     cancelled_at: iso(row.cancelled_at),
-    locations: row.locations.map((l) => ({ ...l, position: Number(l.position), radius_m: Number(l.radius_m) })),
-    members: row.members.map((m) => ({ ...m, added_at: iso(m.added_at), removed_at: iso(m.removed_at) })),
+    locations: row.locations.map((l) => ({
+      ...l,
+      position: Number(l.position),
+      radius_m: Number(l.radius_m),
+    })),
+    members: row.members.map((m) => ({
+      ...m,
+      added_at: iso(m.added_at),
+      removed_at: iso(m.removed_at),
+    })),
     can_decide: Boolean(row.can_decide),
     can_change: Boolean(row.can_change),
     can_withdraw: Boolean(row.can_withdraw),
@@ -99,17 +108,35 @@ const payloadOf = (site, employeeIds, extra = {}) => ({
 /** The dates, against today in Lagos (§6.11). Pure. */
 function checkDates(body, today) {
   if (body.starts_on < today)
-    throw new AppError("SITE_IN_THE_PAST", "Pick a first day from today on", 422, { starts_on: ["Already past"] });
+    throw new AppError(
+      "SITE_IN_THE_PAST",
+      "Pick a first day from today on",
+      422,
+      { starts_on: ["Already past"] },
+    );
   if (lagos.daysBetween(today, body.starts_on) > AHEAD_DAYS)
-    throw new AppError("SITE_TOO_FAR", `Pick a first day within ${AHEAD_DAYS} days`, 422, { starts_on: ["Too far ahead"] });
+    throw new AppError(
+      "SITE_TOO_FAR",
+      `Pick a first day within ${AHEAD_DAYS} days`,
+      422,
+      { starts_on: ["Too far ahead"] },
+    );
   if (lagos.daysBetween(body.starts_on, body.ends_on) + 1 > MAX_DAYS)
-    throw new AppError("SITE_TOO_LONG", `A temporary site covers at most ${MAX_DAYS} days`, 422, {
-      ends_on: [`At most ${MAX_DAYS} days`],
-    });
+    throw new AppError(
+      "SITE_TOO_LONG",
+      `A temporary site covers at most ${MAX_DAYS} days`,
+      422,
+      {
+        ends_on: [`At most ${MAX_DAYS} days`],
+      },
+    );
 }
 
 /** The zone a picked place names, when the runtime knows it; else Lagos (§6.11, addresses.md §4). Pure. */
-const zoneOfPlace = (place) => (place && place.timezone && rules.isTimeZone(place.timezone) ? place.timezone : rules.DEFAULT_TZ);
+const zoneOfPlace = (place) =>
+  place && place.timezone && rules.isTimeZone(place.timezone)
+    ? place.timezone
+    : rules.DEFAULT_TZ;
 
 /** Whether someone is at work on a day: active, started by it and not yet left (422 NOT_EMPLOYED). */
 function employedOn(person, date) {
@@ -134,23 +161,46 @@ async function create(user, body, { direct }) {
   checkDates(body, today);
   const ids = [...body.employee_ids].sort();
   if (direct && user.employee_id && ids.includes(user.employee_id))
-    throw new AppError("OWN_RECORD", "Add a site you are on from Home, for approval", 403, {
-      employee_ids: ["Not yourself"],
-    });
+    throw new AppError(
+      "OWN_RECORD",
+      "Add a site you are on from Home, for approval",
+      403,
+      {
+        employee_ids: ["Not yourself"],
+      },
+    );
 
   return tx(async (client) => {
     // One lock a person, in the order of their ids, so two sites sent at once wait in turn.
     for (const e of ids) await repo.lockEmployee(client, e);
     const people = await sitesRepo.peopleOf(client, ids);
-    if (people.length !== ids.length || !people.every((p) => employedOn(p, body.starts_on)))
-      throw new AppError("NOT_EMPLOYED", "Only people who work here then can be on it", 422, {
-        employee_ids: ["Not working here"],
-      });
-    const clash = await sitesRepo.overlappingSite(client, ids, body.starts_on, body.ends_on);
+    if (
+      people.length !== ids.length ||
+      !people.every((p) => employedOn(p, body.starts_on))
+    )
+      throw new AppError(
+        "NOT_EMPLOYED",
+        "Only people who work here then can be on it",
+        422,
+        {
+          employee_ids: ["Not working here"],
+        },
+      );
+    const clash = await sitesRepo.overlappingSite(
+      client,
+      ids,
+      body.starts_on,
+      body.ends_on,
+    );
     if (clash)
-      throw new AppError("SITE_OVERLAPS", `${clash.display_name} is already on ${clash.number}`, 409, {
-        starts_on: ["Overlaps another site"],
-      });
+      throw new AppError(
+        "SITE_OVERLAPS",
+        `${clash.display_name} is already on ${clash.number}`,
+        409,
+        {
+          starts_on: ["Overlaps another site"],
+        },
+      );
 
     const { number } = await numbering.allocate(client, "temporary_site");
     const status = direct ? "approved" : "submitted";
@@ -172,9 +222,13 @@ async function create(user, body, { direct }) {
       const field = `locations.${i}.address`;
       // A point is the fence's centre: an address typed before F27 has none to give.
       if (loc.address.lat === null || loc.address.lat === undefined)
-        throw new AppError("VALIDATION_FAILED", "Pick an address", 422, { [field]: ["Pick an address"] });
+        throw new AppError("VALIDATION_FAILED", "Pick an address", 422, {
+          [field]: ["Pick an address"],
+        });
       const locationId = crypto.randomUUID();
-      const saved = await places.save(client, OWNER, locationId, loc.address, { field });
+      const saved = await places.save(client, OWNER, locationId, loc.address, {
+        field,
+      });
       await sitesRepo.insertLocation(client, {
         id: locationId,
         temporary_site_id: id,
@@ -190,7 +244,15 @@ async function create(user, body, { direct }) {
     }
     await sitesRepo.insertMembers(client, id, ids);
 
-    const site = { temporary_site_id: id, number, purpose: body.purpose, name: body.name, starts_on: body.starts_on, ends_on: body.ends_on, submitted_by: user.user_id };
+    const site = {
+      temporary_site_id: id,
+      number,
+      purpose: body.purpose,
+      name: body.name,
+      starts_on: body.starts_on,
+      ends_on: body.ends_on,
+      submitted_by: user.user_id,
+    };
     const after = {
       number,
       purpose: body.purpose,
@@ -250,14 +312,23 @@ async function add(user, body, scope) {
 
 function assertAll(scope) {
   if (!scope || scope.scope !== "all")
-    throw new AppError("FORBIDDEN", "Only People with access to everyone change temporary sites", 403);
+    throw new AppError(
+      "FORBIDDEN",
+      "Only People with access to everyone change temporary sites",
+      403,
+    );
 }
 
 /** May People change it: not on it themselves, not over (§6.11). */
 function assertChangeable(site, user, today) {
   if (user.employee_id && site.active_ids.includes(user.employee_id))
-    throw new AppError("OWN_RECORD", "Someone else changes a site you are on", 403);
-  if (site.ends_on < today) throw new AppError("SITE_ENDED", "This temporary site has ended", 409);
+    throw new AppError(
+      "OWN_RECORD",
+      "Someone else changes a site you are on",
+      403,
+    );
+  if (site.ends_on < today)
+    throw new AppError("SITE_ENDED", "This temporary site has ended", 409);
 }
 
 /** POST /attendance/me/temporary-sites/:id/withdraw: the submitter, while it waits. */
@@ -265,12 +336,34 @@ async function withdraw(user, id, body) {
   const seen = await sitesRepo.getSite(pool, id);
   if (!seen || !mineOf(seen, user)) throw notFound();
   if (seen.submitted_by !== user.user_id) throw notFound();
-  if (seen.status !== "submitted") throw new AppError("SITE_NOT_WAITING", "This site no longer waits on approval", 409);
+  if (seen.status !== "submitted")
+    throw new AppError(
+      "SITE_NOT_WAITING",
+      "This site no longer waits on approval",
+      409,
+    );
   await tx(async (client) => {
     const site = await sitesRepo.getSite(client, id, { forUpdate: true });
-    if (site.status !== "submitted") throw new AppError("SITE_NOT_WAITING", "This site no longer waits on approval", 409);
-    if (site.workflow_instance_id) await engine.cancel(client, { instance_id: site.workflow_instance_id, actor: user, reason: body.reason });
-    await sitesRepo.closeSite(client, id, "submitted", "withdrawn", user.user_id, body.reason);
+    if (site.status !== "submitted")
+      throw new AppError(
+        "SITE_NOT_WAITING",
+        "This site no longer waits on approval",
+        409,
+      );
+    if (site.workflow_instance_id)
+      await engine.cancel(client, {
+        instance_id: site.workflow_instance_id,
+        actor: user,
+        reason: body.reason,
+      });
+    await sitesRepo.closeSite(
+      client,
+      id,
+      "submitted",
+      "withdrawn",
+      user.user_id,
+      body.reason,
+    );
     await emit(client, {
       key: EVENTS.TEMPORARY_SITE_WITHDRAWN,
       entity: ENTITY(id),
@@ -292,8 +385,19 @@ async function cancel(user, id, body, scope) {
     if (!site) throw notFound();
     assertChangeable(site, user, today);
     if (site.status !== "approved")
-      throw new AppError("SITE_NOT_APPROVED", "Only an approved site is cancelled; decide a waiting one", 409);
-    await sitesRepo.closeSite(client, id, "approved", "cancelled", user.user_id, body.reason);
+      throw new AppError(
+        "SITE_NOT_APPROVED",
+        "Only an approved site is cancelled; decide a waiting one",
+        409,
+      );
+    await sitesRepo.closeSite(
+      client,
+      id,
+      "approved",
+      "cancelled",
+      user.user_id,
+      body.reason,
+    );
     await emit(client, {
       key: EVENTS.TEMPORARY_SITE_CANCELLED,
       entity: ENTITY(id),
@@ -317,15 +421,31 @@ async function remove(user, id, body, scope) {
     if (site.status !== "submitted" && site.status !== "approved")
       throw new AppError("SITE_CLOSED", "This temporary site is closed", 409);
     if (!site.active_ids.includes(body.employee_id))
-      throw new AppError("NOT_ON_SITE", "That person is not on this site", 409, { employee_id: ["Not on it"] });
-    if (site.active_ids.length === 1) throw new AppError("SITE_LAST_PERSON", "Cancel the site instead", 409);
-    await sitesRepo.removeMember(client, id, body.employee_id, user.user_id, body.reason);
+      throw new AppError(
+        "NOT_ON_SITE",
+        "That person is not on this site",
+        409,
+        { employee_id: ["Not on it"] },
+      );
+    if (site.active_ids.length === 1)
+      throw new AppError("SITE_LAST_PERSON", "Cancel the site instead", 409);
+    await sitesRepo.removeMember(
+      client,
+      id,
+      body.employee_id,
+      user.user_id,
+      body.reason,
+    );
     await emit(client, {
       key: EVENTS.TEMPORARY_SITE_MEMBER_REMOVED,
       entity: ENTITY(id),
       actor: user,
       before: { employee_id: body.employee_id, on_it: true },
-      after: { employee_id: body.employee_id, on_it: false, removed_reason: body.reason },
+      after: {
+        employee_id: body.employee_id,
+        on_it: false,
+        removed_reason: body.reason,
+      },
       payload: payloadOf(site, [body.employee_id], {
         employee_id: body.employee_id,
         subject_employee_id: body.employee_id,
@@ -343,7 +463,10 @@ async function remove(user, id, body, scope) {
 const SETTLED = {
   approved: { status: "approved", key: () => EVENTS.TEMPORARY_SITE_APPROVED },
   rejected: { status: "rejected", key: () => EVENTS.TEMPORARY_SITE_REJECTED },
-  cancelled: { status: "withdrawn", key: () => EVENTS.TEMPORARY_SITE_WITHDRAWN },
+  cancelled: {
+    status: "withdrawn",
+    key: () => EVENTS.TEMPORARY_SITE_WITHDRAWN,
+  },
 };
 
 /**
@@ -359,7 +482,10 @@ async function settle(id, outcome, { reason = null } = {}) {
   await tx(async (client) => {
     const site = await sitesRepo.getSite(client, id, { forUpdate: true });
     if (!site || site.status !== "submitted") return;
-    const by = how.status === "approved" ? await sitesRepo.lastApprover(client, site.workflow_instance_id) : null;
+    const by =
+      how.status === "approved"
+        ? await sitesRepo.lastApprover(client, site.workflow_instance_id)
+        : null;
     if (!(await sitesRepo.settleSite(client, id, how.status, by))) return;
     await emit(client, {
       key: how.key(),
@@ -384,17 +510,25 @@ async function cover(id) {
   if (!site || site.status !== "approved") return 0;
   const addresses = await sitesRepo.locationsOf(pool, id);
   const flags = await sitesRepo.coverableExceptions(pool, id);
-  const inside = (point) => addresses.some((a) => geo.distanceM(point, a) <= Number(a.radius_m));
+  const inside = (point) =>
+    addresses.some((a) => geo.distanceM(point, a) <= Number(a.radius_m));
   let resolved = 0;
   for (const x of flags) {
-    if (!inside({ latitude: Number(x.latitude), longitude: Number(x.longitude) })) continue;
+    if (
+      !inside({ latitude: Number(x.latitude), longitude: Number(x.longitude) })
+    )
+      continue;
     await tx(async (client) => {
       await repo.lockEmployee(client, x.employee_id);
-      const done = await repo.resolveException(client, x.attendance_exception_id, {
-        outcome: "accepted",
-        resolution: `Covered by ${site.number}`,
-        by: site.approved_by,
-      });
+      const done = await repo.resolveException(
+        client,
+        x.attendance_exception_id,
+        {
+          outcome: "accepted",
+          resolution: `Covered by ${site.number}`,
+          by: site.approved_by,
+        },
+      );
       if (!done) return;
       resolved += 1;
       await emit(client, {
@@ -402,7 +536,11 @@ async function cover(id) {
         entity: { type: "attendance_exception", id: x.attendance_exception_id },
         actor: null,
         before: { status: "open", outcome: null },
-        after: { status: "resolved", outcome: "accepted", resolution: `Covered by ${site.number}` },
+        after: {
+          status: "resolved",
+          outcome: "accepted",
+          resolution: `Covered by ${site.number}`,
+        },
         payload: {
           attendance_exception_id: x.attendance_exception_id,
           employee_id: x.employee_id,
@@ -424,14 +562,18 @@ async function cover(id) {
  * ------------------------------------------------------------------ */
 
 /** Whether the person submitted it or is or was on it: their own to read. */
-const mineOf = (site, user) => site.submitted_by === user.user_id || (Boolean(user.employee_id) && site.member_ids.includes(user.employee_id));
+const mineOf = (site, user) =>
+  site.submitted_by === user.user_id ||
+  (Boolean(user.employee_id) && site.member_ids.includes(user.employee_id));
 
 /** The reader's grant for the decisions on People's screens. */
 async function readerOf(user) {
   const approve = await scopeFor(user, "people", "approve");
   return {
     reader: { user, approves: Boolean(approve) },
-    changer: approve ? { scope: approve.scope, employee_id: user.employee_id } : null,
+    changer: approve
+      ? { scope: approve.scope, employee_id: user.employee_id }
+      : null,
   };
 }
 
@@ -451,7 +593,12 @@ async function list(user, query, scope) {
 async function get(user, id, scope) {
   if (!(await sitesRepo.inScope(pool, id, scope))) throw notFound();
   const { reader, changer } = await readerOf(user);
-  const row = await sitesRepo.siteRow(pool, id, { today: lagos.today(), place: scope.scope === "all", reader, changer });
+  const row = await sitesRepo.siteRow(pool, id, {
+    today: lagos.today(),
+    place: scope.scope === "all",
+    reader,
+    changer,
+  });
   if (!row) throw notFound();
   return present(row);
 }
@@ -471,7 +618,13 @@ async function mine(user, query) {
 async function getMine(user, id) {
   const site = await sitesRepo.getSite(pool, id);
   if (!site || !mineOf(site, user)) throw notFound();
-  return present(await sitesRepo.siteRow(pool, id, { today: lagos.today(), place: true, userId: user.user_id }));
+  return present(
+    await sitesRepo.siteRow(pool, id, {
+      today: lagos.today(),
+      place: true,
+      userId: user.user_id,
+    }),
+  );
 }
 
 /* ------------------------------------------------------------------ *
@@ -486,6 +639,22 @@ function nameOfAddress(site, location) {
 }
 
 /**
+ * A person's shift on a day of a site (§6.11): with Site Hours, worked from its start to its end
+ * whatever their schedule or the company hours say, the policy's grace kept; on the Usual Shift,
+ * their own shift unchanged. Pure; calendar.shiftOn and the day's judgement apply it.
+ */
+function siteShift(site, shift) {
+  if (!site || site.hours !== "site") return shift;
+  return {
+    ...shift,
+    working_day: true,
+    starts_at: site.starts_at,
+    ends_at: site.ends_at,
+    off_reason: null,
+  };
+}
+
+/**
  * A site's day as the clock judges it (§6.5, §6.11): its addresses through decideGeofence's `sites`
  * (each address's id as `field_site_id`, reported as `site_id`), judged with the site's mode, or a
  * home's for a Temporary Home, in its first address's zone. Pure.
@@ -494,11 +663,6 @@ function nameOfAddress(site, location) {
  */
 function contextOf(site, { policy, shift }) {
   const home = isHome(site);
-  // Site Hours: every day of the site is worked, from its start to its end on its own clock (§6.11).
-  const hours =
-    site.hours === "site"
-      ? { working_day: true, starts_at: site.starts_at, ends_at: site.ends_at, grace_minutes: shift.grace_minutes, off_reason: null }
-      : shift;
   const addresses = site.locations.map((l) => ({
     field_site_id: l.temporary_site_location_id,
     name: nameOfAddress(site, l),
@@ -508,7 +672,7 @@ function contextOf(site, { policy, shift }) {
   }));
   return {
     policy: rules.forPlace(policy, home ? "home" : "site"),
-    shift: hours,
+    shift,
     timeZone: site.locations[0].timezone || rules.DEFAULT_TZ,
     fence: {
       kind: home ? "temporary_home" : "temporary_site",
@@ -558,7 +722,12 @@ function todayOf(site) {
  */
 async function zoneAt(db, person, instant, fallback) {
   const lagosDay = rules.localDate(instant, rules.DEFAULT_TZ);
-  const near = await sitesRepo.sitesAround(db, person.employee_id, lagos.addDays(lagosDay, -1), lagos.addDays(lagosDay, 1));
+  const near = await sitesRepo.sitesAround(
+    db,
+    person.employee_id,
+    lagos.addDays(lagosDay, -1),
+    lagos.addDays(lagosDay, 1),
+  );
   for (const site of near) {
     const zone = site.timezone || rules.DEFAULT_TZ;
     const day = rules.localDate(instant, zone);
@@ -590,6 +759,7 @@ module.exports = {
   getMine,
   present,
   nameOfAddress,
+  siteShift,
   contextOf,
   todayOf,
   zoneAt,

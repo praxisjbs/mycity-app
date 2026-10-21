@@ -22,9 +22,11 @@ import { ageOf, OVER_BY_HELP, overByText } from "./labels";
 /**
  * Home · Alerts on the in-browser mock (docs/guides/home.md §10): the four counts, the category
  * chips, the open list and who sees what in it, an alert's sheet and what it offers, Clear and
- * Dismiss, View Dismissed, the rules with their switches, New Rule and Edit Rule checked by the
- * contract, the links into the tab, and the phone's layout. The mock answers in the contract's
- * shapes, so what the screen shows is checked against what the API sends.
+ * Dismiss, View Dismissed, the rules with their switches and the Attendance policy's five read
+ * only, New Rule and Edit Rule checked by the contract, the links into the tab, and the phone's
+ * layout. The mock answers in the contract's shapes, so what the screen shows is checked against
+ * what the API sends. Attendance's alerts are the policy's breaches (attendance.md §6.16), cleared
+ * by People's approvers.
  *
  * The mock keeps its alerts and rules for the whole file, so the tests that change them come
  * last, and every figure they check is read from the API rather than assumed.
@@ -116,7 +118,7 @@ const footerButtons = (dialog: HTMLElement) =>
   within(dialog)
     .getAllByRole("button")
     .map((b) => b.textContent?.trim())
-    .filter((t) => ["Close", "Edit Rule", "Dismiss Alert", "Clear Alert"].includes(t ?? ""));
+    .filter((t) => ["Close", "Edit Rule", "Set in Attendance Policy", "Dismiss Alert", "Clear Alert"].includes(t ?? ""));
 /** A button in a sheet's footer by its words (the sheet's own close is an icon also named Close). */
 const footerButton = (dialog: HTMLElement, name: string) => within(dialog).getAllByRole("button", { name }).find((b) => b.textContent?.trim() === name)!;
 const value = (root: HTMLElement, label: string) => within(root).getByText(label).nextElementSibling?.textContent;
@@ -182,11 +184,14 @@ describe("what the screen sends", () => {
     expect(categoryChips(summary, "budget").map((c) => [c.label, c.count])).toEqual([["All", 5], ["Attendance", 3], ["People", 2], ["Budgets", 0]]);
   });
 
-  it("offers Clear and Dismiss only where clearing will work, and Edit Rule to a rule manager on a listed metric", () => {
-    expect(sheetActions({ can_clear: true, metric: "late_arrivals" }, true)).toEqual({ editRule: true, clear: true });
-    expect(sheetActions({ can_clear: true, metric: "late_arrivals" }, false)).toEqual({ editRule: false, clear: true });
-    expect(sheetActions({ can_clear: false, metric: "late_arrivals" }, true)).toEqual({ editRule: true, clear: false });
-    expect(sheetActions({ can_clear: false, metric: "attendance.rule_breached" }, true)).toEqual({ editRule: false, clear: false });
+  it("offers Clear and Dismiss only where clearing will work, Edit Rule to a rule manager on a listed metric, and Set in Attendance Policy on a policy rule's", () => {
+    expect(sheetActions({ can_clear: true, metric: "approval_ageing" }, true)).toEqual({ editRule: true, setPolicy: false, clear: true });
+    expect(sheetActions({ can_clear: true, metric: "approval_ageing" }, false)).toEqual({ editRule: false, setPolicy: false, clear: true });
+    expect(sheetActions({ can_clear: false, metric: "approval_ageing" }, true)).toEqual({ editRule: true, setPolicy: false, clear: false });
+    expect(sheetActions({ can_clear: false, metric: "late_arrivals" }, true)).toEqual({ editRule: false, setPolicy: false, clear: false });
+    // An Attendance policy rule is changed in the policy: never Edit Rule, Set in Attendance Policy for whoever may write it.
+    expect(sheetActions({ can_clear: true, metric: "attendance_policy" }, true, true)).toEqual({ editRule: false, setPolicy: true, clear: true });
+    expect(sheetActions({ can_clear: true, metric: "attendance_policy" }, true, false)).toEqual({ editRule: false, setPolicy: false, clear: true });
   });
 
   it("sorts Age the other way to when an alert was raised: Age going up is the youngest first", () => {
@@ -199,18 +204,18 @@ describe("what the screen sends", () => {
     for (const s of ["age", "-age", "-severity"]) expect(alerts.HomeAlertQuery.safeParse({ sort: serverSort(s), page: "1" }).success).toBe(true);
   });
 
-  it("starts New Rule on the first metric with its window and who clears it, and follows a new metric", () => {
+  it("starts New Rule on the first metric with who clears it, and follows a new metric", () => {
     const start = newRuleValues();
-    expect(start).toEqual({ name: "", metric: "late_arrivals", threshold: "", window_days: "30", severity: "medium", permission_key: "people.view" });
+    expect(start).toEqual({ name: "", metric: "approval_ageing", threshold: "", window_days: "", severity: "medium", permission_key: "people.approve" });
     const deadline = withMetric(start, "document_expiry");
     expect(deadline).toMatchObject({ metric: "document_expiry", window_days: "", permission_key: "people.edit" });
-    // Who Can Clear the person chose stays when the metric changes; a window typed is kept for a metric counted over days.
-    expect(withMetric({ ...start, permission_key: "people.approve", window_days: "14" }, "missing_clock_out")).toMatchObject({ window_days: "14", permission_key: "people.approve" });
+    // Who Can Clear the person chose stays when the metric changes.
+    expect(withMetric({ ...start, permission_key: "people.view" }, "contract_ending")).toMatchObject({ window_days: "", permission_key: "people.view" });
   });
 
-  it("sends a rule as the contract takes it: the window only for a metric counted over days, no metric on a change", () => {
-    const counted = { ...newRuleValues(), name: " Late Arrivals ", threshold: "3" };
-    expect(ruleBody(counted)).toEqual({ name: "Late Arrivals", threshold: "3", window_days: 30, severity: "medium", permission_key: "people.view" });
+  it("sends a rule as the contract takes it: no window for a metric that is not counted over days, no metric on a change", () => {
+    const counted = { ...newRuleValues(), name: " Approvals Waiting ", threshold: "3" };
+    expect(ruleBody(counted)).toEqual({ name: "Approvals Waiting", threshold: "3", severity: "medium", permission_key: "people.approve" });
     expect(alerts.HomeAlertRuleCreate.safeParse({ ...ruleBody(counted), metric: counted.metric }).success).toBe(true);
     const deadline = { ...withMetric(newRuleValues(), "contract_ending"), name: "Contracts Ending", threshold: "30" };
     expect(ruleBody(deadline)).toEqual({ name: "Contracts Ending", threshold: "30", severity: "medium", permission_key: "people.edit" });
@@ -250,7 +255,10 @@ describe("the mock answers what the API answers", () => {
     alerts.HomeAlertSummary.parse(await api.call("GET /api/v1/home/alerts/summary"));
     alerts.HomeAlertPage.parse(await api.call("GET /api/v1/home/alerts", { query: { state: "dismissed" } }));
     alerts.HomeAlertPage.parse(await api.call("GET /api/v1/home/alerts", { query: { category: "attendance", mine: "true", overdue: "false" } }));
-    alerts.HomeAlert.parse(await api.call("GET /api/v1/home/alerts/:id", { params: { id: page.data[0].home_alert_id } }));
+    // Ngozi's grants reach no open alert: People's approvers clear the Attendance policy's.
+    if (who === "ngozi") expect(page.data).toEqual([]);
+    else alerts.HomeAlert.parse(await api.call("GET /api/v1/home/alerts/:id", { params: { id: page.data[0].home_alert_id } }));
+    if (who !== "ngozi") alerts.HomeAlertPolicyRules.parse(await api.call("GET /api/v1/home/alert-rules/policy"));
   }, 30000);
 
   it("words the Open High Alerts card's Over By as the list does, for a count and a deadline", async () => {
@@ -281,12 +289,13 @@ describe("the mock answers what the API answers", () => {
 
   it("refuses the alerts to a reader with neither capability, and the rules to one without alerts.manage", async () => {
     await signedIn("chidera@mycityapp.io");
-    for (const key of ["GET /api/v1/home/alerts", "GET /api/v1/home/alerts/summary", "GET /api/v1/home/alert-rules"] as const) {
+    for (const key of ["GET /api/v1/home/alerts", "GET /api/v1/home/alerts/summary", "GET /api/v1/home/alert-rules", "GET /api/v1/home/alert-rules/policy"] as const) {
       await expect(api.call(key)).rejects.toSatisfy((e: unknown) => e instanceof ApiError && e.status === 403);
     }
     cleanup();
     await signedIn("ngozi@mycityapp.io");
     await expect(api.call("GET /api/v1/home/alert-rules")).rejects.toSatisfy((e: unknown) => e instanceof ApiError && e.status === 403);
+    await expect(api.call("GET /api/v1/home/alert-rules/policy")).rejects.toSatisfy((e: unknown) => e instanceof ApiError && e.status === 403);
   }, 30000);
 });
 
@@ -318,17 +327,19 @@ describe("Home · Alerts, by who is reading", () => {
 
     // How far past its rule, or the days left before a deadline, and Expired once it has passed.
     const cells = (title: string) => within(within(list()).getAllByText(title)[0].closest("tr")!).getAllByRole("cell").map((c) => c.textContent);
-    expect(cells("Bashir Lawal: 4 late arrivals in 30 days").slice(2)).toEqual(["People Viewers", "2 days", "+1", "Medium"]);
+    expect(cells("Annual Leave for Funke Bello: waiting 5 days").slice(2)).toEqual(["People Approvers", "2 days", "+2", "High"]);
+    // An Attendance policy breach: People's approvers clear it, and it has no Over By.
+    expect([2, 3, 5].map((i) => cells("Query Due: Bashir Lawal, 3 late arrivals this month")[i])).toEqual(["People Approvers", "1 day", "Medium"]);
     expect(cells("Grace Okon: Work Permit")[4]).toBe("12 days left");
     expect(cells("Hauwa Yusuf: First Aid Certificate")[4]).toBe("Expired");
     // A date falling today has not passed: Due Today, beside a trigger that says it expires today.
     expect(cells("Tobi Ojo: Passport")[1]).toMatch(/^Expires on \d{2}\/\d{2}\/\d{4}$/);
     expect(cells("Tobi Ojo: Passport")[4]).toBe("Due Today");
     // Operations sees the alert about Ngozi; Ngozi does not (below).
-    expect(titlesIn(list(), page.data)).toContain("Ngozi Eze: 3 late arrivals in 30 days");
+    expect(titlesIn(list(), page.data)).toContain("Query Due: Ngozi Eze, 3 late arrivals this month");
 
     expect(screen.getByRole("heading", { name: "Alert Sources, 30 Days" })).toBeTruthy();
-    expect(screen.getByText("Late Arrivals")).toBeTruthy();
+    expect(screen.getByText("Attendance Policy")).toBeTruthy();
     expect(copyProblems()).toEqual([]);
     expect(await axe(document.body)).toHaveNoViolations();
   }, 30000);
@@ -366,22 +377,15 @@ describe("Home · Alerts, by who is reading", () => {
     expect(order()).toBe("descending");
   }, 30000);
 
-  it("a Head of Department who clears alerts sees only those about their team on rules their grant reaches, and no rules", async () => {
+  it("a Head of Department who clears alerts sees only those their grant reaches, and no rules", async () => {
     await alertsAs("ngozi@mycityapp.io");
     const page = await openAlerts();
-    expect(page.data.map((a) => a.title).sort()).toEqual([
-      "Emeka Obi: 3 missing clock-outs in 14 days",
-      "Rotimi Alade: 6 late arrivals in 30 days",
-      "Rotimi Alade: 6 late arrivals in 30 days",
-    ]);
-    expect(page.data.every((a) => a.can_clear)).toBe(true);
-    // Bashir is outside her team; a partner or a budget is about no one, so only an organisation-wide scope sees it.
-    expect(within(list()).queryByText("Bashir Lawal: 4 late arrivals in 30 days")).toBeNull();
-    // Nobody but the CEO sees an alert about themselves: hers is for Operations and the CEO.
-    expect(within(list()).queryByText("Ngozi Eze: 3 late arrivals in 30 days")).toBeNull();
-    expect(within(list()).queryByText("Eko Hotels: no contact in 34 days")).toBeNull();
+    // Her team's attendance breaches are People approvers' to clear, and she views People only; a
+    // partner or a budget is about no one, so only an organisation-wide scope sees it.
+    expect(page.data).toEqual([]);
+    expect(screen.getByText("No Open Alerts")).toBeTruthy();
     const summary = await summaryNow();
-    expect(summary).toMatchObject({ open: 3, needs_you: 3 });
+    expect(summary).toMatchObject({ open: 0, needs_you: 0 });
     expect(screen.getByRole("button", { name: "View Dismissed" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Alert Rules" })).toBeNull();
     expect(screen.queryByRole("button", { name: "New Rule" })).toBeNull();
@@ -393,22 +397,30 @@ describe("Home · Alerts, by who is reading", () => {
 describe("an alert's sheet", () => {
   it("shows the trigger, who can clear, age, Over By against the rule and severity; Close, Edit Rule, Dismiss Alert, Clear Alert", async () => {
     await alertsAs("cynthia@mycityapp.io");
-    const sheet = await openAlert("Bashir Lawal: 4 late arrivals in 30 days");
-    expect(value(sheet, "Trigger")).toMatch(/^Late on 4 days, last on \d{2}\/\d{2}\/\d{4}$/);
-    expect(value(sheet, "Who Can Clear")).toBe("People Viewers");
+    const sheet = await openAlert("Annual Leave for Funke Bello: waiting 5 days");
+    expect(value(sheet, "Trigger")).toMatch(/^At Line Manager since \d{2}\/\d{2}\/\d{4}$/);
+    expect(value(sheet, "Who Can Clear")).toBe("People Approvers");
     expect(value(sheet, "Age")).toBe("2 days");
-    expect(value(sheet, "Over By")).toBe("+1 over 3");
-    expect(value(sheet, "Severity")).toBe("Medium");
+    expect(value(sheet, "Over By")).toBe("+2 over 3");
+    expect(value(sheet, "Severity")).toBe("High");
     expect(footerButtons(sheet)).toEqual(["Close", "Edit Rule", "Dismiss Alert", "Clear Alert"]);
     expect(await axe(document.body)).toHaveNoViolations();
     fireEvent.click(footerButton(sheet, "Close"));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   }, 30000);
 
-  it("offers a reader without alerts.manage no Edit Rule", async () => {
-    await alertsAs("ngozi@mycityapp.io");
-    const sheet = await openAlert("Emeka Obi: 3 missing clock-outs in 14 days");
-    expect(footerButtons(sheet)).toEqual(["Close", "Dismiss Alert", "Clear Alert"]);
+  it("an Attendance policy breach offers Set in Attendance Policy in place of Edit Rule, which opens the policy", async () => {
+    await alertsAs("cynthia@mycityapp.io");
+    const sheet = await openAlert("Query Due: Bashir Lawal, 3 late arrivals this month");
+    expect(value(sheet, "Trigger")).toMatch(/^Late on \d{2}\/\d{2}\/\d{4}, \d{2}\/\d{2}\/\d{4} and \d{2}\/\d{2}\/\d{4}$/);
+    expect(value(sheet, "Who Can Clear")).toBe("People Approvers");
+    expect(value(sheet, "Age")).toBe("1 day");
+    expect(footerButtons(sheet)).toEqual(["Close", "Set in Attendance Policy", "Dismiss Alert", "Clear Alert"]);
+    expect(await axe(document.body)).toHaveNoViolations();
+    fireEvent.click(footerButton(sheet, "Set in Attendance Policy"));
+    await waitFor(() => expect(window.location.pathname).toBe("/knowledge"));
+    expect(new URLSearchParams(window.location.search).get("policy")).toBe("attendance");
+    expect(screen.queryByRole("dialog")).toBeNull();
   }, 30000);
 });
 
@@ -420,18 +432,18 @@ describe("View Dismissed", () => {
     await screen.findByRole("navigation", { name: "Dismissed Alerts pages" });
     await waitFor(() => expect(titlesIn(list(), dismissed)).toHaveLength(dismissed.length));
     // Most recently closed first, as the server orders a closed list: Seyi's was dismissed after the rule went off.
-    expect(dismissed.map((a) => a.title)).toEqual(["Seyi Balogun: 3 late arrivals in 30 days", "Senior Designer: 7 days at Interview"]);
+    expect(dismissed.map((a) => a.title)).toEqual(["Query Due: Seyi Balogun, 3 late arrivals this month", "Senior Designer: 7 days at Interview"]);
     expect(within(list()).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[0].textContent)).toEqual(dismissed.map((a) => a.title));
     expect(headers(list())).toEqual(["Alert", "Trigger", "Dismissed", "Dismissed By", "Severity"]);
     // The chips count open alerts, so they are not drawn over the dismissed.
     expect(screen.queryByRole("group", { name: "Category" })).toBeNull();
     expect(copyProblems()).toEqual([]);
 
-    const sheet = await openAlert("Seyi Balogun: 3 late arrivals in 30 days");
+    const sheet = await openAlert("Query Due: Seyi Balogun, 3 late arrivals this month");
     expect(value(sheet, "Dismissed By")).toBe("Cynthia Osakunih");
     expect(value(sheet, "Note")).toBe("Client site visits, agreed in advance");
     expect(within(sheet).queryByText("Age")).toBeNull();
-    expect(footerButtons(sheet)).toEqual(["Close", "Edit Rule"]);
+    expect(footerButtons(sheet)).toEqual(["Close", "Set in Attendance Policy"]);
     fireEvent.keyDown(sheet, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
@@ -462,9 +474,9 @@ describe("links into the tab", () => {
 
   it("?id= for an alert the reader may not see says so and leaves the address", async () => {
     await signedIn("cynthia@mycityapp.io");
-    const unseen = (await openAlerts()).data.find((a) => a.title === "Bashir Lawal: 4 late arrivals in 30 days")!;
+    const unseen = (await openAlerts()).data.find((a) => a.title === "Query Due: Bashir Lawal, 3 late arrivals this month")!;
     cleanup();
-    // Bashir is outside Ngozi's team.
+    // Bashir is outside Ngozi's team, and People's approvers clear it.
     await alertsAs("ngozi@mycityapp.io", `&id=${unseen.home_alert_id}`);
     expect(await screen.findByText("Alert not found", {}, { timeout: 5000 })).toBeTruthy();
     await waitFor(() => expect(window.location.search).toBe("?tab=alerts"));
@@ -473,11 +485,11 @@ describe("links into the tab", () => {
 
   it("?rule= opens Edit Rule for that rule to a rule manager, and closing it takes the link out of the address", async () => {
     await signedIn("cynthia@mycityapp.io");
-    const rule = (await rulesNow()).find((r) => r.name === "Late Arrivals")!;
+    const rule = (await rulesNow()).find((r) => r.name === "Approvals Waiting")!;
     cleanup();
     (await signedIn("cynthia@mycityapp.io", `&rule=${rule.home_alert_rule_id}`)).open();
     const dialog = await screen.findByRole("dialog", { name: "Edit Rule" }, { timeout: 8000 });
-    expect(((await within(dialog).findByLabelText("Rule Name")) as HTMLInputElement).value).toBe("Late Arrivals");
+    expect(((await within(dialog).findByLabelText("Rule Name")) as HTMLInputElement).value).toBe("Approvals Waiting");
     expect(new URLSearchParams(window.location.search).get("rule")).toBe(rule.home_alert_rule_id);
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -487,24 +499,25 @@ describe("links into the tab", () => {
   it("?rule= for a rule on a metric no longer listed opens Alert Rules, not its form, and leaves the address", async () => {
     const retired = alerts.HomeAlertRule.parse({
       home_alert_rule_id: "5b7e2c1a-9d3f-4e8b-a6c4-2f1d0e9b8a7c",
-      key: "attendance.rule_breached.late_three",
-      name: "Late Three Times",
-      metric: "attendance.rule_breached",
+      key: "late_arrivals.late_arrivals",
+      name: "Late Arrivals",
+      metric: "late_arrivals",
       category: null,
       kind: null,
       threshold: "3.00",
-      window_days: null,
+      window_days: 30,
       severity: "medium",
       permission_key: "people.view",
       who_can_clear: "People Viewers",
-      enabled: true,
+      enabled: false,
       open_alerts: 0,
       created_by: null,
       updated_by: null,
       created_at: "2026-09-01T09:00:00.000Z",
       updated_at: "2026-09-01T09:00:00.000Z",
     });
-    // A rule kept from before the metric list, as the server still reads it (a literal path is matched before /:id).
+    // A rule kept from before the metric list (Home's own late arrivals, switched off when the
+    // Attendance policy took them, migration 1445), as the server still reads it (a literal path is matched before /:id).
     route(`GET /api/v1/home/alert-rules/${retired.home_alert_rule_id}`, () => ok(retired));
     (await signedIn("cynthia@mycityapp.io", `&rule=${retired.home_alert_rule_id}`)).open();
     expect(await screen.findByRole("dialog", { name: "Alert Rules" }, { timeout: 8000 })).toBeTruthy();
@@ -515,7 +528,7 @@ describe("links into the tab", () => {
 
   it("?rule= opens nothing for a reader without alerts.manage, and leaves the address", async () => {
     await signedIn("cynthia@mycityapp.io");
-    const rule = (await rulesNow()).find((r) => r.name === "Late Arrivals")!;
+    const rule = (await rulesNow()).find((r) => r.name === "Approvals Waiting")!;
     cleanup();
     await alertsAs("ngozi@mycityapp.io", `&rule=${rule.home_alert_rule_id}`);
     await waitFor(() => expect(window.location.search).toBe("?tab=alerts"));
@@ -546,7 +559,7 @@ describe("on a phone", () => {
     expect(document.querySelector("ul.grid-cols-2")?.children).toHaveLength(4);
     expect(document.querySelector("table")).toBeNull();
     expect(screen.queryByText("Alert Sources, 30 Days")).toBeNull();
-    const title = "Bashir Lawal: 4 late arrivals in 30 days";
+    const title = "Annual Leave for Funke Bello: waiting 5 days";
     const card = screen.getByRole("button", { name: title }).closest("li")!;
     for (const label of ["Who Can Clear", "Over By", "Severity"]) expect(within(card).getByText(label)).toBeTruthy();
     for (const label of ["Trigger", "Age"]) expect(within(card).queryByText(label)).toBeNull();
@@ -577,7 +590,7 @@ describe("Clear Alert and Dismiss Alert", () => {
   it("Clear Alert closes it as cleared: off the open list, onto Cleared This Week", async () => {
     await alertsAs("cynthia@mycityapp.io");
     const before = await summaryNow();
-    const title = "Bashir Lawal: 4 late arrivals in 30 days";
+    const title = "Query Due: Bashir Lawal, 3 late arrivals this month";
     const sheet = await openAlert(title);
     fireEvent.click(within(sheet).getByRole("button", { name: "Clear Alert" }));
     expect(await screen.findByText("Alert cleared")).toBeTruthy();
@@ -590,9 +603,9 @@ describe("Clear Alert and Dismiss Alert", () => {
   }, 30000);
 
   it("Dismiss Alert closes it as dismissed: it moves to View Dismissed and Cleared This Week does not count it", async () => {
-    await alertsAs("ngozi@mycityapp.io");
+    await alertsAs("cynthia@mycityapp.io");
     const before = await summaryNow();
-    const title = "Emeka Obi: 3 missing clock-outs in 14 days";
+    const title = "Emeka Obi: 3 forgotten clock-outs this month";
     const sheet = await openAlert(title);
     fireEvent.click(within(sheet).getByRole("button", { name: "Dismiss Alert" }));
     expect(await screen.findByText("Alert dismissed")).toBeTruthy();
@@ -601,7 +614,7 @@ describe("Clear Alert and Dismiss Alert", () => {
     fireEvent.click(screen.getByRole("button", { name: "View Dismissed" }));
     await screen.findByRole("navigation", { name: "Dismissed Alerts pages" });
     const row = (await within(list()).findByText(title)).closest("tr")!;
-    expect(within(row).getAllByRole("cell")[3].textContent).toBe("Ngozi Eze");
+    expect(within(row).getAllByRole("cell")[3].textContent).toBe("Cynthia Osakunih");
   }, 30000);
 });
 
@@ -612,7 +625,7 @@ describe("Alert Rules", () => {
     fireEvent.click(screen.getByRole("button", { name: "Alert Rules" }));
     const dialog = await screen.findByRole("dialog", { name: "Alert Rules" });
     await within(dialog).findByText("Quiet Partners");
-    expect(headers(within(dialog).getByRole("table"))).toEqual(["Rule", "Threshold", "Severity", "Who Can Clear", "Open Alerts", "On", "Actions"]);
+    expect(headers(within(dialog).getByRole("table", { name: "Alert Rules" }))).toEqual(["Rule", "Threshold", "Severity", "Who Can Clear", "Open Alerts", "On", "Actions"]);
     expect(within(dialog).getAllByRole("switch").map((s) => [s.getAttribute("aria-label"), s.getAttribute("aria-checked")])).toEqual(
       [...rules].sort((a, b) => a.name.localeCompare(b.name)).map((r) => [r.name, String(r.enabled)]),
     );
@@ -653,6 +666,31 @@ describe("Alert Rules", () => {
   }, 30000);
 });
 
+describe("the Attendance Policy card", () => {
+  it("lists the policy's five rules read only, with what reaching each does, and Set in Attendance Policy opens it", async () => {
+    await alertsAs("cynthia@mycityapp.io");
+    const policy = alerts.HomeAlertPolicyRules.parse(await api.call("GET /api/v1/home/alert-rules/policy"));
+    fireEvent.click(screen.getByRole("button", { name: "Alert Rules" }));
+    const dialog = await screen.findByRole("dialog", { name: "Alert Rules" });
+    const table = await within(dialog).findByRole("table", { name: "Attendance Policy Rules" });
+    const rows = within(table).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell").map((c) => c.textContent));
+    expect(rows).toEqual([
+      ["Late Arrivals", "3 late arrivals in a month or 5 hours", "AlertRaise Query", String(policy.rules[0].open_alerts)],
+      ["Early Departure", "3 early departures in a month", "AlertRaise Query", String(policy.rules[1].open_alerts)],
+      ["Absence", "2 absences in a month", "AlertRaise Query", String(policy.rules[2].open_alerts)],
+      ["Forgotten Clock-Outs", "3 forgotten clock-outs in a month", "Alert", String(policy.rules[3].open_alerts)],
+      ["Location Flags", "3 location flags in a month", "Alert", String(policy.rules[4].open_alerts)],
+    ]);
+    // Read only: no switch and no Edit Rule on the policy's rules.
+    expect(within(table).queryAllByRole("switch")).toHaveLength(0);
+    expect(within(table).queryByRole("button", { name: "Edit Rule" })).toBeNull();
+    expect(await axe(dialog)).toHaveNoViolations();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Set in Attendance Policy" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/knowledge"));
+    expect(new URLSearchParams(window.location.search).get("policy")).toBe("attendance");
+  }, 30000);
+});
+
 describe("New Rule and Edit Rule", () => {
   const field = (dialog: HTMLElement, label: string) => within(dialog).getByLabelText(label) as HTMLInputElement | HTMLButtonElement;
 
@@ -660,25 +698,20 @@ describe("New Rule and Edit Rule", () => {
     await alertsAs("cynthia@mycityapp.io");
     fireEvent.click(screen.getByRole("button", { name: "New Rule" }));
     const dialog = await screen.findByRole("dialog", { name: "New Rule" });
-    expect(field(dialog, "Metric").value).toBe("late_arrivals");
-    expect(field(dialog, "Window Days").value).toBe("30");
+    expect(field(dialog, "Metric").value).toBe("approval_ageing");
+    // No metric left on the list counts over days, so no window is asked for.
+    expect(within(dialog).queryByLabelText("Window Days")).toBeNull();
     expect(within(dialog).getByRole("radio", { name: "Medium" }).getAttribute("aria-checked")).toBe("true");
-    expect(field(dialog, "Who Can Clear").textContent).toBe("People Viewers");
+    expect(field(dialog, "Who Can Clear").textContent).toBe("People Approvers");
 
     // Nothing typed: the form marks what is missing and sends nothing.
     fireEvent.click(within(dialog).getByRole("button", { name: "Create Rule" }));
     expect(await within(dialog).findByText("Required")).toBeTruthy();
 
-    // A metric counted over days needs its window.
+    // A deadline metric counts whole days, and is cleared by its own grant.
     fireEvent.change(field(dialog, "Rule Name"), { target: { value: "Visa Expiry" } });
     fireEvent.change(field(dialog, "Threshold"), { target: { value: "2.5" } });
-    fireEvent.change(field(dialog, "Window Days"), { target: { value: "" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Create Rule" }));
-    expect(await within(dialog).findByText("Enter the days")).toBeTruthy();
-
-    // A deadline metric has no window, counts whole days, and is cleared by its own grant.
     await chooseValue(field(dialog, "Metric"), "document_expiry");
-    await waitFor(() => expect(within(dialog).queryByLabelText("Window Days")).toBeNull());
     expect(field(dialog, "Who Can Clear").textContent).toBe("People Editors");
     fireEvent.click(within(dialog).getByRole("button", { name: "Create Rule" }));
     expect(await within(dialog).findByText("Whole days only")).toBeTruthy();
@@ -708,25 +741,22 @@ describe("New Rule and Edit Rule", () => {
 
   it("Edit Rule from an alert: the same fields but Metric, the rule's values, and Save Rule", async () => {
     await alertsAs("cynthia@mycityapp.io");
-    const repeated = (await rulesNow()).find((r) => r.name === "Repeated Lateness")!;
-    // Rotimi is past both late-arrival rules; this is Repeated Lateness's alert, one over its 5.
-    const title = "Rotimi Alade: 6 late arrivals in 30 days";
-    const row = within(list()).getAllByText(title).map((t) => t.closest("tr")!).find((tr) => within(tr).queryByText("+1"))!;
-    fireEvent.click(row);
-    const sheet = await screen.findByRole("dialog", { name: title });
-    expect(value(sheet, "Over By")).toBe("+1 over 5");
+    const waiting = (await rulesNow()).find((r) => r.name === "Approvals Waiting")!;
+    const title = "Annual Leave for Funke Bello: waiting 5 days";
+    const sheet = await openAlert(title);
+    expect(value(sheet, "Over By")).toBe("+2 over 3");
     fireEvent.click(within(sheet).getByRole("button", { name: "Edit Rule" }));
     const dialog = await screen.findByRole("dialog", { name: "Edit Rule" });
-    expect(((await within(dialog).findByLabelText("Rule Name")) as HTMLInputElement).value).toBe("Repeated Lateness");
+    expect(((await within(dialog).findByLabelText("Rule Name")) as HTMLInputElement).value).toBe("Approvals Waiting");
     expect(within(dialog).queryByLabelText("Metric")).toBeNull();
-    expect(field(dialog, "Threshold").value).toBe("5");
-    expect(field(dialog, "Window Days").value).toBe("30");
+    expect(field(dialog, "Threshold").value).toBe("3");
+    expect(within(dialog).queryByLabelText("Window Days")).toBeNull();
     expect(within(dialog).getByRole("radio", { name: "High" }).getAttribute("aria-checked")).toBe("true");
 
-    fireEvent.change(field(dialog, "Threshold"), { target: { value: "7" } });
+    fireEvent.change(field(dialog, "Threshold"), { target: { value: "4" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save Rule" }));
     expect(await screen.findByText("Rule saved")).toBeTruthy();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect((await rulesNow()).find((r) => r.home_alert_rule_id === repeated.home_alert_rule_id)).toMatchObject({ name: "Repeated Lateness", metric: "late_arrivals", threshold: "7", window_days: 30, severity: "high" });
+    expect((await rulesNow()).find((r) => r.home_alert_rule_id === waiting.home_alert_rule_id)).toMatchObject({ name: "Approvals Waiting", metric: "approval_ageing", threshold: "4", window_days: null, severity: "high" });
   }, 30000);
 });

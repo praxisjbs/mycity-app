@@ -102,8 +102,6 @@ export type MetricKey = keyof typeof alerts.HOME_ALERT_METRICS;
  * and how a rule on it reads ("3 late in 30 days", "30 days before expiry").
  */
 export const METRIC: Record<MetricKey, { label: string; reads: (threshold: string, windowDays: number | null) => string }> = {
-  late_arrivals: { label: "Late Arrivals", reads: (t, w) => `${figure(t)} late in ${plural(w ?? 0, "day")}` },
-  missing_clock_out: { label: "Missing Clock-Outs", reads: (t, w) => `${figure(t)} missing in ${plural(w ?? 0, "day")}` },
   approval_ageing: { label: "Approval Ageing", reads: (t) => `Waiting ${days(t)}` },
   document_expiry: { label: "Document Expiry", reads: (t) => `${days(t)} before expiry` },
   confirmation_due: { label: "Confirmation Due", reads: (t) => `${days(t)} before confirmation` },
@@ -123,11 +121,11 @@ export const METRIC_OPTIONS = (Object.keys(alerts.HOME_ALERT_METRICS) as MetricK
 export const ruleLine = (rule: Pick<HomeAlertRule, "metric" | "threshold" | "window_days">) =>
   isMetric(rule.metric) ? METRIC[rule.metric].reads(rule.threshold, rule.window_days) : figure(rule.threshold);
 
-/** Alert Sources: one bar per metric, a metric no longer listed counted under Other. */
+/** Alert Sources: one bar per metric, the Attendance policy's breaches as one, a metric no longer listed counted under Other. */
 export function sourceRows(sources: Array<{ metric: string; count: number }>): Array<{ label: string; count: number }> {
   const merged = new Map<string, number>();
   for (const s of sources) {
-    const label = isMetric(s.metric) ? METRIC[s.metric].label : "Other";
+    const label = isMetric(s.metric) ? METRIC[s.metric].label : s.metric === alerts.HOME_ALERT_POLICY_METRIC ? "Attendance Policy" : "Other";
     merged.set(label, (merged.get(label) ?? 0) + s.count);
   }
   return [...merged].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);

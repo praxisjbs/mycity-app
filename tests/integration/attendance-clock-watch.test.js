@@ -1,8 +1,9 @@
 "use strict";
 /**
- * The clock watch end to end (docs/guides/attendance.md §6.14): the reminder to clock in and the
- * automatic clock-out, on the real migrations, with the person's explanation and People's
- * correction through HTTP (every response parsed with its contract, APP_ENV=test).
+ * The clock watch end to end (docs/guides/attendance.md §6.14; T13): the reminder to clock in, the
+ * reminders to clock out every 30 minutes from the end and the System Clock-Out at the end plus 90,
+ * on the real migrations, with the person's Give Real Time and People's correction through HTTP
+ * (every response parsed with its contract, APP_ENV=test).
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/attendance-clock-watch
  *
@@ -219,52 +220,98 @@ describeDb("the clock watch against the real migrations", () => {
     expect(await repo.firstSessionOn(pool, { user_id: people.ops.user.user_id }, day)).toBe(false);
   });
 
-  test("nothing closes while the shift runs, while they are in front of the app, or when presence cannot answer", async () => {
+  test("a reminder to clock out every 30 minutes from the end, each once, the push only for someone away", async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
+    // Musa (in at 09:12) and Bisi (in at 08:50) are still clocked in on Monday.
     away(null);
-    expect(await watch.clockOut({ now: at("16:55") })).toMatchObject({ clocked_out: 0 });
-    presence({ known: true, active: true, last_active_at: at("17:04") });
-    expect(await watch.clockOut({ now: at("17:05") })).toMatchObject({ clocked_out: 0, waiting: 2 });
+    expect(await watch.clockOut({ now: at("16:55") })).toMatchObject({ clock_out_reminded: 0, clocked_out: 0 });
+    presence({ known: true, active: true, last_active_at: at("17:01") });
+    expect(await watch.clockOut({ now: at("17:02") })).toMatchObject({ clock_out_reminded: 0, clock_out_in_front: 2 });
+    away(at("17:02"));
+    expect(await watch.clockOut({ now: at("17:04") })).toMatchObject({ clock_out_reminded: 2 });
+    expect(await watch.clockOut({ now: at("17:09") })).toMatchObject({ clock_out_reminded: 0 });
+    // Presence that cannot be read sends it.
     presence({ known: false, active: false, last_active_at: null });
-    expect(await watch.clockOut({ now: at("17:05") })).toMatchObject({ clocked_out: 0, unknown: 2 });
-    away(at("16:58"));
-    expect(await watch.clockOut({ now: at("17:05") })).toMatchObject({ clocked_out: 0, waiting: 2 });
-    expect((await eventsOn("staff")).filter((e) => e.event_type === "clock_out")).toEqual([]);
+    expect(await watch.clockOut({ now: at("17:31") })).toMatchObject({ clock_out_reminded: 2 });
+    away(null);
+    expect(await watch.clockOut({ now: at("18:02") })).toMatchObject({ clock_out_reminded: 2, clocked_out: 0 });
+    expect(await watch.clockOut({ now: at("18:20") })).toMatchObject({ clock_out_reminded: 0, clocked_out: 0 });
+
+    const slots = await q(
+      "SELECT slot, due_at FROM attendance_clock_reminder WHERE employee_id = $1 AND work_date = $2 AND kind = 'clock_out_due' ORDER BY slot",
+      [employeeId("staff"), DAY],
+    );
+    expect(slots.rows.map((r) => [r.slot, new Date(r.due_at).toISOString()])).toEqual([
+      [1, at("17:00").toISOString()],
+      [2, at("17:30").toISOString()],
+      [3, at("18:00").toISOString()],
+    ]);
+    await drain();
+    const notices = await noticesOf("staff", "attendance.clock_out_due");
+    expect(notices).toHaveLength(3);
+    expect(notices[0]).toMatchObject({ title: "Time to clock out", body: "Your shift ended at 17:00.", entity_type: "attendance_clock_reminder", read_at: null });
+
+    // Bisi clocks out herself: her reminders are read.
+    await punchAt("early", at("18:10"), "clock_out");
+    expect((await noticesOf("early", "attendance.clock_out_due")).every((n) => n.read_at !== null)).toBe(true);
   });
 
-  test("away from the app after the end: clocked out at the end, once, and told", async () => {
+  test("at the end plus 90 minutes, the System Clock-Out: at that moment, once, counted to the end, and told", async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
-    away(at("16:20"));
-    expect(await watch.clockOut({ now: at("17:20") })).toMatchObject({ clocked_out: 2 });
-    expect(await watch.clockOut({ now: at("17:25") })).toMatchObject({ clocked_out: 0 });
+    away(null);
+    expect(await watch.clockOut({ now: at("18:29") })).toMatchObject({ clocked_out: 0 });
+    // A late run still clocks out at 18:30.
+    expect(await watch.clockOut({ now: at("18:44") })).toMatchObject({ clocked_out: 1 });
+    expect(await watch.clockOut({ now: at("18:49") })).toMatchObject({ clocked_out: 0 });
 
     const out = (await eventsOn("staff")).find((e) => e.event_type === "clock_out");
     expect(out).toMatchObject({ source: "system", validation_state: "accepted", excluded: false });
-    expect(new Date(out.occurred_at).toISOString()).toBe(at("17:00").toISOString());
+    expect(new Date(out.occurred_at).toISOString()).toBe(at("18:30").toISOString());
+    const ev = await q("SELECT validation FROM attendance_event WHERE attendance_event_id = $1", [out.attendance_event_id]);
+    expect(ev.rows[0].validation.system).toEqual({
+      shift_end: at("17:00").toISOString(),
+      rule: "system_clock_out_after_minutes",
+      minutes: 90,
+    });
     const day = await repo.getDay(pool, employeeId("staff"), DAY);
-    expect(new Date(day.last_clock_out_at).toISOString()).toBe(at("17:00").toISOString());
-    expect(day.worked_minutes).toBe(468);
+    expect(new Date(day.last_clock_out_at).toISOString()).toBe(at("18:30").toISOString());
+    // In at 09:12, counted to 17:00: never early, never overtime.
+    expect(day).toMatchObject({ worked_minutes: 468, early_minutes: 0, overtime_minutes: 0 });
 
     await drain();
     const [notice] = await noticesOf("staff", "attendance.clocked_out_automatically");
-    expect(notice).toMatchObject({ title: "Clocked out automatically", body: "12/10/2026: clocked out at 17:00.", entity_type: "attendance_record" });
+    expect(notice).toMatchObject({
+      title: "System Clock-Out",
+      body: "12/10/2026: clocked out by the system at 18:30.",
+      entity_type: "attendance_record",
+    });
 
-    // The person's own clock-out afterwards is refused; the day reads the automatic one.
-    await expect(punchAt("staff", at("17:30"), "clock_out")).rejects.toMatchObject({ code: "ALREADY_CLOCKED_OUT" });
+    // The person's own clock-out afterwards is refused; the day reads the system's.
+    await expect(punchAt("staff", at("18:50"), "clock_out")).rejects.toMatchObject({ code: "ALREADY_CLOCKED_OUT" });
     const days = await as("staff").get("/attendance/me?month=2026-10");
     expect(days.status).toBe(200);
     expect(days.body.data.find((d) => d.attendance_date === DAY)).toMatchObject({ clock_out_automatic: true });
   });
 
-  test("on the app after the end: clocked out at the last moment they were, never before the clock-in", async () => {
+  test("an evening start gets no reminder and no System Clock-Out; one between the end and that moment is clocked out at it", async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
-    await punchAt("late", at("18:10"));
-    away(at("18:40"));
-    expect(await watch.clockOut({ now: at("19:00") })).toMatchObject({ clocked_out: 1 });
-    const out = (await eventsOn("late")).find((e) => e.event_type === "clock_out");
-    expect(new Date(out.occurred_at).toISOString()).toBe(at("18:40").toISOString());
-    const ev = await q("SELECT validation FROM attendance_event WHERE attendance_event_id = $1", [out.attendance_event_id]);
-    expect(ev.rows[0].validation.automatic).toMatchObject({ reason: "left_app", last_active_at: at("18:40").toISOString() });
+    const day = "2026-10-14";
+    away(null);
+    await punchAt("ops", at("17:40", day));
+    await punchAt("late", at("18:40", day));
+    // Tunde's reminders at 17:00 and 17:30 came before his clock-in; Zainab's day is an evening start.
+    expect(await watch.clockOut({ now: at("17:45", day) })).toMatchObject({ clock_out_reminded: 0 });
+    expect(await watch.clockOut({ now: at("18:03", day) })).toMatchObject({ clock_out_reminded: 1 });
+    expect(await watch.clockOut({ now: at("18:41", day) })).toMatchObject({ clocked_out: 1, evening: 1 });
+    expect(await watch.clockOut({ now: at("23:55", day) })).toMatchObject({ clocked_out: 0, clock_out_reminded: 0, evening: 1 });
+    const tunde = await repo.getDay(pool, employeeId("ops"), day);
+    expect(new Date(tunde.last_clock_out_at).toISOString()).toBe(at("18:30", day).toISOString());
+    expect(tunde.worked_minutes).toBe(0);
+    expect((await eventsOn("late", day)).filter((e) => e.event_type === "clock_out")).toEqual([]);
+    const reminders = await q("SELECT count(*)::int AS n FROM attendance_clock_reminder WHERE employee_id = $1 AND kind = 'clock_out_due'", [
+      employeeId("late"),
+    ]);
+    expect(reminders.rows[0].n).toBe(0);
   });
 
   test("the register keeps the person's own punch's location and device", async () => {
@@ -273,19 +320,30 @@ describeDb("the clock watch against the real migrations", () => {
     expect(res.body.data[0]).toMatchObject({ location_verdict: "unverified" });
   });
 
-  test("the person explains an automatic clock-out; People keep it or correct its time", async () => {
+  test("Give Real Time on a System Clock-Out; People keep the system's time or correct it, which stands in for the person's", async () => {
     const out = (await eventsOn("staff")).find((e) => e.event_type === "clock_out");
     const clockIn = (await eventsOn("staff")).find((e) => e.event_type === "clock_in");
+    const give = (who, id, body) => as(who).post(`/attendance/me/events/${id}/explanation`, body);
 
-    expect((await as("early").post(`/attendance/me/events/${out.attendance_event_id}/explanation`, { employee_note: "Not mine" })).status).toBe(404);
-    const wrong = await as("staff").post(`/attendance/me/events/${clockIn.attendance_event_id}/explanation`, { employee_note: "Left at four" });
+    expect((await give("early", out.attendance_event_id, { employee_note: "Not mine", real_time: "16:00" })).status).toBe(404);
+    const wrong = await give("staff", clockIn.attendance_event_id, { employee_note: "Left at four", real_time: "16:00" });
     expect(wrong.status).toBe(422);
     expect(wrong.body.error.code).toBe("NOT_AUTOMATIC");
+    const early = await give("staff", out.attendance_event_id, { employee_note: "I left before I came in", real_time: "08:00" });
+    expect(early.status).toBe(422);
+    expect(early.body.error).toMatchObject({ code: "REAL_TIME_INVALID", fields: { real_time: ["After your clock-in"] } });
+    expect((await give("staff", out.attendance_event_id, { employee_note: "No time given" })).status).toBe(422);
 
-    const res = await as("staff").post(`/attendance/me/events/${out.attendance_event_id}/explanation`, { employee_note: "I left at four for a site visit" });
+    const res = await give("staff", out.attendance_event_id, { employee_note: "I left at four for a site visit", real_time: "16:00" });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ exception_type: "automatic_clock_out", status: "open", employee_note: "I left at four for a site visit", detail: "Clocked out automatically at 17:00" });
-    const again = await as("staff").post(`/attendance/me/events/${out.attendance_event_id}/explanation`, { employee_note: "Again" });
+    expect(res.body).toMatchObject({
+      exception_type: "automatic_clock_out",
+      status: "open",
+      employee_note: "I left at four for a site visit",
+      real_time: "16:00",
+      detail: "System Clock-Out at 18:30; real time 16:00",
+    });
+    const again = await give("staff", out.attendance_event_id, { employee_note: "Again", real_time: "16:10" });
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe("ALREADY_EXPLAINED");
 
@@ -307,11 +365,13 @@ describeDb("the clock watch against the real migrations", () => {
     expect(admin).toMatchObject({ event_type: "clock_out", excluded: false });
     const day = await repo.getDay(pool, employeeId("staff"), DAY);
     expect(new Date(day.last_clock_out_at).toISOString()).toBe(at("16:00").toISOString());
+    // People's clock-out stands in for the person's own: an hour early, worked to 16:00 (§6.4).
+    expect(day).toMatchObject({ early_minutes: 60, worked_minutes: 408 });
     const days = await as("staff").get("/attendance/me?month=2026-10");
     expect(days.body.data.find((d) => d.attendance_date === DAY)).toMatchObject({ clock_out_automatic: false });
   });
 
-  test("the day-close after an automatic clock-out opens no missing clock-out", async () => {
+  test("the day-close after a System Clock-Out opens no missing clock-out", async () => {
     await service.closeDays({ now: at("12:00", "2026-10-13") });
     const missing = await q(
       `SELECT count(*)::int AS n FROM attendance_exception x JOIN attendance_day ad ON ad.attendance_day_id = x.attendance_day_id
@@ -321,9 +381,36 @@ describeDb("the clock watch against the real migrations", () => {
     expect(missing.rows[0].n).toBe(0);
   });
 
-  test("a day that is not worked has no end: no automatic clock-out", async () => {
+  test("a day that is not worked has no end: no reminder and no System Clock-Out", async () => {
     await punchAt("early", at("10:00", "2026-10-18"));
     away(null);
-    expect(await watch.clockOut({ now: at("20:00", "2026-10-18") })).toMatchObject({ clocked_out: 0 });
+    expect(await watch.clockOut({ now: at("20:00", "2026-10-18") })).toMatchObject({ clocked_out: 0, clock_out_reminded: 0 });
+  });
+
+  test("a part-timer's own hours: reminded from their own end, never on their Off day", async () => {
+    const day = "2026-10-20";
+    // Bisi works Tuesdays 10:00 to 14:00 from 20 October; Wednesday is her Off day.
+    const d = (working, starts_at = null, ends_at = null) => ({ working, starts_at, ends_at, place: working ? "office" : null });
+    await q(
+      `INSERT INTO attendance_work_schedule (employee_id, days, effective_from, reason)
+       VALUES ($1, $2::jsonb, $3, 'Part time from this week')`,
+      [
+        employeeId("early"),
+        JSON.stringify([d(true), d(true, "10:00", "14:00"), d(false), d(true), d(true), d(false), d(false)].map((x, i) => ({ weekday: i + 1, ...x }))),
+        day,
+      ],
+    );
+    away(null);
+    expect(await watch.remind({ now: at("09:05", day) })).toMatchObject({ reminded: 3 }); // everyone but Bisi
+    expect(await watch.remind({ now: at("10:05", day) })).toMatchObject({ reminded: 1 }); // Bisi at her own start
+    await punchAt("early", at("10:02", day));
+    expect(await watch.clockOut({ now: at("14:03", day) })).toMatchObject({ clock_out_reminded: 1 });
+    expect(await watch.clockOut({ now: at("15:31", day) })).toMatchObject({ clocked_out: 1 });
+    const bisi = await repo.getDay(pool, employeeId("early"), day);
+    expect(new Date(bisi.last_clock_out_at).toISOString()).toBe(at("15:30", day).toISOString());
+    expect(bisi).toMatchObject({ worked_minutes: 238, late_minutes: 2, shift_starts_at: "10:00:00", shift_ends_at: "14:00:00" });
+    // Her Off day: nothing at 10:05.
+    const wednesday = "2026-10-21";
+    expect(await watch.remind({ now: at("10:05", wednesday) })).toMatchObject({ reminded: 0 });
   });
 });

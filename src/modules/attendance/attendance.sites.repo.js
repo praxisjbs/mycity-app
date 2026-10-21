@@ -123,49 +123,6 @@ const REGISTER_SITE = (employeeCol, dateExpr) => `(SELECT min(CASE WHEN rs.purpo
     WHERE rm.employee_id = ${employeeCol} AND rm.removed_at IS NULL AND rs.status = 'approved'
       AND rs.starts_on <= ${dateExpr} AND rs.ends_on >= ${dateExpr})`;
 
-/**
- * The people on an approved temporary site with its own hours on `date` who have no day yet, at
- * work then: the day-close closes theirs on a day the organisation does not work (§6.11).
- */
-async function siteHoursWithoutDay(db, date) {
-  // pagination:complete the day-close must see every person on such a site that day
-  const { rows } = await completeQuery(
-    db,
-    `SELECT e.employee_id
-       FROM employee e
-      WHERE e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= $1::date)
-        AND (e.left_on IS NULL OR e.left_on > $1::date)
-        AND ${SITE_HOURS_DAY("e.employee_id", "$1::date")}
-        AND NOT EXISTS (SELECT 1 FROM attendance_day ad
-                         WHERE ad.employee_id = e.employee_id AND ad.attendance_date = $1::date)
-      ORDER BY e.employee_id`,
-    [date],
-    { label: "people on a site with its own hours and no day" },
-  );
-  return rows;
-}
-
-/**
- * The approved sites with their own hours whose days touch `from`..`to`, each with its start and
- * its first address's zone: the clock watch reminds their people at the site's start (§6.14).
- */
-async function siteHoursAround(db, from, to) {
-  // pagination:complete the watch reminds at every such site, not a page of them
-  const { rows } = await completeQuery(
-    db,
-    `SELECT s.temporary_site_id, s.starts_on::text AS starts_on, s.ends_on::text AS ends_on,
-            ${HHMM("s.starts_at")} AS starts_at,
-            (SELECT l.timezone FROM attendance_temporary_site_location l
-              WHERE l.temporary_site_id = s.temporary_site_id AND l.position = 1) AS timezone
-       FROM attendance_temporary_site s
-      WHERE s.status = 'approved' AND s.hours = 'site' AND s.starts_on <= $2::date AND s.ends_on >= $1::date
-      ORDER BY s.starts_on, s.temporary_site_id`,
-    [from, to],
-    { label: "temporary sites with their own hours round today" },
-  );
-  return rows;
-}
-
 /* ------------------------------------------------------------------ *
  * Writing a site
  * ------------------------------------------------------------------ */
@@ -612,8 +569,6 @@ module.exports = {
   renameAddress,
   siteOn,
   sitesAround,
-  siteHoursWithoutDay,
-  siteHoursAround,
   peopleOf,
   overlappingSite,
   insertSite,

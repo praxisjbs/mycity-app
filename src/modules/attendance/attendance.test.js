@@ -287,21 +287,84 @@ describe("the shift and lateness", () => {
   });
   const policy = { grace_minutes: 5 };
 
-  test("a weekday, a Saturday, a Sunday and a public holiday", () => {
-    expect(rules.shiftFor("2026-10-16", cal, policy)).toEqual({ working_day: true, starts_at: "09:00", ends_at: "17:00", grace_minutes: 5, off_reason: null });
+  test("a weekday, a Saturday, a Sunday and a public holiday, by the working week while no version sets hours", () => {
+    expect(rules.shiftFor("2026-10-16", cal, policy)).toEqual({
+      working_day: true,
+      starts_at: "09:00",
+      ends_at: "17:00",
+      grace_minutes: 5,
+      early_grace_minutes: 0,
+      off_reason: null,
+      place: "office",
+      attendance_work_schedule_id: null,
+    });
     expect(rules.shiftFor("2026-10-17", cal, policy)).toMatchObject({ working_day: true, ends_at: "15:00" });
-    expect(rules.shiftFor("2026-10-18", cal, policy)).toMatchObject({ working_day: false, starts_at: null, off_reason: "weekend" });
+    expect(rules.shiftFor("2026-10-18", cal, policy)).toMatchObject({ working_day: false, starts_at: null, off_reason: "Day Off" });
     expect(rules.shiftFor("2026-10-01", cal, policy)).toMatchObject({ working_day: false, off_reason: "Independence Day" });
+  });
+
+  // The company hours a version sets (§6.15's suggested hours, with Saturday off for the test).
+  const HOURS = [1, 2, 3, 4, 5, 6, 7].map((weekday) =>
+    weekday <= 5
+      ? { weekday, working: true, starts_at: "08:00", ends_at: "16:00" }
+      : { weekday, working: false, starts_at: null, ends_at: null },
+  );
+
+  test("a version's company hours replace the working week; a remote pattern works them from home", () => {
+    const withHours = { ...policy, hours: HOURS };
+    expect(rules.shiftFor("2026-10-16", cal, withHours)).toMatchObject({ working_day: true, starts_at: "08:00", ends_at: "16:00" });
+    expect(rules.shiftFor("2026-10-17", cal, withHours)).toMatchObject({ working_day: false, off_reason: "Day Off" });
+    expect(rules.shiftFor("2026-10-16", cal, withHours, { pattern: "remote" })).toMatchObject({ place: "remote" });
+    expect(rules.shiftFor("2026-10-16", cal, withHours, { pattern: "hybrid" })).toMatchObject({ place: "office" });
+  });
+
+  test("a person's schedule wins: its own hours, a blank day on the company hours, Off, and never a holiday", () => {
+    const day = (working, starts_at = null, ends_at = null, place = "office") => ({ working, starts_at, ends_at, place });
+    const schedule = {
+      attendance_work_schedule_id: "s-1",
+      days: [
+        day(true, "10:00", "14:00", "remote"), // Monday, part time from home
+        day(false),
+        day(true), // Wednesday, the company hours
+        day(true),
+        day(true),
+        day(true, "09:00", "13:00"), // Saturday, worked although the company is off
+        day(true), // Sunday, blank on a day the company does not work: Off
+      ],
+    };
+    const on = (date, p = { ...policy, hours: HOURS }) => rules.shiftFor(date, cal, p, { schedule, pattern: "on_site" });
+    expect(on("2026-10-12")).toMatchObject({ working_day: true, starts_at: "10:00", ends_at: "14:00", place: "remote", attendance_work_schedule_id: "s-1" });
+    expect(on("2026-10-13")).toMatchObject({ working_day: false, off_reason: "Day Off" });
+    expect(on("2026-10-14")).toMatchObject({ working_day: true, starts_at: "08:00", ends_at: "16:00", place: "office" });
+    expect(on("2026-10-17")).toMatchObject({ working_day: true, starts_at: "09:00", ends_at: "13:00" });
+    expect(on("2026-10-18")).toMatchObject({ working_day: false });
+    expect(rules.shiftFor("2026-10-01", cal, policy, { schedule })).toMatchObject({ working_day: false, off_reason: "Independence Day" });
+  });
+
+  test("a day judged once is read back from what it recorded, with the judging version's grace", () => {
+    const day = { shift_working: true, shift_starts_at: "09:00:00", shift_ends_at: "17:00:00", attendance_work_schedule_id: "s-1" };
+    expect(rules.recordedShift(day, { grace_minutes: 10, early_grace_minutes: 5 })).toEqual({
+      working_day: true,
+      starts_at: "09:00",
+      ends_at: "17:00",
+      grace_minutes: 10,
+      early_grace_minutes: 5,
+      off_reason: null,
+      place: null,
+      attendance_work_schedule_id: "s-1",
+    });
+    expect(rules.recordedShift({ shift_working: false }, { grace_minutes: 0 })).toMatchObject({ working_day: false, starts_at: null });
   });
 
   const late = (utc, grace = 5) =>
     lateness.minutesLate({ expectedStart: "09:00", firstClockInAt: new Date(utc), graceMinutes: grace, date: "2026-10-16", timeZone: TZ });
 
-  test("inside the grace is not late; after it, late by the minutes past it", () => {
+  test("inside the grace is not late; after it, late from the start (T2)", () => {
     expect(late("2026-10-16T07:55:00Z")).toBe(0); // 08:55
     expect(late("2026-10-16T08:05:00Z")).toBe(0); // 09:05, the last minute of grace
-    expect(late("2026-10-16T08:06:00Z")).toBe(1); // 09:06
-    expect(late("2026-10-16T09:20:00Z")).toBe(75); // 10:20, 75 minutes after 09:05
+    expect(late("2026-10-16T08:06:00Z")).toBe(6); // 09:06: 6 minutes from 09:00
+    expect(late("2026-10-16T08:12:00Z")).toBe(12); // 09:12, grace 5: 12 minutes late
+    expect(late("2026-10-16T09:20:00Z")).toBe(80); // 10:20
     expect(late("2026-10-16T08:06:00Z", 0)).toBe(6);
   });
 
@@ -309,10 +372,22 @@ describe("the shift and lateness", () => {
     expect(late("2026-10-16T08:30:00Z", 0)).toBe(30);
   });
 
-  test("overtime is after the day's end, past midnight included; nothing without a clock-out", () => {
-    const over = (utc, end = "17:00") =>
-      lateness.minutesOvertime({ expectedEnd: end, lastClockOutAt: utc ? new Date(utc) : null, date: "2026-10-16", timeZone: TZ });
-    expect(over("2026-10-16T16:30:00Z")).toBe(30); // 17:30
+  const early = (utc, grace = 5) =>
+    lateness.minutesEarly({ expectedEnd: "17:00", lastClockOutAt: new Date(utc), graceMinutes: grace, date: "2026-10-16", timeZone: TZ });
+
+  test("leaving early counts to the end once past the early grace (T5)", () => {
+    expect(early("2026-10-16T15:50:00Z")).toBe(10); // 16:50, grace 5: 10 minutes early
+    expect(early("2026-10-16T15:55:00Z")).toBe(0); // 16:55, within the grace
+    expect(early("2026-10-16T16:10:00Z")).toBe(0); // after the end
+    expect(early("2026-10-16T15:59:00Z", 0)).toBe(1);
+  });
+
+  test("overtime counts every minute past the end once past after_minutes; nothing without a clock-out", () => {
+    const over = (utc, after = 30) =>
+      lateness.minutesOvertime({ expectedEnd: "17:00", lastClockOutAt: utc ? new Date(utc) : null, afterMinutes: after, date: "2026-10-16", timeZone: TZ });
+    expect(over("2026-10-16T16:45:00Z")).toBe(45); // 17:45 after 30: 45 minutes
+    expect(over("2026-10-16T16:20:00Z")).toBe(0); // 17:20 after 30: none
+    expect(over("2026-10-16T16:20:00Z", 0)).toBe(20);
     expect(over("2026-10-16T15:00:00Z")).toBe(0); // 16:00
     expect(over("2026-10-16T23:10:00Z")).toBe(7 * 60 + 10); // 00:10 the next day
     expect(over(null)).toBe(0);
@@ -328,19 +403,48 @@ describe("the shift and lateness", () => {
       onLeave: false,
       closed: false,
       late: lateness.minutesLate,
+      early: lateness.minutesEarly,
       overtime: lateness.minutesOvertime,
       ...over,
     });
-  const at = (event_type, utc) => ({ event_type, occurred_at: new Date(utc) });
+  const at = (event_type, utc, source = "pwa") => ({ event_type, occurred_at: new Date(utc), source });
 
-  test("a day's figures: present, late, worked and overtime minutes", () => {
+  test("a day's figures: present, late, worked, early and overtime minutes", () => {
     expect(project({ events: [at("clock_in", "2026-10-16T07:58:00Z"), at("clock_out", "2026-10-16T16:30:00Z")] })).toMatchObject({
       status: "present",
       worked_minutes: 8 * 60 + 32,
       late_minutes: 0,
+      early_minutes: 0,
       overtime_minutes: 30,
+      system_clock_out: false,
     });
-    expect(project({ events: [at("clock_in", "2026-10-16T08:40:00Z")] })).toMatchObject({ status: "late", late_minutes: 35, worked_minutes: 0 });
+    expect(project({ events: [at("clock_in", "2026-10-16T08:40:00Z")] })).toMatchObject({ status: "late", late_minutes: 40, worked_minutes: 0 });
+    expect(project({ events: [at("clock_in", "2026-10-16T07:58:00Z"), at("clock_out", "2026-10-16T15:30:00Z")] })).toMatchObject({
+      status: "present",
+      early_minutes: 30,
+      overtime_minutes: 0,
+    });
+    expect(
+      project({ overtimeAfter: 30, events: [at("clock_in", "2026-10-16T07:58:00Z"), at("clock_out", "2026-10-16T16:20:00Z")] }),
+    ).toMatchObject({ overtime_minutes: 0 });
+  });
+
+  test("a System Clock-Out counts to the end, is never early and never overtime; one People add stands in for the person's", () => {
+    const system = project({ events: [at("clock_in", "2026-10-16T07:58:00Z"), at("clock_out", "2026-10-16T17:30:00Z", "system")] });
+    expect(system).toMatchObject({ worked_minutes: 8 * 60 + 2, early_minutes: 0, overtime_minutes: 0, system_clock_out: true });
+    // A clock-in after the end has no worked minutes when the system clocks it out.
+    expect(project({ events: [at("clock_in", "2026-10-16T16:30:00Z"), at("clock_out", "2026-10-16T17:30:00Z", "system")] })).toMatchObject({
+      worked_minutes: 0,
+    });
+    const admin = project({ events: [at("clock_in", "2026-10-16T07:58:00Z"), at("clock_out", "2026-10-16T18:00:00Z", "admin")] });
+    expect(admin).toMatchObject({ worked_minutes: 10 * 60 + 2, overtime_minutes: 120, system_clock_out: false });
+    expect(project({ events: [at("clock_in", "2026-10-16T07:58:00Z"), at("clock_out", "2026-10-16T15:00:00Z", "admin")] })).toMatchObject({
+      early_minutes: 60,
+    });
+  });
+
+  test("someone with no login is never absent", () => {
+    expect(project({ closed: true, expected: false })).toMatchObject({ status: null });
   });
 
   test("leave beats a punch; a closed working day with no clock-in is absent; an open one has no status yet", () => {
@@ -349,9 +453,15 @@ describe("the shift and lateness", () => {
     expect(project({})).toMatchObject({ status: null });
   });
 
-  test("a punch on a Sunday is present and never late; a closed Sunday with none is not absent", () => {
+  test("a punch on a Sunday is present and never late, every worked minute overtime; a closed Sunday with none is not absent", () => {
     const sunday = (over) => project({ shift: rules.shiftFor("2026-10-18", cal, policy), date: "2026-10-18", ...over });
-    expect(sunday({ events: [at("clock_in", "2026-10-18T10:00:00Z")] })).toMatchObject({ status: "present", late_minutes: 0 });
+    expect(sunday({ events: [at("clock_in", "2026-10-18T09:00:00Z"), at("clock_out", "2026-10-18T12:30:00Z")] })).toMatchObject({
+      status: "present",
+      late_minutes: 0,
+      early_minutes: 0,
+      worked_minutes: 210,
+      overtime_minutes: 210,
+    });
     expect(sunday({ closed: true })).toMatchObject({ status: null });
   });
 
@@ -366,9 +476,10 @@ describe("the shift and lateness", () => {
         onLeave: false,
         closed: false,
         late: lateness.minutesLate,
+        early: lateness.minutesEarly,
         overtime: lateness.minutesOvertime,
       }),
-    ).toMatchObject({ status: "late", late_minutes: 25, overtime_minutes: 60 }); // 09:30 in, 16:00 out
+    ).toMatchObject({ status: "late", late_minutes: 30, overtime_minutes: 60 }); // 09:30 in, 16:00 out
   });
 });
 
@@ -432,71 +543,206 @@ describe("what a person reads", () => {
     expect(detailOf("unknown_device", { device_label: "Chrome on Android" })).toBe("Unregistered device: Chrome on Android");
     expect(detailOf("suspicious_timestamp", { skew_seconds: -540 })).toBe("Device clock 9 min ahead");
     expect(detailOf("missing_clock_out", { clock_in_at: "2026-10-16T07:58:00Z", timezone: TZ })).toBe("Clocked in 08:58, no clock-out");
-    expect(detailOf("automatic_clock_out", { clock_out_at: "2026-10-16T16:00:00Z", timezone: TZ })).toBe(
-      "Clocked out automatically at 17:00",
+    expect(detailOf("automatic_clock_out", { clock_out_at: "2026-10-16T16:00:00Z", timezone: TZ })).toBe("System Clock-Out at 17:00");
+    expect(detailOf("automatic_clock_out", { clock_out_at: "2026-10-16T17:30:00Z", timezone: TZ, real_time: "17:40" })).toBe(
+      "System Clock-Out at 18:30; real time 17:40",
     );
   });
 });
 
 describe("the clock watch", () => {
-  const { decideAutomatic, shiftEnd, AWAY_MIN } = require("./attendance.clock-watch");
+  const { clockOutPlan, shiftEnd, shiftStart } = require("./attendance.clock-watch");
   const end = new Date("2026-10-16T16:00:00Z"); // 17:00 in Lagos
   const clockInAt = new Date("2026-10-16T07:55:00Z");
-  const seen = (last, active = false, known = true) => ({ known, active, last_active_at: last ? new Date(last) : null });
-  const decide = (now, activity) => decideAutomatic({ shiftEnd: end, clockInAt, now: new Date(now), activity });
+  const plan = (now, over = {}) => clockOutPlan({ shiftEnd: end, clockInAt, now: new Date(now), every: 30, after: 90, ...over });
+  const slot = (n, utc) => ({ reminder: { slot: n, at: new Date(utc) }, systemAt: null, evening: false });
 
-  test("a shift ends at the working week's end in the workplace's zone; an end before the start is the next morning", () => {
+  test("a shift starts and ends in the workplace's zone; an end before the start is the next morning", () => {
     const day = { working_day: true, starts_at: "09:00", ends_at: "17:00" };
+    expect(shiftStart("2026-10-16", day, TZ).toISOString()).toBe("2026-10-16T08:00:00.000Z");
     expect(shiftEnd("2026-10-16", day, TZ).toISOString()).toBe("2026-10-16T16:00:00.000Z");
     expect(shiftEnd("2026-10-16", { working_day: true, starts_at: "22:00", ends_at: "06:00" }, TZ).toISOString()).toBe(
       "2026-10-17T05:00:00.000Z",
     );
     expect(shiftEnd("2026-10-18", { working_day: false, starts_at: null, ends_at: null }, TZ)).toBeNull();
+    expect(shiftStart("2026-10-18", { working_day: false, starts_at: null }, TZ)).toBeNull();
   });
 
-  test("nothing before the end, while they are in front of the app, recently there, or when presence cannot answer", () => {
-    expect(decide("2026-10-16T15:59:00Z", seen(null))).toEqual({ due: false, reason: "shift_running" });
-    expect(decide("2026-10-16T16:30:00Z", seen("2026-10-16T16:29:00Z", true))).toEqual({ due: false, reason: "in_front" });
-    expect(decide("2026-10-16T16:30:00Z", seen(null, false, false))).toEqual({ due: false, reason: "presence_unknown" });
-    expect(decide("2026-10-16T16:10:00Z", seen("2026-10-16T15:58:00Z"))).toEqual({ due: false, reason: "recently_active" });
-    expect(decideAutomatic({ shiftEnd: null, clockInAt, now: new Date(), activity: seen(null) })).toEqual({ due: false, reason: "no_end" });
+  test("a reminder every 30 minutes from the end: 17:00, 17:30, 18:00, then the System Clock-Out at 18:30 (T13)", () => {
+    expect(plan("2026-10-16T15:59:00Z")).toEqual({ reminder: null, systemAt: null, evening: false });
+    expect(plan("2026-10-16T16:00:00Z")).toEqual(slot(1, "2026-10-16T16:00:00Z"));
+    expect(plan("2026-10-16T16:04:00Z")).toEqual(slot(1, "2026-10-16T16:00:00Z"));
+    expect(plan("2026-10-16T16:31:00Z")).toEqual(slot(2, "2026-10-16T16:30:00Z"));
+    expect(plan("2026-10-16T17:29:00Z")).toEqual(slot(3, "2026-10-16T17:00:00Z"));
+    expect(plan("2026-10-16T17:30:00Z")).toEqual({ reminder: null, systemAt: new Date("2026-10-16T17:30:00Z"), evening: false });
+    // A late run still clocks out at the moment, not when it ran.
+    expect(plan("2026-10-16T19:05:00Z").systemAt).toEqual(new Date("2026-10-16T17:30:00Z"));
+    expect(plan("2026-10-16T16:20:00Z", { shiftEnd: null })).toEqual({ reminder: null, systemAt: null, evening: false });
   });
 
-  test(`away ${AWAY_MIN} minutes: the end's time, or the last moment on the app after it, never before the clock-in`, () => {
-    expect(decide("2026-10-16T16:15:00Z", seen("2026-10-16T15:58:00Z"))).toEqual({ due: true, at: end, reason: "away_at_end" });
-    expect(decide("2026-10-16T16:05:00Z", seen(null))).toEqual({ due: true, at: end, reason: "away_at_end" });
-    expect(decide("2026-10-16T18:00:00Z", seen("2026-10-16T17:40:00Z"))).toEqual({
-      due: true,
-      at: new Date("2026-10-16T17:40:00Z"),
-      reason: "left_app",
-    });
-    const evening = decideAutomatic({
-      shiftEnd: end,
-      clockInAt: new Date("2026-10-16T17:10:00Z"),
-      now: new Date("2026-10-16T18:00:00Z"),
-      activity: seen(null),
-    });
-    expect(evening).toEqual({ due: true, at: new Date("2026-10-16T17:10:00Z"), reason: "away_at_end" });
+  test("no reminder whose time came before the clock-in; an evening start gets neither", () => {
+    const inAt = new Date("2026-10-16T16:40:00Z"); // 17:40, after the end
+    expect(plan("2026-10-16T16:45:00Z", { clockInAt: inAt })).toEqual({ reminder: null, systemAt: null, evening: false });
+    expect(plan("2026-10-16T17:05:00Z", { clockInAt: inAt })).toEqual(slot(3, "2026-10-16T17:00:00Z"));
+    expect(plan("2026-10-16T17:35:00Z", { clockInAt: inAt }).systemAt).toEqual(new Date("2026-10-16T17:30:00Z"));
+    const evening = new Date("2026-10-16T17:30:00Z"); // 18:30, at the System Clock-Out's moment
+    expect(plan("2026-10-16T19:00:00Z", { clockInAt: evening })).toEqual({ reminder: null, systemAt: null, evening: true });
+  });
+
+  test("the policy's figures set the interval and the moment", () => {
+    expect(plan("2026-10-16T16:50:00Z", { every: 45, after: 60 })).toEqual(slot(2, "2026-10-16T16:45:00Z"));
+    expect(plan("2026-10-16T17:00:00Z", { every: 45, after: 60 }).systemAt).toEqual(new Date("2026-10-16T17:00:00Z"));
   });
 });
 
-describe("hybrid staff's week", () => {
-  const { placesOf, homeDaysOf } = require("./attendance.schedule");
-  const cal = { days: new Set([1, 2, 3, 4, 5, 6]) };
-  const places = (pattern, officeDays) => placesOf(pattern, officeDays, cal).map((d) => d.place);
+describe("a person's week", () => {
+  const schedules = require("./attendance.schedule");
+  const cal = workingWeek.makeCalendar({ days: [1, 2, 3, 4, 5, 6], holidays: [], hours: {} });
+  const HOURS = [1, 2, 3, 4, 5, 6, 7].map((weekday) =>
+    weekday <= 5 ? { weekday, working: true, starts_at: "09:00", ends_at: "17:00" } : { weekday, working: false, starts_at: null, ends_at: null },
+  );
+  const places = (week) => week.map(schedules.placeOf);
 
-  test("each weekday is off when not worked, else office or remote by the pattern and the schedule", () => {
-    expect(places("on_site", null)).toEqual(["office", "office", "office", "office", "office", "office", "off"]);
-    expect(places("remote", null)).toEqual(["remote", "remote", "remote", "remote", "remote", "remote", "off"]);
-    expect(places("hybrid", null)).toEqual(["office", "office", "office", "office", "office", "office", "off"]);
-    expect(places("hybrid", [1, 2, 4])).toEqual(["office", "office", "remote", "office", "remote", "remote", "off"]);
-    // A schedule only counts for hybrid staff.
-    expect(places("on_site", [1])).toEqual(["office", "office", "office", "office", "office", "office", "off"]);
+  test("with no schedule: the company hours at the place the pattern gives; hybrid is at the office", () => {
+    expect(places(schedules.weekFrom(null, "on_site", cal, HOURS))).toEqual(["office", "office", "office", "office", "office", "off", "off"]);
+    expect(places(schedules.weekFrom(null, "remote", cal, HOURS))).toEqual(["remote", "remote", "remote", "remote", "remote", "off", "off"]);
+    expect(places(schedules.weekFrom(null, "hybrid", cal, null))).toEqual(["office", "office", "office", "office", "office", "office", "off"]);
+    expect(schedules.weekFrom(null, "on_site", cal, HOURS)[0]).toEqual({
+      weekday: 1, working: true, starts_at: "09:00", ends_at: "17:00", place: "office", company_hours: true,
+    });
   });
 
-  test("the home days are the working days a schedule leaves out", () => {
-    expect(homeDaysOf([1, 2, 4], cal)).toEqual([3, 5, 6]);
-    expect(homeDaysOf([1, 2, 3, 4, 5, 6], cal)).toEqual([]);
+  test("a schedule's days: its own hours, a blank day on the company hours, Off, and a blank day the company does not work", () => {
+    const d = (working, starts_at = null, ends_at = null, place = "office") => ({ weekday: 0, working, starts_at, ends_at, place });
+    const days = [d(true, "10:00", "14:00", "remote"), d(true), d(false), d(true, null, null, "remote"), d(true), d(true), d(false)];
+    const week = schedules.weekFrom(days, "on_site", cal, HOURS);
+    expect(places(week)).toEqual(["remote", "office", "off", "remote", "office", "off", "off"]);
+    expect(week[0]).toMatchObject({ starts_at: "10:00", ends_at: "14:00", company_hours: false });
+    expect(week[1]).toMatchObject({ starts_at: "09:00", ends_at: "17:00", company_hours: true });
+  });
+
+  test("a working day with no hours on a weekday the company does not work is refused on that day (gap l)", () => {
+    const d = (weekday, working, starts_at = null, ends_at = null) => ({ weekday, working, starts_at, ends_at, place: working ? "office" : null });
+    const days = [d(1, true), d(2, true), d(3, true), d(4, true), d(5, true), d(6, true), d(7, true, "09:00", "13:00")];
+    expect(schedules.checkDays(days, cal, HOURS)).toEqual({ "days.5.starts_at": ["Give the hours"] });
+    expect(schedules.checkDays(days, cal, null)).toEqual({});
+  });
+});
+
+describe("pending deductions and overtime", () => {
+  const pay = require("./attendance.pay");
+  const m = require("../../shared/money/money");
+  // ₦300,000 over 20 working days is ₦15,000 a day; over 8 hours, ₦1,875 an hour.
+  const daily = pay.dailyRate("300000.00", 20);
+  const hourly = pay.hourlyRate(daily, 8 * 60);
+
+  test("the daily and hourly rates, and none with no gross or no working day", () => {
+    expect(m.toWire(daily)).toBe("15000.00");
+    expect(m.toWire(hourly)).toBe("1875.00");
+    expect(pay.dailyRate(null, 20)).toBeNull();
+    expect(pay.dailyRate("300000.00", 0)).toBeNull();
+    expect(pay.hourlyRate(null, 480)).toBeNull();
+    expect(pay.shiftMinutes({ working_day: true, starts_at: "09:00", ends_at: "15:00" })).toBe(360);
+    expect(pay.shiftMinutes({ working_day: false })).toBe(0);
+  });
+
+  test("each deduction method, rounded to the kobo once (T4)", () => {
+    expect(pay.deductionAmount("pro_rata", { daily, hourly, minutes: 12 })).toBe("375.00");
+    expect(pay.deductionAmount("pro_rata", { daily, hourly: pay.hourlyRate(pay.dailyRate("250000.00", 22), 480), minutes: 7 })).toBe(
+      "165.72",
+    );
+    expect(pay.deductionAmount("per_hour", { daily, hourly, minutes: 61, amount: "2000.00" })).toBe("4000.00");
+    expect(pay.deductionAmount("per_hour", { daily, hourly, minutes: 60, amount: "2000.00" })).toBe("2000.00");
+    expect(pay.deductionAmount("per_day", { daily, hourly, minutes: 200, amount: "2500.00" })).toBe("2500.00");
+    expect(pay.deductionAmount("daily_rate", { daily, hourly, minutes: 480 })).toBe("15000.00");
+  });
+
+  test("with no gross set a salary-derived amount is empty, a fixed one is not", () => {
+    expect(pay.deductionAmount("pro_rata", { daily: null, hourly: null, minutes: 12 })).toBeNull();
+    expect(pay.deductionAmount("daily_rate", { daily: null, hourly: null, minutes: 480 })).toBeNull();
+    expect(pay.deductionAmount("per_day", { daily: null, hourly: null, minutes: 12, amount: "1000.00" })).toBe("1000.00");
+  });
+
+  test("overtime at a multiple or a fixed amount an hour, prorated to the minute", () => {
+    expect(pay.overtimeAmount("multiplier", { hourly, minutes: 45, multiplier: 1.5 })).toBe("2109.38");
+    expect(pay.overtimeAmount("multiplier", { hourly, minutes: 60, multiplier: 2 })).toBe("3750.00");
+    expect(pay.overtimeAmount("per_hour", { hourly: null, minutes: 90, multiplier: 1, amount: "1500.00" })).toBe("2250.00");
+    expect(pay.overtimeAmount("multiplier", { hourly: null, minutes: 60, multiplier: 1.5 })).toBeNull();
+  });
+
+  test("the approval method: pending, confirmed, held to a pre-approval, and the monthly cap", () => {
+    expect(pay.overtimeOutcome({ approval: "manager_after", minutes: 90, preApproved: null, capLeft: 600 })).toEqual({
+      status: "pending", confirmed_minutes: null, reason: null,
+    });
+    expect(pay.overtimeOutcome({ approval: "automatic", minutes: 90, preApproved: null, capLeft: 600 })).toEqual({
+      status: "confirmed", confirmed_minutes: 90, reason: null,
+    });
+    expect(pay.overtimeOutcome({ approval: "pre_approved", minutes: 90, preApproved: null, capLeft: 600 })).toEqual({
+      status: "cut", confirmed_minutes: 0, reason: "Not pre-approved",
+    });
+    expect(pay.overtimeOutcome({ approval: "pre_approved", minutes: 90, preApproved: 60, capLeft: 600 })).toEqual({
+      status: "confirmed", confirmed_minutes: 60, reason: "Beyond pre-approval",
+    });
+    expect(pay.overtimeOutcome({ approval: "pre_approved", minutes: 45, preApproved: 60, capLeft: 600 })).toEqual({
+      status: "confirmed", confirmed_minutes: 45, reason: null,
+    });
+    expect(pay.overtimeOutcome({ approval: "automatic", minutes: 90, preApproved: null, capLeft: 30 })).toEqual({
+      status: "confirmed", confirmed_minutes: 30, reason: "Monthly cap",
+    });
+    expect(pay.overtimeOutcome({ approval: "automatic", minutes: 90, preApproved: null, capLeft: 0 })).toEqual({
+      status: "cut", confirmed_minutes: 0, reason: "Monthly cap",
+    });
+  });
+
+  test("what a day qualifies for under the version that judged it: never leave, an Off day's deduction or a holiday", () => {
+    const c = require("@mycity/contract");
+    const r = {
+      ...c.attendance.AttendanceRules.parse({}),
+      late_deduction: { on: true, method: "pro_rata", amount: null },
+      early_deduction: { on: true, method: "per_day", amount: "1000.00" },
+      absence_deduction: { on: true },
+      overtime: { ...c.attendance.AttendanceRules.parse({}).overtime, on: true },
+    };
+    const work = { working_day: true, starts_at: "09:00", ends_at: "17:00" };
+    const day = (over) => ({ status: "present", late_minutes: 0, early_minutes: 0, overtime_minutes: 0, ...over });
+    expect(Object.keys(pay.qualifies(day({ status: "late", late_minutes: 12, early_minutes: 10, overtime_minutes: 45 }), work, r))).toEqual([
+      "late", "early_departure", "overtime",
+    ]);
+    expect(pay.qualifies(day({ status: "absent" }), work, r)).toEqual({
+      absence: { minutes: 480, method: "daily_rate", rest_day: false, amount: null },
+    });
+    expect(pay.qualifies(day({ status: "leave", late_minutes: 12 }), work, r)).toEqual({});
+    expect(pay.qualifies(day({ overtime_minutes: 120 }), { working_day: false }, r)).toEqual({
+      overtime: { minutes: 120, method: "multiplier", rest_day: true, amount: null },
+    });
+    const off = { ...r, late_deduction: { on: false, method: "pro_rata", amount: null } };
+    expect(pay.qualifies(day({ status: "late", late_minutes: 12 }), work, off)).toEqual({});
+  });
+});
+
+describe("the consequence rules' words", () => {
+  const engine = require("./attendance.rules-engine");
+  const breach = (over) => ({ rule: "late", period: "month", count: 3, minutes: 41, reached: "count", days: ["2026-10-02", "2026-10-06", "2026-10-09"], raise_query: false, ...over });
+
+  test("an alert counts what was reached, Query Due first while the query waits on M3", () => {
+    expect(engine.wordsOf(breach(), "Ada Obi")).toEqual({
+      title: "Ada Obi: 3 late arrivals this month",
+      trigger: "Late on 02/10/2026, 06/10/2026 and 09/10/2026",
+    });
+    expect(engine.wordsOf(breach({ raise_query: true }), "Ada Obi").title).toBe("Query Due: Ada Obi, 3 late arrivals this month");
+    expect(engine.wordsOf(breach({ reached: "hours", minutes: 300, count: 2 }), "Ada Obi").title).toBe("Ada Obi: 5 hours late this month");
+    expect(engine.wordsOf(breach({ rule: "absence", period: "week", count: 1, days: ["2026-10-06"] }), "Ada Obi")).toEqual({
+      title: "Ada Obi: 1 absence this week",
+      trigger: "Absent on 06/10/2026",
+    });
+    expect(engine.wordsOf(breach({ rule: "location_flag", period: "days_30", days: ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"], count: 4 }), "Ada Obi").trigger).toBe(
+      "Outside on 4 days, last on 04/10/2026",
+    );
+  });
+
+  test("each rule is the policy's", () => {
+    expect(Object.values(engine.RULES).map((r) => r.key)).toEqual(["late_rule", "early_rule", "absence_rule", "forgotten_rule", "location_rule"]);
+    expect(engine.BY_POLICY_KEY.forgotten_rule).toBe("forgotten_clock_out");
   });
 });
 
@@ -572,7 +818,17 @@ describe("the routes", () => {
     const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
     expect(by("GET", "/schedules/:employee_id").permission).toMatchObject({ key: "people", action: "view" });
     expect(by("POST", "/schedules/:employee_id").permission).toMatchObject({ key: "people", action: "edit" });
-    expect(Object.keys(by("POST", "/schedules/:employee_id").contract.body.shape).sort()).toEqual(["effective_from", "office_days", "reason"]);
+    expect(Object.keys(by("POST", "/schedules/:employee_id").contract.body.shape).sort()).toEqual(["days", "effective_from", "reason"]);
+    expect(by("GET", "/me/schedule").contract.self).toBe(true);
+  });
+
+  test("pay items are read under people view and decided under people approve; my own are self", () => {
+    const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
+    expect(by("GET", "/pay-items").permission).toMatchObject({ key: "people", action: "view" });
+    for (const path of ["/pay-items/waive", "/pay-items/:id/overtime", "/overtime-approvals"])
+      expect(by("POST", path).permission).toMatchObject({ key: "people", action: "approve" });
+    expect(by("GET", "/me/pay-items").contract.self).toBe(true);
+    expect(Object.keys(shapeOf(by("POST", "/me/events/:id/explanation").contract.body)).sort()).toEqual(["employee_note", "real_time"]);
   });
 
   test("the policy is no longer this module's to serve: it lives under /policies", () => {
@@ -624,35 +880,81 @@ describe("the Attendance policy's rules", () => {
     });
   });
 
-  test("what changed is the visible rules that differ, in the worksheet's order, as lines", () => {
-    const next = { ...RULES, home_radius_m: 200, grace_minutes: 5 };
-    expect(type.changed(RULES, next)).toEqual(["grace_minutes", "home_radius_m"]);
+  test("every rule is shown now: what changed is the rules that differ, in the worksheet's order, as lines", () => {
+    expect(type.VISIBLE).toEqual(Object.keys(c.attendance.AttendanceRules.shape).filter((k) => type.VISIBLE.includes(k)));
+    expect(type.VISIBLE.length).toBe(Object.keys(c.attendance.AttendanceRules.shape).length);
+    const next = {
+      ...RULES,
+      home_radius_m: 200,
+      grace_minutes: 5,
+      late_rule: { ...RULES.late_rule, on: true },
+      late_deduction: { on: true, method: "per_hour", amount: "2000.00" },
+      hours: type.SUGGESTED_HOURS,
+    };
+    expect(type.changed(RULES, next)).toEqual(["hours", "grace_minutes", "late_rule", "late_deduction", "home_radius_m"]);
     expect(type.changeLines(RULES, next)).toEqual([
+      "Company Hours: The Working Week to Mon to Fri 09:00 to 17:00, Sat 09:00 to 15:00, Sun Off",
       "Grace Minutes: 10 minutes to 5 minutes",
+      "Late Arrivals: Off to 3 in a month or 5 hours, Alert, Raise Query",
+      "Late Deduction: Off to Fixed per Hour, ₦2,000.00",
       "Home Radius: 150 m to 200 m",
     ]);
     expect(type.changed(null, next)).toEqual([]);
-    // A rule PR 3 enforces is not shown yet, so changing it is not listed either.
-    expect(type.changed(RULES, { ...RULES, late_rule: { ...RULES.late_rule, on: true } })).toEqual([]);
   });
 
-  test("staff read every section as sentences, the values filled in and a changed section tagged", () => {
+  test("staff read every section as sentences, PR 1's sections as they were, the values filled in and a changed section tagged", () => {
     const sections = type.sections({ ...RULES, office_geofence_mode: "warn" }, ["grace_minutes"]);
-    expect(sections.map((s) => s.title)).toEqual([
-      "Clocking In",
-      "At the Office",
-      "Working From Home",
-      "At a Temporary Site",
-      "Your Location",
-      "Your Devices",
+    expect(sections.map((s) => s.key)).toEqual([
+      "hours", "clocking_in", "late", "early", "absence", "forgotten", "location_flags", "overtime",
+      "office", "home", "site", "location", "devices", "clock_prompts",
     ]);
-    expect(sections[0].sentences[0]).toMatchObject({ text: expect.stringContaining("10 minutes"), changed: true });
-    expect(sections[1].sentences[0].changed).toBe(false);
-    expect(type.sections({ ...RULES, office_geofence_mode: "block" })[1].sentences[0].text).toMatch(/refused/);
+    const byKey = Object.fromEntries(sections.map((s) => [s.key, s]));
+    expect(["clocking_in", "office", "home", "site", "location", "devices"].map((k) => byKey[k].title)).toEqual([
+      "Clocking In", "At the Office", "Working From Home", "At a Temporary Site", "Your Location", "Your Devices",
+    ]);
+    expect(byKey.clocking_in.sentences.map((x) => x.text)).toEqual([
+      "You have a grace period of 10 minutes after your start time.",
+      "A clock-in after it counts as late from your start time.",
+    ]);
+    expect(byKey.clocking_in.sentences[0].changed).toBe(true);
+    expect(byKey.office.sentences[0].changed).toBe(false);
+    expect(byKey.hours.sentences.map((x) => x.text)).toContain("Where your own work schedule differs, your schedule applies.");
+    expect(byKey.late.sentences.map((x) => x.text)).toEqual([
+      "Late arrivals do not count toward a limit.",
+      "Late arrivals do not lead to a deduction.",
+    ]);
+    expect(type.sections({ ...RULES, office_geofence_mode: "block" }).find((x) => x.key === "office").sentences[0].text).toMatch(/refused/);
   });
 
-  test("a first draft starts from the suggested values", () => {
-    expect(type.suggestions()).toMatchObject({ grace_minutes: 5, device_mode: "warn", home_radius_m: 150 });
+  test("a first draft starts from the suggested values, every consequence rule off with its figures filled in (T5)", () => {
+    const s = type.suggestions();
+    expect(c.attendance.AttendanceRulesDraft.safeParse(s).success).toBe(true);
+    expect(s).toMatchObject({
+      grace_minutes: 5,
+      early_grace_minutes: 5,
+      device_mode: "warn",
+      home_radius_m: 150,
+      late_rule: { on: false, count: 3, period: "month", hours: 5, alert: true, query: true },
+      absence_rule: { on: false, count: 2 },
+      forgotten_rule: { on: false, alert: true, query: false },
+      overtime: { on: false, after_minutes: 30, approval: "manager_after", multiplier: 1.5, rest_day_multiplier: 2, monthly_cap_hours: 20 },
+      clock_out_reminder_minutes: 30,
+      system_clock_out_after_minutes: 90,
+    });
+    expect(s.hours.map((d) => (d.working ? `${d.starts_at}-${d.ends_at}` : "off"))).toEqual([
+      "09:00-17:00", "09:00-17:00", "09:00-17:00", "09:00-17:00", "09:00-17:00", "09:00-15:00", "off",
+    ]);
+  });
+
+  test("a fixed amount is refused outside ₦1 to ₦1,000,000, on its own field", () => {
+    const s = type.suggestions();
+    const draft = (over) => c.attendance.AttendanceRulesDraft.safeParse({ ...s, ...over });
+    const paths = (r) => (r.success ? [] : r.error.issues.map((i) => i.path.join(".")));
+    expect(paths(draft({ late_deduction: { on: true, method: "per_day", amount: "0.00" } }))).toEqual(["late_deduction.amount"]);
+    expect(paths(draft({ early_deduction: { on: true, method: "per_hour", amount: "1000000.01" } }))).toEqual(["early_deduction.amount"]);
+    expect(paths(draft({ late_deduction: { on: true, method: "per_day", amount: "1000000.00" } }))).toEqual([]);
+    expect(paths(draft({ overtime: { ...s.overtime, on: true, method: "per_hour", amount: "0.50" } }))).toEqual(["overtime.amount"]);
+    expect(paths(draft({ late_deduction: { on: true, method: "per_day", amount: null } }))).toEqual(["late_deduction.amount"]);
   });
 
   test("a temporary site's sentences cover its addresses and check-ins, and always end with where to add one", () => {
@@ -678,28 +980,21 @@ describe("the Attendance policy's rules", () => {
 });
 
 describe("a temporary site's hours (§6.11)", () => {
-  const { contextOf } = require("./attendance.sites");
-  const policy = { geofence_mode: "warn", office_geofence_mode: "warn", home_geofence_mode: "warn", site_geofence_mode: "block", grace_minutes: 10 };
-  const sunday = { working_day: false, starts_at: null, ends_at: null, grace_minutes: 10, off_reason: "Sunday" };
-  const site = (over) => ({
-    temporary_site_id: "00000000-0000-4000-a000-000000000001",
-    number: "TS-0001",
-    name: "Partner Training",
-    purpose: "training_delivering",
-    hours: "usual",
-    starts_at: null,
-    ends_at: null,
-    locations: [{ temporary_site_location_id: "00000000-0000-4000-a000-000000000002", position: 1, name: null, latitude: 6.6, longitude: 3.4, radius_m: 150, timezone: "Africa/Gaborone" }],
-    ...over,
+  const { siteShift } = require("./attendance.sites");
+  const sunday = { working_day: false, starts_at: null, ends_at: null, grace_minutes: 10, early_grace_minutes: 5, off_reason: "Off", place: null, attendance_work_schedule_id: null };
+
+  test("Site Hours make the day worked from its start to its end, the policy's grace kept", () => {
+    expect(siteShift({ hours: "site", starts_at: "11:00", ends_at: "15:00" }, sunday)).toEqual({
+      ...sunday,
+      working_day: true,
+      starts_at: "11:00",
+      ends_at: "15:00",
+      off_reason: null,
+    });
   });
 
-  test("Site Hours make the day worked from its start to its end, with the policy's grace, on the site's clock", () => {
-    const ctx = contextOf(site({ hours: "site", starts_at: "11:00", ends_at: "15:00" }), { policy, shift: sunday });
-    expect(ctx.shift).toEqual({ working_day: true, starts_at: "11:00", ends_at: "15:00", grace_minutes: 10, off_reason: null });
-    expect(ctx.timeZone).toBe("Africa/Gaborone");
-  });
-
-  test("the Usual Shift keeps the organisation's day, a day off included", () => {
-    expect(contextOf(site(), { policy, shift: sunday }).shift).toBe(sunday);
+  test("the Usual Shift, or no site, keeps the person's own shift", () => {
+    expect(siteShift({ hours: "usual", starts_at: null, ends_at: null }, sunday)).toBe(sunday);
+    expect(siteShift(null, sunday)).toBe(sunday);
   });
 });

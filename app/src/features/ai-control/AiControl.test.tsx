@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AiActionRow, AiChain, AiControlModel, AiJobRow, AiPriceProposal, AiSpend } from "@mycity/contract/contract.gen.ts";
+import type { AiActionRow, AiChain, AiControlModel, AiJobRow, AiPriceProposal, AiPriceRun, AiSpend } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider } from "@mycity/ui";
 
 const m = vi.hoisted(() => ({
@@ -15,6 +15,7 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock("@/api/hooks", () => ({
   invalidate: m.invalidate,
+  refresh: vi.fn(async () => undefined),
   useApi: (key: string) => ({ data: m.data[key] ?? null, error: null, loading: false, reload: () => undefined, set: () => undefined }),
   usePaged: (key: string) => {
     const rows = m.rows[key] ?? [];
@@ -91,7 +92,37 @@ const MODEL: AiControlModel = {
   ngn_per_audio_hour: null,
   in_chains: [{ scope: "action", key: "data-answers", label: "Data Answers", position: 2 }],
   proposed: false,
+  not_listed: false,
 };
+
+/** Asked about once; the provider's page did not price it. */
+const UNLISTED: AiControlModel = {
+  ...MODEL,
+  ai_model_id: "00000000-0000-4000-8000-000000000003",
+  model: "gemini-2.0-flash",
+  display_name: "Gemini 2.0 Flash",
+  input_usd_per_million: null,
+  output_usd_per_million: null,
+  audio_usd_per_million: null,
+  input_ngn_per_million: null,
+  output_ngn_per_million: null,
+  in_chains: [],
+  not_listed: true,
+};
+
+const RATE = { usd_ngn: "1534.2100000000", day: "2026-10-20" };
+const RUN: AiPriceRun = {
+  ai_price_run_id: "00000000-0000-4000-8000-0000000000bb",
+  status: "done",
+  batches_total: 4,
+  batches_done: 4,
+  proposals: 1,
+  not_listed: 2,
+  error_code: null,
+  started_at: "2026-10-20T08:00:00.000Z",
+  finished_at: "2026-10-20T08:03:00.000Z",
+};
+const SUMMARY = "GET /api/v1/ai-control/models/summary";
 
 const PROPOSAL: AiPriceProposal = {
   ai_price_proposal_id: "00000000-0000-4000-8000-0000000000aa",
@@ -187,29 +218,74 @@ describe("AI Control", () => {
     expect(screen.queryByRole("button", { name: "Make First" })).toBeNull();
   });
 
-  it("Models: a proposed price is accepted as found; Find Prices asks the worker", async () => {
-    m.data = { "GET /api/v1/ai-control/models/summary": { finding: false, last_found_at: null, proposals: 1, rate: { usd_ngn: "1534.2100000000", day: "2026-10-20" } } };
-    m.rows = { "GET /api/v1/ai-control/models": [MODEL], "GET /api/v1/ai-control/prices": [PROPOSAL] };
+  it("Models: the proposals wait in New Prices; Accept All saves them; Find More asks about the rest", async () => {
+    m.data = { [SUMMARY]: { finding: false, run: RUN, last_found_at: RUN.finished_at, proposals: 1, to_price: 3, not_listed: 2, rate: RATE } };
+    m.rows = { "GET /api/v1/ai-control/models": [MODEL, UNLISTED], "GET /api/v1/ai-control/prices": [PROPOSAL] };
+    m.call.mockImplementation(async (key) => (key === "POST /api/v1/ai-control/prices/accept-all" ? { accepted: 1 } : {}));
     page("models");
     expect(screen.getByText("$0.30 / $2.50 per M")).toBeTruthy();
     expect(screen.getByText("Data Answers (Fallback 1)")).toBeTruthy();
-    await userEvent.click(screen.getAllByRole("button", { name: "Accept" })[0]);
+    expect(screen.getByText("Not Listed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Find Prices" })).toBeNull();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Review Prices" })[0]);
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getByText("New Prices")).toBeTruthy();
+    expect(sheet.getAllByText("Gemini 3.8 Flash").length).toBeGreaterThan(0);
+    expect(sheet.getByText("Still to Price")).toBeTruthy();
+    expect(sheet.getByText("3")).toBeTruthy();
+
+    await userEvent.click(sheet.getAllByRole("button", { name: "Accept" })[0]);
     await waitFor(() =>
       expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai-control/prices/:id/accept", {
         params: { id: PROPOSAL.ai_price_proposal_id },
         body: { input_usd_per_million: "0.5000", output_usd_per_million: "3.0000", audio_usd_per_million: "", usd_per_audio_hour: "", usd_per_thousand_searches: "14.0000" },
       }),
     );
-    await userEvent.click(screen.getAllByRole("button", { name: "Find Prices" })[0]);
+    await userEvent.click(sheet.getByRole("button", { name: "Accept All" }));
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai-control/prices/accept-all", { body: {} }));
+    await userEvent.click(sheet.getByRole("button", { name: "Find More" }));
     await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai-control/prices/find", { body: {} }));
   });
 
-  it("Models: while Find Prices runs, it says so instead of offering the button", () => {
-    m.data = { "GET /api/v1/ai-control/models/summary": { finding: true, last_found_at: null, proposals: 0, rate: null } };
+  it("Models: while Find Prices runs, it says so and New Prices shows the batch", async () => {
+    const running: AiPriceRun = { ...RUN, status: "running", batches_done: 1, proposals: 0, not_listed: 0, finished_at: null };
+    m.data = { [SUMMARY]: { finding: true, run: running, last_found_at: null, proposals: 0, to_price: 60, not_listed: 0, rate: null } };
     m.rows = { "GET /api/v1/ai-control/models": [MODEL] };
     page("models");
     expect(screen.queryByRole("button", { name: "Find Prices" })).toBeNull();
     expect(screen.getAllByText("Finding Prices").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("button", { name: "Review Prices" })[0]);
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getByText("Batch 2 of 4")).toBeTruthy();
+    expect(sheet.queryByRole("button", { name: "Accept All" })).toBeNull();
+    expect(sheet.queryByRole("button", { name: "Find More" })).toBeNull();
+  });
+
+  it("Models: a failed run says why on the tab; Find Prices starts another and opens New Prices", async () => {
+    const failed: AiPriceRun = { ...RUN, status: "failed", batches_done: 0, proposals: 0, not_listed: 0, error_code: "NO_SEARCH_MODEL" };
+    m.data = { [SUMMARY]: { finding: false, run: failed, last_found_at: failed.finished_at, proposals: 0, to_price: 5, not_listed: 0, rate: RATE } };
+    m.rows = { "GET /api/v1/ai-control/models": [MODEL] };
+    page("models");
+    // With New Prices closed, the reason is on the tab.
+    expect(screen.getAllByText("No Search Model").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("button", { name: "Find Prices" })[0]);
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai-control/prices/find", { body: {} }));
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getByText("No Search Model")).toBeTruthy();
+    expect(sheet.getByText("Nothing New")).toBeTruthy();
+  });
+
+  it("Models: Operations & People review the prices and change nothing", async () => {
+    m.can = (_module, action) => action === "view";
+    m.data = { [SUMMARY]: { finding: false, run: RUN, last_found_at: RUN.finished_at, proposals: 1, to_price: 0, not_listed: 0, rate: RATE } };
+    m.rows = { "GET /api/v1/ai-control/models": [MODEL], "GET /api/v1/ai-control/prices": [PROPOSAL] };
+    page("models");
+    await userEvent.click(screen.getAllByRole("button", { name: "Review Prices" })[0]);
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getAllByText("Gemini 3.8 Flash").length).toBeGreaterThan(0);
+    expect(sheet.queryByRole("button", { name: "Accept All" })).toBeNull();
+    expect(sheet.queryByRole("button", { name: "Accept" })).toBeNull();
   });
 
   it("Spend: each provider against its cap; Set Cap on a paid one only, sent as an amount", async () => {

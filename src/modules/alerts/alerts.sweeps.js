@@ -4,8 +4,9 @@
  * §3 step 5, §7):
  *
  *   sweep()            every morning at 06:00 Lagos (the `home-alert-sweeps` scheduler): every
- *                      switched-on rule, every subject its metric finds at or past the threshold
- *   evaluatePerson()   an attendance signal (alerts.events.js): one person's rules of a metric or two
+ *                      switched-on rule, every subject its metric finds at or past the threshold.
+ *                      The rules the system keeps for the Attendance policy are never read here:
+ *                      attendance raises their alerts as each breach commits (home.md §6)
  *
  * A rule's metric is read a batch at a time (alerts.metrics.js), and each breach is raised in a
  * transaction of its own through the shared engine, which raises a new alert, refreshes the
@@ -14,8 +15,7 @@
  * from before it) is skipped.
  *
  * The sweep carries on past a rule it cannot read or a breach it cannot raise, logs it and
- * counts it, as the workflow timeout sweep does: tomorrow's run is the retry. A signal lets a
- * failure throw, so the outbox runs it again; running it twice changes nothing.
+ * counts it, as the workflow timeout sweep does: tomorrow's run is the retry.
  */
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
@@ -39,22 +39,20 @@ async function raiseOne(db, rule, metric, reading) {
  * Read one rule's metric on a Lagos day, batch by batch, and raise each breach.
  * @param {import("pg").Pool} db
  * @param {object} rule  a switched-on home_alert_rule row
- * @param {{today: string, employee_id?: string|null, tolerant: boolean}} opts
- *   tolerant: log and count a breach that cannot be raised and go on (the sweep), or throw (a signal)
+ * @param {{today: string}} opts
  * @param {{raised: number, refreshed: number, failed: number}} tally  added to
  */
-async function runRule(db, rule, { today, employee_id: employeeId = null, tolerant }, tally) {
+async function runRule(db, rule, { today }, tally) {
   const metric = metrics.metricOf(rule.metric);
   let after = null;
   do {
-    const { readings, next } = await metric.evaluate(db, rule, { today, after, employee_id: employeeId });
+    const { readings, next } = await metric.evaluate(db, rule, { today, after });
     for (const reading of readings) {
       try {
         const out = await raiseOne(db, rule, metric, reading);
         if (out.created) tally.raised += 1;
         else if (out.raised) tally.refreshed += 1;
       } catch (err) {
-        if (!tolerant) throw err;
         tally.failed += 1;
         logger.error({ err, rule: rule.key, subject: reading.subject }, "an alert could not be raised");
       }
@@ -81,7 +79,7 @@ async function sweep({ now = new Date(), db = pool } = {}) {
       continue;
     }
     try {
-      await runRule(db, rule, { today, tolerant: true }, tally);
+      await runRule(db, rule, { today }, tally);
     } catch (err) {
       tally.failed += 1;
       logger.error({ err, rule: rule.key }, "an alert rule could not be read");
@@ -90,23 +88,4 @@ async function sweep({ now = new Date(), db = pool } = {}) {
   return tally;
 }
 
-/**
- * One person's switched-on rules of these metrics, read now: an attendance signal's work.
- * @param {string} employeeId
- * @param {string[]} metricKeys  metrics that read one person (alerts.metrics.js per_person)
- * @param {{now?: Date, db?: import("pg").Pool}} [opts]
- * @returns {Promise<{raised: number, refreshed: number, failed: number}>}
- */
-async function evaluatePerson(employeeId, metricKeys, { now = new Date(), db = pool } = {}) {
-  for (const key of metricKeys) {
-    const metric = metrics.metricOf(key);
-    if (!metric || !metric.per_person) throw new Error(`alerts.evaluatePerson: "${key}" does not read one person`);
-  }
-  const today = lagos.today(now);
-  const tally = { raised: 0, refreshed: 0, failed: 0 };
-  for (const rule of await repo.enabledRulesFor(db, metricKeys))
-    await runRule(db, rule, { today, employee_id: employeeId, tolerant: false }, tally);
-  return tally;
-}
-
-module.exports = { sweep, evaluatePerson };
+module.exports = { sweep };

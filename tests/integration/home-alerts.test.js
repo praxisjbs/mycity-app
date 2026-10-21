@@ -9,11 +9,13 @@
  * Refuses to run unless the database name ends in "_test": it drops and rebuilds the public
  * schema. Every person here is invented. Days are counted back from today in Lagos.
  *
- * The rules are made on the screen's own routes; then the attendance day-close and a clock-in
- * signal raise their alerts, and the morning sweep raises the rest from real rows in the
- * modules that own them: the days the attendance module recorded late, a request waiting for
- * approval, documents near expiry, a confirmation and contracts coming due. Who sees which
- * alert follows the rule's grant over the person it is about, and never reaches the person
+ * The rules are made on the screen's own routes, and the morning sweep raises their alerts from
+ * real rows in the modules that own them: a request waiting for approval, documents near expiry,
+ * a confirmation and contracts coming due. Attendance's alerts are the Attendance policy's
+ * breaches (attendance.md §6.16): a version in force switches Late Arrivals and Forgotten
+ * Clock-Outs on, the attendance module counts each person's days as it records them, and each
+ * breach raises its own alert after commit on the rule Home keeps for that policy rule. Who sees
+ * which alert follows the rule's grant over the person it is about, and never reaches the person
  * themselves; clearing takes both checks; a rule switched off dismisses its open alerts; a
  * closed alert is raised again only for new evidence.
  *
@@ -29,6 +31,7 @@ const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { emit } = require("../../src/shared/events/emit");
 const { rebuild } = require("./helpers/schema");
+const { attendanceVersion } = require("./helpers/policies");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -42,6 +45,7 @@ const searchService = require("../../src/shared/search/search.service");
 const realtime = require("../../src/services/realtime/emitter");
 const attendanceRepo = require("../../src/modules/attendance/attendance.repo");
 const reconcile = require("../../src/modules/attendance/attendance.reconcile");
+const rulesEngine = require("../../src/modules/attendance/attendance.rules-engine");
 const { EVENTS: ATTENDANCE } = require("../../src/modules/attendance/attendance.events");
 const sweeps = require("../../src/modules/alerts/alerts.sweeps");
 const engine = require("../../src/shared/alerts/alerts");
@@ -131,6 +135,14 @@ describeDb("Home · Alerts against the real migrations", () => {
       subjectId,
     ]);
   const daysFromToday = (n) => lagos.addDays(today, n);
+  /** The open alert of a policy rule about a person (its subject is the breach). */
+  const policyAlert = (policyRule, who) =>
+    one(
+      `SELECT a.home_alert_id, a.subject_id FROM home_alert a JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id
+        WHERE r.key = $1 AND a.subject_employee_id = $2 AND a.cleared_at IS NULL
+        ORDER BY a.raised_at DESC LIMIT 1`,
+      [`attendance_policy.${policyRule}`, ids[who]],
+    );
 
   /** Someone with no login, as People · Employees adds them. */
   async function person(key, first, last, { manager = null } = {}) {
@@ -188,9 +200,26 @@ describeDb("Home · Alerts against the real migrations", () => {
     }
   }
 
+  /**
+   * The attendance module counts a person's consequence rules on a day, as a punch or the day-close
+   * would, and each breach's alert follows after commit.
+   */
+  async function countRules(who, daysAgo) {
+    await tx(async (client) => rulesEngine.countDay(client, await attendanceRepo.person(client, ids[who]), daysFromToday(-daysAgo)));
+    await drain();
+  }
+
   beforeAll(async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
     await rebuild(pool, config.DB_NAME);
+    // The Attendance policy MyCity would publish: Late Arrivals (3 in 30 days, Alert) and Forgotten
+    // Clock-Outs (1 in 30 days, Alert and Raise Query) switched on.
+    const countRule = (count, alert, query) => ({ on: true, count, period: "days_30", alert, query });
+    await attendanceVersion(
+      pool,
+      { late_rule: { ...countRule(3, true, false), hours: null }, forgotten_rule: countRule(1, true, true) },
+      "2026-01-01",
+    );
     workingWeek.invalidateCalendar();
     outbox.markReady();
     aiRegistry.load();
@@ -278,10 +307,8 @@ describeDb("Home · Alerts against the real migrations", () => {
 
   describe("the rules", () => {
     const RULES = {
-      late: { name: "Late Arrivals", metric: "late_arrivals", threshold: "3", window_days: 30, severity: "medium", permission_key: "people.view" },
-      lateHigh: { name: "Late Arrivals", metric: "late_arrivals", threshold: "5", window_days: 30, severity: "high", permission_key: "people.view" },
-      missing: { name: "Missing Clock-Outs", metric: "missing_clock_out", threshold: "1", window_days: 7, severity: "low", permission_key: "people.approve" },
       waiting: { name: "Approvals Waiting", metric: "approval_ageing", threshold: "3", severity: "high", permission_key: "people.approve" },
+      waitingSlow: { name: "Approvals Waiting", metric: "approval_ageing", threshold: "4", severity: "medium", permission_key: "people.view" },
       documents: { name: "Documents Expiring", metric: "document_expiry", threshold: "30", severity: "medium", permission_key: "people.edit" },
       confirmations: { name: "Confirmations Due", metric: "confirmation_due", threshold: "14", severity: "medium", permission_key: "people.edit" },
       contracts: { name: "Contracts Ending", metric: "contract_ending", threshold: "30.00", severity: "high", permission_key: "people.edit" },
@@ -290,7 +317,7 @@ describeDb("Home · Alerts against the real migrations", () => {
 
     test("only a holder of `alerts.manage` reads or writes them", async () => {
       for (const who of ["manager", "clerk", "staff"]) {
-        for (const res of [await as(who).get("/home/alert-rules"), await as(who).post("/home/alert-rules", RULES.late)])
+        for (const res of [await as(who).get("/home/alert-rules"), await as(who).post("/home/alert-rules", RULES.waiting)])
           expect([who, res.status, res.body.error.code]).toEqual([who, 403, "CAPABILITY_REQUIRED"]);
       }
       expect((await request(app).get("/api/v1/home/alert-rules")).status).toBe(401);
@@ -303,55 +330,53 @@ describeDb("Home · Alerts against the real migrations", () => {
         expect([key, res.status]).toEqual([key, 201]);
         rules[key] = a.HomeAlertRule.parse(res.body);
       }
-      expect(rules.late).toMatchObject({
-        key: "late_arrivals.late_arrivals",
-        name: "Late Arrivals",
-        category: "attendance",
+      expect(rules.waiting).toMatchObject({
+        key: "approval_ageing.approvals_waiting",
+        name: "Approvals Waiting",
+        category: "approval",
         kind: "count",
         threshold: "3",
-        window_days: 30,
-        who_can_clear: "People Viewers",
+        window_days: null,
+        who_can_clear: "People Approvers",
         enabled: true,
         open_alerts: 0,
         created_by: people.ops.user.user_id,
         updated_by: people.ops.user.user_id,
       });
-      expect(rules.lateHigh.key).toBe("late_arrivals.late_arrivals_2");
+      expect(rules.waitingSlow).toMatchObject({ key: "approval_ageing.approvals_waiting_2", who_can_clear: "People Viewers" });
       expect(rules.contracts).toMatchObject({ key: "contract_ending.contracts_ending", kind: "deadline", threshold: "30" });
-      expect(rules.waiting).toMatchObject({ window_days: null, who_can_clear: "People Approvers" });
       expect(rules.partners).toMatchObject({ category: "partnership", who_can_clear: "Partnerships Editors" });
       expect((await countEvents("home.alert_rule_created")) - before).toBe(Object.keys(RULES).length);
     });
 
-    test("a rule fits its metric: a window only where it counts over days, whole days for a deadline, a known grant", async () => {
+    test("a rule fits its metric: no window, whole days for a deadline, a known grant; attendance's are the policy's", async () => {
       const refused = async (body, field, message) => {
         const res = await as("ops").post("/home/alert-rules", body);
         expect([res.status, res.body.error.fields[field]]).toEqual([422, [message]]);
       };
       await refused({ ...RULES.documents, threshold: "2.5" }, "threshold", "Whole days only");
       await refused({ ...RULES.waiting, window_days: 30 }, "window_days", "Not for this metric");
-      await refused({ ...RULES.late, window_days: undefined }, "window_days", "Enter the days");
-      await refused({ ...RULES.late, permission_key: "nowhere.view" }, "permission_key", "Choose who clears");
-      expect((await as("ops").post("/home/alert-rules", { ...RULES.late, key: "mine" })).status).toBe(422);
+      await refused({ ...RULES.waiting, permission_key: "nowhere.view" }, "permission_key", "Choose who clears");
+      expect((await as("ops").post("/home/alert-rules", { ...RULES.waiting, key: "mine" })).status).toBe(422);
+      for (const metric of ["late_arrivals", "missing_clock_out", "attendance_policy"])
+        expect([metric, (await as("ops").post("/home/alert-rules", { ...RULES.waiting, metric })).status]).toEqual([metric, 422]);
     });
 
     test("the rules list pages, filters and sorts; one rule reads by id", async () => {
       const all = await everyPage("ops", "/home/alert-rules", a.HomeAlertRulePage);
       expect(all.map((r) => r.name)).toEqual([
         "Approvals Waiting",
+        "Approvals Waiting",
         "Confirmations Due",
         "Contracts Ending",
         "Documents Expiring",
-        "Late Arrivals",
-        "Late Arrivals",
-        "Missing Clock-Outs",
         "Quiet Partners",
       ]);
       expect((await everyPage("ops", "/home/alert-rules?category=people", a.HomeAlertRulePage)).map((r) => r.name)).toEqual([
         "Confirmations Due",
         "Contracts Ending",
       ]);
-      expect(await everyPage("ops", "/home/alert-rules?metric=late_arrivals", a.HomeAlertRulePage)).toHaveLength(2);
+      expect(await everyPage("ops", "/home/alert-rules?metric=approval_ageing", a.HomeAlertRulePage)).toHaveLength(2);
       expect(await everyPage("ops", "/home/alert-rules?enabled=false", a.HomeAlertRulePage)).toEqual([]);
       expect((await everyPage("ops", "/home/alert-rules?q=quiet", a.HomeAlertRulePage)).map((r) => r.key)).toEqual([
         "partner_inactivity.quiet_partners",
@@ -364,12 +389,12 @@ describeDb("Home · Alerts against the real migrations", () => {
     });
 
     test("a rule changes in anything but its metric; saving it unchanged records nothing", async () => {
-      const path = `/home/alert-rules/${rules.lateHigh.home_alert_rule_id}`;
+      const path = `/home/alert-rules/${rules.waitingSlow.home_alert_rule_id}`;
       const before = await countEvents("home.alert_rule_updated");
-      const changed = a.HomeAlertRule.parse((await as("ops").patch(path, { name: "Late Arrivals, Serious", severity: "high" })).body);
-      expect(changed).toMatchObject({ name: "Late Arrivals, Serious", key: "late_arrivals.late_arrivals_2" });
+      const changed = a.HomeAlertRule.parse((await as("ops").patch(path, { name: "Approvals Waiting, Slow", severity: "high" })).body);
+      expect(changed).toMatchObject({ name: "Approvals Waiting, Slow", key: "approval_ageing.approvals_waiting_2" });
       expect(await countEvents("home.alert_rule_updated")).toBe(before + 1);
-      expect((await as("ops").patch(path, { name: "Late Arrivals, Serious", threshold: "5.00" })).status).toBe(200);
+      expect((await as("ops").patch(path, { name: "Approvals Waiting, Slow", threshold: "4.00" })).status).toBe(200);
       expect(await countEvents("home.alert_rule_updated")).toBe(before + 1);
 
       expect((await as("ops").patch(path, { metric: "approval_ageing" })).status).toBe(422);
@@ -381,19 +406,19 @@ describeDb("Home · Alerts against the real migrations", () => {
       await refused(rules.waiting.home_alert_rule_id, { window_days: 7 }, "window_days", "Not for this metric");
       await refused(rules.waiting.home_alert_rule_id, { permission_key: "nowhere.approve" }, "permission_key", "Choose who clears");
       expect((await as("ops").patch(`/home/alert-rules/${crypto.randomUUID()}`, { name: "X" })).status).toBe(404);
-      expect((await as("keeper").patch(path, { threshold: "6" })).status).toBe(200);
-      expect((await one("SELECT updated_by FROM home_alert_rule WHERE key = 'late_arrivals.late_arrivals_2'")).updated_by).toBe(
+      expect((await as("keeper").patch(path, { threshold: "4.5" })).status).toBe(200);
+      expect((await one("SELECT updated_by FROM home_alert_rule WHERE key = 'approval_ageing.approvals_waiting_2'")).updated_by).toBe(
         people.keeper.user.user_id,
       );
     });
   });
 
   /* ---------------------------------------------------------------- *
-   * Signals
+   * The Attendance policy's breaches
    * ---------------------------------------------------------------- */
 
-  describe("the signals between sweeps", () => {
-    test("the day-close's signal re-reads that person's rules: a missing clock-out raises at once", async () => {
+  describe("the Attendance policy's breaches (attendance.md §6.16)", () => {
+    test("the day-close's missing clock-out is a forgotten clock-out: its breach raises Query Due after commit", async () => {
       const yesterday = workingWeek.addWorkingDays(today, -1, await workingWeek.loadCalendar(pool));
       await q(
         `INSERT INTO attendance_event (employee_id, event_type, occurred_at, work_date, worksite_id, source, validation_state)
@@ -402,45 +427,108 @@ describeDb("Home · Alerts against the real migrations", () => {
       );
       await reconcile.recomputeDay(pool, await attendanceRepo.person(pool, ids.remote), yesterday);
       await reconcile.closeDays();
+      // The breach is recorded with the day-close; its alert follows after commit.
+      const breach = await one("SELECT attendance_rule_breach_id, rule, count, days, home_alert_id FROM attendance_rule_breach WHERE employee_id = $1", [
+        ids.remote,
+      ]);
+      expect(breach).toMatchObject({ rule: "forgotten_clock_out", count: 1, home_alert_id: null });
       expect((await one("SELECT count(*)::int AS n FROM home_alert")).n).toBe(0);
       await drain();
-      const { rows } = await q("SELECT home_alert_rule_id, subject_id, title, trigger, over_by FROM home_alert");
+      const { rows } = await q(
+        `SELECT r.key, r.metric, a.subject_type, a.subject_id, a.subject_employee_id, a.title, a.trigger, a.severity
+           FROM home_alert a JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id`,
+      );
       expect(rows).toEqual([
         {
-          home_alert_rule_id: rules.missing.home_alert_rule_id,
-          subject_id: ids.remote,
-          title: "Zainab Lawal: 1 missing clock-out in 7 days",
+          key: "attendance_policy.forgotten_rule",
+          metric: "attendance_policy",
+          subject_type: "attendance_rule_breach",
+          subject_id: breach.attendance_rule_breach_id,
+          subject_employee_id: ids.remote,
+          title: "Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
           trigger: `No clock-out on ${formatDate(yesterday)}`,
-          over_by: "0.00",
+          severity: "medium",
         },
       ]);
+      expect((await one("SELECT home_alert_id FROM attendance_rule_breach WHERE attendance_rule_breach_id = $1", [breach.attendance_rule_breach_id])).home_alert_id).toBeTruthy();
       // Running the handlers again changes nothing.
       await q("UPDATE event_outbox SET status = 'pending', completed_handlers = '{}' WHERE event_key = $1", [
-        ATTENDANCE.ATTENDANCE_DAY_CLOSED,
+        ATTENDANCE.ATTENDANCE_RULE_BREACHED,
       ]);
       await drain();
       expect((await one("SELECT count(*)::int AS n FROM home_alert")).n).toBe(1);
       expect(await countEvents("home.alert_raised")).toBe(1);
     });
 
-    test("a clock-in re-reads that person's late arrivals", async () => {
+    test("late arrivals: three give one breach and its alert; the fourth waits for the next", async () => {
       await lateOn("outsider", [2, 3, 6, 12]);
-      await tx((client) =>
-        emit(client, {
-          key: ATTENDANCE.ATTENDANCE_PUNCHED,
-          entity: { type: "attendance_event", id: crypto.randomUUID() },
-          actor: null,
-          payload: { employee_id: ids.outsider, subject_employee_id: ids.outsider, event_type: "clock_in", work_date: today },
-        }),
-      );
-      await drain();
-      const raised = await openAlert("late", ids.outsider);
-      expect(raised).toBeTruthy();
-      expect(await one("SELECT title, over_by, subject_employee_id FROM home_alert WHERE home_alert_id = $1", [raised.home_alert_id])).toEqual({
-        title: "Bisi Ojo: 4 late arrivals in 30 days",
-        over_by: "1.00",
+      await countRules("outsider", 2);
+      const breaches = await q("SELECT days::text[] AS days, count FROM attendance_rule_breach WHERE employee_id = $1 AND rule = 'late'", [
+        ids.outsider,
+      ]);
+      expect(breaches.rows).toEqual([{ days: [12, 6, 3].map((n) => daysFromToday(-n)), count: 3 }]);
+      const raised = await policyAlert("late_rule", "outsider");
+      expect(await one("SELECT title, trigger, subject_employee_id FROM home_alert WHERE home_alert_id = $1", [raised.home_alert_id])).toEqual({
+        title: "Bisi Ojo: 3 late arrivals in 30 days",
+        trigger: `Late on ${[12, 6, 3].map((n) => formatDate(daysFromToday(-n))).join(", ").replace(/, ([^,]*)$/, " and $1")}`,
         subject_employee_id: ids.outsider,
       });
+      // Counting the same day again adds nothing.
+      await countRules("outsider", 2);
+      expect((await one("SELECT count(*)::int AS n FROM attendance_rule_breach WHERE employee_id = $1", [ids.outsider])).n).toBe(1);
+    });
+
+    test("a breach with Alert and Raise Query off raises nothing", async () => {
+      const day = daysFromToday(-20);
+      await tx(async (client) => {
+        const { attendance_rule_breach_id: id } = await attendanceRepo.insertBreach(client, {
+          employee_id: ids.filler2,
+          rule: "location_flag",
+          policy_version_id: null,
+          period: "month",
+          period_start: day,
+          period_end: day,
+          count: 1,
+          minutes: 0,
+          reached: "count",
+          days: [day],
+          last_day: day,
+          alert: false,
+          raise_query: false,
+        });
+        await emit(client, {
+          key: ATTENDANCE.ATTENDANCE_RULE_BREACHED,
+          entity: { type: "attendance_rule_breach", id },
+          actor: null,
+          payload: { attendance_rule_breach_id: id, employee_id: ids.filler2, alert: false, raise_query: false },
+        });
+      });
+      await drain();
+      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_employee_id = $1", [ids.filler2])).n).toBe(0);
+    });
+
+    test("Alert Rules reads the policy's five rules, read only; the rules Home keeps for them are never listed or edited", async () => {
+      const res = await as("ops").get("/home/alert-rules/policy");
+      expect(res.status).toBe(200);
+      const read = a.HomeAlertPolicyRules.parse(res.body);
+      expect(read.version).toBeGreaterThanOrEqual(1);
+      expect(read.rules.map((r) => [r.rule, r.name, r.on, r.figures, r.alert, r.query])).toEqual([
+        ["late_rule", "Late Arrivals", true, "3 late arrivals in 30 days", true, false],
+        ["early_rule", "Early Departure", false, null, true, true],
+        ["absence_rule", "Absence", false, null, true, true],
+        ["forgotten_rule", "Forgotten Clock-Outs", true, "1 forgotten clock-out in 30 days", true, true],
+        ["location_rule", "Location Flags", false, null, true, false],
+      ]);
+      expect(read.rules.find((r) => r.rule === "late_rule").open_alerts).toBe(1);
+      expect(read.rules.find((r) => r.rule === "forgotten_rule").open_alerts).toBe(1);
+      expect((await as("keeper").get("/home/alert-rules/policy")).status).toBe(200);
+      expect((await as("manager").get("/home/alert-rules/policy")).status).toBe(403);
+
+      const kept = await one("SELECT home_alert_rule_id FROM home_alert_rule WHERE key = 'attendance_policy.late_rule'");
+      expect((await everyPage("ops", "/home/alert-rules", a.HomeAlertRulePage)).map((r) => r.metric)).not.toContain("attendance_policy");
+      expect((await as("ops").get(`/home/alert-rules/${kept.home_alert_rule_id}`)).status).toBe(404);
+      expect((await as("ops").patch(`/home/alert-rules/${kept.home_alert_rule_id}`, { enabled: false })).status).toBe(404);
+      expect((await one("SELECT enabled FROM home_alert_rule WHERE home_alert_rule_id = $1", [kept.home_alert_rule_id])).enabled).toBe(true);
     });
   });
 
@@ -453,9 +541,11 @@ describeDb("Home · Alerts against the real migrations", () => {
     const docIds = {};
 
     beforeAll(async () => {
-      // Late: Musa three times in the window; Zainab twice in it and once long before.
+      // Late: Musa three times in 30 days, a breach; Zainab twice in them and once long before, none.
       await lateOn("staff", [3, 7, 9]);
+      await countRules("staff", 3);
       await lateOn("remote", [5, 8, 45]);
+      await countRules("remote", 5);
       // A leave request waiting five days at the line manager; another opened today.
       const { workflow_definition_id: flow } = await one(
         "SELECT workflow_definition_id FROM workflow_definition WHERE key = 'leave.approval' AND version = 1",
@@ -502,8 +592,8 @@ describeDb("Home · Alerts against the real migrations", () => {
       tally = await require("../../src/jobs/schedulers/home-alert-sweeps").run();
     });
 
-    test("each metric over M0 and M1 tables raises from real rows, and nothing below its threshold", async () => {
-      expect(tally).toEqual({ rules: 8, raised: 31, refreshed: 2, skipped: 0, failed: 0 });
+    test("each metric over M0 tables raises from real rows, and nothing below its threshold; the policy's are not swept", async () => {
+      expect(tally).toEqual({ rules: 6, raised: 31, refreshed: 0, skipped: 0, failed: 0 });
       const { rows } = await q(
         `SELECT r.key, a.subject_type, a.subject_id, a.subject_employee_id, a.title, a.trigger, a.over_by
            FROM home_alert a JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id
@@ -519,6 +609,42 @@ describeDb("Home · Alerts against the real migrations", () => {
           title: "Leave Request for Musa Danjuma: waiting 5 days",
           trigger: `At Line Manager since ${formatDate(daysFromToday(-5))}`,
           over_by: "2.00",
+        },
+        {
+          key: "approval_ageing.approvals_waiting_2",
+          subject_type: "leave_request",
+          subject_id: leaveRequest,
+          subject_employee_id: ids.staff,
+          title: "Leave Request for Musa Danjuma: waiting 5 days",
+          trigger: `At Line Manager since ${formatDate(daysFromToday(-5))}`,
+          over_by: "0.50",
+        },
+        {
+          key: "attendance_policy.forgotten_rule",
+          subject_type: "attendance_rule_breach",
+          subject_id: expect.any(String),
+          subject_employee_id: ids.remote,
+          title: "Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
+          trigger: expect.stringMatching(/^No clock-out on /),
+          over_by: "0.00",
+        },
+        {
+          key: "attendance_policy.late_rule",
+          subject_type: "attendance_rule_breach",
+          subject_id: expect.any(String),
+          subject_employee_id: ids.outsider,
+          title: "Bisi Ojo: 3 late arrivals in 30 days",
+          trigger: expect.stringMatching(/^Late on /),
+          over_by: "0.00",
+        },
+        {
+          key: "attendance_policy.late_rule",
+          subject_type: "attendance_rule_breach",
+          subject_id: expect.any(String),
+          subject_employee_id: ids.staff,
+          title: "Musa Danjuma: 3 late arrivals in 30 days",
+          trigger: `Late on ${[9, 7, 3].map((n) => formatDate(daysFromToday(-n))).join(", ").replace(/, ([^,]*)$/, " and $1")}`,
+          over_by: "0.00",
         },
         {
           key: "confirmation_due.confirmations_due",
@@ -547,35 +673,8 @@ describeDb("Home · Alerts against the real migrations", () => {
           trigger: `Expired on ${formatDate(daysFromToday(-2))}`,
           over_by: "-2.00",
         },
-        {
-          key: "late_arrivals.late_arrivals",
-          subject_type: "employee",
-          subject_id: ids.outsider,
-          subject_employee_id: ids.outsider,
-          title: "Bisi Ojo: 4 late arrivals in 30 days",
-          trigger: `Late on 4 days, last on ${formatDate(daysFromToday(-2))}`,
-          over_by: "1.00",
-        },
-        {
-          key: "late_arrivals.late_arrivals",
-          subject_type: "employee",
-          subject_id: ids.staff,
-          subject_employee_id: ids.staff,
-          title: "Musa Danjuma: 3 late arrivals in 30 days",
-          trigger: `Late on ${[9, 7, 3].map((n) => formatDate(daysFromToday(-n))).join(", ").replace(/, ([^,]*)$/, " and $1")}`,
-          over_by: "0.00",
-        },
-        {
-          key: "missing_clock_out.missing_clock_outs",
-          subject_type: "employee",
-          subject_id: ids.remote,
-          subject_employee_id: ids.remote,
-          title: "Zainab Lawal: 1 missing clock-out in 7 days",
-          trigger: expect.stringMatching(/^No clock-out on /),
-          over_by: "0.00",
-        },
       ]);
-      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = $1", [leaveRequest])).n).toBe(1);
+      expect((await one("SELECT count(*)::int AS n FROM home_alert WHERE subject_id = $1", [leaveRequest])).n).toBe(2);
       const contracts = await q(
         "SELECT a.over_by FROM home_alert a WHERE a.home_alert_rule_id = $1 ORDER BY a.over_by::numeric",
         [rules.contracts.home_alert_rule_id],
@@ -585,14 +684,14 @@ describeDb("Home · Alerts against the real migrations", () => {
 
     test("one open alert per rule and subject: the next sweep refreshes, it never doubles", async () => {
       const again = await sweeps.sweep();
-      expect(again).toEqual({ rules: 8, raised: 0, refreshed: 33, skipped: 0, failed: 0 });
-      expect((await one("SELECT count(*)::int AS n FROM home_alert")).n).toBe(33);
-      expect(await countEvents("home.alert_raised")).toBe(33);
+      expect(again).toEqual({ rules: 6, raised: 0, refreshed: 31, skipped: 0, failed: 0 });
+      expect((await one("SELECT count(*)::int AS n FROM home_alert")).n).toBe(34);
+      expect(await countEvents("home.alert_raised")).toBe(34);
     });
 
     test("the queue re-runs a morning by hand, under the scheduler's lock", async () => {
       const handler = require("../../src/jobs/handlers/home-alert-sweeps");
-      expect(await handler({ data: { date: today } })).toMatchObject({ raised: 0, refreshed: 33, failed: 0 });
+      expect(await handler({ data: { date: today } })).toMatchObject({ raised: 0, refreshed: 31, failed: 0 });
     });
   });
 
@@ -612,26 +711,24 @@ describeDb("Home · Alerts against the real migrations", () => {
 
     test("Operations and the CEO see every alert, two pages of them", async () => {
       const first = a.HomeAlertPage.parse((await as("ops").get("/home/alerts")).body);
-      expect(first.page).toEqual({ number: 1, size: 25, total: 33, pages: 2, has_next: true });
-      expect(await alertsOf("ceo")).toHaveLength(33);
+      expect(first.page).toEqual({ number: 1, size: 25, total: 34, pages: 2, has_next: true });
+      expect(await alertsOf("ceo")).toHaveLength(34);
       expect((await alertsOf("ops")).every((r) => r.can_clear)).toBe(true);
     });
 
     test("a line manager sees the alerts of the rules their grants hold, about their own team only", async () => {
       expect(subjects(await alertsOf("manager"))).toEqual([
+        "Approvals Waiting, Slow: Leave Request for Musa Danjuma: waiting 5 days",
         "Approvals Waiting: Leave Request for Musa Danjuma: waiting 5 days",
+        "Forgotten Clock-Outs: Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
         "Late Arrivals: Musa Danjuma: 3 late arrivals in 30 days",
-        "Missing Clock-Outs: Zainab Lawal: 1 missing clock-out in 7 days",
       ]);
     });
 
     test("a rule keeper sees the alerts their grant reaches but may clear none of them", async () => {
       const rows = await alertsOf("keeper");
-      expect(subjects(rows)).toEqual([
-        "Late Arrivals: Bisi Ojo: 4 late arrivals in 30 days",
-        "Late Arrivals: Musa Danjuma: 3 late arrivals in 30 days",
-      ]);
-      expect(rows.map((r) => r.can_clear)).toEqual([false, false]);
+      expect(subjects(rows)).toEqual(["Approvals Waiting, Slow: Leave Request for Musa Danjuma: waiting 5 days"]);
+      expect(rows.map((r) => r.can_clear)).toEqual([false]);
       expect(await alertsOf("keeper", "?mine=true")).toEqual([]);
     });
 
@@ -659,8 +756,18 @@ describeDb("Home · Alerts against the real migrations", () => {
         outcome: null,
         can_clear: true,
       });
-      const late = rows.find((r) => r.title === "Bisi Ojo: 4 late arrivals in 30 days");
-      expect(late).toMatchObject({ over_by: "1.00", over_by_kind: "over", link: `/people?tab=employees&id=${ids.outsider}` });
+      const late = rows.find((r) => r.title === "Bisi Ojo: 3 late arrivals in 30 days");
+      expect(late).toMatchObject({
+        rule_name: "Late Arrivals",
+        metric: "attendance_policy",
+        category: "attendance",
+        subject_type: "attendance_rule_breach",
+        subject_employee_id: ids.outsider,
+        over_by: null,
+        over_by_kind: null,
+        who_can_clear: "People Approvers",
+        link: `/people?tab=attendance&id=${late.subject_id}`,
+      });
       const waiting = rows.find((r) => r.metric === "approval_ageing");
       expect(waiting.link).toBe(`/people?tab=leave&id=${leaveRequest}`);
     });
@@ -674,19 +781,20 @@ describeDb("Home · Alerts against the real migrations", () => {
 
     test("the list filters by category, severity, rule and age, and sorts by severity", async () => {
       expect(subjects(await alertsOf("ops", "?category=attendance"))).toEqual([
-        "Late Arrivals: Bisi Ojo: 4 late arrivals in 30 days",
+        "Forgotten Clock-Outs: Query Due: Zainab Lawal, 1 forgotten clock-out in 30 days",
+        "Late Arrivals: Bisi Ojo: 3 late arrivals in 30 days",
         "Late Arrivals: Musa Danjuma: 3 late arrivals in 30 days",
-        "Missing Clock-Outs: Zainab Lawal: 1 missing clock-out in 7 days",
       ]);
-      expect(await alertsOf("ops", "?severity=high")).toHaveLength(27);
+      expect(await alertsOf("ops", "?severity=high")).toHaveLength(28);
       expect(await alertsOf("ops", `?home_alert_rule_id=${rules.contracts.home_alert_rule_id}`)).toHaveLength(26);
       expect(await alertsOf("ops", "?q=passport")).toHaveLength(1);
       const bySeverity = a.HomeAlertPage.parse((await as("ops").get("/home/alerts?sort=-severity")).body).data;
       expect(bySeverity[0].severity).toBe("high");
+      // No rule raising low alerts breaches here: the least severe open is medium.
       const lowest = a.HomeAlertPage.parse((await as("ops").get("/home/alerts?sort=severity")).body).data;
-      expect(lowest[0].severity).toBe("low");
+      expect(lowest[0].severity).toBe("medium");
 
-      const { home_alert_id: aged } = await openAlert("late", ids.outsider);
+      const { home_alert_id: aged } = await policyAlert("late_rule", "outsider");
       await q("UPDATE home_alert SET raised_at = now() - interval '8 days' WHERE home_alert_id = $1", [aged]);
       expect((await alertsOf("ops", "?overdue=true")).map((r) => r.home_alert_id)).toEqual([aged]);
     });
@@ -700,7 +808,7 @@ describeDb("Home · Alerts against the real migrations", () => {
     const clear = (who, id, body = {}) => as(who).post(`/home/alerts/${id}/clear`, body);
 
     test("a rule's grant without `alerts.clear` is refused at the route", async () => {
-      const { home_alert_id: id } = await openAlert("late", ids.staff);
+      const { home_alert_id: id } = await policyAlert("late_rule", "staff");
       for (const who of ["clerk", "keeper", "staff"]) {
         const res = await clear(who, id);
         expect([who, res.status, res.body.error.code]).toEqual([who, 403, "CAPABILITY_REQUIRED"]);
@@ -710,7 +818,7 @@ describeDb("Home · Alerts against the real migrations", () => {
     test("`alerts.clear` without the rule's grant over the person cannot reach the alert", async () => {
       const passport = await openAlert("documents", (await one("SELECT document_id FROM document WHERE title = 'Passport'")).document_id);
       expect((await clear("manager", passport.home_alert_id)).status).toBe(404);
-      const outsider = await openAlert("late", ids.outsider);
+      const outsider = await policyAlert("late_rule", "outsider");
       expect((await clear("manager", outsider.home_alert_id)).status).toBe(404);
       expect(await one("SELECT cleared_at FROM home_alert WHERE home_alert_id = $1", [outsider.home_alert_id])).toEqual({
         cleared_at: null,
@@ -718,7 +826,7 @@ describeDb("Home · Alerts against the real migrations", () => {
     });
 
     test("a line manager clears their team's alert, once: again is the same answer and no second entry", async () => {
-      const { home_alert_id: id } = await openAlert("late", ids.staff);
+      const { home_alert_id: id } = await policyAlert("late_rule", "staff");
       const before = await countEvents("home.alert_cleared");
       const first = a.HomeAlert.parse((await clear("manager", id, { note: "Spoke to Musa" })).body);
       expect(first).toMatchObject({
@@ -749,18 +857,19 @@ describeDb("Home · Alerts against the real migrations", () => {
         "Musa Danjuma: 3 late arrivals in 30 days",
         "Office Lease",
       ]);
-      expect(await alertsOf("ops")).toHaveLength(30);
+      expect(await alertsOf("ops")).toHaveLength(31);
     });
 
-    test("a breach a person closed is not raised again by the next sweep for the same evidence", async () => {
-      expect(await sweeps.sweep()).toEqual({ rules: 8, raised: 0, refreshed: 30, skipped: 0, failed: 0 });
-      // Late again today, after the clear: newer evidence, so a new alert.
-      await lateOn("staff", [0], new Date());
-      expect((await sweeps.sweep()).raised).toBe(1);
-      const fresh = await openAlert("late", ids.staff);
+    test("a breach a person closed is not raised again by the next sweep; the next breach raises its own", async () => {
+      expect(await sweeps.sweep()).toEqual({ rules: 6, raised: 0, refreshed: 29, skipped: 0, failed: 0 });
+      // Late three more times after the breach: the count restarted, so a second breach and its own alert (T3).
+      await lateOn("staff", [0, 1, 2], new Date());
+      await countRules("staff", 0);
+      const fresh = await policyAlert("late_rule", "staff");
       expect(await one("SELECT title FROM home_alert WHERE home_alert_id = $1", [fresh.home_alert_id])).toEqual({
-        title: "Musa Danjuma: 4 late arrivals in 30 days",
+        title: "Musa Danjuma: 3 late arrivals in 30 days",
       });
+      expect((await one("SELECT count(*)::int AS n FROM attendance_rule_breach WHERE employee_id = $1 AND rule = 'late'", [ids.staff])).n).toBe(2);
       expect((await clear("manager", fresh.home_alert_id)).status).toBe(200);
     });
   });
@@ -772,36 +881,35 @@ describeDb("Home · Alerts against the real migrations", () => {
   describe("the counts", () => {
     test("Open, Needs You, Overdue 7 Days +, Cleared This Week, the chips and Alert Sources", async () => {
       expect(await summaryOf("ops")).toEqual({
-        open: 30,
-        needs_you: 30,
+        open: 31,
+        needs_you: 31,
         overdue: 1,
         cleared_this_week: 3,
         categories: [
           { category: "people", count: 26 },
+          { category: "approval", count: 2 },
           { category: "attendance", count: 2 },
-          { category: "approval", count: 1 },
           { category: "document", count: 1 },
         ],
         sources: [
           { metric: "contract_ending", count: 26 },
-          { metric: "late_arrivals", count: 3 },
+          { metric: "attendance_policy", count: 4 },
+          { metric: "approval_ageing", count: 2 },
           { metric: "document_expiry", count: 2 },
-          { metric: "approval_ageing", count: 1 },
           { metric: "confirmation_due", count: 1 },
-          { metric: "missing_clock_out", count: 1 },
         ],
       });
     });
 
     test("each reader's counts are over the alerts they may see; a rule keeper needs to clear none", async () => {
-      expect(await summaryOf("manager")).toMatchObject({ open: 2, needs_you: 2, overdue: 0, cleared_this_week: 2 });
-      expect(await summaryOf("keeper")).toMatchObject({ open: 1, needs_you: 0, overdue: 1, cleared_this_week: 2 });
+      expect(await summaryOf("manager")).toMatchObject({ open: 3, needs_you: 3, overdue: 0, cleared_this_week: 2 });
+      expect(await summaryOf("keeper")).toMatchObject({ open: 1, needs_you: 0, overdue: 0, cleared_this_week: 0 });
     });
 
     test("the list, the Overview's alerts beside Need You and the Open High Alerts card agree", async () => {
       const overview = (who) => as(who).get("/home/overview").then((res) => c.dashboard.HomeOverview.parse(res.body));
       expect((await overview("manager")).alerts_to_clear).toBe((await summaryOf("manager")).needs_you);
-      expect((await overview("ops")).alerts_to_clear).toBe(30);
+      expect((await overview("ops")).alerts_to_clear).toBe(31);
       expect((await overview("keeper")).alerts_to_clear).toBeNull();
       const card = c.dashboard.HomeKpiDetailPage.parse((await as("ops").get("/home/kpi/alerts_high_open")).body);
       expect(card.page.total).toBe((await alertsOf("ops", "?severity=high")).length);
@@ -849,11 +957,11 @@ describeDb("Home · Alerts against the real migrations", () => {
       const dismissed = await alertsOf("ops", "?state=dismissed");
       expect(dismissed).toHaveLength(27);
       expect(dismissed.filter((r) => r.note === "Rule switched off").every((r) => r.cleared_by === null)).toBe(true);
-      expect(await summaryOf("ops")).toMatchObject({ open: 4, needs_you: 4, cleared_this_week: 3 });
+      expect(await summaryOf("ops")).toMatchObject({ open: 5, needs_you: 5, cleared_this_week: 3 });
 
       expect((await as("ops").patch(path, { enabled: false })).status).toBe(200);
       expect((await countEvents("home.alert_cleared")) - cleared).toBe(26);
-      expect((await sweeps.sweep()).rules).toBe(7);
+      expect((await sweeps.sweep()).rules).toBe(5);
     });
 
     test("switched back on, what still breaches is raised at the next sweep", async () => {
@@ -871,8 +979,8 @@ describeDb("Home · Alerts against the real migrations", () => {
     test("alerts.mine is the open alerts the asker may clear, a page of 25; empty without `alerts.clear`", async () => {
       const read = await authorise.runRead(pool, users.manager, "alerts.mine", {});
       expect(read.list).toBe(true);
-      expect(a.HomeAlertPage.parse(wire({ data: read.data, page: read.page })).page.total).toBe(2);
-      expect(read.citations.map((x) => x.type)).toEqual(["home_alert", "home_alert"]);
+      expect(a.HomeAlertPage.parse(wire({ data: read.data, page: read.page })).page.total).toBe(3);
+      expect(read.citations.map((x) => x.type)).toEqual(["home_alert", "home_alert", "home_alert"]);
       const ops = await authorise.runRead(pool, users.ops, "alerts.mine", { category: "people" });
       expect(ops.page).toMatchObject({ total: 26, pages: 2 });
       for (const who of ["keeper", "staff"]) {
@@ -919,11 +1027,10 @@ describeDb("Home · Alerts against the real migrations", () => {
     beforeAll(async () => {
       const mine = await authorise.runRead(pool, users.manager, "alerts.mine", {});
       before = { summary: await summaryOf("manager"), mine: mine.page.total };
-      // Kemi, the line manager, is late three times herself.
+      // Kemi, the line manager, is late three times herself: a breach of the policy's Late Arrivals.
       await lateOn("manager", [1, 2, 4]);
-      await sweeps.evaluatePerson(ids.manager, ["late_arrivals"]);
-      ({ home_alert_id: id } = (await openAlert("late", ids.manager)) || {});
-      await drain();
+      await countRules("manager", 1);
+      ({ home_alert_id: id } = (await policyAlert("late_rule", "manager")) || {});
     });
 
     /** How many times someone was told an alert was raised. */
@@ -942,7 +1049,7 @@ describeDb("Home · Alerts against the real migrations", () => {
       expect(about(await alertsOf("manager", "?mine=true"))).toEqual([]);
       expect((await as("manager").get(`/home/alerts/${id}`)).status).toBe(404);
       expect((await as("manager").post(`/home/alerts/${id}/clear`, { outcome: "dismissed" })).status).toBe(404);
-      expect(await tx((client) => engine.mayClear(client, users.manager, { permission_key: "people.view" }, ids.manager))).toBe(
+      expect(await tx((client) => engine.mayClear(client, users.manager, { permission_key: "people.approve" }, ids.manager))).toBe(
         false,
       );
 
@@ -975,26 +1082,15 @@ describeDb("Home · Alerts against the real migrations", () => {
    * ---------------------------------------------------------------- */
 
   describe("evidence after a person closed an alert", () => {
-    test("a missed clock-out cleared before the day-close reaches its day is not raised again when it does", async () => {
-      const day = workingWeek.addWorkingDays(today, -2, await workingWeek.loadCalendar(pool));
-      await q(
-        `INSERT INTO attendance_event (employee_id, event_type, occurred_at, work_date, worksite_id, source, validation_state)
-         VALUES ($1, 'clock_in', $2, $3, $4, 'pwa', 'accepted')`,
-        [ids.filler1, lagos.instant(day, "08:00"), day, headOffice],
-      );
-      await reconcile.recomputeDay(pool, await attendanceRepo.person(pool, ids.filler1), day);
-      // Still open: the day-close has not reached the day.
-      await sweeps.evaluatePerson(ids.filler1, ["missing_clock_out"]);
-      const { home_alert_id: id } = await openAlert("missing", ids.filler1);
-      expect((await as("ops").post(`/home/alerts/${id}/clear`, { note: "Left at five" })).status).toBe(200);
-
-      // The day-close reaches the day after the clear, and its signal re-reads the person.
-      expect(await reconcile.closeDay(ids.filler1, day)).toMatchObject({ missing_clock_out: true });
-      await drain();
-      const { rows } = await q("SELECT cleared_at IS NULL AS open FROM home_alert WHERE home_alert_rule_id = $1 AND subject_id = $2", [
-        rules.missing.home_alert_rule_id,
-        ids.filler1,
+    test("a breach's alert a person cleared stays cleared when its day is counted again", async () => {
+      const { home_alert_id: id, subject_id: breachId } = await policyAlert("late_rule", "outsider");
+      expect((await as("ops").post(`/home/alerts/${id}/clear`, { note: "Spoke to Bisi" })).status).toBe(200);
+      await countRules("outsider", 2);
+      await q("UPDATE event_outbox SET status = 'pending', completed_handlers = '{}' WHERE event_key = $1", [
+        ATTENDANCE.ATTENDANCE_RULE_BREACHED,
       ]);
+      await drain();
+      const { rows } = await q("SELECT cleared_at IS NULL AS open FROM home_alert WHERE subject_id = $1", [breachId]);
       expect(rows).toEqual([{ open: false }]);
     });
 

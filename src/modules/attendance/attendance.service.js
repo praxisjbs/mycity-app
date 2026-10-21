@@ -19,14 +19,16 @@
  *      judged by the geofence mode (attendance.geofence.js); the time: the device's clock
  *      against the server's
  *   7. the strictest result is recorded with its evidence (attendance_event, append-only),
- *      the day recalculated, an exception opened for each check that wants review, and
- *      attendance.punched (and attendance.review_required) emitted, all committed together
+ *      the day recalculated (judged on its first clock-in, attendance.reconcile.js), an
+ *      exception opened for each check that wants review, then the day's pay items and rule
+ *      counts settled, and attendance.punched (and attendance.review_required) emitted, all
+ *      committed together
  *
  * The unique index on active events is the backstop for anything the lock missed: its
  * violation is the same 409. A rejected punch is recorded as an attempt, counts for
  * nothing and opens no exception. A clock-in that counts reads the day's reminder to clock
- * in, if the clock watch sent one (attendance.clock-watch.js, which also writes the
- * system's automatic clock-out).
+ * in, and a clock-out the day's reminders to clock out, if the clock watch sent them
+ * (attendance.clock-watch.js, which also makes the System Clock-Out).
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
@@ -133,8 +135,18 @@ async function openSession(db, employeeId, date) {
   return { date: null, events: todayEvents };
 }
 
+/** A shift as the clock and the register show it: its day, hours, grace and why it is off. */
+const shiftOut = (shift, offReason = shift.off_reason) => ({
+  working_day: shift.working_day,
+  starts_at: shift.starts_at,
+  ends_at: shift.ends_at,
+  grace_minutes: shift.grace_minutes,
+  off_reason: shift.working_day ? null : offReason || rules.OFF_DAY,
+});
+
 /**
- * GET /attendance/me/today: the server's word on where the person stands.
+ * GET /attendance/me/today: the server's word on where the person stands. The shift is the
+ * person's own (§6.13), as their day was judged once it was (§6.4).
  * @param {{user_id: string, employee_id: string, session_id: string}} user
  */
 async function today(user, { now = new Date() } = {}) {
@@ -144,14 +156,14 @@ async function today(user, { now = new Date() } = {}) {
   const date = rules.localDate(now, zone);
   const session = await openSession(pool, user.employee_id, date);
   const sessionDate = session.date || date;
-  const ctx = await calendar.contextFor(pool, person, sessionDate);
+  const { judged, ctx } = await reconcile.judgedOn(pool, person, sessionDate);
   const leave = await repo.grantedLeave(pool, user.employee_id, date);
   const day = await repo.getDay(pool, user.employee_id, sessionDate);
   const active = session.events.filter((e) => !e.excluded);
   const clockIn = active.find((e) => e.event_type === "clock_in") || null;
   const clockOut = active.find((e) => e.event_type === "clock_out") || null;
   const device = await devices.statusForSession(pool, user);
-  // Working from home: remote staff, or a hybrid employee's home day (§6.13).
+  // Working from home: a Remote day of the person's week, or remote staff with no schedule (§6.13).
   const remote = ctx.home_day;
   let homeState = null;
   if (person.work_pattern === "remote" || remote) {
@@ -180,7 +192,7 @@ async function today(user, { now = new Date() } = {}) {
     clock_out_automatic: Boolean(clockOut && clockOut.source === "system"),
     sign_in_prompt: signInPrompt,
     review: (await repo.openExceptionCount(pool, day ? day.attendance_day_id : null)) > 0,
-    shift: ctx.shift,
+    shift: shiftOut(judged.shift, ctx.shift.off_reason),
     work_pattern: person.work_pattern,
     location: ctx.approved
       ? { kind: "approved_day", name: ctx.approved.name, radius_m: null, home_state: homeState }
@@ -368,7 +380,8 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
     const opened = [];
     let dayId = null;
     if (result !== "rejected") {
-      const r = await reconcile.recomputeDay(client, person, workDate);
+      // Settled once the day's exceptions are open: Location Flags counts them (§6.16).
+      const r = await reconcile.recomputeDay(client, person, workDate, { settle: false });
       dayId = r.day ? r.day.attendance_day_id : null;
       for (const type of reasons) {
         const x = await repo.insertException(client, {
@@ -393,12 +406,13 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         });
         if (x) opened.push(x);
       }
+      await reconcile.settle(client, person, r);
     }
 
-    // The day's reminder to clock in has done its work: a push still held is not sent.
-    if (body.event_type === "clock_in" && result !== "rejected") {
-      const reminder = await repo.reminderOn(client, employeeId, workDate, "clock_in_due");
-      if (reminder)
+    // The day's reminders have done their work: a push still held is not sent.
+    if (result !== "rejected") {
+      const kind = body.event_type === "clock_in" ? "clock_in_due" : "clock_out_due";
+      for (const reminder of await repo.remindersOn(client, employeeId, workDate, kind))
         await notifications.markReadForRecord(client, user, "attendance_clock_reminder", reminder.attendance_clock_reminder_id);
     }
 
@@ -512,21 +526,29 @@ const requestMyExport = (user, body) => requestExport(user, { kind: "month", mon
 /** The date a register read is for: the one asked, or today in Lagos. */
 const dateOf = (query, now = new Date()) => query.date || lagos.today(now);
 
-const register = (query, scope) => repo.register(pool, dateOf(query), query, scope);
+/**
+ * The register for a day: each person by their own day (their schedule, else the company hours in
+ * force on the date, which the SQL takes as a parameter; §6.9, §6.13).
+ */
+async function register(query, scope) {
+  const date = dateOf(query);
+  return repo.register(pool, date, query, scope, { hours: await calendar.companyHoursOn(pool, date) });
+}
 
 async function summary(query, scope) {
   const date = dateOf(query);
-  return { date, ...(await repo.registerSummary(pool, date, scope)) };
+  return { date, ...(await repo.registerSummary(pool, date, scope, { hours: await calendar.companyHoursOn(pool, date) })) };
 }
 
-/** One person's day on the register, within the caller's scope. */
+/** One person's day on the register, within the caller's scope: its shift as the day was judged. */
 async function dayDetail(employeeId, query, scope) {
   assertInScope(scope, employeeId);
   const date = dateOf(query);
-  const row = await repo.registerRow(pool, date, employeeId);
+  const row = await repo.registerRow(pool, date, employeeId, { hours: await calendar.companyHoursOn(pool, date) });
   if (!row) throw new AppError("NOT_FOUND", "Not found", 404);
   const person = await repo.person(pool, employeeId);
-  const ctx = await calendar.contextFor(pool, person, date);
+  const { judged, ctx } = await reconcile.judgedOn(pool, person, date);
+  const approval = await repo.overtimeApprovalOn(pool, employeeId, date);
   return {
     employee: row.employee,
     date,
@@ -534,15 +556,16 @@ async function dayDetail(employeeId, query, scope) {
     status: row.status,
     attendance_day_id: row.attendance_day_id,
     shift: {
-      working_day: ctx.shift.working_day,
-      starts_at: ctx.shift.starts_at,
-      ends_at: ctx.shift.ends_at,
-      grace_minutes: ctx.shift.grace_minutes,
+      working_day: judged.shift.working_day,
+      starts_at: judged.shift.starts_at,
+      ends_at: judged.shift.ends_at,
+      grace_minutes: judged.shift.grace_minutes,
     },
     clock_in_at: row.clock_in_at,
     clock_out_at: row.clock_out_at,
     worked_minutes: row.worked_minutes,
     late_minutes: row.late_minutes,
+    early_minutes: row.early_minutes,
     overtime_minutes: row.overtime_minutes,
     closed: Boolean(row.closed_at),
     expected_location: ctx.fence
@@ -552,6 +575,9 @@ async function dayDetail(employeeId, query, scope) {
         : null,
     policy: { geofence_mode: ctx.policy.geofence_mode, device_mode: ctx.policy.device_mode },
     open_exceptions: row.open_exceptions,
+    overtime_approval: approval
+      ? { minutes: Number(approval.minutes), approved_by_name: approval.approved_by_name || null, reason: approval.reason }
+      : null,
   };
 }
 

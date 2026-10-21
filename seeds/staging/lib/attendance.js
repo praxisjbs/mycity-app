@@ -2,8 +2,8 @@
 /**
  * Attendance for the real staff on staging: today and the working days before it, so the
  * figures that read the attendance register (Clocked In Today, the attendance chart, the On
- * Time donut, Team, My Attendance, the late arrival and missing clock-out alerts) have days to
- * count (docs/guides/home.md §11).
+ * Time donut, Team, My Attendance) have days to count (docs/guides/home.md §11). The Attendance
+ * policy's breaches follow from the same days once a version switches a rule on.
  *
  * Written the way the attendance module writes a day, through its own functions: each punch is
  * an attendance_event recorded under the person's lock, the day recalculated from its punches

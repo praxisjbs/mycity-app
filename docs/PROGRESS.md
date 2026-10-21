@@ -632,13 +632,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 
 **Notes**
 
 - 21/10/2026 · TB · Overview (#1): Add Work Site's sheet opens on Hours (Usual Shift or Site Hours); on a day of a site with its own hours the Staff day strip's Shift Today shows the site's hours (`docs/guides/home.md` §3 step 10, §6). Left: nothing.
+- 21/10/2026 · TB · Attendance's PR 3 (rules and schedules, `docs/guides/attendance.md` §1.2): Alerts (#2) shows attendance's alerts as the Attendance policy's breaches on the five rules the system keeps (People Approvers, no Over By, Query Due while M3's query is not in), Alert Rules opens with the read-only Attendance Policy card and Set in Attendance Policy, and Home's own Late Arrivals and Missing Clock-Outs rules are switched off with their open alerts dismissed (`1445`; the staging seed keeps two rules). Overview (#1): the day strip and Your Week read the person's own shift (their work schedule, else the company hours). Team (#86): the roster counts only people with a login as expected. Left: nothing on Home for PR 3.
 - 20/10/2026 · TB · Overview (#1): Add Work Site (attendance's PR 4, `docs/guides/home.md` §3 step 10, `docs/guides/attendance.md` §6.11): a button beside New, an entry in New and, on a phone, the floating button's second action, each opening Attendance's temporary site sheet over the Overview (`?action=work-site`, also ⌘K's). The Purpose list is searchable (`SelectField searchable`, packages/ui). A present day on an approved site reads Field on the roster and Team, a Temporary Home Remote. Left: nothing.
 - 19/10/2026 · TB · Overview (#1): the clock-in prompt left Home (owner decision of 19/10/2026, replacing O12; `docs/guides/home.md` §3, §6). `HomeOverview.prompt_clock_in`, `dashboard.prompt.js` and the Overview's opener are gone; Attendance decides the prompt and the shell opens it on whatever screen comes first (`docs/guides/attendance.md` §6.14). The Overview still reads itself again after a clock-in (its screen test now punches directly). Left: nothing.
 - 19/10/2026 · TB · Overview (#1) and Reports (#3): the Overview's Export and Run Now download their file on the device that pressed instead of emailing it (`docs/guides/home.md` §3, §5 to §7, §10; foundation.md §6.12). The button is busy while the run's file is made, Recent Runs shows it Pending meanwhile, and the toast reads "RPT-0215 downloaded". `GET /home/overview/export/:id` lets Staff, who hold no `home.reports`, wait on their own Overview run. A schedule's runs are still emailed. Left: nothing.
@@ -743,8 +744,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
@@ -752,13 +753,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 91 | Org Chart | `org-chart` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
 - 21/10/2026 · TB · Work Location Requests (#87): Add Work Site opens on Hours, Usual Shift or Site Hours with a start and an end, and a site shows its hours (`docs/guides/attendance.md` §6.11). Left: nothing.
+- 21/10/2026 · TB · Attendance's PR 3: My Attendance (#9) shows the month's Deductions and Overtime (day, kind, minutes, amount from the monthly gross, or No Salary Set, and status; an item opens with its method and reason), the Home Location card whenever the week has a Remote day, and Give Real Time on a System Clock-Out (Real Time, Your Note, Send Time); My Profile (#8) reads the person's own work schedule with its hours. Policy Updates (#89): the Attendance policy's sentences cover every rule. Left: the query a breach raises (M3) and payroll taking pending items into a run (M6).
 - 20/10/2026 · TB · My Attendance (#9), Work Location Requests (#87) and Policy Updates (#89), attendance's PR 4 (`docs/guides/attendance.md` §6.11, §6.12, §6.15; `docs/guides/ess.md`): Work Location Requests lists the person's temporary sites with Add Work Site (header, full width on a phone, the floating button) and a site's view with its addresses on maps, its people, its approval and Withdraw Submission (a reason); `?site=` opens one; their requests made before PR 4 stay under the sites and New Request is gone. My Attendance shows Temporary Sites waiting, in progress or to come, and each day's route of check-ins between the punches. The clock panel names the site and its addresses and, once clocked in, offers Check In with the day's check-ins under it. Policy Updates reads the site section as At a Temporary Site. Left: nothing.
 - 20/10/2026 · TB · Policy Updates (#89) rebuilt for every policy (`app/src/features/policies/PolicyUpdates.tsx`, `docs/guides/policies.md`): To Acknowledge, All Policies and Waiting On You; a policy opens as its text or its sentences with what changed, its signatures, Download PDF and earlier versions; an approver approves with a signature or rejects with a reason; the acknowledge sheet after the clock (`AcknowledgeSheet.tsx`). Checked by 8 screen tests on the mock and, on the real API in Chromium (20/10/2026), the Attendance policy's Version 1 published with a drawn signature, a written policy for Engineering, the sign-in prompt then the sheet for each at 390 px with touch, Later holding until tomorrow, Acknowledge recorded, and the PDF made on the letterhead. Left: Tidy With AI against a real model (the local stub's answer is refused by the word check, as it should be).
 - 20/10/2026 · TB · Policy Updates (#89) moves to M1 with Knowledge Hub · Policies and will carry every policy that applies to the person, with the acknowledge sheet after the clock (`docs/guides/policies.md`); In progress until PR 1 rebuilds it. The attendance redesign of 20/10/2026 (`docs/guides/attendance.md` §1.1, four PRs) also changes My Attendance (#9: deductions, overtime, check-ins, System Clock-Out) and Work Location Requests (#87: becomes the person's temporary sites) in PRs 3 and 4; both stay Built until then.
@@ -883,7 +885,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -893,6 +895,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 **Notes**
 
 - 21/10/2026 · TB · Attendance (#25) and Worksites (#28), a temporary site's hours (owner decision, 21/10/2026; `docs/guides/attendance.md` §6.11): Add Work Site and Add Temporary Site open on Hours, Usual Shift or Site Hours with Starts At and Ends At, and a site shows its hours. Site Hours make every day of the site worked for its people, weekends and holidays included, on the site's own clock: the clock-in reminder and the start prompt at its start, lateness from it with the policy's grace, the closing prompt, overtime and the system clock-out from its end, and a day with no clock-in closed absent; the register and the roster count those days as worked. Migration `1475`. Left: nothing.
+- 21/10/2026 · TB · Attendance's PR 3 built (rules and schedules, `docs/guides/attendance.md` §1.2): Employees (#24) gains the record's Work Schedule tab after Job, in place of the Attendance tab (Work Setup, the week day by day, Set Schedule for anyone, never one's own); Attendance (#25) gains Deductions and Overtime in the view switch (Waive Selected up to 25 with a reason, Confirm and Cut on overtime, Approve Overtime on a person's day), System Clock-Out as a punch's source with the real time a person gave, early departures and overtime on a day. Backend: work schedules (`1420`), each day judged once (`1425`), the consequence rules (`attendance.rules-engine.js`, `1430`), pending deductions and overtime (`attendance.pay.js`, `1435`), reminders to clock out every 30 minutes and the System Clock-Out (`1440`). This closes the #24 and #25 part of the 20/10/2026 note, with PR 4's places beside it. PR 2 (clock fixes) is not built: it was not on main, so none of it is here. Checked on the real API in Chromium at 1440 × 900 and at 390 px with touch: a version published on Policies (grace 10 minutes from 22/10), a schedule set from 22/10, a late clock-in run through the watch (reminders at 17:00, 17:30 and 18:00, the System Clock-Out at 18:30), Give Real Time and Correct Time to 17:40 (the day 8h 05m, late 35, overtime 40), a deduction waived, overtime confirmed, 19 breach alerts on Home; not checked: a push on a real phone. Left: PR 2, the M3 query subscriber, payroll's `in_run` (M6).
 - 20/10/2026 · TB · Attendance (#25) and Worksites (#28), attendance's PR 4 (`docs/guides/attendance.md` §6.11, §6.12, §10): Worksites has a Permanent and Temporary switch; Permanent is the worksites as before, alone. Temporary lists the sites in the reader's scope with state chips, Add Temporary Site (People's own, in force at once; ⌘K's too), and a site's view with Approve and Reject (through its approval; nobody on a site decides it), Take Off and Cancel Site with a reason; while a request or assignment made before PR 4 waits or is in force, Requests and Field sit beside the sites. People · Attendance loses Requests, Field and New Assignment; a day's evidence and an exception show the route of check-ins between the punches, and a check-in's flag is decided Accept or Reject. Backend: migrations 1450, 1455, 1460, seed 1470, `attendance.sites`, `.sites.repo`, `.check-ins`, the site first in `contextFor` with its time zone, the approval's exclusions in the workflow engine. Checked live in Chromium against the real API (1440 by 900 and a 390 px phone with touch): Add Work Site with the purpose searched and an address from the device while search was down, the approval on Worksites, a clock-in matched to the site, Check In listed Inside on the panel and on People's route, the phone's fan and full sheets. Left: PR 2's location reader is not merged, so Check In reads the location itself; PR 3's Location Flags do not yet count flagged check-ins.
 - 20/10/2026 · TB · Attendance redesign agreed (`docs/guides/attendance.md` §1.1, TB's decisions of 20/10/2026, after an audit of the clock path the same day), built in four PRs (§1.2): 1, policies foundation (in progress); 2, clock fixes; 3, rules and schedules (lateness from the start, alerts and queries from the policy, pending deductions, overtime, work schedules on a Work Schedule tab, reminders and the system clock-out); 4, places (permanent and temporary sites on Worksites #28, Add Work Site on Home, HR approval, check-ins). Attendance (#25), Worksites (#28) and Employees (#24) stay Built until their PR lands.
 - 19/10/2026 · TB · Attendance (#25), New Assignment, and Work Location Requests (#87), a client visit: each site shows its centre and fence on a map under the radius once both coordinates are real, a tap moving the centre (`SiteMap.tsx`, shared with Worksites #28; `docs/guides/attendance.md` §10). No address lookup on these two (worksites only). Nothing left on maps for these forms.
@@ -1049,7 +1052,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
@@ -1057,6 +1060,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · Policies (#62): the Attendance worksheet shows every rule (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts; `app/src/features/policies/worksheet.ts`), each a switch with its figures, with the server's suggestions for a first draft; a rule compares as changed whatever order its keys came in. Closes PR 1's "Left: the worksheet's PR 3 sections". Left: Tidy With AI against a real model.
 - 20/10/2026 · TB · Policies (#62), attendance's PR 4: the Attendance policy's `site_geofence_mode` reads Temporary Site Check on the worksheet, with new help, and its section At a Temporary Site covers a site's addresses and its check-ins and ends with "Working somewhere else? Add it from Home, or ask People." (`docs/guides/policies.md` §14). Left: nothing.
 - 20/10/2026 · TB · Policies (#62) built (PR 1): the `policies` module, contract and migrations `1400`, `1405` (the Attendance policy's versions moved over with their ids), seed `1396`; the screen in `app/src/features/policies/` (the list, a policy's draft with the editor or the Attendance worksheet, Publish or Submit with a signature, Withdraw, Recall, Archive, versions and acknowledgements, Download PDF), the mock, and `RichText` in `packages/ui`. Tests: unit, `tests/integration/policies.test.js` on the real migrations, the screen on the mock. Tidy With AI runs on the Default job, carrying personal data (never DeepSeek), TB 20/10/2026. Left: the worksheet's PR 3 sections; Tidy With AI against a real model.
 - 20/10/2026 · TB · Policies (#62) brought forward from M10 to M1 (TB's decisions of 20/10/2026; MILESTONES §18 ratified 20/10/2026): Knowledge Hub · Policies becomes the one place for every company policy, documents and rules policies, the Attendance policy first, with versions, Applies To, an optional approval route with signatures, Tidy With AI and the letterhead PDF; staff acknowledge on ESS · Policy Updates. Guide written (`docs/guides/policies.md`); the build is PR 1 of four (`docs/guides/attendance.md` §1.2). Left: the contract, the `policies` module and migrations `1400`, `1405`, `1396`, the screens; Tidy With AI waits for the AI area convention to pick its model.
@@ -1079,7 +1083,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 98 | Actions | `actions` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
-| 99 | Models | `models` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 99 | Models | `models` | M10 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 100 | Spend | `spend` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 
 **Notes**
@@ -1099,6 +1103,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   built in M10) and Find Prices; gate `check/ai-actions.js` fails a call that names no registered action.
   Tests: 10 integration, 11 unit, 6 screen. Left: Data Answers and the per-module switch's screen with M10's
   Assistant; set Find Prices' first prices on staging and production once the keys are in.
+- 21/10/2026 · TB · Find Prices fixed after the first run on staging proposed nothing for 129 models (the
+  answer was capped at 60 and cut short; decisions 29 to 32). Fewer models: a key's list now leaves off
+  `-latest` aliases, Gemma and snapshots of a model already listed, unless a chain uses one (migration 10210
+  clears those already stored). Find Prices asks only about models with no price, 20 to a request with
+  thinking kept low, and marks Not Listed what the page does not price (asked again after 7 days); each press
+  is an `ai_price_run` with its progress, run as the `ai-find-prices` job and claimed once, since a run
+  outlasts an outbox handler (a review found retries searching twice). Models: the New Prices sheet (Batch 2 of 4, each price with Accept
+  and Dismiss, Accept All, Find More, Still to Price and Not Listed), opened by Find Prices or Review Prices;
+  the list opens on models in a chain, with a Show filter (On Key, Not on Key, Any); a failed run's reason
+  stays beside Find Prices. Tests: 14 integration, 2 unit, 4 screen for Models. Left: on staging and production, press Test on the Gemini connection to re-read
+  its list, then Find Prices until Still to Price reaches 0.
 
 ### Settings
 

@@ -16,7 +16,9 @@
  *                  pipeline, expenses and budgets, and vacancies for the open seats, by SQL with
  *                  fixed ids listed in HOME_STAGING_ROWS (lib/home-staging-rows.js), which says
  *                  how each owning milestone takes them away when its own seed lands
- *   alert rules    four rules through the alerts service, made by this seed (the audit says so)
+ *   alert rules    two rules through the alerts service, made by this seed (the audit says so).
+ *                  Attendance's alerts are the Attendance policy's breaches, raised by the
+ *                  attendance module as they happen, so no attendance rule is made here
  *   alerts         the morning sweep itself (alerts.sweeps.js), so every alert is a real breach
  *                  of the rows above, raised through the shared alert engine
  *   reports        four reports through the reports service, each made by the person who owns
@@ -49,10 +51,8 @@ const { realStaff } = require("./lib/staff");
 const { seedAttendance } = require("./lib/attendance");
 const forward = require("./lib/forward-rows");
 
-/** The alert rules a demonstration needs: the attendance pair, quiet partners and a budget running out. */
+/** The alert rules a demonstration needs: quiet partners and a budget running out. */
 const RULES = Object.freeze([
-  { name: "Late Arrivals", metric: "late_arrivals", threshold: "2", window_days: 14, severity: "medium" },
-  { name: "Missing Clock-Out", metric: "missing_clock_out", threshold: "1", window_days: 7, severity: "medium" },
   { name: "Quiet Partners", metric: "partner_inactivity", threshold: "30", severity: "high" },
   { name: "Budget Nearly Spent", metric: "budget_threshold", threshold: "80", severity: "high" },
 ]);

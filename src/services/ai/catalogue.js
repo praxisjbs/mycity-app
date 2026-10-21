@@ -82,4 +82,35 @@ async function fetch(provider, apiKey, { vendors = VENDORS, timeoutMs = 20_000 }
   return out;
 }
 
-module.exports = { fetch, capabilitiesOf, VENDORS };
+/** A dated or numbered snapshot's suffix: -09-2025, -2024-08-06, -20250929, -001, -05-06, -exp-1206. */
+const SNAPSHOT = /(-\d{2}-\d{4}|-\d{4}-\d{2}-\d{2}|-\d{8}|-\d{3}|-\d{2}-\d{2}|-exp-\d{4})$/i;
+
+/**
+ * The models worth keeping from a provider's list (docs/guides/ai-control.md decision 29): its
+ * `-latest` aliases, Gemma's open models, and a snapshot whose base model is on the same list
+ * are left off, unless a chain uses them.
+ *
+ *   catalogue.trim("gemini", models, new Set(["gemini:gemini-2.0-flash-001"]))
+ *   // → { kept: [...], dropped: [...] }
+ *
+ * @param {string} provider
+ * @param {Array<{model: string}>} models  the provider's list, as fetch() gives it
+ * @param {Set<string>} [keep]  "provider:model" ids a chain uses, lower case
+ */
+function trim(provider, models, keep = new Set()) {
+  const ids = new Set(models.map((m) => String(m.model).toLowerCase()));
+  const kept = [];
+  const dropped = [];
+  for (const m of models) {
+    const id = String(m.model).toLowerCase();
+    let off = /-latest$/.test(id) || (provider === "gemini" && /^gemma-/.test(id));
+    if (!off && SNAPSHOT.test(id)) {
+      const base = id.replace(SNAPSHOT, "");
+      off = ids.has(base) || ids.has(base.replace(/-preview$/, ""));
+    }
+    (off && !keep.has(`${provider}:${id}`) ? dropped : kept).push(m);
+  }
+  return { kept, dropped };
+}
+
+module.exports = { fetch, trim, capabilitiesOf, VENDORS, SNAPSHOT };
