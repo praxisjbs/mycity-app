@@ -182,7 +182,7 @@ export function MyAttendancePage() {
             format={(v) => `${v} hours`}
             bars={[...days.rows]
               .sort((a, b) => a.attendance_date.localeCompare(b.attendance_date))
-              .map((d) => ({ label: formatDate(d.attendance_date).slice(0, 6), value: Math.round(d.worked_minutes / 6) / 10, series: d.status === "late" ? 3 : 1 }))}
+              .map((d) => ({ label: formatDate(d.attendance_date).slice(0, 5), value: Math.round(d.worked_minutes / 6) / 10, series: d.status === "late" ? 3 : 1 }))}
           />
           <Pager page={days.page} onPage={days.setPage} noun="day" />
         </>

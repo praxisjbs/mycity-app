@@ -158,6 +158,7 @@ Migration `10200_ai_control.sql` (M10's block; M10 brought forward). `ai_model` 
 | `ai_price_run` (10210) | `status` (`running`, `done`, `failed`), `batches_total`, `batches_done`, `proposals`, `not_listed`, `error_code`, `claimed_at`, `requested_by`, `started_at`, `finished_at` | One per Find Prices press: the New Prices sheet's progress and outcome. The job claims it once (`claimed_at`). A run `running` with no progress for 15 minutes is taken as lost |
 | `ai_model` (PR1) | adds `usd_per_thousand_searches` `numeric(12,4)`; `price_not_listed_at` (10210) | Google Search's price, for Find Prices; when the provider's page last did not price the model |
 | `ai_run_step` (M0) | adds `audio_seconds`, `ngn_per_audio_hour`, `searches`, `ngn_per_search`, `usd_ngn_rate`, `rate_day`; kind adds `search` | What the step was charged at, so a new price or rate never rewrites past spend |
+| `ai_run` (M0) | adds `original_purpose` (10220) | The key a run was recorded under when 10220 moved it onto its registered action (§6.5); null for every other run, and read by no code. 10220's DOWN puts the old key back from it |
 | `ai_setting` (M0) | `monthly_cap_ngn` is the overall cap, set on Spend | `vendor` and `model` are no longer read: the chains decide (§6.1) |
 
 The registry of actions is code, `src/services/ai/actions.js` (§6.5). Grants are reference data:
@@ -292,6 +293,10 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 - `scripts/check/ai-actions.js` fails a build when an AI call names an action that is not
   registered, names it with anything but a literal, or a registry entry lacks its job, its
   personal-data answer, who chose it and when, or (Top Tier) its reason.
+- Voice notes transcribed before the registry were kept under the purpose `transcription`, which
+  Spend · By Action showed as a bare key with no job. Migration 10220 moved them onto
+  `voice-note-transcription`, keeping the old key in `ai_run.original_purpose` (§4), so every run's
+  purpose is a registered action. Spend still shows a key it does not know as the key itself.
 
 ### 6.6 Embeddings
 
@@ -344,7 +349,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 |---|---|---|---|
 | AI Control · Actions (`actions`) | AI Control as the title; each job as a card (desktop) with its chain as First and Fallback 1 to 3, each model's name, provider and state pill (Ready, Not Set Up, Not on Key, Daily Limit, Skipped Until a time, At Cap, Personal Data, Cannot Search); Make First on each fallback; Edit Chain (First Choice, Fallback 1 to 3, each a model picker searching the models that can do the job; Embeddings First Choice only; Save Chain); Locked on Embeddings once indexed; the actions with job, first choice, Personal Data, Own Chain and Not Built Yet pills, Calls Today; an action's sheet with Make First, Edit Chain and Use Job Chain; toasts "Moved to first", "Chain saved", "Back on its job's chain" | Help terms on each job's name (what it is for, from §6.2), on Personal Data (DeepSeek is passed by) and on Own Chain | How the chain is walked and when a provider is skipped: §6.1 |
 | AI Control · Models (`models`) | Models as the title; Find Prices; the New Prices sheet, opened by Find Prices and by Review Prices while proposals wait: the run's progress ("Batch 2 of 4"), each proposed price (model, provider, price, page) with Accept and Dismiss, Accept All, and Find More once the run ends with models still to price; Still to Price and Not Listed counts; a failed run's reason as a pill ("No Search Model"), in the sheet and beside Find Prices once it is closed; the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider and Show (On Key, Not on Key, Any) filters; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "12 prices saved", "Prices saved", "Proposal dismissed" | Help terms on In Naira (the day's rate it used) and Not Listed (models the provider's page does not price; asked again after 7 days) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
-| AI Control · Spend (`spend`) | Spend as the title; All AI: spent, against its cap (a meter, the percent and "₦19K of ₦100K cap"), Month Of, One Dollar, Rates Of; each provider: Free or Paid, Not Set Up, At Cap, spent, against its cap or "no cap", calls this month; Set Cap on All AI and each paid provider (Monthly Cap, Optional; blank removes it); Spend by Day (desktop); By Action: action, job, calls, spent; toasts "Cap set", "Cap removed" | Help terms on All AI and on Monthly Cap (what happens once reached) | How spend is summed: §6.3 |
+| AI Control · Spend (`spend`) | Spend as the title; All AI: spent, against its cap (a meter, the percent and "₦19K of ₦100K cap"), Month Of, One Dollar, Rates Of; each provider: Free or Paid, Not Set Up, At Cap, spent, against its cap or "no cap", calls this month; Set Cap on All AI and each paid provider (Monthly Cap, Optional; blank removes it); Spend by Day (desktop): a bar a day, each labelled 14/10, every few days on a narrow screen; By Action: action, job, calls, spent; toasts "Cap set", "Cap removed" | Help terms on All AI and on Monthly Cap (what happens once reached) | How spend is summed: §6.3 |
 
 ### 10.2 Phone layout
 
@@ -392,6 +397,7 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · Spend fixed after staging showed Spend by Day's labels run together and a bare `transcription` row in By Action: each day reads 14/10 on the shared bar chart, which keeps its labels 11 px and leaves off those that would touch (§10.1); migration 10220 moves the voice notes kept under `transcription` before the registry onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` (§4, §6.5).
 - 20/10/2026 · TB · Decisions 29 to 32 after the first Find Prices on staging returned nothing for 129 models (the answer was capped at 60 and cut short): fewer models kept, Find Prices in requests of 20 over every unpriced model with Not Listed marks, the New Prices sheet with Accept All and Find More, the Models tab opening on the models in a chain and on the key.
 - 21/10/2026 · TB · Find Prices runs as the `ai-find-prices` job, claimed once, since a run outlasts an outbox handler; a run is lost after 15 minutes without progress; a failed run's reason stays on the tab; Not Listed counts only a model still without a price and on the key; a job that comes too late ends its run as LOST; one running run is a database rule.
 

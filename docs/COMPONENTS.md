@@ -121,7 +121,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
 | Charts | [AreaChart](#areachart) | `AreaChart` | A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter. | stable |
 | Charts | [BandChart](#bandchart) | `BandChart` | Salary bands: each grade's range on one scale, with its midpoint marked and its figures beside it. | stable |
-| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars: headcount by department, claims by month, interviews by stage. | stable |
+| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars: headcount by department, claims by month, spend by day. | stable |
 | Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
@@ -3865,13 +3865,13 @@ Salary bands: each grade's range on one scale, with its midpoint marked and its 
 
 ### BarChart
 
-Figures side by side as bars: headcount by department, claims by month, interviews by stage.
+Figures side by side as bars: headcount by department, claims by month, spend by day.
 
 | | |
 |---|---|
-| Use | Comparing a handful of categories, where each figure matters as much as the shape. |
-| Avoid | A run of days (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars). |
-| Phone | No caption; the drawing scrolls inside its own card, so the page never scrolls sideways. |
+| Use | Comparing a handful of categories, or each day of a month, where each figure matters as much as the shape. |
+| Avoid | A run of days where only the shape matters (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars). |
+| Phone | No caption. Up to 12 bars every label shows and a narrow card scrolls the drawing inside it; past 12 (a month of days) labels that would touch are left off, never the first or the last. The page never scrolls sideways. |
 | Accessibility | The drawing is hidden from screen readers and the frame reads every bar as a label and a figure instead. |
 | Status | stable |
 | Exports | `BarChart` |

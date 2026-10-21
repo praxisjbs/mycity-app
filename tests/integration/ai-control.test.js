@@ -14,6 +14,7 @@
  */
 // A key in the server file, so Gemini is set up; nothing else is.
 process.env.GEMINI_API_KEY = "test-key";
+const fs = require("node:fs");
 const request = require("supertest");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
@@ -36,6 +37,8 @@ const usage = require("../../src/shared/integrations/usage");
 const ai = require("../../src/services/ai/llm.service");
 const jobs = require("../../src/services/ai/jobs");
 const governance = require("../../src/services/ai/governance");
+const ledger = require("../../src/services/ai/ledger");
+const prices = require("../../src/services/ai/prices");
 const repo = require("../../src/modules/ai_governance/ai_governance.repo");
 require("../../src/modules/ai_governance/ai_governance.events");
 
@@ -360,6 +363,38 @@ describeDb("AI Control against the real migrations", () => {
       const byAction = (await as("ops").get("/ai-control/spend/actions")).body;
       expect(byAction.data.find((a) => a.key === "policy-tidy")).toMatchObject({ label: "Tidy Policy", job: "default" });
       expect(byAction.page.size).toBe(25);
+    });
+
+    test("a voice note kept before the registry, under its old key, counts as Voice Note Transcription (10220)", async () => {
+      const old = await ledger.startRun(pool, { purpose: "transcription", module: "community", actor: null, vendor: "groq", model: "whisper-large-v3" });
+      await ledger.recordStep(pool, old, {
+        step_no: 1,
+        kind: "transcription",
+        vendor: "groq",
+        model: "whisper-large-v3",
+        usage: { input_tokens: 0, output_tokens: 0, audio_seconds: 12 },
+        prices: prices.zero(),
+        latency_ms: 900,
+        outcome: "ok",
+      });
+      await ledger.finishRun(pool, old, { status: "ok" });
+      const byAction = async () => (await as("ops").get("/ai-control/spend/actions")).body.data;
+      expect((await byAction()).find((a) => a.key === "transcription")).toMatchObject({ label: "transcription", job: null });
+
+      const migration = fs.readFileSync(require.resolve("../../migrations/10220_ai_run_registered_purpose.sql"), "utf8");
+      const up = migration.slice(migration.indexOf("-- UP"), migration.indexOf("-- DOWN"));
+      const down = migration.slice(migration.indexOf("-- DOWN"));
+      await q(up);
+      await q(up);
+      const after = await byAction();
+      expect(after.map((a) => a.key)).not.toContain("transcription");
+      expect(after.find((a) => a.key === "voice-note-transcription")).toMatchObject({ label: "Voice Note Transcription", job: "transcription", calls: 1 });
+      expect(await one("SELECT purpose, original_purpose FROM ai_run WHERE run_id = $1", [old])).toEqual({ purpose: "voice-note-transcription", original_purpose: "transcription" });
+
+      // DOWN puts back exactly the key each run was recorded under.
+      await q(down);
+      expect(await one("SELECT purpose FROM ai_run WHERE run_id = $1", [old])).toEqual({ purpose: "transcription" });
+      await q(up);
     });
   });
 

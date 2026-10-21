@@ -109,6 +109,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · `BarChart` (Build kit) copes with a month of days, found on AI Control · Spend (#100): its
+  drawing is laid out in the card's own pixels at the chart's height (the placeholder's), so labels stay 11 px
+  and the chart no longer grows taller with the screen. Up to 12 bars every label shows and a narrow card
+  scrolls the drawing; past 12, labels that would touch are left off at an even step, the first and the last
+  always, none past an edge, and the read-out list keeps every bar. The tallest bar now fills the chart when
+  every figure is under 1. Gallery state Month of Days; `docs/COMPONENTS.md` regenerated. Tests: 6 unit.
+  Left: nothing.
 - 20/10/2026 · TB · Refresh and history in the hub (FRONTEND_FOUNDATION F28, F29; TB's eight answers in
   §5, asked on a live design board). Refresh is in place first: the data client's `refresh` asks every
   read on screen again quietly and settles when the last lands. Phone: the page pulls to refresh
@@ -759,6 +766,9 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · My Attendance (#9): My Days as a chart labels each day 13/10 (it read 13/10/, with a
+  stray slash), and the shared bar chart leaves off the days that would touch, every few days at an even step,
+  the first and the last always. Left: nothing.
 - 21/10/2026 · TB · Attendance's PR 2 built (clock fixes, `docs/guides/attendance.md` §1.2): the clock panel (opened from every screen and My Attendance, #9) reads the location through one reader (`app/src/features/attendance/location.ts`: up to ten seconds, the best fix, stopping at 50 m, a watchdog so Not Now, Esc and the close button work while it reads), Check In and the home's Use This Location too; a reading that cannot prove the place names the fix for this device (Precise Location Off with the iPhone or Android steps, Use Your Phone on a computer, Location Blocked with this browser's steps and no ask step, Secure Address Needed), unsupported offers no Retry, Clock In Anyway sends what was read. My Attendance reads Location Unclear (help: the reading could not prove where you were) and a punch's location as Unclear with its reason. Left: nothing for PR 2; not checked on a real phone (the device fixes are covered by tests with each user agent).
 - 21/10/2026 · TB · Work Location Requests (#87): Add Work Site opens on Hours, Usual Shift or Site Hours with a start and an end, and a site shows its hours (`docs/guides/attendance.md` §6.11). Left: nothing.
 - 21/10/2026 · TB · Attendance's PR 3: My Attendance (#9) shows the month's Deductions and Overtime (day, kind, minutes, amount from the monthly gross, or No Salary Set, and status; an item opens with its method and reason), the Home Location card whenever the week has a Remote day, and Give Real Time on a System Clock-Out (Real Time, Your Note, Send Time); My Profile (#8) reads the person's own work schedule with its hours. Policy Updates (#89): the Attendance policy's sentences cover every rule. Left: the query a breach raises (M3) and payroll taking pending items into a run (M6).
@@ -1086,7 +1096,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 98 | Actions | `actions` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 99 | Models | `models` | M10 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 100 | Spend | `spend` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 100 | Spend | `spend` | M10 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 
 **Notes**
 
@@ -1116,6 +1126,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   the list opens on models in a chain, with a Show filter (On Key, Not on Key, Any); a failed run's reason
   stays beside Find Prices. Tests: 14 integration, 2 unit, 4 screen for Models. Left: on staging and production, press Test on the Gemini connection to re-read
   its list, then Find Prices until Still to Price reaches 0.
+- 21/10/2026 · TB · Spend (#100) fixed after staging showed Spend by Day's labels run together and a bare
+  `transcription` row in By Action. Each bar carried the whole date (`dayLabel` split `formatDate` on a space
+  it no longer has) and the shared bar drawing printed every label at a size that grew with the card; each
+  day now reads 14/10, the chart sits in one card, not two, and `BarChart` keeps its labels 11 px, leaving off
+  those that would touch (M0 note). The `transcription` row was 4 voice notes kept under the old key before
+  the registry: migration 10220 moves them onto Voice Note Transcription, the old key kept in
+  `ai_run.original_purpose` so its DOWN is exact. Tests: 1 integration, 1 screen. Left: nothing; 10220 runs
+  with the next deploy.
 
 ### Settings
 
