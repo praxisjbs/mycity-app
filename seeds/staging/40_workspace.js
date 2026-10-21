@@ -44,7 +44,7 @@ async function exists(pool, sql) {
   return rows.length > 0;
 }
 
-module.exports = async function seed({ pool, log }) {
+module.exports = async function seed({ pool, log = () => {}, now = new Date() }) {
   const lagos = src("shared/time/lagos");
   const { atomically } = src("shared/db/tx");
   const { scopeFor } = src("middleware/rbac");
@@ -65,14 +65,16 @@ module.exports = async function seed({ pool, log }) {
   const ceo = as(staff.ceo);
   const head = as(staff.head);
   const manager = as(staff.manager);
-  const headTeam = staff.reportsOf(staff.head).filter((p) => as(p));
-  const managerTeam = staff.reportsOf(staff.manager).filter((p) => as(p));
+  // Work is set for everyone on a team; only someone with a login adds their own.
+  const headTeam = staff.reportsOf(staff.head);
+  const managerTeam = staff.reportsOf(staff.manager);
   if (!ceo) {
     log("workspace: no CEO login yet (10_staff.js gives one), nothing added");
     return;
   }
 
-  const today = lagos.today();
+  // The run's day, as Home's seed takes it, so a test can read Home on a fixed date.
+  const today = lagos.today(now);
   const day = (n) => lagos.addDays(today, n);
 
   /* ---------------- My Workspace ---------------- */
@@ -86,10 +88,11 @@ module.exports = async function seed({ pool, log }) {
     };
     const plan = [
       [ceo, staff.operations, { title: "Sign off the payroll preview", priority: "high", cadence: "weekly" }],
-      [ceo, staff.operations, { title: "Review the partnerships shortlist", due_on: day(2) }],
-      [ceo, staff.management[0], { title: "Close out departmental targets", due_on: day(1) }],
+      // Overdue, so Home's Overdue Tasks and My Overdue Tasks have something to show.
+      [ceo, staff.operations, { title: "Review the partnerships shortlist", due_on: day(-2) }],
+      [ceo, staff.management[0], { title: "Close out departmental targets", due_on: day(-1) }],
       [ceo, staff.management[1], { title: "Fix clock-in retry on Android", priority: "urgent", due_on: day(3) }],
-      [head, headTeam[0], { title: "Prepare the social calendar", cadence: "daily" }],
+      [head, headTeam[0], { title: "Prepare the social calendar", due_on: day(-3) }],
       [head, headTeam[0], { title: "Design the partner pitch deck", cadence: "weekly" }],
       [head, headTeam[1], { title: "Update the partner contact log", due_on: day(2) }],
       [head, headTeam[2], { title: "Chase the Eko Hotels proposal", priority: "high", due_on: day(1) }],
@@ -98,7 +101,7 @@ module.exports = async function seed({ pool, log }) {
     let n = 0;
     for (const [by, to, body] of plan) if (await set(by, to, body)) n += 1;
     // A person's own work beside what was set for them (A24).
-    for (const p of headTeam.slice(0, 2)) {
+    for (const p of headTeam.filter((x) => as(x)).slice(0, 2)) {
       const me = as(p);
       if (await set(me, p, { title: "Draft my notes for the team meeting", due_on: day(1), priority: "low" })) n += 1;
     }
@@ -108,7 +111,8 @@ module.exports = async function seed({ pool, log }) {
   await part(log, "calendar", async () => {
     if (await exists(pool, "SELECT 1 FROM calendar_event LIMIT 1")) return log("calendar: already there");
     const at = (d, hhmm) => lagos.instant(d, hhmm).toISOString();
-    const meet = day(1);
+    // Monday of the run's week, so the meetings are in Your Week whatever day the seed runs.
+    const meet = lagos.addDays(today, 1 - lagos.weekday(today));
     const attendees = [staff.operations, ...staff.management].filter((p) => p && as(p)).map((p) => p.employee_id);
     await calendar.create(
       ceo,

@@ -105,7 +105,7 @@ describeDb("Home's staging seed against the real migrations", () => {
     outbox.markReady();
     await runFile(staffSeed);
     // Tasks and the calendar come from My Workspace's own seed, which runs before Home's.
-    await runFile(workspaceSeed);
+    await runFile(workspaceSeed, { now: NOW });
     staff = await realStaff(pool);
     await runFile(home, { now: NOW });
     first = await counts();

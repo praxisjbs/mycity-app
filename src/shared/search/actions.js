@@ -160,7 +160,7 @@ const ACTIONS = Object.freeze([
     screen: "workspace.calendar",
     params: { action: "new" },
     need: ["workspace", "create"],
-    words: ["event", "meeting", "book a meeting", "calendar", "invite"],
+    words: ["event", "meeting", "book a meeting", "calendar", "schedule a meeting"],
   }),
   a("request_leave", "Request Leave", {
     screen: "ess.my-leave",
