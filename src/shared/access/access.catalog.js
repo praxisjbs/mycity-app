@@ -109,7 +109,13 @@ const MODULE_CATALOG = [
     key: "praxis_ai",
     area: "system",
     label: "Praxis AI",
-    description: "The assistant, and AI controls",
+    description: "The assistant",
+  },
+  {
+    key: "ai_control",
+    area: "system",
+    label: "AI Control",
+    description: "Which model answers each AI feature, model prices, and the monthly spend and caps",
   },
   {
     key: "settings",

@@ -1,12 +1,10 @@
 "use strict";
 /**
- * Field assignments: the one write path for sending people to one or two sites for some days,
- * and the reads behind People · Attendance (Field) and My Attendance
+ * Field assignments made before attendance's PR 4, which retired setting new ones in favour of
+ * temporary sites (attendance.sites.js): the reads behind People · Worksites' Field and My
+ * Attendance, and the changes that still apply to one in force until its last day
  * (docs/guides/attendance.md §6.12).
  *
- *   create()  a line manager or People (`people` approve) set one for people within that scope,
- *             never themselves. Checked (the people, the dates, one a person a day) under each
- *             person's lock, numbered FA-0001, saved and in force at once; each person is told
  *   cancel()  stops it for the days still to come, with a reason everyone still on it reads
  *   remove()  takes one person off, with a reason they read; never the last one
  *
@@ -18,16 +16,10 @@ const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
-const numbering = require("../../shared/numbering/numbering");
 const { scopeFor } = require("../../middleware/rbac");
 const lagos = require("../../shared/time/lagos");
 const repo = require("./attendance.repo");
-const places = require("../../shared/places/places");
 const { EVENTS } = require("./attendance.events");
-
-/** The longest an assignment runs, in calendar days, and how far ahead it may start. */
-const MAX_DAYS = 31;
-const AHEAD_DAYS = 90;
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -83,82 +75,6 @@ const payloadOf = (row, employeeId, extra = {}) => ({
   subject_employee_id: employeeId,
   ...extra,
 });
-
-/** The dates, against today in Lagos (§6.12). */
-function checkDates(body, today) {
-  if (body.starts_on < today)
-    throw new AppError("ASSIGNMENT_IN_THE_PAST", "Pick a first day from today on", 422, { starts_on: ["Already past"] });
-  if (lagos.daysBetween(today, body.starts_on) > AHEAD_DAYS)
-    throw new AppError("ASSIGNMENT_TOO_FAR", `Pick a first day within ${AHEAD_DAYS} days`, 422, {
-      starts_on: ["Too far ahead"],
-    });
-  if (lagos.daysBetween(body.starts_on, body.ends_on) + 1 > MAX_DAYS)
-    throw new AppError("ASSIGNMENT_TOO_LONG", `A field assignment covers at most ${MAX_DAYS} days`, 422, {
-      ends_on: [`At most ${MAX_DAYS} days`],
-    });
-}
-
-/**
- * POST /attendance/field-assignments.
- * @param {{user_id: string, employee_id: string|null}} user  the session's
- * @param {object} body  FieldAssignmentCreate
- * @param {{scope: string, scope_ids: string[]|null}} scope  the reader's `people` approve scope
- */
-async function create(user, body, scope) {
-  const today = lagos.today();
-  checkDates(body, today);
-  const ids = [...body.employee_ids].sort();
-  if (user.employee_id && ids.includes(user.employee_id))
-    throw new AppError("OWN_RECORD", "Someone else sends you out", 403, { employee_ids: ["Not yourself"] });
-  if (!ids.every((e) => inScope(scope, e)))
-    throw new AppError("FORBIDDEN", "You can only send out people in your team", 403, {
-      employee_ids: ["Outside your team"],
-    });
-
-  const id = await tx(async (client) => {
-    // One lock a person, in the order of their ids, so two assignments set at once wait in turn.
-    for (const e of ids) await repo.lockEmployee(client, e);
-    for (const e of ids) {
-      const person = await repo.person(client, e);
-      if (!person || person.status !== "active")
-        throw new AppError("NOT_EMPLOYED", "Only people who work here now can be sent out", 422, {
-          employee_ids: ["Not working here"],
-        });
-    }
-    const clash = await repo.overlappingAssignment(client, ids, body.starts_on, body.ends_on);
-    if (clash)
-      throw new AppError("ASSIGNMENT_OVERLAPS", `${clash.display_name} is already on ${clash.number}`, 409, {
-        starts_on: ["Overlaps another"],
-      });
-
-    const { number } = await numbering.allocate(client, "field_assignment");
-    const row = await repo.insertAssignment(client, {
-      number,
-      name: body.name,
-      client: body.client,
-      note: body.note || null,
-      starts_on: body.starts_on,
-      ends_on: body.ends_on,
-      assigned_by: user.user_id,
-      sites: body.sites.map((x) => ({ ...x, address: x.address ? places.lineOf(x.address) : null })),
-      employee_ids: ids,
-    });
-    for (const [i, site] of body.sites.entries())
-      if (site.address)
-        await places.save(client, "attendance_field_site.address", row.site_ids[i], site.address, { field: `sites.${i}.address` });
-    const facts = { ...row, number, name: body.name, starts_on: body.starts_on, ends_on: body.ends_on };
-    for (const e of ids)
-      await emit(client, {
-        key: EVENTS.FIELD_ASSIGNMENT_ASSIGNED,
-        entity: ENTITY(row.field_assignment_id),
-        actor: user,
-        after: { number, employee_id: e, starts_on: body.starts_on, ends_on: body.ends_on, sites: body.sites.length },
-        payload: payloadOf(facts, e),
-      });
-    return row.field_assignment_id;
-  });
-  return present(await repo.assignmentRow(pool, id, { today, changer: scope }), user);
-}
 
 /** The assignment, 404 unless someone in `scope` is or was on it. */
 async function visible(id, scope) {
@@ -259,4 +175,4 @@ async function getMine(user, id) {
   return present(await repo.assignmentRow(pool, id, { today: lagos.today(), changer: null }), user);
 }
 
-module.exports = { MAX_DAYS, AHEAD_DAYS, create, cancel, remove, list, get, mine, getMine, present };
+module.exports = { cancel, remove, list, get, mine, getMine, present };

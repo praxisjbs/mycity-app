@@ -427,6 +427,10 @@ async function reassign(user, id, { user_id: toUserId, reason }) {
     if (locked.opened_by && to.user_id === locked.opened_by) {
       throw new AppError("VALIDATION_FAILED", "Not the requester", 422, { user_id: ["Not the requester"] });
     }
+    // Someone the approval excludes never decides it (a temporary site's people, foundation.md §6.5).
+    if (to.employee_id && (locked.excluded_employee_ids || []).includes(to.employee_id)) {
+      throw new AppError("VALIDATION_FAILED", "Not someone on it", 422, { user_id: ["Not someone on it"] });
+    }
     if (!(await approveScope(to, locked.module_key))) {
       throw new AppError("VALIDATION_FAILED", "They cannot approve these", 422, { user_id: ["They cannot approve these"] });
     }
@@ -457,6 +461,7 @@ async function reassign(user, id, { user_id: toUserId, reason }) {
         reassigned_from: locked.stage_approvers,
         subject_employee_id: locked.subject_employee_id,
         opened_by: locked.opened_by,
+        excluded_employee_ids: locked.excluded_employee_ids || [],
         reason,
       },
     });

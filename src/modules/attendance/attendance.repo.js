@@ -21,6 +21,7 @@ const { scopeClause } = require("../../shared/rbac/scope");
 const { personJson } = require("../../shared/db/person");
 const lagos = require("../../shared/time/lagos");
 const approvers = require("../../shared/workflow/approvers");
+const { REGISTER_SITE } = require("./attendance.sites.repo");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -96,6 +97,7 @@ const REQUEST_PLACE = (col) =>
 /** The place a punch was judged against, named, when it was not a worksite (§6.10 to §6.12). */
 const PUNCH_PLACE = `COALESCE(w.name, CASE ev.validation #>> '{geofence,place}' WHEN 'home' THEN 'Home'
   WHEN 'field' THEN ev.validation #>> '{geofence,worksite_name}'
+  WHEN 'temporary_site' THEN ev.validation #>> '{geofence,worksite_name}'
   ELSE ${REQUEST_PLACE("ev.validation #>> '{geofence,place}'")} END)`;
 
 /**
@@ -292,18 +294,31 @@ function upsertDay(client, employeeId, date, p, { closed = false, judged = null 
   );
 }
 
-/** Open an exception, once: null when the same one is already there. */
+/**
+ * Open an exception, once: null when the same one is already there. One per punch and type, one per
+ * check-in and type (§6.12), else one per day and type (a missing clock-out).
+ */
 function insertException(client, x) {
   const target = x.attendance_event_id
     ? "(attendance_event_id, exception_type) WHERE attendance_event_id IS NOT NULL"
-    : "(attendance_day_id, exception_type) WHERE attendance_event_id IS NULL";
+    : x.attendance_check_in_id
+      ? "(attendance_check_in_id, exception_type) WHERE attendance_check_in_id IS NOT NULL"
+      : "(attendance_day_id, exception_type) WHERE attendance_event_id IS NULL AND attendance_check_in_id IS NULL";
   return one(
     client,
-    `INSERT INTO attendance_exception (attendance_day_id, attendance_event_id, exception_type, severity, evidence)
-     VALUES ($1, $2, $3, $4, $5::jsonb)
+    `INSERT INTO attendance_exception
+       (attendance_day_id, attendance_event_id, attendance_check_in_id, exception_type, severity, evidence)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb)
      ON CONFLICT ${target} DO NOTHING
      RETURNING attendance_exception_id, exception_type`,
-    [x.attendance_day_id, x.attendance_event_id || null, x.exception_type, x.severity, JSON.stringify(x.evidence || {})],
+    [
+      x.attendance_day_id,
+      x.attendance_event_id || null,
+      x.attendance_check_in_id || null,
+      x.exception_type,
+      x.severity,
+      JSON.stringify(x.evidence || {}),
+    ],
   );
 }
 
@@ -416,7 +431,7 @@ function listEvents(db, employeeId, date, query, { coordinates }) {
  * ------------------------------------------------------------------ */
 
 const EXCEPTIONS = `
-  SELECT x.attendance_exception_id, x.attendance_day_id, x.attendance_event_id,
+  SELECT x.attendance_exception_id, x.attendance_day_id, x.attendance_event_id, x.attendance_check_in_id,
          ${PERSON()} AS employee, ad.employee_id, ad.attendance_date AS work_date,
          x.exception_type, x.severity, x.status, x.outcome, x.evidence, x.employee_note,
          x.employee_noted_at, x.resolution, x.reviewed_at, ${nameOf("re")} AS reviewed_by_name,
@@ -429,7 +444,7 @@ const EXCEPTIONS = `
     LEFT JOIN app_user ru ON ru.user_id = x.reviewed_by
     LEFT JOIN employee re ON re.employee_id = ru.employee_id`;
 
-const EXCEPTION_OUT = `v.attendance_exception_id, v.attendance_day_id, v.attendance_event_id, v.employee,
+const EXCEPTION_OUT = `v.attendance_exception_id, v.attendance_day_id, v.attendance_event_id, v.attendance_check_in_id, v.employee,
   v.employee_id, v.work_date, v.exception_type, v.severity, v.status, v.outcome, v.evidence, v.employee_note,
   v.employee_noted_at, v.resolution, v.reviewed_at, v.reviewed_by_name, v.created_at`;
 
@@ -513,13 +528,14 @@ const REGISTER = (hours) => `
          COALESCE(ad.worked_minutes, 0) AS worked_minutes, COALESCE(ad.late_minutes, 0) AS late_minutes,
          COALESCE(ad.early_minutes, 0) AS early_minutes,
          COALESCE(ad.overtime_minutes, 0) AS overtime_minutes, ad.closed_at,
+         COALESCE(${REGISTER_SITE("e.employee_id", "$1::date")},
          CASE WHEN fa.sites IS NOT NULL THEN fa.sites
               WHEN lr.request_type IS NOT NULL THEN ${REQUEST_PLACE("lr.request_type")}
               WHEN ${PLACE_REMOTE("e.employee_id", "e.work_pattern", "$1::date")}
               THEN CASE WHEN EXISTS (SELECT 1 FROM attendance_home ah
                                       WHERE ah.employee_id = e.employee_id AND ah.status = 'approved')
                         THEN 'Home' ELSE 'Remote' END
-              WHEN w.active THEN w.name END AS expected_location,
+              WHEN w.active THEN w.name END) AS expected_location,
          CASE WHEN w.active THEN w.radius_m END AS expected_radius_m,
          last.validation #>> '{geofence,verdict}' AS location_verdict,
          last.device_label,
@@ -995,52 +1011,6 @@ function approvedRequestOn(db, employeeId, date) {
   );
 }
 
-/** A request of the person's, waiting or approved, sharing a day with `from`..`to`. */
-function overlappingRequest(db, employeeId, from, to) {
-  return one(
-    db,
-    `SELECT r.location_request_id, r.number FROM attendance_location_request r
-      WHERE r.employee_id = $1 AND r.status IN ('submitted', 'approved')
-        AND r.starts_on <= $3::date AND r.ends_on >= $2::date
-      ORDER BY r.starts_on LIMIT 1`,
-    [employeeId, from, to],
-  );
-}
-
-function insertRequest(client, r) {
-  return one(
-    client,
-    `INSERT INTO attendance_location_request
-       (number, employee_id, request_type, starts_on, ends_on, address, latitude, longitude, accuracy_m,
-        site_latitude, site_longitude, site_radius_m, reason, requested_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-     RETURNING location_request_id`,
-    [
-      r.number,
-      r.employee_id,
-      r.request_type,
-      r.starts_on,
-      r.ends_on,
-      r.address,
-      r.latitude,
-      r.longitude,
-      r.accuracy_m,
-      r.site_latitude,
-      r.site_longitude,
-      r.site_radius_m,
-      r.reason,
-      r.requested_by,
-    ],
-  );
-}
-
-function setRequestWorkflow(client, id, workflowInstanceId) {
-  return client.query("UPDATE attendance_location_request SET workflow_instance_id = $2 WHERE location_request_id = $1", [
-    id,
-    workflowInstanceId,
-  ]);
-}
-
 /** One request's own columns, without the person or the approval. */
 function getRequest(db, id) {
   return one(db, `SELECT ${REQUEST} FROM attendance_location_request r WHERE r.location_request_id = $1`, [id]);
@@ -1164,49 +1134,6 @@ function fieldAssignmentOn(db, employeeId, date) {
       ORDER BY a.starts_on LIMIT 1`,
     [employeeId, date],
   );
-}
-
-/** Someone of `employeeIds` already on an active assignment sharing a day with `from`..`to`. */
-function overlappingAssignment(db, employeeIds, from, to) {
-  return one(
-    db,
-    `SELECT m.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, a.number
-       FROM attendance_field_member m
-       JOIN attendance_field_assignment a ON a.field_assignment_id = m.field_assignment_id
-       JOIN employee e ON e.employee_id = m.employee_id
-      WHERE m.employee_id = ANY($1::uuid[]) AND m.removed_at IS NULL AND a.status = 'active'
-        AND a.starts_on <= $3::date AND a.ends_on >= $2::date
-      ORDER BY a.starts_on, m.employee_id LIMIT 1`,
-    [employeeIds, from, to],
-  );
-}
-
-async function insertAssignment(client, a) {
-  const row = await one(
-    client,
-    `INSERT INTO attendance_field_assignment (number, name, client, note, starts_on, ends_on, assigned_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING field_assignment_id`,
-    [a.number, a.name, a.client, a.note, a.starts_on, a.ends_on, a.assigned_by],
-  );
-  row.site_ids = [];
-  for (const [i, site] of a.sites.entries()) {
-    const {
-      rows: [made],
-    } = await client.query(
-      `INSERT INTO attendance_field_site (field_assignment_id, position, name, address, latitude, longitude, radius_m)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING field_site_id`,
-      [row.field_assignment_id, i + 1, site.name, site.address, site.latitude, site.longitude, site.radius_m],
-    );
-    row.site_ids.push(made.field_site_id);
-  }
-  await client.query(
-    `INSERT INTO attendance_field_member (field_assignment_id, employee_id)
-     SELECT $1, x FROM unnest($2::uuid[]) AS x`,
-    [row.field_assignment_id, a.employee_ids],
-  );
-  return row;
 }
 
 /** An assignment's own columns and who is still on it (sorted); locked when `forUpdate`. */
@@ -1839,17 +1766,12 @@ module.exports = {
   listHomes,
   homeRow,
   approvedRequestOn,
-  overlappingRequest,
-  insertRequest,
-  setRequestWorkflow,
   getRequest,
   settleRequest,
   cancelRequest,
   listRequests,
   requestRow,
   fieldAssignmentOn,
-  overlappingAssignment,
-  insertAssignment,
   getAssignment,
   cancelAssignment,
   removeMember,

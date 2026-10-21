@@ -9,6 +9,7 @@ import { EmployeeWorkSchedule } from "@/features/attendance/WorkSetup";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
 import { ReportingForm } from "@/features/shared/ReportingForm";
 import { hrefFor, useRouter } from "@/lib/router";
+import { useTrailTitle } from "@/lib/trail";
 import {
   ActionGroup,
   BackButton,
@@ -76,6 +77,8 @@ export function Employee360({ id }: { id: string }) {
   const exportData = useMutation("POST /api/v1/employees/:id/data-export");
   const photo = usePhoto(e?.photo_url);
   const back = () => navigate(hrefFor("people", "employees"));
+  // The trail reads the person's name for this place, not the screen's (F29).
+  useTrailTitle(e?.display_name);
 
   if (error)
     return (

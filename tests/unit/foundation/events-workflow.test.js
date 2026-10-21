@@ -263,7 +263,7 @@ describe("route map", () => {
       Home: "home", "My Workspace": "workspace", "Employee Self-Service": "ess", "Staff Community": "community",
       Mailbox: "mailbox", People: "people", Performance: "performance", "Queries & Sanctions": "queries",
       Recruitment: "recruitment", Payroll: "payroll", Partnerships: "partnerships", Expenses: "expenses",
-      "Knowledge Hub": "knowledge", "Praxis AI": "praxis_ai", Settings: "settings",
+      "Knowledge Hub": "knowledge", "Praxis AI": "praxis_ai", "AI Control": "ai_control", Settings: "settings",
     };
     const found = {};
     let module = null;
@@ -275,7 +275,7 @@ describe("route map", () => {
       if (row && !/\| Dropped \|/.test(line)) (found[module] = found[module] || []).push(row[1]);
     }
     expect(found).toEqual(routeMap.SCREENS);
-    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(90);
+    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(93);
   });
 });
 

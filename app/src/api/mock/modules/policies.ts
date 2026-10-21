@@ -142,7 +142,7 @@ const RULE_LABEL: Record<Visible, string> = {
   overtime: "Overtime",
   office_geofence_mode: "Office Check",
   home_geofence_mode: "Home Check",
-  site_geofence_mode: "Field Site Check",
+  site_geofence_mode: "Temporary Site Check",
   home_radius_m: "Home Radius",
   max_accuracy_m: "GPS Accuracy",
   device_mode: "Device Check",
@@ -302,10 +302,12 @@ function home(mode: string, radius: number) {
   const away = `Working from home, a clock-in more than ${metres(radius)} from your approved home`;
   return [mode === "warn" ? `${away} is accepted and sent for review.` : `${away} is refused, and People see it.`, "Until People approve your home, your clock-ins are sent for review."];
 }
+/** T14's fixed sentence, at the foot of the site section whatever its mode. */
+const ELSEWHERE = "Working somewhere else? Add it from Home, or ask People.";
 function site(mode: string) {
-  if (mode === "off") return ["At a field site or client visit, your location is recorded with each clock-in. Nothing is flagged."];
-  if (mode === "warn") return ["At a field site or client visit, a clock-in outside the site's radius is accepted and sent for review."];
-  return ["At a field site or client visit, a clock-in outside the site's radius is refused, and People see it."];
+  if (mode === "off") return ["At a temporary site, your location is recorded with each clock-in and check-in. Nothing is flagged.", ELSEWHERE];
+  if (mode === "warn") return ["At a temporary site, a clock-in or check-in outside its addresses is accepted and sent for review.", ELSEWHERE];
+  return ["At a temporary site, a clock-in outside its addresses is refused, and People see it.", "A check-in outside them is sent for review.", ELSEWHERE];
 }
 function location(r: AttendanceRules) {
   const checked = [r.office_geofence_mode, r.home_geofence_mode, r.site_geofence_mode].some((m) => m !== "off");
@@ -347,7 +349,7 @@ const SECTIONS: Array<{ key: string; title: string; rules: readonly Visible[]; t
   { key: "overtime", title: "Overtime", rules: ["overtime"], text: (r) => overtime(r.overtime) },
   { key: "office", title: "At the Office", rules: ["office_geofence_mode"], text: (r) => office(r.office_geofence_mode) },
   { key: "home", title: "Working From Home", rules: ["home_geofence_mode", "home_radius_m"], text: (r) => home(r.home_geofence_mode, r.home_radius_m) },
-  { key: "site", title: "At a Field Site", rules: ["site_geofence_mode"], text: (r) => site(r.site_geofence_mode) },
+  { key: "site", title: "At a Temporary Site", rules: ["site_geofence_mode"], text: (r) => site(r.site_geofence_mode) },
   { key: "location", title: "Your Location", rules: ["max_accuracy_m"], text: location },
   { key: "devices", title: "Your Devices", rules: ["device_mode"], text: (r) => device(r.device_mode) },
   { key: "clock_prompts", title: "Clocking Out", rules: ["clock_out_reminder_minutes", "system_clock_out_after_minutes"], text: clockPrompts },

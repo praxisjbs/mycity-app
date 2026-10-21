@@ -69,7 +69,7 @@ erDiagram
 | Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `notification_rule`, `notification_rule_recipient`, `notification_reminder_rule`, `notification_setting`, `reminder`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
-| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
+| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model`, `ai_chain`, `ai_provider_cap`, `ai_price_proposal` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
 
 Every core table above was checked against the shared code that writes it by running
 `tests/integration` on the real migrations (#26, #27): the code and the schema agree, and CI keeps
@@ -228,7 +228,18 @@ beforehand, one per person and day) · `1440` reminders to clock out: `attendanc
 `kind` widened to `clock_out_due`, a `slot` and `due_at`, unique per person, day, kind and slot ·
 `1445` Home's `late_arrivals` and `missing_clock_out` rules switched off and their open alerts
 dismissed as the rule change, with a check that keeps them off (the Attendance policy raises
-attendance's alerts, `docs/guides/home.md` §6).
+attendance's alerts, `docs/guides/home.md` §6) · `1450` temporary sites (attendance.md §6.11, PR 4): `attendance_temporary_site`
+(numbered `TS-0001`, a purpose of seventeen, a name, a description, one to 90 days, its status and
+approval, who submitted, approved or cancelled it and why), `attendance_temporary_site_location` (one
+to eight picked addresses, each its `place`, point, radius of 150 to 500 m and time zone) and
+`attendance_temporary_site_member` (one to 25 people, taken off with a reason) · `1455`
+`workflow_instance.excluded_employee_ids` (the people an approval excludes from deciding it:
+everyone on a temporary site) · `1460` `attendance_check_in` (one row per check-in at a stop,
+append-only: its point, accuracy, matched address, distance, verdict, evidence and policy version,
+unique per person and Idempotency-Key), `attendance_exception.attendance_check_in_id` (a flag a
+check-in opened), and `1300`'s day index narrowed to exceptions of neither a punch nor a check-in ·
+`1470` the `temporary_site` numbering scheme and version 1 of the `attendance.temporary_site`
+approval (Operations & People, 48 hours).
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
 other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026). The
@@ -246,10 +257,13 @@ are read by nothing after `1405` and are dropped by a later release (MIGRATIONS 
 use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
-- Attendance (attendance.md §4, §13): the redesign's tables above (PRs 2 and 4; PR 3's are built);
-  the foreign keys of `attendance_rule_breach.employee_query_id` (M3) and
-  `attendance_pay_item.payroll_run_id` (M6) once their tables exist; dropping `attendance_schedule`
-  (frozen by `1420`), `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
+- Attendance (attendance.md §4, §13): the redesign's tables above (PR 2; PR 3's are built in `1420`
+  to `1445`, PR 4's places in `1450` to `1470`); the foreign keys of
+  `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
+  their tables exist; dropping `attendance_location_request` and the field assignment tables once no
+  request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
+  (MIGRATIONS §8); dropping
+  `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
   nothing reads them; dropping the superseded booleans `require_geofence` and `require_known_device`
   and `1300`'s one `geofence_mode`, superseded by the place modes of `1370` (MIGRATIONS §8).
 - Attendance, for Home (LA): the shared roster (`src/modules/attendance/attendance.roster.js`)
@@ -467,7 +481,11 @@ their grants on screen came forward to M0 with foundation track C (`0400`, `0449
 ### M10 Staff Knowledge Hub & AI Assistance · 10000 to 10999 · TB
 
 **Built:** `10000` knowledge categories, articles, versions, embeddings, AI conversations,
-messages, citations · `10099` seed.
+messages, citations · `10099` seed · `10200` AI Control, brought forward (`docs/guides/ai-control.md`
+§4): `ai_chain` (each job's and action's chain, a row per model), `ai_provider_cap` (a paid provider's
+monthly cap), `ai_price_proposal` (Find Prices' proposals, one open per model), `ai_model`'s price of a
+thousand searches, and on `ai_run_step` the audio seconds, searches, naira prices and rate a step was
+charged at, with kind `search` · `10290` seed: the `ai_control` grants.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

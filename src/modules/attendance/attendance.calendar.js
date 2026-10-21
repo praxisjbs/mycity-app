@@ -12,7 +12,10 @@
  *              a field site's on a field assignment or a client visit, a home's when the date is
  *              worked from home (a Remote day of the person's week, a temporary home, a remote
  *              day), the office's otherwise
- *   fence      a field assignment the person is still on covering the date before anything
+ *   fence      an approved temporary site the person is still on covering the date before
+ *              anything (§6.11, PR 4, attendance.sites.js contextOf): its addresses, the nearest
+ *              judging the punch, a Temporary Home judged as a home, read in its own zone.
+ *              Then a field assignment the person is still on covering the date
  *              (§6.12): its sites, the nearer judging the punch (attendance.geofence.js).
  *              Then an approved work location request covering the date (§6.11): its
  *              temporary home, fenced like a home; a client visit, its site; a remote day, the
@@ -35,6 +38,7 @@ const worksites = require("../worksites/worksites.service");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
 const policies = require("../policies/policies.service");
+const temporarySites = require("./attendance.sites");
 // The Attendance policy type registers itself with policies when it is loaded.
 require("./attendance.policy-type");
 
@@ -115,6 +119,9 @@ async function homeFence(db, person, policy, extra = {}) {
 async function contextFor(db, person, date) {
   const policy = await policyFor(db, person.employee_id, date);
   const shift = await shiftOn(db, person, date, { policy });
+  // A temporary site the person is still on that day comes first (§6.11).
+  const site = await temporarySites.siteOn(db, person.employee_id, date);
+  if (site) return temporarySites.contextOf(site, { policy, shift });
   const assignment = await repo.fieldAssignmentOn(db, person.employee_id, date);
   if (assignment)
     return {

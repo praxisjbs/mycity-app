@@ -77,10 +77,10 @@ export const SIGN_INS: Record<string, { view: "operations" | "ceo" | "partnershi
 /**
  * Every module key, for the two accounts that open everything on the mock (the screen
  * gates sign in as one of them). `system_health` holds Settings' Status, Performance and
- * Faults tabs and `integrations` its Integrations tab (app/src/shell/access.ts), so without
- * them the crawl never reaches those.
+ * Faults tabs and `integrations` its Integrations tab (app/src/shell/access.ts), and
+ * `ai_control` is AI Control's own key, so without them the crawl never reaches those.
  */
-export const MODULES_ALL = ["home", "workspace", "ess", "community", "mailbox", "people", "performance", "queries", "recruitment", "payroll", "partnerships", "expenses", "knowledge", "praxis_ai", "settings", "system_health", "integrations"];
+export const MODULES_ALL = ["home", "workspace", "ess", "community", "mailbox", "people", "performance", "queries", "recruitment", "payroll", "partnerships", "expenses", "knowledge", "praxis_ai", "ai_control", "settings", "system_health", "integrations"];
 
 export function grantsFor(key: string): Record<string, string[]> {
   const all = ["view", "create", "edit", "delete", "approve", "export"];

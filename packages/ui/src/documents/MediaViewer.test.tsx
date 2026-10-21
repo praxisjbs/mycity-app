@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { setViewport } from "../testing/viewport";
 import { MediaViewer, type ViewerItem } from "./MediaViewer";
+import { resetHistoryForTest, startHistory } from "../lib/history";
 
 vi.mock("./PdfViewer.draw", () => ({
   default: ({ name }: { name: string }) => (
@@ -140,14 +141,19 @@ describe("MediaViewer", () => {
   it("offers Share on a phone that can share the file, and the phone's Back closes it", async () => {
     setViewport(390);
     Object.defineProperty(navigator, "canShare", { value: () => true, configurable: true });
-    const back = vi.spyOn(window.history, "back").mockImplementation(() => undefined);
+    // The app's router starts the window's history; the viewer then holds a step of its own (F29).
+    startHistory();
     const { props, unmount } = view();
     expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    await act(async () => {
+      const landed = new Promise<void>((r) => window.addEventListener("popstate", () => setTimeout(r, 0), { once: true }));
+      window.history.back();
+      await landed;
+    });
     expect(props.onClose).toHaveBeenCalledTimes(1);
     unmount();
-    expect(back).not.toHaveBeenCalled();
+    resetHistoryForTest();
     delete (navigator as { canShare?: unknown }).canShare;
   });
 

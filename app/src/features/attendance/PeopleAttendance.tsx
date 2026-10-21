@@ -1,6 +1,5 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
-import workflow from "@mycity/contract/schemas/workflow.js";
-import type { AttendanceEvent, AttendanceException, ExceptionDecision, ExportFile, FieldAssignment, HomeDecision, HomeRequest, HomeStatus, LocationRequest, LocationRequestStatus, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceEvent, AttendanceException, ExceptionDecision, ExportFile, HomeDecision, HomeRequest, HomeStatus, RegisterRow, RegisterStatus } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
@@ -9,23 +8,22 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
-import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, PATTERN, PUNCH_STATE, REGISTER_STATUS, REQUEST_TYPE, VERDICT } from "./labels";
-import { RequestApproval, requestDates, requestPill, requestPlace, requestSite } from "./WorkLocationRequests";
-import { AssignmentView, FieldView, NewAssignmentForm, useAssignmentLink } from "./FieldAssignments";
+import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, PATTERN, PUNCH_STATE, REGISTER_STATUS, VERDICT } from "./labels";
+import { DayRoute } from "./TemporarySites";
 import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
 
 /**
  * People · Attendance (#25, docs/guides/attendance.md §10): one day's register for everyone in the
- * reader's `people` scope, with its figures, each person's day and the evidence of every punch,
- * the exceptions waiting on People, remote staff's home locations, work location requests and field
- * assignments (set, cancelled and changed here by a line manager or People), and the pending
- * deductions and overtime (waived, confirmed and cut here, §6.17). A manager sees their team; the coordinates, the home addresses and the home decisions are for
- * People with scope all, which the API enforces. A request is decided in its approval by whoever
- * it waits on.
+ * reader's `people` scope, with its figures, each person's day and the evidence of every punch
+ * (and on a temporary site's day each check-in between them), the exceptions waiting on People and
+ * remote staff's home locations, and the pending deductions and overtime (waived, confirmed and cut
+ * here, §6.17). A manager sees their team; the coordinates, the home addresses and the home
+ * decisions are for People with scope all, which the API enforces. Temporary sites, and the
+ * requests and field assignments made before them, are on People · Worksites, Temporary.
  */
 
-type View = "register" | "exceptions" | "homes" | "requests" | "field" | "deductions" | "overtime";
+type View = "register" | "exceptions" | "homes" | "deductions" | "overtime";
 const STATUS_CHIPS: Array<[RegisterStatus | "all", string]> = [
   ["all", "All"],
   ["present", "Present"],
@@ -39,8 +37,6 @@ export function PeopleAttendance() {
   const [params] = useSearchParams();
   const id = params.get("id");
   const homeId = params.get("home");
-  const requestId = params.get("request");
-  const assignmentId = params.get("assignment");
   const { can } = useAuth();
   const modal = useModal();
   const [date, setDate] = useState(todayIso());
@@ -52,18 +48,11 @@ export function PeopleAttendance() {
   useRecordLink(id, openDay);
   const openHome = useCallback((h: HomeRequest) => modal.open({ title: h.employee.display_name, body: (close) => <HomeView h={h} close={close} /> }), [modal]);
   useHomeLink(homeId, openHome, () => setView("homes"));
-  const openRequest = useCallback((r: LocationRequest) => modal.open({ title: `${r.number} · ${r.employee.display_name}`, body: (close) => <RequestView r={r} close={close} /> }), [modal]);
-  useRequestLink(requestId, openRequest, () => setView("requests"));
-  const openAssignment = useCallback((a: FieldAssignment) => modal.open({ title: a.number, wide: true, body: (close) => <AssignmentView a={a} close={close} /> }), [modal]);
-  const toField = useCallback(() => setView("field"), []);
-  useAssignmentLink(assignmentId, openAssignment, { before: toField });
-  const mayAssign = can("people", "approve");
-  const newAssignment = useCallback(() => (setView("field"), modal.open({ title: "New Assignment", wide: true, body: (close) => <NewAssignmentForm close={close} /> })), [modal]);
   // Deductions ticked on the Deductions view put Waive Selected in the phone's floating button.
   const waiveRef = useRef<(() => void) | null>(null);
   const [canWaive, setCanWaive] = useState(false);
-  // search:none Waive Selected acts on the deductions ticked on the list, never from search; New Assignment is listed in shared/search/actions.js
-  useScreenAction(canWaive ? { label: "Waive Selected", icon: "check", onSelect: () => waiveRef.current?.() } : mayAssign ? { label: "New Assignment", onSelect: newAssignment } : null);
+  // search:none Waive Selected acts on the deductions ticked on the list, never from search
+  useScreenAction(canWaive ? { label: "Waive Selected", icon: "check", onSelect: () => waiveRef.current?.() } : null);
 
   const exportRange = () => modal.open({ title: "Export Register", body: (close) => <ExportForm close={close} date={date} status={status} /> });
   const tile = (title: string, value: number | undefined, filter: RegisterStatus | null, tone?: "ok" | "warn" | "err", help?: string) => (
@@ -75,18 +64,7 @@ export function PeopleAttendance() {
       <PageHeader
         title="Attendance"
         sub={formatDate(date)}
-        actions={
-          can("people", "export") || mayAssign ? (
-            <>
-              {can("people", "export") && <Button icon="download" onClick={exportRange}>Export</Button>}
-              {mayAssign && (
-                <DesktopOnly>
-                  <Button variant="primary" icon="plus" onClick={newAssignment}>New Assignment</Button>
-                </DesktopOnly>
-              )}
-            </>
-          ) : undefined
-        }
+        actions={can("people", "export") ? <Button icon="download" onClick={exportRange}>Export</Button> : undefined}
       >
         <Field label="Date">
           <DateField value={date} onChange={(d) => d && setDate(d)} max={todayIso()} />
@@ -115,21 +93,17 @@ export function PeopleAttendance() {
           label="View"
           value={view}
           onChange={setView}
-          options={[["register", "Register"], ["exceptions", "Exceptions"], ["homes", "Homes"], ["requests", "Requests"], ["field", "Field"], ["deductions", "Deductions"], ["overtime", "Overtime"]]}
+          options={[["register", "Register"], ["exceptions", "Exceptions"], ["homes", "Homes"], ["deductions", "Deductions"], ["overtime", "Overtime"]]}
         />
       </div>
       {view === "register" ? (
         <Register date={date} status={status} setStatus={setStatus} openDay={openDay} />
       ) : view === "exceptions" ? (
         <Exceptions date={date} />
-      ) : view === "homes" ? (
-        <Homes openHome={openHome} />
-      ) : view === "requests" ? (
-        <Requests openRequest={openRequest} />
       ) : view === "deductions" || view === "overtime" ? (
         <PayItemsView key={view} group={view} waiveRef={waiveRef} onCanWaive={setCanWaive} />
       ) : (
-        <FieldView openAssignment={openAssignment} />
+        <Homes openHome={openHome} />
       )}
     </>
   );
@@ -184,6 +158,7 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
   const day = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: employeeId }, query: { date } });
   const events = usePaged("GET /api/v1/attendance/events", { filters: { employee_id: employeeId, date } });
   const exceptions = usePaged("GET /api/v1/attendance/exceptions", { filters: { employee_id: employeeId, date } });
+  const checkIns = usePaged("GET /api/v1/attendance/check-ins", { filters: { employee_id: employeeId, date } });
   const modal = useModal();
   const me = useMe();
   const { can } = useAuth();
@@ -231,6 +206,7 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
         empty={{ icon: "clock", title: "No Punches", text: "Nothing was recorded on this day." }}
         columns={evidenceColumns}
       />
+      <DayRoute className="mt-3" punches={events.rows} checkIns={checkIns.rows} />
       {exceptions.rows.length > 0 && (
         <DataView
           className="mt-3"
@@ -300,6 +276,7 @@ function Exceptions({ date }: { date: string }) {
 function ExceptionView({ x, close }: { x: AttendanceException; close: () => void }) {
   const { can } = useAuth();
   const events = usePaged("GET /api/v1/attendance/events", { filters: { employee_id: x.employee.employee_id, date: x.work_date } });
+  const checkIns = usePaged("GET /api/v1/attendance/check-ins", { filters: { employee_id: x.employee.employee_id, date: x.work_date } });
   return (
     <>
       <Card>
@@ -322,6 +299,7 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
         />
       </Card>
       <DataView className="mt-3" title="Punches" wide list={events} rowKey={(e) => e.attendance_event_id} noun="punch" nounPlural="punches" columns={evidenceColumns} />
+      <DayRoute className="mt-3" punches={events.rows} checkIns={checkIns.rows} />
       {x.status === "open" && can("people", "approve") ? (
         <DecisionForm x={x} close={close} />
       ) : (
@@ -336,7 +314,14 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
 const DECISIONS: Record<ExceptionDecision["decision"], string> = { accept: "Accept", reject: "Reject", add_clock_out: "Add Clock-Out" };
 
 /** What each kind of exception can be decided as, and the words the choice and its help use. */
-function decisionsFor(type: AttendanceException["exception_type"]): { options: Array<ExceptionDecision["decision"]>; label: (d: ExceptionDecision["decision"]) => string; help: string } {
+function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendance_check_in_id">): { options: Array<ExceptionDecision["decision"]>; label: (d: ExceptionDecision["decision"]) => string; help: string } {
+  const type = x.exception_type;
+  if (x.attendance_check_in_id)
+    return {
+      options: ["accept", "reject"],
+      label: (d) => DECISIONS[d],
+      help: "Accept clears the check-in's flag. Reject keeps it flagged. The shift is not changed either way.",
+    };
   if (type === "automatic_clock_out")
     return {
       options: ["accept", "add_clock_out"],
@@ -352,7 +337,7 @@ function decisionsFor(type: AttendanceException["exception_type"]): { options: A
 
 /** Decide: accept the punch, stop it counting, add the missing clock-out or correct a System Clock-Out. The punch itself never changes. */
 function DecisionForm({ x, close }: { x: AttendanceException; close: () => void }) {
-  const { options, label, help } = decisionsFor(x.exception_type);
+  const { options, label, help } = decisionsFor(x);
   // A System Clock-Out whose real time the person gave starts from Correct Time at that time.
   const given = x.exception_type === "automatic_clock_out" && x.real_time;
   const f = useContractForm({ decision: given ? ("add_clock_out" as const) : options[0], resolution: "", clock_out_time: given ? (x.real_time ?? "") : "" }, {
@@ -526,140 +511,6 @@ function HomeDecisionForm({ h, close }: { h: HomeRequest; close: () => void }) {
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={() => submit()}>Record Decision</Button>
-      </FormFooter>
-    </Card>
-  );
-}
-
-/** A link to a work location request (`?request=`, from a notice or search) opens it in Requests, once. */
-function useRequestLink(id: string | null, openRequest: (r: LocationRequest) => void, toRequests: () => void) {
-  const request = useApi("GET /api/v1/attendance/requests/:id", { params: { id: id ?? "" }, enabled: !!id });
-  const done = useRef<string | null>(null);
-  useEffect(() => {
-    if (request.data && done.current !== request.data.location_request_id) {
-      done.current = request.data.location_request_id;
-      toRequests();
-      openRequest(request.data);
-    }
-  }, [request.data, openRequest, toRequests]);
-}
-
-const REQUEST_CHIPS: Array<[LocationRequestStatus | "all", string]> = [
-  ["submitted", "Waiting"],
-  ["approved", "Approved"],
-  ["rejected", "Rejected"],
-  ["cancelled", "Cancelled"],
-  ["all", "All"],
-];
-
-/** Work location requests in the reader's scope, waiting first. */
-function Requests({ openRequest }: { openRequest: (r: LocationRequest) => void }) {
-  const [status, setStatus] = useState<LocationRequestStatus | "all">("submitted");
-  const list = usePaged("GET /api/v1/attendance/requests", { filters: status === "all" ? {} : { status } });
-  return (
-    <>
-      <Chips label="Requests" value={status} onChange={setStatus} options={REQUEST_CHIPS} />
-      <DataView
-        title="Requests"
-        list={list}
-        search="Name or Number"
-        rowKey={(r) => r.location_request_id}
-        onRowClick={openRequest}
-        noun="request"
-        empty={{ icon: "target", title: "No Requests Here", text: "Choose All to see every request." }}
-        columns={[
-          { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department} /> },
-          { key: "n", label: "Request", render: (r) => `${r.number} · ${REQUEST_TYPE[r.request_type]}` },
-          { key: "starts_on", label: "Dates", sortable: true, render: requestDates },
-          { key: "w", label: "Waiting On", desktop: true, render: (r) => r.waiting_on },
-          { key: "s", label: "Status", render: requestPill },
-        ]}
-      />
-    </>
-  );
-}
-
-/** One request: what was asked, its approval, and the decision when it waits on the reader. */
-function RequestView({ r, close }: { r: LocationRequest; close: () => void }) {
-  return (
-    <>
-      <Card>
-        <CardHeader record title={REQUEST_TYPE[r.request_type]} right={requestPill(r)} />
-        <KeyValue
-          items={[
-            ["Employee", r.employee.display_name],
-            ["First Day", formatDate(r.starts_on)],
-            ["Last Day", formatDate(r.ends_on)],
-            ["Days", String(r.days)],
-            ["Place", requestPlace(r)],
-            ...(requestSite(r) ? ([["Site", requestSite(r)]] as Array<[string, string]>) : []),
-            ...(r.home_latitude !== null && r.home_longitude !== null
-              ? ([["Coordinates", `${r.home_latitude.toFixed(5)}, ${r.home_longitude.toFixed(5)}`]] as Array<[string, string]>)
-              : []),
-            ...(r.accuracy_m !== null ? ([["Accuracy", `${Math.round(r.accuracy_m)} m`]] as Array<[string, string]>) : []),
-            ["Reason", r.reason],
-            ["Requested", formatDateTime(r.requested_at)],
-            ...(r.waiting_on ? ([["Waiting On", r.waiting_on]] as Array<[string, string]>) : []),
-            ...(r.cancel_reason ? ([["Cancel Reason", r.cancel_reason]] as Array<[string, string]>) : []),
-          ]}
-        />
-      </Card>
-      {r.workflow_instance_id && <RequestApproval instanceId={r.workflow_instance_id} />}
-      {r.can_decide && r.workflow_instance_id ? (
-        <RequestDecisionForm r={r} instanceId={r.workflow_instance_id} close={close} />
-      ) : (
-        <FormFooter>
-          <Button variant="primary" onClick={close}>Close</Button>
-        </FormFooter>
-      )}
-    </>
-  );
-}
-
-const REQUEST_DECISIONS: Array<["approve" | "reject", string]> = [
-  ["approve", "Approve"],
-  ["reject", "Reject"],
-];
-
-/** The stage waiting on the reader: approve it, or reject it with a reason the person reads. */
-function RequestDecisionForm({ r, instanceId, close }: { r: LocationRequest; instanceId: string; close: () => void }) {
-  const f = useContractForm({ decision: "approve" as "approve" | "reject", reason: "" }, {
-    safeParse: (v: unknown) => {
-      const x = v as { decision: "approve" | "reject"; reason: string };
-      return x.decision === "reject" ? workflow.ReasonBody.safeParse({ reason: x.reason.trim() }) : workflow.ApproveBody.safeParse({});
-    },
-  });
-  const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
-  const reject = useMutation("POST /api/v1/workflow/instances/:id/reject");
-  const v = f.values;
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      if (v.decision === "approve") await approve.run({ params: { id: instanceId }, body: {} });
-      else await reject.run({ params: { id: instanceId }, body: { reason: v.reason.trim() } });
-      invalidate("/api/v1/attendance");
-      invalidate("/api/v1/workflow");
-      close();
-      toast(v.decision === "approve" ? `${r.number} approved` : `${r.number} rejected`);
-    } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Decision not recorded");
-    }
-  };
-  return (
-    <Card className="mt-3">
-      <CardHeader title="Decide" />
-      <Field label="Outcome" {...f.status("decision")}>
-        <ChoiceField value={v.decision} onChange={(d) => f.set("decision", d)} options={REQUEST_DECISIONS} />
-      </Field>
-      {v.decision === "reject" && (
-        <Field label="Reason" {...f.status("reason")}>
-          <TextAreaField {...f.field("reason")} placeholder="Team is short" rows={3} />
-        </Field>
-      )}
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={approve.pending || reject.pending} onClick={submit}>Record Decision</Button>
       </FormFooter>
     </Card>
   );

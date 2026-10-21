@@ -5,7 +5,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import { Button, ChoiceField, Field, Form, FormError, FormFooter, HelpTerm, NumberField, SecretField, TextField, toast, useContractForm, Wizard } from "@mycity/ui";
-import { HELP, PLAN } from "./words";
+import { dailyHelp, HELP, PLAN } from "./words";
 
 /** The connections that are a key, a daily limit and a plan. */
 const KEY_ONLY = ["geoapify", "gemini", "groq", "openai", "anthropic", "deepseek", "exchange_rates"] as const;
@@ -308,7 +308,7 @@ function KeyForm({ c, done }: { c: Integration; done: () => void }) {
       <Field label={<HelpTerm help={HELP.plan}>Plan</HelpTerm>} {...f.status("plan")}>
         <ChoiceField {...f.field("plan")} options={PLANS} />
       </Field>
-      <Field label={<HelpTerm help={code === "groq" ? HELP.dailyGroq : HELP.daily}>Daily Limit</HelpTerm>} optional {...f.status("daily_limit")}>
+      <Field label={<HelpTerm help={dailyHelp(code)}>Daily Limit</HelpTerm>} optional {...f.status("daily_limit")}>
         <NumberField {...f.field("daily_limit")} placeholder={LIMIT_EXAMPLE[code] ?? "1000"} />
       </Field>
       {problem && <FormError>{problem}</FormError>}

@@ -129,6 +129,21 @@ const DROPPED = {
   city: new Set(["building", "street", "landmark", "area", "region", "country"]),
 };
 
+/**
+ * The provider's time zone of a result (`timezone.name`, "Africa/Lagos"), when the runtime knows it;
+ * else null. Kept so an owner that needs a place's zone can read it (docs/guides/addresses.md §4).
+ */
+function zoneOf(tz) {
+  const name = tz && typeof tz === "object" ? capped(tz.name, 64) : null;
+  if (!name) return null;
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: name });
+    return name;
+  } catch {
+    return null;
+  }
+}
+
 /** One provider result as a place, or null when it has no usable point or address. */
 function toPlace(hit) {
   if (!hit || typeof hit !== "object") return null;
@@ -149,6 +164,7 @@ function toPlace(hit) {
     city: capped(hit.city, 120),
     state: capped(hit.state, 120),
     country_code: country && /^[a-z]{2}$/i.test(country) ? country.toLowerCase() : null,
+    timezone: zoneOf(hit.timezone),
   };
 }
 

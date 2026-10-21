@@ -48,6 +48,16 @@
  *   attendance.overtime_decided     its line manager tells the approvers over them too
  *   attendance.pay_item_changed     an item followed its day: audit, and the screens reload
  *   attendance.overtime_approved    overtime approved beforehand for a person's day: they are told
+ *   temporary_site.submitted        Add Work Site sent a site for approval (attendance.temporary_site
+ *                                   tells its approvers): the others on it are told they are on it
+ *   temporary_site.approved         its approval ended approved, or People added it directly: the
+ *                                   others on it are told, and the location flags it covers clear
+ *   temporary_site.rejected,        its approval ended rejected, or it was withdrawn: the others on
+ *   temporary_site.withdrawn        it are told (the approval tells the submitter of a decision)
+ *   temporary_site.cancelled        People cancelled it: everyone still on it is told why
+ *   temporary_site.member_removed   People took someone off it: they are told why
+ *   attendance.checked_in           a check-in at a stop on a site's day: the clock reloads; a
+ *                                   flagged one also emits attendance.review_required
  *   The Attendance policy's versions, approvals and acknowledgements are policies' events
  *   (src/modules/policies/policies.events.js); its rules are this module's (guide §6.15).
  *
@@ -90,10 +100,19 @@ const EVENTS = defineEvents("people", {
   "attendance.pay_item_waived": { summary: "An attendance deduction was waived" },
   "attendance.overtime_decided": { summary: "Overtime was confirmed or cut" },
   "attendance.overtime_approved": { summary: "Overtime was approved beforehand" },
+  "temporary_site.submitted": { summary: "A temporary site was sent for approval" },
+  "temporary_site.approved": { summary: "A temporary site was approved" },
+  "temporary_site.rejected": { summary: "A temporary site was rejected" },
+  "temporary_site.withdrawn": { summary: "A temporary site was withdrawn" },
+  "temporary_site.cancelled": { summary: "A temporary site was cancelled" },
+  "temporary_site.member_removed": { summary: "Someone was taken off a temporary site" },
+  "attendance.checked_in": { summary: "A check-in was recorded at a stop" },
 });
 
 /** The approval every work location request opens (docs/guides/attendance.md §6.11). */
 const REQUEST_DEFINITION_KEY = "attendance.location_request";
+/** The approval every temporary site sent from Add Work Site opens (§6.11). */
+const SITE_DEFINITION_KEY = "attendance.temporary_site";
 
 defineDocumentType("attendance_export", {
   label: "Attendance export",
@@ -190,6 +209,68 @@ defineNotification(EVENTS.ATTENDANCE_CLOCKED_OUT_AUTOMATICALLY, {
   to: [{ subject: true }],
   title: "System Clock-Out",
   body: (e) => `${formatDate(e.payload.work_date)}: clocked out by the system at ${e.payload.clock_out_time}.`,
+});
+
+/** "TS-0001 · Gaborone Partner Training" */
+const siteOf = (p) => `${p.number} · ${p.name}`;
+
+/**
+ * The people on a temporary site, as logins. `butSubmitter` leaves out whoever sent it, whom the
+ * approval already tells of its decision (workflow.completed goes to opened_by). The person who
+ * acted is never told of their own action (shared/notifications/fanout.js).
+ */
+const siteMembers = ({ butSubmitter = false } = {}) => async (event, client) => {
+  const p = event.payload || {};
+  const ids = Array.isArray(p.employee_ids) ? p.employee_ids : [];
+  if (!ids.length) return [];
+  const { rows } = await client.query(
+    `SELECT user_id FROM app_user
+      WHERE employee_id = ANY($1::uuid[]) AND status = 'active' AND user_id IS DISTINCT FROM $2::uuid
+      ORDER BY user_id`,
+    [ids, butSubmitter && !p.direct ? p.submitted_by || null : null],
+  );
+  return rows.map((r) => r.user_id);
+};
+
+defineNotification(EVENTS.TEMPORARY_SITE_SUBMITTED, {
+  to: [{ users: siteMembers() }],
+  title: "Put on a Temporary Site",
+  body: (e) => `${siteOf(e.payload)}, ${daysOf(e.payload)}. Waiting on approval.`,
+  who: "The people on it",
+});
+
+defineNotification(EVENTS.TEMPORARY_SITE_APPROVED, {
+  to: [{ users: siteMembers({ butSubmitter: true }) }],
+  title: (e) => (e.payload.direct ? "Added to a Temporary Site" : "Temporary Site Approved"),
+  body: (e) => `${siteOf(e.payload)}, ${daysOf(e.payload)}.`,
+  who: "The people on it",
+});
+
+defineNotification(EVENTS.TEMPORARY_SITE_REJECTED, {
+  to: [{ users: siteMembers({ butSubmitter: true }) }],
+  title: "Temporary Site Rejected",
+  body: (e) => (e.payload.reason ? `${siteOf(e.payload)}: ${e.payload.reason}` : `${siteOf(e.payload)}.`),
+  who: "The people on it",
+});
+
+defineNotification(EVENTS.TEMPORARY_SITE_WITHDRAWN, {
+  to: [{ users: siteMembers() }],
+  title: "Temporary Site Withdrawn",
+  body: (e) => `${siteOf(e.payload)}, ${daysOf(e.payload)}.`,
+  who: "The people on it",
+});
+
+defineNotification(EVENTS.TEMPORARY_SITE_CANCELLED, {
+  to: [{ users: siteMembers() }],
+  title: "Temporary Site Cancelled",
+  body: (e) => `${siteOf(e.payload)}: ${e.payload.reason}`,
+  who: "The people on it",
+});
+
+defineNotification(EVENTS.TEMPORARY_SITE_MEMBER_REMOVED, {
+  to: [{ subject: true }],
+  title: "Taken off a Temporary Site",
+  body: (e) => `${siteOf(e.payload)}: ${e.payload.reason}`,
 });
 
 defineNotification(EVENTS.ATTENDANCE_SCHEDULE_SET, {
@@ -295,6 +376,7 @@ for (const key of [
   EVENTS.ATTENDANCE_PAY_ITEM_WAIVED,
   EVENTS.ATTENDANCE_OVERTIME_DECIDED,
   EVENTS.ATTENDANCE_OVERTIME_APPROVED,
+  EVENTS.ATTENDANCE_CHECKED_IN,
 ])
   outbox.register(key, "attendance.push_updated", pushUpdated);
 
@@ -335,6 +417,22 @@ async function raiseBreachAlert(event) {
 
 outbox.register(EVENTS.ATTENDANCE_RULE_BREACHED, "attendance.raise_breach_alert", raiseBreachAlert);
 
+/** A site's change reloads the clock and the screens of everyone on it. */
+async function pushSiteUpdated(event) {
+  for (const employeeId of (event.payload && event.payload.employee_ids) || [])
+    await pushUpdated({ payload: { employee_id: employeeId, work_date: null } });
+}
+
+for (const key of [
+  EVENTS.TEMPORARY_SITE_SUBMITTED,
+  EVENTS.TEMPORARY_SITE_APPROVED,
+  EVENTS.TEMPORARY_SITE_REJECTED,
+  EVENTS.TEMPORARY_SITE_WITHDRAWN,
+  EVENTS.TEMPORARY_SITE_CANCELLED,
+  EVENTS.TEMPORARY_SITE_MEMBER_REMOVED,
+])
+  outbox.register(key, "attendance.push_site_updated", pushSiteUpdated);
+
 /* The service and the export are required when a handler runs: they require this file. */
 outbox.register(EVENTS.ATTENDANCE_EXPORT_REQUESTED, "attendance.build_export", (event, ctx) =>
   require("./attendance.export").buildExport(event, ctx),
@@ -364,8 +462,30 @@ outbox.register(WORKFLOW.WORKFLOW_CANCELLED, "attendance.apply_request_withdrawa
   await settleRequest(event.entity.id, "cancelled");
 });
 
+/*
+ * A temporary site's approval, the same way: its outcome copied onto the site once, after commit; a
+ * withdrawal made by the submitter has already closed it. An approved site then clears the location
+ * flags it covers (§6.11).
+ */
+const sites = () => require("./attendance.sites");
+
+workflow.onCompleted(SITE_DEFINITION_KEY, "attendance.apply_temporary_site_decision", (event) =>
+  sites().settle(event.entity.id, OUTCOME[event.payload.state] || null, { reason: event.payload.reason || null }),
+);
+
+outbox.register(WORKFLOW.WORKFLOW_CANCELLED, "attendance.apply_temporary_site_withdrawal", async (event) => {
+  if (event.payload.definition_key !== SITE_DEFINITION_KEY) return;
+  await sites().settle(event.entity.id, "cancelled");
+});
+
+outbox.register(EVENTS.TEMPORARY_SITE_APPROVED, "attendance.resolve_covered_exceptions", (event) =>
+  sites().cover(event.entity.id),
+);
+
 /** Attendance addresses saved while search was down are named by the places-name job (F27). */
 for (const owner of Object.keys(require("./attendance.repo").ADDRESS_LINE))
   places.owner(owner, { rename: (client, key, line) => require("./attendance.repo").renameAddress(client, owner, key, line) });
+for (const owner of Object.keys(require("./attendance.sites.repo").ADDRESS_LINE))
+  places.owner(owner, { rename: (client, key, line) => require("./attendance.sites.repo").renameAddress(client, owner, key, line) });
 
-module.exports = { EVENTS, WHAT, REQUEST_DEFINITION_KEY, pushUpdated, payLine, raiseBreachAlert };
+module.exports = { EVENTS, WHAT, REQUEST_DEFINITION_KEY, SITE_DEFINITION_KEY, pushUpdated, payLine, raiseBreachAlert };

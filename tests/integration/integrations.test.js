@@ -384,6 +384,7 @@ describeDb("Settings · Integrations against the real migrations", () => {
       );
       expect(told.rows.map((r) => r.work_email)).toEqual(["femi@mycity.test"]);
     });
+
   });
 
   describe("removing what was saved", () => {
@@ -498,6 +499,16 @@ describeDb("Settings · Integrations against the real migrations", () => {
       expect(await quota.spent("groq")).toBe(true);
       expect(await quota.spent("gemini")).toBe(false);
       expect(await quota.spent("mail_sender")).toBe(false);
+    });
+
+    test("an AI provider past 80% warns nobody (ai-control.md decision 26)", async () => {
+      const saved = (await as("admin").get("/integrations/groq")).body;
+      expect((await as("admin").put("/integrations/groq").send({ code: "groq", daily_limit: 100, plan: "free", saved_at: saved.saved_at })).status).toBe(200);
+      usage.record("groq", "transcribe", { ok: true, units: 95 });
+      await usage.flush();
+      expect((await as("admin").get("/integrations")).body.data.find((r) => r.code === "groq").units_today).toBeGreaterThanOrEqual(95);
+      expect((await service.watch()).warned).toBe(0);
+      expect(await one("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'integration.quota_warning' AND payload->>'code' = 'groq'")).toEqual({ n: 0 });
     });
   });
 

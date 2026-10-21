@@ -9,6 +9,9 @@
  *   attendance.pay_items    the deductions and overtime, within the asker's `people` scope; their
  *                           amounts are masked as the salary is, as every assistant read is masked
  *                           (shared/ai/authorise.js)
+ *   attendance.temporary_sites  temporary sites with someone in the asker's `people` scope on
+ *                           them (PR 4): number, purpose, name, dates, state and who is on them;
+ *                           never an address, a point or a description
  *
  * The Attendance policy's rules are read through policies.read and policies.mine
  * (src/modules/policies/policies.ai.js).
@@ -25,6 +28,20 @@ const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const service = require("./attendance.service");
 const pay = require("./attendance.pay");
+const sites = require("./attendance.sites");
+
+/** A temporary site as the assistant reads it: no address, point or description (§6.11, §9). */
+const siteForAi = (s) => ({
+  temporary_site_id: s.temporary_site_id,
+  number: s.number,
+  purpose: s.purpose,
+  name: s.name,
+  starts_on: s.starts_on,
+  ends_on: s.ends_on,
+  days: s.days,
+  state: s.state,
+  people: s.members.filter((m) => !m.removed_at).map((m) => m.employee.display_name),
+});
 
 const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
 
@@ -83,6 +100,17 @@ module.exports = defineManifest({
         label: `${row.employee.display_name}, ${row.work_date}`,
       }),
     },
+    {
+      key: "attendance.temporary_sites",
+      description: "List temporary sites people work at for some days (client visits, trainings, events): number, purpose, dates, state and who is on them",
+      params: c.attendance.TemporarySiteListQuery,
+      permission: ["people", "view"],
+      run: async (_client, params, actor) => {
+        const page = await sites.list(actor, params, actor.scope);
+        return { ...page, data: page.data.map(siteForAi) };
+      },
+      cite: (row) => ({ type: "attendance_temporary_site", id: row.temporary_site_id, label: `${row.number} · ${row.name}` }),
+    },
   ],
   routes: [
     { intent: "clock in or out", screen: "ess.my-attendance" },
@@ -90,9 +118,11 @@ module.exports = defineManifest({
     { intent: "review attendance", screen: "people.attendance" },
     { intent: "set my home location", screen: "ess.my-attendance" },
     { intent: "approve home locations", screen: "people.attendance" },
-    { intent: "ask for a work location", screen: "ess.work-location-requests" },
-    { intent: "approve work location requests", screen: "people.attendance" },
-    { intent: "send people out on a field assignment", screen: "people.attendance" },
+    // Add Work Site is that screen's own action; a manifest carries no action of its own (A23).
+    { intent: "work somewhere else for some days", screen: "ess.work-location-requests" },
+    { intent: "approve a temporary site", screen: "people.worksites" },
+    { intent: "see my temporary sites", screen: "ess.work-location-requests" },
+    { intent: "approve work location requests", screen: "people.worksites" },
     { intent: "see my field assignments", screen: "ess.my-attendance" },
     { intent: "set someone's work schedule", screen: "people.employees" },
     { intent: "see my deductions or overtime", screen: "ess.my-attendance" },

@@ -225,11 +225,14 @@ src/
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
 │   │                  deliverability/{check, route-check, dns-check, dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
-│   ├── ai/            llm.service · governance · ledger · redact · structured · transcription (Groq,
-│   │                  then Gemini, then the browser's captions) · catalogue (a provider's model list,
-│   │                  sorted into what the ERP uses) · jobs (each AI job's model until AI Control) ·
-│   │                  skips (a provider skipped until its quota resets) · vendors/{http, gemini, groq,
-│   │                  openai, anthropic, deepseek, stub} · prompts/*.md · assistant/* (M10)
+│   ├── ai/            llm.service (complete, and search for Find Prices) · governance (the switch,
+│   │                  the caps, the spend) · ledger · redact · structured · transcription (Groq, then
+│   │                  Gemini, then the browser's captions) · catalogue (a provider's model list,
+│   │                  sorted into what the ERP uses) · actions (every AI feature, registered under
+│   │                  its job) · jobs (each action's chain and each model's state, AI Control) ·
+│   │                  prices (what a step is charged at, in naira) · skips (a provider skipped until
+│   │                  its quota resets) · vendors/{http, gemini, groq, openai, anthropic, deepseek,
+│   │                  stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
@@ -293,7 +296,8 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `partnerships` | `partners`, `partner_pipeline`, `leads`, `interactions`, `proposals`, `agreements`, `partnership_analytics` |
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
 | `knowledge` | `knowledge`, `policies` (with the `policies.manage` capability for writing them); announcements are read here too |
-| `praxis_ai` | `assistant`, `ai_governance` |
+| `praxis_ai` | `assistant` |
+| `ai_control` | `ai_governance` (AI Control: chains, prices, caps; `docs/guides/ai-control.md`) |
 | `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `templates`, `signatures`, `search`, `maps` |
 
 Two Settings tabs have a key of their own instead, granted only to the Implementation Team and the
@@ -364,7 +368,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
 | `alerts` | TB | `.metrics` (the metric registry: what each of the seven metrics reads, from which module, about whom, a batch at a time; and the rules the system keeps for the Attendance policy's five consequence rules), `.sweeps` (the 06:00 sweep) |
 | `reports` | TB | `.sources` (the source registry: each source's module, grant, filters and columns over its own screen's query, gathered page by page as the reader, at most 2,000 rows a table; and the reader's own Overview for the Export), `.schedule` (a schedule's next slot in Lagos from its recurrence rule, start day and time), `.generate` (each run's file built as its recipient, PDF or XLSX: a schedule's emailed once it exists, one somebody pressed for downloaded where they pressed; skipped or failed with why), `.files` (a report's tables as the PDF's variables and the XLSX workbook, day-first and in Naira) |
-| `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy's rules, the worksite or approved home, and the shift for a date), `.policy-type` (the Attendance policy as a rules policy: the rules shown, their sentences, the lines a change is listed by; registered with `policies`), `.home` (home locations of staff who work from home: sent, decided, read), `.requests` (work location requests: asked, withdrawn or cancelled, settled from their approval, read), `.assignments` (field assignments: set, cancelled, someone taken off, read), `.schedule` (a person's work schedule from a date: set, the week and a day's shift read), `.clock-watch` (the reminder to clock in, reminders to clock out from the shift's end and the System Clock-Out, every 5 minutes), `.rules-engine` (the Attendance policy's five consequence rules counted per person, each breach recorded and emitted), `.pay` (pending deductions and overtime priced from the monthly gross: settled with the day, waived, confirmed or cut, and overtime approved beforehand), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
+| `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy's rules, the worksite or approved home, and the shift for a date), `.policy-type` (the Attendance policy as a rules policy: the rules shown, their sentences, the lines a change is listed by; registered with `policies`), `.home` (home locations of staff who work from home: sent, decided, read), `.requests` (work location requests made before PR 4: withdrawn or cancelled, settled from their approval, read), `.assignments` (field assignments made before PR 4: cancelled, someone taken off, read), `.sites` and `.sites.repo` (temporary sites: added from Home for approval or by People in force, withdrawn, cancelled, someone taken off, settled from their approval, the flags a late approval covers, a person's zone on a site's day, read), `.check-ins` (check-ins at each stop on a temporary site's day: matched, flagged, read), `.schedule` (a person's work schedule from a date: set, the week and a day's shift read), `.clock-watch` (the reminder to clock in, reminders to clock out from the shift's end and the System Clock-Out, every 5 minutes), `.rules-engine` (the Attendance policy's five consequence rules counted per person, each breach recorded and emitted), `.pay` (pending deductions and overtime priced from the monthly gross: settled with the day, waived, confirmed or cut, and overtime approved beforehand), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
 | `devices` | LA | `.guard` |
 | `policies` | TB | `.types` (the rules types the code knows, each registered by the module that enforces it), `.tidy` (Tidy With AI: a layout-only suggestion, its words held to the original), the PDF `templates/documents/policy.html`, the prompt `services/ai/prompts/policy-tidy.md` (docs/guides/policies.md) |
 | `worksites` | LA | |
@@ -504,7 +508,7 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
 | `assistant` | `.history` (Ask, History). Engine in `services/ai/assistant/{orchestrator, retrieval, embeddings, answer, conversation.repo}.js` |
-| `ai_governance` | Spend cap, model, per-module switch |
+| `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
 The assistant **reads only** (A23). It answers from the manifests every module has carried since M1.
 
@@ -715,7 +719,9 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
-`check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`, `check/provenance.js`
+`check/ai-vendor-imports.js`, `check/ai-actions.js` (every AI call names an action registered in
+`services/ai/actions.js`, with its job, its personal-data answer and who chose it; `docs/guides/ai-control.md`
+§6.5), `check/shell.js`, `check/pagination.js`, `check/provenance.js`
 (code and comments never name the project code came from; that lives in REUSE_MAP.md only).
 
 Frontend guards, from M0 (FRONTEND_GUIDE §10): `gen:components --check` and `check/components.js`

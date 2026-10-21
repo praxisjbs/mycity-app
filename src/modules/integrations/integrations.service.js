@@ -164,7 +164,7 @@ async function settingsView(def, inUse) {
       const counts = await repo.modelCounts(pool, def.code);
       return {
         code: def.code,
-        in_use: jobs.inUseBy(def.code, await jobs.lists(pool)),
+        in_use: await jobs.inUse(def.code, { db: pool }),
         models: counts ? counts.models : 0,
         available: counts ? counts.available : 0,
       };
@@ -609,7 +609,7 @@ function modelView(r, inUse) {
 async function models(code, query) {
   const def = aiDef(code);
   const page = await repo.modelPage(pool, def.models, query);
-  const inUse = jobs.inUseBy(def.models, await jobs.lists(pool));
+  const inUse = await jobs.inUse(def.models, { db: pool });
   return { ...page, data: page.data.map((r) => modelView(r, inUse)) };
 }
 
@@ -643,7 +643,7 @@ async function addModel(code, body, actor) {
     return row.ai_model_id;
   });
   await changed(code);
-  const inUse = jobs.inUseBy(def.models, await jobs.lists(pool));
+  const inUse = await jobs.inUse(def.models, { db: pool });
   return modelView(await repo.modelById(pool, def.models, id), inUse);
 }
 
@@ -695,9 +695,21 @@ async function syncRates(actor) {
  * ------------------------------------------------------------------ */
 
 /**
+ * A model's dollar prices, in the caller's transaction: AI Control's Accept and Edit Price, which
+ * emit their own event (docs/guides/ai-control.md §3 step 3). The model list is this module's.
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {string} id  ai_model_id
+ * @param {object} prices  the five dollar prices, each a string or null
+ * @returns {Promise<object|null>} the model's prices after, or null when there is no such model
+ */
+function setModelPrices(client, id, prices) {
+  return repo.setModelPrices(client, id, prices);
+}
+
+/**
  * Every 15 minutes (integrations-watch): the connections whose test costs nothing are tested
  * and their state moved; then each daily limit is compared with today's use, and IT is told
- * once a day when one passes 80% (guide §3 steps 10 and 11).
+ * once a day when one passes 80% (guide §3 steps 10 and 11), except for an AI provider.
  */
 async function watch() {
   let tested = 0;
@@ -713,6 +725,9 @@ async function watch() {
   for (const r of await repo.connections(pool, today)) {
     const def = providers.has(r.code) ? providers.get(r.code) : null;
     if (!def || !def.limited || !r.daily_limit) continue;
+    // AI warns nobody: AI Control · Spend and this page show where each provider stands
+    // (docs/guides/ai-control.md decision 26).
+    if (def.models) continue;
     if (Number(r.units_today) < WARN_AT * Number(r.daily_limit)) continue;
     await tx(async (client) => {
       const id = await repo.markWarned(client, r.code, today);
@@ -748,6 +763,7 @@ module.exports = {
   models,
   addModel,
   removeModel,
+  setModelPrices,
   syncRates,
   watch,
   purge,

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { installOverlayTestEnv } from "../overlay/test-env";
@@ -52,8 +52,19 @@ describe("Rail", () => {
     await vi.waitFor(() => expect(signOut).toHaveBeenCalledOnce());
   });
 
+  it("with homeHref the pin goes Home, and held it opens the trail", async () => {
+    const onNavigate = vi.fn();
+    const onBrandHold = vi.fn();
+    render(<Rail items={RAIL_ITEMS} current="people" onNavigate={onNavigate} homeHref="/home" onBrandHold={onBrandHold} />);
+    const pin = screen.getByRole("link", { name: "MyCity App, Home" });
+    fireEvent.contextMenu(pin);
+    expect(onBrandHold).toHaveBeenCalledOnce();
+    await userEvent.click(pin);
+    expect(onNavigate).toHaveBeenCalledWith("/home");
+  });
+
   it("has no accessibility violations", async () => {
-    const { container } = render(<Rail items={RAIL_ITEMS} current="people" account={account()} foot="Engineered by JBS Praxis" />);
+    const { container } = render(<Rail items={RAIL_ITEMS} current="people" account={account()} foot="Engineered by JBS Praxis" homeHref="/home" onBrandHold={() => undefined} />);
     expect(await axe(container)).toHaveNoViolations();
   });
 });

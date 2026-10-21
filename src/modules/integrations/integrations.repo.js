@@ -239,6 +239,27 @@ const MODEL_FROM = `ai_model m
 /** Usable first (the key can use it, or it is not known yet), then by name. */
 const MODEL_SORTS = { display_name: "(m.available IS FALSE), m.display_name" };
 
+/**
+ * A model's dollar prices, set by AI Control (Accept or Edit Price, docs/guides/ai-control.md §3
+ * step 3). Each price null is no price.
+ * @param {{query: Function}} db
+ * @param {string} id
+ * @param {{input_usd_per_million: string|null, output_usd_per_million: string|null, audio_usd_per_million: string|null,
+ *          usd_per_audio_hour: string|null, usd_per_thousand_searches: string|null}} p
+ */
+function setModelPrices(db, id, p) {
+  return one(
+    db,
+    `UPDATE ai_model SET input_usd_per_million = $2, output_usd_per_million = $3, audio_usd_per_million = $4,
+            usd_per_audio_hour = $5, usd_per_thousand_searches = $6
+      WHERE ai_model_id = $1
+      RETURNING ai_model_id, provider, model::text AS model, input_usd_per_million::text AS input_usd_per_million,
+                output_usd_per_million::text AS output_usd_per_million, audio_usd_per_million::text AS audio_usd_per_million,
+                usd_per_audio_hour::text AS usd_per_audio_hour, usd_per_thousand_searches::text AS usd_per_thousand_searches`,
+    [id, p.input_usd_per_million, p.output_usd_per_million, p.audio_usd_per_million, p.usd_per_audio_hour, p.usd_per_thousand_searches],
+  );
+}
+
 /** One provider's models, 25 a page. Filters: capability, available, q (id or name). */
 function modelPage(db, provider, query) {
   return pageQuery(
@@ -373,6 +394,7 @@ module.exports = {
   markWarned,
   purge,
   modelPage,
+  setModelPrices,
   modelById,
   modelCounts,
   keepModels,

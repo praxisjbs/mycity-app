@@ -17,6 +17,8 @@ const requests = require("./attendance.requests");
 const assignments = require("./attendance.assignments");
 const schedules = require("./attendance.schedule");
 const pay = require("./attendance.pay");
+const sites = require("./attendance.sites");
+const checkIns = require("./attendance.check-ins");
 
 const q = (req) => req.validated.query || {};
 const id = (req) => req.validated.params.id;
@@ -60,8 +62,6 @@ module.exports = {
 
   myRequests: async (req, res) => sendPaged(res, await requests.mine(req.user, q(req))),
 
-  requestLocation: async (req, res) => created(res, await requests.request(withActor(req), req.validated.body)),
-
   myRequest: async (req, res) => ok(res, await requests.getMine(req.user, id(req))),
 
   cancelRequest: async (req, res) => ok(res, await requests.cancel(withActor(req), id(req), req.validated.body)),
@@ -102,8 +102,6 @@ module.exports = {
 
   assignment: async (req, res) => ok(res, await assignments.get(req.user, id(req), scopeOf(req))),
 
-  assign: async (req, res) => created(res, await assignments.create(withActor(req), req.validated.body, scopeOf(req))),
-
   cancelAssignment: async (req, res) =>
     ok(res, await assignments.cancel(withActor(req), id(req), req.validated.body, scopeOf(req))),
 
@@ -136,4 +134,37 @@ module.exports = {
     created(res, await pay.approveOvertime(withActor(req), scopeOf(req), req.validated.body)),
 
   export: async (req, res) => accepted(res, await service.requestRegisterExport(withActor(req), req.validated.body)),
+
+  // Temporary sites and check-ins (PR 4). The person's own read their own Temporary Home unmasked.
+  mySites: async (req, res) => sendPaged(res, await sites.mine(req.user, q(req))),
+
+  submitSite: async (req, res) => created(res, await sites.submit(withActor(req), req.validated.body)),
+
+  mySite: async (req, res) => ok(res, await sites.getMine(req.user, id(req))),
+
+  withdrawSite: async (req, res) => ok(res, await sites.withdraw(withActor(req), id(req), req.validated.body)),
+
+  checkIn: async (req, res) =>
+    created(
+      res,
+      await checkIns.checkIn(withActor(req), req.validated.body, {
+        idempotencyKey: String(req.headers["idempotency-key"] || "").trim() || null,
+      }),
+    ),
+
+  myCheckIns: async (req, res) => sendPaged(res, await checkIns.mine(req.user, q(req))),
+
+  sites: async (req, res) => sendPaged(res, await masked(req, await sites.list(req.user, q(req), scopeOf(req)))),
+
+  site: async (req, res) => ok(res, await masked(req, await sites.get(req.user, id(req), scopeOf(req)))),
+
+  addSite: async (req, res) => created(res, await masked(req, await sites.add(withActor(req), req.validated.body, scopeOf(req)))),
+
+  cancelSite: async (req, res) =>
+    ok(res, await masked(req, await sites.cancel(withActor(req), id(req), req.validated.body, scopeOf(req)))),
+
+  removeFromSite: async (req, res) =>
+    ok(res, await masked(req, await sites.remove(withActor(req), id(req), req.validated.body, scopeOf(req)))),
+
+  checkIns: async (req, res) => sendPaged(res, await masked(req, await checkIns.list(q(req), scopeOf(req)))),
 };

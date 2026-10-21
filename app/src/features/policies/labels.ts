@@ -107,7 +107,7 @@ export const RULE_LABEL: Record<VisibleRule, string> = {
   overtime: "Overtime",
   office_geofence_mode: "Office Check",
   home_geofence_mode: "Home Check",
-  site_geofence_mode: "Field Site Check",
+  site_geofence_mode: "Temporary Site Check",
   home_radius_m: "Home Radius",
   max_accuracy_m: "GPS Accuracy",
   device_mode: "Device Check",
@@ -131,7 +131,7 @@ export const RULE_HELP: Record<VisibleRule, string> = {
   overtime: "Minutes worked past the end, and every minute on a day not worked, paid as approved.",
   office_geofence_mode: "A clock-in outside the office's radius. Flag: accepted and sent to People to review. Refuse: not accepted.",
   home_geofence_mode: "A clock-in away from an approved home. Flag: accepted and sent to People to review. Refuse: not accepted.",
-  site_geofence_mode: "A clock-in outside a field site's radius. Flag: accepted and sent to People to review. Refuse: not accepted.",
+  site_geofence_mode: "A clock-in outside a temporary site's addresses. Flag: accepted and sent to People to review. Refuse: not accepted. A check-in outside them is flagged under either.",
   home_radius_m: "How far from an approved home a clock-in still counts as at home. At least 150 m.",
   max_accuracy_m: "A phone reading less accurate than this cannot confirm where someone is.",
   device_mode: "A clock-in from a device the person has not registered. Flag: accepted and sent to People to review. Refuse: not accepted.",
@@ -141,7 +141,7 @@ export const RULE_HELP: Record<VisibleRule, string> = {
 
 export const MODE_LABEL: Record<PolicyMode, string> = { off: "Off", warn: "Flag", block: "Refuse" };
 
-/** The modes a new version may set: a home and a field site are never Off. */
+/** The modes a new version may set: a home and a temporary site are never Off. */
 export const MODES_FOR: Record<ModeRule, readonly PolicyMode[]> = {
   office_geofence_mode: ["off", "warn", "block"],
   home_geofence_mode: ["warn", "block"],

@@ -898,22 +898,31 @@ fails the build if it does.
 The vendors are Gemini, Groq (speech to text), OpenAI (embeddings), Anthropic (top-tier drafting,
 Sonnet and Haiku only) and DeepSeek (work with no personal data), each one file in
 `services/ai/vendors/`, plain HTTPS through `vendors/http.js`, with its key and model list on
-Settings · Integrations (`docs/guides/integrations.md` §1.2). Which model answers each job (Default,
-Fast, Deep Reasoning, Image Reading, Transcription, Embeddings, Top Tier) is `services/ai/jobs.js`
-until AI Control is built (`docs/guides/ai-control.md`); every new AI feature names its job there.
+Settings · Integrations (`docs/guides/integrations.md` §1.2). Every AI feature is an **action**,
+registered once in `services/ai/actions.js` under one of seven jobs (Default, Fast, Deep Reasoning,
+Image Reading, Transcription, Embeddings, Top Tier) with whether it carries personal data and who chose
+the job; its `purpose` names it. AI Control (`docs/guides/ai-control.md`) keeps each job's chain, and
+an action's own: a first choice and up to three fallbacks. `services/ai/jobs.js` works out the chain and
+each model's state for every call, and `check/ai-actions.js` fails a call that names no registered
+action.
 
 ### 14.2 What every call passes through
 
 ```
 ai.complete({ purpose, module, actor, input, output: ContractSchema })
-  → governance    module switch on? monthly cap not reached? (refuses with a clear AppError)
+  → governance    module switch on? monthly cap on all AI not reached? (refuses with a clear AppError)
+  → chain         the action's chain (jobs.js): models not set up, off the key, at a Free plan's daily
+                  limit, skipped until a reset, at their provider's monthly cap, DeepSeek on personal
+                  data, are passed by; a failure moves to the next model
   → redact        restricted fields removed; only what the actor may see is ever sent
   → prompt        services/ai/prompts/<purpose>.md, versioned; version recorded on the run
-  → vendor        Gemini, or the stub when no key is configured (pixie resolveVendor rule)
+  → vendor        Gemini, Anthropic or DeepSeek, or the stub when no provider in the chain is set up
+                  (pixie resolveVendor rule)
   → structured    response parsed against a Zod schema from packages/contract; a malformed
                   answer is retried once, then fails, never half-applied
-  → ledger        ai_run + ai_run_step: purpose, module, actor, tokens, cost in NGN, latency,
-                  prompt version, outcome
+  → ledger        ai_run + ai_run_step: purpose (the action), module, actor, the model that answered,
+                  tokens and audio seconds, the naira prices and the day's rate charged (prices.js),
+                  latency, prompt version, outcome
   → result        { output, provisional: true, run_id }
 ```
 

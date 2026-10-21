@@ -55,7 +55,9 @@ left alone.
    `notification-deliver` job.
 2. `notification-deliver` sends `in_app` over the person's socket (`notification`, the contract's
    `Notification`, with a link only when they may open it: the module the record's route in
-   `shared/route-map.js` names as its `permission`, or the screen's module), mails `email`, and queues one
+   `shared/route-map.js` names as its `permission`, or the screen's module; when they hold neither
+   and the record has a screen of its own for the people it concerns, that one, such as a
+   temporary site on ESS · Work Location Requests), mails `email`, and queues one
    `notification-push` job per row carrying `push` (job id `push-<notification_id>`, so a retried
    delivery never queues it twice), at once: nothing waits while the person is in the app (TB,
    19/10/2026).
@@ -332,7 +334,7 @@ row per reminder.
 | Holders of `settings` edit (scope all): Operations & People, the Administrator, Implementation, the CEO | The same | Edit a notice's rule or reset it; edit the reminders |
 | A device holding a device token | Nothing | Mark one of its owner's notices read; renew its own subscription |
 
-No restricted fields. A notice whose record the reader may not open shows no link and opens nothing.
+No restricted fields. A notice whose record the reader may not open, on its screen or on their own, shows no link and opens nothing.
 
 ## 9 · AI and search
 
@@ -443,6 +445,11 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · A notice whose record's screen the reader cannot open falls back to the
+  record's own screen for the people it concerns (`routeMap.linkFor(..., { self: true })`) when
+  they can open that one: someone put on a temporary site opens it on ESS · Work Location Requests,
+  not People · Worksites (`docs/guides/attendance.md` §7, PR 4). The approvers audience leaves out
+  the people an approval excludes (`foundation.md` §6.5).
 - 20/10/2026 · TB · A notice's link is offered by the permission its route names
   (`routeMap.moduleOf`), not by the module its path sits in: System Health's Status, Performance
   and Faults are Settings tabs held by `system_health`. Its `error_group`, `health_snapshot` and

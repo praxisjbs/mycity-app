@@ -106,6 +106,7 @@ const GATES = [
   { id: "schedulers", label: "Every scheduler is started", script: "scripts/check/schedulers.js" },
   { id: "production-environment-refs", label: "Only release/rollback reach production", script: "scripts/check/production-environment-refs.js" },
   { id: "ai-vendor-imports", label: "No AI vendor imports outside services/ai", script: "scripts/check/ai-vendor-imports.js" },
+  { id: "ai-actions", label: "Every AI call names a registered action", script: "scripts/check/ai-actions.js" },
   { id: "shell", label: "Shell scripts LF and parse", script: "scripts/check/shell.js" },
   { id: "pagination", label: "Every list pages at 25", script: "scripts/check/pagination.js" },
   { id: "provenance", label: "Code never names its origin project", script: "scripts/check/provenance.js" },

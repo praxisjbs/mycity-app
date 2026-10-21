@@ -210,12 +210,14 @@ describeDb("⌘K search against the real migrations", () => {
     expect(group(await search("staff", { q: "head sales" }), "org_seat")).toBeUndefined();
   });
 
-  test("the theme, density, Install App and Sign Out are actions the app runs", async () => {
+  test("the theme, density, Install App, Refresh Screen, Reload App and Sign Out are actions the app runs", async () => {
     const run = async (q, title) => group(await search("staff", { q }), "action").items.find((i) => i.title === title);
     expect(await run("dark mode", "Use Dark Theme")).toMatchObject({ run: "theme_dark", link: null });
     expect(await run("light mode", "Use Light Theme")).toMatchObject({ run: "theme_light" });
     expect(await run("compact", "Change Density")).toMatchObject({ run: "density" });
     expect(await run("install", "Install App")).toMatchObject({ run: "install" });
+    expect(await run("refresh", "Refresh Screen")).toMatchObject({ run: "refresh", link: null });
+    expect(await run("restart", "Reload App")).toMatchObject({ run: "reload", link: null });
     expect(await run("log out", "Sign Out")).toMatchObject({ run: "sign_out" });
   });
 

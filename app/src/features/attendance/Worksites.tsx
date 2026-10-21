@@ -1,6 +1,6 @@
 import worksites from "@mycity/contract/schemas/worksites.js";
 import type { Worksite, WorksiteEmployee } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
@@ -9,20 +9,99 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { coordinatesOf, lineOf, loadTile, places, placeValue, pointOf, zoomFor } from "@/features/shared/places";
-import { useScreenAction } from "@/shell/screen-action";
-import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, PageHeader, Pill, TextField, toast, useConfirm, useContractForm, useModal, Who, type PlaceValue } from "@mycity/ui";
+import { useScreenAction, useUrlAction } from "@/shell/screen-action";
+import type { FieldAssignment, LocationRequest } from "@mycity/contract/contract.gen.ts";
+import { AddressField, Button, Card, CardHeader, Chips, DataView, Field, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, PageHeader, Pill, SegmentedControl, TextField, toast, useConfirm, useContractForm, useModal, Who, type PlaceValue } from "@mycity/ui";
+import { AssignmentView, FieldView, useAssignmentLink } from "./FieldAssignments";
 import { PATTERN } from "./labels";
 import { SiteMap } from "./SiteMap";
+import { TemporarySitesView, useSiteLink, useSiteView, useWorkSiteSheet } from "./TemporarySites";
+import { PeopleRequestView, RequestsView, useRequestLink } from "./WorkLocationRequests";
 
 /**
- * People · Worksites (#28, docs/guides/attendance.md §10): the offices a punch is matched to, each
- * a centre, a radius and a timezone, and who is assigned to each. People add, change, retire and
- * restore them; the address is picked from the search or pinned (F27), and the place picked fills
- * the centre, drawn on a map with its fence.
+ * People · Worksites (#28, docs/guides/attendance.md §10), Permanent or Temporary. Permanent: the
+ * offices a punch is matched to, each a centre, a radius and a timezone, and who is assigned to
+ * each. People add, change, retire and restore them; the address is picked from the search or
+ * pinned (F27), and the place picked fills the centre, drawn on a map with its fence. Temporary:
+ * the temporary sites in the reader's scope (§6.11), Add Temporary Site, each site's approval, and
+ * while any made before PR 4 waits or is in force, the old Requests and Field beside them.
  */
+type Side = "permanent" | "temporary";
+type Temporary = "sites" | "requests" | "field";
+
 export function Worksites() {
   const [params] = useSearchParams();
   const id = params.get("id");
+  const { can } = useAuth();
+  const [side, setSide] = useState<Side>(params.get("site") || params.get("request") || params.get("assignment") ? "temporary" : "permanent");
+  const toTemporary = useCallback(() => setSide("temporary"), []);
+  const addSite = useWorkSiteSheet({ direct: true });
+  const mayAddSite = can("people", "approve");
+  useUrlAction("temporary-site", mayAddSite ? () => (setSide("temporary"), addSite()) : null);
+  return (
+    <>
+      <PageHeader
+        title="Worksites"
+        sub="Where staff clock in"
+        actions={
+          side === "permanent" ? (
+            can("people", "create") ? <PermanentAdd /> : undefined
+          ) : mayAddSite ? (
+            <Button variant="primary" icon="plus" onClick={addSite}>Add Temporary Site</Button>
+          ) : undefined
+        }
+      />
+      <div className="mb-3">
+        <SegmentedControl label="Worksites" value={side} onChange={(v) => setSide(v as Side)} options={[["permanent", "Permanent"], ["temporary", "Temporary"]]} />
+      </div>
+      {side === "permanent" ? <Permanent id={id} /> : <TemporarySide addSite={mayAddSite ? addSite : null} toTemporary={toTemporary} />}
+    </>
+  );
+}
+
+/** The header's Add Worksite, for People who add worksites. */
+function PermanentAdd() {
+  const modal = useModal();
+  return <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Add Worksite", body: (close) => <WorksiteForm close={close} /> })}>Add Worksite</Button>;
+}
+
+/**
+ * Temporary: the sites, and while any made before PR 4 is listed, the old requests and field
+ * assignments as their own views. A link (`?site=`, `?request=`, `?assignment=`) opens its record.
+ */
+function TemporarySide({ addSite, toTemporary }: { addSite: (() => void) | null; toTemporary: () => void }) {
+  const [params] = useSearchParams();
+  const modal = useModal();
+  const [view, setView] = useState<Temporary>("sites");
+  useScreenAction(addSite ? { label: "Add Temporary Site", onSelect: addSite } : null);
+  const openSite = useSiteView();
+  useSiteLink(params.get("site"), openSite, { before: toTemporary });
+  const openRequest = useCallback((r: LocationRequest) => modal.open({ title: `${r.number} · ${r.employee.display_name}`, body: (close) => <PeopleRequestView r={r} close={close} /> }), [modal]);
+  const toRequests = useCallback(() => setView("requests"), []);
+  useRequestLink(params.get("request"), openRequest, toRequests);
+  const openAssignment = useCallback((a: FieldAssignment) => modal.open({ title: a.number, wide: true, body: (close) => <AssignmentView a={a} close={close} /> }), [modal]);
+  const toField = useCallback(() => setView("field"), []);
+  useAssignmentLink(params.get("assignment"), openAssignment, { before: toField });
+  // The old views stay while anything made before PR 4 still waits or is in force.
+  const waiting = usePaged("GET /api/v1/attendance/requests", { filters: { status: "submitted" } });
+  const approved = usePaged("GET /api/v1/attendance/requests", { filters: { status: "approved" } });
+  const fieldNow = usePaged("GET /api/v1/attendance/field-assignments", { filters: { state: "in_progress" } });
+  const fieldNext = usePaged("GET /api/v1/attendance/field-assignments", { filters: { state: "upcoming" } });
+  const live = waiting.rows.length + approved.rows.length + fieldNow.rows.length + fieldNext.rows.length > 0;
+  return (
+    <>
+      {(live || view !== "sites") && (
+        <div className="mb-3">
+          <SegmentedControl label="Temporary" value={view} onChange={(v) => setView(v as Temporary)} options={[["sites", "Sites"], ["requests", "Requests"], ["field", "Field"]]} />
+        </div>
+      )}
+      {view === "sites" ? <TemporarySitesView openSite={openSite} /> : view === "requests" ? <RequestsView openRequest={openRequest} /> : <FieldView openAssignment={openAssignment} />}
+    </>
+  );
+}
+
+/** Permanent: the worksites, and one opened by its link (`?id=`). */
+function Permanent({ id }: { id: string | null }) {
   const { can } = useAuth();
   const modal = useModal();
   const [active, setActive] = useState<"true" | "false" | "all">("true");
@@ -41,7 +120,6 @@ export function Worksites() {
 
   return (
     <>
-      <PageHeader title="Worksites" sub="Where staff clock in" actions={can("people", "create") ? <Button variant="primary" icon="plus" onClick={add}>Add Worksite</Button> : undefined} />
       <Chips
         label="Status"
         value={active}

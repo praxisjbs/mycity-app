@@ -47,6 +47,7 @@ import {
   Globe,
   GripVertical,
   Heading2,
+  History,
   House,
   Image,
   Info,
@@ -80,6 +81,7 @@ import {
   Presentation,
   Quote,
   Redo2,
+  RotateCw,
   RefreshCw,
   Rows3,
   Search,
@@ -210,6 +212,9 @@ export const ICONS = {
   street: Signpost,
   landmark: Landmark,
   map: MapGlyph,
+  /* Refresh in place, and the trail of places a person has been (F28, F29); `refresh` stays the full reload. */
+  rotate: RotateCw,
+  history: History,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

@@ -5,7 +5,9 @@
  * gate 13); the @source line lets Tailwind see the classes the package's
  * components use.
  *
- * What stays here is this app's own and nothing else: the full-height shell,
+ * What stays here is this app's own and nothing else: the full-height shell
+ * (which never pulls or bounces itself: the phone shell's own pull refreshes,
+ * FRONTEND_FOUNDATION F28),
  * the burst a tap leaves on
  * a reaction, the shimmer under provisional AI text, the search hit marks, and
  * the reporting tree's connector lines. PR 3 moved the celebration card, the
@@ -23,6 +25,7 @@
 @layer base {
   html, body, #root { height: 100%; }
   body { overflow: hidden; }
+  html, body { overscroll-behavior-y: none; }
 }
 
 @layer utilities {

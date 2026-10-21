@@ -282,6 +282,56 @@ async function transcribe({ apiKey, model, audio, mime, prompt, maxTokens = 8192
   };
 }
 
+/**
+ * One answer with Google Search on (Find Prices, docs/guides/ai-control.md §6.4): the native
+ * generateContent with the google_search tool, since the OpenAI-compatible endpoint has none.
+ * Answers the text, the pages Google Search returned and how many searches ran; each search is
+ * billed apart from the tokens.
+ * @param {{apiKey: string, model: string, system: string, prompt: string, maxTokens?: number,
+ *          timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number, searches: number},
+ *                    sources: Array<{url: string, title: string}>, model: string, finish_reason: string|null}>}
+ */
+async function search({ apiKey, model, system, prompt, maxTokens = 8192, timeoutMs = 120_000, fetchImpl }) {
+  if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    tools: [{ google_search: {} }],
+    generationConfig: { temperature: 0, maxOutputTokens: maxTokens },
+  };
+  const id = String(model).replace(/^models\//, "");
+  const { data } = await request("gemini", `${NATIVE_URL}/models/${encodeURIComponent(id)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs,
+    fetchImpl,
+  });
+  const candidate = (Array.isArray(data.candidates) && data.candidates[0]) || {};
+  const parts = (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts) || [];
+  const grounding = candidate.groundingMetadata || {};
+  const meta = data.usageMetadata || {};
+  return {
+    text: parts
+      .filter((p) => p && typeof p.text === "string" && !p.thought)
+      .map((p) => p.text)
+      .join("")
+      .trim(),
+    usage: {
+      input_tokens: Number(meta.promptTokenCount) || 0,
+      output_tokens: (Number(meta.candidatesTokenCount) || 0) + (Number(meta.thoughtsTokenCount) || 0),
+      searches: Array.isArray(grounding.webSearchQueries) ? grounding.webSearchQueries.length : 0,
+    },
+    sources: (Array.isArray(grounding.groundingChunks) ? grounding.groundingChunks : [])
+      .map((c) => c && c.web)
+      .filter((w) => w && typeof w.uri === "string")
+      .map((w) => ({ url: w.uri, title: String(w.title || "") })),
+    model: data.modelVersion || id,
+    finish_reason: candidate.finishReason || null,
+  };
+}
+
 module.exports = {
   name: "gemini",
   BASE_URL,
@@ -291,6 +341,7 @@ module.exports = {
   listModels,
   listModelsDetailed,
   transcribe,
+  search,
   toolSchema,
   reasoningEffort,
   classify,

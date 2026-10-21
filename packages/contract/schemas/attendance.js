@@ -62,6 +62,239 @@ const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be a time 
 const minutes = z.number().int().min(0);
 
 /* ------------------------------------------------------------------ *
+ * Temporary sites: somewhere else to work for some days, added from Home for oneself and
+ * colleagues and approved by People, or added by People in force at once; and the check-ins
+ * at each stop on their days (guide §6.11, §6.12, PR 4)
+ * ------------------------------------------------------------------ */
+
+/** Why people work there: product vocabulary, not a business choice (A26), in the guide's order. */
+const TemporarySitePurpose = z.enum([
+  "client_visit",
+  "partner_meeting",
+  "training_delivering",
+  "training_attending",
+  "event",
+  "conference",
+  "workshop",
+  "exhibition",
+  "market_activation",
+  "field_survey",
+  "site_inspection",
+  "media_engagement",
+  "government_visit",
+  "out_of_station",
+  "coworking_space",
+  "temporary_home",
+  "other",
+]);
+const TemporarySiteStatus = z.enum(["submitted", "approved", "rejected", "withdrawn", "cancelled"]);
+/** Worked out on the day in Lagos: `submitted` while it waits (Awaiting Approval), else by its days or its status. */
+const TemporarySiteState = z.enum(["submitted", "upcoming", "in_progress", "done", "rejected", "withdrawn", "cancelled"]);
+
+/** The longest a site runs, in calendar days, first and last included. */
+const SITE_MAX_DAYS = 90;
+const daysSpanned = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+const siteReason = text(500).refine((v) => v.length >= 10, "At least 10 characters");
+
+/**
+ * One of a site's addresses, in its order. A venue's line and point are `address`, `latitude` and
+ * `longitude`; a Temporary Home's are `home_address`, `home_latitude` and `home_longitude` instead,
+ * personal data: null below its own people, its submitter and `people` scope all, and masked under
+ * `employee.personal`. `name` is its optional label; `timezone` the place's.
+ */
+const TemporarySiteLocation = z
+  .object({
+    temporary_site_location_id: uuid,
+    position: z.number().int().min(1).max(8),
+    name: z.string().nullable(),
+    address: z.string().nullable(),
+    latitude: z.number().nullable(),
+    longitude: z.number().nullable(),
+    home_address: z.string().nullable(),
+    home_latitude: z.number().nullable(),
+    home_longitude: z.number().nullable(),
+    radius_m: z.number().int(),
+    timezone: z.string(),
+  })
+  .strict();
+
+/** One person on it; `removed_at` once taken off, with the reason they read. */
+const TemporarySiteMember = z
+  .object({
+    employee: PersonRef,
+    added_at: isoDateTime,
+    removed_at: isoDateTime.nullable(),
+    removed_reason: z.string().nullable(),
+  })
+  .strict();
+
+/**
+ * A temporary site. `people` counts those still on it; `members` lists everyone who was (at most
+ * 25). `waiting_on` is the approval stage it waits at. `can_decide`: that stage waits on the reader,
+ * who is not on it; `can_change`: the reader may cancel it or take someone off; `can_withdraw`: the
+ * reader submitted it and it still waits.
+ */
+const TemporarySite = z
+  .object({
+    temporary_site_id: uuid,
+    number: z.string(),
+    purpose: TemporarySitePurpose,
+    name: z.string(),
+    description: z.string(),
+    starts_on: isoDate,
+    ends_on: isoDate,
+    days: z.number().int().min(1),
+    status: TemporarySiteStatus,
+    state: TemporarySiteState,
+    locations: z.array(TemporarySiteLocation).min(1).max(8),
+    members: z.array(TemporarySiteMember).max(25),
+    people: z.number().int().min(0),
+    submitted_by_name: z.string().nullable(),
+    submitted_at: isoDateTime,
+    workflow_instance_id: uuid.nullable(),
+    waiting_on: z.string().nullable(),
+    approved_at: isoDateTime.nullable(),
+    approved_by_name: z.string().nullable(),
+    cancelled_at: isoDateTime.nullable(),
+    cancel_reason: z.string().nullable(),
+    can_decide: z.boolean(),
+    can_change: z.boolean(),
+    can_withdraw: z.boolean(),
+  })
+  .strict();
+const TemporarySitePage = Paged(TemporarySite);
+
+/** An address as the sheet sends it: picked or pinned (F27), with an optional label and its radius (T9). */
+const TemporarySiteLocationInput = z
+  .object({
+    address: PlaceInput,
+    name: optionalText(60),
+    radius_m: z.number().int().min(150, "At least 150 m").max(500, "At most 500 m"),
+  })
+  .strict();
+
+/**
+ * POST /attendance/me/temporary-sites (Add Work Site) and POST /attendance/temporary-sites (People's
+ * own). The dates against today, who may be on it and the one-a-day rule are the service's (guide §6.11).
+ */
+const TemporarySiteCreate = z
+  .object({
+    purpose: TemporarySitePurpose,
+    name: text(120).refine((v) => v.length >= 3, "At least 3 characters"),
+    description: text(1000).refine((v) => v.length >= 30, "At least 30 characters"),
+    starts_on: isoDate,
+    ends_on: isoDate,
+    locations: z.array(TemporarySiteLocationInput).min(1, "Add an address").max(8, "At most eight addresses"),
+    employee_ids: z
+      .array(uuid)
+      .min(1, "Pick someone")
+      .max(25, "At most 25 people")
+      .refine((ids) => new Set(ids).size === ids.length, "Each person once"),
+  })
+  .strict()
+  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] })
+  .refine((v) => v.ends_on < v.starts_on || daysSpanned(v.starts_on, v.ends_on) <= SITE_MAX_DAYS, {
+    message: "At most 90 days",
+    path: ["ends_on"],
+  })
+  .refine((v) => v.purpose !== "temporary_home" || v.locations.length === 1, {
+    message: "One address only",
+    path: ["locations"],
+  });
+
+/** GET /attendance/temporary-sites: within the reader's `people` scope, waiting first. */
+const TemporarySiteListQuery = listQuery(
+  {
+    status: TemporarySiteStatus.optional(),
+    state: TemporarySiteState.optional(),
+    purpose: TemporarySitePurpose.optional(),
+    employee_id: uuid.optional(),
+  },
+  ["starts_on"],
+);
+
+/** GET /attendance/me/temporary-sites: the person's own, waiting and current first. */
+const MyTemporarySiteListQuery = listQuery({ state: TemporarySiteState.optional() }, ["starts_on"]);
+
+/** POST /attendance/me/temporary-sites/:id/withdraw and /attendance/temporary-sites/:id/cancel. */
+const TemporarySiteCancel = z.object({ reason: siteReason }).strict();
+
+/** POST /attendance/temporary-sites/:id/remove: the person taken off reads the reason. */
+const TemporarySiteMemberRemove = z.object({ employee_id: uuid, reason: siteReason }).strict();
+
+/** Where a check-in stands against the address it was matched to. */
+const CheckInVerdict = z.enum(["inside", "outside", "unverified"]);
+
+/**
+ * One stop. `location_name` is the address's label, else the site's name when it has one address,
+ * else "Address N" (Temporary Home for a home);
+ * `address` its line for a venue, `home_address` a Temporary Home's (as on the site); never a point.
+ * `flagged`: it opened an exception for People.
+ */
+const CheckIn = z
+  .object({
+    attendance_check_in_id: uuid,
+    work_date: isoDate,
+    occurred_at: isoDateTime,
+    temporary_site_location_id: uuid,
+    position: z.number().int().min(1).max(8),
+    location_name: z.string(),
+    address: z.string().nullable(),
+    home_address: z.string().nullable(),
+    distance_m: z.number().nullable(),
+    accuracy_m: z.number().nullable(),
+    verdict: CheckInVerdict,
+    location_reason: z.string().nullable(),
+    flagged: z.boolean(),
+  })
+  .strict();
+const CheckInPage = Paged(CheckIn);
+
+/** GET /attendance/me/check-ins: one of my days' stops, in time order. */
+const MyCheckInListQuery = listQuery({ date: isoDate });
+/** GET /attendance/check-ins: one person's stops on a day, for People. */
+const CheckInListQuery = listQuery({ employee_id: uuid, date: isoDate });
+
+/** POST /attendance/check-ins. As a punch's reading: latitude and longitude together or not at all. */
+const CheckInCreate = z
+  .object({
+    device_at: isoDateTime,
+    latitude: z.number().min(-90).max(90).nullable(),
+    longitude: z.number().min(-180).max(180).nullable(),
+    accuracy_m: z.number().min(0).max(100000).nullable(),
+    location_error: LocationError.nullable().optional(),
+  })
+  .strict()
+  .refine((v) => (v.latitude === null) === (v.longitude === null), {
+    message: "Send both coordinates or neither",
+    path: ["longitude"],
+  });
+
+/** The day's site on the clock panel: its number, name and addresses with their radius, no coordinates. */
+const TodayTemporarySite = z
+  .object({
+    temporary_site_id: uuid,
+    number: z.string(),
+    name: z.string(),
+    purpose: TemporarySitePurpose,
+    locations: z
+      .array(
+        z
+          .object({
+            temporary_site_location_id: uuid,
+            position: z.number().int().min(1).max(8),
+            name: z.string().nullable(),
+            address: z.string().nullable(),
+            radius_m: z.number().int(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(8),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
  * The clock
  * ------------------------------------------------------------------ */
 
@@ -109,7 +342,7 @@ const AttendanceToday = z
      */
     location: z
       .object({
-        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day", "field", "client_visit"]),
+        kind: z.enum(["worksite", "home", "none", "remote", "temporary_home", "approved_day", "field", "client_visit", "temporary_site"]),
         name: z.string().nullable(),
         radius_m: z.number().int().nullable(),
         home_state: z.enum(["approved", "pending", "none"]).nullable(),
@@ -127,6 +360,10 @@ const AttendanceToday = z
         can_register: z.boolean(),
       })
       .strict(),
+    /** The day's approved temporary site, or null (PR 4); `location` then names it. */
+    temporary_site: TodayTemporarySite.nullable(),
+    /** The day's check-ins in time order, so the panel shows each stop's result after a reload (PR 4). */
+    check_ins: z.array(CheckIn).max(20),
   })
   .strict();
 
@@ -159,6 +396,16 @@ const PunchResult = z
     reasons: z.array(ExceptionType).max(5),
     distance_m: z.number().nullable(),
     worksite_name: z.string().nullable(),
+    message: z.string(),
+    replayed: z.boolean(),
+    today: AttendanceToday,
+  })
+  .strict();
+
+/** What a check-in recorded, and the state after it; `replayed` for the first one answered again (PR 4). */
+const CheckInResult = z
+  .object({
+    check_in: CheckIn,
     message: z.string(),
     replayed: z.boolean(),
     today: AttendanceToday,
@@ -259,6 +506,8 @@ const AttendanceException = z
     attendance_exception_id: uuid,
     attendance_day_id: uuid,
     attendance_event_id: uuid.nullable(),
+    /** The check-in it flags, on a temporary site's day (PR 4); null for a punch's or the day's. */
+    attendance_check_in_id: uuid.nullable(),
     employee: PersonRef,
     work_date: isoDate,
     exception_type: ExceptionType,
@@ -543,64 +792,6 @@ const LocationRequest = z
   .strict();
 const LocationRequestPage = Paged(LocationRequest);
 
-const isNumber = (v) => typeof v === "number";
-
-/**
- * POST /attendance/me/requests. A temporary home carries one reading taken there and its address;
- * a client visit its address and its site, typed as a field site's is (a centre and a radius of 100
- * to 500 m); a remote day may name an address. Who may ask which type, the spans and the overlap are
- * the service's (guide §6.11).
- */
-const LocationRequestCreate = z
-  .object({
-    request_type: LocationRequestType,
-    starts_on: isoDate,
-    ends_on: isoDate,
-    /** Picked or pinned, never typed (F27). */
-    address: PlaceInput.optional(),
-    reason: text(500).refine((v) => v.length >= 10, "At least 10 characters"),
-    home_latitude: z.number().min(-90).max(90).nullable().optional(),
-    home_longitude: z.number().min(-180).max(180).nullable().optional(),
-    accuracy_m: z.number().min(0).max(100000).nullable().optional(),
-    site_latitude: z.number().min(-90).max(90).nullable().optional(),
-    site_longitude: z.number().min(-180).max(180).nullable().optional(),
-    site_radius_m: z.number().int().min(100, "At least 100 m").max(500, "At most 500 m").nullable().optional(),
-  })
-  .strict()
-  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] })
-  .refine((v) => v.request_type === "remote_day" || Boolean(v.address), {
-    message: "Enter the address",
-    path: ["address"],
-  })
-  .refine(
-    (v) =>
-      v.request_type !== "temporary_home" ||
-      (typeof v.home_latitude === "number" && typeof v.home_longitude === "number" && typeof v.accuracy_m === "number"),
-    { message: "Take a reading there", path: ["home_latitude"] },
-  )
-  .refine((v) => v.request_type === "temporary_home" || (typeof v.home_latitude !== "number" && typeof v.home_longitude !== "number"), {
-    message: "Only for a temporary home",
-    path: ["home_latitude"],
-  })
-  .refine((v) => v.request_type !== "client_visit" || isNumber(v.site_latitude), {
-    message: "Enter the latitude",
-    path: ["site_latitude"],
-  })
-  .refine((v) => v.request_type !== "client_visit" || isNumber(v.site_longitude), {
-    message: "Enter the longitude",
-    path: ["site_longitude"],
-  })
-  .refine((v) => v.request_type !== "client_visit" || isNumber(v.site_radius_m), {
-    message: "Enter the radius",
-    path: ["site_radius_m"],
-  })
-  .refine(
-    (v) =>
-      v.request_type === "client_visit" ||
-      (!isNumber(v.site_latitude) && !isNumber(v.site_longitude) && !isNumber(v.site_radius_m)),
-    { message: "Only for a client visit", path: ["site_latitude"] },
-  );
-
 /** GET /attendance/me/requests: the person's own, newest first. */
 const MyLocationRequestListQuery = listQuery({ status: LocationRequestStatus.optional() }, ["starts_on"]);
 
@@ -680,39 +871,6 @@ const FieldAssignmentPage = Paged(FieldAssignment);
 
 const minLength = (n) => (v) => v.length >= n;
 const reasonText = text(500).refine(minLength(10), "At least 10 characters");
-
-/** A site as it is set: its centre and radius typed until address search exists (F21). */
-const FieldSiteInput = z
-  .object({
-    name: text(120).refine(minLength(2), "At least 2 characters"),
-    /** Picked or pinned, never typed (F27). */
-    address: PlaceInput.optional(),
-    latitude: z.number().min(-90).max(90),
-    longitude: z.number().min(-180).max(180),
-    radius_m: z.number().int().min(100, "At least 100 m").max(500, "At most 500 m"),
-  })
-  .strict();
-
-/**
- * POST /attendance/field-assignments. Who may be put on it, the dates against today and the overlap
- * are the service's (guide §6.12).
- */
-const FieldAssignmentCreate = z
-  .object({
-    name: text(120).refine(minLength(3), "At least 3 characters"),
-    client: text(120).refine(minLength(2), "At least 2 characters"),
-    note: optionalText(500),
-    starts_on: isoDate,
-    ends_on: isoDate,
-    employee_ids: z
-      .array(uuid)
-      .min(1, "Pick someone")
-      .max(25, "At most 25 people")
-      .refine((ids) => new Set(ids).size === ids.length, "Each person once"),
-    sites: z.array(FieldSiteInput).min(1, "Add a site").max(2, "At most two sites"),
-  })
-  .strict()
-  .refine((v) => v.ends_on >= v.starts_on, { message: "Ends before it starts", path: ["ends_on"] });
 
 /** GET /attendance/field-assignments: within the reader's `people` scope, in progress and upcoming first. */
 const FieldAssignmentListQuery = listQuery(
@@ -1251,13 +1409,6 @@ const TABLES = {
     },
   },
   LocationRequestPage: { table: null, reason: "a page of work location requests" },
-  LocationRequestCreate: {
-    table: "attendance_location_request",
-    virtual: {
-      home_latitude: "written to attendance_location_request.latitude",
-      home_longitude: "written to attendance_location_request.longitude",
-    },
-  },
   MyLocationRequestListQuery: { table: null, reason: "list controls for the person's own requests" },
   LocationRequestListQuery: { table: null, reason: "list controls for People's requests" },
   LocationRequestCancel: {
@@ -1282,14 +1433,6 @@ const TABLES = {
     },
   },
   FieldAssignmentPage: { table: null, reason: "a page of field assignments" },
-  FieldSiteInput: { table: "attendance_field_site" },
-  FieldAssignmentCreate: {
-    table: "attendance_field_assignment",
-    virtual: {
-      employee_ids: "written as attendance_field_member rows",
-      sites: "written as attendance_field_site rows",
-    },
-  },
   FieldAssignmentListQuery: { table: null, reason: "list controls for People's field assignments" },
   MyFieldAssignmentListQuery: { table: null, reason: "list controls for the person's own field assignments" },
   FieldAssignmentCancel: { table: null, reason: "why it is cancelled; kept as cancel_reason and on the audit row" },
@@ -1420,6 +1563,74 @@ const TABLES = {
       approved_by_name: "who approved it, from app_user and employee",
     },
   },
+  TemporarySiteLocation: {
+    table: "attendance_temporary_site_location",
+    virtual: {
+      home_address: "a Temporary Home's attendance_temporary_site_location.address, named for the personal-details mask",
+      home_latitude: "a Temporary Home's attendance_temporary_site_location.latitude, named for the personal-details mask",
+      home_longitude: "a Temporary Home's attendance_temporary_site_location.longitude, named for the personal-details mask",
+    },
+  },
+  TemporarySiteMember: {
+    table: "attendance_temporary_site_member",
+    virtual: { employee: "the person, from employee and department" },
+  },
+  TemporarySite: {
+    table: "attendance_temporary_site",
+    virtual: {
+      days: "calendar days from starts_on to ends_on",
+      state: "awaiting approval, upcoming, in progress or done against today in Lagos, else its status",
+      locations: "its attendance_temporary_site_location rows",
+      members: "its attendance_temporary_site_member rows",
+      people: "how many attendance_temporary_site_member rows are not removed",
+      submitted_by_name: "who added it, from employee",
+      submitted_at: "attendance_temporary_site.created_at",
+      waiting_on: "the name of the approval stage it waits at, from workflow_instance",
+      approved_by_name: "who approved it, from employee",
+      can_decide: "whether that stage waits on the reader and they are not on it (shared/workflow/approvers.js)",
+      can_change: "whether the reader may cancel it or take someone off",
+      can_withdraw: "whether the reader submitted it and it still waits",
+    },
+  },
+  TemporarySitePage: { table: null, reason: "a page of temporary sites" },
+  TemporarySiteLocationInput: { table: "attendance_temporary_site_location" },
+  TemporarySiteCreate: {
+    table: "attendance_temporary_site",
+    virtual: {
+      locations: "written as attendance_temporary_site_location rows, each place kept by shared/places",
+      employee_ids: "written as attendance_temporary_site_member rows",
+    },
+  },
+  TemporarySiteListQuery: { table: null, reason: "list controls for People's temporary sites" },
+  MyTemporarySiteListQuery: { table: null, reason: "list controls for the person's own temporary sites" },
+  TemporarySiteCancel: {
+    table: null,
+    reason: "why a site is withdrawn or cancelled; kept as cancel_reason and on the audit row",
+  },
+  TemporarySiteMemberRemove: {
+    table: null,
+    reason: "who is taken off and why; kept as removed_reason on their attendance_temporary_site_member row",
+  },
+  TodayTemporarySite: { table: null, reason: "the day's site on the clock panel, from attendance_temporary_site and its locations" },
+  CheckIn: {
+    table: "attendance_check_in",
+    virtual: {
+      position: "the matched address's attendance_temporary_site_location.position",
+      location_name: "the matched address's label, else its position",
+      address: "a venue's attendance_temporary_site_location.address",
+      home_address: "a Temporary Home's attendance_temporary_site_location.address, named for the personal-details mask",
+      location_reason: "why a reading was unclear, from attendance_check_in.evidence",
+      flagged: "an attendance_exception carries it",
+    },
+  },
+  CheckInPage: { table: null, reason: "a page of check-ins" },
+  MyCheckInListQuery: { table: null, reason: "list controls for one of my days' check-ins" },
+  CheckInListQuery: { table: null, reason: "list controls for one person's check-ins on a day" },
+  CheckInCreate: {
+    table: "attendance_check_in",
+    virtual: { location_error: "why the browser gave no reading; kept in attendance_check_in.evidence" },
+  },
+  CheckInResult: { table: null, reason: "what a check-in recorded, and the state after it" },
 };
 
 module.exports = {
@@ -1478,7 +1689,6 @@ module.exports = {
   LocationRequestStatus,
   LocationRequest,
   LocationRequestPage,
-  LocationRequestCreate,
   MyLocationRequestListQuery,
   LocationRequestListQuery,
   LocationRequestCancel,
@@ -1488,8 +1698,6 @@ module.exports = {
   FieldMember,
   FieldAssignment,
   FieldAssignmentPage,
-  FieldSiteInput,
-  FieldAssignmentCreate,
   FieldAssignmentListQuery,
   MyFieldAssignmentListQuery,
   FieldAssignmentCancel,
@@ -1532,4 +1740,25 @@ module.exports = {
   OvertimeDecision,
   OvertimePreApprovalCreate,
   OvertimePreApproval,
+  TemporarySitePurpose,
+  TemporarySiteStatus,
+  TemporarySiteState,
+  TemporarySiteLocation,
+  TemporarySiteMember,
+  TemporarySite,
+  TemporarySitePage,
+  TemporarySiteLocationInput,
+  TemporarySiteCreate,
+  TemporarySiteListQuery,
+  MyTemporarySiteListQuery,
+  TemporarySiteCancel,
+  TemporarySiteMemberRemove,
+  CheckInVerdict,
+  CheckIn,
+  CheckInPage,
+  MyCheckInListQuery,
+  CheckInListQuery,
+  CheckInCreate,
+  CheckInResult,
+  TodayTemporarySite,
 };

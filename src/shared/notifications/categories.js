@@ -214,6 +214,7 @@ const MODULE_TO_CATEGORY = Object.freeze({
   expenses: "expenses",
   knowledge: "knowledge",
   praxis_ai: "system",
+  ai_control: "system",
   settings: "system",
   system_health: "system_health",
 });

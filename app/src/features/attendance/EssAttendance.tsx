@@ -1,12 +1,12 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import devices from "@mycity/contract/schemas/devices.js";
-import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice, PayItem } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice, PayItem, TemporarySite } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
-import { useSearchParams } from "@/lib/router";
+import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
@@ -15,9 +15,11 @@ import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAs
 import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PAY_KIND, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
 import { payColumns, payDetails } from "./PayItems";
 import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, type FieldBinding, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, TimeField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { DayRoute, MyTemporarySites } from "./TemporarySites";
 
 /**
- * ESS · My Attendance (#9, with the person's field assignments) and My Devices (#88)
+ * ESS · My Attendance (#9, with the person's temporary sites, each day's route of check-ins, and the
+ * field assignments made before PR 4) and My Devices (#88)
  * (docs/guides/attendance.md §10). Work Location Requests (#87) is WorkLocationRequests.tsx, Policy
  * Updates (#89) features/policies/PolicyUpdates.tsx.
  * Everything here is the caller's own: the routes take no employee id.
@@ -49,6 +51,7 @@ const LOCATION_NAME: Partial<Record<AttendanceToday["location"]["kind"], string>
 
 export function MyAttendancePage() {
   const [params] = useSearchParams();
+  const { navigate } = useRouter();
   const id = params.get("id");
   const modal = useModal();
   const clock = useClock();
@@ -72,6 +75,8 @@ export function MyAttendancePage() {
   });
   const openAssignment = useCallback((a: FieldAssignment) => modal.open({ title: a.number, wide: true, body: (close) => <AssignmentView a={a} close={close} /> }), [modal]);
   useAssignmentLink(params.get("assignment"), openAssignment, { mine: true });
+  // A site opens where the person's sites are kept, with its approval and Withdraw Submission.
+  const openSite = (site: TemporarySite) => navigate(hrefFor("ess", "work-location-requests", { site: site.temporary_site_id }));
   const openFigure = (status: FigureStatus) =>
     modal.open({ title: `${FIGURE[status]}, ${formatMonth(month)}`, wide: true, body: <FigureDays month={month} status={status} /> });
   const explain = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], body: (close) => <ExplainForm x={x} close={close} /> });
@@ -125,6 +130,7 @@ export function MyAttendancePage() {
       />
       <HomeLocationCard openOnLoad={params.get("home") === "set"} />
       {todayCard}
+      <MyTemporarySites openSite={openSite} />
       <MyFieldAssignments open={openAssignment} />
       <Grid cols="4m2" className="mt-3">
         <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} onOpen={() => openFigure("present")} />
@@ -207,6 +213,7 @@ function FigureDays({ month, status }: { month: string; status: FigureStatus }) 
 function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
   const modal = useModal();
   const events = usePaged("GET /api/v1/attendance/me/events", { filters: { date } });
+  const checkIns = usePaged("GET /api/v1/attendance/me/check-ins", { filters: { date } });
   const automatic = events.rows.find((e) => e.source === "system" && e.event_type === "clock_out" && !e.excluded);
   const giveTime = (e: AttendanceEvent) => modal.open({ title: "Give Real Time", body: (close) => <GiveRealTime e={e} close={close} /> });
   return (
@@ -242,6 +249,7 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
           },
         ]}
       />
+      <DayRoute className="mt-3" punches={events.rows} checkIns={checkIns.rows} />
       {automatic && (
         <FormFooter>
           <Button className="phone:w-full" icon="clock" onClick={() => giveTime(automatic)}>Give Real Time</Button>

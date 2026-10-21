@@ -155,6 +155,8 @@ function readPlaceToken(token) {
     city: str(p.c, 120),
     state: str(p.st, 120),
     country_code: str(p.cc, 2),
+    /** The provider's time zone, when it named one; the owner checks it before keeping it. */
+    timezone: str(p.tz, 64),
     verified: p.v === true,
     pending: p.p === true,
   };
@@ -213,6 +215,7 @@ const PlaceInput = z
         city: null,
         state: null,
         country_code: null,
+        timezone: null,
         verified: false,
         pending: true,
         details,

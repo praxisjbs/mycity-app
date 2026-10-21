@@ -754,7 +754,7 @@ describe("the routes", () => {
   test("the person's own routes are self and name no employee; People's carry the people grant", () => {
     expect(routes.length).toBeGreaterThan(10);
     for (const r of routes) {
-      if (r.path.startsWith("/me") || r.path === "/punches") {
+      if (r.path.startsWith("/me") || r.path === "/punches" || (r.method === "POST" && r.path === "/check-ins")) {
         expect(r.contract.self).toBe(true);
         expect(r.path).not.toMatch(/employee_id/);
         if (r.contract.body) expect(Object.keys(shapeOf(r.contract.body))).not.toContain("employee_id");
@@ -764,14 +764,31 @@ describe("the routes", () => {
     }
   });
 
-  test("a work location request names no employee or status; People read requests, and decide them in the approval", () => {
-    const send = routes.find((r) => r.method === "POST" && r.path === "/me/requests");
-    expect(Object.keys(shapeOf(send.contract.body)).sort()).toEqual([
-      "accuracy_m", "address", "ends_on", "home_latitude", "home_longitude", "reason", "request_type",
-      "site_latitude", "site_longitude", "site_radius_m", "starts_on",
-    ]);
+  test("a work location request takes no new entry from PR 4; People still read requests, and decide them in the approval", () => {
+    expect(routes.some((r) => r.method === "POST" && r.path === "/me/requests")).toBe(false);
+    expect(routes.find((r) => r.method === "POST" && r.path === "/me/requests/:id/cancel").contract.self).toBe(true);
     expect(routes.find((r) => r.method === "GET" && r.path === "/requests").permission).toMatchObject({ key: "people", action: "view" });
     expect(routes.some((r) => /decision|approve/.test(r.path) && r.path.startsWith("/requests"))).toBe(false);
+  });
+
+  test("a temporary site: anyone sends one, People add, cancel and change one under approve, read under view; decided in its approval", () => {
+    const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
+    for (const path of ["/temporary-sites", "/temporary-sites/:id/cancel", "/temporary-sites/:id/remove"])
+      expect(by("POST", path).permission).toMatchObject({ key: "people", action: "approve" });
+    for (const path of ["/temporary-sites", "/temporary-sites/:id", "/check-ins"])
+      expect(by("GET", path).permission).toMatchObject({ key: "people", action: "view" });
+    for (const [method, path] of [["GET", "/me/temporary-sites"], ["POST", "/me/temporary-sites"], ["GET", "/me/temporary-sites/:id"],
+      ["POST", "/me/temporary-sites/:id/withdraw"], ["POST", "/check-ins"], ["GET", "/me/check-ins"]])
+      expect(by(method, path).contract.self).toBe(true);
+    expect(Object.keys(shapeOf(by("POST", "/me/temporary-sites").contract.body)).sort()).toEqual([
+      "description", "employee_ids", "ends_on", "locations", "name", "purpose", "starts_on",
+    ]);
+    expect(routes.some((r) => /decision|approve/.test(r.path) && r.path.startsWith("/temporary-sites"))).toBe(false);
+  });
+
+  test("a check-in carries no distance, flag, site, device or employee: the server works those out", () => {
+    const send = routes.find((r) => r.method === "POST" && r.path === "/check-ins");
+    expect(Object.keys(shapeOf(send.contract.body)).sort()).toEqual(["accuracy_m", "device_at", "latitude", "location_error", "longitude"]);
   });
 
   test("a home request carries no employee or status, and only People decide one", () => {
@@ -787,15 +804,13 @@ describe("the routes", () => {
     expect(keys.sort()).toEqual(["accuracy_m", "device_at", "event_type", "latitude", "location_error", "longitude", "note"]);
   });
 
-  test("a field assignment is set, cancelled and changed under people approve; read under view", () => {
+  test("a field assignment takes no new entry from PR 4; one in force is still cancelled and changed under people approve", () => {
     const by = (method, path) => routes.find((r) => r.method === method && r.path === path);
-    for (const path of ["/field-assignments", "/field-assignments/:id/cancel", "/field-assignments/:id/remove"])
+    expect(by("POST", "/field-assignments")).toBeUndefined();
+    for (const path of ["/field-assignments/:id/cancel", "/field-assignments/:id/remove"])
       expect(by("POST", path).permission).toMatchObject({ key: "people", action: "approve" });
     for (const path of ["/field-assignments", "/field-assignments/:id"])
       expect(by("GET", path).permission).toMatchObject({ key: "people", action: "view" });
-    expect(Object.keys(shapeOf(by("POST", "/field-assignments").contract.body)).sort()).toEqual([
-      "client", "employee_ids", "ends_on", "name", "note", "sites", "starts_on",
-    ]);
     expect(by("GET", "/me/field-assignments").contract.self).toBe(true);
   });
 
@@ -895,7 +910,7 @@ describe("the Attendance policy's rules", () => {
     ]);
     const byKey = Object.fromEntries(sections.map((s) => [s.key, s]));
     expect(["clocking_in", "office", "home", "site", "location", "devices"].map((k) => byKey[k].title)).toEqual([
-      "Clocking In", "At the Office", "Working From Home", "At a Field Site", "Your Location", "Your Devices",
+      "Clocking In", "At the Office", "Working From Home", "At a Temporary Site", "Your Location", "Your Devices",
     ]);
     expect(byKey.clocking_in.sentences.map((x) => x.text)).toEqual([
       "You have a grace period of 10 minutes after your start time.",
@@ -940,5 +955,26 @@ describe("the Attendance policy's rules", () => {
     expect(paths(draft({ late_deduction: { on: true, method: "per_day", amount: "1000000.00" } }))).toEqual([]);
     expect(paths(draft({ overtime: { ...s.overtime, on: true, method: "per_hour", amount: "0.50" } }))).toEqual(["overtime.amount"]);
     expect(paths(draft({ late_deduction: { on: true, method: "per_day", amount: null } }))).toEqual(["late_deduction.amount"]);
+  });
+
+  test("a temporary site's sentences cover its addresses and check-ins, and always end with where to add one", () => {
+    const site = (mode) => type.sections({ ...RULES, site_geofence_mode: mode }).find((x) => x.key === "site").sentences.map((x) => x.text);
+    expect(site("warn")).toEqual([
+      "At a temporary site, a clock-in or check-in outside its addresses is accepted and sent for review.",
+      "Working somewhere else? Add it from Home, or ask People.",
+    ]);
+    expect(site("block")).toEqual([
+      "At a temporary site, a clock-in outside its addresses is refused, and People see it.",
+      "A check-in outside them is sent for review.",
+      "Working somewhere else? Add it from Home, or ask People.",
+    ]);
+    expect(site("off")[0]).toBe("At a temporary site, your location is recorded with each clock-in and check-in. Nothing is flagged.");
+    expect(site("off").at(-1)).toBe("Working somewhere else? Add it from Home, or ask People.");
+    expect(type.RULE_LABEL.site_geofence_mode).toBe("Temporary Site Check");
+    expect(type.changeLines({ ...RULES, site_geofence_mode: "warn" }, { ...RULES, site_geofence_mode: "block" })).toEqual([
+      "Temporary Site Check: Flag to Refuse",
+    ]);
+    // Every sentence a person reads keeps to 20 words (FRONTEND_GUIDE §5.3).
+    for (const mode of ["off", "warn", "block"]) for (const t of site(mode)) expect(t.split(/\s+/).length).toBeLessThanOrEqual(20);
   });
 });

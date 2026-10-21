@@ -27,6 +27,7 @@ import "./modules/policies";
 import "./modules/settings";
 import "./modules/system_health";
 import "./modules/integrations";
+import "./modules/ai_control";
 import "./modules/imports";
 import "./modules/workflow";
 import { dispatch } from "./core";

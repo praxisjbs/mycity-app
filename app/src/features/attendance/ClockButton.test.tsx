@@ -14,7 +14,9 @@ import { useClock } from "./ClockButton";
 /**
  * The clock panel on the in-browser mock (docs/guides/attendance.md §10, §11): the location is
  * read only after the press, the reason comes first, a lost answer is retried with the same
- * Idempotency-Key and body, and what the panel shows after a punch is the server's answer.
+ * Idempotency-Key and body, and what the panel shows after a punch is the server's answer. On a
+ * temporary site's day (§6.12) it names the site and its addresses, and once clocked in offers
+ * Check In, retried the same way. The mock's TS-0001 is in progress for Bashir.
  */
 
 type Position = { coords: { latitude: number; longitude: number; accuracy: number } };
@@ -188,4 +190,52 @@ describe("the clock panel", () => {
       office.active = true;
     }
   }, 20000);
+  it("on a temporary site's day: the site and its addresses, then Check In once clocked in, a lost answer tried again with the same key", async () => {
+    permission = "granted";
+    await signedInAs("bashir@mycityapp.io");
+    expect(clock!.today!.location).toMatchObject({ kind: "temporary_site", name: "Partner Training Week" });
+    expect(clock!.today!.temporary_site).toMatchObject({ number: "TS-0001", name: "Partner Training Week" });
+    act(() => clock!.open());
+    if (clock!.today!.state !== "clocked_in") {
+      await screen.findByText("Start Your Day");
+      // Check In waits for the clock-in.
+      expect(screen.queryByRole("button", { name: "Check In" })).toBeNull();
+      press("Clock In");
+      // The permission is read first, then the location is asked for.
+      await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
+      act(() => answer!({ coords: { latitude: 6.4282, longitude: 3.4219, accuracy: 12 } }));
+      await waitFor(() => expect(clock!.today?.state).toBe("clocked_in"));
+      getCurrentPosition.mockClear();
+      cleanup();
+      await signedInAs("bashir@mycityapp.io");
+      act(() => clock!.open());
+    }
+    await screen.findByText("Finish Your Day");
+    expect(screen.getByText("TS-0001")).toBeTruthy();
+    expect(screen.getByText("Hall · 200 m; Annex · 150 m")).toBeTruthy();
+
+    const real = api.call.bind(api);
+    let lost = false;
+    const call = vi.spyOn(api, "call").mockImplementation(((key: string, opts: unknown) => {
+      if (key === "POST /api/v1/attendance/check-ins" && !lost) {
+        lost = true;
+        return Promise.reject(new ApiError(0, null));
+      }
+      return (real as (k: string, o: unknown) => Promise<unknown>)(key, opts);
+    }) as typeof api.call);
+    press("Check In");
+    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
+    act(() => answer!({ coords: { latitude: 6.4285, longitude: 3.4219, accuracy: 12 } }));
+    await screen.findByText("Check-in not sent yet.");
+    press("Try Again");
+    await screen.findByText("Checked in at Hall.");
+    const sent = call.mock.calls.filter(([key]) => key === "POST /api/v1/attendance/check-ins");
+    expect(sent).toHaveLength(2);
+    expect(sent[1][1]).toEqual(sent[0][1]);
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(clock!.today!.check_ins).toHaveLength(1));
+    expect(clock!.today!.check_ins[0]).toMatchObject({ location_name: "Hall", verdict: "inside", flagged: false });
+    expect(await screen.findByText("Inside")).toBeTruthy();
+    expect(await axe(document.body)).toHaveNoViolations();
+  }, 30000);
 });

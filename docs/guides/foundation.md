@@ -429,6 +429,14 @@ As built (17/10/2026):
   saving it is refused until every stage is valid.
 - **Who decides**: the people the current stage names, and only while they hold `approve` on the
   request's module; nobody decides their own request (the CEO excepted, who may decide any stage).
+- **People an approval excludes** (TB, 20/10/2026, for attendance's temporary sites, attendance.md
+  §6.11): a module may name, when it opens the approval, employees who never decide it whatever role
+  they hold (`openInstance({ exclude_employee_ids })`, kept on `workflow_instance.excluded_employee_ids`,
+  migration `1455`). The engine refuses them on every stage (`canAct`), My Approvals, Need You and ⌘K's
+  Waiting on You leave the approval out for them (`waitingOnClause`), and the stage's notice skips them
+  (`recipients`). The CEO is excepted as above. A temporary site excludes everyone on it, so a
+  colleague on the site who holds Operations & People cannot approve it; every other approval
+  excludes nobody.
 
 ### 6.6 The org tree
 
@@ -457,7 +465,8 @@ As built (17/10/2026):
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
   Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
   Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
-  Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
+  Dark Theme, Use Light Theme, Change Density, Install App, Refresh Screen, Reload App, Sign Out, Add
+  Work Site, Add Temporary Site), then
   one group per kind of record from each `<module>.search.js` (Employees, Departments, Open Seats, Users,
   Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's).
 - **Waiting on You** comes first: the requests waiting on the reader's decision (the My Approvals list),
@@ -480,7 +489,10 @@ As built (17/10/2026):
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
   (`useScreenAction`), another word runs what the screen names with `useUrlAction` (`password`, `pin`),
   and `?importer=employees` opens the Import wizard. Clock In, Mark All Read and the three
-  notification actions run in the app itself (`docs/guides/notifications.md` §9).
+  notification actions run in the app itself (`docs/guides/notifications.md` §9), and so do Refresh
+  Screen and Reload App (`run` `refresh` and `reload`, FRONTEND_FOUNDATION F28): the same refresh in
+  place as the pull and the refresh button, and the same reload as holding it, which a person using a
+  screen reader reaches here.
 - **The gate** (`scripts/check/search-coverage.js`): every screen in the route map has a search entry
   whose label equals the shell's; every entity type in `ENTITY_ROUTES` is declared by a provider or its
   line carries `// search:none <reason>`; every `useScreenAction({ label })` in the app is an action in
@@ -815,6 +827,13 @@ screen.
 ## 14 · Change log
 
 - 21/10/2026 · TB · §10, §13: the employee record's Attendance tab becomes Work Schedule, after Job (attendance's PR 3, `attendance.md` §6.13): Work Setup and the person's week, each weekday Working or Off with its hours and place, and Set Schedule for anyone (`people` edit, never their own).
+- 20/10/2026 · TB · §6.7: ⌘K gains Refresh Screen and Reload App, run in the app (F28), so the
+  refresh and the reload have a path without the pull or the hold. The employee record names its
+  place on the trail with the person's name (`useTrailTitle`, F29).
+- 20/10/2026 · TB · AI Control is its own module under System (`docs/guides/ai-control.md`), beside
+  Praxis AI, with its own `ai_control` key. Settings · Integrations opens a connection named in the
+  address (`?id=` its code), for AI Control · Models' Open Connection, and each AI connection links to
+  AI Control.
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) left the shell (`catalogue.ts`, `coming-soon.ts`, `features/settings/index.tsx`); Knowledge Hub · Policies is shown only to holders of `policies.manage` (`shell/access.ts`, as `src/shared/search/screens.js`); the shell mounts the acknowledge sheet beside the clock prompts (`docs/guides/policies.md` §6.7).
 - 20/10/2026 · TB · Settings · Integrations gains the AI providers (Groq, OpenAI, Anthropic,
   DeepSeek beside Gemini) with their model lists, Exchange Rates, and a Free or Paid plan on every
@@ -977,3 +996,4 @@ screen.
 - 20/10/2026 · TB · Settings · Integrations (#77) built with its own guide (`docs/guides/integrations.md`), brought forward from M9: §2 and §6.8 point there; Geoapify's key (§5, §6.13) and the local domains (§6.14) are kept there, with `GEOAPIFY_API_KEY` and `SMTP_LOCAL_DOMAINS` as the server file's fallback.
 - 20/10/2026 · TB · §6.13: addresses are picked, never typed (F27), with their own guide, `docs/guides/addresses.md`, which now covers the `maps` module (taken off this guide's header). The reverse lookup became `GET /maps/pin`, open to everyone signed in for a point they pin as an address.
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) is dropped: policies live on Knowledge Hub · Policies (`docs/guides/policies.md`), brought forward from M10; §2 and §6.8 say so, and Settings · Approvals gains the Policy Approval route (and the Temporary Site route with attendance's PR 4).
+- 20/10/2026 · TB · §6.5: an approval may exclude people from deciding it (`exclude_employee_ids` on `openInstance`, `workflow_instance.excluded_employee_ids`, `1455`), read by `canAct`, `waitingOnClause` and the stage's notice; attendance's temporary sites exclude everyone on them (attendance.md §6.11). §6.7: ⌘K's Add Work Site and Add Temporary Site; a screen may register a second action for the floating button (`useScreenAction(action, { second: true })`, Home's Add Work Site beside New). §6.8's Temporary Site route is built as it says.

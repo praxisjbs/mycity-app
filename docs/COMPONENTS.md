@@ -145,14 +145,17 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [DesktopShell](#desktopshell) | `DesktopShell` | The staff app's desktop frame: the rail at the left, the top bar, the module's tab strip and the page, which alone scrolls. | stable |
 | Shell | [FloatingButton](#floatingbutton) | `FloatingButton` | The phone's floating button, bottom right above the bottom bar: a tap fans out the screen's New action, Clock In or Out, Praxis AI and Help, with Hide Here last (F18). | stable |
 | Shell | [MoreSheet](#moresheet) | `MoreSheet` | The phone's More: a launcher in a bottom sheet with the person's row, a search bar, the modules they may open as tiles four to a row, and Sign Out (F17). | stable |
+| Shell | [NavCapsule](#navcapsule) | `NavCapsule` | Back, forward and refresh in one capsule at the start of the desktop top bar: a click on the arrow refreshes in place and a 0.6 s hold reloads the app (the Hold Ring); hovering an arrow names where it goes; a held or right clicked arrow opens the trail. | stable |
 | Shell | [NotificationCenter](#notificationcenter) | `NotificationCenter` | The bell's pane: All and Unread, the notifications grouped Today, Yesterday and Earlier, Mark All Read and the settings gear; a page from the right on a phone, a panel under the bell on desktop. | beta |
 | Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
-| Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar. | stable |
+| Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar. | stable |
 | Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
+| Shell | [PullIndicator](#pullindicator) | `PullIndicator` | The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
+| Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 
 ## Foundations
 
@@ -2100,7 +2103,7 @@ A full-screen page that slides in from the right over the screen on a phone, lik
 |---|---|
 | Use | A place a person goes into and comes back from without leaving the screen they were on: the notification pane, Notification Settings over it. |
 | Avoid | A form or a record on desktop (use Modal or SidePanel); a short choice (use Sheet); a real screen with its own address (a route). |
-| Phone | This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close. On desktop it draws the same page as a panel on the right. |
+| Phone | This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close; the phone's own Back (Android's, the iPhone's edge swipe) closes it first (F29). With `onRefresh` its body pulls to refresh (F28). On desktop it draws the same page as a panel on the right. |
 | Accessibility | A modal dialog named by `title` (Radix underneath, through Vaul): focus moves in and is trapped, Esc and Back close it, focus returns to the opener. Back is a named button; `actions` are IconButtons with labels. |
 | Status | beta |
 | Exports | `PhonePage` |
@@ -2119,7 +2122,8 @@ A full-screen page that slides in from the right over the screen on a phone, lik
 | `actions` | `ReactNode` |  | IconButtons at the right of the header (Mark All Read, a gear). |
 | `bar` | `ReactNode` |  | Something fixed under the header that does not scroll away (a segmented control). |
 | `children` | `ReactNode` |  | The body; it scrolls. |
-| `bodyRef` | `(el: HTMLDivElement \| null) => void` |  | Called with the scrolling body, for a list that loads more near its end or pulls to refresh. |
+| `bodyRef` | `(el: HTMLDivElement \| null) => void` |  | Called with the scrolling body, for a list that loads more near its end. |
+| `onRefresh` | `() => Promise<unknown>` |  | Pull to refresh (F28): pulled down at its top, the body loads again; the pin turns until the promise settles. |
 | `container` | `HTMLElement \| null` |  | Where the page mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
 
@@ -3135,6 +3139,9 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `placeholder` | `string` |  | A format example of at most 3 words; Search. |
 | `label` | `string` |  | Names the box for assistive technology; the placeholder otherwise. |
 | `className` | `string` |  | Layout classes only. |
+| `controls` | `string` |  | The id of the list this box narrows, when it moves through it (a searchable SelectField). |
+| `activeId` | `string` |  | The id of that list's highlighted option. |
+| `onKeyDown` | `(e: KeyboardEvent<HTMLInputElement>) => void` |  | Keys pressed in the box (the arrow keys and Enter of that list). |
 
 **FilterSelect** props (`FilterSelectProps`)
 
@@ -3191,10 +3198,10 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 
 | | |
 |---|---|
-| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
+| Use | SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
 | Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
-| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
-| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field. Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
+| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
 | Status | stable |
 | Exports | `SelectField`, `ChoiceField`, `SelectMenu` |
 | Import | `import { SelectField, ChoiceField, SelectMenu } from "@mycity/ui";` |
@@ -3219,6 +3226,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `className` | `string` |  | Layout classes only. |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default. |
+| `searchable` | `boolean` |  | A search box above the options (SelectMenu's `searchable`). |
 
 **ChoiceField** props (`ChoiceFieldProps`)
 
@@ -3253,6 +3261,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `disabled` | `boolean` |  | Shown but not usable. |
 | `name` | `string` |  | Its name in a submitted form. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default (the gallery passes its themed frame). |
+| `searchable` | `boolean` |  | A search box above the options, narrowing them as the person types: for a fixed list long enough to scroll. |
 
 ```tsx
 <SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />
@@ -4705,6 +4714,44 @@ The phone's More: a launcher in a bottom sheet with the person's row, a search b
 <MoreSheet open={open} onClose={close} person={{ name: "Cynthia Osakunih", subtitle: "Operations Manager" }} groups={groups} onSearch={openSearch} onSignOut={signOut} />
 ```
 
+### NavCapsule
+
+Back, forward and refresh in one capsule at the start of the desktop top bar: a click on the arrow refreshes in place and a 0.6 s hold reloads the app (the Hold Ring); hovering an arrow names where it goes; a held or right clicked arrow opens the trail.
+
+| | |
+|---|---|
+| Use | Once, in TopBar's start slot after the rail toggle (F28, F29). `arrows` only while the app runs installed (useInstalled), where the window has no back or forward of its own; refresh always. |
+| Avoid | A phone (the page pulls to refresh, the system's Back goes back); a record's own way back to its list (a link); more buttons in the capsule. |
+| Phone | Never shown on a phone; its buttons are 44 px targets so the gallery's phone view passes. |
+| Accessibility | A group named History of three named buttons, each described by where it goes or what a hold does, aria-disabled with nothing back or ahead. An arrow opens the trail with a hold, a right click, Arrow Down or the menu key; Shift and Enter on Refresh reloads. Refresh is busy (aria-busy) until the screen's reads are in. |
+| Status | stable |
+| Exports | `NavCapsule` |
+| Import | `import { NavCapsule } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/NavCapsule.tsx` |
+| Test | `packages/ui/src/shell/NavCapsule.test.tsx` |
+| Gallery | `packages/ui/src/shell/NavCapsule.gallery.tsx` (`npm run gallery`, `#/NavCapsule`) |
+
+**NavCapsule** props (`NavCapsuleProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `arrows` | `boolean` |  | Back and forward. False in a browser tab, which has its own (F29). Default true. |
+| `back` | `string \| null` |  | Where Back goes, by name; null or absent when there is nowhere back. |
+| `forward` | `string \| null` |  | Where Forward goes, by name; null or absent when nothing is ahead. |
+| `onBack` | `() => void` |  | Back one place. |
+| `onForward` | `() => void` |  | Forward one place. |
+| `onRefresh` | `() => Promise<unknown>` | yes | Refresh in place: the arrow turns until its promise settles, and a second press waits. |
+| `onReload` | `() => unknown` | yes | The hold: restart the app. A promise it returns settles only if the page stays. |
+| `trail` | `TrailItem[]` |  | The trail, for the menu an arrow opens: the one ahead first, the place on screen, then back. |
+| `onGo` | `(offset: number) => void` |  | Go to a place on the trail, by its offset. |
+| `trailOpen` | `boolean` |  | The trail held open from elsewhere (the pin held); leave unset to let the capsule keep its own. |
+| `onTrailOpenChange` | `(open: boolean) => void` |  | Called when the trail opens or closes. |
+| `container` | `HTMLElement \| null` |  | Where the trail mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<NavCapsule arrows={installed} back="People · Employees" onBack={back} onRefresh={refresh} onReload={reload} trail={trail} onGo={go} />
+```
+
 ### NotificationCenter
 
 The bell's pane: All and Unread, the notifications grouped Today, Yesterday and Earlier, Mark All Read and the settings gear; a page from the right on a phone, a panel under the bell on desktop.
@@ -4790,9 +4837,9 @@ The phone's top: a bar with the pin at the left and search, the bell and the per
 
 | | |
 |---|---|
-| Use | Once, in PhoneShell's header slot. The title is the module's name; the tabs are the module's Tabs. Scrolling the page down slides the title away and keeps the tabs; scrolling up brings it back. |
+| Use | Once, in PhoneShell's header slot. The title is the module's name; the tabs are the module's Tabs. Scrolling the page down slides the title away and keeps the tabs; scrolling up brings it back. `onPinHold` opens the trail when the pin is held, in the installed app (F29). |
 | Avoid | Desktop (TopBar); a screen's own title (PageHeader carries that inside the page); more than three actions in the bar. |
-| Phone | The whole point: one line of bar (the pin alone, no word), a large one-line title shortened with an ellipsis when long, the tabs a sideways-scrolling strip; every control 44 px. |
+| Phone | The whole point: one line of bar (the pin alone, no word), a large one-line title shortened with an ellipsis when long, the tabs a sideways-scrolling strip; every control 44 px. There is no back button (F29): the phone's own Back goes back, and holding the pin opens the trail. |
 | Accessibility | The pin is a link named "MyCity App, Home". The title is text, not a heading (the screen's PageHeader holds the page's h1); while it is slid away it is hidden from assistive technology too. |
 | Status | stable |
 | Exports | `PhoneHeader` |
@@ -4810,6 +4857,7 @@ The phone's top: a bar with the pin at the left and search, the bell and the per
 | `actions` | `ReactNode` |  | The bar's actions, right to left as read: search, the bell, the avatar button. |
 | `homeHref` | `string` | yes | Where the pin goes: Home. |
 | `onNavigate` | `(href: string) => void` |  | Called with homeHref on a plain tap on the pin. |
+| `onPinHold` | `() => void` |  | The pin held (or right clicked): the trail of places, in the installed app (F29). |
 
 ```tsx
 <PhoneHeader title="Employee Self-Service" homeHref="/home" actions={<><IconButton icon="srch" label="Search" /><IconButton icon="bell" label="Notifications" /></>} tabs={<Tabs ... />} />
@@ -4817,13 +4865,13 @@ The phone's top: a bar with the pin at the left and search, the bell and the per
 
 ### PhoneShell
 
-The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar.
+The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar.
 
 | | |
 |---|---|
-| Use | Once, by the staff app's shell, at 760 px and below; it lays out PhoneHeader, the screen, FloatingButton and BottomBar, and tells them which way the page scrolls. |
+| Use | Once, by the staff app's shell, at 760 px and below; it lays out PhoneHeader, the screen, FloatingButton and BottomBar, and tells them which way the page scrolls. `onRefresh` and `onReload` give the page its pull (F28). |
 | Avoid | Desktop (DesktopShell); a screen drawing its own bottom bar or floating button; the public site (PublicPage). |
-| Phone | The whole point: a native app frame. The page keeps clear space under its content for the floating button (F18), so the button never hides data, and only the page scrolls. While the button's fan is open the page dims behind it. |
+| Phone | The whole point: a native app frame. The page keeps clear space under its content for the floating button (F18), so the button never hides data, and only the page scrolls. While the button's fan is open the page dims behind it. Pulled down at its top the page refreshes in place, and pulled on past the second notch it reloads the app (F28); a fit page has no pull, and the browser's own pull never runs. |
 | Accessibility | The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the bottom bar is the Main navigation. |
 | Status | stable |
 | Exports | `PhoneShell` |
@@ -4845,6 +4893,8 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 | `fit` | `boolean` |  | A fit page: it fills the height and only its panes scroll. |
 | `pageKey` | `string` |  | Changes when the screen changes (its path): the page scrolls back to the top and the title returns. |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
+| `onRefresh` | `() => Promise<unknown>` |  | Pull to refresh (F28): every read on the screen again, in place. The pin turns until its promise settles. |
+| `onReload` | `() => unknown` |  | Pulled on past the second notch: restart the app. A promise it returns settles only if the page stays. |
 
 ```tsx
 <PhoneShell header={<PhoneHeader ... />} bottomBar={<BottomBar ... />} fab={<FloatingButton ... />}>{screen}</PhoneShell>
@@ -4894,6 +4944,35 @@ The public site's page: the mark and the theme switch on top, the page on one ca
 <PageMessage icon="ok" tone="ok" title="Application Sent">We reply within five working days.</PageMessage>
 ```
 
+### PullIndicator
+
+The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch.
+
+| | |
+|---|---|
+| Use | Drawn by PhoneShell and PhonePage while their page is pulled (F28), fed by their pull; a screen never draws one. `distance` sets it still, for the gallery and tests. |
+| Avoid | Desktop (the refresh button in NavCapsule); a list loading its first page (Skeleton); work inside the content (Spinner). |
+| Phone | The whole point. It follows the finger under the header, lands with a small bounce once the ring closes (64 px), turns while the screen refreshes and shows a tick when it is done; pulled on past 136 px it turns Deep Green with the reload mark. The page under it never moves. |
+| Accessibility | Hidden while it is only being pulled; while it works it is a status that says Refreshing or Reloading once. Anyone who cannot pull has Refresh Screen and Reload App in ⌘K. |
+| Status | stable |
+| Exports | `PullIndicator` |
+| Import | `import { PullIndicator } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/PullIndicator.tsx` |
+| Test | `packages/ui/src/shell/PullIndicator.test.tsx` |
+| Gallery | `packages/ui/src/shell/PullIndicator.gallery.tsx` (`npm run gallery`, `#/PullIndicator`) |
+
+**PullIndicator** props (`PullIndicatorProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `state` | `PullState` | yes | Where the pull is: idle, pulling, armed (the ring closed), deep (past the second notch), refreshing, reloading, done, settling. |
+| `distance` | `number` |  | A fixed pull in px, for a still picture; in use the pull writes it as the finger moves. |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<PullIndicator ref={indicator} state={state} />
+```
+
 ### Rail
 
 The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot.
@@ -4903,7 +4982,7 @@ The desktop navigation: the pin and name, the modules the person may open groupe
 | Use | Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app. |
 | Avoid | A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar). |
 | Phone | Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes. |
-| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
+| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); with `homeHref` the pin is a link Home, and with `onBrandHold` a hold or the menu key on it opens the trail (F29); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
 | Status | stable |
 | Exports | `Rail` |
 | Import | `import { Rail } from "@mycity/ui";` |
@@ -4923,6 +5002,8 @@ The desktop navigation: the pin and name, the modules the person may open groupe
 | `brandName` | `string` |  | The name beside the pin; MyCity App unless set. |
 | `foot` | `ReactNode` |  | A last line under the account (Engineered by JBS Praxis). |
 | `label` | `string` |  | Names the navigation landmark; Modules unless set. |
+| `homeHref` | `string` |  | With it the pin is a link Home, as on a phone. |
+| `onBrandHold` | `() => void` |  | The pin held (or right clicked): the trail of places, in the installed app (F29). |
 
 ```tsx
 <Rail items={items} current="people" onNavigate={navigate} account={{ name: "Cynthia Osakunih", subtitle: "Operations Manager", menu }} />
@@ -4995,6 +5076,38 @@ The desktop top bar: the rail toggle, the search button that opens the command p
 <TopBar start={<IconButton icon="panel" label="Collapse Menu" />} search={<SearchButton onClick={openPalette} />} actions={<IconButton icon="bell" label="Notifications" />} />
 ```
 
+### TrailMenu
+
+The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29).
+
+| | |
+|---|---|
+| Use | Held open by the app's shell: under NavCapsule on desktop when an arrow or the pin is held, as a sheet on a phone when the pin is held. Items come from the app's trail, the one ahead first, then the place on screen, then back. |
+| Avoid | Moving between modules (Rail, BottomBar); finding a record (CommandPalette); a list of actions (Menu). |
+| Phone | A bottom sheet of 44 px rows titled Trail, the place on screen marked Now; a tap goes there and the sheet closes. The phone's Back closes it first. |
+| Accessibility | A menu named Trail of menu items, each read with its place and how far back or ahead it is; arrow keys move, Enter goes, Esc closes and focus returns to the control that opened it. |
+| Status | stable |
+| Exports | `TrailMenu` |
+| Import | `import { TrailMenu } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/TrailMenu.tsx` |
+| Test | `packages/ui/src/shell/TrailMenu.test.tsx` |
+| Gallery | `packages/ui/src/shell/TrailMenu.gallery.tsx` (`npm run gallery`, `#/TrailMenu`) |
+
+**TrailMenu** props (`TrailMenuProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether it is showing. |
+| `onOpenChange` | `(open: boolean) => void` | yes | Called to open or close it. |
+| `items` | `TrailItem[]` | yes | The places, the one ahead first, then the place on screen (offset 0), then back. |
+| `onGo` | `(offset: number) => void` | yes | Go to a place, by its offset; the menu closes. |
+| `children` | `ReactElement` |  | On desktop, what it hangs under (the capsule); a phone needs nothing. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<TrailMenu open={open} onOpenChange={setOpen} items={trail} onGo={(offset) => go(offset)}><NavCapsule ... /></TrailMenu>
+```
+
 ## Helpers
 
 Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/lib`).
@@ -5048,6 +5161,20 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |
 | `formatPhone` | `lib/format.ts` | A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. |
 | `formatPhoneLocal` | `lib/format.ts` | A stored number as a person types it at home, for a field to start from: "0803 123 4567". |
+| `HistoryChange` (type) | `lib/history.ts` | What changed in the window's history. |
+| `startHistory` | `lib/history.ts` | Once, by the app's router, before its first render. |
+| `historyStartedFresh` | `lib/history.ts` | Whether the window opened on an entry nothing had marked: a new window or a cold start of the app, never a reload. |
+| `currentStep` | `lib/history.ts` | The step on screen, and the place of the entry it is on. |
+| `pushStep` | `lib/history.ts` | A new step at this address. |
+| `replaceStep` | `lib/history.ts` | The step on screen at a new address: a filter, a search, a sort, a page. |
+| `onHistory` | `lib/history.ts` | Told after every change to the window's history; returns the way to stop. |
+| `goHistory` | `lib/history.ts` | Moves through the window's history by entries: -1 is Back, 1 is Forward; a trail jump passes the difference of two places. |
+| `restoreSteps` | `lib/history.ts` | Rebuilds the window's history from a trail kept on the device, the oldest first and the last one on screen, so Back works after the app was closed. |
+| `useBackClose` | `lib/history.ts` | On a phone, while `open`, the overlay holds an entry of its own, so Back closes it (`onClose`) before it leaves the screen. |
+| `resetHistoryForTest` | `lib/history.ts` | Tests only: back to a window nothing has marked. |
+| `HoldOptions` (type) | `lib/hold.ts` |  |
+| `HoldHandlers` (type) | `lib/hold.ts` | The handlers to spread on the control. |
+| `useHold` | `lib/hold.ts` |  |
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |
@@ -5061,6 +5188,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `useMediaQuery` | `lib/media.ts` | true while the media query matches; false before the first render on a server. |
 | `useIsPhone` | `lib/media.ts` | true on a phone: the phone shell renders (gate 11). |
 | `useIsMobile` | `lib/media.ts` | The merged screens' name for useIsPhone. |
+| `INSTALLED_QUERY` | `lib/media.ts` | Running as an installed app: every display mode but a browser tab's. |
+| `isInstalled` | `lib/media.ts` | Running as an installed app right now, read once (outside React: the app's start). |
+| `useInstalled` | `lib/media.ts` | true while the app runs as an installed app (FRONTEND_FOUNDATION F29): its own window on a computer, or opened from the home screen of a phone, where an iPhone says so through navigator.standalone. |
 | `PlanMilestone` (type) | `lib/plan.ts` | One milestone from MILESTONES §4. |
 | `PlanScreen` (type) | `lib/plan.ts` | One screen's row in PROGRESS: its milestone, and which ticks it has. |
 | `DeliveryPlan` (type) | `lib/plan.ts` | The whole plan, as vite.shared.js deliveryPlan() writes it. |
