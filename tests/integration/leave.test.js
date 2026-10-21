@@ -197,7 +197,13 @@ describeDb("leave against the real migrations", () => {
     expect(past.status).toBe(422);
     expect(past.body.error.code).toBe("LEAVE_IN_THE_PAST");
 
-    expect((await ask("staff", "annual", d("12-30"), `${Y + 1}-01-04`)).body.error.code).toBe("LEAVE_SPANS_YEARS");
+    // The contract refuses New Year itself, so the form says it as the Last Day is typed (fault #1, 21/10/2026).
+    const newYear = await ask("staff", "annual", d("12-30"), `${Y + 1}-01-04`);
+    expect([newYear.status, newYear.body.error.code, newYear.body.error.fields]).toEqual([
+      422,
+      "VALIDATION_FAILED",
+      { ends_on: ["Ends in another year"] },
+    ]);
     // A Sunday on its own.
     expect((await ask("staff", "annual", d("02-07"), d("02-07"))).body.error.code).toBe("LEAVE_NO_WORKING_DAYS");
     expect((await ask("staff", "annual", d("02-05"), d("02-04"))).status).toBe(422);

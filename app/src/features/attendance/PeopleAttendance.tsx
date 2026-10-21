@@ -551,7 +551,7 @@ function ExportForm({ close, date, status }: { close: () => void; date: string; 
   return (
     <>
       <Field label="Period" {...f.status("period")}>
-        <DateRangeField value={f.values.period} onChange={(p) => f.set("period", p)} max={todayIso()} />
+        <DateRangeField value={f.values.period} onChange={(p) => f.set("period", p)} onProblem={f.field("period").onProblem} max={todayIso()} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

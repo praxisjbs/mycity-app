@@ -432,7 +432,7 @@ route("PUT /api/v1/settings/numbering/:doc_type", (req) => {
   if (!/^[A-Z0-9]{0,8}$/.test(prefix)) return invalid({ prefix: ["Up to 8 letters"] });
   if (b.reset !== "never" && !b.include_period) return invalid({ include_period: ["Needed when it resets"] });
   if (!prefix && !(b.padding > 0)) return invalid({ padding: ["Add sequence digits"] });
-  if (b.padding === 0 && !(b.include_period && b.reset !== "never")) return invalid({ padding: ["Add digits or a period"] });
+  if (b.padding === 0 && !(b.include_period && b.reset !== "never")) return invalid({ padding: ["Add digits or period"] });
   const before = s.next;
   Object.assign(s, { prefix, padding: b.padding, separator: b.separator, reset: b.reset, include_period: b.include_period, updated_at: new Date().toISOString() });
   s.next = nextOf(s);

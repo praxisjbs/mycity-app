@@ -66,6 +66,11 @@ function SchemeForm({ scheme, close }: { scheme: NumberingScheme; close: () => v
     settings.NumberingSchemeSave,
   );
   const v = f.values;
+  // A scheme that starts again must carry its period (NumberingSchemeSave), so moving off Never ticks it.
+  const setReset = (x: NumberingScheme["reset"]) => {
+    f.set("reset", x);
+    if (x !== "never") f.set("include_period", true);
+  };
   const submit = async () => {
     try {
       await save.run({ params: { doc_type: scheme.doc_type }, body: v });
@@ -94,7 +99,7 @@ function SchemeForm({ scheme, close }: { scheme: NumberingScheme; close: () => v
         <ChoiceField value={v.separator} onChange={(x) => f.set("separator", x)} options={SEPARATORS} />
       </Field>
       <Field label="Starts Again" {...f.status("reset")}>
-        <ChoiceField value={v.reset} onChange={(x) => f.set("reset", x)} options={Object.entries(RESET) as Array<[NumberingScheme["reset"], string]>} />
+        <ChoiceField value={v.reset} onChange={setReset} options={Object.entries(RESET) as Array<[NumberingScheme["reset"], string]>} />
       </Field>
       <Field label="Period" {...f.status("include_period")}>
         <CheckboxField label="Put the year or month in the number" value={v.include_period} onChange={(x) => f.set("include_period", x)} />

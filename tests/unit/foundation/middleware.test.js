@@ -288,6 +288,58 @@ describe("a 5xx AppError's own severity", () => {
   });
 });
 
+describe("a refused form, as System Health counts it", () => {
+  const reporter = require("../../../src/shared/observability/error-reporter");
+  const { AppError } = require("../../../src/shared/errors");
+  const { publicRoute } = require("../../../src/http/route");
+  const c = require("@mycity/contract");
+  const TYPE = "33333333-3333-4333-8333-333333333333";
+  let rows;
+  beforeEach(() => {
+    rows = [];
+    // Each row is 12 values (error-reporter.js flush): severity 1, message 5, stack 6, route 7.
+    reporter.__reset({
+      query: async (_sql, params) => {
+        for (let i = 0; i < params.length; i += 12)
+          rows.push({ severity: params[i + 1], message: params[i + 5], at: params[i + 6].split("\n")[1].trim(), route: params[i + 7] });
+        return { rows: [] };
+      },
+    });
+  });
+  afterEach(() => reporter.__reset());
+  /** A router mounted under its base path, as the module loader mounts ESS's. */
+  function app(handler) {
+    const router = express.Router();
+    publicRoute(router, "post", "/leave", { body: c.leave.LeaveRequestCreate, response: c.leave.LeaveRequest }, handler);
+    const a = express();
+    a.use(express.json());
+    a.use("/api/v1/ess", router);
+    a.use(errorHandler);
+    return a;
+  }
+
+  test("a service's refusal is named by its own rule, at the route as declared", async () => {
+    const res = await request(app(() => {
+      throw new AppError("LEAVE_IN_THE_PAST", "Pick a first day from today on", 422, { starts_on: ["Already past"] });
+    })).post("/api/v1/ess/leave").send({ leave_type_id: TYPE, starts_on: "2020-10-28", ends_on: "2020-10-30" });
+    expect([res.status, res.body.error.code]).toEqual([422, "LEAVE_IN_THE_PAST"]);
+    await reporter.flush();
+    expect(rows).toEqual([
+      { severity: "notice", message: "LEAVE_IN_THE_PAST: starts_on", at: "at POST /api/v1/ess/leave", route: "POST /api/v1/ess/leave" },
+    ]);
+  });
+
+  test("the contract's refusal is VALIDATION_FAILED, at the same full route", async () => {
+    const res = await request(app(() => undefined))
+      .post("/api/v1/ess/leave").send({ leave_type_id: TYPE, starts_on: "2026-11-04", ends_on: "2026-11-02" });
+    expect(res.status).toBe(422);
+    await reporter.flush();
+    expect(rows).toEqual([
+      { severity: "notice", message: "VALIDATION_FAILED: ends_on", at: "at POST /api/v1/ess/leave", route: "POST /api/v1/ess/leave" },
+    ]);
+  });
+});
+
 describe("upload", () => {
   function app(mw) {
     const a = express();

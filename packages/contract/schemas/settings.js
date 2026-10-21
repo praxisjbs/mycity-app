@@ -213,7 +213,11 @@ const NumberingSummary = z
   })
   .strict();
 
-/** PUT /settings/numbering/:doc_type: applies to future numbers only. */
+/**
+ * PUT /settings/numbering/:doc_type: applies to future numbers only. The rules a scheme must
+ * meet (shared/numbering/schemes.js validateScheme, and a reset carrying its period) are
+ * checked here too, so the form flags them as it is filled rather than on Save.
+ */
 const NumberingSchemeSave = z
   .object({
     prefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{0,8}$/, "Up to 8 letters"),
@@ -222,7 +226,19 @@ const NumberingSchemeSave = z
     reset: NumberingReset,
     include_period: z.boolean(),
   })
-  .strict();
+  .strict()
+  .superRefine((s, ctx) => {
+    const resets = s.reset !== "never";
+    // With no prefix the number is the sequence alone (00001), so it must have one.
+    if (s.prefix === "" && s.padding === 0)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["padding"], message: "Add sequence digits" });
+    // With no sequence every number of a period would be the same, so the period must tell them apart.
+    else if (s.padding === 0 && !(s.include_period && resets))
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["padding"], message: "Add digits or period" });
+    // A scheme that starts again without its period would issue last period's numbers again.
+    if (resets && !s.include_period)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["include_period"], message: "Needed when it resets" });
+  });
 
 const NumberingParams = z.object({ doc_type: DocType }).strict();
 

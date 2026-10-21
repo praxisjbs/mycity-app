@@ -15,7 +15,9 @@
  * re-checked on every keystroke, so the mark clears the moment it is fixed.
  * check() marks every problem, moves focus to the first one and returns
  * whether the form is clean; Submit is never disabled. The server's 422
- * `fields` land on the same marks (setServerErrors). Messages are at most 4
+ * `fields` land on the same marks (setServerErrors), and so does what a control
+ * alone can see (the binding's onProblem: a typed date that is not real, or one
+ * outside the field's min and max). Messages are at most 4
  * words (gate 12): the contract's own message when it is that short, else a
  * short one chosen by the kind of problem.
  */
@@ -102,15 +104,17 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
   const values = form.watch() as T;
   const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
   const [server, setServer] = useState<Record<string, string[]>>({});
+  // What a control alone can see, by field: it speaks over the contract, whose value it did not hand over.
+  const [own, setOwn] = useState<Record<string, string>>({});
   const timers = useRef<Record<string, number>>({});
   useEffect(() => () => Object.values(timers.current).forEach((t) => window.clearTimeout(t)), []);
 
   const local = useMemo(() => problemsOf(values, rules), [values, rules]);
   const errors = useMemo(() => {
-    const out: Partial<Record<keyof T, string>> = { ...local };
+    const out: Partial<Record<keyof T, string>> = { ...local, ...(own as Partial<Record<keyof T, string>>) };
     for (const [k, msgs] of Object.entries(server)) if (msgs[0] && !out[k as keyof T]) out[k as keyof T] = msgs[0];
     return out;
-  }, [local, server]);
+  }, [local, own, server]);
 
   const touch = useCallback((k: keyof T) => setTouched((s) => (s[k] ? s : { ...s, [k]: true })), []);
 
@@ -161,6 +165,16 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
     },
     state: stateOf(k),
     message: shown(k) ? errors[k] : undefined,
+    onProblem: (message: string | undefined, now?: boolean) => {
+      setOwn((s) => {
+        if (s[k as string] === message) return s;
+        const next = { ...s };
+        if (message) next[k as string] = message;
+        else delete next[k as string];
+        return next;
+      });
+      if (message && now) touch(k);
+    },
   });
 
   /** Only the mark and the message, for the Field around a control. */
@@ -174,7 +188,7 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
     const all = (keys ?? (Object.keys(form.getValues()) as Array<keyof T>)) as Array<keyof T>;
     setTouched((s) => ({ ...s, ...Object.fromEntries(all.map((k) => [k, true])) }));
     void form.trigger(all as Array<Path<FieldValues>>);
-    const now = { ...problemsOf(form.getValues() as T, rulesRef.current), ...Object.fromEntries(Object.entries(server).map(([k, m]) => [k, m[0]])) } as Partial<Record<keyof T, string>>;
+    const now = { ...problemsOf(form.getValues() as T, rulesRef.current), ...own, ...Object.fromEntries(Object.entries(server).map(([k, m]) => [k, m[0]])) } as Partial<Record<keyof T, string>>;
     const bad = all.filter((k) => now[k]);
     if (bad.length) {
       window.requestAnimationFrame(() => {
@@ -203,6 +217,7 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
     form.reset((next ?? initial) as DefaultValues<FieldValues>);
     setTouched({});
     setServer({});
+    setOwn({});
   };
 
   const setServerErrors = (fields: ServerFields) => setServer(Object.fromEntries(Object.entries(fields).filter((e): e is [string, string[]] => !!e[1]?.length)));

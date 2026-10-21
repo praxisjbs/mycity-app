@@ -2663,10 +2663,11 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `value` | `string` | yes | ISO date (YYYY-MM-DD), or "" for none. |
-| `onChange` | `(iso: string) => void` | yes | Called with the ISO date, or "" when cleared. |
+| `onChange` | `(iso: string) => void` | yes | Called with the ISO date the text shows, or "" while it shows none: cleared, half typed, or outside min and max. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
-| `min` | `string` |  | The earliest date that may be picked, ISO. |
-| `max` | `string` |  | The latest date that may be picked, ISO. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with what was typed ("Not a real date", "Pick 21/10/2026 or later"), or undefined once it is right. |
+| `min` | `string` |  | The earliest date that may be picked or typed, ISO. |
+| `max` | `string` |  | The latest date that may be picked or typed, ISO. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
@@ -2680,6 +2681,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `value` | `DateRange` | yes | The period; "" for an end not chosen. |
 | `onChange` | `(value: DateRange) => void` | yes | Called with the period. |
 | `onBlur` | `() => void` |  | Called when the person leaves either end. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with either end as typed, or undefined once both are right (as DateField's). |
 | `min` | `string` |  | The earliest date either end may take, ISO. |
 | `max` | `string` |  | The latest date either end may take, ISO. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |

@@ -3,6 +3,7 @@ import { act, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import organisation from "@mycity/contract/schemas/organisation.js";
 import { rules, useContractForm, shortMessage } from "./useContractForm";
+import { DateField } from "./DateField";
 import { Field } from "./Field";
 import { TextField } from "./TextField";
 import { Form } from "./Form";
@@ -126,5 +127,45 @@ describe("useContractForm with INTERIM rules", () => {
     for (const msg of [rules.required()(""), rules.email(""), rules.email("x"), rules.email("x@y"), rules.amount(""), rules.amount("1.234")]) {
       expect(String(msg).split(" ").length).toBeLessThanOrEqual(4);
     }
+  });
+});
+
+describe("useContractForm and what only a control can see", () => {
+  function DueForm({ onSave }: { onSave: (data: unknown) => void }) {
+    const form = useContractForm({ due: "" }, { due: rules.required("Pick a day") }, { pauseMs: 50 });
+    return (
+      <Form onSubmit={form.submit(onSave)}>
+        <Field label="Due Date" {...form.status("due")}>
+          <DateField {...form.field("due")} min="2026-10-21" />
+        </Field>
+        <button type="submit">Save Task</button>
+      </Form>
+    );
+  }
+
+  it("marks a typed day outside the field's range at once, and never saves it", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<DueForm onSave={onSave} />);
+    const due = screen.getByLabelText("Due Date");
+    await user.type(due, "01/10/2026");
+    expect(screen.getByText("Pick 21/10/2026 or later")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save Task" }));
+    expect(onSave).not.toHaveBeenCalled();
+    await user.clear(due);
+    await user.type(due, "28/10/2026");
+    await vi.waitFor(() => expect(screen.queryByText("Pick 21/10/2026 or later")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Save Task" }));
+    expect(onSave).toHaveBeenCalledWith({ due: "2026-10-28" });
+  });
+
+  it("refuses half a date on Save, though the value under it is empty", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(<DueForm onSave={onSave} />);
+    await user.type(screen.getByLabelText("Due Date"), "28/10/202");
+    await user.click(screen.getByRole("button", { name: "Save Task" }));
+    expect(await screen.findByText("Not a real date")).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
   });
 });
