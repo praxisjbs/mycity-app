@@ -39,6 +39,7 @@ section exists to stop.
 | `addresses.md` | Addresses: every address across both apps picked from the address search, pinned on the map or, in an outage, taken from the device; never typed (F27, gate 22) | TB | M0 | ☑ |
 | `integrations.md` | Integrations: Settings tab for the system sender, the staff mail server, Geoapify, the AI providers (Gemini, Groq, OpenAI, Anthropic, DeepSeek) with their model lists, Exchange Rates and web push, their keys encrypted, tested before save and watched (brought forward from M9) | TB | M9 | ☑ |
 | `ai-control.md` | AI Control: which model answers each AI feature, its fallbacks, model prices and the monthly spend per provider (brought forward from M10, built in PR2) | TB | M10 | ☑ |
+| `praxis-ai.md` | Praxis AI: Ask and History, questions answered from the modules' reads with the person's own permissions, up to 5 reads a question, routes for changes, voice in (brought forward from M10) | TB, GE | M10 | ☐ |
 
 Tick **Written** when the guide exists and has been read by the owner of every screen in its §2.
 Later milestones add their rows as they start.
