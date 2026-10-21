@@ -1,7 +1,7 @@
 import aiControl from "@mycity/contract/schemas/ai_control.js";
 import type { AiControlModel, AiPriceProposal, AiPricesSave, AiProvider } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
-import { invalidate, useApi, usePaged } from "@/api/hooks";
+import { invalidate, refresh, useApi, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { doesOf } from "@/features/settings/integrations/words";
 import { useRouter } from "@/lib/router";
@@ -16,21 +16,20 @@ import {
   Form,
   FormError,
   FormFooter,
-  formatDateTime,
   HelpTerm,
   KeyValue,
-  LinkText,
   Money,
   PageHeader,
   PhoneOnly,
   Pill,
+  ProgressBar,
   TextField,
   toast,
   useContractForm,
   useModal,
 } from "@mycity/ui";
 import { useEffect, useState } from "react";
-import { HELP, JOB, PROVIDER, positionOf, usd } from "./words";
+import { HELP, JOB, PROVIDER, SHOW, positionOf, reasonOf, usd } from "./words";
 
 const fail = (e: unknown, fallback: string) => toast(e instanceof ApiError ? e.message : fallback);
 
@@ -154,7 +153,7 @@ function ModelSheet({ m, close }: { m: AiControlModel; close: () => void }) {
           ["Does", doesOf(m.capabilities)],
           ["On Key", m.available === true ? "Available" : m.available === false ? "Not on Key" : "Not Checked"],
           ["Plan", m.plan === "free" ? "Free" : m.plan === "paid" ? "Paid" : null],
-          ["Price", priceOf(m)],
+          ["Price", priceOf(m) ?? (m.not_listed ? <HelpTerm help={HELP.notListed}>Not Listed</HelpTerm> : null)],
           [<HelpTerm help={HELP.naira}>In Naira</HelpTerm>, nairaOf(m)],
           ["Per 1,000 Searches", usd(m.usd_per_thousand_searches)],
           ["In Chains", chainsOf(m)],
@@ -181,26 +180,38 @@ function ModelSheet({ m, close }: { m: AiControlModel; close: () => void }) {
   );
 }
 
-/** The prices Find Prices read, waiting for IT: Accept, Edit Price, Dismiss. */
-function Proposals() {
+/** The New Prices sheet (decision 31): the run as it goes, its proposals, Accept All, Find More. */
+function NewPrices() {
   const { can } = useAuth();
-  const modal = useModal();
-  const list = usePaged("GET /api/v1/ai-control/prices");
   const edit = can("ai_control", "edit");
-  const accept = (p: AiPriceProposal, body?: AiPricesSave) =>
-    api.call("POST /api/v1/ai-control/prices/:id/accept", {
-      params: { id: p.ai_price_proposal_id },
-      body: body ?? {
-        input_usd_per_million: p.input_usd_per_million ?? "",
-        output_usd_per_million: p.output_usd_per_million ?? "",
-        audio_usd_per_million: p.audio_usd_per_million ?? "",
-        usd_per_audio_hour: p.usd_per_audio_hour ?? "",
-        usd_per_thousand_searches: p.usd_per_thousand_searches ?? "",
-      },
-    });
-  const acceptNow = async (p: AiPriceProposal) => {
+  const summary = useApi("GET /api/v1/ai-control/models/summary");
+  const list = usePaged("GET /api/v1/ai-control/prices");
+  const s = summary.data;
+  const run = s?.run ?? null;
+  const running = run?.status === "running";
+
+  // While the run goes, its proposals are read again quietly; the tab behind polls the run itself.
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => refresh("/api/v1/ai-control/prices"), FINDING_MS);
+    return () => {
+      clearInterval(t);
+      invalidate("/api/v1/ai-control");
+    };
+  }, [running]);
+
+  const accept = async (p: AiPriceProposal) => {
     try {
-      await accept(p);
+      await api.call("POST /api/v1/ai-control/prices/:id/accept", {
+        params: { id: p.ai_price_proposal_id },
+        body: {
+          input_usd_per_million: p.input_usd_per_million ?? "",
+          output_usd_per_million: p.output_usd_per_million ?? "",
+          audio_usd_per_million: p.audio_usd_per_million ?? "",
+          usd_per_audio_hour: p.usd_per_audio_hour ?? "",
+          usd_per_thousand_searches: p.usd_per_thousand_searches ?? "",
+        },
+      });
       invalidate("/api/v1/ai-control");
       toast("Prices saved");
     } catch (e) {
@@ -216,145 +227,173 @@ function Proposals() {
       fail(e, "Not dismissed");
     }
   };
-  const editFirst = (p: AiPriceProposal) =>
-    modal.open({ title: "Edit Price", body: (done) => <PriceForm start={p} label="Accept Prices" save={(body) => accept(p, body)} done={done} /> });
-  const open = (p: AiPriceProposal) =>
-    modal.open({
-      title: p.display_name,
-      body: (close) => (
-        <>
-          <KeyValue
-            items={[
-              ["Provider", PROVIDER[p.provider]],
-              ["Price", priceOf(p)],
-              ["Per 1,000 Searches", usd(p.usd_per_thousand_searches)],
-              ["Page", <LinkText text={p.source_url} />],
-              ["Found", formatDateTime(p.created_at)],
-            ]}
-          />
-          {edit && (
-            <FormFooter>
-              <Button onClick={() => dismiss(p).then(close)}>Dismiss</Button>
-              <Button onClick={() => (close(), editFirst(p))}>Edit Price</Button>
-              <Button variant="primary" onClick={() => acceptNow(p).then(close)}>
-                Accept
-              </Button>
-            </FormFooter>
-          )}
-        </>
-      ),
-    });
+  const acceptAll = async () => {
+    try {
+      const r = await api.call("POST /api/v1/ai-control/prices/accept-all", { body: {} });
+      invalidate("/api/v1/ai-control");
+      toast(`${r.accepted} ${r.accepted === 1 ? "price" : "prices"} saved`);
+    } catch (e) {
+      fail(e, "Not saved");
+    }
+  };
+  const findMore = async () => {
+    try {
+      await api.call("POST /api/v1/ai-control/prices/find", { body: {} });
+      toast("Finding prices");
+      await refresh("/api/v1/ai-control/models/summary");
+    } catch (e) {
+      fail(e, "Not started");
+    }
+  };
 
-  if (!list.rows.length) return null;
+  const waiting = list.page?.total ?? list.rows.length;
+  const reason = run && run.status !== "running" ? reasonOf(run.error_code) : null;
   return (
-    <DataView<AiPriceProposal>
-      className="mb-3"
-      list={list}
-      title="Proposed Prices"
-      caption="Proposed prices"
-      noun="proposal"
-      rowKey={(r) => r.ai_price_proposal_id}
-      onRowClick={open}
-      empty={{ title: "Nothing Proposed", icon: "check" }}
-      columns={[
-        {
-          key: "model",
-          label: "Model",
-          render: (r) => (
-            <span className="flex min-w-0 flex-col">
-              <span data-copy="content">{r.display_name}</span>
-              <span className="text-xs text-subtle-foreground">{PROVIDER[r.provider]}</span>
-            </span>
-          ),
-        },
-        { key: "price", label: "Price", render: priceOf },
-        { key: "page", label: "Page", desktop: true, render: (r) => <span data-copy="content">{hostOf(r.source_url)}</span> },
-        {
-          key: "do",
-          label: "",
-          desktop: true,
-          render: (r) =>
-            edit ? (
-              <ActionGroup>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    return acceptNow(r);
-                  }}
-                >
-                  Accept
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    return dismiss(r);
-                  }}
-                >
-                  Dismiss
-                </Button>
-              </ActionGroup>
-            ) : (
-              <></>
+    <>
+      {running && (
+        <ProgressBar
+          className="mb-3"
+          label={run.batches_total ? `Batch ${Math.min(run.batches_done + 1, run.batches_total)} of ${run.batches_total}` : "Starting Search"}
+          value={run.batches_total ? run.batches_done : undefined}
+          max={run.batches_total || 100}
+        />
+      )}
+      {reason && (
+        <div className="mb-3">
+          <Pill tone={run?.status === "failed" ? "err" : "warn"}>{reason}</Pill>
+        </div>
+      )}
+      <DataView<AiPriceProposal>
+        list={list}
+        caption="New prices"
+        noun="price"
+        rowKey={(r) => r.ai_price_proposal_id}
+        empty={running ? { title: "Searching", icon: "srch" } : { title: "Nothing New", icon: "check" }}
+        columns={[
+          {
+            key: "model",
+            label: "Model",
+            render: (r) => (
+              <span className="flex min-w-0 flex-col">
+                <span data-copy="content">{r.display_name}</span>
+                <span className="text-xs text-subtle-foreground">{PROVIDER[r.provider]}</span>
+              </span>
             ),
-        },
-      ]}
-    />
+          },
+          { key: "price", label: "Price", render: priceOf },
+          { key: "page", label: "Page", desktop: true, render: (r) => <span data-copy="content">{hostOf(r.source_url)}</span> },
+          {
+            key: "do",
+            label: "",
+            render: (r) =>
+              edit ? (
+                <ActionGroup>
+                  <Button size="sm" onClick={() => accept(r)}>
+                    Accept
+                  </Button>
+                  <Button size="sm" onClick={() => dismiss(r)}>
+                    Dismiss
+                  </Button>
+                </ActionGroup>
+              ) : (
+                <></>
+              ),
+          },
+        ]}
+      />
+      {s && (
+        <KeyValue
+          className="mt-3"
+          items={[
+            ["Still to Price", String(s.to_price)],
+            [<HelpTerm help={HELP.notListed}>Not Listed</HelpTerm>, String(s.not_listed)],
+          ]}
+        />
+      )}
+      {edit && !running && (waiting > 0 || (s?.to_price ?? 0) > 0) && (
+        <FormFooter>
+          {(s?.to_price ?? 0) > 0 && <Button onClick={findMore}>Find More</Button>}
+          {waiting > 0 && (
+            <Button variant="primary" icon="check" onClick={acceptAll}>
+              Accept All
+            </Button>
+          )}
+        </FormFooter>
+      )}
+    </>
   );
 }
 
 const PROVIDERS: Array<[AiProvider | "", string]> = [["", "Any Provider"], ...(Object.entries(PROVIDER) as Array<[AiProvider, string]>)];
+type Show = (typeof SHOW)[number][0];
 
 /** AI Control · Models (docs/guides/ai-control.md §2, §10). */
 export function Models() {
   const { can } = useAuth();
   const modal = useModal();
   const [provider, setProvider] = useState<AiProvider | "">("");
+  const [show, setShow] = useState<Show>("usable");
   const summary = useApi("GET /api/v1/ai-control/models/summary");
-  const list = usePaged("GET /api/v1/ai-control/models", { filters: provider ? { provider } : {} });
+  const list = usePaged("GET /api/v1/ai-control/models", { filters: { ...(provider ? { provider } : {}), ...(show !== "usable" ? { show } : {}) } });
   const s = summary.data;
   const finding = !!s?.finding;
 
-  // While a search runs, read its state again until it ends, then the whole tab.
+  // While a search runs, read its state again quietly until it ends, then the whole tab.
   const { reload } = summary;
   useEffect(() => {
     if (!finding) return;
-    const t = setInterval(reload, FINDING_MS);
+    const t = setInterval(() => refresh("/api/v1/ai-control/models/summary"), FINDING_MS);
     return () => {
       clearInterval(t);
       invalidate("/api/v1/ai-control");
     };
-  }, [finding, reload]);
+  }, [finding]);
 
+  const review = () => modal.open({ title: "New Prices", wide: true, full: true, body: () => <NewPrices /> });
   const find = async () => {
     try {
       await api.call("POST /api/v1/ai-control/prices/find", { body: {} });
       toast("Finding prices");
-      summary.reload();
+      await reload();
+      review();
     } catch (e) {
       fail(e, "Not started");
     }
   };
-  const findButton = can("ai_control", "edit") ? (
-    finding ? (
-      <Pill tone="info">Finding Prices</Pill>
-    ) : (
-      <Button variant="primary" icon="srch" onClick={find}>
-        Find Prices
-      </Button>
-    )
-  ) : null;
+  const waiting = finding || (s?.proposals ?? 0) > 0;
+  // The last run's failure stays in view after New Prices is closed, for everyone who opens the tab.
+  const failed = s?.run?.status === "failed" ? reasonOf(s.run.error_code) : null;
+  const findButton = (
+    <ActionGroup>
+      {finding && (
+        <Pill tone="info" className="phone:self-start">
+          Finding Prices
+        </Pill>
+      )}
+      {failed && (
+        <Pill tone="err" className="phone:self-start">
+          {failed}
+        </Pill>
+      )}
+      {waiting && can("ai_control", "view") ? (
+        <Button variant="primary" icon="check" onClick={review}>
+          Review Prices
+        </Button>
+      ) : can("ai_control", "edit") ? (
+        <Button variant="primary" icon="srch" onClick={find}>
+          Find Prices
+        </Button>
+      ) : null}
+    </ActionGroup>
+  );
 
   return (
     <>
       <PageHeader
         title="Models"
         sub="Every provider's models and their prices"
-        actions={<DesktopOnly>{findButton}</DesktopOnly>}
+        actions={<DesktopOnly className="flex items-center gap-2">{findButton}</DesktopOnly>}
       />
-      <Proposals />
       <DataView<AiControlModel>
         list={list}
         title="Models"
@@ -363,7 +402,12 @@ export function Models() {
         search="Search models"
         rowKey={(r) => r.ai_model_id}
         onRowClick={(m) => modal.open({ title: m.display_name, body: (close) => <ModelSheet m={m} close={close} /> })}
-        actions={<FilterSelect label="Provider" value={provider} onChange={(v) => setProvider(v as AiProvider | "")} options={PROVIDERS} />}
+        actions={
+          <>
+            <FilterSelect label="Provider" value={provider} onChange={(v) => setProvider(v as AiProvider | "")} options={PROVIDERS} />
+            <FilterSelect label="Show" value={show} onChange={(v) => setShow(v as Show)} options={SHOW} />
+          </>
+        }
         empty={{ title: "No Models", icon: "spark" }}
         columns={[
           {
@@ -386,13 +430,13 @@ export function Models() {
             render: (r) =>
               r.available === true ? <Pill tone="ok">Available</Pill> : r.available === false ? <Pill tone="neutral">Not on Key</Pill> : <Pill tone="warn">Not Checked</Pill>,
           },
-          { key: "price", label: "Price", render: (r) => priceOf(r) ?? (r.proposed ? <Pill tone="info">Proposed</Pill> : null) },
+          { key: "price", label: "Price", render: (r) => priceOf(r) ?? (r.proposed ? <Pill tone="info">Proposed</Pill> : r.not_listed ? <Pill tone="neutral">Not Listed</Pill> : null) },
           { key: "naira", label: <HelpTerm help={HELP.naira}>In Naira</HelpTerm>, desktop: true, render: nairaOf },
           { key: "chains", label: "In Chains", desktop: true, render: chainsOf },
         ]}
       />
       <PhoneOnly>
-        <div className="mt-3 flex flex-col">{findButton}</div>
+        <div className="mt-3 flex flex-col gap-2">{findButton}</div>
       </PhoneOnly>
     </>
   );

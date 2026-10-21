@@ -12,6 +12,7 @@
  *   PUT    /models/:id/prices             edit   Edit Price
  *   POST   /prices/find                   edit   Find Prices (202: the worker searches)
  *   GET    /prices                        view   the open proposals, 25 a page
+ *   POST   /prices/accept-all             edit   Accept All: every open proposal, as proposed
  *   POST   /prices/:id/accept             edit   Accept, edited or not
  *   POST   /prices/:id/dismiss            edit   Dismiss
  *   GET    /spend                         view   this Lagos month against the caps
@@ -72,6 +73,10 @@ route(router, "post", "/prices/find",
 route(router, "get", "/prices",
   { query: c.common.PageQuery, response: a.AiPriceProposalPage, summary: "The prices Find Prices proposed" },
   view, controller.proposals);
+
+route(router, "post", "/prices/accept-all",
+  { body: c.common.EmptyBody, response: a.AiAcceptAll, summary: "Accept every proposed price" },
+  edit, controller.acceptAll);
 
 route(router, "post", "/prices/:id/accept",
   { params: a.AiIdParams, body: a.AiPricesSave, response: a.AiControlModel, summary: "Accept a proposed price" },

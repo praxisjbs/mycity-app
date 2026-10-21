@@ -26,6 +26,7 @@ module.exports = {
   setPrices: async (req, res) => ok(res, await service.setPrices(params(req).id, req.validated.body, withActor(req))),
   findPrices: async (req, res) => accepted(res, await service.findPrices(withActor(req))),
   proposals: async (req, res) => sendPaged(res, await service.proposals(req.validated.query)),
+  acceptAll: async (req, res) => ok(res, await service.acceptAll(withActor(req))),
   acceptProposal: async (req, res) => ok(res, await service.acceptProposal(params(req).id, req.validated.body, withActor(req))),
   dismissProposal: async (req, res) => {
     await service.dismissProposal(params(req).id, withActor(req));

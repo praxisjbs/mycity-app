@@ -283,6 +283,16 @@ async function transcribe({ apiKey, model, audio, mime, prompt, maxTokens = 8192
 }
 
 /**
+ * Thinking kept low for a lookup, so the answer keeps its room: a level from Gemini 3, a token
+ * budget on 2.x, nothing for a model this cannot tell.
+ */
+function thinkingOf(model) {
+  const m = /^(?:models\/)?gemini-(\d+)/i.exec(String(model || ""));
+  if (!m) return {};
+  return Number(m[1]) >= 3 ? { thinkingConfig: { thinkingLevel: "low" } } : { thinkingConfig: { thinkingBudget: 1024 } };
+}
+
+/**
  * One answer with Google Search on (Find Prices, docs/guides/ai-control.md §6.4): the native
  * generateContent with the google_search tool, since the OpenAI-compatible endpoint has none.
  * Answers the text, the pages Google Search returned and how many searches ran; each search is
@@ -292,13 +302,13 @@ async function transcribe({ apiKey, model, audio, mime, prompt, maxTokens = 8192
  * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number, searches: number},
  *                    sources: Array<{url: string, title: string}>, model: string, finish_reason: string|null}>}
  */
-async function search({ apiKey, model, system, prompt, maxTokens = 8192, timeoutMs = 120_000, fetchImpl }) {
+async function search({ apiKey, model, system, prompt, maxTokens = 16384, timeoutMs = 180_000, fetchImpl }) {
   if (!apiKey) throw new VendorError("gemini: no API key", "config");
   const body = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     tools: [{ google_search: {} }],
-    generationConfig: { temperature: 0, maxOutputTokens: maxTokens },
+    generationConfig: { temperature: 0, maxOutputTokens: maxTokens, ...thinkingOf(model) },
   };
   const id = String(model).replace(/^models\//, "");
   const { data } = await request("gemini", `${NATIVE_URL}/models/${encodeURIComponent(id)}:generateContent`, {
@@ -342,6 +352,7 @@ module.exports = {
   listModelsDetailed,
   transcribe,
   search,
+  thinkingOf,
   toolSchema,
   reasoningEffort,
   classify,

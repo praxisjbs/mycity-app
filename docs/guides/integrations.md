@@ -430,6 +430,12 @@ mailbox's 50 recipients an hour (40 and 10) and the host's 30 IMAP connections p
 
 ### 6.11 An AI connection's model list, and each job's model
 
+- **What is left off** (`ai-control.md` decision 29): besides models the ERP cannot use, each
+  provider's `-latest` aliases, Gemma's open models, and a dated or numbered snapshot whose base
+  model is on the same list (`-001`, `-09-2025`, `-2024-08-06`, `-20250929`). A model in a chain is
+  kept whatever its name. Stored rows the rule leaves off go at the next save or test, and once by
+  migration 10210.
+
 - **Start**: `9291` seeds the models known on 20/10/2026 with what each does and its published list
   price; a price not known is null. A file key that has never been tested reads `available` null,
   which keeps its models usable.
@@ -618,6 +624,7 @@ bound form here; nothing else is ported.
 
 ## 14 · Change log
 
+- 20/10/2026 · TB · §6.11: the model list leaves off `-latest` aliases, Gemma and snapshots whose base model is listed (`ai-control.md` decision 29).
 - 20/10/2026 · TB · With AI Control (`ai-control.md`): an AI connection's In Use reads the chains in use, saved there or in code; each AI connection has Open AI Control (`ai_control` view); a link that names a connection (`?id=` its code) opens it, as AI Control · Models' Open Connection does.
 
 - 20/10/2026 · TB · Daily Limit Near stops for the AI providers (`ai-control.md` decision 26): decision 10, §3 step 10, §6.12, §7 and the help terms on Daily Limit and Plan say so; open question 6 answered.

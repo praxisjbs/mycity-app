@@ -436,7 +436,11 @@ async function save(code, body, actor) {
  */
 async function keepFetched(client, code, collect) {
   const def = providers.get(code);
-  if (def.models && Array.isArray(collect.models)) await repo.keepModels(client, def.models, collect.models);
+  if (def.models && Array.isArray(collect.models)) {
+    // Aliases, Gemma and snapshots with a base model are left off, unless a chain uses them.
+    const { kept, dropped } = require("../../services/ai/catalogue").trim(def.models, collect.models, await repo.chainedModels(client, def.models));
+    await repo.keepModels(client, def.models, kept, dropped);
+  }
   if (code === "exchange_rates" && collect.rates)
     await repo.putRates(client, { ...collect.rates, day: lagos.today() });
 }
