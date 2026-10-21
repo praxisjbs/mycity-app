@@ -79,6 +79,7 @@ async function fakeFetch(input) {
       data: [
         { id: "whisper-large-v3", active: true },
         { id: "llama-3.3-70b-versatile", active: true },
+        { id: "llama-3.3-70b-latest", active: true },
         { id: "playai-tts", active: true },
       ],
     });
@@ -438,7 +439,9 @@ describeDb("Settings · Integrations against the real migrations", () => {
       // Not on this key's list any more; speech out is no use to the ERP and is left off.
       expect(by["whisper-large-v3-turbo"].available).toBe(false);
       expect(by["llama-3.3-70b-versatile"]).toMatchObject({ source: "provider", available: true, capabilities: ["text"] });
+      // An alias of a model on the list is left off too (ai-control.md decision 29).
       expect(by["playai-tts"]).toBeUndefined();
+      expect(by["llama-3.3-70b-latest"]).toBeUndefined();
       expect((await as("admin").get("/integrations/groq/models?available=false")).body.data.map((m) => m.model)).toEqual([
         "whisper-large-v3-turbo",
       ]);

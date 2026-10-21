@@ -94,12 +94,29 @@ Asked when PR2 started (TB, 20/10/2026):
 28. **Find Prices runs on request only**, when IT presses it on AI Control · Models. Nothing is
     spent unless someone asks.
 
+After the first Find Prices on staging returned nothing for a list of 129 models (TB, 20/10/2026):
+
+29. **Fewer models.** A provider's list leaves off its `-latest` aliases, Gemma's open models, and a
+    dated or numbered snapshot whose base model is on the same list (`gemini-2.0-flash-001` when
+    `gemini-2.0-flash` is there). A model in a chain is never dropped. The rows already stored are
+    cleared by migration 10210 (`integrations.md` §6.11).
+30. **Find Prices prices every model, 20 at a time.** One press asks about every model on a set-up
+    provider's key that has no price, no proposal waiting and was not found on the page in the
+    last 7 days, in requests of 20, each a billed search. Each request's proposals appear as it
+    returns; a model the page does not price is marked **Not Listed**.
+31. **New Prices, and Accept All.** Find Prices opens a sheet that shows the run's progress and the
+    prices as they arrive. **Accept All** saves every waiting price in one press. **Find More**
+    starts the next run for the models still to price, until none is left. A run that fails says
+    why, in a few words.
+32. **The Models tab opens on what matters**: the models in a chain first, then the rest the key
+    can use. The Not on Key models (Gemini 2.5, retired 16/10/2026) are behind the Show filter.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | AI Control · Actions (`actions`) | Staff app, System group, after Praxis AI | `ai_control` view | The seven jobs, each with its chain (first choice and up to three fallbacks) and the state of each model in it; the actions, 25 a page, each with its job, whether it carries personal data, its chain and today's calls | Edit Chain, Make First, give an action its own chain, Use Job Chain to put it back (edit) |
-| AI Control · Models (`models`) | Staff app | `ai_control` view | Every model of every AI provider, 25 a page: what it does, whether the key can use it, its price in dollars and naira, the chains it is in; the prices Find Prices proposed, with the page each came from | Find Prices, Accept, Edit Price, Dismiss (edit); open the provider's connection |
+| AI Control · Models (`models`) | Staff app | `ai_control` view | The models in a chain first, then the rest the key can use, 25 a page (Not on Key and Any behind the filter): what each does, its price in dollars and naira, the chains it is in; the New Prices sheet: Find Prices' progress, the prices it proposed with their pages, how many models are still to price or not listed | Find Prices, Accept All, Accept, Edit Price, Dismiss, Find More (edit); open the provider's connection |
 | AI Control · Spend (`spend`) | Staff app | `ai_control` view | This Lagos month: each provider's spend against its cap, all AI against the overall cap, the day's rate, spend by day and, 25 a page, spend by action | Set Cap on a paid provider, Set Cap on all AI (edit) |
 | Settings · Integrations (`integrations`) | Staff app | `integrations` view | Each AI connection's In Use reads AI Control's chains, and links to AI Control · Actions | As built (`integrations.md`) |
 | Praxis AI · Ask | Staff app | Everyone with Praxis AI | Data Answers is registered on Default (decision 27) | Built in M10 |
@@ -137,7 +154,8 @@ Migration `10200_ai_control.sql` (M10's block; M10 brought forward). `ai_model` 
 | `ai_chain` | `scope` (`job`, `action`), `key`, `position` (1 to 4), `provider`, `model`, `updated_by` | One row per link. A job or action with no rows uses the chain in code (§6.1). UNIQUE (`scope`, `key`, `position`) |
 | `ai_provider_cap` | `provider` (primary key), `monthly_cap_ngn` `numeric(18,2)` or null, `updated_by` | A paid provider's monthly cap in naira; null or no row is no cap |
 | `ai_price_proposal` | `ai_model_id`, the four dollar prices and `usd_per_thousand_searches`, `source_url`, `status` (`proposed`, `accepted`, `dismissed`), `run_id`, `decided_by`, `decided_at` | One open proposal per model: a newer one replaces it |
-| `ai_model` (PR1) | adds `usd_per_thousand_searches` `numeric(12,4)` | Google Search's price, for Find Prices |
+| `ai_price_run` (10210) | `status` (`running`, `done`, `failed`), `batches_total`, `batches_done`, `proposals`, `not_listed`, `error_code`, `requested_by`, `started_at`, `finished_at` | One per Find Prices press: the New Prices sheet's progress and outcome. A run still `running` after 15 minutes is taken as lost |
+| `ai_model` (PR1) | adds `usd_per_thousand_searches` `numeric(12,4)`; `price_not_listed_at` (10210) | Google Search's price, for Find Prices; when the provider's page last did not price the model |
 | `ai_run_step` (M0) | adds `audio_seconds`, `ngn_per_audio_hour`, `searches`, `ngn_per_search`, `usd_ngn_rate`, `rate_day`; kind adds `search` | What the step was charged at, so a new price or rate never rewrites past spend |
 | `ai_setting` (M0) | `monthly_cap_ngn` is the overall cap, set on Spend | `vendor` and `model` are no longer read: the chains decide (§6.1) |
 
@@ -155,12 +173,13 @@ Under `/api/v1/ai-control`, schemas in `packages/contract/schemas/ai_control.js`
 | `PUT /chains/:scope/:key` | `AiChainSave` (`links`: 1 to 4 `{provider, model}`) → `AiChain` | edit |
 | `POST /chains/:scope/:key/first` | `AiMakeFirst` (`position`) → `AiChain` | edit |
 | `DELETE /chains/action/:key` | → `no_content`: the action is back on its job's chain | edit |
-| `GET /models` (`provider`, `capability`, `q`, `page`) | → `AiControlModelPage`, 25 a page; Edit Chain's pickers ask for their job's `capability` | view |
-| `GET /models/summary` | → `AiModelsSummary`: whether Find Prices is running, when it last ran, the open proposals, the day's rate | view |
+| `GET /models` (`provider`, `capability`, `show`, `q`, `page`) | → `AiControlModelPage`, 25 a page, models in a chain first; `show` is `usable` (the default: on the key, or not checked), `not_on_key` or `all`; Edit Chain's pickers ask for their job's `capability` | view |
+| `GET /models/summary` | → `AiModelsSummary`: the newest run (status, batches, proposals, not listed, error), the open proposals, the models still to price and not listed, the day's rate | view |
 | `PUT /models/:id/prices` | `AiPricesSave` → `AiControlModel` | edit |
 | `POST /prices/find` | → 202 `AiFindPrices` (`requested_at`) | edit |
 | `GET /prices` (`page`) | → `AiPriceProposalPage`, the open proposals, 25 a page | view |
 | `POST /prices/:id/accept` | `AiPricesSave` (the proposal's prices, edited or not) → `AiControlModel` | edit |
+| `POST /prices/accept-all` | → `AiAcceptAll` (`accepted`): every open proposal, as proposed | edit |
 | `POST /prices/:id/dismiss` | → `no_content` | edit |
 | `GET /spend` | → `AiSpend`: the month, the rate, all AI and each provider against their caps, spend by day | view |
 | `GET /spend/actions` (`page`) | → `AiSpendActionPage`, this month by action, 25 a page | view |
@@ -232,13 +251,25 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 
 ### 6.4 Find Prices
 
-- One request per AI provider with models, through the `find-prices` action (Deep Reasoning, no
-  personal data). Only a model that can search is called: Gemini's, with Google Search on; any
-  other in the chain is Cannot Search. The answer is JSON listing, for each model we hold, the
-  dollar prices and the pricing page.
+- A press opens an `ai_price_run` and emits `ai_control.prices_requested`; the outbox handler does
+  the rest in the worker. It asks about every model on a set-up provider's key (available, or not
+  checked yet) with no price, no open proposal, and no Not Listed mark from the last 7 days.
+- The models go 20 to a request, one provider per request, through the `find-prices` action (Deep
+  Reasoning, no personal data). Only a model that can search is called: Gemini's, with Google
+  Search on; any other in the chain is Cannot Search. The answer is JSON listing, for each model
+  asked about, the dollar prices and the pricing page; thinking is kept low and the answer has
+  room for 20 models.
+- After each request its proposals are kept and the run's `batches_done` and counts move, so the
+  New Prices sheet fills as the run goes. A model the answer does not price is marked Not Listed.
 - A proposal names one of our models and an `https` page. A page off the provider's own site is
-  replaced by the first page Google Search returned. A model the answer does not price gets none.
-- At most one request runs at a time (`ALREADY_FINDING`). Each search is a billed step.
+  replaced by the first page Google Search returned.
+- The run ends `done` when any answer was read, `failed` when no request could be read or none
+  could be made: no model that can search (`NO_SEARCH_MODEL`), AI switched off, the overall cap
+  reached, or every answer unreadable (`ANSWER_UNREADABLE`). Either keeps the first error's code,
+  so a run that read some batches and not others says so. Switched off, a cap or no model that can
+  search stops the run at once; any other error passes to the next batch.
+- At most one run at a time (`ALREADY_FINDING`). Each request is a billed search.
+- **Accept All** saves every open proposal as proposed, each audited (`ai_control.price_set`).
 
 ### 6.5 The registry and its check
 
@@ -266,6 +297,7 @@ changing it is a support step that rebuilds the index first (`docs/runbooks/`).
 | `ai_control.chain_changed` | Edit Chain or Make First saved | Audit only |
 | `ai_control.chain_reset` | Use Job Chain | Audit only |
 | `ai_control.prices_requested` | Find Prices pressed | Outbox: the search of §6.4, proposals written |
+| `ai_control.prices_proposed` | A Find Prices request proposed prices | Audit only |
 | `ai_control.price_set` | Accept, or Edit Price saved | Audit only |
 | `ai_control.cap_changed` | Set Cap, a provider's or all AI | Audit only |
 
@@ -302,7 +334,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | AI Control · Actions (`actions`) | AI Control as the title; each job as a card (desktop) with its chain as First and Fallback 1 to 3, each model's name, provider and state pill (Ready, Not Set Up, Not on Key, Daily Limit, Skipped Until a time, At Cap, Personal Data, Cannot Search); Make First on each fallback; Edit Chain (First Choice, Fallback 1 to 3, each a model picker searching the models that can do the job; Embeddings First Choice only; Save Chain); Locked on Embeddings once indexed; the actions with job, first choice, Personal Data, Own Chain and Not Built Yet pills, Calls Today; an action's sheet with Make First, Edit Chain and Use Job Chain; toasts "Moved to first", "Chain saved", "Back on its job's chain" | Help terms on each job's name (what it is for, from §6.2), on Personal Data (DeepSeek is passed by) and on Own Chain | How the chain is walked and when a provider is skipped: §6.1 |
-| AI Control · Models (`models`) | Models as the title; Find Prices (Finding Prices while it runs); Proposed Prices: model, provider, price, page, Accept and Dismiss, and in its sheet Edit Price; the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider filter; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "Prices saved", "Proposal dismissed" | Help term on In Naira (the day's rate it used) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
+| AI Control · Models (`models`) | Models as the title; Find Prices; the New Prices sheet, opened by Find Prices and by Review Prices while proposals wait: the run's progress ("Batch 2 of 4"), each proposed price (model, provider, price, page) with Dismiss, Accept All, and Find More once the run ends with models still to price; Still to Price and Not Listed counts; a failed run's reason in a few words ("No search model ready"); the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider and Show (On Key, Not on Key, Any) filters; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "12 prices saved", "Prices saved", "Proposal dismissed" | Help terms on In Naira (the day's rate it used) and Not Listed (models the provider's page does not price; asked again after 7 days) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
 | AI Control · Spend (`spend`) | Spend as the title; All AI: spent, against its cap (a meter, the percent and "₦19K of ₦100K cap"), Month Of, One Dollar, Rates Of; each provider: Free or Paid, Not Set Up, At Cap, spent, against its cap or "no cap", calls this month; Set Cap on All AI and each paid provider (Monthly Cap, Optional; blank removes it); Spend by Day (desktop); By Action: action, job, calls, spent; toasts "Cap set", "Cap removed" | Help terms on All AI and on Monthly Cap (what happens once reached) | How spend is summed: §6.3 |
 
 ### 10.2 Phone layout
@@ -310,7 +342,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | AI Control · Actions (`actions`) | Each job as a row with its first choice and its state, which opens the job's sheet | The fallbacks, in the job's sheet; the action rows below, each opening its own sheet | Make First and Edit Chain in the chain's sheet | More, then AI Control; tabs scroll sideways |
-| AI Control · Models (`models`) | Each model as a card: name, provider, Available, price | The chains it is in, the naira price | Find Prices, full width at the foot | As above |
+| AI Control · Models (`models`) | Each model as a card: name, provider, Available, price | The chains it is in, the naira price | Find Prices, full width at the foot; New Prices as a sheet with Accept All at its foot | As above |
 | AI Control · Spend (`spend`) | All AI, then each provider's spend against its cap, as cards | Spend by day | Set Cap on a paid provider's card, opening a sheet | As above |
 
 ## 11 · Edge cases
@@ -327,6 +359,10 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **A provider moved from Paid to Free**: its spend this month stays as charged; its cap stays
   stored and Spend shows it as Free.
 - **Find Prices pressed twice**: the second press is refused while the first runs.
+- **A run lost** (the worker restarted mid-run): after 15 minutes it is taken as ended, and Find
+  Prices can be pressed again; the proposals it kept stay.
+- **A model the page never prices** (an old or regional model): Not Listed, asked again after 7
+  days; Edit Price sets it by hand.
 - **A proposal for a model removed from the list**: it is dismissed with the model.
 
 ## 12 · Donor code
@@ -345,6 +381,8 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
    person which job (CLAUDE.md, §6.5).
 
 ## 14 · Change log
+
+- 20/10/2026 · TB · Decisions 29 to 32 after the first Find Prices on staging returned nothing for 129 models (the answer was capped at 60 and cut short): fewer models kept, Find Prices in requests of 20 over every unpriced model with Not Listed marks, the New Prices sheet with Accept All and Find More, the Models tab opening on the models in a chain and on the key.
 
 - 20/10/2026 · TB · PR2 built (API, UI, mobile): §2 to §11 as built; §6.1 step 3 says which refusals mark a provider Skipped (a reset time given, or a spent balance); `GET /models` filters by capability for Edit Chain's pickers; §10 lists every label, field and toast.
 

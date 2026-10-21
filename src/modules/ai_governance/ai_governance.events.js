@@ -14,13 +14,13 @@ const EVENTS = defineEvents("ai_control", {
   "ai_control.chain_reset": { summary: "An action was put back on its job's chain" },
   "ai_control.prices_requested": { summary: "Find Prices was pressed: the providers' pricing pages are searched" },
   "ai_control.prices_proposed": { summary: "Find Prices proposed prices for IT to accept" },
-  "ai_control.price_set": { summary: "A model's prices were accepted or edited on AI Control" },
+  "ai_control.price_set": { summary: "A model's prices were accepted, edited, or saved with Accept All on AI Control" },
   "ai_control.cap_changed": { summary: "A provider's monthly cap, or the cap on all AI, was set" },
 });
 
 /** The search itself, after the request commits: it can take a minute, so it runs in the worker. */
 outbox.register(EVENTS.AI_CONTROL_PRICES_REQUESTED, "ai_control.find_prices", async (event) => {
-  await require("./ai_governance.service").runFindPrices({ actor: event.actor_user_id || null });
+  await require("./ai_governance.service").runFindPrices({ runId: event.payload.ai_price_run_id || null, actor: event.actor_user_id || null });
 });
 
 module.exports = { EVENTS };
