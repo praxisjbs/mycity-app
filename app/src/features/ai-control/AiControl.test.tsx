@@ -15,6 +15,7 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock("@/api/hooks", () => ({
   invalidate: m.invalidate,
+  refresh: vi.fn(async () => undefined),
   useApi: (key: string) => ({ data: m.data[key] ?? null, error: null, loading: false, reload: () => undefined, set: () => undefined }),
   usePaged: (key: string) => {
     const rows = m.rows[key] ?? [];
@@ -261,15 +262,17 @@ describe("AI Control", () => {
     expect(sheet.queryByRole("button", { name: "Find More" })).toBeNull();
   });
 
-  it("Models: with nothing waiting, Find Prices starts a run and opens New Prices; a failed run says why", async () => {
+  it("Models: a failed run says why on the tab; Find Prices starts another and opens New Prices", async () => {
     const failed: AiPriceRun = { ...RUN, status: "failed", batches_done: 0, proposals: 0, not_listed: 0, error_code: "NO_SEARCH_MODEL" };
     m.data = { [SUMMARY]: { finding: false, run: failed, last_found_at: failed.finished_at, proposals: 0, to_price: 5, not_listed: 0, rate: RATE } };
     m.rows = { "GET /api/v1/ai-control/models": [MODEL] };
     page("models");
+    // With New Prices closed, the reason is on the tab.
+    expect(screen.getAllByText("No Search Model").length).toBeGreaterThan(0);
     await userEvent.click(screen.getAllByRole("button", { name: "Find Prices" })[0]);
     await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai-control/prices/find", { body: {} }));
     const sheet = within(await screen.findByRole("dialog"));
-    expect(sheet.getByText("No search model ready")).toBeTruthy();
+    expect(sheet.getByText("No Search Model")).toBeTruthy();
     expect(sheet.getByText("Nothing New")).toBeTruthy();
   });
 

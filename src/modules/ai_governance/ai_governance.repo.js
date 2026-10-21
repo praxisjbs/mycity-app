@@ -44,15 +44,20 @@ async function deleteChain(db, scope, key) {
  * Models and proposals
  * ------------------------------------------------------------------ */
 
+/** How long a Not Listed mark keeps a model out of Find Prices (§6.4). */
+const NOT_LISTED_DAYS = 7;
+
+/** Not Listed: the page did not price it this week, and it has no price yet and is on the key. */
+const NOT_LISTED = `m.price_not_listed_at > now() - interval '${NOT_LISTED_DAYS} days'
+  AND m.input_usd_per_million IS NULL AND m.output_usd_per_million IS NULL AND m.usd_per_audio_hour IS NULL
+  AND m.available IS NOT FALSE`;
+
 const MODEL = `m.ai_model_id, m.provider, m.model::text AS model, m.display_name, m.capabilities, m.available,
   m.input_usd_per_million::text AS input_usd_per_million, m.output_usd_per_million::text AS output_usd_per_million,
   m.audio_usd_per_million::text AS audio_usd_per_million, m.usd_per_audio_hour::text AS usd_per_audio_hour,
   m.usd_per_thousand_searches::text AS usd_per_thousand_searches,
   EXISTS (SELECT 1 FROM ai_price_proposal pp WHERE pp.ai_model_id = m.ai_model_id AND pp.status = 'proposed') AS proposed,
-  (m.price_not_listed_at IS NOT NULL AND m.price_not_listed_at > now() - interval '7 days') AS not_listed`;
-
-/** How long a Not Listed mark keeps a model out of Find Prices (§6.4). */
-const NOT_LISTED_DAYS = 7;
+  (${NOT_LISTED}) AS not_listed`;
 
 /** The models in a chain first ($5, "provider:model"), then usable ones, then by provider and name. */
 const MODEL_SORTS = {
@@ -108,7 +113,7 @@ async function priceCounts(db, providers) {
   return one(
     db,
     `SELECT count(*) FILTER (WHERE ${TO_PRICE})::int AS to_price,
-            count(*) FILTER (WHERE m.price_not_listed_at > now() - interval '${NOT_LISTED_DAYS} days')::int AS not_listed
+            count(*) FILTER (WHERE ${NOT_LISTED})::int AS not_listed
        FROM ai_model m WHERE m.provider = ANY($1::text[])`,
     [providers],
   );
@@ -204,7 +209,7 @@ async function openProposals(db) {
  * ------------------------------------------------------------------ */
 
 const RUN = `r.ai_price_run_id, r.status, r.batches_total, r.batches_done, r.proposals, r.not_listed, r.error_code,
-  r.started_at, r.finished_at`;
+  r.started_at, r.finished_at, r.updated_at`;
 
 /** A run, as it starts. */
 function startPriceRun(db, userId) {
@@ -216,18 +221,50 @@ function newestPriceRun(db) {
   return one(db, `SELECT ${RUN} FROM ai_price_run r ORDER BY r.started_at DESC LIMIT 1`, []);
 }
 
+/** A running run with no progress for this long is taken as lost (§6.4, §11). */
+const LOST_MINUTES = 15;
+
 /**
- * A run's progress: the batches it will ask (which starts the count again, as a retried run
- * does), and what each one adds.
+ * The worker's job takes the run, once: a job delivered again finds it claimed, or ended, and
+ * asks nothing. A run the screen already shows as lost (the job came too late) is ended as LOST
+ * instead of started. True when this call holds it.
+ */
+async function claimPriceRun(db, id) {
+  const { rowCount } = await db.query(
+    `UPDATE ai_price_run SET claimed_at = now()
+      WHERE ai_price_run_id = $1 AND status = 'running' AND claimed_at IS NULL
+        AND updated_at > now() - interval '${LOST_MINUTES} minutes'`,
+    [id],
+  );
+  if (rowCount === 1) return true;
+  await db.query(
+    `UPDATE ai_price_run SET status = 'failed', error_code = 'LOST', finished_at = now()
+      WHERE ai_price_run_id = $1 AND status = 'running' AND claimed_at IS NULL
+        AND updated_at <= now() - interval '${LOST_MINUTES} minutes'`,
+    [id],
+  );
+  return false;
+}
+
+/** Locks the run for a batch's write, while it is still running: false once it has ended or been taken as lost. */
+async function lockRunningRun(db, id) {
+  const { rowCount } = await db.query("SELECT 1 FROM ai_price_run WHERE ai_price_run_id = $1 AND status = 'running' FOR UPDATE", [id]);
+  return rowCount === 1;
+}
+
+/**
+ * A running run's progress: the batches it will ask, and what each one adds. False when the
+ * run is no longer running, so the job stops.
  */
 async function progressPriceRun(db, id, { total, done = 0, proposals = 0, notListed = 0 }) {
-  await db.query(
+  const { rowCount } = await db.query(
     `UPDATE ai_price_run SET batches_total = COALESCE($2, batches_total),
-            batches_done = CASE WHEN $2::int IS NULL THEN batches_done + $3 ELSE $3 END,
+            batches_done = batches_done + $3,
             proposals = proposals + $4, not_listed = not_listed + $5
-      WHERE ai_price_run_id = $1`,
+      WHERE ai_price_run_id = $1 AND status = 'running'`,
     [id, total === undefined ? null : total, done, proposals, notListed],
   );
+  return rowCount === 1;
 }
 
 /** A run ended, done or failed with the first error's code. */
@@ -338,6 +375,9 @@ module.exports = {
   markNotListed,
   startPriceRun,
   newestPriceRun,
+  LOST_MINUTES,
+  claimPriceRun,
+  lockRunningRun,
   progressPriceRun,
   finishPriceRun,
   openProposalsForUpdate,

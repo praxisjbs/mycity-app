@@ -67,16 +67,20 @@ export const HELP = {
   notListed: "Models the provider's pricing page did not price. Find Prices asks about them again after 7 days.",
 };
 
-/** Why a Find Prices run stopped short, in a few words (§6.4). */
+/** Why a Find Prices run stopped short, as its pill reads (§6.4). */
 export const RUN_REASON: Record<string, string> = {
-  NO_SEARCH_MODEL: "No search model ready",
-  AI_DISABLED: "AI switched off",
-  AI_MODULE_DISABLED: "AI off for AI Control",
-  AI_CAP_REACHED: "Monthly cap reached",
-  AI_UNAVAILABLE: "Search not answering",
-  ANSWER_UNREADABLE: "Answer not readable",
-  LOST: "Search stopped",
+  NO_SEARCH_MODEL: "No Search Model",
+  AI_DISABLED: "AI Switched Off",
+  AI_MODULE_DISABLED: "AI Switched Off",
+  AI_CAP_REACHED: "Monthly Cap Reached",
+  AI_UNAVAILABLE: "Search Not Answering",
+  ANSWER_UNREADABLE: "Answer Not Readable",
+  RUN_FAILED: "Search Failed",
+  LOST: "Search Stopped",
 };
+
+/** A run's reason, or Search Stopped for a code this screen does not know. */
+export const reasonOf = (code: string | null | undefined) => (code ? (RUN_REASON[code] ?? "Search Stopped") : null);
 
 /** The Models tab's Show filter (decision 32). */
 export const SHOW: Array<["usable" | "not_on_key" | "all", string]> = [

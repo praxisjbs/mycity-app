@@ -1097,10 +1097,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   `-latest` aliases, Gemma and snapshots of a model already listed, unless a chain uses one (migration 10210
   clears those already stored). Find Prices asks only about models with no price, 20 to a request with
   thinking kept low, and marks Not Listed what the page does not price (asked again after 7 days); each press
-  is an `ai_price_run` with its progress. Models: the New Prices sheet (Batch 2 of 4, each price with Accept
+  is an `ai_price_run` with its progress, run as the `ai-find-prices` job and claimed once, since a run
+  outlasts an outbox handler (a review found retries searching twice). Models: the New Prices sheet (Batch 2 of 4, each price with Accept
   and Dismiss, Accept All, Find More, Still to Price and Not Listed), opened by Find Prices or Review Prices;
-  the list opens on models in a chain, with a Show filter (On Key, Not on Key, Any). Tests: 12 integration,
-  2 unit, 4 screen for Models. Left: on staging and production, press Test on the Gemini connection to re-read
+  the list opens on models in a chain, with a Show filter (On Key, Not on Key, Any); a failed run's reason
+  stays beside Find Prices. Tests: 14 integration, 2 unit, 4 screen for Models. Left: on staging and production, press Test on the Gemini connection to re-read
   its list, then Find Prices until Still to Price reaches 0.
 
 ### Settings

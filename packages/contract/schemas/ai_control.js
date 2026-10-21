@@ -176,7 +176,7 @@ const AiControlModel = z
     in_chains: z.array(ModelChainRef).max(50),
     /** An open Find Prices proposal waits for this model. */
     proposed: z.boolean(),
-    /** The provider's pricing page did not price it in the last 7 days. */
+    /** Not Listed: the pricing page did not price it in the last 7 days, and it still has no price and is on the key. */
     not_listed: z.boolean(),
   })
   .strict();
@@ -204,7 +204,7 @@ const AiPriceRun = z
     batches_done: z.number().int().min(0),
     proposals: z.number().int().min(0),
     not_listed: z.number().int().min(0),
-    /** Why a failed run failed: NO_SEARCH_MODEL, AI_UNAVAILABLE, AI_DISABLED, AI_CAP_REACHED, ANSWER_UNREADABLE, LOST. */
+    /** Why the run stopped short (a failed run, or a done run that missed some requests): NO_SEARCH_MODEL, AI_UNAVAILABLE, AI_DISABLED, AI_MODULE_DISABLED, AI_CAP_REACHED, ANSWER_UNREADABLE, RUN_FAILED, LOST. */
     error_code: z.string().nullable(),
     started_at: isoDateTime,
     finished_at: isoDateTime.nullable(),
@@ -222,7 +222,7 @@ const AiModelsSummary = z
     proposals: z.number().int().min(0),
     /** Models the next run would ask about: on a set-up key, no price, nothing waiting, not Not Listed. */
     to_price: z.number().int().min(0),
-    /** Models marked Not Listed in the last 7 days. */
+    /** Models Not Listed: marked in the last 7 days, still without a price and on the key. */
     not_listed: z.number().int().min(0),
     rate: AiRate.nullable(),
   })
@@ -383,7 +383,7 @@ const TABLES = {
       output_ngn_per_million: "the output price times the day's rate",
       ngn_per_audio_hour: "the audio hour price times the day's rate",
       in_chains: "the chains it is in, stored or from code",
-      not_listed: "price_not_listed_at within the last 7 days",
+      not_listed: "price_not_listed_at within the last 7 days, no price yet, on the key",
       proposed: "an open ai_price_proposal names it",
     },
   },

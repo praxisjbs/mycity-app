@@ -1,6 +1,6 @@
 "use strict";
 /**
- * What AI Control records, and the search that follows Find Prices. Loaded by the API and the
+ * What AI Control records, and the job that follows Find Prices. Loaded by the API and the
  * worker (docs/guides/ai-control.md §7).
  *
  * Every event is audit only: AI Control tells nobody anything, a provider at its cap included
@@ -8,6 +8,7 @@
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
+const queues = require("../../jobs/queues");
 
 const EVENTS = defineEvents("ai_control", {
   "ai_control.chain_changed": { summary: "A job's or an action's chain was changed on AI Control, or a model made first" },
@@ -18,9 +19,20 @@ const EVENTS = defineEvents("ai_control", {
   "ai_control.cap_changed": { summary: "A provider's monthly cap, or the cap on all AI, was set" },
 });
 
-/** The search itself, after the request commits: it can take a minute, so it runs in the worker. */
+/**
+ * The search itself, after the request commits: a request of 20 models can take minutes, so it
+ * runs as a job rather than inside this handler. One attempt: the run records its own failure,
+ * and Find Prices is pressed again.
+ */
 outbox.register(EVENTS.AI_CONTROL_PRICES_REQUESTED, "ai_control.find_prices", async (event) => {
-  await require("./ai_governance.service").runFindPrices({ runId: event.payload.ai_price_run_id || null, actor: event.actor_user_id || null });
+  const runId = event.payload.ai_price_run_id;
+  if (!runId) return;
+  await queues.enqueue(
+    "ai-find-prices",
+    "find-prices",
+    { ai_price_run_id: runId, actor: event.actor_user_id || null },
+    { jobId: `ai-find-prices-${runId}`, attempts: 1 },
+  );
 });
 
 module.exports = { EVENTS };

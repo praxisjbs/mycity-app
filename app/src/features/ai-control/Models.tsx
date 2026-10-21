@@ -1,7 +1,7 @@
 import aiControl from "@mycity/contract/schemas/ai_control.js";
 import type { AiControlModel, AiPriceProposal, AiPricesSave, AiProvider } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
-import { invalidate, useApi, usePaged } from "@/api/hooks";
+import { invalidate, refresh, useApi, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { doesOf } from "@/features/settings/integrations/words";
 import { useRouter } from "@/lib/router";
@@ -29,7 +29,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { useEffect, useState } from "react";
-import { HELP, JOB, PROVIDER, RUN_REASON, SHOW, positionOf, usd } from "./words";
+import { HELP, JOB, PROVIDER, SHOW, positionOf, reasonOf, usd } from "./words";
 
 const fail = (e: unknown, fallback: string) => toast(e instanceof ApiError ? e.message : fallback);
 
@@ -190,17 +190,15 @@ function NewPrices() {
   const run = s?.run ?? null;
   const running = run?.status === "running";
 
-  // While the run goes, read it and its proposals again until it ends, then the whole tab.
-  const { reload } = summary;
-  const { reload: reloadList } = list;
+  // While the run goes, its proposals are read again quietly; the tab behind polls the run itself.
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => Promise.all([reload(), reloadList()]), FINDING_MS);
+    const t = setInterval(() => refresh("/api/v1/ai-control/prices"), FINDING_MS);
     return () => {
       clearInterval(t);
       invalidate("/api/v1/ai-control");
     };
-  }, [running, reload, reloadList]);
+  }, [running]);
 
   const accept = async (p: AiPriceProposal) => {
     try {
@@ -242,14 +240,14 @@ function NewPrices() {
     try {
       await api.call("POST /api/v1/ai-control/prices/find", { body: {} });
       toast("Finding prices");
-      await reload();
+      await refresh("/api/v1/ai-control/models/summary");
     } catch (e) {
       fail(e, "Not started");
     }
   };
 
   const waiting = list.page?.total ?? list.rows.length;
-  const reason = run && run.status !== "running" && run.error_code ? (RUN_REASON[run.error_code] ?? "Search stopped") : null;
+  const reason = run && run.status !== "running" ? reasonOf(run.error_code) : null;
   return (
     <>
       {running && (
@@ -340,16 +338,16 @@ export function Models() {
   const s = summary.data;
   const finding = !!s?.finding;
 
-  // While a search runs, read its state again until it ends, then the whole tab.
+  // While a search runs, read its state again quietly until it ends, then the whole tab.
   const { reload } = summary;
   useEffect(() => {
     if (!finding) return;
-    const t = setInterval(reload, FINDING_MS);
+    const t = setInterval(() => refresh("/api/v1/ai-control/models/summary"), FINDING_MS);
     return () => {
       clearInterval(t);
       invalidate("/api/v1/ai-control");
     };
-  }, [finding, reload]);
+  }, [finding]);
 
   const review = () => modal.open({ title: "New Prices", wide: true, full: true, body: () => <NewPrices /> });
   const find = async () => {
@@ -363,9 +361,20 @@ export function Models() {
     }
   };
   const waiting = finding || (s?.proposals ?? 0) > 0;
+  // The last run's failure stays in view after New Prices is closed, for everyone who opens the tab.
+  const failed = s?.run?.status === "failed" ? reasonOf(s.run.error_code) : null;
   const findButton = (
     <ActionGroup>
-      {finding && <Pill tone="info">Finding Prices</Pill>}
+      {finding && (
+        <Pill tone="info" className="phone:self-start">
+          Finding Prices
+        </Pill>
+      )}
+      {failed && (
+        <Pill tone="err" className="phone:self-start">
+          {failed}
+        </Pill>
+      )}
       {waiting && can("ai_control", "view") ? (
         <Button variant="primary" icon="check" onClick={review}>
           Review Prices
@@ -383,7 +392,7 @@ export function Models() {
       <PageHeader
         title="Models"
         sub="Every provider's models and their prices"
-        actions={<DesktopOnly>{findButton}</DesktopOnly>}
+        actions={<DesktopOnly className="flex items-center gap-2">{findButton}</DesktopOnly>}
       />
       <DataView<AiControlModel>
         list={list}
@@ -427,7 +436,7 @@ export function Models() {
         ]}
       />
       <PhoneOnly>
-        <div className="mt-3 flex flex-col">{findButton}</div>
+        <div className="mt-3 flex flex-col gap-2">{findButton}</div>
       </PhoneOnly>
     </>
   );

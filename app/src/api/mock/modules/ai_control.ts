@@ -207,7 +207,14 @@ const view = (m: Model): AiControlModel => ({
 });
 
 const WEEK = 7 * 24 * 3600_000;
-const notListed = (m: Model) => m.notListedAt !== undefined && Date.now() - m.notListedAt < WEEK;
+/** Not Listed while the mark is under a week old and the model still has no price on the key. */
+const notListed = (m: Model) =>
+  m.notListedAt !== undefined &&
+  Date.now() - m.notListedAt < WEEK &&
+  !m.prices.input_usd_per_million &&
+  !m.prices.output_usd_per_million &&
+  !m.prices.usd_per_audio_hour &&
+  m.available !== false;
 /** What Find Prices would ask about: on a key, no price, nothing waiting, not Not Listed (§6.4). */
 const toPrice = () =>
   MODELS.filter(

@@ -305,14 +305,17 @@ async function modelOne(id) {
   return modelView(r, rate && rate.usd_ngn, plan[r.provider], inChains);
 }
 
-/** A run still going after this is taken as lost, and Find Prices may be pressed again. */
-const LOST_MS = 15 * 60_000;
+/**
+ * A run with no progress for this long is taken as lost, and Find Prices may be pressed again.
+ * One batch, every link of its chain timing out, stays well inside it.
+ */
+const LOST_MS = repo.LOST_MINUTES * 60_000;
 
 /** The newest run as the screen reads it: a run lost mid-way reads as failed, LOST. */
 async function newestRun(db = pool) {
   const r = await repo.newestPriceRun(db);
   if (!r) return null;
-  const lost = r.status === "running" && Date.now() - new Date(r.started_at).getTime() > LOST_MS;
+  const lost = r.status === "running" && Date.now() - new Date(r.updated_at || r.started_at).getTime() > LOST_MS;
   return {
     ai_price_run_id: r.ai_price_run_id,
     status: lost ? "failed" : r.status,
@@ -374,22 +377,30 @@ async function setPrices(id, body, actor) {
   return modelOne(id);
 }
 
-/** POST /ai-control/prices/find: 202; the worker searches (runFindPrices). Also Find More. */
+const ALREADY_FINDING = () => new AppError("ALREADY_FINDING", "Find Prices is already running", 409);
+
+/** POST /ai-control/prices/find: 202; the ai-find-prices job searches (runFindPrices). Also Find More. */
 async function findPrices(actor) {
   const run = await newestRun();
-  if (run && run.status === "running") throw new AppError("ALREADY_FINDING", "Find Prices is already running", 409);
-  const started = await tx(async (client) => {
-    if (run && run.lost) await repo.finishPriceRun(client, run.ai_price_run_id, "failed", "LOST");
-    const row = await repo.startPriceRun(client, userOf(actor));
-    await emit(client, {
-      key: EVENTS.AI_CONTROL_PRICES_REQUESTED,
-      entity: { type: "ai_price_run", id: row.ai_price_run_id },
-      actor,
-      payload: { ai_price_run_id: row.ai_price_run_id },
+  if (run && run.status === "running") throw ALREADY_FINDING();
+  try {
+    const started = await tx(async (client) => {
+      if (run && run.lost) await repo.finishPriceRun(client, run.ai_price_run_id, "failed", "LOST");
+      const row = await repo.startPriceRun(client, userOf(actor));
+      await emit(client, {
+        key: EVENTS.AI_CONTROL_PRICES_REQUESTED,
+        entity: { type: "ai_price_run", id: row.ai_price_run_id },
+        actor,
+        payload: { ai_price_run_id: row.ai_price_run_id },
+      });
+      return row;
     });
-    return row;
-  });
-  return { requested_at: iso(started.started_at) };
+    return { requested_at: iso(started.started_at) };
+  } catch (err) {
+    // Another press started one in the same instant (ai_price_run_one_running_uq).
+    if (err.code === "23505" && err.constraint === "ai_price_run_one_running_uq") throw ALREADY_FINDING();
+    throw err;
+  }
 }
 
 /** POST /ai-control/prices/accept-all: every open proposal, as proposed (decision 31). */
@@ -470,21 +481,34 @@ const BATCH = 20;
 const ENDS_RUN = new Set(["NO_SEARCH_MODEL", "AI_DISABLED", "AI_MODULE_DISABLED", "AI_CAP_REACHED"]);
 
 /**
- * Find Prices' search, in the worker (§6.4): every model a run should ask about, 20 to a request,
- * one provider per request, through the find-prices action. Each request's proposals are kept as
- * it returns, the models it did not price are marked Not Listed, and the run's progress moves, so
- * the New Prices sheet fills as it goes. Nothing is saved to a model here.
- * @param {{runId?: string|null, actor?: string|null, llm?: object}} [opts]  llm: tests
+ * Find Prices' search, the `ai-find-prices` job (§6.4): every model a run should ask about, 20 to
+ * a request, one provider per request, through the find-prices action. Each request's proposals
+ * are kept as it returns, the models it did not price are marked Not Listed, and the run's
+ * progress moves, so the New Prices sheet fills as it goes. Nothing is saved to a model here.
+ *
+ * Delivery is at least once, so the run is claimed first: a second delivery, or a run already
+ * ended, asks nothing. A run taken as lost (Find Prices pressed again) stops at its next batch.
+ * @param {{runId: string, actor?: string|null, llm?: object}} opts  llm: tests
  */
-async function runFindPrices({ runId = null, actor = null, llm = ai } = {}) {
-  const id = runId || (await repo.startPriceRun(pool, actor)).ai_price_run_id;
+async function runFindPrices({ runId, actor = null, llm = ai }) {
+  if (!(await repo.claimPriceRun(pool, runId))) return newestRun();
+  try {
+    await askInBatches(runId, actor, llm);
+  } catch (err) {
+    await repo.finishPriceRun(pool, runId, "failed", "RUN_FAILED");
+    throw err;
+  }
+  return newestRun();
+}
+
+async function askInBatches(id, actor, llm) {
   const batches = [];
   for (const code of await keyedProviders()) {
     const def = providers.get(code);
     const list = await repo.modelsToPrice(pool, code);
     for (let i = 0; i < list.length; i += BATCH) batches.push({ def, models: list.slice(i, i + BATCH) });
   }
-  await repo.progressPriceRun(pool, id, { total: batches.length });
+  if (!(await repo.progressPriceRun(pool, id, { total: batches.length }))) return;
   let read = 0;
   let firstError = null;
   for (const { def, models: batch } of batches) {
@@ -504,15 +528,14 @@ async function runFindPrices({ runId = null, actor = null, llm = ai } = {}) {
       const code = err.code || "AI_UNAVAILABLE";
       firstError = firstError || code;
       logger.warn({ provider: def.code, code, err: err.message }, "find prices: the search did not answer");
-      if (ENDS_RUN.has(code)) break;
-      await repo.progressPriceRun(pool, id, { done: 1 });
+      if (ENDS_RUN.has(code) || !(await repo.progressPriceRun(pool, id, { done: 1 }))) break;
       continue;
     }
     const parsed = parseStructured(res.text, c.ai_control.FindPricesAnswer);
     if (!parsed.ok) {
       firstError = firstError || "ANSWER_UNREADABLE";
       logger.warn({ provider: def.code, issues: parsed.issues }, "find prices: the answer could not be read");
-      await repo.progressPriceRun(pool, id, { done: 1 });
+      if (!(await repo.progressPriceRun(pool, id, { done: 1 }))) break;
       continue;
     }
     read += 1;
@@ -525,7 +548,8 @@ async function runFindPrices({ runId = null, actor = null, llm = ai } = {}) {
       rows.push({ ai_model_id: m.ai_model_id, ...Object.fromEntries(PRICE_KEYS.map((k) => [k, p[k]])), source_url: sourceFor(p.source_url, res.sources, def.code) });
     }
     const unpriced = [...byId.values()].map((m) => m.ai_model_id);
-    await tx(async (client) => {
+    const kept = await tx(async (client) => {
+      if (!(await repo.lockRunningRun(client, id))) return false;
       const n = await repo.addProposals(client, res.run_id, rows);
       await repo.markNotListed(client, unpriced);
       await repo.progressPriceRun(client, id, { done: 1, proposals: n, notListed: unpriced.length });
@@ -536,11 +560,12 @@ async function runFindPrices({ runId = null, actor = null, llm = ai } = {}) {
           actor,
           payload: { provider: def.code, proposals: n, not_listed: unpriced.length },
         });
+      return true;
     });
+    if (!kept) break;
   }
   // Done when any answer was read, keeping the first error so the sheet can say some were not.
   await repo.finishPriceRun(pool, id, batches.length > 0 && read === 0 ? "failed" : "done", firstError);
-  return newestRun();
 }
 
 /* ------------------------------------------------------------------ *
