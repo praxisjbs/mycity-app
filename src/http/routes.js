@@ -87,6 +87,7 @@ function buildRoutes(opts = {}) {
       maxAge: 600,
     }),
     rateLimit.staffLimiter,
+    rateLimit.uploadLimiter,
     idempotency,
     staff,
   );

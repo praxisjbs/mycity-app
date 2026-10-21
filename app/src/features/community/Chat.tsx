@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { useRealtime } from "@/api/realtime";
 import { upload } from "@/api/upload";
 import type { LinkPreview, Message, MessageCreate } from "@/api/types/community";
-import type { PageMeta } from "@/api/types/common";
-import { ActionGroup, Button, ChoiceField, cn, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, startCaptions, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type Captions, type MenuItem } from "@mycity/ui";
+import { ActionGroup, Button, ChoiceField, cn, CountBadge, ErrorState, Field, firstLink, formatDate, FormFooter, Icon, IconButton, InlineInput, InlineTextArea, Menu, Spinner, startCaptions, TextAreaField, toast, todayIso, useConfirm, useContractForm, useIsMobile, useModal, type Captions, type MenuItem } from "@mycity/ui";
 import { AlbumPost, Post } from "./Posts";
 import { MessageLink, useViewer, viewerFilesOf } from "./Media";
 import { ForwardTo, forwardable } from "./Forward";
@@ -34,19 +33,73 @@ interface Pushed {
   community_channel_id?: string;
 }
 
+/** Pages read at once when a conversation opens at its first unread (community.md §3 step 20). */
+const UNREAD_PAGES = 4;
+
+const timeOf = (m: Message) => new Date(m.sent_at).getTime();
+
+/** Oldest first, as the screen shows them: by time, then by id, as the server breaks ties. */
+function byTime(a: Message, b: Message) {
+  const d = timeOf(a) - timeOf(b);
+  if (d) return d;
+  return a.community_message_id < b.community_message_id ? -1 : a.community_message_id > b.community_message_id ? 1 : 0;
+}
+
 /**
- * A conversation's messages: newest page first, "Load Older" reaches back a page at a
- * time (community.md §5). Search goes to the server as `q`. A new message, a reaction or
- * a receipt pushed over the socket reloads the open conversation; the list beside it
- * reloads through `onActivity`.
+ * A page laid over the messages on screen: its copy of a message wins, each message shows once
+ * (a page read after new messages arrived repeats some), and older pages already read stay.
  */
-export function useThread(id: string | null, { direct = false, onActivity }: { direct?: boolean; onActivity?: () => void } = {}) {
+function merge(list: Message[], page: Message[]): Message[] {
+  const ids = new Set(page.map((m) => m.community_message_id));
+  return [...list.filter((m) => !ids.has(m.community_message_id)), ...page].sort(byTime);
+}
+
+/** What the server counts as unread: live messages from anyone else. */
+const unreadKind = (m: Message) => !m.mine && !m.deleted;
+
+/** Where the "N Unread Messages" line goes: walking back from the newest, the `unread`-th one from someone else. */
+function firstUnreadOf(msgs: Message[], unread: number): { id: string; count: number } | null {
+  if (unread <= 0 || !msgs.length) return null;
+  let seen = 0;
+  for (let i = msgs.length - 1; i >= 0; i -= 1) {
+    const m = msgs[i]!;
+    if (!unreadKind(m)) continue;
+    seen += 1;
+    if (seen === unread) return { id: m.community_message_id, count: unread };
+  }
+  // Further back than the pages read: above the oldest one read.
+  return { id: msgs[0]!.community_message_id, count: unread };
+}
+
+/**
+ * A conversation's messages (community.md §3 step 20): opened at its newest page, or with as
+ * many pages as reach its first unread (`unread`, the list's count when it opened); older ones
+ * 25 at a time through `older`. Search goes to the server as `q`.
+ *
+ * A message, an edit or a receipt pushed over the socket reads the newest page again QUIETLY
+ * (`refresh`): what is on screen stays, the newest page is laid over it, and several pushes at
+ * once make one more read, not one each. Only a new message in a direct conversation says
+ * delivered, and only when it is from the other person and newer than the last one said: a
+ * receipt is never answered, so two screens can never acknowledge each other in a loop.
+ */
+export function useThread(id: string | null, { direct = false, unread = 0, onActivity }: { direct?: boolean; unread?: number; onActivity?: () => void } = {}) {
   const [msgs, setMsgs] = useState<Message[]>([]);
-  const [page, setPage] = useState<PageMeta | null>(null);
+  const [hasOlder, setHasOlder] = useState(false);
   const [q, setQ] = useState("");
-  const [loading, setLoading] = useState(false);
+  /** The first page has answered: only then may the conversation say it is empty. */
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [olderState, setOlderState] = useState<"idle" | "loading" | "failed">("idle");
   const [pins, setPins] = useState<Message[]>([]);
-  const pageNo = useRef(1);
+  const [firstUnread, setFirstUnread] = useState<{ id: string; count: number } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  /** Which opening the answers belong to: one for an earlier conversation or search is dropped. */
+  const gen = useRef(0);
+  const pages = useRef(1);
+  const unreadAtOpen = useRef(unread);
+  unreadAtOpen.current = unread;
+  /** The newest message from the other person this screen has said delivered for. */
+  const ackedAt = useRef(0);
 
   const fetchPage = useCallback(
     async (n: number, search: string) => {
@@ -56,70 +109,196 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
     [id],
   );
 
-  /* Receiving a direct message is what makes its sender's second tick. */
-  const acknowledge = useCallback(() => {
-    if (id && direct) void api.call("POST /api/v1/community/channels/:id/delivered", { params: { id }, body: { up_to: new Date().toISOString() } }).catch(() => undefined);
-  }, [id, direct]);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const loadPins = useCallback(async () => {
+    const at = gen.current;
+    if (!id) return;
     try {
-      if (id) void api.call("GET /api/v1/community/channels/:id/pins", { params: { id }, query: {} }).then((r) => setPins(r.data), () => undefined);
-      const res = await fetchPage(1, q);
-      pageNo.current = 1;
-      if (res) {
-        setMsgs(res.data);
-        setPage(res.page);
-      }
-    } finally {
-      setLoading(false);
+      const res = await api.call("GET /api/v1/community/channels/:id/pins", { params: { id }, query: {} });
+      if (gen.current === at) setPins(res.data);
+    } catch {
+      // The pinned bar is a convenience: it stays as it was.
     }
-  }, [fetchPage, q, id]);
+  }, [id]);
 
+  const newestFromOther = (list: Message[]) => {
+    for (let i = list.length - 1; i >= 0; i -= 1) if (!list[i]!.mine) return timeOf(list[i]!);
+    return 0;
+  };
+
+  /* Opening a conversation, or a search: as many pages as reach the first unread, at most 4. */
   useEffect(() => {
+    const at = ++gen.current;
+    pages.current = 1;
+    ackedAt.current = 0;
     setMsgs([]);
     setPins([]);
-    void reload();
-  }, [reload]);
+    setLoaded(false);
+    setError(null);
+    setHasOlder(false);
+    setOlderState("idle");
+    setFirstUnread(null);
+    if (!id) return;
+    const want = q ? 0 : unreadAtOpen.current;
+    void loadPins();
+    void (async () => {
+      let list: Message[] = [];
+      let n = 0;
+      let more: boolean;
+      try {
+        do {
+          n += 1;
+          const res = await fetchPage(n, q);
+          if (gen.current !== at || !res) return;
+          list = merge(list, res.data);
+          more = res.page.has_next;
+        } while (more && n < UNREAD_PAGES && list.filter(unreadKind).length < want);
+      } catch (e) {
+        if (gen.current === at) setError(e instanceof ApiError ? e : new ApiError(0, null));
+        return;
+      }
+      pages.current = n;
+      // Opening reads the conversation, which marks it delivered too: only newer ones are said.
+      ackedAt.current = Math.max(ackedAt.current, newestFromOther(list));
+      // A quiet read may have landed meanwhile: lay this over it.
+      setMsgs((cur) => merge(cur, list));
+      setHasOlder(more);
+      setFirstUnread(firstUnreadOf(list, want));
+      setLoaded(true);
+    })();
+  }, [id, q, fetchPage, loadPins, attempt]);
 
-  const live = useCallback(
+  /** Reads the newest page and lays it over what is on screen; null when it failed or the conversation changed. */
+  const readNewest = useCallback(async (): Promise<Message[] | null> => {
+    const at = gen.current;
+    try {
+      const res = await fetchPage(1, q);
+      if (!res || gen.current !== at) return null;
+      setMsgs((list) => merge(list, res.data));
+      if (pages.current === 1) setHasOlder(res.page.has_next);
+      return res.data;
+    } catch {
+      // A quiet read that failed changes nothing on screen; the next push reads again.
+      return null;
+    }
+  }, [fetchPage, q]);
+
+  const running = useRef<Promise<Message[] | null> | null>(null);
+  const again = useRef(false);
+  /** The newest page again, quietly; asked while one is out, it reads once more after it, not once per ask. */
+  const refresh = useCallback((): Promise<Message[] | null> => {
+    if (running.current) {
+      again.current = true;
+      return running.current;
+    }
+    let run: Promise<Message[] | null> | null = null;
+    run = (async () => {
+      let fresh: Message[] | null;
+      try {
+        do {
+          again.current = false;
+          fresh = await readNewest();
+        } while (again.current);
+      } finally {
+        if (running.current === run) running.current = null;
+      }
+      return fresh;
+    })();
+    running.current = run;
+    return run;
+  }, [readNewest]);
+  useEffect(() => {
+    running.current = null;
+    again.current = false;
+  }, [id, q]);
+
+  /* A new message from the other person reached this device: the sender's second tick. */
+  const acknowledge = useCallback(
+    (fresh: Message[] | null) => {
+      if (!id || !direct || !fresh) return;
+      const newest = newestFromOther(fresh);
+      if (newest <= ackedAt.current) return;
+      ackedAt.current = newest;
+      void api.call("POST /api/v1/community/channels/:id/delivered", { params: { id }, body: { up_to: new Date().toISOString() } }).catch(() => undefined);
+    },
+    [id, direct],
+  );
+
+  const here = useCallback((p: unknown) => Boolean(id) && (p as Pushed | null)?.community_channel_id === id, [id]);
+  const onMessage = useCallback(
     (p: unknown) => {
-      const at = (p as Pushed | null)?.community_channel_id;
-      if (at && at === id) {
-        void reload();
-        acknowledge();
+      if (here(p)) {
+        void refresh().then(acknowledge);
+        void loadPins();
       }
       onActivity?.();
     },
-    [id, reload, acknowledge, onActivity],
+    [here, refresh, acknowledge, loadPins, onActivity],
   );
-  useRealtime("community.message", live);
-  useRealtime("community.message_updated", live);
-  useRealtime("community.receipt", live);
+  const onUpdated = useCallback(
+    (p: unknown) => {
+      if (here(p)) {
+        void refresh();
+        void loadPins();
+      }
+      onActivity?.();
+    },
+    [here, refresh, loadPins, onActivity],
+  );
+  /* A receipt changes ticks and counts only: read again, never answered. */
+  const onReceipt = useCallback(
+    (p: unknown) => {
+      if (here(p)) void refresh();
+      onActivity?.();
+    },
+    [here, refresh, onActivity],
+  );
+  useRealtime("community.message", onMessage);
+  useRealtime("community.message_updated", onUpdated);
+  useRealtime("community.receipt", onReceipt);
 
-  const older = async () => {
-    const res = await fetchPage(pageNo.current + 1, q);
-    if (res) {
-      pageNo.current += 1;
-      setMsgs((m) => [...res.data, ...m]);
-      setPage(res.page);
+  const olderBusy = useRef(false);
+  /** The next 25 back, laid in above what is on screen; a page that fails offers Load Older. */
+  const older = useCallback(async () => {
+    if (!id || olderBusy.current || !hasOlder) return;
+    const at = gen.current;
+    olderBusy.current = true;
+    setOlderState("loading");
+    try {
+      const res = await fetchPage(pages.current + 1, q);
+      if (!res || gen.current !== at) return;
+      pages.current += 1;
+      setMsgs((list) => merge(list, res.data));
+      setHasOlder(res.page.has_next);
+      setOlderState("idle");
+    } catch {
+      if (gen.current === at) setOlderState("failed");
+    } finally {
+      olderBusy.current = false;
     }
-  };
+  }, [id, hasOlder, fetchPage, q]);
 
-  /** A sent message shows from the server's answer at once; the page is read again behind it. */
-  const arrived = (m: Message) => setMsgs((list) => (list.some((x) => x.community_message_id === m.community_message_id) ? list : [...list, m]));
+  /** After a pin, an unpin or a delete: the newest page and the pinned bar again. */
+  const reload = useCallback(async () => {
+    await Promise.all([refresh(), loadPins()]);
+  }, [refresh, loadPins]);
+
+  /** A sent message shows from the server's answer at once; the newest page is read again behind it. */
+  const arrived = (m: Message) => setMsgs((list) => merge(list, [m]));
 
   const send = async (body: MessageCreate) => {
     if (!id) return;
     arrived(await api.call("POST /api/v1/community/channels/:id/messages", { params: { id }, body, idempotencyKey: crypto.randomUUID() }));
-    void reload();
+    // Answering is reading: the unread line has done its work.
+    setFirstUnread(null);
+    void refresh();
   };
 
   /** Files sent together (Send Files): posted one at a time, in order, then read back once. */
   const sendMany = async (bodies: MessageCreate[]) => {
     if (!id) return;
     for (const body of bodies) arrived(await api.call("POST /api/v1/community/channels/:id/messages", { params: { id }, body, idempotencyKey: crypto.randomUUID() }));
-    void reload();
+    setFirstUnread(null);
+    void refresh();
   };
 
   /**
@@ -137,11 +316,12 @@ export function useThread(id: string | null, { direct = false, onActivity }: { d
   };
 
   const replace = (m: Message) => setMsgs((list) => list.map((x) => (x.community_message_id === m.community_message_id ? m : x)));
+  const retry = () => setAttempt((n) => n + 1);
 
   /** Messages picked to forward together (§3 step 19); null when not picking. A new conversation starts afresh. */
   const [picking, setPicking] = useState<string[] | null>(null);
   useEffect(() => setPicking(null), [id]);
-  return { id, msgs, page, q, setQ, loading, older, send, sendMany, sendFile, reload, replace, pins, picking, setPicking };
+  return { id, msgs, q, setQ, loaded, error, retry, hasOlder, olderState, older, firstUnread, send, sendMany, sendFile, reload, replace, pins, picking, setPicking };
 }
 
 /** Edit Message: the author's text, within 15 minutes of sending it. */
@@ -320,20 +500,133 @@ function rowsOf(msgs: Message[]): ThreadRow[] {
   return out;
 }
 
-/** Messages, with a day marker wherever the date changes. */
+/** How close to the bottom still counts as at the bottom, and how far up the arrow shows. */
+const NEAR_BOTTOM_PX = 80;
+const ARROW_AFTER_PX = 240;
+/** How far ahead of the top older messages start loading, so scrolling rarely waits. */
+const OLDER_AHEAD_PX = 400;
+/** Room above the unread line on opening, so the day's label held at the top does not cover it. */
+const UNDER_LABEL_PX = 44;
+
+/**
+ * The open conversation (community.md §3 step 20): each day's messages under its label, which
+ * stays at the top while they scroll; older pages load as the top comes near and what is on
+ * screen keeps its place; a new message follows the person down only when they are at the
+ * bottom or sent it, otherwise the Newest Messages arrow counts it.
+ */
 export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread>; dm?: boolean; editPoll?: (m: Message) => void }) {
   const modal = useModal();
   const confirm = useConfirm();
   const box = useRef<HTMLDivElement>(null);
-  const last = t.msgs[t.msgs.length - 1]?.community_message_id;
+  const top = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const [away, setAway] = useState(false);
+  /** New messages that arrived while the person read older ones. */
+  const [fresh, setFresh] = useState(0);
+  const toBottom = () => {
+    const el = box.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    atBottom.current = true;
+    setAway(false);
+    setFresh(0);
+  };
+  const onScroll = () => {
+    const el = box.current;
+    if (!el) return;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    atBottom.current = gap < NEAR_BOTTOM_PX;
+    setAway(gap > ARROW_AFTER_PX);
+    if (atBottom.current) setFresh(0);
+  };
+
+  /* Opened: at the first unread, under its line, else at the newest. */
+  const { loaded, firstUnread, id: openId, q } = t;
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || !loaded) return;
+    setFresh(0);
+    const line = firstUnread ? el.querySelector<HTMLElement>("[data-unread-line]") : null;
+    if (line) el.scrollTop += line.getBoundingClientRect().top - el.getBoundingClientRect().top - UNDER_LABEL_PX;
+    else if (!q) el.scrollTop = el.scrollHeight;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    atBottom.current = gap < NEAR_BOTTOM_PX;
+    setAway(gap > ARROW_AFTER_PX);
+  }, [openId, q, loaded, firstUnread]);
+
+  /* A newer message: follow it at the bottom or when it is one's own, else count it on the arrow. */
+  const lastMsg = t.msgs[t.msgs.length - 1];
+  const last = lastMsg?.community_message_id;
+  const seenLast = useRef<string | undefined>(undefined);
+  useLayoutEffect(() => {
+    const before = seenLast.current;
+    seenLast.current = last;
+    const el = box.current;
+    if (!el || !last || !loaded || q || before === undefined || before === last) return;
+    if (atBottom.current || lastMsg?.mine) {
+      el.scrollTop = el.scrollHeight;
+      setFresh(0);
+      return;
+    }
+    const i = t.msgs.findIndex((m) => m.community_message_id === before);
+    setFresh((n) => n + (i < 0 ? 1 : t.msgs.length - 1 - i));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the newest message changes, reading the list as it is then
+  }, [last]);
+
+  /* Older messages laid in above: the first one on screen stays where it was. */
+  const anchor = useRef<{ id: string; top: number } | null>(null);
+  const keepPlace = () => {
+    const el = box.current;
+    const node = el?.querySelector<HTMLElement>("[data-message]");
+    anchor.current = node ? { id: node.dataset.message ?? "", top: node.getBoundingClientRect().top } : null;
+  };
+  const oldest = t.msgs[0]?.community_message_id;
+  useLayoutEffect(() => {
+    const el = box.current;
+    const a = anchor.current;
+    anchor.current = null;
+    if (!el || !a) return;
+    const node = el.querySelector<HTMLElement>(`[data-message="${a.id}"]`);
+    if (node) el.scrollTop += node.getBoundingClientRect().top - a.top;
+  }, [oldest]);
+
+  /* The top coming near loads the next page back; without an observer, Load Older does. */
+  const watching = typeof IntersectionObserver !== "undefined";
+  const canOlder = loaded && t.hasOlder && t.olderState === "idle";
+  const { older } = t;
   useEffect(() => {
     const el = box.current;
-    if (el && !t.q) el.scrollTop = el.scrollHeight;
-  }, [last, t.q]);
+    const mark = top.current;
+    if (!el || !mark || !canOlder || !watching) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        keepPlace();
+        void older();
+      },
+      { root: el, rootMargin: `${OLDER_AHEAD_PX}px 0px 0px 0px` },
+    );
+    io.observe(mark);
+    return () => io.disconnect();
+  }, [canOlder, watching, older, oldest]);
+  const olderByHand = async () => {
+    keepPlace();
+    await t.older();
+  };
+
   const today = todayIso();
   const yesterday = todayIso(new Date(Date.now() - 86400000));
-  let lastDay = "";
   const rows = useMemo(() => rowsOf(t.msgs), [t.msgs]);
+  const days = useMemo(() => {
+    const out: { day: string; rows: ThreadRow[] }[] = [];
+    for (const r of rows) {
+      const day = todayIso(new Date(r.ms[0]!.sent_at));
+      const cur = out[out.length - 1];
+      if (cur && cur.day === day) cur.rows.push(r);
+      else out.push({ day, rows: [r] });
+    }
+    return out;
+  }, [rows]);
   const files = useMemo(() => viewerFilesOf(t.msgs), [t.msgs]);
   const forward = useForward(t);
   const { open: view, viewer } = useViewer(files, (key) => forward([key]));
@@ -459,61 +752,82 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
       </span>
     );
   };
-  return (
-    <div ref={box} data-thread data-copy="content" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 [&>*]:flex-shrink-0">
-      {t.page?.has_next && (
-        <Button className="self-center" size="sm" onClick={() => t.older()}>
-          Load Older
-        </Button>
-      )}
-      {rows.map(({ key, ms }) => {
-        const m = ms[0]!;
-        const day = todayIso(new Date(m.sent_at));
-        const marker = day !== lastDay ? (day === today ? "Today" : day === yesterday ? "Yesterday" : formatDate(day)) : null;
-        lastDay = day;
-        const ids = ms.map((x) => x.community_message_id);
-        const canPick = ms.every(forwardable);
-        const on = Boolean(picking && ids.every((id) => picking.includes(id)));
-        return (
-          <div key={key} data-message={m.community_message_id} className="flex flex-col gap-3">
-            {marker && <span className="self-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-2xs text-subtle-foreground">{marker}</span>}
-            <div
-              className={cn("group flex items-start gap-2", picking && canPick && "cursor-pointer", phone && "no-callout select-none")}
-              onClickCapture={(e) => {
-                if (picking && canPick) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  toggle(ids);
-                }
-              }}
-              {...pressFor(ids, canPick)}
+  const row = ({ key, ms }: ThreadRow) => {
+    const m = ms[0]!;
+    const ids = ms.map((x) => x.community_message_id);
+    const canPick = ms.every(forwardable);
+    const on = Boolean(picking && ids.every((id) => picking.includes(id)));
+    const unreadHere = firstUnread && ms.some((x) => x.community_message_id === firstUnread.id);
+    return (
+      <div key={key} data-message={m.community_message_id} className="flex flex-col gap-3">
+        {unreadHere && (
+          <p data-unread-line className="self-stretch rounded-full bg-muted py-1 text-center text-2xs font-semibold text-subtle-foreground">
+            {firstUnread.count === 1 ? "1 Unread Message" : `${firstUnread.count} Unread Messages`}
+          </p>
+        )}
+        <div
+          className={cn("group flex items-start gap-2", picking && canPick && "cursor-pointer", phone && "no-callout select-none")}
+          onClickCapture={(e) => {
+            if (picking && canPick) {
+              e.preventDefault();
+              e.stopPropagation();
+              toggle(ids);
+            }
+          }}
+          {...pressFor(ids, canPick)}
+        >
+          {picking && (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={on}
+              aria-label={ms.length > 1 ? "Select photos" : "Select message"}
+              className={cn("mt-1 flex size-5.5 flex-none items-center justify-center max-md:mt-0 max-md:size-tap", !canPick && "invisible")}
             >
-              {picking && (
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={on}
-                  aria-label={ms.length > 1 ? "Select photos" : "Select message"}
-                  className={cn("mt-1 flex size-5.5 flex-none items-center justify-center max-md:mt-0 max-md:size-tap", !canPick && "invisible")}
-                >
-                  <span className={cn("flex size-5.5 items-center justify-center rounded-full border-2", on ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
-                    {on && <Icon name="tick" className="size-3.5" />}
-                  </span>
-                </button>
-              )}
-              <div className={cn("flex min-w-0 flex-1 flex-col", m.mine && m.message_type !== "announcement" && "items-end")}>
-                {ms.length > 1 ? (
-                  <AlbumPost ms={ms} q={t.q} dm={dm} onView={view} menu={picking ? undefined : albumMenu(ms)} />
-                ) : (
-                  <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} onView={view} menu={picking ? undefined : menuOf(m)} />
-                )}
-              </div>
-            </div>
+              <span className={cn("flex size-5.5 items-center justify-center rounded-full border-2", on ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                {on && <Icon name="tick" className="size-3.5" />}
+              </span>
+            </button>
+          )}
+          <div className={cn("flex min-w-0 flex-1 flex-col", m.mine && m.message_type !== "announcement" && "items-end")}>
+            {ms.length > 1 ? (
+              <AlbumPost ms={ms} q={t.q} dm={dm} onView={view} menu={picking ? undefined : albumMenu(ms)} />
+            ) : (
+              <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} onView={view} menu={picking ? undefined : menuOf(m)} />
+            )}
           </div>
-        );
-      })}
-      {!t.msgs.length && !t.loading && <p className="m-auto text-xs text-subtle-foreground">{t.q ? "Nothing matches here." : "No messages yet. Say hello."}</p>}
-      {viewer}
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={box} onScroll={onScroll} data-thread data-copy="content" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 [&>*]:flex-shrink-0">
+        <div ref={top} aria-hidden="true" />
+        {t.olderState === "loading" && <Spinner className="self-center" label="Loading older messages" />}
+        {loaded && t.hasOlder && (t.olderState === "failed" || (!watching && t.olderState === "idle")) && (
+          <Button className="self-center" size="sm" onClick={olderByHand}>
+            Load Older
+          </Button>
+        )}
+        {days.map(({ day, rows: dayRows }) => (
+          <div key={day} className="flex flex-col gap-3">
+            <span className="sticky top-2 z-10 self-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-2xs text-subtle-foreground">
+              {day === today ? "Today" : day === yesterday ? "Yesterday" : formatDate(day)}
+            </span>
+            {dayRows.map(row)}
+          </div>
+        ))}
+        {t.error && !t.msgs.length && <ErrorState error={t.error} onRetry={t.retry} />}
+        {loaded && !t.msgs.length && <p className="m-auto text-xs text-subtle-foreground">{t.q ? "Nothing matches here." : "No messages yet. Say hello."}</p>}
+        {viewer}
+      </div>
+      {(away || fresh > 0) && (
+        <div className="absolute right-3 bottom-3">
+          <IconButton icon="down" label="Newest Messages" onClick={toBottom} className="rounded-full border border-border bg-card shadow-2" />
+          {fresh > 0 && <CountBadge count={fresh} max={99} label="new messages" className="pointer-events-none absolute -top-1.5 -right-1.5" />}
+        </div>
+      )}
     </div>
   );
 }

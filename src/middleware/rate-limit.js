@@ -4,7 +4,8 @@
  * environment (`mycity:<env>:rl:`), so staging traffic never spends
  * production's budget and a restart does not reset anyone's count.
  *
- *   staffLimiter        /api/v1        per signed-in user (per IP before sign-in), RATE_LIMIT_STAFF_PER_MIN
+ *   staffLimiter        /api/v1        per signed-in user (per IP before sign-in), RATE_LIMIT_STAFF_PER_MIN, uploads aside
+ *   uploadLimiter       /api/v1        uploads only (a multipart POST), per signed-in user, 60 per minute
  *   publicLimiter       /api/public    per IP, RATE_LIMIT_PUBLIC_PER_MIN
  *   publicWriteLimiter  /api/public    per IP, writes only, RATE_LIMIT_PUBLIC_WRITES_PER_MIN
  *   signInLimiter       sign-in        per IP, failed attempts only, 10 per 15 minutes
@@ -128,13 +129,35 @@ function makeLimiter({
 
 const WRITE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+/** The verified user, else the address: the staff surface's key for every limiter on it. */
+const staffKey = (req) => {
+  const userId = userIdFromRequest(req);
+  return userId ? `user:${userId}` : `ip:${req.ip}`;
+};
+
+/** A file on its way: every upload route takes one multipart POST per file. */
+const isUpload = (req) =>
+  req.method === "POST" && Boolean(req.is("multipart/form-data"));
+
+/*
+ * Uploads have their own budget (docs/guides/community.md §6), so a screen busy with
+ * reads never blocks a file and a burst of files never blocks the screen. Each request
+ * counts against exactly one of the two: a multipart header on another route only moves
+ * it to the smaller budget.
+ */
 const staffLimiter = makeLimiter({
   name: "staff",
   max: config.RATE_LIMIT_STAFF_PER_MIN,
-  key: (req) => {
-    const userId = userIdFromRequest(req);
-    return userId ? `user:${userId}` : `ip:${req.ip}`;
-  },
+  key: staffKey,
+  skip: isUpload,
+});
+
+/** Six full Send Files (10 files each) a minute. */
+const uploadLimiter = makeLimiter({
+  name: "upload",
+  max: 60,
+  key: staffKey,
+  skip: (req) => !isUpload(req),
 });
 
 const publicLimiter = makeLimiter({
@@ -265,6 +288,7 @@ module.exports = {
   storeKind,
   makeLimiter,
   staffLimiter,
+  uploadLimiter,
   publicLimiter,
   publicWriteLimiter,
   signInLimiter,

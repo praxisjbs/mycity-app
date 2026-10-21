@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { usePhoto, usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
@@ -66,10 +66,10 @@ function Channels() {
   const rows = list.rows;
   const current = rows.find((c) => c.community_channel_id === sel) ?? (mobile ? undefined : rows.find((c) => c.can_post) ?? rows[0]);
   const reloadList = list.reload;
-  const t = useThread(current?.community_channel_id ?? null, { onActivity: reloadList });
+  const openUnread = current?.unread ?? 0;
+  const t = useThread(current?.community_channel_id ?? null, { unread: openUnread, onActivity: reloadList });
   /* Opening a channel marks it read, whether picked or shown first. */
   const openId = current?.community_channel_id;
-  const openUnread = current?.unread ?? 0;
   useEffect(() => {
     if (openId && openUnread) void api.call("POST /api/v1/community/channels/:id/read", { params: { id: openId }, body: {} }).then(reloadList);
   }, [openId, openUnread, reloadList]);
@@ -485,19 +485,36 @@ function Direct() {
   const split = useSplitPanes("chat", 300);
   const current = (sel && (list.rows.find((r) => r.community_channel_id === sel.community_channel_id) ?? sel)) ?? (mobile ? null : list.rows[0] ?? null);
   const reloadList = list.reload;
-  const t = useThread(current?.community_channel_id ?? null, { direct: true, onActivity: reloadList });
-  /* Reading a conversation clears its count on the server; show that in the list. */
+  const t = useThread(current?.community_channel_id ?? null, { direct: true, unread: current?.unread ?? 0, onActivity: reloadList });
+  /*
+   * Reading a conversation clears its count on the server; show that in the list. Once on
+   * opening and again for each new message from the other person, never for older pages.
+   */
   const openId = current?.community_channel_id;
+  const lastIn = useMemo(() => {
+    for (let i = t.msgs.length - 1; i >= 0; i -= 1) if (!t.msgs[i]!.mine) return t.msgs[i]!.community_message_id;
+    return undefined;
+  }, [t.msgs]);
   useEffect(() => {
     if (!openId) return;
     void api.call("POST /api/v1/community/channels/:id/read", { params: { id: openId }, body: {} }).then(reloadList, () => undefined);
-  }, [openId, reloadList, t.msgs.length]);
+  }, [openId, reloadList, lastIn]);
 
-  /* Messages that arrive while the list is open have reached this device. */
-  const ackAll = useCallback(() => {
-    for (const r of list.rows) if (r.unread > 0) void api.call("POST /api/v1/community/channels/:id/delivered", { params: { id: r.community_channel_id }, body: { up_to: new Date().toISOString() } }).catch(() => undefined);
-  }, [list.rows]);
-  useEffect(ackAll, [ackAll]);
+  /*
+   * Messages that arrive while the list is open have reached this device: said once for each
+   * conversation's newest message, not on every read of the list (community.md §3 step 10).
+   */
+  const waiting = list.rows
+    .filter((r) => r.unread > 0)
+    .map((r) => `${r.community_channel_id} ${r.last_at ?? ""}`)
+    .join(",");
+  useEffect(() => {
+    if (!waiting) return;
+    for (const w of waiting.split(",")) {
+      const id = w.split(" ")[0]!;
+      void api.call("POST /api/v1/community/channels/:id/delivered", { params: { id }, body: { up_to: new Date().toISOString() } }).catch(() => undefined);
+    }
+  }, [waiting]);
   useRealtime("community.channels", reloadList);
 
   const pick = (c: Conversation) => {

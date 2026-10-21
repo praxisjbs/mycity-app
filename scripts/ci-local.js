@@ -232,5 +232,6 @@ if (notBuilt.length) {
   );
 }
 
-const exitCode = failed.length || (STRICT && notBuilt.length) ? 1 : 0;
-process.exit(exitCode);
+// Not process.exit(): a failed gate's report can be long, and into a pipe (CI) exit drops what is
+// still being written, the summary included.
+process.exitCode = failed.length || (STRICT && notBuilt.length) ? 1 : 0;

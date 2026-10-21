@@ -3477,7 +3477,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 | Use | Anywhere a person attaches a file: a CV, a receipt, a signed offer, a mail attachment, an import sheet. |
 | Avoid | A raw `<input type="file">` anywhere else (gate 18); storing a path or a name instead of the `document_id`; a silent wait on a large file. |
 | Phone | The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels. |
-| Accessibility | The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph. |
+| Accessibility | The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph. A file that failed says why, with Retry (not for one too large) and Remove, each named for the file. |
 | Status | stable |
 | Exports | `UploadField` |
 | Import | `import { UploadField } from "@mycity/ui";` |

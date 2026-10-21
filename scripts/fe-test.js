@@ -52,6 +52,8 @@ function run(name) {
   const failed = results.filter((r) => r.code !== 0).map((r) => WORKSPACES[r.name]);
   if (failed.length) {
     console.error(`\nfe-test: failed in ${failed.join(", ")}`);
-    process.exit(1);
+    // Not process.exit(): into a pipe (CI) a long report is still being written, and exit drops
+    // the rest, so the failing test's own lines never reached the log.
+    process.exitCode = 1;
   }
 })();

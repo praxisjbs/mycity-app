@@ -315,21 +315,47 @@ function setPinned(db, channelId, userId, on) {
   );
 }
 
-function markRead(db, channelId, userId) {
-  return db.query(
-    `UPDATE community_member SET last_read_at = now(),
-            last_delivered_at = GREATEST(COALESCE(last_delivered_at, now()), now())
-      WHERE community_channel_id = $1 AND user_id = $2`,
+/**
+ * Moves one of the caller's pointers (`set`) and says whether it covered a live message from
+ * someone else that it had not covered before: the only time a receipt is worth sending
+ * (community.md §3 step 10). Every part of the statement reads the same snapshot, so `was` is
+ * the pointer as it stood before `mark` moved it.
+ */
+const MARK = (pointer, set) => `
+  WITH was AS (SELECT ${pointer} AS at FROM community_member WHERE community_channel_id = $1 AND user_id = $2),
+       mark AS (UPDATE community_member SET ${set} WHERE community_channel_id = $1 AND user_id = $2 RETURNING ${pointer} AS at)
+  SELECT EXISTS (
+    SELECT 1 FROM community_message x, was
+     WHERE x.community_channel_id = $1 AND x.deleted_at IS NULL
+       AND (x.sender_user_id IS NULL OR x.sender_user_id <> $2)
+       AND (was.at IS NULL OR x.sent_at > was.at)
+       AND x.sent_at <= (SELECT at FROM mark)
+  ) AS covered`;
+
+/** Read up to now. Resolves true when something from the others was unread. */
+async function markRead(db, channelId, userId) {
+  const row = await one(
+    db,
+    MARK(
+      "last_read_at",
+      "last_read_at = now(), last_delivered_at = GREATEST(COALESCE(last_delivered_at, now()), now())",
+    ),
     [channelId, userId],
   );
+  return Boolean(row && row.covered);
 }
 
-function markDelivered(db, channelId, userId, upTo) {
-  return db.query(
-    `UPDATE community_member SET last_delivered_at = GREATEST(COALESCE(last_delivered_at, $3), LEAST($3, now()))
-      WHERE community_channel_id = $1 AND user_id = $2`,
+/** Delivered up to `upTo` (never past now). Resolves true when it reached a message not delivered before. */
+async function markDelivered(db, channelId, userId, upTo) {
+  const row = await one(
+    db,
+    MARK(
+      "last_delivered_at",
+      "last_delivered_at = GREATEST(COALESCE(last_delivered_at, $3), LEAST($3, now()))",
+    ),
     [channelId, userId, upTo],
   );
+  return Boolean(row && row.covered);
 }
 
 /* ------------------------------------------------------------------ *
@@ -359,6 +385,13 @@ function lockPair(db, userA, userB) {
   ]);
 }
 
+/**
+ * A direct conversation shows once its first message is sent (community.md §3 step 7): one
+ * started and left empty is in nobody's list, and Forward To offers its colleague as a person.
+ * A message deleted since still counts, so a conversation does not vanish when it is.
+ */
+const TALKED = `EXISTS (SELECT 1 FROM community_message t WHERE t.community_channel_id = c.community_channel_id)`;
+
 const CONVERSATION = `
   SELECT c.community_channel_id, other.user_id, (other.user_id = $1) AS is_self, ${PERSON("e", "d")} AS person,
          ${ONLINE()} AS online, p.last_seen_at,
@@ -383,7 +416,7 @@ function listConversations(db, userId, query) {
       WHERE c.channel_type = 'direct'
         AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
         AND (NOT $3::boolean OR ${UNREAD} > 0)
-        AND (lm.last_at IS NOT NULL OR c.created_by = $1)
+        AND ${TALKED}
       ORDER BY m.pinned_at DESC NULLS LAST, COALESCE(lm.last_at, c.created_at) DESC, c.community_channel_id`,
     [userId, query.q ?? null, Boolean(query.unread)],
     query,
@@ -631,7 +664,7 @@ function forwardTargets(db, userId, query) {
          SELECT 'direct', c.community_channel_id, e.employee_id, e.first_name || ' ' || e.last_name,
                 ${PERSON("e", "d")}, NULL, other.user_id = $1, 0, COALESCE(lm.last_at, c.created_at)
            ${CONVERSATION_FROM}
-          WHERE c.channel_type = 'direct' AND c.archived_at IS NULL AND (lm.last_at IS NOT NULL OR c.created_by = $1)
+          WHERE c.channel_type = 'direct' AND c.archived_at IS NULL AND ${TALKED}
             AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
          UNION ALL
          SELECT 'person', NULL, e.employee_id, e.first_name || ' ' || e.last_name,
@@ -644,7 +677,7 @@ function forwardTargets(db, userId, query) {
               SELECT 1 FROM community_channel c
                 JOIN community_member a ON a.community_channel_id = c.community_channel_id AND a.user_id = $1
                 JOIN community_member b ON b.community_channel_id = c.community_channel_id AND b.user_id = u.user_id
-               WHERE c.channel_type = 'direct'
+               WHERE c.channel_type = 'direct' AND ${TALKED}
                  AND (SELECT count(*) FROM community_member z WHERE z.community_channel_id = c.community_channel_id)
                      = CASE WHEN u.user_id = $1 THEN 1 ELSE 2 END)
             AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || COALESCE(d.name, '') || ' ' || e.job_title)
