@@ -1,5 +1,5 @@
 import type { Assessment, Candidate, CandidateDetail, InterviewDetail, OfferRow, OnboardingDetail, PoolRow, Stage, Vacancy } from "@/api/types/recruitment";
-import type { Status } from "@/api/types/performance";
+import type { Status } from "@/api/types/shared";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
 import { byId, refKey } from "../data/people";
 

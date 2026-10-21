@@ -174,15 +174,10 @@ describe("the rows", () => {
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 
-  test("dates count from the run's day: targets inside the quarter, agreements inside the year", () => {
+  test("dates count from the run's day: agreements inside the year", () => {
     expect(x.quarterName).toBe("Q4 2026");
     for (const { row, values } of written) {
-      if (row.table === "employee_target") {
-        expect(values.due_on >= x.today).toBe(true);
-        expect(values.due_on <= x.quarter.to).toBe(true);
-      }
       if (row.table === "partnership_agreement") expect(values.starts_on >= "2026-01-01").toBe(true);
-      if (row.table === "calendar_event") expect(values.starts_at < values.ends_at).toBe(true);
     }
   });
 
@@ -190,8 +185,7 @@ describe("the rows", () => {
     const vacancy = forward.ROWS.find((r) => r.table === "vacancy" && r.key === "open-seat-2");
     const withoutSeats = { ...x, seats: x.seats.slice(0, 1) };
     expect(vacancy.values(withoutSeats, [staff.operations])).toBeNull();
-    const task = forward.ROWS.find((r) => r.table === "task");
-    expect(task.values(x, [staff.operations, { ...staff.ceo, user_id: null }])).toBeNull();
+    expect(vacancy.values(x, [{ ...staff.operations, user_id: null }])).toBeNull();
     const line = forward.ROWS.find((r) => r.table === "budget_line");
     expect(line.values({ ...x, categories: new Map() }, [])).toBeNull();
     expect(() => forward.personOf(staff, "chairman")).toThrow(/no post/);
@@ -205,14 +199,9 @@ describe("the rows", () => {
     expect([filled.number, filled.slug]).toEqual([before.number, before.slug]);
   });
 
-  test("a row whose unique key would take a value a row before it holds is left out", () => {
+  test("with no unique key in the way, every row is planned", () => {
+    // Reviews, whose keys could clash when one person held both manager posts, are M2's own seed now.
     const keys = new Map(forward.DELETE_ORDER.map((table) => [table, []]));
-    keys.set("performance_review", [["performance_cycle_id", "employee_id", "reviewer_employee_id", "review_type"]]);
-    // One person in both posts: the Line Manager's team is the Head's, reviewed once.
-    const plan = forward.planOf(forward.ROWS, x, { ...staff, manager: staff.head }, keys);
-    const reviews = [...plan.values()].filter((p) => p.row.table === "performance_review").map((p) => p.row.key);
-    expect(reviews).toHaveLength(6);
-    expect(reviews.every((key) => /:head_team:\d$/.test(key))).toBe(true);
     expect(forward.planOf(forward.ROWS, x, staff, keys).size).toBe(forward.ROWS.length);
   });
 });

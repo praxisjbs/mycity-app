@@ -1,5 +1,5 @@
 import type { Category, Disbursement, ExpenseDetail, ExpenseRow, Requisition } from "@/api/types/expenses";
-import type { Status, Trail } from "@/api/types/performance";
+import type { Status, Trail } from "@/api/types/shared";
 import { created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
 import { byKey, refKey, SIGN_INS } from "../data/people";
 import { REQUESTS, STAGE_PILL, type MockRequest } from "../data/expenses";

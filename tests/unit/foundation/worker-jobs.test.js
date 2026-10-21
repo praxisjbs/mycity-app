@@ -30,7 +30,7 @@ describe("job registry", () => {
     }
   });
 
-  test("the queue list is the README §5.15 list: M0, and the M1 jobs built so far", () => {
+  test("the queue list is the README §5.15 list: M0, and the M1 and M2 jobs built so far", () => {
     expect(registry.JOBS.map((j) => j.queue).sort()).toEqual([
       "announcement-publish",
       "attendance-day-close",
@@ -47,7 +47,9 @@ describe("job registry", () => {
       "notification-deliver",
       "notification-push",
       "pdf-render",
+      "review-cycle-open",
       "scheduled-report",
+      "task-recurrence",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
       "alert-ageing",
@@ -60,7 +62,10 @@ describe("job registry", () => {
       "mail-sync",
       "media-reconcile",
       "outbox-dispatch",
+      "review-cycles",
+      "review-reminders",
       "scheduled-reports",
+      "task-recurrence",
       "workflow-timeout",
     ]);
   });

@@ -317,6 +317,25 @@ function routeOf(def, instance) {
 async function detail(client, id, user) {
   const instance = await engine.getInstance(client, id);
   if (!instance || !(await mayRead(client, instance, user))) throw notFound();
+  return viewOf(client, instance, user);
+}
+
+/**
+ * A request's route, decisions and what the caller may do, for a module that shows its
+ * own record's approval beside the record (Performance's goals, plans and reviews). The
+ * module has already decided the caller may see the record, so this does not ask again;
+ * null when there is no instance.
+ * @param {{query: Function}} client
+ * @param {string|null} id  workflow_instance_id
+ * @param {object} user     req.user
+ */
+async function approvalOf(client, id, user) {
+  if (!id) return null;
+  const instance = await engine.getInstance(client, id);
+  return instance ? viewOf(client, instance, user) : null;
+}
+
+async function viewOf(client, instance, user) {
   const def = await definitions.findById(client, instance.workflow_definition_id);
   const route = routeOf(def, instance);
   const authored = route.map(({ stage, state }) => (state === "now" ? instance.stage_approvers : stage.approvers));
@@ -465,6 +484,7 @@ async function reassign(user, id, { user_id: toUserId, reason }) {
 }
 
 module.exports = {
+  approvalOf,
   approveModules,
   conditionList,
   approverView,

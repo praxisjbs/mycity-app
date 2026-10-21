@@ -1,0 +1,53 @@
+<style>
+  .rs-head { margin: 0 0 6mm 0; }
+  .rs-head h1 { margin: 0 0 1mm 0; font-size: 15pt; color: #014339; }
+  .rs-head p { margin: 0; font-size: 9pt; color: #71717A; }
+  .rs-facts { width: 100%; border-collapse: collapse; margin: 0 0 6mm 0; font-size: 9pt; }
+  .rs-facts td { padding: 1.2mm 0; vertical-align: top; }
+  .rs-facts td.k { width: 32%; color: #71717A; }
+  .rs-ratings { display: flex; gap: 6mm; margin: 0 0 6mm 0; }
+  .rs-rating { flex: 1; padding: 3mm 4mm; border: 0.3mm solid #E4E4E7; border-radius: 2.5mm; }
+  .rs-rating span { display: block; font-size: 8pt; color: #71717A; }
+  .rs-rating strong { font-size: 16pt; color: #014339; }
+  h2 { margin: 6mm 0 2mm 0; font-size: 11pt; color: #09090B; }
+  table.rs-grid { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .rs-grid th { text-align: left; padding: 1.5mm; border-bottom: 0.4mm solid #A1A1AA; color: #6A6A72; font-weight: 600; }
+  .rs-grid td { padding: 1.5mm; border-bottom: 0.25mm solid #E4E4E7; vertical-align: top; }
+  .rs-grid tr { page-break-inside: avoid; }
+  .rs-answer { margin: 0 0 4mm 0; page-break-inside: avoid; font-size: 9pt; }
+  .rs-answer p.q { margin: 0 0 1.5mm 0; font-weight: 600; }
+  .rs-answer p.who { margin: 1.5mm 0 0.5mm 0; font-size: 8pt; color: #71717A; }
+  .rs-answer p.a { margin: 0; white-space: pre-wrap; }
+</style>
+<div class="rs-head">
+  <h1>Performance Review</h1>
+  <p>{{ cycle }} · {{ period }}</p>
+</div>
+<table class="rs-facts">
+  <tr><td class="k">Employee</td><td>{{ employee }}</td></tr>
+  <tr><td class="k">Job Title</td><td>{{ job_title }}</td></tr>
+  <tr><td class="k">Department</td><td>{{ department }}</td></tr>
+  <tr><td class="k">Reviewer</td><td>{{ reviewer }}</td></tr>
+  <tr><td class="k">Closed</td><td>{{ closed_on }}</td></tr>
+</table>
+<div class="rs-ratings">
+  <div class="rs-rating"><span>Self Rating</span><strong>{{ self_rating }}</strong></div>
+  <div class="rs-rating"><span>Manager Rating</span><strong>{{ manager_rating }}</strong></div>
+</div>
+{{#if summary}}<h2>Manager's Summary</h2><p class="rs-answer">{{ summary }}</p>{{/if}}
+<h2>KPIs</h2>
+<table class="rs-grid">
+  <tr><th>KPI</th><th>Weight</th><th>Result</th><th>Self</th><th>Manager</th><th>Comment</th></tr>
+  {{#each kpis}}<tr><td>{{ title }}</td><td>{{ weight }}</td><td>{{ result }}</td><td>{{ self }}</td><td>{{ manager }}</td><td>{{ comment }}</td></tr>{{/each}}
+</table>
+<h2>Questions</h2>
+{{#each answers}}<div class="rs-answer">
+  <p class="q">{{ prompt }}</p>
+  <p class="who">Employee</p><p class="a">{{ self }}</p>
+  <p class="who">Manager</p><p class="a">{{ manager }}</p>
+</div>{{/each}}
+<h2>Approvals</h2>
+<table class="rs-grid">
+  <tr><th>Stage</th><th>By</th><th>On</th></tr>
+  {{#each approvals}}<tr><td>{{ stage }}</td><td>{{ by }}</td><td>{{ on }}</td></tr>{{/each}}
+</table>

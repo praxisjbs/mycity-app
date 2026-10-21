@@ -121,6 +121,11 @@ const JOBS = Object.freeze([
     concurrency: 1,
     summary: "The morning's repeating tasks and due reminders, run again by hand",
   },
+  {
+    queue: "review-cycle-open",
+    concurrency: 1,
+    summary: "The morning's review cycles opened again by hand",
+  },
 ]);
 
 /** Files in jobs/schedulers/. */
@@ -138,6 +143,8 @@ const SCHEDULERS = Object.freeze([
   "scheduled-reports",
   "data-export-cleanup",
   "task-recurrence",
+  "review-cycles",
+  "review-reminders",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

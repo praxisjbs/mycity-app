@@ -1,5 +1,5 @@
 import type { Contract, Lead, Partner360, PartnerRow, Proposal } from "@/api/types/partnerships";
-import type { Status, Trail } from "@/api/types/performance";
+import type { Status, Trail } from "@/api/types/shared";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
 import { byId, refKey } from "../data/people";
 import { PARTNERS, STAGES, stageTone, type MockPartner, type Stage } from "../data/partners";

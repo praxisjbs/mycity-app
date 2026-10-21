@@ -8,8 +8,8 @@
  * nothing a wrong employee id could slip past; the service reads the employee
  * from `req.user` and there is no parameter that names another.
  *
- * My Profile, My Documents (M0, track B) and My Leave (M1) are on the real API. The other
- * tabs are added here as their milestones land.
+ * My Profile, My Documents (M0, track B), My Leave (M1) and My Performance (M2) are on the
+ * real API. The other tabs are added here as their milestones land.
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -95,5 +95,27 @@ route(router, "post", "/leave/:id/cancel",
   { params: c.common.IdParams, body: c.leave.LeaveCancel, response: c.leave.LeaveRequest,
     self: true, summary: "Cancel one of my leave requests" },
   controller.cancelLeave);
+
+/* My Performance: my month, my reviews, and my open self review (M2). */
+
+route(router, "get", "/performance",
+  { response: c.ess.MyPerformance, self: true, summary: "My KPIs this month and my reviews" },
+  controller.performance);
+
+route(router, "get", "/performance/review",
+  { response: c.reviews.ReviewDetail, self: true, summary: "My open self review" },
+  controller.performanceReview);
+
+route(router, "put", "/performance/review",
+  { body: c.reviews.ReviewSave, response: c.reviews.ReviewDetail, self: true, summary: "Save my self review" },
+  controller.savePerformanceReview);
+
+route(router, "post", "/performance/review/submit",
+  { body: c.common.EmptyBody, response: c.reviews.ReviewDetail, self: true, summary: "Hand in my self review" },
+  controller.submitPerformanceReview);
+
+route(router, "post", "/performance/review/dictation",
+  { body: c.reviews.DictationRequest, response: c.reviews.Dictation, self: true, summary: "Dictate an answer on my review" },
+  upload.single("file", { purpose: "voice_note" }), controller.dictatePerformanceAnswer);
 
 module.exports = { basePath: "/ess", surface: "staff", router };

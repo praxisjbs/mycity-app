@@ -9,8 +9,10 @@
  *
  * Same path as llm.service.complete: governance first (a refusal is recorded), the run
  * opened before anything is sent, the step recorded with its tokens, the run closed.
- * The stub answers with a marked placeholder. With a Gemini key, until M2, the call
- * fails with AI_NOT_AVAILABLE and the run says so, rather than pretending.
+ * The stub answers with a marked placeholder. With a Gemini key the stored recording is sent
+ * to Gemini (vendors/gemini.js transcribe): a type Gemini takes as it is, anything else
+ * (browsers record webm/Opus, Safari mp4/AAC) first made 16 kHz mono FLAC with ffmpeg, which
+ * for a dictated answer of at most three minutes takes well under a second.
  *
  * Only audio the caller may read is sent: the caller checks vault.canRead first, and
  * this reads the stored file by id (a voice note must be audio, and must have passed
@@ -21,7 +23,47 @@ const catalog = require("../../shared/access/access.catalog");
 const governance = require("./governance");
 const ledger = require("./ledger");
 
-const DEFAULT_VENDORS = Object.freeze({ stub: require("./vendors/stub") });
+const fs = require("node:fs/promises");
+const os = require("node:os");
+const path = require("node:path");
+const { config } = require("../../config/env");
+const storage = require("../storage/storage.service");
+const av = require("../media/av-pipeline");
+
+const DEFAULT_VENDORS = Object.freeze({ gemini: require("./vendors/gemini"), stub: require("./vendors/stub") });
+
+/** Types Gemini takes as they are, by the stored mime's base type. */
+const ACCEPTED = new Map([
+  ["audio/wav", "audio/wav"],
+  ["audio/x-wav", "audio/wav"],
+  ["audio/mp3", "audio/mp3"],
+  ["audio/mpeg", "audio/mp3"],
+  ["audio/aiff", "audio/aiff"],
+  ["audio/aac", "audio/aac"],
+  ["audio/flac", "audio/flac"],
+]);
+const CONVERT_TIMEOUT_MS = 60_000;
+
+/** The recording's bytes in a type the vendor takes. */
+async function audioOf(doc) {
+  const audio = await storage.get(doc.storage_key);
+  const base = String(doc.mime || "").split(";")[0].trim().toLowerCase();
+  if (ACCEPTED.has(base)) return { audio, mimeType: ACCEPTED.get(base) };
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mycity-audio-"));
+  try {
+    const input = path.join(dir, "in.bin");
+    const output = path.join(dir, "out.flac");
+    await fs.writeFile(input, audio);
+    await av.run(
+      config.FFMPEG_PATH || "ffmpeg",
+      ["-hide_banner", "-loglevel", "error", "-nostdin", "-i", input, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac", output],
+      { timeoutMs: CONVERT_TIMEOUT_MS },
+    );
+    return { audio: await fs.readFile(output), mimeType: "audio/flac" };
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
 
 /**
  * @param {{document_id: string, module: string, actor: object|null, purpose?: string,
@@ -38,7 +80,7 @@ async function transcribe({
   if (!catalog.isModule(module))
     throw new Error(`ai.transcribe: "${module}" is not a module key`);
   const { rows } = await db.query(
-    "SELECT mime, scan_status FROM document WHERE document_id = $1",
+    "SELECT mime, scan_status, storage_key FROM document WHERE document_id = $1",
     [documentId],
   );
   const doc = rows[0];
@@ -88,12 +130,12 @@ async function transcribe({
       prices,
       latency_ms: 0,
       outcome: "failed",
-      error: "transcription arrives with M2",
+      error: "this vendor does not transcribe",
     });
     await ledger.finishRun(db, runId, {
       status: "failed",
       error_code: "AI_NOT_AVAILABLE",
-      error: "transcription arrives with M2",
+      error: "this vendor does not transcribe",
     });
     throw new AppError(
       "AI_NOT_AVAILABLE",
@@ -101,7 +143,35 @@ async function transcribe({
       501,
     );
   }
-  const res = await vendor.transcribe({ document_id: documentId, model });
+  let res;
+  try {
+    const input = vendorName === "stub" ? {} : await audioOf(doc);
+    res = await vendor.transcribe({
+      document_id: documentId,
+      model,
+      apiKey: config.GEMINI_API_KEY,
+      timeoutMs: config.AI_REQUEST_TIMEOUT_MS,
+      ...input,
+    });
+  } catch (err) {
+    await ledger.recordStep(db, runId, {
+      step_no: 1,
+      kind: "transcription",
+      vendor: vendorName,
+      model,
+      prices,
+      latency_ms: Date.now() - started,
+      outcome: "failed",
+      error: err.message,
+    });
+    const configError = err.kind === "config";
+    await ledger.finishRun(db, runId, {
+      status: "failed",
+      error_code: configError ? "AI_VENDOR_CONFIG" : "AI_UNAVAILABLE",
+      error: err.message,
+    });
+    throw new AppError(configError ? "AI_VENDOR_CONFIG" : "AI_UNAVAILABLE", "Could not hear that, try again", 503);
+  }
   await ledger.recordStep(db, runId, {
     step_no: 1,
     kind: "transcription",

@@ -1,5 +1,5 @@
 import type { AiAnswer, AiTurn, Article, Block, Faq, Overdue, Resource } from "@/api/types/knowledge";
-import type { Status } from "@/api/types/performance";
+import type { Status } from "@/api/types/shared";
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail } from "../core";
 import { byKey, refKey, SIGN_INS } from "../data/people";
 import { PARTNERS } from "../data/partners";

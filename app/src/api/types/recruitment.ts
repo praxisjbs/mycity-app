@@ -1,6 +1,6 @@
 import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
-import type { Status, Step, Trail } from "./performance";
+import type { Status, Step, Trail } from "./shared";
 import type { LetterPreview } from "./queries";
 
 /** INTERIM Recruitment shapes (owner TB; MILESTONES §9). Candidates apply and take assessments on the public site. */

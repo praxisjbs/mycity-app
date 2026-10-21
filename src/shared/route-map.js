@@ -216,18 +216,15 @@ const ENTITY_ROUTES = Object.freeze({
   worksite: screen("people", "worksites"),
 
   // Performance
-  // search:none not built yet (src/modules/goals)
   goal: {
     ...screen("performance", "goals"),
     self: screen("ess", "my-performance"),
   },
-  // search:none not built yet (src/modules/targets)
   target: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
-  kpi: screen("performance", "kpis"), // search:none not built yet (src/modules/kpis)
-  // search:none not built yet (src/modules/reviews)
+  kpi: screen("performance", "kpis"),
   review: {
     ...screen("performance", "reviews"),
     self: screen("ess", "my-performance"),

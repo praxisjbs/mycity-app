@@ -12,8 +12,11 @@
  * change, the request an upload answers, and the controls of their own leave list,
  * which never name another person.
  *
- * The rest of ESS (payslips, queries, performance) arrives with its own milestones;
- * its shapes belong here when they do.
+ * My Performance (M2) reads the caller's KPIs and reviews in the shapes of kpis.js and
+ * reviews.js; what it adds is the month at a glance below.
+ *
+ * The rest of ESS (payslips, queries) arrives with its own milestones; its shapes belong
+ * here when they do.
  */
 const { z } = require("zod");
 const { uuid, optionalText, isoDate, listQuery, phone, blank } = require("./common");
@@ -21,6 +24,9 @@ const { UploadPurpose } = require("./documents");
 const { LeaveStatus } = require("./leave");
 const { EmployeeStatus, EmploymentType, WorkPattern, ManagerRef } = require("./organisation");
 const { SchedulePlace } = require("./attendance");
+const { Kpi, KpiTrace } = require("./kpis");
+const { Review, Cycle } = require("./reviews");
+const { Month } = require("./goals");
 
 /* ------------------------------------------------------------------ *
  * My Profile
@@ -193,7 +199,35 @@ const TABLES = {
   EssLeaveCalendarQuery: { table: null, reason: "the month the leave calendar shows" },
   EssDataExportQueued: { table: null, reason: "that Download My Data was queued, and the email it goes to" },
   DataExportEmailVars: { table: null, reason: "the variables of templates/email/data-export.html, not a row" },
+  MyPerformance: { table: null, reason: "the caller's KPIs, score and reviews for a month" },
 };
+
+/* ------------------------------------------------------------------ *
+ * My Performance (docs/guides/performance.md §2, §10)
+ * ------------------------------------------------------------------ */
+
+/** GET /ess/performance: the caller's month and their reviews. */
+const MyPerformance = z
+  .object({
+    month: Month,
+    /** Who set the month's KPIs; null before any are set. */
+    set_by: z.string().nullable(),
+    /** Σ(attainment × weight) ÷ 100 over the active KPIs, 0 to 1. */
+    kpi_score: z.number().min(0).max(1).nullable(),
+    on_track: z.number().int().min(0),
+    kpi_count: z.number().int().min(0),
+    weight_assigned: z.string(),
+    last_review: z.number().nullable(),
+    next_cycle: Cycle.nullable(),
+    kpis: z.array(Kpi),
+    /** Rolls Up To, for each KPI. */
+    traces: z.array(KpiTrace),
+    /** The caller's own reviews, newest first; the manager rating shows once closed. */
+    reviews: z.array(Review).max(25),
+    /** The open self review, when a cycle is open and it is not yet submitted. */
+    open_review_id: uuid.nullable(),
+  })
+  .strict();
 
 module.exports = {
   TABLES,
@@ -207,4 +241,5 @@ module.exports = {
   EssLeaveCalendarQuery,
   EssDataExportQueued,
   DataExportEmailVars,
+  MyPerformance,
 };

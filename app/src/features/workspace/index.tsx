@@ -311,6 +311,12 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
     },
     tasks.TaskCreate,
   );
+  /* Counts Towards: the assignee's approved KPIs this month (performance guide §3 step 6). */
+  const [kpi, setKpi] = useState(task?.counts_towards?.employee_target_id ?? "");
+  const kpis = usePaged("GET /api/v1/performance/kpis", {
+    filters: { month: todayIso().slice(0, 7), employee_id: (who[0] ?? task?.assignee)?.employee_id ?? me.employee_id ?? undefined, status: "active" },
+    enabled: canAssign,
+  });
   const createTask = useMutation("POST /api/v1/tasks");
   const editTask = useMutation("PATCH /api/v1/tasks/:id");
   const submit = async () => {
@@ -319,7 +325,7 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
     try {
       if (task) {
         const body = task.can_reassign
-          ? { title: v.title, priority: v.priority, cadence: v.cadence || null, due_on: v.due_on || null, description: v.description || null, ...(who[0] ? { primary_assignee_id: who[0].employee_id } : {}) }
+          ? { title: v.title, priority: v.priority, cadence: v.cadence || null, due_on: v.due_on || null, description: v.description || null, employee_target_id: kpi || null, ...(who[0] ? { primary_assignee_id: who[0].employee_id } : {}) }
           : { priority: v.priority, description: v.description || null };
         await editTask.run({ params: { id: task.task_id }, body: body as never });
         toast("Task saved");
@@ -332,6 +338,7 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
             ...(v.due_on && { due_on: v.due_on }),
             ...(v.description && { description: v.description }),
             ...(who[0] && { primary_assignee_id: who[0].employee_id }),
+            ...(kpi && { employee_target_id: kpi }),
           },
         });
         toast(who[0] ? `${t.number} set for ${who[0].display_name}` : `${t.number} created`);
@@ -358,6 +365,11 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
       )}
       {canAssign && <Field label="Due" optional {...f.field("due_on")}><DateField {...f.field("due_on")} min={todayIso()} /></Field>}
       <Field label="Priority"><SelectField options={[["urgent", "Urgent"], ["high", "High"], ["normal", "Normal"], ["low", "Low"]]} {...f.field("priority")} /></Field>
+      {canAssign && kpis.rows.length > 0 && (
+        <Field label="Counts Towards" optional help="Done tasks add to this KPI's progress.">
+          <SelectField value={kpi} onChange={setKpi} options={[["", "None"], ...kpis.rows.map((k) => [k.employee_target_id, k.title] as [string, string])]} />
+        </Field>
+      )}
       <Field label="Notes" optional><TextAreaField {...f.field("description")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

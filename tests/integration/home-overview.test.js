@@ -334,8 +334,10 @@ describeDb("Home · Overview against the real migrations", () => {
       // Goals this quarter (M2): one live, one ended last quarter, one a department's, one a draft.
       const goal = (title, level, status, from, to) =>
         q(
-          `INSERT INTO organisational_goal (level, title, status, starts_on, ends_on, owner_employee_id)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+          // A departmental target names its department (2020, A16).
+          `INSERT INTO organisational_goal (level, title, status, starts_on, ends_on, owner_employee_id, department_id)
+           VALUES ($1, $2, $3, $4, $5, $6,
+                   CASE WHEN $1 = 'department' THEN (SELECT department_id FROM department WHERE code = 'TEST') END)`,
           [level, title, status, from, to, employeeOf("ceo")],
         );
       await goal("Reach Three New States", "organisation", "active", "2026-10-01", "2026-12-31");

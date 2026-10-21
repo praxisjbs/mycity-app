@@ -10,7 +10,7 @@
 | Capabilities | `goals.organisation` (record and activate organisational goals), `goals.company` (set annual and monthly goals), `goals.department` (set a department's monthly targets), `kpis.assign` (set individual monthly KPIs for people in scope), `reviews.cycles` (open and close review cycles, edit the cycle's questions) |
 | Screens (PROGRESS.md rows) | #29 Goals, #30 Targets, #31 KPIs, #32 Reviews, #33 Analytics, #10 My Performance |
 | Status | Draft |
-| Last changed | 19/10/2026 |
+| Last changed | 20/10/2026 |
 
 Sources: MILESTONES §7.1, §7.2 and Definition of done (A16, A17, A18); REUSE_MAP §3.2; the meeting
 of 10 October 2026 (Cynthia Osakunih: "once the managers have set the target the COO will go ahead
@@ -75,14 +75,15 @@ their own part in ESS · My Performance.
    an answer to each question (typed or dictated), an overall rating out of 5; Submit. Until then the
    manager's review shows "Waiting for the self review" and none of its content (A17).
 10. **Manager, second level, HR.** The manager sees the self review beside their own form (KPI
-    ratings prefilled from progress, `reviews.autoscore`), fills it and submits; that opens
+    ratings prefilled from progress, `kpis/kpis.score.js`), fills it and submits; that opens
     `performance.review`: the manager's own line manager (second level), then Operations & People
     (HR receives it). On HR's stage the review closes, its PDF is generated into the vault, and the
     employee sees the manager's comment in My Performance.
 11. **Dictation (A18).** On any answer, Dictate records audio (VoiceField), uploads it
-    (`purpose: dictation`), transcribes it and tidies it against the employee's goals; the person
-    sees both texts and chooses Use Tidied, Use As Spoken or keeps typing. Nothing is saved until
-    they save the review.
+    (`purpose: voice_note`), transcribes it and tidies it against the employee's goals, and keeps
+    the audio, transcript and AI run against that answer; the person sees both texts and chooses
+    Use Tidied, Use As Spoken or keeps typing. The answer's text changes only when they save the
+    review, and a save that does not name the dictation clears it.
 
 ## 4 · Data
 
@@ -95,14 +96,19 @@ their own part in ESS · My Performance.
 | `kpi_definition` (2000) | `code`, `name`, `measurement_type`, `unit`, `direction` | an optional library of KPI wordings MyCity enters; no seed (A26) |
 | `performance_cycle` (2000, 2030) | `performance_cycle_id`, `name`, `starts_on`, `ends_on`, `status`, `self_review_opens_at`, `manager_review_opens_at`, `closes_at`, `opened_by` | `status` CHECK `draft`, `scheduled`, `open`, `closed` |
 | `performance_cycle_question` (2030) | `performance_cycle_id`, `position`, `prompt` | the cycle's questions, copied from the last cycle when one opens |
-| `performance_review` (2000, 2030) | `performance_review_id`, `performance_cycle_id`, `employee_id`, `reviewer_employee_id`, `review_type`, `status`, `overall_score`, `summary`, `submitted_at`, `workflow_instance_id`, `document_id` | `review_type` `self` or `manager` (`designated` kept for a review given to someone other than the line manager); `status` CHECK `draft`, `submitted`, `second_level`, `with_hr`, `closed`, `returned`. Read by Home |
+| `performance_review` (2000, 2030) | `performance_review_id`, `performance_cycle_id`, `employee_id`, `reviewer_employee_id`, `review_type`, `status`, `overall_score`, `summary`, `submitted_at`, `closed_at`, `workflow_instance_id`, `document_id` | `review_type` `self` or `manager` (`designated` kept for a review given to someone other than the line manager); `status` CHECK `draft`, `submitted`, `second_level`, `with_hr`, `closed`, `returned`. `dictation_document_id` (2000) is no longer written: dictation is per answer. Read by Home |
 | `performance_review_item` (2000) | `performance_review_id`, `employee_target_id`, `score`, `comment` | a rating per KPI (1 to 5) |
 | `performance_review_answer` (2030) | `performance_review_id`, `performance_cycle_question_id`, `answer_text`, `dictation_document_id`, `transcript`, `ai_run_id` | A18: the audio, what was said, and the run that tidied it |
 
 Schema migration file(s): `migrations/2020_goal_cascade.sql`, `migrations/2030_reviews.sql`.
-Reference-data file(s): `seeds/reference/2091_seed_performance.sql` (the `goal` and `performance_review`
-numbering schemes, the status codes, the `performance.goal` and `performance.review` workflow
+Reference-data file(s): `seeds/reference/2091_seed_performance.sql` (the numbering schemes
+`goal_organisation`, `goal_annual`, `goal_monthly` and `goal_department`, one per prefix; a review has
+no number, the status codes, the `performance.goal` and `performance.review` workflow
 definitions, the five capabilities and their default holders).
+
+Contracts: `packages/contract/schemas/goals.js`, `targets.js`, `kpis.js`, `reviews.js` (with
+Performance Analytics) and `ess.js` (`MyPerformance`). Quantities and weights are decimal strings,
+like money; ratings are whole numbers 1 to 5.
 
 ## 5 · API
 
@@ -116,12 +122,12 @@ All under `/api/v1/performance`, permission key `performance` unless said.
 | `POST /goals` | `GoalCreate` → `Goal` | create, `goals.organisation` or `goals.company` by level (§6) | | |
 | `PATCH /goals/:id` | `GoalEdit` → `Goal` | edit | | draft or returned only |
 | `POST /goals/:id/submit` | `EmptyBody` → `Goal` | create, `goals.company` | | opens `performance.goal` |
-| `POST /goals/:id/decide` | `ApprovalDecision` → `Goal` | approve | | the stage's approver; `decision` `approve` or `return`, `reason` |
+| `POST /goals/:id/decide` | `DecideBody` → `Goal` | approve | | the stage's approver; `decision` `approve` or `return`, `reason` |
 | `GET /targets` | `TargetListQuery` → `TargetPage` | view · scope by department | yes, 25 | `month`, `department_id`, `status`, `q` |
 | `GET /targets/summary` | `TargetSummaryQuery` → `TargetsSummary` | view | no | the month's counts, chain, last month, trail |
 | `POST /targets` | `TargetCreate` → `Target` | create, `goals.department` | | a departmental target (a `department` level goal) |
 | `POST /plans/:department_id/:month/submit` | `EmptyBody` → `Plan` | create, `goals.department` | | the department's month; `month` is `YYYY-MM` |
-| `POST /plans/:id/decide` | `ApprovalDecision` → `Plan` | approve | | |
+| `POST /plans/:id/decide` | `DecideBody` → `Plan` | approve | | |
 | `GET /kpis` | `KpiListQuery` → `KpiPage` | view · scope on `employee_id` | yes, 25 | `month`, `department_id`, `employee_id`, `status`, `q` |
 | `GET /kpis/summary` | `KpiSummaryQuery` → `KpisSummary` | view · scope | no | |
 | `GET /kpis/employees/:id` | `KpiMonthQuery` → `EmployeeKpis` | view · scope | no (a person's KPIs for a month are few; complete) | |
@@ -133,18 +139,18 @@ All under `/api/v1/performance`, permission key `performance` unless said.
 | `GET /reviews/:id` | → `ReviewDetail` | view · scope, or the employee or reviewer | | a manager review returns no self content until the self review is submitted, and no manager content to the employee until closed |
 | `PUT /reviews/:id` | `ReviewSave` → `ReviewDetail` | the reviewer (self route below for the employee) | | draft or returned only |
 | `POST /reviews/:id/submit` | `EmptyBody` → `ReviewDetail` | the reviewer | | manager submit opens `performance.review` |
-| `POST /reviews/:id/decide` | `ApprovalDecision` → `ReviewDetail` | approve | | second level and HR |
-| `POST /reviews/:id/dictation` | multipart `audio` + `DictationRequest` → `Dictation` | the reviewer | | `performance_cycle_question_id`; returns `transcript` and `tidied`; saves nothing on the review |
-| `GET /reviews/:id/pdf` | → `DocumentRef` | view · scope | | closed reviews |
+| `POST /reviews/:id/decide` | `DecideBody` → `ReviewDetail` | approve | | second level and HR |
+| `POST /reviews/:id/dictation` | multipart `file` + `DictationRequest` → `Dictation` | the reviewer | | `performance_cycle_question_id`, `duration_s`; returns `dictation_id`, `transcript` and `tidied`; keeps the dictation against the answer, never its text |
+| (the review's PDF) | `ReviewDetail.document` | as the review | | a closed review carries its `DocumentRef`; the file is read through the documents routes with the review's own read rule |
 | `GET /cycles` | `CycleListQuery` → `CyclePage` | view | yes, 25 | |
 | `POST /cycles` | `CycleCreate` → `Cycle` | create, `reviews.cycles` | | name, period, opens, closes, questions |
 | `POST /cycles/:id/close` | `EmptyBody` → `Cycle` | edit, `reviews.cycles` | | |
 | `GET /analytics` | `PerformanceAnalyticsQuery` → `PerformanceAnalytics` | view · scope | no | |
 | `GET /api/v1/ess/performance` | → `MyPerformance` | `ess` · own | no | |
-| `GET /api/v1/ess/performance/review` | → `ReviewDetail` or 204 | `ess` · own | | the open self review |
+| `GET /api/v1/ess/performance/review` | → `ReviewDetail` | `ess` · own | | the open self review; 404 `NO_OPEN_REVIEW` when none (`MyPerformance.open_review_id` says whether there is one) |
 | `PUT /api/v1/ess/performance/review` | `ReviewSave` → `ReviewDetail` | `ess` · own | | |
 | `POST /api/v1/ess/performance/review/submit` | `EmptyBody` → `ReviewDetail` | `ess` · own | | |
-| `POST /api/v1/ess/performance/review/dictation` | multipart `audio` + `DictationRequest` → `Dictation` | `ess` · own | | |
+| `POST /api/v1/ess/performance/review/dictation` | multipart `file` + `DictationRequest` → `Dictation` | `ess` · own | | |
 
 ## 6 · Rules and calculations
 
@@ -184,7 +190,7 @@ All under `/api/v1/performance`, permission key `performance` unless said.
   reviewer is the line manager on that day (`employee_effective_manager`). Someone with no line
   manager is reviewed by the CEO.
 - **Dictation (A18).** Audio of at most 3 minutes and 10 MB. The transcript is never changed by the
-  system; the tidy step is one `llm.complete` call with purpose `review_answer_tidy`, given the
+  system; the tidy step is one `llm.complete` call with purpose `review-cleanup`, given the
   question, the transcript and the person's KPI titles, under the rule: fix wording, grammar and
   filler; never add, remove or change a fact, figure, name, judgement or tone. The run id is kept
   with the answer. The person chooses which text to keep.
@@ -235,7 +241,7 @@ employee, their reviewer, the second-level approver, Operations & People and the
 - **Search**: `goals.search.js` (types `goal`: code, title, theme), `targets.search.js` (departmental
   targets), `kpis.search.js` (KPIs by person and title, scoped), `reviews.search.js` (reviews by
   employee and cycle, scoped).
-- **Feature AI**: the dictation tidy step (§6), prompt `services/ai/prompts/review_answer_tidy.md`.
+- **Feature AI**: the dictation tidy step (§6), prompt `services/ai/prompts/review-cleanup.md` (purpose `review-cleanup`); the transcription is purpose `review-dictation`.
 
 ## 10 · On screen and mobile
 
@@ -249,7 +255,7 @@ is listed here as tier 1 or tier 2.**
 |---|---|---|---|
 | Performance · Goals (`goals`) | The year (desktop subtitle); New Goal; Organisational Goals (Goal ID, Strategic Theme, Goal, Success Measure, Baseline, Owner, Status); Annual Goals and Monthly Goals (Goal, Rolls Up To, Owner, Progress, Status); Goal Progress. A goal opens: its fields, Quarterly Cascade, Rolls Up To, Children, Approval (the stages and who acted), Submit for Approval, Approve, Return. New Goal: Level, Goal, Strategic Theme, Success Measure, Baseline, Quarter 1 to 4 (Optional) for organisational; Rolls Up To and the month for monthly | Help term on Status Pending: "Waiting on Management, Operations & People, then the CEO." | "Saved as a draft. Nothing binds until the CEO approves" is removed from the form. The cascade levels and who sets each: §6 |
 | Performance · Targets (`targets`) | The month (desktop subtitle); Previous Month, This Month, Next Month; Set Targets; Submit Month (head); Departments, Approved, Awaiting Approval; the chain Management, Operations & People, CEO with where the month is; Departmental Targets (Department, Target, Rolls Up To, Set By, Measure, Status, Approve or Return when it waits on the reader); Last Month's Results; the month's Approval Trail | None | The chain card's note "Nothing becomes binding until the CEO approves" is removed: the chain shows it. §3 step 5 |
-| Performance · KPIs (`kpis`) | The month (desktop subtitle); Assign KPIs; Staff With KPIs, Weights, On Track, Behind or At Risk; Department filter; This Month (Employee, KPI, Weight, Progress, Set By, Status); Weights (one person's KPIs, Total, Edit Weights); Where Progress Comes From. Assign KPIs: Employee, then each KPI (KPI, Target, Unit, From Tasks or By Hand, Weight) with Add KPI and Total; Cancel, Save KPIs | Help term on Weights: "Each person's KPIs add up to 100%." | The card title "Weights Must Total 100%" becomes Weights. Scoring formula: §6 |
+| Performance · KPIs (`kpis`) | The month (desktop subtitle); Assign KPIs; Staff With KPIs, Weights, On Track, Behind or At Risk; Department filter; This Month (Employee, KPI, Weight, Progress, Set By, Status); Weights (one person's KPIs, Total, Edit Weights); Progress Sources. Assign KPIs: Employee, then each KPI (KPI, Target, Unit, From Tasks or By Hand, Weight) with Add KPI and Total; Cancel, Save KPIs | Help term on Weights: "Each person's KPIs add up to 100%." | The card title "Weights Must Total 100%" becomes Weights. Scoring formula: §6 |
 | Performance · Reviews (`reviews`) | The cycle and its dates (desktop subtitle); Open Cycle, Close Cycle, Review Form; Cycle, Opens, Closes, Average Rating; the chain Self, Manager, Second Level, HR; Review History (Employee, Cycle, Self Rating, Manager, Second Level, Status). A review opens the form: the employee's self review (once submitted), then the reviewer's: each KPI with its progress, a rating 1 to 5 and a comment; each question's answer with Dictate; Overall Rating; Save Draft, Submit Review; for an approver Approve, Return. Waiting: "Waiting for the Self Review". Open Cycle: Cycle, Period, Opens On, Closes On, Questions (one per line, Add Question); Cancel, Open Cycle | Help term on Dictate: "Speak your answer. We tidy the wording and you choose which to keep." | The chain note "The manager cannot see the form until the employee has submitted" is removed: the form shows Waiting. The sample quote card is removed. §6 Review sequence |
 | Performance · Analytics (`analytics`) | The cycle; Goals On Track, Reviews Completed, Avg Self Rating, Avg Manager Rating; Goal Completion by Month; By Department; Self vs Manager Rating (Department, Self, Manager, Gap) | Help term on Gap: "Manager rating minus self rating." | How each figure is worked out: §6 |
 | ESS · My Performance (`my-performance`) | The month and who set the KPIs (desktop subtitle); KPI Score, On Track, Weight Assigned, Last Review, Next Cycle; My KPIs This Month; Rolls Up To; My Reviews (Cycle, Self Rating, Manager, Second Level, Status); Start My Review while a cycle is open; My Review (each KPI: rating and comment; each question with Dictate; Overall Rating; Save Draft, Submit Review). A dictated answer shows As Spoken and Tidied with Use Tidied, Use As Spoken | Help term on KPI Score: "Your KPIs, weighted to 100%. It updates as the tasks against each KPI close." | That the manager cannot see it until submitted: §6. How tidying works: §6 Dictation |
@@ -270,7 +276,7 @@ is listed here as tier 1 or tier 2.**
 - **A person moves department mid-month**: their KPIs stay under the target they were set against
   until the month ends; next month's are set by the new department.
 - **A goal's parent is returned after a child was submitted**: the child keeps its place; it cannot
-  be approved past Management until its parent is active (422 `PARENT_NOT_ACTIVE`).
+  be approved at any stage until its parent is active (422 `PARENT_NOT_ACTIVE`).
 - **Weights edited after approval**: not possible; the person's KPIs are fixed once the month is
   approved. A change is a new KPI next month (§13).
 - **Line manager changes during a cycle**: the review stays with the reviewer it opened with;
@@ -305,5 +311,18 @@ is listed here as tier 1 or tier 2.**
 
 ## 14 · Change log
 
+- 20/10/2026 · AJ · Staging: `seeds/staging/40_productivity.js` records the CEO's organisational goals, an annual and this month's goal approved through `performance.goal`, the head's two targets with their team's KPIs and the month approved, and the quarter's check-in open with the three questions of §13 and two self reviews handed in, all through the services; Home's forward goals, targets and reviews are taken away first.
+- 20/10/2026 · AJ · §3 step 10: the prefilled ratings come from `kpis/kpis.score.js`; the empty `reviews.autoscore.js` and `reviews.analytics.js` stubs are deleted (README §11.5).
+- 20/10/2026 · AJ · Screens built (§10): Where Progress Comes From is titled Progress Sources, since a card title may not open with Where (gate 8); a goal, a department's month and a review open in a sheet with their approval card, and Return asks its reason in that card.
+- 20/10/2026 · AJ · The review PDF: on `review.closed` an outbox handler generates `review_summary` (template `review-summary.html`, variables `ReviewSummaryVars`: both ratings, the KPIs with both scores, both answers to each question, who approved and when) and links it on the review; a closed review's detail carries it as `document`, so there is no separate PDF route. Settings · Documents & Numbering lists the four goal schemes (and Project and Task, which it lacked).
+- 20/10/2026 · AJ · Dictation built (A18): `POST /performance/reviews/:id/dictation` and `POST /ess/performance/review/dictation`. The recording is stored as `review_dictation` (personal; read by whoever may read the review), transcribed by Gemini's native API (a browser's webm, mp4 or ogg first made 16 kHz FLAC with ffmpeg in the request, under a second for three minutes), tidied by `review-cleanup` at temperature 0; transcript, audio and run are kept against the answer at once, its text only when the person saves with the `dictation_id`. Purpose names are kebab-case, as `llm.service` requires, so the prompt is the existing `review-cleanup.md` stub, not `review_answer_tidy.md`.
+- 20/10/2026 · AJ · Analytics and My Performance built: `GET /performance/analytics` (the year's KPI attainment by month and department, the cycle's ratings and the self vs manager gap, in the reader's scope) and `GET /ess/performance` with the self review under `/ess/performance/review`. The open self review answers 404 `NO_OPEN_REVIEW` rather than 204, since a route declares one response.
+- 20/10/2026 · AJ · Reviews API built (§5 cycles and reviews routes, jobs `review-cycles` 06:00 and `review-reminders` 08:00 Monday to Saturday): a cycle opens at once when its day is today; the review list is one row per person and cycle (the manager review, or the CEO's self review); the manager's ratings are prefilled from attainment until saved and kept as they stood when handed in; handing a review in needs an overall rating; HR's approval closes the self review with the manager's. Writing a review needs only the `performance` view grant plus being its reviewer, as My Review in ESS needs only `ess`. Not yet: the review PDF (§7 `review.closed`), dictation (§3 step 11), Analytics, My Performance.
+- 20/10/2026 · AJ · KPIs API built (§5 kpis routes): KPIs hang from a departmental target of the person's department for the month whatever its status short of cancelled, because the month is assembled as a draft and approved as one (§6 "under an active or pending departmental target" read that way). Nobody sets their own KPIs; the same KPI twice in a month is refused; once the month is sent the person's KPIs are fixed (`PLAN_LOCKED`). A manual figure is recorded by the person or whoever set it (`performance` edit), only on an approved KPI; a tasks KPI refuses one (`KPI_FROM_TASKS`). Status (On Track, At Risk, Behind, Met) is worked out, never stored. ⌘K finds KPIs (`kpis.search.js`).
+- 20/10/2026 · AJ · Targets API built (§5 targets and plans routes): a department's head is whoever holds `goals.department` in that department (the organisation records no head per department); the CEO may set any department's targets. A month with no target cannot be submitted (`PLAN_EMPTY`); one whose people's weights do not each total 100 is refused (`WEIGHTS_NOT_100`, naming each person and their total); once sent, the month takes no new target (`PLAN_LOCKED`). On the CEO's approval the targets and KPIs go active and each person is told their KPIs are set; a done, reopened or cancelled task linked to a tasks-sourced KPI recounts it. ⌘K finds targets (`targets.search.js`) apart from goals.
+- 20/10/2026 · AJ · Goals API built (§5 goals routes): New Goal is gated by `goals.organisation` or `goals.company` on the route and the level's own capability in the service; Return closes the request (the engine's reject) and the goal goes back to `returned`; approving a goal whose parent is not active is refused with `PARENT_NOT_ACTIVE` at any stage. Scoring in `kpis.score.js`.
+- 20/10/2026 · AJ · Contracts written. §4: four goal numbering schemes (one per prefix), no review
+  number, `closed_at` on a review, dictation per answer. §5: decisions take `DecideBody` (the name
+  `ApprovalDecision` is the workflow's decision row); dictation audio uploads as `voice_note`.
 - 19/10/2026 · AJ · First version, from MILESTONES §7, REUSE_MAP §3.2 and the 10/10 meeting; the COO
   stage is Management (AJ, 19/10/2026).

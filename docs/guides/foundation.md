@@ -699,6 +699,7 @@ screen.
 
 ## 14 · Change log
 
+- 20/10/2026 · AJ · Approvals: `workflow.service.approvalOf(client, instance_id, user)` gives a request's route, decisions and `can_decide` to a module that shows its own record's approval beside the record (Performance's goals, a department's month, reviews), without asking again whether the caller may read it; `detail()` now builds its answer through the same `viewOf()`. GE to review.
 - 19/10/2026 · AJ · A module's tab strip on a narrow desktop window (People, ESS, Settings and every other module): `Tabs` keeps the tabs that fit, the active one always among them, and folds the rest into More Tabs, a ⋯ menu at the end of the strip (dotted when a hidden tab has a count), instead of scrolling sideways. Phones keep the sideways row. FRONTEND_GUIDE §9.2 updated. TB to review.
 - 19/10/2026 · AJ · The employee record's header shows the person's photo (`Employee360.photo_url`, the 384 px size; `ProfileHeader` gains `photo`), and Settings · Users and a role's people show each face (`UserRow.photo_url`, 192 px, read in `users.repo.js` through `shared/db/person.js`); initials when there is none. TB to review.
 - 19/10/2026 · LA · §10, §13: the employee record gains an Attendance tab (the person's pattern,

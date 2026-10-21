@@ -149,7 +149,7 @@ Every list is paged at 25 (BACKEND_STRUCTURE §16). Contract in `packages/contra
 | `GET /documents` | `DocumentListQuery` (`status`) → `DocumentListPage` | `ess` · own | yes | Built 17/10/2026. Documents held and ones People asked for, in one list |
 | `GET /documents/summary` | → `DocumentSummary` | `ess` · own | | Built 17/10/2026. The five counts, over every row, not the page |
 | `POST /documents` | multipart `EssDocumentUpload` → `DocumentRow` | `ess` · own | | Built 17/10/2026. Upload engine and vault; `document_request_id` answers a Missing row |
-| `GET /performance` | → `EssPerformance` | `ess` · own | | M2 |
+| `GET /performance` | → `MyPerformance` | `ess` · own | | M2; the self review's routes are in `docs/guides/performance.md` §5 |
 
 Download Their Data is the organisation module's route, built by ESS (`ess.export.js`):
 `POST /api/v1/employees/:id/data-export` (`EmptyBody` → `EmployeeDataExportQueued`, 202), `people`
@@ -408,3 +408,5 @@ Deductions figure and every form open the shared modal.
 - 19/10/2026 · LA · My Attendance (#9) shows the person's field assignments in progress and to come, under Today (attendance guide §6.12, §10); §10.2 row updated.
 - 19/10/2026 · LA · My Profile's Work Schedule shows each day's place (Office, Remote or Off, `EssWorkDay.place`), read from attendance's week (attendance guide §6.13): People set a hybrid employee's office days on the employee record's Attendance tab, which is the Attendance setup of §2 and §3 step 2.
 - 19/10/2026 · AJ · The photo also reaches the employee record's header in People · Employees and Settings · Users and Roles (`Employee360.photo_url`, `UserRow.photo_url`); the organogram PDF is the one place left with initials.
+- 20/10/2026 · AJ · §5: My Performance answers `MyPerformance` (`schemas/ess.js`), built on the KPI and review shapes of `kpis.js` and `reviews.js`; the self review's routes are in the performance guide.
+- 20/10/2026 · AJ · §5: My Performance on the real API: `GET /ess/performance` (`MyPerformance`) and the open self review at `GET`, `PUT /ess/performance/review` and `POST /ess/performance/review/submit` (`ess.performance.js`, through the KPIs and reviews services with the caller's own scope).

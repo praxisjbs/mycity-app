@@ -30,6 +30,11 @@ const SEEDED_RULES = [
 ];
 const SEEDED_KEYS = SEEDED_RULES.map(([key]) => key);
 const HOME_CAPABILITIES = ["alerts.manage", "home.reports", "home.team"];
+/** Performance's capabilities (2091): its own tests hold them, so the lists below leave them out. */
+const PERFORMANCE_CAPABILITIES = new Set(
+  catalog.CAPABILITY_CATALOG.filter((c) => c.module === "performance").map((c) => c.code),
+);
+const notPerformance = (codes) => codes.filter((code) => !PERFORMANCE_CAPABILITIES.has(code));
 
 const q = (sql, params) => pool.query(sql, params);
 const one = async (sql, params) => (await q(sql, params)).rows[0];
@@ -395,7 +400,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
       const all = ["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"];
       const managers = ["alerts.clear", "home.reports", "home.team"];
       // 1129 (Mailbox) adds Configure Signature to System Administrator and Implementation.
-      expect(Object.fromEntries(rows.map((r) => [r.role, r.codes]))).toEqual({
+      expect(Object.fromEntries(rows.map((r) => [r.role, notPerformance(r.codes)]))).toEqual({
         implementation: [...all, "mailbox.signature"],
         operations_people: all,
         management: all,
@@ -469,16 +474,18 @@ describeDb("Home schema and reference data against the real migrations", () => {
 
         const codes = await c.query("SELECT code::text AS code FROM capability ORDER BY code::text");
         // 1129's capability is Mailbox's, untouched by undoing Home's seed.
-        expect(codes.rows.map((r) => r.code)).toEqual(["alerts.clear", "announcements.post", "home.team", "mailbox.signature"]);
+        expect(notPerformance(codes.rows.map((r) => r.code))).toEqual(["alerts.clear", "announcements.post", "home.team", "mailbox.signature"]);
         const heldBy = async (role) =>
-          (
-            await c.query(
+          notPerformance(
+            (
+              await c.query(
               `SELECT c.code::text AS code FROM role_capability rc
                  JOIN role r ON r.role_id = rc.role_id JOIN capability c ON c.capability_id = rc.capability_id
                 WHERE r.code = $1 ORDER BY c.code::text`,
               [role],
-            )
-          ).rows.map((r) => r.code);
+              )
+            ).rows.map((r) => r.code),
+          );
         expect(await heldBy("operations_people")).toEqual(["alerts.clear", "announcements.post"]);
         expect(await heldBy("manager")).toEqual([]);
         expect(await heldBy("studio_lead")).toEqual(["home.team"]);
@@ -507,7 +514,7 @@ describeDb("Home schema and reference data against the real migrations", () => {
              JOIN role r ON r.role_id = rc.role_id JOIN capability c ON c.capability_id = rc.capability_id
             WHERE r.code = 'manager' ORDER BY c.code::text`,
         );
-        expect(held.rows.map((r) => r.code)).toEqual(["alerts.clear"]);
+        expect(notPerformance(held.rows.map((r) => r.code))).toEqual(["alerts.clear"]);
       });
     });
 

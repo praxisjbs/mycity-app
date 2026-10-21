@@ -1,5 +1,5 @@
 import type { Firing, LetterPreview, LetterTemplate, QueryDetail, Rule, SanctionRow } from "@/api/types/queries";
-import type { Status } from "@/api/types/performance";
+import type { Status } from "@/api/types/shared";
 import { at, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, refKey } from "../data/people";
 

@@ -1,6 +1,6 @@
 import type { IsoDate, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
-import type { Status, Step, Trail } from "./performance";
+import type { Status, Step, Trail } from "./shared";
 
 /** INTERIM Partnerships shapes (owner NE; MILESTONES §12). Stages are MyCity's own tracker stages. */
 export interface PartnerRow {

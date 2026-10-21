@@ -162,7 +162,7 @@ event type codes, `cancelled`).
 | `task.blocked` / `task.unblocked` | Mark Blocked / Clear Blocker | notification to the setter |
 | `task.cancelled` | Cancel Task | notification to the assignee |
 | `task.commented` | a comment is saved | notification to the assignee and setter, not the author |
-| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day; on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task) |
+| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day (counted from today when its day has passed, so a task days overdue repeats once); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task) |
 | `calendar_event.created`, `.changed`, `.cancelled` | save, change, call off | notification to the attendees (an ICS file by email is §13) |
 | `calendar_event.answered` | an attendee accepts or declines | notification to the owner |
 
@@ -249,6 +249,8 @@ is listed here as tier 1 or tier 2.**
 
 ## 14 · Change log
 
+- 20/10/2026 · AJ · Staging: `seeds/staging/40_productivity.js` sets tasks (by the CEO, the head of department and the line manager for their people, and people's own, A24) and this week's meetings through the tasks and calendar services, after taking Home's forward rows out of those tables.
+- 20/10/2026 · AJ · §7: a repeating task days overdue repeats once, on its next day still to come, instead of once per sweep (found when the integration suite ran on a Tuesday).
 - 19/10/2026 · AJ · Built: §3 to §10 now say what shipped (drag between columns, Since You Were Away
   from the previous working day, the reader's own month, attendees any employee, the morning
   `task-recurrence` sweep with reminders, ⌘K New Task and New Event, no `workspace.ai.js`); §13 adds

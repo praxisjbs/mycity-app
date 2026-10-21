@@ -5,7 +5,7 @@
 | Owner | TB |
 | Milestone | M1 |
 | Backend modules | `organisation` |
-| Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram tab), `app/src/features/ess/` (Org Chart tab), `app/src/features/shared/ReportingForm.tsx` (Change Manager, shared with the employee record) |
+| Frontend paths | `app/src/features/organogram/`, `app/src/features/people/` (Organogram tab), `app/src/features/ess/index.tsx` (the Org Chart tab, which shows `OrgTree` as a viewer), `app/src/features/shared/ReportingForm.tsx` (Change Manager, shared with the employee record) |
 | Permission key(s) | `people` (builder, manage), `org_chart` (viewer, read for all staff) |
 | Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
@@ -310,6 +310,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 20/10/2026 · AJ · Header: the ESS path is the Org Chart tab's own file (`app/src/features/ess/index.tsx`), not the whole ESS folder, which `docs/guides/ess.md` and `docs/guides/performance.md` cover. TB to review.
 - 19/10/2026 · AJ · The employee record (`Employee360`) carries `photo_url` at 384 px, and its header shows the face (`ProfileHeader` `photo`), initials when there is none. TB to review.
 - 19/10/2026 · AJ · Every node carries `photo_url` (`OrgNode`, from `shared/db/person.js` at 192 px; null for a vacant seat): the desktop chart, the phone's tiles and a person's sheet show the face through `Avatar`, initials when there is none. The Download PDF keeps initials. TB to review.
 - 19/10/2026 · AJ · `employee` gained `photo_document_id` (1170): the person's photo, a vault document of type

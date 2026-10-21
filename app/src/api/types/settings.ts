@@ -1,5 +1,5 @@
 import type { IsoDateTime, Paged, PersonRef } from "./common";
-import type { Status } from "./performance";
+import type { Status } from "./shared";
 
 /**
  * INTERIM shapes for the Settings screens still on the mock: Approvals (track D),

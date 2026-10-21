@@ -425,7 +425,12 @@ async function comment(actor, scope, id, { body }) {
 const BATCH = 100;
 
 /** Make the next occurrence of one repeating task, if it is still due. */
-async function repeatOne(id, cal) {
+/**
+ * The next occurrence of one repeating task. It is counted from the task's own due day, or
+ * from yesterday when that day is already past, so a task days overdue repeats once, on its
+ * next day still to come, rather than once per sweep until it catches up.
+ */
+async function repeatOne(id, cal, now = new Date()) {
   return tx(async (client) => {
     if (!(await repo.lock(client, id))) return false;
     const t = await repo.get(client, id);
@@ -434,7 +439,9 @@ async function repeatOne(id, cal) {
       [id],
     );
     if (!t || !t.recurrence || rows.length || t.status === "cancelled") return false;
-    const lastDay = t.due_at ? lagos.dateOf(new Date(t.due_at)) : lagos.today();
+    const today = lagos.today(now);
+    const dueDay = t.due_at ? lagos.dateOf(new Date(t.due_at)) : today;
+    const lastDay = dueDay < today ? lagos.addDays(today, -1) : dueDay;
     const day = recurrence.nextDay(t.recurrence, lastDay, cal);
     const { number } = await numbering.allocate(client, "task");
     const childId = await repo.insert(client, {
@@ -503,7 +510,7 @@ async function sweep(now = new Date()) {
   for (;;) {
     const ids = await repo.dueToRepeat(pool, now, BATCH);
     let made = 0;
-    for (const id of ids) if (await repeatOne(id, cal)) made += 1;
+    for (const id of ids) if (await repeatOne(id, cal, now)) made += 1;
     repeated += made;
     if (ids.length < BATCH || made === 0) break;
   }

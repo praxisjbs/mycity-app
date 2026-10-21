@@ -63,7 +63,9 @@ mycity-app/
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
-│                             (60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
+│                             (40_productivity.js: M2's tasks, calendar, goals, targets, KPIs and
+│                             review cycle through their services; 60_home.js: Home's figures, its
+│                             HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
@@ -304,6 +306,11 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `alerts.manage` | `home` | Create, change and switch off alert rules | Implementation, Operations & People, Management | `1199` |
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
 | `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
+| `goals.organisation` | `performance` | Set Organisational Goals: record the organisation's goals, active at once (A16) | the CEO only | `2091` |
+| `goals.company` | `performance` | Set Company Goals: annual and monthly goals, sent for approval | Implementation, Management | `2091` |
+| `goals.department` | `performance` | Set Department Targets: a department's monthly targets, and submit its month | Implementation, Head of Department | `2091` |
+| `kpis.assign` | `performance` | Assign KPIs: the monthly KPIs and weights of the people in scope | Implementation, Head of Department, Line Manager | `2091` |
+| `reviews.cycles` | `performance` | Run Review Cycles: open and close cycles and edit their questions | Implementation, Operations & People | `2091` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -332,7 +339,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `devices` | LA | `.guard` |
 | `worksites` | LA | |
 | `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
-| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, emailed, removed after seven days) |
+| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave`, `.performance` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, emailed, removed after seven days) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
 | `announcements` | GE | |
 | `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
@@ -353,13 +360,13 @@ and `templates/email/org-chart-export.html` (the PDF attached).
 
 | Module | Files beyond the template |
 |---|---|
-| `tasks` | `.audience` (reporting line scope), `.blockage`, `.recurrence` |
+| `tasks` | `.audience` (reporting line scope), `.recurrence` |
 | `calendar` | |
 | `workspace` | `.today`, `.analytics` (aggregator) |
 | `goals` | `.cascade`, `.trace` (KPI → organisational goal), `.approval` (A16) |
 | `targets` | `.progress`, `.approval` |
-| `kpis` | `.weights` (must total 100) |
-| `reviews` | `.cycle`, `.sequence` (self rating first, A17), `.autoscore`, `.metrics`, `.pdf`, `.dictation` (A18), `.analytics` |
+| `kpis` | `.weights` (must total 100), `.score` (attainment, status, KPI Score and the prefilled rating, shared by every performance screen) |
+| `reviews` | `.cycle`, `.sequence` (self rating first, A17), `.metrics`, `.pdf`, `.dictation` (A18); the prefilled ratings come from `kpis/kpis.score.js` |
 
 Shared first filled: `shared/time/recurrence`, `services/calendar/ics`, `services/ai`
 (`llm.service`, `transcription`, prompt `review-cleanup.md`).
@@ -481,7 +488,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 |---|---|---|
 | M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
 | M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `data-export-cleanup` (Download My Data files removed after seven days, 03:30 Lagos); loop `loops/mail-idle` |
-| M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
+| M2 | `task-recurrence`, `review-cycle-open` (the morning's cycle opening, re-run by hand) | `task-recurrence`, `review-cycles` (opens cycles on their day, 06:00), `review-reminders` (reviews due within three days or overdue, 08:00 working days) |
 | M3 | `query-rule-evaluate` | |
 | M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |
 | M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch`, `talent-pool-purge` | `offer-expiry`, `signature-reminders`, `talent-pool-purge` |
