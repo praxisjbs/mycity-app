@@ -211,7 +211,7 @@ async function moduleOfInstance(client, id) {
 async function lockPending(client, id) {
   const { rows } = await client.query(
     `SELECT workflow_instance_id, workflow_definition_id, definition_key, module_key, entity_type, entity_id,
-            subject_employee_id, current_stage, state, stage_approvers, opened_by
+            subject_employee_id, current_stage, state, stage_approvers, opened_by, excluded_employee_ids
        FROM workflow_instance WHERE workflow_instance_id = $1 FOR UPDATE`,
     [id],
   );

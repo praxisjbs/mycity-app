@@ -52,10 +52,16 @@ function opener(user) {
 async function present(rows, canOpen) {
   const out = [];
   for (const row of rows) {
-    const link = routeMap.linkFor(row.entity_type, row.entity_id);
+    let link = routeMap.linkFor(row.entity_type, row.entity_id);
     // Who may open it is the route's own permission: System Health's tabs sit in Settings
     // but are held by system_health (shared/route-map.js).
-    const shown = link && (await canOpen(routeMap.moduleOf(row.entity_type))) ? { module: link.module, tab: link.tab, path: link.path } : null;
+    if (link && !(await canOpen(routeMap.moduleOf(row.entity_type)))) {
+      // Someone who cannot open the staff screen opens their own instead, where the route names one
+      // (a temporary site they are on opens on Work Location Requests); else the notice has no link.
+      const own = routeMap.linkFor(row.entity_type, row.entity_id, { self: true });
+      link = own && own.module !== link.module && (await canOpen(own.module)) ? own : null;
+    }
+    const shown = link ? { module: link.module, tab: link.tab, path: link.path } : null;
     out.push({ ...row, body: row.body || null, link: shown });
   }
   return out;

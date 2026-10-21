@@ -295,6 +295,7 @@ const DOC_LABELS = Object.freeze({
   report_run: "Report Run",
   location_request: "Work Location Request",
   field_assignment: "Field Assignment",
+  temporary_site: "Temporary Site",
   policy: "Policy",
   query: "Query",
   sanction: "Sanction",

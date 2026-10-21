@@ -10,7 +10,7 @@
  * @exports FilterSelect
  * @example <SearchInput label="Search Employees" placeholder="Name or Email" value={q} onChange={setQ} />
  */
-import { useId } from "react";
+import { useId, type KeyboardEvent } from "react";
 import { cn } from "../lib/cn";
 import { Icon } from "../icons/Icon";
 import { SelectMenu, type Option } from "./SelectField";
@@ -26,10 +26,16 @@ export interface SearchInputProps {
   label?: string;
   /** Layout classes only. */
   className?: string;
+  /** The id of the list this box narrows, when it moves through it (a searchable SelectField). */
+  controls?: string;
+  /** The id of that list's highlighted option. */
+  activeId?: string;
+  /** Keys pressed in the box (the arrow keys and Enter of that list). */
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
 }
 
 /** Search box for a list. The text goes to the server as `q`. */
-export function SearchInput({ value, onChange, placeholder = "Search", label, className }: SearchInputProps) {
+export function SearchInput({ value, onChange, placeholder = "Search", label, className, controls, activeId, onKeyDown }: SearchInputProps) {
   return (
     <span className={cn("flex h-control min-w-0 items-center gap-2 rounded-full border border-input bg-background px-3 text-field focus-within:border-ring", className)}>
       <Icon name="srch" size="s" className="text-subtle-foreground" />
@@ -40,6 +46,9 @@ export function SearchInput({ value, onChange, placeholder = "Search", label, cl
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={label ?? placeholder}
+        aria-controls={controls}
+        aria-activedescendant={activeId}
+        onKeyDown={onKeyDown}
       />
     </span>
   );

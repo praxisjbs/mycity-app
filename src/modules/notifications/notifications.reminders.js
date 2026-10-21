@@ -297,6 +297,7 @@ defineReminder(APPROVAL, {
         stage_approvers: a.stage_approvers || [],
         subject_employee_id: a.subject_employee_id,
         opened_by: a.opened_by,
+        excluded_employee_ids: a.excluded_employee_ids || [],
         waited_hours: Math.floor((now.getTime() - since.getTime()) / HOUR_MS),
       },
     };

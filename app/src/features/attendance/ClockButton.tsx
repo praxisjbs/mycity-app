@@ -1,5 +1,5 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
-import type { AttendanceToday, LocationError, PunchCreate, PunchResult } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceToday, CheckInCreate, CheckInResult, LocationError, PunchCreate, PunchResult } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
@@ -7,6 +7,7 @@ import { useRealtime } from "@/api/realtime";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
 import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Menu, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
+import { checkInShown } from "./labels";
 import { claimSignIn, claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES, remindIn, type PromptKind } from "./prompts";
 
 /**
@@ -16,7 +17,9 @@ import { claimSignIn, claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES
  * match it to: a worksite, or for remote staff their approved home (asked too while they have none,
  * so People see where they were); every punch carries one Idempotency-Key, kept for a retry of the
  * same press, so a lost answer never makes a second punch. What the panel shows after a punch is
- * the server's.
+ * the server's. On a temporary site's day it names the site and its addresses, and once clocked in
+ * offers Check In at each stop (§6.12), which reads the location at the press and keeps its key and
+ * body for Try Again in the same way.
  */
 
 const PATTERN: Record<AttendanceToday["work_pattern"], string> = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
@@ -297,6 +300,8 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
         ? `Approved Home · ${t.location.radius_m} m`
         : t.location.kind === "temporary_home"
           ? `Temporary Home · ${t.location.radius_m} m`
+          : t.location.kind === "temporary_site"
+            ? (t.location.name ?? "Temporary Site")
           : t.location.kind === "approved_day"
             ? (t.location.name ?? "Approved Request")
             : t.location.kind === "field" || t.location.kind === "client_visit"
@@ -305,7 +310,7 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
               ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
               : "No Office Assigned";
   const punchName = eventType === "clock_out" ? "clock-out" : "clock-in";
-  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home", client_visit: "the client's site" };
+  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home", client_visit: "the client's site", temporary_site: "the site's nearest address" };
   const askText =
     t.location.kind === "remote" || t.location.kind === "none"
       ? `Your ${punchName} goes to People with your location.`
@@ -424,6 +429,12 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
             ["Shift", t.shift.working_day && t.shift.starts_at ? `${t.shift.starts_at} to ${t.shift.ends_at}${t.shift.grace_minutes ? `, ${t.shift.grace_minutes} min grace` : ""}` : (t.shift.off_reason ?? "Day Off")],
             ["Work Arrangement", PATTERN[t.work_pattern]],
             [<HelpTerm key="l" help="Your punch is matched to this place. Inside the circle counts as on site.">Clock Location</HelpTerm>, fence],
+            ...(t.temporary_site
+              ? ([
+                  ["Temporary Site", t.temporary_site.number],
+                  [t.temporary_site.locations.length === 1 ? "Address" : "Addresses", t.temporary_site.locations.map((l) => `${l.name ?? l.address ?? `Address ${l.position}`} · ${l.radius_m} m`).join("; ")],
+                ] as Array<[string, string]>)
+              : []),
             [
               <HelpTerm key="d" help={deviceHelp}>This Device</HelpTerm>,
               <Pill key="dv" tone={unregistered ? (t.policy.device_mode === "off" ? "neutral" : "warn") : "ok"}>{unregistered ? "Not Registered" : "Registered"}</Pill>,
@@ -431,6 +442,7 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
           ]}
         />
       </Card>
+      {t.state === "clocked_in" && t.temporary_site && stage.kind === "ready" && <CheckInStep t={t} />}
       <FormFooter>
         {stage.kind === "weak" ? (
           <Button onClick={() => punch(stage.fix)}>{`${verb} Anyway`}</Button>
@@ -442,6 +454,89 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
         {primary}
       </FormFooter>
     </>
+  );
+}
+
+/** Reads the location once, at the press: a fix, or why there is none. */
+function readLocation(): Promise<{ fix?: Fix; error?: LocationError }> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve({ error: "unsupported" });
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ fix: { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) } }),
+      (e) => resolve({ error: LOCATION_ERROR[e.code] ?? "unavailable" }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  });
+}
+
+type CheckInStage = { kind: "ready" } | { kind: "done"; res: CheckInResult } | { kind: "lost"; body: CheckInCreate; key: string } | { kind: "refused"; message: string };
+
+/**
+ * Check In, on a temporary site's day once clocked in (§6.12): one press reads the location and
+ * sends it with a new Idempotency-Key; a lost answer keeps that key and body for Try Again, so it
+ * never records twice. The server matches it to the nearest address; it never touches the shift.
+ * Under it, the day's check-ins so far.
+ */
+function CheckInStep({ t }: { t: AttendanceToday }) {
+  const [stage, setStage] = useState<CheckInStage>({ kind: "ready" });
+  const send = async (body: CheckInCreate, key: string) => {
+    try {
+      const res = await api.call("POST /api/v1/attendance/check-ins", { body, idempotencyKey: key });
+      invalidate("/api/v1/attendance");
+      setStage({ kind: "done", res });
+    } catch (e) {
+      const err = e instanceof ApiError ? e : new ApiError(0, null);
+      if (err.status === 0 || err.status >= 500 || err.code === "IDEMPOTENCY_IN_PROGRESS") setStage({ kind: "lost", body, key });
+      else setStage({ kind: "refused", message: err.message });
+    }
+  };
+  const checkIn = async () => {
+    const at = await readLocation();
+    const body: CheckInCreate = {
+      device_at: new Date().toISOString(),
+      latitude: at.fix?.latitude ?? null,
+      longitude: at.fix?.longitude ?? null,
+      accuracy_m: at.fix?.accuracy_m ?? null,
+      ...(at.error && { location_error: at.error }),
+    };
+    return send(body, crypto.randomUUID());
+  };
+  const flagged = stage.kind === "done" && stage.res.check_in.flagged;
+  return (
+    <div className="mt-3">
+      {stage.kind === "done" && (
+        <Banner tone={flagged ? "warn" : "ok"} icon="pin">
+          {stage.res.message}
+        </Banner>
+      )}
+      {stage.kind === "refused" && (
+        <Banner tone="err" icon="pin">
+          {stage.message}
+        </Banner>
+      )}
+      {stage.kind === "lost" ? (
+        <Banner tone="err" icon="offline" action={<Button size="sm" icon="refresh" onClick={() => send(stage.body, stage.key)}>Try Again</Button>}>
+          Check-in not sent yet.
+        </Banner>
+      ) : (
+        <Button block icon="pin" onClick={checkIn}>
+          Check In
+        </Button>
+      )}
+      {t.check_ins.length > 0 && (
+        <Card className="mt-3">
+          <KeyValue
+            items={t.check_ins.map((c) => [
+              formatTime(c.occurred_at),
+              <span key={c.attendance_check_in_id} className="flex flex-wrap items-center gap-2">
+                <span data-copy="content">{c.address ? `${c.location_name}, ${c.address}` : c.location_name}</span>
+                <Pill tone={checkInShown(c).tone}>{checkInShown(c).text}</Pill>
+              </span>,
+            ])}
+          />
+        </Card>
+      )}
+    </div>
   );
 }
 

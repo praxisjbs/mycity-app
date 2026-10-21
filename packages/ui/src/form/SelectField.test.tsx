@@ -68,6 +68,51 @@ describe("SelectField and ChoiceField", () => {
     expect(onChange).toHaveBeenCalledWith("mkt");
   });
 
+  it("a searchable SelectField narrows its options as the person types, and the keys choose", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Field label="Department">
+        <SelectField searchable value="" onChange={onChange} options={departments} placeholder="Choose One" />
+      </Field>,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Department" }));
+    const box = await screen.findByRole("searchbox", { name: "Search Department" });
+    expect(box).toHaveFocus();
+    await user.keyboard("o");
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Operations", "People", "Technology", "Office of the CEO"]);
+    await user.keyboard("ff");
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Office of the CEO"]);
+    await user.keyboard("{Enter}");
+    expect(onChange).toHaveBeenCalledWith("ceo");
+    expect(screen.queryByRole("searchbox")).toBeNull();
+
+    await user.click(screen.getByRole("combobox", { name: "Department" }));
+    await user.keyboard("zz");
+    expect(screen.queryAllByRole("option")).toEqual([]);
+    expect(screen.getByRole("status")).toHaveTextContent("Nothing matches");
+    await user.clear(screen.getByRole("searchbox"));
+    await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+    expect(onChange).toHaveBeenLastCalledWith("fin");
+  });
+
+  it("a searchable SelectField on a phone puts the search box above its sheet's rows", async () => {
+    setViewport(390);
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Field label="Department">
+        <SelectField searchable value="ops" onChange={onChange} options={departments} />
+      </Field>,
+    );
+    await user.click(screen.getByRole("button", { name: "Department" }));
+    await screen.findByRole("dialog", { name: "Department" });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search Department" }), { target: { value: "mark" } });
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Marketing"]);
+    fireEvent.click(screen.getByRole("option", { name: "Marketing" }));
+    expect(onChange).toHaveBeenCalledWith("mkt");
+  });
+
   it("ChoiceField is a radio group that moves with the arrow keys", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -98,5 +143,17 @@ describe("SelectField and ChoiceField", () => {
       </div>,
     );
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("a searchable SelectField, open, has no accessibility violations", async () => {
+    const user = userEvent.setup();
+    render(
+      <Field label="Department">
+        <SelectField searchable value="ops" onChange={() => undefined} options={departments} />
+      </Field>,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Department" }));
+    await screen.findByRole("searchbox");
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 });

@@ -8,7 +8,7 @@
  *   token.verify(token);               // true only for one this environment made, unaltered
  *
  * The payload is the place (source, line, point, provider id, kind, city, state, country,
- * verified, pending, accuracy) as base64url JSON; the contract reads it back
+ * verified, pending, accuracy, and its time zone when the provider named one) as base64url JSON; the contract reads it back
  * (`readPlaceToken`). The signature is HMAC-SHA256 over the payload, cut to 128 bits, with a
  * key derived from ENCRYPTION_KEY (HKDF, info "place-token v1"): no new secret, and a token made
  * on staging never verifies on production. A token does not expire: it says where a place came
@@ -41,7 +41,8 @@ const round = (v, places) => (typeof v === "number" && Number.isFinite(v) ? Numb
  * Sign a place. Details are never in a token: they travel beside it, typed by the person.
  * @param {{source: string, formatted?: string|null, lat?: number|null, lon?: number|null,
  *          accuracy_m?: number|null, provider_id?: string|null, kind?: string, city?: string|null,
- *          state?: string|null, country_code?: string|null, verified?: boolean, pending?: boolean}} place
+ *          state?: string|null, country_code?: string|null, timezone?: string|null, verified?: boolean,
+ *          pending?: boolean}} place
  * @returns {string}
  */
 function sign(place) {
@@ -56,6 +57,8 @@ function sign(place) {
     c: place.city || null,
     st: place.state || null,
     cc: place.country_code || null,
+    // Optional, so a token signed before the zone was kept still verifies and reads as no zone.
+    tz: place.timezone || null,
     v: Boolean(place.verified),
     p: Boolean(place.pending),
   };
