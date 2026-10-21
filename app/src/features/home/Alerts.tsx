@@ -4,7 +4,7 @@ import type { HomeAlert, HomeAlertQuery, HomeAlertSummary } from "@mycity/contra
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
-import { useSearchParams } from "@/lib/router";
+import { useRouter, useSearchParams } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -34,7 +34,7 @@ import {
   type DataViewColumn,
   type KeyValueItem,
 } from "@mycity/ui";
-import { useRuleForms } from "./AlertRules";
+import { ATTENDANCE_POLICY_HREF, useRuleForms } from "./AlertRules";
 import { ageOf, ALERT_CATEGORY, isMetric, OVER_BY_HELP, overByDetail, overByText, SEVERITY, sourceRows } from "./labels";
 
 /**
@@ -46,7 +46,8 @@ import { ageOf, ALERT_CATEGORY, isMetric, OVER_BY_HELP, overByDetail, overByText
  *
  * An alert opens as a sheet (a bottom sheet on a phone): its trigger, who can clear it, its age
  * and Over By, with Clear Alert and Dismiss Alert where `can_clear` says clearing will work, and
- * Edit Rule for a holder of `alerts.manage`. The rules themselves are ./AlertRules.
+ * Edit Rule for a holder of `alerts.manage`; an alert of an Attendance policy rule offers Set in
+ * Attendance Policy to a holder of `policies.manage` instead. The rules themselves are ./AlertRules.
  *
  * The two shells (§10.2): on desktop the list is a table with Trigger and Age, and Alert Sources
  * sits under it; on a phone the cards are two to a row, each alert is a card with its severity,
@@ -96,11 +97,13 @@ export function categoryChips(summary: Pick<HomeAlertSummary, "open" | "categori
 
 /**
  * What an alert's sheet offers: Clear Alert and Dismiss Alert where clearing will work
- * (`can_clear`: open, `alerts.clear`, and the rule's grant over its subject), and Edit Rule to a
- * holder of `alerts.manage` for a rule on a metric still listed.
+ * (`can_clear`: open, `alerts.clear`, and the rule's grant over its subject), Edit Rule to a
+ * holder of `alerts.manage` for a rule on a metric still listed, and for an alert of an
+ * Attendance policy rule, Set in Attendance Policy to a holder of `policies.manage` instead.
  */
-export function sheetActions(alert: Pick<HomeAlert, "can_clear" | "metric">, manage: boolean) {
-  return { editRule: manage && isMetric(alert.metric), clear: alert.can_clear };
+export function sheetActions(alert: Pick<HomeAlert, "can_clear" | "metric">, manage: boolean, setPolicy = false) {
+  const policy = alert.metric === alerts.HOME_ALERT_POLICY_METRIC;
+  return { editRule: manage && isMetric(alert.metric), setPolicy: policy && setPolicy, clear: alert.can_clear };
 }
 
 const severityPill = (a: Pick<HomeAlert, "severity">) => <Pill tone={SEVERITY[a.severity].tone}>{SEVERITY[a.severity].text}</Pill>;
@@ -129,6 +132,7 @@ export function Alerts({ linked }: { linked: string | null }) {
   const modal = useModal();
   const rules = useRuleForms();
   const manage = hasCapability(me, "alerts.manage");
+  const setPolicy = hasCapability(me, "policies.manage");
   const [params, setParams] = useSearchParams();
   const [view, setView] = useState<AlertView>("open");
   const category = categoryOf(params.get("category"));
@@ -149,6 +153,7 @@ export function Alerts({ linked }: { linked: string | null }) {
           <AlertSheet
             alert={alert}
             manage={manage}
+            setPolicy={setPolicy}
             close={close}
             onEditRule={() => {
               // Edit Rule takes the sheet's place, so the sheet's own close never runs.
@@ -158,7 +163,7 @@ export function Alerts({ linked }: { linked: string | null }) {
           />
         ),
       }),
-    [modal, manage, rules],
+    [modal, manage, setPolicy, rules],
   );
 
   /* A link to one alert opens it once it is read; closing it takes the link out of the address. */
@@ -290,10 +295,11 @@ function AlertSources({ sources }: { sources: HomeAlertSummary["sources"] }) {
 type Outcome = "cleared" | "dismissed";
 
 /** One alert, opened: what raised it and where it stands, and what the reader may do about it. */
-function AlertSheet({ alert, manage, close, onEditRule }: { alert: HomeAlert; manage: boolean; close: () => void; onEditRule: () => void }) {
+function AlertSheet({ alert, manage, setPolicy, close, onEditRule }: { alert: HomeAlert; manage: boolean; setPolicy: boolean; close: () => void; onEditRule: () => void }) {
+  const { navigate } = useRouter();
   const clear = useMutation("POST /api/v1/home/alerts/:id/clear");
   const [acting, setActing] = useState<Outcome | null>(null);
-  const can = sheetActions(alert, manage);
+  const can = sheetActions(alert, manage, setPolicy);
 
   const act = async (outcome: Outcome) => {
     if (acting) return;
@@ -334,6 +340,7 @@ function AlertSheet({ alert, manage, close, onEditRule }: { alert: HomeAlert; ma
         <Button onClick={close}>Close</Button>
         <Grow />
         {can.editRule && <Button onClick={onEditRule}>Edit Rule</Button>}
+        {can.setPolicy && <Button onClick={() => (close(), navigate(ATTENDANCE_POLICY_HREF))}>Set in Attendance Policy</Button>}
         {can.clear && (
           <Button busy={acting === "dismissed"} onClick={() => act("dismissed")}>
             Dismiss Alert

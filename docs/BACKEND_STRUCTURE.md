@@ -141,7 +141,8 @@ src/
 │   ├── spreadsheet/   parse.js · build.js · csv.js · cells.js · context.js · day-first-cells.js (§9)
 │   ├── import/        engine.js · mapping.js · registry.js · report.js · revert.js (§9)
 │   ├── tokens/        public-token.js (32-byte, hashed at rest, expiring)
-│   ├── rules/         window-counter.js (N events in a rolling window, M3 and M7)
+│   ├── rules/         window-counter.js (N events, or H hours of them, in a rolling window or a
+│   │                  period; M1's attendance consequence rules, M3 and M7)
 │   ├── alerts/        alerts.js (work nobody has done; count and deadline breaches; ageing;
 │   │                  clear-by-permission over the subject; a switched-off rule's alerts dismissed)
 │   ├── state/         state-history.js (time at stage, M4 M7 M8)

@@ -133,7 +133,10 @@ describe("the Attendance policy type", () => {
   test("a changed rule tags its section, and only its section", () => {
     const rules = attendanceType.suggestions();
     const out = attendanceType.sections(rules, ["device_mode"]);
-    expect(out.map((s) => s.key)).toEqual(["clocking_in", "office", "home", "site", "location", "devices"]);
+    expect(out.map((s) => s.key)).toEqual([
+      "hours", "clocking_in", "late", "early", "absence", "forgotten", "location_flags", "overtime",
+      "office", "home", "site", "location", "devices", "clock_prompts",
+    ]);
     expect(out.find((s) => s.key === "devices").sentences.every((x) => x.changed)).toBe(true);
     expect(out.filter((s) => s.key !== "devices").every((s) => s.sentences.every((x) => !x.changed))).toBe(true);
   });
@@ -156,9 +159,40 @@ describe("the Attendance policy type", () => {
     expect(a.late_rule).not.toBe(b.late_rule);
   });
 
-  test("only the rules something enforces are shown", () => {
-    expect(attendanceType.VISIBLE).not.toContain("late_rule");
-    expect(attendanceType.VISIBLE).not.toContain("overtime");
+  test("every rule is enforced since PR 3, so every rule is shown", () => {
+    const c = require("@mycity/contract");
+    expect([...attendanceType.VISIBLE].sort()).toEqual(Object.keys(c.attendance.AttendanceRules.shape).sort());
+  });
+});
+
+describe("the rules of the version that judged something (rulesOfVersion, §6.8)", () => {
+  const service = require("./policies.service");
+  const c = require("@mycity/contract");
+  const VERSION_ID = "11111111-1111-4111-8111-111111111111";
+  /** A client that answers the one read with `row`, and records what it was asked. */
+  const db = (row) => {
+    const asked = [];
+    return { asked, query: async (sql, params) => (asked.push(params), { rows: row ? [row] : [] }) };
+  };
+
+  test("that version's rules, parsed with the type's defaults filled in", async () => {
+    const client = db({ policy_version_id: VERSION_ID, version: 3, rules: { grace_minutes: 10 } });
+    const out = await service.rulesOfVersion(client, "attendance", VERSION_ID);
+    expect(client.asked).toEqual([["attendance", VERSION_ID]]);
+    expect(out.policy_version_id).toBe(VERSION_ID);
+    expect(out.version).toBe(3);
+    expect(out.rules).toEqual({ ...c.attendance.AttendanceRules.parse({}), grace_minutes: 10 });
+  });
+
+  test("the type's defaults for no id, or an id that is not that type's version, read nothing more", async () => {
+    const none = db(null);
+    expect(await service.rulesOfVersion(none, "attendance", null)).toEqual({
+      policy_version_id: null,
+      version: null,
+      rules: c.attendance.AttendanceRules.parse({}),
+    });
+    expect(none.asked).toEqual([]);
+    expect((await service.rulesOfVersion(db(null), "attendance", VERSION_ID)).policy_version_id).toBeNull();
   });
 });
 

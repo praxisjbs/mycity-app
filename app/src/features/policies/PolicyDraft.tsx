@@ -4,17 +4,67 @@ import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, Card, CardHeader, CheckboxField, ChoiceField, Chips, Field, Form, FormFooter, Grid, NumberField, Pill, RichTextField, TextField, toast, useConfirm, useContractForm, useModal, type ContractSchema } from "@mycity/ui";
-import { MODE_LABEL, MODES_FOR, PATTERN_LABEL, RULE_HELP, RULE_LABEL, WORKSHEET, type ModeRule, type NumberRule, type VisibleRule } from "./labels";
+import {
+  Button,
+  Card,
+  CardHeader,
+  CheckboxField,
+  ChoiceField,
+  Chips,
+  EmptyValue,
+  Field,
+  Form,
+  FormFooter,
+  FormRow,
+  Grid,
+  Money,
+  MoneyField,
+  NumberField,
+  Pill,
+  RichTextField,
+  TextField,
+  TimeField,
+  toMoneyString,
+  toast,
+  useConfirm,
+  useContractForm,
+  useModal,
+  type ContractSchema,
+  type FieldBinding,
+} from "@mycity/ui";
+import {
+  APPROVAL_LABEL,
+  COUNT_RULES,
+  DEDUCTION_RULES,
+  HOURS_RULES,
+  METHOD_LABEL,
+  MODE_LABEL,
+  MODES_FOR,
+  NUMBER_RULES,
+  OVERTIME_METHOD_LABEL,
+  PATTERN_LABEL,
+  PERIOD_LABEL,
+  RULE_HELP,
+  RULE_LABEL,
+  WEEKDAY_LABEL,
+  WORKSHEET,
+  type CountRule,
+  type DeductionRule,
+  type ModeRule,
+  type NumberRule,
+  type VisibleRule,
+} from "./labels";
+import { fieldOfRulePath, ruleChanged, worksheetRules, worksheetValues } from "./worksheet";
 
 /**
  * A policy's draft on Knowledge Hub · Policies (docs/guides/policies.md §6.2, §6.6): Policy Settings
  * (title, Applies To, acknowledgement, approval), then the editor with Tidy With AI for a document,
- * or the Attendance worksheet (attendance.md §6.15). Save Draft keeps every field; nobody is told.
- * The Attendance policy applies to everyone, so its title and Applies To are fixed.
+ * or the Attendance worksheet (attendance.md §6.15): a card per section, a row per rule, a switch
+ * that is on opening its figures beneath it. Save Draft keeps every field; nobody is told. The
+ * Attendance policy applies to everyone, so its title and Applies To are fixed.
  */
 
-type Values = {
+type Settings = {
   title: string;
   audience: "everyone" | "some";
   department_ids: string[];
@@ -25,12 +75,16 @@ type Values = {
   needs_approval: boolean;
   body_html: string;
   rules: AttendanceRules | null;
-} & Record<NumberRule, string> &
-  Record<ModeRule, PolicyMode>;
+};
+/** The settings, and the worksheet's own values (worksheet.ts), one per control. */
+type Values = Settings & { [key: string]: unknown };
 
-const NUMBER_RULES: readonly NumberRule[] = ["grace_minutes", "home_radius_m", "max_accuracy_m"];
 const isNumberRule = (r: VisibleRule): r is NumberRule => (NUMBER_RULES as readonly string[]).includes(r);
+const isCountRule = (r: VisibleRule): r is CountRule => (COUNT_RULES as readonly string[]).includes(r);
+const isDeductionRule = (r: VisibleRule): r is DeductionRule => (DEDUCTION_RULES as readonly string[]).includes(r);
+const isModeRule = (r: VisibleRule): r is ModeRule => r.endsWith("_mode");
 const asNumber = (s: string) => (s.trim() === "" ? Number.NaN : Number(s));
+const PERIODS = Object.entries(PERIOD_LABEL) as Array<[keyof typeof PERIOD_LABEL, string]>;
 
 /** The rules a draft starts from: its own, else the newest version's, else the type's suggestions. */
 const baseRules = (p: Policy): AttendanceRules | null => p.draft?.rules ?? p.waiting?.rules ?? p.in_force?.rules ?? p.suggested_rules ?? p.current_rules;
@@ -51,13 +105,7 @@ function valuesOf(p: Policy): Values {
     needs_approval: d?.needs_approval ?? false,
     body_html: d?.body_html ?? "",
     rules,
-    grace_minutes: String(rules?.grace_minutes ?? 0),
-    home_radius_m: String(rules?.home_radius_m ?? 150),
-    max_accuracy_m: String(rules?.max_accuracy_m ?? 100),
-    office_geofence_mode: rules?.office_geofence_mode ?? "warn",
-    home_geofence_mode: rules?.home_geofence_mode ?? "warn",
-    site_geofence_mode: rules?.site_geofence_mode ?? "warn",
-    device_mode: rules?.device_mode ?? "off",
+    ...(rules ? worksheetValues(rules) : {}),
   };
 }
 
@@ -74,19 +122,7 @@ function bodyOf(p: Policy, v: Values): PolicyDraftSave {
     needs_approval: v.needs_approval,
   };
   if (p.kind !== "attendance") return { ...settings, body_html: v.body_html };
-  return {
-    ...settings,
-    rules: {
-      ...(v.rules as AttendanceRules),
-      grace_minutes: asNumber(v.grace_minutes),
-      home_radius_m: asNumber(v.home_radius_m),
-      max_accuracy_m: asNumber(v.max_accuracy_m),
-      office_geofence_mode: v.office_geofence_mode,
-      home_geofence_mode: v.home_geofence_mode,
-      site_geofence_mode: v.site_geofence_mode,
-      device_mode: v.device_mode,
-    },
-  };
+  return { ...settings, rules: worksheetRules(v.rules as AttendanceRules, v as Record<string, string | boolean>) };
 }
 
 /** The contract's draft schema over the form: its marks land on the field that holds each value. */
@@ -96,9 +132,9 @@ function draftSchema(p: Policy): ContractSchema {
       const r = policies.PolicyDraftSave.safeParse(bodyOf(p, value as Values));
       if (r.success) return r;
       const issues = (r.error?.issues ?? []).map((i) => {
-        const [head, sub] = i.path;
+        const [head, ...rest] = i.path;
         if (head === "applies_to") return { ...i, path: ["audience"] };
-        if (head === "rules") return { ...i, path: [String(sub ?? "rules")] };
+        if (head === "rules") return { ...i, path: [rest.length ? fieldOfRulePath(rest) : "rules"] };
         return i;
       });
       return { success: false, error: { issues } };
@@ -161,33 +197,148 @@ export function DraftEditor({ p }: { p: Policy }) {
     }
   };
 
+  const now = attendance && v.rules ? worksheetRules(v.rules, v as Record<string, string | boolean>) : null;
   /** A rule's label, tagged when the draft changes it against the newest version. */
-  const label = (rule: VisibleRule) => {
-    const now = isNumberRule(rule) ? asNumber(v[rule]) : v[rule];
-    const changed = newest ? String(newest[rule]) !== String(now) : false;
+  const label = (rule: VisibleRule) => (
+    <>
+      {RULE_LABEL[rule]}
+      {now && ruleChanged(rule, newest, now) && <Pill tone="warn" className="ml-1.5">Changed</Pill>}
+    </>
+  );
+  /** A worksheet value's binding: the form keeps one flat value per control (worksheet.ts). */
+  const text = (key: string) => f.field(key) as FieldBinding<string> & { name: string };
+  const flag = (key: string) => v[key] === true;
+  const tick = (key: string, words: string) => (
+    <CheckboxField key={key} label={words} value={flag(key)} onChange={(x) => f.set(key, x)} disabled={!editable} />
+  );
+  const number = (key: string, words: string, { decimal = false, optional = false } = {}) => (
+    <Field key={key} label={words} optional={optional} {...f.status(key)}>
+      <NumberField {...text(key)} decimal={decimal} disabled={!editable} className="w-28" />
+    </Field>
+  );
+  const choice = <O extends string>(key: string, words: string, options: Array<[O, string]>) => (
+    <Field key={key} label={words} {...f.status(key)}>
+      <ChoiceField
+        label={words}
+        value={String(v[key]) as O}
+        onChange={(x) => f.set(key, x)}
+        options={options}
+        disabled={editable ? [] : options.map(([o]) => o)}
+      />
+    </Field>
+  );
+  const money = (key: string, words: string) => (
+    <Field key={key} label={words} {...f.status(key)}>
+      {editable ? <MoneyField {...text(key)} /> : <Money value={String(v[key] ?? "") ? toMoneyString(String(v[key])) : null} />}
+    </Field>
+  );
+  const time = (key: string, words: string) => (
+    <Field key={key} label={words} {...f.status(key)}>
+      {editable ? <TimeField {...text(key)} /> : String(v[key] ?? "") ? <span className="tabular-nums">{String(v[key])}</span> : <EmptyValue />}
+    </Field>
+  );
+
+  /** One rule's row: its label and help, its control, and a switch's figures when it is on. */
+  const ruleField = (rule: VisibleRule) => {
+    if (isNumberRule(rule))
+      return (
+        <Field key={rule} label={label(rule)} help={RULE_HELP[rule]} {...f.status(rule)}>
+          <NumberField {...text(rule)} disabled={!editable} className="w-28" />
+        </Field>
+      );
+    if (isModeRule(rule))
+      return (
+        <Field key={rule} label={label(rule)} help={RULE_HELP[rule]} {...f.status(rule)}>
+          <ChoiceField
+            label={RULE_LABEL[rule]}
+            value={v[rule] as PolicyMode}
+            onChange={(m) => f.set(rule, m)}
+            options={MODES_FOR[rule].map((m) => [m, MODE_LABEL[m]] as [PolicyMode, string])}
+            disabled={editable ? [] : MODES_FOR[rule]}
+          />
+        </Field>
+      );
+    if (rule === "hours")
+      return (
+        <div key={rule}>
+          <Field label={label(rule)} help={RULE_HELP.hours} {...f.status("hours_on")}>
+            {tick("hours_on", "Set Company Hours")}
+          </Field>
+          {flag("hours_on") &&
+            WEEKDAY_LABEL.map((day, i) => (
+              <FormRow key={day}>
+                <Field label={day} {...f.status(`hours_${i}_working`)}>
+                  {tick(`hours_${i}_working`, "Working")}
+                </Field>
+                {flag(`hours_${i}_working`) && (
+                  <Grid cols={2}>
+                    {time(`hours_${i}_starts_at`, "Starts")}
+                    {time(`hours_${i}_ends_at`, "Ends")}
+                  </Grid>
+                )}
+              </FormRow>
+            ))}
+        </div>
+      );
+    if (isCountRule(rule))
+      return (
+        <div key={rule}>
+          <Field label={label(rule)} help={RULE_HELP[rule]} {...f.status(`${rule}_on`)}>
+            {tick(`${rule}_on`, "On")}
+          </Field>
+          {flag(`${rule}_on`) && (
+            <>
+              <FormRow>
+                {number(`${rule}_count`, "Count")}
+                {(HOURS_RULES as readonly string[]).includes(rule) && number(`${rule}_hours`, "Or Hours", { decimal: true, optional: true })}
+              </FormRow>
+              {choice(`${rule}_period`, "Period", PERIODS)}
+              {tick(`${rule}_alert`, "Alert")}
+              {tick(`${rule}_query`, "Raise Query")}
+            </>
+          )}
+        </div>
+      );
+    if (isDeductionRule(rule))
+      return (
+        <div key={rule}>
+          <Field label={label(rule)} help={RULE_HELP[rule]} {...f.status(`${rule}_on`)}>
+            {tick(`${rule}_on`, "On")}
+          </Field>
+          {flag(`${rule}_on`) && (
+            <>
+              {choice(`${rule}_method`, "Method", Object.entries(METHOD_LABEL) as Array<[string, string]>)}
+              {v[`${rule}_method`] !== "pro_rata" && money(`${rule}_amount`, "Amount")}
+            </>
+          )}
+        </div>
+      );
+    if (rule === "absence_deduction")
+      return (
+        <Field key={rule} label={label(rule)} help={RULE_HELP[rule]} {...f.status("absence_deduction_on")}>
+          {tick("absence_deduction_on", "On")}
+        </Field>
+      );
     return (
-      <>
-        {RULE_LABEL[rule]}
-        {changed && <Pill tone="warn" className="ml-1.5">Changed</Pill>}
-      </>
+      <div key={rule}>
+        <Field label={label(rule)} help={RULE_HELP.overtime} {...f.status("overtime_on")}>
+          {tick("overtime_on", "On")}
+        </Field>
+        {flag("overtime_on") && (
+          <>
+            {number("overtime_after_minutes", "After Minutes")}
+            {choice("overtime_approval", "Approval", Object.entries(APPROVAL_LABEL) as Array<[string, string]>)}
+            {choice("overtime_method", "Paid As", Object.entries(OVERTIME_METHOD_LABEL) as Array<[string, string]>)}
+            <FormRow>
+              {v.overtime_method === "per_hour" ? money("overtime_amount", "Amount an Hour") : number("overtime_multiplier", "Multiple", { decimal: true })}
+              {number("overtime_rest_day_multiplier", "Rest Day Multiple", { decimal: true })}
+            </FormRow>
+            {number("overtime_monthly_cap_hours", "Monthly Cap Hours")}
+          </>
+        )}
+      </div>
     );
   };
-  const ruleField = (rule: VisibleRule) =>
-    isNumberRule(rule) ? (
-      <Field key={rule} label={label(rule)} help={RULE_HELP[rule]} {...f.status(rule)}>
-        <NumberField {...f.field(rule)} disabled={!editable} className="w-28" />
-      </Field>
-    ) : (
-      <Field key={rule} label={label(rule)} help={RULE_HELP[rule]} {...f.status(rule)}>
-        <ChoiceField
-          label={RULE_LABEL[rule]}
-          value={v[rule]}
-          onChange={(m) => f.set(rule, m)}
-          options={MODES_FOR[rule].map((m) => [m, MODE_LABEL[m]] as [PolicyMode, string])}
-          disabled={editable ? [] : MODES_FOR[rule]}
-        />
-      </Field>
-    );
 
   return (
     <Form onSubmit={f.submit(submit)}>

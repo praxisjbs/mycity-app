@@ -214,7 +214,21 @@ who published or withdrew it and why, who saved it, and the location check per p
 (`office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode`, taking a row's one
 `geofence_mode`); `attendance_policy_acknowledgement` (one row per person and version: reminded,
 acknowledged) · `1395` `1099`'s Standard policy removed while it is as seeded and nothing was judged
-by it (A26, §5).
+by it (A26, §5) · `1420` a person's own work schedule: `attendance_work_schedule` (the seven ISO
+weekdays, each Working or Off with its hours, blank for the company hours, and Office or Remote, from
+a first day; one row per person per first day), `1340`'s rows copied in with blank hours; `1340`'s
+table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes` and what judged it
+(`policy_version_id`, `attendance_work_schedule_id`, `shift_working`, `shift_starts_at`,
+`shift_ends_at`, `judged_at`) · `1430` `attendance_rule_breach` (one row per breach of the Attendance
+policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
+alert it raised; `employee_query_id` for M3, no key yet) · `1435` `attendance_pay_item` (one pending
+deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
+`payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
+beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
+`kind` widened to `clock_out_due`, a `slot` and `due_at`, unique per person, day, kind and slot ·
+`1445` Home's `late_arrivals` and `missing_clock_out` rules switched off and their open alerts
+dismissed as the rule change, with a check that keeps them off (the Attendance policy raises
+attendance's alerts, `docs/guides/home.md` §6).
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
 other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026). The
@@ -232,8 +246,10 @@ are read by nothing after `1405` and are dropped by a later release (MIGRATIONS 
 use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
-- Attendance (attendance.md §4, §13): the redesign's tables above (PRs 2 to 4); dropping
-  `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
+- Attendance (attendance.md §4, §13): the redesign's tables above (PRs 2 and 4; PR 3's are built);
+  the foreign keys of `attendance_rule_breach.employee_query_id` (M3) and
+  `attendance_pay_item.payroll_run_id` (M6) once their tables exist; dropping `attendance_schedule`
+  (frozen by `1420`), `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
   nothing reads them; dropping the superseded booleans `require_geofence` and `require_known_device`
   and `1300`'s one `geofence_mode`, superseded by the place modes of `1370` (MIGRATIONS §8).
 - Attendance, for Home (LA): the shared roster (`src/modules/attendance/attendance.roster.js`)
@@ -242,7 +258,7 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
   no index of its own, so `1150` no longer adds `attendance_event (occurred_at)`. Its statuses are
   the register's (`present`, `late`, `absent`, `leave`, checked by `1300`) in Home's words, with
   `present` split into on site, remote (by `employee.work_pattern`, an approved remote day or a
-  hybrid home day by `attendance_schedule`, `1340`) and
+  Remote day of the person's work schedule, `attendance_work_schedule`, `1420`) and
   field (a field assignment covering the day, `1330`). When the register's statuses change, the
   roster's mapping changes in the same PR (`tests/integration/attendance-roster.test.js` holds the
   two together).

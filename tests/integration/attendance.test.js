@@ -569,13 +569,13 @@ describeDb("attendance against the real migrations", () => {
    * Time: lateness, midnight, Saturday, leave
    * ---------------------------------------------------------------- */
 
-  test("lateness is read on the workplace's clock against the working week and the policy's grace", async () => {
+  test("lateness is read on the workplace's clock against the working week, from the start once past the grace", async () => {
     await setRules({ grace_minutes: 5 });
-    // Monday 5 October 2026: 09:20 Lagos is 08:20Z, 15 minutes past 09:05.
+    // Monday 5 October 2026: 09:20 Lagos is 08:20Z: past the grace, so late from 09:00 (T2).
     const r = await punchAt("ops", "2026-10-05T08:20:00Z");
     const day = await repo.getDay(pool, people.ops.employee.employee_id, "2026-10-05");
     expect(r.work_date).toBe("2026-10-05");
-    expect(day).toMatchObject({ status: "late", late_minutes: 15 });
+    expect(day).toMatchObject({ status: "late", late_minutes: 20 });
     await setRules({ grace_minutes: 0 });
   });
 
@@ -1484,75 +1484,106 @@ describeDb("attendance against the real migrations", () => {
    * Hybrid staff's weekly schedule (guide §6.13)
    * ---------------------------------------------------------------- */
 
-  describe("hybrid staff's weekly schedule", () => {
+  describe("work schedules (§6.13)", () => {
     const lagos = require("../../src/shared/time/lagos");
     const roster = require("../../src/modules/attendance/attendance.roster");
     const day = (n) => lagos.addDays(today(), n);
-    /** The first date from day(n) on that falls on ISO weekday `wd`. */
+    /** The seeded public holidays: a holiday is nobody's working day, so a test of a weekday skips them. */
+    let holidays = new Set();
+    /** The first date from day(n) on that falls on ISO weekday `wd` and is no public holiday. */
     const onWeekday = (n, wd) => {
       let d = day(n);
-      while (lagos.weekday(d) !== wd) d = lagos.addDays(d, 1);
+      while (lagos.weekday(d) !== wd || holidays.has(d)) d = lagos.addDays(d, 1);
       return d;
     };
     const ALL = { scope: "all", scope_ids: null };
     const musa = () => people.staff.employee.employee_id;
+    const zainab = () => people.other.employee.employee_id;
     const set = (who, id, body) => as(who).post(`/attendance/schedules/${id}`, { reason: "Office on the team's days", ...body });
     const homeAt = (m) => ({ latitude: 6.62 + m / 111_195, longitude: 3.52 });
+    /** A week, Monday first, from a letter a day: O office, R remote (the company hours), - Off. */
+    const week = (letters) =>
+      [...letters].map((ch, i) => ({
+        weekday: i + 1,
+        working: ch !== "-",
+        starts_at: null,
+        ends_at: null,
+        place: ch === "O" ? "office" : ch === "R" ? "remote" : null,
+      }));
+    const placesOf = (days) => days.map((d) => (d.working ? d.place : "off"));
 
     beforeAll(async () => {
       await q("UPDATE employee SET work_pattern = 'hybrid' WHERE employee_id = $1", [musa()]);
+      holidays = new Set((await q("SELECT holiday_date::text AS d FROM public_holiday")).rows.map((r) => r.d));
     });
     afterAll(async () => {
       await q("UPDATE employee SET work_pattern = 'on_site' WHERE employee_id = $1", [musa()]);
     });
 
-    test("read within scope; set under people edit, never your own, hybrid only, with its checks", async () => {
+    test("read within scope; set under people edit for anyone, never your own, with its checks", async () => {
       const read = await as("manager").get(`/attendance/schedules/${musa()}`);
       expect(read.status).toBe(200);
       expect(read.body).toMatchObject({
         employee: { display_name: "Musa Danjuma" }, work_pattern: "hybrid", worksite: { name: "Testbed Office", radius_m: 100 },
         home_state: null, current: null, next: null, can_edit: false,
       });
-      // No schedule yet: every working day is at the office.
-      expect(new Set(read.body.week.filter((d) => d.place !== "off").map((d) => d.place))).toEqual(new Set(["office"]));
-      expect(read.body.week.find((d) => d.weekday === 7).place).toBe("off");
+      // No schedule yet: the company hours, every working day at the office (hybrid, T8).
+      expect(placesOf(read.body.week)).toEqual(["office", "office", "office", "office", "office", "office", "off"]);
+      expect(read.body.week[0]).toMatchObject({ starts_at: "09:00", ends_at: "17:00", company_hours: true });
       expect((await as("manager").get(`/attendance/schedules/${people.outsider.employee.employee_id}`)).status).toBe(404);
       expect((await as("outsider").get(`/attendance/schedules/${musa()}`)).status).toBe(403);
       expect((await as("ops").get(`/attendance/schedules/${musa()}`)).body.can_edit).toBe(true);
+      const mine = await as("staff").get("/attendance/me/schedule");
+      expect(mine.status).toBe(200);
+      expect(mine.body).toMatchObject({ employee: { display_name: "Musa Danjuma" }, can_edit: false });
 
-      expect((await set("manager", musa(), { office_days: [1, 2], effective_from: day(1) })).status).toBe(403);
+      const days = week("OORORO-");
+      expect((await set("manager", musa(), { days, effective_from: day(1) })).status).toBe(403);
       const no = async (who, id, body, status, code) => {
         const res = await set(who, id, body);
         expect([res.status, res.body.error && res.body.error.code]).toEqual([status, code]);
+        return res;
       };
-      await no("ops", people.ops.employee.employee_id, { office_days: [1, 2], effective_from: day(1) }, 403, "OWN_RECORD");
-      await no("ops", people.other.employee.employee_id, { office_days: [1, 2], effective_from: day(1) }, 422, "SCHEDULE_NOT_NEEDED");
-      await no("ops", musa(), { office_days: [1, 2], effective_from: day(-1) }, 422, "SCHEDULE_IN_THE_PAST");
-      await no("ops", musa(), { office_days: [1, 2], effective_from: day(95) }, 422, "SCHEDULE_TOO_FAR");
-      await no("ops", musa(), { office_days: [1, 7], effective_from: day(1) }, 422, "SCHEDULE_DAY_NOT_WORKED");
-      const working = read.body.week.filter((d) => d.place !== "off").map((d) => d.weekday);
-      await no("ops", musa(), { office_days: working, effective_from: day(1) }, 422, "SCHEDULE_NO_HOME_DAY");
-      expect((await set("ops", musa(), { office_days: [1, 1], effective_from: day(1) })).status).toBe(422);
-      expect((await set("ops", musa(), { office_days: [1, 2], effective_from: day(1), reason: "short" })).status).toBe(422);
-      expect((await q("SELECT count(*)::int AS n FROM attendance_schedule", [])).rows[0].n).toBe(0);
+      await no("ops", people.ops.employee.employee_id, { days, effective_from: day(1) }, 403, "OWN_RECORD");
+      await no("ops", musa(), { days, effective_from: day(-1) }, 422, "SCHEDULE_IN_THE_PAST");
+      await no("ops", musa(), { days, effective_from: day(95) }, 422, "SCHEDULE_TOO_FAR");
+      // A blank Sunday the company hours do not work needs its own hours (gap l).
+      const sunday = await no("ops", musa(), { days: week("OOOOOOO"), effective_from: day(1) }, 422, "SCHEDULE_HOURS_NEEDED");
+      expect(sunday.body.error.fields).toEqual({ "days.6.starts_at": ["Give the hours"] });
+      // The contract's own refusals: no working day, an Off day with hours, a working day with no place
+      // or one end before its start, and a short reason.
+      expect((await set("ops", musa(), { days: week("-------"), effective_from: day(1) })).status).toBe(422);
+      const offWithHours = week("OOOOOO-");
+      offWithHours[6] = { ...offWithHours[6], starts_at: "09:00", ends_at: "12:00" };
+      expect((await set("ops", musa(), { days: offWithHours, effective_from: day(1) })).status).toBe(422);
+      const noPlace = week("OOOOOO-");
+      noPlace[0] = { ...noPlace[0], place: null };
+      expect((await set("ops", musa(), { days: noPlace, effective_from: day(1) })).status).toBe(422);
+      const backwards = week("OOOOOO-");
+      backwards[0] = { ...backwards[0], starts_at: "14:00", ends_at: "10:00" };
+      expect((await set("ops", musa(), { days: backwards, effective_from: day(1) })).status).toBe(422);
+      expect((await set("ops", musa(), { days, effective_from: day(1), reason: "short" })).status).toBe(422);
+      expect((await q("SELECT count(*)::int AS n FROM attendance_work_schedule", [])).rows[0].n).toBe(0);
     });
 
     test("set from today, replaced from the same day, a later one waits; history, the notice, My Profile and the home", async () => {
-      const first = await set("ops", musa(), { office_days: [4, 1, 2], effective_from: today() });
+      const first = await set("ops", musa(), { days: week("OORORO-"), effective_from: today() });
       expect(first.status).toBe(201);
       expect(first.body).toMatchObject({
-        current: { office_days: [1, 2, 4], effective_from: today(), set_by_name: "Tunde Bakare" },
+        current: { effective_from: today(), set_by_name: "Tunde Bakare" },
         next: null, home_state: "none", can_edit: true,
       });
-      expect(first.body.week.find((d) => d.weekday === 3).place).toBe("remote");
-      expect(first.body.week.find((d) => d.weekday === 1).place).toBe("office");
+      expect(placesOf(first.body.current.days)).toEqual(["office", "office", "remote", "office", "remote", "office", "off"]);
+      expect(placesOf(first.body.week)).toEqual(["office", "office", "remote", "office", "remote", "office", "off"]);
 
-      const again = await set("ops", musa(), { office_days: [1, 2, 3], effective_from: today() });
-      expect(again.body.current.office_days).toEqual([1, 2, 3]);
-      expect((await q("SELECT count(*)::int AS n FROM attendance_schedule WHERE employee_id = $1", [musa()])).rows[0].n).toBe(1);
+      const again = await set("ops", musa(), { days: week("OOORRO-"), effective_from: today() });
+      expect(placesOf(again.body.current.days)).toEqual(["office", "office", "office", "remote", "remote", "office", "off"]);
+      expect((await q("SELECT count(*)::int AS n FROM attendance_work_schedule WHERE employee_id = $1", [musa()])).rows[0].n).toBe(1);
 
-      const later = await set("ops", musa(), { office_days: [1, 2], effective_from: day(60) });
-      expect(later.body).toMatchObject({ current: { office_days: [1, 2, 3] }, next: { office_days: [1, 2], effective_from: day(60) } });
+      const later = await set("ops", musa(), { days: week("OORRR--"), effective_from: day(60) });
+      expect(placesOf(later.body.current.days)).toEqual(["office", "office", "office", "remote", "remote", "office", "off"]);
+      expect(later.body.next).toMatchObject({ effective_from: day(60) });
+      expect(placesOf(later.body.next.days)).toEqual(["office", "office", "remote", "remote", "remote", "off", "off"]);
 
       await drain();
       const history = await as("ops").get(`/employees/${musa()}/history`);
@@ -1561,13 +1592,33 @@ describeDb("attendance against the real migrations", () => {
         people.staff.user.user_id,
       ]);
       expect(told.rows.map((r) => r.title)).toEqual(["Work schedule set", "Work schedule set", "Work schedule set"]);
-      expect(told.rows[1].body).toBe(`Office Mon, Tue, Wed from ${today().split("-").reverse().join("/")}.`);
+      expect(told.rows[1].body).toBe(`Your work schedule starts on ${today().split("-").reverse().join("/")}.`);
 
       const profile = await as("staff").get("/ess/profile");
-      const place = (wd) => profile.body.working_week.find((d) => d.weekday === wd).place;
-      expect([place(1), place(3), place(4), place(7)]).toEqual(["office", "office", "remote", "off"]);
+      const place = (wd) => profile.body.working_week.find((d) => d.weekday === wd);
+      expect([place(1).place, place(3).place, place(4).place, place(7).place]).toEqual(["office", "office", "remote", "off"]);
+      expect(place(6)).toMatchObject({ is_working_day: true, starts_at: "09:00", ends_at: "15:00" });
       expect((await as("staff").get("/attendance/me/home")).body.needed).toBe(true);
       expect((await as("other").get("/attendance/me/home")).body.needed).toBe(false);
+    });
+
+    test("anyone gets one, whatever their pattern: a part-timer's own hours judge the day, their Off day is never absent", async () => {
+      const part = week("O-OO---");
+      part[0] = { ...part[0], starts_at: "10:00", ends_at: "14:00" };
+      const res = await set("ops", zainab(), { days: part, effective_from: today(), reason: "Part time on Mondays" });
+      expect(res.status).toBe(201);
+      expect(res.body.work_pattern).toBe("on_site");
+      const monday = onWeekday(75, 1);
+      const tuesday = lagos.addDays(monday, 1);
+      const r = await punchAt("other", `${monday}T09:07:00Z`); // 10:07 Lagos
+      expect(r.today.shift).toMatchObject({ working_day: true, starts_at: "10:00", ends_at: "14:00" });
+      expect(await repo.getDay(pool, zainab(), monday)).toMatchObject({ status: "late", late_minutes: 7, shift_starts_at: "10:00:00" });
+      await service.closeDays({ now: new Date(`${lagos.addDays(tuesday, 1)}T00:30:00Z`) });
+      expect(await repo.getDay(pool, zainab(), tuesday)).toBeNull();
+      const reg = await as("ops").get(`/attendance/register?date=${tuesday}&q=Zainab`);
+      expect(reg.body.data[0]).toMatchObject({ status: "off" });
+      // Musa, expected that Tuesday by his own week, is closed absent.
+      expect(await repo.getDay(pool, musa(), tuesday)).toMatchObject({ status: "absent" });
     });
 
     test("on the clock: an office day at the worksite, a home day at the approved home, no home is reviewed", async () => {

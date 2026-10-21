@@ -19,7 +19,7 @@ import type {
 } from "@mycity/contract/contract.gen.ts";
 import attendanceContract from "@mycity/contract/schemas/attendance.js";
 import policiesContract from "@mycity/contract/schemas/policies.js";
-import { todayIso } from "@mycity/ui";
+import { formatMoney, todayIso } from "@mycity/ui";
 import { audit } from "../data/audit";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid } from "../core";
 import { byKey, PEOPLE, ref, refKey, SIGN_INS, type MockPerson } from "../data/people";
@@ -100,66 +100,295 @@ const wordsOf = (blocks: RichTextBlock[]) =>
   blocks.flatMap((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.flat() : b.spans)).map((s) => s.text).join(" ");
 
 /* ------------------------------------------------------------------ *
- * The Attendance policy's rules, as staff read them
+ * The Attendance policy's rules, as staff read them (word for word the server's
+ * attendance.policy-type.js)
  * ------------------------------------------------------------------ */
 const DEFAULT_RULES: AttendanceRules = attendanceContract.AttendanceRules.parse({});
-const VISIBLE = ["grace_minutes", "office_geofence_mode", "home_geofence_mode", "site_geofence_mode", "home_radius_m", "max_accuracy_m", "device_mode"] as const;
+const VISIBLE = [
+  "hours",
+  "grace_minutes",
+  "late_rule",
+  "late_deduction",
+  "early_grace_minutes",
+  "early_rule",
+  "early_deduction",
+  "absence_rule",
+  "absence_deduction",
+  "forgotten_rule",
+  "location_rule",
+  "overtime",
+  "office_geofence_mode",
+  "home_geofence_mode",
+  "site_geofence_mode",
+  "home_radius_m",
+  "max_accuracy_m",
+  "device_mode",
+  "clock_out_reminder_minutes",
+  "system_clock_out_after_minutes",
+] as const;
 type Visible = (typeof VISIBLE)[number];
 const RULE_LABEL: Record<Visible, string> = {
+  hours: "Company Hours",
   grace_minutes: "Grace Minutes",
+  late_rule: "Late Arrivals",
+  late_deduction: "Late Deduction",
+  early_grace_minutes: "Early Grace Minutes",
+  early_rule: "Early Departures",
+  early_deduction: "Early Deduction",
+  absence_rule: "Absences",
+  absence_deduction: "Absence Deduction",
+  forgotten_rule: "Forgotten Clock-Outs",
+  location_rule: "Location Flags",
+  overtime: "Overtime",
   office_geofence_mode: "Office Check",
   home_geofence_mode: "Home Check",
   site_geofence_mode: "Field Site Check",
   home_radius_m: "Home Radius",
   max_accuracy_m: "GPS Accuracy",
   device_mode: "Device Check",
+  clock_out_reminder_minutes: "Clock-Out Reminder",
+  system_clock_out_after_minutes: "System Clock-Out",
 };
+type Count = AttendanceRules["late_rule"] | AttendanceRules["absence_rule"];
+type Deduction = AttendanceRules["late_deduction"];
+type Hours = NonNullable<AttendanceRules["hours"]>;
 const MODE: Record<string, string> = { off: "Off", warn: "Flag", block: "Refuse" };
-const minutes = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
-const ruleValue = (k: Visible, r: AttendanceRules) =>
-  k === "grace_minutes" ? minutes(r.grace_minutes) : k === "home_radius_m" || k === "max_accuracy_m" ? `${r[k]} m` : MODE[r[k]];
+const PERIOD: Record<string, string> = { week: "a week", month: "a month", days_30: "30 days" };
+const METHOD: Record<string, string> = { pro_rata: "Pro-Rata by Minute", per_hour: "Fixed per Hour", per_day: "Fixed per Day" };
+const APPROVAL: Record<string, string> = { manager_after: "Line Manager After", pre_approved: "Pre-Approved", automatic: "Automatic" };
+const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const counted = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const minutes = (n: number) => counted(n, "minute");
+const metres = (n: number) => `${n} m`;
+const times = (n: number) => `${Number(n)} times`;
+const naira = (amount: string | null) => formatMoney(amount);
+const upper = (s: string) => `${s[0]!.toUpperCase()}${s.slice(1)}`;
+
+type Run = { from: number; to: number; working: boolean; starts_at: string | null; ends_at: string | null };
+function runsOf(hours: Hours): Run[] {
+  const runs: Run[] = [];
+  hours.forEach((d, i) => {
+    const last = runs[runs.length - 1];
+    if (last && last.working === d.working && last.starts_at === d.starts_at && last.ends_at === d.ends_at) last.to = i;
+    else runs.push({ from: i, to: i, working: d.working, starts_at: d.starts_at, ends_at: d.ends_at });
+  });
+  return runs;
+}
+function hoursValue(hours: AttendanceRules["hours"]) {
+  if (!Array.isArray(hours)) return "The Working Week";
+  return runsOf(hours)
+    .map((r) => {
+      const days = r.from === r.to ? DAY_SHORT[r.from] : `${DAY_SHORT[r.from]} to ${DAY_SHORT[r.to]}`;
+      return r.working ? `${days} ${r.starts_at} to ${r.ends_at}` : `${days} Off`;
+    })
+    .join(", ");
+}
+function countValue(rule: Count) {
+  if (!rule.on) return "Off";
+  const h = "hours" in rule && rule.hours ? ` or ${counted(rule.hours, "hour")}` : "";
+  const does = [rule.alert ? "Alert" : null, rule.query ? "Raise Query" : null].filter(Boolean);
+  return `${rule.count} in ${PERIOD[rule.period]}${h}${does.length ? `, ${does.join(", ")}` : ""}`;
+}
+const deductionValue = (d: Deduction) => (!d.on ? "Off" : d.method === "pro_rata" || !d.amount ? METHOD[d.method] : `${METHOD[d.method]}, ${naira(d.amount)}`);
+function overtimeValue(o: AttendanceRules["overtime"]) {
+  if (!o.on) return "Off";
+  const pay = o.method === "per_hour" ? `${o.amount ? naira(o.amount) : "a fixed amount"} an hour` : times(o.multiplier);
+  return [`After ${minutes(o.after_minutes)}`, APPROVAL[o.approval], pay, `${times(o.rest_day_multiplier)} on rest days`, `${counted(o.monthly_cap_hours, "hour")} a month`].join(", ");
+}
+function ruleValue(k: Visible, r: AttendanceRules): string {
+  switch (k) {
+    case "hours":
+      return hoursValue(r.hours);
+    case "grace_minutes":
+    case "early_grace_minutes":
+    case "clock_out_reminder_minutes":
+    case "system_clock_out_after_minutes":
+      return minutes(r[k]);
+    case "max_accuracy_m":
+    case "home_radius_m":
+      return metres(r[k]);
+    case "late_rule":
+    case "early_rule":
+    case "absence_rule":
+    case "forgotten_rule":
+    case "location_rule":
+      return countValue(r[k]);
+    case "late_deduction":
+    case "early_deduction":
+      return deductionValue(r[k]);
+    case "absence_deduction":
+      return r.absence_deduction.on ? "A Day's Pay" : "Off";
+    case "overtime":
+      return overtimeValue(r.overtime);
+    default:
+      return MODE[r[k]] ?? String(r[k]);
+  }
+}
+/** A value with its keys in one order, so a rule compares equal however it was built. */
+const sortedKeys = (x: unknown): unknown =>
+  Array.isArray(x) ? x.map(sortedKeys) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, sortedKeys(v)])) : x;
 const changedRules = (before: AttendanceRules | null, after: AttendanceRules) =>
-  before ? VISIBLE.filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k])) : [];
+  before ? VISIBLE.filter((k) => JSON.stringify(sortedKeys(before[k])) !== JSON.stringify(sortedKeys(after[k]))) : [];
+
+type What = { one: string; many: string };
+function companyHours(r: AttendanceRules) {
+  const own = "Where your own work schedule differs, your schedule applies.";
+  if (!Array.isArray(r.hours)) return ["Your hours are the company's working week.", own];
+  return [
+    ...runsOf(r.hours).map((run) => {
+      const days = run.from === run.to ? DAY_LONG[run.from] : `${DAY_LONG[run.from]} to ${DAY_LONG[run.to]}`;
+      return run.working ? `${days}, ${run.starts_at} to ${run.ends_at}.` : `${days}, no work.`;
+    }),
+    own,
+  ];
+}
+const grace = (r: AttendanceRules) =>
+  r.grace_minutes > 0
+    ? [`You have a grace period of ${minutes(r.grace_minutes)} after your start time.`, "A clock-in after it counts as late from your start time."]
+    : ["There is no grace period. A clock-in after your start time counts as late."];
+function limit(rule: Count, what: What, hoursWhat: string | null = null) {
+  if (!rule.on) return [`${upper(what.many)} do not count toward a limit.`];
+  const h = "hours" in rule && rule.hours && hoursWhat ? `, or ${counted(rule.hours, "hour")} ${hoursWhat},` : "";
+  const out = [`${counted(rule.count, what.one, what.many)} in ${PERIOD[rule.period]}${h} reach the limit.`];
+  if (rule.alert && rule.query) out.push("People are alerted and a query is raised. The count then starts again.");
+  else if (rule.alert) out.push("People are alerted. The count then starts again.");
+  else if (rule.query) out.push("A query is raised. The count then starts again.");
+  return out;
+}
+function deduction(d: Deduction, what: What) {
+  if (!d.on) return [`${upper(what.many)} do not lead to a deduction.`];
+  if (d.method === "pro_rata") return [`Each ${what.one} is deducted from your pay by the minute.`];
+  if (d.method === "per_hour") return [`Each ${what.one} deducts ${naira(d.amount)} for every hour or part of one.`];
+  return [`Each ${what.one} deducts ${naira(d.amount)}.`];
+}
+const early = (r: AttendanceRules) =>
+  r.early_grace_minutes > 0
+    ? [`Leaving more than ${minutes(r.early_grace_minutes)} before your end time counts as leaving early.`]
+    : ["Leaving before your end time counts as leaving early."];
+const absence = (r: AttendanceRules) => [
+  ...limit(r.absence_rule, { one: "absence", many: "absences" }),
+  r.absence_deduction.on ? "Each absent day deducts a day's pay." : "Absences do not lead to a deduction.",
+];
+function overtime(o: AttendanceRules["overtime"]) {
+  if (!o.on) return ["Overtime is not paid."];
+  const pay =
+    o.method === "per_hour"
+      ? `It is paid at ${naira(o.amount)} an hour, and on rest days at ${times(o.rest_day_multiplier)} your hourly rate.`
+      : `It is paid at ${times(o.multiplier)} your hourly rate, and ${times(o.rest_day_multiplier)} on rest days.`;
+  const approval = {
+    manager_after: "Your line manager confirms it after the day.",
+    pre_approved: "Only overtime approved beforehand is paid.",
+    automatic: "It is confirmed automatically.",
+  }[o.approval];
+  return [
+    o.after_minutes > 0 ? `Work more than ${minutes(o.after_minutes)} past your end time and every minute after it is overtime.` : "Every minute worked past your end time is overtime.",
+    pay,
+    approval,
+    `At most ${counted(o.monthly_cap_hours, "hour")} of overtime are paid in a month.`,
+  ];
+}
+const clockPrompts = (r: AttendanceRules) => [
+  `Still clocked in after your end time, you are reminded to clock out every ${minutes(r.clock_out_reminder_minutes)}.`,
+  `${minutes(r.system_clock_out_after_minutes)} after your end time, the system clocks you out. Your hours count to your end time.`,
+];
+function office(mode: string) {
+  if (mode === "off") return ["At the office, your location is recorded with each clock-in and clock-out. Nothing is flagged."];
+  if (mode === "warn") return ["At the office, a clock-in outside your office's radius is accepted and sent to People for review."];
+  return ["At the office, a clock-in outside your office's radius is refused, and People see it. Clock in again from inside it."];
+}
+function home(mode: string, radius: number) {
+  if (mode === "off") return ["Working from home, your location is recorded with each clock-in and clock-out. Nothing is flagged."];
+  const away = `Working from home, a clock-in more than ${metres(radius)} from your approved home`;
+  return [mode === "warn" ? `${away} is accepted and sent for review.` : `${away} is refused, and People see it.`, "Until People approve your home, your clock-ins are sent for review."];
+}
+function site(mode: string) {
+  if (mode === "off") return ["At a field site or client visit, your location is recorded with each clock-in. Nothing is flagged."];
+  if (mode === "warn") return ["At a field site or client visit, a clock-in outside the site's radius is accepted and sent for review."];
+  return ["At a field site or client visit, a clock-in outside the site's radius is refused, and People see it."];
+}
+function location(r: AttendanceRules) {
+  const checked = [r.office_geofence_mode, r.home_geofence_mode, r.site_geofence_mode].some((m) => m !== "off");
+  return [
+    `Your phone's location must be accurate to within ${metres(r.max_accuracy_m)}. A weaker reading cannot confirm where you are.`,
+    ...(checked ? ["When your location cannot be confirmed, your clock-in is sent to People for review."] : []),
+  ];
+}
+function device(mode: string) {
+  if (mode === "off") return ["You can clock in from any device. Each device you use is recorded."];
+  if (mode === "warn") return ["A clock-in from a device not registered on My Devices is accepted and sent for review."];
+  return ["A clock-in from a device not registered on My Devices is refused. Register it first."];
+}
+const LATE = { one: "late arrival", many: "late arrivals" };
+const EARLY = { one: "early departure", many: "early departures" };
+const SECTIONS: Array<{ key: string; title: string; rules: readonly Visible[]; text: (r: AttendanceRules) => string[] }> = [
+  { key: "hours", title: "Working Hours", rules: ["hours"], text: companyHours },
+  { key: "clocking_in", title: "Clocking In", rules: ["grace_minutes"], text: grace },
+  { key: "late", title: "Late Arrivals", rules: ["late_rule", "late_deduction"], text: (r) => [...limit(r.late_rule, LATE, "late"), ...deduction(r.late_deduction, LATE)] },
+  {
+    key: "early",
+    title: "Leaving Early",
+    rules: ["early_grace_minutes", "early_rule", "early_deduction"],
+    text: (r) => [...early(r), ...limit(r.early_rule, EARLY, "left early"), ...deduction(r.early_deduction, EARLY)],
+  },
+  { key: "absence", title: "Absence", rules: ["absence_rule", "absence_deduction"], text: absence },
+  {
+    key: "forgotten",
+    title: "Forgotten Clock-Outs",
+    rules: ["forgotten_rule"],
+    text: (r) => ["A System Clock-Out, or a day with no clock-out, is a forgotten clock-out.", ...limit(r.forgotten_rule, { one: "forgotten clock-out", many: "forgotten clock-outs" })],
+  },
+  {
+    key: "location_flags",
+    title: "Location Flags",
+    rules: ["location_rule"],
+    text: (r) => ["A clock-in or clock-out outside your place of work is a location flag.", ...limit(r.location_rule, { one: "location flag", many: "location flags" })],
+  },
+  { key: "overtime", title: "Overtime", rules: ["overtime"], text: (r) => overtime(r.overtime) },
+  { key: "office", title: "At the Office", rules: ["office_geofence_mode"], text: (r) => office(r.office_geofence_mode) },
+  { key: "home", title: "Working From Home", rules: ["home_geofence_mode", "home_radius_m"], text: (r) => home(r.home_geofence_mode, r.home_radius_m) },
+  { key: "site", title: "At a Field Site", rules: ["site_geofence_mode"], text: (r) => site(r.site_geofence_mode) },
+  { key: "location", title: "Your Location", rules: ["max_accuracy_m"], text: location },
+  { key: "devices", title: "Your Devices", rules: ["device_mode"], text: (r) => device(r.device_mode) },
+  { key: "clock_prompts", title: "Clocking Out", rules: ["clock_out_reminder_minutes", "system_clock_out_after_minutes"], text: clockPrompts },
+];
 
 function sectionsOf(r: AttendanceRules, changed: readonly string[]): PolicySection[] {
-  const office =
-    r.office_geofence_mode === "off"
-      ? "At the office, your location is recorded with each clock-in and clock-out. Nothing is flagged."
-      : r.office_geofence_mode === "warn"
-        ? "At the office, a clock-in outside your office's radius is accepted and sent to People for review."
-        : "At the office, a clock-in outside your office's radius is refused, and People see it. Clock in again from inside it.";
-  const away = `Working from home, a clock-in more than ${r.home_radius_m} m from your approved home`;
-  const home =
-    r.home_geofence_mode === "off"
-      ? ["Working from home, your location is recorded with each clock-in and clock-out. Nothing is flagged."]
-      : [r.home_geofence_mode === "warn" ? `${away} is accepted and sent for review.` : `${away} is refused, and People see it.`, "Until People approve your home, your clock-ins are sent for review."];
-  const site =
-    r.site_geofence_mode === "off"
-      ? "At a field site or client visit, your location is recorded with each clock-in. Nothing is flagged."
-      : r.site_geofence_mode === "warn"
-        ? "At a field site or client visit, a clock-in outside the site's radius is accepted and sent for review."
-        : "At a field site or client visit, a clock-in outside the site's radius is refused, and People see it.";
-  const checked = [r.office_geofence_mode, r.home_geofence_mode, r.site_geofence_mode].some((m) => m !== "off");
-  const device =
-    r.device_mode === "off"
-      ? "You can clock in from any device. Each device you use is recorded."
-      : r.device_mode === "warn"
-        ? "A clock-in from a device not registered on My Devices is accepted and sent for review."
-        : "A clock-in from a device not registered on My Devices is refused. Register it first.";
-  const SECTIONS: Array<[string, string, readonly string[], string[]]> = [
-    ["clocking_in", "Clocking In", ["grace_minutes"], [r.grace_minutes > 0 ? `You have a grace period of ${minutes(r.grace_minutes)} after your resumption time. A clock-in after it counts as late.` : "There is no grace period. A clock-in after your resumption time counts as late."]],
-    ["office", "At the Office", ["office_geofence_mode"], [office]],
-    ["home", "Working From Home", ["home_geofence_mode", "home_radius_m"], home],
-    ["site", "At a Field Site", ["site_geofence_mode"], [site]],
-    ["location", "Your Location", ["max_accuracy_m"], [`Your phone's location must be accurate to within ${r.max_accuracy_m} m. A weaker reading cannot confirm where you are.`, ...(checked ? ["When your location cannot be confirmed, your clock-in is sent to People for review."] : [])]],
-    ["devices", "Your Devices", ["device_mode"], [device]],
-  ];
-  return SECTIONS.map(([key, title, rules, sentences]) => ({
+  return SECTIONS.map(({ key, title, rules, text }) => ({
     key,
     title,
-    sentences: sentences.map((text, i) => ({ key: `${key}.${i}`, text, changed: rules.some((x) => changed.includes(x)) })),
+    sentences: text(r).map((t, i) => ({ key: `${key}.${i}`, text: t, changed: rules.some((x) => changed.includes(x)) })),
   }));
 }
+
+/** The company hours a first draft suggests: Monday to Friday 09:00 to 17:00, Saturday 09:00 to 15:00, Sunday Off. */
+const SUGGESTED_HOURS: Hours = [1, 2, 3, 4, 5, 6, 7].map((weekday) =>
+  weekday <= 5
+    ? { weekday, working: true, starts_at: "09:00", ends_at: "17:00" }
+    : weekday === 6
+      ? { weekday, working: true, starts_at: "09:00", ends_at: "15:00" }
+      : { weekday, working: false, starts_at: null, ends_at: null },
+);
+
+/** The rules a first draft starts from: every consequence rule, deduction and overtime off, its figures filled in. */
+const suggestions = (): AttendanceRules => ({
+  ...DEFAULT_RULES,
+  hours: SUGGESTED_HOURS.map((d) => ({ ...d })),
+  grace_minutes: 5,
+  late_rule: { on: false, count: 3, period: "month", hours: 5, alert: true, query: true },
+  late_deduction: { on: false, method: "pro_rata", amount: null },
+  early_grace_minutes: 5,
+  early_rule: { on: false, count: 3, period: "month", hours: null, alert: true, query: true },
+  early_deduction: { on: false, method: "pro_rata", amount: null },
+  absence_rule: { on: false, count: 2, period: "month", alert: true, query: true },
+  absence_deduction: { on: false },
+  forgotten_rule: { on: false, count: 3, period: "month", alert: true, query: false },
+  location_rule: { on: false, count: 3, period: "month", alert: true, query: false },
+  overtime: { on: false, after_minutes: 30, approval: "manager_after", method: "multiplier", multiplier: 1.5, amount: null, rest_day_multiplier: 2, monthly_cap_hours: 20 },
+  device_mode: "warn",
+  clock_out_reminder_minutes: 30,
+  system_clock_out_after_minutes: 90,
+});
 
 /* ------------------------------------------------------------------ *
  * The records
@@ -252,11 +481,30 @@ function acked(v: Ver, daysBack: number, except: string[] = []) {
   ACKS.set(v.id, new Map(asked(v).filter((p) => !except.includes(p.user_key)).map((p) => [p.user_key, { acknowledged_at: at(daysBack, "09:02"), reminded_at: null, deferred_on: null }])));
 }
 
-/* The Attendance policy: version 2 in force (10 minutes' grace, devices flagged), as the clock expects. */
+/*
+ * The Attendance policy: version 2 in force (10 minutes' grace, devices flagged), as the clock expects.
+ * Both versions keep the company hours and switch on the consequence rules, the late deduction and
+ * overtime, so the clock, My Attendance and People show them.
+ */
+const IN_USE: AttendanceRules = (() => {
+  const r = suggestions();
+  // Read through the contract, as the API reads a version, so each rule's keys come in its order.
+  return attendanceContract.AttendanceRules.parse({
+    ...r,
+    late_rule: { ...r.late_rule, on: true },
+    late_deduction: { ...r.late_deduction, on: true },
+    early_rule: { ...r.early_rule, on: true },
+    absence_rule: { ...r.absence_rule, on: true },
+    absence_deduction: { on: true },
+    forgotten_rule: { ...r.forgotten_rule, on: true },
+    location_rule: { ...r.location_rule, on: true },
+    overtime: { ...r.overtime, on: true },
+  });
+})();
 const ATTENDANCE = policy(1, "attendance", "Attendance Policy");
-const att1 = version(ATTENDANCE, 1, 140, "ifeoma", "First written attendance policy.", { rules: { ...DEFAULT_RULES, grace_minutes: 15, home_radius_m: 100 } });
+const att1 = version(ATTENDANCE, 1, 140, "ifeoma", "First written attendance policy.", { rules: { ...IN_USE, grace_minutes: 15, home_radius_m: 100, device_mode: "off" } });
 const att2 = version(ATTENDANCE, 2, 6, "cynthia", "Grace is now 10 minutes, and unregistered devices are flagged for review.", {
-  rules: { ...DEFAULT_RULES, grace_minutes: 10, device_mode: "warn", home_radius_m: 150 },
+  rules: { ...IN_USE, grace_minutes: 10, device_mode: "warn", home_radius_m: 150 },
 });
 
 const HANDBOOK = policy(2, "document", "Employee Handbook");
@@ -489,7 +737,7 @@ function overview(p: Pol): Policy {
     state: policyState(p),
     today,
     current_rules: p.kind === "attendance" ? attendanceContract.AttendanceRules.parse(now?.rules ?? {}) : null,
-    suggested_rules: p.kind === "attendance" ? { ...DEFAULT_RULES, grace_minutes: 5, device_mode: "warn" } : null,
+    suggested_rules: p.kind === "attendance" ? suggestions() : null,
     in_force: now ? asVersion(now) : null,
     waiting: waiting ? asVersion(waiting) : null,
     draft,
@@ -511,7 +759,23 @@ function overview(p: Pol): Policy {
 
 /** The rules the clock judges a punch by today: the Attendance policy's version in force. */
 export function attendanceRulesInForce(): AttendanceRules {
-  return attendanceContract.AttendanceRules.parse(inForce(ATTENDANCE.policy_id)?.rules ?? {});
+  return attendanceRulesOn(todayIso());
+}
+/** The Attendance policy's version in force today, as Home's Attendance Policy card names it. */
+export function attendanceVersionInForce(): { policy_version_id: string; version: number } | null {
+  const v = inForce(ATTENDANCE.policy_id);
+  return v ? { policy_version_id: v.id, version: v.version! } : null;
+}
+/** Each published version's rules, read once: a published version never changes, and the clock's mock reads them for every day it judges. */
+const READ_RULES = new WeakMap<Ver, AttendanceRules>();
+const NO_VERSION: AttendanceRules = attendanceContract.AttendanceRules.parse({});
+/** The Attendance policy's rules in force on a date: the version a day is judged by. Read only. */
+export function attendanceRulesOn(date: string): AttendanceRules {
+  const v = inForce(ATTENDANCE.policy_id, date);
+  if (!v) return NO_VERSION;
+  let r = READ_RULES.get(v);
+  if (!r) READ_RULES.set(v, (r = attendanceContract.AttendanceRules.parse(v.rules ?? {})));
+  return r;
 }
 
 function refused(issues: Array<{ path: PropertyKey[]; message: string }>) {

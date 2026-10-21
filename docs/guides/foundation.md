@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 20/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -717,7 +717,7 @@ screen.
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
-| Employee record | Profile, Job, Reporting Line, Login, Attendance (attendance.md §10, LA) and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
+| Employee record | Profile, Job, Work Schedule (attendance.md §10, LA), Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address (suggestions as it is typed, §6.13), phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
@@ -804,7 +804,7 @@ screen.
 
 - Attendance Today on the register, and the attendance and location modal a row used to open:
   closed 19/10/2026. A person's day opens on People · Attendance, and their setup (pattern, office,
-  home, week and Set Schedule) is the employee record's Attendance tab (attendance.md §6.13, §10);
+  home, week and Set Schedule) is the employee record's Work Schedule tab, after Job (attendance.md §6.13, §10);
   the INTERIM `EmployeeDetails.tsx` is deleted.
 - The leave flow's day threshold for the second stage: Operations & People decide on screen; the
   seed sets 5 days until they do.
@@ -814,6 +814,7 @@ screen.
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · §10, §13: the employee record's Attendance tab becomes Work Schedule, after Job (attendance's PR 3, `attendance.md` §6.13): Work Setup and the person's week, each weekday Working or Off with its hours and place, and Set Schedule for anyone (`people` edit, never their own).
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) left the shell (`catalogue.ts`, `coming-soon.ts`, `features/settings/index.tsx`); Knowledge Hub · Policies is shown only to holders of `policies.manage` (`shell/access.ts`, as `src/shared/search/screens.js`); the shell mounts the acknowledge sheet beside the clock prompts (`docs/guides/policies.md` §6.7).
 - 20/10/2026 · TB · Settings · Integrations gains the AI providers (Groq, OpenAI, Anthropic,
   DeepSeek beside Gemini) with their model lists, Exchange Rates, and a Free or Paid plan on every

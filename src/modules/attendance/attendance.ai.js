@@ -5,6 +5,10 @@
  *   attendance.my_days      the asker's own days of a month (anyone; their own only)
  *   attendance.register     a day's register, within the asker's `people` scope
  *   attendance.exceptions   the exceptions, within the same scope
+ *   attendance.my_pay_items the asker's own deductions and overtime of a month (anyone; their own only)
+ *   attendance.pay_items    the deductions and overtime, within the asker's `people` scope; their
+ *                           amounts are masked as the salary is, as every assistant read is masked
+ *                           (shared/ai/authorise.js)
  *
  * The Attendance policy's rules are read through policies.read and policies.mine
  * (src/modules/policies/policies.ai.js).
@@ -12,14 +16,15 @@
  * Every read is a page of 25 through the same service and scope as the screen. A row
  * carries the day, the times, the status and the worksite's name: never a coordinate,
  * a device identifier or the evidence behind a punch. The assistant never clocks
- * anyone in, decides an exception or guesses a missing location (A23); it sends the
- * person to the screen that does. A home location is never read: its address and point are
+ * anyone in, decides an exception, waives a deduction, confirms overtime or guesses a missing
+ * location (A23); it sends the person to the screen that does. A home location is never read: its address and point are
  * personal data, so the assistant only sends people to where homes are set and approved; a work
  * location request is never read either (its address can be a home).
  */
 const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const service = require("./attendance.service");
+const pay = require("./attendance.pay");
 
 const EMPTY = { data: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false } };
 
@@ -58,6 +63,26 @@ module.exports = defineManifest({
         label: `${row.employee.display_name}, ${row.work_date}`,
       }),
     },
+    {
+      key: "attendance.my_pay_items",
+      description: "List my own attendance deductions and overtime for a month: the day, the minutes and whether it is pending, waived, confirmed or cut",
+      params: c.attendance.MyPayItemListQuery,
+      permission: ["ess", "view"],
+      run: (_client, params, actor) => (actor.employee_id ? pay.mine(actor, params) : EMPTY),
+      cite: (row) => ({ type: "attendance_pay_item", id: row.attendance_pay_item_id, label: row.work_date }),
+    },
+    {
+      key: "attendance.pay_items",
+      description: "List attendance deductions and overtime waiting on People or decided: late, early departure, absence and overtime by person and day",
+      params: c.attendance.PayItemListQuery,
+      permission: ["people", "view"],
+      run: (_client, params, actor) => pay.list(actor, params, actor.scope),
+      cite: (row) => ({
+        type: "attendance_pay_item",
+        id: row.attendance_pay_item_id,
+        label: `${row.employee.display_name}, ${row.work_date}`,
+      }),
+    },
   ],
   routes: [
     { intent: "clock in or out", screen: "ess.my-attendance" },
@@ -69,7 +94,9 @@ module.exports = defineManifest({
     { intent: "approve work location requests", screen: "people.attendance" },
     { intent: "send people out on a field assignment", screen: "people.attendance" },
     { intent: "see my field assignments", screen: "ess.my-attendance" },
-    { intent: "set a hybrid employee's office days", screen: "people.employees" },
+    { intent: "set someone's work schedule", screen: "people.employees" },
+    { intent: "see my deductions or overtime", screen: "ess.my-attendance" },
+    { intent: "waive deductions or confirm overtime", screen: "people.attendance" },
     { intent: "see my work week", screen: "ess.my-profile" },
     { intent: "read or acknowledge the attendance policy", screen: "ess.policy-updates" },
   ],

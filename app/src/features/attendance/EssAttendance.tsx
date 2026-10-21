@@ -1,6 +1,6 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import devices from "@mycity/contract/schemas/devices.js";
-import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice, PayItem } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
@@ -12,8 +12,9 @@ import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
 import { HomeLocationCard } from "./HomeLocation";
 import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAssignments";
-import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
-import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PAY_KIND, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
+import { payColumns, payDetails } from "./PayItems";
+import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, type FieldBinding, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, TimeField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
 
 /**
  * ESS · My Attendance (#9, with the person's field assignments) and My Devices (#88)
@@ -22,14 +23,14 @@ import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, Expor
  * Everything here is the caller's own: the routes take no employee id.
  */
 
-/** A clock-out's time, and Automatic when the system made it once the shift ended (§6.14). */
+/** A clock-out's time, and System Clock-Out when the system made it after the shift ended (§6.14). */
 function clockOutOf(at: string | null, automatic: boolean): ReactNode {
   if (!at) return null;
   if (!automatic) return formatTime(at);
   return (
     <span className="inline-flex items-center gap-1.5">
       {formatTime(at)}
-      <Pill tone="info">Automatic</Pill>
+      <Pill tone="info">System Clock-Out</Pill>
     </span>
   );
 }
@@ -122,7 +123,7 @@ export function MyAttendancePage() {
           </>
         }
       />
-      {(t?.work_pattern === "remote" || t?.work_pattern === "hybrid") && <HomeLocationCard openOnLoad={params.get("home") === "set"} />}
+      <HomeLocationCard openOnLoad={params.get("home") === "set"} />
       {todayCard}
       <MyFieldAssignments open={openAssignment} />
       <Grid cols="4m2" className="mt-3">
@@ -135,8 +136,10 @@ export function MyAttendancePage() {
           onOpen={() => openFigure("late")}
         />
         <KpiCard title="Absent" value={s ? String(s.absent_days) : ""} tone={s && s.absent_days > 0 ? "err" : undefined} onOpen={() => openFigure("absent")} />
-        <KpiCard title="Hours Worked" value={s ? hours(s.worked_minutes) : ""} help="From the first clock-in to the last clock-out of each day." />
+        <KpiCard title="Hours Worked" value={s ? hours(s.worked_minutes) : ""} help="From the first clock-in to the last clock-out. A System Clock-Out counts to the shift's end." />
       </Grid>
+      <MyPayItems month={month} group="deductions" />
+      <MyPayItems month={month} group="overtime" />
       {open.rows.length > 0 && (
         <DataView
           title="Open Exceptions"
@@ -200,12 +203,12 @@ function FigureDays({ month, status }: { month: string; status: FigureStatus }) 
   return <DataView bare caption={FIGURE[status]} list={list} rowKey={(d) => d.attendance_day_id} noun="day" empty={{ icon: "clock", title: "No Days", text: "None this month." }} columns={DAY_COLUMNS} />;
 }
 
-/** One of my days: its punches with what the server decided about each, and Explain Time on an automatic clock-out. */
+/** One of my days: its punches with what the server decided about each, and Give Real Time on a System Clock-Out. */
 function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
   const modal = useModal();
   const events = usePaged("GET /api/v1/attendance/me/events", { filters: { date } });
   const automatic = events.rows.find((e) => e.source === "system" && e.event_type === "clock_out" && !e.excluded);
-  const explainTime = (e: AttendanceEvent) => modal.open({ title: "Automatic Clock-Out", body: (close) => <ExplainAutomatic e={e} close={close} /> });
+  const giveTime = (e: AttendanceEvent) => modal.open({ title: "Give Real Time", body: (close) => <GiveRealTime e={e} close={close} /> });
   return (
     <>
       {day && (
@@ -214,6 +217,8 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
             ["Status", <Pill key="s" tone={dayStatus(day).tone}>{dayStatus(day).text}</Pill>],
             ["Hours", day.worked_minutes ? hours(day.worked_minutes) : null],
             ...(day.late_minutes ? ([["Late By", lateBy(day.late_minutes)]] as Array<[string, string]>) : []),
+            ...(day.early_minutes ? ([["Left Early By", lateBy(day.early_minutes)]] as Array<[string, string]>) : []),
+            ...(day.overtime_minutes ? ([["Overtime", lateBy(day.overtime_minutes)]] as Array<[string, string]>) : []),
           ]}
         />
       )}
@@ -233,46 +238,83 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
             key: "r",
             label: "Result",
             render: (e: AttendanceEvent) =>
-              e.excluded ? <Pill tone="err">Not Counted</Pill> : e.source === "system" ? <Pill tone="info">Automatic</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
+              e.excluded ? <Pill tone="err">Not Counted</Pill> : e.source === "system" ? <Pill tone="info">System Clock-Out</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
           },
         ]}
       />
       {automatic && (
         <FormFooter>
-          <Button icon="send" onClick={() => explainTime(automatic)}>Explain Time</Button>
+          <Button className="phone:w-full" icon="clock" onClick={() => giveTime(automatic)}>Give Real Time</Button>
         </FormFooter>
       )}
     </>
   );
 }
 
-/** Say why an automatic clock-out's time is wrong; People keep or correct it (§6.8). */
-function ExplainAutomatic({ e, close }: { e: AttendanceEvent; close: () => void }) {
-  const f = useContractForm({ employee_note: "" }, attendance.ExceptionExplanation);
+/** Give the real leaving time of a System Clock-Out, with a note; People keep or correct it (§6.8, §6.14). */
+function GiveRealTime({ e, close }: { e: AttendanceEvent; close: () => void }) {
+  const f = useContractForm({ real_time: "", employee_note: "" }, attendance.RealTimeGiven);
   const save = useMutation("POST /api/v1/attendance/me/events/:id/explanation");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ params: { id: e.attendance_event_id }, body: { employee_note: f.values.employee_note.trim() } });
+      await save.run({ params: { id: e.attendance_event_id }, body: { real_time: f.values.real_time, employee_note: f.values.employee_note.trim() } });
       invalidate("/api/v1/attendance");
       close();
-      toast("Note sent to People");
+      toast("Time sent to People");
     } catch (err) {
       if (err instanceof ApiError && Object.keys(err.fields).length) f.setServerErrors(err.fields);
-      else toast(err instanceof ApiError ? err.message : "Note not sent");
+      else toast(err instanceof ApiError ? err.message : "Time not sent");
     }
   };
   return (
     <>
-      <KeyValue items={[["Date", formatDate(e.work_date)], ["Clock Out", formatTime(e.occurred_at)]]} />
-      <Field label="Your Note" className="mt-3" {...f.status("employee_note")}>
+      <KeyValue items={[["Date", formatDate(e.work_date)], ["System Clock-Out", formatTime(e.occurred_at)]]} />
+      <Field label="Real Time" className="mt-3" {...f.status("real_time")}>
+        <TimeField {...(f.field("real_time") as FieldBinding<string> & { name: string })} />
+      </Field>
+      <Field label="Your Note" {...f.status("employee_note")}>
         <TextAreaField {...f.field("employee_note")} placeholder="Left at 16:00" rows={3} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" icon="send" busy={save.pending} onClick={() => submit()}>Send Note</Button>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={() => submit()}>Send Time</Button>
       </FormFooter>
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * My deductions and overtime for the month (§6.17)
+ * ------------------------------------------------------------------ */
+
+/** The month's deductions, or its overtime, as cards under the figures; nothing when there are none. */
+function MyPayItems({ month, group }: { month: string; group: "deductions" | "overtime" }) {
+  const modal = useModal();
+  const list = usePaged("GET /api/v1/attendance/me/pay-items", { filters: { month, group } });
+  if (list.rows.length === 0) return null;
+  const open = (x: PayItem) =>
+    modal.open({
+      title: PAY_KIND[x.kind],
+      body: (close) => (
+        <>
+          <KeyValue items={payDetails(x)} />
+          <FormFooter>
+            <Button variant="primary" onClick={close}>Close</Button>
+          </FormFooter>
+        </>
+      ),
+    });
+  return (
+    <DataView
+      className="mt-3"
+      title={group === "deductions" ? "Deductions" : "Overtime"}
+      list={list}
+      rowKey={(x) => x.attendance_pay_item_id}
+      onRowClick={open}
+      noun={group === "deductions" ? "deduction" : "overtime item"}
+      columns={payColumns({ person: false, kind: group === "deductions" })}
+    />
   );
 }
 

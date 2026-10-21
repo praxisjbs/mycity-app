@@ -18,6 +18,7 @@ module.exports = {
   clear: async (req, res) => ok(res, await service.clear(withActor(req), id(req), req.validated.body)),
 
   rules: async (req, res) => sendPaged(res, await service.rules(req.validated.query)),
+  policyRules: async (req, res) => ok(res, await service.policyRules(req.user)),
   rule: async (req, res) => ok(res, await service.rule(id(req))),
   createRule: async (req, res) => created(res, await service.createRule(withActor(req), req.validated.body)),
   updateRule: async (req, res) => ok(res, await service.updateRule(withActor(req), id(req), req.validated.body)),

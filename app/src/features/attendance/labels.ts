@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus, SchedulePlace } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PayItem, PayItemKind, PayItemStatus, PunchState, RegisterStatus, SchedulePlace } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -33,7 +33,7 @@ export const EXCEPTION_TYPE: Record<ExceptionType, string> = {
   unknown_device: "Unknown Device",
   suspicious_timestamp: "Device Time Ahead",
   missing_clock_out: "Missing Clock-Out",
-  automatic_clock_out: "Automatic Clock-Out",
+  automatic_clock_out: "System Clock-Out",
 };
 
 export const PUNCH_STATE: Record<PunchState, Shown> = {
@@ -100,8 +100,6 @@ export const PLACE: Record<SchedulePlace, Shown> = {
 /** The weekdays by ISO number, as the week and the schedule name them. */
 export const WEEKDAY: Record<number, string> = { 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday" };
 
-/** Office days in short: "Mon, Tue, Thu". */
-export const officeDaysText = (days: number[]) => [...days].sort((a, b) => a - b).map((d) => WEEKDAY[d].slice(0, 3)).join(", ");
 
 /** The home of someone who works from home on some days, as the record's Attendance tab shows it. */
 export const HOME_STATE: Record<"approved" | "pending" | "none", Shown> = {
@@ -109,6 +107,35 @@ export const HOME_STATE: Record<"approved" | "pending" | "none", Shown> = {
   pending: { tone: "warn", text: "Waiting" },
   none: { tone: "neutral", text: "Not Set" },
 };
+
+/** A pending deduction's or overtime's kind (§6.17). */
+export const PAY_KIND: Record<PayItemKind, string> = {
+  late: "Late",
+  early_departure: "Early Departure",
+  absence: "Absence",
+  overtime: "Overtime",
+};
+
+/** Where a deduction or overtime stands: pending, waived or confirmed by a person, cut, or taken by payroll. */
+export const PAY_STATUS: Record<PayItemStatus, Shown> = {
+  pending: { tone: "warn", text: "Pending" },
+  waived: { tone: "neutral", text: "Waived" },
+  confirmed: { tone: "ok", text: "Confirmed" },
+  cut: { tone: "neutral", text: "Cut" },
+  in_run: { tone: "info", text: "In Payroll" },
+};
+
+/** How an amount was worked out, as an item's sheet names it. */
+export const PAY_METHOD: Record<PayItem["method"], string> = {
+  pro_rata: "Pro-Rata by Minute",
+  per_hour: "Fixed per Hour",
+  per_day: "Fixed per Day",
+  daily_rate: "A Day's Pay",
+  multiplier: "Multiple of Hourly Rate",
+};
+
+/** The help on an item's Amount. */
+export const PAY_AMOUNT_HELP = "Worked out from your monthly gross.";
 
 /** The last six months, newest first, as the month picker offers them. */
 export function recentMonths(today: string, count = 6): string[] {

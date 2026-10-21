@@ -28,19 +28,32 @@
  *   field_assignment.cancelled      it was cancelled (one a person still on it): they are told
  *                                   why, and their clock reloads
  *   field_assignment.member_removed someone was taken off it: they are told why
- *   attendance.schedule_set         People set a hybrid employee's office days: they are told,
- *                                   and their clock reloads; audited on the employee
+ *   attendance.schedule_set         People set someone's work schedule: they are told the first
+ *                                   day, and their clock reloads; audited on the employee
  *   attendance.clock_in_due         the clock watch found someone expected and not clocked in,
  *                                   in the first hour after the start: they are reminded (the bell,
  *                                   and push as their preference allows); clocking in reads it
+ *   attendance.clock_out_due        the clock watch found someone still clocked in after their
+ *                                   shift's end: reminded every clock_out_reminder_minutes until the
+ *                                   system clock-out; clocking out reads them
  *   attendance.clocked_out_automatically
- *                                   the clock watch closed a shift left open once it ended and
- *                                   the person was away from the app: they are told when
+ *                                   the clock watch's System Clock-Out of a shift still open at the
+ *                                   end plus system_clock_out_after_minutes: they are told when
+ *   attendance.rule_breached        a consequence rule was reached (attendance.rules-engine.js):
+ *                                   its Home alert is raised after commit
+ *                                   (attendance.raise_breach_alert); Queries & Sanctions (M3)
+ *                                   subscribes when it raises a query
+ *   attendance.pay_item_added,      a deduction or overtime was added, waived, confirmed or cut
+ *   attendance.pay_item_waived,     (attendance.pay.js): the person is told; overtime waiting on
+ *   attendance.overtime_decided     its line manager tells the approvers over them too
+ *   attendance.pay_item_changed     an item followed its day: audit, and the screens reload
+ *   attendance.overtime_approved    overtime approved beforehand for a person's day: they are told
  *   The Attendance policy's versions, approvals and acknowledgements are policies' events
  *   (src/modules/policies/policies.events.js); its rules are this module's (guide §6.15).
  *
  * Payloads carry ids, dates, results and exception types (a field assignment's number and
- * name too): never coordinates, an address, a device identifier or the evidence itself.
+ * name too): never coordinates, an address, a device identifier or the evidence itself, and never
+ * a pay item's amount, which is derived from a salary (§6.17).
  */
 const { pool } = require("../../config/db");
 const { defineEvents, WORKFLOW } = require("../../shared/events/catalogue");
@@ -67,9 +80,16 @@ const EVENTS = defineEvents("people", {
   "field_assignment.assigned": { summary: "Someone was sent out on a field assignment" },
   "field_assignment.cancelled": { summary: "A field assignment was cancelled" },
   "field_assignment.member_removed": { summary: "Someone was taken off a field assignment" },
-  "attendance.schedule_set": { summary: "A hybrid employee's work schedule was set" },
+  "attendance.schedule_set": { summary: "An employee's work schedule was set" },
   "attendance.clock_in_due": { summary: "An employee was reminded to clock in" },
-  "attendance.clocked_out_automatically": { summary: "An open shift was clocked out automatically" },
+  "attendance.clock_out_due": { summary: "An employee was reminded to clock out" },
+  "attendance.clocked_out_automatically": { summary: "The system clocked out a shift left open" },
+  "attendance.rule_breached": { summary: "An attendance policy rule was breached" },
+  "attendance.pay_item_added": { summary: "An attendance deduction or overtime was added" },
+  "attendance.pay_item_changed": { summary: "An attendance deduction or overtime followed its day" },
+  "attendance.pay_item_waived": { summary: "An attendance deduction was waived" },
+  "attendance.overtime_decided": { summary: "Overtime was confirmed or cut" },
+  "attendance.overtime_approved": { summary: "Overtime was approved beforehand" },
 });
 
 /** The approval every work location request opens (docs/guides/attendance.md §6.11). */
@@ -90,7 +110,7 @@ const WHAT = Object.freeze({
   unknown_device: "an unregistered device",
   suspicious_timestamp: "the device clock ahead",
   missing_clock_out: "no clock-out",
-  automatic_clock_out: "the automatic clock-out's time",
+  automatic_clock_out: "the System Clock-Out's time",
 });
 const whatOf = (types) => (types || []).map((t) => WHAT[t] || t).join(", ");
 
@@ -160,16 +180,81 @@ defineNotification(EVENTS.ATTENDANCE_CLOCK_IN_DUE, {
   body: (e) => `Your shift started at ${e.payload.starts_at}.`,
 });
 
+defineNotification(EVENTS.ATTENDANCE_CLOCK_OUT_DUE, {
+  to: [{ subject: true }],
+  title: "Time to clock out",
+  body: (e) => `Your shift ended at ${e.payload.ends_at}.`,
+});
+
 defineNotification(EVENTS.ATTENDANCE_CLOCKED_OUT_AUTOMATICALLY, {
   to: [{ subject: true }],
-  title: "Clocked out automatically",
-  body: (e) => `${formatDate(e.payload.work_date)}: clocked out at ${e.payload.clock_out_time}.`,
+  title: "System Clock-Out",
+  body: (e) => `${formatDate(e.payload.work_date)}: clocked out by the system at ${e.payload.clock_out_time}.`,
 });
 
 defineNotification(EVENTS.ATTENDANCE_SCHEDULE_SET, {
   to: [{ subject: true }],
   title: "Work schedule set",
-  body: (e) => `Office ${e.payload.office_days_text} from ${formatDate(e.payload.effective_from)}.`,
+  body: (e) => `Your work schedule starts on ${formatDate(e.payload.effective_from)}.`,
+});
+
+/** What a pay item is called in a notice, by kind. */
+const PAY_TITLE = Object.freeze({
+  late: "Late deduction",
+  early_departure: "Early departure deduction",
+  absence: "Absence deduction",
+  overtime: "Overtime recorded",
+});
+const minutesText = (n) => `${n} ${Number(n) === 1 ? "minute" : "minutes"}`;
+/** "13/10/2026: 12 minutes late." */
+function payLine(p) {
+  const day = formatDate(p.work_date);
+  if (p.kind === "late") return `${day}: ${minutesText(p.minutes)} late.`;
+  if (p.kind === "early_departure") return `${day}: left ${minutesText(p.minutes)} early.`;
+  if (p.kind === "absence") return `${day}: absent.`;
+  return `${p.employee_name ? `${p.employee_name}, ` : ""}${day}: ${minutesText(p.minutes)}${p.awaiting_approval ? ", to confirm" : ""}.`;
+}
+
+/*
+ * Overtime waiting on its line manager also tells the approvers over the person: their line
+ * managers and People with `people` approve reaching them (§6.17). Never the person themselves.
+ */
+async function overtimeApprovers(event) {
+  const p = event.payload || {};
+  if (p.kind !== "overtime" || !p.awaiting_approval) return [];
+  const { rows } = await pool.query("SELECT user_id FROM app_user WHERE employee_id = $1", [p.employee_id]);
+  const own = new Set(rows.map((r) => r.user_id));
+  return (await permissionHolders(pool, ["people", "approve"], p.employee_id)).filter((id) => !own.has(id));
+}
+
+defineNotification(EVENTS.ATTENDANCE_PAY_ITEM_ADDED, {
+  to: [{ subject: true }, { users: overtimeApprovers }],
+  who: "The person, and for overtime to confirm their approvers",
+  title: (e) => (e.payload.kind === "overtime" && e.payload.awaiting_approval ? "Overtime awaiting approval" : PAY_TITLE[e.payload.kind]),
+  body: (e) => payLine(e.payload),
+});
+
+defineNotification(EVENTS.ATTENDANCE_PAY_ITEM_WAIVED, {
+  to: [{ subject: true }],
+  title: "Deduction waived",
+  body: (e) => `${formatDate(e.payload.work_date)}: ${e.payload.reason}`,
+});
+
+defineNotification(EVENTS.ATTENDANCE_OVERTIME_DECIDED, {
+  to: [{ subject: true }],
+  title: (e) => (e.payload.status === "confirmed" ? "Overtime confirmed" : "Overtime cut"),
+  body: (e) => {
+    const p = e.payload;
+    const done =
+      p.status === "confirmed" ? `${minutesText(p.confirmed_minutes)} of ${minutesText(p.minutes)} confirmed` : "not paid";
+    return `${formatDate(p.work_date)}: ${done}${p.reason ? ` (${p.reason})` : ""}.`;
+  },
+});
+
+defineNotification(EVENTS.ATTENDANCE_OVERTIME_APPROVED, {
+  to: [{ subject: true }],
+  title: "Overtime approved",
+  body: (e) => `${formatDate(e.payload.work_date)}: up to ${minutesText(e.payload.minutes)}.`,
 });
 
 /*
@@ -205,8 +290,50 @@ for (const key of [
   EVENTS.FIELD_ASSIGNMENT_CANCELLED,
   EVENTS.FIELD_ASSIGNMENT_MEMBER_REMOVED,
   EVENTS.ATTENDANCE_SCHEDULE_SET,
+  EVENTS.ATTENDANCE_PAY_ITEM_ADDED,
+  EVENTS.ATTENDANCE_PAY_ITEM_CHANGED,
+  EVENTS.ATTENDANCE_PAY_ITEM_WAIVED,
+  EVENTS.ATTENDANCE_OVERTIME_DECIDED,
+  EVENTS.ATTENDANCE_OVERTIME_APPROVED,
 ])
   outbox.register(key, "attendance.push_updated", pushUpdated);
+
+/*
+ * After a breach commits, its Home alert (§6.16): when the version said Alert, or while its query
+ * waits on Queries & Sanctions (M3), Query Due. Home raises it on the rule it keeps for the policy
+ * rule (alerts.service raisePolicyBreach); the alert's id is kept on the breach. Running it again
+ * raises nothing twice: the alert's subject is the breach, one open alert a subject.
+ */
+async function raiseBreachAlert(event) {
+  const p = event.payload || {};
+  if (!p.attendance_rule_breach_id || !(p.alert || p.raise_query)) return;
+  const { atomically } = require("../../shared/db/tx");
+  const repo = require("./attendance.repo");
+  const engine = require("./attendance.rules-engine");
+  const alerts = require("../alerts/alerts.service");
+  const client = await pool.connect();
+  try {
+    await atomically(client, async () => {
+      const breach = await repo.getBreach(client, p.attendance_rule_breach_id);
+      if (!breach || breach.home_alert_id) return;
+      const person = await repo.person(client, breach.employee_id);
+      const words = engine.wordsOf(breach, person ? person.ref.display_name : "Someone");
+      const raised = await alerts.raisePolicyBreach(client, {
+        rule: engine.RULES[breach.rule].key,
+        attendance_rule_breach_id: breach.attendance_rule_breach_id,
+        employee_id: breach.employee_id,
+        title: words.title,
+        trigger: words.trigger,
+        since: breach.breached_at,
+      });
+      if (raised && raised.alert) await repo.setBreachAlert(client, breach.attendance_rule_breach_id, raised.alert.home_alert_id);
+    });
+  } finally {
+    client.release();
+  }
+}
+
+outbox.register(EVENTS.ATTENDANCE_RULE_BREACHED, "attendance.raise_breach_alert", raiseBreachAlert);
 
 /* The service and the export are required when a handler runs: they require this file. */
 outbox.register(EVENTS.ATTENDANCE_EXPORT_REQUESTED, "attendance.build_export", (event, ctx) =>
@@ -241,4 +368,4 @@ outbox.register(WORKFLOW.WORKFLOW_CANCELLED, "attendance.apply_request_withdrawa
 for (const owner of Object.keys(require("./attendance.repo").ADDRESS_LINE))
   places.owner(owner, { rename: (client, key, line) => require("./attendance.repo").renameAddress(client, owner, key, line) });
 
-module.exports = { EVENTS, WHAT, REQUEST_DEFINITION_KEY, pushUpdated };
+module.exports = { EVENTS, WHAT, REQUEST_DEFINITION_KEY, pushUpdated, payLine, raiseBreachAlert };

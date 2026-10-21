@@ -193,7 +193,23 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
-  // A reminder to clock in (§6.14): the person's notice opens My Attendance with the clock panel (`?clock=`).
+  // A pending deduction or overtime (§6.17): People · Attendance opens its day; the person's own opens on
+  // My Attendance (both read /attendance/records/:id).
+  // search:none a pay item is found through its day, never looked up on its own
+  attendance_pay_item: {
+    ...screen("people", "attendance"),
+    self: screen("ess", "my-attendance"),
+  },
+  // A breach of an Attendance policy rule (§6.16): its Home alert opens its last day on People · Attendance.
+  // search:none a breach is reached through its Home alert, never looked up
+  attendance_rule_breach: screen("people", "attendance"),
+  // Overtime approved beforehand (§6.17): its day on People · Attendance; the person's own on My Attendance.
+  // search:none an approval is found through the day it covers
+  attendance_overtime_approval: {
+    ...screen("people", "attendance"),
+    self: screen("ess", "my-attendance"),
+  },
+  // A reminder to clock in or out (§6.14): the person's notice opens My Attendance with the clock panel (`?clock=`).
   // search:none a reminder is a notice about today, not a record anyone looks up
   attendance_clock_reminder: {
     ...screen("ess", "my-attendance"),

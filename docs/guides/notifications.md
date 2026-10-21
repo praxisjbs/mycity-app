@@ -284,7 +284,10 @@ it on again reminds what is still waiting at the next tick.
 
 One engine (`src/modules/notifications/notifications.reminders.js`) runs every reminder; a module
 never writes its own clock for one. M2's tasks and calendars are its first users after the company's
-reminders.
+reminders. The one exception is attendance's clock watch (`attendance.md` §6.14; TB, 20/10/2026):
+the reminders to clock in and out follow each person's own shift and sit beside the system clock-out
+under the person's lock, so they stay in `attendance-clock-watch`, one `attendance_clock_reminder`
+row per reminder.
 
 1. **Declare the event** in the module's `<module>.events.js` (`"task.due_soon": { summary: "A task
    is due soon" }`) and its notice with `defineNotification` (who, what it says, its urgency,

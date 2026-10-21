@@ -6,26 +6,28 @@
  *
  *   policy     the Attendance policy's version in force that date, read through
  *              policies.rulesFor (docs/guides/policies.md §6.8), else the type's defaults. MyCity
- *              publishes it on Knowledge Hub · Policies; none is seeded (A26). Its
+ *              publishes it on Knowledge Hub · Policies; none is seeded (A26). Nothing is cached:
+ *              each call reads the version, so a new one applies from its first day. Its
  *              `geofence_mode` is the mode of the date's place (§6.1):
  *              a field site's on a field assignment or a client visit, a home's when the date is
- *              worked from home (remote staff, a hybrid home day, a temporary home, a remote day),
- *              the office's otherwise
+ *              worked from home (a Remote day of the person's week, a temporary home, a remote
+ *              day), the office's otherwise
  *   fence      a field assignment the person is still on covering the date before anything
  *              (§6.12): its sites, the nearer judging the punch (attendance.geofence.js).
  *              Then an approved work location request covering the date (§6.11): its
  *              temporary home, fenced like a home; a client visit, its site; a remote day, the
  *              approved home when the person has one; otherwise no fence and `approved` names
- *              the day, the approval being the check. Then someone working from home that date
- *              (remote staff, or a hybrid employee's home day by their schedule, §6.13): their
+ *              the day, the approval being the check. Then someone working from home that date (a
+ *              Remote day of their work schedule, or with none a remote work pattern, §6.13): their
  *              approved home, with the policy's home_radius_m, or none until People approve one.
  *              Everyone else: the employee's own worksite (employee.worksite_id); only an active
  *              worksite fences
- *   home_day   the date is worked from home by the pattern or the schedule, so having no fence
+ *   home_day   the date is worked from home by the schedule or the pattern, so having no fence
  *              means no approved home (no_home) rather than no office (no_worksite)
  *   zone       the worksite's timezone, else Africa/Lagos (a home has none of its own)
- *   shift      the working week's hours for that weekday, the policy's grace, and whether
- *              the day is worked at all (shared/time/working-week)
+ *   shift      the person's own (§6.13, rules.shiftFor): their work schedule in force for that
+ *              weekday, else the company hours (the policy's `hours`, else the working week of
+ *              Settings · Organisation), the policy's grace, and whether the day is worked at all
  */
 const workingWeek = require("../../shared/time/working-week");
 const lagos = require("../../shared/time/lagos");
@@ -55,14 +57,38 @@ async function policyFor(db, _employeeId, date) {
 const zoneOf = (person) => (person && person.timezone) || rules.DEFAULT_TZ;
 
 /**
- * Whether a hybrid employee works `date` from home: the schedule in force then leaves its weekday
- * out (§6.13). No schedule, or any other pattern, is not a home day here.
+ * The company hours in force on a date: the Attendance policy version's `hours`, or null while no
+ * version sets them (the working week then applies, A22). The SQL that works a day out per person
+ * takes them as a parameter (attendance.repo.js EXPECTED_ON).
  */
-async function hybridHomeDay(db, person, date) {
-  if (person.work_pattern !== "hybrid") return false;
-  const schedule = await repo.scheduleOn(db, person.employee_id, date);
-  return Boolean(schedule) && !schedule.office_days.includes(lagos.weekday(date));
+async function companyHoursOn(db, date) {
+  const { rules: r } = await policies.rulesFor(db, "attendance", date);
+  return r.hours || null;
 }
+
+/** The company hours for each date from `from` to `to` (at most a month), as `{ date: hours|null }`. */
+async function companyHoursBetween(db, from, to) {
+  const out = {};
+  for (let d = from; d <= to; d = lagos.addDays(d, 1)) out[d] = await companyHoursOn(db, d);
+  return out;
+}
+
+/**
+ * A person's shift on a date (§6.4, §6.13): their work schedule in force then, else the company
+ * hours, at the place the schedule or their pattern gives. `policy` is the rules to read the hours
+ * and grace from (the version in force, unless the caller holds the one that judged the day).
+ */
+async function shiftOn(db, person, date, { policy = null, calendar: cal = null } = {}) {
+  const rulesThen = policy || (await policyFor(db, person.employee_id, date));
+  const schedule = await repo.workScheduleOn(db, person.employee_id, date);
+  return rules.shiftFor(date, cal || (await workingWeek.loadCalendar(db)), rulesThen, {
+    schedule,
+    pattern: person.work_pattern,
+  });
+}
+
+/** Whether a shift's date is worked from home: a Remote day, or with no working day a remote pattern. */
+const homeDay = (person, shift) => (shift.place ? shift.place === "remote" : person.work_pattern === "remote");
 
 /** The approved home as a fence, or null when People have approved none. */
 async function homeFence(db, person, policy, extra = {}) {
@@ -88,8 +114,7 @@ async function homeFence(db, person, policy, extra = {}) {
  */
 async function contextFor(db, person, date) {
   const policy = await policyFor(db, person.employee_id, date);
-  const calendar = await workingWeek.loadCalendar(db);
-  const shift = rules.shiftFor(date, calendar, policy);
+  const shift = await shiftOn(db, person, date, { policy });
   const assignment = await repo.fieldAssignmentOn(db, person.employee_id, date);
   if (assignment)
     return {
@@ -109,7 +134,7 @@ async function contextFor(db, person, date) {
       home_day: false,
       ...(await requestPlace(db, person, request, policy)),
     };
-  if (person.work_pattern === "remote" || (await hybridHomeDay(db, person, date))) {
+  if (homeDay(person, shift)) {
     return {
       policy: rules.forPlace(policy, "home"),
       fence: await homeFence(db, person, policy),
@@ -211,4 +236,4 @@ async function requestPlace(db, person, request, policy) {
   };
 }
 
-module.exports = { policyFor, contextFor, zoneOf, hybridHomeDay, PLACE_NAME };
+module.exports = { policyFor, contextFor, zoneOf, companyHoursOn, companyHoursBetween, shiftOn, homeDay, PLACE_NAME };

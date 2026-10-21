@@ -9,6 +9,7 @@
  *   get()           GET  /home/alerts/:id           404 when the reader may not see it
  *   clear()         POST /home/alerts/:id/clear     cleared or dismissed; twice is the same answer
  *   rules()         GET  /home/alert-rules          a page of 25
+ *   policyRules()   GET  /home/alert-rules/policy   the Attendance policy's five rules, read only
  *   rule()          GET  /home/alert-rules/:id
  *   createRule()    POST /home/alert-rules          its key made here from the metric and the name
  *   updateRule()    PATCH /home/alert-rules/:id     anything but the metric; off dismisses its open alerts
@@ -16,6 +17,7 @@
  *   openToClear()   the Overview's alerts beside Need You (dashboard.service)
  *   highOpen(), highPage()   the Open High Alerts card and its records (kpi-catalog/tiles/work.js)
  *   forAssistant()  the assistant's `alerts.mine` (alerts.ai.js)
+ *   raisePolicyBreach()  attendance's breach of a policy rule (attendance.events.js), in its transaction
  *
  * WHO SEES AN ALERT (home.md §6): a holder of `alerts.clear` or `alerts.manage` sees the
  * alerts of the rules whose permission_key they hold, about people within their scope on
@@ -29,9 +31,15 @@
  * passes). `can_clear` on a row says the same, so the screen offers Clear Alert only where it
  * will work.
  *
+ * THE ATTENDANCE POLICY'S RULES (home.md §6 Alerts): attendance's alerts are its policy's
+ * breaches, each raised on a rule the system keeps for that policy rule (metrics.POLICY), one
+ * breach one alert, the breach its subject. Those rules are never listed, edited or swept here;
+ * policyRules() reads the policy's own figures, and the policy's switches are the only ones.
+ *
  * Every write runs in one transaction with its event (BACKEND_GUIDE §3.4); saving a rule as
  * it already is writes and records nothing (home.md §11, Double submit).
  */
+const c = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
@@ -125,7 +133,10 @@ const opensTab = (reader) => reader.may_clear || reader.may_manage;
  * Alerts
  * ------------------------------------------------------------------ */
 
-/** What an alert's over_by holds, from its rule's metric: past a count's threshold, or a deadline's days left. */
+/**
+ * What an alert's over_by holds, from its rule's metric: past a count's threshold, or a deadline's
+ * days left; null for a metric no longer listed and for the policy's, which has no Over By.
+ */
 function overByKind(metricKey) {
   const metric = metrics.metricOf(metricKey);
   return metric ? (metric.kind === "deadline" ? "days_left" : "over") : null;
@@ -169,14 +180,14 @@ function present(row, reader) {
     home_alert_rule_id: row.home_alert_rule_id,
     rule_name: row.rule_name,
     metric: row.metric,
-    category: metric ? metric.category : null,
+    category: metrics.categoryOf(row.metric),
     subject_type: row.subject_type,
     subject_id: row.subject_id,
     subject_employee_id: row.subject_employee_id,
     title: row.title,
     trigger: row.trigger,
     severity: row.severity,
-    over_by: row.over_by,
+    over_by: metric ? row.over_by : null,
     over_by_kind: overByKind(row.metric),
     threshold: row.threshold,
     permission_key: row.permission_key,
@@ -231,8 +242,8 @@ async function summary(user, { now = new Date() } = {}) {
   ]);
   const byCategory = new Map();
   for (const { metric: key, count } of open) {
-    const metric = metrics.metricOf(key);
-    if (metric) byCategory.set(metric.category, (byCategory.get(metric.category) || 0) + count);
+    const category = metrics.categoryOf(key);
+    if (category) byCategory.set(category, (byCategory.get(category) || 0) + count);
   }
   return {
     open: n.open,
@@ -359,7 +370,7 @@ function presentRule(row) {
     key: row.key,
     name: row.name,
     metric: row.metric,
-    category: metric ? metric.category : null,
+    category: metrics.categoryOf(row.metric),
     kind: metric ? metric.kind : null,
     threshold: row.threshold,
     window_days: row.window_days,
@@ -383,11 +394,92 @@ async function rules(query) {
   return { ...page, data: page.data.map(presentRule) };
 }
 
-/** GET /home/alert-rules/:id */
+/** GET /home/alert-rules/:id: never one the system keeps for the Attendance policy. */
 async function rule(id) {
   const row = await repo.ruleById(pool, id);
-  if (!row) throw notFound("Rule");
+  if (!row || metrics.isPolicy(row.metric)) throw notFound("Rule");
   return presentRule(row);
+}
+
+/* ------------------------------------------------------------------ *
+ * The Attendance policy's rules
+ * ------------------------------------------------------------------ */
+
+/** What each policy rule counts, one and many. */
+const POLICY_COUNTS = Object.freeze({
+  late_rule: ["late arrival", "late arrivals"],
+  early_rule: ["early departure", "early departures"],
+  absence_rule: ["absence", "absences"],
+  forgotten_rule: ["forgotten clock-out", "forgotten clock-outs"],
+  location_rule: ["location flag", "location flags"],
+});
+const PERIOD_WORDS = Object.freeze({ week: "a week", month: "a month", days_30: "30 days" });
+
+/** A policy rule's figures in words: "3 late arrivals in a month or 5 hours"; null while it is off. Pure. */
+function figuresOf(key, r) {
+  if (!r || !r.on) return null;
+  const [one, many] = POLICY_COUNTS[key];
+  const hours = r.hours ? ` or ${figure(String(r.hours))} ${Number(r.hours) === 1 ? "hour" : "hours"}` : "";
+  return `${r.count} ${r.count === 1 ? one : many} in ${PERIOD_WORDS[r.period]}${hours}`;
+}
+
+/**
+ * GET /home/alert-rules/policy (HomeAlertPolicyRules): the Attendance policy's five consequence
+ * rules as the version in force today sets them, with their open alerts, read only; `can_set` for
+ * a holder of `policies.manage`, who changes them in the policy.
+ * @param {object} user  req.user
+ */
+async function policyRules(user, { now = new Date() } = {}) {
+  const policies = require("../policies/policies.service");
+  const { policy_version_id: versionId, version, rules: r } = await policies.rulesFor(pool, "attendance", lagos.today(now));
+  const open = await repo.openByKey(pool, metrics.POLICY.metric);
+  const held = user.is_ceo === true ? ["policies.manage"] : await grantsCache.getCapabilities(pool, user.user_id);
+  return {
+    policy_version_id: versionId,
+    version,
+    rules: metrics.POLICY.rules.map((key) => ({
+      rule: key,
+      name: metrics.POLICY.names[key],
+      on: Boolean(r[key] && r[key].on),
+      figures: figuresOf(key, r[key]),
+      alert: Boolean(r[key] && r[key].alert),
+      query: Boolean(r[key] && r[key].query),
+      open_alerts: open[`${metrics.POLICY.metric}.${key}`] || 0,
+    })),
+    can_set: held.includes("policies.manage"),
+  };
+}
+
+/**
+ * Raise the alert of attendance's breach of a policy rule, in the caller's transaction (attendance's
+ * `attendance.raise_breach_alert`, after the breach committed): on the rule the system keeps for the
+ * policy rule, made on its first breach, with the breach as its subject and the person it is about.
+ * One breach is one alert; run again, it refreshes the open one, and raises nothing once a person
+ * closed it.
+ * @param {import("pg").PoolClient} client  inside atomically()
+ * @param {{rule: string, attendance_rule_breach_id: string, employee_id: string, title: string,
+ *          trigger: string, since: Date|string}} breach
+ * @returns {Promise<{raised: boolean, created: boolean, alert: object|null}>}
+ */
+async function raisePolicyBreach(client, breach) {
+  if (!c.alerts.HOME_ALERT_POLICY_RULES.includes(breach.rule))
+    throw new Error(`alerts.raisePolicyBreach: "${breach.rule}" is not a policy rule`);
+  const kept = await repo.keptRule(client, {
+    key: `${metrics.POLICY.metric}.${breach.rule}`,
+    name: metrics.POLICY.names[breach.rule],
+    threshold: metrics.POLICY.threshold,
+    severity: metrics.POLICY.severity,
+    permission_key: metrics.POLICY.permission_key,
+  });
+  return alerts.raise(client, {
+    rule: kept,
+    subject: { type: "attendance_rule_breach", id: breach.attendance_rule_breach_id },
+    value: 1,
+    title: breach.title,
+    trigger: breach.trigger,
+    subject_employee_id: breach.employee_id,
+    since: breach.since,
+  });
 }
 
 /** Longest a key's name part may be. */
@@ -496,7 +588,7 @@ const SAME = Object.freeze({
 async function updateRule(actor, id, body) {
   return tx(async (client) => {
     const before = await repo.ruleById(client, id, { lock: true });
-    if (!before) throw notFound("Rule");
+    if (!before || metrics.isPolicy(before.metric)) throw notFound("Rule");
     const metric = metrics.metricOf(before.metric);
     checkRule(metric, body);
     const changes = {};
@@ -539,6 +631,9 @@ module.exports = {
   searchAlerts,
   searchRules,
   rules,
+  policyRules,
+  figuresOf,
+  raisePolicyBreach,
   rule,
   slugOf,
   keyFor,

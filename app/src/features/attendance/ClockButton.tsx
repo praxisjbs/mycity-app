@@ -33,8 +33,8 @@ export function useClock() {
 }
 
 /**
- * Called once by the shell: a punch made on another device or decided by People, or an automatic
- * clock-out, refreshes the state. The prompts that open the panel by themselves are ClockPrompts'.
+ * Called once by the shell: a punch made on another device or decided by People, or a System
+ * Clock-Out, refreshes the state. The prompts that open the panel by themselves are ClockPrompts'.
  */
 export function useClockSync() {
   useRealtime("attendance.updated", () => invalidate("/api/v1/attendance"));
@@ -350,7 +350,7 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
       <>
         <Result
           tone={t.review ? "warn" : t.clock_out_automatic ? "info" : "ok"}
-          label={t.review ? "Review Required" : t.clock_out_automatic ? "Automatic Clock-Out" : "Day Complete"}
+          label={t.review ? "Review Required" : t.clock_out_automatic ? "System Clock-Out" : "Day Complete"}
           title={`${formatTime(t.clock_in_at)} to ${formatTime(t.clock_out_at)}`}
           text={formatDate(t.date)}
         />

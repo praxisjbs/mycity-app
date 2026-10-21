@@ -181,6 +181,8 @@ const AttendanceDay = z
     clock_out_automatic: z.boolean(),
     worked_minutes: minutes,
     late_minutes: minutes,
+    /** Minutes the person's own last clock-out came before the end, once past the early grace (§6.4). */
+    early_minutes: minutes,
     overtime_minutes: minutes,
     closed_at: isoDateTime.nullable(),
     open_exceptions: z.number().int().min(0),
@@ -266,6 +268,8 @@ const AttendanceException = z
     detail: z.string(),
     employee_note: z.string().nullable(),
     employee_noted_at: isoDateTime.nullable(),
+    /** The real leaving time the person gave for a System Clock-Out (Give Real Time, §6.14), HH:MM. */
+    real_time: clockTime.nullable(),
     resolution: z.string().nullable(),
     reviewed_at: isoDateTime.nullable(),
     reviewed_by_name: z.string().nullable(),
@@ -290,6 +294,13 @@ const ExceptionListQuery = listQuery(
  * for an automatic clock-out, which opens its exception with the note.
  */
 const ExceptionExplanation = z.object({ employee_note: text(1000) }).strict();
+
+/**
+ * POST /attendance/me/events/:id/explanation: Give Real Time on a System Clock-Out (§6.14), the
+ * person's note and their real leaving time on the work date. That it is after the clock-in and not
+ * in the future is the service's.
+ */
+const RealTimeGiven = z.object({ employee_note: text(1000), real_time: clockTime }).strict();
 
 /**
  * POST /attendance/exceptions/:id/decision. A correction names the clock-out's time: the missing
@@ -376,11 +387,17 @@ const DayDetail = z
     clock_out_at: isoDateTime.nullable(),
     worked_minutes: minutes,
     late_minutes: minutes,
+    early_minutes: minutes,
     overtime_minutes: minutes,
     closed: z.boolean(),
     expected_location: z.object({ name: z.string(), radius_m: z.number().int().nullable() }).strict().nullable(),
     policy: z.object({ geofence_mode: PolicyMode, device_mode: PolicyMode }).strict(),
     open_exceptions: z.number().int().min(0),
+    /** Overtime approved for this day beforehand (Approve Overtime, §6.17), or null. */
+    overtime_approval: z
+      .object({ minutes: z.number().int().min(1), approved_by_name: z.string().nullable(), reason: z.string() })
+      .strict()
+      .nullable(),
   })
   .strict();
 
@@ -713,8 +730,8 @@ const FieldAssignmentCancel = z.object({ reason: reasonText }).strict();
 const FieldMemberRemove = z.object({ employee_id: uuid, reason: reasonText }).strict();
 
 /* ------------------------------------------------------------------ *
- * Hybrid staff's weekly schedule: the days at the office, set by People;
- * the other working days are worked from home (guide §6.13)
+ * Work schedules: a person's own week, set by People from a date; with
+ * none, the company hours of the Attendance policy (guide §6.13)
  * ------------------------------------------------------------------ */
 
 /** An ISO weekday: 1 is Monday, 7 is Sunday. */
@@ -723,14 +740,52 @@ const Weekday = z.number().int().min(1).max(7);
 /** Where a person works on a day of the week. */
 const SchedulePlace = z.enum(["office", "remote", "off"]);
 
-/** One day of the person's week. */
+/** Where a working day of a schedule is worked. */
+const WorkPlace = z.enum(["office", "remote"]);
+
+/** One weekday's place, as the week used to be read (kept for My Profile's `EssWorkDay.place`). */
 const ScheduleDay = z.object({ weekday: Weekday, place: SchedulePlace }).strict();
 
-/** One version of a hybrid employee's schedule: the office days from a first day. */
+/**
+ * One weekday of a schedule as People set it. A working day names its place and either both times
+ * (the end after the start, the same day) or neither, which takes the company hours for that
+ * weekday (guide §6.13); an Off day has neither times nor a place.
+ */
+const ScheduleDayInput = z
+  .object({
+    weekday: Weekday,
+    working: z.boolean(),
+    starts_at: clockTime.nullable(),
+    ends_at: clockTime.nullable(),
+    place: WorkPlace.nullable(),
+  })
+  .strict()
+  .superRefine((d, ctx) => {
+    if (!d.working) {
+      if (d.starts_at !== null || d.ends_at !== null)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["starts_at"], message: "Not on a day off" });
+      if (d.place !== null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["place"], message: "Not on a day off" });
+      return;
+    }
+    if (d.place === null) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["place"], message: "Office or Remote" });
+    if ((d.starts_at === null) !== (d.ends_at === null))
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [d.starts_at === null ? "starts_at" : "ends_at"], message: "Both times or neither" });
+    else if (d.starts_at !== null && d.ends_at <= d.starts_at)
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["ends_at"], message: "Ends after it starts" });
+  });
+
+/** The seven weekdays of a schedule, Monday first. */
+const ScheduleDays = z
+  .array(ScheduleDayInput)
+  .length(7, "All seven days")
+  .refine((days) => days.every((d, i) => d.weekday === i + 1), "Monday to Sunday, in order")
+  .refine((days) => days.some((d) => d.working), "At least one working day");
+
+/** One version of a person's schedule: their week from a first day, as it was set. */
 const ScheduleVersion = z
   .object({
-    attendance_schedule_id: uuid,
-    office_days: z.array(Weekday).min(1).max(7),
+    attendance_work_schedule_id: uuid,
+    days: z.array(ScheduleDayInput).length(7),
     effective_from: isoDate,
     reason: z.string(),
     set_by_name: z.string().nullable(),
@@ -739,11 +794,26 @@ const ScheduleVersion = z
   .strict();
 
 /**
- * GET /attendance/schedules/:employee_id: how a person's week is worked. `week` is each weekday
- * (Monday first) by the pattern, the organisation's week and the schedule in force today; `current`
- * is that schedule and `next` one waiting to start (hybrid staff only). `worksite` is the office an
- * office day is matched to, when one is assigned and active. `home_state` is the home of someone who
- * works from home on some days (remote staff, hybrid staff with a home day), else null. `can_edit`
+ * One day of a person's week as it is worked: Working (with its hours and place, `company_hours`
+ * when they are the company's) or Off.
+ */
+const WorkDay = z
+  .object({
+    weekday: Weekday,
+    working: z.boolean(),
+    starts_at: clockTime.nullable(),
+    ends_at: clockTime.nullable(),
+    place: WorkPlace.nullable(),
+    company_hours: z.boolean(),
+  })
+  .strict();
+
+/**
+ * GET /attendance/schedules/:employee_id and /attendance/me/schedule: how a person's week is worked.
+ * `week` is each weekday (Monday first) as worked today, by the schedule in force or, with none
+ * (`current` null), the company hours at the place the work pattern gives; `next` is a schedule
+ * waiting to start. `worksite` is the office an Office day is matched to, when one is assigned and
+ * active. `home_state` is the home of someone whose week has a Remote day, else null. `can_edit`
  * says whether the reader may set the schedule.
  */
 const WorkSchedule = z
@@ -752,7 +822,7 @@ const WorkSchedule = z
     work_pattern: WorkPattern,
     worksite: z.object({ worksite_id: uuid, name: z.string(), radius_m: z.number().int() }).strict().nullable(),
     home_state: z.enum(["approved", "pending", "none"]).nullable(),
-    week: z.array(ScheduleDay).length(7),
+    week: z.array(WorkDay).length(7),
     current: ScheduleVersion.nullable(),
     next: ScheduleVersion.nullable(),
     can_edit: z.boolean(),
@@ -762,17 +832,13 @@ const WorkSchedule = z
 const ScheduleParams = z.object({ employee_id: uuid }).strict();
 
 /**
- * POST /attendance/schedules/:employee_id. The office days, each once; that they are working days,
- * that one is left for home, the first day against today and who may set it are the service's
- * (guide §6.13).
+ * POST /attendance/schedules/:employee_id: the seven days, the first day and why. The first day
+ * against today, a blank working day the company hours do not work, and who may set it are the
+ * service's (guide §6.13).
  */
 const WorkScheduleSet = z
   .object({
-    office_days: z
-      .array(Weekday)
-      .min(1, "Pick an office day")
-      .max(6, "Leave a home day")
-      .refine((days) => new Set(days).size === days.length, "Each day once"),
+    days: ScheduleDays,
     effective_from: isoDate,
     reason: reasonText,
   })
@@ -934,6 +1000,17 @@ const AttendanceRules = z.object({
 /** Fixed methods name their amount. */
 const amountGiven = (d) => !d.on || d.method === "pro_rata" || Boolean(d.amount);
 
+/** A fixed amount's range (guide §6.15): ₦1.00 to ₦1,000,000.00, compared in kobo, never as a float. */
+const kobo = (amount) => {
+  const m = /^(-?)(\d+)\.(\d{2})$/.exec(String(amount));
+  return m ? (m[1] ? -1 : 1) * (Number(m[2]) * 100 + Number(m[3])) : Number.NaN;
+};
+const MIN_FIXED_KOBO = 100;
+const MAX_FIXED_KOBO = 100_000_000;
+const inRange = (amount) => kobo(amount) >= MIN_FIXED_KOBO && kobo(amount) <= MAX_FIXED_KOBO;
+/** A fixed deduction's amount, when one is given and used. */
+const deductionInRange = (d) => !d.on || d.method === "pro_rata" || !d.amount || inRange(d.amount);
+
 /**
  * The rules as People save them in a draft: every rule given, and the rules a new version must
  * meet (guide §6.15): a home and a temporary site are Flag or Refuse, never Off; a home's radius is
@@ -950,7 +1027,13 @@ const AttendanceRulesDraft = z
   .refine((r) => !r.overtime.on || r.overtime.method === "multiplier" || Boolean(r.overtime.amount), {
     message: "Enter the amount",
     path: ["overtime", "amount"],
-  });
+  })
+  .refine((r) => deductionInRange(r.late_deduction), { message: "₦1 to ₦1,000,000", path: ["late_deduction", "amount"] })
+  .refine((r) => deductionInRange(r.early_deduction), { message: "₦1 to ₦1,000,000", path: ["early_deduction", "amount"] })
+  .refine(
+    (r) => !r.overtime.on || r.overtime.method === "multiplier" || !r.overtime.amount || inRange(r.overtime.amount),
+    { message: "₦1 to ₦1,000,000", path: ["overtime", "amount"] },
+  );
 
 /* ------------------------------------------------------------------ *
  * Exports
@@ -974,6 +1057,133 @@ const RegisterExportRequest = z
     (v) => (Date.parse(`${v.to}T00:00:00Z`) - Date.parse(`${v.from}T00:00:00Z`)) / 86_400_000 <= 30,
     { message: "At most 31 days", path: ["to"] },
   );
+
+/* ------------------------------------------------------------------ *
+ * Pending deductions and overtime: what a late, early or absent day, or a
+ * day's overtime, comes to under the policy (guide §6.17)
+ * ------------------------------------------------------------------ */
+
+const PayItemKind = z.enum(["late", "early_departure", "absence", "overtime"]);
+/** The deductions, or the overtime: the two views of People · Attendance and My Attendance. */
+const PayItemGroup = z.enum(["deductions", "overtime"]);
+const PayItemStatus = z.enum(["pending", "waived", "confirmed", "cut", "in_run"]);
+/**
+ * How the amount was worked out: a deduction's method (pro_rata, per_hour started, per_day), an
+ * absence's day rate (daily_rate), or overtime's (multiplier of the hourly rate, per_hour prorated).
+ */
+const PayItemMethod = z.enum(["pro_rata", "per_hour", "per_day", "daily_rate", "multiplier"]);
+
+/**
+ * One pending deduction or overtime item. `pay_amount` is derived from the person's salary and is
+ * masked as the salary is (null below the salary grant, and null too with no salary set: No Salary
+ * Set). `confirmed_minutes` is what was confirmed of an overtime item. `can_decide` says whether the
+ * reader may waive it (a deduction) or confirm and cut it (overtime pending its line manager).
+ */
+const PayItem = z
+  .object({
+    attendance_pay_item_id: uuid,
+    attendance_day_id: uuid.nullable(),
+    employee: PersonRef,
+    work_date: isoDate,
+    kind: PayItemKind,
+    minutes,
+    rest_day: z.boolean(),
+    method: PayItemMethod,
+    pay_amount: money.nullable(),
+    salary_set: z.boolean(),
+    status: PayItemStatus,
+    confirmed_minutes: minutes.nullable(),
+    reason: z.string().nullable(),
+    decided_by_name: z.string().nullable(),
+    decided_at: isoDateTime.nullable(),
+    created_at: isoDateTime,
+    can_decide: z.boolean(),
+  })
+  .strict();
+const PayItemPage = Paged(PayItem);
+
+/** GET /attendance/pay-items: within the reader's `people` scope, pending first, then the newest day. */
+const PayItemListQuery = listQuery(
+  {
+    group: PayItemGroup.optional(),
+    kind: PayItemKind.optional(),
+    status: PayItemStatus.optional(),
+    month: month.optional(),
+    employee_id: uuid.optional(),
+  },
+  ["work_date", "minutes"],
+);
+
+/** GET /attendance/me/pay-items: the person's own for a month (this month when absent), newest day first. */
+const MyPayItemListQuery = listQuery(
+  { month: month.optional(), group: PayItemGroup.optional(), kind: PayItemKind.optional() },
+  ["work_date"],
+);
+
+/** POST /attendance/pay-items/waive: up to 25 deductions at once, with the reason the person reads. */
+const PayItemWaive = z
+  .object({
+    pay_item_ids: z
+      .array(uuid)
+      .min(1, "Pick a deduction")
+      .max(25, "At most 25")
+      .refine((ids) => new Set(ids).size === ids.length, "Each once"),
+    reason: reasonText,
+  })
+  .strict();
+
+/** What a waive did: the items it waived, and those it skipped because they were no longer pending. */
+const PayItemBatchResult = z
+  .object({
+    waived: z.array(PayItem).max(25),
+    skipped: z
+      .array(z.object({ attendance_pay_item_id: uuid, code: z.enum(["NOT_PENDING", "IN_RUN"]) }).strict())
+      .max(25),
+  })
+  .strict();
+
+/**
+ * POST /attendance/pay-items/:id/overtime: confirm all of it, confirm fewer minutes, or cut it with a
+ * reason (Line Manager After, §6.17). That `minutes` is at most the item's is the service's.
+ */
+const OvertimeDecision = z
+  .object({
+    decision: z.enum(["confirm", "cut"]),
+    minutes: z.number().int().min(1, "At least 1").optional(),
+    reason: optionalText(500),
+  })
+  .strict()
+  .refine((v) => v.decision !== "cut" || (v.reason || "").length >= 10, {
+    message: "At least 10 characters",
+    path: ["reason"],
+  })
+  .refine((v) => v.decision !== "cut" || v.minutes === undefined, { message: "Not when cutting", path: ["minutes"] });
+
+/**
+ * POST /attendance/overtime-approvals: overtime approved beforehand for a person's day (Approve
+ * Overtime, Pre-Approved). The day against today and who may approve are the service's (§6.17).
+ */
+const OvertimePreApprovalCreate = z
+  .object({
+    employee_id: uuid,
+    work_date: isoDate,
+    minutes: z.number().int().min(1, "At least 1").max(720, "At most 720"),
+    reason: reasonText,
+  })
+  .strict();
+
+/** One overtime approval: the person, the day, the minutes and who approved them. */
+const OvertimePreApproval = z
+  .object({
+    attendance_overtime_approval_id: uuid,
+    employee: PersonRef,
+    work_date: isoDate,
+    minutes: z.number().int().min(1),
+    reason: z.string(),
+    approved_by_name: z.string().nullable(),
+    approved_at: isoDateTime,
+  })
+  .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
@@ -1013,17 +1223,22 @@ const TABLES = {
     table: "attendance_home",
     virtual: { decision: "written as attendance_home.status approved or rejected", reason: "attendance_home.decision_reason" },
   },
-  ScheduleDay: { table: null, reason: "one weekday's place, from the pattern, working_week and attendance_schedule" },
+  ScheduleDay: { table: null, reason: "one weekday's place, from attendance_work_schedule, the company hours and the pattern" },
+  ScheduleDayInput: { table: null, reason: "one weekday of attendance_work_schedule.days (jsonb), as People set it" },
   ScheduleVersion: {
-    table: "attendance_schedule",
+    table: "attendance_work_schedule",
     virtual: { set_by_name: "who set it, from app_user and employee" },
+  },
+  WorkDay: {
+    table: null,
+    reason: "one weekday as worked, from attendance_work_schedule.days, the policy's hours and working_week",
   },
   WorkSchedule: {
     table: null,
-    reason: "a person's week, from employee, worksite, attendance_home, working_week and attendance_schedule",
+    reason: "a person's week, from employee, worksite, attendance_home, attendance_work_schedule and the company hours",
   },
   ScheduleParams: { table: null, reason: "the person whose schedule it is" },
-  WorkScheduleSet: { table: "attendance_schedule" },
+  WorkScheduleSet: { table: "attendance_work_schedule" },
   LocationRequest: {
     table: "attendance_location_request",
     virtual: {
@@ -1135,6 +1350,7 @@ const TABLES = {
       employee: "the person, from attendance_day and employee, with their photo_url",
       work_date: "attendance_day.attendance_date",
       detail: "one line from attendance_exception.evidence",
+      real_time: "the real leaving time the person gave, from attendance_exception.evidence",
       reviewed_by_name: "who decided it, from employee",
     },
   },
@@ -1142,6 +1358,10 @@ const TABLES = {
   MyExceptionListQuery: { table: null, reason: "list controls for my exceptions" },
   ExceptionListQuery: { table: null, reason: "list controls for the exceptions" },
   ExceptionExplanation: { table: "attendance_exception" },
+  RealTimeGiven: {
+    table: "attendance_exception",
+    virtual: { real_time: "kept in attendance_exception.evidence with the instant it names" },
+  },
   ExceptionDecision: {
     table: "attendance_exception",
     virtual: {
@@ -1170,6 +1390,36 @@ const TABLES = {
   AttendanceRulesDraft: { table: null, reason: "the Attendance policy's rules as a draft saves them, kept as policy_version.rules (jsonb)" },
   MyExportRequest: { table: null, reason: "the month to export" },
   RegisterExportRequest: { table: null, reason: "the register's filters for an export" },
+  PayItem: {
+    table: "attendance_pay_item",
+    virtual: {
+      employee: "the person, from employee and department, with their photo_url",
+      pay_amount: "attendance_pay_item.amount, named for the salary mask",
+      salary_set: "whether employee.gross_monthly is set",
+      decided_by_name: "who decided it, from app_user and employee; null when the system did",
+      can_decide: "whether the reader may waive it or confirm and cut it",
+    },
+  },
+  PayItemPage: { table: null, reason: "a page of deductions and overtime" },
+  PayItemListQuery: { table: null, reason: "list controls for People's deductions and overtime" },
+  MyPayItemListQuery: { table: null, reason: "list controls for the person's own deductions and overtime" },
+  PayItemWaive: { table: null, reason: "the deductions People waive and why; the reason kept on each attendance_pay_item" },
+  PayItemBatchResult: { table: null, reason: "the items a waive waived and those it skipped" },
+  OvertimeDecision: {
+    table: "attendance_pay_item",
+    virtual: {
+      decision: "written as attendance_pay_item.status confirmed or cut",
+      minutes: "written as attendance_pay_item.confirmed_minutes",
+    },
+  },
+  OvertimePreApprovalCreate: { table: "attendance_overtime_approval" },
+  OvertimePreApproval: {
+    table: "attendance_overtime_approval",
+    virtual: {
+      employee: "the person, from employee and department, with their photo_url",
+      approved_by_name: "who approved it, from app_user and employee",
+    },
+  },
 };
 
 module.exports = {
@@ -1203,6 +1453,7 @@ module.exports = {
   MyExceptionListQuery,
   ExceptionListQuery,
   ExceptionExplanation,
+  RealTimeGiven,
   ExceptionDecision,
   RegisterQuery,
   RegisterRow,
@@ -1245,8 +1496,12 @@ module.exports = {
   FieldMemberRemove,
   Weekday,
   SchedulePlace,
+  WorkPlace,
   ScheduleDay,
+  ScheduleDayInput,
+  ScheduleDays,
   ScheduleVersion,
+  WorkDay,
   WorkSchedule,
   ScheduleParams,
   WorkScheduleSet,
@@ -1264,4 +1519,17 @@ module.exports = {
   AttendanceRule,
   AttendanceRules,
   AttendanceRulesDraft,
+  PayItemKind,
+  PayItemGroup,
+  PayItemStatus,
+  PayItemMethod,
+  PayItem,
+  PayItemPage,
+  PayItemListQuery,
+  MyPayItemListQuery,
+  PayItemWaive,
+  PayItemBatchResult,
+  OvertimeDecision,
+  OvertimePreApprovalCreate,
+  OvertimePreApproval,
 };

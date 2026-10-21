@@ -10,8 +10,9 @@
  *
  * Home owns the screen, the rules and the tables (docs/guides/home.md). This file is
  * the engine behind them, so every alert is raised, cleared and aged the same way. Home's
- * metric registry (src/modules/alerts/alerts.metrics.js) reads each breach, in its daily
- * sweep or on a signal such as attendance.punched, and calls raise() for the rule:
+ * metric registry (src/modules/alerts/alerts.metrics.js) reads each breach in its daily
+ * sweep, and attendance raises each breach of its policy's rules as it commits (through
+ * alerts.service raisePolicyBreach); both call raise() for the rule:
  *
  *   const alerts = require("../../shared/alerts/alerts");
  *

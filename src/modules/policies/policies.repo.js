@@ -178,6 +178,20 @@ function rulesInForce(db, kind, date) {
   );
 }
 
+/**
+ * One published (or once published, now past) version of a rules policy of this kind, by its id, or
+ * null: the version something was judged by (§6.8, rulesOfVersion).
+ */
+function rulesOfVersion(db, kind, versionId) {
+  return one(
+    db,
+    `SELECT v.policy_version_id, v.version, v.rules
+       FROM policy_version v JOIN policy p ON p.policy_id = v.policy_id
+      WHERE p.kind = $1 AND v.policy_version_id = $2`,
+    [kind, versionId],
+  );
+}
+
 /** The newest published version (waiting or in force), or null. */
 function newestPublished(db, policyId) {
   return one(
@@ -717,6 +731,7 @@ module.exports = {
   workingVersion,
   versionInForce,
   rulesInForce,
+  rulesOfVersion,
   newestPublished,
   previousPublished,
   lastWaitingStart,
