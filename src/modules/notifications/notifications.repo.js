@@ -884,6 +884,8 @@ async function digestsDue(db, day) {
        FROM app_user u
        LEFT JOIN notification_setting s ON s.user_id = u.user_id
       WHERE u.status = 'active' AND COALESCE(s.digest, true)
+        -- Only once they have signed in: an invitation still open is no reader of a digest.
+        AND u.password_changed_at IS NOT NULL
         AND (s.digest_sent_on IS NULL OR s.digest_sent_on < $1::date)
       ORDER BY u.user_id
       LIMIT 200 -- pagination:batch people one tick queues a digest for`,
@@ -907,7 +909,8 @@ async function markDigest(db, userId, day) {
 /** Who a digest goes to, and whether they still want it. */
 async function digestPerson(db, userId) {
   const { rows } = await db.query(
-    `SELECT u.user_id, u.email, e.first_name, e.last_name, COALESCE(s.digest, true) AS digest
+    `SELECT u.user_id, u.email, e.first_name, e.last_name, COALESCE(s.digest, true) AS digest,
+            (u.password_changed_at IS NOT NULL) AS signed_in
        FROM app_user u
        JOIN employee e ON e.employee_id = u.employee_id
        LEFT JOIN notification_setting s ON s.user_id = u.user_id

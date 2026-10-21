@@ -666,6 +666,12 @@ the fallback) and are not checked. Every other domain still is, and a
 trapped one is still refused. Today's failed digests are not sent again (a digest day already passed
 is not sent late, `notifications.md` §11).
 
+Mail to a `mycityapp.io` address is delivered on the host itself, so the address must exist there,
+as a mailbox or a forwarder (TB, 21/10/2026). One that does not is refused at once with cPanel's 550
+("The mail server could not deliver mail to … The account or domain may not exist"), which the
+System Sender lists as a Refused Address and never retries (`integrations.md` §6.16); the cure is the
+mailbox in cPanel, or the right address in People (`docs/runbooks/dns-and-mail.md` §5).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -825,6 +831,8 @@ screen.
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · §6.14 and Settings · Integrations (`docs/guides/integrations.md` §1.3, §6.15, §6.16): system mail can be paused on the System Sender (only invitations, password resets and the test email go out; notices are pushed instead), and an address the mail server refuses for good is not retried but listed as Refused Addresses. The screen's change is on the Integrations tab only.
 
 - 21/10/2026 · TB · §10, §13: the employee record's Attendance tab becomes Work Schedule, after Job (attendance's PR 3, `attendance.md` §6.13): Work Setup and the person's week, each weekday Working or Off with its hours and place, and Set Schedule for anyone (`people` edit, never their own).
 - 20/10/2026 · TB · §6.7: ⌘K gains Refresh Screen and Reload App, run in the app (F28), so the

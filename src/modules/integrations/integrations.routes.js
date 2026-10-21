@@ -10,6 +10,9 @@
  *   DELETE /:code                          delete  forget what was saved
  *   POST   /:code/test                     edit    test the settings in use
  *   POST   /mail_sender/test-email         edit    a real message to the tester
+ *   POST   /mail_sender/pause              edit    pause system mail but invitations and resets
+ *   POST   /mail_sender/resume             edit    resume it; held mail goes out
+ *   GET    /mail_sender/refusals           view    the addresses the mail server refused, 25 a page
  *   POST   /web_push/replace-keys          edit    a new key pair
  *   POST   /exchange_rates/sync            edit    fetch today's exchange rates now
  *   GET    /:code/models                   view    an AI connection's model list, 25 a page
@@ -41,6 +44,18 @@ route(router, "get", "/summary",
 route(router, "post", "/mail_sender/test-email",
   { body: c.common.EmptyBody, response: i.IntegrationCheck, summary: "Send a test email to myself" },
   requirePermission("integrations", "edit"), controller.testEmail);
+
+route(router, "post", "/mail_sender/pause",
+  { body: c.common.EmptyBody, response: i.Integration, summary: "Pause system mail except invitations and resets" },
+  requirePermission("integrations", "edit"), controller.pauseMail);
+
+route(router, "post", "/mail_sender/resume",
+  { body: c.common.EmptyBody, response: i.Integration, summary: "Resume system mail" },
+  requirePermission("integrations", "edit"), controller.resumeMail);
+
+route(router, "get", "/mail_sender/refusals",
+  { query: i.MailRefusalListQuery, response: i.MailRefusalPage, summary: "Addresses the mail server refused" },
+  requirePermission("integrations", "view"), controller.refusals);
 
 route(router, "post", "/web_push/replace-keys",
   { body: c.common.EmptyBody, response: i.Integration, summary: "Replace the web push key pair" },

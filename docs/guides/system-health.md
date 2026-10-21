@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #95, #96, #97 |
 | Status | Built |
-| Last changed | 20/10/2026 |
+| Last changed | 21/10/2026 |
 
 ---
 
@@ -65,7 +65,11 @@ one creates alarm without action.
    Settings · Integrations (`docs/guides/integrations.md` §3 step 12) adds two checks, `maps`
    (Geoapify) and `mail_server` (the staff mail server), which read the connection's stored state
    and never call the provider; `mail` and `ai` now read the settings in use there. A failing
-   connection therefore reaches IT through these two events, with no alert of its own.
+   connection therefore reaches IT through these two events, with no alert of its own. System
+   mail paused on purpose (`integrations.md` §6.15) reads `mail` as `degraded`, mode `paused`
+   ("Paused: invitations and password resets only", where to look: Resume it on Settings,
+   Integrations); its going down and coming back emit neither event, since the pause's own notice
+   told IT.
 5. The IT team opens Settings · System Health from the notice. Status shows the live checks,
    Performance draws the samples, Faults lists the groups.
 5a. Every minute the `system-health-sample` scheduler reads the whole server (processor, memory,
@@ -296,7 +300,7 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
 | Every API and worker process, every minute | both | Upserts its `process_beat`: memory, heap, event-loop delay (p99 of the minute), CPU, and on the API the sockets and people connected |
 | `mycity-host-stats.timer` (root, every 15 minutes) | server | `ops/monitoring/host-stats.sh` writes `/var/lib/mycity/host-stats.json`: the disk's parts, restart needed, updates waiting |
 | `system_health.targets_changed` | Edit Targets is saved | Audit only; no notice |
-| `system_health.check_down` | a readiness check leaves `up` | Notifies, urgency `urgent` for `postgres`, `redis` and `worker`, `important` otherwise |
+| `system_health.check_down` | a readiness check leaves `up` | Notifies, urgency `urgent` for `postgres`, `redis` and `worker`, `important` otherwise; not for `mail` paused on purpose |
 | `system_health.check_recovered` | it returns to `up` | Notifies, urgency `normal` |
 | `system_health.fault_new` | a `fatal` or `error` fingerprint is seen for the first time | Notifies, urgency from severity |
 | `system_health.fault_returned` | a `fatal` or `error` fault marked Fixed fires again | Notifies, urgency `important` |
@@ -443,6 +447,8 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   built; TB decided against it on 20/10/2026 to keep the screen single-audience.
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · A fault's Where (`error_group.frame`, and the fingerprint) is the stack's first "at" line, not its second line: a mail server's 550 reply runs to three lines, so the fault on Settings · Status named a line of the reply instead of the code. Mail paused on Settings · Integrations reads `degraded`, mode `paused`, with its own Where to Look, and emits no check down or recovered (§3 step 4, §7; `integrations.md` §6.15). A refused address is one `warning` fault, counted and never pushed (`integrations.md` §6.16).
 
 - 20/10/2026 · TB · Settings · Integrations' AI providers and Exchange Rates
   (`docs/guides/integrations.md` §1.2): Groq, OpenAI, Anthropic, DeepSeek, Exchange Rates and web

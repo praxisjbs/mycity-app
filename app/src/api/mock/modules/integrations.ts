@@ -7,6 +7,7 @@ import type {
   IntegrationCheck,
   IntegrationCode,
   IntegrationRow,
+  MailRefusal,
   ModelCapability,
   ModelInUse,
   SecretState,
@@ -62,6 +63,7 @@ const row = (code: IntegrationCode, display_name: string, group: IntegrationRow[
   plan: null,
   units_today: 0,
   watched: false,
+  paused_at: null,
   ...over,
 });
 
@@ -260,9 +262,27 @@ function settingsOf(c: Connection): Integration["settings"] {
   return { code, ...c.values } as Integration["settings"];
 }
 
+/** Who paused system mail on the mock, while it is paused. */
+let pausedBy: string | null = null;
+
+/** Addresses the mail server refused (docs/guides/integrations.md §6.16): invented, none of them a real person's. */
+const REFUSALS: MailRefusal[] = [
+  { mail_refusal_id: sid("refusal:1"), email: "ada.obi@gmial.com", person_name: null, template: "notification", smtp_code: 550, reply: "550 No such domain", refusals: 3, first_refused_at: AGO(60 * 30), last_refused_at: AGO(60 * 2) },
+  { mail_refusal_id: sid("refusal:2"), email: "former.staff@mycityapp.io", person_name: null, template: "digest", smtp_code: 550, reply: "550 No such user here", refusals: 1, first_refused_at: AGO(60 * 9), last_refused_at: AGO(60 * 9) },
+];
+
 function detail(c: Connection): Integration {
   const settings = settingsOf(c);
-  return { ...c.row, saved_at: c.saved_at, saved_by_name: c.saved_by_name, settings, secrets: c.secrets, last_check: c.checks[0] ?? null, usage: c.usage };
+  return {
+    ...c.row,
+    saved_at: c.saved_at,
+    saved_by_name: c.saved_by_name,
+    paused_by_name: c.row.paused_at ? pausedBy : null,
+    settings,
+    secrets: c.secrets,
+    last_check: c.checks[0] ?? null,
+    usage: c.usage,
+  };
 }
 
 const of = (code: string) => (ORDER.includes(code as IntegrationCode) ? CONNECTIONS[code as IntegrationCode] : null);
@@ -325,6 +345,24 @@ route("POST /api/v1/integrations/mail_sender/test-email", () => {
   settle(c, done);
   return ok(done);
 });
+
+route("POST /api/v1/integrations/mail_sender/pause", () => {
+  const c = CONNECTIONS.mail_sender;
+  if (!c.row.paused_at) {
+    c.row.paused_at = new Date().toISOString();
+    pausedBy = "Cynthia Osakunih";
+  }
+  return ok(detail(c));
+});
+
+route("POST /api/v1/integrations/mail_sender/resume", () => {
+  const c = CONNECTIONS.mail_sender;
+  c.row.paused_at = null;
+  pausedBy = null;
+  return ok(detail(c));
+});
+
+route("GET /api/v1/integrations/mail_sender/refusals", (req) => paged(REFUSALS, req, { search: (r) => [r.email] }));
 
 route("POST /api/v1/integrations/web_push/replace-keys", () => {
   const c = CONNECTIONS.web_push;
