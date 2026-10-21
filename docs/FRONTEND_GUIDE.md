@@ -419,6 +419,12 @@ element outside the form components (§8.6).
   the button is busy, not disabled (§8.4).
 - **Server errors land on fields.** An `AppError` with `fields` marks those fields the same way; a
   general error is one line above the footer.
+- **So does what only a control can see.** A typed date that is not a real one ("Not a real date"),
+  or one outside the field's `min` and `max` ("Pick 21/10/2026 or later"), reaches the form through
+  the binding's `onProblem`: the form holds no date while the text shows none, the field is marked
+  (at once for a whole date out of range, after the pause for half of one) and Submit refuses it. A
+  rule that needs no data (a Last Day in another year, a numbering scheme without its period) is
+  the contract's, so the form says it as the field is filled rather than after Save (21/10/2026).
 
 ### 8.4 Footers and buttons
 

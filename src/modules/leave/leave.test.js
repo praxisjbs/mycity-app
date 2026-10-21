@@ -50,6 +50,26 @@ describe("the allowance", () => {
   });
 });
 
+describe("the contract, which the form checks as it is filled", () => {
+  const { leave } = require("@mycity/contract");
+  const span = { leave_type_id: "33333333-3333-4333-8333-333333333333", reason: "" };
+  const endsOn = (schema, body) => {
+    const r = schema.safeParse(body);
+    return r.success ? null : r.error.issues.filter((i) => i.path[0] === "ends_on").map((i) => i.message);
+  };
+
+  test("a Last Day in another year is refused on the Last Day, for the employee and for People", () => {
+    const newYear = { ...span, starts_on: "2026-12-28", ends_on: "2027-01-04" };
+    expect(endsOn(leave.LeaveRequestCreate, newYear)).toEqual(["Ends in another year"]);
+    expect(endsOn(leave.LeaveRecordCreate, { ...newYear, employee_id: "44444444-4444-4444-8444-444444444444" })).toEqual(["Ends in another year"]);
+    expect(endsOn(leave.LeaveRequestCreate, { ...span, starts_on: "2026-12-28", ends_on: "2026-12-31" })).toBeNull();
+  });
+
+  test("a backwards span says only that it ends before it starts", () => {
+    expect(endsOn(leave.LeaveRequestCreate, { ...span, starts_on: "2027-01-02", ends_on: "2026-12-30" })).toEqual(["Ends before it starts"]);
+  });
+});
+
 describe("an approval's end", () => {
   test("every end state of the flow maps to a request status", () => {
     expect(OUTCOME).toEqual({

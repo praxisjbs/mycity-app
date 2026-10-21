@@ -118,18 +118,24 @@ const span = {
 };
 const endsAfterStart = (v) => !v.starts_on || !v.ends_on || v.ends_on >= v.starts_on;
 const ENDS_BEFORE = { message: "Ends before it starts", path: ["ends_on"] };
+/** A year's allowance is counted per year, so leave over New Year is two requests. */
+const oneYear = (v) =>
+  !v.starts_on || !v.ends_on || v.ends_on < v.starts_on || v.ends_on.slice(0, 4) === v.starts_on.slice(0, 4);
+const OTHER_YEAR = { message: "Ends in another year", path: ["ends_on"] };
 
 /** POST /ess/leave: the employee asks for leave. */
 const LeaveRequestCreate = z
   .object(span)
   .strict()
-  .refine(endsAfterStart, ENDS_BEFORE);
+  .refine(endsAfterStart, ENDS_BEFORE)
+  .refine(oneYear, OTHER_YEAR);
 
 /** POST /leave/requests: People record leave on someone's behalf. It is approved at once. */
 const LeaveRecordCreate = z
   .object({ employee_id: uuid, ...span })
   .strict()
-  .refine(endsAfterStart, ENDS_BEFORE);
+  .refine(endsAfterStart, ENDS_BEFORE)
+  .refine(oneYear, OTHER_YEAR);
 
 /** POST /ess/leave/:id/cancel and POST /leave/requests/:id/cancel */
 const LeaveCancel = z.object({ reason: optionalText(500) }).strict();

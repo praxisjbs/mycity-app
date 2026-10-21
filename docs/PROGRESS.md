@@ -109,6 +109,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · The form system (PR 1 · Ground), from the 21/10 System Health brief (fault #2): `DateField` keeps what is typed. It had rewritten its text from the value it had just handed over, so at 28/10/20 the year read 2020 and a typed 28/10/2026 left the form as 2020-10-28 while the field showed red; the leave server refused it as Already Past. The form now holds only the date the text shows (none while it is half typed or outside `min` and `max`), and a control tells the form what only it can see through the binding's new `onProblem`: "Not a real date" after the pause, "Pick 21/10/2026 or later" at once for a whole date outside the range, and check() refuses both. `DateRangeField` passes either end's. Tests beside each (`DateField.test.tsx`, `useContractForm.test.tsx`). Left: nothing; every `DateField` bound with `f.field` has it, and People · Attendance's Export passes its Period's.
 - 21/10/2026 · TB · `BarChart` (Build kit) copes with a month of days, found on AI Control · Spend (#100): its
   drawing is laid out in the card's own pixels at the chart's height (the placeholder's), so labels stay 11 px
   and the chart no longer grows taller with the screen. Up to 12 bars every label shows and a narrow card
@@ -759,7 +760,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
+| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
@@ -770,6 +771,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · My Leave (#12), faults #1 and #2 of the 21/10 System Health brief (the server refused LEAVE_SPANS_YEARS and LEAVE_IN_THE_PAST after Send Request): Request Leave's types read what is left of the First Day's year ("Annual · 12 days left", from `GET /ess/leave/balances?year=`), a Last Day in another year reads "Ends in another year" as it is typed (`schemas/leave.js`, for Record Leave too), and a typed day before today "Pick 21/10/2026 or later" at once (the shared `DateField`, M0 note). Tests: `app/src/features/people/Leave.test.tsx`, `leave.test.js`, `tests/integration/leave.test.js`. Left: nothing.
 - 21/10/2026 · TB · My Attendance (#9): My Days as a chart labels each day 13/10 (it read 13/10/, with a
   stray slash), and the shared bar chart leaves off the days that would touch, every few days at an even step,
   the first and the last always. Left: nothing.
@@ -902,13 +904,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 21/10/2026 · TB · Leave (#26): Record Leave marks a Last Day in another year as it is typed (the contract's New Year check, with My Leave's, #12). Attendance (#25): Export's Period says what is wrong with a typed day after today ("Pick 21/10/2026 or earlier") through `DateRangeField`'s `onProblem`, and every attendance date field keeps a four-digit year as typed (M0 note). Left: nothing.
 - 21/10/2026 · TB · Attendance's PR 2 built (clock fixes, `docs/guides/attendance.md` §1.2): Attendance (#25) lists every refused punch's exception (outside the fence or an unknown device under Refuse, its detail Refused), decided as §6.8 says (accept keeps the refusal, reject marks it wrong; neither makes it count); Location Unclear in place of Location Unverified, with its reason (no reading, rough reading, at the edge, no home, no office). A punch People reject frees its slot: the person clocks in or out again, and a clock-out rejected on a day already closed opens its missing clock-out for Add Clock-Out, which recalculates the day. Backend: the reading judged with its accuracy (`attendance.geofence.js` `judgeReading`), `1380` (`attendance_event.slot`, the unique index a slot at a time; applied on a fresh database before `1405`, `1450` and `1460`, and on one already holding them), `1397` (the label), leave read on the work date and re-projected onto a closed day when granted later (`attendance.day_reprojected`), a stored key reused for the other punch after 48 hours is 422, `shared/geo`'s second geofence removed. This closes PR 3's "Left: PR 2". Left: the M3 query subscriber and payroll's `in_run` (M6), as before.
 - 21/10/2026 · TB · Attendance (#25) and Worksites (#28), a temporary site's hours (owner decision, 21/10/2026; `docs/guides/attendance.md` §6.11): Add Work Site and Add Temporary Site open on Hours, Usual Shift or Site Hours with Starts At and Ends At, and a site shows its hours. Site Hours make every day of the site worked for its people, weekends and holidays included, on the site's own clock: the clock-in reminder and the start prompt at its start, lateness from it with the policy's grace, the closing prompt, overtime and the system clock-out from its end, and a day with no clock-in closed absent; the register and the roster count those days as worked. Migration `1475`. Left: nothing.
 - 21/10/2026 · TB · Attendance's PR 3 built (rules and schedules, `docs/guides/attendance.md` §1.2): Employees (#24) gains the record's Work Schedule tab after Job, in place of the Attendance tab (Work Setup, the week day by day, Set Schedule for anyone, never one's own); Attendance (#25) gains Deductions and Overtime in the view switch (Waive Selected up to 25 with a reason, Confirm and Cut on overtime, Approve Overtime on a person's day), System Clock-Out as a punch's source with the real time a person gave, early departures and overtime on a day. Backend: work schedules (`1420`), each day judged once (`1425`), the consequence rules (`attendance.rules-engine.js`, `1430`), pending deductions and overtime (`attendance.pay.js`, `1435`), reminders to clock out every 30 minutes and the System Clock-Out (`1440`). This closes the #24 and #25 part of the 20/10/2026 note, with PR 4's places beside it. PR 2 (clock fixes) is not built: it was not on main, so none of it is here. Checked on the real API in Chromium at 1440 × 900 and at 390 px with touch: a version published on Policies (grace 10 minutes from 22/10), a schedule set from 22/10, a late clock-in run through the watch (reminders at 17:00, 17:30 and 18:00, the System Clock-Out at 18:30), Give Real Time and Correct Time to 17:40 (the day 8h 05m, late 35, overtime 40), a deduction waived, overtime confirmed, 19 breach alerts on Home; not checked: a push on a real phone. Left: PR 2, the M3 query subscriber, payroll's `in_run` (M6).
@@ -1154,7 +1157,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 73 | Attendance Policy | `attendance-policy` | M9 | LA | ☑ | ☑ | ☑ | Dropped | 20/10/2026 |
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
-| 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
+| 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
@@ -1162,6 +1165,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · From the 21/10 System Health brief. Documents & Numbering (#76), fault #3: a scheme's three rules are the contract's (`NumberingSchemeSave`), so the form marks them as it is filled rather than on Save ("Needed when it resets", "Add sequence digits", "Add digits or period"), and Each Year or Each Month ticks Period. Faults (#97): a refused form is recorded under its own rule and the route as declared (`LEAVE_SPANS_YEARS: ends_on` at `POST /api/v1/ess/leave`, where three lines had read `VALIDATION_FAILED` at `POST /leave`). Of the brief's other faults, #5 and #6 were already fixed (Find Prices as a job, #107; refused addresses, #111) and #4 is Geoapify's outage (Ignore it). Tests: `app/src/features/settings/Numbering.test.tsx`, `domain.test.js`, `middleware.test.js`. Left: mark #1 to #3 Fixed and #4 Ignored once this is on staging.
 - 21/10/2026 · TB · Faults (#97) on a phone: a tap on a row's tick opened the fault instead of picking
   it, so nothing could be picked for Download Brief. The phone card's open button is stretched over the
   whole card and covered the tick (`DataView`, since Faults moved to the list's own selection on

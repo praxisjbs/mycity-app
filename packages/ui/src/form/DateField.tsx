@@ -10,7 +10,7 @@
  * @exports DateRangeField, TimeField
  * @example <DateField min={todayIso()} {...form.field("start_date")} />
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn";
 import { formatDate, monthName, parseDayFirst, todayIso } from "../lib/format";
 import { Icon } from "../icons/Icon";
@@ -22,13 +22,15 @@ import { controlClass } from "./TextField";
 export interface DateFieldProps {
   /** ISO date (YYYY-MM-DD), or "" for none. */
   value: string;
-  /** Called with the ISO date, or "" when cleared. */
+  /** Called with the ISO date the text shows, or "" while it shows none: cleared, half typed, or outside min and max. */
   onChange: (iso: string) => void;
   /** Called when the person leaves the field. */
   onBlur?: () => void;
-  /** The earliest date that may be picked, ISO. */
+  /** Told what is wrong with what was typed ("Not a real date", "Pick 21/10/2026 or later"), or undefined once it is right. */
+  onProblem?: (message: string | undefined, now?: boolean) => void;
+  /** The earliest date that may be picked or typed, ISO. */
   min?: string;
-  /** The latest date that may be picked, ISO. */
+  /** The latest date that may be picked or typed, ISO. */
   max?: string;
   /** The mark; the Field supplies one otherwise. */
   state?: FieldState;
@@ -42,22 +44,58 @@ export interface DateFieldProps {
   placeholder?: string;
 }
 
-export function DateField({ value, onChange, onBlur, min, max, state, message: _message, id, name, placeholder = "DD/MM/YYYY" }: DateFieldProps) {
+/**
+ * What typed text holds: the ISO date when it is a whole date within min and max, else "" and
+ * what is wrong. `final` once nothing more can be typed onto it (a four-digit year); a two-digit
+ * year may still be on its way to four, so it waits for the pause like any half-typed value.
+ */
+function readTyped(text: string, min?: string, max?: string): { iso: string; problem?: string; final?: boolean } {
+  if (!text.trim()) return { iso: "" };
+  const iso = parseDayFirst(text);
+  if (!iso) return { iso: "", problem: "Not a real date" };
+  const final = /\d{4}\s*$/.test(text);
+  if (min && iso < min) return { iso: "", problem: `Pick ${formatDate(min)} or later`, final };
+  if (max && iso > max) return { iso: "", problem: `Pick ${formatDate(max)} or earlier`, final };
+  return { iso };
+}
+
+export function DateField({ value, onChange, onBlur, onProblem, min, max, state, message: _message, id, name, placeholder = "DD/MM/YYYY" }: DateFieldProps) {
   const a = useFieldControl({ id, state });
   const [text, setText] = useState(formatDate(value));
+  const [problem, setProblem] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
+  // The value this field last handed over. Its echo is not a change from outside, so the text stays
+  // as typed: rewritten from it, "28/10/20" became 28/10/2020 and the year never reached 2026.
+  const sent = useRef<string | null>(null);
+  const problemRef = useRef(onProblem);
+  problemRef.current = onProblem;
 
-  useEffect(() => setText(formatDate(value)), [value]);
+  useEffect(() => {
+    if (value === sent.current) return;
+    sent.current = null;
+    setText(formatDate(value));
+    setProblem(undefined);
+    problemRef.current?.(undefined);
+  }, [value]);
 
   const commit = (t: string) => {
     setText(t);
-    const iso = parseDayFirst(t);
-    if (iso) onChange(iso);
-    else if (!t.trim()) onChange("");
+    const typed = readTyped(t, min, max);
+    setProblem(typed.problem);
+    onProblem?.(typed.problem, typed.final);
+    if (typed.iso !== value) {
+      sent.current = typed.iso;
+      onChange(typed.iso);
+    }
   };
 
-  const typedBad = text.trim() !== "" && !parseDayFirst(text);
-  const shown: FieldState = typedBad ? "bad" : a.state;
+  /** Leaving the field shows a whole date as it is kept: 1.2.26 reads 01/02/2026. */
+  const leave = () => {
+    if (value && parseDayFirst(text) === value) setText(formatDate(value));
+    onBlur?.();
+  };
+
+  const shown: FieldState = problem ? "bad" : a.state;
 
   return (
     <span className="relative flex w-full items-center desk:max-w-48">
@@ -71,7 +109,7 @@ export function DateField({ value, onChange, onBlur, min, max, state, message: _
         placeholder={placeholder}
         value={text}
         onChange={(e) => commit(e.target.value)}
-        onBlur={onBlur}
+        onBlur={leave}
       />
       <Popover
         title="Pick a Date"
@@ -168,6 +206,8 @@ export interface DateRangeFieldProps {
   onChange: (value: DateRange) => void;
   /** Called when the person leaves either end. */
   onBlur?: () => void;
+  /** Told what is wrong with either end as typed, or undefined once both are right (as DateField's). */
+  onProblem?: (message: string | undefined, now?: boolean) => void;
   /** The earliest date either end may take, ISO. */
   min?: string;
   /** The latest date either end may take, ISO. */
@@ -179,14 +219,20 @@ export interface DateRangeFieldProps {
 }
 
 /** From and to, each day-first; the to date can never be before the from date. */
-export function DateRangeField({ value, onChange, onBlur, min, max, state }: DateRangeFieldProps) {
+export function DateRangeField({ value, onChange, onBlur, onProblem, min, max, state }: DateRangeFieldProps) {
+  // Each end's own problem: the period reports the first, so fixing one end never hides the other's.
+  const ends = useRef<{ from?: string; to?: string }>({});
+  const told = (end: "from" | "to") => (message: string | undefined, now?: boolean) => {
+    ends.current = { ...ends.current, [end]: message };
+    onProblem?.(ends.current.from ?? ends.current.to, now);
+  };
   return (
     <span className="flex flex-col gap-2 desk:flex-row desk:items-center">
-      <DateField value={value.from} onChange={(from) => onChange({ ...value, from })} onBlur={onBlur} min={min} max={value.to || max} state={state} />
+      <DateField value={value.from} onChange={(from) => onChange({ ...value, from })} onBlur={onBlur} onProblem={told("from")} min={min} max={value.to || max} state={state} />
       <span className="hidden text-sm text-muted-foreground desk:inline" aria-hidden>
         to
       </span>
-      <DateField value={value.to} onChange={(to) => onChange({ ...value, to })} onBlur={onBlur} min={value.from || min} max={max} state={state} />
+      <DateField value={value.to} onChange={(to) => onChange({ ...value, to })} onBlur={onBlur} onProblem={told("to")} min={value.from || min} max={max} state={state} />
     </span>
   );
 }

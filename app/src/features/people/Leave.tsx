@@ -309,6 +309,14 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
   const [whoError, setWhoError] = useState(false);
   const types = usePaged("GET /api/v1/leave/types", { filters: { active: "true" } });
   const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", reason: "" }, leave.LeaveRequestCreate);
+  // My Leave: each type with what is left of the year the First Day falls in, so a request past it is seen before Send.
+  const year = Number((f.values.starts_on || todayIso()).slice(0, 4));
+  const balances = useApi("GET /api/v1/ess/leave/balances", { query: { year }, enabled: !onBehalf });
+  const left = new Map((balances.data?.balances ?? []).map((b) => [b.leave_type_id, b.remaining] as const));
+  const typeLabel = (t: { leave_type_id: string; name: string }) => {
+    const n = left.get(t.leave_type_id);
+    return n == null ? t.name : `${t.name} · ${dayCount(Math.max(n, 0))} left`;
+  };
   const ask = useMutation("POST /api/v1/ess/leave");
   const recordIt = useMutation("POST /api/v1/leave/requests");
   const busy = ask.pending || recordIt.pending;
@@ -356,7 +364,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
       <Field label="Leave Type" {...f.field("leave_type_id")}>
         <SelectField
           placeholder={types.loading ? "Loading" : "Pick a type"}
-          options={types.rows.map((t) => [t.leave_type_id, t.name])}
+          options={types.rows.map((t) => [t.leave_type_id, typeLabel(t)])}
           {...f.field("leave_type_id")}
         />
       </Field>

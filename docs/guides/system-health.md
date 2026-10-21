@@ -174,6 +174,12 @@ downloads `GET /api/v1/documents/:id/content`, as every other export does.
   fingerprints anything itself, so the screen and the alert channel always agree on what one fault is.
 - A group's `severity` is the worst severity seen on it. `notice` (a 422) never alerts and never
   escalates: it is counted so form trouble can be seen, nothing more.
+- **A refused form** is titled by the rule that refused it and its fields, at the route as declared:
+  `LEAVE_SPANS_YEARS: ends_on` at `POST /api/v1/ess/leave`, or `VALIDATION_FAILED: …` when the
+  contract refused it. Each rule is its own line, so the brief says which rule a person met (TB,
+  21/10/2026, faults #1 to #3: three lines titled `VALIDATION_FAILED` at `POST /leave` needed the
+  server's log to tell them apart). The route is `req.routePattern`, stamped by `http/route.js`
+  before the router's base path is unwound; every fault the error handler records carries it.
 - Only `fatal` and `error` are told. A `warning` or `notice` group is grouped, counted and reopened
   when it comes back like any other, but never pushed as new, back again or happening fast, and
   never escalates (TB, 20/10/2026, fault #1). The roll-up reads the reporter's `ALERT_SEVERITIES`,
@@ -447,6 +453,8 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   built; TB decided against it on 20/10/2026 to keep the screen single-audience.
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · A refused form is recorded under the rule that refused it (`LEAVE_IN_THE_PAST: starts_on`, not `VALIDATION_FAILED: starts_on`) and every fault the API records carries the route as declared (`POST /api/v1/ess/leave`, not `POST /leave`), §6. The three open `VALIDATION_FAILED` lines of the 21/10 brief stop counting; their causes are fixed in the date field, `schemas/leave.js` and `schemas/settings.js`.
 
 - 21/10/2026 · TB · A fault's Where (`error_group.frame`, and the fingerprint) is the stack's first "at" line, not its second line: a mail server's 550 reply runs to three lines, so the fault on Settings · Status named a line of the reply instead of the code. Mail paused on Settings · Integrations reads `degraded`, mode `paused`, with its own Where to Look, and emits no check down or recovered (§3 step 4, §7; `integrations.md` §6.15). A refused address is one `warning` fault, counted and never pushed (`integrations.md` §6.16).
 

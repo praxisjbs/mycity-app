@@ -17,8 +17,9 @@
  * alert channel), at the severity an AppError gives itself, `error` unless it says
  * otherwise (an outside service not answering is a `warning`, shared/errors.js). 4xx are
  * logged at warn; validation failures are recorded at
- * `notice`, grouped by route and field names, so a form that keeps failing shows
- * up as one rising count rather than noise.
+ * `notice`, grouped by the rule that refused them (the error's code), its field names and
+ * the route as declared, so a form that keeps failing shows up as one rising count per
+ * rule rather than noise.
  *
  * Messages are written without dashes (README §7 rule 11: copy a person reads).
  */
@@ -62,18 +63,26 @@ const PG = {
   P0001: [409, "NOT_ALLOWED", "That is not allowed by a business rule"],
 };
 
+/**
+ * The route as declared (`POST /api/v1/ess/leave`), which http/route.js stamps while the
+ * router's base path is still on the request: by the time an error reaches this handler
+ * Express has unwound req.baseUrl, so reading it here would give `POST /leave`.
+ */
 const routeOf = (req) =>
-  `${req.method} ${req.baseUrl || ""}${req.route ? req.route.path : req.path}`;
+  req.routePattern
+    ? `${req.method} ${req.routePattern}`
+    : `${req.method} ${req.baseUrl || ""}${req.route ? req.route.path : req.path}`;
 
-function recordValidation(req, fields) {
+/** A refused form as one fault per rule: "LEAVE_SPANS_YEARS: ends_on" at its route. */
+function recordValidation(req, fields, code = "VALIDATION_FAILED") {
   try {
     const names =
       Object.keys(fields || {})
         .sort()
         .join(", ") || "unknown";
-    const err = new Error(`VALIDATION_FAILED: ${names}`);
+    const err = new Error(`${code}: ${names}`);
     err.name = "ValidationError";
-    err.stack = `ValidationError: VALIDATION_FAILED: ${names}\n    at ${routeOf(req)}`;
+    err.stack = `ValidationError: ${code}: ${names}\n    at ${routeOf(req)}`;
     report(err, {
       origin: "server",
       severity: "notice",
@@ -116,7 +125,7 @@ function errorHandler(err, req, res, _next) {
       });
     } else {
       logger.warn({ code: err.code, status }, err.message);
-      if (status === 422 && err.fields) recordValidation(req, err.fields);
+      if (status === 422 && err.fields) recordValidation(req, err.fields, err.code);
     }
     return send(
       res,

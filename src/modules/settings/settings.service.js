@@ -354,7 +354,9 @@ const numberingSummary = () => repo.numberingSummary(pool, [...DOC_TYPES]);
 
 /**
  * PUT /settings/numbering/:doc_type. A scheme that resets must carry its period, or
- * the next period would issue a number already issued in the last.
+ * the next period would issue a number already issued in the last. The contract
+ * (NumberingSchemeSave) holds the same rules, so a form meets them as it is filled; these
+ * checks stay for any caller that reaches the service another way.
  */
 async function saveScheme(docType, body, actor) {
   if (!SCHEMES[docType]) throw notFound();
@@ -372,7 +374,7 @@ async function saveScheme(docType, body, actor) {
     for (const p of problems) {
       if (p === "include_period") fields.include_period = ["Needed when it resets"];
       else if (p.includes("no prefix")) fields.padding = ["Add sequence digits"];
-      else if (p.includes("no sequence")) fields.padding = ["Add digits or a period"];
+      else if (p.includes("no sequence")) fields.padding = ["Add digits or period"];
       else if (p.startsWith("prefix")) fields.prefix = ["Up to 8 letters"];
       else if (p.startsWith("padding")) fields.padding = ["0 to 10"];
       else if (p.startsWith("separator")) fields.separator = ["Not a separator"];
