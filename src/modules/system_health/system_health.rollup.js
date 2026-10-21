@@ -203,6 +203,8 @@ async function snapshot(now = new Date()) {
   for (const [key, value] of Object.entries(checks)) {
     const was = before[key] && before[key].status;
     const is = value.status;
+    // Mail paused or resumed on purpose: its own notice told IT already (integrations.events.js).
+    if (service.pausedMail(key, value) || service.pausedMail(key, before[key])) continue;
     // Only the moment it changes. A check that stays down is already on somebody's phone.
     if (is !== "up" && (was === "up" || was === undefined) && previous) {
       await tx((client) =>

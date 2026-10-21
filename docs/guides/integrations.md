@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #77 |
 | Status | Built |
-| Last changed | 20/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources: TB's twelve answers of 20/10/2026 (§1.1), TB's answers on AI providers, transcription and
 exchange rates of the same day (§1.2, with `ai-control.md`), MILESTONES §14 (M9) and A4, the Mailbox guide
@@ -140,6 +140,31 @@ Refinements made while recording these, within those decisions (TB to overrule):
 - A browser caption is never stored as the transcript: it is shown, marked as a draft, and the next
   Transcribe tries Groq and Gemini again.
 
+### 1.3 Pausing system mail, and refused addresses (TB, 21/10/2026, binding)
+
+On the Namecheap plan's 50 recipients an hour, system mail ran out of its hour each morning and the
+rest went out in bursts an hour apart, so the Milestone 1 handover could not count on an invitation
+arriving. Until the plan moves to 10,000 an hour, IT can pause system mail.
+
+1. **Pause Mail on the System Sender.** Beside Test on its panel, for `integrations` edit (the IT
+   team; the CEO passes). Each environment pauses on its own page. The System Sender's row shows
+   Paused, and Settings · Status reads Mail as Paused.
+2. **What still goes while paused**: an invitation, a password reset and Send Test Email, and the
+   server's own health alarm (which mails when the database may be down and so cannot read the
+   pause). The Mailbox is each person's own mail, not system mail, and is never paused.
+3. **Notices reach people by push instead.** A notice due by email is pushed to the person's
+   devices even where their push switch for its category is off, and the bell has it as always.
+4. **On Resume**: a notice's email and a daily digest from the pause are dropped (push and the bell
+   carried them); any other system mail waited in its queue and goes out at once, paced.
+5. **An invitation or a reset whose link stopped working while it waited is dropped**, not sent:
+   a newer link replaced it, or it expired.
+6. **A refused address is not tried again.** The mail server's 550 for a mailbox that does not
+   exist or a domain that takes no mail is recorded as a warning (Faults, never pushed) and listed
+   on the System Sender as Refused Addresses, with whoever holds the address, so IT corrects the
+   email in People or creates the mailbox in cPanel.
+7. **The daily digest goes only to people who have signed in** at least once (`notifications.md`).
+8. **After the upgrade** the Hourly Limit is raised here and mail resumed. Nothing in code changes.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -154,7 +179,8 @@ Refinements made while recording these, within those decisions (TB to overrule):
 | Settings · Notifications (`notifications`) | Staff app | `settings` view | The new notices Integration Changed and Daily Limit Near | Turn a notice off, change its channels |
 | Mailbox (every tab) | Staff app | Each mailbox's owner | Unchanged; after a staff mail server change, the Reconnect banner for a refused password | Reconnect (`mailbox.md`) |
 | Every address field and map (`AddressField`, `MapView`) | Staff app | Everyone | Unchanged; the suggestions and tiles use the key saved here | As before (`foundation.md` §6.13) |
-| The bell and the notification pane | Staff app, both shells | `integrations` view holders | A connection changed by someone else, a daily limit at 80%; System Health's check down and recovered | Open the notice, which lands on the connection |
+| The bell and the notification pane | Staff app, both shells | `integrations` view holders | A connection changed by someone else, a daily limit at 80%; System Health's check down and recovered; System mail paused and resumed | Open the notice, which lands on the connection |
+| The System Sender (its row and its panel) | Staff app, over Integrations | `integrations` view; Pause Mail and Resume Mail with edit | While paused, Paused on its row and a banner on its panel naming who paused it and when; Refused Addresses, 25 a page | Pause Mail, Resume Mail (§6.15) |
 
 ## 3 · How the screens relate
 
@@ -236,6 +262,14 @@ Refinements made while recording these, within those decisions (TB to overrule):
     chain, Groq then Gemini, skipping a provider until its quota resets, and falls back to the captions
     the sender's browser wrote, as a draft that is never stored.
 
+19. **Pause Mail** → `POST /integrations/mail_sender/pause` sets `paused_at` and `paused_by` on the
+    System Sender's row in one transaction with `integration.mail_paused`, and bumps the version, so
+    every process reads it within a second (§6.15). Pressed again it changes nothing.
+20. **Resume Mail** → `POST /integrations/mail_sender/resume` clears them with `integration.mail_resumed`;
+    its outbox handler promotes the `email-send` jobs held for the pause.
+21. **Refused Addresses** → `GET /integrations/mail_sender/refusals`: `mail_refusal`, written by system
+    mail as it sends (`shared/integrations/refusals.js`, §6.16), newest refusal first, 25 a page.
+
 ## 4 · Data
 
 | Table | Key columns | Notes |
@@ -254,8 +288,11 @@ on `status` and changes its default from `inactive` to `unchecked`; no row exist
 CHECKs on `integration_check.kind` (adds `sync`) and `integration_usage.kind` (adds `transcribe` and
 `rates`); its DOWN deletes rows of those kinds before narrowing them again.
 
+| `integration_connection.paused_at`, `paused_by` (`9230`) | When system mail was paused and by whom | The System Sender's row only; null while it is not paused (§6.15) |
+| `mail_refusal` (`9230`, new) | `mail_refusal_id`, `email` (citext, unique), `template`, `smtp_code`, `reply` (the server's words, 300 characters), `refusals`, `first_refused_at`, `last_refused_at` | One row per address the mail server refused for good (§6.16). Telemetry, like `integration_usage`: no event, no audit row. Deleted when mail to the address is accepted again, or after 30 days untouched |
+
 Schema migration file(s): `migrations/9200_integrations.sql`, `migrations/9210_integrations_ai_models.sql`,
-`migrations/9220_exchange_rates.sql`. Reference-data file(s): `seeds/reference/9290_seed_integrations.sql`
+`migrations/9220_exchange_rates.sql`, `migrations/9230_integrations_mail_pause.sql`. Reference-data file(s): `seeds/reference/9290_seed_integrations.sql`
 (the `integrations` grant for the Implementation Team and the System Administrator, the `9190`
 pattern), `seeds/reference/9291_seed_ai_models.sql` (the starting model lists, §1.2). No connection,
 key or URL is seeded (A26).
@@ -274,6 +311,9 @@ All under `/api/v1/integrations`. Secrets never appear in a response.
 | `DELETE /:code` | → 204 | `integrations` delete | | Fresh sign-in. The server file applies again |
 | `POST /:code/test` | `IntegrationTestBody` → `IntegrationCheck` | `integrations` edit | | The settings in use. `address` is Geoapify's search text |
 | `POST /mail_sender/test-email` | `EmptyBody` → `IntegrationCheck` | `integrations` edit | | To the tester's own work email; 429 `MAIL_PACED` when the hour is full |
+| `POST /mail_sender/pause` | `EmptyBody` → `Integration` | `integrations` edit | | Pause system mail (§6.15); already paused changes nothing |
+| `POST /mail_sender/resume` | `EmptyBody` → `Integration` | `integrations` edit | | Resume it; held mail goes out at once |
+| `GET /mail_sender/refusals` | `MailRefusalListQuery` → `MailRefusalPage` | `integrations` view | yes, 25 | The addresses the mail server refused, newest first, each with `person_name` (a login's, else an employee's); `q` searches the address |
 | `POST /web_push/replace-keys` | `EmptyBody` → `Integration` | `integrations` edit | | Fresh sign-in |
 | `POST /exchange_rates/sync` | `EmptyBody` → `IntegrationCheck` | `integrations` edit | | Fetches today's rates now; a check of kind `sync` |
 | `GET /:code/models` | `AiModelListQuery` → `AiModelPage` | `integrations` view | yes, 25 | An AI connection's model list, usable first then by name, each with the jobs it does (`in_use`). Filters: `capability`, `available`; `q` searches the id and the name. 404 for a connection with no list |
@@ -492,6 +532,44 @@ mailbox's 50 recipients an hour (40 and 10) and the host's 30 IMAP connections p
   returns the captions. Nothing set up: the stub's placeholder, as a draft; one stored before this
   reads as no transcript.
 
+### 6.15 Pausing system mail (§1.3)
+
+- **Where it is kept**: `paused_at` and `paused_by` on the System Sender's `integration_connection`
+  row, whatever its settings come from (saved or the server file). `settings.of("mail_sender")`
+  carries `paused_at`; Pause and Resume bump the version (§6.7).
+- **What it stops**: `system-mail.send()` throws `MAIL_PAUSED` before anything is rendered, routed,
+  paced or counted, for every template but `user-invite`, `password-reset` and `integration-test`
+  (`WHILE_PAUSED`). `sendPlain` (the server's health alarm) is not paused. A paused message takes
+  no slot of the hourly limit, so an invitation is never queued behind it.
+- **What each caller does with it**: `email-send` holds the job 15 minutes, tagged `held_for:
+  pause`, until Resume promotes it; `notification-deliver` emails nothing and pushes each row that
+  was due by email instead (`instead_of_email`, past the person's push switch for the category;
+  not for a job more than a day old); the daily digest returns `mail_paused`, so the day's digest
+  is dropped.
+- **An invitation or a reset** is sent only while its link still works (`identity.linkStillOpen`):
+  one replaced by a newer link, or expired while it waited, finishes with `link_closed`. This holds
+  paused or not.
+- **Status**: the `mail` readiness check reads `degraded`, mode `paused` ("Paused: invitations and
+  password resets only"), which keeps a release ready. System Health tells nobody of it going down
+  or coming back: the pause's own notice did.
+
+### 6.16 Refused addresses
+
+- **A refusal** is a 5xx answer to RCPT TO for every recipient (nodemailer's `EENVELOPE` with
+  `rejected`): no such mailbox, a domain that takes no mail. cPanel's words are "The mail server
+  could not deliver mail to … The account or domain may not exist". Some recipients refused while
+  others took the message are kept the same way, and the message went.
+- **Not a refusal**: a reply naming the host's own sending limit ("exceeded the max emails per
+  hour", a sending quota, a rate limit). That is read as `MAIL_PACED` for an hour, so the job waits.
+  A 4xx is a deferral, retried as before.
+- **What happens**: the address is kept in `mail_refusal` (counted again when it is refused again),
+  `send()` throws `MAIL_REFUSED`, and the job finishes without a retry: `email-send` and the digest
+  return `refused`; `notification-deliver` marks that row done and carries on. One warning fault,
+  "the mail server refused the recipient", counts every refusal on Faults and is never pushed.
+- **Off the list**: when mail to the address is accepted, and after 30 days untouched
+  (`integrations-purge`). Correcting a person's email is done in People; a sign-in email that was
+  wrong when the login was made is corrected on the server (`docs/runbooks/dns-and-mail.md` §5).
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -501,6 +579,8 @@ mailbox's 50 recipients an hour (40 and 10) and the host's 30 IMAP connections p
 | `integration.keys_replaced` | Replace Keys commits | Audit. Tells the other IT holders |
 | `integration.tested` | A Test or Send Test Email from the page | Audit only: who, which connection, the result |
 | `integration.quota_warning` | The watch finds today's use at 80% of the daily limit, for a connection that is not an AI provider | Tells every IT holder (Daily Limit Near), once a day |
+| `integration.mail_paused` | Pause Mail commits | Audit (paused before and after). Tells the other IT holders: "System mail paused", "Only invitations and password resets are sent." |
+| `integration.mail_resumed` | Resume Mail commits | Audit. Tells the other IT holders: "System mail resumed". Outbox: promotes the `email-send` jobs held for the pause |
 | `integrations-watch` (scheduler, every 15 minutes) | On schedule | Tests the free connections (§3 step 10) |
 | `integrations-purge` (scheduler, 03:10 Lagos) | On schedule | Deletes checks older than 90 days and use older than 30 |
 | `integration.model_added`, `integration.model_removed` | Add Model, Remove | Audit only; nobody is told |
@@ -551,8 +631,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Settings · Integrations (`integrations`) | Integrations as the title; the subtitle "Connected services and their keys" (desktop); KPI cards Working, Failing, Not Set Up; the group chips All, Mail, Maps, AI, Finance, Notifications; Connections, one row each (a card on a phone): its name, a state pill (Working, Failing, Not Checked, Not Set Up), its source (Saved Here or Server File) or, when failing, the failure in a few words in its place (Password refused, Key refused, Not answering, Over today's quota, Saved key unreadable, Model not available), its plan pill (Free, Paid; desktop), its group, Checked with the time (day-first when not today), today's use against the daily limit (120 of 3,000) where one is set, and Test (edit); toasts "Test passed", "Test failed: Key refused" | Help term on Server File: "Set in the server's environment file. Saving here takes over from it." | Where values come from, the cache and the version, encryption, why a password shows no characters, what the watch probes: §3, §6 |
-| A connection (side panel; a full-screen page on a phone) | Its name as the title, the state pill and the source; Settings: the values in use as label and value pairs, each secret as "Saved, ends 1a2b" (a key) or Saved (a password or a pair), with who set it and the day, or Not Set; Plan; for an AI connection In Use (each job and its model, "Transcription (Fallback): Gemini 3.8 Flash") and Models ("2 of 3 on this key"); for an AI connection the Models card: Search Models, each model's name with what it does and the jobs it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour", desktop), Add Model (edit) and, on a model added here, Remove (delete), 25 a page; for Exchange Rates the Exchange Rate card: One Dollar (₦1,534.21), Rates Of (the day), Currencies, and Sync Rates (edit); toasts "Rates synced", "Sync failed: Key refused", "Model added", "Model removed"; Remove Model confirms by name; for an AI connection Open AI Control (`ai_control` view); Test and Edit Settings at the foot, and behind More Actions (⋯) Send Test Email (System Sender), Replace Keys (Web Push) and Remove Saved Settings (Saved Here only); for Geoapify an Address field above the tests, prefilled; Last Test: each step with a tick or a cross, its name (Connect, Sign In, Send Email, IMAP, SMTP, Address Search, Address Lookup, Map Tile, Key, Answer, Keys, Test Push), its time, and the suggestions an address search found; Checks: when, kind (Save, Test, Test Email, Watch), result, by, 25 a page; Use: 7 days of calls and failures as bars with the daily limit; toasts "Test passed", "Test failed: Key refused", "Test email sent", "Keys replaced", "Settings removed"; Remove and Replace confirm by name (Remove Settings, Replace Keys) | Help terms: Server File ("Set in the server's environment file. Saving here takes over from it."), Daily Limit ("Your plan's allowance a day. IT is warned at 80%."; Groq's: "Seconds of audio a day, each request counted as at least ten."; the other AI connections': "Your plan's allowance a day."), Plan ("Free stops at the daily limit and the next provider answers. Paid only counts."), Rates Of ("Fetched after midnight, Lagos, each day."), Hourly Limit ("Recipients the mail host accepts an hour. Production and staging share the plan's 50."), Hourly Limit per Person ("Messages each person may send from their mailbox in an hour."), Local Domains ("Domains whose mailboxes are on this server, comma separated. Mail to them skips the route check."), Security, IMAP Host, SMTP Host and Sync Every (as on Edit Settings), Live Connections ("Mailboxes held open so new mail arrives at once. Production and staging share the host's 30."), Units on Use ("Geoapify counts credits: a search or lookup is one, four map tiles are one.") | What each step does on the network, which steps cost credits, how Replace Keys reaches devices, how a model list is read and kept, how each job's model is chosen, when rates are fetched: §3, §6.3, §6.6, §6.11, §6.13 |
+| Settings · Integrations (`integrations`) | Integrations as the title; the subtitle "Connected services and their keys" (desktop); KPI cards Working, Failing, Not Set Up; the group chips All, Mail, Maps, AI, Finance, Notifications; Connections, one row each (a card on a phone): its name, a state pill (Working, Failing, Not Checked, Not Set Up) with Paused beside it on the System Sender while system mail is paused, its source (Saved Here or Server File) or, when failing, the failure in a few words in its place (Password refused, Key refused, Not answering, Over today's quota, Saved key unreadable, Model not available), its plan pill (Free, Paid; desktop), its group, Checked with the time (day-first when not today), today's use against the daily limit (120 of 3,000) where one is set, and Test (edit); toasts "Test passed", "Test failed: Key refused" | Help term on Server File: "Set in the server's environment file. Saving here takes over from it." | Where values come from, the cache and the version, encryption, why a password shows no characters, what the watch probes: §3, §6 |
+| A connection (side panel; a full-screen page on a phone) | Its name as the title, the state pill and the source; Settings: the values in use as label and value pairs, each secret as "Saved, ends 1a2b" (a key) or Saved (a password or a pair), with who set it and the day, or Not Set; Plan; for an AI connection In Use (each job and its model, "Transcription (Fallback): Gemini 3.8 Flash") and Models ("2 of 3 on this key"); for an AI connection the Models card: Search Models, each model's name with what it does and the jobs it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour", desktop), Add Model (edit) and, on a model added here, Remove (delete), 25 a page; for Exchange Rates the Exchange Rate card: One Dollar (₦1,534.21), Rates Of (the day), Currencies, and Sync Rates (edit); toasts "Rates synced", "Sync failed: Key refused", "Model added", "Model removed"; Remove Model confirms by name; for an AI connection Open AI Control (`ai_control` view); for the System Sender: while paused, a banner "Mail paused by Femi Bello, 21/10/2026 07:40", and Refused Addresses: Address, Person, Message (Invitation, Password Reset, Notice, Daily Digest, Report, Test Email), Last Refused, Times (desktop), 25 a page, No Refused Addresses when there are none; Pause Mail or Resume Mail beside Test (edit), toasts "Mail paused", "Mail resumed"; Test and Edit Settings at the foot, and behind More Actions (⋯) Send Test Email (System Sender), Replace Keys (Web Push) and Remove Saved Settings (Saved Here only); for Geoapify an Address field above the tests, prefilled; Last Test: each step with a tick or a cross, its name (Connect, Sign In, Send Email, IMAP, SMTP, Address Search, Address Lookup, Map Tile, Key, Answer, Keys, Test Push), its time, and the suggestions an address search found; Checks: when, kind (Save, Test, Test Email, Watch), result, by, 25 a page; Use: 7 days of calls and failures as bars with the daily limit; toasts "Test passed", "Test failed: Key refused", "Test email sent", "Keys replaced", "Settings removed"; Remove and Replace confirm by name (Remove Settings, Replace Keys) | Help terms: Server File ("Set in the server's environment file. Saving here takes over from it."), Daily Limit ("Your plan's allowance a day. IT is warned at 80%."; Groq's: "Seconds of audio a day, each request counted as at least ten."; the other AI connections': "Your plan's allowance a day."), Plan ("Free stops at the daily limit and the next provider answers. Paid only counts."), Rates Of ("Fetched after midnight, Lagos, each day."), Hourly Limit ("Recipients the mail host accepts an hour. Production and staging share the plan's 50."), Hourly Limit per Person ("Messages each person may send from their mailbox in an hour."), Local Domains ("Domains whose mailboxes are on this server, comma separated. Mail to them skips the route check."), Security, IMAP Host, SMTP Host and Sync Every (as on Edit Settings), Live Connections ("Mailboxes held open so new mail arrives at once. Production and staging share the host's 30."), Units on Use ("Geoapify counts credits: a search or lookup is one, four map tiles are one."), Mail paused ("Only invitations, password resets and test emails are sent. Notices reach people by push and the bell."), Refused Addresses ("Addresses the mail server would not take: no such mailbox, or a misspelt domain. Correct the email in People, or create the mailbox.") | What each step does on the network, which steps cost credits, how Replace Keys reaches devices, how a model list is read and kept, how each job's model is chosen, when rates are fetched, what a pause holds, drops and pushes, how a refusal is told from the host's limit: §3, §6.3, §6.6, §6.11, §6.13, §6.15, §6.16 |
 | Edit Settings (form; a two-step wizard for the two mail connections) | System Sender, step Server: Server, Port, Security (TLS, STARTTLS), Username (Optional), Password; step Sending: From, Reply-To (Optional), Hourly Limit, Local Domains (Optional). Staff Mail Server, step Servers: IMAP Host (Optional), IMAP Port, SMTP Host (Optional), SMTP Port; step Limits: Hourly Limit per Person, Sync Every, Minutes, Live Connections. Geoapify, Gemini, Groq, OpenAI, Anthropic, DeepSeek and Exchange Rates: API Key, Plan (Free, Paid), Daily Limit (Optional). Web Push: Subject. A saved secret reads "Saved, ends 1a2b" or Saved with Replace, and Keep Saved puts it back (`SecretField`); Cancel, Back, Next, Save Settings; a refused field takes the wizard back to its step; field errors from §6.3 and "Type the password again"; toast "Settings saved" | Help terms: Security ("TLS from the first byte on 465; STARTTLS on 587."), IMAP Host and SMTP Host ("Blank uses each address's own domain."), Sync Every ("Minutes between syncs of every mailbox, behind live mail."), and Hourly Limit, Hourly Limit per Person, Local Domains, Live Connections and Daily Limit as on the connection | The test before save, the fresh sign-in and the destination rule: §6.4, §6.5 |
 | Add Model (modal; a sheet on a phone) | Model ID, Name (Optional), Does (Text Only, Text and Images, Text, Images, Audio, Speech to Text, Embeddings), Endpoint (Optional); Cancel, Add Model; field errors "Not a model id", "Already on the list", "Sonnet or Haiku only", "Not an https address"; toast "Model added" | None | Where a model's list comes from and why Opus and Fable are left off: §1.2, §6.11 |
 | Settings · Status (`status`) | Owned by System Health (`system-health.md` §10): the rows Maps and Staff Mail Server, and from PR1 Groq, OpenAI, Anthropic, DeepSeek, Exchange Rates and Web Push, like every check | As built there | §3 step 12 here |
@@ -561,8 +641,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Settings · Integrations (`integrations`) | Two KPI cards, Working and Failing; the group chips; then each connection as a card: the name, the state pill, and the source or the failure | The subtitle; the Not Set Up card; the plan, the group, Checked, today's use and Test on each card (all on the connection's page) | Tap a connection: its page opens full screen | Settings from More; the tabs scroll sideways along the top |
-| A connection (full-screen sheet) | The state pill and the source; Settings as label over value; for an AI connection the Models card as cards (the name with what it does, On Key); for Exchange Rates the Exchange Rate card with Sync Rates; Last Test with its steps; Use as bars | A model's price and Remove (on desktop); the Checks and Models lists page 25 at a time as cards | Test, full width at the foot, with Edit Settings above it and More Actions (⋯), an action sheet of Send Test Email, Replace Keys and Remove Saved Settings | Close returns to Integrations |
+| Settings · Integrations (`integrations`) | Two KPI cards, Working and Failing; the group chips; then each connection as a card: the name, the state pill (with Paused on the System Sender while mail is paused), and the source or the failure | The subtitle; the Not Set Up card; the plan, the group, Checked, today's use and Test on each card (all on the connection's page) | Tap a connection: its page opens full screen | Settings from More; the tabs scroll sideways along the top |
+| A connection (full-screen sheet) | The state pill and the source; the System Sender's Mail paused banner while paused; Settings as label over value; for an AI connection the Models card as cards (the name with what it does, On Key); for Exchange Rates the Exchange Rate card with Sync Rates; Last Test with its steps; Use as bars | A model's price and Remove (on desktop); the Checks and Models lists page 25 at a time as cards | Test, full width at the foot, with Edit Settings above it (and on the System Sender, Pause Mail or Resume Mail) and More Actions (⋯), an action sheet of Send Test Email, Replace Keys and Remove Saved Settings; Refused Addresses as cards (Times on desktop) | Close returns to Integrations |
 | Edit Settings | A full-screen sheet: the step's title and fields (one step for the key connections and Web Push) | Nothing | Next, then Save Settings, full width at the foot | Close at the top; Back on the second step |
 | Add Model | A sheet: Model ID, Name, Does, Endpoint | Nothing | Add Model, full width at the foot | Close at the top, or Cancel, returns to the connection |
 
@@ -601,6 +681,21 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **Laptops and CI** run without network access to the providers: tests fake them, and unset mail is
   captured.
 
+- **Paused with no sender set up**: nothing is sent either way; a message waits for the sender
+  (`held_for: sender`) first, and for Resume once a sender is saved.
+- **Pause Mail pressed twice, or by two people**: the second press changes nothing and tells
+  nobody; both see Paused.
+- **A notice written while paused, Resume pressed a minute later**: its email is not sent; it was
+  pushed, and it is in the bell.
+- **A scheduled report while paused**: it waits in its queue, re-asking every 15 minutes, and goes
+  out on Resume within its hour's limit.
+- **An invitation queued days ago**: sent only if its link still works; Resend Invitation replaces
+  the link, so the old message is dropped and only the new one goes.
+- **The host refusing every message for its hourly limit**: read as the hourly limit (wait an hour),
+  never as refused addresses.
+- **A refused address corrected in People**: the next message goes to the new address; the old one
+  leaves Refused Addresses after 30 days.
+
 ## 12 · Donor code
 
 None. The encryption service (`services/secrets/encryption.service.js`) came in at M0 and gains the
@@ -615,7 +710,8 @@ bound form here; nothing else is ported.
    connection under its own code; nothing chooses between senders yet.
 3. **Bounces on the no-reply inbox** (decision 1's fourth option, not chosen).
 4. **Whether the 50 recipients an hour is per mailbox or for the hosting account**
-   (`dns-and-mail.md` §4), which decides the two hourly limits.
+   (`dns-and-mail.md` §4), which decides the two hourly limits. TB, 21/10/2026: the plan moves to
+   10,000 an hour (Stellar Business); until then system mail can be paused (§1.3).
 5. **The seeded model ids**: Gemini 3.8 Flash and 3.5 Flash-Lite and DeepSeek V4 Flash and Pro were
    named from Google's and DeepSeek's announcements, not read from a key; the first save of a real key
    confirms or marks them. Their prices are null until Find Prices (PR2) or IT fills them.
@@ -623,6 +719,8 @@ bound form here; nothing else is ported.
    decision 26, TB 20/10/2026).
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · §1.3, §6.15, §6.16 from TB's answers for the Milestone 1 handover: Pause Mail and Resume Mail on the System Sender (`integration_connection.paused_at`, `9230`); while paused only invitations, password resets, Send Test Email and the server's health alarm go out, notices are pushed instead, digests are dropped and other mail waits for Resume; a queued invitation or reset whose link stopped working is dropped; an address the mail server refuses for good is not retried, is one warning on Faults and is listed as Refused Addresses (`mail_refusal`, `GET /mail_sender/refusals`); a host over its own hourly limit is waited on for an hour. Settings · Status reads Mail as Paused without a check-down notice.
 
 - 20/10/2026 · TB · §6.11: the model list leaves off `-latest` aliases, Gemma and snapshots whose base model is listed (`ai-control.md` decision 29).
 - 20/10/2026 · TB · With AI Control (`ai-control.md`): an AI connection's In Use reads the chains in use, saved there or in code; each AI connection has Open AI Control (`ai_control` view); a link that names a connection (`?id=` its code) opens it, as AI Control · Models' Open Connection does.

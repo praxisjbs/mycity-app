@@ -11,6 +11,9 @@
  *   remove(code, by)       forget what was saved; the server file applies again
  *   test(code, body, by)   test the settings in use
  *   testEmail(by)          a real message to the tester, through system mail
+ *   pauseMail(by)          pause system mail: only invitations, resets and the test go out
+ *   resumeMail(by)         resume it; mail held meanwhile goes out at once
+ *   refusals(query)        the addresses the mail server refused, 25 a page
  *   replaceKeys(by)        a new web push key pair
  *   models(code, query)    an AI connection's model list, 25 a page
  *   addModel(code, b, by)  Add Model; removeModel(code, id, by) takes one added by hand off
@@ -81,6 +84,7 @@ function rowOf(def, row, inUse, unitsToday) {
     plan: quota.planOf(def, row),
     units_today: Math.round((Number(unitsToday) || 0) * 100) / 100,
     watched: def.watched,
+    paused_at: def.code === "mail_sender" && row ? iso(row.paused_at) : null,
   };
 }
 
@@ -242,6 +246,7 @@ async function get(code) {
     ...rowOf(def, row, inUse, usage[usage.length - 1].units),
     saved_at: row ? iso(row.saved_at) : null,
     saved_by_name: row && row.saved_at ? row.saved_by_name || null : null,
+    paused_by_name: def.code === "mail_sender" && row && row.paused_at ? row.paused_by_name || null : null,
     settings: inUse ? await settingsView(def, inUse) : null,
     secrets: secretsView(def, await repo.secretStates(pool, code), inUse),
     last_check: last ? checkView(last) : null,
@@ -550,6 +555,71 @@ async function testEmail(actor) {
   return record("mail_sender", "test_email", steps, actor, { moveState: Boolean(inUse), audit: true });
 }
 
+/* ------------------------------------------------------------------ *
+ * Pausing system mail, and the addresses it was refused for (guide §6.15, §6.16)
+ * ------------------------------------------------------------------ */
+
+/**
+ * POST /integrations/mail_sender/pause: until Resume only invitations, password resets and the
+ * test email go out; notices are pushed instead and digests dropped. Pressed again, nothing
+ * changes and nobody is told twice.
+ */
+async function pauseMail(actor) {
+  const changedNow = await tx(async (client) => {
+    const id = await state.ensure(client, "mail_sender");
+    if (!(await repo.pause(client, "mail_sender", actor.user_id))) return false;
+    await emit(client, {
+      key: EVENTS.INTEGRATION_MAIL_PAUSED,
+      entity: { type: "integration", id },
+      actor,
+      before: { paused: false },
+      after: { paused: true },
+      payload: { code: "mail_sender", integration_connection_id: id },
+    });
+    return true;
+  });
+  if (changedNow) await settings.bump();
+  return get("mail_sender");
+}
+
+/** POST /integrations/mail_sender/resume: mail held while paused goes out at once (the outbox). */
+async function resumeMail(actor) {
+  const changedNow = await tx(async (client) => {
+    const id = await state.ensure(client, "mail_sender");
+    if (!(await repo.resume(client, "mail_sender"))) return false;
+    await emit(client, {
+      key: EVENTS.INTEGRATION_MAIL_RESUMED,
+      entity: { type: "integration", id },
+      actor,
+      before: { paused: true },
+      after: { paused: false },
+      payload: { code: "mail_sender", integration_connection_id: id },
+    });
+    return true;
+  });
+  if (changedNow) await settings.bump();
+  return get("mail_sender");
+}
+
+/** GET /integrations/mail_sender/refusals */
+async function refusals(query) {
+  const page = await repo.refusalPage(pool, query);
+  return {
+    ...page,
+    data: page.data.map((r) => ({
+      mail_refusal_id: r.mail_refusal_id,
+      email: r.email,
+      person_name: r.person_name || null,
+      template: r.template,
+      smtp_code: r.smtp_code === null || r.smtp_code === undefined ? null : Number(r.smtp_code),
+      reply: r.reply || null,
+      refusals: Number(r.refusals),
+      first_refused_at: iso(r.first_refused_at),
+      last_refused_at: iso(r.last_refused_at),
+    })),
+  };
+}
+
 /** POST /integrations/web_push/replace-keys */
 async function replaceKeys(actor) {
   const vapid = require("../../services/push/vapid");
@@ -763,6 +833,9 @@ module.exports = {
   remove,
   test,
   testEmail,
+  pauseMail,
+  resumeMail,
+  refusals,
   replaceKeys,
   models,
   addModel,

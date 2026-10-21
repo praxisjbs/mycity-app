@@ -24,7 +24,12 @@
  * one is set, the last four characters of a key, who set it and when (§6.4). A save carries
  * a secret only to set or replace it; left blank, the saved one is kept.
  *
- * Read with `integrations` view; saved, tested and replaced with edit; removed with delete.
+ * System mail can be paused on the System Sender (guide §6.15): until it is resumed only
+ * invitations, password resets and IT's own test email go out, and notices reach people by push.
+ * The addresses the mail server refused for good are listed beside it (guide §6.16).
+ *
+ * Read with `integrations` view; saved, tested, paused and replaced with edit; removed with
+ * delete.
  */
 const { z } = require("zod");
 const { uuid, text, email, isoDate, isoDateTime, listQuery, Paged, blank } = require("./common");
@@ -237,6 +242,12 @@ const IntegrationRow = z
     units_today: z.number().min(0),
     /** The worker checks it every 15 minutes (a free test). */
     watched: z.boolean(),
+    /**
+     * When system mail was paused (the System Sender only): until it is resumed only invitations,
+     * password resets and the test email go out. Null when it is not paused, and for every other
+     * connection.
+     */
+    paused_at: isoDateTime.nullable(),
   })
   .strict();
 
@@ -375,12 +386,44 @@ const Integration = IntegrationRow.extend({
   /** Sent back on a save, so a save over a newer one is refused. Null: nothing saved here. */
   saved_at: isoDateTime.nullable(),
   saved_by_name: z.string().nullable(),
+  /** Who paused system mail; null while it is not paused. */
+  paused_by_name: z.string().nullable(),
   settings: IntegrationSettings.nullable(),
   secrets: z.array(SecretState).max(4),
   last_check: IntegrationCheck.nullable(),
   /** The last seven days, oldest first, today last. */
   usage: z.array(UsageDay).max(7),
 }).strict();
+
+/* ------------------------------------------------------------------ *
+ * Addresses the mail server refused (guide §6.16)
+ * ------------------------------------------------------------------ */
+
+/**
+ * An address the mail server refused for good: a mailbox that does not exist, a domain that
+ * takes no mail. Such a message is not tried again. The address stays on the list until mail
+ * to it is accepted again, or 30 days pass.
+ */
+const MailRefusal = z
+  .object({
+    mail_refusal_id: uuid,
+    email: z.string(),
+    /** Whoever holds the address: a login's or an employee's name. Null when nobody does. */
+    person_name: z.string().nullable(),
+    /** What was being sent: a system mail template's key (`digest`, `notification`, `user-invite`). */
+    template: z.string(),
+    smtp_code: z.number().int().nullable(),
+    /** The mail server's own words, cut to 300 characters. */
+    reply: z.string().nullable(),
+    refusals: z.number().int().min(1),
+    first_refused_at: isoDateTime,
+    last_refused_at: isoDateTime,
+  })
+  .strict();
+
+const MailRefusalListQuery = listQuery();
+
+const MailRefusalPage = Paged(MailRefusal);
 
 /* ------------------------------------------------------------------ *
  * Saving
@@ -611,12 +654,19 @@ const TABLES = {
       watched: "whether the registry lets the worker test it for free",
       plan: "plan, else the registry's starting plan; null without a daily limit",
       saved_by_name: "who saved it, from app_user and employee",
+      paused_by_name: "who paused system mail, from app_user and employee",
       settings: "the settings in use: configuration, or the server file",
       secrets: "each secret field's state, from integration_secret",
       last_check: "the newest integration_check",
       usage: "seven days of integration_usage",
     },
   },
+  MailRefusal: {
+    table: "mail_refusal",
+    virtual: { person_name: "the login's or the employee's name that holds the address, from app_user and employee" },
+  },
+  MailRefusalListQuery: { table: null, reason: "list controls" },
+  MailRefusalPage: { table: null, reason: "a page of refused addresses" },
   MailSenderSave: { table: null, reason: "the system sender's settings: configuration and its password in integration_secret" },
   MailboxServerSave: { table: null, reason: "the staff mail server's settings, kept in configuration" },
   GeoapifySave: { table: null, reason: "Geoapify's key in integration_secret, its daily limit and plan" },
@@ -683,6 +733,9 @@ module.exports = {
   WebPushSettings,
   IntegrationSettings,
   Integration,
+  MailRefusal,
+  MailRefusalListQuery,
+  MailRefusalPage,
   MailSenderSave,
   MailboxServerSave,
   GeoapifySave,

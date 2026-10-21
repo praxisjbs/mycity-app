@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `/auth/me` lists the ones the person holds (§5) |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
-| Last changed | 20/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
@@ -217,7 +217,10 @@ unknown email and a wrong password get the same message and take the same time. 
 account is told so only after the right password.
 
 **Links:** a reset link lasts 30 minutes, an invitation 72 hours. A new link closes the open ones of
-the same kind. Setting a password spends every open link and ends every session.
+the same kind. Setting a password spends every open link and ends every session. A link's email
+that waited in the mail queue goes out only while its link still works (`linkStillOpen`): one a
+newer link replaced, or that expired meanwhile, is dropped (`docs/guides/integrations.md` §6.15).
+Invitations and resets are the system mail that still goes while IT has paused it.
 
 **Logins:** no login without an employee; a person cannot suspend, reactivate or change the roles of
 their own login.
@@ -416,6 +419,8 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   them, the drawings standing in for the first four until they load.
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · §6 Links: a queued invitation or reset is sent only while its link still works (`identity.linkStillOpen`, checked by the `email-send` job), and both still go while system mail is paused (`docs/guides/integrations.md` §6.15).
 
 - 16/10/2026 · TB · First version, with the build: sessions to the donor rules, the lock screen,
   the four-city sign-in screen, Forgot, Reset and Welcome, My Security on the real API, Settings ·

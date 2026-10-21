@@ -123,6 +123,7 @@ const SCREENS = Object.freeze([
   s("settings", "documents-and-numbering", "Documents & Numbering", ["numbering", "number format", "document numbers", "prefixes"]),
   s("settings", "integrations", "Integrations", [
     "integration", "connect", "api keys", "smtp", "mail server", "no-reply", "imap", "system sender",
+    "pause mail", "resume mail", "mail paused", "stop emails", "refused addresses", "bounced mail", "undeliverable",
     "geoapify", "maps key", "address search", "gemini", "ai key", "web push", "vapid", "push keys",
     "groq", "whisper", "transcription key", "openai", "embeddings key", "anthropic", "claude", "deepseek",
     "ai models", "add model", "exchange rates", "exchange rate", "dollar rate", "sync rates", "free plan", "paid plan",

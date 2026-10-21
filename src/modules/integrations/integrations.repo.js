@@ -1,8 +1,9 @@
 "use strict";
 /**
- * Integrations' SQL (migrations 0090, 9000, 9200, 9210, 9220; docs/guides/integrations.md §4):
- * each connection's saved settings, plan and state, its secrets as far as they are ever shown,
- * its checks and its use, the AI connections' model lists and the exchange rates.
+ * Integrations' SQL (migrations 0090, 9000, 9200, 9210, 9220, 9230; docs/guides/integrations.md
+ * §4): each connection's saved settings, plan and state, its secrets as far as they are ever
+ * shown, its checks and its use, system mail paused, the addresses the mail server refused,
+ * the AI connections' model lists and the exchange rates.
  *
  * A secret's ciphertext is written here and never read back here: shared/integrations/
  * settings.js is its one reader. The state columns are shared/integrations/state.js's.
@@ -20,7 +21,7 @@ const NAME = (alias) => `trim(${alias}.first_name || ' ' || ${alias}.last_name)`
 
 const CONNECTION = `c.integration_connection_id, c.code::text AS code, c.provider, c.display_name,
   c.status, c.configuration, c.saved_at, c.saved_by, c.daily_limit, c.plan, c.state_at, c.last_checked_at,
-  c.last_ok_at, c.last_error_code, c.quota_warned_on, c.updated_at`;
+  c.last_ok_at, c.last_error_code, c.quota_warned_on, c.paused_at, c.paused_by, c.updated_at`;
 
 /**
  * Every connection that has a row, with today's units: the registry's handful, merged with
@@ -43,15 +44,39 @@ async function connections(db, day) {
   return rows;
 }
 
-/** One connection's row with who saved it, or null when it has none yet. */
+/** One connection's row with who saved it and who paused it, or null when it has none yet. */
 function connection(db, code) {
   return one(
     db,
-    `SELECT ${CONNECTION}, ${NAME("se")} AS saved_by_name
+    `SELECT ${CONNECTION}, ${NAME("se")} AS saved_by_name, ${NAME("pe")} AS paused_by_name
        FROM integration_connection c
        LEFT JOIN app_user su ON su.user_id = c.saved_by
        LEFT JOIN employee se ON se.employee_id = su.employee_id
+       LEFT JOIN app_user pu ON pu.user_id = c.paused_by
+       LEFT JOIN employee pe ON pe.employee_id = pu.employee_id
       WHERE c.code = $1`,
+    [code],
+  );
+}
+
+/** Pause system mail (guide §6.15); null when it already was. */
+function pause(db, code, by) {
+  return one(
+    db,
+    `UPDATE integration_connection SET paused_at = now(), paused_by = $2
+      WHERE code = $1 AND paused_at IS NULL
+      RETURNING integration_connection_id, paused_at`,
+    [code, by || null],
+  );
+}
+
+/** Resume system mail; null when it was not paused. */
+function resume(db, code) {
+  return one(
+    db,
+    `UPDATE integration_connection SET paused_at = NULL, paused_by = NULL
+      WHERE code = $1 AND paused_at IS NOT NULL
+      RETURNING integration_connection_id`,
     [code],
   );
 }
@@ -217,11 +242,37 @@ async function markWarned(db, code, day) {
   return row ? row.integration_connection_id : null;
 }
 
-/** Checks past 90 days and use past 30 go (guide §3 step 13). */
-async function purge(db, { checkDays = 90, usageDays: keepDays = 30 } = {}) {
+/** Checks past 90 days, use past 30 and refused addresses untouched for 30 go (guide §3 step 13). */
+async function purge(db, { checkDays = 90, usageDays: keepDays = 30, refusalDays = 30 } = {}) {
   const checks = await db.query("DELETE FROM integration_check WHERE created_at < now() - make_interval(days => $1)", [checkDays]);
   const usage = await db.query("DELETE FROM integration_usage WHERE day < (now() AT TIME ZONE 'Africa/Lagos')::date - $1::int", [keepDays]);
-  return { checks: checks.rowCount, usage: usage.rowCount };
+  const refused = await db.query("DELETE FROM mail_refusal WHERE last_refused_at < now() - make_interval(days => $1)", [refusalDays]);
+  return { checks: checks.rowCount, usage: usage.rowCount, refusals: refused.rowCount };
+}
+
+/* ------------------------------------------------------------------ *
+ * Addresses the mail server refused (mail_refusal, 9230; guide §6.16)
+ * ------------------------------------------------------------------ */
+
+/**
+ * The refused addresses, the newest refusal first, 25 a page, each with whoever holds it: a
+ * login with that email, else an employee with that work email. `q` searches the address.
+ */
+function refusalPage(db, query) {
+  return pageQuery(
+    db,
+    `SELECT r.mail_refusal_id, r.email::text AS email, r.template, r.smtp_code, r.reply, r.refusals,
+            r.first_refused_at, r.last_refused_at,
+            COALESCE(${NAME("le")}, ${NAME("we")}) AS person_name, ${TOTAL_COL}
+       FROM mail_refusal r
+       LEFT JOIN app_user lu ON lu.email = r.email
+       LEFT JOIN employee le ON le.employee_id = lu.employee_id
+       LEFT JOIN employee we ON we.work_email = r.email
+      WHERE ($1::text IS NULL OR search_fold(r.email::text) LIKE '%' || search_fold($1) || '%')
+      ORDER BY r.last_refused_at DESC, r.mail_refusal_id`,
+    [query.q || null],
+    query,
+  );
 }
 
 /* ------------------------------------------------------------------ *
@@ -414,6 +465,9 @@ module.exports = {
   usageDays,
   markWarned,
   purge,
+  pause,
+  resume,
+  refusalPage,
   modelPage,
   setModelPrices,
   modelById,

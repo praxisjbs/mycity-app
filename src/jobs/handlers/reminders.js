@@ -4,6 +4,8 @@
  * reminders scheduler (docs/guides/notifications.md §6). Paced like all system mail: when the
  * hourly limit is reached the job goes back in the queue. Sending twice is prevented by the job
  * id (`digest-<user>-<day>`); a retry after the mail went cannot happen, as nothing follows it.
+ * Paused system mail drops the day's digest, and an address the mail server refuses for good
+ * finishes the job without a retry (docs/guides/integrations.md §6.15, §6.16).
  */
 const { UnrecoverableError } = require("bullmq");
 const pace = require("../../services/mail/pace");
@@ -16,6 +18,11 @@ module.exports = async function remindersJob(job, token) {
     return await reminders.sendDigest(job.data);
   } catch (err) {
     if (err && err.code === "MAIL_PACED") throw await pace.postpone(job, token, err.retryAfterMs);
+    if (err && err.code === "MAIL_PAUSED") return { sent: false, reason: "mail_paused" };
+    if (err && err.code === "MAIL_REFUSED") {
+      require("../../services/mail/system-mail.service").reportRefused(err, { queue: "reminders", template: "digest" });
+      return { sent: false, reason: "refused" };
+    }
     throw err;
   }
 };
