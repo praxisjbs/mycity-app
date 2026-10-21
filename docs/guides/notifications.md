@@ -421,6 +421,10 @@ listed here as tier 1 or tier 2.
   goes at 07:00 too. Turning quiet hours off does not bring held pushes forward; they go at the old
   end time.
 - **Nothing unread in the last day.** No digest. A person who reads everything never receives one.
+- **The mail server refuses a person's address** (a 5xx at RCPT TO: no such mailbox or domain).
+  The digest is not sent (`recipient_refused`) and not retried; a notice's email is skipped
+  (`email_refused`) and the rest of the job goes on. Each is a `warning` on Faults, one group for
+  every such person, so a wrong address shows without paging anyone; fix it on the person's record.
 - **The digest's time changed after today's was sent.** Tomorrow's goes at the new time.
 
 ## 12 · Donor code
@@ -439,6 +443,10 @@ The design choices of Settings · Notifications (copies only on notices about so
 channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5, open to TB.
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · System Health fault on staging (the `reminders` job failed with "all recipients
+  were rejected: 550"): a refused address is now a `warning` and the job ends, for the digest and
+  for notice emails (§11). The refusal at RCPT TO is read as the recipient whatever its wording.
 
 - 20/10/2026 · TB · A notice's link is offered by the permission its route names
   (`routeMap.moduleOf`), not by the module its path sits in: System Health's Status, Performance

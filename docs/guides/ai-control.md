@@ -108,7 +108,8 @@ Asked when PR2 started (TB, 20/10/2026):
 
 1. Settings · Integrations saves a provider's key and reads its model list (`integrations.md` §3).
    AI Control · Models lists those models with their prices.
-2. **Find Prices** emits `ai_control.prices_requested`; its outbox handler asks the Find Prices
+2. **Find Prices** emits `ai_control.prices_requested`; its outbox handler queues the
+   `ai-find-prices` job, which asks the Find Prices
    action's chain (Deep Reasoning) once per AI provider, with Google Search on, for that provider's
    prices, and keeps each answer as a proposal with the page it came from. The Models tab shows
    Finding Prices until the run ends. Nothing is saved to a model until IT presses **Accept** (or
@@ -239,6 +240,9 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 - A proposal names one of our models and an `https` page. A page off the provider's own site is
   replaced by the first page Google Search returned. A model the answer does not price gets none.
 - At most one request runs at a time (`ALREADY_FINDING`). Each search is a billed step.
+- The run is a worker job (`ai-find-prices`), not the outbox handler itself: each search may take
+  two minutes, longer than an outbox handler may run. It is never retried, so a failure never
+  searches and pays twice; a provider that fails is logged and the next one is asked.
 
 ### 6.5 The registry and its check
 
@@ -265,7 +269,7 @@ changing it is a support step that rebuilds the index first (`docs/runbooks/`).
 |---|---|---|
 | `ai_control.chain_changed` | Edit Chain or Make First saved | Audit only |
 | `ai_control.chain_reset` | Use Job Chain | Audit only |
-| `ai_control.prices_requested` | Find Prices pressed | Outbox: the search of §6.4, proposals written |
+| `ai_control.prices_requested` | Find Prices pressed | Outbox: queues the `ai-find-prices` job (one attempt), which runs the search of §6.4 and writes the proposals |
 | `ai_control.price_set` | Accept, or Edit Price saved | Audit only |
 | `ai_control.cap_changed` | Set Cap, a provider's or all AI | Audit only |
 
@@ -327,6 +331,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **A provider moved from Paid to Free**: its spend this month stays as charged; its cap stays
   stored and Spend shows it as Free.
 - **Find Prices pressed twice**: the second press is refused while the first runs.
+- **Find Prices slower than two minutes** (several providers, each searching): it runs on as a
+  job; the outbox only queues it, so it is never cut off and searched again.
 - **A proposal for a model removed from the list**: it is dismissed with the model.
 
 ## 12 · Donor code
@@ -345,6 +351,11 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
    person which job (CLAUDE.md, §6.5).
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · System Health fault on staging (`ai_control.find_prices` did not finish
+  within 120 s): the search ran inside the outbox handler, whose limit is 120 s for the whole run,
+  and a retry searched again while the first still ran. It is now the `ai-find-prices` job, queued
+  once by the handler and never retried (§3, §6.4, §7, §11).
 
 - 20/10/2026 · TB · PR2 built (API, UI, mobile): §2 to §11 as built; §6.1 step 3 says which refusals mark a provider Skipped (a reset time given, or a spent balance); `GET /models` filters by capability for Edit Chain's pickers; §10 lists every label, field and toast.
 

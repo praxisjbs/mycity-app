@@ -52,6 +52,15 @@ function dbQuery(sql, params) {
   return require("../../config/db").query(sql, params);
 }
 
+/**
+ * The first "at ..." line of a stack. Not simply its second line: a message can run over
+ * several lines (an SMTP refusal does), and its second line is then more of the message.
+ */
+function topFrame(stack) {
+  const line = String(stack || "").split("\n").find((l) => /^\s+at /.test(l));
+  return line ? line.trim() : null;
+}
+
 /** Group key: same error at the same place is one fingerprint whatever the ids. */
 function fingerprint(err, meta = {}) {
   const name = (err && err.name) || "Error";
@@ -63,10 +72,8 @@ function fingerprint(err, meta = {}) {
     .replace(/\b\d+\b/g, "<n>")
     .slice(0, 200);
   const frame =
-    String((err && err.stack) || "")
-      .split("\n")[1]
-      ?.trim()
-      .replace(/:\d+:\d+\)?$/, ")")
+    topFrame(err && err.stack)
+      ?.replace(/:\d+:\d+\)?$/, ")")
       .slice(0, 120) ||
     meta.route ||
     "";

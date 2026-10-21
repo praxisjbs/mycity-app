@@ -108,7 +108,7 @@ one creates alarm without action.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `error_group` | `fingerprint` (unique), `title`, `severity`, `origin`, `route`, `frame`, `status`, `assigned_to`, `status_changed_at`, `status_changed_by`, `first_seen_at`, `last_seen_at`, `first_release`, `last_release`, `regressions`, `regressed_at`, `escalated_at`, `last_message` | One row per distinct fault. State only: counts are never stored here, they are aggregated from `error_event` at read time, so a late or replayed row can never double count |
+| `error_group` | `fingerprint` (unique), `title`, `severity`, `origin`, `route`, `frame` (the stack's first `at` line, shown as Where), `status`, `assigned_to`, `status_changed_at`, `status_changed_by`, `first_seen_at`, `last_seen_at`, `first_release`, `last_release`, `regressions`, `regressed_at`, `escalated_at`, `last_message` | One row per distinct fault. State only: counts are never stored here, they are aggregated from `error_event` at read time, so a late or replayed row can never double count |
 | `error_group_note` | `error_group_id`, `author_user_id`, `body`, `created_at` | What the team worked out about a fault. `author_user_id` null means the system wrote it (came back, spiking) |
 | `health_snapshot` | `taken_at`, `status`, `checks` jsonb, `outbox_backlog`, `worker_lag_s`, `faults_open`, `faults_new_24h`, `release` | One row every 5 minutes. Drawn as the Performance section; kept 30 days |
 | `error_event` | gains index `(fingerprint, occurred_at DESC)` | The table itself is unchanged. The index is what makes the grouped list and the 24 hour and 7 day counts cheap |
@@ -443,6 +443,10 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
   built; TB decided against it on 20/10/2026 to keep the screen single-audience.
 
 ## 14 · Change log
+
+- 21/10/2026 · TB · Where read the stack's second line, which for a message that spans lines (an
+  SMTP refusal) is more of the message. It is now the first `at` line, in the fault's `frame` and in
+  its fingerprint; a fault already filed that way gets one new group the next time it happens.
 
 - 20/10/2026 · TB · Settings · Integrations' AI providers and Exchange Rates
   (`docs/guides/integrations.md` §1.2): Groq, OpenAI, Anthropic, DeepSeek, Exchange Rates and web

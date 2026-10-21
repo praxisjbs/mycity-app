@@ -64,6 +64,15 @@ describe("error reporter", () => {
     const b = reporter.fingerprint({ name: "Error", message: "Employee 9e9e9e9e-0000-4000-8000-000000000002 has 7 items", stack: "" });
     expect(a).toBe(b);
   });
+
+  test("the frame is the first at line, even when the message spans lines", () => {
+    const fp = reporter.fingerprint({
+      name: "Error",
+      message: "Refused: 550-first\n550-second",
+      stack: "Error: Refused: 550-first\n550-second\n    at send (/srv/app/mail.js:10:4)\n    at run (/srv/app/job.js:2:1)",
+    });
+    expect(fp.split("|")[2]).toBe("at send (/srv/app/mail.js)");
+  });
 });
 
 describe("metrics", () => {

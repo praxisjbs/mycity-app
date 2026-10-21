@@ -8,6 +8,7 @@
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const outbox = require("../../shared/events/outbox");
+const queues = require("../../jobs/queues");
 
 const EVENTS = defineEvents("ai_control", {
   "ai_control.chain_changed": { summary: "A job's or an action's chain was changed on AI Control, or a model made first" },
@@ -18,9 +19,18 @@ const EVENTS = defineEvents("ai_control", {
   "ai_control.cap_changed": { summary: "A provider's monthly cap, or the cap on all AI, was set" },
 });
 
-/** The search itself, after the request commits: it can take a minute, so it runs in the worker. */
-outbox.register(EVENTS.AI_CONTROL_PRICES_REQUESTED, "ai_control.find_prices", async (event) => {
-  await require("./ai_governance.service").runFindPrices({ actor: event.actor_user_id || null });
-});
+/**
+ * The search itself, after the request commits. One search per provider, each up to two
+ * minutes, is longer than an outbox handler may run, so it is a job of its own
+ * (jobs/handlers/ai-find-prices.js). Never retried: a retry would search, and pay, again.
+ */
+outbox.register(EVENTS.AI_CONTROL_PRICES_REQUESTED, "ai_control.find_prices", (event) =>
+  queues.enqueue(
+    "ai-find-prices",
+    "find",
+    { actor_user_id: event.actor_user_id || null },
+    { jobId: `find-prices-${event.event_id}`, attempts: 1 },
+  ),
+);
 
 module.exports = { EVENTS };

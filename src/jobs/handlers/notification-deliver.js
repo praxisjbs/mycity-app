@@ -20,6 +20,9 @@
  * Paced like all system mail (services/mail/pace.js): when the hourly limit is reached, the
  * emails already sent are recorded and the job is put back in the queue for the rest.
  *
+ * An address the mail server refuses is skipped (`email_refused`) and kept as a warning on
+ * Settings · Faults, once per person, rather than failing the job: a retry would be refused too.
+ *
  * Retries do not repeat what already went out: each email sent is recorded on the job
  * (job.updateData), and a retry skips it. A bell push may repeat; the client keys on
  * notification_id.
@@ -33,6 +36,8 @@ const routeMap = require("../../shared/route-map");
 const variables = require("../../shared/templates/variables");
 const systemMail = require("../../services/mail/system-mail.service");
 const pace = require("../../services/mail/pace");
+const { isRecipientRefused } = require("../../services/mail/smtp-errors");
+const { report } = require("../../shared/observability/error-reporter");
 const realtime = require("../../services/realtime/emitter");
 const notifications = require("../../modules/notifications/notifications.service");
 const queues = require("../queues");
@@ -68,7 +73,7 @@ module.exports = async function notificationDeliver(job, token) {
     throw new UnrecoverableError(
       "notification-deliver: the job needs notifications",
     );
-  const out = { in_app: 0, email: 0, email_skipped: 0, push_queued: 0, push_held: 0 };
+  const out = { in_app: 0, email: 0, email_skipped: 0, email_refused: 0, push_queued: 0, push_held: 0 };
   const has = (row, ch) =>
     Array.isArray(row.channels) && row.channels.includes(ch);
 
@@ -99,6 +104,7 @@ module.exports = async function notificationDeliver(job, token) {
   );
   const people = await recipients([...new Set(mailRows.map((r) => r.user_id))]);
   let firstErr = null;
+  const refused = new Set();
   for (const row of mailRows) {
     const person = people.get(row.user_id);
     if (!person || !person.email) {
@@ -125,6 +131,12 @@ module.exports = async function notificationDeliver(job, token) {
     } catch (err) {
       if (err && err.code === "MAIL_PACED")
         throw await pace.postpone(job, token, err.retryAfterMs);
+      // A refused address is wrong data, not a failed job: a retry would be refused too.
+      if (isRecipientRefused(err)) {
+        out.email_refused += 1;
+        refused.add(row.user_id);
+        continue;
+      }
       if (!firstErr) firstErr = err;
       logger.warn(
         {
@@ -136,6 +148,13 @@ module.exports = async function notificationDeliver(job, token) {
       );
     }
   }
+  for (const userId of refused)
+    report(new Error("Notification email not sent: the mail server refused the person's email address"), {
+      origin: "worker",
+      severity: "warning",
+      route: "job notification-deliver",
+      user_id: userId,
+    });
   if (firstErr) throw firstErr;
   return out;
 };

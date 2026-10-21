@@ -126,6 +126,11 @@ const JOBS = Object.freeze([
     concurrency: 2,
     summary: "One person's daily digest of what they have not read",
   },
+  {
+    queue: "ai-find-prices",
+    concurrency: 1,
+    summary: "Find Prices: each AI provider's pricing page searched in turn",
+  },
 ]);
 
 /** Files in jobs/schedulers/. */

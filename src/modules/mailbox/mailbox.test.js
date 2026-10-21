@@ -7,7 +7,7 @@ const {
   normaliseReferences,
   snippetOf,
 } = require("./threading");
-const { mapSmtpError, mapImapError, retryPlan } = require("../../services/mail/smtp-errors");
+const { mapSmtpError, mapImapError, retryPlan, isRecipientRefused } = require("../../services/mail/smtp-errors");
 const { cleanHtml, textToHtml } = require("./visible");
 const { outgoingHtml, textOf } = require("./compose");
 const { settingsFor } = require("./autodiscover");
@@ -109,6 +109,16 @@ describe("what a mail server's refusal means", () => {
       mapSmtpError({ responseCode: 552, response: "552 Message size exceeds" })
         .code,
     ).toBe("MESSAGE_REFUSED");
+    // Refused at RCPT TO in words the recipient pattern does not know: still the recipient.
+    const rcpt = {
+      code: "EENVELOPE",
+      command: "RCPT TO",
+      responseCode: 550,
+      response: "550-The mail server could not deliver mail to a@example.com.  The\n550-account or domain may not exist",
+    };
+    expect(mapSmtpError(rcpt).code).toBe("RECIPIENT_REFUSED");
+    expect(isRecipientRefused(rcpt)).toBe(true);
+    expect(isRecipientRefused({ ...rcpt, responseCode: 450, response: "450 try later" })).toBe(false);
     expect(
       mapImapError({ authenticationFailed: true, message: "Command failed" })
         .code,

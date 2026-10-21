@@ -329,6 +329,7 @@ interface copy; the copy rules apply to the chrome around them.
 - **First sync of a large mailbox**: read in batches from the last UID; each run takes the next
   batch until the folder is caught up.
 - **Hard-bounced recipient**: the send fails with `RECIPIENT_REFUSED` and the sender is notified.
+  Any 5xx answer to RCPT TO counts, whatever the server's wording ("account or domain may not exist").
 - **Double send** on a bad connection: refused by the Idempotency-Key.
 - **Offline**: not supported; the draft is kept.
 - **Dangerous attachment types**: refused by the mime policy; inbound ones are listed but not opened
@@ -400,3 +401,5 @@ interface copy; the copy rules apply to the chrome around them.
   (`mail_account.server_moved`) and syncs it as its retest (§3 step 11, §7, §11). The sync scheduler
   ticks every minute to honour a changed interval; `smtp-errors.js` moved to `services/mail/`.
 - 20/10/2026 · TB · Nothing in the mailbox changed. Always Show Images' `sender_address` is an email address, marked `address:none` in the contract so gate 22 (addresses picked, never typed, `docs/guides/addresses.md`) knows it is not a place.
+- 21/10/2026 · TB · A 5xx at RCPT TO is `RECIPIENT_REFUSED` whatever its wording, not `MESSAGE_REFUSED`
+  (§11); found from a system mail fault (`notifications.md` §14).

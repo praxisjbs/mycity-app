@@ -385,6 +385,8 @@ const linkOf = (row) => {
  * One person's digest (the `reminders` job `digest`): the bell notices that arrived in the 24
  * hours before it was queued and are still unread, newest first, at most 25 listed. Nothing is
  * sent when there are none, or when the person or the company turned the digest off meanwhile.
+ * A mail server that refuses the person's address is a wrong address, not a broken job: it is
+ * kept as a warning on Settings · Faults (one group for every such person) and not retried.
  * @returns {Promise<{sent: boolean, count?: number, reason?: string}>}
  */
 async function sendDigest({ user_id: userId, until }, { db = pool } = {}) {
@@ -397,22 +399,32 @@ async function sendDigest({ user_id: userId, until }, { db = pool } = {}) {
   const page = await repo.digestPage(db, userId, { from: new Date(end.getTime() - DIGEST_WINDOW_MS), until: end });
   if (page.data.length === 0) return { sent: false, reason: "nothing_unread" };
   const systemMail = require("../../services/mail/system-mail.service");
-  await systemMail.send({
-    to: { name: `${person.first_name} ${person.last_name}`.trim(), email: person.email },
-    recipient: { first_name: person.first_name, last_name: person.last_name, email: person.email },
-    template: DIGEST_TEMPLATE,
-    data: {
-      count: page.page.total,
-      more: Math.max(0, page.page.total - page.data.length),
-      items: page.data.map((n) => ({
-        title: n.title,
-        body: n.body || "",
-        when: new Date(n.created_at).toISOString(),
-        link_url: linkOf(n),
-      })),
-      open_url: new URL("/?pane=notifications", config.STAFF_ORIGIN).href,
-    },
-  });
+  try {
+    await systemMail.send({
+      to: { name: `${person.first_name} ${person.last_name}`.trim(), email: person.email },
+      recipient: { first_name: person.first_name, last_name: person.last_name, email: person.email },
+      template: DIGEST_TEMPLATE,
+      data: {
+        count: page.page.total,
+        more: Math.max(0, page.page.total - page.data.length),
+        items: page.data.map((n) => ({
+          title: n.title,
+          body: n.body || "",
+          when: new Date(n.created_at).toISOString(),
+          link_url: linkOf(n),
+        })),
+        open_url: new URL("/?pane=notifications", config.STAFF_ORIGIN).href,
+      },
+    });
+  } catch (err) {
+    if (!require("../../services/mail/smtp-errors").isRecipientRefused(err)) throw err;
+    logger.warn({ user_id: userId, err }, "daily digest not sent: the mail server refused the address");
+    require("../../shared/observability/error-reporter").report(
+      new Error("Daily digest not sent: the mail server refused the person's email address"),
+      { origin: "worker", severity: "warning", route: "job reminders", user_id: userId },
+    );
+    return { sent: false, reason: "recipient_refused" };
+  }
   return { sent: true, count: page.page.total };
 }
 

@@ -3,7 +3,8 @@
  * What a mail server's refusal means, and what the person should do (mailbox.md §11), for
  * the mailbox, the system sender's test and its counted sends.
  * One ladder, in this order: authentication, sender, recipient, temporary, other 5xx,
- * anything else. The send queue retries on the verdict's code, so a permanent refusal
+ * anything else. A 5xx answer to RCPT TO is the recipient whatever its wording: servers
+ * say "the account or domain may not exist" as often as "user unknown". The send queue retries on the verdict's code, so a permanent refusal
  * is never retried and a deferral is.
  */
 const { AppError } = require("../../shared/errors");
@@ -28,6 +29,7 @@ const PERMANENT = new Set([
 ]);
 
 const replyCode = (err) => Number(err && err.responseCode) || null;
+const atRecipient = (err, code) => Boolean(err && err.command === "RCPT TO" && code >= 500);
 const replyText = (err) =>
   String((err && err.response) || (err && err.message) || err || "");
 
@@ -57,6 +59,7 @@ function mapSmtpError(err) {
   }
   if (
     RECIPIENT.test(raw) ||
+    atRecipient(err, code) ||
     ((code === 551 || code === 553) && /recipient|user|mailbox/i.test(raw))
   ) {
     return new AppError(
@@ -151,4 +154,7 @@ function stepCodeOf(err) {
   return "UNAVAILABLE";
 }
 
-module.exports = { PERMANENT, mapSmtpError, mapImapError, retryPlan, stepCodeOf };
+/** The server refused the address itself: no retry, and nothing is wrong with the system. */
+const isRecipientRefused = (err) => Boolean(err) && mapSmtpError(err).code === "RECIPIENT_REFUSED";
+
+module.exports = { PERMANENT, mapSmtpError, isRecipientRefused, mapImapError, retryPlan, stepCodeOf };

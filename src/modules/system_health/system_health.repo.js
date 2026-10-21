@@ -747,7 +747,8 @@ function recentFingerprints(db, since) {
                          WHEN bool_or(x.severity = 'warning') THEN 'warning'
                          ELSE 'notice' END
                FROM error_event x WHERE x.fingerprint = e.fingerprint) AS severity,
-            (SELECT split_part(x.stack, E'\\n', 2) FROM error_event x
+            -- The first "at" line, not the second line: a message can span several lines.
+            (SELECT trim(substring(x.stack from '\\n\\s*(at [^\\n]*)')) FROM error_event x
               WHERE x.fingerprint = e.fingerprint AND x.stack IS NOT NULL
               ORDER BY x.occurred_at DESC LIMIT 1) AS frame
        FROM error_event e
