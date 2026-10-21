@@ -98,7 +98,7 @@ const SCREENS = Object.freeze([
   s("expenses", "budgets", "Budgets", ["budget", "spend limits"]),
   s("expenses", "categories", "Categories", ["expense categories", "expense types"]),
 
-  s("knowledge", "policies", "Policies", ["policy", "handbook", "rules"]),
+  s("knowledge", "policies", "Policies", ["policy", "handbook", "rules", "attendance policy", "grace period", "lateness policy", "clock in rules"]),
   s("knowledge", "sops", "SOPs", ["sop", "procedures", "processes", "how to"]),
   s("knowledge", "faqs", "FAQs", ["faq", "questions", "help"]),
   s("knowledge", "training", "Training", ["courses", "learning", "lessons"]),
@@ -107,15 +107,27 @@ const SCREENS = Object.freeze([
   s("praxis_ai", "ask", "Ask", ["ai", "assistant", "chat", "question"]),
   s("praxis_ai", "history", "History", ["ai history", "past questions", "conversations"]),
 
+  s("ai_control", "actions", "Actions", ["ai control", "ai actions", "fallback", "chain", "make first", "which model", "top tier", "deep reasoning", "transcription model", "gemini", "anthropic", "claude", "groq", "deepseek"]),
+  s("ai_control", "models", "Models", ["ai models", "model prices", "find prices", "ai prices", "openai", "price per million"]),
+  s("ai_control", "spend", "Spend", ["ai spend", "ai cost", "ai budget", "monthly cap", "set cap", "recharge", "spend by action"]),
+
   s("settings", "organisation", "Organisation", ["organization", "company", "company profile", "working week", "holidays", "public holidays"]),
+  s("settings", "status", "Status", ["health", "system health", "uptime", "checks", "disk", "memory", "cpu", "server"]),
+  s("settings", "performance", "Performance", ["performance", "response time", "slow", "error rate", "load"]),
+  s("settings", "faults", "Faults", ["faults", "errors", "crashes", "exceptions", "stack trace", "brief"]),
   s("settings", "users", "Users", ["logins", "accounts", "invite", "user accounts"]),
   s("settings", "roles-and-permissions", "Roles & Permissions", ["roles", "permissions", "access", "grants", "rbac"]),
   s("settings", "approvals", "Approvals", ["approval flows", "workflow", "approval route", "hierarchy", "sign off"]),
-  s("settings", "attendance-policy", "Attendance Policy", ["clock in rules", "grace period", "lateness policy"]),
   s("settings", "notifications", "Notifications", ["notification settings", "alerts settings", "email settings"]),
   s("settings", "appearance", "Appearance", ["theme", "dark mode", "branding"]),
   s("settings", "documents-and-numbering", "Documents & Numbering", ["numbering", "number format", "document numbers", "prefixes"]),
-  s("settings", "integrations", "Integrations", ["integration", "connect", "api keys"]),
+  s("settings", "integrations", "Integrations", [
+    "integration", "connect", "api keys", "smtp", "mail server", "no-reply", "imap", "system sender",
+    "pause mail", "resume mail", "mail paused", "stop emails", "refused addresses", "bounced mail", "undeliverable",
+    "geoapify", "maps key", "address search", "gemini", "ai key", "web push", "vapid", "push keys",
+    "groq", "whisper", "transcription key", "openai", "embeddings key", "anthropic", "claude", "deepseek",
+    "ai models", "add model", "exchange rates", "exchange rate", "dollar rate", "sync rates", "free plan", "paid plan",
+  ]),
   s("settings", "security", "Security", ["password rules", "sessions", "two step", "failed sign ins"]),
   s("settings", "audit-log", "Audit Log", ["audit", "history", "who changed", "activity log"]),
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
@@ -142,8 +154,16 @@ function hasCapability(reader, code) {
  * @param {{module: string, tab: string}} screen
  * @param {Reader} reader
  */
+/** Settings' tabs that system_health holds rather than settings. */
+const SYSTEM_HEALTH_TABS = ["status", "performance", "faults"];
+
 function tabVisible(screen, reader) {
   const can = (module, action = "view") => (reader.grants[module] || []).includes(action);
+  // Status, Performance and Faults sit in Settings but are held by system_health
+  // (docs/guides/system-health.md §8), as the shell shows them (app/src/shell/access.ts).
+  if (screen.module === "settings" && SYSTEM_HEALTH_TABS.includes(screen.tab)) return reader.is_ceo || can("system_health");
+  // Integrations is the IT team's: its own key, not Settings' (docs/guides/integrations.md §8).
+  if (screen.module === "settings" && screen.tab === "integrations") return reader.is_ceo || can("integrations");
   if (!can(screen.module)) return false;
   const full = can("settings") || reader.is_ceo;
   const { module, tab } = screen;
@@ -154,6 +174,8 @@ function tabVisible(screen, reader) {
   if (module === "home" && tab === "alerts")
     return hasCapability(reader, "alerts.clear") || hasCapability(reader, "alerts.manage");
   if (module === "home" && tab === "reports") return hasCapability(reader, "home.reports");
+  // Knowledge Hub · Policies is for those who write policies; everyone reads theirs on Policy Updates.
+  if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
   if (module === "people" && !full) return tab === "attendance" || tab === "organogram";
   if (module === "community" && tab === "announcements") return can("people", "create");
   if (module === "queries" && !full) return tab === "queries";

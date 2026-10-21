@@ -22,7 +22,7 @@ map, read §11 first.
 | `docs/DATABASE_SCHEMA.md` | **The database design**: the core every milestone attaches to, each milestone's tables as built and what it still owes, and what is not built and why. Read before any milestone's schema work |
 | `docs/MIGRATIONS.md` | **The migration and reference-seed conventions**: numbering, idempotency, DOWN, table shape, matching the code, what a seed may hold (A26), checks before the PR. Read before any migration |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
-| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F26 (binding) and the three PRs that build `packages/ui` |
+| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F27 (binding) and the three PRs that build `packages/ui` |
 | `docs/COMPONENTS.md` | Every shared component in `packages/ui`, generated from the code. Check it before building anything; a missing one is added with `npm run new:component` |
 | `docs/guides/<module>.md` | One full-stack engineering guide per feature: backend, API, events and every screen it touches, and how they relate. A change passes through its guide first |
 | `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
@@ -63,9 +63,8 @@ mycity-app/
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
-│                             (40_productivity.js: M2's tasks, calendar, goals, targets, KPIs and
-│                             review cycle through their services; 60_home.js: Home's figures, its
-│                             HOME_STAGING_ROWS manifest; lib/)
+│                             (40_workspace.js: My Workspace's tasks and calendar through their
+│                             services; 60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
 │                             (roles, CEO flag); loaded on staging and production by each deploy (TB,
@@ -103,13 +102,20 @@ mycity-app/
 │   │                         restore-drill.js (weekly), installed on the server as mycity-backup,
 │   │                         mycity-restore-drill
 │   ├── import/               command-line import
+│   ├── ops/                  health-brief.js: the Status brief made on the server (npm run health:brief),
+│   │                         and with --watch the health watch that mails it when something is down
 │   └── deploy/               deploy-gate, check-gate, release-manifest, verify-staging, rollback
 ├── ops/
 │   ├── systemd/              four units + env templates; mycity-backup.service + .timer (nightly
-│   │                         02:30), mycity-restore-drill.service + .timer (Sundays 04:00)
+│   │                         02:30), mycity-restore-drill.service + .timer (Sundays 04:00),
+│   │                         mycity-health-watch-prod.service + .timer and
+│   │                         mycity-health-watch-stg.service + mycity-health-watch-stg.timer (every 5 minutes),
+│   │                         mycity-host-stats.service + .timer (every 15 minutes)
 │   ├── provision/            provision.sh: a fresh Ubuntu 24.04 to a ready server (runbooks/server-setup.md)
 │   ├── nginx/                mycity.conf (shared) + one file per host (runbooks/proxy.md)
-│   ├── monitoring/           uptime-probe.js, run from outside by .github/workflows/uptime.yml
+│   ├── monitoring/           uptime-probe.js, run from outside by .github/workflows/uptime.yml;
+│   │                         host-stats.sh, installed as mycity-host-stats: what fills the disk,
+│   │                         for Settings · Performance (/var/lib/mycity/host-stats.json)
 │   └── ssh/                  authorized_keys template for the deploy user
 ├── tests/
 │   ├── unit/                 cross-module unit tests
@@ -120,11 +126,12 @@ mycity-app/
 │   ├── BACKEND_GUIDE.md      how to write backend code (read first)
 │   ├── MIGRATIONS.md         migration and reference-seed conventions (read before any migration)
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
-│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F26, the three PRs
+│   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F27, the three PRs
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
 │   ├── PROGRESS.md           93 screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
-│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, add-a-module,
+│   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, system-health,
+│   │                         add-a-module,
 │   │                         proxy (nginx settings), server-setup (provisioning), github-settings,
 │   │                         first-accounts (the first two logins on a server),
 │   │                         staff-roster (MyCity's staff onto a server that has none),
@@ -171,7 +178,8 @@ src/
 │                  idempotency · auth · rbac · public-token · upload · error-handler
 ├── shared/
 │   ├── errors.js · route-map.js
-│   ├── db/            tx · query-helpers · pg-types · effective-dated · person (PersonRef in SQL, photo sizes)
+│   ├── db/            tx · query-helpers · pg-types · effective-dated · person (PersonRef in SQL, photo sizes) ·
+│   │                  media (MediaRef in SQL: a file's shape, page count and sizes)
 │   ├── crud/          resource (makeRepo / makeService / makeController / mountResource)
 │   ├── http/          validate · paged (THE pagination gate, 25 per page) · body-limits · respond
 │   ├── events/        emit · outbox · catalogue
@@ -180,11 +188,11 @@ src/
 │   ├── organisation/  profile (Settings · Organisation's profile and brand files, the one reader for
 │   │                  letterheads, system mail and email signatures)
 │   ├── rbac/          grants-cache · field-mask · scope · sessions
-│   ├── money/         money
+│   ├── money/         money · fx (exchange rates read: the dollar against every currency, kept by day)
 │   ├── time/          lagos · working-week · day-first · recurrence
 │   ├── numbering/     numbering · schemes
 │   ├── files/         sniff · mime-policy · hash · safe-name · variant-key
-│   ├── documents/     vault · generate · render · markdown · canonical
+│   ├── documents/     vault · generate · exports · render · markdown · canonical
 │   ├── templates/     template-store · variables
 │   ├── spreadsheet/   parse · build · csv · cells · day-first-cells · context
 │   ├── import/        engine · mapping · registry · report · revert
@@ -194,31 +202,54 @@ src/
 │   ├── state/         state-history
 │   ├── dedup/         dedup
 │   ├── geo/           geo
+│   ├── places/        places (every address a person enters, kept per field of a record, and the
+│   │                  naming of locations saved while search was down) · token (the signature on
+│   │                  every place our search or pin hands out) · owners (every address field, F27)
 │   ├── notifications/ categories · fanout
+│   ├── integrations/  providers (the registry of Settings · Integrations' connections) · settings (the
+│   │                  one reader of a connection's values: saved here, else the server file) · state ·
+│   │                  usage (each provider call counted a day, flushed every 15 s) · quota (a Free plan's
+│   │                  daily limit as a hard stop) · refusals (the addresses the mail server refused)
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms) ·
 │   │                  actions (⌘K actions: each screen's New action, Clock In, Request Leave)
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
-│   └── observability/ scrub · metrics · error-reporter · alert (WhatsApp and webhook; also the
-│                      server's mycity-alert)
+│   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
+│                      row and each route a quarter hour, with latency buckets, for Settings ·
+│                      Performance) · process-beat (each API and worker process's own row a
+│                      minute) · alert (WhatsApp and webhook; also the server's mycity-alert)
 ├── services/
 │   ├── storage/       storage.service
-│   ├── media/         image-pipeline · av-pipeline · scan · reconcile
+│   ├── media/         image-pipeline · av-pipeline · pdf-pipeline (a PDF's page count and first page) ·
+│   │                  pdf-page (the first page drawn by PDF.js in its own process) · scan · reconcile
 │   ├── pdf/           chromium · pdf.service
-│   ├── mail/          system-mail.service · pace (the hourly sending limit) · deliverability/{check,
-│   │                  route-check, dns-check, dmarc, ptr, rbl, evaluate}
+│   ├── mail/          system-mail.service · pace (the hourly sending limit) · smtp-errors (what a mail
+│   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
+│   │                  deliverability/{check, route-check, dns-check, dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
-│   ├── ai/            llm.service · governance · ledger · redact · structured · transcription ·
-│   │                  vendors/{gemini, stub} · prompts/*.md · assistant/* (M10)
+│   ├── ai/            llm.service (complete, and search for Find Prices) · governance (the switch,
+│   │                  the caps, the spend) · ledger · redact · structured · transcription (Groq, then
+│   │                  Gemini, then the browser's captions) · catalogue (a provider's model list,
+│   │                  sorted into what the ERP uses) · actions (every AI feature, registered under
+│   │                  its job) · jobs (each action's chain and each model's state, AI Control) ·
+│   │                  prices (what a step is charged at, in naira) · skips (a provider skipped until
+│   │                  its quota resets) · vendors/{http, gemini, groq, openai, anthropic, deepseek,
+│   │                  stub} · prompts/*.md · assistant/* (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
+│   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
+│   │                  map tiles, cached and kept under the provider's rate; F21, F27)
+│   ├── fx/            exchangerate-api (Exchange Rates' provider: every currency against a base, daily)
 │   ├── qr/            qr
+│   ├── web/           links (what counts as a link, the first one's card form) · public-fetch (a page or a
+│   │                  picture from the public web only: private addresses refused, size and time capped) ·
+│   │                  page-card (a page's Open Graph card)
 │   └── realtime/      emitter · active (who is in front of the app, for the push hold)
 ├── realtime/      socket
 └── jobs/
-    ├── queues.js · registry.js · cron-lock.js
+    ├── queues.js · registry.js · cron-lock.js · report.js (whether each scheduler is on time, what each queue holds)
     ├── handlers/      one file per queue (table in §5.15)
     ├── schedulers/    one file per recurring job
-    └── loops/         long-running loops (mail-idle)
+    └── loops/         long-running loops (mail-idle, outbox-wake)
 ```
 
 ---
@@ -265,12 +296,19 @@ The staff app has **15 modules** (MILESTONES §18); those are the permission key
 | `payroll` | `payroll`, `payslips`, `salary_structure`, `deductions`, `statutory` |
 | `partnerships` | `partners`, `partner_pipeline`, `leads`, `interactions`, `proposals`, `agreements`, `partnership_analytics` |
 | `expenses` | `expenses`, `requisitions`, `disbursements`, `budgets`, `expense_categories` |
-| `knowledge` | `knowledge` (announcements are read here too) |
-| `praxis_ai` | `assistant`, `ai_governance` |
-| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `integrations`, `templates`, `signatures`, `search` |
+| `knowledge` | `knowledge`, `policies` (with the `policies.manage` capability for writing them); announcements are read here too |
+| `praxis_ai` | `assistant` |
+| `ai_control` | `ai_governance` (AI Control: chains, prices, caps; `docs/guides/ai-control.md`) |
+| `settings` | `identity`, `access`, `audit`, `settings`, `notifications`, `workflow`, `documents`, `imports`, `users`, `security`, `templates`, `signatures`, `search`, `maps` |
+
+Two Settings tabs have a key of their own instead, granted only to the Implementation Team and the
+System Administrator (the CEO passes): `system_health` for Status, Performance and Faults
+(`system_health` module, seed `9190`) and `integrations` for Integrations (`integrations` module,
+seed `9290`).
 
 The settings modules that every user touches (`identity` login, own `notifications`, own `documents`,
-`search`, the requests waiting on them in `workflow`) check ownership, not the `settings` grant.
+`search`, the address search in `maps`, the requests waiting on them in `workflow`) check ownership,
+not the `settings` grant.
 
 **Capabilities.** A capability is a named authority inside a module that its six actions cannot
 express: Home's `view` opens Home to every employee, `home.team` opens its Team tab to the people
@@ -306,11 +344,6 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `alerts.manage` | `home` | Create, change and switch off alert rules | Implementation, Operations & People, Management | `1199` |
 | `announcements.post` | `community` | Post announcements and track who has read them | Implementation, Operations & People, Management | `0449` |
 | `mailbox.signature` | `mailbox` | Configure Signature: the company's signature links and what shows on everyone's email signature | Implementation, System Administrator | `1129` |
-| `goals.organisation` | `performance` | Set Organisational Goals: record the organisation's goals, active at once (A16) | the CEO only | `2091` |
-| `goals.company` | `performance` | Set Company Goals: annual and monthly goals, sent for approval | Implementation, Management | `2091` |
-| `goals.department` | `performance` | Set Department Targets: a department's monthly targets, and submit its month | Implementation, Head of Department | `2091` |
-| `kpis.assign` | `performance` | Assign KPIs: the monthly KPIs and weights of the people in scope | Implementation, Head of Department, Line Manager | `2091` |
-| `reviews.cycles` | `performance` | Run Review Cycles: open and close cycles and edit their questions | Implementation, Operations & People | `2091` |
 
 ### 5.3 M0 · Foundation · GE, LA · 9 to 19 Oct
 
@@ -319,12 +352,13 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `identity` | | Login, refresh, logout, me, sessions, known devices |
 | `security` | `.mfa` (TOTP codes, recovery codes), `.passkeys` (WebAuthn), `.pin`, `.challenge` (single-use tickets), `.signin` (what `identity`'s sign-in calls) | Each person's two-step sign-in, passkeys and PIN, the fresh-sign-in check, Reset Two-Step (`docs/guides/identity.md`); came forward from M9 (TB, 16/10/2026) |
 | `access` | | Roles created, edited and deleted with their grants, record scope, field visibility and capabilities; the matrix; two-step required by role (`docs/guides/foundation.md` §6.3) |
-| `audit` | `audit.events.js` (the emailed Excel export) | Audit ledger read at 25 with filters, the summary, masked per reader |
-| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template), `org-chart.export.js` (Download PDF in the worker: drawn as the person asking, rendered, emailed) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
+| `audit` | `audit.events.js` (the Excel export, made in the worker and downloaded where it was asked for) | Audit ledger read at 25 with filters, the summary, masked per reader |
+| `organisation` | `employee.import.js` (the staff importer), `employee-360.service.js`, `manager-text.js` (the Line Manager cell of a sheet, read once), `org-chart.layout.js` (Download PDF's drawing: the tree laid out in millimetres for its template, in the request; the pdf-render job draws it and the screen downloads it) | Departments, employees, reporting lines and vacant seats; the staff register and the employee 360; the bounded reporting tree behind Org Chart and Organogram, and its PDF |
 | `settings` | `settings.security-rules.js` (session length, idle lock, password minimum within the `.env` floor); `settings.appearance.js` (M9) | Organisation profile, working week, holidays, numbering schemes, the security rules, everyone's sessions and failed sign-ins (`docs/guides/foundation.md` §6.4) |
-| `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (M6) | Caller's own inbox, preferences and devices |
+| `notifications` | `notifications.push.js` (web push to a person's devices), `notifications.reminders.js` (the reminder engine, Approvals Waiting, Probation Ending and the daily digest), `notifications.rules.js` (Settings · Notifications: the company's rule per notice and its reminders) | Caller's own inbox, preferences, quiet hours, digest and devices; Settings · Notifications (`docs/guides/notifications.md`) |
 | `workflow` | `.search` (approval flows) | My Approvals and its count, one request, approve, reject, request changes, withdraw, reassign; Settings · Approvals (flows saved as new versions); the leave flow (`0499`) |
 | `search` | routes and controller only | `GET /search`, ⌘K: screens, actions and every module's records (`shared/search`; `docs/guides/foundation.md` §6.7) |
+| `maps` | `maps.service.js` (the places-name job's naming), `maps.events.js` (`place.named`) | `GET /maps/search` (the address search behind every address field, signed places, from the second character), `/maps/pin` (a pinned point's nearest address, signed), `/maps/tiles` (the map's tiles, signed in); every address is kept by its owner through `shared/places` (`services/maps`; `docs/guides/addresses.md`, F27) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
 
@@ -332,26 +366,38 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 
 | Module | Owner | Files beyond the template |
 |---|---|---|
-| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.prompt` (when the Overview opens Attendance's clock-in panel), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
-| `alerts` | TB | `.metrics` (the metric registry: what each of the nine metrics reads, from which module, about whom, a batch at a time), `.sweeps` (the 06:00 sweep, and one person's re-read on an attendance signal) |
-| `reports` | TB | `.sources` (the source registry: each source's module, grant, filters and columns over its own screen's query, gathered page by page as the reader, at most 2,000 rows a table; and the reader's own Overview for the Export), `.schedule` (a schedule's next slot in Lagos from its recurrence rule, start day and time), `.generate` (each run's file built as its recipient, PDF or XLSX, emailed once it exists; skipped or failed with why), `.files` (a report's tables as the PDF's variables and the XLSX workbook, day-first and in Naira) |
-| `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict), `.reconcile` (the day recalculated, exceptions decided, the day-close), `.export` (the month and the register as workbooks), `.calendar` (the policy, the worksite or approved home, and the shift for a date), `.home` (home locations of staff who work from home: sent, decided, read), `.requests` (work location requests: asked, withdrawn or cancelled, settled from their approval, read), `.assignments` (field assignments: set, cancelled, someone taken off, read), `.schedule` (hybrid staff's weekly schedule: the office days set, the week read), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
+| `dashboard` | TB | `kpi-catalog/{index, shared, guards, eligibility, resolve}.js`, `kpi-catalog/tiles/{people, work, business, finance}.js`; `sources/`, one adapter per owning module of a later milestone (docs/guides/home.md §4.1): `tasks.source.js`, `calendar.source.js`, `goals.source.js`, `reviews.source.js`, `vacancies.source.js`, `payroll.source.js`, `partners.source.js`, `expenses.source.js`, `budgets.source.js`; `.layout` (the sections each Home view draws beside its cards), `.activity` (Activity Today: the allow-list of events and who may see each), `.team` (the Team tab: its four cards, today's roster and Attendance This Month in the reader's home scope, and the assistant's team.today) |
+| `alerts` | TB | `.metrics` (the metric registry: what each of the seven metrics reads, from which module, about whom, a batch at a time; and the rules the system keeps for the Attendance policy's five consequence rules), `.sweeps` (the 06:00 sweep) |
+| `reports` | TB | `.sources` (the source registry: each source's module, grant, filters and columns over its own screen's query, gathered page by page as the reader, at most 2,000 rows a table; and the reader's own Overview for the Export), `.schedule` (a schedule's next slot in Lagos from its recurrence rule, start day and time), `.generate` (each run's file built as its recipient, PDF or XLSX: a schedule's emailed once it exists, one somebody pressed for downloaded where they pressed; skipped or failed with why), `.files` (a report's tables as the PDF's variables and the XLSX workbook, day-first and in Naira) |
+| `attendance` | LA | `.rules` (wall clock, working week, the day worked out), `.lateness`, `.clock-guard`, `.geofence` (the location verdict: a reading judged with its accuracy), `.reconcile` (the day recalculated, exceptions decided, the day-close, leave granted later re-projecting a closed day), `.export` (the month and the register as workbooks), `.calendar` (the policy's rules, the worksite or approved home, and the shift for a date), `.policy-type` (the Attendance policy as a rules policy: the rules shown, their sentences, the lines a change is listed by; registered with `policies`), `.home` (home locations of staff who work from home: sent, decided, read), `.requests` (work location requests made before PR 4: withdrawn or cancelled, settled from their approval, read), `.assignments` (field assignments made before PR 4: cancelled, someone taken off, read), `.sites` and `.sites.repo` (temporary sites: added from Home for approval or by People in force, withdrawn, cancelled, someone taken off, settled from their approval, the flags a late approval covers, a person's zone on a site's day, read), `.check-ins` (check-ins at each stop on a temporary site's day: matched, flagged, read), `.schedule` (a person's work schedule from a date: set, the week and a day's shift read), `.clock-watch` (the reminder to clock in, reminders to clock out from the shift's end and the System Clock-Out, every 5 minutes), `.rules-engine` (the Attendance policy's five consequence rules counted per person, each breach recorded and emitted), `.pay` (pending deductions and overtime priced from the monthly gross: settled with the day, waived, confirmed or cut, and overtime approved beforehand), `.roster` (Home's read of a day on this module's records and the register's rules: summary, page, personal), `.auto-query` (M3, empty until then), `.analytics` (M2, empty until then) |
 | `devices` | LA | `.guard` |
+| `policies` | TB | `.types` (the rules types the code knows, each registered by the module that enforces it), `.tidy` (Tidy With AI: a layout-only suggestion, its words held to the original), the PDF `templates/documents/policy.html`, the prompt `services/ai/prompts/policy-tidy.md` (docs/guides/policies.md) |
 | `worksites` | LA | |
 | `leave` | AJ | `.balance` (the dates and allowance rules), `.clash` (who else in the department is away); requests open the `leave.approval` flow, decided in `workflow` |
-| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave`, `.performance` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, emailed, removed after seven days) |
-| `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20) |
+| `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, downloaded where it was asked for, removed a day later) |
+| `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20), `.links` (link cards: fetched once per address and kept for a week, their pictures in the vault) |
 | `announcements` | GE | |
-| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `smtp-errors`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
+| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test` |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
-`services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `shared/geo`,
-`shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence).
+`services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `services/media/pdf-pipeline`
+and `services/web` (Staff Community's PDF previews and link cards), `shared/geo`,
+`shared/alerts`, `shared/spreadsheet` (exports), `realtime/socket` (presence),
+`shared/documents/exports` (every Export and Download button's file: reserved in the request, made
+in the worker, downloaded on the device that asked, removed a day later; `docs/guides/foundation.md` §6.12).
 
 Templates first filled in M1: `templates/documents/report.html` (a report run, landscape, its RPT
-number on it) and `templates/email/scheduled-report.html` (the report's file attached);
-`templates/documents/org-chart.html` (Download PDF: the whole organogram on one page sized to it)
-and `templates/email/org-chart-export.html` (the PDF attached).
+number on it), `templates/documents/policy.html` (a policy version on the letterhead with its signatures) and `templates/email/scheduled-report.html` (a schedule's file attached);
+`templates/documents/org-chart.html` (Download PDF: the whole organogram on one page sized to it).
+Filled in M0 with Settings · Notifications: `templates/email/digest.html` (each person's daily digest
+of what arrived unread in the last day; `docs/guides/notifications.md` §6).
+
+Attendance's clock fixes (PR 2, `docs/guides/attendance.md` §1.2): `migrations/1380_attendance_rejected_punch_slot.sql`
+(`attendance_event.slot` and the unique index a slot at a time: a punch People reject frees its slot),
+`seeds/reference/1397_seed_attendance_location_unclear.sql` (the `location_unverified` label reads
+Location Unclear), and the feature's one location reader, `app/src/features/attendance/location.ts`
+(the clock's punch, Check In and the home: up to ten seconds, the best fix, always ending, and the fix
+for this device), tested in `app/src/features/attendance/location.test.ts`.
 
 **M1 mailbox rule:** cut the five `require` lines into triage, binding and assist before anything else
 (MILESTONES §6.5). `mailbox/binding/` stays empty until M7.
@@ -365,8 +411,8 @@ and `templates/email/org-chart-export.html` (the PDF attached).
 | `workspace` | `.today`, `.analytics` (aggregator) |
 | `goals` | `.cascade`, `.trace` (KPI → organisational goal), `.approval` (A16) |
 | `targets` | `.progress`, `.approval` |
-| `kpis` | `.weights` (must total 100), `.score` (attainment, status, KPI Score and the prefilled rating, shared by every performance screen) |
-| `reviews` | `.cycle`, `.sequence` (self rating first, A17), `.metrics`, `.pdf`, `.dictation` (A18); the prefilled ratings come from `kpis/kpis.score.js` |
+| `kpis` | `.weights` (must total 100) |
+| `reviews` | `.cycle`, `.sequence` (self rating first, A17), `.autoscore`, `.metrics`, `.pdf`, `.dictation` (A18), `.analytics` |
 
 Shared first filled: `shared/time/recurrence`, `services/calendar/ics`, `services/ai`
 (`llm.service`, `transcription`, prompt `review-cleanup.md`).
@@ -420,8 +466,8 @@ Shared first filled: `shared/documents/canonical` (A12), `services/qr`. Template
 | `deductions` | `.acceptance` (nothing deducts itself) |
 | `statutory` | `.rates`, `.report` (off by default; bands from current law, never the donor's) |
 
-Also: `notifications.reminders` and the `settings` Notifications screen (company reminder rules).
-Web push and each person's preferences were brought forward to M0 by TB on 19/10/2026
+Web push, each person's preferences, `notifications.reminders` and the `settings` Notifications
+screen (company rules and reminders) were brought forward to M0 by TB on 19/10/2026
 (`docs/guides/notifications.md`). The daily rate divides by the working days from
 `shared/time/working-week` (A22), never by a constant.
 
@@ -459,7 +505,7 @@ Chain for every request: requester, line manager, Operations, requisition, CEO, 
 |---|---|
 | `users` | `.invite` |
 | `security` | Nothing left: `.sessions` (End Session on Settings · Security) and requiring two-step by role came forward to M0 with foundation track C (§5.3) |
-| `integrations` | |
+| `integrations` | `.testers` (each connection's test, one per registry code); the registry, reader, state and use counts are `shared/integrations/` (§4). Brought forward by TB, 20/10/2026 |
 | `settings` | `settings.appearance.js` |
 
 Four permission layers: module, action, record scope, field. No entity layer (A2).
@@ -470,7 +516,7 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
 | `assistant` | `.history` (Ask, History). Engine in `services/ai/assistant/{orchestrator, retrieval, embeddings, answer, conversation.repo}.js` |
-| `ai_governance` | Spend cap, model, per-module switch |
+| `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
 The assistant **reads only** (A23). It answers from the manifests every module has carried since M1.
 
@@ -486,21 +532,26 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 
 | Milestone | Handlers (`jobs/handlers/`) | Schedulers (`jobs/schedulers/`) |
 |---|---|---|
-| M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit` | `outbox-dispatch`, `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup` |
-| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail) | `celebrations`, `announcement-release` (the safety net behind `announcement-publish`), `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `data-export-cleanup` (Download My Data files removed after seven days, 03:30 Lagos); loop `loops/mail-idle` |
-| M2 | `task-recurrence`, `review-cycle-open` (the morning's cycle opening, re-run by hand) | `task-recurrence`, `review-cycles` (opens cycles on their day, 06:00), `review-reminders` (reviews due within three days or overdue, 08:00 working days) |
+| M0 | `email-send`, `pdf-render`, `notification-deliver`, `notification-push`, `media-derive`, `media-scan`, `av-transcode`, `import-validate`, `import-commit`, `reminders` (one person's daily digest; brought forward from M6) | `outbox-dispatch` (with the loop `loops/outbox-wake`: a commit runs it at once), `workflow-timeout`, `alert-ageing`, `media-reconcile`, `import-cleanup`, `urgent-repeats` (open urgent notices alerted again every 30 minutes, 08:00 to 18:00 Lagos), `reminders` (the reminder engine's tick every 5 minutes, and each person's daily digest queued; brought forward from M6), `places-name` (the device locations saved while address search was down, named every 5 minutes, 25 a run; `docs/guides/addresses.md` §7) |
+| M1 | `celebrations`, `mail-sync`, `attendance-day-close`, `home-alert-sweeps` (the morning's alert sweep, re-run by hand for a day), `scheduled-report`, `announcement-publish` (delayed, scheduled announcements), `mail-send` (delayed, scheduled and retried mail), `link-preview` (a chat link's card, fetched after the message commits) | `celebrations`, `community-membership` (every active login in #general and #announcements, hourly), `announcement-release` (the safety net behind `announcement-publish`), `mail-sync` (every minute: due mail, then every mailbox at the staff mail server's interval), `attendance-day-close`, `attendance-clock-watch` (clock-in and clock-out reminders and the System Clock-Out, every 5 minutes), `home-alert-sweeps` (Home's alert rules read every morning at 06:00 Lagos), `scheduled-reports`, `export-cleanup` (export files removed a day after they were made, every hour); loop `loops/mail-idle` |
+| M2 | `task-recurrence`, `review-cycle-open` | `task-recurrence`, `review-cycles` |
 | M3 | `query-rule-evaluate` | |
 | M4 | `assessment-expire`, `interview-feedback-reminder` | `assessment-expiry`, `interview-reminders` |
 | M5 | `offer-expiry`, `signature-reminder`, `onboarding-dispatch`, `talent-pool-purge` | `offer-expiry`, `signature-reminders`, `talent-pool-purge` |
-| M6 | `payroll-compute`, `payslip-render`, `reminders` | `reminders` |
+| M6 | `payroll-compute`, `payslip-render` | |
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
-| M10 | `knowledge-embed` | |
+| M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
+| M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | |
 
 `partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's
 `home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity and budget threshold
 read through Home's source adapters, approval ageing reads the workflow tables in the metric's own SQL.
 Their stub files stay for their milestones to delete or fill.
+
+Every scheduler file must be named in `SCHEDULERS` or the worker never starts it;
+`scripts/check/schedulers.js` fails the build otherwise, and every tick is recorded in
+`schedule_run` so a job that stops is visible on Settings · Status.
 
 Every scheduler takes `cron-lock` so a restart overlap cannot double-fire. Every handler is
 idempotent: the outbox and BullMQ both deliver at least once.
@@ -636,6 +687,12 @@ data, not code. Services call `openInstance()` inside their transaction and reac
     button is busy from the press until the work settles and refuses a second press, and the
     buttons beside it wait; never `() => void save()`, never `disabled={busy}`
     (FRONTEND_FOUNDATION F26, FRONTEND_GUIDE §8.4, lint `mycity/no-void-press`).
+20. **Addresses are picked, never typed.** Every address or location a person enters, in both apps
+    and on every environment, is an `AddressField` (a `PlacesField` for cities) bound to the
+    contract's `PlaceInput`, saved through `shared/places` by the owning service. The API accepts
+    only a place our address search or a pin signed, or the device's location while search is down;
+    the Details line (flat, gate) is the only free text, printed before the address
+    (FRONTEND_FOUNDATION F27, `docs/guides/addresses.md`, gate 22).
 
 ---
 
@@ -666,10 +723,13 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 | 19 AI read manifest only | M4 | `check/ai-no-writes.js` |
 | 20 Money | M6 | `check/money.js` |
 | 21 Nothing the browser styles itself | M0 | `check/native-ui.js`: no native select, picker, spinner, checkbox, `title` tooltip, validation bubble or unbranded toast, in source and on every gallery page and app screen in Chromium (F25), no exemptions |
+| 22 Addresses picked, never typed | M0 | `check/addresses.js`: every request body field named like an address is the contract's `PlaceInput` and kept by a registered owner, every owner registers its rename, and every address field on a screen is an `AddressField` or a `PlacesField` (F27, `docs/guides/addresses.md` §6.10); a deliberate exception carries `address:none <reason>` |
 
 Pipeline guards from M0: `gen:contract --check`, `check/env-template.js`, `check/module-catalogue.js`,
 `check/capabilities.js` (from M1: every capability catalogued once and seeded, §5.2), `check/public-surface.js`, `check/numbering-schemes.js`, `check/production-environment-refs.js`,
-`check/ai-vendor-imports.js`, `check/shell.js`, `check/pagination.js`, `check/provenance.js`
+`check/ai-vendor-imports.js`, `check/ai-actions.js` (every AI call names an action registered in
+`services/ai/actions.js`, with its job, its personal-data answer and who chose it; `docs/guides/ai-control.md`
+§6.5), `check/shell.js`, `check/pagination.js`, `check/provenance.js`
 (code and comments never name the project code came from; that lives in REUSE_MAP.md only).
 
 Frontend guards, from M0 (FRONTEND_GUIDE §10): `gen:components --check` and `check/components.js`

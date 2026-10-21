@@ -15,12 +15,19 @@
 const crypto = require("node:crypto");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
+const documents = require("../../shared/documents/generate");
+const exportFiles = require("../../shared/documents/exports");
 const numbering = require("../../shared/numbering/numbering");
 const lagos = require("../../shared/time/lagos");
 const routeMap = require("../../shared/route-map");
 const managerText = require("./manager-text");
+const { layout } = require("./org-chart.layout");
 const repo = require("./organisation.repo");
-const { EVENTS, CHART_EXPORT } = require("./organisation.events");
+const places = require("../../shared/places/places");
+
+/** A person's home address field (shared/places/owners.js). */
+const HOME = "employee.home_address";
+const { EVENTS, CHART_DOC_TYPE, CHART_EXPORT } = require("./organisation.events");
 
 const findDepartmentByName = (client, name) => repo.findDepartmentByName(client, name);
 const findEmployeeByWorkEmail = (client, email) => repo.findEmployeeByWorkEmail(client, email);
@@ -126,7 +133,13 @@ async function createEmployee(client, body, actor) {
     ? body.staff_number
     : (await numbering.allocate(client, "employee", { date: body.start_date })).number;
 
-  const employee = await repo.insertEmployee(client, { ...body, staff_number: staffNumber });
+  const home = body.home_address;
+  const employee = await repo.insertEmployee(client, {
+    ...body,
+    home_address: home ? places.lineOf(home) : null,
+    staff_number: staffNumber,
+  });
+  if (home) await places.save(client, HOME, employee.employee_id, home, { field: "home_address" });
   if (body.staff_number) await advanceStaffNumbers(client);
   if (employee.line_manager_id)
     await repo.recordReportingLine(
@@ -160,7 +173,11 @@ async function updateEmployee(client, employeeId, patch, actor) {
     throw new AppError("DEPARTMENT_NOT_FOUND", "Pick a department that exists.", 422, {
       department_id: ["Not a department"],
     });
-  const after = await repo.updateEmployee(client, employeeId, patch);
+  const change = { ...patch };
+  // The home address is a place (F27), kept through shared/places; the record keeps its line.
+  if (patch.home_address !== undefined)
+    change.home_address = (await places.save(client, HOME, employeeId, patch.home_address, { field: "home_address" })).line;
+  const after = await repo.updateEmployee(client, employeeId, change);
   await emit(client, {
     key: EVENTS.EMPLOYEE_UPDATED,
     entity: { type: "employee", id: employeeId },
@@ -169,6 +186,25 @@ async function updateEmployee(client, employeeId, patch, actor) {
     after,
   });
   return after;
+}
+
+/**
+ * Record a birthday known only as a day and month, for the celebrations (migration 1180).
+ * A full date_of_birth wins wherever both exist.
+ *
+ * @param {import("pg").PoolClient} client  inside atomically()
+ */
+async function setBirthday(client, employeeId, { day, month }, actor) {
+  const change = await repo.setBirthday(client, employeeId, { day, month });
+  if (!change) throw new AppError("NOT_FOUND", "Not found", 404);
+  await emit(client, {
+    key: EVENTS.EMPLOYEE_UPDATED,
+    entity: { type: "employee", id: employeeId },
+    actor,
+    before: change.before,
+    after: change.after,
+  });
+  return change.after;
 }
 
 /**
@@ -514,21 +550,28 @@ async function orgChart(client, { view = "viewer" } = {}) {
 }
 
 /**
- * POST /org-chart/exports, Download PDF: queue the whole chart, in the view asked for, for the
- * worker, which draws it as the person asking and emails it (org-chart.export.js;
- * docs/guides/organogram.md §5, §7). In the caller's transaction, with its event.
- * @returns {Promise<{queued: true, email: string}>}
+ * POST /org-chart/exports, Download PDF: the whole chart, in the view asked for, read and laid
+ * out now (org-chart.layout.js) and queued through documents.generate, so the pdf-render job
+ * draws it after commit; the screen that asked waits for it and downloads it there
+ * (docs/guides/organogram.md §5, §7). Nothing is emailed. In the caller's transaction, with
+ * its event.
+ * @returns {Promise<object>} the ExportFile, pending
  */
 async function requestOrgChartExport(client, { view = "viewer" } = {}, actor) {
-  if (!actor || !actor.email)
-    throw new AppError("NO_EMAIL", "Your login has no email to send the PDF to.", 422);
+  const tree = await orgChart(client, { view });
+  const doc = await documents.generate(client, {
+    doc_type: CHART_DOC_TYPE,
+    entity: { type: CHART_EXPORT, id: crypto.randomUUID() },
+    data: { ...layout(tree.nodes), seats: tree.seats, filled: tree.filled, open: tree.open },
+    actor,
+  });
   await emit(client, {
     key: EVENTS.ORG_CHART_EXPORT_REQUESTED,
-    entity: { type: CHART_EXPORT, id: crypto.randomUUID() },
+    entity: { type: CHART_EXPORT, id: doc.entity_id },
     actor,
-    payload: { view, requested_by: actor.user_id },
+    payload: { view, requested_by: actor.user_id, document_id: doc.document_id },
   });
-  return { queued: true, email: actor.email };
+  return exportFiles.present(doc);
 }
 
 /* ------------------------------------------------------------------ *
@@ -745,6 +788,7 @@ function splitName(full) {
 }
 
 module.exports = {
+  setBirthday,
   findDepartmentByName,
   findOrCreateDepartment,
   createDepartment,

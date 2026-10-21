@@ -70,6 +70,8 @@ export interface RawRequest {
   query: Record<string, unknown>;
   body: unknown;
   headers: Record<string, string>;
+  /** Cancels the request (a search a newer key overtook); the call then rejects with an AbortError. */
+  signal?: AbortSignal;
 }
 export interface RawResponse {
   status: number;
@@ -129,8 +131,11 @@ function fetchTransport(credentials: RequestCredentials, onHeaders?: (h: Headers
         headers: { Accept: "application/json", ...(req.body !== undefined ? { "Content-Type": "application/json" } : {}), ...req.headers },
         body: req.body !== undefined ? JSON.stringify(req.body) : undefined,
         credentials,
+        signal: req.signal,
       });
-    } catch {
+    } catch (err) {
+      // A request the caller cancelled is not the network failing: the caller drops it.
+      if (req.signal?.aborted) throw err;
       return OFFLINE;
     }
     onHeaders?.(res.headers);
@@ -150,7 +155,8 @@ export interface ApiResult<T> {
   data: T | undefined;
   error: ApiError | null;
   loading: boolean;
-  reload: () => void;
+  /** Ask again; settles once the answer is in. */
+  reload: () => Promise<void>;
   /** Replace the data in place (after a write that returned the new record). */
   set: (data: T) => void;
 }
@@ -172,7 +178,8 @@ export interface PagedResult<R> {
    */
   sort: string | undefined;
   setSort: (sort: string | undefined) => void;
-  reload: () => void;
+  /** Ask for the current page again; settles once it is in. */
+  reload: () => Promise<void>;
 }
 
 /** Runs `fn` while holding a lock every tab of this origin shares; in-tab only where the browser has no Web Locks. */
@@ -218,6 +225,7 @@ export function createApi<E>(config: ApiConfig) {
         ...(config.auth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
       },
+      signal: opts.signal,
     };
   }
 
@@ -280,7 +288,8 @@ export function createApi<E>(config: ApiConfig) {
 
   /* ───── reads, with a small cache and invalidation by path ───── */
 
-  type Listener = () => void;
+  /** A mounted read, asked to load again; `quiet` keeps what it shows. It may hand back when it has landed. */
+  type Listener = (quiet: boolean) => Promise<void> | void;
   const cache = new Map<string, unknown>();
   const listeners = new Map<string, Set<Listener>>();
   const cacheKey = (key: string, params: unknown, query: unknown) => JSON.stringify([key, params ?? null, query ?? null]);
@@ -297,15 +306,36 @@ export function createApi<E>(config: ApiConfig) {
     };
   }
 
-  /** Refetch everything whose path starts with one of these prefixes: invalidate("/api/v1/employees"). */
-  function invalidate(...prefixes: string[]) {
+  /** Asks every mounted read under the prefixes again and drops their cached answers; settles when the last has landed. */
+  function reloadUnder(prefixes: string[], quiet: boolean): Promise<void> {
+    const landed: Promise<void>[] = [];
     for (const [path, set] of listeners) {
-      if (prefixes.some((p) => path.startsWith(p))) set.forEach((fn) => fn());
+      if (!prefixes.some((p) => path.startsWith(p))) continue;
+      set.forEach((fn) => {
+        const out = fn(quiet);
+        if (out) landed.push(out);
+      });
     }
     for (const k of [...cache.keys()]) {
       const path = JSON.parse(k)[0] as string;
       if (prefixes.some((p) => path.slice(path.indexOf(" ") + 1).startsWith(p))) cache.delete(k);
     }
+    return Promise.allSettled(landed).then(() => undefined);
+  }
+
+  /** Refetch everything whose path starts with one of these prefixes: invalidate("/api/v1/employees"). */
+  function invalidate(...prefixes: string[]) {
+    void reloadUnder(prefixes, false);
+  }
+
+  /**
+   * Refresh in place (FRONTEND_FOUNDATION F28): every mounted read under these
+   * prefixes asks again quietly, its data staying on screen and `loading`
+   * false, so nothing turns back into a skeleton. The promise settles once the
+   * last of them has landed, whether it answered or failed.
+   */
+  function refresh(...prefixes: string[]): Promise<void> {
+    return reloadUnder(prefixes, true);
   }
 
   /** One GET. Pass `enabled: false` to wait (a detail panel with no id yet). */
@@ -320,12 +350,31 @@ export function createApi<E>(config: ApiConfig) {
       loading: enabled && !(config.cache && cache.has(ck)),
     }));
     const [tick, setTick] = useState(0);
-    const reload = useCallback(() => setTick((t) => t + 1), []);
+    // Who waits for the next answer (refresh, a caller's reload), and whether it should keep what is shown.
+    const waiting = useRef<Array<() => void>>([]);
+    const quiet = useRef(false);
+    const ask = useCallback(
+      (soft: boolean) =>
+        new Promise<void>((resolve) => {
+          waiting.current.push(resolve);
+          quiet.current = soft;
+          setTick((t) => t + 1);
+        }),
+      [],
+    );
+    const reload = useCallback(() => ask(false), [ask]);
 
     useEffect(() => {
-      if (!enabled) return;
+      const mine = waiting.current.splice(0);
+      const settle = () => mine.forEach((done) => done());
+      const soft = quiet.current;
+      quiet.current = false;
+      if (!enabled) {
+        settle();
+        return;
+      }
       let live = true;
-      setState((s) => ({ ck, data: s.ck === ck ? s.data : cached(), error: null, loading: true }));
+      setState((s) => ({ ck, data: s.ck === ck ? s.data : cached(), error: null, loading: !(soft && s.ck === ck && s.data !== undefined) }));
       const [k, p, q] = JSON.parse(ck) as [K, ParamsOf<E, K>, QueryOf<E, K>];
       call(k, { params: p ?? undefined, query: q ?? undefined } as Opts<K>)
         .then((data) => {
@@ -335,14 +384,15 @@ export function createApi<E>(config: ApiConfig) {
         .catch((e: unknown) => {
           const error = e instanceof ApiError ? e : new ApiError(0, null);
           if (live) setState((s) => ({ ck, data: s.data, error, loading: false }));
-        });
+        })
+        .finally(settle);
       return () => {
         live = false;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps -- `ck` is the serialised key, params and query
     }, [ck, enabled, tick]);
 
-    useEffect(() => subscribe(pathOf(key, params), reload), [key, params, reload]);
+    useEffect(() => subscribe(pathOf(key, params), ask), [key, params, ask]);
 
     const set = useCallback(
       (data: ResponseOf<E, K>) => {
@@ -419,27 +469,36 @@ export function createApi<E>(config: ApiConfig) {
       setPages(1);
     }, [resetKey]);
 
-    // invalidate() of this list, or reload(): from the first page again. reload() settles once that page is in.
+    // invalidate() of this list, refresh(), or reload(): from the first page again. Each settles once that page is in;
+    // refresh() keeps the rows on screen meanwhile (quiet).
     const [tick, setTick] = useState(0);
     const waiting = useRef<Array<() => void>>([]);
-    const reload = useCallback(
-      () =>
+    const quiet = useRef(false);
+    const ask = useCallback(
+      (soft: boolean) =>
         new Promise<void>((resolve) => {
           waiting.current.push(resolve);
+          quiet.current = soft;
           setPages(1);
           setTick((t) => t + 1);
         }),
       [],
     );
+    const reload = useCallback(() => ask(false), [ask]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `resetKey` is the serialised key and params
-    useEffect(() => subscribe(pathOf(key, opts.params), () => void reload()), [key, resetKey, reload]);
+    useEffect(() => subscribe(pathOf(key, opts.params), ask), [key, resetKey, ask]);
 
     useEffect(() => {
-      if (opts.enabled === false) return;
+      const soft = quiet.current;
+      quiet.current = false;
+      if (opts.enabled === false) {
+        waiting.current.splice(0).forEach((done) => done());
+        return;
+      }
       let live = true;
       const settle = () => waiting.current.splice(0).forEach((done) => done());
       const [k, p, f, q] = JSON.parse(resetKey) as [K, ParamsOf<E, K>, Record<string, unknown>, string];
-      setState((s) => ({ ...s, loading: true }));
+      setState((s) => ({ ...s, loading: !(soft && s.reset === resetKey && s.rows.length > 0) }));
       call(k, { params: p ?? undefined, query: { ...f, page: pages, ...(q ? { q } : {}) } } as Opts<K>)
         .then((body) => {
           const b = body as { data: RowOf<E, K>[]; page: PageMeta };
@@ -491,5 +550,5 @@ export function createApi<E>(config: ApiConfig) {
     return { run, pending, error, fields: error?.fields ?? {}, reset: () => setError(null) };
   }
 
-  return { api: { call }, session, refreshSession, invalidate, useApi, usePaged, useInfinite, useMutation };
+  return { api: { call }, session, refreshSession, invalidate, refresh, useApi, usePaged, useInfinite, useMutation };
 }

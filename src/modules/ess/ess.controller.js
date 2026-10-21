@@ -47,13 +47,6 @@ module.exports = {
   listLeave: async (req, res) =>
     sendPaged(res, await service.leave.list(req.user, req.validated.query)),
 
-  performance: async (req, res) => ok(res, await service.performance.summary(req.user)),
-  performanceReview: async (req, res) => ok(res, await service.performance.review(req.user)),
-  savePerformanceReview: async (req, res) =>
-    ok(res, await service.performance.save(withActor(req), req.validated.body)),
-  submitPerformanceReview: async (req, res) => ok(res, await service.performance.submit(withActor(req))),
-  dictatePerformanceAnswer: async (req, res) =>
-    ok(res, await service.performance.dictate(withActor(req), readUpload(req), req.validated.body)),
   leaveCalendar: async (req, res) =>
     sendPaged(res, await service.leave.calendar(req.user, req.validated.query)),
   leaveBalances: async (req, res) =>

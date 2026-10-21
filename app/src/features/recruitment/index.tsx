@@ -9,8 +9,9 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportAction, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal, Who, Wizard, type PlaceValue } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { places } from "@/features/shared/places";
 import { toTrail } from "@/features/shared/wire";
 
 export default function Recruitment({ tab, id }: ModuleScreenProps) {
@@ -112,11 +113,11 @@ function VacancyDetail({ v, close }: { v: Vacancy; close: () => void }) {
 
 function VacancyForm({ close }: { close: () => void }) {
   const depts = useDepartmentOptions("Pick the department");
-  const f = useContractForm({ title: "", department: "", openings: "1", location: "Lagos", arrangement: "hybrid", closes_on: "", description: "" }, {
+  const f = useContractForm({ title: "", department: "", openings: "1", location: null as PlaceValue | null, arrangement: "hybrid", closes_on: "", description: "" }, {
     title: (v) => (v.trim().length < 3 ? "Name the role" : null),
     department: (v) => (!v ? "Pick the department" : null),
     openings: (v) => (!(Number(v) >= 1) ? "At least one" : null),
-    location: (v) => (!v.trim() ? "Pick a location" : null),
+    location: (v) => (!v ? "Pick a location" : null),
     closes_on: (v) => (!v ? "Pick the closing date" : null),
     description: (v) => (v.trim().length < 40 ? "At least 40 characters" : null),
   });
@@ -124,7 +125,8 @@ function VacancyForm({ close }: { close: () => void }) {
   const submit = async () => {
     if (!f.check()) return;
     try {
-      const v = await save.run({ body: { ...f.values, openings: Number(f.values.openings), arrangement: f.values.arrangement as "hybrid" } });
+      // Checked above: the location is picked.
+      const v = await save.run({ body: { ...f.values, location: f.values.location!, openings: Number(f.values.openings), arrangement: f.values.arrangement as "hybrid" } });
       invalidate("/api/v1/recruitment/vacancies");
       close();
       toast(`${v.title} published at ${v.public_url}`);
@@ -146,7 +148,7 @@ function VacancyForm({ close }: { close: () => void }) {
             <>
               <Field label="Role" {...f.field("title")}><TextField {...f.field("title")} placeholder="e.g. Content Producer" /></Field>
               <Field label="Department" {...f.field("department")}><SelectField options={depts.slice(1)} placeholder="Pick the department" {...f.field("department")} /></Field>
-              <Field label="Location" {...f.field("location")}><TextField {...f.field("location")} /></Field>
+              <Field label="Location" {...f.field("location")}><AddressField {...f.field("location")} places={places} level="area" placeholder="Lekki Phase 1" /></Field>
               <Field label="Arrangement"><ChoiceField value={f.values.arrangement} onChange={(v) => f.set("arrangement", v)} options={[["on_site", "On Site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]} /></Field>
             </>
           ),

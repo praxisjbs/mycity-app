@@ -1,18 +1,17 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
-import type { FieldAssignment, FieldAssignmentCreate, FieldAssignmentState } from "@mycity/contract/contract.gen.ts";
+import type { FieldAssignment, FieldAssignmentState } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, Field, formatDate, formatDateTime, FormFooter, Grid, HelpTerm, KeyValue, NumberField, Pill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, DataView, Field, formatDate, formatDateTime, FormFooter, HelpTerm, KeyValue, Pill, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
 import { ASSIGNMENT_STATE } from "./labels";
 
 /**
- * Field assignments (docs/guides/attendance.md §6.12, §10): People · Attendance's Field view, where a
- * line manager or People send people to one or two sites for some days, cancel it or take someone
- * off; and on My Attendance, the person's own in progress and to come. The API decides who may set
- * or change one; `can_change` says whether this reader may.
+ * Field assignments made before PR 4 (docs/guides/attendance.md §6.12, §10), which retired making
+ * new ones: People · Worksites' Temporary, Field view, where a line manager or People cancel one or
+ * take someone off; and on My Attendance, the person's own in progress and to come. The API decides
+ * who may change one; `can_change` says whether this reader may.
  */
 
 export const assignmentPill = (a: Pick<FieldAssignment, "state">) => <Pill tone={ASSIGNMENT_STATE[a.state].tone}>{ASSIGNMENT_STATE[a.state].text}</Pill>;
@@ -174,136 +173,6 @@ function ChangeForm({ a, employee, close }: { a: FieldAssignment; employee?: Per
         <Button variant="danger" busy={cancel.pending || remove.pending} onClick={submit}>
           {employee ? "Take Off" : "Cancel Assignment"}
         </Button>
-      </FormFooter>
-    </>
-  );
-}
-
-type SiteKey = "name" | "address" | "latitude" | "longitude" | "radius";
-type Values = {
-  name: string;
-  client: string;
-  note: string;
-  starts_on: string;
-  ends_on: string;
-  people: PersonRef[];
-  count: "1" | "2";
-} & Record<`s${1 | 2}_${SiteKey}`, string>;
-
-const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
-const siteOf = (v: Values, n: 1 | 2) => ({
-  name: v[`s${n}_name`],
-  ...(v[`s${n}_address`].trim() && { address: v[`s${n}_address`].trim() }),
-  latitude: num(v[`s${n}_latitude`]),
-  longitude: num(v[`s${n}_longitude`]),
-  radius_m: num(v[`s${n}_radius`]),
-});
-/** The body the API takes. */
-const bodyOf = (v: Values) => ({
-  name: v.name.trim(),
-  client: v.client.trim(),
-  ...(v.note.trim() && { note: v.note.trim() }),
-  starts_on: v.starts_on,
-  ends_on: v.ends_on,
-  employee_ids: v.people.map((p) => p.employee_id),
-  sites: v.count === "2" ? [siteOf(v, 1), siteOf(v, 2)] : [siteOf(v, 1)],
-});
-/** The contract's paths on the form's fields: a site's are per site, the people one field. */
-const fieldOf = (path: PropertyKey[]): string => {
-  if (path[0] === "employee_ids") return "people";
-  if (path[0] === "sites") {
-    const key = String(path[2] ?? "name");
-    return `s${Number(path[1] ?? 0) + 1}_${key === "radius_m" ? "radius" : key}`;
-  }
-  return String(path[0]);
-};
-const remap = (fields: Record<string, string[]>) =>
-  Object.fromEntries(Object.entries(fields).map(([k, v]) => [k === "employee_ids" ? "people" : k, v]));
-
-const blankSite = (n: 1 | 2) => ({ [`s${n}_name`]: "", [`s${n}_address`]: "", [`s${n}_latitude`]: "", [`s${n}_longitude`]: "", [`s${n}_radius`]: "200" });
-
-/** New Assignment: who, where, which days. In force once saved; each person is told. */
-export function NewAssignmentForm({ close }: { close: () => void }) {
-  const f = useContractForm<Values>(
-    { name: "", client: "", note: "", starts_on: "", ends_on: "", people: [], count: "1", ...blankSite(1), ...blankSite(2) } as unknown as Values,
-    {
-      safeParse: (v: unknown) => {
-        const r = attendance.FieldAssignmentCreate.safeParse(bodyOf(v as Values));
-        if (r.success) return r;
-        return { success: false, error: { issues: r.error.issues.map((i) => ({ ...i, path: [fieldOf(i.path)] })) } };
-      },
-    },
-  );
-  const save = useMutation("POST /api/v1/attendance/field-assignments");
-  const v = f.values;
-  const submit = async () => {
-    if (!f.check()) return;
-    try {
-      // Checked against the contract above, so every number is one.
-      const a = await save.run({ body: bodyOf(v) as FieldAssignmentCreate });
-      invalidate("/api/v1/attendance");
-      close();
-      toast(`${a.number} set, ${a.people} told`);
-    } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) {
-        f.setServerErrors(remap(e.fields));
-        // Who is already out on those days: the mark on First Day cannot say.
-        if (e.code === "ASSIGNMENT_OVERLAPS") toast(e.message);
-      } else toast(e instanceof ApiError ? e.message : "Assignment not saved");
-    }
-  };
-  const site = (n: 1 | 2) => (
-    <Card className="mt-3" key={n}>
-      <CardHeader title={n === 1 ? (v.count === "2" ? "First Site" : "Site") : "Second Site"} />
-      <Field label="Site Name" {...f.status(`s${n}_name`)}>
-        <TextField {...f.field(`s${n}_name`)} placeholder="Expo Hall" maxLength={120} />
-      </Field>
-      <Field label="Address" optional {...f.status(`s${n}_address`)}>
-        <TextField {...f.field(`s${n}_address`)} placeholder="Street, area, city" maxLength={300} />
-      </Field>
-      <Grid cols={2}>
-        <Field label="Latitude" {...f.status(`s${n}_latitude`)}>
-          <NumberField decimal {...f.field(`s${n}_latitude`)} placeholder="6.4281" />
-        </Field>
-        <Field label="Longitude" {...f.status(`s${n}_longitude`)}>
-          <NumberField decimal {...f.field(`s${n}_longitude`)} placeholder="3.4219" />
-        </Field>
-      </Grid>
-      <Field label={<HelpTerm help="A punch within this distance of the site counts at the site. Between 100 and 500 metres.">Radius, Metres</HelpTerm>} {...f.status(`s${n}_radius`)}>
-        <NumberField {...f.field(`s${n}_radius`)} />
-      </Field>
-    </Card>
-  );
-  return (
-    <>
-      <Field label="Name" {...f.status("name")}>
-        <TextField {...f.field("name")} placeholder="Stand Build" maxLength={120} />
-      </Field>
-      <Field label="Client or Event" {...f.status("client")}>
-        <TextField {...f.field("client")} placeholder="Example Expo" maxLength={120} />
-      </Field>
-      <Field label="People" {...f.status("people")}>
-        <EmployeePicker multiple value={v.people} onChange={(p) => f.set("people", p)} placeholder="Search people" />
-      </Field>
-      <Grid cols={2}>
-        <Field label="First Day" {...f.status("starts_on")}>
-          <DateField {...f.field("starts_on")} min={todayIso()} />
-        </Field>
-        <Field label="Last Day" {...f.status("ends_on")}>
-          <DateField {...f.field("ends_on")} min={v.starts_on || todayIso()} />
-        </Field>
-      </Grid>
-      <Field label="Sites" {...f.status("count")}>
-        <ChoiceField value={v.count} onChange={(c) => f.set("count", c)} options={[["1", "One Site"], ["2", "Two Sites"]] as Array<["1" | "2", string]>} />
-      </Field>
-      {site(1)}
-      {v.count === "2" && site(2)}
-      <Field label="Note" optional className="mt-3" {...f.status("note")}>
-        <TextAreaField {...f.field("note")} placeholder="Badges at gate" rows={2} />
-      </Field>
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Save Assignment</Button>
       </FormFooter>
     </>
   );

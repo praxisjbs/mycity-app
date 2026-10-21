@@ -34,6 +34,31 @@ async function syncable(db) {
   return rows.map((r) => r.mail_account_id);
 }
 
+/**
+ * Every account with a saved password, and the host each is held open on: what a change of
+ * staff mail server moves, and what the IDLE loop compares its connections with
+ * (docs/guides/integrations.md §3 step 8).
+ */
+async function movable(db) {
+  const { rows } = await db.query(
+    `SELECT mail_account_id, email, status, incoming_host, incoming_port, tls FROM mail_account
+      WHERE status IN ('connected', 'needs_reconnect') AND integration_secret_id IS NOT NULL
+      ORDER BY mail_account_id
+      LIMIT 30 -- pagination:batch the host's plan holds 30 mailboxes; one pass moves them all`,
+  );
+  return rows;
+}
+
+/** Point one account at a mail server. One the old server refused is tried again there. */
+function repoint(db, id, s) {
+  return db.query(
+    `UPDATE mail_account SET incoming_host = $2, incoming_port = $3, outgoing_host = $4, outgoing_port = $5,
+            tls = $6, status = 'connected', consecutive_failures = 0, last_error_code = NULL
+      WHERE mail_account_id = $1`,
+    [id, s.incoming_host, s.incoming_port, s.outgoing_host, s.outgoing_port, s.tls !== false],
+  );
+}
+
 async function saveSecret(db, { key, ciphertext, by }) {
   const row = await one(
     db,
@@ -474,6 +499,40 @@ function enqueue(db, q) {
   );
 }
 
+/**
+ * A draft's waiting send stood down: it is being replaced by a new schedule, or the draft
+ * was discarded. `keepKey` spares the send this same request already made (a retried press).
+ */
+function cancelQueuedForDraft(db, userId, draftId, keepKey = null) {
+  return db.query(
+    `UPDATE mail_send_queue SET status = 'cancelled'
+      WHERE user_id = $1 AND mail_draft_id = $2 AND status = 'queued'
+        AND idempotency_key IS DISTINCT FROM $3`,
+    [userId, draftId, keepKey],
+  );
+}
+
+/** A scheduled draft was edited: its waiting send carries the new words, recipients and files. */
+function refreshQueued(db, userId, draftId, d) {
+  return db.query(
+    `UPDATE mail_send_queue SET payload = payload || $3::jsonb
+      WHERE user_id = $1 AND mail_draft_id = $2 AND status = 'queued'`,
+    [
+      userId,
+      draftId,
+      JSON.stringify({
+        to_addresses: d.to_addresses,
+        cc_addresses: d.cc_addresses,
+        bcc_addresses: d.bcc_addresses,
+        subject: d.subject,
+        body_html: d.body_html,
+        document_ids: d.document_ids,
+        in_reply_to: d.in_reply_to,
+      }),
+    ],
+  );
+}
+
 function cancelQueued(db, userId, queueId) {
   return one(
     db,
@@ -542,10 +601,27 @@ async function sentLastHour(db, accountId) {
   return row.n;
 }
 
+/** One attachment of a mail in the user's own mailbox, outside Spam; null for anyone else's, a spam mail's or none. */
+function attachmentOf(db, mailAttachmentId, userId) {
+  return one(
+    db,
+    `SELECT a.mail_attachment_id, a.document_id
+       FROM mail_attachment a
+       JOIN mail_message m ON m.mail_message_id = a.mail_message_id
+       JOIN mail_account ac ON ac.mail_account_id = m.mail_account_id
+       LEFT JOIN mail_folder f ON f.mail_folder_id = m.mail_folder_id
+      WHERE a.mail_attachment_id = $1 AND ac.user_id = $2 AND f.kind IS DISTINCT FROM 'spam'`,
+    [mailAttachmentId, userId],
+  );
+}
+
 module.exports = {
+  attachmentOf,
   accountOf,
   accountById,
   syncable,
+  movable,
+  repoint,
   saveSecret,
   secretOf,
   retireSecret,
@@ -577,6 +653,8 @@ module.exports = {
   listDrafts,
   enqueue,
   cancelQueued,
+  cancelQueuedForDraft,
+  refreshQueued,
   claimDue,
   claimOne,
   requeueStalled,

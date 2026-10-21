@@ -6,14 +6,15 @@ React apps: the staff app (`app/`, `hub.mycityapp.io`) and the public site (`pub
 
 Status: **the rules here are settled. The foundation (§9) is one design system for both apps,
 `packages/ui` (`@mycity/ui`), owned by AJ (Adole Jerome), backup TB.** It is built in three PRs
-planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F26 are binding: where this guide
+planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F27 are binding: where this guide
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
 rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8 brought into line;
 §1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell); §8.8 and gate 21
 (nothing the browser styles itself, F25) added 18 October 2026, and one press, one request (F26:
-§8.4, §9.4, the `no-void-press` lint) the same day.
+§8.4, §9.4, the `no-void-press` lint) the same day; refresh (F28) and back and forward (F29) in the
+hub added 20 October 2026 (§7, §9.2, §9.5, §9.7).
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -35,7 +36,7 @@ the client has already accepted.
 Guides lead, gates confirm (F9). Every builder, person or AI, starts here, so the gates in §10
 confirm work that was built right instead of rejecting it at the end.
 
-1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F26 and where each foundation PR
+1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F27 and where each foundation PR
    stands. Then **read `docs/COMPONENTS.md`**, the catalogue of every shared component: what it is
    for, when not to use it, its props and how it behaves on a phone. It is generated from the code
    (`npm run gen:components`), so it is never out of date.
@@ -291,6 +292,20 @@ drawn with (PR 3: `DataView`, `Kanban`, the charts, the pickers, the editor, the
 Build every screen for them: the page keeps clear space under its content by itself, give the screen one New
 action (`useScreenAction`, below), and never rely on dragging on a phone.
 
+- **Pull to refresh** (F28): pulling down at the top of a page drops the pin in a disc under the
+  header while a yellow ring fills. Let go once the ring has closed (64 px) and every read on the
+  screen loads again in place, the ring spinning until the last one lands; pull on past 136 px and
+  the disc turns Deep Green with the reload mark, and letting go restarts the app on the same screen.
+  `PhoneShell` owns it (`onRefresh`, `onReload`) and so does `PhonePage` (`onRefresh`). It only
+  listens, so scrolling never waits on it: it starts only when the page and every list under the
+  finger are at their top and the first move is clearly down, never on a fit page, and never over
+  anything marked `data-pull="off"`. A component that drags vertically (a map, the signature pad, a
+  document) carries that mark; a screen never needs to.
+- **Back** (F29): there is no back button on a phone. Android's Back and the iPhone's edge swipe go
+  back a step: a new screen, tab or opened record. An open sheet, page, menu, search or the file
+  viewer is a step of its own, so Back closes it first (`useBackClose` in every overlay of
+  `@mycity/ui`; a feature does nothing for it). In the installed app, holding the pin opens the
+  trail (`TrailMenu`, a sheet): the last 8 places and the 1 ahead.
 - **Top bar and title rail** (PR 2 question 3): the pin alone at the left, which goes Home; search,
   the bell and the person's avatar at the right (the avatar opens More). Under it the title rail:
   the module's name as one large line, shortened when long, over the module's tabs. Scrolling down
@@ -335,7 +350,10 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
 - **What is left off a phone is decided per screen** in the feature guide's §10 (an extra KPI
   card, a secondary column, a chart), never ad hoc.
 
-**The desktop shell:** the sidebar, dense tables with the shared pager, keyboard navigation, side
+**The desktop shell:** at the start of the top bar, one capsule (`NavCapsule`): refresh, the Hold
+Ring (F28: a click refreshes in place, a 0.6 s hold reloads the app), and in the installed app back
+and forward (F29: hover names where an arrow goes; holding an arrow, right clicking it or holding the
+pin opens the trail). Then the sidebar, dense tables with the shared pager, keyboard navigation, side
 panels and multi-pane layouts where they help, hover help (§5.2). The mobile bottom bar and the
 floating button never show.
 
@@ -507,6 +525,23 @@ added in `packages/ui` with `npm run new:component`, drawn in tokens, never left
 
 ---
 
+### 8.9 Addresses are picked, never typed (gate 22)
+
+Every address or location a person enters, in both apps and on every environment, is an
+`AddressField`, or a `PlacesField` for a list of cities (FRONTEND_FOUNDATION F27,
+`docs/guides/addresses.md`). There is no free address field: typing searches, and only a pick, a
+pin on the map or, while address search is down, the device's location becomes the address.
+
+| Never | Always |
+|---|---|
+| `TextField` for an address, a location, a headquarters, a venue or a city list | `AddressField` with the app's `places` (bound once in `features/shared/places.ts`) and the field's `level` (`address`, `area`, `city`); `PlacesField` for several cities |
+| Sending typed text as an address | The field's value as the body's field: it already is the contract's `PlaceInput`, `{ token, details }`, or `{ device, details }` in an outage |
+| Prefilling the field from the line a list shows | `placeValue(record.<field>_place)`, so an untouched address goes back as it came |
+| An instruction or a hint about how search works on the screen | The field's own states (§10 of the guide): Searching, No address found with Drop a Pin, Address search is unavailable with Use Current Location |
+
+A deliberate exception (a search box that is not an address kept, such as the Geoapify test on
+Settings · Integrations) carries `address:none <reason>` on the line or the line above.
+
 ## 9 · Foundation: `packages/ui` and the two apps
 
 Owner AJ, backup TB (CODEOWNERS). Built in three PRs (FRONTEND_FOUNDATION §1, §4), **all three
@@ -544,7 +579,9 @@ packages/ui/
     index.ts                  THE public barrel: everything a feature may import, and nothing else
     styles/                   tokens.css (the only file with a hex value), theme.css (the Tailwind 4
                               theme and variants), base.css (element defaults, focus ring, reduced motion)
-    lib/                      cn, format, media (useIsPhone), preferences (theme, density), slots, ids,
+    lib/                      history (the window's history: keyed steps, Back closing a phone's
+                              overlays, F29), hold (press and hold), cn, format, media (useIsPhone,
+                              useInstalled), preferences (theme, density), slots, ids,
                               environment (the staging marks), plan (what opens where, F14)
     icons/                    Icon (Lucide underneath)
     actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
@@ -560,13 +597,14 @@ packages/ui/
                               ErrorBoundary, ErrorState
     form/                     the form system: the only home of raw form elements (§8.6)
     data/                     ApiError, createApiClient, useApi, usePaged, useInfinite, useMutation, invalidate,
-                              DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
+                              refresh (F28), DataView (F20), Pager, Toolbar, ExportButton, Kanban (F19), Calendar
     charts/                   AreaChart, BarChart, DonutChart, BandChart, Sparkline; each a boundary
                               around its own *.draw.tsx chunk (F22)
     documents/                DocumentPreview, ImageViewer, Paper, Reader
     maps/                     MapView, PlaceSearch, LocationLabel on Leaflet, with Geoapify proxied (F21)
     illustrations/            Illustration, in token colours; CityShowcase, the sign-in screen's photographs
     shell/                    the frame both apps' shells are built from (PR 2): Brand, ComingSoon,
+                              NavCapsule and TrailMenu (F28, F29), PullIndicator and pull (F28),
                               PublicPage, DesktopShell, PhoneShell, Rail, TopBar, PhoneHeader, BottomBar,
                               MoreSheet, FloatingButton, CommandPalette, NotificationCenter (the bell's
                               pane), NotificationRow, ShellNotice
@@ -591,7 +629,8 @@ app/
     main.tsx  App.tsx         entry; providers (auth, router, modal, toasts)
     sw.ts                     the service worker: precache, offline, update, web push (§9.7)
     styles/index.css          Tailwind and the @mycity/ui styles; the staging offset; no colour of its own
-    lib/                      plan (the delivery plan bound to this app), router, routes (screen URLs)
+    lib/                      plan (the delivery plan bound to this app), router (the step rule, F29),
+                              routes (screen URLs), trail (this device's trail of places, F29)
     api/
       client.ts               the staff app's client, made with createApiClient (session, refresh)
       endpoints.ts  hooks.ts  the typed endpoint map; the shared hooks bound to this client
@@ -600,7 +639,15 @@ app/
       types/<module>.ts       INTERIM wire shapes, one file per module, until contract.gen.ts covers it
       upload.ts               this app's session on the one upload engine (@mycity/ui lib/upload)
       download.ts             the other way: a gated file fetched with the session's token, as a
-                              download (saveFile) or a blob URL a preview can draw (useFileUrl)
+                              download (saveFile), a blob URL a preview can draw (useFileUrl), the
+                              bytes and URL a PDF preview needs (useFileBlob), what the file viewer
+                              draws (fetchFile), and people's and chat photos, each fetched once (usePhotos)
+                              download (saveFile) or a blob URL a preview can draw (useFileUrl); a
+                              download lands on this device: Downloads, or the share sheet on an
+                              iPhone app opened from the home screen
+      exports.ts              every Export and Download button's file: asked for, waited on while the
+                              worker makes it, then saved on this device (saveExport, saveRun); never
+                              emailed (docs/guides/foundation.md §6.12)
       mock/                   the in-browser mock, laptops and CI only (§9.5): core, data/, modules/<module>.ts
     auth/                     AuthProvider (useAuth, useMe; the session clock and the locked state; every way in),
                               Login (with the code step and the PIN), LockSheet, passkey (the browser's WebAuthn
@@ -609,15 +656,18 @@ app/
                               slugs, one-word names), access (grants, capabilities), nav (rail, bottom
                               bar, More), screens (lazy per module), More, Fab, screen-action
                               (useScreenAction), Search (⌘K), Bell, Notices, pwa (update, install),
+                              refresh (refresh in place and Reload App, F28), trail-items (the trail's
+                              names for its places, F29),
                               offline, Planned (Coming Soon, the Prototype View switch), coming-soon,
                               layout-context
     features/shared/          wiring, never components (§9.4): sections (PagedTable, ExportAction),
                               pickers (EmployeePicker), wire (the API's shapes to the components'),
-                              KpiTiles, Letter
+                              files (useFileViewer: MediaViewer on this app's session), KpiTiles, Letter
     features/<module>/        one folder per module: home, workspace, ess, community, mailbox, people,
                               performance, queries, recruitment, payroll, partnerships, expenses,
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
-                              shared by People, ESS and Settings; notifications (the bell's pane, the banner,
+                              shared by People, ESS and Settings; policies (Knowledge Hub ·
+                              Policies, ESS · Policy Updates and the acknowledge sheet); notifications (the bell's pane, the banner,
                               push on the device, Notification Settings, §9.6); and shared/ (sections, KPI
                               tiles, letters)
 ```
@@ -696,12 +746,28 @@ screens still call it `useIsMobile`, the same hook), both from the Shell group o
 
 - **Desktop** (`DesktopShell`): the `Rail` (collapsible to 66 px, remembered in `mc-rail`; the
   person's menu at its foot: My Profile, My Security, Theme, Density, Install App, Sign Out), the
-  `TopBar` (rail toggle, `SearchButton`, Clock In or Out, the bell), the module's `Tabs`, the page.
+  `TopBar` (rail toggle, the `NavCapsule` of F28 and F29, `SearchButton`, Clock In or Out, the
+  bell), the module's `Tabs`, the page.
   When the window is too narrow for every tab, `Tabs` shows the ones that fit (the active one
   always among them) and folds the rest into More Tabs, a ⋯ menu at the end of the strip; it never
   scrolls sideways on desktop.
 - **Phone** (`PhoneShell`): `PhoneHeader` (§7: the pin; search, the bell, the avatar; the title rail
-  over the tabs, which scroll sideways), the page, the `FloatingButton` and the `BottomBar` with `MoreSheet` (F16 to F18).
+  over the tabs, which scroll sideways), the page with its pull to refresh (F28), the
+  `FloatingButton` and the `BottomBar` with `MoreSheet` (F16 to F18).
+
+**Steps and the trail** (F29). `lib/router.tsx` keeps the window's history through `@mycity/ui`'s
+history controller (`lib/history.ts`), which keys every entry, so a step is known again when Back or
+Forward returns to it. `navigate` decides what a step is: a change of path, `tab` or `id` adds one; a
+change of any other key (filters, `q`, `sort`, `page`, a modal's own key) replaces the current one,
+so Back returns to a list as it was left. `{ replace: true }` or `{ replace: false }` still decides
+for a caller that knows better. On a phone, every overlay in `@mycity/ui` takes a step of its own
+while it is open (`useBackClose`), so Back closes it first; when it closes any other way its step is
+taken back, and a step made while it was open lands on the screen underneath. `lib/trail.ts` keeps
+this device's trail (`localStorage`, never sent anywhere): each step's address and, for a record, the
+name a screen gives it with `useTrailTitle(name)`, so the trail reads "Ada Obi" rather than
+"Employees". The installed app reopens on the last place with its back steps, when the person left it
+within the last 12 hours; another person signing in, or Sign Out, starts it afresh. The trail shows
+the last 8 places and the 1 ahead.
 
 A screen may also render a different layout per shell; it never shrinks the desktop one. Chat and
 Mailbox are "fit" pages (`useFitPage`): only their panes scroll, and scrolling past a pane's end
@@ -826,7 +892,9 @@ What a feature may still keep beside its screens is **wiring**, not components:
 `features/shared/sections.tsx` binds `DataView` and `ExportButton` to this app's endpoints
 (`PagedTable`, `ExportAction`), `features/shared/pickers.tsx` binds `PersonPicker` to the employees
 endpoint (`EmployeePicker`), `features/shared/wire.ts` maps what the API sends to what the
-components take, and `api/upload.ts` gives the upload engine this app's session.
+components take, `features/shared/files.tsx` binds `MediaViewer` to this app's session
+(`useFileViewer`, for My Documents and a mail's attachments), and `api/upload.ts` gives the
+upload engine this app's session.
 
 **Submit is never disabled** (§8.3). `Button`, `IconButton` and `BigButton` are busy while the work
 their handler returns runs (F26, §8.4), or while `busy` says so (a mutation's pending that the press
@@ -860,7 +928,10 @@ with `code`, `message` and `fields`. Writes that must not repeat pass `idempoten
 `Idempotency-Key`). The hooks: `useApi` (one read), `usePaged` (server pages: `page`, `q` debounced
 250 ms, filters; changing either goes to page 1), `useInfinite` (phones), `useMutation` (with
 `fields` after a 422) and `invalidate(prefix)`, which reloads every mounted read under that path.
-There is no client cache beyond the mounted reads. The page size is the contract's
+`refresh(prefix)` (F28) asks every mounted read under that path again, quietly: data stays on
+screen, `loading` stays false, and the promise it returns settles when the last read has landed
+(the pull's ring and the refresh button spin until then). `invalidate` keeps its plain reload, for
+after a write. There is no client cache beyond the mounted reads. The page size is the contract's
 (`__CONTRACT_PAGE_SIZE__`, read from `packages/contract/schemas/common.js` at build), never a
 constant in an app.
 
@@ -909,8 +980,8 @@ and reconnects. A refused refresh leaves it closed and the session sheet takes o
 `useRealtime(event, handler)` hands an event to the components listening while they are mounted;
 `usePresence(userId)` keeps who is online from `presence` events. While the tab is on screen and was
 touched in the last 5 minutes the socket says `presence:active` every 30 seconds, and
-`presence:idle` when that stops: the server holds a push to the person's devices for a minute while
-they are looking at the app. Realtime is best effort: everything also arrives over HTTP, so a
+`presence:idle` when that stops (attendance's clock watch reads it; a push is never held for it, TB
+19/10/2026). Realtime is best effort: everything also arrives over HTTP, so a
 dropped socket only means the bell refreshes when it is opened. The in-browser mock has no server, so
 nothing connects in mock mode; it answers every notification route in the contract's shapes.
 
@@ -925,14 +996,16 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   `Modal` on desktop). It reloads its dot, its list and the badge counts
   (`GET /api/v1/notifications/unread-count`, `GET /api/v1/notifications`,
   `GET /api/v1/notifications/badges`) on `notification` (a new one) and `notification_read` (a read
-  mark made in another tab or on another device). Open marks a notice read before it navigates.
+  mark or an Acknowledge made in another tab or on another device). Open marks a notice read before
+  it navigates. A row is red for an urgent notice and amber for an important one.
   Whether the pane and Notification Settings are open is one store (`features/notifications/state.ts`),
   so the bell, ⌘K and a `pane=notifications` link open the same ones.
 - **Arrivals** (`features/notifications/arrivals.ts`, `useArrivals`): a notice reaching a window on
   screen, over the socket or from the service worker, shows the banner (`notify()` from
   `@mycity/ui`, on the second, top `Toaster`, for 3 seconds) and chimes or vibrates (`sound.ts`):
-  once per notice whichever way it came, never for the record already on screen. A window in the
-  background only reloads its bell; the device's own notification sounds. A link from a notification
+  once per notice whichever way it came, and again on each urgent repeat, never for the record
+  already on screen. A window in the background only reloads its bell. The device shows its own
+  notification as well, the one in the person's hand included (`app/src/sw.ts`, TB 19/10/2026). A link from a notification
   carries `n=<ids>` (marked read, then dropped from the address) or `pane=notifications`. When the
   app comes to the front it closes the notifications in the shade whose notices are read, and the
   app icon's count follows the unread count (`setAppBadge`, where the platform has one).
@@ -942,6 +1015,11 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   The device's id, token and key id live in IndexedDB (`device-store.ts`, database `mycity-push`),
   where the service worker reads them. The one-time Turn On offer is a `ShellNotice`
   (`shell/Notices.tsx`); the browser's own prompt never shows unasked.
+- **The urgent bar** (`features/notifications/UrgentNotices.tsx`, `UrgentBar` from `@mycity/ui`,
+  the shells' `alert` slot): the person's open urgent notices (`GET /api/v1/notifications/urgent`)
+  under the top bar on every screen of both shells, red and pulsing slowly, with Acknowledge (an
+  urgent announcement, `POST /api/v1/notifications/:id/acknowledge`) or Open. The modules they are
+  about show their nav count in red (`urgent` on `Rail` and `BottomBar` items).
 - **⌘K** runs Notification Settings, Turn On Notifications, Send Test Notification and Mark All Read
   in the app itself (`shell/Search.tsx`, `src/shared/search/actions.js`).
 
@@ -960,6 +1038,12 @@ app's own, `src/sw.ts` (typed by `tsconfig.sw.json`, the WebWorker library, and 
   is installed (opened standalone, or the browser reports `appinstalled`). Where the browser offers
   its own prompt (`beforeinstallprompt`) Install App uses it; on an iPhone or iPad it shows the Add
   to Home Screen steps.
+- **Installed** (F28, F29): `useInstalled()` from `@mycity/ui` is true when the app runs as an
+  installed app (display mode standalone, minimal-ui or window controls overlay, or an iPhone's home
+  screen). Only then does the desktop capsule show back and forward and the pin open the trail; the
+  refresh button and the pull show everywhere. Reload App (a hold on the refresh button, the deep
+  pull, ⌘K) hands over to a waiting new version as the update notice's Reload does, and asks first
+  when a screen holds unsaved work.
 - **Offline**: the shell and assets are precached, so the installed app opens without a connection;
   the worker answers no `/api/` request, so every number on screen is live and nothing personal is
   cached. With no connection the page area shows the offline page (`shell/offline.tsx`: No
@@ -1005,6 +1089,7 @@ when a change touches it (F23). Several gates are lint rules in
 | 17 No dashes | `scripts/check/dashes.js` | An em dash, an en dash or a double hyphen in copy a person reads (§5.4) |
 | 18 Upload engine | lint `no-file-input`; `scripts/check/upload.js` | A raw `<input type="file">` outside `packages/ui/src/form/` (§8.7) |
 | 21 Nothing the browser styles itself | `scripts/check/native-ui.js` (source, and every gallery page and app screen in Chromium) | A native select, option, datalist, progress, meter or dialog; a browser-drawn input type; a `title` tooltip; a form without `noValidate`; a control the `base.css` reset missed; sonner outside the `Toaster`. No exemptions, `packages/ui` included (§8.8, F25) |
+| 22 Addresses picked, never typed | `scripts/check/addresses.js` (the routes the API mounts, and the source of `packages/ui`, `app` and `public-app`) | A request body field named like an address that is not the contract's `PlaceInput`; a `PlaceInput` no registered owner keeps; a Field labelled like an address, or a control bound to an address field, that is not an `AddressField` or a `PlacesField`. A deliberate exception carries `address:none <reason>` (§8.9, F27) |
 | F26 One press, one request | lint `no-void-press` (`packages/ui/eslint.shared.js`, tested in `packages/ui/src/testing/eslint-rules.test.ts`) | A press handler on `Button`, `IconButton`, `BigButton`, `Form`, `Wizard`, `ConfirmDialog` or `ExportButton` that throws its work away (`() => void save()`, or a local function it names that does), so the button cannot stay busy (§8.4) |
 | Components (F8) | `scripts/gen/components.js --check`, `scripts/check/components.js` | A stale `docs/COMPONENTS.md`; a component without its header, test or gallery page; ANY file in an app's `components/` (both folders are gone); a feature shadowing a shared component (§9.4) |
 | Mock-free (F12) | `scripts/check/mock-free.js` | A release build that contains the in-browser mock (§9.5) |
@@ -1039,6 +1124,8 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
   `() => void save()` and no `disabled={busy}` (F26, §8.4)
 - [ ] Nothing the browser draws in its own style: no native select or picker, no browser input
   type, no `title` tooltip, no validation bubble, no unbranded toast, on phone or desktop (gate 21, §8.8)
+- [ ] Every address picked, never typed: an `AddressField` (a `PlacesField` for cities) bound to
+  the contract's `PlaceInput`, prefilled with `placeValue(record.<field>_place)` (gate 22, §8.9)
 - [ ] `npm run ci` green, the whole suite, before pushing
 - [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked (UI, Mobile) and a note left

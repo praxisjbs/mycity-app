@@ -1,15 +1,11 @@
-import type { Accepted, IsoDateTime, Tone } from "./common";
+import type { ExportFile } from "@mycity/contract/contract.gen.ts";
 
-/** A status as the INTERIM modules word it: a tone and the words. */
-export type Status = { tone: Tone; text: string };
-/** A step of an INTERIM approval chain. */
-export type Step = { label: string; state: "done" | "now" | null };
-/** A step on an INTERIM record's trail. */
-export type Trail = { title: string; when: IsoDateTime; text: string | null; tone: "hi" | "ok" | null };
-
-/** INTERIM cross-module endpoints: exports run in the worker and land in the Mailbox. */
+/**
+ * INTERIM cross-module endpoints: an export of a module still to come, made in the worker and
+ * downloaded on the device that asked (api/exports.ts), as every export is.
+ */
 declare module "@/api/endpoints" {
   interface Endpoints {
-    "POST /api/v1/exports": { query: never; body: { source: string; filters: Record<string, unknown> }; params: never; response: Accepted };
+    "POST /api/v1/exports": { query: never; body: { source: string; filters: Record<string, unknown> }; params: never; response: ExportFile };
   }
 }

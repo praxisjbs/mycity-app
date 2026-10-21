@@ -1,0 +1,40 @@
+# MyCity health watch (production) · docs/guides/system-health.md §7, docs/runbooks/system-health.md §7.
+# Installed by ops/provision/provision.sh; started every 5 minutes by mycity-health-watch-prod.timer.
+# Run now:  sudo systemctl start mycity-health-watch-prod     Logs: journalctl -u mycity-health-watch-prod
+# Reads the system the way Settings · Status does, without needing the API, the database or Redis,
+# and mails the Status brief to HEALTH_ALERT_TO when something is down (red only). Its memory is
+# /var/lib/mycity-health-watch-prod/state.json. Until a release with the script exists it is skipped.
+
+[Unit]
+Description=MyCity health watch (production)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/srv/mycity/prod/current/scripts/ops/health-brief.js
+
+[Service]
+Type=oneshot
+User=mycity-prod
+Group=mycity-prod
+# Reading the API's and the worker's journal for the brief's warnings.
+SupplementaryGroups=systemd-journal
+WorkingDirectory=/srv/mycity/prod/current
+EnvironmentFile=/srv/mycity/prod/shared/.env
+EnvironmentFile=-/srv/mycity/prod/current/BUILD.env
+Environment=MYCITY_PROCESS=mycity-health-watch
+Environment=HOME=/tmp
+ExecStart=/usr/bin/node scripts/ops/health-brief.js --watch --state=/var/lib/mycity-health-watch-prod/state.json
+StateDirectory=mycity-health-watch-prod
+TimeoutStartSec=2min
+Nice=5
+SyslogIdentifier=mycity-health-watch-prod
+
+# It reads and mails; it writes only its own state.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes

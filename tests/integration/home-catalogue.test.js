@@ -121,6 +121,8 @@ describeDb("the KPI catalogue against the real migrations", () => {
     await login("mgr", "manager");
     await login("staff", "employee");
     await login("outsider", "employee");
+    // Zainab has a login too: someone with none is never expected to clock in (attendance.md §6.4).
+    await login("staff2", "employee");
   });
 
   afterAll(async () => {
@@ -420,12 +422,12 @@ describeDb("the KPI catalogue against the real migrations", () => {
         (
           await one(
             `INSERT INTO home_alert_rule (key, name, metric, threshold, severity, permission_key)
-             VALUES ($1, $2, 'late_arrivals', 3, 'high', $3) RETURNING home_alert_rule_id`,
+             VALUES ($1, $2, 'approval_ageing', 3, 'high', $3) RETURNING home_alert_rule_id`,
             [key, key, permission],
           )
         ).home_alert_rule_id;
-      const people_ = await rule("late_arrivals.people", "people.approve");
-      const payroll = await rule("late_arrivals.payroll", "payroll.view");
+      const people_ = await rule("approval_ageing.people", "people.approve");
+      const payroll = await rule("approval_ageing.payroll", "payroll.view");
       const alert = (ruleId, subject, severity, raisedDaysAgo, cleared = false) =>
         q(
           `INSERT INTO home_alert (home_alert_rule_id, subject_type, subject_id, subject_employee_id, title, trigger,

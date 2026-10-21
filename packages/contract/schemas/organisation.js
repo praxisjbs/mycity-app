@@ -27,6 +27,7 @@ const {
   listQuery,
   Paged,
 } = require("./common");
+const { PlaceInput } = require("./maps");
 
 /**
  * PROPOSED values, to confirm with MyCity (Cynthia). Most MyCity staff are
@@ -96,8 +97,11 @@ const employeeCore = {
 
 /** Restricted fields (field-masked, BACKEND_STRUCTURE §9.4). Optional on create. */
 const employeeRestricted = {
-  /** Masked as personal details (field-mask.js employee.personal), as is personal_email. */
-  home_address: optionalText(300),
+  /**
+   * Masked as personal details (field-mask.js employee.personal), as is personal_email. Picked
+   * or pinned, never typed (F27); the person sets it on My Profile.
+   */
+  home_address: PlaceInput.optional(),
   personal_email: blank(email),
   bank_name: optionalText(100),
   account_number: blank(accountNumber),
@@ -306,7 +310,8 @@ const EmployeeUpdate = z
     next_of_kin_name: optionalText(150),
     next_of_kin_phone: blank(phone),
     next_of_kin_relationship: optionalText(50),
-    home_address: optionalText(300),
+    /** Picked or pinned, never typed (F27); left out, it stays as it is. No People form asks for it. */
+    home_address: PlaceInput.optional(),
     bank_name: optionalText(100),
     account_number: blank(accountNumber),
     gross_monthly: blank(money),
@@ -484,11 +489,11 @@ const OrgChartTree = z
   .strict();
 
 /**
- * POST /org-chart/exports, Download PDF: the whole tree in the view asked for, drawn in
- * the worker and emailed to the person asking (docs/guides/organogram.md §5 to §7).
+ * POST /org-chart/exports, Download PDF: the whole tree in the view asked for, drawn by the
+ * pdf-render job and downloaded on the device that pressed; answered as documents ExportFile
+ * (docs/guides/organogram.md §5 to §7).
  */
 const OrgChartExportRequest = z.object({ view: z.enum(["builder", "viewer"]).default("viewer") }).strict();
-const OrgChartExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
 
 /** A length on the PDF's page, in millimetres. */
 const mm = z.number().min(0).max(100000);
@@ -524,16 +529,6 @@ const OrgChartDocumentVars = z
     open: z.number().int(),
   })
   .strict();
-
-/**
- * POST /employees/:id/data-export, Download Their Data: the CEO only. One person's data as
- * Download My Data builds it, emailed to the CEO; the person's one a day counts it
- * (docs/guides/ess.md §5, §6).
- */
-const EmployeeDataExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
-
-/** The variables of templates/email/org-chart-export.html: when the attached chart was drawn. */
-const OrgChartExportEmailVars = z.object({ as_at: z.string() }).strict();
 
 /* ------------------------------------------------------------------ *
  * The staff import row
@@ -691,10 +686,7 @@ const TABLES = {
   },
   OrgChartTree: { table: null, reason: "the whole bounded tree and its counts" },
   OrgChartExportRequest: { table: null, reason: "which view of the tree Download PDF draws" },
-  OrgChartExportQueued: { table: null, reason: "that the PDF was queued, and where it will be emailed" },
   OrgChartDocumentVars: { table: null, reason: "the variables of templates/documents/org-chart.html, the chart laid out" },
-  OrgChartExportEmailVars: { table: null, reason: "the variables of templates/email/org-chart-export.html, not a row" },
-  EmployeeDataExportQueued: { table: null, reason: "that Download Their Data was queued, and the CEO's email it goes to" },
   EmployeeImportRow: {
     table: "employee",
     virtual: {
@@ -760,10 +752,7 @@ module.exports = {
   OrgNode,
   OrgChartTree,
   OrgChartExportRequest,
-  OrgChartExportQueued,
   OrgChartDocumentVars,
-  OrgChartExportEmailVars,
-  EmployeeDataExportQueued,
   EmployeeImportRow,
   AdminBootstrap,
 };

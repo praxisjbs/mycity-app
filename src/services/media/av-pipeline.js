@@ -3,7 +3,7 @@
  * Voice notes and video, made playable everywhere (BACKEND_STRUCTURE §5.3). Runs in the
  * worker (the av-transcode job), never in a request: a minute of video takes seconds of CPU.
  *
- *   voice note (M1 chat, M2 dictation)  → Opus in Ogg, mono, 32 kbps; duration stored
+ *   voice note (M1 chat, M2 dictation)  → Opus in Ogg, mono, 32 kbps; duration and waveform stored
  *   video (chat)                        → H.264 + AAC MP4, at most 720p, fast start; a poster frame
  *
  * The original upload stays the master (it is what was sent); these are variants beside it,
@@ -14,6 +14,7 @@
  * store, so storing the result is a rename. Paths come from FFMPEG_PATH / FFPROBE_PATH.
  */
 const { spawn } = require("node:child_process");
+const fs = require("node:fs/promises");
 const path = require("node:path");
 const { config } = require("../../config/env");
 const storage = require("../storage/storage.service");
@@ -120,6 +121,14 @@ async function toOpus(inAbs, outAbs) {
   ]);
 }
 
+/**
+ * Speech as MP3, 16 kHz mono: what a model that cannot read the browser's WebM is sent
+ * (services/ai/transcription.js). Small, and enough for a voice.
+ */
+async function speechMp3(inAbs, outAbs) {
+  await ffmpeg(["-i", inAbs, "-t", String(MAX_SECONDS), "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k", outAbs]);
+}
+
 async function toMp4(inAbs, outAbs) {
   await ffmpeg([
     "-i",
@@ -163,10 +172,64 @@ async function posterFrame(inAbs, outAbs, durationMs) {
   ]);
 }
 
+/** How many bars a voice note's waveform has. */
+const WAVEFORM_BARS = 48;
+
+/** Samples a second the loudness is read at: plenty for 48 bars, small for 15 minutes. */
+const WAVEFORM_RATE = 4000;
+
+/**
+ * Loudness in `bars` buckets, each 0 to 100 against the loudest, from signed 16-bit mono
+ * samples. RMS per bucket, then a square root so quiet speech still shows. Pure.
+ * @param {Buffer} pcm
+ * @param {number} [bars]
+ * @returns {number[]|null} null when there is no sound to read
+ */
+function waveformOf(pcm, bars = WAVEFORM_BARS) {
+  const samples = Math.floor(pcm.length / 2);
+  if (samples < bars) return null;
+  const per = samples / bars;
+  const rms = [];
+  for (let b = 0; b < bars; b += 1) {
+    const from = Math.floor(b * per);
+    const to = Math.floor((b + 1) * per);
+    let sum = 0;
+    for (let i = from; i < to; i += 1) {
+      const v = pcm.readInt16LE(i * 2) / 32768;
+      sum += v * v;
+    }
+    rms.push(Math.sqrt(sum / Math.max(1, to - from)));
+  }
+  const loudest = Math.max(...rms);
+  if (!(loudest > 0)) return rms.map(() => 0);
+  return rms.map((r) => Math.round(Math.sqrt(r / loudest) * 100));
+}
+
+/** A voice note's waveform, read from the file ffmpeg can decode; null when it holds no sound. */
+async function waveform(inAbs, dir) {
+  const out = path.join(dir, "loudness.pcm");
+  await ffmpeg([
+    "-i",
+    inAbs,
+    "-t",
+    String(MAX_SECONDS),
+    "-vn",
+    "-ac",
+    "1",
+    "-ar",
+    String(WAVEFORM_RATE),
+    "-f",
+    "s16le",
+    out,
+  ]);
+  return waveformOf(await fs.readFile(out));
+}
+
 /**
  * Make the playable variants for a stored audio or video master.
  * @param {{document_id: string, storage_key: string, kind: "audio"|"video"}} doc
  * @returns {Promise<{duration_ms: number|null, width: number|null, height: number|null,
+ *           waveform: number[]|null,
  *           variants: Array<{kind: string, key: string, mime: string, bytes: number}>}>}
  */
 async function derive({ document_id: id, storage_key: key, kind }) {
@@ -174,6 +237,7 @@ async function derive({ document_id: id, storage_key: key, kind }) {
   const info = await probe(input);
   const { dir, cleanup } = await storage.scratch();
   const variants = [];
+  let bars = null;
   try {
     if (kind === "audio" || !info.has_video) {
       const out = path.join(dir, "voice.ogg");
@@ -181,6 +245,7 @@ async function derive({ document_id: id, storage_key: key, kind }) {
       const k = variantKey(id, "voice", "ogg");
       const { bytes } = await storage.putFile(k, out, { overwrite: true });
       variants.push({ kind: "opus", key: k, mime: "audio/ogg", bytes });
+      bars = await waveform(input, dir);
     } else {
       const out = path.join(dir, "video.mp4");
       await toMp4(input, out);
@@ -205,6 +270,7 @@ async function derive({ document_id: id, storage_key: key, kind }) {
     duration_ms: info.duration_ms,
     width: info.width,
     height: info.height,
+    waveform: bars,
     variants,
   };
 }
@@ -220,4 +286,4 @@ async function health() {
   }
 }
 
-module.exports = { run, probe, derive, health, MAX_SECONDS };
+module.exports = { run, probe, derive, health, waveformOf, speechMp3, MAX_SECONDS, WAVEFORM_BARS };

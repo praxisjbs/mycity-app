@@ -13,6 +13,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "../lib/cn";
 import { useIsPhone } from "../lib/media";
+import { useBackClose } from "../lib/history";
 import { Icon, type IconName } from "../icons/Icon";
 import { IconButton } from "../actions/Button";
 import { Spinner } from "../display/Skeleton";
@@ -62,6 +63,8 @@ export function CommandPalette({ open, onClose, query, onQueryChange, results, l
   const input = useRef<HTMLInputElement>(null);
   const list = useId();
   const returnFocus = useReturnFocus(open);
+  // On a phone search is a screen of its own: Back closes it (F29).
+  useBackClose(open, onClose);
 
   useEffect(() => setCur(0), [query, results.length]);
   useEffect(() => {

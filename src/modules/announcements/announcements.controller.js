@@ -1,8 +1,9 @@
 "use strict";
 // search:none announcements are found through community.search.js
 // ai:none the announcements reads are declared in community.ai.js
-const { ok, created } = require("../../shared/http/respond");
+const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
+const { withActor } = require("../../shared/events/emit");
 const service = require("./announcements.service");
 
 module.exports = {
@@ -22,6 +23,8 @@ module.exports = {
     ),
   cancel: async (req, res) =>
     ok(res, await service.cancel(req.validated.params.id, req.user)),
+  archive: async (req, res) =>
+    ok(res, await service.archive(req.validated.params.id, req.user)),
   readers: async (req, res) =>
     sendPaged(
       res,
@@ -29,4 +32,8 @@ module.exports = {
     ),
   remind: async (req, res) =>
     ok(res, await service.remind(req.validated.params.id, req.user)),
+  acknowledge: async (req, res) => {
+    await service.acknowledge(req.validated.params.id, withActor(req));
+    noContent(res);
+  },
 };

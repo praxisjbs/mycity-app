@@ -53,12 +53,13 @@ password they already use for webmail.
 | Detail | Value | Where it goes |
 |---|---|---|
 | SMTP server | `mycityapp.io`, port `465`, TLS from the first byte | `SMTP_HOST=mycityapp.io`, `SMTP_PORT=465`, `SMTP_SECURE=true` |
-| SMTP username | `no-reply@mycityapp.io` | `SMTP_USER`; the password only in the server's `.env` files |
+| SMTP username | `no-reply@mycityapp.io` | `SMTP_USER`; the password on Settings · Integrations (encrypted) or in the server's `.env` files |
 | IMAP server | `mycityapp.io`, port `993` | the Mailbox module's connection defaults |
 | Certificate name | `mycityapp.io` | the host must be exactly that: `mail.mycityapp.io` fails the certificate check |
 | Sending limit | **50 recipients an hour** | `MAIL_SEND_PER_HOUR`: production 40, staging 10 (both send from `no-reply`) |
 | IMAP connections | **30 at once from one IP address** | the Mailbox module's limit (guide `mailbox.md` §6); prod and staging share the server's IP |
 | Mailboxes on the plan | **30** | at most 30 staff mailboxes; more needs a bigger plan |
+| MX | `mx1-hosting`, `mx2-hosting`, `mx3-hosting.jellyfish.systems`: Namecheap's spam filter, which hands mail back to the mailboxes on `mycityapp.io` | `SMTP_LOCAL_DOMAINS=mycityapp.io` (the default): system mail to staff is delivered on the host, not refused by the route check (foundation guide §6.14) |
 
 System mail is paced to the limit (`src/services/mail/pace.js`): a batch larger than the hour's
 allowance (payslips for every employee, a round of invitations) goes out over several hours instead
@@ -66,6 +67,50 @@ of being refused. Still to ask the domain manager: is the 50 for each mailbox, o
 hosting account? If it is the whole account, staff sending from their own mailboxes eats into the
 same 50, and the plan is too small for an office of 30.
 
-The two `.env` files on the server were written before these values were known: set the `SMTP_*`
-lines above and add `MAIL_SEND_PER_HOUR=40` (production) or `MAIL_SEND_PER_HOUR=10` (staging). A
-server refuses to start without it.
+**Where these go (20/10/2026).** On Settings · Integrations, on each environment
+(`docs/guides/integrations.md`): System Sender, Server `mycityapp.io`, Port `465`, Security TLS,
+Username `no-reply@mycityapp.io` and its password, From, Hourly Limit `40` (production) or `10`
+(staging), Local Domains `mycityapp.io`; Staff Mail Server, the IMAP and SMTP hosts and ports above
+(blank uses each address's own domain, which is the same here). Saved there they are tested before
+they are kept, win over the `.env` lines and apply within a second, with no restart. The `.env`
+lines in the table stay as the fallback when nothing is saved; a server no longer refuses to start
+without them: with neither, system mail is held (not lost) until a sender is set, and goes out the
+moment one is saved.
+
+## 5 · Paused mail and refused addresses (21/10/2026)
+
+**Pause Mail** (Settings · Integrations → System Sender, IT only; `docs/guides/integrations.md`
+§6.15). Press it on each environment. Until Resume Mail only invitations, password resets, Send Test
+Email and the server's health alarm are sent; notices reach people by push and the bell, digests are
+dropped, other mail waits. Staff sending from Mailbox is not affected. Settings · Status reads Mail
+as Paused.
+
+**After the hosting upgrade** (Stellar Business, 10,000 an hour): on each environment, System Sender
+→ Edit Settings → Hourly Limit (production and staging together at most the plan's limit), Save
+Settings, then Resume Mail. When the sender is still read from the server file, the first save asks
+for its password: `sudo grep '^SMTP_PASSWORD=' /srv/mycity/<env>/shared/.env`.
+
+**A refused address** (cPanel's 550, "The mail server could not deliver mail to … The account or
+domain may not exist") is listed on the System Sender as a Refused Address and not tried again
+(§6.16). Mail between `mycityapp.io` addresses is delivered on the host itself, so:
+
+| The address | Cure |
+|---|---|
+| `name@mycityapp.io` | cPanel → Email Accounts → Create the mailbox (or Forwarders, to send it on), or correct the work email in People |
+| Another domain | A typo (`gmial.com`) or a domain that takes no mail: correct the work email in People |
+
+A login's sign-in email is fixed when the login is made, so a wrong one is corrected on the server,
+in one transaction with the employee's work email, as `administrator`:
+
+```sh
+sudo -u postgres psql -d mycity_<stg|prod> -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+UPDATE employee SET work_email = 'right@example.com', updated_at = now() WHERE work_email = 'wrong@exmaple.com';
+UPDATE app_user SET email = 'right@example.com', updated_at = now() WHERE email = 'wrong@exmaple.com';
+COMMIT;
+SQL
+```
+
+Each UPDATE should say `UPDATE 1`. Then Resend Invitation on Settings · Users. The change has no
+audit row, because it does not go through the app.
+

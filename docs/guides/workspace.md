@@ -15,8 +15,8 @@
 Sources: MILESTONES §7 (A24) and §7 Definition of done; REUSE_MAP §3.1; the meeting of
 10 October 2026 (Cynthia Osakunih, Tom-Blake Asaah: "task and activity tracking is a primary
 reason for needing the ERP"; tasks stay in the workspace, performance is its own module). The
-Performance Management System (goals, targets, KPIs, reviews) is `docs/guides/performance.md`; this
-guide covers only how a task counts towards a KPI. The demo (`demo.html`, My Workspace) is a visual
+Performance Management System (goals, targets, KPIs, reviews) is TB's, built from MyCity's own
+sheets; this guide covers only how a task counts towards a KPI, which waits for it. The demo (`demo.html`, My Workspace) is a visual
 reference; where it differs, this guide wins.
 
 ---
@@ -37,8 +37,8 @@ work; the CEO and Management read Analytics across the organisation.
 | My Workspace · Calendar (`calendar`) | staff app | every employee | the month: their own events, events they are invited to, events shared with everyone, their tasks' deadlines, their approved leave; Coming Up | New Event (with attendees); answer an invitation; open a task from its deadline |
 | My Workspace · Analytics (`analytics`) | staff app | every employee for themselves; managers for their reporting line; CEO and `all` scope for everyone | completion rate, overdue, average completion time, tasks completed per week, workload by person, tasks by priority | switch Mine and My Team; choose the period (30 days, 90 days, this year); open a figure's tasks |
 | Home · Overview, Team (M1, TB) | staff app | as Home | Overdue Tasks and My Overdue Tasks cards, Your Week, Open Tasks on the roster | read only, through `dashboard/sources/tasks.source.js` and `calendar.source.js` |
-| ESS · My Performance (M2) | staff app | the employee | a KPI's progress, which counts its done tasks | read only (`docs/guides/performance.md`) |
-| Performance · KPIs (M2) | staff app | managers | a KPI's progress from its tasks | read only (`docs/guides/performance.md`) |
+| ESS · My Performance (M2) | staff app | the employee | a KPI's progress, which counts its done tasks | read only, once Performance is built (TB) |
+| Performance · KPIs (M2) | staff app | managers | a KPI's progress from its tasks | read only, once Performance is built (TB) |
 | Notifications bell (M0) | both shells | the assignee, the setter | task set for you, task due tomorrow, task blocked, comment on your task | open the task (`linkFor("task", id)`) |
 | ⌘K search | both shells | per scope | tasks by number and title; calendar events by title | open the task or event |
 
@@ -59,7 +59,8 @@ work; the CEO and Management read Analytics across the organisation.
    board read the change.
 4. **Done counts.** A task linked to an individual KPI (`employee_target_id`) that reaches Done
    emits `task.completed`; the performance module's outbox handler recounts that KPI's progress
-   (`docs/guides/performance.md` §3). Moving it back out of Done recounts it again.
+   (once Performance is built). Moving it back out of Done recounts it again. Until then the task form
+   has no Counts Towards field: a task's `employee_target_id` is set only through the API.
 5. **A deadline is on the calendar.** `GET /api/v1/calendar` returns, for the month, the reader's
    events, plus each open task with a due date (kind Deadline), plus their approved leave (read
    through the leave service). A task opened there is the same task panel.
@@ -249,7 +250,8 @@ is listed here as tier 1 or tier 2.**
 
 ## 14 · Change log
 
-- 20/10/2026 · AJ · Staging: `seeds/staging/40_productivity.js` sets tasks (by the CEO, the head of department and the line manager for their people, and people's own, A24) and this week's meetings through the tasks and calendar services, after taking Home's forward rows out of those tables.
+- 21/10/2026 · AJ · Performance left out of M2's PR (the lead, 21/10/2026: TB builds it from MyCity's sheets): the task form's Counts Towards field is gone until a KPIs API exists; `task.completed` and `task.reopened` still carry the KPI for it. The staging seed is `40_workspace.js` (tasks and calendar only).
+- 20/10/2026 · AJ · Staging: `seeds/staging/40_workspace.js` sets tasks (by the CEO, the head of department and the line manager for their people, and people's own, A24) and this week's meetings through the tasks and calendar services, after taking Home's forward rows out of those tables.
 - 20/10/2026 · AJ · §7: a repeating task days overdue repeats once, on its next day still to come, instead of once per sweep (found when the integration suite ran on a Tuesday).
 - 19/10/2026 · AJ · Built: §3 to §10 now say what shipped (drag between columns, Since You Were Away
   from the previous working day, the reader's own month, attendees any employee, the morning

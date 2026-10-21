@@ -10,10 +10,10 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Composer, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
-import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
+import { Composer, PickBar, PinnedBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
+import { SendFiles, SharedFiles } from "./Media";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
-import { upload } from "@/api/upload";
 
 export default function Community({ tab }: ModuleScreenProps) {
   if (tab === "direct-messages") return <Direct />;
@@ -139,14 +139,17 @@ function Channels() {
         {mobile && <IconButton icon="menu" label="Switch channel" onClick={() => setDrawer(true)} />}
         <span className="min-w-0 flex-1">
           <b className="flex items-center gap-1.5 truncate text-base font-strong"># {current.name}{!current.can_post && <Pill>Read Only</Pill>}</b>
-          <span className="block text-2xs text-subtle-foreground">{current.members} {current.members === 1 ? "member" : "members"}</span>
+          <span className="block truncate text-2xs text-subtle-foreground">
+            {current.members} {current.members === 1 ? "member" : "members"}
+            {!mobile && current.description && <> · {current.description}</>}
+          </span>
         </span>
         <Menu
           trigger={(p) => <IconButton {...p} icon="dots" label="Channel menu" />}
           items={[
             { label: "View Members", icon: "users", onSelect: () => modal.open({ title: "Channel Members", body: (close) => <Members c={current} close={close} /> }) },
             ...(current.is_admin ? [{ label: "Edit Members", icon: "user" as const, onSelect: () => modal.open({ title: "Edit Members", body: (close) => <Members c={current} close={close} edit onChanged={reloadList} /> }) }] : []),
-            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: "Channel Details", body: (close) => <><KeyValue items={[["Channel", `#${current.name}`], ["Members", current.members], ["Who Can Post", WHO_POSTS[current.post_policy]]]} /><FormFooter><Button variant="primary" onClick={close}>Close</Button></FormFooter></> }) },
+            { label: "Channel Details", icon: "info", onSelect: () => modal.open({ title: "Channel Details", body: (close) => <ChannelDetails c={current} close={close} onChanged={reloadList} /> }) },
             { label: "Search in Channel", icon: "srch", onSelect: () => setSearching(true) },
             "sep",
             ...(current.pin_locked ? [] : [{ label: current.pinned ? "Unpin" : "Pin to Top", icon: "pinned" as const, onSelect: () => void pinChannel(current) }]),
@@ -155,6 +158,7 @@ function Channels() {
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
+      <PinnedBar t={t} />
       <ThreadBody
         t={t}
         editPoll={(m) => modal.open({ title: "Edit Poll", body: (close) => <PollForm close={close} edit={m} send={(b) =>
@@ -166,14 +170,14 @@ function Channels() {
                 })
             } /> })}
       />
-      {/* #announcements takes nothing posted straight in: no composer, for anyone. */}
-      {current.post_policy !== "people_ceo" && (
+      {/* #announcements takes nothing posted straight in: no composer, for anyone. While picking, the bar takes its place. */}
+      {t.picking ? <PickBar t={t} /> : current.post_policy !== "people_ceo" && (
       <Composer
         key={current.community_channel_id}
         placeholder={`Message #${current.name}`}
         readOnly={current.can_post ? undefined : "Only admins post here"}
         onSend={(b) => after(t.send(b))}
-        onVoice={(file, secs) => after(t.sendFile(file, secs))}
+        onVoice={(file, secs, captions) => after(t.sendFile(file, secs, captions))}
         plus={(cls) => (
           <Menu
             align="start"
@@ -182,7 +186,7 @@ function Channels() {
               { label: "Recognise a Colleague", icon: "thumb", onSelect: () => modal.open({ title: "Recognise a Colleague", body: (close) => <Recognise close={close} done={() => (t.reload(), reloadList())} /> }) },
               ...(current.can_moderate ? [{ label: "Celebrate", icon: "flag" as const, onSelect: () => modal.open({ title: "Celebrate", body: (close) => <Celebrate close={close} send={(b) => after(t.send(b))} /> }) }] : []),
               ...(current.can_poll ? [{ label: "Start a Poll", icon: "chart" as const, onSelect: () => modal.open({ title: "Start a Poll", body: (close) => <PollForm close={close} send={(b) => after(t.send(b))} /> }) }] : []),
-              { label: "Attach a File", icon: "clip", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
+              { label: "Attach a File", icon: "clip", onSelect: () => modal.open({ title: "Send Files", body: (close) => <SendFiles channelId={current.community_channel_id} close={close} send={(bs) => after(t.sendMany(bs))} /> }) },
             ]}
           />
         )}
@@ -316,6 +320,44 @@ function PeopleList({ people, right }: { people: PersonRef[]; right?: (p: Person
   );
 }
 
+/** What a channel is; its admins rename it and write its purpose here. #general and #announcements stay fixed. */
+function ChannelDetails({ c, close, onChanged }: { c: Channel; close: () => void; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const f = useContractForm({ name: c.name, purpose: c.description ?? "" }, { name: (v) => (/^[a-z0-9][a-z0-9-]{1,29}$/.test(v) ? null : "Not a valid name") });
+  const save = useMutation("PUT /api/v1/community/channels/:id");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id: c.community_channel_id }, body: { name: f.values.name, description: f.values.purpose.trim() } });
+      onChanged();
+      close();
+      toast("Channel saved");
+    } catch {
+      f.setServerErrors(save.fields);
+    }
+  };
+  if (editing)
+    return (
+      <>
+        <Field label={<HelpTerm help="Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name.">Channel Name</HelpTerm>} {...f.field("name")}><TextField {...f.field("name")} autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
+        <Field label="Purpose" optional><TextAreaField {...f.field("purpose")} /></Field>
+        <FormFooter>
+          <Button onClick={() => setEditing(false)}>Cancel</Button>
+          <Button variant="primary" busy={save.pending} onClick={submit}>Save Changes</Button>
+        </FormFooter>
+      </>
+    );
+  return (
+    <>
+      <KeyValue items={[["Channel", `#${c.name}`], ["Purpose", c.description ?? "None"], ["Members", c.members], ["Who Can Post", WHO_POSTS[c.post_policy]]]} />
+      <FormFooter>
+        {c.is_admin && !c.pin_locked && <Button icon="edit" onClick={() => setEditing(true)}>Edit Channel</Button>}
+        <Button variant="primary" onClick={close}>Close</Button>
+      </FormFooter>
+    </>
+  );
+}
+
 function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel) => void }) {
   const f = useContractForm({ name: "", purpose: "" }, { name: (v) => (/^[a-z0-9][a-z0-9-]{1,29}$/.test(v) ? null : "Not a valid name") });
   const [people, setPeople] = useState<PersonRef[]>([]);
@@ -418,25 +460,6 @@ function PollForm({ close, send, edit }: { close: () => void; send: (b: { messag
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="chart" onClick={go}>{edit ? "Save Changes" : "Post Poll"}</Button>
       </FormFooter>
-    </>
-  );
-}
-
-/** A file goes to the conversation through the upload engine, then it is posted. */
-function Attach({ channelId, close, send }: { channelId: string; close: () => void; send: (b: { message_type: "file"; document_id: string }) => Promise<void> }) {
-  return (
-    <>
-      <UploadField
-        upload={upload}
-        purpose="attachment"
-        endpoint={`/api/v1/community/channels/${channelId}/media`}
-        multiple={false}
-        onUploaded={(docs) => {
-          close();
-          void Promise.all(docs.map((d) => send({ message_type: "file", document_id: d.document_id })));
-        }}
-      />
-      <FormFooter><Button onClick={close}>Cancel</Button></FormFooter>
     </>
   );
 }
@@ -586,23 +609,24 @@ function Direct() {
         />
       </ThreadHead>
       {searching && <ThreadSearch t={t} onClose={() => setSearching(false)} />}
+      <PinnedBar t={t} />
       <ThreadBody t={t} dm />
-      <Composer
+      {t.picking ? <PickBar t={t} /> : <Composer
         key={current.community_channel_id}
         placeholder={current.is_self ? "Message yourself" : `Message ${current.person.display_name.split(" ")[0]}`}
         onSend={(b) => after(t.send(b))}
-        onVoice={(file, secs) => after(t.sendFile(file, secs))}
+        onVoice={(file, secs, captions) => after(t.sendFile(file, secs, captions))}
         plus={(cls) => (
           <Menu
             align="start"
             trigger={(p) => <button {...p} type="button" className={cls} aria-label="Attach"><Icon name="clip" /></button>}
             items={[
-              { label: "Photo or Video", icon: "image", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
-              { label: "Document", icon: "doc", onSelect: () => modal.open({ title: "Attach a File", body: (close) => <Attach channelId={current.community_channel_id} close={close} send={(b) => after(t.send(b))} /> }) },
+              { label: "Photo or Video", icon: "image", onSelect: () => modal.open({ title: "Send Files", body: (close) => <SendFiles channelId={current.community_channel_id} accept="image/*,video/*" kinds="Photos or videos" close={close} send={(bs) => after(t.sendMany(bs))} /> }) },
+              { label: "Document", icon: "doc", onSelect: () => modal.open({ title: "Send Files", body: (close) => <SendFiles channelId={current.community_channel_id} accept=".pdf,.docx,.xlsx,.pptx,.csv,.txt" kinds="PDF, Word, Excel or PowerPoint" close={close} send={(bs) => after(t.sendMany(bs))} /> }) },
             ]}
           />
         )}
-      />
+      />}
     </>
   ) : (
     <p className="m-auto text-xs text-subtle-foreground">Pick a conversation.</p>
@@ -686,7 +710,7 @@ function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onM
       </div>
       <div className={sec}>
         <h3 data-ui="title" className={h4}>Shared in Conversation</h3>
-        {p.shared_files.map((f) => <div key={f.document_id}>{line("doc", f.file_name, `${Math.max(1, Math.round(f.size_bytes / 1024))} KB`)}</div>)}
+        <SharedFiles files={p.shared_files} />
         {p.voice_notes > 0 && line("mic", `${p.voice_notes} voice note${p.voice_notes > 1 ? "s" : ""}`)}
         {!p.shared_files.length && !p.voice_notes && <p className="text-2xs text-subtle-foreground">Nothing shared yet.</p>}
       </div>
@@ -731,10 +755,10 @@ function Announcements() {
       {list.error ? <ErrorState error={list.error} onRetry={list.reload} /> : list.loading && !list.rows.length ? <Card><LoadingRows count={4} /></Card> : (
         <Grid cols={2} className="mt-3">
           {list.rows.map((a) => (
-            <Card key={a.announcement_id} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.status === "scheduled" ? "Scheduled Announcement" : "Announcement Reads", body: (close) => <AnnouncementReads a={a} close={close} done={list.reload} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
+            <Card key={a.announcement_id} urgency={a.urgency} data-copy="content" role="button" tabIndex={0} className="cursor-pointer text-left transition hover:-translate-y-px hover:shadow-2" onClick={() => modal.open({ title: a.status === "scheduled" ? "Scheduled Announcement" : "Announcement Reads", body: (close) => <AnnouncementReads a={a} close={close} done={list.reload} /> })} onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <div className="mb-1.5 flex items-start gap-2">
                 <h2 data-copy="content" className="flex-1 text-sm font-semibold">{a.title}</h2>
-                {a.status === "scheduled" ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience_size ? "ok" : "neutral"}>{a.reads} of {a.audience_size} read</Pill>}
+                {a.status === "scheduled" ? <Pill tone="info">Scheduled</Pill> : <Pill tone={a.reads === a.audience_size ? "ok" : "neutral"}>{a.reads} of {a.audience_size} {a.urgency === "urgent" ? "acknowledged" : "read"}</Pill>}
               </div>
               <p className="line-clamp-3 text-sm whitespace-pre-wrap text-muted-foreground">{a.body}</p>
               <p className="mt-2 text-2xs text-subtle-foreground">{a.status === "scheduled" ? `Goes out ${formatDateTime(a.publish_at!)}` : `Posted ${formatDate(a.published_at!)}`} by {a.author?.display_name}</p>
@@ -763,11 +787,30 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       if (e instanceof ApiError) toast(e.message);
     }
   };
+  /* A published one is taken down: it leaves #announcements and the tab, its reads kept for the record. */
+  const archive = useMutation("POST /api/v1/community/announcements/:id/archive");
+  const takeDown = async () => {
+    if (!(await confirm({ title: "Archive Announcement", body: `"${a.title}" leaves #announcements for everyone.`, confirmLabel: "Archive Announcement", cancelLabel: "Keep It", destructive: true }))) return;
+    try {
+      await archive.run({ params: { id: a.announcement_id }, body: {} });
+      invalidate("/api/v1/community");
+      close();
+      done();
+      toast("Announcement archived");
+    } catch (e) {
+      if (e instanceof ApiError) toast(e.message);
+    }
+  };
   const notRead = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "not_read" }, enabled: live });
   const read = usePaged("GET /api/v1/community/announcements/:id/reads", { params: { id: a.announcement_id }, filters: { read: "read" }, enabled: live });
   const remind = useMutation("POST /api/v1/community/announcements/:id/remind");
   const pct = Math.round((a.reads * 100) / Math.max(1, a.audience_size));
   const nNot = notRead.page?.total ?? 0;
+  /* An urgent announcement is read once acknowledged (community.md §3 step 12). */
+  const urgent = a.urgency === "urgent";
+  const doneLabel = urgent ? "Acknowledged" : "Read";
+  const notLabel = urgent ? "Not Acknowledged" : "Not Read";
+  const ackAt = new Map(read.rows.map((r) => [r.person.employee_id, r.acknowledged_at]));
   const nudge = async () => {
     try {
       const r = await remind.run({ params: { id: a.announcement_id }, body: {} });
@@ -787,19 +830,26 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       </div>
       {!live ? <Pill tone="info">Scheduled</Pill> : (
         <>
-          <h3 data-ui="title" className="mb-1.5 text-sm font-semibold">Read by {a.reads} of {a.audience_size}</h3>
+          <h3 data-ui="title" className="mb-1.5 text-sm font-semibold">{doneLabel} by {a.reads} of {a.audience_size}</h3>
           <Meter pct={pct} label={`${pct}%`} />
           <div className="mt-4 mb-1.5 flex items-center gap-2">
-            <h3 data-ui="title" className="flex-1 text-sm font-semibold">Not Read · {nNot}</h3>
+            <h3 data-ui="title" className="flex-1 text-sm font-semibold">{notLabel} · {nNot}</h3>
             {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={() => nudge()}>Remind Them</Button>}
           </div>
-          {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">Not Read</Pill>} /> : <p className="text-2xs text-subtle-foreground">Everyone has read it.</p>}
-          <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">Read · {read.page?.total ?? 0}</h3>
-          <PeopleList people={read.rows.map((r) => r.person)} right={() => <Pill tone="ok">Read</Pill>} />
+          {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">{notLabel}</Pill>} /> : <p className="text-2xs text-subtle-foreground">{urgent ? "Everyone has acknowledged it." : "Everyone has read it."}</p>}
+          <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">{doneLabel} · {read.page?.total ?? 0}</h3>
+          <PeopleList
+            people={read.rows.map((r) => r.person)}
+            right={(p) => {
+              const at = urgent ? ackAt.get(p.employee_id) : null;
+              return <Pill tone="ok">{at ? formatDateTime(at) : doneLabel}</Pill>;
+            }}
+          />
         </>
       )}
       <FormFooter>
         {!live && <Button variant="danger" busy={cancel.pending} onClick={() => callOff()}>Cancel Announcement</Button>}
+        {live && <Button variant="danger" icon="trash" busy={archive.pending} onClick={() => takeDown()}>Archive Announcement</Button>}
         {!live && <Button icon="edit" onClick={() => setEditing(true)}>Edit</Button>}
         <Button variant="primary" onClick={close}>Close</Button>
       </FormFooter>
@@ -811,6 +861,7 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
 function NewAnnouncement({ close, done, edit }: { close: () => void; done: () => void; edit?: Announcement }) {
   const [when, setWhen] = useState<"now" | "later">(edit ? "later" : "now");
   const [kind, setKind] = useState<"all" | "departments">(edit?.audience.kind ?? "all");
+  const [urgency, setUrgency] = useState<Announcement["urgency"]>(edit?.urgency ?? "normal");
   const [depts, setDepts] = useState<string[]>(edit?.audience.department_ids ?? []);
   const [deptsBad, setDeptsBad] = useState(false);
   const f = useContractForm({ title: edit?.title ?? "", body: edit?.body ?? "", date: edit?.publish_at ? todayIso(new Date(edit.publish_at)) : "" }, { title: (v) => (v.trim().length > 3 ? null : "Add a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
@@ -826,9 +877,9 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
     const publish_at = `${f.values.date}T09:00:00+01:00`;
     try {
       if (edit) {
-        await change.run({ params: { id: edit.announcement_id }, body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, publish_at } });
+        await change.run({ params: { id: edit.announcement_id }, body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, urgency, publish_at } });
       } else {
-        await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, ...(when === "later" && { publish_at }) } });
+        await save.run({ body: { title: f.values.title.trim(), body: f.values.body.trim(), audience, urgency, ...(when === "later" && { publish_at }) } });
       }
       invalidate("/api/v1/community");
       close();
@@ -844,6 +895,9 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
     <>
       <Field label="Headline" {...f.field("title")}><TextField {...f.field("title")} /></Field>
       <Field label="Message" {...f.field("body")}><TextAreaField {...f.field("body")} /></Field>
+      <Field label="Level" help="Urgent stays red on everyone's screens and repeats every 30 minutes of the working day until each person acknowledges. Important reminds the unread after 4 hours.">
+        <ChoiceField value={urgency} onChange={setUrgency} options={[["normal", "Normal"], ["important", "Important"], ["urgent", "Urgent"]]} />
+      </Field>
       <Field label="Audience"><ChoiceField value={kind} onChange={setKind} options={[["all", "All Staff"], ["departments", "Departments"]]} /></Field>
       {kind === "departments" && (
         <Field label="Departments" state={deptsBad ? "bad" : undefined} message={deptsBad ? "Choose a department" : undefined}>

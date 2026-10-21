@@ -48,11 +48,51 @@ describe("a job over the limit waits instead of failing", () => {
     expect(job.moved.at).toBeLessThan(before + 120000 + 16000);
   });
 
+  test("with no sender set up, the job waits 15 minutes, tagged so saving a sender releases it", async () => {
+    jest.doMock("../../../src/services/mail/system-mail.service", () => ({
+      send: async () => {
+        throw Object.assign(new Error("system mail is not set up"), { code: "MAIL_NOT_SET_UP" });
+      },
+    }));
+    const emailSend = require("../../../src/jobs/handlers/email-send");
+    const job = { ...fakeJob(), updateData: jest.fn(async function (data) { this.data = data; }) };
+    const before = Date.now();
+    await expect(emailSend(job, "tok")).rejects.toMatchObject({ name: "DelayedError" });
+    expect(job.data.held_for).toBe("sender");
+    expect(job.moved.at).toBeGreaterThanOrEqual(before + 15 * 60 * 1000);
+  });
+
   test("a message with more recipients than the hour allows fails for good", async () => {
     jest.doMock("../../../src/services/mail/system-mail.service", () => ({
       send: async () => { throw new Error("system mail: 60 recipients is more than the hourly sending limit of 40"); },
     }));
     const emailSend = require("../../../src/jobs/handlers/email-send");
     await expect(emailSend(fakeJob(), "tok")).rejects.toMatchObject({ name: "UnrecoverableError" });
+  });
+});
+
+describe("system mail with no sender set up anywhere (docs/guides/integrations.md §6.8)", () => {
+  afterEach(() => jest.resetModules());
+
+  function mailWith(unset) {
+    // The tests above replace the real module; these need it.
+    jest.dontMock("../../../src/services/mail/system-mail.service");
+    jest.doMock("../../../src/config/env", () => {
+      const actual = jest.requireActual("../../../src/config/env");
+      return { ...actual, config: { ...actual.config, MAIL_UNSET: unset } };
+    });
+    jest.doMock("../../../src/shared/integrations/settings", () => ({ of: async () => null, secret: async () => null, bump: async () => {}, forget: () => {} }));
+    return require("../../../src/services/mail/system-mail.service");
+  }
+
+  test("a server holds it: nothing is sent and nothing is faked", async () => {
+    const mail = mailWith("hold");
+    await expect(mail.send({ to: "ada@mycity.io", template: "user-invite", data: {} })).rejects.toMatchObject({ code: "MAIL_NOT_SET_UP" });
+    expect(await mail.health()).toMatchObject({ status: "degraded", mode: "not_set_up" });
+  });
+
+  test("a laptop or CI keeps it in memory, as before", async () => {
+    const mail = mailWith("capture");
+    expect(await mail.health()).toEqual({ status: "up", mode: "captured" });
   });
 });

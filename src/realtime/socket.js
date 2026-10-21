@@ -193,6 +193,19 @@ function isAttached() {
 }
 
 /**
+ * Who is connected to this process right now, for Settings · Performance: the open
+ * sockets, and how many different people they belong to. Counts only, never who.
+ */
+function presence() {
+  if (!io) return { sockets: 0, people: 0 };
+  const people = new Set();
+  for (const socket of io.of("/").sockets.values()) {
+    if (socket.data && socket.data.user) people.add(socket.data.user.user_id);
+  }
+  return { sockets: io.of("/").sockets.size, people: people.size };
+}
+
+/**
  * Close every socket and stop accepting. Socket.io also closes the HTTP server it is
  * attached to; the promise settles when that has finished.
  */
@@ -208,6 +221,7 @@ module.exports = {
   attach,
   close,
   isAttached,
+  presence,
   authenticate,
   hostAllowed,
   MAX_MESSAGE_BYTES,

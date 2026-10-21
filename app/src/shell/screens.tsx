@@ -27,5 +27,6 @@ export const SCREENS: Record<string, Loader> = {
   expenses: lazy(() => import("@/features/expenses")),
   knowledge: lazy(() => import("@/features/knowledge")),
   praxis_ai: lazy(() => import("@/features/assistant")),
+  ai_control: lazy(() => import("@/features/ai-control")),
   settings: lazy(() => import("@/features/settings")),
 };

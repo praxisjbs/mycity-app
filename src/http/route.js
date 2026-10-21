@@ -213,6 +213,13 @@ function define(kind, router, method, path, contract, handlers) {
   const before = handlers.slice(0, -1);
   const last = handlers[handlers.length - 1];
   const chain = [
+    // The route as declared, for the per-route figures (shared/observability/request-stats.js).
+    // Stamped first, while req.baseUrl is still this router's: an error handed to the app's
+    // handler unwinds it, and the raw URL would make every id a route of its own.
+    (req, _res, next) => {
+      req.routePattern = `${req.baseUrl || ""}${path}`;
+      next();
+    },
     // Required here, not at the top: a public routes file loads this module and
     // must not pull the staff auth middleware in with it.
     ...(kind === "staff" && !contract.anonymous

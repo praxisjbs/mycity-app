@@ -903,7 +903,13 @@ invoices, and sensitive operational actions.
 after the session has ended, and a tap opens the record through sign-in), the in-app banner, the
 bell's pane on both shells and each person's Notification Settings (In App, Email and Push per
 category) are built in M0 (`docs/guides/notifications.md`, `docs/runbooks/push-notifications.md`).
-M6 keeps the configurable reminders above (Settings · Notifications, #74) and the definition of
+**Added to M0 by TB on the same day:** every device alerted at once, every channel post alerting,
+and urgency (Normal, Important, Urgent) with Acknowledge, a red bar on every screen and urgent
+repeats every 30 minutes of the working day; then Settings · Notifications (#74) with the
+configurable reminders above: who each notice reaches and how, approvals waiting, employees due
+for confirmation, a daily digest and each person's quiet hours, on one reminder engine that M2's
+tasks and calendars use (`docs/handoff/notifications-everywhere.md`). Due invoices join the
+reminders with the module that owns them. M6 keeps payroll's own notices and the definition of
 done below.
 
 ### Definition of done
@@ -1273,6 +1279,12 @@ ratifying it also updates the summary counts, the `SCREENS` constant in
 
 **Ratified 15/10/2026 (TB).** Six screens join the inventory, taking the admin surface to 86 and the inventory to 92: **People · Organogram** (`organogram`) and **Employee Self-Service · Org Chart** (`org-chart`), the two proposed above; the three ESS attendance tabs built with the attendance work, **Work Location Requests** (`work-location-requests`), **My Devices** (`my-devices`) and **Policy Updates** (`policy-updates`); and **My Security** (`my-security`). All are M1. They are applied to the table above, the summary counts, the `SCREENS` constant in `scripts/check/progress.js`, `src/shared/route-map.js` and `docs/PROGRESS.md` (rows #87 to #92). They reuse the `ess` and `people` permission keys.
 
+**Ratified 20/10/2026 (TB).** One screen joins the inventory, taking the admin surface to 87 and the inventory to 93: **Settings · System Health** (`system-health`), second in Settings, after Organisation. It carries the readiness checks, a day or a week of snapshots, and every fault the code reports, grouped with a status the team shares, and downloads a Markdown brief an AI can fix them from. It is M9, and it is the first screen with a permission key of its own rather than a reused one: `system_health`, granted to the Implementation Team and the System Administrator only, because a stack trace is not Operations & People's or Management's to act on and alerting them creates alarm without action. It is applied to the table below, the `SCREENS` constant in `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js` and `docs/PROGRESS.md` (row #95). Its engineering shape is in `docs/guides/system-health.md`.
+
+**Amended 20/10/2026 (TB).** Settings · System Health is split into three tabs after TB walked the first release on staging: **Status** (`status`), **Performance** (`performance`) and **Faults** (`faults`), taking the admin surface to 89 and the inventory to 95. One tab meant scrolling past the checks and the chart to reach the fault list, which is the part the IT team uses. The `system_health` permission key and everything behind it are unchanged; only the tab the screens sit on changes. Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`, `src/shared/search/screens.js` and `docs/PROGRESS.md` (rows #95 to #97).
+
+**Ratified 20/10/2026 (TB).** Policies are centralised. **Knowledge Hub · Policies** (`policies`) is brought forward from M10 to M1, built with the attendance work, as the one place every company policy lives: a written document, or a rules policy whose switches and figures the system enforces, the Attendance policy first. **Settings · Attendance Policy** (`attendance-policy`) is dropped: its worksheet is the Attendance policy on Knowledge Hub · Policies, taking Settings to 13 tabs, the admin surface to 88 and the inventory to 94. **Employee Self-Service · Policy Updates** keeps its slug and now carries every policy that applies to the person, with their acknowledgement. Its row in `docs/PROGRESS.md` (#73) is marked Dropped, not deleted. Applied to the table below, `src/shared/route-map.js`, `src/shared/search/screens.js`, the app's catalogue and `docs/PROGRESS.md` (rows #62, #73, #89). Its engineering shape is in `docs/guides/policies.md`, and the Attendance policy's rules in `docs/guides/attendance.md` §6.15. Policies use the `knowledge` permission key with a new capability, `policies.manage`, so only Operations & People (and those given it) write them; everyone else reads the policies that apply to them on ESS.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1292,9 +1304,9 @@ staff never navigates to it to do their job.
 | People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
 | Business | **Partnerships** | 6 | Pipeline · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 |
 | Business | **Expenses** | 6 | My Requests · Approvals · Requisitions · Disbursements · Budgets · Categories | M8 |
-| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · Announcements | M10 |
+| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · Announcements | M1 (Policies), M10 |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
-| System | **Settings** | 11 | Organisation · Users · Roles & Permissions · Approvals · Attendance Policy · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
+| System | **Settings** | 13 | Organisation · Status · Performance · Faults · Users · Roles & Permissions · Approvals · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
 
 **Separate application — `go.mycityapp.io`, not in the rail**
 
@@ -1302,10 +1314,11 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
 
-Two of the above span a milestone boundary. **Recruitment** gets Vacancies through Interviews in M4 and
+Three of the above span a milestone boundary. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026) and SOPs, FAQs, Training and Announcements in M10. **Recruitment** gets Vacancies through Interviews in M4 and
 Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
-in M6 with the notification engine, not in M9 with the rest of the module.
+with the notification engine, not in M9 with the rest of the module (brought forward from M6 to
+M0 by TB on 19/10/2026).
 
 ### 18.1 Naming rules
 

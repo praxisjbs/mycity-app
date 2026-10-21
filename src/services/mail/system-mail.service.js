@@ -15,21 +15,41 @@
  * committed (README §6.4); a request never waits on SMTP, and a rolled-back save never
  * sends anything.
  *
- * Transport:
- *  - SMTP_HOST set: real delivery over SMTP, STARTTLS required on 587 (TLS from the first
- *    byte with SMTP_SECURE on 465). Staging sends real mail too (A4), marked: the subject
- *    starts "[STAGING]" and the message carries a red banner, so nobody mistakes a test
- *    offer letter for a real one.
+ * Transport: the system sender on Settings · Integrations (shared/integrations/settings.js:
+ * saved there, else SMTP_* and MAIL_* in the server file; docs/guides/integrations.md §6.3),
+ * read at each message, so a new password or server applies at once: the SMTP transport is
+ * rebuilt when the settings change and the old one closed.
+ *  - Set up: real delivery over SMTP, STARTTLS required (`starttls`, 587) or TLS from the
+ *    first byte (`tls`, 465). Staging sends real mail too (A4), marked: the subject starts
+ *    "[STAGING]" and the message carries a red banner, so nobody mistakes a test offer
+ *    letter for a real one.
  *    Before handing a message to the relay, each recipient domain is checked
  *    (deliverability/route-check.js): a relay that hosts the domain's website but not its
  *    mail would keep the message in a local mailbox and report success, so that send
  *    fails with MAIL_ROUTE_TRAPPED instead.
- *  - SMTP_HOST empty (development, test): nothing leaves the machine. Messages are kept in
- *    memory (captured()) for tests and logged at debug.
+ *  - Not set up, on a laptop or in CI (config MAIL_UNSET "capture"): nothing leaves the
+ *    machine. Messages are kept in memory (captured()) for tests and logged at debug.
+ *  - Not set up, on staging or production (MAIL_UNSET "hold"): send() throws MailNotSetUpError
+ *    (code MAIL_NOT_SET_UP) before anything is rendered, and the job puts itself back until
+ *    mail is set up (guide §6.8). Nothing is faked and nothing is lost (A4).
  *
- * Paced: at most MAIL_SEND_PER_HOUR recipients in any 60 minutes (services/mail/pace.js), the
- * mailbox's hourly limit. Over it, send() throws MailPacedError (code MAIL_PACED) before
- * anything goes out, and the job that called it postpones itself until a slot frees.
+ * Paced: at most the sender's hourly limit of recipients in any 60 minutes
+ * (services/mail/pace.js). Over it, send() throws MailPacedError (code MAIL_PACED) before
+ * anything goes out, and the job that called it postpones itself until a slot frees. A server
+ * that says its own sending limit is used up is read the same way, for an hour.
+ * Every message that reached the server is counted (shared/integrations/usage.js).
+ *
+ * Paused: IT can pause system mail on the System Sender (docs/guides/integrations.md §6.15).
+ * Until it is resumed send() throws MailPausedError (code MAIL_PAUSED) before anything is
+ * rendered, except for WHILE_PAUSED: invitations and password resets, a person's only way in,
+ * and IT's own test. Each caller decides what paused mail becomes: a notice is pushed instead,
+ * a digest is dropped, anything else waits in its queue until Resume.
+ *
+ * Refused: an address the server refuses for good (a 5xx to RCPT TO: no such mailbox, a domain
+ * that takes no mail) is kept on the System Sender's Refused Addresses
+ * (shared/integrations/refusals.js) and send() throws MailRefusedError (code MAIL_REFUSED),
+ * which its caller records as done, never tried again. Mail accepted for an address takes it
+ * off that list.
  *
  * Rendering is the same engine as documents (shared/documents/render.js): escaped values,
  * house formats, the subject a template too, inside templates/email/layout.html. A plain
@@ -48,35 +68,165 @@ const variables = require("../../shared/templates/variables");
 const storage = require("../storage/storage.service");
 const routeCheck = require("./deliverability/route-check");
 const pace = require("./pace");
+const integrations = require("../../shared/integrations/settings");
+const usage = require("../../shared/integrations/usage");
+const refusals = require("../../shared/integrations/refusals");
 
 const EMAIL_RE = /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/;
 const MAX_RECIPIENTS = 50;
 const CAPTURE_LIMIT = 200;
 
+/**
+ * The templates that go out while system mail is paused (docs/guides/integrations.md §6.15):
+ * an invitation and a password reset, without which nobody can get in, and Send Test Email,
+ * which is how IT checks the sender before resuming.
+ */
+const WHILE_PAUSED = new Set(["user-invite", "password-reset", "integration-test"]);
+
+/**
+ * A server saying its own sending limit is used up, not that the address is wrong: cPanel's
+ * "has exceeded the max emails per hour", a sending quota, a rate limit.
+ */
+const OVER_LIMIT = /(emails|messages|recipients) per hour|sending (limit|quota|rate)|rate limit/i;
+const HOUR_MS = 60 * 60 * 1000;
+
+/** The SMTP transport and the settings it was built from, so a change builds a new one. */
 let transport = null;
+let transportFor = null;
+let capturing = null;
 const captured = [];
 
-function getTransport() {
-  if (transport) return transport;
-  if (config.SMTP_HOST) {
-    transport = nodemailer.createTransport({
-      host: config.SMTP_HOST,
-      port: config.SMTP_PORT,
-      secure: config.SMTP_SECURE,
-      requireTLS: !config.SMTP_SECURE,
-      auth: config.SMTP_USER
-        ? { user: config.SMTP_USER, pass: config.SMTP_PASSWORD }
-        : undefined,
-      pool: true,
-      maxConnections: 3,
-      connectionTimeout: 15_000,
-      greetingTimeout: 15_000,
-      socketTimeout: 60_000,
-    });
-  } else {
-    transport = nodemailer.createTransport({ jsonTransport: true });
+/** Mail held on a server where nothing is set up (guide §6.8). */
+class MailNotSetUpError extends Error {
+  constructor() {
+    super("system mail is not set up: Settings, Integrations, System Sender");
+    this.name = "MailNotSetUpError";
+    this.code = "MAIL_NOT_SET_UP";
   }
-  return transport;
+}
+
+/** System mail paused on Settings · Integrations (guide §6.15). */
+class MailPausedError extends Error {
+  constructor() {
+    super("system mail is paused: Settings, Integrations, System Sender");
+    this.name = "MailPausedError";
+    this.code = "MAIL_PAUSED";
+  }
+}
+
+/**
+ * The mail server refused every recipient for good (guide §6.16). Its message names no
+ * address, so every refusal is one fault; `rejected` holds them.
+ */
+class MailRefusedError extends Error {
+  constructor({ rejected, smtpCode, reply }) {
+    super("system mail: the mail server refused the recipient");
+    this.name = "MailRefusedError";
+    this.code = "MAIL_REFUSED";
+    this.rejected = rejected;
+    this.smtpCode = smtpCode;
+    this.reply = reply;
+  }
+}
+
+/**
+ * A permanent refusal of the addresses themselves: a 5xx to RCPT TO for every recipient,
+ * not a server over its own sending limit. Null for anything else.
+ */
+function refusalOf(err) {
+  if (!err || err.code !== "EENVELOPE") return null;
+  const code = Number(err.responseCode) || 0;
+  const reply = String(err.response || "");
+  if (code < 500 || code > 599 || OVER_LIMIT.test(reply)) return null;
+  const rejected = (Array.isArray(err.rejected) ? err.rejected : []).map(String).filter(Boolean);
+  return rejected.length ? { rejected, smtpCode: code, reply: reply.slice(0, 300) } : null;
+}
+
+/** The server says its own hourly limit is used up: wait an hour, as at our own limit. */
+const overLimit = (err) => Boolean(err) && OVER_LIMIT.test(String(err.response || ""));
+
+/** The system sender in use, or null. */
+const senderSettings = () => integrations.of("mail_sender");
+
+/**
+ * A refusal as System Health keeps it (guide §6.16): one warning for every refused address,
+ * counted on Faults and never pushed; the addresses themselves are on Refused Addresses.
+ * @param {MailRefusedError} err
+ * @param {{queue: string, template: string}} where
+ */
+function reportRefused(err, { queue, template }) {
+  require("../../shared/observability/error-reporter").report(err, {
+    origin: "worker",
+    severity: "warning",
+    route: `job ${queue}`,
+    extra: { template, smtp_code: err.smtpCode || null, refused: (err.rejected || []).length },
+  });
+}
+
+/** Is system mail paused (guide §6.15)? Only invitations, resets and the test email go out. */
+async function paused() {
+  const s = await senderSettings();
+  return Boolean(s && s.paused_at);
+}
+
+/**
+ * nodemailer's options for a sender's settings. `password` null: no sign-in (the test's
+ * first step, or a relay that takes none).
+ */
+function smtpOptions(v, password, { pool = false } = {}) {
+  return {
+    host: v.host,
+    port: v.port,
+    secure: v.security === "tls",
+    requireTLS: v.security !== "tls",
+    tls: { servername: v.host },
+    auth: v.username && password !== null ? { user: v.username, pass: password || "" } : undefined,
+    pool,
+    maxConnections: 3,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: pool ? 60_000 : 15_000,
+  };
+}
+
+/** A fingerprint of what the transport depends on; the password only as a hash. */
+function fingerprintOf(s) {
+  const v = s.values;
+  const hash = require("node:crypto").createHash("sha256").update(String(s.secrets.password || "")).digest("hex");
+  return [v.host, v.port, v.security, v.username || "", hash].join("|");
+}
+
+/** The transport for the settings in use; rebuilt, and the old one closed, when they change. */
+async function getTransport() {
+  const s = await senderSettings();
+  if (!s) {
+    if (config.MAIL_UNSET !== "capture") throw new MailNotSetUpError();
+    if (!capturing) capturing = nodemailer.createTransport({ jsonTransport: true });
+    return { transport: capturing, settings: null };
+  }
+  const fp = fingerprintOf(s);
+  if (!transport || transportFor !== fp) {
+    if (transport) transport.close();
+    transport = nodemailer.createTransport(smtpOptions(s.values, s.secrets.password, { pool: true }));
+    transportFor = fp;
+  }
+  return { transport, settings: s };
+}
+
+/**
+ * Settings · Integrations' test of a sender, before or after it is saved: reach the
+ * server (TLS as configured) and, with a password, sign in. One connection, closed after.
+ * Throws nodemailer's error; integrations.testers.js names it.
+ * @param {{host: string, port: number, security: string, username?: string|null}} values
+ * @param {string|null} password  null: connect only
+ */
+async function verifyWith(values, password) {
+  const t = nodemailer.createTransport(smtpOptions(values, password));
+  try {
+    await t.verify();
+  } finally {
+    t.close();
+  }
 }
 
 function addressList(value) {
@@ -237,38 +387,74 @@ async function send(msg) {
   const first = Array.isArray(msg.to) ? msg.to[0] : msg.to;
   const recipient =
     msg.recipient || (typeof first === "object" ? first : { email: first });
+  const { transport: t, settings } = await getTransport();
+  if (settings && settings.paused_at && !WHILE_PAUSED.has(msg.template)) throw new MailPausedError();
+  const sender = settings ? settings.values : null;
+  const recipients = to.length + (cc ? cc.length : 0);
   // A relay that hosts a recipient's domain but not its mail would accept the message and
-  // keep it in a local mailbox: fail loudly instead (code MAIL_ROUTE_TRAPPED).
-  if (config.SMTP_HOST)
+  // keep it in a local mailbox: fail loudly instead (code MAIL_ROUTE_TRAPPED). Domains whose
+  // mailboxes are on the relay (the sender's local domains, MyCity's own) are delivered there.
+  if (sender)
     await routeCheck.assertRoutable({
-      smtpHost: config.SMTP_HOST,
+      smtpHost: sender.host,
       to: [...to, ...(cc || [])].map((a) =>
         typeof a === "string" ? a : a.address,
       ),
+      localDomains: sender.local_domains,
     });
   const rendered = await renderEmail(db, msg.template, msg.data || {}, {
     recipient,
     inline: true,
   });
-  if (config.SMTP_HOST) {
-    const slot = await pace.reserve(to.length + (cc ? cc.length : 0));
+  if (sender) {
+    const slot = await pace.reserve(recipients, { limit: sender.per_hour || 0 });
     if (!slot.ok) throw new pace.MailPacedError(slot.wait_ms);
   }
-  const info = await getTransport().sendMail({
-    from: config.MAIL_FROM,
-    replyTo: msg.reply_to || config.MAIL_REPLY_TO || undefined,
-    to,
-    cc,
-    subject: rendered.subject,
-    html: rendered.html,
-    text: rendered.text,
-    attachments: [...rendered.inline, ...(await attachmentsOf(db, msg.attachments))],
-    headers: {
-      "X-MyCity-Template": `${msg.template}@${rendered.template_version}`,
-      "Auto-Submitted": "auto-generated",
-    },
-  });
-  if (!config.SMTP_HOST) {
+  let info;
+  try {
+    info = await t.sendMail({
+      from: sender ? sender.from : config.MAIL_FROM,
+      replyTo: msg.reply_to || (sender ? sender.reply_to : config.MAIL_REPLY_TO) || undefined,
+      to,
+      cc,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      attachments: [...rendered.inline, ...(await attachmentsOf(db, msg.attachments))],
+      headers: {
+        "X-MyCity-Template": `${msg.template}@${rendered.template_version}`,
+        "Auto-Submitted": "auto-generated",
+      },
+    });
+  } catch (err) {
+    if (sender)
+      usage.record("mail_sender", "send", {
+        ok: false,
+        units: recipients,
+        error_code: require("./smtp-errors").stepCodeOf(err),
+      });
+    const refused = sender ? refusalOf(err) : null;
+    if (refused) {
+      await refusals.record({ emails: refused.rejected, template: msg.template, smtp_code: refused.smtpCode, reply: refused.reply }, { db });
+      throw new MailRefusedError(refused);
+    }
+    if (sender && overLimit(err)) throw new pace.MailPacedError(HOUR_MS);
+    throw err;
+  }
+  if (sender) {
+    usage.record("mail_sender", "send", { ok: true, units: recipients });
+    await refusals.accepted((info.accepted || []).map(String), { db });
+    // Some recipients refused while others took it: theirs are kept, the message went.
+    const rejected = (info.rejected || []).map(String);
+    if (rejected.length) {
+      const why = (info.rejectedErrors || [])[0] || {};
+      await refusals.record(
+        { emails: rejected, template: msg.template, smtp_code: Number(why.responseCode) || null, reply: why.response || null },
+        { db },
+      );
+    }
+  }
+  if (!sender) {
     captured.push({
       template: msg.template,
       to,
@@ -279,7 +465,7 @@ async function send(msg) {
     if (captured.length > CAPTURE_LIMIT) captured.shift();
     logger.debug(
       { template: msg.template, to },
-      "system mail captured (no SMTP_HOST)",
+      "system mail captured (no sender set up)",
     );
   }
   return {
@@ -289,25 +475,119 @@ async function send(msg) {
   };
 }
 
-/** Messages kept instead of sent (no SMTP_HOST). Tests only. */
+/** How long sendPlain waits for the saved settings before it uses the server file's. */
+const PLAIN_SETTINGS_MS = 3000;
+
+/**
+ * The sender for sendPlain: the one in use when the database answers in time, else the
+ * server file's, else null. The health watch mails when the database itself may be what is
+ * down, so it never waits on it for long.
+ */
+async function plainSender() {
+  let timer;
+  try {
+    return await Promise.race([
+      senderSettings(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("settings not read in time")), PLAIN_SETTINGS_MS);
+      }),
+    ]);
+  } catch {
+    const file = require("../../shared/integrations/providers").get("mail_sender").fromFile(config);
+    return file ? { source: "file", values: file.values, secrets: file.secrets, unreadable: [] } : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Send a plain-text message with no template and no database: the one sender for mail
+ * that must go out when the database itself may be down, which is the server's health
+ * watch (scripts/ops/health-brief.js) and nothing else. The system sender saved on Settings ·
+ * Integrations when the database answers, else the server file's SMTP_* and MAIL_* lines,
+ * which is why those stay in the file (docs/guides/integrations.md §6.2). Its own connection,
+ * closed after; the same route check and pacing as send() (without Redis, pacing counts in
+ * this process); the subject is marked [STAGING] on staging as every system mail's is.
+ * @param {{to: string|string[], cc?: string|string[], subject: string, text: string,
+ *          attachments?: Array<{filename: string, content: string|Buffer, contentType?: string}>}} msg
+ * @returns {Promise<{message_id: string, accepted: string[], rejected: string[]}>}
+ */
+async function sendPlain(msg) {
+  const to = addressList(msg.to);
+  if (to.length === 0) throw new Error("system mail: no recipient");
+  const cc = msg.cc && [].concat(msg.cc).length ? addressList(msg.cc) : undefined;
+  const all = [...to, ...(cc || [])].map((a) => (typeof a === "string" ? a : a.address));
+  const s = await plainSender();
+  if (!s && config.MAIL_UNSET !== "capture") throw new MailNotSetUpError();
+  const sender = s ? s.values : null;
+  if (sender) {
+    await routeCheck.assertRoutable({ smtpHost: sender.host, to: all, localDomains: sender.local_domains });
+    const slot = await pace.reserve(all.length, { limit: sender.per_hour || 0 });
+    if (!slot.ok) throw new pace.MailPacedError(slot.wait_ms);
+  }
+  const subject = `${config.APP_ENV === "staging" ? "[STAGING] " : ""}${String(msg.subject).replace(/\s+/g, " ").trim()}`;
+  if (!capturing) capturing = nodemailer.createTransport({ jsonTransport: true });
+  const t = sender ? nodemailer.createTransport(smtpOptions(sender, s.secrets.password)) : capturing;
+  let info;
+  try {
+    info = await t.sendMail({
+      from: sender ? sender.from : config.MAIL_FROM,
+      replyTo: (sender ? sender.reply_to : config.MAIL_REPLY_TO) || undefined,
+      to,
+      cc,
+      subject,
+      text: String(msg.text),
+      attachments: (msg.attachments || []).map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
+      headers: { "X-MyCity-Template": "plain", "Auto-Submitted": "auto-generated" },
+    });
+  } finally {
+    if (sender) t.close();
+  }
+  if (!sender) {
+    captured.push({ template: "plain", to, cc, subject, html: null, text: String(msg.text), attachments: msg.attachments || [] });
+    if (captured.length > CAPTURE_LIMIT) captured.shift();
+  }
+  return {
+    message_id: info.messageId,
+    accepted: (info.accepted || []).map(String),
+    rejected: (info.rejected || []).map(String),
+  };
+}
+
+/** Messages kept instead of sent (nothing set up, on a laptop or in CI). Tests only. */
 function capturedMail() {
   return captured.slice();
 }
 
 function __reset() {
   captured.length = 0;
+  if (transport) transport.close();
   transport = null;
+  transportFor = null;
+  capturing = null;
 }
 
-/** Readiness: the SMTP server answers and accepts our login. */
+/** Readiness: the sender in use answers and accepts our login; held mail when none is set up. */
 async function health() {
-  if (!config.SMTP_HOST) return { status: "up", mode: "captured" };
+  let s;
   try {
-    await getTransport().verify();
+    s = await senderSettings();
+  } catch (err) {
+    return { status: "degraded", error: String(err.code || err.message).slice(0, 120) };
+  }
+  if (!s)
+    return config.MAIL_UNSET === "capture"
+      ? { status: "up", mode: "captured" }
+      : { status: "degraded", mode: "not_set_up", error: "not set up: mail is held" };
+  // Paused on purpose: degraded, which keeps the release ready, and Status says why.
+  if (s.paused_at) return { status: "degraded", mode: "paused", paused_at: s.paused_at };
+  try {
+    const { transport: t } = await getTransport();
+    await t.verify();
     const out = { status: "up", mode: "smtp" };
-    if (config.MAIL_SEND_PER_HOUR) {
+    if (s.values.per_hour) {
       out.sent_last_hour = await pace.usage();
-      out.per_hour = config.MAIL_SEND_PER_HOUR;
+      out.per_hour = s.values.per_hour;
     }
     return out;
   } catch (err) {
@@ -318,4 +598,21 @@ async function health() {
   }
 }
 
-module.exports = { send, renderEmail, textOf, capturedMail, health, __reset };
+module.exports = {
+  send,
+  sendPlain,
+  paused,
+  renderEmail,
+  textOf,
+  capturedMail,
+  health,
+  verifyWith,
+  smtpOptions,
+  refusalOf,
+  reportRefused,
+  WHILE_PAUSED,
+  MailNotSetUpError,
+  MailPausedError,
+  MailRefusedError,
+  __reset,
+};

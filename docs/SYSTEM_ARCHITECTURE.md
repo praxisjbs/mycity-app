@@ -184,6 +184,10 @@ event_outbox    the work that must follow (dispatched after commit)
 
 The worker drains `event_outbox` (`FOR UPDATE SKIP LOCKED`, exponential backoff, per-handler
 completion so a retry skips handlers that already succeeded). Handlers are named and idempotent.
+It runs as soon as a transaction holding an event commits: `emit()` sends a Postgres `NOTIFY` on
+`mycity_outbox`, which Postgres delivers only on commit, and the worker's `jobs/loops/outbox-wake.js`
+LISTENs on its own connection. A one-second tick (`schedulers/outbox-dispatch.js`) is the safety
+net for a wake lost to a dropped connection (GE, 20/10/2026: a chat message waited up to a second).
 
 ```
 service tx ──► emit ──► COMMIT
@@ -212,7 +216,7 @@ Realtime is best effort; everything that changes state goes through the outbox.
 | `pdf-render` | worker | Chromium render | Praxis `services/pdf.service.js`, `chromium.js` |
 | `notification-deliver` | worker | Push + email fan-out | Praxis `jobs/handlers/notification-deliver` |
 | `workflow-timeout` (every 5 min) | worker | Applies stage `on_timeout` | Pixie engine `resolveTimeout` |
-| `celebrations` (05:00 Lagos) | worker | Birthday, anniversary posts (M1) | new |
+| `celebrations` (08:00 Lagos) | worker | Birthday, anniversary posts (M1) | new |
 | `mail-sync`, IMAP IDLE | worker | Mailbox (M1) | Praxis `jobs/mail-*` |
 
 BullMQ prefix `mycity:prod` / `mycity:stg` on separate Redis logical DBs. Queue names are the handler
@@ -237,7 +241,12 @@ seconds; `/api/health/ready` reports `worker` degraded when none is fresh.
 - **Module catalogue** (`shared/access/access.catalog.js`) is the single list of permission keys; a
   CI gate checks it equals the distinct `requirePermission` keys in `src/`.
 - **Secrets.** `.env` per environment, mode 600, owned by the service user. Integration secrets
-  (mailbox passwords) AES-256-GCM in `integration_secret`, never on the row that uses them.
+  (mailbox passwords; the system sender's password, the keys of Geoapify, Gemini, Groq, OpenAI,
+  Anthropic, DeepSeek and Exchange Rates, and the web push pair, set on Settings · Integrations, `docs/guides/integrations.md` §6.4) AES-256-GCM in
+  `integration_secret`, each bound to its row, never on the row that uses them and never sent back
+  to a browser. What changes often (mail, keys, limits) is set on that page, per environment,
+  without SSH or a restart; `.env` keeps what the app needs before it can read its database
+  (`ENCRYPTION_KEY` first) and stays the fallback for the rest.
 - **Service users.** `mycity-prod` and `mycity-stg` run their own units and cannot read each
   other's `.env` or media. `mycity-deploy` is the only SSH login CI has, with a forced command
   (§ 9.5).
@@ -426,6 +435,10 @@ seed guard.
   and the certificate's days left. Errors, backup, drill and probe all alert through one sender
   (`shared/observability/alert.js`): WhatsApp links per person (`ALERT_WHATSAPP_URLS`) and/or a
   chat webhook (`ALERT_WEBHOOK_URL`).
+- **Health watch.** `mycity-health-watch-<env>.timer` every 5 minutes on the server
+  (`scripts/ops/health-brief.js --watch`): reads the readiness checks without needing the API, the
+  database or Redis, and mails the Status brief to `HEALTH_ALERT_TO` when something is down
+  (`docs/guides/system-health.md` §6, `docs/runbooks/system-health.md` §7).
 
 ---
 

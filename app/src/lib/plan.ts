@@ -22,7 +22,8 @@ export const plan = createDeliveryPlan(__DELIVERY_PLAN__, {
 const SECTION: Record<string, string> = {
   home: "Home", workspace: "My Workspace", ess: "Employee Self-Service", community: "Staff Community", mailbox: "Mailbox",
   people: "People", performance: "Performance", queries: "Queries & Sanctions", recruitment: "Recruitment", payroll: "Payroll",
-  partnerships: "Partnerships", expenses: "Expenses", knowledge: "Knowledge Hub", praxis_ai: "Praxis AI", settings: "Settings",
+  partnerships: "Partnerships", expenses: "Expenses", knowledge: "Knowledge Hub", praxis_ai: "Praxis AI", ai_control: "AI Control",
+  settings: "Settings",
 };
 
 /** The plan's key for one screen: "<PROGRESS section>|<tab slug>". */

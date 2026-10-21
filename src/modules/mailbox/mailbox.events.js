@@ -47,6 +47,9 @@ const EVENTS = defineEvents("mailbox", {
   "mail_signature.config_changed": {
     summary: "The company's email signature links or switches were changed",
   },
+  "mail_account.server_moved": {
+    summary: "Every mailbox moved to the staff mail server set on Settings, Integrations",
+  },
 });
 
 defineDocumentType("mail_attachment", {
@@ -110,6 +113,20 @@ outbox.register(EVENTS.MAIL_MESSAGE_QUEUED, "mailbox.deliver_later", (event) =>
   ),
 );
 
+/**
+ * The staff mail server changed or was removed on Settings · Integrations: every mailbox
+ * moves to the server now in use and is synced with its saved password at once
+ * (docs/guides/integrations.md §3 step 8). Other connections are not the mailbox's.
+ */
+async function moveMailboxes(event) {
+  if (event.payload.code !== "mailbox_server") return;
+  const ids = await require("./mailbox.service").moveServer(event);
+  for (const id of ids)
+    await queues.enqueue("mail-sync", "sync", { mail_account_id: id }, { jobId: `mail-sync-moved-${id}-${event.event_id}` });
+}
+outbox.register("integration.saved", "mailbox.move_on_server_saved", moveMailboxes);
+outbox.register("integration.removed", "mailbox.move_on_server_removed", moveMailboxes);
+
 /** The owner's open tabs reload their folder. */
 async function tellOwner(event) {
   let userId = event.payload.user_id;
@@ -148,6 +165,7 @@ defineNotification(EVENTS.MAIL_MESSAGE_RECEIVED, {
   to: [{ users: ownerOf }],
   title: (e) => e.payload.from || "New mail",
   body: (e) => [e.payload.subject, e.payload.preview].filter(Boolean).join("\n"),
+  who: "The mailbox's owner",
 });
 
 defineNotification(EVENTS.MAIL_ACCOUNT_NEEDS_RECONNECT, {
@@ -155,6 +173,7 @@ defineNotification(EVENTS.MAIL_ACCOUNT_NEEDS_RECONNECT, {
   title: "Reconnect your mailbox",
   body: "The mail server refused the saved password.",
   priority: "high",
+  who: "The mailbox's owner",
 });
 
 defineNotification(EVENTS.MAIL_SEND_FAILED, {
@@ -162,6 +181,7 @@ defineNotification(EVENTS.MAIL_SEND_FAILED, {
   title: (e) => `Not sent: ${e.payload.subject}`,
   body: (e) => e.payload.reason,
   priority: "high",
+  who: "The mailbox's owner",
 });
 
 module.exports = { EVENTS };

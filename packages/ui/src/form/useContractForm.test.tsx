@@ -97,6 +97,9 @@ describe("useContractForm", () => {
     expect(shortMessage({ type: "custom", message: "must look like MCA-0001" })).toBe("Must look like MCA-0001");
     expect(shortMessage({ type: "too_small", message: "String must contain at least 1 character(s)" })).toBe("Required");
     expect(shortMessage({ type: "invalid_enum_value", message: "Invalid enum value" })).toBe("Choose one");
+    expect(shortMessage({ type: "invalid_type", message: "Required" })).toBe("Required");
+    expect(shortMessage({ type: "invalid_type", message: "Expected object, received string" })).toBe("Required");
+    expect(shortMessage({ type: "invalid_type", message: "Pick an address" })).toBe("Pick an address");
   });
 });
 

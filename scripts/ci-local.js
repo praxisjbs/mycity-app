@@ -95,6 +95,7 @@ const GATES = [
   { id: "ai-no-writes", label: "19 AI read manifest only", script: "scripts/check/ai-no-writes.js" },
   { id: "money", label: "20 Money", script: "scripts/check/money.js" },
   { id: "native-ui", label: "21 Nothing the browser styles itself", script: "scripts/check/native-ui.js", group: "screens" },
+  { id: "addresses", label: "22 Addresses picked, never typed", script: "scripts/check/addresses.js" },
   // Pipeline guards
   { id: "contract", label: "Contract is generated and current", script: "scripts/gen/contract.js", args: ["--check"] },
   { id: "env-template", label: ".env.example matches the schema", script: "scripts/check/env-template.js" },
@@ -102,8 +103,10 @@ const GATES = [
   { id: "capabilities", label: "Capabilities are catalogued and seeded", script: "scripts/check/capabilities.js" },
   { id: "public-surface", label: "Public routes import no auth", script: "scripts/check/public-surface.js" },
   { id: "numbering-schemes", label: "Numbering schemes exist", script: "scripts/check/numbering-schemes.js" },
+  { id: "schedulers", label: "Every scheduler is started", script: "scripts/check/schedulers.js" },
   { id: "production-environment-refs", label: "Only release/rollback reach production", script: "scripts/check/production-environment-refs.js" },
   { id: "ai-vendor-imports", label: "No AI vendor imports outside services/ai", script: "scripts/check/ai-vendor-imports.js" },
+  { id: "ai-actions", label: "Every AI call names a registered action", script: "scripts/check/ai-actions.js" },
   { id: "shell", label: "Shell scripts LF and parse", script: "scripts/check/shell.js" },
   { id: "pagination", label: "Every list pages at 25", script: "scripts/check/pagination.js" },
   { id: "provenance", label: "Code never names its origin project", script: "scripts/check/provenance.js" },

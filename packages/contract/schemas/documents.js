@@ -5,14 +5,19 @@
  * names a `document_id`, and the bytes are reached only through a route that
  * checks who is asking.
  *
- * Three shapes travel:
+ * Four shapes travel:
  *
  *   DocumentRef    what an upload answers with: the id a record stores, and
  *                  enough to draw the file in the upload tray
+ *   MediaRef       a DocumentRef with what drawing it in place needs: its shape,
+ *                  pages, length and derived sizes (a chat message's file)
  *   Document       one document as a screen lists it, with its version chain
  *   DocumentRow    the Vault list on My Documents and an employee's record: a
  *                  document that is held, OR one that was asked for and not
  *                  yet given (status "missing")
+ *   ExportFile     a file somebody pressed Export or Download for: pending
+ *                  while the worker makes it, then done (downloaded on the
+ *                  device that pressed) or failed
  *
  * Statuses a person reads, derived rather than stored (one per row):
  *   missing                a document asked for, not yet uploaded
@@ -100,6 +105,23 @@ const DocumentRef = z
   })
   .strict();
 
+/**
+ * A stored file as a screen draws it before opening it: a photo at its own shape, a
+ * video's poster and length, a PDF's first page and page count. `variants` are the
+ * derived files it has (GET /documents/:id/variant/:kind): `webp-320` and `webp-960` (a
+ * photo, or a PDF's first page), `poster` and `mp4-720` (a video), `opus` (a voice note).
+ * A chat message's file and the files a conversation shares travel as one.
+ */
+const MediaRef = DocumentRef.extend({
+  width: z.number().int().min(1).nullable(),
+  height: z.number().int().min(1).nullable(),
+  page_count: z.number().int().min(1).nullable(),
+  duration_ms: z.number().int().min(0).nullable(),
+  /** A voice note's loudness in bars, each 0 to 100; null until the worker has measured it. */
+  waveform: z.array(z.number().int().min(0).max(100)).max(64).nullable(),
+  variants: z.array(z.string()).max(20),
+}).strict();
+
 /** One document. `storage_key` never crosses the wire. */
 const Document = z
   .object({
@@ -124,6 +146,19 @@ const Document = z
     verified_at: isoDateTime.nullable(),
     uploaded_by_name: z.string().nullable(),
     created_at: isoDateTime,
+  })
+  .strict();
+
+/**
+ * What an export answers (202) and GET /exports/:id answers while the screen waits: the file
+ * the worker is making for the person who pressed (docs/guides/foundation.md §6.12). Done, it
+ * is downloaded from GET /documents/:id/content on the device that pressed; nothing is emailed.
+ */
+const ExportFile = z
+  .object({
+    document_id: uuid,
+    file_name: z.string(),
+    status: z.enum(["pending", "done", "failed"]),
   })
   .strict();
 
@@ -209,10 +244,26 @@ const TABLES = {
       mime_type: "document.mime, named as the upload field reads it",
     },
   },
+  MediaRef: {
+    table: "document",
+    virtual: {
+      file_name: "document.original_name, as the upload tray shows it",
+      size_bytes: "document.bytes, named as the upload field reads it",
+      mime_type: "document.mime, named as the upload field reads it",
+      variants: "the kinds of its document_variant rows, the derived files it has",
+    },
+  },
   Document: {
     table: "document",
     virtual: {
       uploaded_by_name: "the uploader's name, joined from app_user and employee",
+    },
+  },
+  ExportFile: {
+    table: "document",
+    virtual: {
+      file_name: "document.original_name, the name the file is saved under",
+      status: "document.render_status: pending while the worker makes it, then done or failed",
     },
   },
   DocumentVersionQuery: {
@@ -257,7 +308,9 @@ module.exports = {
   DocumentUpload,
   EmployeeDocumentUpload,
   DocumentRef,
+  MediaRef,
   Document,
+  ExportFile,
   DocumentVersionQuery,
   DocumentVersionPage,
   VariantParams,

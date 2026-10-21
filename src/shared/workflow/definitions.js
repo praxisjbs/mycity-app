@@ -17,9 +17,11 @@
  * leave flow (docs/guides/foundation.md §6.5, seeded in 0499): the line manager, then
  * Operations & People when the request is over 5 days, a number Operations & People
  * change on Settings, Approvals.
- * M2 adds `performance.goal` and `performance.review` (seeded in 2091).
  * M1 adds `attendance.location_request` (docs/guides/attendance.md §6.11, seeded in
- * 1392): a work location request, the line manager then Operations & People.
+ * 1392): a work location request, the line manager then Operations & People; and
+ * `policy.approval` (docs/guides/policies.md §6.4, seeded in 1396): a policy version, the CEO.
+ * Attendance's PR 4 adds `attendance.temporary_site` (docs/guides/attendance.md §6.11, seeded in
+ * 1470): a temporary site, Operations & People; everyone on the site is excluded from deciding it.
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -101,41 +103,31 @@ const DEFAULTS = Object.freeze({
         sla_hours: 48,
       },
     ],
-  },  // M2, seeded in 2091 (docs/guides/performance.md §6): goals, targets and a department's month.
-  "performance.goal": {
-    key: "performance.goal",
-    module: "performance",
-    name: "Goals and Targets",
-    description: "Management, then Operations & People, then the CEO, whose approval makes it binding.",
-    context: {},
+  },
+  // M1, seeded in 1470 (docs/guides/attendance.md §6.11).
+  "attendance.temporary_site": {
+    key: "attendance.temporary_site",
+    module: "people",
+    name: "Temporary Site",
+    description: "Operations & People approve where people work for some days.",
+    context: { days: "number" },
     stages: [
-      { key: "management", name: "Management", approver: { type: "role", value: "management" }, sla_hours: 48 },
       {
         key: "operations_people",
         name: "Operations & People",
         approver: { type: "role", value: "operations_people" },
         sla_hours: 48,
       },
-      { key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 48 },
     ],
   },
-  // M2, seeded in 2091: a manager review, opened with the reviewer as subject so the first stage
-  // is the reviewer's own line manager.
-  "performance.review": {
-    key: "performance.review",
-    module: "performance",
-    name: "Performance Review",
-    description: "The reviewer's line manager, then Operations & People.",
+  // M1, seeded in 1396 (docs/guides/policies.md §6.4).
+  "policy.approval": {
+    key: "policy.approval",
+    module: "knowledge",
+    name: "Policy Approval",
+    description: "The CEO approves and signs a policy version before it can start.",
     context: {},
-    stages: [
-      { key: "second_level", name: "Second Level", approver: { type: "manager_of_subject" }, sla_hours: 48 },
-      {
-        key: "operations_people",
-        name: "Operations & People",
-        approver: { type: "role", value: "operations_people" },
-        sla_hours: 48,
-      },
-    ],
+    stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
   },
 });
 

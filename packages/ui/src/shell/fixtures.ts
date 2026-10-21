@@ -7,6 +7,7 @@ import type { BottomBarItem } from "./BottomBar";
 import type { LauncherGroup } from "./MoreSheet";
 import type { PaletteResult } from "./CommandPalette";
 import type { RailItem } from "./Rail";
+import type { TrailItem } from "./TrailMenu";
 
 export const RAIL_ITEMS: RailItem[] = [
   { key: "home", label: "Home", icon: "home", href: "#/Rail" },
@@ -68,4 +69,13 @@ export const PALETTE_RESULTS: PaletteResult[] = [
   { key: "s2", group: "Screens", title: "My Leave", subtitle: "Self-Service", href: "#/CommandPalette" },
   { key: "p1", group: "People", title: "Adaeze Okonkwo", subtitle: "Content Producer", icon: "user", href: "#/CommandPalette" },
   { key: "p2", group: "People", title: "Bashir Lawal", subtitle: "Field Officer", icon: "user", href: "#/CommandPalette" },
+];
+
+/** A trail: Payroll ahead, Ada Obi's record on screen, then three places back (NavCapsule, TrailMenu). */
+export const TRAIL_ITEMS: TrailItem[] = [
+  { offset: 1, title: "Runs", sub: "Payroll", icon: "wallet" },
+  { offset: 0, title: "Ada Obi", sub: "People · Employees", icon: "users" },
+  { offset: -1, title: "Employees", sub: "People", icon: "users" },
+  { offset: -2, title: "Overview", sub: "Home", icon: "home" },
+  { offset: -3, title: "Inbox", sub: "Mailbox", icon: "mail" },
 ];

@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `/auth/me` lists the ones the person holds (§5) |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
-| Last changed | 19/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
@@ -44,7 +44,7 @@ administrator can reset their two-step from Settings · Users.
 | Forgot Password | Staff app, the sign-in card | Anyone | Email field | Send a reset link |
 | Reset and Welcome (`/reset?token=`, `/welcome?token=`) | Staff app, from an email | The person the link was sent to | Their email or first name; New Password, Confirm Password | Choose a password; ask for a new link when it has expired |
 | Lock screen | Over any staff screen | The signed-in person | Their name, email, why it locked; the PIN when they have one, else Password; Use Passkey; the code step when two-step asks; when their role now requires two-step, one line asking them to sign out and sign in | Unlock with the PIN, a passkey or the password; Sign Out |
-| ESS · My Security (`my-security`) | Staff app | Every employee, own account | Password (last changed), Two-Step Sign-In (On or Off, Ask for a Code, recovery codes left), PIN (On or Off, when changed), Passkeys (name, added, last used, This Device), Signed In (live sessions), Recent Sign-Ins with the Method, Clock-In Devices link | Change Password; Set Up Two-Step, Change App, New Codes, Turn Off (not while a role they hold requires two-step), how often it asks; Set PIN, Change PIN, Remove PIN; Add Passkey, rename or remove one; Confirm It's You when asked; sign out one device; Sign Out Others; Open My Devices |
+| ESS · My Security (`my-security`) | Staff app | Every employee, own account | Password (last changed), Two-Step Sign-In (On or Off, Ask for a Code, recovery codes left), PIN (On or Off, when changed), Passkeys (name, added, last used, This Device), Signed In (live sessions), Recent Sign-Ins with the Method, Clock-In Devices (the person's registered and new devices, Manage My Devices) | Change Password; Set Up Two-Step, Change App, New Codes, Turn Off (not while a role they hold requires two-step), how often it asks; Set PIN, Change PIN, Remove PIN; Add Passkey, rename or remove one; Confirm It's You when asked; sign out one device; Sign Out Others; Open My Devices |
 | Settings · Users (`users`) | Staff app | `settings` view | Counts, the logins with status, roles and two-step (desktop), Users by Role | Invite User; per login: Save Roles, Resend Invitation, Send Reset Link, Sign Out Everywhere, Reset Two-Step, Suspend, Reactivate |
 | People · Employees, the 360 | Staff app | `settings` create | Send Invite on the record header | Invite this employee to sign in |
 | The bell and email | Everywhere | The person concerned | Security notices, including every way in added, changed or removed | Read them; they cannot be switched off |
@@ -217,7 +217,10 @@ unknown email and a wrong password get the same message and take the same time. 
 account is told so only after the right password.
 
 **Links:** a reset link lasts 30 minutes, an invitation 72 hours. A new link closes the open ones of
-the same kind. Setting a password spends every open link and ends every session.
+the same kind. Setting a password spends every open link and ends every session. A link's email
+that waited in the mail queue goes out only while its link still works (`linkStillOpen`): one a
+newer link replaced, or that expired meanwhile, is dropped (`docs/guides/integrations.md` §6.15).
+Invitations and resets are the system mail that still goes while IT has paused it.
 
 **Logins:** no login without an employee; a person cannot suspend, reactivate or change the roles of
 their own login.
@@ -350,7 +353,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 | Forgot Password | Reset Password, "We will email you a link.", Email, Send Link, Back; then Check Your Email with the address | None | How long a link lasts and that only an active login gets one: §6 |
 | Reset and Welcome | The email (reset) or "Welcome, first name" (invitation); New Password, Confirm Password, Save Password or Set Password; an expired link says so with Request New Link | None | The password rules beyond the field's own mark: §6 |
 | Lock screen | Session Locked, Session Ended or Signed Out (Enter Code at the code step); why in one line; the person's photo or initials, name and email; PIN or Password, or Sign-In Code; Sign Out, Use Passkey, Use Password or Use PIN, Use Recovery Code, Unlock | None | The idle and time limits and the server-side end: §3 step 5, §6 |
-| ESS · My Security | Password with when it was changed; Two-Step Sign-In with On or Off, Ask for a Code (Every Sign-In, Once a Day, Once a Month), the recovery codes left, Set Up Two-Step, New Codes, Change App, Turn Off; PIN with On or Off and when changed, Set PIN, Change PIN, Remove PIN; Passkeys (Name with This Device, Added, Last Used; Add Passkey; a passkey's sheet with Name, Save Name, Remove Passkey); Signed In (device, address, when; Sign Out per device; Sign Out Others); Recent Sign-Ins (When, Device, Method, Address, Status); Clock-In Devices with Open My Devices. In the set-up: the QR code, the key, one line to scan it, Code From App, Turn On; then the ten codes, one line to keep them, Copy Codes. Confirm It's You: Confirm With, Password or PIN, Confirm or Use Passkey | Two-Step Sign-In and PIN: what each is, behind the card title | Why other sessions end on a password change, the reuse rule, the window, how codes and passkeys are checked: §6 |
+| ESS · My Security | Password with when it was changed; Two-Step Sign-In with On or Off, Ask for a Code (Every Sign-In, Once a Day, Once a Month), the recovery codes left, Set Up Two-Step, New Codes, Change App, Turn Off; PIN with On or Off and when changed, Set PIN, Change PIN, Remove PIN; Passkeys (Name with This Device, Added, Last Used; Add Passkey; a passkey's sheet with Name, Save Name, Remove Passkey); Signed In (device, address, when; Sign Out per device; Sign Out Others); Recent Sign-Ins (When, Device, Method, Address, Status); Clock-In Devices: each registered or new device (name and platform, status, last clock-in, This Device; removed ones left out) and Manage My Devices. In the set-up: the QR code, the key, one line to scan it, Code From App, Turn On; then the ten codes, one line to keep them, Copy Codes. Confirm It's You: Confirm With, Password or PIN, Confirm or Use Passkey | Two-Step Sign-In and PIN: what each is, behind the card title | Why other sessions end on a password change, the reuse rule, the window, how codes and passkeys are checked: §6 |
 | Settings · Users | Users, Active, Invited, Suspended, Signed In Now; the status chips; the list (person, roles, last seen, two-step, status); Users by Role; a login's detail with its actions, Reset Two-Step among them, and its confirmation in one sentence | None | What each role grants: Settings · Roles & Permissions, §8; what a reset removes: §6 |
 
 ### 10.2 Phone layout
@@ -417,6 +420,8 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · §6 Links: a queued invitation or reset is sent only while its link still works (`identity.linkStillOpen`, checked by the `email-send` job), and both still go while system mail is paused (`docs/guides/integrations.md` §6.15).
+
 - 16/10/2026 · TB · First version, with the build: sessions to the donor rules, the lock screen,
   the four-city sign-in screen, Forgot, Reset and Welcome, My Security on the real API, Settings ·
   Users and Send Invite on the employee record.
@@ -454,3 +459,8 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 - 19/10/2026 · AJ · `/auth/me` carries the person's `photo_url` (from `employee.photo_document_id`, set on ESS · My Profile; `docs/guides/ess.md` §3 step 1) in place of null. The app fetches it with the session (`useMyPhoto`) for the rail, the phone top bar, More and the lock screen, and `refreshMe` reads `/me` again after the photo changes. TB to review.
 - 19/10/2026 · AJ · Download My Data's Sign-Ins sheet is the person's own `GET /auth/sessions` list, read in the worker through `identity.service.listSessions` (`docs/guides/ess.md` §3 step 8). TB to review.
 - 19/10/2026 · AJ · Settings · Users and a role's people show each person's photo: `UserRow.photo_url` (192 px, `users.repo.js` through `shared/db/person.js`), initials when there is none. TB to review.
+- 19/10/2026 · TB · Account and sign-in notices name their audience (The account holder) in
+  Settings · Notifications (`docs/guides/notifications.md` §6); they are Security: always on, no
+  copies.
+- 19/10/2026 · AJ · My Security's Clock-In Devices card lists the person's registered and new devices (`GET /devices/mine`) above Manage My Devices, in place of the link alone (the team lead, 19/10/2026). §10 updated.
+- 20/10/2026 · TB · Sign Out also wipes this device's trail of places (`app/src/lib/trail.ts`, FRONTEND_FOUNDATION F29), so the next person on a shared device never sees where the last one went; a session that ends or locks keeps it for the same person's next sign-in.

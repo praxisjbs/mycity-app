@@ -72,34 +72,6 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M2 My Workspace: a task, "TSK-0001" (seeded in 2090)
-  goal_organisation: {
-    prefix: "OG",
-    padding: 2,
-    separator: "-",
-    reset: "yearly",
-    include_period: true,
-  }, // M2 Performance: an organisational goal, "OG-2026-01" (seeded in 2091)
-  goal_annual: {
-    prefix: "AG",
-    padding: 2,
-    separator: "-",
-    reset: "yearly",
-    include_period: true,
-  }, // M2 Performance: an annual goal, "AG-2026-01" (seeded in 2091)
-  goal_monthly: {
-    prefix: "MG",
-    padding: 3,
-    separator: "-",
-    reset: "yearly",
-    include_period: true,
-  }, // M2 Performance: a monthly goal, "MG-2026-001" (seeded in 2091)
-  goal_department: {
-    prefix: "DT",
-    padding: 3,
-    separator: "-",
-    reset: "yearly",
-    include_period: true,
-  }, // M2 Performance: a departmental target, "DT-2026-001" (seeded in 2091)
   location_request: {
     prefix: "WLR",
     padding: 4,
@@ -114,6 +86,20 @@ const SCHEMES = Object.freeze({
     reset: "never",
     include_period: false,
   }, // M1 attendance: a field assignment, "FA-0001" (seeded in 1393)
+  temporary_site: {
+    prefix: "TS",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M1 attendance: a temporary site, "TS-0001" (seeded in 1470)
+  policy: {
+    prefix: "POL",
+    padding: 4,
+    separator: "-",
+    reset: "never",
+    include_period: false,
+  }, // M1 policies: a company policy, "POL-0001" (seeded in 1396)
   query: {
     prefix: "QRY",
     padding: 4,

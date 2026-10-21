@@ -14,17 +14,23 @@ import { useClock } from "./ClockButton";
 /**
  * The clock panel on the in-browser mock (docs/guides/attendance.md §10, §11): the location is
  * read only after the press, the reason comes first, a lost answer is retried with the same
- * Idempotency-Key and body, and what the panel shows after a punch is the server's answer.
+ * Idempotency-Key and body, and what the panel shows after a punch is the server's answer. On a
+ * temporary site's day (§6.12) it names the site and its addresses, and once clocked in offers
+ * Check In, retried the same way. The mock's TS-0001 is in progress for Bashir.
  */
 
 type Position = { coords: { latitude: number; longitude: number; accuracy: number } };
 let answer: ((p: Position) => void) | null = null;
 let refuse: ((e: { code: number }) => void) | null = null;
-const getCurrentPosition = vi.fn((ok: (p: Position) => void, no: (e: { code: number }) => void) => {
+const watchPosition = vi.fn((ok: (p: Position) => void, no: (e: { code: number }) => void) => {
   answer = ok;
   refuse = no;
+  return 1;
 });
+const clearWatch = vi.fn();
 let permission = "prompt";
+const JSDOM_AGENT = navigator.userAgent;
+const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
 expect.extend(axeMatchers);
 installMatchMedia();
@@ -38,15 +44,19 @@ if (!("ResizeObserver" in window)) {
 
 beforeEach(() => {
   setViewport(1440);
-  getCurrentPosition.mockClear();
+  watchPosition.mockClear();
+  clearWatch.mockClear();
   answer = null;
   refuse = null;
-  Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: { watchPosition, clearWatch } });
+  Object.defineProperty(navigator, "userAgent", { configurable: true, value: JSDOM_AGENT });
+  Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
   Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: async () => ({ state: permission }) } });
 });
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 let clock: ReturnType<typeof useClock> | null = null;
@@ -83,6 +93,12 @@ async function signedInAs(email: string) {
 }
 
 const press = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
+/** Opens the panel and presses whichever punch it offers: the mock's day may already hold a clock-in. */
+async function openAndPunch() {
+  act(() => clock!.open());
+  await screen.findByText(/^(Start|Finish) Your Day$/);
+  press(screen.queryByRole("button", { name: "Clock In" }) ? "Clock In" : "Clock Out");
+}
 
 describe("the clock panel", () => {
   it("asks for the location only after Clock In is pressed, after saying what it is matched to", async () => {
@@ -90,17 +106,20 @@ describe("the clock panel", () => {
     await signedInAs("chidera@mycityapp.io");
     act(() => clock!.open());
     await screen.findByText("Start Your Day");
-    expect(getCurrentPosition).not.toHaveBeenCalled();
+    expect(watchPosition).not.toHaveBeenCalled();
     expect(await axe(document.body)).toHaveNoViolations();
 
     press("Clock In");
     await screen.findByText("Share Your Location");
     expect(screen.getByText(/matched to MyCity Office, Lekki/)).toBeTruthy();
-    expect(getCurrentPosition).not.toHaveBeenCalled();
+    expect(watchPosition).not.toHaveBeenCalled();
 
     press("Allow Location");
-    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
     await screen.findByText("Finding Your Location");
+    // While it reads the panel stays answerable: Not Now, never a held Clock In.
+    expect(screen.getByRole("button", { name: "Not Now" }).getAttribute("aria-disabled")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Clock In" })).toBeNull();
     act(() => answer!({ coords: { latitude: 6.44705, longitude: 3.47201, accuracy: 12 } }));
 
     // Inside the fence, but this browser is not a registered device: the server holds it for review.
@@ -118,7 +137,7 @@ describe("the clock panel", () => {
     act(() => clock!.open());
     await screen.findByText("Start Your Day");
     press("Clock In");
-    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
     act(() => answer!({ coords: { latitude: 6.45201, longitude: 3.43502, accuracy: 9 } }));
 
     await screen.findByText("No Connection");
@@ -139,9 +158,10 @@ describe("the clock panel", () => {
     act(() => clock!.open());
     await screen.findByText("Start Your Day");
     press("Clock In");
-    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
     act(() => refuse!({ code: 1 }));
-    await screen.findByText("Location Is Off");
+    await screen.findByText("Location Blocked");
+    expect(screen.getByText(/turn Location on/)).toBeTruthy();
     const call = vi.spyOn(api, "call");
     press("Clock In Anyway");
     await screen.findByText("Review Required");
@@ -158,9 +178,9 @@ describe("the clock panel", () => {
     act(() => clock!.open());
     await screen.findByText("Finish Your Day");
     press("Clock Out");
-    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
     act(() => answer!({ coords: { latitude: 6.44705, longitude: 3.47201, accuracy: 12 } }));
-    expect(screen.getByText("Processing")).toBeTruthy();
+    await screen.findByText("Processing");
     fireEvent.click(screen.getByRole("button", { name: /Clock Out/ }));
     await screen.findByText(/Clocked Out/);
     expect(call.mock.calls.filter((c) => c[0] === "POST /api/v1/attendance/punches")).toHaveLength(1);
@@ -182,10 +202,137 @@ describe("the clock panel", () => {
       await screen.findByText("Share Your Location");
       expect(screen.getByText(/goes to People with your location/)).toBeTruthy();
       press("Allow Location");
+      await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
       act(() => answer!({ coords: { latitude: 6.4281, longitude: 3.4219, accuracy: 12 } }));
       expect(await screen.findByText(/People will review it: you have no office assigned yet/)).toBeTruthy();
     } finally {
       office.active = true;
     }
   }, 20000);
+  it("Not Now closes the panel while it reads, and the reading stops with it", async () => {
+    permission = "granted";
+    await signedInAs("cynthia@mycityapp.io");
+    await openAndPunch();
+    await screen.findByText("Finding Your Location");
+    press(screen.queryByRole("button", { name: "Not Now" }) ? "Not Now" : "Remind Me");
+    await waitFor(() => expect(screen.queryByText("Finding Your Location")).toBeNull());
+    expect(clearWatch).toHaveBeenCalled();
+  }, 20000);
+
+  it("a blocked location skips the ask step and says how to allow it in this browser", async () => {
+    permission = "denied";
+    await signedInAs("cynthia@mycityapp.io");
+    await openAndPunch();
+    await screen.findByText("Location Blocked");
+    expect(screen.queryByText("Share Your Location")).toBeNull();
+    expect(watchPosition).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Retry Location" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Anyway$/ })).toBeTruthy();
+  }, 20000);
+
+  it("an insecure page needs the secure address; no location support offers no Retry; either can clock in anyway", async () => {
+    permission = "granted";
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: false });
+    await signedInAs("cynthia@mycityapp.io");
+    await openAndPunch();
+    await screen.findByText("Secure Address Needed");
+    expect(screen.queryByRole("button", { name: "Retry Location" })).toBeNull();
+    const call = vi.spyOn(api, "call");
+    fireEvent.click(screen.getByRole("button", { name: /Anyway$/ }));
+    await screen.findByText("Review Required");
+    const body = call.mock.calls.find((c) => c[0] === "POST /api/v1/attendance/punches")?.[1] as { body: { location_error: string } };
+    expect(body.body).toMatchObject({ latitude: null, location_error: "insecure" });
+
+    cleanup();
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: undefined });
+    await signedInAs("funke@mycityapp.io");
+    await openAndPunch();
+    await screen.findByText("No Location Support");
+    expect(screen.queryByRole("button", { name: "Retry Location" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Anyway$/ })).toBeTruthy();
+  }, 20000);
+
+  it("a phone set to approximate location is told how to turn precise location on; a computer to use the phone", async () => {
+    permission = "granted";
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: IPHONE });
+    await signedInAs("emeka@mycityapp.io");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    await openAndPunch();
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
+    act(() => answer!({ coords: { latitude: 6.44705, longitude: 3.47201, accuracy: 1800 } }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    vi.useRealTimers();
+    await screen.findByText("Precise Location Off");
+    expect(screen.getByText(/Safari Websites, and turn on Precise Location/)).toBeTruthy();
+    const call = vi.spyOn(api, "call");
+    fireEvent.click(screen.getByRole("button", { name: /Anyway$/ }));
+    await screen.findByText("Review Required");
+    const sent = call.mock.calls.find((c) => c[0] === "POST /api/v1/attendance/punches")?.[1] as { body: { accuracy_m: number } };
+    expect(sent.body).toMatchObject({ accuracy_m: 1800, latitude: 6.44705 });
+
+    cleanup();
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: JSDOM_AGENT });
+    await signedInAs("funke@mycityapp.io");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    await openAndPunch();
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(2));
+    act(() => answer!({ coords: { latitude: 6.45201, longitude: 3.43502, accuracy: 640 } }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    vi.useRealTimers();
+    await screen.findByText("Use Your Phone");
+  }, 30000);
+
+  it("on a temporary site's day: the site and its addresses, then Check In once clocked in, a lost answer tried again with the same key", async () => {
+    permission = "granted";
+    await signedInAs("bashir@mycityapp.io");
+    expect(clock!.today!.location).toMatchObject({ kind: "temporary_site", name: "Partner Training Week" });
+    expect(clock!.today!.temporary_site).toMatchObject({ number: "TS-0001", name: "Partner Training Week" });
+    act(() => clock!.open());
+    if (clock!.today!.state !== "clocked_in") {
+      await screen.findByText("Start Your Day");
+      // Check In waits for the clock-in.
+      expect(screen.queryByRole("button", { name: "Check In" })).toBeNull();
+      press("Clock In");
+      // The permission is read first, then the location is asked for.
+      await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
+      act(() => answer!({ coords: { latitude: 6.4282, longitude: 3.4219, accuracy: 12 } }));
+      await waitFor(() => expect(clock!.today?.state).toBe("clocked_in"));
+      watchPosition.mockClear();
+      cleanup();
+      await signedInAs("bashir@mycityapp.io");
+      act(() => clock!.open());
+    }
+    await screen.findByText("Finish Your Day");
+    expect(screen.getByText("TS-0001")).toBeTruthy();
+    expect(screen.getByText("Hall · 200 m; Annex · 150 m")).toBeTruthy();
+
+    const real = api.call.bind(api);
+    let lost = false;
+    const call = vi.spyOn(api, "call").mockImplementation(((key: string, opts: unknown) => {
+      if (key === "POST /api/v1/attendance/check-ins" && !lost) {
+        lost = true;
+        return Promise.reject(new ApiError(0, null));
+      }
+      return (real as (k: string, o: unknown) => Promise<unknown>)(key, opts);
+    }) as typeof api.call);
+    press("Check In");
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
+    act(() => answer!({ coords: { latitude: 6.4285, longitude: 3.4219, accuracy: 12 } }));
+    await screen.findByText("Check-in not sent yet.");
+    press("Try Again");
+    await screen.findByText("Checked in at Hall.");
+    const sent = call.mock.calls.filter(([key]) => key === "POST /api/v1/attendance/check-ins");
+    expect(sent).toHaveLength(2);
+    expect(sent[1][1]).toEqual(sent[0][1]);
+    expect(watchPosition).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(clock!.today!.check_ins).toHaveLength(1));
+    expect(clock!.today!.check_ins[0]).toMatchObject({ location_name: "Hall", verdict: "inside", flagged: false });
+    expect(await screen.findByText("Inside")).toBeTruthy();
+    expect(await axe(document.body)).toHaveNoViolations();
+  }, 30000);
 });

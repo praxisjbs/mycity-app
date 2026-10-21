@@ -18,7 +18,9 @@
 #   files      /srv/mycity/<prod|stg>/{releases,shared/.env,media}, /srv/mycity/bin,
 #              /srv/mycity/backups/<prod|stg>
 #   systemd    mycity-{api,worker}-{prod,stg}, enabled; deploy-gate starts them
-#              mycity-backup.timer (nightly) and mycity-restore-drill.timer (Sundays), started
+#              mycity-backup.timer (nightly) and mycity-restore-drill.timer (Sundays), started;
+#              mycity-health-watch-{prod,stg}.timer (every 5 minutes) and mycity-host-stats.timer
+#              (every 15 minutes, for Settings · Performance), started
 #
 # Run it from a checkout of the repository, as root:
 #
@@ -45,7 +47,7 @@ ENVS=(prod stg)
 declare -A APP_ENV=([prod]=production [stg]=staging)
 declare -A HOSTS=([prod]="hub.mycityapp.io go.mycityapp.io" [stg]="hub.staging.mycityapp.io go.staging.mycityapp.io")
 UNITS=(mycity-api-prod mycity-worker-prod mycity-api-stg mycity-worker-stg)
-TIMERS=(mycity-backup mycity-restore-drill)
+TIMERS=(mycity-backup mycity-restore-drill mycity-host-stats mycity-health-watch-prod mycity-health-watch-stg)
 NODE_MAJOR=20
 NODE_MIN=20.19.0
 
@@ -172,10 +174,12 @@ for e in "${ENVS[@]}"; do
   install -d -m 700 -o mycity-deploy -g mycity-deploy "/srv/mycity/backups/$e"
 done
 # The server's own tools, root-owned in /srv/mycity/bin: deploy-gate (CI's forced command), the
-# nightly backup and the restore drill (their timers are set up in step 10), and the alert sender
-# those two use.
+# nightly backup and the restore drill (their timers are set up in step 10), the alert sender
+# those two use, and the host figures Settings · Performance reads from /var/lib/mycity.
+install -d -m 755 -o root -g root /var/lib/mycity
 for tool in scripts/deploy/deploy-gate:deploy-gate scripts/db/backup.sh:mycity-backup \
-  scripts/db/restore-drill.js:mycity-restore-drill src/shared/observability/alert.js:mycity-alert; do
+  scripts/db/restore-drill.js:mycity-restore-drill src/shared/observability/alert.js:mycity-alert \
+  ops/monitoring/host-stats.sh:mycity-host-stats; do
   if [[ -s "$REPO/${tool%%:*}" ]]; then
     install -m 755 -o root -g root "$REPO/${tool%%:*}" "/srv/mycity/bin/${tool##*:}"
     note "${tool##*:} installed"
@@ -200,6 +204,11 @@ random_page_cost = 1.1
 wal_compression = on
 log_min_duration_statement = 1000
 timezone = 'UTC'
+# Settings · Performance, Slowest Queries: every statement's time, its values replaced by
+# placeholders. Loaded at start, so the restart below is what turns it on.
+shared_preload_libraries = 'pg_stat_statements'
+pg_stat_statements.track = top
+pg_stat_statements.max = 5000
 CONF
 systemctl enable postgresql >/dev/null
 systemctl restart postgresql
@@ -218,8 +227,9 @@ for e in "${ENVS[@]}"; do
   pg -tAc "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 ||
     sudo -u postgres createdb --owner="$role" --encoding=UTF8 --template=template0 --locale=C.UTF-8 "$db"
   # Only this environment's role may connect. The migrations run as that role, so it owns
-  # the public schema; the extensions are created here because pgvector is not a trusted
-  # extension (migration 0001's CREATE EXTENSION IF NOT EXISTS then finds them).
+  # the public schema; the extensions are created here because pgvector and
+  # pg_stat_statements are not trusted extensions (migration 0001's CREATE EXTENSION IF NOT
+  # EXISTS then finds vector; Settings · Performance reads pg_stat_statements if it is there).
   pg -d "$db" <<SQL
 REVOKE ALL ON DATABASE $db FROM PUBLIC;
 GRANT CONNECT, TEMPORARY ON DATABASE $db TO $role;
@@ -230,6 +240,7 @@ CREATE EXTENSION IF NOT EXISTS citext;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS unaccent;
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 SQL
   note "$db ready, owned by $role"
 done
@@ -294,11 +305,14 @@ for e in "${ENVS[@]}"; do
     render "$OPS/systemd/$e.env.template" "$target" "$e"
     note "$target written"
   fi
+  # System mail may instead be set on Settings, Integrations, System Sender, which wins over
+  # these lines; with neither, ${APP_ENV[$e]} starts and holds its mail until one is set
+  # (docs/guides/integrations.md §6.8).
   if grep -q '^SMTP_HOST=$' "$target" || grep -q '^SMTP_PASSWORD=$' "$target"; then
-    later "fill SMTP_* in $target (${APP_ENV[$e]} refuses to boot without mail)"
+    later "set the system sender for ${APP_ENV[$e]}: Settings, Integrations, or SMTP_* in $target (mail is held until then)"
   fi
   if ! grep -q '^MAIL_SEND_PER_HOUR=[1-9]' "$target"; then
-    later "add MAIL_SEND_PER_HOUR to $target (production 40, staging 10; ${APP_ENV[$e]} refuses to boot without it)"
+    later "give ${APP_ENV[$e]}'s sender its hourly limit (production 40, staging 10): Settings, Integrations, or MAIL_SEND_PER_HOUR in $target"
   fi
 done
 
@@ -315,7 +329,7 @@ systemctl daemon-reload
 systemctl enable "${UNITS[@]/%/.service}" >/dev/null
 note "units enabled; they start with the first deploy (no release in /srv/mycity/*/current yet)"
 systemctl enable --now "${TIMERS[@]/%/.timer}" >/dev/null
-note "backup nightly at 02:30 and restore drill on Sundays at 04:00 (Lagos): systemctl list-timers 'mycity-*'"
+note "backup nightly at 02:30, restore drill on Sundays at 04:00 (Lagos), health watch every 5 minutes, host figures every 15 minutes: systemctl list-timers 'mycity-*'"
 
 # Where the nightly backup sends its offsite copy. Written once, commented out, for the operator
 # to fill (docs/runbooks/backup-restore.md §2); never overwritten.

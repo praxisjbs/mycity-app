@@ -1,6 +1,6 @@
 import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
-import type { Status, Step, Trail } from "./shared";
+import type { Status, Step, Trail } from "./performance";
 
 /** INTERIM Queries & Sanctions shapes (owner AJ; MILESTONES §8). Managers see their own; People and the CEO see all. */
 export interface QueryRow {

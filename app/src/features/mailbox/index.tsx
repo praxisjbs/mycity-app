@@ -4,13 +4,15 @@ import { invalidate, useApi, usePaged } from "@/api/hooks";
 import "@/api/types/mailbox";
 import type { MailAddress, MailFolder, MailMessage, ThreadRow } from "@/api/types/mailbox";
 import { saveFile, useFileUrls } from "@/api/download";
+import { useFileViewer, viewableFile } from "@/features/shared/files";
+import { ForwardTo } from "@/features/community/Forward";
 import { useRealtime } from "@/api/realtime";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, type ComposeInit } from "./Composer";
 import { ApiError } from "@/api/client";
-import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
+import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, fileTypeOf, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
 import { MailSignature } from "./MailSignature";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
@@ -242,13 +244,13 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
         </span>
       </div>
       {thread.messages.map((m, i) => (
-        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} />
+        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} forwardable={!spam} />
       ))}
     </div>
   );
 }
 
-function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onTrust: (address: string, trusted: boolean) => Promise<void>; onMailto: (m: Mailto) => void }) {
+function Message({ m, subject, head, images, onImages, onTrust, onMailto, forwardable }: { m: MailMessage; subject: string; head: boolean; images: boolean; onImages: () => void; onTrust: (address: string, trusted: boolean) => Promise<void>; onMailto: (m: Mailto) => void; forwardable?: boolean }) {
   const showRemote = images || m.images_trusted;
   /* Only the parts the body draws are fetched, each into a local URL the sealed frame may show. */
   const parts = useMemo(() => {
@@ -259,6 +261,11 @@ function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m:
   const body = useMemo(() => (m.body_html == null ? null : prepareEmail(m.body_html, { showRemote, inline })), [m.body_html, showRemote, inline]);
   const split = useMemo(() => (body ? splitQuoted(body.html) : null), [body]);
   const [history, setHistory] = useState(false);
+  const files = useFileViewer();
+  const modal = useModal();
+  /* Forward to Chat (community.md §3 step 19): the file goes to up to 5 Staff Community chats; never from Spam. */
+  const toChat = (a: MailMessage["attachments"][number]) =>
+    modal.open({ title: "Forward To", body: (close) => <ForwardTo source={{ mail_attachment_id: a.mail_attachment_id }} close={close} /> });
   return (
     <div className={cn(head && "border-b border-dashed border-border")}>
       {head && <p className="pt-3 text-2xs font-semibold text-subtle-foreground">{who(m.from)} · {formatWhen(m.sent_at)}</p>}
@@ -288,13 +295,23 @@ function Message({ m, subject, head, images, onImages, onTrust, onMailto }: { m:
       )}
       {m.attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-dashed border-border pt-3 pb-1">
-          {m.attachments.map((a) => (
-            <button key={a.mail_attachment_id} type="button" onClick={() => void saveFile(`/api/v1/documents/${a.document_id}/content`, a.file_name)} className="flex cursor-pointer items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">
-              <Icon name="doc" />{a.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
-            </button>
-          ))}
+          {m.attachments.map((a) => {
+            const url = `/api/v1/documents/${a.document_id}/content`;
+            /* A photo, a video or a PDF opens in the file viewer; anything else downloads. */
+            const forward = forwardable ? () => toChat(a) : undefined;
+            const openIt = () => (viewableFile(a.mime_type) ? files.view(url, { name: a.file_name, mime: a.mime_type, by: who(m.from), at: formatWhen(m.sent_at) }, forward) : saveFile(url, a.file_name));
+            return (
+              <span key={a.mail_attachment_id} className="flex items-center gap-0.5">
+                <button type="button" onClick={openIt} className="flex cursor-pointer items-center gap-1.5 rounded-ctl border border-border bg-muted px-2.5 py-1.5 text-xs font-semibold hover:bg-accent">
+                  <Icon name={fileTypeOf(a.mime_type, a.file_name).glyph} />{a.file_name}<span className="text-2xs text-subtle-foreground">{formatBytes(a.size_bytes)}</span>
+                </button>
+                {forward && <IconButton icon="forward" label={`Forward ${a.file_name} to a chat`} size="sm" onClick={forward} />}
+              </span>
+            );
+          })}
         </div>
       )}
+      {files.viewer}
     </div>
   );
 }
@@ -327,7 +344,7 @@ function DraftReader({ row, onBack, compose }: { row: ThreadRow; onBack: () => v
         </span>
         <span className="flex flex-wrap gap-1.5 max-md:w-full">
           {row.scheduled && <Button onClick={() => cancelSchedule()}>Cancel Schedule</Button>}
-          <Button variant="primary" icon="send" onClick={() => compose({ draft_id: draft.mail_draft_id, to: draft.to_addresses, cc: draft.cc_addresses, bcc: draft.bcc_addresses, subject: draft.subject, body_html: draft.body_html, attachments: draft.attachments, in_reply_to: draft.in_reply_to }, "Continue Draft")}>Continue Editing</Button>
+          <Button variant="primary" icon="send" onClick={() => compose({ draft_id: draft.mail_draft_id, to: draft.to_addresses, cc: draft.cc_addresses, bcc: draft.bcc_addresses, subject: draft.subject, body_html: draft.body_html, attachments: draft.attachments, in_reply_to: draft.in_reply_to, scheduled: row.scheduled ? { release_at: row.scheduled.release_at } : null }, row.scheduled ? "Edit Scheduled Mail" : "Continue Draft")}>Continue Editing</Button>
         </span>
       </div>
       {row.scheduled && <div className="mt-3"><Pill tone="info">Scheduled {formatDateTime(row.scheduled.release_at)}</Pill></div>}

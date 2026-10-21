@@ -12,9 +12,16 @@
  * their scope on that grant; an alert about no one in particular only with `all` scope; never
  * an alert about the reader themselves, the CEO excepted. The service works out the grants
  * the reader holds and who the reader is (`seen`); this file turns them into SQL.
+ *
+ * THE KEPT RULES. The rules the system keeps for the Attendance policy (metric
+ * `attendance_policy`, home.md §6 Alerts) are made here (keptRule) on their first breach and never
+ * listed on Alert Rules, edited or swept: rulePage and enabledRules leave them out.
  */
+const c = require("@mycity/contract");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
+
+const POLICY_METRIC = c.alerts.HOME_ALERT_POLICY_METRIC;
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -244,8 +251,9 @@ function rulePage(db, query, { metrics }) {
         AND ($2::text IS NULL OR r.metric = $2)
         AND ($3::text[] IS NULL OR r.metric = ANY($3::text[]))
         AND ($4::boolean IS NULL OR r.enabled = $4)
+        AND r.metric <> $5
       ORDER BY ${orderBy(query, RULE_SORTS, "r.home_alert_rule_id")}`,
-    [query.q || null, query.metric || null, metrics, query.enabled === undefined ? null : query.enabled === "true"],
+    [query.q || null, query.metric || null, metrics, query.enabled === undefined ? null : query.enabled === "true", POLICY_METRIC],
     query,
   );
 }
@@ -356,32 +364,58 @@ async function enabledRules(db) {
     `SELECT home_alert_rule_id, key::text AS key, name, metric, threshold::text AS threshold, window_days, severity,
             permission_key, enabled
        FROM home_alert_rule
-      WHERE enabled
+      WHERE enabled AND metric <> $1
       ORDER BY key, home_alert_rule_id`,
-    [],
+    [POLICY_METRIC],
     { label: "switched-on alert rules", ceiling: 1000 },
   );
   return rows;
 }
 
 /**
- * The switched-on rules of some metrics, a signal's list.
- * @param {{query: Function}} db
- * @param {string[]} metrics
+ * The rule the system keeps for one of the Attendance policy's consequence rules, made the first
+ * time it is needed (home.md §6 Alerts): threshold 1, no window, its severity and Who Can Clear,
+ * switched on, by nobody. Made at the same moment by another breach, it is read as that one made it.
+ * @param {{query: Function}} db  inside the raise's transaction
+ * @param {{key: string, name: string, threshold: string, severity: string, permission_key: string}} rule
  */
-async function enabledRulesFor(db, metrics) {
-  // pagination:complete the switched-on rules of a metric or two, a handful
-  const { rows } = await completeQuery(
+async function keptRule(db, rule) {
+  await db.query(
+    `INSERT INTO home_alert_rule (key, name, metric, threshold, window_days, severity, permission_key, enabled)
+     VALUES ($1, $2, $3, $4::numeric, NULL, $5, $6, true)
+     ON CONFLICT (key) DO NOTHING`,
+    [rule.key, rule.name, POLICY_METRIC, rule.threshold, rule.severity, rule.permission_key],
+  );
+  return one(
     db,
     `SELECT home_alert_rule_id, key::text AS key, name, metric, threshold::text AS threshold, window_days, severity,
             permission_key, enabled
-       FROM home_alert_rule
-      WHERE enabled AND metric = ANY($1::text[])
-      ORDER BY key, home_alert_rule_id`,
-    [metrics],
-    { label: "switched-on alert rules of a metric", ceiling: 1000 },
+       FROM home_alert_rule WHERE key = $1 AND metric = $2`,
+    [rule.key, POLICY_METRIC],
   );
-  return rows;
+}
+
+/**
+ * The open alerts of each kept rule of a metric, by the rule's key: the Attendance policy's five,
+ * for Alert Rules' read-only card.
+ * @param {{query: Function}} db
+ * @param {string} metric
+ * @returns {Promise<Record<string, number>>}
+ */
+async function openByKey(db, metric) {
+  // pagination:complete one count per kept rule of the metric, five at most
+  const { rows } = await completeQuery(
+    db,
+    `SELECT r.key::text AS key, count(a.home_alert_id)::int AS n
+       FROM home_alert_rule r
+       LEFT JOIN home_alert a ON a.home_alert_rule_id = r.home_alert_rule_id AND a.cleared_at IS NULL
+      WHERE r.metric = $1
+      GROUP BY r.key
+      ORDER BY r.key`,
+    [metric],
+    { label: "open alerts of the kept rules", ceiling: 20 },
+  );
+  return Object.fromEntries(rows.map((r) => [r.key, r.n]));
 }
 
 module.exports = {
@@ -398,5 +432,6 @@ module.exports = {
   insertRule,
   updateRule,
   enabledRules,
-  enabledRulesFor,
+  keptRule,
+  openByKey,
 };

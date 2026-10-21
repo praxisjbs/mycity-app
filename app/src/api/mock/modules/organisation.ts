@@ -1,6 +1,7 @@
 import type { ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
 import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
-import { accepted, at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
+import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
+import { exportFile } from "./shared";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
 import roster from "../data/roster.json";
 import { askDataExport } from "./ess";
@@ -458,15 +459,16 @@ route("GET /api/v1/org-chart", (req) => {
   });
 });
 
-/* Download PDF: the real API queues the chart for the worker, which emails it; the mock only says where it would go. */
+/* Download Their Data: the CEO's alone, one person's data made as Download My Data makes it. */
 route("POST /api/v1/employees/:id/data-export", (req) => {
   if (req.user !== "ifeoma") return fail(403, "PERMISSION_DENIED", "Only the CEO can do this");
   const who = byId(req.params.id);
   if (!who) return notFound();
-  return askDataExport(who.employee_id, byKey(req.user)!.work_email, false);
+  return askDataExport(who, req.user, false);
 });
 
-route("POST /api/v1/org-chart/exports", (req) => ({ ...accepted(), body: { queued: true, email: byKey(req.user!)!.work_email } }));
+/* Download PDF: the real API lays the chart out and the pdf-render job draws it; the mock holds no PDF. */
+route("POST /api/v1/org-chart/exports", (req) => exportFile(req.user!, "Organogram", "pdf"));
 
 /* ------------------------------------------------------------------ *
  * Leave, in the contract's shapes (packages/contract/schemas/leave.js)

@@ -253,6 +253,41 @@ describe("error envelope for database errors", () => {
   });
 });
 
+describe("a 5xx AppError's own severity", () => {
+  const reporter = require("../../../src/shared/observability/error-reporter");
+  const { AppError } = require("../../../src/shared/errors");
+  let rows;
+  beforeEach(() => {
+    rows = [];
+    // Each row is 12 values (error-reporter.js flush): the time, then the severity, then the rest.
+    reporter.__reset({
+      query: async (_sql, params) => {
+        for (let i = 0; i < params.length; i += 12) rows.push({ severity: params[i + 1], message: params[i + 5] });
+        return { rows: [] };
+      },
+    });
+  });
+  afterEach(() => reporter.__reset());
+  function appThrowing(err) {
+    const a = express();
+    a.get("/", () => { throw err; });
+    a.use(errorHandler);
+    return a;
+  }
+
+  test("an outside service not answering is recorded as a warning, which never alerts; any other 5xx as an error", async () => {
+    const outage = Object.assign(new AppError("MAPS_UNAVAILABLE", "Maps are not answering.", 502), { severity: "warning" });
+    const res = await request(appThrowing(outage)).get("/");
+    expect([res.status, res.body.error.code]).toEqual([502, "MAPS_UNAVAILABLE"]);
+    await request(appThrowing(new AppError("LEDGER_BROKEN", "The ledger could not be written.", 500))).get("/");
+    await reporter.flush();
+    expect(rows).toEqual([
+      { severity: "warning", message: "Maps are not answering." },
+      { severity: "error", message: "The ledger could not be written." },
+    ]);
+  });
+});
+
 describe("upload", () => {
   function app(mw) {
     const a = express();

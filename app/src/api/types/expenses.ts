@@ -1,6 +1,6 @@
 import type { DocumentRef, IsoDate, IsoDateTime, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
-import type { Status, Step, Trail } from "./shared";
+import type { Status, Step, Trail } from "./performance";
 
 /** INTERIM Expenses shapes (owner LA; MILESTONES §13). One chain for every request (HANDOFF ruling 5). */
 export type ExpenseStage = "line_manager" | "operations" | "requisition" | "ceo" | "approved" | "disbursed" | "rejected" | "returned" | "draft";

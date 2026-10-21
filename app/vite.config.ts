@@ -92,6 +92,8 @@ export default defineConfig(({ mode }) =>
         // the API left to the network (FRONTEND_GUIDE §8) are in src/sw.ts.
         injectManifest: {
           globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+          // PDF.js's fonts, maps and decoders are fetched only by a PDF that needs them, never precached.
+          globIgnores: ["pdfjs/**"],
           rollupFormat: "iife",
         },
         devOptions: { enabled: false },

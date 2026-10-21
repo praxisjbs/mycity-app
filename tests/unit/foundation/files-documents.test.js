@@ -276,6 +276,23 @@ describe("markdown and the template language", () => {
     expect(canonical.isSignable("EMPLOYMENT_CONTRACT")).toBe(true);
     expect(canonical.isSignable("toString")).toBe(false);
   });
+
+  test("a policy version's payload is pinned, and its rules hash the same in any key order", () => {
+    const version = {
+      number: "POL-0001",
+      version: 3,
+      title: "Attendance Policy",
+      effective_from: "2026-11-01",
+      applies_to: { everyone: false, department_ids: ["b", "a"], work_patterns: ["remote"], employee_ids: [] },
+      body_markdown: "",
+      rules: { home_radius_m: 150, grace_minutes: 5, late_rule: { on: true, count: 3 } },
+    };
+    expect(canonical.hash("POLICY_VERSION", version)).toBe("61d70174a1f769eda15540811f3c12668f973fa8c0e1a3e985e9b8318c0e512e");
+    const reordered = { ...version, rules: { late_rule: { count: 3, on: true }, grace_minutes: 5, home_radius_m: 150 } };
+    expect(canonical.hash("POLICY_VERSION", reordered)).toBe(canonical.hash("POLICY_VERSION", version));
+    expect(canonical.hash("POLICY_VERSION", { ...version, rules: { ...version.rules, grace_minutes: 10 } }))
+      .not.toBe(canonical.hash("POLICY_VERSION", version));
+  });
 });
 
 describe("document types, served types, derived file names", () => {
@@ -293,6 +310,51 @@ describe("document types, served types, derived file names", () => {
     expect(types.signatureCeiling("constructor")).toEqual({ signable: false, wet: false });
     expect(() => types.assertDocType("unit_ofer_letter")).toThrow(expect.objectContaining({ code: "UNKNOWN_DOC_TYPE" }));
     expect(types.typeOf("import_source")).toMatchObject({ sensitivity: "restricted", module: null });
+  });
+
+  test("an export type is kept a day and never locked; reserving one needs a transaction, an export type and a file type", async () => {
+    const exportFiles = require("../../../src/shared/documents/exports");
+    const { DEPTH } = require("../../../src/shared/db/tx");
+    types.defineDocumentType("unit_export", { label: "Unit export", module: "settings", sensitivity: "restricted", export: true });
+    expect(types.isExport("unit_export")).toBe(true);
+    expect(types.isExport("unit_offer_letter")).toBe(false);
+    expect(types.isExport("constructor")).toBe(false);
+    expect(types.exportTypes()).toContain("unit_export");
+    expect(types.exportTypes()).not.toContain("unit_offer_letter");
+    expect(exportFiles.KEPT_HOURS).toBe(24);
+
+    const rows = [];
+    const query = async (sql, params) => {
+      const cols = /\(([^)]*)\) VALUES/.exec(sql)[1].split(", ");
+      rows.push(Object.fromEntries(cols.map((c, i) => [c, params[i]])));
+      return { rows: [rows[rows.length - 1]] };
+    };
+    const client = { [DEPTH]: 1, query };
+    const asked = { doc_type: "unit_export", entity: { type: "unit_export", id: "e1" }, file_name: "unit-log-2026-10-19.xlsx", actor: { user_id: "u1" } };
+    await expect(exportFiles.reserve({ query }, asked)).rejects.toThrow(/inside atomically/);
+    await expect(exportFiles.reserve(client, { ...asked, doc_type: "unit_offer_letter" })).rejects.toThrow(/export: true/);
+    await expect(exportFiles.reserve(client, { ...asked, file_name: "unit-log.exe" })).rejects.toThrow(/no file type/);
+    await expect(exportFiles.reserve(client, { ...asked, actor: null })).rejects.toThrow(/person asking/);
+    expect(rows).toEqual([]);
+
+    const doc = await exportFiles.reserve(client, asked);
+    expect(doc).toMatchObject({
+      doc_type: "unit_export",
+      original_name: "unit-log-2026-10-19.xlsx",
+      mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      bytes: 0,
+      sensitivity: "restricted",
+      source: "generated",
+      scan_status: "skipped",
+      render_status: "pending",
+      entity_type: "unit_export",
+      entity_id: "e1",
+      uploaded_by: "u1",
+    });
+    expect(doc.storage_key).toMatch(/^generated\/\d{4}\/\d{2}\/[0-9a-f-]{36}\.xlsx$/);
+    // What the screen reads while it waits; a file stored whole before exports were reserved is done.
+    expect(exportFiles.present(doc)).toEqual({ document_id: doc.document_id, file_name: "unit-log-2026-10-19.xlsx", status: "pending" });
+    expect(exportFiles.present({ ...doc, render_status: null }).status).toBe("done");
   });
 
   test("only allow-listed types are served as themselves", () => {
@@ -380,6 +442,29 @@ describe("small services", () => {
     expect(routeCheck.classify({ relayIps: [], recipientIps: ["1.1.1.1"], mxIps: [] }).state).toBe(STATES.UNKNOWN);
     expect(routeCheck.classify({ relayIps: ["1.1.1.1"], recipientIps: ["1.1.1.1"], mxIps: [], hasMx: false }).ok).toBeNull();
     await expect(routeCheck.assertRoutable({ smtpHost: "", to: "a@b.ng" })).resolves.toBeUndefined();
+  });
+
+  test("deliverability: a domain whose mailboxes are on the relay is sent, any other trapped domain refused", async () => {
+    // Staging's shape: the relay is the domain's own host, its MX the host's spam filter.
+    const dns = require("dns/promises");
+    const hosts = { "mycityapp.io": ["198.51.100.7"], "partner.ng": ["198.51.100.7"] };
+    const a = jest.spyOn(dns, "resolve4").mockImplementation(async (h) => hosts[h] || ["203.0.113.9"]);
+    const mx = jest.spyOn(dns, "resolveMx").mockResolvedValue([{ exchange: "mx1-hosting.jellyfish.systems", priority: 10 }]);
+    routeCheck._resetCache();
+    try {
+      const smtpHost = "mycityapp.io";
+      await expect(routeCheck.assertRoutable({ smtpHost, to: ["ada@mycityapp.io"] })).rejects.toMatchObject({ code: "MAIL_ROUTE_TRAPPED" });
+      await expect(
+        routeCheck.assertRoutable({ smtpHost, to: ["Ada Obi <Ada@MyCityApp.io>"], localDomains: "mycityapp.io" }),
+      ).resolves.toBeUndefined();
+      await expect(
+        routeCheck.assertRoutable({ smtpHost, to: ["ada@mycityapp.io", "obi@partner.ng"], localDomains: " other.ng, MyCityApp.io " }),
+      ).rejects.toMatchObject({ code: "MAIL_ROUTE_TRAPPED", details: { domain: "partner.ng" } });
+    } finally {
+      a.mockRestore();
+      mx.mockRestore();
+      routeCheck._resetCache();
+    }
   });
 
   test("mail text part", () => {

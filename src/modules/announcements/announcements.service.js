@@ -11,6 +11,11 @@
  *
  * Read counts and the read lists are for the poster and holders of announcements.post;
  * the routes check the capability.
+ *
+ * Levels (TB, 19/10/2026): normal, important or urgent. An urgent announcement counts as
+ * read only once each person presses Acknowledge, on its card or on the urgent bar; either
+ * way the reads row and the person's notices close together. An important one reminds the
+ * unread once, 4 hours after it went out.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -18,6 +23,7 @@ const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const lagos = require("../../shared/time/lagos");
 const communityRepo = require("../community/community.repo");
+const notifications = require("../notifications/notifications.service");
 const repo = require("./announcements.repo");
 const { EVENTS } = require("./announcements.events");
 
@@ -47,6 +53,7 @@ function view(row) {
     },
     departments: row.departments || [],
     status: row.status,
+    urgency: row.urgency || "normal",
     author: row.author,
     publish_at: iso(row.publish_at),
     published_at: iso(row.published_at),
@@ -81,6 +88,8 @@ async function publish(client, id) {
     body: a.body,
   });
   await repo.addAudience(client, id, users);
+  // Never told of their own post, the poster has read it (and acknowledged it, when urgent).
+  await repo.markPosterRead(client, id, a.published_by, a.urgency === "urgent");
   const published = await repo.markPublished(client, id, {
     messageId: message.community_message_id,
     audienceSize: users.length,
@@ -93,6 +102,7 @@ async function publish(client, id) {
     payload: {
       announcement_id: id,
       title: a.title,
+      urgency: a.urgency || "normal",
       community_channel_id: channel.community_channel_id,
       community_message_id: message.community_message_id,
     },
@@ -131,6 +141,7 @@ async function create(body, user) {
       title: body.title,
       body: body.body,
       audience: body.audience,
+      urgency: body.urgency || "normal",
       status: when ? "scheduled" : "draft",
       published_by: user.user_id,
       publish_at: when ? when.toISOString() : null,
@@ -160,6 +171,7 @@ async function update(id, body, user) {
       title: body.title,
       body: body.body,
       audience: body.audience,
+      urgency: body.urgency,
       publish_at: when.toISOString(),
     });
     await emit(client, {
@@ -186,6 +198,37 @@ async function cancel(id, user) {
       before,
       after,
       payload: { announcement_id: id },
+    });
+  });
+  return get(id);
+}
+
+/**
+ * Take a published announcement down (TB, 19/10/2026): it leaves #announcements (its message
+ * reads "Message deleted"), the Announcements tab and the stats, and its unopened notices are
+ * withdrawn after the commit. Its reads are kept for the record. Archived twice is a 404; a scheduled one is cancelled instead (409).
+ */
+async function archive(id, user) {
+  await tx(async (client) => {
+    const before = await repo.lockForUpdate(client, id);
+    if (!before || before.status === "cancelled" || before.status === "archived")
+      throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+    if (before.status !== "published")
+      throw new AppError("NOT_POSTED", "It has not gone out yet", 409);
+    const after = await repo.archivePublished(client, id);
+    if (before.community_message_id) await communityRepo.deleteMessage(client, before.community_message_id);
+    const channel = await communityRepo.systemChannel(client, "announcements");
+    await emit(client, {
+      key: EVENTS.ANNOUNCEMENT_ARCHIVED,
+      entity: { type: "announcement", id },
+      actor: user,
+      before,
+      after,
+      payload: {
+        announcement_id: id,
+        community_channel_id: channel.community_channel_id,
+        community_message_id: before.community_message_id,
+      },
     });
   });
   return get(id);
@@ -249,6 +292,72 @@ async function remind(id, user) {
   });
 }
 
+/**
+ * 4 hours after an important announcement went out: whoever has not opened it is reminded once,
+ * as the system (announcement-publish's `remind` job). Anything else, or nobody left, does nothing.
+ */
+async function remindUnread(id) {
+  return tx(async (client) => {
+    const a = await repo.lockForUpdate(client, id);
+    if (!a || a.status !== "published" || a.urgency !== "important") return { reminded: 0 };
+    const users = await repo.unreadUsers(client, id);
+    if (users.length === 0) return { reminded: 0 };
+    await repo.setReminded(client, id);
+    await emit(client, {
+      key: EVENTS.ANNOUNCEMENT_REMINDED,
+      entity: { type: "announcement", id },
+      actor: null,
+      payload: { announcement_id: id, title: a.title, user_ids: users },
+      metadata: { automatic: true },
+    });
+    return { reminded: users.length };
+  });
+}
+
+/** Acknowledge, inside a transaction: the reads row, the person's notices of it, and the event. */
+async function acknowledgeIn(client, id, user) {
+  const person = typeof user === "string" ? { user_id: user } : user;
+  const a = await repo.lockForUpdate(client, id);
+  if (!a || a.status !== "published")
+    throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+  if (a.urgency !== "urgent")
+    throw new AppError("NOT_URGENT", "Only an urgent announcement is acknowledged", 422);
+  const before = await repo.readRowForUpdate(client, id, person.user_id);
+  if (!before) throw new AppError("NOT_FOUND", "There is no such announcement", 404);
+  if (before.acknowledged_at) return before;
+  const after = await repo.acknowledge(client, id, person.user_id);
+  await notifications.acknowledgeForRecord(client, person, "announcement", id);
+  await emit(client, {
+    key: EVENTS.ANNOUNCEMENT_ACKNOWLEDGED,
+    entity: { type: "announcement", id },
+    actor: user,
+    before,
+    after,
+    payload: { announcement_id: id, user_id: person.user_id },
+  });
+  return after;
+}
+
+/**
+ * Acknowledge on an urgent announcement's card. Pressing again changes nothing; 404 outside its
+ * audience, 422 when it is not urgent.
+ */
+async function acknowledge(id, user) {
+  await tx((client) => acknowledgeIn(client, id, user));
+}
+
+/**
+ * Acknowledge pressed on the urgent bar (`notification.acknowledged` for an announcement): the
+ * same, as the person who pressed it. Nothing to record is not an error here.
+ */
+async function acknowledgeFromNotice(userId, id) {
+  try {
+    await tx((client) => acknowledgeIn(client, id, userId));
+  } catch (err) {
+    if (!(err instanceof AppError)) throw err;
+  }
+}
+
 /** The caller read these messages in #announcements. */
 function markReadByMessages(userId, messageIds) {
   return repo.markReadByMessages(pool, userId, messageIds);
@@ -262,10 +371,14 @@ module.exports = {
   create,
   update,
   cancel,
+  archive,
   publish,
   release,
   releaseDue,
   readers,
   remind,
+  remindUnread,
+  acknowledge,
+  acknowledgeFromNotice,
   markReadByMessages,
 };

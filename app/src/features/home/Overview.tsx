@@ -1,15 +1,16 @@
-import { Fragment, useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import type { HomeKpiCard, HomeOverview, HomeReportFormat } from "@mycity/contract/contract.gen.ts";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
+import { saveRun } from "@/api/exports";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
 import { useMe } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
+import { useWorkSiteSheet } from "@/features/attendance/TemporarySites";
 import { useRouter, useSearchParams } from "@/lib/router";
-import { useScreenAction } from "@/shell/screen-action";
+import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, toast, zoneClock } from "@mycity/ui";
 import { CardRow } from "./cards";
-import { claimClockPrompt } from "./clockPrompt";
 import { reloadsFor } from "./refresh";
 import { useCreateActions } from "./createActions";
 import { useKpiDetail } from "./KpiDetail";
@@ -24,11 +25,14 @@ import { ActivityToday, DayStrip, GoalBars, MainChart, NeedYou, Pipeline, SideDo
  * data; every word on the screen is written here and in ./sections.
  *
  * Export makes a file of the reader's own Overview, PDF or XLSX, through the reports engine
- * (POST /home/overview/export): numbered, kept in the vault and emailed to them.
+ * (POST /home/overview/export): numbered, kept in the vault, and downloaded here once it is made.
+ *
+ * Add Work Site, beside New and in it (§3 step 10), opens Attendance's temporary site sheet over
+ * the Overview (`?action=work-site`, New's entry and ⌘K's): Home owns the button only.
  *
  * Both shells come from one tree (§10.2): on a phone the cards are two to a row and the
- * sections stack in the same order; Choose Cards moves into the page menu, New into the
- * floating button's fan as well as the header, and the date line, the chart captions and
+ * sections stack in the same order; Choose Cards moves into the page menu, New and Add Work Site
+ * into the floating button's fan as well as the header, and the date line, the chart captions and
  * Export are left off. A card opens its records (./KpiDetail) as a dialog, a bottom sheet on a phone;
  * `?kpi=<key>` (the assistant's route) or `?id=<key>` (a ⌘K result) opens one straight away.
  */
@@ -43,20 +47,6 @@ export function greetingOf(now = new Date()): string {
 export function dateLineOf(o: Pick<HomeOverview, "date" | "clocked_in">): string {
   const day = `${weekdayOf(o.date)} ${formatDate(o.date)}`;
   return o.clocked_in ? `${day} · ${formatCount(o.clocked_in.present)} of ${formatCount(o.clocked_in.expected)} clocked in` : day;
-}
-
-/**
- * Opens Attendance's clock-in panel once when the server says it is due (`prompt_clock_in`):
- * Home decides when, the panel is Attendance's (decision O12). While a link has a card's
- * records open, the panel waits for them to close rather than taking their place.
- */
-function useClockInPrompt(overview: HomeOverview | undefined, waiting: boolean) {
-  const me = useMe();
-  const { open } = useClock();
-  const due = overview?.prompt_clock_in && !waiting ? overview.date : null;
-  useEffect(() => {
-    if (due && claimClockPrompt(me.user_id, due)) open();
-  }, [due, me.user_id, open]);
 }
 
 /** At most one read of the Overview in this long for other people's punches (the morning's arrivals). */
@@ -95,19 +85,29 @@ function useAttendanceRefresh(reload: () => void, overview: HomeOverview | undef
   }, [punch, reload]);
 }
 
-/** Export: the reader's Overview as a file in the format they choose, toasted with its run's number. Desktop only (§10.2). */
+/**
+ * Export: the reader's Overview as a file in the format they choose, waited on and downloaded
+ * here, toasted with its run's number. Desktop only (§10.2).
+ */
 function ExportOverview() {
   const exporting = useMutation("POST /api/v1/home/overview/export");
+  const [waiting, setWaiting] = useState(false);
   const run = async (format: HomeReportFormat) => {
+    setWaiting(true);
     try {
-      const res = await exporting.run({ body: { format }, idempotencyKey: crypto.randomUUID() });
+      const { run: done, saved } = await saveRun(
+        exporting.run({ body: { format }, idempotencyKey: crypto.randomUUID() }),
+        (id) => api.call("GET /api/v1/home/overview/export/:id", { params: { id } }),
+      );
       invalidate("/api/v1/home/report-runs");
-      toast(`${res.number} queued. It arrives by email.`);
+      if (saved) toast(`${done.number} downloaded`);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Export not queued. Try again.");
+      toast.error(e instanceof ApiError ? e.message : "Export failed. Try again.");
+    } finally {
+      setWaiting(false);
     }
   };
-  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending} onRun={(format) => void run(format)} item={(format) => `Export ${format}`} size="md" />;
+  return <FormatButton label="Export" formats={["pdf", "xlsx"]} busy={exporting.pending || waiting} onRun={(format) => void run(format)} item={(format) => `Export ${format}`} size="md" />;
 }
 
 /** A section of the Overview, laid out two to a row on desktop. */
@@ -163,10 +163,12 @@ export function Overview({ linked }: { linked: string | null }) {
   const first = create[0];
   // search:none the Overview's New runs another screen's own create action, which ⌘K lists with that screen
   useScreenAction(first ? { label: first.label, onSelect: () => navigate(first.href) } : null);
+  const addSite = useWorkSiteSheet();
+  useUrlAction("work-site", addSite);
+  useScreenAction(first && first.key !== "add_work_site" ? { label: "Add Work Site", icon: "pin", onSelect: addSite } : null, { second: true });
 
   /* A link straight to a card's records opens them once the Overview is in; closing them takes the link out of the address. */
   const asked = params.get("kpi") ?? linked;
-  useClockInPrompt(data, asked !== null);
   const shown = useRef<string | null>(null);
   useEffect(() => {
     if (!asked || !data || shown.current === asked) return;
@@ -192,6 +194,9 @@ export function Overview({ linked }: { linked: string | null }) {
             <DesktopOnly as="span" unmount>
               <ExportOverview />
             </DesktopOnly>
+            <Button icon="pin" onClick={addSite}>
+              Add Work Site
+            </Button>
             {create.length > 0 && (
               <Menu
                 label="New"

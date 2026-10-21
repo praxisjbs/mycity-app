@@ -186,14 +186,15 @@ describe("complete()", () => {
       output: { title: "A note", body: "Fine." },
       provisional: true,
       vendor: "gemini",
-      model: config.GEMINI_MODEL,
+      // The Default job's model: the newest stable Flash on Gemini's list (9291), not GEMINI_MODEL.
+      model: "gemini-3.8-flash",
     });
     // 1,000 input tokens at 450.00 per million + 200 output at 3,750.00 per million = 0.45 + 0.75
     expect(r.cost_ngn).toBe("1.20");
     expect(await runOf(r.run_id)).toEqual({
       status: "ok",
       vendor: "gemini",
-      model: config.GEMINI_MODEL,
+      model: "gemini-3.8-flash",
       prompt_key: "test-draft",
       prompt_version: 2,
       error_code: null,
@@ -379,27 +380,32 @@ describe("governance", () => {
 });
 
 describe("transcription", () => {
-  test("the seam runs governance and the ledger; Gemini audio waits for M2", async () => {
+  test("the chain runs governance and the ledger: Gemini answers with no Groq key; nothing answering is AI_UNAVAILABLE, or the captions as a draft", async () => {
     const doc = await one(
       `INSERT INTO document (doc_type, original_name, storage_key, mime, bytes, entity_type, entity_id, sensitivity, scan_status, source)
        VALUES ('voice_note', 'v.ogg', $1, 'audio/ogg', 10, 'community_message', 'm1', 'normal', 'skipped', 'upload') RETURNING document_id`,
       [`comms/2026/10/${crypto.randomUUID()}.ogg`],
     );
-    await expect(
-      transcription.transcribe({
-        document_id: doc.document_id,
-        module: "community",
-        actor: people.hr,
-      }),
-    ).rejects.toMatchObject({ code: "AI_NOT_AVAILABLE" });
-    const stubbed = await transcription.transcribe({
-      document_id: doc.document_id,
-      module: "community",
-      actor: people.hr,
-      vendors: { gemini: require("../../src/services/ai/vendors/stub") },
-    });
-    expect(stubbed.text).toMatch(/^\[AI placeholder\]/);
-    expect(await runOf(stubbed.run_id)).toMatchObject({ status: "ok" });
+    // The stored recording, as each provider takes it; no file or ffmpeg is needed here.
+    const audio = { forGroq: async () => ({ audio: Buffer.from("o"), mime: "audio/ogg", filename: "voice-note.ogg" }), mp3: async () => Buffer.from("m") };
+    const stub = require("../../src/services/ai/vendors/stub");
+    const answering = { transcribe: async () => ({ text: "All on track.", usage: { input_tokens: 40, output_tokens: 4 }, model: "gemini-3.8-flash" }) };
+    const down = {
+      transcribe: async () => {
+        throw Object.assign(new Error("gemini 503: unavailable"), { kind: "transient", status: 503 });
+      },
+    };
+    const run = (gemini, extra = {}) =>
+      transcription.transcribe({ document_id: doc.document_id, module: "community", actor: people.hr, audio, vendors: { gemini, stub }, ...extra });
+
+    const t = await run(answering);
+    expect(t).toMatchObject({ text: "All on track.", draft: false, vendor: "gemini" });
+    expect(await runOf(t.run_id)).toMatchObject({ status: "ok" });
+
+    await expect(run(down)).rejects.toMatchObject({ code: "AI_UNAVAILABLE" });
+    const draft = await run(down, { captions: "all on track" });
+    expect(draft).toMatchObject({ text: "all on track", draft: true, vendor: "browser" });
+    expect(await runOf(draft.run_id)).toMatchObject({ status: "failed", error_code: "AI_UNAVAILABLE" });
   });
 });
 

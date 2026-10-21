@@ -79,6 +79,19 @@ route(
 );
 route(
   router,
+  "post",
+  "/:id/archive",
+  {
+    body: c.common.EmptyBody,
+    response: an.Announcement,
+    summary: "Take a published announcement down",
+  },
+  requirePermission("community", "create"),
+  poster(),
+  controller.archive,
+);
+route(
+  router,
   "get",
   "/:id/reads",
   {
@@ -102,6 +115,19 @@ route(
   requirePermission("community", "view"),
   poster(),
   controller.remind,
+);
+// Anyone in an urgent announcement's audience acknowledges it; the service checks they are.
+route(
+  router,
+  "post",
+  "/:id/acknowledge",
+  {
+    body: c.common.EmptyBody,
+    no_content: true,
+    summary: "Acknowledge an urgent announcement",
+  },
+  requirePermission("community", "view"),
+  controller.acknowledge,
 );
 
 module.exports = {

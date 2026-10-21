@@ -1,194 +1,251 @@
 "use strict";
 /**
- * Voice to text (M1 voice notes on request, M2 dictation). The seam is built in M0 so
- * the callers, the switch, the cap and the ledger are in place; the Gemini audio call
- * itself arrives with M2 (BACKEND_STRUCTURE §14.5).
+ * Voice to text: voice notes on request (M1), dictation (M2, A18). The chain is Groq, then
+ * Gemini, then the browser's own captions (docs/guides/integrations.md §1.2 decisions 6 to 9).
  *
- *   const t = await transcription.transcribe({ document_id, module: "community", actor: req.user });
- *   // → { text, provisional: true, run_id, vendor }
+ *   const t = await transcription.transcribe({ document_id, module: "community", actor: req.user, captions });
+ *   // → { text, draft: false, provisional: true, run_id, vendor: "groq", model: "whisper-large-v3" }
+ *   // → { text: captions, draft: true, vendor: "browser", ... }   when no provider could answer
  *
- * Same path as llm.service.complete: governance first (a refusal is recorded), the run
- * opened before anything is sent, the step recorded with its tokens, the run closed.
- * The stub answers with a marked placeholder. With a Gemini key the stored recording is sent
- * to Gemini (vendors/gemini.js transcribe): a type Gemini takes as it is, anything else
- * (browsers record webm/Opus, Safari mp4/AAC) first made 16 kHz mono FLAC with ffmpeg, which
- * for a dictated answer of at most three minutes takes well under a second.
+ * The chain is the action's (`voice-note-transcription`, services/ai/actions.js), which is the
+ * Transcription job's unless AI Control gives it its own: Whisper on Groq first, then Gemini's
+ * Flash, as it starts (services/ai/jobs.js). A model is passed over when (its state on AI Control):
+ *   - its key is not set up, or the key's list no longer names it;
+ *   - its provider said its quota or rate limit is used up, until the time it gave (skips.js);
+ *   - its provider is on the Free plan and has reached the daily limit on Settings · Integrations;
+ *   - its provider has reached its monthly cap on AI Control · Spend;
+ *   - it refuses, fails, or takes more than 30 seconds (this call only).
+ * A quota refusal also marks the provider skipped until its reset, so the next voice note goes
+ * straight to the next one. When none answers, the captions the browser wrote while the sender
+ * recorded are handed back as a draft, never to be stored as the transcript; without them the
+ * call fails with AI_UNAVAILABLE. With no provider set up at all (a laptop, CI) the stub's marked
+ * placeholder comes back, as a draft too.
  *
- * Only audio the caller may read is sent: the caller checks vault.canRead first, and
- * this reads the stored file by id (a voice note must be audio, and must have passed
- * its scan if it came from outside).
+ * Each step is charged at its model's price (prices.js): Groq by the seconds it bills, Gemini's
+ * input tokens at its audio price. A Free plan is charged nothing; its seconds are still kept.
+ *
+ * Same path as llm.service.complete: governance first (a refusal is recorded), the run opened
+ * before anything is sent, each attempt recorded as a step, the run closed. Only audio the caller
+ * may read is sent: the caller checks access first, and this reads the stored file by id (a voice
+ * note must be audio, and must have passed its scan if it came from outside).
  */
+const path = require("node:path");
+const fsp = require("node:fs/promises");
 const { AppError } = require("../../shared/errors");
 const catalog = require("../../shared/access/access.catalog");
+const integrations = require("../../shared/integrations/settings");
+const quota = require("../../shared/integrations/quota");
+const usage = require("../../shared/integrations/usage");
+const { logger } = require("../../config/logger");
 const governance = require("./governance");
 const ledger = require("./ledger");
+const jobs = require("./jobs");
+const prices = require("./prices");
+const skips = require("./skips");
 
-const fs = require("node:fs/promises");
-const os = require("node:os");
-const path = require("node:path");
-const { config } = require("../../config/env");
-const storage = require("../storage/storage.service");
-const av = require("../media/av-pipeline");
+/** How long one provider may take before the next is asked (decision 7). */
+const PROVIDER_MS = 30_000;
 
-const DEFAULT_VENDORS = Object.freeze({ gemini: require("./vendors/gemini"), stub: require("./vendors/stub") });
+const DEFAULT_VENDORS = Object.freeze({
+  groq: require("./vendors/groq"),
+  gemini: require("./vendors/gemini"),
+  stub: require("./vendors/stub"),
+});
 
-/** Types Gemini takes as they are, by the stored mime's base type. */
-const ACCEPTED = new Map([
-  ["audio/wav", "audio/wav"],
-  ["audio/x-wav", "audio/wav"],
-  ["audio/mp3", "audio/mp3"],
-  ["audio/mpeg", "audio/mp3"],
-  ["audio/aiff", "audio/aiff"],
-  ["audio/aac", "audio/aac"],
-  ["audio/flac", "audio/flac"],
+/** What Groq's Whisper takes as it is; anything else is sent as MP3. */
+const GROQ_TYPES = new Map([
+  ["audio/webm", "webm"],
+  ["audio/ogg", "ogg"],
+  ["audio/mp4", "m4a"],
+  ["audio/x-m4a", "m4a"],
+  ["audio/m4a", "m4a"],
+  ["audio/mpeg", "mp3"],
+  ["audio/mp3", "mp3"],
+  ["audio/wav", "wav"],
+  ["audio/x-wav", "wav"],
+  ["audio/flac", "flac"],
 ]);
-const CONVERT_TIMEOUT_MS = 60_000;
 
-/** The recording's bytes in a type the vendor takes. */
-async function audioOf(doc) {
-  const audio = await storage.get(doc.storage_key);
-  const base = String(doc.mime || "").split(";")[0].trim().toLowerCase();
-  if (ACCEPTED.has(base)) return { audio, mimeType: ACCEPTED.get(base) };
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "mycity-audio-"));
-  try {
-    const input = path.join(dir, "in.bin");
-    const output = path.join(dir, "out.flac");
-    await fs.writeFile(input, audio);
-    await av.run(
-      config.FFMPEG_PATH || "ffmpeg",
-      ["-hide_banner", "-loglevel", "error", "-nostdin", "-i", input, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "flac", output],
-      { timeoutMs: CONVERT_TIMEOUT_MS },
-    );
-    return { audio: await fs.readFile(output), mimeType: "audio/flac" };
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-}
+/** The stored recording, as each provider takes it. */
+const DEFAULT_AUDIO = {
+  /** The original, which is the best quality there is; MP3 when Groq would not read its type. */
+  async forGroq(doc) {
+    const storage = require("../storage/storage.service");
+    const base = String(doc.mime).split(";")[0].trim().toLowerCase();
+    const ext = GROQ_TYPES.get(base);
+    if (ext) return { audio: await storage.get(doc.storage_key), mime: base, filename: `voice-note.${ext}` };
+    return { audio: await DEFAULT_AUDIO.mp3(doc), mime: "audio/mpeg", filename: "voice-note.mp3" };
+  },
+  /** MP3 for Gemini, which cannot read the WebM Chrome records. */
+  async mp3(doc) {
+    const storage = require("../storage/storage.service");
+    const { speechMp3 } = require("../media/av-pipeline");
+    const { dir, cleanup } = await storage.scratch();
+    try {
+      const out = path.join(dir, "speech.mp3");
+      await speechMp3(storage.absPath(doc.storage_key), out);
+      return await fsp.readFile(out);
+    } finally {
+      await cleanup();
+    }
+  },
+};
+
+/** Whether a failure means the provider's quota or rate limit is used up. */
+const isQuota = (err) => Boolean(err) && (err.kind === "rate_limited" || err.status === 429 || err.status === 402);
+
+const draftOf = (captions, runId) => ({
+  text: captions,
+  draft: true,
+  provisional: true,
+  run_id: runId,
+  vendor: "browser",
+  model: "browser",
+});
 
 /**
  * @param {{document_id: string, module: string, actor: object|null, purpose?: string,
- *          db?: {query: Function}, vendors?: object}} req
+ *          captions?: string|null, db?: {query: Function}, vendors?: object, audio?: object}} req
+ *   purpose   the registered action (services/ai/actions.js); a voice note's unless given
+ *   captions  what the browser wrote while the sender recorded, if anything: the last resort
+ *   vendors, audio  tests
+ * @returns {Promise<{text: string, draft: boolean, provisional: true, run_id: string, vendor: string, model: string}>}
  */
 async function transcribe({
   document_id: documentId,
   module,
   actor = null,
-  purpose = "transcription",
+  purpose = "voice-note-transcription",
+  captions = null,
   db = require("../../config/db").pool,
   vendors = DEFAULT_VENDORS,
+  audio = DEFAULT_AUDIO,
 }) {
-  if (!catalog.isModule(module))
-    throw new Error(`ai.transcribe: "${module}" is not a module key`);
-  const { rows } = await db.query(
-    "SELECT mime, scan_status, storage_key FROM document WHERE document_id = $1",
-    [documentId],
-  );
+  if (!catalog.isModule(module)) throw new Error(`ai.transcribe: "${module}" is not a module key`);
+  const { rows } = await db.query("SELECT mime, scan_status, storage_key FROM document WHERE document_id = $1", [documentId]);
   const doc = rows[0];
   if (!doc) throw new AppError("NOT_FOUND", "Not found", 404);
-  if (!/^audio\//.test(doc.mime))
-    throw new AppError(
-      "NOT_AUDIO",
-      "Only a voice recording can be transcribed.",
-      422,
-    );
+  if (!/^audio\//.test(doc.mime)) throw new AppError("NOT_AUDIO", "Only a voice recording can be transcribed.", 422);
   if (doc.scan_status === "pending" || doc.scan_status === "infected")
     throw new AppError("NOT_READY", "This recording is not ready yet.", 409);
+  const fallback = typeof captions === "string" && captions.trim() ? captions.trim() : null;
 
   let g;
   try {
     g = await governance.check(db, { module });
   } catch (err) {
-    if (err instanceof AppError)
-      await ledger.refused(db, { purpose, module, actor, error: err });
+    if (!(err instanceof AppError)) throw err;
+    const runId = await ledger.refused(db, { purpose, module, actor, error: err });
+    // The captions came from the sender's own browser, not an AI vendor: a switched-off AI
+    // still leaves them.
+    if (fallback) return draftOf(fallback, runId);
     throw err;
   }
-  const vendorName = g.vendor;
-  const model = vendorName === "stub" ? "stub" : g.model;
-  const runId = await ledger.startRun(db, {
-    purpose,
-    module,
-    actor,
-    vendor: vendorName,
-    model,
-  });
-  const prices =
-    vendorName === "stub"
-      ? { input_ngn_per_million: "0.00", output_ngn_per_million: "0.00" }
-      : {
-          input_ngn_per_million: g.settings.input_ngn_per_million,
-          output_ngn_per_million: g.settings.output_ngn_per_million,
-        };
 
-  const vendor = vendors[vendorName];
+  const chain = g.settings.forced_stub ? null : await jobs.resolve(purpose, { db });
+  const setUp = Boolean(chain) && chain.links.some((l) => l.state !== "not_set_up" && vendors[l.provider]);
+  if (!setUp) return stub(db, { purpose, module, actor, fallback, vendors });
+  const links = chain.links.filter((l) => l.state === "ready" && vendors[l.provider]);
+  const first = links[0] || chain.links[0];
+
+  const prompt = require("./llm.service").loadPrompt("voice-note-transcription");
+  const runId = await ledger.startRun(db, { purpose, module, actor, vendor: first.provider, model: first.model, prompt });
+  let stepNo = 0;
+  let last = null;
+
+  for (const link of links) {
+    const { provider, model } = link;
+    const skippedUntil = await skips.until(provider);
+    if (skippedUntil) {
+      logger.debug({ provider, until: skippedUntil.toISOString() }, "transcription: provider skipped until its reset");
+      continue;
+    }
+    if (await quota.spent(provider, { db })) continue;
+    const apiKey = await integrations.secret(provider, "api_key", { db });
+    if (!apiKey) continue;
+
+    stepNo += 1;
+    const started = Date.now();
+    const kind = provider === "groq" ? "transcribe" : "call";
+    const charged = await prices.forStep(db, { provider, model, audio: provider === "gemini" });
+    try {
+      const res =
+        provider === "groq"
+          ? await vendors.groq.transcribe({ apiKey, model, ...(await audio.forGroq(doc)), timeoutMs: PROVIDER_MS })
+          : await vendors.gemini.transcribe({
+              apiKey,
+              model,
+              audio: await audio.mp3(doc),
+              mime: "audio/mp3",
+              prompt: prompt.body,
+              timeoutMs: PROVIDER_MS,
+            });
+      usage.record(provider, kind, provider === "groq" ? { ok: true, units: res.billed_s } : { ok: true });
+      await ledger.recordStep(db, runId, {
+        step_no: stepNo,
+        kind: "transcription",
+        vendor: provider,
+        model: res.model || model,
+        usage: provider === "groq" ? { input_tokens: 0, output_tokens: 0, audio_seconds: res.billed_s } : res.usage,
+        prices: charged,
+        latency_ms: Date.now() - started,
+        finish_reason: res.finish_reason || null,
+        outcome: "ok",
+      });
+      await ledger.finishRun(db, runId, { status: "ok", vendor: provider, model: res.model || model });
+      return { text: res.text, draft: false, provisional: true, run_id: runId, vendor: provider, model: res.model || model };
+    } catch (err) {
+      last = err;
+      const code = require("./llm.service").callCode(err);
+      usage.record(provider, kind, provider === "groq" ? { ok: false, units: 0, error_code: code } : { ok: false, error_code: code });
+      await ledger.recordStep(db, runId, {
+        step_no: stepNo,
+        kind: "transcription",
+        vendor: provider,
+        model,
+        prices: charged,
+        latency_ms: Date.now() - started,
+        outcome: "failed",
+        error: err && err.message,
+      });
+      if (isQuota(err)) await skips.mark(provider, err.retryAfterMs, code);
+      logger.warn({ provider, code, err: err && err.message }, "transcription: provider did not answer; trying the next");
+    }
+  }
+
+  await ledger.finishRun(db, runId, {
+    status: "failed",
+    error_code: "AI_UNAVAILABLE",
+    error: last ? last.message : "every provider in the chain was skipped",
+  });
+  if (fallback) return draftOf(fallback, runId);
+  throw new AppError("AI_UNAVAILABLE", "Transcription is not available right now. Try again shortly.", 503);
+}
+
+/** Nothing set up: the browser's captions if there are any, else the stub's marked placeholder. */
+async function stub(db, { purpose, module, actor, fallback, vendors }) {
+  const runId = await ledger.startRun(db, { purpose, module, actor, vendor: fallback ? "browser" : "stub", model: fallback ? "browser" : "stub" });
+  if (fallback) {
+    await ledger.finishRun(db, runId, { status: "ok" });
+    return draftOf(fallback, runId);
+  }
   const started = Date.now();
-  if (!vendor || typeof vendor.transcribe !== "function") {
-    await ledger.recordStep(db, runId, {
-      step_no: 1,
-      kind: "transcription",
-      vendor: vendorName,
-      model,
-      prices,
-      latency_ms: 0,
-      outcome: "failed",
-      error: "this vendor does not transcribe",
-    });
-    await ledger.finishRun(db, runId, {
-      status: "failed",
-      error_code: "AI_NOT_AVAILABLE",
-      error: "this vendor does not transcribe",
-    });
-    throw new AppError(
-      "AI_NOT_AVAILABLE",
-      "Transcription is not available yet.",
-      501,
-    );
-  }
-  let res;
-  try {
-    const input = vendorName === "stub" ? {} : await audioOf(doc);
-    res = await vendor.transcribe({
-      document_id: documentId,
-      model,
-      apiKey: config.GEMINI_API_KEY,
-      timeoutMs: config.AI_REQUEST_TIMEOUT_MS,
-      ...input,
-    });
-  } catch (err) {
-    await ledger.recordStep(db, runId, {
-      step_no: 1,
-      kind: "transcription",
-      vendor: vendorName,
-      model,
-      prices,
-      latency_ms: Date.now() - started,
-      outcome: "failed",
-      error: err.message,
-    });
-    const configError = err.kind === "config";
-    await ledger.finishRun(db, runId, {
-      status: "failed",
-      error_code: configError ? "AI_VENDOR_CONFIG" : "AI_UNAVAILABLE",
-      error: err.message,
-    });
-    throw new AppError(configError ? "AI_VENDOR_CONFIG" : "AI_UNAVAILABLE", "Could not hear that, try again", 503);
-  }
+  const res = await vendors.stub.transcribe();
   await ledger.recordStep(db, runId, {
     step_no: 1,
     kind: "transcription",
-    vendor: vendorName,
-    model: res.model || model,
+    vendor: "stub",
+    model: "stub",
     usage: res.usage,
-    prices,
+    prices: prices.zero(),
     latency_ms: Date.now() - started,
     outcome: "ok",
   });
   await ledger.finishRun(db, runId, { status: "ok" });
-  return {
-    text: res.text,
-    provisional: true,
-    run_id: runId,
-    vendor: vendorName,
-  };
+  return { text: res.text, draft: true, provisional: true, run_id: runId, vendor: "stub", model: "stub" };
 }
 
-module.exports = { transcribe };
+/** The stub's placeholder: never a transcript to keep, or to show as one. */
+const STUB_TEXT = DEFAULT_VENDORS.stub.TRANSCRIPT;
+
+module.exports = { transcribe, PROVIDER_MS, GROQ_TYPES, DEFAULT_AUDIO, STUB_TEXT };

@@ -317,25 +317,6 @@ function routeOf(def, instance) {
 async function detail(client, id, user) {
   const instance = await engine.getInstance(client, id);
   if (!instance || !(await mayRead(client, instance, user))) throw notFound();
-  return viewOf(client, instance, user);
-}
-
-/**
- * A request's route, decisions and what the caller may do, for a module that shows its
- * own record's approval beside the record (Performance's goals, plans and reviews). The
- * module has already decided the caller may see the record, so this does not ask again;
- * null when there is no instance.
- * @param {{query: Function}} client
- * @param {string|null} id  workflow_instance_id
- * @param {object} user     req.user
- */
-async function approvalOf(client, id, user) {
-  if (!id) return null;
-  const instance = await engine.getInstance(client, id);
-  return instance ? viewOf(client, instance, user) : null;
-}
-
-async function viewOf(client, instance, user) {
   const def = await definitions.findById(client, instance.workflow_definition_id);
   const route = routeOf(def, instance);
   const authored = route.map(({ stage, state }) => (state === "now" ? instance.stage_approvers : stage.approvers));
@@ -446,6 +427,10 @@ async function reassign(user, id, { user_id: toUserId, reason }) {
     if (locked.opened_by && to.user_id === locked.opened_by) {
       throw new AppError("VALIDATION_FAILED", "Not the requester", 422, { user_id: ["Not the requester"] });
     }
+    // Someone the approval excludes never decides it (a temporary site's people, foundation.md §6.5).
+    if (to.employee_id && (locked.excluded_employee_ids || []).includes(to.employee_id)) {
+      throw new AppError("VALIDATION_FAILED", "Not someone on it", 422, { user_id: ["Not someone on it"] });
+    }
     if (!(await approveScope(to, locked.module_key))) {
       throw new AppError("VALIDATION_FAILED", "They cannot approve these", 422, { user_id: ["They cannot approve these"] });
     }
@@ -476,6 +461,7 @@ async function reassign(user, id, { user_id: toUserId, reason }) {
         reassigned_from: locked.stage_approvers,
         subject_employee_id: locked.subject_employee_id,
         opened_by: locked.opened_by,
+        excluded_employee_ids: locked.excluded_employee_ids || [],
         reason,
       },
     });
@@ -484,7 +470,6 @@ async function reassign(user, id, { user_id: toUserId, reason }) {
 }
 
 module.exports = {
-  approvalOf,
   approveModules,
   conditionList,
   approverView,

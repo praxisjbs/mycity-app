@@ -14,8 +14,8 @@ import { AREAS, BOTTOM_BAR, type ModuleDef } from "./catalogue";
  */
 
 /** The rail's items, in catalogue order. */
-export function railItems(modules: ModuleDef[], badges: NavBadges | undefined): RailItem[] {
-  return modules.map((m) => ({ key: m.key, label: m.label, icon: m.icon, href: hrefFor(m.key), group: m.area || undefined, count: badges?.[m.key] }));
+export function railItems(modules: ModuleDef[], badges: NavBadges | undefined, urgent: Set<string> = new Set()): RailItem[] {
+  return modules.map((m) => ({ key: m.key, label: m.label, icon: m.icon, href: hrefFor(m.key), group: m.area || undefined, count: badges?.[m.key], urgent: urgent.has(m.key) }));
 }
 
 /** The key the bottom bar marks for a module: its own place, or More for everything else. */
@@ -23,13 +23,15 @@ export const bottomKey = (moduleKey: string | null): string | null =>
   moduleKey && (BOTTOM_BAR as readonly string[]).includes(moduleKey) ? moduleKey : moduleKey ? "more" : null;
 
 /** The bottom bar's five places. A place the person may not open is left out (in practice everyone holds all four). */
-export function bottomItems(modules: ModuleDef[], badges: NavBadges | undefined, openMore: () => void, moreOpen: boolean): BottomBarItem[] {
+export function bottomItems(modules: ModuleDef[], badges: NavBadges | undefined, openMore: () => void, moreOpen: boolean, urgent: Set<string> = new Set()): BottomBarItem[] {
   const places: BottomBarItem[] = BOTTOM_BAR.flatMap((key) => {
     const m = modules.find((x) => x.key === key);
-    return m ? [{ key: m.key, label: m.short, icon: m.icon, href: hrefFor(m.key), count: badges?.[m.key] }] : [];
+    return m ? [{ key: m.key, label: m.short, icon: m.icon, href: hrefFor(m.key), count: badges?.[m.key], urgent: urgent.has(m.key) }] : [];
   });
-  const moreCount = modules.filter((m) => !(BOTTOM_BAR as readonly string[]).includes(m.key)).reduce((n, m) => n + (badges?.[m.key] ?? 0), 0);
-  return [...places, { key: "more", label: "More", icon: "grid", onSelect: openMore, expanded: moreOpen, count: moreCount }];
+  const behindMore = modules.filter((m) => !(BOTTOM_BAR as readonly string[]).includes(m.key));
+  const moreCount = behindMore.reduce((n, m) => n + (badges?.[m.key] ?? 0), 0);
+  const moreUrgent = behindMore.some((m) => urgent.has(m.key));
+  return [...places, { key: "more", label: "More", icon: "grid", onSelect: openMore, expanded: moreOpen, count: moreCount, urgent: moreUrgent }];
 }
 
 /** More's tiles: every module with an area that the person may open, grouped Work, People, Business, System. */

@@ -1,8 +1,9 @@
 "use strict";
 /**
  * Announcements' events (community.md §7): a scheduled one is queued for its time, a
- * published one notifies its audience and appears in #announcements, and a reminder
- * reaches only those who have not read it.
+ * published one notifies its audience at its level and appears in #announcements, and a
+ * reminder reaches only those who have not read it. An important one queues its own reminder
+ * for 4 hours later; Acknowledge pressed on the urgent bar is recorded here as on the card.
  */
 const { pool } = require("../../config/db");
 const { defineEvents } = require("../../shared/events/catalogue");
@@ -10,6 +11,10 @@ const outbox = require("../../shared/events/outbox");
 const { defineNotification } = require("../../shared/notifications/fanout");
 const queues = require("../../jobs/queues");
 const realtime = require("../../services/realtime/emitter");
+const { EVENTS: NOTICE_EVENTS } = require("../notifications/notifications.events");
+
+/** How long after an important announcement its unread are reminded (TB, 19/10/2026). */
+const IMPORTANT_REMIND_MS = 4 * 60 * 60 * 1000;
 
 const EVENTS = defineEvents("community", {
   "announcement.created": {
@@ -21,11 +26,17 @@ const EVENTS = defineEvents("community", {
   "announcement.cancelled": {
     summary: "A scheduled announcement was called off",
   },
+  "announcement.archived": {
+    summary: "A published announcement was taken down",
+  },
   "announcement.published": {
     summary: "An announcement went out to its audience",
   },
   "announcement.reminded": {
     summary: "People who had not read an announcement were reminded",
+  },
+  "announcement.acknowledged": {
+    summary: "Someone acknowledged an urgent announcement",
   },
 });
 
@@ -93,17 +104,69 @@ outbox.register(
   },
 );
 
+const BODY = {
+  urgent: "Urgent. Acknowledge it in #announcements.",
+  important: "Important. New in #announcements.",
+  normal: "New in #announcements.",
+};
+
 defineNotification(EVENTS.ANNOUNCEMENT_PUBLISHED, {
   to: [{ users: (e, client) => audience(e, client) }],
   title: (e) => e.payload.title,
-  body: "New in #announcements.",
+  body: (e) => BODY[e.payload.urgency] || BODY.normal,
   priority: "high",
+  // The level its poster chose; an urgent one closes only on Acknowledge (TB, 19/10/2026).
+  urgency: (e) => e.payload.urgency || "normal",
+  acknowledge: (e) => e.payload.urgency === "urgent",
+  who: "Its audience",
 });
+
+/** An important announcement reminds whoever has not opened it, once, 4 hours later. */
+outbox.register(
+  EVENTS.ANNOUNCEMENT_PUBLISHED,
+  "announcements.schedule_reminder",
+  async (event) => {
+    if (event.payload.urgency !== "important") return;
+    await queues.enqueue(
+      "announcement-publish",
+      "remind",
+      { announcement_id: event.payload.announcement_id },
+      { delay: IMPORTANT_REMIND_MS, jobId: `announcement-remind-${event.payload.announcement_id}` },
+    );
+  },
+);
+
+/** Acknowledge on the urgent bar: recorded on the reads, as if pressed on the card. */
+outbox.register(
+  NOTICE_EVENTS.NOTIFICATION_ACKNOWLEDGED,
+  "announcements.record_acknowledgement",
+  async (event) => {
+    const p = event.payload || {};
+    if (p.entity_type !== "announcement" || !p.entity_id || !p.user_id) return;
+    await require("./announcements.service").acknowledgeFromNotice(p.user_id, p.entity_id);
+  },
+);
 
 defineNotification(EVENTS.ANNOUNCEMENT_REMINDED, {
   to: [{ users: (e) => e.payload.user_ids || [] }],
   title: (e) => `Reminder: ${e.payload.title}`,
   body: "Please read it in #announcements.",
+  who: "Its audience who have not read it",
+});
+
+/* Taken down: its unopened notices go (the urgent bar and its repeats stop), and #announcements updates live. */
+outbox.register(EVENTS.ANNOUNCEMENT_ARCHIVED, "announcements.withdraw_notices", (event) =>
+  require("../notifications/notifications.service").withdrawForRecord("announcement", event.payload.announcement_id),
+);
+outbox.register(EVENTS.ANNOUNCEMENT_ARCHIVED, "announcements.push_archived", async (event) => {
+  const { rows } = await pool.query("SELECT user_id FROM community_member WHERE community_channel_id = $1", [
+    event.payload.community_channel_id,
+  ]);
+  for (const r of rows)
+    realtime.toUser(r.user_id, "community.message_updated", {
+      community_channel_id: event.payload.community_channel_id,
+      community_message_id: event.payload.community_message_id ?? null,
+    });
 });
 
 module.exports = { EVENTS };

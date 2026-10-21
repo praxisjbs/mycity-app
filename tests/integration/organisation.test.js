@@ -40,6 +40,7 @@ const lagos = require("../../src/shared/time/lagos");
 const approvers = require("../../src/shared/workflow/approvers");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
 const c = require("@mycity/contract");
+const { picked } = require("../helpers/places");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -158,7 +159,8 @@ describeDb("the organisation module against the real migrations", () => {
           bank_name: "Test Bank",
           account_number: "0123456789",
           date_of_birth: "1994-04-12",
-          home_address: "12 Test Close, Lagos",
+          // The service takes what the contract parsed: the place itself.
+          home_address: c.maps.PlaceInput.parse(picked("12 Test Close, Lagos")),
         },
         { user_id: null, source: "test" },
       );
@@ -448,7 +450,6 @@ describeDb("the organisation module against the real migrations", () => {
         bank_name: "",
         account_number: null,
         date_of_birth: "",
-        home_address: "",
       });
       expect(res.status).toBe(200);
       expect(res.body.job_title).toBe("Senior Analyst");
@@ -655,78 +656,72 @@ describeDb("the organisation module against the real migrations", () => {
   describe("Download PDF", () => {
     const documents = require("../../src/shared/documents/generate");
     const vault = require("../../src/shared/documents/vault");
-    const exporter = require("../../src/modules/organisation/org-chart.export");
     /* Tests have no Chromium; this stands in for it, as the reports tests do. */
     const fakePdf = async () => Buffer.from("%PDF-1.4\n% an organogram\n");
     const chartDocuments = async () =>
-      (await q("SELECT document_id, render_status, render_html, uploaded_by, entity_id FROM document WHERE doc_type = 'org_chart' ORDER BY created_at")).rows;
-    const emails = () => sent.filter((m) => m.queue === "email-send" && m.name === "org-chart-export");
+      (await q("SELECT document_id, render_status, render_html, uploaded_by, entity_id, locked_at FROM document WHERE doc_type = 'org_chart' ORDER BY created_at")).rows;
 
-    test("any member of staff may ask: the chart is drawn as them and emailed to them", async () => {
+    test("any member of staff may ask: the chart is laid out as they asked, drawn after commit and downloaded, never emailed", async () => {
       const before = (await chartDocuments()).length;
       const res = await asManager()(request(app).post("/api/v1/org-chart/exports")).send({ view: "viewer" });
       expect(res.status).toBe(202);
-      expect(c.organisation.OrgChartExportQueued.parse(res.body)).toEqual({ queued: true, email: "manager@mycity.test" });
+      const file = c.documents.ExportFile.parse(res.body);
+      expect(file).toMatchObject({ status: "pending", file_name: "Organogram.pdf" });
 
-      sent.length = 0;
-      await drain();
       const docs = await chartDocuments();
       expect(docs).toHaveLength(before + 1);
       const doc = docs[docs.length - 1];
-      expect(doc).toMatchObject({ render_status: "pending", uploaded_by: people.manager.user.user_id });
+      expect(doc).toMatchObject({ document_id: file.document_id, render_status: "pending", uploaded_by: people.manager.user.user_id });
       /* Every card is on the page, the open role as one; the viewer's card has no since line. */
       expect(doc.render_html).toContain("Ngozi Umeh");
       expect(doc.render_html).toContain("Vacant · ");
       expect(doc.render_html).toContain("Dotted line · Chidi Nwankwo");
       expect(doc.render_html).not.toContain("Since 2026 · Hybrid");
-      expect(emails()).toHaveLength(0);
+      const waiting = await asManager()(request(app).get(`/api/v1/exports/${file.document_id}`));
+      expect(waiting.body.status).toBe("pending");
 
+      sent.length = 0;
       await documents.renderPending(doc.document_id, { db: pool, renderPdf: fakePdf });
       await drain();
-      expect(emails()).toHaveLength(1);
-      expect(emails()[0].data).toMatchObject({
-        to: { email: "manager@mycity.test" },
-        recipient: { first_name: "Chidi" },
-        template: "org-chart-export",
-        attachments: [{ document_id: doc.document_id }],
-      });
-      expect(emails()[0].opts.jobId).toBe(`org-chart-export-${doc.document_id}`);
+      expect(sent.filter((m) => m.queue === "email-send")).toEqual([]);
+      const done = await asManager()(request(app).get(`/api/v1/exports/${file.document_id}`));
+      expect(c.documents.ExportFile.parse(done.body)).toEqual({ ...file, status: "done" });
+      /* An export is a copy for one person, never locked, so the cleanup can remove it a day later. */
+      expect((await vault.get(pool, doc.document_id)).locked_at).toBeNull();
+      const pdf = await asManager()(request(app).get(`/api/v1/documents/${file.document_id}/content`));
+      expect(pdf.status).toBe(200);
+      expect(pdf.headers["content-type"]).toMatch(/pdf/);
 
-      /* The file is the asker's: they and the CEO open it, not even Operations. */
+      /* The file is the asker's: they and the CEO open it, not even Operations, who cannot wait on it either. */
       const row = await vault.get(pool, doc.document_id);
       expect(await vault.canRead(pool, await grantsCache.getAuthUser(pool, people.manager.user.user_id), row)).toBe(true);
       expect(await vault.canRead(pool, await grantsCache.getAuthUser(pool, people.ops.user.user_id), row)).toBe(false);
+      expect((await asOps()(request(app).get(`/api/v1/exports/${file.document_id}`))).status).toBe(404);
 
-      /* Run again, the request draws nothing more, and the email keeps its job id. */
+      /* The request is on the record, with the file it made. */
       const asked = await one(
         "SELECT entity_type, entity_id, payload FROM event_log WHERE event_key = 'org_chart.export_requested' ORDER BY occurred_at DESC",
       );
-      await exporter.build({ entity: { type: asked.entity_type, id: asked.entity_id }, payload: asked.payload });
-      expect(await chartDocuments()).toHaveLength(before + 1);
-      await exporter.deliver(doc.document_id);
-      expect(new Set(emails().map((m) => m.opts.jobId)).size).toBe(1);
+      expect(asked).toMatchObject({ entity_type: "org_chart_export", entity_id: doc.entity_id, payload: { view: "viewer", document_id: doc.document_id } });
     });
 
     test("the builder's PDF carries the since and arrangement line", async () => {
       await asOps()(request(app).post("/api/v1/org-chart/exports")).send({ view: "builder" });
-      await drain();
       const docs = await chartDocuments();
       expect(docs[docs.length - 1].render_html).toContain("Since 2026 · Hybrid");
     });
 
-    test("a PDF the render job gives up on tells the person who asked", async () => {
-      await asManager()(request(app).post("/api/v1/org-chart/exports")).send({});
-      await drain();
-      const docs = await chartDocuments();
-      const doc = docs[docs.length - 1];
+    test("a PDF the render job gives up on is failed for the screen waiting on it, and nobody is notified", async () => {
+      const res = await asManager()(request(app).post("/api/v1/org-chart/exports")).send({});
+      const doc = (await chartDocuments()).pop();
+      expect(doc.document_id).toBe(res.body.document_id);
       await documents.failRender(doc.document_id, new Error("Chromium went away"), { db: pool });
       await drain();
-      const told = await q("SELECT title, body, entity_type FROM notification WHERE user_id = $1 AND event_key = 'org_chart.export_failed'", [
+      expect((await asManager()(request(app).get(`/api/v1/exports/${doc.document_id}`))).body.status).toBe("failed");
+      const told = await q("SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND entity_type = 'org_chart_export'", [
         people.manager.user.user_id,
       ]);
-      expect(told.rows).toEqual([
-        { title: "Your organogram PDF failed", body: "It could not be drawn. Press Download PDF again.", entity_type: "org_chart_export" },
-      ]);
+      expect(told.rows[0].n).toBe(0);
     });
   });
 
@@ -789,6 +784,23 @@ describeDb("the organisation module against the real migrations", () => {
         date_of_birth: null,
         phone: null,
       });
+
+      /* The DOB column's day and month are kept for the celebrations, matched by email, else staff number. */
+      expect(result.birthdays).toEqual({ set: 4, unmatched: 0 });
+      expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0001'")).toEqual({ birth_day: 12, birth_month: 12 });
+      expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0002'")).toEqual({ birth_day: 26, birth_month: 9 });
+      const due = await require("../../src/modules/community/community.repo").celebrationsOn(pool, "2026-09-17");
+      const sade = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0004'");
+      expect(due).toContainEqual({ employee_id: sade.employee_id, occasion: "birthday", years: null });
+    });
+
+    test("a day and month cell reads day first, and a full date or nonsense is not one", () => {
+      expect(loader.dayMonth("03/07")).toEqual({ day: 3, month: 7 });
+      expect(loader.dayMonth(" 29-2 ")).toEqual({ day: 29, month: 2 });
+      expect(loader.dayMonth("31/04")).toBeNull();
+      expect(loader.dayMonth("03/07/1991")).toBeNull();
+      expect(loader.dayMonth(new Date())).toBeNull();
+      expect(loader.dayMonth("")).toBeNull();
     });
 
     test("the post whose email the sheet leaves empty takes it from roles.json", async () => {
@@ -879,6 +891,7 @@ describeDb("the organisation module against the real migrations", () => {
       const before = await one("SELECT count(*)::int AS n FROM employee");
       const again = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile() });
       expect(again.status).toBe("already_loaded");
+      expect(again.birthdays).toEqual({ set: 0, unmatched: 0 }); // each one is written once
       expect(await one("SELECT count(*)::int AS n FROM employee")).toEqual(before);
       const kept = await one("SELECT job_title FROM employee WHERE staff_number = 'T0002'");
       expect(kept.job_title).toBe("Head of Trading and Settlement");

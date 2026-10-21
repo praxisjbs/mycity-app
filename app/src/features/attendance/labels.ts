@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PunchState, RegisterStatus, SchedulePlace } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, AttendanceEvent, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PayItem, PayItemKind, PayItemStatus, PunchState, RegisterStatus, SchedulePlace, CheckIn, TemporarySitePurpose, TemporarySiteState } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -29,11 +29,15 @@ export const dayStatus = (d: Pick<AttendanceDay, "status" | "late_minutes">): Sh
 export const EXCEPTION_TYPE: Record<ExceptionType, string> = {
   outside_worksite: "Outside Worksite",
   outside_home: "Outside Home",
-  location_unverified: "Location Unverified",
+  location_unverified: "Location Unclear",
   unknown_device: "Unknown Device",
   suspicious_timestamp: "Device Time Ahead",
   missing_clock_out: "Missing Clock-Out",
+  automatic_clock_out: "System Clock-Out",
 };
+
+/** The help on Location Unclear, wherever an exception names it (§10.1). */
+export const UNCLEAR_HELP = "The reading could not prove where you were.";
 
 export const PUNCH_STATE: Record<PunchState, Shown> = {
   accepted: { tone: "ok", text: "Accepted" },
@@ -44,9 +48,18 @@ export const PUNCH_STATE: Record<PunchState, Shown> = {
 export const VERDICT: Record<GeofenceVerdict, string> = {
   inside: "Inside",
   outside: "Outside",
-  unverified: "Unverified",
+  unverified: "Unclear",
   not_applied: "Not Checked",
 };
+
+/** Why a location is unclear (§6.5); any other reason is no reading at all. */
+const UNCLEAR_WHY: Record<string, string> = { poor_accuracy: "rough reading", edge: "at the edge", no_home: "no home", no_worksite: "no office" };
+
+/** A punch's location as its day lists it: the verdict and distance, or Unclear with why. */
+export const locationShown = (e: Pick<AttendanceEvent, "geofence" | "location_reason" | "distance_m">) =>
+  e.geofence === "unverified"
+    ? `Unclear, ${UNCLEAR_WHY[e.location_reason ?? ""] ?? "no reading"}`
+    : `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}`;
 
 /** New is a device seen on a punch and not registered (`observed`). */
 export const DEVICE_STATUS: Record<DeviceStatus, Shown> = {
@@ -83,6 +96,40 @@ export const ASSIGNMENT_STATE: Record<FieldAssignmentState, Shown> = {
   cancelled: { tone: "neutral", text: "Cancelled" },
 };
 
+/** Why people work at a temporary site, in the contract's order (§6.11). */
+export const SITE_PURPOSE: Record<TemporarySitePurpose, string> = {
+  client_visit: "Client Visit",
+  partner_meeting: "Partner Meeting",
+  training_delivering: "Training (Delivering)",
+  training_attending: "Training (Attending)",
+  event: "Event",
+  conference: "Conference",
+  workshop: "Workshop",
+  exhibition: "Exhibition",
+  market_activation: "Market Activation",
+  field_survey: "Field Survey",
+  site_inspection: "Site Inspection",
+  media_engagement: "Media Engagement",
+  government_visit: "Government Visit",
+  out_of_station: "Out-of-Station Assignment",
+  coworking_space: "Coworking Space",
+  temporary_home: "Temporary Home",
+  other: "Other",
+};
+/** Where a temporary site stands today. */
+export const SITE_STATE: Record<TemporarySiteState, Shown> = {
+  submitted: { tone: "warn", text: "Awaiting Approval" },
+  upcoming: { tone: "info", text: "Upcoming" },
+  in_progress: { tone: "ok", text: "In Progress" },
+  done: { tone: "neutral", text: "Done" },
+  rejected: { tone: "err", text: "Rejected" },
+  withdrawn: { tone: "neutral", text: "Withdrawn" },
+  cancelled: { tone: "neutral", text: "Cancelled" },
+};
+/** A check-in against the address it was matched to; flagged ones went to People. */
+export const checkInShown = (c: Pick<CheckIn, "flagged" | "verdict">): Shown =>
+  c.flagged ? { tone: "warn", text: "Flagged" } : c.verdict === "inside" ? { tone: "ok", text: "Inside" } : { tone: "neutral", text: "Recorded" };
+
 export const REQUEST_TYPE_HELP = "Temporary Home: clock in at another home, within 100 m. Remote Day: work away from the office. Client Visit: work at a client's site.";
 
 export const DEVICE_STATUS_HELP = "New: seen on a punch, not registered. Registered: one of your three. Removed: taken off, and it can be registered again.";
@@ -99,8 +146,6 @@ export const PLACE: Record<SchedulePlace, Shown> = {
 /** The weekdays by ISO number, as the week and the schedule name them. */
 export const WEEKDAY: Record<number, string> = { 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday" };
 
-/** Office days in short: "Mon, Tue, Thu". */
-export const officeDaysText = (days: number[]) => [...days].sort((a, b) => a - b).map((d) => WEEKDAY[d].slice(0, 3)).join(", ");
 
 /** The home of someone who works from home on some days, as the record's Attendance tab shows it. */
 export const HOME_STATE: Record<"approved" | "pending" | "none", Shown> = {
@@ -108,6 +153,35 @@ export const HOME_STATE: Record<"approved" | "pending" | "none", Shown> = {
   pending: { tone: "warn", text: "Waiting" },
   none: { tone: "neutral", text: "Not Set" },
 };
+
+/** A pending deduction's or overtime's kind (§6.17). */
+export const PAY_KIND: Record<PayItemKind, string> = {
+  late: "Late",
+  early_departure: "Early Departure",
+  absence: "Absence",
+  overtime: "Overtime",
+};
+
+/** Where a deduction or overtime stands: pending, waived or confirmed by a person, cut, or taken by payroll. */
+export const PAY_STATUS: Record<PayItemStatus, Shown> = {
+  pending: { tone: "warn", text: "Pending" },
+  waived: { tone: "neutral", text: "Waived" },
+  confirmed: { tone: "ok", text: "Confirmed" },
+  cut: { tone: "neutral", text: "Cut" },
+  in_run: { tone: "info", text: "In Payroll" },
+};
+
+/** How an amount was worked out, as an item's sheet names it. */
+export const PAY_METHOD: Record<PayItem["method"], string> = {
+  pro_rata: "Pro-Rata by Minute",
+  per_hour: "Fixed per Hour",
+  per_day: "Fixed per Day",
+  daily_rate: "A Day's Pay",
+  multiplier: "Multiple of Hourly Rate",
+};
+
+/** The help on an item's Amount. */
+export const PAY_AMOUNT_HELP = "Worked out from your monthly gross.";
 
 /** The last six months, newest first, as the month picker offers them. */
 export function recentMonths(today: string, count = 6): string[] {

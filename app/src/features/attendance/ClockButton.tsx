@@ -1,20 +1,29 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
-import type { AttendanceToday, LocationError, PunchCreate, PunchResult } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceToday, CheckInCreate, CheckInResult, LocationError, PunchCreate, PunchResult } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { useRealtime } from "@/api/realtime";
+import { useAuth, useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
-import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
+import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Menu, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
+import { checkInShown } from "./labels";
+import { fixFor, newKey, permission, secure, supported, useLocationReader, type Fix, type Reading } from "./location";
+import { claimSignIn, claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES, remindIn, type PromptKind } from "./prompts";
 
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
  * button (F18) both use useClock (docs/guides/attendance.md §10). The panel asks; the API decides.
- * It reads the location only after the person presses Clock In, and only when there is a place to
+ * It reads the location only after the person presses Clock In, through the feature's one reader
+ * (./location: up to ten seconds, the best fix, always ending), and only when there is a place to
  * match it to: a worksite, or for remote staff their approved home (asked too while they have none,
- * so People see where they were); every punch carries one Idempotency-Key, kept for a retry of the
- * same press, so a lost answer never makes a second punch. What the panel shows after a punch is
- * the server's.
+ * so People see where they were). A reading that cannot prove the place names the fix for this
+ * device (Precise Location Off, Use Your Phone, Location Blocked, Secure Address Needed) and offers
+ * Clock In Anyway. Every punch carries one Idempotency-Key, kept for a retry of the same press, so a
+ * lost answer never makes a second punch. What the panel shows after a punch is
+ * the server's. On a temporary site's day it names the site and its addresses, and once clocked in
+ * offers Check In at each stop (§6.12), which reads the location at the press and keeps its key and
+ * body for Try Again in the same way.
  */
 
 const PATTERN: Record<AttendanceToday["work_pattern"], string> = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" };
@@ -31,12 +40,66 @@ export function useClock() {
 }
 
 /**
- * Called once by the shell: a punch made on another device or decided by People refreshes the
- * state. When the panel opens by itself is Home's to decide (docs/guides/home.md §6 Clock-in
- * prompt): the Overview opens it with useClock().open.
+ * Called once by the shell: a punch made on another device or decided by People, or a System
+ * Clock-Out, refreshes the state. The prompts that open the panel by themselves are ClockPrompts'.
  */
 export function useClockSync() {
   useRealtime("attendance.updated", () => invalidate("/api/v1/attendance"));
+}
+
+/** How often an open app looks at the time for a prompt that has come due. */
+const PROMPT_CHECK_MS = 30_000;
+
+/**
+ * Rendered once by the shell, on both shells: opens the panel by itself on the first screen of the
+ * day's first sign-in, at the shift's start for someone not yet clocked in, and at its end for
+ * someone still clocked in, over a blurred screen (docs/guides/attendance.md §6.14; the rules in
+ * ./prompts). It looks every half minute and when
+ * the app comes to the front, on the server's clock, and never opens over a dialog that is open
+ * or a locked session: it waits until that one closes, so a half-filled form is never lost.
+ */
+export function ClockPrompts() {
+  const me = useMe();
+  const { status } = useAuth();
+  const { data: t } = useApi("GET /api/v1/attendance/me/today");
+  const modal = useModal();
+  const openPanel = useClockPanel();
+  const offset = useRef(0);
+  const latest = useRef({ t, busy: modal.isOpen || status !== "signed-in" });
+  latest.current = { t, busy: modal.isOpen || status !== "signed-in" };
+  useEffect(() => {
+    if (t) offset.current = Date.parse(t.server_time) - Date.now();
+  }, [t]);
+
+  const check = useCallback(() => {
+    const { t: today, busy } = latest.current;
+    if (!today || busy) return;
+    const now = new Date(Date.now() + offset.current);
+    if (today.sign_in_prompt && today.state === "not_clocked_in" && claimSignIn(me.user_id, today.date)) return openPanel("Clock In", "sign_in");
+    const kind = promptDue(today, now);
+    if (kind === "start" && claimStart(me.user_id, today.date)) openPanel("Clock In", "start");
+    else if (kind === "close" && closeDue(me.user_id, today.date, now)) {
+      // Until it is answered, closing it means the shortest Remind Me.
+      remindIn(me.user_id, today.date, now);
+      openPanel("Clock Out", "close");
+    }
+  }, [me.user_id, openPanel]);
+
+  useEffect(() => {
+    check();
+  }, [check, t, modal.isOpen, status]);
+  useEffect(() => {
+    const i = setInterval(check, PROMPT_CHECK_MS);
+    const front = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", front);
+    return () => {
+      clearInterval(i);
+      document.removeEventListener("visibilitychange", front);
+    };
+  }, [check]);
+  return null;
 }
 
 /** The desktop top bar's Clock In / Clock Out button. */
@@ -64,16 +127,22 @@ export function ClockButton({ compact }: { compact?: boolean }) {
   );
 }
 
+/**
+ * Opens the panel. As a prompt it must be answered, over a blurred screen: the scrim, Esc and a drag
+ * leave it open.
+ */
 function useClockPanel() {
   const modal = useModal();
-  return useCallback((title: string) => modal.open({ title, body: (close) => <ClockPanel close={close} /> }), [modal]);
+  return useCallback(
+    (title: string, prompt?: PromptKind) =>
+      modal.open({ title, dismissible: !prompt, blur: !!prompt, body: (close) => <ClockPanel close={close} prompt={prompt} /> }),
+    [modal],
+  );
 }
 
-type Fix = { latitude: number; longitude: number; accuracy_m: number };
 type Stage =
   | { kind: "ready" }
   | { kind: "ask" }
-  | { kind: "locating" }
   | { kind: "weak"; fix: Fix }
   | { kind: "no_location"; error: LocationError }
   | { kind: "sending"; body: PunchCreate; key: string }
@@ -81,17 +150,8 @@ type Stage =
   | { kind: "refused"; message: string }
   | { kind: "done"; res: PunchResult };
 
-const LOCATION_ERROR: Record<number, LocationError> = { 1: "denied", 2: "unavailable", 3: "timeout" };
-
-/** Has the person already let this site read their location? Then the browser will not ask again. */
-async function locationGranted(): Promise<boolean> {
-  try {
-    const p = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
-    return p?.state === "granted";
-  } catch {
-    return false;
-  }
-}
+/** No reading a retry could change: the browser has no location, or the page is not on its secure address. */
+const FINAL: ReadonlySet<LocationError> = new Set(["unsupported", "insecure"]);
 
 /** The workplace's wall clock, kept to the server's time rather than this device's. */
 function useServerClock(t: AttendanceToday | undefined) {
@@ -105,16 +165,25 @@ function useServerClock(t: AttendanceToday | undefined) {
     const i = setInterval(() => setNow(new Date(Date.now() + offset.current)), 15000);
     return () => clearInterval(i);
   }, []);
-  return t ? zoneClock(now, t.timezone) : null;
+  return t ? { ...zoneClock(now, t.timezone), at: now } : null;
 }
 
-function ClockPanel({ close }: { close: () => void }) {
+function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind }) {
   const { navigate } = useRouter();
+  const me = useMe();
   const { data: t, error, reload } = useApi("GET /api/v1/attendance/me/today");
   const [stage, setStage] = useState<Stage>({ kind: "ready" });
   const inFlight = useRef(false);
+  // The reading runs while the panel stays answerable; what it found is handled below, once the day is read.
+  const afterRead = useRef<(r: Reading) => void>(() => undefined);
+  const reader = useLocationReader((r) => afterRead.current(r));
+  const locating = reader.reading;
   const clock = useServerClock(t);
   const toDevices = () => (close(), navigate(hrefFor("ess", "my-devices")));
+  // Shown since the start: the start prompt has nothing left to do today on this device.
+  useEffect(() => {
+    if (t) noteShown(me.user_id, t, new Date(t.server_time));
+  }, [t, me.user_id]);
 
   if (error && !t) {
     return (
@@ -174,26 +243,30 @@ function ClockPanel({ close }: { close: () => void }) {
   };
 
   const punch = (where: Partial<Pick<PunchCreate, "latitude" | "longitude" | "accuracy_m" | "location_error">> = {}) =>
-    send({ event_type: eventType, device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, ...where }, crypto.randomUUID());
+    send({ event_type: eventType, device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, ...where }, newKey());
 
-  const locate = () => {
-    if (!navigator.geolocation) return setStage({ kind: "no_location", error: "unsupported" });
-    setStage({ kind: "locating" });
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) };
-        if (fix.accuracy_m > t.policy.max_accuracy_m) setStage({ kind: "weak", fix });
-        else punch(fix);
-      },
-      (e) => setStage({ kind: "no_location", error: LOCATION_ERROR[e.code] ?? "unavailable" }),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+  // A fix fine enough is sent at once; a rough one, or none, waits on the person with its fix.
+  afterRead.current = (r) => {
+    if (r.error) setStage({ kind: "no_location", error: r.error });
+    else if (r.fix.accuracy_m > t.policy.max_accuracy_m) setStage({ kind: "weak", fix: r.fix });
+    else punch(r.fix);
   };
 
-  /** The press: the location is read now, after saying why, and the server matches it (or keeps it for People). */
+  const locate = () => {
+    setStage({ kind: "ready" });
+    reader.read();
+  };
+
+  /**
+   * The press: the location is read now, after saying why, and the server matches it (or keeps it
+   * for People). Blocked, the browser will not ask, so the panel says how to allow it instead.
+   */
   const start = async () => {
-    if (await locationGranted()) return locate();
-    setStage({ kind: "ask" });
+    if (!secure()) return setStage({ kind: "no_location", error: "insecure" });
+    if (!supported()) return setStage({ kind: "no_location", error: "unsupported" });
+    const allowed = await permission();
+    if (allowed === "granted") return locate();
+    setStage(allowed === "denied" ? { kind: "no_location", error: "denied" } : { kind: "ask" });
   };
 
   if (stage.kind === "done") return <PunchDone res={stage.res} close={close} again={() => setStage({ kind: "ready" })} toDevices={toDevices} />;
@@ -228,6 +301,8 @@ function ClockPanel({ close }: { close: () => void }) {
         ? `Approved Home · ${t.location.radius_m} m`
         : t.location.kind === "temporary_home"
           ? `Temporary Home · ${t.location.radius_m} m`
+          : t.location.kind === "temporary_site"
+            ? (t.location.name ?? "Temporary Site")
           : t.location.kind === "approved_day"
             ? (t.location.name ?? "Approved Request")
             : t.location.kind === "field" || t.location.kind === "client_visit"
@@ -236,7 +311,7 @@ function ClockPanel({ close }: { close: () => void }) {
               ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
               : "No Office Assigned";
   const punchName = eventType === "clock_out" ? "clock-out" : "clock-in";
-  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home", client_visit: "the client's site" };
+  const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home", client_visit: "the client's site", temporary_site: "the site's nearest address" };
   const askText =
     t.location.kind === "remote" || t.location.kind === "none"
       ? `Your ${punchName} goes to People with your location.`
@@ -252,20 +327,27 @@ function ClockPanel({ close }: { close: () => void }) {
         ? "Punches from a device you have not registered go to People for review. Register up to three in My Devices."
         : "Register up to three devices you clock in from in My Devices.";
 
+  // The fix for this device when the reading could not prove the place (§6.5): a banner of its own.
+  const fix = locating ? null : stage.kind === "weak" ? fixFor({ error: null, accuracy_m: stage.fix.accuracy_m }) : stage.kind === "no_location" ? fixFor({ error: stage.error }) : null;
   let step;
-  if (stage.kind === "ask") step = <Result tone="info" label="Location Check" title="Share Your Location" text={askText} icon="target" />;
-  else if (stage.kind === "locating") step = <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />;
+  if (locating) step = <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location if your browser asks." icon="target" />;
+  else if (stage.kind === "ask") step = <Result tone="info" label="Location Check" title="Share Your Location" text={askText} icon="target" />;
+  else if (fix)
+    step = (
+      <Banner tone="warn" icon="target">
+        <b>{fix.title}</b>: {fix.text}
+      </Banner>
+    );
   else if (stage.kind === "weak") step = <Result tone="warn" label="Location Check" title="Weak Location Signal" text={`Accurate to about ${stage.fix.accuracy_m} m. Move near a window, then retry.`} icon="target" />;
   else if (stage.kind === "no_location")
     step =
-      stage.error === "denied" ? (
-        <Result tone="warn" label="Location Check" title="Location Is Off" text="Allow location for this site in your browser settings, then retry." icon="target" />
-      ) : stage.error === "unsupported" ? (
+      stage.error === "unsupported" ? (
         <Result tone="warn" label="Location Check" title="No Location Support" text="This browser cannot share a location." icon="target" />
       ) : (
         <Result tone="warn" label="Location Check" title="Location Not Found" text="Move near a window or outside, then retry." icon="target" />
       );
   else if (stage.kind === "sending") step = <Result tone="info" label={verb} title="Processing" icon="clock" />;
+  const idle = stage.kind === "ready" && !locating;
 
   const statePill =
     t.state === "clocked_in" ? (
@@ -279,7 +361,12 @@ function ClockPanel({ close }: { close: () => void }) {
   if (t.state === "clocked_out") {
     return (
       <>
-        <Result tone={t.review ? "warn" : "ok"} label={t.review ? "Review Required" : "Day Complete"} title={`${formatTime(t.clock_in_at)} to ${formatTime(t.clock_out_at)}`} text={formatDate(t.date)} />
+        <Result
+          tone={t.review ? "warn" : t.clock_out_automatic ? "info" : "ok"}
+          label={t.review ? "Review Required" : t.clock_out_automatic ? "System Clock-Out" : "Day Complete"}
+          title={`${formatTime(t.clock_in_at)} to ${formatTime(t.clock_out_at)}`}
+          text={formatDate(t.date)}
+        />
         <FormFooter>
           <Button onClick={() => (close(), navigate(hrefFor("ess", "my-attendance")))}>My Attendance</Button>
           <Button variant="primary" onClick={close}>Close</Button>
@@ -288,15 +375,37 @@ function ClockPanel({ close }: { close: () => void }) {
     );
   }
 
-  const primary =
-    stage.kind === "ask" ? (
-      <Button variant="primary" icon="target" onClick={locate}>Allow Location</Button>
-    ) : stage.kind === "weak" || stage.kind === "no_location" ? (
-      <Button variant="primary" icon="refresh" onClick={locate}>Retry Location</Button>
+  // While it reads, only Not Now: the reading ends by itself, and nothing holds the panel open meanwhile.
+  const finalError = stage.kind === "no_location" && FINAL.has(stage.error) ? stage.error : null;
+  const primary = locating ? null : stage.kind === "ask" ? (
+    <Button variant="primary" icon="target" onClick={locate}>Allow Location</Button>
+  ) : finalError ? (
+    <Button variant="primary" icon="clock" onClick={() => punch({ location_error: finalError })}>{`${verb} Anyway`}</Button>
+  ) : stage.kind === "weak" || stage.kind === "no_location" ? (
+    <Button variant="primary" icon="refresh" onClick={locate}>Retry Location</Button>
+  ) : (
+    <Button variant="primary" icon="clock" busy={stage.kind === "sending"} onClick={() => start()}>
+      {verb}
+    </Button>
+  );
+
+  /** At the shift's end: bring the prompt back later instead of clocking out now. */
+  const remindLater = (minutes: number) => {
+    const now = clock.at;
+    remindIn(me.user_id, t.date, now, minutes);
+    close();
+    toast(`Reminder set for ${formatTime(new Date(now.getTime() + minutes * 60_000).toISOString())}`);
+  };
+  const later =
+    prompt === "close" && eventType === "clock_out" ? (
+      <Menu
+        label="Remind Me"
+        align="start"
+        trigger={(p) => <Button {...p} icon="bell">Remind Me</Button>}
+        items={REMIND_CHOICES.map((m) => ({ label: m === 60 ? "In 1 Hour" : `In ${m} Minutes`, icon: "clock" as const, onSelect: () => remindLater(m) }))}
+      />
     ) : (
-      <Button variant="primary" icon="clock" busy={stage.kind === "sending" || stage.kind === "locating"} onClick={() => start()}>
-        {verb}
-      </Button>
+      <Button onClick={close}>Not Now</Button>
     );
 
   return (
@@ -310,17 +419,17 @@ function ClockPanel({ close }: { close: () => void }) {
         <div className="mt-2">{statePill}</div>
       </div>
       {step && <div className="mb-3">{step}</div>}
-      {t.location.kind === "remote" && stage.kind === "ready" && (
+      {t.location.kind === "remote" && idle && (
         <Banner tone="warn" icon="home" action={t.location.home_state === "none" ? <Button size="sm" onClick={toHome}>Set Home</Button> : undefined}>
           {t.location.home_state === "pending" ? "Your home location is waiting for approval." : "No approved home location yet."}
         </Banner>
       )}
-      {t.location.kind === "none" && stage.kind === "ready" && (
+      {t.location.kind === "none" && idle && (
         <Banner tone="warn" icon="pin">
           No office assigned yet.
         </Banner>
       )}
-      {unregistered && t.policy.device_mode !== "off" && stage.kind === "ready" && (
+      {unregistered && t.policy.device_mode !== "off" && idle && (
         <Banner tone={t.policy.device_mode === "block" ? "err" : "warn"} icon="lock" action={t.device.can_register ? <Button size="sm" onClick={toDevices}>Register Device</Button> : undefined}>
           {t.policy.device_mode === "block" ? "Register this device to clock in." : "This device is not registered."}
         </Banner>
@@ -331,6 +440,12 @@ function ClockPanel({ close }: { close: () => void }) {
             ["Shift", t.shift.working_day && t.shift.starts_at ? `${t.shift.starts_at} to ${t.shift.ends_at}${t.shift.grace_minutes ? `, ${t.shift.grace_minutes} min grace` : ""}` : (t.shift.off_reason ?? "Day Off")],
             ["Work Arrangement", PATTERN[t.work_pattern]],
             [<HelpTerm key="l" help="Your punch is matched to this place. Inside the circle counts as on site.">Clock Location</HelpTerm>, fence],
+            ...(t.temporary_site
+              ? ([
+                  ["Temporary Site", t.temporary_site.number],
+                  [t.temporary_site.locations.length === 1 ? "Address" : "Addresses", t.temporary_site.locations.map((l) => `${l.name ?? l.address ?? `Address ${l.position}`} · ${l.radius_m} m`).join("; ")],
+                ] as Array<[string, string]>)
+              : []),
             [
               <HelpTerm key="d" help={deviceHelp}>This Device</HelpTerm>,
               <Pill key="dv" tone={unregistered ? (t.policy.device_mode === "off" ? "neutral" : "warn") : "ok"}>{unregistered ? "Not Registered" : "Registered"}</Pill>,
@@ -338,17 +453,99 @@ function ClockPanel({ close }: { close: () => void }) {
           ]}
         />
       </Card>
+      {t.state === "clocked_in" && t.temporary_site && idle && <CheckInStep t={t} />}
       <FormFooter>
         {stage.kind === "weak" ? (
           <Button onClick={() => punch(stage.fix)}>{`${verb} Anyway`}</Button>
-        ) : stage.kind === "no_location" ? (
+        ) : stage.kind === "no_location" && !finalError ? (
           <Button onClick={() => punch({ location_error: stage.error })}>{`${verb} Anyway`}</Button>
         ) : (
-          <Button onClick={close}>Not Now</Button>
+          later
         )}
         {primary}
       </FormFooter>
     </>
+  );
+}
+
+type CheckInStage =
+  | { kind: "ready" }
+  | { kind: "sending" }
+  | { kind: "done"; res: CheckInResult }
+  | { kind: "lost"; body: CheckInCreate; key: string }
+  | { kind: "refused"; message: string };
+
+/**
+ * Check In, on a temporary site's day once clocked in (§6.12): one press reads the location through
+ * the same reader as a punch and sends it with a new Idempotency-Key; a lost answer keeps that key
+ * and body for Try Again, so it never records twice. The server matches it to the nearest address;
+ * it never touches the shift. Under it, the day's check-ins so far.
+ */
+function CheckInStep({ t }: { t: AttendanceToday }) {
+  const [stage, setStage] = useState<CheckInStage>({ kind: "ready" });
+  const send = async (body: CheckInCreate, key: string) => {
+    setStage({ kind: "sending" });
+    try {
+      const res = await api.call("POST /api/v1/attendance/check-ins", { body, idempotencyKey: key });
+      invalidate("/api/v1/attendance");
+      setStage({ kind: "done", res });
+    } catch (e) {
+      const err = e instanceof ApiError ? e : new ApiError(0, null);
+      if (err.status === 0 || err.status >= 500 || err.code === "IDEMPOTENCY_IN_PROGRESS") setStage({ kind: "lost", body, key });
+      else setStage({ kind: "refused", message: err.message });
+    }
+  };
+  // Whatever the reading found is sent: the server records a rough or missing one as Location Unclear.
+  const reader = useLocationReader((at) =>
+    send(
+      {
+        device_at: new Date().toISOString(),
+        latitude: at.fix?.latitude ?? null,
+        longitude: at.fix?.longitude ?? null,
+        accuracy_m: at.fix?.accuracy_m ?? null,
+        ...(at.error && { location_error: at.error }),
+      },
+      newKey(),
+    ),
+  );
+  const flagged = stage.kind === "done" && stage.res.check_in.flagged;
+  return (
+    <div className="mt-3">
+      {stage.kind === "done" && (
+        <Banner tone={flagged ? "warn" : "ok"} icon="pin">
+          {stage.res.message}
+        </Banner>
+      )}
+      {stage.kind === "refused" && (
+        <Banner tone="err" icon="pin">
+          {stage.message}
+        </Banner>
+      )}
+      {stage.kind === "lost" ? (
+        <Banner tone="err" icon="offline" action={<Button size="sm" icon="refresh" onClick={() => send(stage.body, stage.key)}>Try Again</Button>}>
+          Check-in not sent yet.
+        </Banner>
+      ) : reader.reading ? (
+        <Result tone="info" label="Check In" title="Finding Your Location" icon="target" />
+      ) : (
+        <Button block icon="pin" busy={stage.kind === "sending"} onClick={reader.read}>
+          Check In
+        </Button>
+      )}
+      {t.check_ins.length > 0 && (
+        <Card className="mt-3">
+          <KeyValue
+            items={t.check_ins.map((c) => [
+              formatTime(c.occurred_at),
+              <span key={c.attendance_check_in_id} className="flex flex-wrap items-center gap-2">
+                <span data-copy="content">{c.address ? `${c.location_name}, ${c.address}` : c.location_name}</span>
+                <Pill tone={checkInShown(c).tone}>{checkInShown(c).text}</Pill>
+              </span>,
+            ])}
+          />
+        </Card>
+      )}
+    </div>
   );
 }
 

@@ -38,7 +38,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F26, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F27, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -53,7 +53,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
-   frontend gates), decisions F1 to F26 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   frontend gates), decisions F1 to F27 in `docs/FRONTEND_FOUNDATION.md` §3 win over
    `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
 4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
 5. `README.MD` is the map of every file.
@@ -68,6 +68,11 @@ silently.
   `src/shared/http/paged.js` (`pageQuery`, `sendPaged`). No `LIMIT`/`OFFSET` in a repo, no
   page-size parameter in the contract or the frontend. The AI reads in pages of 25 too.
 - **AI reads, never writes** (A23). Manifests declare reads and screen routes only.
+- **Every AI feature names its job** (`docs/guides/ai-control.md` §6.2: Default, Fast, Deep
+  Reasoning, Image Reading, Transcription, Embeddings, Top Tier). Before building one, ask the person
+  which job it uses, your recommendation first, and register the action with who chose it. Top Tier
+  is only for long drafting from many sources, never work Default or Deep Reasoning can do. No
+  personal data goes to DeepSeek. Permissions are checked by code, never by a model.
 - **One write path**: every write goes through the owning module's service, in a transaction,
   with `emit()`. Follow-on work is an outbox handler.
 - **Contract**: every request and response shape is a Zod schema in `packages/contract`,
@@ -85,6 +90,12 @@ silently.
 - **Search reaches everything.** Every new screen, action and record type is findable from ⌘K
   (its module's `.search.js`, the route map, the screen's New action), or carries
   `search:none <reason>`; the search coverage gate fails it otherwise (`docs/guides/foundation.md` §6.7).
+- **Addresses are picked, never typed** (F27, gate 22; TB, 20/10/2026). Every address or location a
+  person enters, on hub and go, live and staging, is an `AddressField` (a `PlacesField` for a list
+  of cities) bound to the contract's `PlaceInput` and saved with `places.save()` in the owning
+  service. The API takes only a place our search or pin signed, or the device's location while
+  address search is down. No free address field, anywhere; a new one is a new owner
+  (`docs/guides/addresses.md` §6.9).
 - **Three tiers of screen text** (FRONTEND_GUIDE §5, gate 8). Operational content is open. Support
   text sits behind a help term (hover on desktop, tap on a phone) or a Details row, closed by
   default. How the system works or why it was built never reaches a screen: no explainer cards
@@ -154,6 +165,14 @@ A task is not finished until:
 - When you do ask a question or surface a decision, use the AskUserQuestion tool, not prose, unless
   the person asks for the answer in chat or requests Markdown. Always include a recommendation: put
   the recommended option first and mark it `(Recommended)`.
+- **Work in the foreground, and stay fast.** Read, search and edit in the session itself, and send
+  independent tool calls together so they run at once. Spawn subagents only when the work is too
+  broad for one context or gains real coverage from parallel readers (a whole-module audit, a sweep
+  of large transcripts); then start them together in one message, in the foreground
+  (`run_in_background: false`), and bring their findings into the chat. Never run the same search
+  here and in an agent. A background agent or a Workflow is for work long enough that waiting would
+  block the person; say so when you start one. Slower in the foreground is fine; work lost with a
+  session that ends is not.
 
 Team: GE Godwin-Okoh Elisha (architecture, M0, M3, M7, M9, community and mailbox) · TB Tom-Blake
 Asaah (Home, M4, M10, M11) · LA Love Adeola (migrations and data, attendance, M5, M6) · AJ Adole

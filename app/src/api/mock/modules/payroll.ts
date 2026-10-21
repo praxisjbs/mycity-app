@@ -1,5 +1,5 @@
 import type { Grade, PayrollDeduction, RunRow, Statutory } from "@/api/types/payroll";
-import type { Status } from "@/api/types/shared";
+import type { Status } from "@/api/types/performance";
 import { accepted, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid } from "../core";
 import { byId, byKey, PEOPLE, refKey, SIGN_INS } from "../data/people";
 import { kobo, money, SLIPS } from "../data/payroll";

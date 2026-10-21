@@ -1,0 +1,14 @@
+# Starts mycity-host-stats.service two minutes after boot and every 15 minutes after that, so
+# Settings · Performance's disk card is never more than a quarter hour behind.
+# Next run:  systemctl list-timers mycity-host-stats.timer
+
+[Unit]
+Description=MyCity host figures every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target

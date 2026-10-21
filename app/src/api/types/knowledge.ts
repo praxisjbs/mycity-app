@@ -1,6 +1,6 @@
 import type { IsoDate, IsoDateTime, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
-import type { Status } from "./shared";
+import type { Status } from "./performance";
 
 /** INTERIM Knowledge Hub and Praxis AI shapes (owner AJ; MILESTONES §14, §15). */
 export type ArticleKind = "policy" | "sop";

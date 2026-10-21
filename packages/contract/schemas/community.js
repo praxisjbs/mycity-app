@@ -13,7 +13,8 @@
 const { z } = require("zod");
 const { uuid, text, optionalText, isoDateTime, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
-const { DocumentRef } = require("./documents");
+const { MediaRef } = require("./documents");
+const { NotificationUrgency } = require("./notifications");
 
 /** Who may post in a channel, fixed when it is created (§6). */
 const POST_POLICIES = ["everyone", "admins", "people_ceo"];
@@ -92,6 +93,14 @@ const ChannelCreate = z
   })
   .strict();
 
+/** PUT /community/channels/:id: an admin renames it and sets its description; a blank one clears it. */
+const ChannelUpdate = z
+  .object({
+    name: ChannelName,
+    description: optionalText(300),
+  })
+  .strict();
+
 /** A member of a channel. */
 const Member = z
   .object({
@@ -135,6 +144,28 @@ const DeliveredAck = z.object({ up_to: isoDateTime }).strict();
 
 const PollOption = z.object({ text: z.string(), votes: z.number().int().min(0) }).strict();
 
+/**
+ * A link's card (community.md §3 step 18): what the page says about itself, fetched by the
+ * server once a week per address. `url` is the link as posted, normalised; `site_name` is
+ * the page's own, else its host; `image` is the page's picture, copied into the vault.
+ */
+const LinkPreview = z
+  .object({
+    community_link_preview_id: uuid,
+    url: z.string(),
+    site_name: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    image: MediaRef.nullable(),
+  })
+  .strict();
+
+/** POST /community/link-previews: the composer asks for the card of the first link it holds. */
+const LinkPreviewRequest = z.object({ url: z.string().trim().min(4).max(2048) }).strict();
+
+/** The card, or null when the page offers none, cannot be reached, or is not on the public web. */
+const LinkPreviewAnswer = z.object({ preview: LinkPreview.nullable() }).strict();
+
 /** One message, for the caller. The block that matches message_type is set; the rest are null. */
 const Message = z
   .object({
@@ -145,7 +176,10 @@ const Message = z
     mine: z.boolean(),
     sent_at: isoDateTime,
     body: z.string().nullable(),
-    document: DocumentRef.nullable(),
+    document: MediaRef.nullable(),
+    album_key: uuid.nullable(),
+    link: LinkPreview.nullable(),
+    forwarded: z.boolean(),
     duration_s: z.number().int().min(0).nullable(),
     transcript: z.string().nullable(),
     celebration: z
@@ -171,13 +205,29 @@ const Message = z
       })
       .strict()
       .nullable(),
-    announcement: z.object({ announcement_id: uuid, title: z.string() }).strict().nullable(),
+    /**
+     * The announcement this message publishes. An urgent one waits on the caller's Acknowledge when
+     * they are in its audience (`in_audience`) and `acknowledged_at` is still null.
+     */
+    announcement: z
+      .object({
+        announcement_id: uuid,
+        title: z.string(),
+        urgency: NotificationUrgency,
+        in_audience: z.boolean(),
+        acknowledged_at: isoDateTime.nullable(),
+      })
+      .strict()
+      .nullable(),
     status: MessageStatus.nullable(),
     deleted: z.boolean(),
     edited_at: isoDateTime.nullable(),
     can_edit: z.boolean(),
     can_delete: z.boolean(),
     can_close: z.boolean(),
+    /** While it is pinned at the top of the conversation; null once that time has passed. */
+    pinned_until: isoDateTime.nullable(),
+    can_pin: z.boolean(),
   })
   .strict();
 
@@ -190,9 +240,11 @@ const MessagePage = Paged(Message);
 
 /**
  * POST /community/channels/:id/messages.
- *   text            body
+ *   text            body; no_link_preview when the sender removed the first link's card
  *   image, audio, video, file   document_id (uploaded first), body optional as a caption;
- *                   audio carries duration_s
+ *                   audio carries duration_s, and captions when the sender's browser wrote
+ *                   them while recording (kept only as the transcript's last resort,
+ *                   docs/guides/integrations.md §1.2 decision 8); album_key on files sent together
  *   poll            body is the question, options 2 to 4
  *   birthday, anniversary   subject_employee_id: a celebration card posted by hand
  */
@@ -202,8 +254,11 @@ const MessageCreate = z
     body: optionalText(4000),
     document_id: uuid.optional(),
     duration_s: z.number().int().min(1).max(300).optional(),
+    captions: optionalText(10000),
     options: z.array(text(80)).min(2).max(4).optional(),
     subject_employee_id: uuid.optional(),
+    album_key: uuid.optional(),
+    no_link_preview: z.boolean().optional(),
   })
   .strict()
   .superRefine((b, ctx) => {
@@ -236,10 +291,21 @@ const MessageEdit = z
   })
   .strict();
 
+/** PUT /community/messages/:id/pin: how long it stays at the top (§3 step 16). */
+const PIN_PERIODS = ["24h", "7d", "30d"];
+const MessagePin = z.object({ period: z.enum(PIN_PERIODS) }).strict();
+
+/** GET /community/channels/:id/pins: what is pinned now, newest pin first (at most 3). */
+const PinListQuery = listQuery();
+
 const PollVote = z.object({ option_index: z.number().int().min(0).max(3) }).strict();
 
-/** POST /community/messages/:id/transcript. */
-const Transcript = z.object({ transcript: z.string() }).strict();
+/**
+ * POST /community/messages/:id/transcript. `draft` is the browser's own captions, shown when
+ * neither Groq nor Gemini could answer and never kept as the transcript: the next request asks
+ * them again.
+ */
+const Transcript = z.object({ transcript: z.string(), draft: z.boolean() }).strict();
 
 /* ------------------------------------------------------------------ *
  * Direct messages
@@ -276,6 +342,64 @@ const DirectCreate = z.object({ employee_id: uuid }).strict();
 const ColleagueListQuery = listQuery({ with_self: z.coerce.boolean().optional() });
 const ColleaguePage = Paged(PersonRef);
 
+/* ------------------------------------------------------------------ *
+ * Forwarding (§3 step 19)
+ * ------------------------------------------------------------------ */
+
+/** The kinds of message that may be forwarded: words, files and voice notes. */
+const FORWARDABLE = ["text", "image", "audio", "video", "file"];
+/** At most this many messages, and this many chats, in one forward. */
+const MAX_FORWARD_MESSAGES = 25;
+const MAX_FORWARD_CHATS = 5;
+
+/**
+ * GET /community/forward-targets: where the caller may forward to. A `channel` or `direct`
+ * conversation they are in carries its `community_channel_id`; a `person` is a colleague with
+ * no conversation yet, by `employee_id` (forwarding starts one). `person` is the other member of
+ * a direct conversation, or the colleague.
+ */
+const ForwardTarget = z
+  .object({
+    kind: z.enum(["channel", "direct", "person"]),
+    community_channel_id: uuid.nullable(),
+    employee_id: uuid.nullable(),
+    name: z.string(),
+    person: PersonRef.nullable(),
+    members: z.number().int().min(0).nullable(),
+    is_self: z.boolean(),
+  })
+  .strict();
+const ForwardTargetQuery = listQuery();
+const ForwardTargetPage = Paged(ForwardTarget);
+
+/**
+ * POST /community/forward: messages (in the order they were sent), or one mail attachment, to
+ * up to 5 chats: conversations by `channel_ids`, colleagues by `employee_ids`.
+ */
+const ForwardRequest = z
+  .object({
+    message_ids: z.array(uuid).min(1).max(MAX_FORWARD_MESSAGES).optional(),
+    mail_attachment_id: uuid.optional(),
+    channel_ids: z.array(uuid).max(MAX_FORWARD_CHATS).optional(),
+    employee_ids: z.array(uuid).max(MAX_FORWARD_CHATS).optional(),
+  })
+  .strict()
+  .superRefine((b, ctx) => {
+    const issue = (key, message) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message });
+    if (Boolean(b.message_ids) === Boolean(b.mail_attachment_id)) issue("message_ids", "Choose what to forward");
+    const chats = new Set([...(b.channel_ids ?? []), ...(b.employee_ids ?? [])]).size;
+    if (chats === 0) issue("channel_ids", "Choose a chat");
+    if (chats > MAX_FORWARD_CHATS) issue("channel_ids", "At most 5 chats");
+  });
+
+/** What a forward did: how many messages it posted, and in which conversations. */
+const ForwardResult = z
+  .object({
+    sent: z.number().int().min(1),
+    community_channel_ids: z.array(uuid).min(1).max(MAX_FORWARD_CHATS),
+  })
+  .strict();
+
 /** GET /community/people/:id/card: the profile panel (§3 step 8). */
 const ProfileCard = z
   .object({
@@ -286,7 +410,7 @@ const ProfileCard = z
     worksite: z.string().nullable(),
     online: z.boolean(),
     last_seen_at: isoDateTime.nullable(),
-    shared_files: z.array(DocumentRef).max(25),
+    shared_files: z.array(MediaRef).max(25),
     voice_notes: z.number().int().min(0),
     shared_channels: z.array(z.string()).max(25),
   })
@@ -311,6 +435,7 @@ const TABLES = {
   },
   ChannelListQuery: { table: null, reason: "list controls for the caller's channels" },
   ChannelPage: { table: null, reason: "a page of channels" },
+  ChannelUpdate: { table: "community_channel" },
   ChannelCreate: {
     table: "community_channel",
     virtual: {
@@ -334,12 +459,21 @@ const TABLES = {
   PinSet: { table: null, reason: "sets community_member.pinned_at for the caller" },
   DeliveredAck: { table: null, reason: "moves the caller's community_member.last_delivered_at" },
   PollOption: { table: null, reason: "one option of a poll, its text from metadata and its votes counted" },
+  LinkPreview: {
+    table: "community_link_preview",
+    virtual: { image: "the page's picture, a vault document from image_document_id, as a MediaRef" },
+  },
+  LinkPreviewRequest: { table: null, reason: "the link a composer asks a card for" },
+  LinkPreviewAnswer: { table: null, reason: "the card for a link, or null when the page offers none" },
   Message: {
     table: "community_message",
     virtual: {
       author: "the sender's employee, as a PersonRef with their photo_url; null for a system post",
       mine: "whether the caller sent it",
-      document: "the attached file, from document",
+      document: "the attached file, from document, as a MediaRef with its shape and derived sizes",
+      album_key: "files sent together share it, kept in metadata",
+      link: "the first link's card, from community_link_preview by community_link_preview_id",
+      forwarded: "whether it is a forwarded copy, from metadata",
       duration_s: "a voice note's length, from metadata",
       celebration: "a birthday or anniversary card: its person (a PersonRef with photo_url) from metadata, reactions counted",
       recognition: "a recognition card: who it recognises (a PersonRef with photo_url) from peer_recognition, reactions counted",
@@ -350,8 +484,14 @@ const TABLES = {
       can_edit: "whether the caller may edit it now: the author, text within 15 minutes or a poll before its first vote",
       can_delete: "whether the caller may delete it: the author or a moderator, never an announcement's post",
       can_close: "whether the caller may close it: an open poll, by its author or a moderator",
+      can_pin: "whether the caller may pin or unpin it: a moderator in a channel, either person in a direct conversation",
     },
   },
+  MessagePin: {
+    table: null,
+    reason: "a pin's period, written as community_message.pinned_until",
+  },
+  PinListQuery: { table: null, reason: "list controls for a conversation's pins" },
   MessageListQuery: { table: null, reason: "list controls for a conversation's messages" },
   MessageEdit: {
     table: "community_message",
@@ -362,13 +502,16 @@ const TABLES = {
     table: "community_message",
     virtual: {
       duration_s: "a voice note's length, kept in metadata",
+      captions: "what the sender's browser heard while recording, kept in metadata",
       options: "a poll's options, kept in metadata",
       subject_employee_id: "the person a celebration card is for, kept in metadata",
+      album_key: "files sent together share it, kept in metadata",
+      no_link_preview: "the sender removed the first link's card, kept in metadata",
     },
   },
   RecognitionCreate: { table: "peer_recognition" },
   PollVote: { table: "community_poll_vote" },
-  Transcript: { table: "community_message" },
+  Transcript: { table: "community_message", virtual: { draft: "the browser's captions, not a stored transcript" } },
   Conversation: {
     table: null,
     reason: "a direct community_channel as the caller's list shows it: the other person (with photo_url) and the latest message",
@@ -378,6 +521,14 @@ const TABLES = {
   DirectCreate: { table: null, reason: "the colleague to talk to; becomes a direct community_channel and two members" },
   ColleagueListQuery: { table: null, reason: "list controls for the colleague picker, and whether to offer the caller" },
   ColleaguePage: { table: null, reason: "a page of colleagues, each a PersonRef with their photo_url" },
+  ForwardTarget: {
+    table: null,
+    reason: "a conversation the caller may post in (community_channel), or a colleague with no conversation yet (employee)",
+  },
+  ForwardTargetQuery: { table: null, reason: "list controls for the Forward To sheet" },
+  ForwardTargetPage: { table: null, reason: "a page of places to forward to" },
+  ForwardRequest: { table: null, reason: "what to forward and where; becomes a community_message in each chat" },
+  ForwardResult: { table: null, reason: "how many messages a forward posted, and where" },
   ProfileCard: {
     table: null,
     reason: "a colleague's public work details and photo_url from employee, with what this conversation shares",
@@ -398,6 +549,7 @@ module.exports = {
   ChannelPage,
   ChannelName,
   ChannelCreate,
+  ChannelUpdate,
   Member,
   MemberListQuery,
   MemberPage,
@@ -408,12 +560,18 @@ module.exports = {
   PinSet,
   DeliveredAck,
   PollOption,
+  LinkPreview,
+  LinkPreviewRequest,
+  LinkPreviewAnswer,
   Message,
   MessageListQuery,
   MessagePage,
   MessageCreate,
   RecognitionCreate,
   MessageEdit,
+  PIN_PERIODS,
+  MessagePin,
+  PinListQuery,
   PollVote,
   Transcript,
   Conversation,
@@ -422,5 +580,13 @@ module.exports = {
   DirectCreate,
   ColleagueListQuery,
   ColleaguePage,
+  FORWARDABLE,
+  MAX_FORWARD_MESSAGES,
+  MAX_FORWARD_CHATS,
+  ForwardTarget,
+  ForwardTargetQuery,
+  ForwardTargetPage,
+  ForwardRequest,
+  ForwardResult,
   ProfileCard,
 };

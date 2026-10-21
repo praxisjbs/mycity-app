@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { HomeReport, HomeReportFormat, HomeReportRun, HomeReportSummary } from "@mycity/contract/contract.gen.ts";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { saveFile } from "@/api/download";
+import { saveRun } from "@/api/exports";
 import { useApi, useMutation, usePaged, type PagedResult } from "@/api/hooks";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
@@ -113,21 +114,30 @@ export function FormatButton({ label, formats, busy, onRun, item, size = "sm" }:
   );
 }
 
-/** Run Now: one file of the report for the reader, toasted with its number ("RPT-0215 queued"). */
+/**
+ * Run Now: one file of the report for the reader, waited on and downloaded here, toasted with
+ * its number ("RPT-0215 downloaded"). It waits in Recent Runs as Pending meanwhile.
+ */
 function RunNow({ report }: { report: HomeReport }) {
   const run = useMutation("POST /api/v1/home/reports/:id/run");
+  const [waiting, setWaiting] = useState(false);
   const go = async (format: HomeReportFormat) => {
+    setWaiting(true);
     try {
       // A key per press, so a request sent again is the same press. Pressed again while its file
       // waits, the server answers the same run.
-      const res = await run.run({ params: { id: report.saved_report_id }, body: { format }, idempotencyKey: crypto.randomUUID() });
+      const asked = run.run({ params: { id: report.saved_report_id }, body: { format }, idempotencyKey: crypto.randomUUID() });
+      void asked.then(() => refreshReports(), () => undefined);
+      const { run: done, saved } = await saveRun(asked, (id) => api.call("GET /api/v1/home/report-runs/:id", { params: { id } }));
       refreshReports();
-      toast(`${res.number} queued`);
+      if (saved) toast(`${done.number} downloaded`);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Report not run. Try again.");
+    } finally {
+      setWaiting(false);
     }
   };
-  return <FormatButton label="Run Now" formats={runFormats(report)} busy={run.pending} onRun={(format) => void go(format)} item={(format) => `Run as ${format}`} />;
+  return <FormatButton label="Run Now" formats={runFormats(report)} busy={run.pending || waiting} onRun={(format) => void go(format)} item={(format) => `Run as ${format}`} />;
 }
 
 interface ReportActions {

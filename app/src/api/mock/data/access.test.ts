@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CAPABILITIES, capabilitiesOf, ROLE_CAPABILITIES } from "./access";
 
 const HOME = ["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"];
-const EVERY = [...HOME, "mailbox.signature"];
+const EVERY = [...HOME, "mailbox.signature", "policies.manage"];
 
 describe("mock capabilities", () => {
   it("the catalogue is the seeded one, A to Z", () => {
@@ -11,7 +11,8 @@ describe("mock capabilities", () => {
 
   it("each role holds what the reference seeds give it", () => {
     expect(capabilitiesOf(["implementation"], false)).toEqual(EVERY);
-    for (const role of ["operations_people", "management"]) expect(capabilitiesOf([role], false)).toEqual(HOME);
+    expect(capabilitiesOf(["operations_people"], false)).toEqual([...HOME, "policies.manage"]);
+    expect(capabilitiesOf(["management"], false)).toEqual(HOME);
     for (const role of ["head_of_department", "manager"]) expect(capabilitiesOf([role], false)).toEqual(["alerts.clear", "home.reports", "home.team"]);
     expect(capabilitiesOf(["administrator"], false)).toEqual(["mailbox.signature"]);
     for (const role of ["employee", "unknown"]) expect(capabilitiesOf([role], false)).toEqual([]);

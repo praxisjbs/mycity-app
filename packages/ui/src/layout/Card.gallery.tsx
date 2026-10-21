@@ -30,6 +30,18 @@ export default {
         <p>Monday to Friday, 08:00 to 17:00</p>
       </Card>
     ),
+    Important: () => (
+      <Card urgency="important">
+        <CardHeader title="New Leave Form" />
+        <p>Use it from Monday.</p>
+      </Card>
+    ),
+    Urgent: () => (
+      <Card urgency="urgent">
+        <CardHeader title="Fire Drill at 11" />
+        <p>Leave by the east stairs.</p>
+      </Card>
+    ),
     "No Padding": () => (
       <Card pad={false}>
         <div className="bg-muted p-6 text-center text-sm">Lekki Worksite</div>

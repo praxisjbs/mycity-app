@@ -4,14 +4,17 @@
  * @summary A full-screen page that slides in from the right over the screen on a phone, like a native app's next screen: Back, a title, its own actions, a body that scrolls.
  * @use A place a person goes into and comes back from without leaving the screen they were on: the notification pane, Notification Settings over it.
  * @avoid A form or a record on desktop (use Modal or SidePanel); a short choice (use Sheet); a real screen with its own address (a route).
- * @phone This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close. On desktop it draws the same page as a panel on the right.
+ * @phone This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close; the phone's own Back (Android's, the iPhone's edge swipe) closes it first (F29). With `onRefresh` its body pulls to refresh (F28). On desktop it draws the same page as a panel on the right.
  * @a11y A modal dialog named by `title` (Radix underneath, through Vaul): focus moves in and is trapped, Esc and Back close it, focus returns to the opener. Back is a named button; `actions` are IconButtons with labels.
  * @status beta
  * @example <PhonePage open={open} onClose={close} title="Notifications" actions={<IconButton icon="cog" label="Notification Settings" />}>{rows}</PhonePage>
  */
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { cn } from "../lib/cn";
+import { useBackClose } from "../lib/history";
+import { PullIndicator } from "../shell/PullIndicator";
+import { usePull } from "../shell/pull";
 import { IconButton } from "../actions/Button";
 import { ActionGroup } from "../actions/ActionGroup";
 import { focusInto, useReturnFocus } from "./context";
@@ -29,21 +32,35 @@ export interface PhonePageProps {
   bar?: ReactNode;
   /** The body; it scrolls. */
   children?: ReactNode;
-  /** Called with the scrolling body, for a list that loads more near its end or pulls to refresh. */
+  /** Called with the scrolling body, for a list that loads more near its end. */
   bodyRef?: (el: HTMLDivElement | null) => void;
+  /** Pull to refresh (F28): pulled down at its top, the body loads again; the pin turns until the promise settles. */
+  onRefresh?: () => Promise<unknown>;
   /** Where the page mounts; document.body by default (the gallery passes its themed frame). */
   container?: HTMLElement | null;
   /** Extra classes for the scrolling body. */
   bodyClassName?: string;
 }
 
-export function PhonePage({ open, onClose, title, actions, bar, children, bodyRef, container, bodyClassName }: PhonePageProps) {
+export function PhonePage({ open, onClose, title, actions, bar, children, bodyRef, onRefresh, container, bodyClassName }: PhonePageProps) {
   const content = useRef<HTMLDivElement | null>(null);
   const isOpen = useRef(open);
   useEffect(() => {
     isOpen.current = open;
   }, [open]);
   const returnFocus = useReturnFocus(open);
+  // The phone's Back closes the page before it leaves the screen behind it (F29).
+  useBackClose(open, onClose);
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
+  const bodyEl = useCallback(
+    (el: HTMLDivElement | null) => {
+      setBody(el);
+      bodyRef?.(el);
+    },
+    [bodyRef],
+  );
+  const indicator = useRef<HTMLDivElement | null>(null);
+  const pull = usePull(body, indicator, { onRefresh });
 
   return (
     <Drawer.Root open={open} onOpenChange={(next) => !next && onClose()} direction="right" repositionInputs={false}>
@@ -73,8 +90,11 @@ export function PhonePage({ open, onClose, title, actions, bar, children, bodyRe
             )}
           </div>
           {bar != null && <div className="flex-none border-b border-border bg-card px-3 py-2">{bar}</div>}
-          <div ref={bodyRef} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", bodyClassName)}>
-            {children}
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {onRefresh && <PullIndicator ref={indicator} state={pull} />}
+            <div ref={bodyEl} className={cn("min-h-0 flex-1 overflow-y-auto", onRefresh ? "overscroll-y-none" : "overscroll-contain", bodyClassName)}>
+              {children}
+            </div>
           </div>
         </Drawer.Content>
       </Drawer.Portal>

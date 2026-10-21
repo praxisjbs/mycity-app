@@ -18,6 +18,7 @@
 const crypto = require("node:crypto");
 const webpush = require("web-push");
 const vapid = require("./vapid");
+const usage = require("../../shared/integrations/usage");
 
 const TIMEOUT_MS = 10_000;
 /** A push service refuses a topic longer than 32 URL-safe base64 characters. */
@@ -60,6 +61,15 @@ function classify(err) {
  */
 async function send(sub, payload, { ttl = 24 * 60 * 60, urgency = "normal", topic } = {}) {
   const k = await vapid.keys();
+  const out = await deliver(sub, payload, { ttl, urgency, topic }, k);
+  // Counted on Settings · Integrations: a subscription the browser dropped is not a failure
+  // of the service, a refusal or no answer is (docs/guides/integrations.md §6.9).
+  if (out.ok || out.gone) usage.record("web_push", "push", { ok: true });
+  else usage.record("web_push", "push", { ok: false, error_code: out.status === 429 ? "OVER_QUOTA" : "UNAVAILABLE" });
+  return out;
+}
+
+async function deliver(sub, payload, { ttl, urgency, topic }, k) {
   try {
     const res = await transport(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

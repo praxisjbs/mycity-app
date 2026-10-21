@@ -3,49 +3,58 @@ import type { LocationError, MyHome } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
-import { Button, Card, CardHeader, Field, FormFooter, KeyValue, Pill, Result, TextAreaField, toast, useContractForm, useModal } from "@mycity/ui";
+import { places } from "@/features/shared/places";
+import { AddressField, Banner, Button, Card, CardHeader, Field, FormFooter, KeyValue, Pill, Result, toast, useContractForm, useModal, type PlaceValue } from "@mycity/ui";
 import { HOME_STATUS } from "./labels";
+import { fixFor, useLocationReader, type Fix } from "./location";
 
 /**
  * ESS · My Attendance's Home Location (docs/guides/attendance.md §6.10, §10): the approved home of a
  * remote employee, or of a hybrid employee whose schedule has home days (`needed`), the one waiting
  * on People, or the reason the last one was rejected, and the sheet
  * that sends a new one. The reading is taken on this device when the person presses Use This
- * Location, at home; the address is their own words. People approve it; the API decides who may.
+ * Location, at home, through the feature's one reader (./location); the address is picked. People
+ * approve it; the API decides who may.
  */
 
-export type Fix = { latitude: number; longitude: number; accuracy_m: number };
 export type Reading = { kind: "none" } | { kind: "locating" } | { kind: "fix"; fix: Fix } | { kind: "weak"; fix: Fix } | { kind: "failed"; error: LocationError };
-
-const LOCATION_ERROR: Record<number, LocationError> = { 1: "denied", 2: "unavailable", 3: "timeout" };
 
 /**
  * One location reading taken on this device when the person asks for it, refused when coarser
- * than `max` metres. A home and a work location request's temporary home are both read this way.
+ * than `max` metres. While it reads the sheet stays answerable: the reading always ends.
  */
 export function useReading(max: number, onFix: (fix: Fix) => void) {
   const [reading, setReading] = useState<Reading>({ kind: "none" });
+  const reader = useLocationReader((r) => {
+    if (r.error) return setReading({ kind: "failed", error: r.error });
+    if (r.fix.accuracy_m > max) return setReading({ kind: "weak", fix: r.fix });
+    onFix(r.fix);
+    setReading({ kind: "fix", fix: r.fix });
+  });
   const locate = () => {
-    if (!navigator.geolocation) return setReading({ kind: "failed", error: "unsupported" });
     setReading({ kind: "locating" });
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) };
-        if (fix.accuracy_m > max) return setReading({ kind: "weak", fix });
-        onFix(fix);
-        setReading({ kind: "fix", fix });
-      },
-      (e) => setReading({ kind: "failed", error: LOCATION_ERROR[e.code] ?? "unavailable" }),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+    reader.read();
   };
   return { reading, setReading, locate };
 }
 
-/** Where the reading stands, as the step above a form shows it; `idle` is the line before the first press. */
+/** A reading a new one cannot change: no location in this browser, or a page off its secure address. */
+const finalReading = (reading: Reading) => reading.kind === "failed" && (reading.error === "unsupported" || reading.error === "insecure");
+
+/**
+ * Where the reading stands, as the step above a form shows it; `idle` is the line before the first
+ * press. A reading that could not prove the place names the fix for this device (§6.5).
+ */
 export function ReadingStep({ reading, idle }: { reading: Reading; idle: { title: string; text: string } }) {
   if (reading.kind === "fix") return <Result tone="ok" label="Location Check" title="Location Found" text={`Accurate to ${reading.fix.accuracy_m} m.`} icon="target" />;
-  if (reading.kind === "locating") return <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />;
+  if (reading.kind === "locating") return <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location if your browser asks." icon="target" />;
+  const fix = reading.kind === "weak" ? fixFor({ error: null, accuracy_m: reading.fix.accuracy_m }) : reading.kind === "failed" ? fixFor({ error: reading.error }) : null;
+  if (fix)
+    return (
+      <Banner tone="warn" icon="target">
+        <b>{fix.title}</b>: {fix.text}
+      </Banner>
+    );
   if (reading.kind === "weak")
     return <Result tone="warn" label="Location Check" title="Weak Location Signal" text={`Accurate to about ${reading.fix.accuracy_m} m. Move near a window, then retry.`} icon="target" />;
   if (reading.kind === "failed")
@@ -53,8 +62,8 @@ export function ReadingStep({ reading, idle }: { reading: Reading; idle: { title
       <Result
         tone="warn"
         label="Location Check"
-        title={reading.error === "denied" ? "Location Is Off" : reading.error === "unsupported" ? "No Location Support" : "Location Not Found"}
-        text={reading.error === "denied" ? "Allow location for this site in your browser settings, then retry." : reading.error === "unsupported" ? "This browser cannot share a location." : "Move near a window or outside, then retry."}
+        title={reading.error === "unsupported" ? "No Location Support" : "Location Not Found"}
+        text={reading.error === "unsupported" ? "This browser cannot share a location." : "Move near a window or outside, then retry."}
         icon="target"
       />
     );
@@ -98,13 +107,13 @@ export function HomeLocationCard({ openOnLoad }: { openOnLoad: boolean }) {
   );
 }
 
-type HomeValues = { home_address: string; home_latitude: number | null; home_longitude: number | null; accuracy_m: number | null };
+type HomeValues = { home_address: PlaceValue | null; home_latitude: number | null; home_longitude: number | null; accuracy_m: number | null };
 
 /** The sheet: one reading taken here, the address, and Send for Approval. */
 export function SetHomeForm({ max, close }: { max: number; close: () => void }) {
   const f = useContractForm<HomeValues>(
-    { home_address: "", home_latitude: null, home_longitude: null, accuracy_m: null },
-    { safeParse: (v: unknown) => attendance.HomeRequestCreate.safeParse({ ...(v as HomeValues), home_address: (v as HomeValues).home_address.trim() }) },
+    { home_address: null, home_latitude: null, home_longitude: null, accuracy_m: null },
+    attendance.HomeRequestCreate,
   );
   const send = useMutation("POST /api/v1/attendance/me/home");
   const { reading, setReading, locate } = useReading(max, (fix) => {
@@ -117,7 +126,8 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
     if (!f.check()) return;
     const v = f.values;
     try {
-      await send.run({ body: { home_address: v.home_address.trim(), home_latitude: v.home_latitude!, home_longitude: v.home_longitude!, accuracy_m: v.accuracy_m! } });
+      // Checked against the contract above: the address is picked and the reading is taken.
+      await send.run({ body: { home_address: v.home_address!, home_latitude: v.home_latitude!, home_longitude: v.home_longitude!, accuracy_m: v.accuracy_m! } });
       invalidate("/api/v1/attendance");
       close();
       toast("Home location sent for approval");
@@ -135,7 +145,11 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
         <ReadingStep reading={reading} idle={{ title: "At Home Now", text: "Take the reading where you work from home." }} />
       </div>
       <Field label="Address" {...f.status("home_address")}>
-        <TextAreaField {...f.field("home_address")} placeholder="12 Sample Street" rows={2} />
+        <AddressField
+          {...f.field("home_address")}
+          places={places}
+          near={f.values.home_latitude !== null && f.values.home_longitude !== null ? { lat: f.values.home_latitude, lon: f.values.home_longitude } : null}
+        />
       </Field>
       <FormFooter>
         {located ? (
@@ -146,9 +160,11 @@ export function SetHomeForm({ max, close }: { max: number; close: () => void }) 
         ) : (
           <>
             <Button onClick={close}>Not Now</Button>
-            <Button variant="primary" icon="target" busy={reading.kind === "locating"} onClick={locate}>
-              {reading.kind === "none" ? "Use This Location" : "Retry Location"}
-            </Button>
+            {reading.kind !== "locating" && !finalReading(reading) && (
+              <Button variant="primary" icon="target" onClick={locate}>
+                {reading.kind === "none" ? "Use This Location" : "Retry Location"}
+              </Button>
+            )}
           </>
         )}
       </FormFooter>

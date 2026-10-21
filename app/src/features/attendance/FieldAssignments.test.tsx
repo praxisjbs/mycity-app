@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { FieldMember } from "@mycity/contract/contract.gen.ts";
-import { formatDate, ModalProvider, todayIso } from "@mycity/ui";
+import { ModalProvider } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
@@ -12,12 +12,13 @@ import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { useClock } from "./ClockButton";
 import { MyAttendancePage } from "./EssAttendance";
-import { PeopleAttendance } from "./PeopleAttendance";
+import { Worksites } from "./Worksites";
 
 /**
- * Field assignments on the in-browser mock (docs/guides/attendance.md §6.12, §10): the person sees
- * theirs on My Attendance and the clock names its site; People set one (checked as it is filled),
- * take someone off and cancel it, each with a reason. The mock's assignments are invented: FA-0002,
+ * Field assignments made before PR 4 on the in-browser mock (docs/guides/attendance.md §6.12, §10):
+ * the person sees theirs on My Attendance and the clock names its site; People take someone off and
+ * cancel one on People · Worksites, Temporary, Field, each with a reason; nobody makes a new one.
+ * The mock's assignments are invented: FA-0002,
  * Stand Build, is in progress today for Adedotun and Grace at Expo Hall.
  */
 
@@ -71,11 +72,6 @@ async function signedInAs(email: string, screenUnderTest: ReactNode) {
   await waitFor(() => expect(clock?.today).toBeTruthy(), { timeout: 5000 });
 }
 
-const typed = (days: number) => {
-  const d = new Date(`${todayIso()}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return formatDate(d.toISOString().slice(0, 10));
-};
 const fill = (dialog: HTMLElement, label: string, value: string) => fireEvent.change(within(dialog).getByLabelText(label), { target: { value } });
 const pressIn = (dialog: HTMLElement, name: string) => fireEvent.click(within(dialog).getByRole("button", { name }));
 
@@ -93,41 +89,11 @@ describe("field assignments", () => {
     expect(await axe(dialog)).toHaveNoViolations();
   }, 30000);
 
-  it("People set one, checked as it is filled; each person is put on it", async () => {
-    await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
-    fireEvent.click(screen.getByRole("radio", { name: "Field" }));
-    await screen.findByText("FA-0003 · Partner Visits");
-    fireEvent.click(screen.getAllByRole("button", { name: "New Assignment" })[0]);
-    const dialog = await screen.findByRole("dialog", { name: "New Assignment" });
-    pressIn(dialog, "Save Assignment");
-    await waitFor(() => expect(within(dialog).getByLabelText("Name").getAttribute("aria-invalid")).toBe("true"));
-    expect(within(dialog).getByLabelText("Latitude").getAttribute("aria-invalid")).toBe("true");
-
-    fill(dialog, "Name", "Venue Setup");
-    fill(dialog, "Client or Event", "Northwind Events");
-    fireEvent.change(within(dialog).getByPlaceholderText("Search people"), { target: { value: "Bashir" } });
-    await waitFor(() => expect(within(dialog).getAllByRole("option").length).toBeGreaterThan(0), { timeout: 5000 });
-    fireEvent.click(within(dialog).getByRole("option", { name: /Bashir Lawal/ }));
-    fill(dialog, "First Day", typed(5));
-    fill(dialog, "Last Day", typed(5));
-    fill(dialog, "Site Name", "Hall B");
-    fill(dialog, "Latitude", "6.5");
-    fill(dialog, "Longitude", "3.4");
-    pressIn(dialog, "Save Assignment");
-    // Bashir is already on FA-0003 that day: the server marks the first day.
-    await waitFor(() => expect(within(dialog).getByText("Overlaps another")).toBeTruthy());
-
-    fill(dialog, "First Day", typed(8));
-    fill(dialog, "Last Day", typed(9));
-    pressIn(dialog, "Save Assignment");
-    await screen.findByText("FA-0004 · Venue Setup");
-    const page = await api.call("GET /api/v1/attendance/field-assignments", { query: { q: "FA-0004" } });
-    expect(page.data[0]).toMatchObject({ state: "upcoming", people: 1, days: 2, can_change: true, sites: [{ name: "Hall B", latitude: 6.5, longitude: 3.4, radius_m: 200 }] });
-  }, 30000);
-
   it("People take someone off with a reason, then cancel the assignment; never the last one taken off", async () => {
-    await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
-    fireEvent.click(screen.getByRole("radio", { name: "Field" }));
+    await signedInAs("cynthia@mycityapp.io", <Worksites />);
+    fireEvent.click(screen.getByRole("radio", { name: "Temporary" }));
+    // FA-0002 is in force, so the views made before PR 4 sit beside the sites.
+    fireEvent.click(await screen.findByRole("radio", { name: "Field" }, { timeout: 5000 }));
     fireEvent.click(await screen.findByText("FA-0002 · Stand Build"));
     let dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByText("Grace Okon"));

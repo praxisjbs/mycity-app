@@ -1,26 +1,41 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import devices from "@mycity/contract/schemas/devices.js";
-import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, AttendanceEvent, AttendanceException, AttendanceToday, FieldAssignment, MyDevice, PayItem, TemporarySite } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useMe } from "@/auth/AuthProvider";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
-import { useSearchParams } from "@/lib/router";
+import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
 import { HomeLocationCard } from "./HomeLocation";
 import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAssignments";
-import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
-import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PAY_KIND, PUNCH_STATE, UNCLEAR_HELP, dayStatus, hours, lateBy, locationShown, recentMonths } from "./labels";
+import { payColumns, payDetails } from "./PayItems";
+import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, type FieldBinding, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, TimeField, toast, todayIso, useConfirm, useContractForm, useIsPhone, useModal } from "@mycity/ui";
+import { DayRoute, MyTemporarySites } from "./TemporarySites";
 
 /**
- * ESS · My Attendance (#9, with the person's field assignments), My Devices (#88), and Policy
- * Updates (#89), still on INTERIM shapes until M9 (docs/guides/attendance.md §10). Work Location
- * Requests (#87) is WorkLocationRequests.tsx.
+ * ESS · My Attendance (#9, with the person's temporary sites, each day's route of check-ins, and the
+ * field assignments made before PR 4) and My Devices (#88)
+ * (docs/guides/attendance.md §10). Work Location Requests (#87) is WorkLocationRequests.tsx, Policy
+ * Updates (#89) features/policies/PolicyUpdates.tsx.
  * Everything here is the caller's own: the routes take no employee id.
  */
+
+/** A clock-out's time, and System Clock-Out when the system made it after the shift ended (§6.14). */
+function clockOutOf(at: string | null, automatic: boolean): ReactNode {
+  if (!at) return null;
+  if (!automatic) return formatTime(at);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {formatTime(at)}
+      <Pill tone="info">System Clock-Out</Pill>
+    </span>
+  );
+}
 
 /** Today's place as the Today card names it; a worksite and an approved request's day by their own name. */
 const LOCATION_NAME: Partial<Record<AttendanceToday["location"]["kind"], string>> = {
@@ -36,6 +51,7 @@ const LOCATION_NAME: Partial<Record<AttendanceToday["location"]["kind"], string>
 
 export function MyAttendancePage() {
   const [params] = useSearchParams();
+  const { navigate } = useRouter();
   const id = params.get("id");
   const modal = useModal();
   const clock = useClock();
@@ -59,9 +75,19 @@ export function MyAttendancePage() {
   });
   const openAssignment = useCallback((a: FieldAssignment) => modal.open({ title: a.number, wide: true, body: (close) => <AssignmentView a={a} close={close} /> }), [modal]);
   useAssignmentLink(params.get("assignment"), openAssignment, { mine: true });
+  // A site opens where the person's sites are kept, with its approval and Withdraw Submission.
+  const openSite = (site: TemporarySite) => navigate(hrefFor("ess", "work-location-requests", { site: site.temporary_site_id }));
   const openFigure = (status: FigureStatus) =>
     modal.open({ title: `${FIGURE[status]}, ${formatMonth(month)}`, wide: true, body: <FigureDays month={month} status={status} /> });
   const explain = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], body: (close) => <ExplainForm x={x} close={close} /> });
+  // A reminder's notice (`?clock=`) opens the clock panel, once.
+  const clockLink = params.get("clock");
+  const clockOpened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!clockLink || !clock.today || clockOpened.current === clockLink) return;
+    clockOpened.current = clockLink;
+    if (clock.ready && !clock.unavailable) clock.open();
+  }, [clockLink, clock]);
 
   const todayCard = t && (
     <Card>
@@ -76,7 +102,7 @@ export function MyAttendancePage() {
       <KeyValue
         items={[
           ["Clock In", t.clock_in_at ? formatTime(t.clock_in_at) : null],
-          ["Clock Out", t.clock_out_at ? formatTime(t.clock_out_at) : null],
+          ["Clock Out", clockOutOf(t.clock_out_at, t.clock_out_automatic)],
           ["Location", LOCATION_NAME[t.location.kind] ?? t.location.name],
         ]}
       />
@@ -98,12 +124,13 @@ export function MyAttendancePage() {
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} min={`${Number(months[0].slice(0, 4)) - 2}-01`} max={months[0]} className="phone:flex-1" />
-            <ExportButton message="Export queued for your email" onExport={() => api.call("POST /api/v1/attendance/me/export", { body: { month } })}>Export Month</ExportButton>
+            <ExportButton onExport={() => saveExport(api.call("POST /api/v1/attendance/me/export", { body: { month } }))}>Export Month</ExportButton>
           </>
         }
       />
-      {(t?.work_pattern === "remote" || t?.work_pattern === "hybrid") && <HomeLocationCard openOnLoad={params.get("home") === "set"} />}
+      <HomeLocationCard openOnLoad={params.get("home") === "set"} />
       {todayCard}
+      <MyTemporarySites openSite={openSite} />
       <MyFieldAssignments open={openAssignment} />
       <Grid cols="4m2" className="mt-3">
         <KpiCard title="Days Present" value={s ? String(s.days_present) : ""} onOpen={() => openFigure("present")} />
@@ -115,8 +142,10 @@ export function MyAttendancePage() {
           onOpen={() => openFigure("late")}
         />
         <KpiCard title="Absent" value={s ? String(s.absent_days) : ""} tone={s && s.absent_days > 0 ? "err" : undefined} onOpen={() => openFigure("absent")} />
-        <KpiCard title="Hours Worked" value={s ? hours(s.worked_minutes) : ""} help="From the first clock-in to the last clock-out of each day." />
+        <KpiCard title="Hours Worked" value={s ? hours(s.worked_minutes) : ""} help="From the first clock-in to the last clock-out. A System Clock-Out counts to the shift's end." />
       </Grid>
+      <MyPayItems month={month} group="deductions" />
+      <MyPayItems month={month} group="overtime" />
       {open.rows.length > 0 && (
         <DataView
           title="Open Exceptions"
@@ -125,7 +154,7 @@ export function MyAttendancePage() {
           onRowClick={explain}
           noun="exception"
           columns={[
-            { key: "t", label: "Exception", render: (x) => EXCEPTION_TYPE[x.exception_type] },
+            { key: "t", label: "Exception", render: (x) => (x.exception_type === "location_unverified" ? <HelpTerm help={UNCLEAR_HELP}>{EXCEPTION_TYPE[x.exception_type]}</HelpTerm> : EXCEPTION_TYPE[x.exception_type]) },
             { key: "d", label: "Date", render: (x) => formatDate(x.work_date) },
             { key: "w", label: "Detail", desktop: true, render: (x) => x.detail },
             { key: "n", label: "Your Note", render: (x) => (x.employee_note ? <Pill tone="ok">Sent</Pill> : <Pill tone="warn">Explain</Pill>) },
@@ -153,7 +182,7 @@ export function MyAttendancePage() {
             format={(v) => `${v} hours`}
             bars={[...days.rows]
               .sort((a, b) => a.attendance_date.localeCompare(b.attendance_date))
-              .map((d) => ({ label: formatDate(d.attendance_date).slice(0, 6), value: Math.round(d.worked_minutes / 6) / 10, series: d.status === "late" ? 3 : 1 }))}
+              .map((d) => ({ label: formatDate(d.attendance_date).slice(0, 5), value: Math.round(d.worked_minutes / 6) / 10, series: d.status === "late" ? 3 : 1 }))}
           />
           <Pager page={days.page} onPage={days.setPage} noun="day" />
         </>
@@ -166,7 +195,7 @@ export function MyAttendancePage() {
 const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
   { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
   { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
-  { key: "o", label: "Clock Out", render: (d) => (d.last_clock_out_at ? formatTime(d.last_clock_out_at) : null) },
+  { key: "o", label: "Clock Out", render: (d) => clockOutOf(d.last_clock_out_at, d.clock_out_automatic) },
   { key: "h", label: "Hours", align: "n", render: (d) => (d.worked_minutes ? hours(d.worked_minutes) : null) },
   { key: "s", label: "Status", render: (d) => <Pill tone={dayStatus(d).tone}>{dayStatus(d).text}</Pill> },
 ];
@@ -180,9 +209,13 @@ function FigureDays({ month, status }: { month: string; status: FigureStatus }) 
   return <DataView bare caption={FIGURE[status]} list={list} rowKey={(d) => d.attendance_day_id} noun="day" empty={{ icon: "clock", title: "No Days", text: "None this month." }} columns={DAY_COLUMNS} />;
 }
 
-/** One of my days: its punches with what the server decided about each. */
+/** One of my days: its punches with what the server decided about each, and Give Real Time on a System Clock-Out. */
 function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
+  const modal = useModal();
   const events = usePaged("GET /api/v1/attendance/me/events", { filters: { date } });
+  const checkIns = usePaged("GET /api/v1/attendance/me/check-ins", { filters: { date } });
+  const automatic = events.rows.find((e) => e.source === "system" && e.event_type === "clock_out" && !e.excluded);
+  const giveTime = (e: AttendanceEvent) => modal.open({ title: "Give Real Time", body: (close) => <GiveRealTime e={e} close={close} /> });
   return (
     <>
       {day && (
@@ -191,6 +224,8 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
             ["Status", <Pill key="s" tone={dayStatus(day).tone}>{dayStatus(day).text}</Pill>],
             ["Hours", day.worked_minutes ? hours(day.worked_minutes) : null],
             ...(day.late_minutes ? ([["Late By", lateBy(day.late_minutes)]] as Array<[string, string]>) : []),
+            ...(day.early_minutes ? ([["Left Early By", lateBy(day.early_minutes)]] as Array<[string, string]>) : []),
+            ...(day.overtime_minutes ? ([["Overtime", lateBy(day.overtime_minutes)]] as Array<[string, string]>) : []),
           ]}
         />
       )}
@@ -204,12 +239,91 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
         columns={[
           { key: "t", label: "Punch", render: (e: AttendanceEvent) => (e.event_type === "clock_in" ? "Clock In" : "Clock Out") },
           { key: "a", label: "Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
-          { key: "l", label: "Location", render: (e: AttendanceEvent) => (e.worksite_name ? `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}` : VERDICT[e.geofence]) },
+          { key: "l", label: "Location", render: (e: AttendanceEvent) => locationShown(e) },
           { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
-          { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Not Counted" : PUNCH_STATE[e.validation_state].text}</Pill> },
+          {
+            key: "r",
+            label: "Result",
+            render: (e: AttendanceEvent) =>
+              e.excluded ? <Pill tone="err">Not Counted</Pill> : e.source === "system" ? <Pill tone="info">System Clock-Out</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
+          },
         ]}
       />
+      <DayRoute className="mt-3" punches={events.rows} checkIns={checkIns.rows} />
+      {automatic && (
+        <FormFooter>
+          <Button className="phone:w-full" icon="clock" onClick={() => giveTime(automatic)}>Give Real Time</Button>
+        </FormFooter>
+      )}
     </>
+  );
+}
+
+/** Give the real leaving time of a System Clock-Out, with a note; People keep or correct it (§6.8, §6.14). */
+function GiveRealTime({ e, close }: { e: AttendanceEvent; close: () => void }) {
+  const f = useContractForm({ real_time: "", employee_note: "" }, attendance.RealTimeGiven);
+  const save = useMutation("POST /api/v1/attendance/me/events/:id/explanation");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id: e.attendance_event_id }, body: { real_time: f.values.real_time, employee_note: f.values.employee_note.trim() } });
+      invalidate("/api/v1/attendance");
+      close();
+      toast("Time sent to People");
+    } catch (err) {
+      if (err instanceof ApiError && Object.keys(err.fields).length) f.setServerErrors(err.fields);
+      else toast(err instanceof ApiError ? err.message : "Time not sent");
+    }
+  };
+  return (
+    <>
+      <KeyValue items={[["Date", formatDate(e.work_date)], ["System Clock-Out", formatTime(e.occurred_at)]]} />
+      <Field label="Real Time" className="mt-3" {...f.status("real_time")}>
+        <TimeField {...(f.field("real_time") as FieldBinding<string> & { name: string })} />
+      </Field>
+      <Field label="Your Note" {...f.status("employee_note")}>
+        <TextAreaField {...f.field("employee_note")} placeholder="Left at 16:00" rows={3} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" icon="send" busy={save.pending} onClick={() => submit()}>Send Time</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * My deductions and overtime for the month (§6.17)
+ * ------------------------------------------------------------------ */
+
+/** The month's deductions, or its overtime, as cards under the figures; nothing when there are none. */
+function MyPayItems({ month, group }: { month: string; group: "deductions" | "overtime" }) {
+  const modal = useModal();
+  const list = usePaged("GET /api/v1/attendance/me/pay-items", { filters: { month, group } });
+  const phone = useIsPhone();
+  if (list.rows.length === 0) return null;
+  const open = (x: PayItem) =>
+    modal.open({
+      title: PAY_KIND[x.kind],
+      body: (close) => (
+        <>
+          <KeyValue items={payDetails(x)} />
+          <FormFooter>
+            <Button variant="primary" onClick={close}>Close</Button>
+          </FormFooter>
+        </>
+      ),
+    });
+  return (
+    <DataView
+      className="mt-3"
+      title={group === "deductions" ? "Deductions" : "Overtime"}
+      list={list}
+      rowKey={(x) => x.attendance_pay_item_id}
+      onRowClick={open}
+      noun={group === "deductions" ? "deduction" : "overtime item"}
+      columns={payColumns({ person: false, kind: group === "deductions", phone })}
+    />
   );
 }
 
@@ -360,79 +474,6 @@ function RegisterForm({ close }: { close: () => void }) {
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={() => submit()}>Register Device</Button>
       </FormFooter>
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * INTERIM: Work Location Requests (#87) and Policy Updates (#89)
- * ------------------------------------------------------------------ */
-
-export function PolicyUpdatesPage() {
-  const me = useMe();
-  const cur = useApi("GET /api/v1/attendance/policies/current");
-  const versions = usePaged("GET /api/v1/attendance/policies");
-  const ack = useMutation("POST /api/v1/attendance/policies/:version/acknowledge");
-  const modal = useModal();
-  const p = cur.data;
-  if (cur.error) return <ErrorState error={cur.error} onRetry={cur.reload} />;
-  if (!p) return <LoadingRows count={6} />;
-  const read = () =>
-    modal.open({
-      title: `Attendance Policy v${p.version}`,
-      wide: true,
-      body: (
-        <>
-          {[...new Set(p.settings.map((s) => s.section))].map((sec) => (
-            <Card key={sec} className="mb-3">
-              <CardHeader title={sec} />
-              <KeyValue items={p.settings.filter((s) => s.section === sec).map((s) => [s.label, String(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.kind === "mode" ? { record: "Record only", warn: "Warn", block: "Block" }[s.value as string] : s.value)])} />
-            </Card>
-          ))}
-        </>
-      ),
-    });
-  return (
-    <>
-      <PageHeader title="Policy Updates" sub={`Attendance policy · ${me.display_name}`} />
-      <div className="mb-3 rounded-card border border-border bg-background px-3.5 py-3">
-        <h2 data-ui="title" className="text-base">Policy v{p.version}</h2>
-        <div data-copy="content">
-          <p className="mt-1 text-sm leading-normal text-muted-foreground">{p.summary}</p>
-          <ul className="mt-2 list-disc pl-5 text-xs text-muted-foreground">{p.changes.map((c) => <li key={c}>{c}</li>)}</ul>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={read}>Read Full Policy</Button>
-          {!p.acknowledged_at && (
-            <Button variant="primary" icon="ok" busy={ack.pending} onClick={async () => (await ack.run({ params: { version: String(p.version) }, body: {} }), invalidate("/api/v1/attendance"), toast(`Policy v${p.version} acknowledged`))}>
-              Acknowledge
-            </Button>
-          )}
-        </div>
-      </div>
-      <Grid cols={2}>
-        <Card>
-          <CardHeader title="Acknowledgment" right={p.acknowledged_at ? <Pill tone="ok">{`Acknowledged ${formatDate(p.acknowledged_at)}`}</Pill> : <Pill tone="err">Pending</Pill>} />
-          <KeyValue items={[["Current version", `v${p.version}`], ["Published", formatDate(p.published_at)], ["Published by", p.published_by], ["Clock-in while pending", p.settings.find((s) => s.key === "ack_blocks")?.value ? "Blocked until acknowledged" : "Allowed, with a reminder"]]} />
-        </Card>
-        <Card>
-          <CardHeader title="Full Policy" />
-          <KeyValue items={p.settings.filter((s) => ["grace", "mode_remote", "mode_office", "dev_warn_new", "late_rule"].includes(s.key)).map((s) => [s.label, String(typeof s.value === "boolean" ? (s.value ? "On" : "Off") : s.kind === "mode" ? { record: "Record only", warn: "Warn", block: "Block" }[s.value as string] : s.value)])} />
-        </Card>
-      </Grid>
-      <DataView
-        title="All Versions"
-        rows={versions.rows}
-        rowKey={(v) => String(v.version)}
-        loading={versions.loading}
-        columns={[
-          { key: "v", label: "Version", render: (v) => `v${v.version}` },
-          { key: "p", label: "Published", render: (v) => formatDate(v.published_at) },
-          { key: "s", label: "Summary", render: (v) => v.summary },
-          { key: "a", label: "Your Acknowledgment", render: (v) => (v.acknowledged_at ? <Pill tone="ok">{formatDate(v.acknowledged_at)}</Pill> : <Pill tone="warn">Pending</Pill>) },
-        ]}
-        footer={<Pager page={versions.page} onPage={versions.setPage} noun="version" />}
-      />
     </>
   );
 }

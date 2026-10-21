@@ -17,6 +17,7 @@ const pinoHttp = require("pino-http");
 const { logger } = require("../config/logger");
 const requestContext = require("../config/request-context");
 const metrics = require("../shared/observability/metrics");
+const requestStats = require("../shared/observability/request-stats");
 
 const QUIET = /^\/api\/health(\/|$)/;
 
@@ -30,6 +31,13 @@ function record(req, res) {
       "HTTP requests by method, templated route and status.",
     );
     const ms = Number(res.responseTime || 0);
+    // The same numbers a minute at a time in the database, for Settings · Performance:
+    // the snapshot runs in the worker, which cannot read this process's metrics. Only the
+    // API counts there, never the frontend's files, so a page of cached scripts cannot
+    // make the app look fast. The route is the one route() stamped, or "(no route)".
+    if ((req.originalUrl || req.url || "").startsWith("/api/")) {
+      requestStats.record(ms, res.statusCode, { method: req.method, route: req.routePattern || "(no route)" });
+    }
     if (ms > 0) {
       metrics.observe(
         "mycity_http_request_duration_seconds",

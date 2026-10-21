@@ -24,6 +24,8 @@ const SearchKind = z.enum(["screen", "action", "record"]);
  *   theme_dark   the dark theme;  theme_light  the light theme
  *   density      Compact or Comfortable, whichever is not on
  *   install      installs the app (offered only where the browser can)
+ *   refresh      every read on the screen asks again, in place (FRONTEND_FOUNDATION F28)
+ *   reload       the whole app starts again on the same screen (F28)
  *   sign_out     signs out
  */
 const SearchRun = z.enum([
@@ -36,6 +38,8 @@ const SearchRun = z.enum([
   "theme_light",
   "density",
   "install",
+  "refresh",
+  "reload",
   "sign_out",
 ]);
 

@@ -5,13 +5,14 @@
  * @use Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app.
  * @avoid A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar).
  * @phone Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes.
- * @a11y The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu.
+ * @a11y The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); with `homeHref` the pin is a link Home, and with `onBrandHold` a hold or the menu key on it opens the trail (F29); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu.
  * @status stable
  * @example <Rail items={items} current="people" onNavigate={navigate} account={{ name: "Cynthia Osakunih", subtitle: "Operations Manager", menu }} />
  */
 import { forwardRef, type HTMLAttributes, type MouseEvent, type ReactElement, type ReactNode } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cn } from "../lib/cn";
+import { useHold } from "../lib/hold";
 import { Icon, type IconName } from "../icons/Icon";
 import { Avatar } from "../display/Avatar";
 import { Menu, type MenuItem } from "../overlay/Menu";
@@ -32,6 +33,8 @@ export interface RailItem {
   group?: string;
   /** Things waiting in it; nothing is drawn for 0. */
   count?: number;
+  /** Something urgent waits in it: its count shows red, at least 1. */
+  urgent?: boolean;
 }
 
 /** The person at the foot of the rail, and what their menu holds. */
@@ -63,6 +66,10 @@ export interface RailProps {
   foot?: ReactNode;
   /** Names the navigation landmark; Modules unless set. */
   label?: string;
+  /** With it the pin is a link Home, as on a phone. */
+  homeHref?: string;
+  /** The pin held (or right clicked): the trail of places, in the installed app (F29). */
+  onBrandHold?: () => void;
 }
 
 const plain = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
@@ -80,8 +87,9 @@ const Tip = forwardRef<HTMLElement, { label: string | null; children: ReactEleme
     </Slot>
   );
 });
-export function Rail({ items, current, collapsed = false, onNavigate, account, brandName = "MyCity App", foot, label = "Modules" }: RailProps) {
+export function Rail({ items, current, collapsed = false, onNavigate, account, brandName = "MyCity App", foot, label = "Modules", homeHref, onBrandHold }: RailProps) {
   let lastGroup: string | undefined;
+  const hold = useHold({ onHold: () => onBrandHold?.() });
   return (
     <nav
       data-ui="desktop-nav"
@@ -92,7 +100,25 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
       )}
     >
       <div className="flex min-h-14.5 flex-none items-center gap-2.5 px-4.5 pt-4 pb-3">
-        <Brand tone="on-dark" size="m" name={collapsed ? undefined : brandName} />
+        {homeHref ? (
+          <a
+            href={homeHref}
+            aria-label={`${brandName}, Home`}
+            aria-haspopup={onBrandHold ? "menu" : undefined}
+            onClick={(e) => {
+              if (onNavigate && plain(e)) {
+                e.preventDefault();
+                onNavigate(homeHref);
+              }
+            }}
+            {...(onBrandHold ? hold : {})}
+            className="no-callout -m-1 flex items-center rounded-ctl p-1 select-none phone:min-h-tap"
+          >
+            <Brand tone="on-dark" size="m" name={collapsed ? undefined : brandName} label={`${brandName}, Home`} />
+          </a>
+        ) : (
+          <Brand tone="on-dark" size="m" name={collapsed ? undefined : brandName} />
+        )}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-2.5 pt-0.5 pb-2.5">
         {items.map((item) => {
@@ -125,9 +151,16 @@ export function Rail({ items, current, collapsed = false, onNavigate, account, b
                   <span data-ui="nav-label" className={cn(collapsed && "sr-only")}>
                     {item.label}
                   </span>
-                  {!!item.count && (
-                    <span className={cn("ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums", on ? "bg-on-primary-badge" : "bg-sidebar-badge", collapsed && "sr-only")}>
-                      {item.count}
+                  {(!!item.count || item.urgent) && (
+                    <span
+                      data-urgent={item.urgent ? "" : undefined}
+                      className={cn(
+                        "ml-auto rounded-full px-1.5 text-2xs leading-5 font-strong tabular-nums",
+                        item.urgent ? "bg-destructive text-background" : on ? "bg-on-primary-badge" : "bg-sidebar-badge",
+                        collapsed && "sr-only",
+                      )}
+                    >
+                      {Math.max(item.count ?? 0, item.urgent ? 1 : 0)}
                     </span>
                   )}
                 </a>

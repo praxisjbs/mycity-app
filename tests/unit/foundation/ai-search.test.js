@@ -254,39 +254,6 @@ describe("the Gemini vendor", () => {
     ).rejects.toMatchObject({ kind: "config" });
   });
 
-  test("a recording goes to the native API inline, and only the words come back", async () => {
-    let seen;
-    const fetchImpl = async (url, init) => {
-      seen = { url, init, body: JSON.parse(init.body) };
-      return reply(200, {
-        modelVersion: "gemini-2.5-flash",
-        candidates: [{ content: { parts: [{ text: '{"text": " Three sessions went well. "}' }] } }],
-        usageMetadata: { promptTokenCount: 160, candidatesTokenCount: 12 },
-      })();
-    };
-    const r = await gemini.transcribe({
-      apiKey: "k",
-      model: "models/gemini-2.5-flash",
-      audio: Buffer.from("RIFF"),
-      mimeType: "audio/wav",
-      fetchImpl,
-    });
-    expect(seen.url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
-    expect(seen.init.headers["x-goog-api-key"]).toBe("k");
-    expect(seen.body.contents[0].parts[0].inlineData).toEqual({ mimeType: "audio/wav", data: Buffer.from("RIFF").toString("base64") });
-    expect(seen.body.generationConfig.temperature).toBe(0);
-    expect(r).toEqual({ text: "Three sessions went well.", usage: { input_tokens: 160, output_tokens: 12 }, model: "gemini-2.5-flash" });
-
-    const notJson = async () =>
-      reply(200, { candidates: [{ content: { parts: [{ text: "Three sessions" }] } }] })();
-    await expect(
-      gemini.transcribe({ apiKey: "k", model: "m", audio: Buffer.from("x"), mimeType: "audio/wav", fetchImpl: notJson }),
-    ).rejects.toMatchObject({ kind: "transient" });
-    await expect(
-      gemini.transcribe({ apiKey: "", model: "m", audio: Buffer.from("x"), mimeType: "audio/wav" }),
-    ).rejects.toMatchObject({ kind: "config" });
-  });
-
   test("tool schemas are cut down to what Gemini accepts", () => {
     expect(
       gemini.toolSchema({
@@ -595,6 +562,15 @@ describe("search's screens follow the shell", () => {
     expect(tabVisible({ module: "people", tab: "attendance" }, manager)).toBe(true);
     expect(tabVisible({ module: "expenses", tab: "approvals" }, manager)).toBe(true);
     expect(tabVisible({ module: "expenses", tab: "approvals" }, { ...manager, manages_people: false })).toBe(false);
+  });
+
+  test("Integrations is found by integrations viewers and the CEO, with or without Settings", () => {
+    const screen = { module: "settings", tab: "integrations" };
+    expect(tabVisible(screen, reader([], { grants: { settings: ["view", "edit"] } }))).toBe(false);
+    expect(tabVisible(screen, reader([], { grants: { settings: ["view"], integrations: ["view"] } }))).toBe(true);
+    expect(tabVisible(screen, reader([], { grants: { integrations: ["view"] } }))).toBe(true);
+    expect(tabVisible(screen, reader([], { grants: {}, is_ceo: true }))).toBe(true);
+    expect(tabVisible({ module: "settings", tab: "users" }, reader([], { grants: { integrations: ["view"] } }))).toBe(false);
   });
 });
 

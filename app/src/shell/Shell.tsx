@@ -1,10 +1,12 @@
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Avatar,
   BottomBar,
   DesktopShell,
   ErrorBoundary,
+  goHistory,
   IconButton,
+  NavCapsule,
   PhoneHeader,
   PhoneShell,
   Rail,
@@ -12,16 +14,22 @@ import {
   Skeleton,
   Tabs,
   TopBar,
+  TrailMenu,
   useDensity,
+  useInstalled,
   useIsPhone,
   useTheme,
   type MenuItem,
+  type TrailItem,
 } from "@mycity/ui";
 import { useApi } from "@/api/hooks";
 import { useAuth, useMe, useMyPhoto } from "@/auth/AuthProvider";
-import { ClockButton, useClockSync } from "@/features/attendance/ClockButton";
+import { ClockButton, ClockPrompts, useClockSync } from "@/features/attendance/ClockButton";
+import { AcknowledgePrompts } from "@/features/policies/AcknowledgeSheet";
+import { UrgentNotices, urgentModules, useUrgentNotices } from "@/features/notifications/UrgentNotices";
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
+import { goTrail, startTrail, useTrail } from "@/lib/trail";
 import { visibleModules, visibleTabs } from "./access";
 import { BellButton } from "./Bell";
 import { moduleByKey, type ModuleDef, type TabDef } from "./catalogue";
@@ -33,9 +41,11 @@ import { ShellNotices, useInstallApp } from "./Notices";
 import { OfflinePage, useOnline } from "./offline";
 import { PlannedScreen, ViewBar } from "./Planned";
 import { noteVisit, usePwa } from "./pwa";
+import { refreshScreen, useReloadApp } from "./refresh";
 import { SCREENS } from "./screens";
 import { ScreenActionProvider } from "./screen-action";
 import { Search } from "./Search";
+import { nameOfPlace, trailItems } from "./trail-items";
 
 /**
  * The staff app's frame, on the Shell group of @mycity/ui. Two shells, not one
@@ -52,6 +62,11 @@ import { Search } from "./Search";
  * one the person may not open, lands on the first allowed screen. What a
  * screen shows before its milestone is the delivery plan's call (F14,
  * lib/plan.ts). ⌘K or Ctrl K opens search anywhere.
+ *
+ * Refresh and history (F28, F29): the phone's page pulls to refresh (a second
+ * notch reloads); desktop has the capsule at the start of the top bar, refresh
+ * everywhere and, in the installed app, back and forward. The installed app's
+ * trail (an arrow or the pin held) is this device's own (lib/trail.ts).
  */
 export function Shell() {
   const me = useMe();
@@ -59,6 +74,8 @@ export function Shell() {
   const { location, navigate } = useRouter();
   const modules = useMemo(() => visibleModules(me), [me]);
   const { data: badges } = useApi("GET /api/v1/notifications/badges");
+  const urgentRows = useUrgentNotices();
+  const urgent = useMemo(() => urgentModules(urgentRows), [urgentRows]);
 
   const key = location.module ? moduleKeyOf(location.module) : null;
   const mod = moduleByKey(key);
@@ -95,6 +112,24 @@ export function Shell() {
   useEffect(() => noteVisit(), []);
   useClockSync();
 
+  // This device's trail for this person: put back from the last session, or started afresh (F29).
+  useLayoutEffect(() => {
+    if (startTrail(me.user_id) === "home") navigate(hrefFor("home"), { replace: true });
+  }, [me.user_id, navigate]);
+  const trail = useTrail();
+  const installed = useInstalled();
+  const reloadApp = useReloadApp();
+  const [trailOpen, setTrailOpen] = useState(false);
+  const history: HistoryProps = {
+    installed,
+    items: useMemo(() => trailItems(trail), [trail]),
+    back: nameOfPlace(trail.places[trail.index - 1]),
+    forward: nameOfPlace(trail.places[trail.index + 1]),
+    trailOpen,
+    setTrailOpen,
+    reloadApp,
+  };
+
   const page = allowed && tab ? <ModulePage mod={allowed} tab={tab} id={location.id} /> : null;
   const strip =
     allowed && tab ? (
@@ -105,13 +140,28 @@ export function Shell() {
         items={tabs.map((t) => ({ value: t.slug, label: t.label, href: hrefFor(allowed.key, t.slug) }))}
       />
     ) : undefined;
-  const frame: FrameProps = { modules, mod: allowed, tab, tabs: strip, page, fit, badges, openSearch, path: `${location.path}?tab=${tab?.slug ?? ""}` };
+  const frame: FrameProps = {
+    modules,
+    mod: allowed,
+    tab,
+    tabs: strip,
+    page,
+    fit,
+    badges,
+    urgent,
+    alert: <UrgentNotices rows={urgentRows} />,
+    openSearch,
+    path: `${location.path}?tab=${tab?.slug ?? ""}`,
+    history,
+  };
 
   return (
     <FitContext.Provider value={useCallback((f: boolean) => setFit(f), [])}>
       <ScreenActionProvider>
         {phone ? <PhoneFrame {...frame} /> : <DesktopFrame {...frame} />}
         <Search open={search} onClose={() => setSearch(false)} />
+        <ClockPrompts />
+        <AcknowledgePrompts />
       </ScreenActionProvider>
     </FitContext.Provider>
   );
@@ -125,9 +175,27 @@ interface FrameProps {
   page: ReactNode;
   fit: boolean;
   badges: Record<string, number> | undefined;
+  /** Modules an open urgent notice is about: their badges show red. */
+  urgent: Set<string>;
+  /** The urgent bar, under the top bar on every screen. */
+  alert: ReactNode;
   openSearch: () => void;
   /** The screen in view (path and tab): a new one resets the scroll and Hide Here. */
   path: string;
+  /** Refresh, reload, back, forward and the trail (F28, F29). */
+  history: HistoryProps;
+}
+
+interface HistoryProps {
+  /** Running as an installed app: back, forward and the trail show only then. */
+  installed: boolean;
+  items: TrailItem[];
+  /** Where Back and Forward go, by name. */
+  back: string | null;
+  forward: string | null;
+  trailOpen: boolean;
+  setTrailOpen: (open: boolean) => void;
+  reloadApp: () => Promise<void>;
 }
 
 const RAIL_KEY = "mc-rail";
@@ -139,7 +207,7 @@ function readCollapsed() {
   }
 }
 
-function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: FrameProps) {
+function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, openSearch, history }: FrameProps) {
   const me = useMe();
   const photo = useMyPhoto();
   const { navigate } = useRouter();
@@ -159,10 +227,12 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: Fra
       fit={fit}
       rail={
         <Rail
-          items={railItems(modules, badges)}
+          items={railItems(modules, badges, urgent)}
           current={mod?.key ?? null}
           collapsed={collapsed}
           onNavigate={navigate}
+          homeHref={hrefFor("home")}
+          onBrandHold={history.installed ? () => history.setTrailOpen(true) : undefined}
           account={{ name: me.display_name, subtitle: me.job_title, photo, menu }}
           foot={
             <>
@@ -176,7 +246,24 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: Fra
       }
       topBar={
         <TopBar
-          start={<IconButton icon="panel" label={collapsed ? "Expand Menu" : "Collapse Menu"} onClick={toggle} />}
+          start={
+            <>
+              <IconButton icon="panel" label={collapsed ? "Expand Menu" : "Collapse Menu"} onClick={toggle} />
+              <NavCapsule
+                arrows={history.installed}
+                back={history.back}
+                forward={history.forward}
+                onBack={() => goHistory(-1)}
+                onForward={() => goHistory(1)}
+                onRefresh={refreshScreen}
+                onReload={history.reloadApp}
+                trail={history.items}
+                onGo={goTrail}
+                trailOpen={history.trailOpen}
+                onTrailOpenChange={history.setTrailOpen}
+              />
+            </>
+          }
           search={<SearchButton onClick={openSearch} />}
           actions={
             <>
@@ -187,6 +274,7 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, openSearch }: Fra
         />
       }
       tabs={tabs}
+      alert={alert}
       notice={<ShellNotices />}
     >
       {page}
@@ -214,7 +302,7 @@ function useAccountMenu(): MenuItem[] {
   ];
 }
 
-function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }: FrameProps) {
+function PhoneFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, openSearch, path, history }: FrameProps) {
   const me = useMe();
   const photo = useMyPhoto();
   const { navigate } = useRouter();
@@ -224,11 +312,14 @@ function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }:
       <PhoneShell
         pageKey={path}
         fit={fit}
+        onRefresh={refreshScreen}
+        onReload={history.reloadApp}
         header={
           <PhoneHeader
             title={mod?.label}
             homeHref={hrefFor("home")}
             onNavigate={navigate}
+            onPinHold={history.installed ? () => history.setTrailOpen(true) : undefined}
             tabs={tabs}
             actions={
               <>
@@ -241,13 +332,15 @@ function PhoneFrame({ modules, mod, tabs, page, fit, badges, openSearch, path }:
             }
           />
         }
-        bottomBar={<BottomBar items={bottomItems(modules, badges, () => setMore(true), more)} current={more ? "more" : bottomKey(mod?.key ?? null)} onNavigate={navigate} />}
+        bottomBar={<BottomBar items={bottomItems(modules, badges, () => setMore(true), more, urgent)} current={more ? "more" : bottomKey(mod?.key ?? null)} onNavigate={navigate} />}
         fab={<Fab page={path} />}
+        alert={alert}
         notice={<ShellNotices />}
       >
         {page}
       </PhoneShell>
       <More open={more} onClose={() => setMore(false)} modules={modules} badges={badges} current={mod?.key ?? null} onSearch={openSearch} />
+      {history.installed && <TrailMenu open={history.trailOpen} onOpenChange={history.setTrailOpen} items={history.items} onGo={goTrail} />}
     </>
   );
 }

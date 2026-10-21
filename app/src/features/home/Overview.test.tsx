@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import dashboard from "@mycity/contract/schemas/dashboard.js";
 import reports from "@mycity/contract/schemas/reports.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import { formatTime, ModalProvider, Toaster, todayIso } from "@mycity/ui";
+import { formatTime, ModalProvider, Toaster } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
@@ -17,7 +17,7 @@ import Home from "./index";
 /**
  * Home · Overview on the in-browser mock (docs/guides/home.md §10): each Home view draws its
  * own sections and nothing a guide keeps off a screen; Choose Cards; the records behind a card;
- * the clock-in prompt; Export; the phone's layout. The screen gates crawl Operations only (FRONTEND_GUIDE
+ * the Overview read again after a clock-in; Export; the phone's layout. The screen gates crawl Operations only (FRONTEND_GUIDE
  * §9.4), so the CEO, Partnerships and Staff Overviews are held to the copy rules here.
  *
  * The clock is a Monday morning in Lagos, a working day, whatever day the suite runs.
@@ -82,12 +82,8 @@ async function signedIn(email: string, at = "/home?tab=overview") {
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
   });
   return {
-    /**
-     * Puts the Overview on screen. Unless the test is about the clock-in prompt, the prompt is
-     * marked as already opened today, so a dialog does not cover the page under test.
-     */
-    show: async ({ prompt = false }: { prompt?: boolean } = {}) => {
-      if (!prompt) localStorage.setItem("mc-clock-prompt", `${auth!.me!.user_id}|${todayIso()}`);
+    /** Puts the Overview on screen. */
+    show: async () => {
       rerender(app(true));
       // A dialog the screen opens by itself hides the page from the accessibility tree: look past it.
       await screen.findByRole("heading", { level: 1, name: /^Good Morning, /, hidden: true }, { timeout: 8000 });
@@ -98,8 +94,8 @@ async function signedIn(email: string, at = "/home?tab=overview") {
 }
 
 /** Signs in on the mock and waits for the Overview. */
-async function overviewAs(email: string, at?: string, opts?: { prompt?: boolean }) {
-  await (await signedIn(email, at)).show(opts);
+async function overviewAs(email: string, at?: string) {
+  await (await signedIn(email, at)).show();
 }
 
 /** Opens a link on the screen in view, as the address bar or a ⌘K result would. */
@@ -156,51 +152,20 @@ function copyProblems(root: ParentNode = document.body): string[] {
 /** Lines the earlier, server-written Overview carried that are tier 3 (home.md §10.1): never on a screen. */
 const TIER_3 = /Your own attendance is in|live in My Workspace|threshold the rule watches|Grouped the way|Raised by the rule|Posted automatically|Weighted across departments/;
 
-describe("the clock-in prompt", () => {
-  it("opens once when the server says it is due, and not again that day", async () => {
-    await overviewAs("cynthia@mycityapp.io", undefined, { prompt: true });
-    expect(await screen.findByRole("dialog", { name: "Clock In" }, { timeout: 5000 })).toBeTruthy();
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    cleanup();
-    // Back on Home later the same day: the session is still the day's first, the screen does not open it again.
-    await overviewAs("cynthia@mycityapp.io", undefined, { prompt: true });
-    expect(dashboard.HomeOverview.parse(await api.call("GET /api/v1/home/overview")).prompt_clock_in).toBe(true);
-    expect(screen.queryByRole("dialog")).toBeNull();
-  }, 30000);
-
-  it("waits while a link has a card's records open, and opens once they close", async () => {
-    await overviewAs("ngozi@mycityapp.io", "/home?tab=overview&kpi=partnerships_active", { prompt: true });
-    const sheet = await screen.findByRole("dialog", { name: "Active Partnerships" }, { timeout: 5000 });
-    expect(screen.queryByRole("dialog", { name: "Clock In" })).toBeNull();
-    fireEvent.keyDown(sheet, { key: "Escape" });
-    expect(await screen.findByRole("dialog", { name: "Clock In" }, { timeout: 5000 })).toBeTruthy();
-  }, 30000);
-
-  it("does not open when the server says it is not due: here, someone already clocked in", async () => {
-    const session = await signedIn("chidera@mycityapp.io");
-    await api.call("POST /api/v1/attendance/punches", {
-      body: { event_type: "clock_in", device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, location_error: "denied" },
-      idempotencyKey: crypto.randomUUID(),
-    });
-    await session.show({ prompt: true });
-    expect(dashboard.HomeOverview.parse(await api.call("GET /api/v1/home/overview")).prompt_clock_in).toBe(false);
-    expect(screen.queryByRole("dialog")).toBeNull();
-  }, 30000);
-
-  it("reads the Overview again after the clock-in it opens: the day strip shows the punch", async () => {
+describe("a clock-in", () => {
+  it("reads the Overview again: the day strip shows the punch", async () => {
     // Precious has not clocked in today, and no other case here signs her in.
-    await overviewAs("precious@mycityapp.io", undefined, { prompt: true });
-    const panel = await screen.findByRole("dialog", { name: "Clock In" }, { timeout: 5000 });
+    await overviewAs("precious@mycityapp.io");
     const strip = () => within(screen.getByRole("list", { name: "Your Day", hidden: true }));
     expect(strip().getByText("Not In")).toBeTruthy();
-    fireEvent.click(await within(panel).findByRole("button", { name: "Clock In" }));
-    fireEvent.click(await within(panel).findByRole("button", { name: "Allow Location" }));
-    fireEvent.click(await within(panel).findByRole("button", { name: "Clock In Anyway" }));
-    // The punch is recorded (for review: the device is not registered); the panel then closes.
-    await within(panel).findAllByText(/^Clocked In/, {}, { timeout: 5000 });
-    fireEvent.keyDown(panel, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // As the clock panel does after a punch: record it, then reload attendance's reads.
+    await act(async () => {
+      await api.call("POST /api/v1/attendance/punches", {
+        body: { event_type: "clock_in", device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, location_error: "denied" },
+        idempotencyKey: crypto.randomUUID(),
+      });
+      invalidate("/api/v1/attendance");
+    });
     const today = dashboard.HomeOverview.parse(await api.call("GET /api/v1/home/overview")).day_strip!;
     expect(today.clock_in_at).not.toBeNull();
     await waitFor(() => expect(strip().getByText(formatTime(today.clock_in_at!))).toBeTruthy());
@@ -275,16 +240,24 @@ describe("Home · Overview, by Home view", () => {
     await overviewAs("chidera@mycityapp.io");
     fireEvent.keyDown(screen.getByRole("button", { name: "New" }), { key: "Enter" });
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave"]);
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave", "Add Work Site"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Request Leave" }));
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe("/ess?tab=my-leave&action=new"));
+  }, 30000);
+
+  it("Add Work Site, beside New and in it, opens Attendance's temporary site sheet over the Overview", async () => {
+    await overviewAs("chidera@mycityapp.io");
+    fireEvent.click(screen.getByRole("button", { name: "Add Work Site" }));
+    const sheet = await screen.findByRole("dialog", { name: "Add Work Site" }, { timeout: 5000 });
+    expect(within(sheet).getByRole("button", { name: "Submit for Approval" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/home");
   }, 30000);
 
   it("offers New Rule and New Report to their capabilities' holders; New Rule opens the rule form on Alerts", async () => {
     await overviewAs("cynthia@mycityapp.io");
     fireEvent.keyDown(screen.getByRole("button", { name: "New" }), { key: "Enter" });
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave", "New Rule", "New Report"]);
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["New Task", "Request Leave", "Add Work Site", "New Rule", "New Report"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "New Rule" }));
     expect(await screen.findByRole("dialog", { name: "New Rule" }, { timeout: 5000 })).toBeTruthy();
     // The address asked once; it no longer does, so Back or a reload does not open the form again.
@@ -430,19 +403,33 @@ describe("the records behind a card", () => {
 describe("Export", () => {
   // The toasts, on their own: the Overview's other cases read the page without them.
   const toasts = () => render(<Toaster />);
+  // The clock is held still here, and the mock makes a run's file a few seconds after it is asked
+  // for: each look moves it on a second until the file is saved (the mock holds no bytes, and says so).
+  const savedMeanwhile = () =>
+    waitFor(
+      () => {
+        vi.setSystemTime(new Date(Date.now() + 1_000));
+        expect(screen.getByText("Files download once the API is connected")).toBeTruthy();
+      },
+      { timeout: 12000, interval: 250 },
+    );
 
-  it("makes a file of the reader's own Overview in the format they choose, toasted with its run's number", async () => {
+  it("makes a file of the reader's own Overview in the format they choose, waits for it and downloads it here", async () => {
     toasts();
     await overviewAs("cynthia@mycityapp.io");
+    const before = reports.HomeReportRunPage.parse(await api.call("GET /api/v1/home/report-runs")).page.total;
     fireEvent.keyDown(screen.getByRole("button", { name: "Export" }), { key: "Enter" });
     const menu = await screen.findByRole("menu");
     expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Export PDF", "Export XLSX"]);
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Export XLSX" }));
-    const toast = await screen.findByText(/^RPT-\d{4} queued\. It arrives by email\.$/, {}, { timeout: 5000 });
-    const number = toast.textContent!.split(" ")[0];
-    // A run of the reader's own Overview, for them alone, Pending until its file is there.
-    const runs = reports.HomeReportRunPage.parse(await api.call("GET /api/v1/home/report-runs")).data;
-    expect(runs.find((r) => r.number === number)).toMatchObject({ report_key: "overview", format: "xlsx", recipient_name: "Cynthia Osakunih", report_schedule_id: null });
+    // Busy while the file is made, then saved on this device (the in-browser mock holds no bytes, and says so).
+    await waitFor(() => expect(screen.getByRole("button", { name: "Export" }).getAttribute("aria-busy")).toBe("true"));
+    await savedMeanwhile();
+    // A run of the reader's own Overview, for them alone, done and never emailed.
+    const runs = reports.HomeReportRunPage.parse(await api.call("GET /api/v1/home/report-runs"));
+    expect(runs.page.total).toBe(before + 1);
+    const run = runs.data.reduce((a, b) => (b.number > a.number ? b : a));
+    expect(run).toMatchObject({ report_key: "overview", format: "xlsx", recipient_name: "Cynthia Osakunih", report_schedule_id: null, status: "done", emailed_at: null });
     // The Overview's own report is not one of the reports Reports lists.
     const listed = reports.HomeReportPage.parse(await api.call("GET /api/v1/home/reports")).data;
     expect(listed.some((r) => r.report_key === "overview")).toBe(false);
@@ -453,7 +440,9 @@ describe("Export", () => {
     await overviewAs("chidera@mycityapp.io");
     fireEvent.keyDown(screen.getByRole("button", { name: "Export" }), { key: "Enter" });
     fireEvent.click(within(await screen.findByRole("menu")).getByRole("menuitem", { name: "Export PDF" }));
-    expect(await screen.findByText(/^RPT-\d{4} queued\. It arrives by email\.$/, {}, { timeout: 5000 })).toBeTruthy();
+    // Staff hold no `home.reports`: the screen waits on its own run through the Overview's own read.
+    await savedMeanwhile();
+    expect(screen.queryByText("Export failed. Try again.")).toBeNull();
     cleanup();
     setViewport(390);
     await overviewAs("chidera@mycityapp.io");

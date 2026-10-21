@@ -39,7 +39,14 @@
  * on our relay, and there the local delivery is CORRECT. A remote MX on its own
  * is the ordinary case for every domain on the internet we do not host. Only the
  * combination — we host the domain, but its mail lives somewhere else — is the
- * trap, and in that combination local delivery is always wrong.
+ * trap.
+ *
+ * One arrangement looks exactly the same and is not a trap: a host whose MX is
+ * its own spam filter (Namecheap's mx*-hosting.jellyfish.systems), which takes
+ * the domain's mail in from the internet and hands it back to the mailboxes on
+ * the relay. There local delivery is right, and public DNS cannot tell it from
+ * the trap. So those domains are named by configuration (SMTP_LOCAL_DOMAINS,
+ * MyCity's own by default) and the send-path guard does not check them.
  *
  * `classify` is pure so the decision is testable without a resolver; `checkRoute`
  * is the network wrapper. Every lookup failure degrades to UNKNOWN rather than a
@@ -284,16 +291,29 @@ const domainsOf = (to) => {
   ];
 };
 
+/** Domains as a lower-case set, from a comma-separated string or a list. */
+const domainSet = (value) =>
+  new Set(
+    (Array.isArray(value) ? value : String(value || "").split(","))
+      .map((d) => String(d).trim().toLowerCase())
+      .filter(Boolean),
+  );
+
 /**
  * Throw when this relay would swallow mail for any of `to`.
  *
  * Silent on every other outcome, including UNKNOWN — an unproven suspicion must
  * never stop a message. `err.code` is `MAIL_ROUTE_TRAPPED` so the job's log and
  * the UI can key a fix guide off it.
+ *
+ * `localDomains` (SMTP_LOCAL_DOMAINS) are not checked: their mailboxes are on the
+ * relay behind a filtering MX, so local delivery is where their mail belongs.
  */
-async function assertRoutable({ smtpHost, to }) {
+async function assertRoutable({ smtpHost, to, localDomains }) {
   if (!smtpHost || !to) return;
+  const local = domainSet(localDomains);
   for (const domain of domainsOf(to)) {
+    if (local.has(domain)) continue;
     let verdict;
     try {
       verdict = await checkRouteCached({ smtpHost, recipientDomain: domain });

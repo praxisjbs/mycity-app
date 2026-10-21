@@ -71,9 +71,11 @@ export function TextField({ value, onChange, onBlur, state, message: _message, t
 export interface PasswordFieldProps extends BoundProps, NativeInput {
   /** new-password on sign-up and change, current-password on sign-in. */
   autoComplete?: "current-password" | "new-password";
+  /** What the show and hide button names: password (the default), or key for an API key. */
+  noun?: "password" | "key";
 }
 
-export function PasswordField({ value, onChange, onBlur, state, message: _message, className, id, autoComplete = "current-password", ...rest }: PasswordFieldProps) {
+export function PasswordField({ value, onChange, onBlur, state, message: _message, className, id, autoComplete = "current-password", noun = "password", ...rest }: PasswordFieldProps) {
   const a = useFieldControl({ id, state });
   const [shown, setShown] = useState(false);
   return (
@@ -90,7 +92,7 @@ export function PasswordField({ value, onChange, onBlur, state, message: _messag
       />
       <button
         type="button"
-        aria-label={shown ? "Hide password" : "Show password"}
+        aria-label={`${shown ? "Hide" : "Show"} ${noun}`}
         aria-pressed={shown}
         onClick={() => setShown((s) => !s)}
         className="absolute right-0 flex h-control min-h-tap w-11 items-center justify-center text-subtle-foreground hover:text-foreground"

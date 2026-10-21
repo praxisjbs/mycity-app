@@ -3,8 +3,12 @@ import { useMemo, useState } from "react";
 import type { HomeAlertRule } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useRouter } from "@/lib/router";
+import { hrefFor } from "@/lib/routes";
 import {
   Button,
+  Card,
+  CardHeader,
   ChoiceField,
   DataView,
   ErrorState,
@@ -35,8 +39,12 @@ import { clearerOptions, isMetric, METRIC_OPTIONS, ruleLine, SEVERITY } from "./
  * form, checked by the contract's own rule (HomeAlertRuleCreate), a dialog on desktop and a
  * bottom sheet on a phone. A rule's key is the server's to make, and its metric stays once it
  * is made, so Edit Rule does not offer it. Switching a rule off asks first, since the server
- * dismisses its open alerts with it.
+ * dismisses its open alerts with it. The Attendance policy's five consequence rules come first,
+ * read only on their own card: they are changed in the policy (Set in Attendance Policy).
  */
+
+/** Knowledge Hub · Policies, open on the Attendance policy. */
+export const ATTENDANCE_POLICY_HREF = hrefFor("knowledge", "policies", { policy: "attendance" });
 
 export interface RuleForms {
   /** Alert Rules: every rule, its switch, and the way to change it. */
@@ -108,6 +116,7 @@ function RuleList({ close, forms }: { close: () => void; forms: RuleForms }) {
 
   return (
     <>
+      <PolicyRules close={close} />
       <DataView bare caption="Alert Rules" list={list} rowKey={(r) => r.home_alert_rule_id} noun="rule" columns={columns} empty={{ title: "No Rules Yet" }} />
       <ModalFooter>
         <Button onClick={close}>Close</Button>
@@ -117,6 +126,56 @@ function RuleList({ close, forms }: { close: () => void; forms: RuleForms }) {
         </Button>
       </ModalFooter>
     </>
+  );
+}
+
+/**
+ * The Attendance Policy card: the policy's five rules as the version in force today sets them,
+ * each with its figures in words (or Off) and what reaching it does; Set in Attendance Policy for
+ * a holder of `policies.manage`.
+ */
+function PolicyRules({ close }: { close: () => void }) {
+  const { navigate } = useRouter();
+  const { data, error, reload } = useApi("GET /api/v1/home/alert-rules/policy");
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (!data) return <LoadingRows count={2} />;
+  return (
+    <Card className="mb-3">
+      <CardHeader
+        title="Attendance Policy"
+        help="These rules are set in the Attendance policy. Their alerts are raised when someone reaches a limit."
+        right={
+          data.can_set ? (
+            <Button size="sm" onClick={() => (close(), navigate(ATTENDANCE_POLICY_HREF))}>
+              Set in Attendance Policy
+            </Button>
+          ) : undefined
+        }
+      />
+      <DataView
+        bare
+        caption="Attendance Policy Rules"
+        rows={data.rules}
+        rowKey={(r) => r.rule}
+        noun="rule"
+        columns={[
+          { key: "name", label: "Rule", render: (r) => r.name },
+          { key: "figures", label: "Limit", render: (r) => r.figures ?? <Pill tone="neutral">Off</Pill> },
+          {
+            key: "does",
+            label: "Does",
+            render: (r) =>
+              r.on ? (
+                <span className="inline-flex flex-wrap gap-1.5">
+                  {r.alert && <Pill tone="info">Alert</Pill>}
+                  {r.query && <Pill tone="warn">Raise Query</Pill>}
+                </span>
+              ) : null,
+          },
+          { key: "open_alerts", label: "Open Alerts", align: "n", desktop: true, render: (r) => formatCount(r.open_alerts) },
+        ]}
+      />
+    </Card>
   );
 }
 

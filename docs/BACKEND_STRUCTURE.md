@@ -141,12 +141,13 @@ src/
 │   ├── spreadsheet/   parse.js · build.js · csv.js · cells.js · context.js · day-first-cells.js (§9)
 │   ├── import/        engine.js · mapping.js · registry.js · report.js · revert.js (§9)
 │   ├── tokens/        public-token.js (32-byte, hashed at rest, expiring)
-│   ├── rules/         window-counter.js (N events in a rolling window, M3 and M7)
+│   ├── rules/         window-counter.js (N events, or H hours of them, in a rolling window or a
+│   │                  period; M1's attendance consequence rules, M3 and M7)
 │   ├── alerts/        alerts.js (work nobody has done; count and deadline breaches; ageing;
 │   │                  clear-by-permission over the subject; a switched-off rule's alerts dismissed)
 │   ├── state/         state-history.js (time at stage, M4 M7 M8)
 │   ├── dedup/         dedup.js (scoring, advisory, never blocking)
-│   ├── geo/           geo.js (distance, inside-fence; M1 clock-in)
+│   ├── geo/           geo.js (distance, a usable point; M1 clock-in)
 │   ├── notifications/ categories.js · fanout.js
 │   ├── search/        provider.js · registry.js · search.service.js
 │   ├── ai/            manifest.js · registry.js · catalogue-sync.js · authorise.js ·
@@ -178,9 +179,10 @@ src/
 ├── jobs/
 │   ├── queues.js · registry.js · cron-lock.js
 │   ├── handlers/      email-send · pdf-render · notification-deliver · notification-push ·
-│   │                  media-derive · media-scan · av-transcode · import-validate · import-commit
+│   │                  media-derive · media-scan · av-transcode · import-validate · import-commit ·
+│   │                  reminders
 │   └── schedulers/    outbox-dispatch · workflow-timeout · alert-ageing · media-reconcile ·
-│                      import-cleanup
+│                      import-cleanup · urgent-repeats · reminders
 │
 └── modules/                          M0 ships these nine; each follows §8
     ├── identity/                     login, refresh, logout, me, sessions, known devices
@@ -361,6 +363,7 @@ and only then moves the file into the vault. A staff user never opens an unscann
 | Signature capture (M5) | profile `document`, PNG kept | Stamped into the PDF execution block |
 | Voice note (M1 chat, M2 dictation) | `av-pipeline` | Opus in Ogg, duration stored; original kept |
 | Video (chat) | `av-pipeline` | H.264 MP4 ≤ 720p + poster frame |
+| PDF (chat, documents) | `pdf-pipeline`: PDF.js in a child process (60 s, 512 MB), nothing in the file runs | Page count on `document.page_count`; the first page as WebP 960 and 320 |
 | HEIC from iPhones | `image-pipeline` normalisation | Converted on the way in |
 
 Brand images (logo, pin, white variant, app icons) come from `assets/brand/` vector masters and are
@@ -772,6 +775,7 @@ fails at the first query. Everything else in each table is the migration's call.
 | `event_outbox` (0030) | `outbox_id` uuid PK, `event_id` FK, `event_key`, `dedup_key` (UNIQUE where not null), `status` (`pending` / `processing` / `done` / `failed`), `attempts`, `max_attempts` (default 8), `next_attempt_at`, `completed_handlers` text[], `last_error`, `created_at`, `updated_at`, `processed_at`; index on `next_attempt_at` where pending. A handler is given `{ outbox_id, attempt, max_attempts }`, so one that keeps a status of its own (a report run) records a final failure instead of throwing it again | `shared/events/outbox` |
 | `notification` (0060) | `notification_id` uuid PK, `user_id`, `event_id` FK, `event_key`, `category`, `priority` (`normal` / `high`), `title`, `body`, `entity_type`, `entity_id` text, `channels` text[], `created_at`, `read_at`, `delivery_queued_at`; UNIQUE (`event_id`, `user_id`). No link column: the inbox derives it (`shared/route-map`). The bell shows rows whose `channels` include `in_app` | `shared/notifications/fanout` |
 | `notification_preference` (0060) | `user_id`, `category`, `channel` (`in_app` / `email` / `push`), `enabled`; PRIMARY KEY (`user_id`, `category`, `channel`) | `shared/notifications/fanout` |
+| `notification_rule`, `notification_rule_recipient` (0480) | `notification_rule_id`, `event_key` UNIQUE, `enabled`, `urgency` (null: as declared), `in_app`, `email`, `push` (each null: the category's default); `notification_rule_id`, `role_id` or `employee_id`. Written by the notifications module (Settings · Notifications) | `shared/notifications/fanout` (each event's rule: Off, copies, urgency, default channels) |
 | `workflow_definition` (0070) | `workflow_definition_id` uuid PK, `key`, `version`, `module_key`, `name`, `description`, `context_types` jsonb, `stages` jsonb, `active`, `created_by`, `created_at`; UNIQUE (`key`, `version`) | `shared/workflow/definitions` |
 | `workflow_instance` (0070) | `workflow_instance_id` uuid PK, `workflow_definition_id` FK, `definition_key`, `module_key`, `entity_type`, `entity_id` text, `subject_employee_id`, `current_stage`, `state` (`pending` / `approved` / `rejected` / `cancelled` / `timeout_approved` / `timeout_rejected`), `context` jsonb, `stage_approvers` jsonb, `stage_entered_at`, `stage_due_at`, `opened_by`, `opened_at`, `completed_at`; UNIQUE (`entity_type`, `entity_id`) WHERE `state = 'pending'` | `shared/workflow/engine` |
 | `workflow_decision` (0070) | `workflow_decision_id` uuid PK, `workflow_instance_id` FK, `stage_key`, `actor_id` NULL, `decision` (`approve` / `reject` / `request_changes` / `cancel` / `timeout_approve` / `timeout_reject`), `reason`, `decided_at` (clock_timestamp, so two decisions in one transaction keep their order) | `shared/workflow/engine` |
@@ -829,7 +833,7 @@ milestone shown, so nothing is retrofitted.
 | Time at stage | M4, M7, M8 | `shared/state` | Built |
 | Rolling-window rules ("3 in 30 days") | M3, M7 inactivity | `shared/rules` | Seam |
 | Geofence maths | M1 clock-in | `shared/geo` | Built |
-| Realtime rooms, presence | M1 chat | `realtime/socket`, `services/realtime/active` (in front of the app, for the push hold) | Built (presence M1) |
+| Realtime rooms, presence | M1 chat | `realtime/socket`, `services/realtime/active` (in front of the app, for attendance's clock watch) | Built (presence M1) |
 | Mailbox secrets, IMAP IDLE loop slot | M1 | `services/secrets`, worker | Seam |
 | Recurrence, ICS invites | M2, M4 | `shared/time/recurrence`, `services/calendar` | Seam |
 | LLM client, governance, spend ledger, stub when off | M2, M4, M7, M10 | `services/ai` (§14) | Built (vendor key M2) |
@@ -887,21 +891,38 @@ prompts.
 | **Feature AI**: one task inside a module's service | M2 transcript cleanup, M4 JD draft and CV screening, M7 proposal draft | The module's service, via `ai.complete()` | M2, M4, M7 |
 | **Assistant**: answers questions from data | M10 Praxis AI ("who has overdue tasks?") | `services/ai/assistant/`, via the manifests | M10 |
 
-Both go through `services/ai/llm.service.js`. Nothing else in `src/` may import a vendor SDK;
-`check/ai-vendor-imports.js` fails the build if it does.
+Both go through `services/ai/llm.service.js` (voice through `services/ai/transcription.js`, the same
+governance and ledger). Nothing else in `src/` may import a vendor SDK; `check/ai-vendor-imports.js`
+fails the build if it does.
+
+The vendors are Gemini, Groq (speech to text), OpenAI (embeddings), Anthropic (top-tier drafting,
+Sonnet and Haiku only) and DeepSeek (work with no personal data), each one file in
+`services/ai/vendors/`, plain HTTPS through `vendors/http.js`, with its key and model list on
+Settings · Integrations (`docs/guides/integrations.md` §1.2). Every AI feature is an **action**,
+registered once in `services/ai/actions.js` under one of seven jobs (Default, Fast, Deep Reasoning,
+Image Reading, Transcription, Embeddings, Top Tier) with whether it carries personal data and who chose
+the job; its `purpose` names it. AI Control (`docs/guides/ai-control.md`) keeps each job's chain, and
+an action's own: a first choice and up to three fallbacks. `services/ai/jobs.js` works out the chain and
+each model's state for every call, and `check/ai-actions.js` fails a call that names no registered
+action.
 
 ### 14.2 What every call passes through
 
 ```
 ai.complete({ purpose, module, actor, input, output: ContractSchema })
-  → governance    module switch on? monthly cap not reached? (refuses with a clear AppError)
+  → governance    module switch on? monthly cap on all AI not reached? (refuses with a clear AppError)
+  → chain         the action's chain (jobs.js): models not set up, off the key, at a Free plan's daily
+                  limit, skipped until a reset, at their provider's monthly cap, DeepSeek on personal
+                  data, are passed by; a failure moves to the next model
   → redact        restricted fields removed; only what the actor may see is ever sent
   → prompt        services/ai/prompts/<purpose>.md, versioned; version recorded on the run
-  → vendor        Gemini, or the stub when no key is configured (pixie resolveVendor rule)
+  → vendor        Gemini, Anthropic or DeepSeek, or the stub when no provider in the chain is set up
+                  (pixie resolveVendor rule)
   → structured    response parsed against a Zod schema from packages/contract; a malformed
                   answer is retried once, then fails, never half-applied
-  → ledger        ai_run + ai_run_step: purpose, module, actor, tokens, cost in NGN, latency,
-                  prompt version, outcome
+  → ledger        ai_run + ai_run_step: purpose (the action), module, actor, the model that answered,
+                  tokens and audio seconds, the naira prices and the day's rate charged (prices.js),
+                  latency, prompt version, outcome
   → result        { output, provisional: true, run_id }
 ```
 
@@ -966,7 +987,7 @@ This keeps a broad question from timing out the AI call or the request behind it
 | Milestone | Adds | On top of |
 |---|---|---|
 | M1 onward | One `.ai.js` per module | registry, gate 9 |
-| M2 | `transcription.js` body, `prompts/review-cleanup.md`, vendor key in `.env` | `complete()`, ledger |
+| M2 | `prompts/review-cleanup.md` (`transcription.js` came early, 20/10/2026: Groq, then Gemini, then the browser's captions, `docs/guides/integrations.md` §6.14; keys on Settings · Integrations) | `complete()`, ledger |
 | M4 | `prompts/jd-draft.md`, `prompts/cv-screen.md` | structured output, provisional flag |
 | M7 | `prompts/proposal-draft.md`, `prompts/mou-draft.md` | same |
 | M10 | `services/ai/assistant/` (retrieve, choose reads, answer, cite), embeddings with pgvector, spend screen | catalogue, authorise, cite, ledger, governance |

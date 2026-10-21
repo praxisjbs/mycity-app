@@ -184,7 +184,6 @@ const FIELDS = [
   ["confirmation_due_on", "Confirmation due (YYYY-MM-DD, optional; end of probation)"],
   ["confirmed_on", "Confirmed on (YYYY-MM-DD, optional)"],
   ["date_of_birth", "Date of birth (YYYY-MM-DD, optional)"],
-  ["home_address", "Home address (optional)"],
   ["staff_number", "Staff number (optional, issued automatically when blank)"],
   ["gender", `Gender (${contract.organisation.GENDERS.join(", ")}, optional)`],
   ["next_of_kin_name", "Next of kin name (optional)"],
@@ -214,7 +213,8 @@ function sampleEmployee(workEmail) {
  * The implementation team's login: a complete employee record, held by the Implementation Team
  * role for the length of the build and suspended at handover (docs/runbooks/first-accounts.md).
  * Every employee field is filled except the ones that point at other records (worksite, line
- * and dotted managers, seats: a remote first account has none to point at) and left_on. The
+ * and dotted managers, seats: a remote first account has none to point at), left_on, and the
+ * home address, which is picked on My Profile after sign-in (F27: a terminal cannot pick one). The
  * email is typed at the terminal and serves as both work and personal email, so it is never kept
  * here. A consultant has no probation, so confirmation is due and done on the start date. A
  * two-month consultancy of N3,700,000, so N1,850,000 a month. The account number is ten zeros on
@@ -239,7 +239,6 @@ const BUILD_ACCOUNT = Object.freeze({
     work_pattern: "remote",
     gender: "male",
     date_of_birth: "1990-03-12",
-    home_address: "14 Adeola Odeku Street, Victoria Island, Lagos",
     next_of_kin_name: "JBS Praxis Office",
     next_of_kin_phone: "08027492738",
     next_of_kin_relationship: "Employer",

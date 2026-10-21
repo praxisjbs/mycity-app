@@ -12,14 +12,15 @@
  * The photo is the organisation module's too (organisation.photo.js): uploaded here through the
  * upload engine as an avatar, read by every colleague.
  *
- * The work schedule shows the organisation's week (Settings, A22) with each day's place,
- * Office, Remote or Off, from the attendance module: the work pattern and, for hybrid
- * staff, the schedule People set (attendance guide §6.13).
+ * The work schedule is the person's own week from the attendance module (attendance guide §6.13):
+ * each day Working or Off, its hours and Office or Remote, by the schedule People set, else the
+ * company hours (the Attendance policy's, else Settings' working week, A22) at the place the work
+ * pattern gives.
  */
 const { pool } = require("../../config/db");
+const places = require("../../shared/places/places");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
-const workingWeek = require("../../shared/time/working-week");
 const organisation = require("../organisation/organisation.service");
 const employee360 = require("../organisation/employee-360.service");
 const photo = require("../organisation/organisation.photo");
@@ -30,23 +31,15 @@ const { EVENTS } = require("./ess.events");
 
 const BANK_FIELDS = ["bank_name", "account_number"];
 
-/** The organisation's week, Monday first, as the calendar Settings keeps, and where the person works each day. */
+/** The person's own week, Monday first: each day worked or not, its hours, and Office, Remote or Off. */
 async function workingWeekOf(client, employeeId) {
-  const cal = await workingWeek.loadCalendar(client);
-  const places = await schedules.weekOf(client, employeeId);
-  const out = [];
-  for (let weekday = 1; weekday <= 7; weekday += 1) {
-    const working = cal.days.has(weekday);
-    const hours = cal.hours[weekday] || (working ? workingWeek.DEFAULT_WEEK : null);
-    out.push({
-      weekday,
-      is_working_day: working,
-      starts_at: working && hours ? hours.starts_at : null,
-      ends_at: working && hours ? hours.ends_at : null,
-      place: places[weekday - 1].place,
-    });
-  }
-  return out;
+  return (await schedules.weekOf(client, employeeId)).map((d) => ({
+    weekday: d.weekday,
+    is_working_day: d.working,
+    starts_at: d.starts_at,
+    ends_at: d.ends_at,
+    place: schedules.placeOf(d),
+  }));
 }
 
 /** The 360 cut to what My Profile shows. */
@@ -82,7 +75,10 @@ function profileOf(e, week, photoUrl = null) {
 
 async function get(user) {
   const me = meOf(user);
-  return profileOf(await employee360.get(pool, me), await workingWeekOf(pool, me), await photo.photoOf(pool, me));
+  return {
+    ...profileOf(await employee360.get(pool, me), await workingWeekOf(pool, me), await photo.photoOf(pool, me)),
+    home_address_place: await places.view(pool, "employee.home_address", me),
+  };
 }
 
 /**

@@ -12,12 +12,18 @@
  *           the open app shows the banner. Best effort: the inbox is the record.
  *   email   system mail with templates/email/notification.html, linking to the record
  *           (shared/route-map). Sent only to active users.
- *   push    one `notification-push` job per row (jobs/handlers/notification-push.js). When
- *           the person is in front of the app on any device, it waits a minute and goes only
- *           if the notice is still unread (TB, 19/10/2026); Security never waits.
+ *   push    one `notification-push` job per row (jobs/handlers/notification-push.js), at once:
+ *           every device of the person, whether or not they are in the app (TB, 19/10/2026);
+ *           held until their quiet hours end when they turned them on, unless the notice is
+ *           urgent or Security (the job skips a notice read meanwhile).
  *
  * Paced like all system mail (services/mail/pace.js): when the hourly limit is reached, the
  * emails already sent are recorded and the job is put back in the queue for the rest.
+ *
+ * While system mail is paused (docs/guides/integrations.md §6.15) no notice is emailed and none
+ * is kept for later: a row that would have been emailed is pushed instead, whatever the person's
+ * push switch for its category says, unless its event is a day old (a postponed job woken late).
+ * An address the mail server refuses for good is recorded (§6.16) and not tried again.
  *
  * Retries do not repeat what already went out: each email sent is recorded on the job
  * (job.updateData), and a retry skips it. A bell push may repeat; the client keys on
@@ -33,15 +39,13 @@ const variables = require("../../shared/templates/variables");
 const systemMail = require("../../services/mail/system-mail.service");
 const pace = require("../../services/mail/pace");
 const realtime = require("../../services/realtime/emitter");
-const active = require("../../services/realtime/active");
-const grantsCache = require("../../shared/rbac/grants-cache");
 const notifications = require("../../modules/notifications/notifications.service");
 const queues = require("../queues");
 
-/** How long a push waits while its person is in front of the app. */
-const HOLD_MS = 60_000;
-/** A push job retries for about 20 minutes: 10 s, doubling, eight tries. */
-const PUSH_RETRY = { attempts: 8, backoff: { type: "exponential", delay: 10_000 } };
+const { PUSH_RETRY } = notifications;
+
+/** A notice older than this is not pushed in place of its email: it is old news by then. */
+const INSTEAD_MS = 24 * 60 * 60 * 1000;
 
 const TEMPLATE = "notification";
 variables.defineVariables(
@@ -53,25 +57,6 @@ variables.defineVariables(
 function linkOf(row) {
   const link = routeMap.linkFor(row.entity_type, row.entity_id);
   return link ? new URL(link.path, config.STAFF_ORIGIN).href : null;
-}
-
-/** A new notice as the bell and the banner read it: the contract's Notification. */
-async function bell(row) {
-  const user = await grantsCache.getAuthUser(pool, row.user_id);
-  const canOpen = user ? notifications.opener(user) : async () => false;
-  const [shown] = await notifications.present([row], canOpen);
-  return {
-    notification_id: row.notification_id,
-    category: row.category,
-    priority: row.priority,
-    title: row.title,
-    body: row.body || null,
-    entity_type: row.entity_type ?? null,
-    entity_id: row.entity_id ?? null,
-    link: shown.link,
-    read_at: null,
-    created_at: new Date(row.created_at || Date.now()).toISOString(),
-  };
 }
 
 async function recipients(userIds) {
@@ -91,30 +76,43 @@ module.exports = async function notificationDeliver(job, token) {
     throw new UnrecoverableError(
       "notification-deliver: the job needs notifications",
     );
-  const out = { in_app: 0, email: 0, email_skipped: 0, push_queued: 0, push_held: 0 };
+  const out = { in_app: 0, email: 0, email_skipped: 0, email_paused: 0, email_refused: 0, push_queued: 0, push_held: 0 };
   const has = (row, ch) =>
     Array.isArray(row.channels) && row.channels.includes(ch);
 
+  const now = new Date();
+  const paused = rows.some((r) => has(r, "email")) && (await systemMail.paused());
+  const fresh = !job.timestamp || now.getTime() - job.timestamp < INSTEAD_MS;
+  /** Pushed because its email is paused: the person's push switch for the category is off. */
+  const instead = (row) => paused && fresh && has(row, "email") && !has(row, "push");
+  const pushes = (row) => has(row, "push") || instead(row);
+  const quiet = await notifications.quietUntil(
+    rows.filter((r) => pushes(r) && !notifications.passesQuiet(r)).map((r) => r.user_id),
+    now,
+  );
   for (const row of rows) {
-    if (has(row, "in_app") && realtime.toUser(row.user_id, "notification", await bell(row)))
+    if (has(row, "in_app") && realtime.toUser(row.user_id, "notification", await notifications.asNotice(row)))
       out.in_app += 1;
-    if (has(row, "push")) {
-      const hold = row.category !== "security" && (await active.isActive(row.user_id));
+    if (pushes(row)) {
+      const until = notifications.passesQuiet(row) ? null : quiet.get(row.user_id);
       await queues.enqueue(
         "notification-push",
         "send",
-        { notification_id: row.notification_id, push: job.data.push || null },
-        { ...PUSH_RETRY, jobId: `push-${row.notification_id}`, delay: hold ? HOLD_MS : 0 },
+        { notification_id: row.notification_id, push: job.data.push || null, ...(instead(row) ? { instead_of_email: true } : {}) },
+        { ...PUSH_RETRY, jobId: `push-${row.notification_id}`, ...(until ? { delay: until.getTime() - now.getTime() } : {}) },
       );
       out.push_queued += 1;
-      if (hold) out.push_held += 1;
+      if (until) out.push_held += 1;
     }
   }
 
   const done = new Set((job.data.sent_email || []).map(String));
-  const mailRows = rows.filter(
-    (r) => has(r, "email") && !done.has(String(r.notification_id)),
-  );
+  const owed = rows.filter((r) => has(r, "email") && !done.has(String(r.notification_id)));
+  if (paused) {
+    out.email_paused = owed.length;
+    return out;
+  }
+  const mailRows = owed;
   const people = await recipients([...new Set(mailRows.map((r) => r.user_id))]);
   let firstErr = null;
   for (const row of mailRows) {
@@ -143,6 +141,19 @@ module.exports = async function notificationDeliver(job, token) {
     } catch (err) {
       if (err && err.code === "MAIL_PACED")
         throw await pace.postpone(job, token, err.retryAfterMs);
+      // Paused since this job began: the rest are not emailed (their bell is already lit).
+      if (err && err.code === "MAIL_PAUSED") {
+        out.email_paused += 1;
+        continue;
+      }
+      // Refused for good: on Refused Addresses, and done, so a retry does not ask again.
+      if (err && err.code === "MAIL_REFUSED") {
+        if (!out.email_refused) systemMail.reportRefused(err, { queue: "notification-deliver", template: TEMPLATE });
+        out.email_refused += 1;
+        done.add(String(row.notification_id));
+        await job.updateData({ ...job.data, sent_email: [...done] });
+        continue;
+      }
       if (!firstErr) firstErr = err;
       logger.warn(
         {

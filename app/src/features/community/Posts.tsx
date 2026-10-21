@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api } from "@/api/client";
-import { saveFile, useFileUrl } from "@/api/download";
+import { api, ApiError } from "@/api/client";
+import { invalidate } from "@/api/hooks";
+import { useFileUrl } from "@/api/download";
 import type { Message } from "@/api/types/community";
 import { usePhoto, usePhotos } from "@/api/download";
-import { Avatar, cn, Confetti, formatBytes, formatDate, formatTime, Icon, Pill, ShareBar, Tooltip, Waveform } from "@mycity/ui";
+import { Avatar, Button, Card, cn, Confetti, formatDate, formatDateTime, formatTime, Icon, LinkText, Pill, ShareBar, toast, Tooltip, Waveform } from "@mycity/ui";
+import { AlbumMedia, MessageLink, MessageMedia } from "./Media";
 
-/** Highlight search hits inside a message. */
+/** Highlight search hits inside a heading (a message's own text is LinkText, which also opens its links). */
 export function Hl({ text, q }: { text: string; q: string }) {
   if (!q.trim()) return <>{text}</>;
   const parts = text.split(new RegExp(`(${q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
@@ -64,47 +66,106 @@ function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }
   );
 }
 
-function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
+/**
+ * A voice note plays the moment Play is pressed: its bytes are fetched as it is drawn (the
+ * playable Opus when the worker has made it), and the bars follow the audio's own position
+ * from its first sound, not from the press.
+ */
+function useVoicePlayer(m: Message) {
+  const secs = m.duration_s || 1;
+  const doc = m.document;
+  const live = import.meta.env.VITE_API_MODE !== "mock";
+  const url = doc && live ? `/api/v1/documents/${doc.document_id}/${doc.variants.includes("opus") ? "variant/opus" : "content"}` : null;
+  const href = useFileUrl(url);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const wanted = useRef(false);
+  const frame = useRef(0);
   const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!href) return;
+    const a = new Audio();
+    a.preload = "auto";
+    a.src = href;
+    const follow = () => {
+      const length = Number.isFinite(a.duration) && a.duration > 0 ? a.duration : secs;
+      setProgress(a.currentTime / length);
+      frame.current = requestAnimationFrame(follow);
+    };
+    a.onplaying = () => {
+      setPlaying(true);
+      cancelAnimationFrame(frame.current);
+      frame.current = requestAnimationFrame(follow);
+    };
+    a.onpause = () => {
+      cancelAnimationFrame(frame.current);
+      setPlaying(false);
+    };
+    a.onended = () => {
+      cancelAnimationFrame(frame.current);
+      setPlaying(false);
+      setProgress(0);
+    };
+    audio.current = a;
+    if (wanted.current) void a.play().catch(() => setPlaying(false));
+    return () => {
+      cancelAnimationFrame(frame.current);
+      a.pause();
+      audio.current = null;
+    };
+  }, [href, secs]);
+
+  /* The in-browser mock holds no bytes: the bars run over the note's length instead. */
+  const pretend = () => {
+    const from = performance.now();
+    setPlaying(true);
+    const step = (now: number) => {
+      const p = (now - from) / (secs * 1000);
+      if (p >= 1 || !wanted.current) {
+        wanted.current = false;
+        setPlaying(false);
+        return setProgress(0);
+      }
+      setProgress(p);
+      frame.current = requestAnimationFrame(step);
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+
+  const toggle = () => {
+    if (playing) {
+      wanted.current = false;
+      audio.current?.pause();
+      return;
+    }
+    wanted.current = true;
+    if (audio.current) void audio.current.play().catch(() => setPlaying(false));
+    else if (!live || !doc) pretend();
+  };
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  return { playing, progress, toggle, secs };
+}
+
+function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
   const [tr, setTr] = useState<"hidden" | "loading" | "shown">("hidden");
   const [text, setText] = useState(m.transcript ?? "");
-  const [wanted, setWanted] = useState(false);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const secs = m.duration_s || 1;
-  /* The note's bytes are gated: fetched with the session once Play is first pressed. */
-  const href = useFileUrl(wanted && m.document ? `/api/v1/documents/${m.document.document_id}/content` : null);
-  useEffect(
-    () => () => {
-      if (t.current) clearTimeout(t.current);
-      audio.current?.pause();
-    },
-    [],
-  );
-  useEffect(() => {
-    if (!href || audio.current) return;
-    audio.current = new Audio(href);
-    audio.current.onended = () => setPlaying(false);
-    void audio.current.play().catch(() => setPlaying(false));
-  }, [href]);
-  const play = () => {
-    if (playing) {
-      audio.current?.pause();
-      if (t.current) clearTimeout(t.current);
-      return setPlaying(false);
-    }
-    setPlaying(true);
-    if (audio.current) void audio.current.play().catch(() => setPlaying(false));
-    else if (m.document && import.meta.env.VITE_API_MODE !== "mock") setWanted(true);
-    else t.current = setTimeout(() => setPlaying(false), secs * 1000);
-  };
+  /** The browser's own captions, shown when no transcription service could answer: asked again next time. */
+  const [draft, setDraft] = useState(false);
+  const { playing, progress, toggle: play, secs } = useVoicePlayer(m);
   const transcribe = async () => {
     if (tr === "shown") return setTr("hidden");
-    if (text) return setTr("shown");
+    if (text && !draft) return setTr("shown");
     setTr("loading");
-    const r = await api.call("POST /api/v1/community/messages/:id/transcript", { params: { id: m.community_message_id }, body: {} });
-    setText(r.transcript);
-    setTr("shown");
+    try {
+      const r = await api.call("POST /api/v1/community/messages/:id/transcript", { params: { id: m.community_message_id }, body: {} });
+      setText(r.transcript);
+      setDraft(r.draft);
+      setTr("shown");
+    } catch (e) {
+      setTr("hidden");
+      toast(e instanceof ApiError ? e.message : "Could not transcribe");
+    }
   };
   return (
     <>
@@ -112,11 +173,20 @@ function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
         <button type="button" onClick={play} aria-label={playing ? "Pause voice note" : "Play voice note"} className={cn("flex size-7.5 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground", playing && "ring-4 ring-primary/25")}>
           <Icon name={playing ? "pause" : "play"} />
         </button>
-        <Waveform seconds={secs} playing={playing} />
+        <Waveform seconds={secs} peaks={m.document?.waveform} progress={progress} />
         <em className="text-2xs not-italic opacity-80">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, "0")}</em>
       </div>
       {tr === "loading" && <p className="shimmer mt-2 max-w-80 rounded-ctl px-2.5 py-2 text-xs leading-normal opacity-75">Transcribing…</p>}
-      {tr === "shown" && <p className={cn("mt-2 max-w-80 rounded-ctl px-2.5 py-2 text-xs leading-normal", mine ? "bg-white/10" : "bg-black/5")}>{text}</p>}
+      {tr === "shown" && (
+        <div className={cn("mt-2 max-w-80 rounded-ctl px-2.5 py-2 text-xs leading-normal", mine ? "bg-white/10" : "bg-black/5")}>
+          {draft && (
+            <Pill tone="warn" className="mb-1">
+              Draft
+            </Pill>
+          )}
+          <p data-copy="content">{text}</p>
+        </div>
+      )}
       <button type="button" onClick={transcribe} className="mt-1.5 inline-flex items-center gap-1 text-2xs font-strong underline underline-offset-2 opacity-85">
         {tr === "shown" ? "Hide Transcript" : <><Icon name="doc" className="size-3" />Transcribe</>}
       </button>
@@ -124,10 +194,101 @@ function VoiceNote({ m, mine }: { m: Message; mine: boolean }) {
   );
 }
 
+/**
+ * An announcement in #announcements, at its level: amber when important, red and pulsing when
+ * urgent, with Acknowledge for each person in its audience until they press it (community.md §3).
+ */
+function AnnouncementPost({ m, q }: { m: Message; q: string }) {
+  const a = m.announcement;
+  const asks = a?.urgency === "urgent" && a.in_audience;
+  const acknowledge = () =>
+    api
+      .call("POST /api/v1/community/announcements/:id/acknowledge", { params: { id: a!.announcement_id }, body: {} })
+      .then(() => invalidate("/api/v1/community", "/api/v1/notifications"));
+  return (
+    <Card urgency={a?.urgency ?? "normal"} className="max-w-152">
+      <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground">
+        <Icon name="flag" />
+        {m.author?.display_name} · {formatDate(m.sent_at)}
+        {a?.urgency === "urgent" && <Pill tone="err">Urgent</Pill>}
+        {a?.urgency === "important" && <Pill tone="warn">Important</Pill>}
+      </div>
+      <h3 data-copy="content" className="text-base"><Hl text={a?.title ?? ""} q={q} /></h3>
+      <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><LinkText text={m.body ?? ""} highlight={q} /></p>
+      {asks &&
+        (a.acknowledged_at ? (
+          <p className="mt-2.5 flex items-center gap-1.5 text-xs text-success">
+            <Icon name="tick" />Acknowledged {formatDateTime(a.acknowledged_at)}
+          </p>
+        ) : (
+          <Button variant="primary" size="sm" className="mt-2.5 phone:w-full" onClick={acknowledge}>
+            Acknowledge
+          </Button>
+        ))}
+    </Card>
+  );
+}
+
+/** The mark on a forwarded copy (§3 step 19); who first sent it is never shown. */
+function Forwarded({ media }: { media?: boolean }) {
+  return (
+    <span className={cn("flex items-center gap-1 text-2xs italic opacity-75", media ? "px-2 pt-1 pb-1.5" : "mb-0.5")}>
+      <Icon name="forward" className="size-3" />
+      Forwarded
+    </span>
+  );
+}
+
 const TICK = { sent: ["tick", "Sent"], delivered: ["ticks", "Delivered"], read: ["ticks", "Read"] } as const;
 
+/** A sent message's ticks, in a direct conversation (§3 step 10). */
+function Ticks({ status }: { status: NonNullable<Message["status"]> }) {
+  return (
+    <Tooltip label={TICK[status][1]}>
+      <span role="img" className={cn("ml-1 inline-flex align-text-bottom", status === "read" ? "text-info" : "text-subtle-foreground")} aria-label={TICK[status][1]}>
+        <Icon name={TICK[status][0]} className="size-3.5" />
+      </span>
+    </Tooltip>
+  );
+}
+
+const bubble = (mine: boolean) =>
+  mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground";
+
+/** Four or more photos and videos sent together: one bubble, two by two, the caption under it (§3 step 17). */
+export function AlbumPost({ ms, q, dm, onView, menu }: { ms: Message[]; q: string; dm?: boolean; onView: (key: string) => void; menu?: ReactNode }) {
+  const first = ms[0]!;
+  const last = ms[ms.length - 1]!;
+  const authorPhoto = usePhoto(first.mine ? null : first.author?.photo_url);
+  const caption = ms.find((x) => x.body)?.body ?? null;
+  return (
+    <div className={cn("flex max-w-4/5 gap-2 max-md:max-w-11/12", first.mine && "flex-row-reverse self-end")}>
+      {!first.mine && <Avatar name={first.author?.display_name ?? "MyCity"} src={authorPhoto} size={30} className="mt-0.5" />}
+      <div className="min-w-0">
+        <div className={cn("mb-0.5 flex items-baseline gap-1.5 text-xs font-strong", first.mine && "justify-end")}>
+          {!first.mine && first.author?.display_name}
+          <span className="text-2xs font-normal text-subtle-foreground">
+            {formatTime(last.sent_at)}
+            {first.mine && dm && last.status && <Ticks status={last.status} />}
+          </span>
+          {menu}
+        </div>
+        <div className={cn("w-min p-1 text-sm leading-normal wrap-any", bubble(first.mine))}>
+          {first.forwarded && <Forwarded media />}
+          <AlbumMedia ms={ms} onView={onView} />
+          {caption && (
+            <div className="px-2 pt-1.5 pb-0.5 whitespace-pre-wrap">
+              <LinkText text={caption} highlight={q} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** One post in a channel or a conversation. */
-export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; menu?: ReactNode }) {
+export function Post({ m, q, dm, onCelebrate, onVote, onView, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; onView?: (key: string) => void; menu?: ReactNode }) {
   const authorPhoto = usePhoto(m.mine ? null : m.author?.photo_url);
   const toPhoto = usePhoto(m.recognition?.to.photo_url);
   /* A card keeps its look; its menu sits beside it. */
@@ -171,30 +332,34 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
     /* A poll reads as a block up to 560 px, as in the demo, not shrunk to its words. */
     return <div className={cn("flex w-full max-w-140 items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div>;
   }
-  if (m.message_type === "announcement") {
-    return (
-      <div className="max-w-152 rounded-card border border-border bg-background px-3.5 py-3">
-        <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground"><Icon name="flag" />{m.author?.display_name} · {formatDate(m.sent_at)}</div>
-        <h3 data-copy="content" className="text-base"><Hl text={m.announcement?.title ?? ""} q={q} /></h3>
-        <p className="mt-1 text-sm leading-normal whitespace-pre-wrap text-muted-foreground"><Hl text={m.body ?? ""} q={q} /></p>
-      </div>
-    );
-  }
+  if (m.message_type === "announcement") return <AnnouncementPost m={m} q={q} />;
+  /* A photo, a video or a file fills its bubble, its caption under it; a text carries its first link's card above it. */
+  const media = !m.deleted && m.message_type !== "audio" && Boolean(m.document);
   let inner: ReactNode;
   if (m.deleted) inner = <span className="italic opacity-70">Message deleted</span>;
   else if (m.message_type === "audio") inner = <VoiceNote m={m} mine={m.mine} />;
-  else if (m.document)
+  else if (media)
     inner = (
-      <button
-        type="button"
-        onClick={() => void saveFile(`/api/v1/documents/${m.document!.document_id}/content`, m.document!.file_name)}
-        className={cn("mt-0.5 flex items-center gap-2 rounded-box border px-2.5 py-2 text-left", m.mine ? "border-white/20 bg-white/10" : "border-border bg-background")}
-      >
-        <Icon name={m.message_type === "image" ? "image" : "doc"} />
-        <span><b className="block text-xs">{m.document.file_name}</b><span className="text-2xs opacity-70">{formatBytes(m.document.size_bytes)}</span></span>
-      </button>
+      <>
+        <MessageMedia m={m} onView={() => onView?.(m.community_message_id)} />
+        {m.body && (
+          <div className="px-2 pt-1.5 pb-0.5 whitespace-pre-wrap">
+            <LinkText text={m.body} highlight={q} />
+          </div>
+        )}
+      </>
     );
-  else inner = <Hl text={m.body ?? ""} q={q} />;
+  else
+    inner = (
+      <>
+        {m.link && (
+          <div className="mb-1.5">
+            <MessageLink link={m.link} mine={m.mine} />
+          </div>
+        )}
+        <LinkText text={m.body ?? ""} highlight={q} />
+      </>
+    );
   return (
     <div className={cn("flex max-w-4/5 gap-2 max-md:max-w-11/12", m.mine && "flex-row-reverse self-end")}>
       {!m.mine && <Avatar name={m.author?.display_name ?? "MyCity"} src={authorPhoto} size={30} className="mt-0.5" />}
@@ -204,17 +369,12 @@ export function Post({ m, q, dm, onCelebrate, onVote, menu }: { m: Message; q: s
           <span className="text-2xs font-normal text-subtle-foreground">
             {formatTime(m.sent_at)}
             {m.edited_at && !m.deleted && " · Edited"}
-            {m.mine && dm && m.status && (
-              <Tooltip label={TICK[m.status][1]}>
-                <span role="img" className={cn("ml-1 inline-flex align-text-bottom", m.status === "read" ? "text-info" : "text-subtle-foreground")} aria-label={TICK[m.status][1]}>
-                  <Icon name={TICK[m.status][0]} className="size-3.5" />
-                </span>
-              </Tooltip>
-            )}
+            {m.mine && dm && m.status && <Ticks status={m.status} />}
           </span>
           {menu}
         </div>
-        <div className={cn("px-3 py-2 text-sm leading-normal whitespace-pre-wrap wrap-any", m.mine ? "bubble-me border border-secondary bg-secondary text-secondary-foreground" : "bubble-them border border-border bg-muted text-foreground")}>
+        <div className={cn("text-sm leading-normal wrap-any", media ? "w-min p-1" : "px-3 py-2 whitespace-pre-wrap", bubble(m.mine))}>
+          {m.forwarded && !m.deleted && <Forwarded media={media} />}
           {inner}
         </div>
       </div>

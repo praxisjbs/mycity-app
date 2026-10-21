@@ -1,20 +1,19 @@
 import type { AccessCatalogue, AuditEntry, FailedSignIn, Holiday, LiveSession, NumberingScheme, Organisation, RoleDetail, RoleGrant, RoleRow, RoleSave, UserRow, WorkingDay } from "@mycity/contract/contract.gen.ts";
-import type { NotificationPref } from "@/api/types/settings";
-import type { Status } from "@/api/types/shared";
-import { accepted, at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { at, created, fail, invalid, isoDaysAgo, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { exportFile } from "./shared";
 import { CAPABILITIES, ROLE_CAPABILITIES } from "../data/access";
 import { byId, byKey, PEOPLE, SIGN_INS } from "../data/people";
 import { AUDIT, audit } from "../data/audit";
 import { waysOf } from "./security";
 import { ON_UPLOAD } from "../uploads";
+import { pickAnAddress, placeOf } from "./maps";
 
-const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const admin = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?? "");
 const who = (u: string) => byKey(u)!.display_name;
 
 /* ── Organisation: the profile, the working week (A22), holidays (entered on screen, A26) ── */
-const PROFILE_KEYS = ["legal_name", "trading_name", "registration_number", "tax_id", "address", "phone", "email", "website"] as const;
-const ORG: Organisation = { legal_name: "MyCity App Ltd", trading_name: "MyCityApp", registration_number: null, tax_id: null, address: null, phone: null, email: "hello@mycityapp.io", website: "https://mycityapp.io", logo: null, logo_white: null, icon: null, currency: "NGN", time_zone: "Africa/Lagos" };
+const PROFILE_KEYS = ["legal_name", "trading_name", "registration_number", "tax_id", "phone", "email", "website"] as const;
+const ORG: Organisation = { legal_name: "MyCity App Ltd", trading_name: "MyCityApp", registration_number: null, tax_id: null, address: null, address_place: null, phone: null, email: "hello@mycityapp.io", website: "https://mycityapp.io", logo: null, logo_white: null, icon: null, currency: "NGN", time_zone: "Africa/Lagos" };
 route("GET /api/v1/settings/organisation", () => ok(ORG));
 
 /* The brand files (foundation.md §6.11): an upload lands through the mock upload engine, which tells us here. */
@@ -32,7 +31,10 @@ route("DELETE /api/v1/settings/organisation/brand/:slot", (req) => {
 });
 route("PATCH /api/v1/settings/organisation", (req) => {
   if (!admin(req.user!)) return fail(403, "PERMISSION_DENIED", "You do not have access to this");
-  const b = req.body as Partial<Record<(typeof PROFILE_KEYS)[number], string | null>>;
+  const b = req.body as Partial<Record<(typeof PROFILE_KEYS)[number], string | null>> & { address?: unknown };
+  // The address is picked, never typed (F27): a place, or null to clear it.
+  const kept = b.address ? placeOf(b.address) : null;
+  if (b.address && !kept) return pickAnAddress("address");
   if (b.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(b.email)) return invalid({ email: ["Check the email"] });
   if (b.website && !/^https?:\/\//.test(b.website)) return invalid({ website: ["Not a web address"] });
   for (const k of PROFILE_KEYS) {
@@ -41,6 +43,10 @@ route("PATCH /api/v1/settings/organisation", (req) => {
     if (next !== ORG[k]) audit(who(req.user!), "A setting was changed", `Organisation · ${k.replace(/_/g, " ")}`, ORG[k], next, null, "Settings");
     ORG[k] = next as never;
   }
+  if (b.address !== undefined && (kept?.line ?? null) !== ORG.address) {
+    audit(who(req.user!), "A setting was changed", "Organisation · address", ORG.address, kept?.line ?? null, null, "Settings");
+  }
+  if (b.address !== undefined) Object.assign(ORG, { address: kept?.line ?? null, address_place: kept?.view ?? null });
   return ok(ORG);
 });
 
@@ -378,28 +384,6 @@ route("DELETE /api/v1/settings/roles/:id", (req) => {
   return noContent();
 });
 
-const PREFS = new Map<string, NotificationPref[]>();
-const prefsOf = (u: string) => {
-  let p = PREFS.get(u);
-  if (!p) {
-    p = [["approvals", "Approvals pending", "When something is waiting on you", true, true, false], ["query", "Query raised against you", "You are always told. There is no setting for it", true, true, true], ["payslip", "Payslip ready", "When a run is locked", true, true, false], ["task", "Task assigned to you", "", true, false, false], ["community", "Community messages", "Keep these in app only", true, false, false], ["announcement", "Announcements", "", true, true, false], ["recognition", "Recognition received", "", true, false, false], ["celebration", "Birthday and anniversary", "", true, false, false], ["alert_cleared", "Alert cleared", "", false, false, false]].map(([key, label, help, in_app, email, locked]) => ({ key: key as string, label: label as string, help: help as string, in_app: in_app as boolean, email: email as boolean, locked: locked as boolean }));
-    PREFS.set(u, p);
-  }
-  return p;
-};
-route("GET /api/v1/settings/notifications", (req) => ok(prefsOf(req.user!)));
-route("PATCH /api/v1/settings/notifications", (req) => {
-  const p = prefsOf(req.user!);
-  for (const [k, v] of Object.entries(req.body as Record<string, { in_app: boolean; email: boolean }>)) {
-    const x = p.find((y) => y.key === k);
-    if (!x) return invalid({ [k]: ["Not a notification category"] });
-    if (x.locked && (!v.in_app || !v.email)) return fail(409, "LOCKED", `${x.label} cannot be switched off.`);
-    x.in_app = !!v.in_app;
-    x.email = !!v.email;
-  }
-  return ok(p);
-});
-
 let THEME: "system" | "light" | "dark" = "system";
 const APPEAR = () => ({ theme_default: THEME, palette: [["Primary Yellow", "--primary"], ["Yellow Tint", "--accent"], ["City Green", "--secondary"], ["Deep Green", "--sidebar"]].map(([name, token]) => ({ name, token })), dark: [["Background", "--background", "Deep Green, darkened"], ["Card", "--card", "Deep Green exactly"], ["Text", "--foreground", "Clears AA against the background"], ["Muted text", "--muted-foreground", "Clears AA"], ["Primary", "--primary", "The brand yellow, unchanged"]].map(([name, token, note]) => ({ name, token, note })), typeface: "Geist" });
 route("GET /api/v1/settings/appearance", () => ok(APPEAR()));
@@ -455,13 +439,6 @@ route("PUT /api/v1/settings/numbering/:doc_type", (req) => {
   audit(who(req.user!), "A setting was changed", `Numbering · ${s.label}`, before, s.next, null, "Settings");
   return ok(s);
 });
-
-route("GET /api/v1/settings/integrations", () =>
-  ok({
-    items: [["smtp", "SMTP, mycityapp.io", "Outbound mail for notifications and offer letters.", S("ok", "Connected")], ["imap", "IMAP mailbox", "Staff mailboxes on the MyCity domain. No Google, no Microsoft.", S("ok", "Connected")], ["model", "Gemini", "The model behind Praxis AI. Spend capped monthly.", S("ok", "Connected")], ["careers", "Careers page", "Vacancies publish to go.mycityapp.io.", S("ok", "Connected")], ["sheets", "Google Sheets import", "Download as xlsx and import. No API connection needed.", S("neutral", "Manual")], ["payments", "Payment gateway", "Not in scope. Disbursement is logged, not executed.", S("neutral", "Not connected")]].map(([key, name, text, status]) => ({ key: key as string, name: name as string, text: text as string, status: status as Status })),
-    health: [["SMTP", "09:14", 284], ["IMAP", "09:21", 1842], ["Gemini", "09:12", 84], ["Careers page", "08:02", 612]].map(([service, t, volume]) => ({ service: service as string, last_call: at(0, t as string), volume_7d: volume as number, failures: 0, status: S("ok", "Healthy") })),
-  }),
-);
 
 /* ── Security: rules within the .env floor, two-step by role, failed sign-ins, live sessions ── */
 const FLOOR = { session_max_age_min: 120, idle_lock_min: 30, password_min_length: 8 };
@@ -541,4 +518,4 @@ route("GET /api/v1/audit", (req) =>
       })
     : fail(403, "PERMISSION_DENIED", "You do not have access to this"),
 );
-route("POST /api/v1/audit/exports", (req) => (admin(req.user!) ? { ...accepted(), body: { queued: true, email: byKey(req.user!)!.work_email } } : fail(403, "PERMISSION_DENIED", "You do not have access to this")));
+route("POST /api/v1/audit/exports", (req) => (admin(req.user!) ? exportFile(req.user!, "audit-log") : fail(403, "PERMISSION_DENIED", "You do not have access to this")));

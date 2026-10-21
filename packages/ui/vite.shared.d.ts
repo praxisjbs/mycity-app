@@ -1,10 +1,13 @@
-import type { UserConfig } from "vite";
+import type { Plugin, UserConfig } from "vite";
 
 /** The repository root's Zod, by the file its `import` condition names. */
 export declare function zodEntry(): string;
 
 /** The partial Vite config both apps merge under their own (see vite.shared.js). */
 export declare function sharedVite(): UserConfig;
+
+/** PDF.js's own files at <base>pdfjs/: served in dev, written into the build (PdfViewer). */
+export declare function pdfjsAssets(): Plugin;
 
 /** The contract's page size, from packages/contract/schemas/common.js. */
 export declare function contractPageSize(): number;

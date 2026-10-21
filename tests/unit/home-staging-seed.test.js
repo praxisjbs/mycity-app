@@ -174,9 +174,13 @@ describe("the rows", () => {
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 
-  test("dates count from the run's day: agreements inside the year", () => {
+  test("dates count from the run's day: targets inside the quarter, agreements inside the year", () => {
     expect(x.quarterName).toBe("Q4 2026");
     for (const { row, values } of written) {
+      if (row.table === "employee_target") {
+        expect(values.due_on >= x.today).toBe(true);
+        expect(values.due_on <= x.quarter.to).toBe(true);
+      }
       if (row.table === "partnership_agreement") expect(values.starts_on >= "2026-01-01").toBe(true);
     }
   });
@@ -199,9 +203,14 @@ describe("the rows", () => {
     expect([filled.number, filled.slug]).toEqual([before.number, before.slug]);
   });
 
-  test("with no unique key in the way, every row is planned", () => {
-    // Reviews, whose keys could clash when one person held both manager posts, are M2's own seed now.
+  test("a row whose unique key would take a value a row before it holds is left out", () => {
     const keys = new Map(forward.DELETE_ORDER.map((table) => [table, []]));
+    keys.set("performance_review", [["performance_cycle_id", "employee_id", "reviewer_employee_id", "review_type"]]);
+    // One person in both posts: the Line Manager's team is the Head's, reviewed once.
+    const plan = forward.planOf(forward.ROWS, x, { ...staff, manager: staff.head }, keys);
+    const reviews = [...plan.values()].filter((p) => p.row.table === "performance_review").map((p) => p.row.key);
+    expect(reviews).toHaveLength(6);
+    expect(reviews.every((key) => /:head_team:\d$/.test(key))).toBe(true);
     expect(forward.planOf(forward.ROWS, x, staff, keys).size).toBe(forward.ROWS.length);
   });
 });

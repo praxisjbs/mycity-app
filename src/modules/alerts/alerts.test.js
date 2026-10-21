@@ -2,7 +2,8 @@
 /**
  * Home · Alerts without a database (docs/guides/home.md §5, §6 Alerts, §7, §9): the metric
  * registry against the contract, what each metric reads and how its breaches read on the
- * screen, a rule's key, Who Can Clear, the routes and their checks, the signals and the jobs.
+ * screen, a rule's key, Who Can Clear, the Attendance policy's kept rules, the routes and their
+ * checks, the events and the jobs.
  * The reads, the writes and the sweep run against the real migrations in
  * tests/integration/home-alerts.test.js.
  */
@@ -13,7 +14,7 @@ const { checkStatement } = require("../../../scripts/check/schema-drift");
 const { buildCatalogue } = require("../../../scripts/check/lib/catalogue");
 const metrics = require("./alerts.metrics");
 const service = require("./alerts.service");
-const { EVENTS, SIGNALS, SIGNAL_HANDLER, onSignal } = require("./alerts.events");
+const { EVENTS } = require("./alerts.events");
 
 const { alerts: contract } = c;
 const ID = "8a6e0804-2bd0-4672-b79d-d97027f9071a";
@@ -36,9 +37,9 @@ function recording(rows = []) {
 
 const rule = (over = {}) => ({
   home_alert_rule_id: ID,
-  key: "late_arrivals.three_in_thirty",
+  key: "approval_ageing.three_days",
   threshold: "3",
-  window_days: 30,
+  window_days: null,
   severity: "medium",
   permission_key: "people.view",
   enabled: true,
@@ -70,21 +71,37 @@ describe("the metric registry", () => {
     expect(metrics.METRICS.recruitment_sla.owner).toEqual({ module: "vacancies", milestone: "M4", by: "TB" });
   });
 
-  test("only the attendance pair reads one person, and only a metric counted over days has a window", () => {
-    const perPerson = Object.values(metrics.METRICS).filter((m) => m.per_person).map((m) => m.key);
-    expect(perPerson).toEqual(["late_arrivals", "missing_clock_out"]);
-    const windowed = Object.values(metrics.METRICS).filter((m) => m.window).map((m) => m.key);
-    expect(windowed).toEqual(["late_arrivals", "missing_clock_out"]);
+  test("attendance's metrics are gone: none reads one person, none counts over days (T1)", () => {
+    expect(Object.keys(metrics.METRICS)).not.toContain("late_arrivals");
+    expect(Object.keys(metrics.METRICS)).not.toContain("missing_clock_out");
+    expect(Object.values(metrics.METRICS).filter((m) => m.per_person)).toEqual([]);
+    expect(Object.values(metrics.METRICS).filter((m) => m.window)).toEqual([]);
     const deadlines = Object.values(metrics.METRICS).filter((m) => m.kind === "deadline").map((m) => m.key);
     expect(deadlines).toEqual(["document_expiry", "confirmation_due", "contract_ending"]);
   });
 
   test("a metric is found by key, a rule's from before the list is not, and a category names its metrics", () => {
-    expect(metrics.metricOf("late_arrivals").key).toBe("late_arrivals");
-    expect(metrics.metricOf("late_count")).toBeNull();
+    expect(metrics.metricOf("approval_ageing").key).toBe("approval_ageing");
+    expect(metrics.metricOf("late_arrivals")).toBeNull();
     expect(metrics.metricOf("toString")).toBeNull();
     expect(metrics.metricsIn("people")).toEqual(["confirmation_due", "contract_ending"]);
-    expect(metrics.metricsIn("attendance")).toEqual(["late_arrivals", "missing_clock_out"]);
+    // Attendance's alerts are the policy's, on the rules the system keeps for it.
+    expect(metrics.metricsIn("attendance")).toEqual(["attendance_policy"]);
+    expect(metrics.categoryOf("attendance_policy")).toBe("attendance");
+    expect(metrics.categoryOf("late_arrivals")).toBeNull();
+    expect(metrics.isPolicy("attendance_policy")).toBe(true);
+  });
+
+  test("the policy's kept rules: one per consequence rule, named as the policy names it, one breach one alert", () => {
+    expect(metrics.POLICY).toMatchObject({
+      metric: contract.HOME_ALERT_POLICY_METRIC,
+      rules: contract.HOME_ALERT_POLICY_RULES,
+      threshold: "1",
+      severity: "medium",
+      permission_key: "people.approve",
+    });
+    expect(Object.keys(metrics.POLICY.names)).toEqual([...contract.HOME_ALERT_POLICY_RULES]);
+    expect(Object.keys(contract.HOME_ALERT_METRICS)).not.toContain(contract.HOME_ALERT_POLICY_METRIC);
   });
 });
 
@@ -97,7 +114,7 @@ describe("what each metric reads", () => {
 
   test.each(Object.keys(contract.HOME_ALERT_METRICS))("%s reads migrated columns, in batches", async (key) => {
     const client = recording();
-    const r = key === "late_arrivals" || key === "missing_clock_out" ? rule() : rule({ window_days: null, threshold: "30" });
+    const r = rule({ window_days: null, threshold: "30" });
     expect(await metrics.METRICS[key].evaluate(client, r, { today: TODAY, after: null })).toEqual({
       readings: [],
       next: null,
@@ -109,53 +126,23 @@ describe("what each metric reads", () => {
     expect(params).toContain(metrics.BATCH);
   });
 
-  test("a window is the last W days, today the last", async () => {
-    const client = recording();
-    await metrics.METRICS.late_arrivals.evaluate(client, rule(), { today: TODAY, employee_id: ID });
-    const [{ params }] = client.statements;
-    expect(params.slice(0, 5)).toEqual(["2026-09-15", TODAY, ID, null, "3"]);
-    expect(() => metrics.windowStart(rule({ window_days: null }), TODAY)).toThrow(/no window/);
-  });
-
-  test("late arrivals read as the screen shows them, with the latest late clock-in as the evidence", async () => {
-    const since = new Date("2026-10-14T08:40:00Z");
-    const client = recording([
-      { employee_id: ID, first_name: "Bisi", last_name: "Ojo", value: 3, dates: ["2026-10-09", "2026-10-12", TODAY], since },
-    ]);
-    const { readings, next } = await metrics.METRICS.late_arrivals.evaluate(client, rule(), { today: TODAY });
-    expect(next).toBeNull();
-    expect(readings).toEqual([
-      {
-        subject: { type: "employee", id: ID },
-        subject_employee_id: ID,
-        value: 3,
-        title: "Bisi Ojo: 3 late arrivals in 30 days",
-        trigger: "Late on 09/10/2026, 12/10/2026 and 14/10/2026",
-        since,
-      },
-    ]);
-  });
-
-  test("many days read as a count and the last day", () => {
-    expect(metrics.onDays("Late on", ["2026-10-01"])).toBe("Late on 01/10/2026");
-    expect(metrics.onDays("Late on", ["2026-10-01", "2026-10-02"])).toBe("Late on 01/10/2026 and 02/10/2026");
-    expect(metrics.onDays("Late on", ["2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06"])).toBe(
-      "Late on 4 days, last on 06/10/2026",
-    );
-  });
-
   test("a full batch hands back the cursor for the next; a short one ends it", async () => {
     const rows = Array.from({ length: metrics.BATCH }, (_, i) => ({
-      employee_id: i === metrics.BATCH - 1 ? OTHER : ID,
+      workflow_instance_id: i === metrics.BATCH - 1 ? OTHER : ID,
+      entity_type: "leave_request",
+      entity_id: ID,
+      subject_employee_id: ID,
+      current_stage: "manager",
+      stage_entered_at: new Date("2026-10-09T16:00:00Z"),
+      definition_name: "Leave Request",
+      stages: [{ key: "manager", name: "Line Manager" }],
       first_name: "A",
       last_name: "B",
-      value: 3,
-      dates: [TODAY],
-      since: null,
     }));
-    const full = await metrics.METRICS.late_arrivals.evaluate(recording(rows), rule(), { today: TODAY });
+    const full = await metrics.METRICS.approval_ageing.evaluate(recording(rows), rule(), { today: TODAY });
     expect(full.next).toBe(OTHER);
-    expect(full.readings[0].since).toEqual(new Date("2026-10-13T23:00:00Z"));
+    const short = await metrics.METRICS.approval_ageing.evaluate(recording(rows.slice(0, 3)), rule(), { today: TODAY });
+    expect(short.next).toBeNull();
   });
 
   test("an approval's age is whole Lagos days at its stage, about the record waiting", async () => {
@@ -342,6 +329,7 @@ describe("the routes", () => {
       "GET /alerts/:id",
       "POST /alerts/:id/clear",
       "GET /alert-rules",
+      "GET /alert-rules/policy",
       "GET /alert-rules/:id",
       "POST /alert-rules",
       "PATCH /alert-rules/:id",
@@ -354,6 +342,7 @@ describe("the routes", () => {
       query: contract.HomeAlertRuleQuery,
       response: contract.HomeAlertRulePage,
     });
+    expect(find("GET", "/alert-rules/policy").contract.response).toBe(contract.HomeAlertPolicyRules);
     expect(find("POST", "/alert-rules").contract.body).toBe(contract.HomeAlertRuleCreate);
     expect(find("PATCH", "/alert-rules/:id").contract.body).toBe(contract.HomeAlertRuleUpdate);
   });
@@ -397,28 +386,22 @@ describe("events and signals", () => {
     for (const key of Object.values(EVENTS)) expect(catalogue.get(key).module).toBe("home");
   });
 
-  test("each signal is spelt as its owning module declares it, and re-reads metrics that read one person", () => {
+  test("Home reads no attendance event: the policy's breaches raise attendance's alerts (T1)", () => {
     require("../attendance/attendance.events");
-    for (const [key, signal] of Object.entries(SIGNALS)) {
-      expect([key, catalogue.has(key)]).toEqual([key, true]);
-      expect([key, catalogue.get(key).module]).toEqual([key, signal.module]);
-      for (const metric of signal.metrics) expect([key, metrics.METRICS[metric].per_person]).toEqual([key, true]);
-      expect(outbox.handlersFor(key).map((h) => h.name)).toContain(SIGNAL_HANDLER);
-    }
+    for (const key of ["attendance.punched", "attendance.day_closed"])
+      expect(outbox.handlersFor(key).map((h) => h.name)).not.toContain("alerts.person-signal");
+    expect(outbox.handlersFor("attendance.rule_breached").map((h) => h.name)).toContain("attendance.raise_breach_alert");
   });
 
-  test("a clock-in re-reads the person's late arrivals; a clock-out and a payload with nobody do nothing", async () => {
-    const sweeps = require("./alerts.sweeps");
-    const spy = jest.spyOn(sweeps, "evaluatePerson").mockResolvedValue({ raised: 0, refreshed: 0, failed: 0 });
-    const punched = onSignal("attendance.punched");
-    await punched({ payload: { employee_id: ID, event_type: "clock_in" } });
-    await punched({ payload: { employee_id: ID, event_type: "clock_out" } });
-    await onSignal("attendance.day_closed")({ payload: { employee_id: OTHER, work_date: TODAY } });
-    await onSignal("attendance.day_closed")({ payload: {} });
-    expect(spy.mock.calls).toEqual([
-      [ID, ["late_arrivals"]],
-      [OTHER, ["late_arrivals", "missing_clock_out"]],
-    ]);
+  test("a policy rule's figures read in words, and Off is none", () => {
+    expect(service.figuresOf("late_rule", { on: true, count: 3, period: "month", hours: 5, alert: true, query: true })).toBe(
+      "3 late arrivals in a month or 5 hours",
+    );
+    expect(service.figuresOf("absence_rule", { on: true, count: 1, period: "week", alert: true, query: false })).toBe("1 absence in a week");
+    expect(service.figuresOf("early_rule", { on: true, count: 2, period: "days_30", hours: 1.5 })).toBe(
+      "2 early departures in 30 days or 1.5 hours",
+    );
+    expect(service.figuresOf("forgotten_rule", { on: false, count: 3, period: "month" })).toBeNull();
   });
 
   test("the morning sweep is one scheduler at 06:00 Lagos, and its queue refuses a date it cannot read", async () => {

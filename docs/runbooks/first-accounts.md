@@ -79,8 +79,9 @@ placeholder:
 `employment_type` is one of `full_time`, `part_time`, `contractor`, `consultant`, `intern`;
 `work_pattern` one of `on_site`, `hybrid`, `remote`. The optional fields (`middle_name`,
 `preferred_name`, `personal_email`, `contract_ends_on`, `confirmation_due_on`, `confirmed_on`,
-`home_address`, `date_of_birth`, `gender`, next of kin, bank, `gross_monthly`) can be added the
-same way. A phone is 11 digits (`0803 123 4567`) or `+234` and ten. `chmod 600` the file, then:
+`date_of_birth`, `gender`, next of kin, bank, `gross_monthly`) can be added the same way. The home
+address is not among them: an address is picked, never typed (F27), so the person picks it on My
+Profile after signing in. A phone is 11 digits (`0803 123 4567`) or `+234` and ten. `chmod 600` the file, then:
 
 ```sh
 sudo -u mycity-<env> node --env-file=/srv/mycity/<env>/shared/.env \

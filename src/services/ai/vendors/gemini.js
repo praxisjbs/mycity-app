@@ -20,19 +20,17 @@
  *  - `finish_reason: "length"` means the answer was cut off at the ceiling; it is
  *    returned so the ledger records it.
  *
- * Errors carry a `kind`: "config" (401, 403, 404: the key or model is wrong, retrying
- * cannot help), "rate_limited" (429), "timeout", or "transient" (5xx, network).
+ * Errors carry a `kind` (vendors/http.js): "config" (400, 401, 403, 404: the key or model is
+ * wrong, retrying cannot help), "rate_limited" (429, with how long Google asked us to wait),
+ * "timeout", or "transient" (5xx, network).
+ *
+ * The model list and transcription use Google's own API beside the compatible one: its list says
+ * what each model does and its display name, and it takes audio inline as MP3.
  */
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
+const { VendorError, classify, request, retryAfterOf } = require("./http");
 
-class VendorError extends Error {
-  constructor(message, kind, status = null) {
-    super(message);
-    this.name = "VendorError";
-    this.kind = kind;
-    this.status = status;
-  }
-}
+const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
+const NATIVE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 function reasoningEffort(model) {
   return /^(models\/)?gemini-2\.5-flash/i.test(String(model || ""))
@@ -64,12 +62,6 @@ function toolSchema(node) {
     }
   }
   return out;
-}
-
-function classify(status) {
-  if (status === 401 || status === 403 || status === 404) return "config";
-  if (status === 429) return "rate_limited";
-  return "transient";
 }
 
 /**
@@ -160,6 +152,7 @@ async function complete({
       `gemini ${res.status}: ${detail}`,
       classify(res.status),
       res.status,
+      { retryAfterMs: res.status === 429 ? retryAfterOf(res.headers, data) : null },
     );
   }
   if (!data)
@@ -184,59 +177,26 @@ async function complete({
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Audio to text
- * ------------------------------------------------------------------ */
-
 /**
- * The compatible endpoint takes only wav and mp3 audio, so a recording goes to the native
- * generateContent API on the same host and version, inline. Temperature 0 and a JSON answer
- * keep the model to the words spoken: it is told never to tidy, summarise or translate
- * (tidying is a separate step the person sees beside the transcript).
+ * The models a key may use (GET /models). It costs nothing, so Settings · Integrations checks
+ * a key with it (docs/guides/integrations.md §6.3). Errors as complete(): a VendorError with
+ * the status (Google answers 400 to a key that is not valid).
+ * @param {{apiKey: string, timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<string[]>} the model names, without "models/"
  */
-const NATIVE_URL = BASE_URL.replace(/\/openai$/, "");
-
-const TRANSCRIBE_SYSTEM = [
-  "You transcribe one short voice recording made at work: a voice note, or an answer dictated into a form.",
-  "Write down the words spoken, verbatim, in the language they were spoken in. Never translate, summarise, correct grammar or add words.",
-  "No speaker labels, timestamps or descriptions of sounds. If nothing intelligible is said, text is an empty string.",
-  'Answer with JSON only: {"text": "..."}',
-].join("\n");
-
-/**
- * @param {{apiKey: string, model: string, audio: Buffer, mimeType: string, timeoutMs?: number,
- *          fetchImpl?: typeof fetch}} req  audio in a type Gemini takes (wav, mp3, aiff, aac, ogg, flac)
- * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number}, model: string}>}
- */
-async function transcribe({ apiKey, model, audio, mimeType, timeoutMs = 90_000, fetchImpl = fetch }) {
+async function listModels({ apiKey, timeoutMs = 20_000, fetchImpl = fetch }) {
   if (!apiKey) throw new VendorError("gemini: no API key", "config");
-  if (!Buffer.isBuffer(audio) || !audio.length) throw new VendorError("gemini: no audio", "config");
-  const name = String(model).replace(/^models\//, "");
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let res;
   try {
-    res = await fetchImpl(`${NATIVE_URL}/models/${encodeURIComponent(name)}:generateContent`, {
-      method: "POST",
-      headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: TRANSCRIBE_SYSTEM }] },
-        contents: [
-          {
-            role: "user",
-            parts: [{ inlineData: { mimeType, data: audio.toString("base64") } }, { text: "Transcribe this recording." }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0,
-          responseMimeType: "application/json",
-          responseSchema: { type: "OBJECT", properties: { text: { type: "STRING" } }, required: ["text"] },
-        },
-      }),
+    res = await fetchImpl(`${BASE_URL}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
       signal: ctrl.signal,
     });
   } catch (err) {
-    if (err && err.name === "AbortError") throw new VendorError(`gemini: no answer within ${timeoutMs} ms`, "timeout");
+    if (err && err.name === "AbortError")
+      throw new VendorError(`gemini: no answer within ${timeoutMs} ms`, "timeout");
     throw new VendorError(`gemini: ${err && err.message}`, "transient");
   } finally {
     clearTimeout(timer);
@@ -252,28 +212,147 @@ async function transcribe({ apiKey, model, audio, mimeType, timeoutMs = 90_000, 
     const detail = (data && data.error && (data.error.message || data.error.status)) || raw.slice(0, 300);
     throw new VendorError(`gemini ${res.status}: ${detail}`, classify(res.status), res.status);
   }
-  const parts = (data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
-  const answer = parts.map((p) => p.text || "").join("");
-  let text;
-  try {
-    text = String(JSON.parse(answer).text || "");
-  } catch {
-    throw new VendorError("gemini: the transcript is not the JSON asked for", "transient", res.status);
+  const list = (data && Array.isArray(data.data) && data.data) || [];
+  return list.map((m) => String((m && m.id) || "").replace(/^models\//, "")).filter(Boolean);
+}
+
+/**
+ * The models the key may use, from Google's own list (free): each one's id without "models/",
+ * its display name, and the methods it answers (generateContent, embedContent).
+ * @param {{apiKey: string, timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<Array<{id: string, display_name: string, methods: string[]}>>}
+ */
+async function listModelsDetailed({ apiKey, timeoutMs = 20_000, fetchImpl }) {
+  if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  const out = [];
+  let token = null;
+  for (let page = 0; page < 10; page += 1) {
+    const url = `${NATIVE_URL}/models?pageSize=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ""}`;
+    const { data } = await request("gemini", url, { headers: { "x-goog-api-key": apiKey }, timeoutMs, fetchImpl });
+    for (const m of Array.isArray(data.models) ? data.models : []) {
+      const id = String((m && m.name) || "").replace(/^models\//, "");
+      if (!id) continue;
+      out.push({
+        id,
+        display_name: String(m.displayName || id),
+        methods: Array.isArray(m.supportedGenerationMethods) ? m.supportedGenerationMethods.map(String) : [],
+      });
+    }
+    if (!data.nextPageToken) break;
+    token = data.nextPageToken;
   }
-  const usage = (data && data.usageMetadata) || {};
+  return out;
+}
+
+/**
+ * One recording to text, sent inline (a voice note is well under Google's 20 MB inline limit).
+ * @param {{apiKey: string, model: string, audio: Buffer, mime: string, prompt: string,
+ *          maxTokens?: number, timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}>}
+ */
+async function transcribe({ apiKey, model, audio, mime, prompt, maxTokens = 8192, timeoutMs = 30_000, fetchImpl }) {
+  if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  const body = {
+    contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: mime, data: audio.toString("base64") } }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: maxTokens },
+  };
+  const id = String(model).replace(/^models\//, "");
+  const { data } = await request("gemini", `${NATIVE_URL}/models/${encodeURIComponent(id)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs,
+    fetchImpl,
+  });
+  const candidate = (Array.isArray(data.candidates) && data.candidates[0]) || {};
+  const parts = (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts) || [];
+  const meta = data.usageMetadata || {};
   return {
-    text: text.trim(),
-    usage: { input_tokens: Number(usage.promptTokenCount) || 0, output_tokens: Number(usage.candidatesTokenCount) || 0 },
-    model: data.modelVersion || name,
+    text: parts
+      .filter((p) => p && typeof p.text === "string" && !p.thought)
+      .map((p) => p.text)
+      .join("")
+      .trim(),
+    usage: {
+      input_tokens: Number(meta.promptTokenCount) || 0,
+      output_tokens: (Number(meta.candidatesTokenCount) || 0) + (Number(meta.thoughtsTokenCount) || 0),
+    },
+    model: data.modelVersion || id,
+    finish_reason: candidate.finishReason || null,
+  };
+}
+
+/**
+ * Thinking kept low for a lookup, so the answer keeps its room: a level from Gemini 3, a token
+ * budget on 2.x, nothing for a model this cannot tell.
+ */
+function thinkingOf(model) {
+  const m = /^(?:models\/)?gemini-(\d+)/i.exec(String(model || ""));
+  if (!m) return {};
+  return Number(m[1]) >= 3 ? { thinkingConfig: { thinkingLevel: "low" } } : { thinkingConfig: { thinkingBudget: 1024 } };
+}
+
+/**
+ * One answer with Google Search on (Find Prices, docs/guides/ai-control.md §6.4): the native
+ * generateContent with the google_search tool, since the OpenAI-compatible endpoint has none.
+ * Answers the text, the pages Google Search returned and how many searches ran; each search is
+ * billed apart from the tokens.
+ * @param {{apiKey: string, model: string, system: string, prompt: string, maxTokens?: number,
+ *          timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number, searches: number},
+ *                    sources: Array<{url: string, title: string}>, model: string, finish_reason: string|null}>}
+ */
+async function search({ apiKey, model, system, prompt, maxTokens = 16384, timeoutMs = 180_000, fetchImpl }) {
+  if (!apiKey) throw new VendorError("gemini: no API key", "config");
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    tools: [{ google_search: {} }],
+    generationConfig: { temperature: 0, maxOutputTokens: maxTokens, ...thinkingOf(model) },
+  };
+  const id = String(model).replace(/^models\//, "");
+  const { data } = await request("gemini", `${NATIVE_URL}/models/${encodeURIComponent(id)}:generateContent`, {
+    method: "POST",
+    headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs,
+    fetchImpl,
+  });
+  const candidate = (Array.isArray(data.candidates) && data.candidates[0]) || {};
+  const parts = (candidate.content && Array.isArray(candidate.content.parts) && candidate.content.parts) || [];
+  const grounding = candidate.groundingMetadata || {};
+  const meta = data.usageMetadata || {};
+  return {
+    text: parts
+      .filter((p) => p && typeof p.text === "string" && !p.thought)
+      .map((p) => p.text)
+      .join("")
+      .trim(),
+    usage: {
+      input_tokens: Number(meta.promptTokenCount) || 0,
+      output_tokens: (Number(meta.candidatesTokenCount) || 0) + (Number(meta.thoughtsTokenCount) || 0),
+      searches: Array.isArray(grounding.webSearchQueries) ? grounding.webSearchQueries.length : 0,
+    },
+    sources: (Array.isArray(grounding.groundingChunks) ? grounding.groundingChunks : [])
+      .map((c) => c && c.web)
+      .filter((w) => w && typeof w.uri === "string")
+      .map((w) => ({ url: w.uri, title: String(w.title || "") })),
+    model: data.modelVersion || id,
+    finish_reason: candidate.finishReason || null,
   };
 }
 
 module.exports = {
   name: "gemini",
-  transcribe,
   BASE_URL,
+  NATIVE_URL,
   VendorError,
   complete,
+  listModels,
+  listModelsDetailed,
+  transcribe,
+  search,
+  thinkingOf,
   toolSchema,
   reasoningEffort,
   classify,

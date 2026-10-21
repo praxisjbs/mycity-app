@@ -11,17 +11,15 @@
  * or status moves it too: the people under an empty seat are in the team of the first
  * person above it (docs/guides/organogram.md §6).
  *
- * Download PDF (organogram.md §5 to §7) runs through three more, each safe to run
- * twice (org-chart.export.js):
+ * Download PDF (organogram.md §5 to §7) needs no handler of its own: the request lays the
+ * chart out and queues it through documents.generate (organisation.service.js), the
+ * pdf-render job draws it, and the screen that asked downloads it
+ * (shared/documents/exports.js). `org_chart.export_requested` is its audit line. Nothing is
+ * emailed.
  *
- *   org_chart.export_requested   organisation.org_chart_pdf     read the tree as the person
- *                                                               asking, lay it out, queue it for
- *                                                               the pdf-render job
- *   document.generated           organisation.org_chart_email   an org_chart PDF exists: email it
- *   document.render_failed       organisation.org_chart_failed  it could not be drawn: tell them
- *
- * The document type `org_chart` is declared once, here. A request's PDF is opened by the
- * person who asked and the CEO, and nobody else (the vault rule for `org_chart_export`).
+ * The document type `org_chart` is declared once, here, as an export: kept a day, never
+ * locked. A request's PDF is opened by the person who asked and the CEO, and nobody else (the
+ * vault rule for `org_chart_export`).
  */
 const c = require("@mycity/contract");
 const { defineEvents } = require("../../shared/events/catalogue");
@@ -31,7 +29,6 @@ const { defineDocType } = require("../../shared/documents/generate");
 const { defineDocumentType } = require("../../shared/documents/types");
 const vault = require("../../shared/documents/vault");
 const { defineVariables } = require("../../shared/templates/variables");
-const { defineNotification } = require("../../shared/notifications/fanout");
 
 const EVENTS = defineEvents("people", {
   "department.created": { summary: "A department was created" },
@@ -45,7 +42,6 @@ const EVENTS = defineEvents("people", {
   "org_seat.created": { summary: "A vacant seat was added to the structure" },
   "org_seat.updated": { summary: "A vacant seat was changed" },
   "org_chart.export_requested": { summary: "An organogram PDF was requested" },
-  "org_chart.export_failed": { summary: "An organogram PDF could not be drawn" },
 });
 
 /** The document type of Download PDF's file. */
@@ -62,9 +58,9 @@ defineDocType(CHART_DOC_TYPE, {
   sensitivity: "normal",
   landscape: true,
   title: () => "Organogram",
+  export: true,
 });
 defineVariables("document", "org-chart", c.organisation.OrgChartDocumentVars);
-defineVariables("email", "org-chart-export", c.organisation.OrgChartExportEmailVars);
 
 /**
  * An employee's photo (organisation.photo.js): uploaded on ESS · My Profile, shown wherever the
@@ -80,12 +76,6 @@ vault.defineAccess(CHART_EXPORT, async (client, user, doc) =>
   user.is_ceo === true || (Boolean(doc.uploaded_by) && doc.uploaded_by === user.user_id),
 );
 
-defineNotification(EVENTS.ORG_CHART_EXPORT_FAILED, {
-  to: [{ users: (event) => [event.payload.requested_by] }],
-  title: "Your organogram PDF failed",
-  body: "It could not be drawn. Press Download PDF again.",
-});
-
 const bumpTeams = async () => grantsCache.bumpTeamVersion();
 
 outbox.register(EVENTS.EMPLOYEE_REPORTING_LINE_CHANGED, "organisation.refresh_team_scope", bumpTeams);
@@ -94,18 +84,9 @@ outbox.register(EVENTS.EMPLOYEE_ARCHIVED, "organisation.refresh_team_scope", bum
 outbox.register(EVENTS.EMPLOYEE_RESTORED, "organisation.refresh_team_scope", bumpTeams);
 outbox.register(EVENTS.ORG_SEAT_UPDATED, "organisation.refresh_team_scope", bumpTeams);
 
-/** A document event about Download PDF's file; every other document is someone else's. */
-const isChart = (event) => Boolean(event.payload) && event.payload.doc_type === CHART_DOC_TYPE;
-
-// The work is required when a handler runs: it needs the service, which requires this file.
-outbox.register(EVENTS.ORG_CHART_EXPORT_REQUESTED, "organisation.org_chart_pdf", (event) =>
-  require("./org-chart.export").build(event),
-);
-outbox.register(vault.EVENTS.DOCUMENT_GENERATED, "organisation.org_chart_email", (event) =>
-  isChart(event) ? require("./org-chart.export").deliver(event.payload.document_id) : undefined,
-);
-outbox.register(vault.EVENTS.DOCUMENT_RENDER_FAILED, "organisation.org_chart_failed", (event) =>
-  isChart(event) ? require("./org-chart.export").failed(event.payload.document_id) : undefined,
-);
+/** A home address saved while search was down is named by the places-name job (F27). */
+require("../../shared/places/owners").owner("employee.home_address", {
+  rename: (client, id, line) => require("./organisation.repo").updateEmployee(client, id, { home_address: line }),
+});
 
 module.exports = { EVENTS, CHART_DOC_TYPE, CHART_EXPORT, PHOTO_DOC_TYPE, PHOTO_ENTITY };

@@ -86,6 +86,8 @@
 /packages/contract/schemas/leads.js                @swizfcodes @tomblakeasaah196
 /src/modules/mailbox/                              @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/mailbox.js              @swizfcodes @tomblakeasaah196
+/src/modules/maps/                                 @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/maps.js                 @swizfcodes @tomblakeasaah196
 /src/modules/notifications/                        @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/notifications.js        @swizfcodes @tomblakeasaah196
 /src/modules/organisation/                         @swizfcodes @tomblakeasaah196
@@ -110,6 +112,8 @@
 /packages/contract/schemas/security.js             @swizfcodes @tomblakeasaah196
 /src/modules/settings/                             @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/settings.js             @swizfcodes @tomblakeasaah196
+/src/modules/system_health/                        @swizfcodes @tomblakeasaah196
+/packages/contract/schemas/system_health.js        @swizfcodes @tomblakeasaah196
 /src/modules/templates/                            @swizfcodes @tomblakeasaah196
 /packages/contract/schemas/templates.js            @swizfcodes @tomblakeasaah196
 /src/modules/users/                                @swizfcodes @tomblakeasaah196
@@ -134,6 +138,8 @@
 /packages/contract/schemas/interviews.js           @tomblakeasaah196 @swizfcodes
 /src/modules/knowledge/                            @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/knowledge.js            @tomblakeasaah196 @swizfcodes
+/src/modules/policies/                             @tomblakeasaah196 @swizfcodes
+/packages/contract/schemas/policies.js             @tomblakeasaah196 @swizfcodes
 /src/modules/reports/                              @tomblakeasaah196 @swizfcodes
 /packages/contract/schemas/reports.js              @tomblakeasaah196 @swizfcodes
 /src/modules/vacancies/                            @tomblakeasaah196 @swizfcodes
@@ -213,4 +219,8 @@
 /docs/guides/foundation.md                         @swizfcodes @tomblakeasaah196
 /docs/guides/notifications.md                      @swizfcodes @tomblakeasaah196
 /docs/guides/workspace.md                          @Ghosted34 @tomblakeasaah196 @swizfcodes
-/docs/guides/performance.md                        @Ghosted34 @tomblakeasaah196 @swizfcodes
+/docs/guides/system-health.md                      @swizfcodes @tomblakeasaah196
+/docs/guides/integrations.md                       @tomblakeasaah196 @swizfcodes
+/docs/guides/addresses.md                          @tomblakeasaah196 @swizfcodes
+/docs/guides/policies.md                           @tomblakeasaah196 @LovedataX @swizfcodes
+/docs/guides/ai-control.md                         @tomblakeasaah196 @swizfcodes

@@ -95,12 +95,15 @@ const SCREENS = Object.freeze({
   ],
   knowledge: ["policies", "sops", "faqs", "training", "announcements"],
   praxis_ai: ["ask", "history"],
+  ai_control: ["actions", "models", "spend"],
   settings: [
     "organisation",
+    "status",
+    "performance",
+    "faults",
     "users",
     "roles-and-permissions",
     "approvals",
-    "attendance-policy",
     "notifications",
     "appearance",
     "documents-and-numbering",
@@ -114,10 +117,13 @@ const SCREENS = Object.freeze({
 const screen = (module, tab) => ({ module, tab });
 
 /**
- * entity_type → { module, tab, self?, param? }. Types are the snake_case names modules pass
- * to emit() and store beside a notification, task or alert. `param` names the query value
- * that carries the record's id when its tab opens two kinds of record (an alert rule beside
- * the alerts it raises: `?rule=`; a report's run beside the reports: `?run=`); `id` otherwise.
+ * entity_type → { module, tab, self?, param?, permission? }. Types are the snake_case names
+ * modules pass to emit() and store beside a notification, task or alert. `param` names the
+ * query value that carries the record's id when its tab opens two kinds of record (an alert
+ * rule beside the alerts it raises: `?rule=`; a report's run beside the reports: `?run=`);
+ * `id` otherwise. `permission` is the module key a viewer must hold when the screen sits in
+ * another module's tabs (System Health's three tabs in Settings); the screen's module
+ * otherwise.
  */
 const ENTITY_ROUTES = Object.freeze({
   // Home
@@ -141,6 +147,7 @@ const ENTITY_ROUTES = Object.freeze({
   direct_message: screen("community", "direct-messages"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
   announcement: screen("community", "announcements"),
   recognition: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  community_link_preview: screen("community", "channels"), // search:none a page's card, kept once per address; found through the message that posts the link
   mail_thread: screen("mailbox", "inbox"), // opens the conversation by id, whichever folder it is in
   mail_message: screen("mailbox", "inbox"), // search:none a message is found through its conversation (mailbox.search.js)
   mail_signature: screen("mailbox", "signature"), // search:none one per person, their own; ⌘K finds the Signature tab (shared/search/screens.js)
@@ -159,11 +166,11 @@ const ENTITY_ROUTES = Object.freeze({
     self: screen("ess", "my-profile"),
   },
   // A Download My Data workbook (ess.export.js): its record opens My Profile, where it is asked for.
-  data_export: screen("ess", "my-profile"), // search:none a file that is emailed to whoever asked and removed after seven days; nothing to look up
+  data_export: screen("ess", "my-profile"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   // A post nobody holds yet opens on the Organogram, focused on it.
   org_seat: screen("people", "organogram"),
-  // A Download PDF request: its notice opens the Org Chart, where it can be asked for again.
-  org_chart_export: screen("ess", "org-chart"), // search:none a request for a file that is emailed to the person who asked; nothing to look up
+  // A Download PDF file: its record opens the Org Chart, where it is asked for.
+  org_chart_export: screen("ess", "org-chart"), // search:none a file downloaded where it was asked for and removed a day later; nothing to look up
   import_batch: screen("settings", "imports"),
   // A file opens where its record is: on the employee's own My Documents, or on
   // the record's Documents tab for whoever may see it.
@@ -187,6 +194,28 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
+  // A pending deduction or overtime (§6.17): People · Attendance opens its day; the person's own opens on
+  // My Attendance (both read /attendance/records/:id).
+  // search:none a pay item is found through its day, never looked up on its own
+  attendance_pay_item: {
+    ...screen("people", "attendance"),
+    self: screen("ess", "my-attendance"),
+  },
+  // A breach of an Attendance policy rule (§6.16): its Home alert opens its last day on People · Attendance.
+  // search:none a breach is reached through its Home alert, never looked up
+  attendance_rule_breach: screen("people", "attendance"),
+  // Overtime approved beforehand (§6.17): its day on People · Attendance; the person's own on My Attendance.
+  // search:none an approval is found through the day it covers
+  attendance_overtime_approval: {
+    ...screen("people", "attendance"),
+    self: screen("ess", "my-attendance"),
+  },
+  // A reminder to clock in or out (§6.14): the person's notice opens My Attendance with the clock panel (`?clock=`).
+  // search:none a reminder is a notice about today, not a record anyone looks up
+  attendance_clock_reminder: {
+    ...screen("ess", "my-attendance"),
+    param: "clock",
+  },
   // A remote employee's home location: People · Attendance opens it in Homes (`?home=`,
   // its `?id=` is a day); the person's own opens their Home Location on My Attendance.
   attendance_home: {
@@ -194,20 +223,46 @@ const ENTITY_ROUTES = Object.freeze({
     param: "home",
     self: screen("ess", "my-attendance"),
   },
-  // A work location request: People · Attendance opens it in Requests (`?request=`); the
-  // person's own opens on Work Location Requests.
+  // A work location request made before attendance's PR 4: People · Worksites opens it in
+  // Temporary, Requests (`?request=`); the person's own opens on Work Location Requests.
   attendance_location_request: {
-    ...screen("people", "attendance"),
+    ...screen("people", "worksites"),
     param: "request",
     self: screen("ess", "work-location-requests"),
   },
-  // A field assignment: People · Attendance opens it in Field (`?assignment=`); someone on it
-  // opens it on My Attendance.
+  // A field assignment made before attendance's PR 4: People · Worksites opens it in Temporary,
+  // Field (`?assignment=`); someone on it opens it on My Attendance.
   attendance_field_assignment: {
-    ...screen("people", "attendance"),
+    ...screen("people", "worksites"),
     param: "assignment",
     self: screen("ess", "my-attendance"),
   },
+  // A temporary site (attendance.md §6.11): People · Worksites opens it in Temporary (`?site=`); its
+  // own people and its submitter open it on Work Location Requests (`?site=`).
+  attendance_temporary_site: {
+    ...screen("people", "worksites"),
+    param: "site",
+    self: screen("ess", "work-location-requests"),
+  },
+  // The person's own temporary sites, as ⌘K's My Temporary Sites finds them: Work Location Requests.
+  attendance_own_temporary_site: { ...screen("ess", "work-location-requests"), param: "site" },
+  // A check-in at a stop opens the person's day, where its route is (§6.12).
+  // search:none a check-in is found through its day, never on its own
+  attendance_check_in: {
+    ...screen("people", "attendance"),
+    self: screen("ess", "my-attendance"),
+  },
+  // A version of the attendance policy from before policies (its notices kept from then): the same id
+  // is a policy_version now (migration 1405), so it opens on Policy Updates (`?version=`).
+  // search:none kept for old notices; versions are found as policy_version
+  attendance_policy: {
+    ...screen("ess", "policy-updates"),
+    param: "version",
+  },
+  // A policy: Knowledge Hub · Policies opens it (`?policy=`), for those who write policies.
+  policy: { ...screen("knowledge", "policies"), param: "policy" },
+  // A version of a policy, as the people it applies to and its approvers read it: Policy Updates (`?version=`).
+  policy_version: { ...screen("ess", "policy-updates"), param: "version" },
   leave_request: {
     ...screen("people", "leave"),
     self: screen("ess", "my-leave"),
@@ -216,15 +271,18 @@ const ENTITY_ROUTES = Object.freeze({
   worksite: screen("people", "worksites"),
 
   // Performance
+  // search:none not built yet (src/modules/goals)
   goal: {
     ...screen("performance", "goals"),
     self: screen("ess", "my-performance"),
   },
+  // search:none not built yet (src/modules/targets)
   target: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
-  kpi: screen("performance", "kpis"),
+  kpi: screen("performance", "kpis"), // search:none not built yet (src/modules/kpis)
+  // search:none not built yet (src/modules/reviews)
   review: {
     ...screen("performance", "reviews"),
     self: screen("ess", "my-performance"),
@@ -285,7 +343,6 @@ const ENTITY_ROUTES = Object.freeze({
   expense_category: screen("expenses", "categories"), // search:none not built yet (src/modules/expense_categories)
 
   // Knowledge Hub
-  policy: screen("knowledge", "policies"), // search:none not built yet (src/modules/knowledge)
   sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
   faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
   training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)
@@ -304,7 +361,14 @@ const ENTITY_ROUTES = Object.freeze({
   numbering_scheme: screen("settings", "documents-and-numbering"),
   public_holiday: screen("settings", "organisation"),
   template: screen("settings", "documents-and-numbering"), // search:none not built yet (src/modules/templates)
-  integration: screen("settings", "integrations"), // search:none not built yet (src/modules/integrations)
+  // Status, Performance, Faults and Integrations sit in Settings but are held by keys of their
+  // own (docs/guides/system-health.md §8, integrations.md §8): `permission` is what a viewer must
+  // hold to open them. A fault opens its sheet on Faults; a check going down or coming back, and
+  // the digest, open Status.
+  integration: { ...screen("settings", "integrations"), permission: "integrations" }, // search:none five connections, each found as the Integrations screen by its name (shared/search/screens.js)
+  error_group: { ...screen("settings", "faults"), permission: "system_health" }, // search:none faults are found on Settings · Faults with its filters, not by name: a fingerprint is not a word anybody types
+  health_snapshot: { ...screen("settings", "status"), permission: "system_health" }, // search:none a snapshot is a moment of the readiness checks; its notices open Status
+  performance_target: { ...screen("settings", "performance"), permission: "system_health" }, // search:none one row for the organisation, changed with Edit Targets on Performance
 });
 
 /** "praxis_ai" → "praxis-ai" */
@@ -321,6 +385,8 @@ function check() {
       throw new Error(`route-map: ${module} lists a tab twice`);
   }
   for (const [type, r] of Object.entries(ENTITY_ROUTES)) {
+    if (r.permission !== undefined && !catalog.isModule(r.permission))
+      throw new Error(`route-map: ${type} is held by "${r.permission}", which is not a module key`);
     if (r.param !== undefined && (!/^[a-z][a-z_]*$/.test(r.param) || ["tab", "id"].includes(r.param)))
       throw new Error(
         `route-map: ${type} carries its id as "${r.param}"; name a snake_case value other than tab and id`,
@@ -380,10 +446,13 @@ function linkFor(entityType, entityId, { self = false } = {}) {
   };
 }
 
-/** The module a record belongs to (its staff view), or null. Used to check the viewer may open it. */
+/**
+ * The module a viewer must hold to open a record (its staff view), or null. Used to check
+ * the viewer may open it: the screen's module, or the `permission` its route names.
+ */
 function moduleOf(entityType) {
   const r = ENTITY_ROUTES[entityType];
-  return r ? r.module : null;
+  return r ? r.permission || r.module : null;
 }
 
 const hasRoute = (entityType) =>

@@ -263,7 +263,7 @@ describe("route map", () => {
       Home: "home", "My Workspace": "workspace", "Employee Self-Service": "ess", "Staff Community": "community",
       Mailbox: "mailbox", People: "people", Performance: "performance", "Queries & Sanctions": "queries",
       Recruitment: "recruitment", Payroll: "payroll", Partnerships: "partnerships", Expenses: "expenses",
-      "Knowledge Hub": "knowledge", "Praxis AI": "praxis_ai", Settings: "settings",
+      "Knowledge Hub": "knowledge", "Praxis AI": "praxis_ai", "AI Control": "ai_control", Settings: "settings",
     };
     const found = {};
     let module = null;
@@ -271,10 +271,11 @@ describe("route map", () => {
       const h = line.match(/^### (.+)$/);
       if (h) module = LABEL_TO_MODULE[h[1].trim()] || null;
       const row = module && line.match(/^\| \d+ \| [^|]+\| `([a-z0-9-]+)` \|/);
-      if (row) (found[module] = found[module] || []).push(row[1]);
+      // A dropped screen keeps its row and number, and is no longer a screen.
+      if (row && !/\| Dropped \|/.test(line)) (found[module] = found[module] || []).push(row[1]);
     }
     expect(found).toEqual(routeMap.SCREENS);
-    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(88);
+    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(93);
   });
 });
 

@@ -11,7 +11,8 @@
  * `run` is for an action with no screen of its own, which the app does itself: Clock In
  * or Out (the clock sheet), Mark All Read, Notification Settings, Turn On Notifications and
  * Send Test Notification (the bell, docs/guides/notifications.md §9), the theme and density the person
- * prefers, Install App (the app drops it where the browser cannot install) and Sign Out.
+ * prefers, Install App (the app drops it where the browser cannot install), Refresh Screen and
+ * Reload App (the pull and the refresh button's two depths, FRONTEND_FOUNDATION F28) and Sign Out.
  *
  * Every screen's New action is here: the search coverage gate fails a
  * `useScreenAction({ label })` in the app whose label is not an action below, unless the
@@ -37,6 +38,8 @@ const RUNS = new Set([
   "theme_light",
   "density",
   "install",
+  "refresh",
+  "reload",
   "sign_out",
 ]);
 
@@ -79,6 +82,12 @@ const ACTIONS = Object.freeze([
     params: { action: "new" },
     need: ["people", "create"],
     words: ["worksite", "office", "geofence", "new office", "clock-in location"],
+  }),
+  a("add_temporary_site", "Add Temporary Site", {
+    screen: "people.worksites",
+    params: { action: "temporary-site" },
+    need: ["people", "approve"],
+    words: ["temporary site", "send people out", "field assignment", "client site", "out of station"],
   }),
   a("import_staff", "Import Staff", {
     screen: "settings.imports",
@@ -124,6 +133,13 @@ const ACTIONS = Object.freeze([
     capability: "home.reports",
     words: ["report", "build report", "schedule report", "attendance report", "send me a report"],
   }),
+  a("new_policy", "New Policy", {
+    screen: "knowledge.policies",
+    params: { action: "new" },
+    need: ["knowledge", "create"],
+    capability: "policies.manage",
+    words: ["policy", "write a policy", "company policy", "handbook", "attendance policy"],
+  }),
   a("clock_in", "Clock In", {
     screen: "ess.my-attendance",
     run: "clock",
@@ -140,40 +156,6 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
   }),
-  a("new_goal", "New Goal", {
-    screen: "performance.goals",
-    params: { action: "new" },
-    need: ["performance", "create"],
-    capability: "goals.company",
-    words: ["goal", "set a goal", "annual goal", "monthly goal", "objective", "strategy"],
-  }),
-  a("set_targets", "Set Targets", {
-    screen: "performance.targets",
-    params: { action: "new" },
-    need: ["performance", "create"],
-    capability: "goals.department",
-    words: ["targets", "department targets", "monthly targets", "set targets"],
-  }),
-  a("assign_kpis", "Assign KPIs", {
-    screen: "performance.kpis",
-    params: { action: "new" },
-    need: ["performance", "create"],
-    capability: "kpis.assign",
-    words: ["kpi", "kpis", "assign kpis", "set kpis", "weights", "individual targets"],
-  }),
-  a("open_cycle", "Open Cycle", {
-    screen: "performance.reviews",
-    params: { action: "new" },
-    need: ["performance", "create"],
-    capability: "reviews.cycles",
-    words: ["review cycle", "appraisal", "open cycle", "start reviews", "performance review"],
-  }),
-  a("start_my_review", "Start My Review", {
-    screen: "ess.my-performance",
-    params: { action: "new" },
-    need: ["ess", "view"],
-    words: ["my review", "self review", "appraisal", "rate myself", "self assessment"],
-  }),
   a("new_event", "New Event", {
     screen: "workspace.calendar",
     params: { action: "new" },
@@ -186,16 +168,12 @@ const ACTIONS = Object.freeze([
     need: ["ess", "create"],
     words: ["leave", "apply for leave", "holiday", "vacation", "time off", "day off", "sick leave"],
   }),
-  a("request_work_location", "New Request", {
-    screen: "ess.work-location-requests",
-    params: { action: "new" },
-    words: ["work location", "work from home", "remote day", "temporary home", "client visit", "work elsewhere"],
-  }),
-  a("new_field_assignment", "New Assignment", {
-    screen: "people.attendance",
-    params: { action: "new" },
-    need: ["people", "approve"],
-    words: ["field assignment", "send out", "field work", "venue", "crew", "event staff"],
+  // A temporary site from Home's sheet, for anyone (attendance.md §6.11); it replaced New Request
+  // and New Assignment in attendance's PR 4.
+  a("add_work_site", "Add Work Site", {
+    screen: "home.overview",
+    params: { action: "work-site" },
+    words: ["work site", "temporary site", "work elsewhere", "work location", "client visit", "training", "out of station", "field work", "temporary home"],
   }),
   a("change_password", "Change Password", {
     screen: "ess.my-security",
@@ -246,6 +224,16 @@ const ACTIONS = Object.freeze([
     run: "install",
     need: null,
     words: ["install", "add to home screen", "app", "download app"],
+  }),
+  a("refresh_screen", "Refresh Screen", {
+    run: "refresh",
+    need: null,
+    words: ["refresh", "reload data", "update", "latest", "pull to refresh", "fresh numbers"],
+  }),
+  a("reload_app", "Reload App", {
+    run: "reload",
+    need: null,
+    words: ["reload", "restart", "restart app", "hard refresh", "start again"],
   }),
   a("sign_out", "Sign Out", {
     run: "sign_out",

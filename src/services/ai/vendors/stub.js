@@ -111,13 +111,16 @@ async function complete({ schema = null } = {}) {
   };
 }
 
+/** The transcription placeholder, never kept as a voice note's transcript. */
+const TRANSCRIPT = "[AI placeholder] No AI vendor is configured, so this voice note was not transcribed.";
+
 /** Transcription placeholder (services/ai/transcription.js). */
 async function transcribe() {
   return {
-    text: "[AI placeholder] No AI vendor is configured, so this voice note was not transcribed.",
+    text: TRANSCRIPT,
     usage: { input_tokens: 0, output_tokens: 0 },
     model: "stub",
   };
 }
 
-module.exports = { name: "stub", complete, transcribe, placeholder, TEXT };
+module.exports = { name: "stub", complete, transcribe, placeholder, TEXT, TRANSCRIPT };

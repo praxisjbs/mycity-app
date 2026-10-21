@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
-import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
+import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, formatDateTime, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 
 export interface ComposeInit {
@@ -15,6 +15,8 @@ export interface ComposeInit {
   body_html?: string;
   attachments?: DocumentRef[];
   in_reply_to?: string | null;
+  /** The draft waits on the queue: when it goes. Editing it keeps that time until Done. */
+  scheduled?: { release_at: string } | null;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -157,7 +159,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       await api.call("POST /api/v1/mailbox/messages", { body: { ...payload(), subject: subject.trim(), mail_draft_id: draftId, ...(release_at && { release_at }) }, idempotencyKey: sendKey });
       invalidate("/api/v1/mailbox");
       close();
-      toast(release_at ? `Scheduled for ${formatDate(release_at.slice(0, 10))} ${release_at.slice(11, 16)}` : `Sent to ${to.join(", ")}`);
+      toast(release_at ? (release_at === init.scheduled?.release_at ? "Scheduled mail updated" : `Scheduled for ${formatDate(release_at.slice(0, 10))} ${release_at.slice(11, 16)}`) : `Sent to ${to.join(", ")}`);
     } catch (e) {
       setBusy(false);
       if (e instanceof ApiError && e.fields?.release_at) setSched((s) => ({ ...s, open: true, past: true }));
@@ -268,15 +270,27 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           <>
             <Button icon="trash" className="max-md:px-3" onClick={() => setConfirmDiscard(true)}><span className="max-md:sr-only">Discard</span></Button>
             <Menu
-              trigger={(p) => <Button {...p} icon="clock" className="max-md:px-3"><span className="max-md:sr-only">Schedule</span></Button>}
+              trigger={(p) =>
+                init.scheduled ? (
+                  <Button {...p} icon="clock" className="max-md:px-3" aria-label={`Scheduled ${formatDateTime(init.scheduled.release_at)}, change time`}>{formatDateTime(init.scheduled.release_at)}</Button>
+                ) : (
+                  <Button {...p} icon="clock" className="max-md:px-3"><span className="max-md:sr-only">Schedule</span></Button>
+                )
+              }
               items={[
                 { label: `Tomorrow, ${formatDate(q.tomorrow).slice(0, 5)} at 08:00`, icon: "clock", onSelect: () => void send(at(q.tomorrow, "08:00")) },
                 { label: `Monday, ${formatDate(q.monday).slice(0, 5)} at 08:00`, icon: "clock", onSelect: () => void send(at(q.monday, "08:00")) },
                 "sep",
                 { label: "Pick Date and Time", icon: "check", onSelect: () => setSched((s) => ({ ...s, open: true })) },
+                ...(init.scheduled ? ["sep" as const, { label: "Send Now", icon: "send" as const, onSelect: () => void send() }] : []),
               ]}
             />
-            <Button variant="primary" icon="send" className="max-md:flex-1" busy={busy} onClick={() => send()}>Send</Button>
+            {init.scheduled ? (
+              /* Editing a scheduled mail: Done keeps its time, with what is on screen now. */
+              <Button variant="primary" icon="check" className="max-md:flex-1" busy={busy} onClick={() => send(init.scheduled!.release_at)}>Done</Button>
+            ) : (
+              <Button variant="primary" icon="send" className="max-md:flex-1" busy={busy} onClick={() => send()}>Send</Button>
+            )}
           </>
         )}
       </div>

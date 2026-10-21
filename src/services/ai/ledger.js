@@ -16,9 +16,12 @@
  *                prompt_version, prompt_sha, status ('running' | 'ok' | 'failed' | 'refused'),
  *                provisional, error_code, error, request_id, started_at, finished_at
  *   ai_run_step  ai_run_step_id, run_id, step_no, kind ('completion' | 'retry' |
- *                'transcription'), vendor, model, input_tokens, output_tokens,
- *                input_ngn_per_million, output_ngn_per_million, cost_ngn, latency_ms,
- *                finish_reason, outcome ('ok' | 'invalid' | 'failed'), error, created_at
+ *                'transcription' | 'search'), vendor, model, input_tokens, output_tokens,
+ *                audio_seconds, searches, input_ngn_per_million, output_ngn_per_million,
+ *                ngn_per_audio_hour, ngn_per_search, usd_ngn_rate, rate_day, cost_ngn,
+ *                latency_ms, finish_reason, outcome ('ok' | 'invalid' | 'failed'), error,
+ *                created_at (10200 added the audio, search and rate columns: what the step was
+ *                charged at, so a new price or rate never rewrites past spend)
  */
 const requestContext = require("../../config/request-context");
 const money = require("../../shared/money/money");
@@ -64,19 +67,22 @@ async function startRun(db, run) {
  * @param {{query: Function}} db
  * @param {string} runId
  * @param {{step_no: number, kind: string, vendor: string, model: string,
- *          usage?: {input_tokens: number, output_tokens: number},
- *          prices: {input_ngn_per_million: string, output_ngn_per_million: string},
+ *          usage?: {input_tokens: number, output_tokens: number, audio_seconds?: number, searches?: number},
+ *          prices: {input_ngn_per_million: string, output_ngn_per_million: string, ngn_per_audio_hour?: string|null,
+ *                   ngn_per_search?: string|null, usd_ngn_rate?: string|null, rate_day?: string|null},
  *          latency_ms: number, finish_reason?: string|null, outcome: string, error?: string|null}} step
  * @returns {Promise<string>} the step's cost, "0.00" style
  */
 async function recordStep(db, runId, step) {
   const usage = step.usage || { input_tokens: 0, output_tokens: 0 };
-  const cost = money.toWire(costOf(usage, step.prices));
+  const p = step.prices;
+  const cost = money.toWire(costOf(usage, p));
   await db.query(
     `INSERT INTO ai_run_step
-       (run_id, step_no, kind, vendor, model, input_tokens, output_tokens, input_ngn_per_million, output_ngn_per_million,
+       (run_id, step_no, kind, vendor, model, input_tokens, output_tokens, audio_seconds, searches,
+        input_ngn_per_million, output_ngn_per_million, ngn_per_audio_hour, ngn_per_search, usd_ngn_rate, rate_day,
         cost_ngn, latency_ms, finish_reason, outcome, error)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
     [
       runId,
       step.step_no,
@@ -85,8 +91,14 @@ async function recordStep(db, runId, step) {
       step.model,
       Number(usage.input_tokens) || 0,
       Number(usage.output_tokens) || 0,
-      step.prices.input_ngn_per_million,
-      step.prices.output_ngn_per_million,
+      Math.max(0, Math.round(Number(usage.audio_seconds) || 0)),
+      Math.max(0, Math.round(Number(usage.searches) || 0)),
+      p.input_ngn_per_million,
+      p.output_ngn_per_million,
+      p.ngn_per_audio_hour || null,
+      p.ngn_per_search || null,
+      p.usd_ngn_rate || null,
+      p.rate_day || null,
       cost,
       Math.round(step.latency_ms || 0),
       step.finish_reason || null,
@@ -101,11 +113,13 @@ async function recordStep(db, runId, step) {
  * Close a run.
  * @param {{query: Function}} db
  * @param {string} runId
- * @param {{status: "ok"|"failed", provisional?: boolean, error_code?: string|null, error?: string|null}} end
+ * @param {{status: "ok"|"failed", provisional?: boolean, error_code?: string|null, error?: string|null,
+ *          vendor?: string, model?: string}} end  vendor and model: the fallback that answered, when not the first
  */
 async function finishRun(db, runId, end) {
   await db.query(
-    `UPDATE ai_run SET status = $2, provisional = $3, error_code = $4, error = $5, finished_at = now()
+    `UPDATE ai_run SET status = $2, provisional = $3, error_code = $4, error = $5, finished_at = now(),
+            vendor = COALESCE($6, vendor), model = COALESCE($7, model)
       WHERE run_id = $1`,
     [
       runId,
@@ -113,6 +127,8 @@ async function finishRun(db, runId, end) {
       end.provisional !== false,
       end.error_code || null,
       clip(end.error),
+      end.vendor || null,
+      end.model || null,
     ],
   );
 }

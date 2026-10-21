@@ -9,17 +9,27 @@
  * Every AI entry point (llm.service.complete, transcription) asks here first, so a
  * new feature cannot forget the switch or the cap.
  *
- * The settings (ai_setting, one row, edited on the M10 spend screen) hold:
+ * The settings (ai_setting, one row) hold:
  *   enabled                 the whole of AI on or off
- *   vendor, model           "gemini" or "stub"; the model name
+ *   vendor                  "stub" sends every call to the stub; otherwise the chains decide
+ *                           (services/ai/jobs.js, AI Control). `model` is no longer read
  *   disabled_modules        per-module switch: module keys whose AI features are off
- *   monthly_cap_ngn         spend ceiling for the Lagos calendar month; NULL is no cap
- *   input/output_ngn_per_million  token prices, so the spend is in naira
+ *   monthly_cap_ngn         spend ceiling for all AI in the Lagos calendar month; NULL is no cap.
+ *                           Set on AI Control · Spend
+ *   input/output_ngn_per_million  token prices for a model with no dollar price yet (prices.js)
+ *
+ * Each paid provider also has its own monthly cap (ai_provider_cap, AI Control · Spend): at it,
+ * every chain passes that provider by until the month ends (atCap); nobody is told
+ * (docs/guides/ai-control.md decision 21).
  * With no row (or before migration 0095), the defaults come from the environment:
- * enabled, Gemini when GEMINI_API_KEY is set, no cap, the AI_*_NGN_PER_MILLION prices.
+ * enabled, Gemini when it has a key, no cap, the AI_*_NGN_PER_MILLION prices. The model is the
+ * Default job's: the best one Gemini's key can use (services/ai/jobs.js), else GEMINI_MODEL. A
+ * key made for a new Google project cannot use every older model, so a fixed default would fail.
  *
  * Which vendor answers: "gemini" with a key; the stub otherwise, never an error
- * (a missing key is a configuration the product supports: CI, laptops, staging).
+ * (a missing key is a configuration the product supports: CI, laptops, staging). The key
+ * is Settings · Integrations' (shared/integrations/settings.js: saved there, else
+ * GEMINI_API_KEY in the server file; docs/guides/integrations.md §6.3).
  *
  * Spend is computed from the tokens each step recorded and the prices recorded with
  * it, summed for the month and rounded once at the end. Rounding each call to the
@@ -29,17 +39,22 @@
  */
 const { config } = require("../../config/env");
 const { AppError } = require("../../shared/errors");
+const integrations = require("../../shared/integrations/settings");
 const catalog = require("../../shared/access/access.catalog");
 const money = require("../../shared/money/money");
 const lagos = require("../../shared/time/lagos");
 
 const VENDORS = new Set(["gemini", "stub"]);
 
-function defaults() {
+/** Gemini's key in use, or null: AI then answers from the stub. */
+const keyOf = (db) => integrations.secret("gemini", "api_key", { db });
+
+function defaults(apiKey = null, model = config.GEMINI_MODEL) {
   return {
     enabled: true,
-    vendor: config.GEMINI_API_KEY ? "gemini" : "stub",
-    model: config.GEMINI_MODEL,
+    vendor: apiKey ? "gemini" : "stub",
+    forced_stub: false,
+    model,
     disabled_modules: [],
     monthly_cap_ngn: null,
     input_ngn_per_million: config.AI_INPUT_NGN_PER_MILLION,
@@ -54,8 +69,14 @@ const str2 = (v) =>
  * The effective settings: the ai_setting row over the environment defaults.
  * @param {{query: Function}} db
  */
+/** The Default job's Gemini model from the key's list, or null when the list has none yet. */
+async function defaultModel(db) {
+  const first = (await require("./jobs").chain("default", { db }))[0];
+  return first && first.provider === "gemini" ? first.model : null;
+}
+
 async function settings(db) {
-  const base = defaults();
+  const base = defaults(await keyOf(db), (await defaultModel(db)) || config.GEMINI_MODEL);
   let row = null;
   try {
     const { rows } = await db.query(
@@ -69,8 +90,10 @@ async function settings(db) {
   if (!row) return base;
   return {
     enabled: row.enabled !== false,
-    vendor: VENDORS.has(row.vendor) ? row.vendor : base.vendor,
-    model: row.model || base.model,
+    // "stub" is a switch: every call to the stub. The model is the Default chain's, whatever the row holds.
+    vendor: row.vendor === "stub" ? "stub" : base.vendor,
+    forced_stub: row.vendor === "stub",
+    model: base.model,
     disabled_modules: Array.isArray(row.disabled_modules)
       ? row.disabled_modules
       : [],
@@ -83,24 +106,35 @@ async function settings(db) {
 }
 
 /** The vendor that will answer: the setting, falling back to the stub without a key. */
-function vendorFor(s) {
-  return s.vendor === "gemini" && config.GEMINI_API_KEY ? "gemini" : "stub";
+function vendorFor(s, apiKey) {
+  return s.vendor === "gemini" && apiKey ? "gemini" : "stub";
 }
 
 /**
- * Naira for one step, unrounded (a Decimal).
- * @param {{input_tokens: number, output_tokens: number}} usage
- * @param {{input_ngn_per_million: string, output_ngn_per_million: string}} prices
+ * Naira for one step, unrounded (a Decimal): tokens at their price per million, audio seconds at
+ * the price of an hour, searches at the price of one (docs/guides/ai-control.md §6.3).
+ * @param {{input_tokens: number, output_tokens: number, audio_seconds?: number, searches?: number}} usage
+ * @param {{input_ngn_per_million: string, output_ngn_per_million: string, ngn_per_audio_hour?: string|null,
+ *          ngn_per_search?: string|null}} prices
  */
 function costOf(usage, prices) {
   const inTok = Number(usage.input_tokens) || 0;
   const outTok = Number(usage.output_tokens) || 0;
+  const seconds = Number(usage.audio_seconds) || 0;
+  const searches = Number(usage.searches) || 0;
   return money
     .money(prices.input_ngn_per_million)
     .times(inTok)
     .plus(money.money(prices.output_ngn_per_million).times(outTok))
-    .dividedBy(1_000_000);
+    .dividedBy(1_000_000)
+    .plus(money.money(prices.ngn_per_audio_hour || 0).times(seconds).dividedBy(3600))
+    .plus(money.money(prices.ngn_per_search || 0).times(searches));
 }
+
+/** One step's naira in SQL, unrounded: the same sum as costOf. */
+const STEP_NGN = `((s.input_tokens::numeric * s.input_ngn_per_million + s.output_tokens::numeric * s.output_ngn_per_million) / 1000000
+  + s.audio_seconds::numeric * COALESCE(s.ngn_per_audio_hour, 0) / 3600
+  + s.searches::numeric * COALESCE(s.ngn_per_search, 0))`;
 
 /** The first instant of the Lagos month containing `now`, and of the next one. */
 function monthWindow(now = new Date()) {
@@ -119,9 +153,9 @@ async function spentThisMonth(db, now = new Date()) {
   const { from, to } = monthWindow(now);
   try {
     const { rows } = await db.query(
-      `SELECT COALESCE(SUM((input_tokens::numeric * input_ngn_per_million + output_tokens::numeric * output_ngn_per_million) / 1000000), 0)::text AS spent
-         FROM ai_run_step
-        WHERE created_at >= $1 AND created_at < $2`,
+      `SELECT COALESCE(SUM(${STEP_NGN}), 0)::text AS spent
+         FROM ai_run_step s
+        WHERE s.created_at >= $1 AND s.created_at < $2`,
       [from, to],
     );
     return money.toWire(rows[0].spent);
@@ -129,6 +163,67 @@ async function spentThisMonth(db, now = new Date()) {
     if (err.code === "42P01") return "0.00";
     throw err;
   }
+}
+
+/**
+ * Each provider's naira for the Lagos month containing `now`, and its calls (runs it answered or
+ * failed), keyed by provider: { gemini: { spent_ngn: "12.30", calls: 4 } }.
+ * @param {{query: Function}} db
+ */
+async function spentByProvider(db, now = new Date()) {
+  const { from, to } = monthWindow(now);
+  try {
+    const { rows } = await db.query(
+      `SELECT s.vendor, COALESCE(SUM(${STEP_NGN}), 0)::text AS spent, count(DISTINCT s.run_id)::int AS calls
+         FROM ai_run_step s
+        WHERE s.created_at >= $1 AND s.created_at < $2
+        GROUP BY s.vendor`,
+      [from, to],
+    );
+    const out = {};
+    for (const r of rows) out[r.vendor] = { spent_ngn: money.toWire(r.spent), calls: r.calls };
+    return out;
+  } catch (err) {
+    if (err.code === "42P01" || err.code === "42703") return {};
+    throw err;
+  }
+}
+
+/** Each provider's monthly cap in naira, or null: { anthropic: "50000.00" }. */
+async function caps(db) {
+  try {
+    const { rows } = await db.query("SELECT provider, monthly_cap_ngn::text AS cap FROM ai_provider_cap");
+    const out = {};
+    for (const r of rows) out[r.provider] = r.cap === null ? null : money.toWire(r.cap);
+    return out;
+  } catch (err) {
+    if (err.code === "42P01") return {};
+    throw err;
+  }
+}
+
+/** Ten seconds of the answer to "is this provider at its cap", per process. */
+const CAP_TTL_MS = 10_000;
+let capMemo = { at: 0, month: null, value: null };
+
+/**
+ * Which providers have reached their monthly cap now, as a Set; asked by every chain walk.
+ * @param {{query: Function}} db
+ */
+async function atCap(db, now = new Date()) {
+  const month = lagos.today(now).slice(0, 7);
+  if (capMemo.value && capMemo.month === month && Date.now() - capMemo.at < CAP_TTL_MS) return capMemo.value;
+  const [limits, spent] = await Promise.all([caps(db), spentByProvider(db, now)]);
+  const value = new Set();
+  for (const [provider, cap] of Object.entries(limits))
+    if (cap !== null && money.compare((spent[provider] && spent[provider].spent_ngn) || "0.00", cap) >= 0) value.add(provider);
+  capMemo = { at: Date.now(), month, value };
+  return value;
+}
+
+/** A cap set or a test: ask again at once. */
+function forgetCaps() {
+  capMemo = { at: 0, month: null, value: null };
 }
 
 /**
@@ -160,10 +255,13 @@ async function check(db, { module, now = new Date() }) {
       429,
     );
   }
+  const apiKey = await keyOf(db);
   return {
     settings: s,
-    vendor: vendorFor(s),
+    vendor: vendorFor(s, apiKey),
     model: s.model,
+    /** For the vendor call only; never logged, stored or sent anywhere else. */
+    api_key: apiKey,
     spent_ngn: spent,
     cap_ngn: s.monthly_cap_ngn,
   };
@@ -173,10 +271,11 @@ async function check(db, { module, now = new Date() }) {
 async function health(db) {
   try {
     const s = await settings(db);
+    const vendor = vendorFor(s, await keyOf(db));
     return {
       status: "up",
-      vendor: vendorFor(s),
-      model: vendorFor(s) === "stub" ? "stub" : s.model,
+      vendor,
+      model: vendor === "stub" ? "stub" : s.model,
       enabled: s.enabled,
     };
   } catch (err) {
@@ -186,12 +285,17 @@ async function health(db) {
 
 module.exports = {
   VENDORS,
+  STEP_NGN,
   defaults,
   settings,
   vendorFor,
   costOf,
   monthWindow,
   spentThisMonth,
+  spentByProvider,
+  caps,
+  atCap,
+  forgetCaps,
   check,
   health,
 };

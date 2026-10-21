@@ -4,7 +4,8 @@ Web push (`docs/guides/notifications.md`) needs **nothing in `.env`**. Each envi
 key pair (VAPID, RFC 8292) the first time someone turns notifications on, and keeps it in
 `integration_secret` (provider `web_push`, key `vapid`), encrypted with `ENCRYPTION_KEY`. This
 runbook is what to check after the first deploy that carries push, how to read a device's health,
-and how to pin or change the keys. TB decided all of it on 19/10/2026
+and how to pin or change the keys. Settings · Integrations, Web Push (`docs/guides/integrations.md`)
+shows the pair's key id, the subject and the pushes sent, and replaces the pair with Replace Keys. TB decided all of it on 19/10/2026
 (`docs/handoff/push-notifications.md` §2).
 
 Commands run on the server as a user with sudo. `<env>` is `prod` or `stg`: the release is in
@@ -15,15 +16,17 @@ Commands run on the server as a user with sudo. `<env>` is `prod` or `stg`: the 
 
 | | |
 |---|---|
-| `.env` | Nothing. `VAPID_SUBJECT` defaults to `mailto:jbspraxisllc@gmail.com`. `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` are only for pinning a pair (§4): both or neither, or the API and the worker refuse to start |
+| `.env` | Nothing. The subject is set on Settings · Integrations, Web Push; `VAPID_SUBJECT` (default `mailto:jbspraxisllc@gmail.com`) is the fallback. `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` pin a pair only where none is stored (§4): both or neither, or the API and the worker refuse to start |
 | `ENCRYPTION_KEY` | The one already set. The stored pair is encrypted with it, so changing it is a key change (§4) |
-| Mail | `MAILBOX_IDLE_MAX` unset or empty: 24 inboxes held live on production, 4 on staging (§2) |
+| Mail | Live Connections on Settings · Integrations, Staff Mail Server; with nothing saved there, `MAILBOX_IDLE_MAX` unset or empty: 24 inboxes held live on production, 4 on staging (§2) |
 | Network | Outbound HTTPS to the browsers' push services: `fcm.googleapis.com` (Chrome and Android), `updates.push.services.mozilla.com` (Firefox), `web.push.apple.com` (Safari, iPhone and iPad), `*.notify.windows.com` (Edge on Windows). `ufw` only limits what comes in, so nothing is needed |
 | nginx | Nothing. The API serves `/sw.js` with `Cache-Control: no-cache` (`src/http/static.js`), so a new service worker reaches every installed app on its next start |
 
 ## 2 · After the first deploy that carries push
 
-1. **Mail is live on both.** Neither `.env` may pin `MAILBOX_IDLE_MAX` to 0:
+1. **Mail is live on both.** Settings · Integrations, Staff Mail Server, must not show Live
+   Connections 0 on either. Where nothing is saved there, neither `.env` may pin `MAILBOX_IDLE_MAX`
+   to 0:
 
    ```sh
    sudo grep -n MAILBOX_IDLE_MAX /srv/mycity/prod/shared/.env /srv/mycity/stg/shared/.env
@@ -103,10 +106,14 @@ phone whose app is not opened again stop until it is.
   sudo systemctl restart mycity-api-<env> mycity-worker-<env>
   ```
 
-  `.env` wins over the stored pair; the stored row stays unused.
+  A stored pair wins over `.env`'s (Settings · Integrations comes first, `docs/guides/integrations.md`
+  §6.1), so a pinned pair is used only where none is stored: to switch to it, delete the stored row
+  (below) and restart both units. A server that pinned a pair after one was stored therefore moves
+  back to the stored pair once this release lands; its devices subscribe again on their next start.
 
-- **Make a new stored pair** (the private half may have leaked): delete the row, restart both units,
-  then make it again with step 2 of §2 (or let the next app start do it).
+- **Make a new stored pair** (the private half may have leaked): Settings · Integrations, Web Push,
+  Replace Keys (a fresh sign-in; no restart). On the server, deleting the row and restarting both
+  units still works; the next app start makes a new one.
 
   ```sh
   sudo -u postgres psql mycity_<env> -c \
@@ -128,5 +135,5 @@ Both units cache the pair for as long as they run, so a change is always followe
 | This Device reads Blocked | Nothing on the server | Notifications are blocked in that browser's site settings; only the person can allow them |
 | This Device reads Install First | Nothing on the server | An iPhone or iPad in Safari: iOS pushes only to an installed app (Share, Add to Home Screen) |
 | Send Test says sent, nothing arrives | §3 for that device | `gone`: it subscribes again on its next start. `failed`: the push service or the network |
-| Mail arrives in the app minutes late | §2 step 1, then `journalctl -u mycity-worker-<env> -g "mail idle"` | `MAILBOX_IDLE_MAX=0` in `.env`, or more connected mailboxes than it allows (the rest are synced every 2 minutes) |
+| Mail arrives in the app minutes late | §2 step 1, then `journalctl -u mycity-worker-<env> -g "mail idle"` | Live Connections 0 on Settings · Integrations (or `MAILBOX_IDLE_MAX=0` in `.env` with nothing saved there), or more connected mailboxes than it allows (the rest are synced every Sync Every minutes) |
 | A notification appears twice | Nothing on the server | Should not happen: the app on screen shows the banner and the device's own notification is held back. Report it with the phone's make and browser |

@@ -27,7 +27,7 @@ export const COMING: Record<string, string[]> = {
   "ess/my-documents": ["Your documents in the vault: contract, ID, certificates", "Upload what is missing, with a progress bar", "Expiry dates, with a reminder before they lapse"],
   "ess/work-location-requests": ["Ask for a temporary home, a remote day or a client visit", "Your line manager, then People, approve it", "On those days your clock-in is matched to that place"],
   "ess/my-devices": ["The phones and laptops you clock in from", "Approve a new device, or remove a lost one", "Clock-in is refused from a device you have not approved"],
-  "ess/policy-updates": ["Each new version of the attendance policy, in plain words", "What changed, and from when", "Acknowledge you have read it; People sees who has"],
+  "ess/policy-updates": ["The policies that apply to you, in plain words", "What changed, and from when", "Acknowledge each new version"],
   "ess/my-security": ["Your password and two-step sign-in", "Where you are signed in, and sign out anywhere", "Recent sign-ins, so a stranger's stands out"],
   "ess/org-chart": ["Who you report to, and who reports to them", "Your team and the teams around it", "Find anyone, and how to reach them"],
 
@@ -99,7 +99,7 @@ export const COMING: Record<string, string[]> = {
   "expenses/categories": ["Expense categories and their limits", "Which categories need receipts", "Who can approve each category"],
 
   /* Knowledge Hub */
-  "knowledge/policies": ["Company policies, versioned and searchable", "Who has read each version", "Only what your role may see"],
+  "knowledge/policies": ["Every company policy, versioned and signed", "The Attendance policy as a worksheet", "Who has acknowledged each version"],
   "knowledge/sops": ["Step-by-step procedures for each department", "Owners keep them current", "Linked from the screens they describe"],
   "knowledge/faqs": ["Answers to the questions staff ask most", "Search in plain words", "Suggest a new question"],
   "knowledge/training": ["Training material and onboarding courses", "Track who has completed what", "Assign training to a person or team"],
@@ -114,11 +114,10 @@ export const COMING: Record<string, string[]> = {
   "settings/users": ["Invite an employee to sign in", "Change a user's role, or disable a login", "Disabled logins keep their history"],
   "settings/roles-and-permissions": ["Create roles from the screen", "Grant modules, actions and record scope", "Mask salary, bank details and query history"],
   "settings/approvals": ["Approval chains for leave, expenses, payroll and more", "Deputies for when an approver is away", "Changed without a deploy"],
-  "settings/attendance-policy": ["Clock-in rules, grace periods and radius", "Draft changes, then publish a new version", "Staff acknowledge each version"],
   "settings/notifications": ["Which events notify whom", "In the app, by email, or both", "Quiet hours and digests"],
   "settings/appearance": ["The organisation's default theme", "Light, dark or the device setting", "Each person can still choose their own"],
   "settings/documents-and-numbering": ["Number formats for offers, queries and documents", "Letterhead and document templates", "Gap-free numbering, checked"],
-  "settings/integrations": ["Mail, bank and other connected services", "Health checks for each connection", "Keys stored encrypted"],
+  "settings/integrations": ["Mail, maps, AI and push keys, changed without a deploy", "Each connection tested before it is saved", "Keys stored encrypted and never shown again"],
   "settings/security": ["Two-step sign-in, required by role", "Active sessions, ended remotely", "Failed sign-ins and blocked attempts"],
   "settings/audit-log": ["Who did what, when, to which record", "Search by person, record, action or date", "Cannot be edited by anyone"],
   "settings/imports": ["Import a spreadsheet of records, column by column", "See what will be created before you commit", "Every import kept, with its error file and Revert"],

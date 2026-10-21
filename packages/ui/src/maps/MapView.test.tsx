@@ -63,4 +63,23 @@ describe("MapView", () => {
     await drawn(container);
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it("fetches every tile through the screen's own loader when given one, and draws the bytes", async () => {
+    // jsdom has no layout; give the map a size so Leaflet asks for the tiles in view.
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(256);
+    const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(256);
+    const made = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:tile");
+    const loadTile = vi.fn().mockResolvedValue(new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }));
+    try {
+      const { container } = render(<MapView markers={MARKERS} loadTile={loadTile} />);
+      await drawn(container);
+      await waitFor(() => expect(loadTile).toHaveBeenCalled());
+      expect(loadTile.mock.calls[0]![0]).toMatch(/^\/api\/v1\/maps\/tiles\/15\/\d+\/\d+\.png$/);
+      await waitFor(() => expect(container.querySelector('img[src="blob:tile"]')).not.toBeNull());
+    } finally {
+      width.mockRestore();
+      height.mockRestore();
+      made.mockRestore();
+    }
+  });
 });

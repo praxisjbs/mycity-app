@@ -1,15 +1,18 @@
 import ess from "@mycity/contract/schemas/ess.js";
 import type { EssProfile } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
+import type { BodyOf } from "@/api/endpoints";
 import { useFileUrl } from "@/api/download";
+import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import { useAuth } from "@/auth/AuthProvider";
 import { PLACE } from "@/features/attendance/labels";
 import { employmentType, workPattern } from "@/features/people/status";
 import { PhoneCards } from "@/features/shared/PhoneCards";
+import { lineOf, places, placeValue } from "@/features/shared/places";
 import { hrefFor, useRouter } from "@/lib/router";
-import { ActionGroup, Banner, Button, Card, Icon, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, UploadField, useConfirm, useContractForm, useModal, Wizard } from "@mycity/ui";
+import { ActionGroup, AddressField, Banner, Button, Card, Icon, CardHeader, DesktopOnly, ErrorState, Field, formatDate, Grid, initials, KeyValue, LoadingRows, PageHeader, Pager, Pill, TextField, Timeline, toast, UploadField, useConfirm, useContractForm, useModal, Wizard, type PlaceValue } from "@mycity/ui";
 
 /**
  * ESS · My Profile (#8, `my-profile`): the caller's own record (docs/guides/ess.md §10).
@@ -29,14 +32,13 @@ export function MyProfilePage() {
   const exportData = useMutation("POST /api/v1/ess/profile/export");
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={8} />;
-  /* Download My Data: built in the background and emailed; once a day (docs/guides/ess.md §6). */
+  /* Download My Data: built in the background and downloaded here; once a day (docs/guides/ess.md §6). */
   const downloadData = async () => {
     try {
-      await exportData.run({ body: {} });
-      toast("We'll email it to you");
+      if (await saveExport(exportData.run({ body: {} }))) toast("Your data downloaded");
     } catch (e) {
       if (!(e instanceof ApiError)) throw e;
-      toast(e.message);
+      toast.error(e.message);
     }
   };
   const edit = () => modal.open({ title: "Edit Profile", body: (close) => <EditProfile p={p} close={close} /> });
@@ -151,7 +153,7 @@ export function MyProfilePage() {
 function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
   const start: EditValues = {
     phone: p.phone ?? "",
-    home_address: p.home_address ?? "",
+    home_address: placeValue(p.home_address_place),
     next_of_kin_name: p.next_of_kin_name ?? "",
     next_of_kin_relationship: p.next_of_kin_relationship ?? "",
     next_of_kin_phone: p.next_of_kin_phone ?? "",
@@ -162,12 +164,15 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
   const save = useMutation("PATCH /api/v1/ess/profile");
   const submit = async () => {
     if (!f.check()) return;
-    const changed = Object.fromEntries(
-      Object.entries(f.values).filter(([k, v]) => v.trim() !== "" && v !== start[k as keyof typeof start]),
+    const changed: Record<string, string | PlaceValue> = Object.fromEntries(
+      Object.entries(f.values).filter((e): e is [string, string] => typeof e[1] === "string" && e[1].trim() !== "" && e[1] !== start[e[0] as keyof typeof start]),
     );
+    // The address goes only when a new one was picked or its details changed (F27).
+    const home = f.values.home_address;
+    if (home && !sameAddress(home, start.home_address)) changed.home_address = home;
     if (!Object.keys(changed).length) return close();
     try {
-      await save.run({ body: changed });
+      await save.run({ body: changed as BodyOf<"PATCH /api/v1/ess/profile"> });
       invalidate("/api/v1/ess/profile");
       close();
       toast(changed.bank_name || changed.account_number ? "Saved. People are told of the bank change." : "Profile saved");
@@ -177,6 +182,11 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
     }
   };
   const changes = CHANGEABLE.flatMap(([key, label]) => {
+    if (key === "home_address") {
+      const now = f.values.home_address;
+      if (!now || sameAddress(now, start.home_address)) return [];
+      return [[label, `${p.home_address || "Not given"} → ${lineOf(now) ?? "New address"}`] as [string, string]];
+    }
     const v = f.values[key].trim();
     if (!v || v === start[key]) return [];
     const before = key === "account_number" ? (p.account_last4 ? `•••• ${p.account_last4}` : "Not given") : start[key] || "Not given";
@@ -197,7 +207,7 @@ function EditProfile({ p, close }: { p: EssProfile; close: () => void }) {
           body: (
             <>
               <Field label="Phone" {...f.field("phone")}><TextField inputMode="tel" autoComplete="tel" {...f.field("phone")} placeholder="0803 123 4567" /></Field>
-              <Field label="Home Address" {...f.field("home_address")}><TextField autoComplete="street-address" {...f.field("home_address")} /></Field>
+              <Field label="Home Address" {...f.field("home_address")}><AddressField {...f.field("home_address")} places={places} /></Field>
             </>
           ),
         },
@@ -257,7 +267,10 @@ const CHANGEABLE: Array<[keyof EditValues, string]> = [
   ["bank_name", "Bank"],
   ["account_number", "Account Number"],
 ];
-type EditValues = { phone: string; home_address: string; next_of_kin_name: string; next_of_kin_relationship: string; next_of_kin_phone: string; bank_name: string; account_number: string };
+type EditValues = { phone: string; home_address: PlaceValue | null; next_of_kin_name: string; next_of_kin_relationship: string; next_of_kin_phone: string; bank_name: string; account_number: string };
+
+/** Whether two addresses as a form holds them are the same place with the same details. */
+const sameAddress = (a: PlaceValue | null, b: PlaceValue | null) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
  * Add, change or remove my photo (docs/guides/ess.md §3 step 1). The upload engine crops it

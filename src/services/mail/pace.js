@@ -1,7 +1,7 @@
 "use strict";
 /**
- * System mail pacing: never more than the mailbox's hourly sending limit
- * (MAIL_SEND_PER_HOUR; docs/runbooks/dns-and-mail.md).
+ * System mail pacing: never more than the mailbox's hourly sending limit (the system
+ * sender's on Settings, Integrations, else MAIL_SEND_PER_HOUR; docs/runbooks/dns-and-mail.md).
  *
  *   const r = await pace.reserve(2);          // two recipients
  *   if (!r.ok) throw new pace.MailPacedError(r.wait_ms);
@@ -17,9 +17,10 @@
  *  - one rolling window per environment, in Redis (a sorted set of send times, kept by one Lua
  *    script so every worker process shares it); without Redis (tests) the same arithmetic in
  *    this process;
- *  - production and staging send from the same mailbox, so their two MAIL_SEND_PER_HOUR
- *    values must add up to the plan's limit at most (40 + 10 of 50);
- *  - 0 turns pacing off (a laptop, CI). A server refuses to boot with 0 (config/env.js).
+ *  - production and staging send from the same mailbox, so their two hourly limits must add
+ *    up to the plan's limit at most (40 + 10 of 50);
+ *  - 0 turns pacing off (a laptop's server file, CI); a sender saved on Settings, Integrations
+ *    always has a limit of at least 1.
  */
 const { config } = require("../../config/env");
 const { tryClient, rkey } = require("../../config/redis");
@@ -90,11 +91,11 @@ async function usage(now = Date.now()) {
  * Throws BullMQ's DelayedError, which is how a processor says "later": always `throw` the result.
  * A few seconds of jitter keeps a batch of postponed jobs from all waking at the same moment.
  */
-async function postpone(job, token, waitMs) {
+async function postpone(job, token, waitMs, reason = "hourly mail limit") {
   const { DelayedError } = require("bullmq");
   const jitter = Math.floor(Math.random() * 15000);
   await job.moveToDelayed(Date.now() + waitMs + jitter, token);
-  return new DelayedError(`postponed ${Math.ceil((waitMs + jitter) / 1000)} s: hourly mail limit`);
+  return new DelayedError(`postponed ${Math.ceil((waitMs + jitter) / 1000)} s: ${reason}`);
 }
 
 function __reset() {

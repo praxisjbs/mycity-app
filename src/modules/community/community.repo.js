@@ -1,7 +1,8 @@
 "use strict";
 /**
- * Staff Community's SQL (migrations 1000 and 1010): channels and direct conversations,
- * their members, messages, reactions, poll votes, recognitions and presence.
+ * Staff Community's SQL (migrations 1000, 1110, 1140 and 1147): channels and direct
+ * conversations, their members, messages, reactions, poll votes, recognitions, presence and
+ * link cards.
  *
  * Membership is the authorisation boundary (community.md §6): every read of a channel's
  * contents joins community_member on the caller, so a channel the caller is not in reads
@@ -10,6 +11,7 @@
  */
 const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
+const { mediaJson } = require("../../shared/db/media");
 
 const one = async (db, sql, params) =>
   (await db.query(sql, params)).rows[0] || null;
@@ -71,6 +73,17 @@ async function addMembers(db, channelId, userIds, role = "member") {
      SELECT $1, u, $3 FROM unnest($2::uuid[]) AS u
      ON CONFLICT (community_channel_id, user_id) DO NOTHING`,
     [channelId, userIds, role],
+  );
+  return rowCount;
+}
+
+/** Every active login into a channel (#general, #announcements); returns how many joined. */
+async function addEveryone(db, channelId) {
+  const { rowCount } = await db.query(
+    `INSERT INTO community_member (community_channel_id, user_id, member_role)
+     SELECT $1, u.user_id, 'member' FROM app_user u WHERE u.status = 'active'
+     ON CONFLICT (community_channel_id, user_id) DO NOTHING`,
+    [channelId],
   );
   return rowCount;
 }
@@ -148,12 +161,28 @@ async function userOfEmployee(db, employeeId) {
   return row ? row.user_id : null;
 }
 
-function nameTaken(db, name) {
+/** Whether another live channel has the name; `exceptId` is the channel being renamed. */
+function nameTaken(db, name, exceptId = null) {
   return one(
     db,
-    "SELECT 1 FROM community_channel WHERE name = $1 AND channel_type <> 'direct' AND archived_at IS NULL",
-    [name],
+    `SELECT 1 FROM community_channel
+      WHERE name = $1 AND channel_type <> 'direct' AND archived_at IS NULL
+        AND ($2::uuid IS NULL OR community_channel_id <> $2)`,
+    [name, exceptId],
   );
+}
+
+/** An admin renamed the channel or changed its description. */
+function updateChannel(db, id, { name, description }) {
+  return one(
+    db,
+    "UPDATE community_channel SET name = $2, description = $3 WHERE community_channel_id = $1 RETURNING *",
+    [id, name, description ?? null],
+  );
+}
+
+function channelRowForUpdate(db, id) {
+  return one(db, "SELECT * FROM community_channel WHERE community_channel_id = $1 FOR UPDATE", [id]);
 }
 
 function insertChannel(
@@ -394,27 +423,42 @@ function otherPointers(db, channelId, userId) {
  * Messages
  * ------------------------------------------------------------------ */
 
+/** A ready link card as the contract's LinkPreview, from card `lp` and its picture `lpd`; null otherwise. */
+const LINK_PREVIEW = (lp = "lp", lpd = "lpd") => `
+  CASE WHEN ${lp}.community_link_preview_id IS NULL OR ${lp}.status <> 'ready' THEN NULL ELSE json_build_object(
+    'community_link_preview_id', ${lp}.community_link_preview_id,
+    'url', ${lp}.url,
+    'site_name', ${lp}.site_name,
+    'title', ${lp}.title,
+    'description', ${lp}.description,
+    'image', ${mediaJson(lpd)}) END`;
+
 const MESSAGE = `
   SELECT x.community_message_id, x.community_channel_id, x.message_type, x.sender_user_id, x.sent_at,
          x.body, x.metadata, x.transcript, x.deleted_at, x.edited_at, x.document_id,
+         CASE WHEN x.pinned_until > now() THEN x.pinned_until END AS pinned_until,
+         x.community_link_preview_id,
          ${PERSON("e", "d")} AS author,
-         CASE WHEN doc.document_id IS NULL THEN NULL ELSE json_build_object(
-           'document_id', doc.document_id,
-           'file_name', COALESCE(doc.original_name, doc.title, 'file'),
-           'size_bytes', doc.bytes,
-           'mime_type', doc.mime) END AS document,
+         ${mediaJson("doc")} AS document,
+         ${LINK_PREVIEW("lp", "lpd")} AS link,
          (SELECT count(*)::int FROM community_reaction r WHERE r.community_message_id = x.community_message_id) AS reactions,
          EXISTS (SELECT 1 FROM community_reaction r WHERE r.community_message_id = x.community_message_id AND r.user_id = $1) AS reacted,
          pr.to_employee_id AS recognised_employee_id,
-         a.announcement_id, a.title AS announcement_title`;
+         a.announcement_id, a.title AS announcement_title, a.urgency AS announcement_urgency,
+         (ar.user_id IS NOT NULL) AS announcement_in_audience,
+         ar.acknowledged_at AS announcement_acknowledged_at`;
+/** $1 is the reader: their own reads row of an announcement says whether they acknowledged it. */
 const MESSAGE_FROM = `
     FROM community_message x
     LEFT JOIN app_user u ON u.user_id = x.sender_user_id
     LEFT JOIN employee e ON e.employee_id = u.employee_id
     LEFT JOIN department d ON d.department_id = e.department_id
     LEFT JOIN document doc ON doc.document_id = x.document_id
+    LEFT JOIN community_link_preview lp ON lp.community_link_preview_id = x.community_link_preview_id
+    LEFT JOIN document lpd ON lpd.document_id = lp.image_document_id
     LEFT JOIN peer_recognition pr ON pr.community_message_id = x.community_message_id
-    LEFT JOIN announcement a ON a.community_message_id = x.community_message_id`;
+    LEFT JOIN announcement a ON a.community_message_id = x.community_message_id
+    LEFT JOIN announcement_read ar ON ar.announcement_id = a.announcement_id AND ar.user_id = $1`;
 
 /** A page of a channel's messages, newest first; with `q`, only those that match. */
 function listMessages(db, channelId, userId, query) {
@@ -429,6 +473,43 @@ function listMessages(db, channelId, userId, query) {
     [userId, channelId, query.q ?? null],
     query,
   );
+}
+
+/** What is pinned in a conversation now, newest pin first; at most three, one page. */
+function listPins(db, channelId, userId, query) {
+  return pageQuery(
+    db,
+    `${MESSAGE}, ${TOTAL_COL} ${MESSAGE_FROM}
+      WHERE x.community_channel_id = $2 AND x.deleted_at IS NULL AND x.pinned_until > now()
+      ORDER BY x.pinned_at DESC, x.community_message_id`,
+    [userId, channelId],
+    query,
+  );
+}
+
+/** Pin a message until `until`, or unpin it with null. */
+function setPin(db, messageId, until, userId) {
+  return one(
+    db,
+    `UPDATE community_message
+        SET pinned_until = $2::timestamptz,
+            pinned_at = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE now() END,
+            pinned_by = CASE WHEN $2::timestamptz IS NULL THEN NULL ELSE $3::uuid END
+      WHERE community_message_id = $1 RETURNING *`,
+    [messageId, until, userId],
+  );
+}
+
+/** The conversation's live pins past the newest `keep`, oldest first: the ones a new pin pushes out. */
+async function pinsBeyond(db, channelId, keep) {
+  const { rows } = await db.query(
+    `SELECT community_message_id FROM community_message
+      WHERE community_channel_id = $1 AND deleted_at IS NULL AND pinned_until > now()
+      ORDER BY pinned_at DESC, community_message_id
+      OFFSET $2 -- pagination:batch the pins beyond the conversation's limit, at most a few`,
+    [channelId, keep],
+  );
+  return rows.map((r) => r.community_message_id);
 }
 
 function messageFor(db, messageId, userId) {
@@ -448,11 +529,12 @@ function lockMessage(db, messageId) {
   );
 }
 
-function editMessage(db, messageId, { body, metadata }) {
+function editMessage(db, messageId, { body, metadata, community_link_preview_id = null }) {
   return one(
     db,
-    "UPDATE community_message SET body = $2, metadata = $3, edited_at = now() WHERE community_message_id = $1 RETURNING *",
-    [messageId, body, metadata],
+    `UPDATE community_message SET body = $2, metadata = $3, community_link_preview_id = $4, edited_at = now()
+      WHERE community_message_id = $1 RETURNING *`,
+    [messageId, body, metadata, community_link_preview_id],
   );
 }
 
@@ -489,11 +571,16 @@ async function voteCount(db, messageId) {
   return row.n;
 }
 
+/**
+ * One message. `in_order` stamps it with the moment of the insert rather than its transaction's
+ * start, so several written in one transaction (a forward) keep the order they were written in.
+ */
 function insertMessage(db, m) {
   return one(
     db,
-    `INSERT INTO community_message (community_channel_id, sender_user_id, message_type, body, document_id, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    `INSERT INTO community_message (community_channel_id, sender_user_id, message_type, body, document_id, metadata,
+                                    community_link_preview_id, transcript, sent_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${m.in_order ? "clock_timestamp()" : "now()"}) RETURNING *`,
     [
       m.community_channel_id,
       m.sender_user_id ?? null,
@@ -501,7 +588,156 @@ function insertMessage(db, m) {
       m.body ?? null,
       m.document_id ?? null,
       m.metadata ?? {},
+      m.community_link_preview_id ?? null,
+      m.transcript ?? null,
     ],
+  );
+}
+
+/** The messages a forward names, in the order they were sent; deleted ones are left out. */
+async function messagesForForward(db, messageIds) {
+  const { rows } = await db.query(
+    `SELECT community_message_id, community_channel_id, sender_user_id, message_type, body, document_id,
+            metadata, transcript, community_link_preview_id, sent_at
+       FROM community_message
+      WHERE community_message_id = ANY($1::uuid[]) AND deleted_at IS NULL
+      ORDER BY sent_at, community_message_id`,
+    [messageIds],
+  );
+  return rows;
+}
+
+/**
+ * Where the caller may forward to (§3 step 19): the channels they may post in and their
+ * conversations, latest activity first, then colleagues with a login and no conversation with
+ * them yet, by name. `q` searches the names. One page of 25.
+ */
+function forwardTargets(db, userId, query) {
+  return pageQuery(
+    db,
+    `SELECT kind, community_channel_id, employee_id, name, person, members, is_self, ${TOTAL_COL}
+       FROM (
+         SELECT 'channel'::text AS kind, c.community_channel_id, NULL::uuid AS employee_id, c.name,
+                NULL::json AS person,
+                (SELECT count(*)::int FROM community_member mm WHERE mm.community_channel_id = c.community_channel_id) AS members,
+                false AS is_self, 0 AS bucket, COALESCE(lm.last_at, c.created_at) AS active_at
+           FROM community_channel c
+           JOIN community_member m ON m.community_channel_id = c.community_channel_id AND m.user_id = $1
+           ${LAST}
+          WHERE c.channel_type <> 'direct' AND c.archived_at IS NULL
+            AND c.post_policy <> 'people_ceo' AND (c.post_policy <> 'admins' OR m.member_role = 'admin')
+            AND ($2::text IS NULL OR search_fold(c.name) LIKE '%' || search_fold($2) || '%')
+         UNION ALL
+         SELECT 'direct', c.community_channel_id, e.employee_id, e.first_name || ' ' || e.last_name,
+                ${PERSON("e", "d")}, NULL, other.user_id = $1, 0, COALESCE(lm.last_at, c.created_at)
+           ${CONVERSATION_FROM}
+          WHERE c.channel_type = 'direct' AND c.archived_at IS NULL AND (lm.last_at IS NOT NULL OR c.created_by = $1)
+            AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
+         UNION ALL
+         SELECT 'person', NULL, e.employee_id, e.first_name || ' ' || e.last_name,
+                ${PERSON("e", "d")}, NULL, u.user_id = $1, 1, NULL
+           FROM employee e
+           JOIN app_user u ON u.employee_id = e.employee_id AND u.status = 'active'
+           LEFT JOIN department d ON d.department_id = e.department_id
+          WHERE e.status = 'active' AND e.archived_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM community_channel c
+                JOIN community_member a ON a.community_channel_id = c.community_channel_id AND a.user_id = $1
+                JOIN community_member b ON b.community_channel_id = c.community_channel_id AND b.user_id = u.user_id
+               WHERE c.channel_type = 'direct'
+                 AND (SELECT count(*) FROM community_member z WHERE z.community_channel_id = c.community_channel_id)
+                     = CASE WHEN u.user_id = $1 THEN 1 ELSE 2 END)
+            AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name || ' ' || COALESCE(d.name, '') || ' ' || e.job_title)
+                                     LIKE '%' || search_fold($2) || '%')
+       ) t
+      ORDER BY bucket, active_at DESC NULLS LAST, name, community_channel_id, employee_id`,
+    [userId, query.q ?? null],
+    query,
+  );
+}
+
+/** A stored file as the contract's MediaRef: its shape, pages, length and the sizes it has. */
+async function mediaRef(db, documentId) {
+  const row = await one(db, `SELECT ${mediaJson("doc")} AS media FROM document doc WHERE doc.document_id = $1`, [documentId]);
+  return row ? row.media : null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Link cards (community.links.js)
+ * ------------------------------------------------------------------ */
+
+/** The card kept for an address, if any; `lock` holds it for the rest of the transaction. */
+function linkPreviewByUrl(db, url, { lock = false } = {}) {
+  return one(
+    db,
+    `SELECT * FROM community_link_preview WHERE url = $1${lock ? " FOR UPDATE" : ""}`,
+    [url],
+  );
+}
+
+function linkPreviewById(db, previewId, { lock = false } = {}) {
+  return one(
+    db,
+    `SELECT * FROM community_link_preview WHERE community_link_preview_id = $1${lock ? " FOR UPDATE" : ""}`,
+    [previewId],
+  );
+}
+
+/** Keep what a page said about itself, replacing what was kept for that address before. */
+function saveLinkPreview(db, card) {
+  return one(
+    db,
+    `INSERT INTO community_link_preview (url, status, site_name, title, description, image_document_id, fetched_at)
+     VALUES ($1, $2, $3, $4, $5, NULL, now())
+     ON CONFLICT (url) DO UPDATE
+       SET status = EXCLUDED.status, site_name = EXCLUDED.site_name, title = EXCLUDED.title,
+           description = EXCLUDED.description, image_document_id = NULL, fetched_at = now()
+     RETURNING *`,
+    [card.url, card.status, card.site_name ?? null, card.title ?? null, card.description ?? null],
+  );
+}
+
+function setLinkPreviewImage(db, previewId, documentId) {
+  return one(
+    db,
+    "UPDATE community_link_preview SET image_document_id = $2 WHERE community_link_preview_id = $1 RETURNING *",
+    [previewId, documentId],
+  );
+}
+
+/** A card as the contract's LinkPreview; null when it is not ready. */
+async function linkPreviewView(db, previewId) {
+  const row = await one(
+    db,
+    `SELECT ${LINK_PREVIEW("lp", "lpd")} AS preview
+       FROM community_link_preview lp
+       LEFT JOIN document lpd ON lpd.document_id = lp.image_document_id
+      WHERE lp.community_link_preview_id = $1`,
+    [previewId],
+  );
+  return row ? row.preview : null;
+}
+
+/** Attach a card to a text message that still shows that link and has none yet. */
+function attachLinkPreview(db, messageId, previewId) {
+  return one(
+    db,
+    `UPDATE community_message SET community_link_preview_id = $2
+      WHERE community_message_id = $1 AND message_type = 'text' AND deleted_at IS NULL
+        AND community_link_preview_id IS DISTINCT FROM $2
+      RETURNING community_message_id, community_channel_id`,
+    [messageId, previewId],
+  );
+}
+
+/** What the link-preview job needs to know about a message. */
+function messageForCard(db, messageId) {
+  return one(
+    db,
+    `SELECT community_message_id, community_channel_id, sender_user_id, message_type, body, metadata,
+            deleted_at, community_link_preview_id
+       FROM community_message WHERE community_message_id = $1`,
+    [messageId],
   );
 }
 
@@ -659,11 +895,7 @@ async function shared(db, userA, userB) {
   const direct = await findDirect(db, userA, userB);
   if (!direct) return { files: [], voice_notes: 0 };
   const { rows } = await db.query(
-    `SELECT x.message_type, json_build_object(
-              'document_id', doc.document_id,
-              'file_name', COALESCE(doc.original_name, doc.title, 'file'),
-              'size_bytes', doc.bytes,
-              'mime_type', doc.mime) AS document
+    `SELECT x.message_type, ${mediaJson("doc")} AS document
        FROM community_message x JOIN document doc ON doc.document_id = x.document_id
       WHERE x.community_channel_id = $1 AND x.deleted_at IS NULL
       ORDER BY x.sent_at DESC
@@ -698,17 +930,20 @@ async function channelsInCommon(db, userA, userB) {
  * ------------------------------------------------------------------ */
 
 /**
- * Active employees whose birthday (day and month) or start-date anniversary falls on
- * `date`, with how many years. 29 February falls on 28 February in other years.
+ * Active employees whose birthday (day and month, from date_of_birth or, without one,
+ * birth_day and birth_month) or start-date anniversary falls on `date`, with how many
+ * years. 29 February falls on 28 February in other years.
  */
 async function celebrationsOn(db, date) {
   const { rows } = await db.query(
     `WITH day AS (SELECT $1::date AS d)
      SELECT e.employee_id, 'birthday' AS occasion, NULL::int AS years
-       FROM employee e, day
-      WHERE e.status = 'active' AND e.archived_at IS NULL AND e.date_of_birth IS NOT NULL
-        AND (to_char(e.date_of_birth, 'MM-DD') = to_char(day.d, 'MM-DD')
-             OR (to_char(e.date_of_birth, 'MM-DD') = '02-29' AND to_char(day.d, 'MM-DD') = '02-28'
+       FROM employee e, day,
+            LATERAL (SELECT COALESCE(to_char(e.date_of_birth, 'MM-DD'),
+                                     lpad(e.birth_month::text, 2, '0') || '-' || lpad(e.birth_day::text, 2, '0')) AS md) b
+      WHERE e.status = 'active' AND e.archived_at IS NULL AND b.md IS NOT NULL
+        AND (b.md = to_char(day.d, 'MM-DD')
+             OR (b.md = '02-29' AND to_char(day.d, 'MM-DD') = '02-28'
                  AND NOT (extract(year FROM day.d)::int % 4 = 0 AND (extract(year FROM day.d)::int % 100 <> 0 OR extract(year FROM day.d)::int % 400 = 0))))
      UNION ALL
      SELECT e.employee_id, 'anniversary', (extract(year FROM day.d) - extract(year FROM e.start_date))::int
@@ -751,6 +986,7 @@ module.exports = {
   setRole,
   PERSON,
   systemChannel,
+  addEveryone,
   channelById,
   membership,
   addMembers,
@@ -759,6 +995,8 @@ module.exports = {
   userOfEmployee,
   nameTaken,
   insertChannel,
+  updateChannel,
+  channelRowForUpdate,
   listChannels,
   channelFor,
   listMembers,
@@ -773,8 +1011,21 @@ module.exports = {
   directChannelsOf,
   otherPointers,
   listMessages,
+  listPins,
+  setPin,
+  pinsBeyond,
   messageFor,
   insertMessage,
+  mediaRef,
+  linkPreviewByUrl,
+  linkPreviewById,
+  saveLinkPreview,
+  setLinkPreviewImage,
+  linkPreviewView,
+  attachLinkPreview,
+  messageForCard,
+  messagesForForward,
+  forwardTargets,
   setTranscript,
   people,
   fans,

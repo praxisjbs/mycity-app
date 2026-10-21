@@ -12,21 +12,16 @@
  * change, the request an upload answers, and the controls of their own leave list,
  * which never name another person.
  *
- * My Performance (M2) reads the caller's KPIs and reviews in the shapes of kpis.js and
- * reviews.js; what it adds is the month at a glance below.
- *
- * The rest of ESS (payslips, queries) arrives with its own milestones; its shapes belong
- * here when they do.
+ * The rest of ESS (payslips, queries, performance) arrives with its own milestones;
+ * its shapes belong here when they do.
  */
 const { z } = require("zod");
 const { uuid, optionalText, isoDate, listQuery, phone, blank } = require("./common");
 const { UploadPurpose } = require("./documents");
 const { LeaveStatus } = require("./leave");
 const { EmployeeStatus, EmploymentType, WorkPattern, ManagerRef } = require("./organisation");
+const { PlaceInput, PlaceView } = require("./maps");
 const { SchedulePlace } = require("./attendance");
-const { Kpi, KpiTrace } = require("./kpis");
-const { Review, Cycle } = require("./reviews");
-const { Month } = require("./goals");
 
 /* ------------------------------------------------------------------ *
  * My Profile
@@ -36,10 +31,10 @@ const { Month } = require("./goals");
 const clock = z.string().regex(/^\d{2}:\d{2}$/);
 
 /**
- * One day of the week as the organisation works it (Settings, the working week:
- * Monday to Friday 09:00 to 17:00 and Saturday 09:00 to 15:00, A22), and where the
- * person works it: `place` is office, remote or off, from their work pattern and, for
- * hybrid staff, the schedule People set (attendance guide §6.13). Weekday 1 is Monday.
+ * One day of the person's own week (attendance guide §6.13): worked or not, its hours, and where
+ * they work it (`place` office, remote or off), by the work schedule People set, else the company
+ * hours (the Attendance policy's, else Settings' working week, A22) at the place their work pattern
+ * gives. Weekday 1 is Monday.
  */
 const EssWorkDay = z
   .object({
@@ -74,6 +69,8 @@ const EssProfile = z
     phone: z.string().nullable(),
     date_of_birth: isoDate.nullable(),
     home_address: z.string().nullable(),
+    /** The address as Edit Profile reads it (F27): the place, with a token to send it back. */
+    home_address_place: PlaceView.nullable(),
     next_of_kin_name: z.string().nullable(),
     next_of_kin_relationship: z.string().nullable(),
     next_of_kin_phone: z.string().nullable(),
@@ -94,7 +91,8 @@ const EssProfile = z
 const EssProfileUpdate = z
   .object({
     phone: blank(phone),
-    home_address: optionalText(300),
+    /** Picked or pinned, never typed (F27); left out, it stays as it is, as every field here. */
+    home_address: PlaceInput.optional(),
     next_of_kin_name: optionalText(150),
     next_of_kin_relationship: optionalText(50),
     next_of_kin_phone: blank(phone),
@@ -150,22 +148,6 @@ const EssLeaveBalanceQuery = z
   .object({ year: z.coerce.number().int().min(2000).max(2100).optional() })
   .strict();
 
-/**
- * POST /ess/profile/export, Download My Data: everything the caller can see about themselves in
- * the app, as one workbook, built after the request and emailed to their work email. At most
- * one a day for a person, counting the CEO's requests for them (docs/guides/ess.md §6).
- */
-const EssDataExportQueued = z.object({ queued: z.literal(true), email: z.string() }).strict();
-
-/** templates/email/data-export.html: whose data is attached, and for how long MyCity keeps it. */
-const DataExportEmailVars = z
-  .object({
-    subject_name: z.string(),
-    own: z.boolean(),
-    kept_days: z.number().int().min(1),
-  })
-  .strict();
-
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   EssDocumentUpload: {
@@ -175,11 +157,12 @@ const TABLES = {
   },
   EssWorkDay: {
     table: "working_week",
-    virtual: { place: "the person's place that weekday, from the work pattern and attendance_schedule" },
+    virtual: { place: "the person's place that weekday, from attendance_work_schedule or the work pattern" },
   },
   EssProfile: {
     table: "employee",
     virtual: {
+      home_address_place: "the home address as a place, from place (owner employee.home_address)",
       display_name: "first and last name together",
       department: "department.name",
       confirmed: "employee.confirmed_on is set",
@@ -197,37 +180,7 @@ const TABLES = {
   },
   EssLeaveBalanceQuery: { table: null, reason: "which year of the caller's leave to read" },
   EssLeaveCalendarQuery: { table: null, reason: "the month the leave calendar shows" },
-  EssDataExportQueued: { table: null, reason: "that Download My Data was queued, and the email it goes to" },
-  DataExportEmailVars: { table: null, reason: "the variables of templates/email/data-export.html, not a row" },
-  MyPerformance: { table: null, reason: "the caller's KPIs, score and reviews for a month" },
 };
-
-/* ------------------------------------------------------------------ *
- * My Performance (docs/guides/performance.md §2, §10)
- * ------------------------------------------------------------------ */
-
-/** GET /ess/performance: the caller's month and their reviews. */
-const MyPerformance = z
-  .object({
-    month: Month,
-    /** Who set the month's KPIs; null before any are set. */
-    set_by: z.string().nullable(),
-    /** Σ(attainment × weight) ÷ 100 over the active KPIs, 0 to 1. */
-    kpi_score: z.number().min(0).max(1).nullable(),
-    on_track: z.number().int().min(0),
-    kpi_count: z.number().int().min(0),
-    weight_assigned: z.string(),
-    last_review: z.number().nullable(),
-    next_cycle: Cycle.nullable(),
-    kpis: z.array(Kpi),
-    /** Rolls Up To, for each KPI. */
-    traces: z.array(KpiTrace),
-    /** The caller's own reviews, newest first; the manager rating shows once closed. */
-    reviews: z.array(Review).max(25),
-    /** The open self review, when a cycle is open and it is not yet submitted. */
-    open_review_id: uuid.nullable(),
-  })
-  .strict();
 
 module.exports = {
   TABLES,
@@ -239,7 +192,4 @@ module.exports = {
   EssLeaveListQuery,
   EssLeaveBalanceQuery,
   EssLeaveCalendarQuery,
-  EssDataExportQueued,
-  DataExportEmailVars,
-  MyPerformance,
 };

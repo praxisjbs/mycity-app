@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 19/10/2026 |
+| Last changed | 21/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -81,10 +81,12 @@ These finish M0 and no prompt can do them:
 | Settings · Roles & Permissions (#71) | Settings | `settings` view; edit, create, delete to change | C | **Built** (17/10/2026; redesigned 18/10/2026, §6.10) | Roles beside the role in view (desktop) or by level (phone), each module's access as one level with Approve and Export, review before save, who holds a role; the grants matrix as a second view; field visibility and capabilities per role |
 | Settings · Documents & Numbering (#76) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Every numbering scheme with its next number, editable. No other document setting is specified yet |
 | Settings · Security (#78) | Settings | `settings` view, edit | C | **Built** (17/10/2026) | Session length, idle lock, password minimum, two-step by role, failed sign-ins, everyone's sessions with End Session |
-| Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export by email, values masked per reader |
+| Settings · Audit Log (#79) | Settings | `settings` view with scope all (export: `settings` export), the CEO | C | **Built** (17/10/2026) | The log at 25 with filters, the summary, Excel export downloaded where it was asked for (§6.12), values masked per reader |
 | Settings · Approvals (#72) | Settings | `settings` view; edit to change | D | **Built** (17/10/2026) | Every flow, its stages and version; Edit Stages saves a new version |
 | ⌘K Search | Everywhere | Everyone, by permission | D | **Built** (17/10/2026) | Screens with synonyms, actions, and every module's records (employees, logins, departments, roles, numbering, holidays, approval flows, imports), 25 a group |
-| Settings · Integrations (#77), Appearance (#75), Notifications (#74), Attendance Policy (#73) | Settings | | none | Mock | Coming Soon (#74 is M6; #73 is LA's attendance) |
+| Settings · Integrations (#77) | Settings | `integrations` view, edit, delete (Implementation Team, System Administrator) | none | **Built** (20/10/2026) | Its own guide: `docs/guides/integrations.md` |
+| Settings · Appearance (#75), Notifications (#74) | Settings | | none | Mock | Coming Soon (#74 is M6) |
+| Settings · Attendance Policy (#73) | Settings | Retired | LA | **Dropped** (TB, 20/10/2026) | The Attendance policy is a rules policy on Knowledge Hub · Policies: `docs/guides/policies.md`, its rules `docs/guides/attendance.md` §6.15 |
 
 ## 3 · How the screens relate
 
@@ -183,6 +185,15 @@ importer arrives in the request: `engine.assertMay()` makes the real check and r
 The `documents` module mounts at the API root, because an employee's documents are read where the
 employee is (`/employees/:id/documents`) while `src/modules/organisation/` is track A's.
 
+A file as a screen draws it before opening it is a `MediaRef` (`packages/contract/schemas/documents.js`,
+19/10/2026, TB): the `DocumentRef` with the file's width and height, a PDF's page count
+(`document.page_count`, migration `1147`), a video's length and the sizes already made (`variants`,
+read from `/documents/:id/variant/:kind`). Besides a photo's sizes and a video's poster, the worker now
+counts a PDF's pages and draws its first page as `webp-960` and `webp-320` (`media-derive`, through
+`services/media/pdf-pipeline`), so a chat bubble shows the page without opening the file. Opening a
+photo, a video or a PDF anywhere in the app is the shared file viewer (`MediaViewer`); a PDF's pages
+are drawn in the app by PDF.js (FRONTEND_FOUNDATION §5, PR 3 question 4).
+
 **Track C · `access`, `settings`, `audit`** (built 17/10/2026)
 
 | Route | Permission |
@@ -197,7 +208,8 @@ employee is (`/employees/:id/documents`) while `src/modules/organisation/` is tr
 | `GET /settings/security`, `PATCH /settings/security` | `settings` view, edit |
 | `GET /settings/security/failed-logins` (days; sort), `/security/sessions` (search; sort), `POST /settings/security/sessions/:id/end` | `settings` view, edit |
 | `GET /audit` (module, action, actor, record, dates; search; sort), `/audit/summary` | `settings` view with scope all, or the CEO |
-| `POST /audit/exports` (the same filters; the workbook is emailed) | `settings` export with scope all, or the CEO |
+| `POST /audit/exports` (the same filters; 202 with the workbook's file pending, downloaded where it was asked for, §6.12) | `settings` export with scope all, or the CEO |
+| `GET /exports/:id` (an export's file while its screen waits: pending, done or failed, §6.12) | the person who asked, nobody else (`self`) |
 | `POST /auth/two-step/setup`, `POST /auth/two-step/enrol` (anonymous, the set-up ticket) | none; `identity.md` §5 |
 
 `PUT /settings/roles/:id` replaces a role's grants, visible fields and capabilities together, so the
@@ -220,6 +232,19 @@ Users keeps `GET /access/roles`.
 The `workflow` module mounts at the API root, because its halves live under `/workflow` and
 `/settings/approvals`. `GET /search` lives in a module of its own, `search`, because routes are found
 only under `src/modules/`; the work is `shared/search`.
+
+**Maps, `maps`** (built 19/10/2026, §6.13; every address picked, never typed, since 20/10/2026:
+`docs/guides/addresses.md` §5 is the full table)
+
+| Route | Permission |
+|---|---|
+| `GET /maps/search` (`q`, 2 to 200 characters, `level` → `PlaceMatches`: at most six `Place`s, each `place_id`, `formatted`, `lat`, `lon`, `kind` and a signed `token`) | everyone signed in (`self`); it reads no record and writes nothing |
+| `GET /maps/pin` (`PinQuery`: `lat`, `lon` as degrees, `level` → `Place`: the nearest named address, signed, with the tapped point kept) | everyone signed in (`self`): a point a person pins as an address (addresses.md §6.7) |
+| `GET /maps/tiles/:z/:x/:y.png` (`TileParams`: zoom 0 to 20, a column and row that exist at it → the PNG, `no_content` in the contract, `Cache-Control: private, max-age=604800`) | everyone signed in (`self`) |
+
+503 `MAPS_OFF` when no Geoapify key is set (Settings · Integrations, else `GEOAPIFY_API_KEY`), 429 `MAPS_BUSY` over the provider's
+quota or, on the Free plan, once today's daily limit set there is reached, 502 `MAPS_UNAVAILABLE` when the provider refuses, sends a tile that is not an image, or takes
+longer than 4.5 seconds.
 
 ## 6 · Rules and calculations
 
@@ -274,6 +299,11 @@ only under `src/modules/`; the work is `shared/search`.
   row: mapping either would fail every row instead of loading the person. A column with one good
   cell among bad ones is imported, and its bad cells are row problems as usual. Work Hours and S/N
   are not fields of a person at all (the working week is one organisation setting, A22).
+- **A birthday given as a day and month is kept anyway** (GE, 20/10/2026): on every deploy, loaded
+  sheet or not, each DOB cell like `03/07` (day first) is written to `employee.birth_day` and
+  `birth_month` (migration `1180`) through `organisation.setBirthday`, for the person it names by
+  work email, else staff number, only when they have no date of birth and no birthday yet. The
+  Staff Community celebrations read it (community guide §3 step 3). The log gives counts only.
 - The loader asks the import engine for things no person asks for, as batch options: **keep what
   the app already has** (an existing person is left exactly as People hold them, and the reporting
   line is filled only where it is empty), **the work email `roles.json` gives a post** whose
@@ -399,6 +429,14 @@ As built (17/10/2026):
   saving it is refused until every stage is valid.
 - **Who decides**: the people the current stage names, and only while they hold `approve` on the
   request's module; nobody decides their own request (the CEO excepted, who may decide any stage).
+- **People an approval excludes** (TB, 20/10/2026, for attendance's temporary sites, attendance.md
+  §6.11): a module may name, when it opens the approval, employees who never decide it whatever role
+  they hold (`openInstance({ exclude_employee_ids })`, kept on `workflow_instance.excluded_employee_ids`,
+  migration `1455`). The engine refuses them on every stage (`canAct`), My Approvals, Need You and ⌘K's
+  Waiting on You leave the approval out for them (`waitingOnClause`), and the stage's notice skips them
+  (`recipients`). The CEO is excepted as above. A temporary site excludes everyone on it, so a
+  colleague on the site who holds Operations & People cannot approve it; every other approval
+  excludes nobody.
 
 ### 6.6 The org tree
 
@@ -427,7 +465,8 @@ As built (17/10/2026):
   its name, its module or a synonym: "holiday" finds My Leave), **Actions** (Add Employee, Import Staff,
   Start Import, Invite User, New Role, New Holiday, Add Role, Clock In, Request Leave, Change Password,
   Set PIN, Mark All Read, Notification Settings, Turn On Notifications, Send Test Notification, Use
-  Dark Theme, Use Light Theme, Change Density, Install App, Sign Out), then
+  Dark Theme, Use Light Theme, Change Density, Install App, Refresh Screen, Reload App, Sign Out, Add
+  Work Site, Add Temporary Site), then
   one group per kind of record from each `<module>.search.js` (Employees, Departments, Open Seats, Users,
   Roles, Numbering, Holidays, Approval Flows, Imports, and each later module's).
 - **Waiting on You** comes first: the requests waiting on the reader's decision (the My Approvals list),
@@ -450,7 +489,10 @@ As built (17/10/2026):
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
   (`useScreenAction`), another word runs what the screen names with `useUrlAction` (`password`, `pin`),
   and `?importer=employees` opens the Import wizard. Clock In, Mark All Read and the three
-  notification actions run in the app itself (`docs/guides/notifications.md` §9).
+  notification actions run in the app itself (`docs/guides/notifications.md` §9), and so do Refresh
+  Screen and Reload App (`run` `refresh` and `reload`, FRONTEND_FOUNDATION F28): the same refresh in
+  place as the pull and the refresh button, and the same reload as holding it, which a person using a
+  screen reader reaches here.
 - **The gate** (`scripts/check/search-coverage.js`): every screen in the route map has a search entry
   whose label equals the shell's; every entity type in `ENTITY_ROUTES` is declared by a provider or its
   line carries `// search:none <reason>`; every `useScreenAction({ label })` in the app is an action in
@@ -460,8 +502,13 @@ As built (17/10/2026):
 
 ### 6.8 Settings screens not in this guide
 
-Integrations (#77), Appearance (#75) and Notifications (#74, M6) stay Coming Soon. Attendance Policy
-(#73) belongs to LA's attendance work.
+Integrations (#77) has its own guide, `docs/guides/integrations.md`. Appearance (#75) and
+Notifications (#74, M6) stay Coming Soon. Attendance Policy
+(#73) is dropped (TB, 20/10/2026): every policy, the Attendance policy included, lives on Knowledge
+Hub · Policies (`docs/guides/policies.md`). Settings · Approvals lists the Policy Approval route
+(`policy.approval`, seeded in `1396`: one stage, the CEO) and, from attendance's PR 4, the Temporary
+Site route (`attendance.temporary_site`: one stage, Operations & People), both changed there like any
+other.
 
 ### 6.9 What a document's status means (TB, 17/10/2026)
 
@@ -541,18 +588,104 @@ The Icon is drawn on Deep Green, so it must read on a dark ground (the yellow pi
 own icons (the favicon, the home-screen icon) are files in the release, which phones keep, so they
 change with a release, not with this screen.
 
+### 6.12 Exports and downloads (TB, 19/10/2026)
+
+Every Export and Download button makes its file for the person who pressed it and saves it on the
+device they pressed it on. Nothing pressed is emailed. Only a report schedule's files go by email
+(`docs/guides/home.md` §6), because nobody presses anything when a schedule fires. Decided by TB on
+19/10/2026; before that every export was emailed and arrived in the Mailbox.
+
+- **One path** (`src/shared/documents/exports.js`, BACKEND_GUIDE §4). The request reserves the
+  file in its transaction beside the module's own event (`exports.reserve()`; a PDF is
+  `documents.generate()`, pending the same way) and answers 202 `ExportFile`
+  (`document_id`, `file_name`, `status` pending). The module's outbox handler makes it after commit
+  (`exports.make()`: built as the person who asked, filled, done) or fails it (`exports.fail()`:
+  the asker no longer active, or the outbox's last attempt). The screen waits on
+  `GET /exports/:id` (the asker alone) and downloads `GET /documents/:id/content`.
+- **Which buttons.** Export Month (My Attendance), Export Register (People · Attendance), the Audit
+  Log's Export, Download PDF (Org Chart and Organogram), Download My Data, Download Their Data. A
+  report run somebody pressed for (Run Now, the Overview's Export) is a numbered run, not an
+  export: its screen waits on the run (`GET /home/report-runs/:id`; the Overview's own run on
+  `GET /home/overview/export/:id`, which Staff may read without `home.reports`) and downloads its
+  file the same way. The screens of later milestones (Payroll, Expenses, Partnerships,
+  Performance, Recruitment, Praxis AI) already call the shared `ExportAction`
+  (`app/src/features/shared/sections.tsx`), so their exports arrive on this path when their
+  modules land.
+- **The wait is the app's, not the screen's** (`app/src/api/exports.ts`). It looks soon, then every
+  few seconds, and gives up after five minutes. Someone who moves to another screen still gets the
+  file, and its toast, wherever they are in the app; someone who closes the app gets nothing and
+  presses again. Export Register's sheet closes once the request is taken, so nobody is held in it.
+- **On the device** (`app/src/api/download.ts`). Desktop and Android: the browser's own download,
+  into Downloads. An iPhone or iPad app opened from the home screen, which cannot save a download:
+  the share sheet, whose Save to Files keeps it; when the press is too long ago for the share sheet,
+  a toast offers Save File for one more tap.
+- **Kept a day.** An export's document type says `export: true` (`attendance_export`,
+  `audit_export`, `data_export`, `org_chart`): restricted, never locked, and removed from the vault
+  24 hours after it was made by the `export-cleanup` job (every hour), long enough to download it
+  again. Who asked for what stays on the event log and the audit ledger. A report run's file is not
+  an export: it stays on Recent Runs.
+
+### 6.13 Address search, maps and a worksite's address (F21, 19/10/2026; F27, 20/10/2026)
+
+Every address a person enters is **picked, never typed**: `docs/guides/addresses.md` holds the rule,
+the inventory of every address field, the signed place, the instant search, the pin and the outage
+path (TB, 20/10/2026). What stays here is how maps first came in:
+
+- **The key** stays on the server: the browser asks our API (`/api/v1/maps/...`), never Geoapify.
+  It is kept on Settings · Integrations, encrypted, with a Free or Paid plan and a daily limit, read
+  at each call through `shared/integrations/settings.js`; on the Free plan the limit stops real use
+  (`shared/integrations/quota.js`, `docs/guides/integrations.md` §6.12); the server file's `GEOAPIFY_API_KEY` is the fallback, and
+  every search, pin and tile is counted (`docs/guides/integrations.md` §6.9).
+- **Tiles** (decided 19/10/2026): the tile route is signed in like every staff route, and an image
+  request carries no token, so `MapView` takes `loadTile` and fetches each tile with the session
+  (`fetchBlob` in `app/src/api/download.ts`), drawing it from the bytes. Nothing about the map is
+  public, so nobody outside spends the quota. One style, `osm-bright`, to zoom 20; the server keeps
+  about 300 tiles for a day and the browser keeps each for a week. On the in-browser mock there are
+  no tiles and the map draws its points alone.
+- **A worksite's address from its point**: when People type a worksite's coordinates or tap its map
+  and the address is still empty, the form asks `GET /maps/pin` after a 600 ms pause and fills the
+  address with the signed place it names; an address already chosen is never replaced, and an
+  existing worksite opened for a change is not looked up.
+- **A home keeps the coordinates of its reading**: a picked address never moves the point a punch
+  is fenced on (attendance.md §6.10). A clock-in's point is never sent to the provider, and
+  `LocationLabel` is not used on attendance screens.
+
+### 6.14 System mail to MyCity's own domain (TB, 20/10/2026)
+
+Before system mail goes out, each recipient's domain is route-checked
+(`services/mail/deliverability/route-check.js`): a relay that hosts a domain's website while its
+MX points elsewhere would keep the message in a local mailbox and report success, so that send
+fails with `MAIL_ROUTE_TRAPPED` and is reported in Settings · System Health.
+
+`mycityapp.io` has that shape and is not a trap: its MX is Namecheap's spam filter
+(`mx1-3-hosting.jellyfish.systems`), which passes mail back to the mailboxes on the same cPanel host
+that system mail is sent through and the Mailbox module reads (`docs/runbooks/dns-and-mail.md` §4).
+DNS cannot tell the two apart, so the domains whose mailboxes are on the relay are named in Local
+Domains on Settings · Integrations' System Sender (`SMTP_LOCAL_DOMAINS`, default `mycityapp.io`, is
+the fallback) and are not checked. Every other domain still is, and a
+trapped one is still refused. Today's failed digests are not sent again (a digest day already passed
+is not sent late, `notifications.md` §11).
+
+Mail to a `mycityapp.io` address is delivered on the host itself, so the address must exist there,
+as a mailbox or a forwarder (TB, 21/10/2026). One that does not is refused at once with cPanel's 550
+("The mail server could not deliver mail to … The account or domain may not exist"), which the
+System Sender lists as a Refused Address and never retries (`integrations.md` §6.16); the cure is the
+mailbox in cPanel, or the right address in People (`docs/runbooks/dns-and-mail.md` §5).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
 |---|---|---|
 | `employee.created`, `employee.updated`, `employee.archived`, `employee.restored`, `employee.reporting_line_changed`, `department.*` | A | Search reindex; the team cache version (`grants-cache`) on a reporting change |
 | `import.committed`, `import.reverted` | B | The person who ran it is told (`imports.events.js`) |
-| `document.stored`, `document.superseded` (the vault's own) | B | Scan and derive (existing jobs) |
+| `document.stored`, `document.superseded` (the vault's own) | B | Scan and derive (existing jobs); a PDF's page count and first page (`media-derive`) |
+| `document.derived` (the vault's own, 19/10/2026) | B | A file's sizes, poster or first page are ready: the owning module's handler tells its screens (Staff Community pushes the message again, so its bubble draws them) |
 | `document.requested` | B | The employee it is about is told; the notice opens My Documents |
 | `document.verified`, `document.request_cancelled` | B | Audit only |
 | `role.*`, `permission.changed`, `field_visibility.changed`, `capability.changed`, `settings.security_changed` | C | `security: true`: the watchers are told; the grants cache cleared |
 | `settings.changed` (organisation, working week, holidays, numbering) | C | Audit only; the working week and holidays clear the calendar cache |
-| `audit.export_requested` | C | `audit.send_export` builds the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked), files it in the vault and emails it to them |
+| `audit.export_requested` | C | `audit.build_export` makes the workbook of the whole filtered log (at most 10,000 entries, masked for the person who asked) into the file the request reserved, which the Audit Log downloads (§6.12); nothing is emailed |
+| `export-cleanup` (scheduler, every hour at twenty past) | B | Removes every export file 24 hours after it was made (`vault.remove`, `document.removed`; §6.12) |
 | The engine's own events (`workflow.*`) | D | Approvers told when a stage starts; the requester when decided |
 | `workflow.definition_saved` | D | Audit only (the stages before and after) |
 | `workflow.reassigned` | D | The new approver is told; the stage's time limit starts again |
@@ -602,10 +735,10 @@ screen.
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
 | People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
-| Employee record | Profile, Job, Reporting Line, Login, Attendance (attendance.md §10, LA) and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "We'll email it to you", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
+| Employee record | Profile, Job, Work Schedule (attendance.md §10, LA), Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
 | Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
-| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address, phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
+| Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address (suggestions as it is typed, §6.13), phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
 | Settings · Security | Signed In Now, Two-Step On, Failed Sign-Ins; session minutes, idle lock minutes, password minimum; two-step by role with how many have set it up; who is signed in where; failed sign-ins with the outcome; Save Rules, Undo Changes, End Session | Help term naming the floor a rule cannot go below; help on Two-Step by Role | Why `.env` is the floor: §6.4 |
@@ -689,7 +822,7 @@ screen.
 
 - Attendance Today on the register, and the attendance and location modal a row used to open:
   closed 19/10/2026. A person's day opens on People · Attendance, and their setup (pattern, office,
-  home, week and Set Schedule) is the employee record's Attendance tab (attendance.md §6.13, §10);
+  home, week and Set Schedule) is the employee record's Work Schedule tab, after Job (attendance.md §6.13, §10);
   the INTERIM `EmployeeDetails.tsx` is deleted.
 - The leave flow's day threshold for the second stage: Operations & People decide on screen; the
   seed sets 5 days until they do.
@@ -699,7 +832,35 @@ screen.
 
 ## 14 · Change log
 
-- 20/10/2026 · AJ · Approvals: `workflow.service.approvalOf(client, instance_id, user)` gives a request's route, decisions and `can_decide` to a module that shows its own record's approval beside the record (Performance's goals, a department's month, reviews), without asking again whether the caller may read it; `detail()` now builds its answer through the same `viewOf()`. GE to review.
+- 21/10/2026 · TB · §6.14 and Settings · Integrations (`docs/guides/integrations.md` §1.3, §6.15, §6.16): system mail can be paused on the System Sender (only invitations, password resets and the test email go out; notices are pushed instead), and an address the mail server refuses for good is not retried but listed as Refused Addresses. The screen's change is on the Integrations tab only.
+
+- 21/10/2026 · TB · §10, §13: the employee record's Attendance tab becomes Work Schedule, after Job (attendance's PR 3, `attendance.md` §6.13): Work Setup and the person's week, each weekday Working or Off with its hours and place, and Set Schedule for anyone (`people` edit, never their own).
+- 20/10/2026 · TB · §6.7: ⌘K gains Refresh Screen and Reload App, run in the app (F28), so the
+  refresh and the reload have a path without the pull or the hold. The employee record names its
+  place on the trail with the person's name (`useTrailTitle`, F29).
+- 20/10/2026 · TB · AI Control is its own module under System (`docs/guides/ai-control.md`), beside
+  Praxis AI, with its own `ai_control` key. Settings · Integrations opens a connection named in the
+  address (`?id=` its code), for AI Control · Models' Open Connection, and each AI connection links to
+  AI Control.
+- 20/10/2026 · TB · Settings · Attendance Policy (#73) left the shell (`catalogue.ts`, `coming-soon.ts`, `features/settings/index.tsx`); Knowledge Hub · Policies is shown only to holders of `policies.manage` (`shell/access.ts`, as `src/shared/search/screens.js`); the shell mounts the acknowledge sheet beside the clock prompts (`docs/guides/policies.md` §6.7).
+- 20/10/2026 · TB · Settings · Integrations gains the AI providers (Groq, OpenAI, Anthropic,
+  DeepSeek beside Gemini) with their model lists, Exchange Rates, and a Free or Paid plan on every
+  connection (`docs/guides/integrations.md` §1.2). Geoapify is Free: today's daily limit reached
+  answers `MAPS_BUSY` (§5, §6.13). Settings · Faults picks through the list's selection bar
+  (`docs/guides/system-health.md`).
+
+- 20/10/2026 · TB · Settings' Status, Performance and Faults follow `system_health`, not
+  `settings`, in the shell (`app/src/shell/access.ts`) and ⌘K (`src/shared/search/screens.js`):
+  Operations & People no longer see them, and a holder of System Health without Settings reaches
+  Settings with those three tabs only. A route in `src/shared/route-map.js` may name the
+  `permission` a viewer must hold when its screen sits in another module's tabs; `moduleOf()`
+  answers it. The mock's full-access accounts gain `system_health` so the screen gates crawl the
+  three tabs (`docs/guides/system-health.md` §8).
+
+- 19/10/2026 · TB · §6.13: a field assignment's sites and a client visit's site show the same map as a worksite's form (`app/src/features/attendance/SiteMap.tsx`), without the address lookup.
+- 19/10/2026 · TB · Map tiles and a worksite's address (F21, §5, §6.13; decided 19/10/2026): `GET /maps/tiles/:z/:x/:y.png` (signed in, fetched by the map with the session through `MapView`'s new `loadTile`) and `GET /maps/reverse` (`people` create or edit, a worksite's centre only; homes and punches are never sent). People · Worksites shows the fence on a map in the form and the worksite's details, tapping the map moves the centre, and typed coordinates fill an empty address.
+- 19/10/2026 · TB · The address search (F21, §5, §6.13): `GET /maps/search` in a new `maps` module over `services/maps/geoapify.service.js` (`GEOAPIFY_API_KEY`), and `AddressField` in `packages/ui`, now on every address a person types: People · Worksites, field sites, work location requests, homes, My Profile, Settings · Organisation (§10.1) and a vacancy's location. On a worksite, a field site and a client visit the place picked fills Latitude and Longitude. Map tiles and the reverse lookup stay open.
+- 19/10/2026 · TB · Exports download on the device that pressed, never by email (§6.12, TB's four answers): one path for every Export and Download button (`shared/documents/exports.js`: reserved in the request, made in the worker, `GET /exports/:id` while the screen waits, `ExportFile` in the contract), the Audit Log's export on it (§5, §7; no `NO_EMAIL` refusal any more), phones saving to Downloads or the iPhone share sheet, and every export file removed a day later by `export-cleanup`, which replaces `data-export-cleanup`. `vault.remove` takes an export a render had locked; `documents.generate` no longer locks one. The export email templates are gone.
 - 19/10/2026 · AJ · A module's tab strip on a narrow desktop window (People, ESS, Settings and every other module): `Tabs` keeps the tabs that fit, the active one always among them, and folds the rest into More Tabs, a ⋯ menu at the end of the strip (dotted when a hidden tab has a count), instead of scrolling sideways. Phones keep the sideways row. FRONTEND_GUIDE §9.2 updated. TB to review.
 - 19/10/2026 · AJ · The employee record's header shows the person's photo (`Employee360.photo_url`, the 384 px size; `ProfileHeader` gains `photo`), and Settings · Users and a role's people show each face (`UserRow.photo_url`, 192 px, read in `users.repo.js` through `shared/db/person.js`); initials when there is none. TB to review.
 - 19/10/2026 · LA · §10, §13: the employee record gains an Attendance tab (the person's pattern,
@@ -805,6 +966,11 @@ screen.
   `0449` seeds the §6.3 defaults; `PASSWORD_MIN_LENGTH` joins the `.env` floors. Required two-step by
   role adds the set-up step to sign-in, in `identity` and `security` (§6.4, `identity.md`). §4, §5,
   §6.3, §6.4, §7 to §11 updated.
+- 19/10/2026 · TB · Track B: a file as a screen draws it is `MediaRef` (its shape, a PDF's page count,
+  a video's length, the sizes made); the worker counts a PDF's pages and draws its first page
+  (`document.page_count`, migration `1147`), and `document.derived` says when a file's sizes are ready.
+  ESS · My Documents previews a PDF's pages drawn in the app and opens a PDF or a photo in the file
+  viewer (`docs/guides/ess.md` §10). §5 and §7 updated.
 - 17/10/2026 · TB · Track B built: the `imports` API over any registered importer, Settings · Imports
   (#93, the wizard and the history), the `documents` module (gated upload, download, versions,
   verification and document requests) and ESS · My Documents (#14) on the real API. Migration `0350`
@@ -816,3 +982,26 @@ screen.
 - 16/10/2026 · TB · First version: the remaining M0 and foundation work in four tracks, with TB's
   twenty decisions of 16/10/2026 (§6); the staff sheet and role map go into `seeds/staff/` with
   track A, the repository being private.
+- 19/10/2026 · TB · Approval notices take copies in Settings · Notifications
+  (`docs/guides/notifications.md` §6), each with wording for someone it is not waiting on; the new
+  Approvals Waiting reminder (`workflow.reminded`) brings a waiting approval back to its approvers.
+  Your import finished names its audience and takes no copies.
+- 19/10/2026 · LA · Settings · Attendance Policy (#73) is built from the attendance guide, which owns it (§6.15): §2 and §6.8 point there.
+- 20/10/2026 · TB · Settings gains a second tab, **System Health** (`system-health`), after
+  Organisation. It is the first screen with a permission key of its own rather than `settings`:
+  `system_health`, held by the Implementation Team and the System Administrator only, so a stack
+  trace never reaches Operations & People, Management or the CEO. Its own guide is
+  `docs/guides/system-health.md`; nothing else in Settings changes, and the tab is routed through
+  the same `app/src/features/settings/index.tsx` switch as the rest.
+- 20/10/2026 · GE · §6.1: the staff loader keeps a birthday the sheet gives as a day and month (`employee.birth_day`, `birth_month`, migration `1180`), on every deploy, so the Staff Community celebrations can post it.
+- 20/10/2026 · GE · The outbox dispatcher is woken by each commit (`emit()` sends a Postgres NOTIFY, delivered on commit; `src/jobs/loops/outbox-wake.js` LISTENs) instead of waiting up to a second for its tick, which stays as the safety net (SYSTEM_ARCHITECTURE §6). Measured locally: posting 12 ms, the handlers 5 ms, the reader's refetch 14 ms, so the tick was most of the wait.
+- 20/10/2026 · TB · Settings' System Health tab becomes three, **Status**, **Performance** and
+  **Faults**, after TB walked the first release: one tab meant scrolling past the checks and the
+  chart to reach the fault list, which is the part the IT team uses. The `system_health` permission
+  key, the routes and the data are unchanged; only which tab each section sits on changes. Their
+  guide is `docs/guides/system-health.md`.
+- 20/10/2026 · TB · §6.14: system mail to `mycityapp.io` is no longer refused as a trapped route (System Health fault #1, every staging digest failing). Domains whose mailboxes are on the SMTP relay behind the host's spam-filter MX are named in `SMTP_LOCAL_DOMAINS` (default `mycityapp.io`) and not route-checked; every other domain still is.
+- 20/10/2026 · TB · Settings · Integrations (#77) built with its own guide (`docs/guides/integrations.md`), brought forward from M9: §2 and §6.8 point there; Geoapify's key (§5, §6.13) and the local domains (§6.14) are kept there, with `GEOAPIFY_API_KEY` and `SMTP_LOCAL_DOMAINS` as the server file's fallback.
+- 20/10/2026 · TB · §6.13: addresses are picked, never typed (F27), with their own guide, `docs/guides/addresses.md`, which now covers the `maps` module (taken off this guide's header). The reverse lookup became `GET /maps/pin`, open to everyone signed in for a point they pin as an address.
+- 20/10/2026 · TB · Settings · Attendance Policy (#73) is dropped: policies live on Knowledge Hub · Policies (`docs/guides/policies.md`), brought forward from M10; §2 and §6.8 say so, and Settings · Approvals gains the Policy Approval route (and the Temporary Site route with attendance's PR 4).
+- 20/10/2026 · TB · §6.5: an approval may exclude people from deciding it (`exclude_employee_ids` on `openInstance`, `workflow_instance.excluded_employee_ids`, `1455`), read by `canAct`, `waitingOnClause` and the stage's notice; attendance's temporary sites exclude everyone on them (attendance.md §6.11). §6.7: ⌘K's Add Work Site and Add Temporary Site; a screen may register a second action for the floating button (`useScreenAction(action, { second: true })`, Home's Add Work Site beside New). §6.8's Temporary Site route is built as it says.

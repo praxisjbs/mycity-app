@@ -66,16 +66,21 @@ not ready, mail not filled in, no deploy keys yet). Fix those and run the same c
 
 ## 4 · After the first run
 
-1. **Fill mail in both `.env` files** (`SMTP_*`; production and staging refuse to boot without it):
-   `sudoedit /srv/mycity/prod/shared/.env`, then the same for `stg`. `GEMINI_API_KEY` too, when
-   there is one (empty uses the stub).
+1. **Set mail and the keys on Settings · Integrations**, on each environment, once the app is up
+   (`docs/guides/integrations.md`; `docs/runbooks/dns-and-mail.md` §4 has the values): the System
+   Sender, the Staff Mail Server when its hosts differ from the defaults, Geoapify's key, Gemini's
+   (none uses the stub), Groq's (voice notes, Free plan), Exchange Rates' (the daily rates) and, when
+   they are used, OpenAI's, Anthropic's and DeepSeek's, each with its plan and its share of the daily
+   limit (staging and production share the keys, `docs/guides/integrations.md` §1.2 decision 5). Until a sender is set, system mail is held, not lost. The `.env`
+   lines (`SMTP_*`, `MAIL_SEND_PER_HOUR`, `GEOAPIFY_API_KEY`, `GEMINI_API_KEY`) still work as the
+   fallback, and a server starts without them.
 2. **Copy `/root/mycity-secrets/` somewhere safe**, off the server. It holds the database
    passwords and the two `ENCRYPTION_KEY`s; a lost encryption key loses every value encrypted
    with it (mailbox passwords, integration secrets).
 3. If it says a reboot is wanted: `sudo reboot`. Everything comes back on its own.
 4. **Set up the offsite backup copy**: `docs/runbooks/backup-restore.md` §2.
 5. Check: `systemctl status postgresql redis-server clamav-daemon nginx` all active;
-   `systemctl list-timers 'mycity-*'` lists the backup and the drill;
+   `systemctl list-timers 'mycity-*'` lists the backup, the drill and the two health watches;
    `sudo ufw status` shows only SSH, 80 and 443; `curl -sI http://hub.staging.mycityapp.io`
    gives a 301 to https.
 

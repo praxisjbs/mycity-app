@@ -31,7 +31,7 @@ const realtime = require("../../src/services/realtime/emitter");
 const dashboard = require("../../src/modules/dashboard/dashboard.service");
 const staffSeed = require("../../seeds/staging/10_staff");
 const home = require("../../seeds/staging/60_home");
-const productivity = require("../../seeds/staging/40_productivity");
+const workspaceSeed = require("../../seeds/staging/40_workspace");
 const forward = require("../../seeds/staging/lib/forward-rows");
 const { removeHomeStagingRows } = require("../../seeds/staging/lib/home-staging-rows");
 const { realStaff } = require("../../seeds/staging/lib/staff");
@@ -104,8 +104,8 @@ describeDb("Home's staging seed against the real migrations", () => {
     workingWeek.invalidateCalendar();
     outbox.markReady();
     await runFile(staffSeed);
-    // M2's records come from its own seed, which runs before Home's (lib/home-staging-rows.js).
-    await runFile(productivity);
+    // Tasks and the calendar come from My Workspace's own seed, which runs before Home's.
+    await runFile(workspaceSeed);
     staff = await realStaff(pool);
     await runFile(home, { now: NOW });
     first = await counts();
@@ -130,7 +130,7 @@ describeDb("Home's staging seed against the real migrations", () => {
   });
 
   test("every id the manifest lists is there, in the column it names", async () => {
-    for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS.filter((e) => !productivity.M2_TABLES.includes(e.table))) {
+    for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS.filter((e) => !workspaceSeed.M2_TABLES.includes(e.table))) {
       const { n } = await one(`SELECT count(*)::int AS n FROM ${table} WHERE ${idColumn} = ANY($1::uuid[])`, [ids]);
       expect([table, n]).toEqual([table, ids.length]);
     }
@@ -210,8 +210,10 @@ describeDb("Home's staging seed against the real migrations", () => {
          JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id`,
     );
     const metrics = new Set(alerts.rows.map((a) => a.metric));
-    for (const metric of ["late_arrivals", "missing_clock_out", "partner_inactivity", "budget_threshold"])
-      expect([metric, metrics.has(metric)]).toEqual([metric, true]);
+    for (const metric of ["partner_inactivity", "budget_threshold"]) expect([metric, metrics.has(metric)]).toEqual([metric, true]);
+    // Attendance's alerts are the Attendance policy's breaches: no version is seeded (A26), so none.
+    expect(rules.rows.map((r) => r.metric)).not.toContain("late_arrivals");
+    expect(rules.rows.map((r) => r.metric)).not.toContain("missing_clock_out");
     expect(alerts.rows.every((a) => a.outcome === null)).toBe(true);
     expect(alerts.rows.some((a) => a.severity === "high")).toBe(true);
   });
@@ -318,6 +320,27 @@ describeDb("Home's staging seed against the real migrations", () => {
       ]);
       expect(rows.map((v) => v.title)).toEqual(seats.slice(1, 1 + listed("vacancy").length).map((s) => s.title));
       expect(rows.every((v) => v.status === "open")).toBe(true);
+    });
+
+    test("someone moved to another manager since the last run: the run passes, and each review is of whoever holds its place now", async () => {
+      const before = await realStaff(pool);
+      const moved = before.reportsOf(before.head)[0];
+      await q("UPDATE employee SET line_manager_id = $2 WHERE employee_id = $1", [moved.employee_id, before.ceo.employee_id]);
+      await expect(runFile(home, { now: NOW })).resolves.toBeUndefined();
+      const after = await realStaff(pool);
+      const expected = {};
+      for (const row of forward.ROWS.filter((r) => r.table === "performance_review")) {
+        const [person, by] = row.needs.map((slot) => forward.personOf(after, slot));
+        if (person && by)
+          expected[forward.idOf(row.table, row.key)] = [person.employee_id, by.employee_id, row.key.split(":")[0]];
+      }
+      const { rows } = await q(
+        `SELECT performance_review_id AS id, employee_id, reviewer_employee_id, review_type
+           FROM performance_review WHERE performance_review_id = ANY($1::uuid[])`,
+        [listed("performance_review")],
+      );
+      expect(Object.fromEntries(rows.map((r) => [r.id, [r.employee_id, r.reviewer_employee_id, r.review_type]]))).toEqual(expected);
+      expect(rows.some((r) => r.employee_id === moved.employee_id)).toBe(false);
     });
   });
 

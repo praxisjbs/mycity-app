@@ -18,6 +18,7 @@
  */
 const { z } = require("zod");
 const { uuid, text, isoDate, isoDateTime, email, phone, listQuery, Paged } = require("./common");
+const { PlaceInput, PlaceView } = require("./maps");
 const { SignInMethod } = require("./identity");
 const { DocumentRef } = require("./documents");
 const { RoleCode } = require("./users");
@@ -49,6 +50,8 @@ const Organisation = z
     registration_number: z.string().nullable(),
     tax_id: z.string().nullable(),
     address: z.string().nullable(),
+    /** The address as the edit form reads it (F27): the place, with a token to send it back. */
+    address_place: PlaceView.nullable(),
     phone: z.string().nullable(),
     email: z.string().nullable(),
     website: z.string().nullable(),
@@ -69,7 +72,8 @@ const OrganisationPatch = z
     trading_name: clearable(200).optional(),
     registration_number: clearable(40).optional(),
     tax_id: clearable(40).optional(),
-    address: clearable(500).optional(),
+    /** Picked or pinned, never typed (F27, docs/guides/addresses.md); null clears it. */
+    address: PlaceInput.nullable().optional(),
     phone: clearableAs(phone).optional(),
     email: clearableAs(email).optional(),
     website: clearableAs(z.string().trim().max(200).url("Not a web address")).optional(),
@@ -161,10 +165,8 @@ const DOC_TYPES = [
   "field_assignment",
   "project",
   "task",
-  "goal_organisation",
-  "goal_annual",
-  "goal_monthly",
-  "goal_department",
+  "temporary_site",
+  "policy",
   "query",
   "sanction",
   "letter",

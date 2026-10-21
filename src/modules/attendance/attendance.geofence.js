@@ -3,31 +3,64 @@
  * The geofence decision on one punch, under the policy's mode. Pure; the distance is
  * shared/geo's (docs/guides/attendance.md §6.5).
  *
- * What the server knows is the reading the browser sent (or why it sent none) and
- * the place the person is expected: their worksite, for remote staff and a hybrid employee's
- * home day their approved home (§6.13), on a day an approved work location request covers, its
- * temporary home, client's site or approved home (§6.11), and on a field assignment's day its
- * sites, the nearer judging the punch (§6.12).
- * A distance or an "inside" flag from the client is never read; the server works it out from
- * the coordinates.
+ * What the server knows is the reading the browser sent (or why it sent none) and the place the
+ * person is expected: a temporary site's addresses (the nearest judges the punch, a Temporary Home
+ * as a home), on a field assignment's day the nearer of its sites, on a day an approved work
+ * location request covers its temporary home, client's site or approved home, for remote staff and
+ * a Remote day of the schedule their approved home (§6.13), else their worksite. A distance or an
+ * "inside" flag from the client is never read; the server works it out from the coordinates.
  *
- *   verdict       inside       within the radius (the boundary counts as inside)
- *                 outside      beyond it, with a reading good enough to say so
- *                 unverified   no reading (denied, unavailable, timeout, unsupported),
- *                              or one coarser than the policy's accuracy, or someone working
- *                              from home with no approved home yet (no_home), or someone
- *                              expected at an office with none assigned (no_worksite)
+ * A reading is judged with its accuracy `a`, the distance `d` from the centre and the radius `r`:
+ *
+ *   verdict       inside       d <= r and a <= max_accuracy_m (the boundary counts as inside)
+ *                 outside      d - a > r: even the nearest point the reading allows is beyond the fence
+ *                 unverified   unclear: the reading's circle crosses the fence (edge), or it is rougher
+ *                              than max_accuracy_m (poor_accuracy); or no reading at all: none sent
+ *                              (denied, unavailable, timeout, unsupported, insecure, no_location), or
+ *                              one with no accuracy or an accuracy of 0 or less (no_accuracy); or
+ *                              nothing to match it to: someone working from home with no approved
+ *                              home yet (no_home), or someone expected at an office with none
+ *                              assigned (no_worksite)
  *                 not_applied  an approved remote day, or a client visit sent before sites were
- *                              asked for, with no fence: the approval is the check
- *                              (approved_request)
+ *                              asked for, with no fence: the approval is the check (approved_request)
  *
  *   mode off      every verdict is accepted; it is kept as evidence
  *   mode warn     outside or unverified goes to review, with an exception
- *   mode block    outside is rejected; unverified goes to review, because a reading
- *                 that could not be taken is not proof of being somewhere else
+ *   mode block    outside is rejected and opens its exception, so People see every refusal;
+ *                 unverified goes to review, because a reading that could not prove where someone
+ *                 was is not proof of being somewhere else
  */
 const geo = require("../../shared/geo/geo");
 const { GOOD_ACCURACY_M } = require("./attendance.rules");
+
+/**
+ * Of a temporary site's addresses (or a field assignment's sites), the one a reading is judged
+ * against: the nearest it is inside, else the one it is least far outside. Without a reading, the
+ * first.
+ */
+function nearestSite(sites, point) {
+  if (!geo.isPoint(point)) return sites[0];
+  const scored = sites.map((x) => ({ x, d: geo.distanceM(point, x) }));
+  const inside = scored.filter((c) => c.d <= c.x.radius_m).sort((a, b) => a.d - b.d);
+  if (inside.length) return inside[0].x;
+  return scored.sort((a, b) => a.d - a.x.radius_m - (b.d - b.x.radius_m))[0].x;
+}
+
+/** Is this a usable accuracy: a number above 0? A reading without one proves nothing (no_accuracy). */
+const hasAccuracy = (a) => a !== null && a !== undefined && Number.isFinite(Number(a)) && Number(a) > 0;
+
+/**
+ * One reading against one fence (§6.5): inside when the centre is within the radius and the reading
+ * is as fine as the policy asks; outside when even its nearest possible point is beyond the fence;
+ * otherwise unclear, at the edge or too rough, which is never proof of being elsewhere. Pure.
+ * @param {{distance_m: number, accuracy_m: number, radius_m: number, max_accuracy_m: number}} reading
+ * @returns {{verdict: "inside"|"outside"|"unverified", reason: null|"edge"|"poor_accuracy"}}
+ */
+function judgeReading({ distance_m: d, accuracy_m: a, radius_m: r, max_accuracy_m: max }) {
+  if (d <= r && a <= max) return { verdict: "inside", reason: null };
+  if (d - a > r) return { verdict: "outside", reason: null };
+  return { verdict: "unverified", reason: a > max ? "poor_accuracy" : "edge" };
+}
 
 /**
  * @param {object} input
@@ -43,7 +76,7 @@ const { GOOD_ACCURACY_M } = require("./attendance.rules");
  * @param {{location_request_id: string, place: string, name: string}|null} [input.approved]  an approved
  *          day with no fence
  * @param {"on_site"|"hybrid"|"remote"} input.work_pattern
- * @param {boolean} [input.home_day]  the date is worked from home by the schedule (a hybrid home day)
+ * @param {boolean} [input.home_day]  the date is worked from home by the schedule (a Remote day)
  * @param {number} input.max_accuracy_m
  * @returns {{verdict: string, reason: string|null, distance_m: number|null, radius_m: number|null,
  *            accuracy: "good"|"fair"|"poor"|null, place: "worksite"|"home"|null, worksite_id: string|null,
@@ -51,33 +84,21 @@ const { GOOD_ACCURACY_M } = require("./attendance.rules");
  *            assignment_id: string|null, site_id: string|null, outside: string,
  *            result: "accepted"|"review"|"rejected", exception: string|null, retry_location: boolean}}
  */
-/**
- * Of a field assignment's sites, the one a reading is judged against: the nearest it is inside,
- * else the one it is least far outside. Without a reading, the first.
- */
-function nearestSite(sites, point) {
-  if (!geo.isPoint(point)) return sites[0];
-  const scored = sites.map((x) => ({ x, d: geo.distanceM(point, x) }));
-  const inside = scored.filter((c) => c.d <= c.x.radius_m).sort((a, b) => a.d - b.d);
-  if (inside.length) return inside[0].x;
-  return scored.sort((a, b) => a.d - a.x.radius_m - (b.d - b.x.radius_m))[0].x;
-}
-
 function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected: given, approved = null, work_pattern: pattern, home_day: homeDay = false, max_accuracy_m: maxAccuracyM }) {
   const hasPoint = geo.isPoint(point);
-  // A field assignment's day: judged as at the site the reading is nearest, named by it.
+  // A temporary site's or a field assignment's day: judged as at the address the reading is nearest, named by it.
   const site = given && Array.isArray(given.sites) && given.sites.length ? nearestSite(given.sites, point) : null;
   const expected = site
     ? { ...given, name: site.name, latitude: site.latitude, longitude: site.longitude, radius_m: site.radius_m, site_id: site.field_site_id }
     : given;
-  const accuracy =
-    !hasPoint || accuracyM === null || accuracyM === undefined
-      ? null
-      : Number(accuracyM) <= GOOD_ACCURACY_M
-        ? "good"
-        : Number(accuracyM) <= Number(maxAccuracyM)
-          ? "fair"
-          : "poor";
+  const measured = hasPoint && hasAccuracy(accuracyM);
+  const accuracy = !measured
+    ? null
+    : Number(accuracyM) <= GOOD_ACCURACY_M
+      ? "good"
+      : Number(accuracyM) <= Number(maxAccuracyM)
+        ? "fair"
+        : "poor";
   const atHome = Boolean(expected) && (expected.kind === "home" || expected.kind === "temporary_home");
   const onApprovedDay = !expected && Boolean(approved);
   const base = {
@@ -97,7 +118,7 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
   };
 
   let verdict;
-  let reason = null;
+  let reason;
   if (onApprovedDay) {
     // An approved remote day or client visit with no fence: the approval is the check.
     verdict = "not_applied";
@@ -113,14 +134,18 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
   } else if (!hasPoint) {
     verdict = "unverified";
     reason = locationError || "no_location";
+  } else if (!measured) {
+    // Coordinates with no accuracy say nothing about how far off they may be: no reading.
+    verdict = "unverified";
+    reason = "no_accuracy";
   } else {
     base.distance_m = geo.distanceM(point, expected);
-    if (accuracy === "poor") {
-      verdict = "unverified";
-      reason = "poor_accuracy";
-    } else {
-      verdict = base.distance_m <= Number(expected.radius_m) ? "inside" : "outside";
-    }
+    ({ verdict, reason } = judgeReading({
+      distance_m: base.distance_m,
+      accuracy_m: Number(accuracyM),
+      radius_m: Number(expected.radius_m),
+      max_accuracy_m: Number(maxAccuracyM),
+    }));
   }
   // A new reading changes nothing when there is no place to match it to.
   base.retry_location = verdict === "unverified" && reason !== "no_home" && reason !== "no_worksite";
@@ -128,13 +153,9 @@ function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: lo
   const judged = { ...base, verdict, reason };
   if (mode === "off" || verdict === "inside" || verdict === "not_applied")
     return { ...judged, result: "accepted", exception: null };
-  if (verdict === "outside" && mode === "block")
-    return { ...judged, result: "rejected", exception: null };
-  return {
-    ...judged,
-    result: "review",
-    exception: verdict === "outside" ? base.outside : "location_unverified",
-  };
+  if (verdict === "outside")
+    return { ...judged, result: mode === "block" ? "rejected" : "review", exception: base.outside };
+  return { ...judged, result: "review", exception: "location_unverified" };
 }
 
-module.exports = { decideGeofence };
+module.exports = { decideGeofence, judgeReading };

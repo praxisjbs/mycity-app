@@ -5,36 +5,39 @@
  *
  *   requestOwn(user)            POST /ess/profile/export, the caller's own
  *   requestFor(ceo, id)         POST /employees/:id/data-export, the CEO's Download Their Data
- *   build(event)                employee.data_export_requested, in the worker after commit
- *   purgeExpired()              the data-export-cleanup job: files older than KEPT_DAYS removed
+ *   build(event, ctx)           employee.data_export_requested, in the worker after commit
  *
  * Asked for in the request, at once and audited: `employee.data_export_requested` is on the
- * person's record with who asked. At most one a day for a person (Lagos days), the CEO's
- * requests for them counted with their own; a second is a 429 that says so. The rows are
- * gathered after commit, 25 at a time, through the same reads the screens use: the employee
- * 360 and its history, leave, attendance, the vault's list and the sign-ins My Security shows.
- * The file is kept in the vault as a `data_export` (restricted: the person and the CEO only,
- * ess.events.js), emailed to whoever asked so it arrives in their Mailbox, and removed after
- * KEPT_DAYS days.
+ * person's record with who asked, and the file is reserved (shared/documents/exports.js) as a
+ * restricted `data_export` the person and the CEO alone may open (ess.events.js). At most one
+ * file a day for a person (Lagos days), the CEO's for them counted with their own: the same
+ * asker pressing again that day gets that day's file again, to download once more; anyone else
+ * is refused with a 429 that says so. The rows are gathered after commit, 25 at a time, through
+ * the same reads the screens use: the employee 360 and its history, leave, attendance, the
+ * vault's list and the sign-ins My Security shows. The screen that asked downloads the file on
+ * its own device; nothing is emailed, and the export-cleanup job removes it a day later.
  *
  * What never goes in: the full bank account (its last four digits only), attendance
  * coordinates and device identifiers (a punch carries its location verdict and the device's
  * label), the files themselves (the list of them only), pay (M6).
  *
- * ESS keeps no tables (README §5.1). The two reads below are of the event log, where the
- * request itself is kept: how many there were today, and whose data a file holds.
+ * ESS keeps no tables (README §5.1): the file is the vault's, and the request's record is the
+ * event log's.
  */
+const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
+const { config } = require("../../config/env");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
+const exportFiles = require("../../shared/documents/exports");
+const vault = require("../../shared/documents/vault");
+const { exportFilename } = require("../../shared/spreadsheet/cells");
 const { formatDate, formatDateTime } = require("../../shared/time/day-first");
 const lagos = require("../../shared/time/lagos");
 const { EVENTS, DATA_EXPORT } = require("./ess.events");
 const { meOf } = require("./ess.documents");
 
-/** How long the workbook stays in the vault. */
-const KEPT_DAYS = 7;
 /** The most rows one sheet holds; a working life of attendance fits many times over. */
 const SHEET_CEILING = 5000;
 
@@ -54,55 +57,58 @@ async function tx(fn) {
  * The request
  * ------------------------------------------------------------------ */
 
-/** Requests for one person since the start of today in Lagos, whoever asked. */
-async function requestsToday(client, employeeId) {
+/** Today's file for a person (Lagos day), whoever asked, unless it failed; null when none. */
+async function todaysFile(client, employeeId) {
   const { rows } = await client.query(
-    `SELECT count(*)::int AS n FROM event_log
-      WHERE event_key = $1 AND entity_type = 'employee' AND entity_id = $2
-        AND occurred_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Lagos')`,
-    [EVENTS.EMPLOYEE_DATA_EXPORT_REQUESTED, String(employeeId), lagos.today()],
+    `SELECT ${vault.COLUMNS} FROM document
+      WHERE doc_type = $1 AND subject_employee_id = $2 AND render_status IS DISTINCT FROM 'failed'
+        AND created_at >= ($3::date::timestamp AT TIME ZONE 'Africa/Lagos')
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [DATA_EXPORT, employeeId, lagos.today()],
   );
-  return rows[0].n;
-}
-
-/** Whose data a workbook holds: the person its request was about. */
-async function subjectOf(db, eventId) {
-  const { rows } = await db.query(
-    "SELECT entity_id FROM event_log WHERE event_id = $1::uuid AND event_key = $2",
-    [eventId, EVENTS.EMPLOYEE_DATA_EXPORT_REQUESTED],
-  );
-  return rows[0] ? rows[0].entity_id : null;
+  return rows[0] || null;
 }
 
 /**
- * Record the request, after the checks: someone to send it to, the person exists, and nothing
- * asked for them yet today. One request for a person is decided at a time, so two presses
- * cannot both pass the limit.
+ * Reserve the file and record the request, after the checks: the person exists, and nobody has
+ * a file of theirs today. One request for a person is decided at a time, so two presses cannot
+ * both pass the limit.
+ * @returns {Promise<object>} the ExportFile: pending, or today's again for the same asker
  */
-async function request(actor, employeeId, own) {
-  if (!actor || !actor.email)
-    throw new AppError("NO_EMAIL", "Your login has no email to send the file to.", 422);
-  await tx(async (client) => {
+function request(actor, employeeId, own) {
+  return tx(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('data-export:' || $1::text, 0))", [employeeId]);
     const person = await require("../organisation/organisation.repo").findEmployeeById(client, employeeId);
     if (!person) throw new AppError("NOT_FOUND", "Not found", 404);
-    if ((await requestsToday(client, employeeId)) > 0)
+    const today = await todaysFile(client, employeeId);
+    if (today && today.uploaded_by === actor.user_id) return exportFiles.present(today);
+    if (today)
       throw new AppError(
         "DATA_EXPORT_LIMIT",
         own
-          ? "You already asked for your data today. Try again tomorrow."
-          : "A copy of this person's data was already asked for today. Try again tomorrow.",
+          ? "Your copy was already made today. Try tomorrow."
+          : "Their copy was already made today. Try tomorrow.",
         429,
       );
+    const name = `${person.first_name} ${person.last_name}`.trim();
+    const doc = await exportFiles.reserve(client, {
+      doc_type: DATA_EXPORT,
+      entity: { type: DATA_EXPORT, id: crypto.randomUUID() },
+      subject_employee_id: employeeId,
+      file_name: exportFilename({ base: `my-data-${person.staff_number}`, env: config.APP_ENV, extension: "xlsx" }),
+      title: `Download My Data, ${name}`,
+      actor,
+    });
     await emit(client, {
       key: EVENTS.EMPLOYEE_DATA_EXPORT_REQUESTED,
       entity: { type: "employee", id: employeeId },
       actor,
-      payload: { employee_id: employeeId, requested_by: actor.user_id, own },
+      payload: { employee_id: employeeId, requested_by: actor.user_id, own, document_id: doc.document_id },
       metadata: { for_employee_id: employeeId, by_user_id: actor.user_id, own },
     });
+    return exportFiles.present(doc);
   });
-  return { queued: true, email: actor.email };
 }
 
 /** Download My Data: the caller's own. */
@@ -133,7 +139,7 @@ const words = (v) =>
 
 const LEAVE_STATUS = Object.freeze({ submitted: "Pending", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled" });
 const PUNCH = Object.freeze({ clock_in: "Clock In", clock_out: "Clock Out" });
-const VERDICT = Object.freeze({ inside: "Inside", outside: "Outside", unverified: "Unverified", not_applied: "Not Judged" });
+const VERDICT = Object.freeze({ inside: "Inside", outside: "Outside", unverified: "Unclear", not_applied: "Not Judged" });
 const METHOD = Object.freeze({
   password: "Password",
   password_totp: "Password and Code",
@@ -362,93 +368,32 @@ async function workbookFor(employeeId, asker) {
   return { buffer, employee, own };
 }
 
-/** employee.data_export_requested: build the workbook, keep it, email it to whoever asked. */
-async function build(event) {
-  const queues = require("../../jobs/queues");
-  const vault = require("../../shared/documents/vault");
+/**
+ * employee.data_export_requested: the workbook made into the file the request reserved. An asker
+ * no longer active, or no longer the person or the CEO, gets a failed file instead.
+ * @param {object} event
+ * @param {{attempt: number, max_attempts: number}} ctx  the outbox's
+ */
+async function build(event, ctx) {
   const grantsCache = require("../../shared/rbac/grants-cache");
-  const { exportFilename } = require("../../shared/spreadsheet/cells");
-  const { config } = require("../../config/env");
-  const repo = require("../organisation/organisation.repo");
-
   const p = event.payload || {};
+  // Asked for before exports were downloaded: that one went by email, and has no file here.
+  if (!p.document_id) return;
   const asker = p.requested_by ? await grantsCache.getAuthUser(pool, p.requested_by) : null;
-  if (!asker || asker.status !== "active" || !asker.email) return;
+  if (!asker || asker.status !== "active")
+    return exportFiles.fail(p.document_id, "The person who asked is no longer active.");
   // Only the person themselves or the CEO may have it, as when it was asked for.
-  if (asker.employee_id !== p.employee_id && asker.is_ceo !== true) return;
-
-  let documentId = await repo.documentOf(pool, DATA_EXPORT, event.event_id);
-  let name;
-  let own;
-  if (!documentId) {
-    const made = await workbookFor(p.employee_id, asker);
-    name = made.employee.display_name;
-    own = made.own;
-    const filename = exportFilename({ base: `my-data-${made.employee.staff_number}`, env: config.APP_ENV, extension: "xlsx" });
-    const doc = await tx((client) =>
-      vault.store(client, {
-        file: { buffer: made.buffer, originalname: filename },
-        purpose: "document",
-        doc_type: DATA_EXPORT,
-        entity: { type: DATA_EXPORT, id: event.event_id },
-        sensitivity: "restricted",
-        source: "generated",
-        title: `Download My Data, ${name}`,
-        actor: asker.user_id,
-      }),
-    );
-    documentId = doc.document_id;
-  } else {
-    const e = await repo.findEmployeeById(pool, p.employee_id);
-    name = e ? `${e.first_name} ${e.last_name}`.trim() : "";
-    own = asker.employee_id === p.employee_id;
-  }
-
-  await queues.enqueue(
-    "email-send",
-    "data-export",
-    {
-      to: { name: asker.display_name, email: asker.email },
-      template: "data-export",
-      data: { subject_name: name, own, kept_days: KEPT_DAYS },
-      attachments: [{ document_id: documentId }],
-    },
-    { jobId: `data-export-${event.event_id}` },
-  );
-}
-
-/* ------------------------------------------------------------------ *
- * Removal after KEPT_DAYS
- * ------------------------------------------------------------------ */
-
-/** The data-export-cleanup job: every workbook older than KEPT_DAYS leaves the vault. */
-async function purgeExpired(now = new Date()) {
-  const vault = require("../../shared/documents/vault");
-  const { rows } = await pool.query(
-    `SELECT document_id FROM document
-      WHERE doc_type = $1 AND created_at < $2::timestamptz - make_interval(days => $3::int)
-      ORDER BY created_at, document_id`,
-    [DATA_EXPORT, now.toISOString(), KEPT_DAYS],
-  );
-  let removed = 0;
-  for (const { document_id: id } of rows) {
-    const keys = await tx((client) => vault.remove(client, id, { reason: `kept ${KEPT_DAYS} days` }));
-    if (!keys) continue;
-    await vault.removeFiles(keys);
-    removed += 1;
-  }
-  return { removed };
+  if (asker.employee_id !== p.employee_id && asker.is_ceo !== true)
+    return exportFiles.fail(p.document_id, "Only the person or the CEO may have this file.");
+  await exportFiles.make(p.document_id, ctx, async () => (await workbookFor(p.employee_id, asker)).buffer);
 }
 
 module.exports = {
-  KEPT_DAYS,
   SHEETS,
   NDPA_LINE,
   requestOwn,
   requestFor,
   build,
-  purgeExpired,
-  subjectOf,
   gatherAll,
   recordSheets,
 };

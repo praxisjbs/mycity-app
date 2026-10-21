@@ -560,6 +560,27 @@ function updateEmployee(db, employeeId, patch) {
 }
 
 /**
+ * A birthday known only as a day and month (migration 1180); null for both clears it.
+ * Returns the day and month before and after, for the audit; null when there is no such person.
+ */
+async function setBirthday(db, employeeId, { day, month }) {
+  const row = await one(
+    db,
+    `WITH old AS (SELECT birth_day, birth_month FROM employee WHERE employee_id = $1 FOR UPDATE)
+     UPDATE employee e SET birth_day = $2, birth_month = $3, updated_at = now()
+       FROM old
+      WHERE e.employee_id = $1
+      RETURNING old.birth_day AS was_day, old.birth_month AS was_month, e.birth_day, e.birth_month`,
+    [employeeId, day, month],
+  );
+  if (!row) return null;
+  return {
+    before: { birth_day: row.was_day, birth_month: row.was_month },
+    after: { birth_day: row.birth_day, birth_month: row.birth_month },
+  };
+}
+
+/**
  * Move a person to another staff number. A staff number is not a field of the form, so
  * it is not in UPDATE_COLUMNS: only the roster reaches this, when the sheet takes back a
  * number it says belongs to someone else.
@@ -801,19 +822,6 @@ async function tree(db) {
   return rows;
 }
 
-/**
- * The document a record already has, when an earlier attempt made it, or null: a Download PDF
- * request's PDF (org-chart.export.js). The document table is the vault's; this only reads it.
- */
-async function documentOf(db, entityType, entityId) {
-  const row = await one(
-    db,
-    "SELECT document_id FROM document WHERE entity_type = $1 AND entity_id = $2 LIMIT 1",
-    [entityType, String(entityId)],
-  );
-  return row ? row.document_id : null;
-}
-
 /** The highest sequence a staff number carries, so numbering can be moved past it. */
 async function highestStaffNumberSeq(db) {
   const row = await one(
@@ -827,6 +835,7 @@ async function highestStaffNumberSeq(db) {
 
 module.exports = {
   EMPLOYEE_COLUMNS,
+  setBirthday,
   photoDocumentOf,
   setPhotoDocument,
   INSERT_COLUMNS,
@@ -872,6 +881,5 @@ module.exports = {
   insertSeat,
   updateSeat,
   tree,
-  documentOf,
   highestStaffNumberSeq,
 };

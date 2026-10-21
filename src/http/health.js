@@ -115,10 +115,157 @@ registerCheck("clamd", () => require("../services/media/scan").health());
 registerCheck("mail", () =>
   require("../services/mail/system-mail.service").health(),
 );
-// Which AI vendor answers (Gemini or the stub), from configuration only: no call out.
-registerCheck("ai", () =>
-  require("../services/ai/governance").health(require("../config/db").pool),
+// The connections on Settings · Integrations that have no live probe here, from their stored
+// state: no call out, so a readiness probe never spends Geoapify's credits
+// (docs/guides/integrations.md §3 step 12).
+registerCheck("maps", () =>
+  require("../shared/integrations/state").readiness(require("../config/db").pool, "geoapify"),
 );
+registerCheck("mail_server", () =>
+  require("../shared/integrations/state").readiness(require("../config/db").pool, "mailbox_server"),
+);
+// Which AI vendor answers (Gemini or the stub), from configuration only: no call out; degraded
+// when Gemini's own connection is failing (a refused key, a spent quota).
+registerCheck("ai", async () => {
+  const db = require("../config/db").pool;
+  const [ai, gemini] = await Promise.all([
+    require("../services/ai/governance").health(db),
+    require("../shared/integrations/state").readiness(db, "gemini"),
+  ]);
+  return gemini.status === "degraded" ? { ...ai, status: "degraded", error: gemini.error } : ai;
+});
+// Every other connection on Settings · Integrations, from its stored state, so Settings · Status
+// shows each one (docs/guides/integrations.md §1.2 decision 11). Exchange Rates is also degraded
+// when its newest table is more than a day and a half old.
+for (const code of ["groq", "openai", "anthropic", "deepseek", "web_push"])
+  registerCheck(code, () => require("../shared/integrations/state").readiness(require("../config/db").pool, code));
+registerCheck("exchange_rates", async () => {
+  const db = require("../config/db").pool;
+  const r = await require("../shared/integrations/state").readiness(db, "exchange_rates");
+  if (r.status !== "up" || r.mode === "not_set_up") return r;
+  const t = await require("../shared/money/fx").newest({ db });
+  const ageH = t && t.fetched_at ? (Date.now() - new Date(t.fetched_at).getTime()) / 3_600_000 : null;
+  if (ageH === null || ageH > 36) return { ...r, status: "degraded", error: "RATES_STALE" };
+  return { ...r, rate_day: t.day };
+});
+
+// What a person asks first when something is slow: how much room is left. The levels are
+// the ones Settings · Performance's Edit Targets holds (kept a minute; the defaults when the
+// table cannot be read), so the screen and these checks always agree.
+const levels = () => require("../modules/system_health/system_health.targets").levels();
+
+// Degraded, never fatal: the app still answers on a full disk, it just cannot write.
+registerCheck("disk", async () => {
+  const fs = require("node:fs/promises");
+  const { config } = require("../config/env");
+  const where = config.MEDIA_ROOT || process.cwd();
+  const [st, t] = await Promise.all([fs.statfs(where), levels()]);
+  const total = st.blocks * st.bsize;
+  const free = st.bavail * st.bsize;
+  const freePct = total > 0 ? Math.round((free * 100) / total) : null;
+  return {
+    status:
+      freePct === null ? "degraded" : freePct < t.disk_down_free_pct ? "down" : freePct < t.disk_warn_free_pct ? "degraded" : "up",
+    free_pct: freePct,
+    free_gb: Math.round((free / 1024 ** 3) * 10) / 10,
+    total_gb: Math.round((total / 1024 ** 3) * 10) / 10,
+    path: where,
+  };
+});
+
+// In use is total less what the kernel can hand back (MemAvailable): the disk cache is not
+// counted, or a healthy server would read 90% used all day.
+registerCheck("memory", async () => {
+  const os = require("node:os");
+  const host = require("../modules/system_health/system_health.host");
+  const [mem, t] = await Promise.all([host.memory(), levels()]);
+  const total = mem ? mem.total_mb * 1024 ** 2 : os.totalmem();
+  const used = mem ? mem.in_use_mb * 1024 ** 2 : total - os.freemem();
+  const usedPct = total > 0 ? Math.round((used * 100) / total) : null;
+  return {
+    status: usedPct === null ? "degraded" : usedPct >= t.memory_down_pct ? "down" : usedPct >= t.memory_warn_pct ? "degraded" : "up",
+    used_pct: usedPct,
+    used_gb: Math.round((used / 1024 ** 3) * 10) / 10,
+    total_gb: Math.round((total / 1024 ** 3) * 10) / 10,
+    process_mb: Math.round(process.memoryUsage().rss / 1024 ** 2),
+  };
+});
+
+/**
+ * How busy the processor is: busy time over all time since this check last ran in this
+ * process (a quarter second apart the first time). Steal and I/O wait are not busy. Where
+ * there is no /proc (a laptop) it reports the load and stays up.
+ */
+let lastCpu = null;
+registerCheck("cpu", async () => {
+  const os = require("node:os");
+  const host = require("../modules/system_health/system_health.host");
+  const cores = Math.max(1, os.cpus().length);
+  const load = Math.round((os.loadavg()[0] / cores) * 100) / 100;
+  let before = lastCpu;
+  if (!before) {
+    before = await host.cpuTimes();
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  const [now, t] = await Promise.all([host.cpuTimes(), levels()]);
+  lastCpu = now;
+  const total = before && now ? now.total - before.total : 0;
+  const busyPct = total > 0 ? Math.round(((now.busy - before.busy) * 1000) / total) / 10 : null;
+  return {
+    status: busyPct === null ? "up" : busyPct >= t.cpu_down_pct ? "down" : busyPct >= t.cpu_warn_pct ? "degraded" : "up",
+    busy_pct: busyPct,
+    load,
+    cores,
+  };
+});
+
+// Size and connections in one query rather than two checks: /health/ready already
+// asks the pool for several things at once, and every extra round trip here is a
+// connection this endpoint holds while the app is trying to serve people.
+registerCheck("database_usage", async () => {
+  const [{ rows }, t] = await Promise.all([
+    require("../config/db").pool.query(
+      `SELECT pg_database_size(current_database()) AS bytes,
+              (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database())::int AS used,
+              current_setting('max_connections')::int AS allowed`,
+    ),
+    levels(),
+  ]);
+  const { bytes, used, allowed } = rows[0];
+  const pct = allowed > 0 ? Math.round((used * 100) / allowed) : null;
+  return {
+    status: pct === null ? "degraded" : pct >= t.connections_down_pct ? "down" : pct >= t.connections_warn_pct ? "degraded" : "up",
+    size_mb: Math.round(Number(bytes) / 1024 ** 2),
+    connections_used: used,
+    connections_allowed: allowed,
+    connections_pct: pct,
+  };
+});
+
+/**
+ * Has every background job actually run? Without this a scheduler that is never
+ * started is invisible: the first release of System Health shipped with its own three
+ * unregistered, and nothing said so. Degraded, never fatal: the API serves without them.
+ * Whether a job is on time is jobs/report.js's judgement, so this probe, the check
+ * sheet and the brief can never disagree. Only names leave here: the reasons and the
+ * errors are behind the System Health permission.
+ */
+registerCheck("schedulers", async () => {
+  const { jobs, db_error: error } = await require("../jobs/report").schedulers({
+    db: require("../config/db").pool,
+  });
+  const named = (state) => jobs.filter((j) => j.state === state).map((j) => j.name);
+  if (error) return { status: "degraded", schedulers: jobs.length, error };
+  const late = named("late");
+  const failing = named("failing");
+  return {
+    status: late.length || failing.length ? "degraded" : "up",
+    schedulers: jobs.length,
+    late,
+    failing,
+    waiting: named("waiting"),
+  };
+});
 
 registerCheck("migrations", async () => {
   try {
@@ -138,6 +285,42 @@ registerCheck("migrations", async () => {
     };
   }
 });
+
+/** The names of every probe, in the order they were registered. */
+function checkNames() {
+  return [...checks.keys()];
+}
+
+/**
+ * One probe, run now, with the same timeout and the same reading of a throw as runChecks().
+ * @param {string} name
+ * @returns {Promise<{status: string}|null>}  null for a name no probe has
+ */
+async function runCheck(name) {
+  const check = checks.get(name);
+  if (!check) return null;
+  try {
+    return await withTimeout(Promise.resolve().then(check.fn), name);
+  } catch (err) {
+    return { status: "down", error: err && err.message };
+  }
+}
+
+/**
+ * ready, degraded or unavailable for a set of results, by runChecks()'s own rule: a
+ * fatal check down makes it unavailable, anything else not up makes it degraded.
+ * @param {Record<string, {status: string}>} results
+ */
+function serviceState(results) {
+  let fatal = false;
+  let degraded = false;
+  for (const [name, value] of Object.entries(results || {})) {
+    const check = checks.get(name);
+    if (value && value.status === "down" && check && check.fatal) fatal = true;
+    else if (!value || value.status !== "up") degraded = true;
+  }
+  return fatal ? "unavailable" : degraded ? "degraded" : "ready";
+}
 
 async function runChecks() {
   const names = [...checks.keys()];
@@ -185,4 +368,4 @@ function healthRouter() {
   return router;
 }
 
-module.exports = { healthRouter, registerCheck, runChecks };
+module.exports = { healthRouter, registerCheck, runChecks, runCheck, checkNames, serviceState };

@@ -17,7 +17,7 @@
  *   mode off      accepted whatever the state; the device is still recorded, which is
  *                 what lets People switch the policy on later
  *   mode warn     unknown goes to review, with an unknown_device exception
- *   mode block    unknown is rejected
+ *   mode block    unknown is rejected, and opens the same exception so People see the refusal
  *
  * There is no exemption by role and no "nobody registered anything yet" pass: an
  * unregistered device is unknown, and the policy alone says what that costs.
@@ -47,13 +47,11 @@ function evaluateDevice({
           : "not_registered";
   if (known || mode === "off")
     return { state, known, reason, result: "accepted", exception: null };
-  if (mode === "block")
-    return { state, known, reason, result: "rejected", exception: null };
   return {
     state,
     known,
     reason,
-    result: "review",
+    result: mode === "block" ? "rejected" : "review",
     exception: "unknown_device",
   };
 }

@@ -21,6 +21,10 @@
  * `scope: { column: "m.employee_id", through: "attendance_field_member m WHERE m.field_assignment_id
  * = a.field_assignment_id" }` finds it when any one of them is in the caller's scope, once.
  *
+ * `capability: "<code>"` is for records only some holders of `view` may find (README §5.2): the
+ * search service runs the provider only for a reader holding that capability (the CEO holds every
+ * one), as the route behind the screen checks it.
+ *
  * `owner: { column }` is for records that belong to one person whatever their grant says
  * (their own mail): the query always adds `column = <the caller's user_id>`, so a scope of
  * `all` (the CEO, People) still finds only the caller's own rows. Without a caller it
@@ -95,6 +99,8 @@ function recordProvider(spec) {
     throw new Error(`search provider ${spec.type}: scope is { column }`);
   if (spec.owner && !spec.owner.column)
     throw new Error(`search provider ${spec.type}: owner is { column }`);
+  if (spec.capability !== undefined && !catalog.isCapability(spec.capability))
+    throw new Error(`search provider ${spec.type}: "${spec.capability}" is not a catalogued capability`);
   if (spec.phones !== undefined && (!Array.isArray(spec.phones) || spec.phones.some((col) => !col)))
     throw new Error(`search provider ${spec.type}: phones is a list of columns`);
   const words = (spec.words || [])
@@ -175,6 +181,7 @@ function recordProvider(spec) {
     words,
     scoped: Boolean(spec.scope),
     owned: Boolean(spec.owner),
+    capability: spec.capability || null,
     columns: spec.columns.slice(),
     search,
   });

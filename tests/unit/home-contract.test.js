@@ -69,7 +69,6 @@ describe("KPI cards", () => {
       activity: null,
       week: null,
       alerts_to_clear: null,
-      prompt_clock_in: false,
     };
     expect(issues(dashboard.HomeOverview.safeParse(empty))).toEqual([]);
     expect(dashboard.HomeOverview.safeParse({ ...empty, cards: Array(5).fill(null) }).success).toBe(false);
@@ -110,10 +109,8 @@ describe("KPI cards", () => {
 });
 
 describe("alerts", () => {
-  test("the metrics are the nine the alerts module computes, in the New Rule order", () => {
+  test("the metrics are the seven the alerts module computes, in the New Rule order; attendance's are the policy's", () => {
     expect(Object.keys(alerts.HOME_ALERT_METRICS)).toEqual([
-      "late_arrivals",
-      "missing_clock_out",
       "approval_ageing",
       "document_expiry",
       "confirmation_due",
@@ -123,6 +120,9 @@ describe("alerts", () => {
       "recruitment_sla",
     ]);
     expect(alerts.HomeAlertMetric.options).toEqual(Object.keys(alerts.HOME_ALERT_METRICS));
+    // The rules the system keeps for the Attendance policy are never a metric New Rule offers.
+    expect(alerts.HomeAlertMetric.options).not.toContain(alerts.HOME_ALERT_POLICY_METRIC);
+    expect(alerts.HOME_ALERT_POLICY_RULES).toEqual(["late_rule", "early_rule", "absence_rule", "forgotten_rule", "location_rule"]);
   });
 
   test("each metric has a category, a kind, and a default clearer the access catalogue knows", () => {
@@ -140,10 +140,9 @@ describe("alerts", () => {
   });
 
   const rule = (over = {}) => ({
-    name: "Late three times",
-    metric: "late_arrivals",
+    name: "Waiting three days",
+    metric: "approval_ageing",
     threshold: "3",
-    window_days: 30,
     severity: "medium",
     permission_key: "people.view",
     ...over,
@@ -154,12 +153,12 @@ describe("alerts", () => {
   const ageing = { metric: "approval_ageing", window_days: undefined, threshold: 14, permission_key: "people.approve" };
   const expiry = { metric: "document_expiry", window_days: undefined, permission_key: "people.edit" };
 
-  test("a window belongs to a metric that counts over days, and to no other", () => {
+  test("no metric counts over days now, so a window is refused; the policy's metric is no metric", () => {
     expect(ruleIssues()).toEqual([]);
-    expect(ruleIssues({ window_days: "" })).toEqual(["window_days: Enter the days"]);
-    expect(ruleIssues({ metric: "missing_clock_out", window_days: 1, threshold: 1 })).toEqual([]);
     expect(ruleIssues({ ...ageing, window_days: 30 })).toEqual(["window_days: Not for this metric"]);
     expect(ruleIssues(ageing)).toEqual([]);
+    expect(alerts.HomeAlertRuleCreate.safeParse(rule({ metric: "late_arrivals", window_days: 30 })).success).toBe(false);
+    expect(alerts.HomeAlertRuleCreate.safeParse(rule({ metric: alerts.HOME_ALERT_POLICY_METRIC })).success).toBe(false);
   });
 
   test("a deadline is whole days before the date", () => {
@@ -178,7 +177,7 @@ describe("alerts", () => {
   test("a rule change names a field, and keeps the metric", () => {
     expect(issues(alerts.HomeAlertRuleUpdate.safeParse({}))).toEqual([": Change at least one field"]);
     expect(alerts.HomeAlertRuleUpdate.safeParse({ enabled: false }).success).toBe(true);
-    expect(alerts.HomeAlertRuleUpdate.safeParse({ metric: "late_arrivals" }).success).toBe(false);
+    expect(alerts.HomeAlertRuleUpdate.safeParse({ metric: "approval_ageing" }).success).toBe(false);
   });
 
   test("an alert is cleared unless dismissed, and View Dismissed is a state of the list", () => {

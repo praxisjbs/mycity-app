@@ -94,11 +94,14 @@ describe("the register's statuses in Home's words", () => {
     expect(roster.statusOf(fact({ day_status: "present", working_day: false }))).toBe("on_site");
   });
 
-  test("present is remote only for someone who works remotely; hybrid and on site are on site", () => {
-    expect(roster.statusOf(fact({ day_status: "present", work_pattern: "remote" }))).toBe("remote");
+  test("present is remote on a Remote day of the person's week (their schedule, else a remote pattern), else on site", () => {
+    // remote_day is the SQL's: a Remote day of the schedule in force, or with none working that day a
+    // remote pattern (repo.PLACE_REMOTE), or an approved remote day.
+    expect(roster.statusOf(fact({ day_status: "present", work_pattern: "remote", remote_day: true }))).toBe("remote");
+    expect(roster.statusOf(fact({ day_status: "present", work_pattern: "on_site", remote_day: true }))).toBe("remote");
+    expect(roster.statusOf(fact({ day_status: "present", work_pattern: "remote", remote_day: false }))).toBe("on_site");
     expect(roster.statusOf(fact({ day_status: "present", work_pattern: "hybrid" }))).toBe("on_site");
-    expect(roster.statusOf(fact({ day_status: "present", work_pattern: "on_site" }))).toBe("on_site");
-    expect(roster.statusOf(fact({ day_status: "late", work_pattern: "remote" }))).toBe("late");
+    expect(roster.statusOf(fact({ day_status: "late", work_pattern: "remote", remote_day: true }))).toBe("late");
   });
 
   test("present on a field assignment's day is field, whatever the work pattern; late stays late", () => {
@@ -124,11 +127,11 @@ describe("the register's statuses in Home's words", () => {
 describe("a day as the attendance module records it", () => {
   const read = (projection, patch = {}) => roster.statusOf(fact({ day_status: projection.status, ...patch }));
 
-  test("grace is the module's: inside it is on time, after it late by the minutes past it", () => {
+  test("grace is the module's: inside it is on time, after it late from the start (T2)", () => {
     expect(read(recorded(FRIDAY, [at(FRIDAY, "09:05")], { grace: 5 }))).toBe("on_site");
     const late = recorded(FRIDAY, [at(FRIDAY, "09:07")], { grace: 5 });
     expect(read(late)).toBe("late");
-    expect(late.late_minutes).toBe(2);
+    expect(late.late_minutes).toBe(7);
   });
 
   test("lateness is in whole minutes of the workplace's clock: 09:00:59 is on time", () => {

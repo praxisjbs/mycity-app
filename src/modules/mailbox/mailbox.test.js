@@ -7,7 +7,7 @@ const {
   normaliseReferences,
   snippetOf,
 } = require("./threading");
-const { mapSmtpError, mapImapError, retryPlan } = require("./smtp-errors");
+const { mapSmtpError, mapImapError, retryPlan } = require("../../services/mail/smtp-errors");
 const { cleanHtml, textToHtml } = require("./visible");
 const { outgoingHtml, textOf } = require("./compose");
 const { settingsFor } = require("./autodiscover");

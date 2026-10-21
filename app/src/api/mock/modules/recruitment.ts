@@ -1,7 +1,8 @@
 import type { Assessment, Candidate, CandidateDetail, InterviewDetail, OfferRow, OnboardingDetail, PoolRow, Stage, Vacancy } from "@/api/types/recruitment";
-import type { Status } from "@/api/types/shared";
+import type { Status } from "@/api/types/performance";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid } from "../core";
 import { byId, refKey } from "../data/people";
+import { placeOf } from "./maps";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -52,17 +53,19 @@ route("GET /api/v1/recruitment/vacancies/summary", () =>
 );
 route("GET /api/v1/recruitment/vacancies", (req) => paged(VAC, req, { search: (v) => [v.title, v.department, v.location], filters: { status: (v, s) => (s === "paused" ? v.paused : !v.paused) } }));
 route("POST /api/v1/recruitment/vacancies", (req) => {
-  const b = req.body as Record<string, string | number>;
+  const { location, ...b } = req.body as Record<string, string | number> & { location?: unknown };
+  // Picked at level area (F27): never typed.
+  const place = placeOf(location);
   const f: Record<string, string[]> = {};
   if (!b.title || String(b.title).trim().length < 3) f.title = ["Name the role"];
   if (!b.department) f.department = ["Pick the department"];
   if (!(Number(b.openings) >= 1)) f.openings = ["At least one opening"];
-  if (!b.location) f.location = ["Where is the role based"];
+  if (!place) f.location = ["Pick a location"];
   if (!b.closes_on) f.closes_on = ["Pick the closing date"];
   if (!b.description || String(b.description).trim().length < 40) f.description = ["Describe the role (40 characters or more)"];
   if (Object.keys(f).length) return invalid(f);
   const arr = { on_site: "On Site", hybrid: "Hybrid", remote: "Remote" }[String(b.arrangement)] ?? "Hybrid";
-  const v: Vacancy = { vacancy_id: sid(`vac:new:${VAC.length}`), title: String(b.title).trim(), department: String(b.department), openings: Number(b.openings), location: `${b.location} · ${arr}`, applicants: 0, published_on: isoDaysAgo(0), paused: false, status: S("ok", "Open"), days_open: 0, stage_note: "Published today", next_step: "Applications open on the careers page", public_url: `go.mycityapp.io/jobs/${slug(String(b.title))}` };
+  const v: Vacancy = { vacancy_id: sid(`vac:new:${VAC.length}`), title: String(b.title).trim(), department: String(b.department), openings: Number(b.openings), location: `${place!.line} · ${arr}`, applicants: 0, published_on: isoDaysAgo(0), paused: false, status: S("ok", "Open"), days_open: 0, stage_note: "Published today", next_step: "Applications open on the careers page", public_url: `go.mycityapp.io/jobs/${slug(String(b.title))}` };
   VAC.unshift(v);
   return created(v);
 });

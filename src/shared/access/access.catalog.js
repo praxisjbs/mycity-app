@@ -109,13 +109,31 @@ const MODULE_CATALOG = [
     key: "praxis_ai",
     area: "system",
     label: "Praxis AI",
-    description: "The assistant, and AI controls",
+    description: "The assistant",
+  },
+  {
+    key: "ai_control",
+    area: "system",
+    label: "AI Control",
+    description: "Which model answers each AI feature, model prices, and the monthly spend and caps",
   },
   {
     key: "settings",
     area: "system",
     label: "Settings",
     description: "Organisation, users, roles, approvals and system settings",
+  },
+  {
+    key: "system_health",
+    area: "system",
+    label: "System Health",
+    description: "Readiness checks, performance over time, and the faults the code reports",
+  },
+  {
+    key: "integrations",
+    area: "system",
+    label: "Integrations",
+    description: "Mail, maps, AI and push settings, their keys kept encrypted, tested and watched",
   },
 ];
 
@@ -211,39 +229,16 @@ const CAPABILITY_CATALOG = [
     description: "Post to the announcements channel and track who has read a post.",
   },
   {
+    code: "policies.manage",
+    module: "knowledge",
+    label: "Manage Policies",
+    description: "Write, publish, withdraw and archive company policies, and see who has acknowledged them.",
+  },
+  {
     code: "mailbox.signature",
     module: "mailbox",
     label: "Configure Signature",
     description: "Set the company's signature links and what shows on everyone's email signature.",
-  },  {
-    code: "goals.organisation",
-    module: "performance",
-    label: "Set Organisational Goals",
-    description: "Record and activate the organisation's goals.",
-  },
-  {
-    code: "goals.company",
-    module: "performance",
-    label: "Set Company Goals",
-    description: "Set annual and monthly goals under the organisational goals.",
-  },
-  {
-    code: "goals.department",
-    module: "performance",
-    label: "Set Department Targets",
-    description: "Set a department's monthly targets and submit its month.",
-  },
-  {
-    code: "kpis.assign",
-    module: "performance",
-    label: "Assign KPIs",
-    description: "Set the monthly KPIs and weights of the people in scope.",
-  },
-  {
-    code: "reviews.cycles",
-    module: "performance",
-    label: "Run Review Cycles",
-    description: "Open and close review cycles and edit their questions.",
   },
 ];
 

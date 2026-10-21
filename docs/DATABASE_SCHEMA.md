@@ -13,7 +13,7 @@ files.
 | `docs/MIGRATIONS.md` | How a migration or reference seed is written and checked |
 | `migrations/`, `seeds/reference/` | The schema itself. Where this file and the SQL disagree, the SQL is the fact and this file is fixed |
 
-Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, hybrid staff's weekly schedule, `1340`, a client visit's site, `1350`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, email signatures, `1127` and `1129`, web push, `0460`, and the effective manager through a vacant seat, `1160`): 76 files, 164 tables and 6 views. Gate 6
+Status as of 19/10/2026 (`main` with attendance's clock, `1300` and `1390`, remote staff's approved homes, `1310` and `1391`, work location requests, `1320` and `1392`, field assignments, `1330` and `1393`, hybrid staff's weekly schedule, `1340`, a client visit's site, `1350`, the clock watch, `1360` and `1394`, Home's foundation, `1150` and `1199`, Home's alerts, `1151`, the mailbox's image trust, `1125`, email signatures, `1127` and `1129`, web push, `0460`, notice urgency, `0470` and `1145`, Settings · Notifications and the reminder engine, `0480`, and the effective manager through a vacant seat, `1160`): 84 files, 171 tables and 6 views. Gate 6
 (`check/schema-drift.js`, `check/contract-columns.js`) checks the code and the contract against
 the same reading of the migrations on every PR.
 
@@ -66,10 +66,10 @@ erDiagram
 | Approvals | `workflow_definition`, `workflow_instance`, `workflow_decision` | `shared/workflow` | `workflow_instance_id` on the record waiting for approval; definitions seeded only if they pass `validateDefinition()` |
 | Files | `document`, `document_variant`, `template`, `template_version`, `document_request` | `shared/documents/vault`; the documents service for `document.verified_at` and `document_request` | `document_id uuid REFERENCES document`; never a path or a URL. A document People asked for and have not been given is a `document_request`, not a `document` (`docs/guides/foundation.md` §6.9) |
 | Numbers | `numbering_scheme`, `numbering_counter` | `numbering.allocate()` | `number citext NOT NULL UNIQUE` (or the contract's name for it, `staff_number`) and a scheme in `schemes.js` |
-| Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
+| Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `notification_rule`, `notification_rule_recipient`, `notification_reminder_rule`, `notification_setting`, `reminder`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
-| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
+| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model`, `ai_chain`, `ai_provider_cap`, `ai_price_proposal`, `ai_price_run` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
 
 Every core table above was checked against the shared code that writes it by running
 `tests/integration` on the real migrations (#26, #27): the code and the schema agree, and CI keeps
@@ -109,7 +109,18 @@ given to someone else; `docs/guides/foundation.md` §11) · `0460` web push (bro
 TB, 19/10/2026; `docs/guides/notifications.md` §4): `push_subscription` as a device (its
 `known_device`, label and platform, the hash of its device token, the key id it was made under, its
 health and why it stopped) and `push_delivery`, one row per notice and device, so a retried push is
-never sent twice · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
+never sent twice · `0470` notice urgency (TB, 19/10/2026; `docs/guides/notifications.md` §4, §6):
+`notification.urgency`, `acknowledge_required` and `acknowledged_at`, the urgent repeats' pace
+(`repeat_count`, `last_alert_at`, `repeat_day`, `repeats_on_day`) and `push_delivery.round`
+· `0480` Settings · Notifications and the reminder engine (brought forward from M6 by TB,
+19/10/2026; `docs/guides/notifications.md` §4, §7.1): `notification_rule` and
+`notification_rule_recipient` (the company's rule per notice and its copies),
+`notification_reminder_rule` (approvals, probation, digest), `notification_setting` (a person's
+quiet hours and digest) and `reminder` (one row per occurrence of a declared reminder)
+· `0490` `place` (TB, 20/10/2026; `docs/guides/addresses.md` §4): every address a person enters, one
+row per address field of a record (`owner`, `owner_key`), picked, pinned, the device's location or
+typed before the rule, with its line, details, point, kind and whether it waits to be named;
+backfilled from every address already saved, as typed and unverified · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
 People over 5 days; §6.5).
 
 **Owes:**
@@ -146,7 +157,12 @@ their Show Mobile and WhatsApp switches; the mobile stays `employee.phone`) and
 shows, one row at most); the baked signature rides in `mail_send_queue.payload` and its pictures
 are vault documents (`mail_signature_image`) · `1129` reference data: the `mailbox.signature`
 capability for System Administrator and Implementation · `1130` an announcement can be `cancelled` · `1140` each
-member's own pin (`community_member.pinned_at`) · `1150` Home: a rule's name and who made and
+member's own pin (`community_member.pinned_at`) · `1145` an announcement's level
+(`announcement.urgency`) and who acknowledged an urgent one (`announcement_read.acknowledged_at`;
+TB, 19/10/2026) · `1147` community media and links: `community_link_preview` (a link's card, one
+per address: the site, title, description and the picture as a vault document, ready, empty or
+failed, and when it was fetched), `community_message.community_link_preview_id` (the card a text
+carries), and `document.page_count` (a PDF's pages, counted by the worker) · `1150` Home: a rule's name and who made and
 changed it; `home_alert.subject_employee_id` (the employee an alert is about, which scopes the
 Alerts list); a report's `archived_at`; a schedule's start day, run time, formats (PDF, XLSX) and
 recipients as users, one schedule per report; `home_report_run` (one numbered file per recipient and
@@ -164,7 +180,7 @@ capabilities `home.team`, `home.reports` and `alerts.manage` with their role gra
 (`RPT-0001`), and `1099`'s three alert thresholds removed (A26, §5) · `1200` leave requests as the
 leave module writes them (the four statuses checked, `recorded_by`, `cancelled_at`, the list
 indexes) · `1170` `employee.photo_document_id`, the photo an employee uses (a vault document;
-cleared if it is deleted) · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
+cleared if it is deleted) · `1128` one waiting send per draft (`mail_send_queue_one_per_draft_uq`; doubles and the sends of discarded drafts cancelled) · `1180` `employee.birth_day` and `birth_month`, a birthday known only as a day and month (both or neither, a real day of that month), read by the celebrations when `date_of_birth` is empty · `1190` `document.waveform`, a voice note's loudness in at most 64 bars of 0 to 100, measured by the worker · `1195` `community_message.pinned_until`, `pinned_at`, `pinned_by`, a message pinned for everyone until a time (at most 3 a conversation, kept by the service) · `1290` the leave status code list (Cancelled added, Draft switched off) and the four
 leave types · `1300` attendance as the clock writes it: the policy's `geofence_mode`,
 `device_mode` and `max_accuracy_m`; `attendance_device` (a person's clock-in devices on
 `known_device`, observed, registered or removed); the event's `work_date`, `device_at`, device,
@@ -187,23 +203,82 @@ it, a person taken off keeping their row) · `1393` the `field_assignment` numbe
 weekdays, from a first day, one row per person per first day; the latest started by a date is in
 force; the other working days are home days) · `1350` a client visit's site on
 `attendance_location_request` (`site_latitude`, `site_longitude`, `site_radius_m` 100 to 500 m, all
-three or none, client visits only).
+three or none, client visits only) · `1360` the clock watch: `attendance_clock_reminder` (one row
+per reminder to clock in sent, unique per person, day and kind), the `automatic_clock_out` exception
+type, and 1300's one-active index split in two: one active event of each type a day among the
+person's and People's punches, and one automatic clock-out (`source = 'system'`) a day beside it,
+so People's correction of its time is written next to it · `1394` Automatic Clock-Out in the code
+list · `1380` a punch People reject frees its slot (attendance.md §6.2, PR 2): `attendance_event.slot`
+(how many punches of its type that day a decision had already excluded when it was written; 0 for
+the first, written once) and `1360`'s one-active index for the person's and People's punches made one
+a slot · `1397` the `location_unverified` label renamed Location Unclear (unless someone changed it) ·
+`1370` the attendance policy's versions: on `attendance_policy` its `status` (draft,
+published, withdrawn; at most one draft), `version` (never used twice), `effective_from`, `note`,
+who published or withdrew it and why, who saved it, and the location check per place
+(`office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode`, taking a row's one
+`geofence_mode`); `attendance_policy_acknowledgement` (one row per person and version: reminded,
+acknowledged) · `1395` `1099`'s Standard policy removed while it is as seeded and nothing was judged
+by it (A26, §5) · `1420` a person's own work schedule: `attendance_work_schedule` (the seven ISO
+weekdays, each Working or Off with its hours, blank for the company hours, and Office or Remote, from
+a first day; one row per person per first day), `1340`'s rows copied in with blank hours; `1340`'s
+table frozen · `1425` a day judged once: on `attendance_day` its `early_minutes` and what judged it
+(`policy_version_id`, `attendance_work_schedule_id`, `shift_working`, `shift_starts_at`,
+`shift_ends_at`, `judged_at`) · `1430` `attendance_rule_breach` (one row per breach of the Attendance
+policy's five consequence rules, unique on the person, the rule and its last counted day; the Home
+alert it raised; `employee_query_id` for M3, no key yet) · `1435` `attendance_pay_item` (one pending
+deduction or overtime per person, day and kind, its amount `numeric(18,2)` masked as the salary is;
+`payroll_run_id` for M6, no key yet) and `attendance_overtime_approval` (overtime approved for a day
+beforehand, one per person and day) · `1440` reminders to clock out: `attendance_clock_reminder`'s
+`kind` widened to `clock_out_due`, a `slot` and `due_at`, unique per person, day, kind and slot ·
+`1445` Home's `late_arrivals` and `missing_clock_out` rules switched off and their open alerts
+dismissed as the rule change, with a check that keeps them off (the Attendance policy raises
+attendance's alerts, `docs/guides/home.md` §6) · `1450` temporary sites (attendance.md §6.11, PR 4): `attendance_temporary_site`
+(numbered `TS-0001`, a purpose of seventeen, a name, a description, one to 90 days, its status and
+approval, who submitted, approved or cancelled it and why), `attendance_temporary_site_location` (one
+to eight picked addresses, each its `place`, point, radius of 150 to 500 m and time zone) and
+`attendance_temporary_site_member` (one to 25 people, taken off with a reason) · `1455`
+`workflow_instance.excluded_employee_ids` (the people an approval excludes from deciding it:
+everyone on a temporary site) · `1460` `attendance_check_in` (one row per check-in at a stop,
+append-only: its point, accuracy, matched address, distance, verdict, evidence and policy version,
+unique per person and Idempotency-Key), `attendance_exception.attendance_check_in_id` (a flag a
+check-in opened), and `1300`'s day index narrowed to exceptions of neither a punch nor a check-in ·
+`1470` the `temporary_site` numbering scheme and version 1 of the `attendance.temporary_site`
+approval (Operations & People, 48 hours) · `1475` a temporary site's hours: `hours` (`usual`, `site`),
+`starts_at` and `ends_at` on `attendance_temporary_site`, both for Site Hours with the end after the
+start, neither for the Usual Shift.
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
-other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026).
+other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026). The
+attendance redesign of 20/10/2026 takes four ranges, one per PR (attendance.md §1.2): `1380` to
+`1389` clock fixes; `1400` to `1419` policies, brought forward from M10 (`policies`,
+`policy_version`, `policy_signature`, `policy_acknowledgement` in `1400`; the Attendance policy's
+versions and acknowledgements moved into them, keeping their ids, and
+`attendance_event.policy_version_id`, in `1405`; the `policy` numbering scheme, the
+`policy.approval` workflow and the `policies.manage` capability in `1396`); `1420` to `1449` rules
+and schedules (`attendance_work_schedule`, `attendance_rule_breach`, `attendance_pay_item`,
+`attendance_overtime_approval`); `1450` to `1479` places (`attendance_temporary_site` with its
+locations and members, `attendance_check_in`, the `temporary_site` numbering scheme and the
+`attendance.temporary_site` workflow). `attendance_policy` and `attendance_policy_acknowledgement`
+are read by nothing after `1405` and are dropped by a later release (MIGRATIONS §8); policies do not
+use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
-- Attendance (attendance.md §4, §13): policy versions and acknowledgements (#89), a unique key
-  for the auto-query
-  upsert, the lateness deduction amount; dropping the superseded booleans `require_geofence` and
-  `require_known_device` (MIGRATIONS §8).
+- Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
+  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
+  `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
+  their tables exist; dropping `attendance_location_request` and the field assignment tables once no
+  request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
+  (MIGRATIONS §8); dropping
+  `attendance_policy`, `attendance_policy_acknowledgement` and `employee_attendance_policy` once
+  nothing reads them; dropping the superseded booleans `require_geofence` and `require_known_device`
+  and `1300`'s one `geofence_mode`, superseded by the place modes of `1370` (MIGRATIONS §8).
 - Attendance, for Home (LA): the shared roster (`src/modules/attendance/attendance.roster.js`)
   reads `attendance_day` as `1300`'s code writes it (the punch, People's decisions, the day-close)
   and a day with no record by the register's rules, through `1300`'s and `1200`'s indexes; it needs
   no index of its own, so `1150` no longer adds `attendance_event (occurred_at)`. Its statuses are
   the register's (`present`, `late`, `absent`, `leave`, checked by `1300`) in Home's words, with
   `present` split into on site, remote (by `employee.work_pattern`, an approved remote day or a
-  hybrid home day by `attendance_schedule`, `1340`) and
+  Remote day of the person's work schedule, `attendance_work_schedule`, `1420`) and
   field (a field assignment covering the day, `1330`). When the register's statuses change, the
   roster's mapping changes in the same PR (`tests/integration/attendance-roster.test.js` holds the
   two together).
@@ -226,14 +301,13 @@ performance cycles, reviews and review items · `2010` a task's number, setter (
 cadence, KPI (`employee_target_id`), record pointer (`entity_type`, `entity_id`), the cancelled
 status, blockers and `task_activity`; calendar visibility, record pointer, called-off events and
 `calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2090` the
-`task` numbering scheme and the cancelled status · `2020` the goal cascade (A16): levels
-organisational, annual, monthly, departmental, `code`, theme, success measure, baseline,
-`organisational_goal_quarter`, `performance_plan`, and the KPI's month, unit, direction, progress
-source, setter and plan on `employee_target` · `2030` reviews: cycle statuses and questions, the
-review's workflow, PDF and statuses, `performance_review_answer` with dictation (A18) · `2091` goal
-numbering, statuses, `performance.goal` and `performance.review`, five capabilities · `2099` seed.
+`task` numbering scheme and the cancelled status · `2099` seed.
 
 **Owes:**
+- Goals cascade as A16 sets it (organisational, annual, monthly, departmental, individual KPI),
+  with code, strategic theme, success measure, baseline and the CEO's final approval.
+- Reviews: the second-level and HR stages and their workflow; dictation transcript, cleaned text
+  and `ai_run_id` (A18).
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,
@@ -305,12 +379,13 @@ cases and checklist items, employment contracts, talent pool · `5099` seed.
 ### M6 Payroll & Notifications · 6000 to 6999 · LA
 
 **Built:** nothing in the block. Notifications are M0 (`0060`), web push and each person's
-preferences too (`0460`, brought forward by TB on 19/10/2026).
+preferences too (`0460`), and Settings · Notifications with the reminder settings (`0480`), all
+brought forward by TB on 19/10/2026.
 
 **Owes, all of payroll** (MILESTONES §11, in scope): payroll runs, payslips, salary structures
 and pay components, deductions (pending, accepted, in a run, including M3 fines and lateness),
-statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, the payroll approval workflow,
-and reminder settings. The `payroll_run` and `payslip` numbering schemes are already seeded.
+statutory items (PAYE, pension, NHF, ITF, NSITF) effective-dated, and the payroll approval
+workflow (reminder settings are `0480`). The `payroll_run` and `payslip` numbering schemes are already seeded.
 The earlier note that payroll was "deliberately not modelled" was not a decision and is withdrawn.
 
 **Read by Home** (home.md §4.1): nothing yet. Payroll In Progress is a hidden card with no query and
@@ -388,7 +463,26 @@ and lines, disbursements · `8099` seed.
 
 **Built:** `9000` security events, access reviews and items, integrations, webhooks · `9090`
 reporting views · `9095` `updated_at` triggers (a one-time sweep of the tables that existed then;
-later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed.
+later tables create their own, `docs/MIGRATIONS.md` §6) · `9099` seed · `9100` System Health
+(`error_group`, `error_group_note`, `health_snapshot`) · `9110` its engine (`schedule_run`,
+`request_stat`, resource columns on `health_snapshot`) · `9120` Settings · Performance
+(`perf_sample`, `route_stat`, `process_beat`, `performance_target`, latency buckets on
+`request_stat`, run times on `schedule_run`, `perf_percentile()`; `docs/guides/system-health.md`
+§4) · `9190` seed (the `system_health` grants) · `9200` Settings · Integrations, brought forward by TB on
+20/10/2026 (`docs/guides/integrations.md` §4): `integration_connection` gains the saved settings'
+time and author, a daily limit and its state, `integration_secret` a hint and who set it, and two
+new tables, `integration_check` (each test, 90 days) and `integration_usage` (calls a day per kind,
+30 days) · `9290` seed: the `integrations` grant for the Implementation Team and the System
+Administrator · `9210` AI providers on Settings · Integrations (TB, 20/10/2026;
+`docs/guides/integrations.md` §1.2, §4): `integration_connection.plan` (Free or Paid), the wider kinds
+of `integration_check` (`sync`) and `integration_usage` (`transcribe`, `rates`), and the new `ai_model`
+(each AI connection's model list: what each model does, whether the key can use it, its list price)
+· `9220` `exchange_rate` (every currency against the dollar, a table a day, read through
+`shared/money/fx.js`) · `9230` system mail paused and refused addresses (TB, 21/10/2026;
+`docs/guides/integrations.md` §6.15, §6.16): `integration_connection.paused_at` and `paused_by` (the
+System Sender's pause), and the new `mail_refusal` (one row per address the mail server refused for
+good, counted, deleted when mail to it is accepted or after 30 days) · `9291` seed: the starting model
+lists (ids, capabilities and known prices only).
 
 **Owes:** nothing from this list since 17/10/2026: two-step required per role and editing roles and
 their grants on screen came forward to M0 with foundation track C (`0400`, `0449`;
@@ -397,7 +491,17 @@ their grants on screen came forward to M0 with foundation track C (`0400`, `0449
 ### M10 Staff Knowledge Hub & AI Assistance · 10000 to 10999 · TB
 
 **Built:** `10000` knowledge categories, articles, versions, embeddings, AI conversations,
-messages, citations · `10099` seed.
+messages, citations · `10099` seed · `10200` AI Control, brought forward (`docs/guides/ai-control.md`
+§4): `ai_chain` (each job's and action's chain, a row per model), `ai_provider_cap` (a paid provider's
+monthly cap), `ai_price_proposal` (Find Prices' proposals, one open per model), `ai_model`'s price of a
+thousand searches, and on `ai_run_step` the audio seconds, searches, naira prices and rate a step was
+charged at, with kind `search` · `10210` Find Prices in batches (`docs/guides/ai-control.md` §4,
+decisions 29 to 31): `ai_price_run` (one per Find Prices press: its progress, counts, outcome and the
+job's claim), `ai_model.price_not_listed_at` (asked again after 7 days), and the provider-listed
+`ai_model` rows decision 29 leaves off (`-latest` aliases, Gemma, repeated snapshots no chain uses)
+deleted · `10220` the voice notes kept under the purpose `transcription` before the action registry
+moved onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` so the DOWN puts
+it back (`docs/guides/ai-control.md` §4, §6.5) · `10290` seed: the `ai_control` grants.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).
@@ -437,7 +541,10 @@ Security's two-step and PIN, which M1 owed until then.
    Standard attendance policy, alert thresholds, knowledge categories) move out of the seeds under
    A26, each when its milestone builds the screen that manages it. The alert thresholds moved out on
    17/10/2026: `1199` removes each of `1099`'s three rules while it is as seeded and no alert points
-   at it, and MyCity enters its own on Home, Alerts.
+   at it, and MyCity enters its own on Home, Alerts. The Standard attendance policy moved out on
+   19/10/2026: `1395` removes it while it is as seeded and no punch was judged by it, and MyCity
+   publishes its own Attendance policy on Knowledge Hub · Policies (policies.md, attendance.md
+   §6.15; Settings · Attendance Policy was retired on 20/10/2026).
 
 ## 6 · Changing this document
 

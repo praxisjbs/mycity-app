@@ -35,6 +35,9 @@
  *      (the build account reports to the CTO), only while that person has none.
  *   8. Moves the staff-number counter past every number the sheet brought, so the next
  *      person added on screen is not given one that is taken.
+ *   9. Records a birthday the sheet gives as a day and month with no year (the DOB the
+ *      importer drops in step 4) for each person with no date of birth and no birthday
+ *      yet, so the celebrations can post it. This runs on every deploy, loaded sheet or not.
  *
  * It is safe to run again: every step looks before it writes, and an edit made on screen
  * is never written over.
@@ -279,6 +282,62 @@ async function applyLines({ pool, atomically, log, roles }) {
   return out;
 }
 
+/** A cell holding a day and month with no year ("03/07", "3-7"), day first; null otherwise. */
+function dayMonth(cell) {
+  if (cell === null || cell === undefined || cell instanceof Date) return null;
+  const m = /^(\d{1,2})\s*[/.\-\s]\s*(\d{1,2})$/.exec(String(cell).trim());
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const last = month === 2 ? 29 : [4, 6, 9, 11].includes(month) ? 30 : 31;
+  return month >= 1 && month <= 12 && day >= 1 && day <= last ? { day, month } : null;
+}
+
+/**
+ * Birthdays the sheet gives as a day and month with no year, which the importer cannot
+ * read as a date of birth. Each is matched to its person by work email, else staff
+ * number, and written only for a person with no date of birth and no birthday yet, so
+ * nothing entered on screen is written over. Runs on every deploy, as the sheet may have
+ * been loaded before this step existed. Logs counts only: a birthday is personal.
+ *
+ * @returns {Promise<{set: number, unmatched: number}>}
+ */
+async function applyBirthdays({ pool, atomically, book }) {
+  const organisation = require(path.join(ROOT, "src/modules/organisation/organisation.service.js"));
+  const out = { set: 0, unmatched: 0 };
+  const grid = (book && book.sheets && book.sheets[0] && book.sheets[0].rows) || [];
+  const fold = (v) => String(v ?? "").trim().toLowerCase().replace(/[^a-z]/g, "");
+  const headerRow = grid.findIndex((r) => (r || []).some((c) => ["dob", "dateofbirth", "birthday"].includes(fold(c))));
+  if (headerRow < 0) return out;
+  const header = grid[headerRow].map(fold);
+  const col = (...names) => header.findIndex((h) => names.includes(h));
+  const dob = col("dob", "dateofbirth", "birthday");
+  const email = col("email", "workemail");
+  const staff = col("staffid", "staffnumber", "staffno");
+  for (const row of grid.slice(headerRow + 1)) {
+    const when = dayMonth((row || [])[dob]);
+    if (!when) continue;
+    const mail = email >= 0 ? String(row[email] ?? "").trim().toLowerCase() : "";
+    const number = staff >= 0 ? String(row[staff] ?? "").trim() : "";
+    const { rows } = await pool.query(
+      `SELECT employee_id, date_of_birth, birth_day FROM employee
+        WHERE ($1 <> '' AND lower(work_email::text) = $1) OR ($2 <> '' AND staff_number = $2)
+        ORDER BY (lower(work_email::text) = $1) DESC
+        LIMIT 1`,
+      [mail, number],
+    );
+    const person = rows[0];
+    if (!person) {
+      out.unmatched += 1;
+      continue;
+    }
+    if (person.date_of_birth || person.birth_day !== null) continue;
+    await withTx(pool, atomically, (client) => organisation.setBirthday(client, person.employee_id, when, SYSTEM));
+    out.set += 1;
+  }
+  return out;
+}
+
 /**
  * Load the roster.
  * @param {{db: import("pg").Pool, log?: Function, dryRun?: boolean, sheet?: string, rolesFile?: string}} opts
@@ -308,8 +367,10 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
     log(`this sheet is already loaded (batch ${loaded.number}); checking logins and lines only`);
     const logins = await applyRoles({ pool: db, atomically, log, roles });
     const lines = await applyLines({ pool: db, atomically, log, roles });
+    const birthdays = await applyBirthdays({ pool: db, atomically, book: await readSheets({ buffer, filename: path.basename(sheet) }) });
+    log(`birthdays by day and month: ${birthdays.set} recorded, ${birthdays.unmatched} matched nobody`);
     await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
-    return { status: "already_loaded", batch: loaded.import_batch_id, logins, lines };
+    return { status: "already_loaded", batch: loaded.import_batch_id, logins, lines, birthdays };
   }
 
   /* The sheet is read here as well as by the engine, for the emails it names. */
@@ -375,10 +436,12 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
         numbers the sheet brought. */
   const logins = await applyRoles({ pool: db, atomically, log, roles });
   const lines = await applyLines({ pool: db, atomically, log, roles });
+  const birthdays = await applyBirthdays({ pool: db, atomically, book });
+  log(`birthdays by day and month: ${birthdays.set} recorded, ${birthdays.unmatched} matched nobody`);
   const highest = await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
   log(`staff numbers continue after ${highest}`);
   log(`logins: ${logins.created} invited, ${logins.kept} already had one, ${logins.failed} failed`);
-  return { status: "loaded", batch: batch.import_batch_id, stats: committed.stats, logins, lines, dropped };
+  return { status: "loaded", batch: batch.import_batch_id, stats: committed.stats, logins, lines, birthdays, dropped };
 }
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -457,6 +520,8 @@ module.exports = {
   mappingFor,
   alreadyLoaded,
   applyRoles,
+  dayMonth,
+  applyBirthdays,
   applyLines,
   loadStaff,
   logProblems,

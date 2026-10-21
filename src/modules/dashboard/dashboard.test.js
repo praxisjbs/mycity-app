@@ -767,7 +767,7 @@ describe("the card picker", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * The Overview's routes, controller, layout, activity and prompt
+ * The Overview's routes, controller, layout and activity
  * ------------------------------------------------------------------ */
 
 describe("the routes", () => {
@@ -780,6 +780,7 @@ describe("the routes", () => {
     expect(routes.map((r) => `${r.method} ${r.path}`)).toEqual([
       "GET /overview",
       "POST /overview/export",
+      "GET /overview/export/:id",
       "GET /kpi-picker",
       "PUT /kpi-picks",
       "DELETE /kpi-picks",
@@ -798,6 +799,12 @@ describe("the routes", () => {
       body: c.reports.HomeReportRunNow,
       response: c.reports.HomeReportRun,
     });
+    // The screen that pressed Export waits on its own run here, with no `home.reports` to ask Reports.
+    expect(find("GET", "/overview/export/:id").contract).toMatchObject({
+      params: c.common.IdParams,
+      response: c.reports.HomeReportRun,
+    });
+    expect(find("GET", "/overview/export/:id").capability).toBeNull();
     expect(find("GET", "/team/summary").contract.response).toBe(dashboard.HomeTeamSummary);
     expect(find("GET", "/team").contract).toMatchObject({ query: dashboard.HomeTeamQuery, response: dashboard.HomeTeamPage });
     expect(find("GET", "/team/attendance").contract).toMatchObject({
@@ -914,6 +921,8 @@ describe("the sections of each Home view", () => {
   const layout = require("./dashboard.layout");
   const workingWeek = require("../../shared/time/working-week");
   const roster = require("../attendance/attendance.roster");
+  const schedules = require("../attendance/attendance.schedule");
+  const rules = require("../attendance/attendance.rules");
   const leaveService = require("../leave/leave.service");
   const cal = workingWeek.makeCalendar({
     days: [1, 2, 3, 4, 5, 6],
@@ -922,6 +931,13 @@ describe("the sections of each Home view", () => {
   });
   const all = { scope: "all", scope_ids: null, employee_id: ID };
   const user = { user_id: ID, employee_id: ID, role_ids: [], is_ceo: false };
+  /** The reader's own shift on each day, as attendance.schedule.js dayOn gives it (the company hours here). */
+  const ownWeek = (schedule = null) =>
+    jest
+      .spyOn(schedules, "dayOn")
+      .mockImplementation(async (_db, _id, date, opts = {}) =>
+        rules.shiftFor(date, (opts && opts.calendar) || cal, rules.DEFAULT_POLICY, { schedule }),
+      );
 
   test("every Home view is laid out, and nothing else", () => {
     expect(Object.keys(layout.VIEWS).sort()).toEqual([...c.identity.HomeView.options].sort());
@@ -958,6 +974,7 @@ describe("the sections of each Home view", () => {
 
   test("a section whose module the reader cannot view is null; Your Week is on every Overview", async () => {
     jest.spyOn(workingWeek, "loadCalendar").mockResolvedValue(cal);
+    ownWeek();
     jest.spyOn(leaveService, "listFor").mockResolvedValue({ data: [] });
     const summary = jest.spyOn(roster, "summary");
     const sections = await layout.sectionsFor({ query: jest.fn() }, {
@@ -991,6 +1008,7 @@ describe("the sections of each Home view", () => {
       data: [meeting(lagos.dateOf(span.from))],
     }));
     const due = jest.spyOn(tasks, "dueBetween").mockResolvedValue({ data: [] });
+    ownWeek();
     const sections = await layout.sectionsFor({ query: jest.fn() }, {
       user,
       view: "staff",
@@ -1012,6 +1030,7 @@ describe("the sections of each Home view", () => {
     jest.spyOn(workingWeek, "loadCalendar").mockResolvedValue(cal);
     jest.spyOn(leaveService, "listFor").mockResolvedValue({ data: [] });
     jest.spyOn(roster, "summary").mockRejectedValue(new Error("connection reset"));
+    ownWeek();
     const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
     const sections = await layout.sectionsFor({ query: jest.fn() }, {
       user,
@@ -1022,6 +1041,51 @@ describe("the sections of each Home view", () => {
     expect(sections).toMatchObject({ clocked_in: null, chart: null, donut: null });
     expect(sections.week).toHaveLength(6);
     expect(warn).toHaveBeenCalledWith(expect.objectContaining({ part: "attendance" }), expect.any(String));
+  });
+
+  test("Your Week is the reader's own schedule: their working days and hours, a holiday they would work named", async () => {
+    jest.spyOn(workingWeek, "loadCalendar").mockResolvedValue(
+      workingWeek.makeCalendar({ days: [1, 2, 3, 4, 5, 6], holidays: [{ holiday_date: "2026-10-14", name: "Test Day" }], hours: {} }),
+    );
+    jest.spyOn(leaveService, "listFor").mockResolvedValue({ data: [] });
+    const d = (working, starts_at = null, ends_at = null) => ({ working, starts_at, ends_at, place: working ? "office" : null });
+    // A part-timer: Monday 10:00 to 14:00, Wednesday on the company hours, Saturday off, Sunday 09:00 to 13:00.
+    const schedule = { attendance_work_schedule_id: ID, days: [d(true, "10:00", "14:00"), d(false), d(true), d(false), d(false), d(false), d(true, "09:00", "13:00")] };
+    jest
+      .spyOn(schedules, "dayOn")
+      .mockImplementation(async (_db, _id, date, opts = {}) => rules.shiftFor(date, opts.calendar, rules.DEFAULT_POLICY, { schedule }));
+    const sections = await layout.sectionsFor({ query: jest.fn() }, { user, view: "staff", today: "2026-10-14", scopes: new Map() });
+    expect(sections.week.map((day) => [day.date, day.starts_at, day.ends_at, day.holiday])).toEqual([
+      ["2026-10-12", "10:00", "14:00", null],
+      ["2026-10-14", null, null, "Test Day"],
+      ["2026-10-18", "09:00", "13:00", null],
+    ]);
+  });
+
+  test("the day strip's Shift Today is the reader's own, and Hours Today the day's worked minutes", async () => {
+    const shift = rules.shiftFor("2026-10-16", cal, rules.DEFAULT_POLICY);
+    jest.spyOn(schedules, "dayOn").mockResolvedValue({ ...shift, starts_at: "10:00", ends_at: "14:00" });
+    const page = jest.spyOn(roster, "page").mockResolvedValue({
+      data: [
+        {
+          status: "on_site",
+          worksite: "Head Office",
+          clock_in_at: new Date("2026-10-16T09:00:00Z"),
+          clock_out_at: new Date("2026-10-16T15:30:00Z"),
+          worked_minutes: 240,
+        },
+      ],
+    });
+    expect(await layout.dayStrip({ query: jest.fn() }, { user, today: "2026-10-16" })).toEqual({
+      starts_at: "10:00",
+      ends_at: "14:00",
+      clock_in_at: "2026-10-16T09:00:00.000Z",
+      clock_out_at: "2026-10-16T15:30:00.000Z",
+      status: "on_site",
+      worksite: "Head Office",
+      worked_minutes: 240,
+    });
+    expect(page).toHaveBeenCalledWith(expect.anything(), { date: "2026-10-16" }, { scope: "own", scope_ids: [ID] }, { page: 1 });
   });
 
   test("Staff draws its own day and none of the organisation's sections", () => {
@@ -1059,51 +1123,6 @@ describe("Activity Today", () => {
     const public_ = activity.visibleWhere(new Map([["community", scope("own")]]), open);
     expect(public_).not.toContain("se.employee_id");
     expect(open).toEqual(["community", ["recognition.posted", "celebration.posted"]]);
-  });
-});
-
-describe("the clock-in prompt", () => {
-  const prompt = require("./dashboard.prompt");
-  const attendance = require("../attendance/attendance.service");
-  const SESSION = "5a4c0a52-0d0b-4f87-8f53-0c6b3f0c0e11";
-  const now = new Date("2026-10-14T07:30:00Z");
-  const user = { user_id: ID, employee_id: ID, session_id: SESSION };
-  const db = (first) => ({ query: jest.fn(async () => ({ rows: first ? [{ session_id: first }] : [] })) });
-  const stand = (state, working = true) => ({ state, shift: { working_day: working } });
-
-  test("only the first session of the day asks Attendance where the person stands", async () => {
-    const today = jest.spyOn(attendance, "today").mockResolvedValue(stand("not_clocked_in"));
-    expect(await prompt.shouldPrompt(db(SESSION), user, { now, today: "2026-10-14" })).toBe(true);
-    expect(today).toHaveBeenCalledWith(user, { now });
-    today.mockClear();
-    expect(await prompt.shouldPrompt(db(ID), user, { now, today: "2026-10-14" })).toBe(false);
-    expect(await prompt.shouldPrompt(db(null), user, { now, today: "2026-10-14" })).toBe(false);
-    expect(today).not.toHaveBeenCalled();
-  });
-
-  test("the day's bounds are Lagos's", async () => {
-    const client = db(SESSION);
-    jest.spyOn(attendance, "today").mockResolvedValue(stand("not_clocked_in"));
-    await prompt.shouldPrompt(client, user, { now, today: "2026-10-14" });
-    const [, params] = client.query.mock.calls[0];
-    expect(params).toEqual([ID, new Date("2026-10-13T23:00:00Z"), new Date("2026-10-14T23:00:00Z")]);
-  });
-
-  test.each([
-    ["clocked in", stand("clocked_in")],
-    ["clocked out", stand("clocked_out")],
-    ["on leave, or no longer employed", stand("unavailable")],
-    ["a day that is not worked", stand("not_clocked_in", false)],
-  ])("not when %s", async (_name, where) => {
-    jest.spyOn(attendance, "today").mockResolvedValue(where);
-    expect(await prompt.shouldPrompt(db(SESSION), user, { now, today: "2026-10-14" })).toBe(false);
-  });
-
-  test("not without a session or an employee", async () => {
-    const client = db(SESSION);
-    expect(await prompt.shouldPrompt(client, { ...user, session_id: undefined }, { now, today: "2026-10-14" })).toBe(false);
-    expect(await prompt.shouldPrompt(client, { ...user, employee_id: null }, { now, today: "2026-10-14" })).toBe(false);
-    expect(client.query).not.toHaveBeenCalled();
   });
 });
 

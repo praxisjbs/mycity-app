@@ -90,12 +90,21 @@ const CATEGORIES = Object.freeze([
     push: false,
   },
   { key: "system", label: "System", locked: false, email: false, push: false },
+  // Production faults and the readiness checks, for the IT team only. Locked like
+  // Security: push and the bell cannot be switched off, because a fault nobody is told
+  // about is the whole thing System Health exists to prevent. Email stays off by
+  // default; only the 24 hour escalation declares it (fanout defineNotification channels).
+  { key: "system_health", label: "System Health", locked: true, email: false, push: true },
 ]);
 
 const BY_KEY = new Map(CATEGORIES.map((c) => [c.key, c]));
 
 /** First segment of an event key → category. */
 const DOMAIN_TO_CATEGORY = Object.freeze({
+  // the system watching itself, and the services it runs on (docs/guides/integrations.md §7)
+  system_health: "system_health",
+  integration: "system_health",
+
   // who can do what
   auth: "security",
   session: "security",
@@ -205,7 +214,9 @@ const MODULE_TO_CATEGORY = Object.freeze({
   expenses: "expenses",
   knowledge: "knowledge",
   praxis_ai: "system",
+  ai_control: "system",
   settings: "system",
+  system_health: "system_health",
 });
 
 /**
@@ -239,13 +250,19 @@ function defaultOn(category, channel) {
 
 /**
  * Is a channel on, given the person's stored preference (true, false, or undefined
- * when they never set one)? A locked category stays on wherever it is on by default.
+ * when they never set one) and the company's default for the notice (Settings ·
+ * Notifications; undefined or null when People left it to the category)? The person's
+ * choice wins, then the company's, then the notice's own declared default
+ * (defineNotification's `channels`: the 24 hour escalation declares email, which its
+ * category leaves off), then the category's. A locked category stays on
+ * wherever it is on by default.
  */
-function isOn(category, channel, stored) {
+function isOn(category, channel, stored, company, declared) {
   if (isLocked(category) && defaultOn(category, channel)) return true;
-  return stored === undefined || stored === null
-    ? defaultOn(category, channel)
-    : stored === true;
+  if (stored !== undefined && stored !== null) return stored === true;
+  if (company !== undefined && company !== null) return company === true;
+  if (declared !== undefined && declared !== null) return declared === true;
+  return defaultOn(category, channel);
 }
 
 module.exports = {

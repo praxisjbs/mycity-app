@@ -5,12 +5,14 @@
  *
  * A punch, in one transaction, after the person's advisory lock:
  *
- *   1. the idempotency key: a punch this key already made is answered again, unchanged
- *   2. the person: employed, and not on granted leave that day
+ *   1. the idempotency key: a punch this key already made is answered again, unchanged; the
+ *      same key sent for the other punch (a clock-out with a clock-in's key) is a 422
+ *   2. the person: employed
  *   3. the work date at the workplace (the server's time, the worksite's zone); a
- *      clock-out closes today's shift, or yesterday's while yesterday is still open
- *   4. the clock guard on that date's active events (attendance.clock-guard.js); a
- *      refusal writes nothing and is a 409
+ *      clock-out closes today's shift, or yesterday's while yesterday is still open; then
+ *      granted leave on that work date refuses it
+ *   4. the clock guard on that date's punches that count (attendance.clock-guard.js): a punch
+ *      People rejected frees its slot; a refusal writes nothing and is a 409
  *   5. the device: the session's known device, recorded by the devices service the first
  *      time it punches, judged by the device mode (devices.guard.js)
  *   6. the geofence: the reading against the expected worksite (for remote staff, the
@@ -19,31 +21,44 @@
  *      judged by the geofence mode (attendance.geofence.js); the time: the device's clock
  *      against the server's
  *   7. the strictest result is recorded with its evidence (attendance_event, append-only),
- *      the day recalculated, an exception opened for each check that wants review, and
- *      attendance.punched (and attendance.review_required) emitted, all committed together
+ *      the day recalculated (judged on its first clock-in, attendance.reconcile.js), an
+ *      exception opened for each check that wants review, then the day's pay items and rule
+ *      counts settled, and attendance.punched (and attendance.review_required) emitted, all
+ *      committed together
  *
- * The unique index on active events is the backstop for anything the lock missed: its
- * violation is the same 409. A rejected punch is recorded as an attempt, counts for
- * nothing and opens no exception.
+ * The unique index on the punches that count is the backstop for anything the lock missed: its
+ * violation is the same 409. A rejected punch is recorded as an attempt and counts for nothing,
+ * but opens the exception of each check that refused it (outside the fence, an unknown device),
+ * which are the only reasons it names, so People see every refusal. A clock-in that counts reads
+ * the day's reminder to clock in, and a clock-out the day's reminders to clock out, if the clock
+ * watch sent them (attendance.clock-watch.js, which also makes the System Clock-Out).
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
+const { config } = require("../../config/env");
 const requestContext = require("../../config/request-context");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const exportFiles = require("../../shared/documents/exports");
+const { exportFilename } = require("../../shared/spreadsheet/cells");
 const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const { formatDate } = require("../../shared/time/day-first");
 const identity = require("../identity/identity.service");
+const notifications = require("../notifications/notifications.service");
 const devices = require("../devices/devices.service");
 const deviceGuard = require("../devices/devices.guard");
 const calendar = require("./attendance.calendar");
+const clockWatch = require("./attendance.clock-watch");
 const guard = require("./attendance.clock-guard");
 const { decideGeofence } = require("./attendance.geofence");
 const reconcile = require("./attendance.reconcile");
+const attendanceExport = require("./attendance.export");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const sites = require("./attendance.sites");
+const checkIns = require("./attendance.check-ins");
 const { EVENTS } = require("./attendance.events");
 
 async function tx(fn) {
@@ -62,6 +77,16 @@ const SEVERITY = Object.freeze({
   unknown_device: "high",
   suspicious_timestamp: "medium",
   missing_clock_out: "medium",
+  automatic_clock_out: "low",
+});
+
+/** Why a location is unclear, as the person reads it inside a sentence (§6.5); anything else is no reading. */
+const UNCLEAR_TEXT = Object.freeze({
+  no_home: "you have no approved home location yet",
+  no_worksite: "you have no office assigned yet",
+  poor_accuracy: "your location reading was too rough",
+  edge: "your location reading was at the edge of the fence",
+  insecure: "the clock was opened from an address that is not secure",
 });
 
 /** What a person reads about each reason, inside a sentence. */
@@ -76,11 +101,7 @@ function reasonText(code, ev) {
         ? `you were ${ev.geofence.distance_m} m from your temporary home`
         : `you were ${ev.geofence.distance_m} m from your approved home`;
     case "location_unverified":
-      if (ev.geofence.reason === "no_home") return "you have no approved home location yet";
-      if (ev.geofence.reason === "no_worksite") return "you have no office assigned yet";
-      return ev.geofence.reason === "poor_accuracy"
-        ? "your location reading was not accurate enough"
-        : "your location could not be checked";
+      return UNCLEAR_TEXT[ev.geofence.reason] || "your location could not be checked";
     case "unknown_device":
       return "this device is not registered";
     case "suspicious_timestamp":
@@ -122,25 +143,35 @@ async function openSession(db, employeeId, date) {
   return { date: null, events: todayEvents };
 }
 
+/** A shift as the clock and the register show it: its day, hours, grace and why it is off. */
+const shiftOut = (shift, offReason = shift.off_reason) => ({
+  working_day: shift.working_day,
+  starts_at: shift.starts_at,
+  ends_at: shift.ends_at,
+  grace_minutes: shift.grace_minutes,
+  off_reason: shift.working_day ? null : offReason || rules.OFF_DAY,
+});
+
 /**
- * GET /attendance/me/today: the server's word on where the person stands.
+ * GET /attendance/me/today: the server's word on where the person stands. The shift is the
+ * person's own (§6.13), as their day was judged once it was (§6.4).
  * @param {{user_id: string, employee_id: string, session_id: string}} user
  */
 async function today(user, { now = new Date() } = {}) {
   const person = await repo.person(pool, user.employee_id);
   if (!person) throw notEmployed();
-  const zone = calendar.zoneOf(person);
+  const zone = await sites.zoneAt(pool, person, now, calendar.zoneOf(person));
   const date = rules.localDate(now, zone);
   const session = await openSession(pool, user.employee_id, date);
   const sessionDate = session.date || date;
-  const ctx = await calendar.contextFor(pool, person, sessionDate);
+  const { judged, ctx } = await reconcile.judgedOn(pool, person, sessionDate);
   const leave = await repo.grantedLeave(pool, user.employee_id, date);
   const day = await repo.getDay(pool, user.employee_id, sessionDate);
   const active = session.events.filter((e) => !e.excluded);
   const clockIn = active.find((e) => e.event_type === "clock_in") || null;
   const clockOut = active.find((e) => e.event_type === "clock_out") || null;
   const device = await devices.statusForSession(pool, user);
-  // Working from home: remote staff, or a hybrid employee's home day (§6.13).
+  // Working from home: a Remote day of the person's week, or remote staff with no schedule (§6.13).
   const remote = ctx.home_day;
   let homeState = null;
   if (person.work_pattern === "remote" || remote) {
@@ -153,6 +184,9 @@ async function today(user, { now = new Date() } = {}) {
   else if (session.date) state = "clocked_in";
   else if (leave) state = "unavailable";
   else if (clockIn && clockOut) state = "clocked_out";
+  // The sign-in prompt (§6.14): the first session of a working day, not yet clocked in.
+  const signInPrompt =
+    state === "not_clocked_in" && ctx.shift.working_day === true && (await repo.firstSessionOn(pool, user, lagos.today(now)));
 
   return {
     date: sessionDate,
@@ -163,8 +197,10 @@ async function today(user, { now = new Date() } = {}) {
     leave: leave ? { starts_on: leave.starts_on, ends_on: leave.ends_on, leave_type_name: leave.leave_type_name } : null,
     clock_in_at: clockIn ? new Date(clockIn.occurred_at).toISOString() : null,
     clock_out_at: clockOut ? new Date(clockOut.occurred_at).toISOString() : null,
+    clock_out_automatic: Boolean(clockOut && clockOut.source === "system"),
+    sign_in_prompt: signInPrompt,
     review: (await repo.openExceptionCount(pool, day ? day.attendance_day_id : null)) > 0,
-    shift: ctx.shift,
+    shift: shiftOut(judged.shift, ctx.shift.off_reason),
     work_pattern: person.work_pattern,
     location: ctx.approved
       ? { kind: "approved_day", name: ctx.approved.name, radius_m: null, home_state: homeState }
@@ -177,6 +213,8 @@ async function today(user, { now = new Date() } = {}) {
       max_accuracy_m: ctx.policy.max_accuracy_m,
     },
     device,
+    temporary_site: sites.todayOf(ctx.site || null),
+    check_ins: ctx.site ? await checkIns.onDay(pool, user.employee_id, sessionDate) : [],
   };
 }
 
@@ -218,21 +256,17 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
 
   const outcome = await tx(async (client) => {
     await repo.lockEmployee(client, employeeId);
+    // A key the middleware no longer remembers (48 hours) is still on its punch: the same punch is
+    // answered again; the other one sent with it is the middleware's refusal, never the old answer.
     const prior = await repo.eventByKey(client, employeeId, idempotencyKey);
+    if (prior && prior.event_type !== body.event_type)
+      throw new AppError("IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was used for a different request. Use a new key.", 422);
     if (prior) return { row: prior, replayed: true };
 
     const person = await repo.person(client, employeeId);
     if (!person || person.status !== "active") throw notEmployed();
-    const zone = calendar.zoneOf(person);
+    const zone = await sites.zoneAt(client, person, now, calendar.zoneOf(person));
     const date = rules.localDate(now, zone);
-    const leave = await repo.grantedLeave(client, employeeId, date);
-    if (leave)
-      throw new AppError(
-        "ON_LEAVE",
-        `You are on ${leave.leave_type_name} leave from ${formatDate(leave.starts_on)} to ${formatDate(leave.ends_on)}.`,
-        422,
-      );
-
     let workDate = date;
     let dayEvents = await repo.eventsOn(client, employeeId, date);
     if (body.event_type === "clock_out" && !guard.isOpen(dayEvents)) {
@@ -242,6 +276,15 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         dayEvents = session.events;
       }
     }
+    // Leave is read on the day the punch belongs to: a clock-out closing yesterday's shift is yesterday's.
+    const leave = await repo.grantedLeave(client, employeeId, workDate);
+    if (leave)
+      throw new AppError(
+        "ON_LEAVE",
+        `You are on ${leave.leave_type_name} leave from ${formatDate(leave.starts_on)} to ${formatDate(leave.ends_on)}.`,
+        422,
+      );
+
     const transition = guard.evaluateClockTransition({ events: dayEvents, eventType: body.event_type });
     if (!transition.allowed) throw conflict(transition.reason, transition.message);
 
@@ -270,18 +313,17 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
     const timeResult = time.future ? "review" : "accepted";
     const result = rules.strictest(geofence.result, deviceDecision.result, timeResult);
 
+    // Each check that did not accept, with its own result: a refused punch names only those that refused it.
     const checks = [
-      geofence.result !== "accepted" ? geofence.exception || geofence.outside : null,
-      deviceDecision.result !== "accepted" ? "unknown_device" : null,
-      time.future ? "suspicious_timestamp" : null,
-    ].filter(Boolean);
-    const reasons = result === "rejected"
-      ? checks.filter((c) => (c === "unknown_device" ? deviceDecision.result : geofence.result) === "rejected")
-      : checks;
+      { type: geofence.exception, result: geofence.result },
+      { type: "unknown_device", result: deviceDecision.result },
+      { type: "suspicious_timestamp", result: timeResult },
+    ].filter((c) => c.result !== "accepted");
+    const reasons = checks.filter((c) => result !== "rejected" || c.result === "rejected").map((c) => c.type);
 
     const validation = {
       policy: {
-        attendance_policy_id: ctx.policy.attendance_policy_id,
+        policy_version_id: ctx.policy.policy_version_id,
         geofence_mode: ctx.policy.geofence_mode,
         device_mode: ctx.policy.device_mode,
         max_accuracy_m: ctx.policy.max_accuracy_m,
@@ -299,6 +341,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         request_id: geofence.request_id,
         assignment_id: geofence.assignment_id,
         site_id: geofence.site_id,
+        temporary_site_id: (ctx.fence && ctx.fence.temporary_site_id) || null,
         result: geofence.result,
       },
       device: {
@@ -324,7 +367,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         worksite_id: geofence.worksite_id,
         known_device_id: knownDeviceId,
         attendance_device_id: device ? device.attendance_device_id : null,
-        attendance_policy_id: ctx.policy.attendance_policy_id,
+        policy_version_id: ctx.policy.policy_version_id,
         latitude: point ? point.latitude : null,
         longitude: point ? point.longitude : null,
         accuracy_m: body.accuracy_m,
@@ -346,34 +389,42 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
     }
     if (device) await devices.notePunch(client, device.attendance_device_id, now);
 
+    // Settled once the day's exceptions are open: Location Flags counts them (§6.16). A refused punch
+    // changes nothing on the day, but opens its exception there, so People see every refusal (§6.7).
     const opened = [];
-    let dayId = null;
+    const r = await reconcile.recomputeDay(client, person, workDate, { settle: false, keep: reasons.length > 0 });
+    const dayId = r.day ? r.day.attendance_day_id : null;
+    for (const type of reasons) {
+      const evidence =
+        type === "unknown_device"
+          ? { device_label: validation.device.label, reason: deviceDecision.reason, event_type: body.event_type }
+          : type === "suspicious_timestamp"
+            ? { skew_seconds: time.skew_seconds, event_type: body.event_type }
+            : {
+                reason: geofence.reason,
+                place: geofence.place,
+                distance_m: geofence.distance_m,
+                radius_m: geofence.radius_m,
+                worksite_name: geofence.worksite_name,
+                accuracy_m: body.accuracy_m,
+                event_type: body.event_type,
+              };
+      const x = await repo.insertException(client, {
+        attendance_day_id: dayId,
+        attendance_event_id: row.attendance_event_id,
+        exception_type: type,
+        severity: SEVERITY[type],
+        evidence: result === "rejected" ? { ...evidence, refused: true } : evidence,
+      });
+      if (x) opened.push(x);
+    }
+    await reconcile.settle(client, person, r);
+
+    // The day's reminders have done their work: a push still held is not sent.
     if (result !== "rejected") {
-      const r = await reconcile.recomputeDay(client, person, workDate);
-      dayId = r.day ? r.day.attendance_day_id : null;
-      for (const type of reasons) {
-        const x = await repo.insertException(client, {
-          attendance_day_id: dayId,
-          attendance_event_id: row.attendance_event_id,
-          exception_type: type,
-          severity: SEVERITY[type],
-          evidence:
-            type === "unknown_device"
-              ? { device_label: validation.device.label, reason: deviceDecision.reason, event_type: body.event_type }
-              : type === "suspicious_timestamp"
-                ? { skew_seconds: time.skew_seconds, event_type: body.event_type }
-                : {
-                    reason: geofence.reason,
-                    place: geofence.place,
-                    distance_m: geofence.distance_m,
-                    radius_m: geofence.radius_m,
-                    worksite_name: geofence.worksite_name,
-                    accuracy_m: body.accuracy_m,
-                    event_type: body.event_type,
-                  },
-        });
-        if (x) opened.push(x);
-      }
+      const kind = body.event_type === "clock_in" ? "clock_in_due" : "clock_out_due";
+      for (const reminder of await repo.remindersOn(client, employeeId, workDate, kind))
+        await notifications.markReadForRecord(client, user, "attendance_clock_reminder", reminder.attendance_clock_reminder_id);
     }
 
     const facts = {
@@ -452,18 +503,29 @@ async function myExceptions(user, query) {
   return reconcile.presentPage(page);
 }
 
-/** Ask for a workbook of the request's scope; it is built after commit and emailed. */
-async function requestExport(actor, payload) {
-  if (!actor.email) throw new AppError("NO_EMAIL", "Your login has no email to send the export to.", 422);
-  await tx((client) =>
-    emit(client, {
-      key: EVENTS.ATTENDANCE_EXPORT_REQUESTED,
-      entity: { type: "attendance_export", id: crypto.randomUUID() },
+/**
+ * Ask for a workbook of the request's scope, for the person asking: its file is reserved now,
+ * made after commit (attendance.export.js) and downloaded on the device that asked.
+ * @returns {Promise<object>} the ExportFile, pending
+ */
+function requestExport(actor, payload) {
+  const kind = attendanceExport.KINDS[payload.kind];
+  return tx(async (client) => {
+    const doc = await exportFiles.reserve(client, {
+      doc_type: attendanceExport.DOC_TYPE,
+      entity: { type: attendanceExport.DOC_TYPE, id: crypto.randomUUID() },
+      file_name: exportFilename({ base: kind.base, env: config.APP_ENV, extension: "xlsx" }),
+      title: `${kind.title} export`,
       actor,
-      payload: { ...payload, requested_by: actor.user_id },
-    }),
-  );
-  return { queued: true, email: actor.email };
+    });
+    await emit(client, {
+      key: EVENTS.ATTENDANCE_EXPORT_REQUESTED,
+      entity: { type: doc.entity_type, id: doc.entity_id },
+      actor,
+      payload: { ...payload, requested_by: actor.user_id, document_id: doc.document_id },
+    });
+    return exportFiles.present(doc);
+  });
 }
 
 const requestMyExport = (user, body) => requestExport(user, { kind: "month", month: body.month });
@@ -475,21 +537,29 @@ const requestMyExport = (user, body) => requestExport(user, { kind: "month", mon
 /** The date a register read is for: the one asked, or today in Lagos. */
 const dateOf = (query, now = new Date()) => query.date || lagos.today(now);
 
-const register = (query, scope) => repo.register(pool, dateOf(query), query, scope);
+/**
+ * The register for a day: each person by their own day (their schedule, else the company hours in
+ * force on the date, which the SQL takes as a parameter; §6.9, §6.13).
+ */
+async function register(query, scope) {
+  const date = dateOf(query);
+  return repo.register(pool, date, query, scope, { hours: await calendar.companyHoursOn(pool, date) });
+}
 
 async function summary(query, scope) {
   const date = dateOf(query);
-  return { date, ...(await repo.registerSummary(pool, date, scope)) };
+  return { date, ...(await repo.registerSummary(pool, date, scope, { hours: await calendar.companyHoursOn(pool, date) })) };
 }
 
-/** One person's day on the register, within the caller's scope. */
+/** One person's day on the register, within the caller's scope: its shift as the day was judged. */
 async function dayDetail(employeeId, query, scope) {
   assertInScope(scope, employeeId);
   const date = dateOf(query);
-  const row = await repo.registerRow(pool, date, employeeId);
+  const row = await repo.registerRow(pool, date, employeeId, { hours: await calendar.companyHoursOn(pool, date) });
   if (!row) throw new AppError("NOT_FOUND", "Not found", 404);
   const person = await repo.person(pool, employeeId);
-  const ctx = await calendar.contextFor(pool, person, date);
+  const { judged, ctx } = await reconcile.judgedOn(pool, person, date);
+  const approval = await repo.overtimeApprovalOn(pool, employeeId, date);
   return {
     employee: row.employee,
     date,
@@ -497,15 +567,16 @@ async function dayDetail(employeeId, query, scope) {
     status: row.status,
     attendance_day_id: row.attendance_day_id,
     shift: {
-      working_day: ctx.shift.working_day,
-      starts_at: ctx.shift.starts_at,
-      ends_at: ctx.shift.ends_at,
-      grace_minutes: ctx.shift.grace_minutes,
+      working_day: judged.shift.working_day,
+      starts_at: judged.shift.starts_at,
+      ends_at: judged.shift.ends_at,
+      grace_minutes: judged.shift.grace_minutes,
     },
     clock_in_at: row.clock_in_at,
     clock_out_at: row.clock_out_at,
     worked_minutes: row.worked_minutes,
     late_minutes: row.late_minutes,
+    early_minutes: row.early_minutes,
     overtime_minutes: row.overtime_minutes,
     closed: Boolean(row.closed_at),
     expected_location: ctx.fence
@@ -515,6 +586,9 @@ async function dayDetail(employeeId, query, scope) {
         : null,
     policy: { geofence_mode: ctx.policy.geofence_mode, device_mode: ctx.policy.device_mode },
     open_exceptions: row.open_exceptions,
+    overtime_approval: approval
+      ? { minutes: Number(approval.minutes), approved_by_name: approval.approved_by_name || null, reason: approval.reason }
+      : null,
   };
 }
 
@@ -550,6 +624,7 @@ function requestRegisterExport(actor, body) {
 }
 
 module.exports = {
+  openSession,
   today,
   punch,
   messageOf,
@@ -558,6 +633,7 @@ module.exports = {
   myEvents,
   myExceptions,
   explain: reconcile.explain,
+  explainAutomatic: reconcile.explainAutomatic,
   requestMyExport,
   register,
   summary,
@@ -569,4 +645,5 @@ module.exports = {
   myRecord,
   requestRegisterExport,
   closeDays: reconcile.closeDays,
+  watchClock: clockWatch.watch,
 };

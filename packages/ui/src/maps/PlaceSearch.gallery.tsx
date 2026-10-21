@@ -9,7 +9,7 @@ import type { Place } from "./geoapify";
 const Searching = () => {
   const [place, setPlace] = useState<Place | null>(null);
   return (
-    <Field label="Worksite Address" help="The address people clock in at. The map shows where it is.">
+    <Field label="Find on Map">
       <PlaceSearch search={samplePlaceSearch} onPick={setPlace} value={place} />
       {place && <MapView className="mt-2" height="sm" markers={[{ key: place.place_id, lat: place.lat, lon: place.lon, label: place.formatted, tone: "brand" }]} radiusMetres={150} />}
     </Field>

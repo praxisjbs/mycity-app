@@ -306,13 +306,14 @@ describeDb("documents and imports through the API", () => {
     });
 
     (hasFfmpeg ? test : test.skip)(
-      "a voice note: stored, given a playable Opus variant, served by range",
+      "a voice note: stored, given a playable Opus variant and its waveform, served by range",
       async () => {
         const { dir, cleanup } = await storage.scratch();
         const wav = path.join(dir, "note.wav");
         execFileSync(config.FFMPEG_PATH, [
           "-hide_banner", "-loglevel", "error",
-          "-f", "lavfi", "-i", "sine=frequency=440:duration=2", wav,
+          // A second of tone, then a second of silence: the waveform should show both.
+          "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-af", "apad=whole_dur=2", wav,
         ]);
         const buffer = await fsp.readFile(wav);
         const up = await as(tokens.staff)
@@ -333,6 +334,12 @@ describeDb("documents and imports through the API", () => {
         await tx((c) =>
           require("../../src/shared/documents/vault").completeAv(c, up.body.document_id, derived),
         );
+
+        expect(derived.waveform).toHaveLength(av.WAVEFORM_BARS);
+        expect(Math.min(...derived.waveform.slice(2, 20))).toBeGreaterThan(80);
+        expect(Math.max(...derived.waveform.slice(-20))).toBeLessThan(5);
+        const kept = await one("SELECT waveform FROM document WHERE document_id = $1", [up.body.document_id]);
+        expect(kept.waveform).toEqual(derived.waveform);
 
         const playable = await as(tokens.staff).get(`/documents/${up.body.document_id}/variant/opus`);
         expect(playable.status).toBe(200);

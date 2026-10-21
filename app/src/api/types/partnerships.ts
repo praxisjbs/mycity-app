@@ -1,6 +1,7 @@
+import type { PlaceValue } from "@mycity/ui";
 import type { IsoDate, Money, Paged, PersonRef, Uuid } from "./common";
 import type { BarRow } from "./home";
-import type { Status, Step, Trail } from "./shared";
+import type { Status, Step, Trail } from "./performance";
 
 /** INTERIM Partnerships shapes (owner NE; MILESTONES §12). Stages are MyCity's own tracker stages. */
 export interface PartnerRow {
@@ -62,7 +63,8 @@ export interface PartnerCreate {
   type: string;
   owner_id: Uuid;
   value: Money;
-  hq: string;
+  /** Picked from the address search at level area (F27). */
+  hq: PlaceValue;
   website: string;
 }
 export interface InteractionCreate {
@@ -113,7 +115,8 @@ export interface ProposalCreate {
   partner_id: Uuid;
   what: string;
   why_now: string;
-  cities: string;
+  /** Picked from the address search at level city (F27), one or more. */
+  cities: PlaceValue[];
   weeks: number;
   value: Money;
   terms: string;

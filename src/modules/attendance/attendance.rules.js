@@ -13,8 +13,12 @@
  * A day, in this order, because the order is the policy:
  *   approved leave        leave, whatever was punched
  *   a clock-in            late when its late minutes are above 0, else present
- *   closed, expected      absent: a working day that ended with no clock-in
+ *   closed, expected      absent: a working day of the person's own shift that ended with no
+ *                         clock-in, for someone with an active login
  *   anything else         no status yet (an open day with no punch, or a day off)
+ *
+ * The shift is the person's: their work schedule for the weekday, else the company hours
+ * (guide §6.13, shiftFor).
  */
 const workingWeek = require("../../shared/time/working-week");
 const { weekday } = require("../../shared/time/lagos");
@@ -25,17 +29,27 @@ const FUTURE_TOLERANCE_S = 120;
 const DELAY_FLAG_S = 300;
 const DEFAULT_TZ = "Africa/Lagos";
 
-/** The defaults when MyCity has entered no policy (MILESTONES §6.2; A26). */
+/**
+ * The rules when MyCity has published no Attendance policy version: the contract's defaults
+ * (AttendanceRules, guide §6.15; A26). The location check has a mode for each kind of place
+ * (guide §6.1); `geofence_mode` is the one for the place a date is matched to, the office's until
+ * attendance.calendar.js contextFor knows the place.
+ */
 const DEFAULT_POLICY = Object.freeze({
-  attendance_policy_id: null,
-  name: null,
-  grace_minutes: 0,
-  latest_clock_out_minutes: 240,
+  policy_version_id: null,
+  version: null,
+  ...require("@mycity/contract").attendance.AttendanceRules.parse({}),
   geofence_mode: "warn",
-  device_mode: "off",
-  max_accuracy_m: 100,
-  home_radius_m: 100,
 });
+
+/** The kinds of place a date is matched to, each with its own location mode (guide §6.1). */
+const PLACES = Object.freeze(["office", "home", "site"]);
+
+/** The policy with `geofence_mode` set to the mode of the place: office, home or site. Pure. */
+function forPlace(policy, place) {
+  if (!PLACES.includes(place)) throw new Error(`attendance: "${place}" is not a place`);
+  return { ...policy, geofence_mode: policy[`${place}_geofence_mode`] || DEFAULT_POLICY.geofence_mode };
+}
 
 /** Accuracy at or under this many metres is a good reading (the guide's §6.5). */
 const GOOD_ACCURACY_M = 50;
@@ -176,65 +190,156 @@ function strictest(...results) {
   return results.reduce((a, b) => (ORDER[b] > ORDER[a] ? b : a), "accepted");
 }
 
+/** A shift's figures as "HH:MM", or the fallback when the value is not a time. */
+const hhmm = (value, fallback = null) => (parseHHMM(value) !== null ? String(value).slice(0, 5) : fallback);
+
 /**
- * The shift on a date: the working week's hours for that weekday (Settings ·
- * Organisation, A22), unless the day is not worked (a weekend, a public holiday).
+ * The company hours for an ISO weekday: the Attendance policy's `hours` when a version sets them,
+ * else Settings · Organisation's working week (A22; guide §6.13). Pure.
+ * @param {number} wd  the ISO weekday, 1 Monday to 7 Sunday
+ * @param {object} cal  shared/time/working-week loadCalendar()
+ * @param {Array<{weekday: number, working: boolean, starts_at: string|null, ends_at: string|null}>|null} hours
+ * @returns {{working: boolean, starts_at: string|null, ends_at: string|null}}
+ */
+function companyDay(wd, cal, hours) {
+  if (Array.isArray(hours) && hours.length === 7) {
+    const h = hours[wd - 1];
+    return h && h.working ? { working: true, starts_at: hhmm(h.starts_at), ends_at: hhmm(h.ends_at) } : { working: false, starts_at: null, ends_at: null };
+  }
+  if (!cal.days.has(wd)) return { working: false, starts_at: null, ends_at: null };
+  const h = (cal.hours && cal.hours[wd]) || null;
+  return {
+    working: true,
+    starts_at: hhmm(h && h.starts_at, workingWeek.DEFAULT_WEEK.starts_at),
+    ends_at: hhmm(h && h.ends_at, workingWeek.DEFAULT_WEEK.ends_at),
+  };
+}
+
+/** What a day off is called on the clock: a public holiday by its name, any other day not worked "Day Off". */
+const OFF_DAY = "Day Off";
+
+/**
+ * A person's shift on a date (guide §6.4, §6.13): the work schedule in force then, else the company
+ * hours (the policy's, else the working week), at the place the schedule or the work pattern gives;
+ * never on a public holiday. A schedule's working day with no times takes the company hours for that
+ * weekday, and reads as Off when the company hours do not work it. Pure.
  * @param {string} date
  * @param {object} cal  shared/time/working-week loadCalendar()
- * @param {{grace_minutes: number}} policy
+ * @param {{grace_minutes?: number, early_grace_minutes?: number, hours?: Array|null}} policy  its rules
+ * @param {{schedule?: {attendance_work_schedule_id: string, days: Array}|null, pattern?: string}} [person]
+ * @returns {{working_day: boolean, starts_at: string|null, ends_at: string|null, grace_minutes: number,
+ *            early_grace_minutes: number, off_reason: string|null, place: "office"|"remote"|null,
+ *            attendance_work_schedule_id: string|null}}
  */
-function shiftFor(date, cal, policy) {
-  const working = workingWeek.isWorkingDay(date, cal);
-  const hours = (cal.hours && cal.hours[weekday(date)]) || null;
-  const pick = (value, fallback) => (working ? (parseHHMM(value) !== null ? String(value).slice(0, 5) : fallback) : null);
+function shiftFor(date, cal, policy, { schedule = null, pattern = "on_site" } = {}) {
+  const wd = weekday(date);
+  const company = companyDay(wd, cal, policy.hours || null);
+  let day;
+  if (schedule) {
+    const d = (schedule.days || [])[wd - 1] || { working: false };
+    if (!d.working) day = { working: false, starts_at: null, ends_at: null, place: null };
+    else if (hhmm(d.starts_at) && hhmm(d.ends_at)) day = { working: true, starts_at: hhmm(d.starts_at), ends_at: hhmm(d.ends_at), place: d.place || "office" };
+    else if (company.working) day = { ...company, place: d.place || "office" };
+    else day = { working: false, starts_at: null, ends_at: null, place: null };
+  } else {
+    day = { ...company, place: company.working ? (pattern === "remote" ? "remote" : "office") : null };
+  }
+  const holiday = cal.holidays.has(date);
+  const working = day.working && !holiday;
   return {
     working_day: working,
-    starts_at: pick(hours && hours.starts_at, workingWeek.DEFAULT_WEEK.starts_at),
-    ends_at: pick(hours && hours.ends_at, workingWeek.DEFAULT_WEEK.ends_at),
+    starts_at: working ? day.starts_at : null,
+    ends_at: working ? day.ends_at : null,
     grace_minutes: Number(policy.grace_minutes) || 0,
-    off_reason: working ? null : workingWeek.whyNotWorking(date, cal),
+    early_grace_minutes: Number(policy.early_grace_minutes) || 0,
+    off_reason: working ? null : holiday ? cal.holidayNames.get(date) || "Public Holiday" : OFF_DAY,
+    place: working ? day.place : null,
+    attendance_work_schedule_id: schedule ? schedule.attendance_work_schedule_id : null,
   };
 }
 
 /**
- * What a day comes to, from its counted punches.
+ * The shift a day was judged against, as attendance_day records it (guide §6.4), in the shape
+ * shiftFor gives; the grace figures are the judging version's.
+ */
+function recordedShift(day, policy) {
+  const working = day.shift_working === true;
+  return {
+    working_day: working,
+    starts_at: working ? hhmm(day.shift_starts_at) : null,
+    ends_at: working ? hhmm(day.shift_ends_at) : null,
+    grace_minutes: Number(policy.grace_minutes) || 0,
+    early_grace_minutes: Number(policy.early_grace_minutes) || 0,
+    off_reason: working ? null : OFF_DAY,
+    place: null,
+    attendance_work_schedule_id: day.attendance_work_schedule_id || null,
+  };
+}
+
+/**
+ * What a day comes to, from its counted punches (guide §6.4).
+ *
+ *   lateness   from the start, once the first clock-in is past the start plus grace (T2)
+ *   early      to the end, when the person's own last clock-out (theirs, or one People added) is
+ *              before the end less the early grace (T5); a system clock-out is never early
+ *   worked     first clock-in to last clock-out; a system clock-out counts only to the shift's end
+ *   overtime   on a working day, the minutes from the end to the person's own last clock-out once
+ *              past `after_minutes`; on a day not worked, every worked minute; never from a system
+ *              clock-out
+ *
  * @param {object} input
- * @param {Array<{event_type: string, occurred_at: string|Date}>} input.events  counted: accepted
- *        or review, not excluded by a decision
- * @param {{working_day: boolean, starts_at: string|null, ends_at: string|null, grace_minutes: number}} input.shift
+ * @param {Array<{event_type: string, occurred_at: string|Date, source?: string}>} input.events  counted:
+ *        accepted or review, not excluded by a decision
+ * @param {{working_day: boolean, starts_at: string|null, ends_at: string|null, grace_minutes: number,
+ *          early_grace_minutes?: number}} input.shift
  * @param {string} input.date
  * @param {string} input.timeZone
  * @param {boolean} input.onLeave
  * @param {boolean} input.closed
+ * @param {boolean} [input.expected]  the person is expected at all (an active login): absent only then
+ * @param {number} [input.overtimeAfter]  the version's overtime.after_minutes
  * @param {(a: object) => number} input.late       minutes late (attendance.lateness.js)
+ * @param {(a: object) => number} [input.early]    minutes early (attendance.lateness.js)
  * @param {(a: object) => number} input.overtime   minutes over (attendance.lateness.js)
  * @returns {{status: string|null, first_clock_in_at: Date|null, last_clock_out_at: Date|null,
- *            worked_minutes: number, late_minutes: number, overtime_minutes: number}}
+ *            worked_minutes: number, late_minutes: number, early_minutes: number, overtime_minutes: number,
+ *            system_clock_out: boolean}}
  */
-function projectDay({ events, shift, date, timeZone, onLeave, closed, late, overtime }) {
+function projectDay({ events, shift, date, timeZone, onLeave, closed, expected = true, overtimeAfter = 0, late, early, overtime }) {
   const at = (e) => new Date(e.occurred_at);
   const ins = events.filter((e) => e.event_type === "clock_in").map(at).sort((a, b) => a - b);
-  const outs = events.filter((e) => e.event_type === "clock_out").map(at).sort((a, b) => a - b);
+  const outs = events.filter((e) => e.event_type === "clock_out").sort((a, b) => at(a) - at(b));
   const firstIn = ins[0] || null;
-  const lastOut = outs.length ? outs[outs.length - 1] : null;
-  const worked = firstIn && lastOut && lastOut > firstIn ? Math.floor((lastOut - firstIn) / 60_000) : 0;
+  const lastOutEvent = outs.length ? outs[outs.length - 1] : null;
+  const lastOut = lastOutEvent ? at(lastOutEvent) : null;
+  const system = Boolean(lastOutEvent && lastOutEvent.source === "system");
+  const end = shift.working_day && shift.ends_at ? zonedInstant(date, shift.ends_at, timeZone) : null;
+  const countedOut = system && end && lastOut > end ? end : lastOut;
+  const worked = firstIn && countedOut && countedOut > firstIn ? Math.floor((countedOut - firstIn) / 60_000) : 0;
   const lateMinutes = firstIn && shift.working_day
     ? late({ expectedStart: shift.starts_at, firstClockInAt: firstIn, graceMinutes: shift.grace_minutes, date, timeZone })
     : 0;
-  const overtimeMinutes = lastOut && shift.working_day
-    ? overtime({ expectedEnd: shift.ends_at, lastClockOutAt: lastOut, date, timeZone })
+  const earlyMinutes = lastOut && shift.working_day && !system && early
+    ? early({ expectedEnd: shift.ends_at, lastClockOutAt: lastOut, graceMinutes: shift.early_grace_minutes || 0, date, timeZone })
     : 0;
+  let overtimeMinutes = 0;
+  if (lastOut && !system) {
+    if (shift.working_day) overtimeMinutes = overtime({ expectedEnd: shift.ends_at, lastClockOutAt: lastOut, afterMinutes: overtimeAfter, date, timeZone });
+    else overtimeMinutes = worked;
+  }
   let status = null;
   if (onLeave) status = "leave";
   else if (firstIn) status = lateMinutes > 0 ? "late" : "present";
-  else if (closed && shift.working_day) status = "absent";
+  else if (closed && shift.working_day && expected) status = "absent";
   return {
     status,
     first_clock_in_at: firstIn,
     last_clock_out_at: lastOut,
-    worked_minutes: worked,
+    worked_minutes: onLeave ? 0 : worked,
     late_minutes: onLeave ? 0 : lateMinutes,
+    early_minutes: onLeave ? 0 : earlyMinutes,
     overtime_minutes: onLeave ? 0 : overtimeMinutes,
+    system_clock_out: system,
   };
 }
 
@@ -243,6 +348,8 @@ module.exports = {
   DELAY_FLAG_S,
   DEFAULT_TZ,
   DEFAULT_POLICY,
+  PLACES,
+  forPlace,
   GOOD_ACCURACY_M,
   isTimeZone,
   wallClock,
@@ -254,6 +361,9 @@ module.exports = {
   zonedInstant,
   timeCheck,
   strictest,
+  OFF_DAY,
+  companyDay,
   shiftFor,
+  recordedShift,
   projectDay,
 };

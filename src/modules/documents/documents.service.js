@@ -25,6 +25,7 @@ const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const vault = require("../../shared/documents/vault");
+const exportFiles = require("../../shared/documents/exports");
 const { UPLOAD_CAPS, describeBytes } = require("../../shared/http/body-limits");
 const docTypes = require("../../shared/documents/types");
 const c = require("@mycity/contract");
@@ -78,6 +79,9 @@ async function get(user, documentId) {
   await readable(user, documentId);
   return repo.get(pool, documentId);
 }
+
+/** GET /exports/:id: an export the caller asked for, while their screen waits for its file. */
+const exportFile = (user, documentId) => exportFiles.status(user, documentId);
 
 /** A document's versions, oldest kept, newest first. */
 async function versions(user, documentId, query) {
@@ -358,6 +362,7 @@ module.exports = {
   purposeFor,
   refOf,
   get,
+  exportFile,
   versions,
   withinScope,
   listFor,

@@ -3,6 +3,7 @@ import reportsContract from "@mycity/contract/schemas/reports.js";
 import type {
   HomeActivityItem,
   HomeAlert,
+  HomeAlertPolicyRules,
   HomeAlertRule,
   HomeAlertSummary,
   HomeChart,
@@ -43,6 +44,7 @@ import { HISTORY, TODAY, type TodayStatus } from "../data/attendance";
 import { PARTNERS, STAGES } from "../data/partners";
 import { REQUESTS } from "../data/expenses";
 import { shiftOf, todayOf } from "./attendance";
+import { attendanceRulesInForce, attendanceVersionInForce } from "./policies";
 import { me } from "./identity";
 import { leaveRequests, leaveYear, waitingOn } from "./organisation";
 
@@ -916,7 +918,7 @@ function weekOf(user: string, m: Me): HomeWeekDay[] {
     const d = new Date(monday);
     d.setUTCDate(monday.getUTCDate() + i);
     const day = d.toISOString().slice(0, 10);
-    const shift = shiftOf(day);
+    const shift = shiftOf(day, user);
     if (!shift.working_day) continue;
     days.push({
       date: day,
@@ -946,7 +948,6 @@ function overviewOf(user: string): HomeOverview {
     on_time: () => (may("people") ? onTimeDonut(user) : null),
     org_kpi: () => (may("performance") ? { kind: "org_kpi", percent: null, departments: DEPARTMENTS.map((name) => ({ department_id: departmentId(name), department: name, percent: null })) } : null),
   };
-  const t = todayOf(user);
   return {
     greeting_name: m.first_name,
     date: todayIso(),
@@ -964,7 +965,6 @@ function overviewOf(user: string): HomeOverview {
     week: weekOf(user, m),
     alerts_to_clear: holds(m, "alerts.clear") ? alertsToClear(user).length : null,
     // The mock keeps one session per tab, so every Overview it answers is the day's first session's.
-    prompt_clock_in: t.state === "not_clocked_in" && t.shift.working_day,
   };
 }
 
@@ -1008,11 +1008,8 @@ function ruleKey(metric: string, name: string, taken: (key: string) => boolean):
   return key;
 }
 
-/** A rule on every metric, two on late arrivals and one switched off, so a laptop shows every state. */
+/** A rule on every metric, one switched off, so a laptop shows every state. */
 const RULE_SEEDS: RuleSeed[] = [
-  ["Late Arrivals", "late_arrivals", "3", 30, "medium", "people.view", true],
-  ["Repeated Lateness", "late_arrivals", "5", 30, "high", "people.view", true],
-  ["Missing Clock-Outs", "missing_clock_out", "2", 14, "medium", "people.view", true],
   ["Approvals Waiting", "approval_ageing", "3", null, "high", "people.approve", true],
   ["Documents Expiring", "document_expiry", "30", null, "low", "people.edit", true],
   ["Probation Ending", "confirmation_due", "14", null, "medium", "people.edit", true],
@@ -1042,7 +1039,38 @@ for (const [name, metric, threshold, window_days, severity, permission_key, enab
     updated_at: at(enabled ? 60 : 6, "10:00"),
   });
 }
-const ruleNamed = (name: string) => RULES.find((r) => r.name === name)!;
+/**
+ * The rules the system keeps for the Attendance policy's consequence rules (home.md §6 Alerts): one
+ * per policy rule, never listed on Alert Rules, never edited; their alerts are the policy's breaches.
+ */
+type PolicyRuleKey = "late_rule" | "early_rule" | "absence_rule" | "forgotten_rule" | "location_rule";
+const POLICY_RULES = alertsContract.HOME_ALERT_POLICY_RULES as readonly PolicyRuleKey[];
+const POLICY_RULE_NAME: Record<PolicyRuleKey, string> = {
+  late_rule: "Late Arrivals",
+  early_rule: "Early Departure",
+  absence_rule: "Absence",
+  forgotten_rule: "Forgotten Clock-Outs",
+  location_rule: "Location Flags",
+};
+const KEPT: MockRule[] = POLICY_RULES.map((rule) => ({
+  home_alert_rule_id: sid(`alert-rule:${alertsContract.HOME_ALERT_POLICY_METRIC}.${rule}`),
+  key: `${alertsContract.HOME_ALERT_POLICY_METRIC}.${rule}`,
+  name: POLICY_RULE_NAME[rule],
+  metric: alertsContract.HOME_ALERT_POLICY_METRIC,
+  threshold: "1",
+  window_days: null,
+  severity: "medium",
+  permission_key: "people.approve",
+  enabled: true,
+  created_by: null,
+  updated_by: null,
+  created_at: at(30, "02:00"),
+  updated_at: at(30, "02:00"),
+}));
+const isKept = (r: MockRule) => r.metric === alertsContract.HOME_ALERT_POLICY_METRIC;
+/** A rule's category: its metric's, and attendance for the Attendance policy's. */
+const categoryOfRule = (r: MockRule) => (isKept(r) ? "attendance" : (metricOf(r.metric)?.category ?? null));
+const ruleNamed = (name: string) => [...RULES, ...KEPT].find((r) => r.name === name)!;
 
 /** An alert as the mock keeps it: the row the shared engine writes. */
 interface MockAlert {
@@ -1079,7 +1107,8 @@ type AlertSeed = {
   who: string | null;
   title: string;
   trigger: string;
-  over_by: string;
+  /** Past the threshold; none for an Attendance policy breach, which has no Over By. */
+  over_by?: string;
   /** Raised this many days ago. */
   raised: number;
   /** Closed this many days ago, and how; open when absent. A rule switched off closes its alerts as no one (`by` null). */
@@ -1098,11 +1127,12 @@ const partnerNamed = (name: string) => PARTNERS.find((p) => p.name === name)!;
  * one by its rule being switched off) and some cleared this week.
  */
 const ALERT_SEEDS: AlertSeed[] = [
-  { rule: "Late Arrivals", subject: ["employee", "bashir"], who: "bashir", title: "Bashir Lawal: 4 late arrivals in 30 days", trigger: onDays("Late on", [1, 6, 9, 13]), over_by: "1", raised: 2, link: "/people?tab=attendance" },
-  { rule: "Late Arrivals", subject: ["employee", "rotimi"], who: "rotimi", title: "Rotimi Alade: 6 late arrivals in 30 days", trigger: onDays("Late on", [0, 3, 8, 15, 17, 22]), over_by: "3", raised: 17, link: "/people?tab=attendance" },
-  { rule: "Repeated Lateness", subject: ["employee", "rotimi"], who: "rotimi", title: "Rotimi Alade: 6 late arrivals in 30 days", trigger: onDays("Late on", [0, 3, 8, 15, 17, 22]), over_by: "1", raised: 16, link: "/people?tab=attendance" },
-  { rule: "Late Arrivals", subject: ["employee", "ngozi"], who: "ngozi", title: "Ngozi Eze: 3 late arrivals in 30 days", trigger: onDays("Late on", [2, 7, 19]), over_by: "0", raised: 2, link: "/people?tab=attendance" },
-  { rule: "Missing Clock-Outs", subject: ["employee", "emeka"], who: "emeka", title: "Emeka Obi: 3 missing clock-outs in 14 days", trigger: onDays("No clock-out on", [1, 5, 12]), over_by: "1", raised: 1, link: "/people?tab=attendance" },
+  { rule: "Late Arrivals", subject: ["attendance_rule_breach", "late:bashir"], who: "bashir", title: "Query Due: Bashir Lawal, 3 late arrivals this month", trigger: onDays("Late on", [1, 6, 9]), raised: 1, link: "/people?tab=attendance" },
+  { rule: "Late Arrivals", subject: ["attendance_rule_breach", "late:rotimi"], who: "rotimi", title: "Query Due: Rotimi Alade, 5 hours late this month", trigger: onDays("Late on", [3, 8, 13]), raised: 3, link: "/people?tab=attendance" },
+  { rule: "Late Arrivals", subject: ["attendance_rule_breach", "late:ngozi"], who: "ngozi", title: "Query Due: Ngozi Eze, 3 late arrivals this month", trigger: onDays("Late on", [2, 7, 12]), raised: 2, link: "/people?tab=attendance" },
+  { rule: "Early Departure", subject: ["attendance_rule_breach", "early:funke"], who: "funke", title: "Query Due: Funke Bello, 3 early departures this month", trigger: onDays("Left early on", [2, 6, 10]), raised: 2, link: "/people?tab=attendance" },
+  { rule: "Forgotten Clock-Outs", subject: ["attendance_rule_breach", "forgotten:emeka"], who: "emeka", title: "Emeka Obi: 3 forgotten clock-outs this month", trigger: onDays("No clock-out on", [1, 5, 12]), raised: 1, link: "/people?tab=attendance" },
+  { rule: "Location Flags", subject: ["attendance_rule_breach", "location:zainab"], who: "zainab", title: "Zainab Abubakar: 3 location flags this month", trigger: onDays("Outside on", [3, 5, 8]), raised: 3, link: "/people?tab=attendance" },
   { rule: "Approvals Waiting", subject: ["workflow_instance", "leave:funke"], who: "funke", title: "Annual Leave for Funke Bello: waiting 5 days", trigger: `At Line Manager since ${formatDate(isoDaysAgo(5))}`, over_by: "2", raised: 2, link: "/people?tab=leave" },
   { rule: "Documents Expiring", subject: ["document", "permit:grace"], who: "grace", title: "Grace Okon: Work Permit", trigger: `Expires on ${formatDate(isoDaysAhead(12))}`, over_by: "12", raised: 18, link: employeeLink("grace") },
   { rule: "Documents Expiring", subject: ["document", "first-aid:hauwa"], who: "hauwa", title: "Hauwa Yusuf: First Aid Certificate", trigger: `Expired on ${formatDate(isoDaysAgo(3))}`, over_by: "-3", raised: 33, link: employeeLink("hauwa") },
@@ -1112,9 +1142,9 @@ const ALERT_SEEDS: AlertSeed[] = [
   { rule: "Quiet Partners", subject: ["partner", "Eko Hotels"], who: null, title: "Eko Hotels: no contact in 34 days", trigger: `Last contact on ${formatDate(isoDaysAgo(34))}`, over_by: "4", raised: 4, link: `/partnerships?tab=partners&id=${partnerNamed("Eko Hotels").partner_id}` },
   { rule: "Quiet Partners", subject: ["partner", "Kano Trade Council"], who: null, title: "Kano Trade Council: no contact in 52 days", trigger: `Last contact on ${formatDate(isoDaysAgo(52))}`, over_by: "22", raised: 22, link: `/partnerships?tab=partners&id=${partnerNamed("Kano Trade Council").partner_id}` },
   { rule: "Budget Nearly Spent", subject: ["budget", "marketing-sales"], who: null, title: "Marketing & Sales: 94% spent", trigger: "₦4,700,000.00 of ₦5,000,000.00", over_by: "4", raised: 3, link: "/expenses?tab=budgets" },
-  { rule: "Late Arrivals", subject: ["employee", "seyi"], who: "seyi", title: "Seyi Balogun: 3 late arrivals in 30 days", trigger: onDays("Late on", [11, 14, 20]), over_by: "0", raised: 10, closed: { days: 5, at: "11:20", outcome: "dismissed", by: "cynthia", note: "Client site visits, agreed in advance" }, link: "/people?tab=attendance" },
+  { rule: "Late Arrivals", subject: ["attendance_rule_breach", "late:seyi"], who: "seyi", title: "Query Due: Seyi Balogun, 3 late arrivals this month", trigger: onDays("Late on", [11, 14, 16]), raised: 10, closed: { days: 5, at: "11:20", outcome: "dismissed", by: "cynthia", note: "Client site visits, agreed in advance" }, link: "/people?tab=attendance" },
   { rule: "Slow Hiring Stages", subject: ["application", "senior-designer"], who: null, title: "Senior Designer: 7 days at Interview", trigger: `At Interview since ${formatDate(isoDaysAgo(15))}`, over_by: "2", raised: 8, closed: { days: 6, at: "10:00", outcome: "dismissed", by: null, note: RULE_OFF_NOTE }, link: "/recruitment?tab=interviews" },
-  { rule: "Missing Clock-Outs", subject: ["employee", "yusuf"], who: "yusuf", title: "Yusuf Musa: 2 missing clock-outs in 14 days", trigger: onDays("No clock-out on", [4, 9]), over_by: "0", raised: 3, closed: { days: 0, at: "08:05", outcome: "cleared", by: "cynthia" }, link: "/people?tab=attendance" },
+  { rule: "Forgotten Clock-Outs", subject: ["attendance_rule_breach", "forgotten:yusuf"], who: "yusuf", title: "Yusuf Musa: 3 forgotten clock-outs this month", trigger: onDays("No clock-out on", [4, 9, 13]), raised: 3, closed: { days: 0, at: "08:05", outcome: "cleared", by: "cynthia" }, link: "/people?tab=attendance" },
   { rule: "Documents Expiring", subject: ["document", "ndpa:damilola"], who: "damilola", title: "Damilola Eke: NDPA Certificate", trigger: `Expired on ${formatDate(isoDaysAgo(20))}`, over_by: "-20", raised: 40, closed: { days: 0, at: "08:10", outcome: "cleared", by: "cynthia" }, link: employeeLink("damilola") },
 ];
 
@@ -1125,12 +1155,12 @@ const ALERTS: MockAlert[] = ALERT_SEEDS.map((s) => {
     home_alert_id: sid(`alert:${rule.key}:${s.subject.join(":")}`),
     home_alert_rule_id: rule.home_alert_rule_id,
     subject_type: s.subject[0],
-    subject_id: s.who ? staff(s.who).employee_id : sid(`${s.subject[0]}:${s.subject[1]}`),
+    subject_id: s.who && s.subject[0] === "employee" ? staff(s.who).employee_id : sid(`${s.subject[0]}:${s.subject[1]}`),
     subject_employee_id: s.who ? staff(s.who).employee_id : null,
     title: s.title,
     trigger: s.trigger,
     severity: rule.severity,
-    over_by: `${s.over_by}.00`,
+    over_by: s.over_by === undefined ? null : `${s.over_by}.00`,
     raised_at: raised,
     last_seen_at: s.closed ? at(s.closed.days, "06:00") : at(0, "06:00"),
     escalated_at: rule.severity === "high" && !s.closed && s.raised >= AGED_DAYS ? at(s.raised - AGED_DAYS, "06:10") : null,
@@ -1149,7 +1179,7 @@ const grantWords = (permissionKey: string) => {
   return `${MODULES.find((m) => m.key === module)?.label ?? module} ${HOLDERS[action] ?? action}`;
 };
 
-const ruleOf = (a: MockAlert) => RULES.find((r) => r.home_alert_rule_id === a.home_alert_rule_id)!;
+const ruleOf = (a: MockAlert) => [...RULES, ...KEPT].find((r) => r.home_alert_rule_id === a.home_alert_rule_id)!;
 const metricOf = (metric: string) => (Object.hasOwn(alertsContract.HOME_ALERT_METRICS, metric) ? alertsContract.HOME_ALERT_METRICS[metric as keyof typeof alertsContract.HOME_ALERT_METRICS] : null);
 const nameOfLogin = (userId: string | null) => (userId ? (PEOPLE.find((p) => loginOf(p.user_key) === userId)?.display_name ?? null) : null);
 const openDays = (a: MockAlert) => Math.floor((Date.now() - Date.parse(a.raised_at)) / DAY_MS);
@@ -1213,13 +1243,12 @@ export function overByWords(overBy: string | null, kind: HomeAlert["over_by_kind
 
 function alertOf(a: MockAlert, user: string): HomeAlert {
   const rule = ruleOf(a);
-  const metric = metricOf(rule.metric);
   return {
     home_alert_id: a.home_alert_id,
     home_alert_rule_id: a.home_alert_rule_id,
     rule_name: rule.name,
     metric: rule.metric,
-    category: metric?.category ?? null,
+    category: categoryOfRule(rule),
     subject_type: a.subject_type,
     subject_id: a.subject_id,
     subject_employee_id: a.subject_employee_id,
@@ -1472,7 +1501,8 @@ for (const [name, recipient, format, runAt, status] of ASKED) {
 function settle(run: MockRun) {
   if (run.status !== "pending" || run.settles_at === null || Date.now() < run.settles_at) return;
   const now = new Date().toISOString();
-  Object.assign(run, { status: "done", document_id: sid(`report-file:${run.number}`), finished_at: now, emailed_at: now, settles_at: null });
+  // A schedule's file is emailed; one somebody pressed for is downloaded where they pressed.
+  Object.assign(run, { status: "done", document_id: sid(`report-file:${run.number}`), finished_at: now, emailed_at: run.scheduled_for ? now : null, settles_at: null });
 }
 
 /**
@@ -1907,7 +1937,7 @@ route("GET /api/v1/home/alerts/summary", (req) => {
     for (const k of keys) if (k !== null) out.set(k, (out.get(k) ?? 0) + 1);
     return out;
   };
-  const categories = count<string>(open.map((a) => metricOf(ruleOf(a).metric)?.category ?? null));
+  const categories = count<string>(open.map((a) => categoryOfRule(ruleOf(a))));
   const sources = count(seen.filter((a) => Date.parse(a.raised_at) >= raisedSince).map((a) => ruleOf(a).metric));
   const summary: HomeAlertSummary = {
     open: open.length,
@@ -1933,7 +1963,7 @@ route("GET /api/v1/home/alerts", (req) => {
   const res = paged(rows, req, {
     search: (a) => [a.title, a.trigger],
     filters: {
-      category: (a, v) => metricOf(ruleOf(a).metric)?.category === v,
+      category: (a, v) => categoryOfRule(ruleOf(a)) === v,
       severity: (a, v) => a.severity === v,
       state: (a, v) => stateOf(a) === v,
       mine: (a, v) => mayClearAlert(user, a) === (v === "true"),
@@ -1989,6 +2019,42 @@ route("GET /api/v1/home/alert-rules", (req) => {
       created_at: (a, b) => a.created_at.localeCompare(b.created_at),
     },
   });
+});
+
+/** The Attendance policy's five consequence rules in force, read only (GET /home/alert-rules/policy). */
+route("GET /api/v1/home/alert-rules/policy", (req) => {
+  const refused = withoutCapability(req.user!, "alerts.manage");
+  if (refused) return refused;
+  const r = attendanceRulesInForce();
+  const v = attendanceVersionInForce();
+  const counts: Record<string, [string, string]> = {
+    late_rule: ["late arrival", "late arrivals"],
+    early_rule: ["early departure", "early departures"],
+    absence_rule: ["absence", "absences"],
+    forgotten_rule: ["forgotten clock-out", "forgotten clock-outs"],
+    location_rule: ["location flag", "location flags"],
+  };
+  const period: Record<string, string> = { week: "a week", month: "a month", days_30: "30 days" };
+  const out: HomeAlertPolicyRules = {
+    policy_version_id: v?.policy_version_id ?? null,
+    version: v?.version ?? null,
+    rules: POLICY_RULES.map((rule) => {
+      const x = r[rule];
+      const hours = "hours" in x && x.hours ? ` or ${x.hours} ${x.hours === 1 ? "hour" : "hours"}` : "";
+      const kept = KEPT.find((k) => k.key === `${alertsContract.HOME_ALERT_POLICY_METRIC}.${rule}`)!;
+      return {
+        rule,
+        name: POLICY_RULE_NAME[rule],
+        on: x.on,
+        figures: x.on ? `${x.count} ${x.count === 1 ? counts[rule]![0] : counts[rule]![1]} in ${period[x.period]}${hours}` : null,
+        alert: x.alert,
+        query: x.query,
+        open_alerts: ALERTS.filter((a) => a.home_alert_rule_id === kept.home_alert_rule_id && a.cleared_at === null).length,
+      };
+    }),
+    can_set: holds(me(req.user!), "policies.manage"),
+  };
+  return ok(out);
 });
 
 route("GET /api/v1/home/alert-rules/:id", (req) => {
@@ -2226,4 +2292,12 @@ route("POST /api/v1/home/overview/export", (req) => {
   const body = reportsContract.HomeReportRunNow.safeParse(req.body);
   if (!body.success) return refused422(body.error.issues);
   return queued(runFor(overviewReportOf(req.user!), req.user!, body.data.format, req.idempotency_key));
+});
+
+/* One of the reader's own Overview exports, which the screen that pressed waits on; no capability, as the Export has none. */
+route("GET /api/v1/home/overview/export/:id", (req) => {
+  RUNS.forEach(settle);
+  const run = RUNS.find((r) => r.home_report_run_id === req.params.id && r.recipient === req.user);
+  const report = run && REPORTS.find((r) => r.saved_report_id === run.saved_report_id);
+  return run && report?.report_key === "overview" ? ok(runOf(run)) : notFound();
 });

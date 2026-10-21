@@ -78,6 +78,11 @@ async function start() {
   realtime.attach(server);
 
   await new Promise((resolve) => server.listen(config.PORT, resolve));
+  // Once a minute: this process's memory, event loop and the people connected to it.
+  const stopBeat = require("./shared/observability/process-beat").start({
+    role: "api",
+    extras: () => realtime.presence(),
+  });
   logger.info(
     { port: config.PORT, env: config.APP_ENV },
     "mycity api listening",
@@ -91,7 +96,11 @@ async function start() {
     const force = setTimeout(() => process.exit(1), 10_000);
     force.unref();
     const finish = async () => {
+      await stopBeat().catch(() => {});
+      await require("./shared/observability/request-stats").flush().catch(() => {});
       await flush().catch(() => {});
+      // The connections' counted use (Settings · Integrations), before the pool closes.
+      await require("./shared/integrations/usage").stop();
       await Promise.allSettled([closeRedis(), closeDb()]);
       process.exit(0);
     };

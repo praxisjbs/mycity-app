@@ -25,6 +25,7 @@ const { assertInScope } = require("../../shared/rbac/scope");
 const lagos = require("../../shared/time/lagos");
 const calendar = require("./attendance.calendar");
 const repo = require("./attendance.repo");
+const places = require("../../shared/places/places");
 const schedules = require("./attendance.schedule");
 const { EVENTS } = require("./attendance.events");
 
@@ -81,7 +82,8 @@ async function mine(user) {
 /**
  * POST /attendance/me/home.
  * @param {{user_id: string, employee_id: string}} user  the session's
- * @param {{home_address: string, home_latitude: number, home_longitude: number, accuracy_m: number}} body
+ * @param {{home_address: object, home_latitude: number, home_longitude: number, accuracy_m: number}} body
+ *   home_address is the picked place (contract PlaceInput, F27); the fence stays on the reading
  */
 async function request(user, body) {
   const employeeId = user.employee_id;
@@ -100,12 +102,13 @@ async function request(user, body) {
     if (waiting) await repo.supersedePending(client, employeeId);
     const home = await repo.insertHome(client, {
       employee_id: employeeId,
-      address: body.home_address,
+      address: places.lineOf(body.home_address),
       latitude: body.home_latitude,
       longitude: body.home_longitude,
       accuracy_m: body.accuracy_m,
       requested_by: user.user_id,
     });
+    await places.save(client, "attendance_home.address", home.attendance_home_id, body.home_address, { field: "home_address" });
     await emit(client, {
       key: EVENTS.ATTENDANCE_HOME_REQUESTED,
       entity: { type: "attendance_home", id: home.attendance_home_id },

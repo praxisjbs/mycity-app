@@ -19,6 +19,7 @@ defineNotification(EVENTS.IMPORT_COMMITTED, {
   body: (e) =>
     `${e.payload.create} created, ${e.payload.update} updated, ${e.payload.error} with problems.`,
   include_actor: true,
+  who: "Who ran it",
 });
 
 defineNotification(EVENTS.IMPORT_REVERTED, {
@@ -27,6 +28,7 @@ defineNotification(EVENTS.IMPORT_REVERTED, {
   body: (e) =>
     `${e.payload.archived} archived, ${e.payload.restored} put back as they were.`,
   include_actor: true,
+  who: "Who ran it",
 });
 
 module.exports = {};

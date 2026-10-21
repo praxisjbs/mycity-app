@@ -45,7 +45,9 @@
     "fe:typecheck": "npm run typecheck -w @mycity/ui -w @mycity/app -w @mycity/public-app",
     "fe:lint": "npm run lint -w @mycity/ui -w @mycity/app -w @mycity/public-app",
     "fe:test": "node scripts/fe-test.js",
-    "fe:build": "npm run build -w @mycity/ui -w @mycity/app -w @mycity/public-app"
+    "fe:build": "npm run build -w @mycity/ui -w @mycity/app -w @mycity/public-app",
+    "check:schedulers": "node scripts/check/schedulers.js",
+    "health:brief": "node scripts/ops/health-brief.js"
   },
   "dependencies": {
     "@mycity/contract": "file:packages/contract",
@@ -64,12 +66,14 @@
     "express-rate-limit": "^7.5.1",
     "heic-convert": "^2.1.0",
     "helmet": "^8.3.0",
+    "htmlparser2": "^8.0.2",
     "imapflow": "^1.0.191",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "mailparser": "^3.7.4",
     "multer": "^2.4.0",
     "nodemailer": "^7.0.13",
+    "pdfjs-dist": "5.6.205",
     "pg": "^8.23.1",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",

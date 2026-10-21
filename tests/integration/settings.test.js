@@ -151,7 +151,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(res.body.page.total).toBe(7);
       const byCode = Object.fromEntries(res.body.data.map((r) => [r.code, r]));
       expect(byCode.operations_people).toEqual(
-        expect.objectContaining({ is_system: true, users: 1, modules: 15, scope: "all", fields_visible: 4 }),
+        expect.objectContaining({ is_system: true, users: 1, modules: 16, scope: "all", fields_visible: 4 }),
       );
       expect(byCode.employee).toEqual(expect.objectContaining({ users: 1, scope: "own", fields_visible: 0 }));
       expect(res.body.data[0].code).toBe("implementation");
@@ -160,7 +160,7 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("the catalogue and the matrix: every module, every role", async () => {
       const cat = await as("ops").get("/settings/roles/catalogue");
       expect(cat.status).toBe(200);
-      expect(cat.body.modules).toHaveLength(15);
+      expect(cat.body.modules).toHaveLength(18);
       expect(cat.body.modules.find((m) => m.key === "ess").own_only).toBe(true);
       expect(cat.body.fields.map((f) => f.key)).toEqual([
         "employee.salary",
@@ -175,12 +175,13 @@ describeDb("access, settings and audit against the real migrations", () => {
         "home.reports",
         "home.team",
         "mailbox.signature",
+        "policies.manage",
       ]);
 
       const m = await as("ops").get("/settings/roles/matrix");
       expect(m.status).toBe(200);
       expect(m.body.roles).toHaveLength(7);
-      expect(m.body.rows).toHaveLength(15);
+      expect(m.body.rows).toHaveLength(18);
       const payroll = m.body.rows.find((r) => r.module_key === "payroll");
       const staffRole = m.body.roles.findIndex((r) => r.code === "employee");
       expect(payroll.cells[staffRole]).toEqual(expect.objectContaining({ actions: [], scope: null }));
@@ -231,7 +232,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         (await as("ops").get(`/settings/roles/${roles.find((r) => r.code === code).role_id}`)).body;
       const ops = await detail("operations_people");
       expect(ops.visible_fields).toHaveLength(4);
-      expect(ops.capabilities).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team"]);
+      expect(ops.capabilities).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team", "policies.manage"]);
       const staff = await detail("employee");
       expect(staff.visible_fields).toEqual([]);
       expect(staff.capabilities).toEqual([]);
@@ -249,6 +250,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "announcements.post",
         "home.reports",
         "home.team",
+        "policies.manage",
       ]);
       expect(await grantsCache.getCapabilities(pool, people.staff.user.user_id)).toEqual([]);
     });
@@ -604,7 +606,7 @@ describeDb("access, settings and audit against the real migrations", () => {
     test("every numbered document type, with the next number it would give", async () => {
       const res = await as("ops").get("/settings/numbering");
       expect(res.status).toBe(200);
-      expect(res.body.page.total).toBe(19);
+      expect(res.body.page.total).toBe(21);
       const expense = res.body.data.find((s) => s.doc_type === "expense");
       expect(expense).toEqual(expect.objectContaining({ label: "Expense Request", prefix: "EXP", next: "EXP-0001", issued: 0 }));
       const staff = res.body.data.find((s) => s.doc_type === "employee");
@@ -613,7 +615,7 @@ describeDb("access, settings and audit against the real migrations", () => {
       const found = await as("ops").get("/settings/numbering?q=payslip");
       expect(found.body.data.map((s) => s.doc_type)).toEqual(["payslip"]);
       const summary = await as("ops").get("/settings/numbering/summary");
-      expect(summary.body).toEqual(expect.objectContaining({ types: 19, resetting: 2 }));
+      expect(summary.body).toEqual(expect.objectContaining({ types: 21, resetting: 2 }));
     });
 
     test("a scheme changes the next number, never one issued; a reset needs its period", async () => {
@@ -880,31 +882,48 @@ describeDb("access, settings and audit against the real migrations", () => {
       expect(res.body.today).toBeGreaterThan(0);
       expect(res.body.this_month).toBeGreaterThanOrEqual(res.body.today);
       expect(res.body.by_module[0]).toEqual(expect.objectContaining({ module_key: "settings", label: "Settings" }));
-      expect(res.body.modules).toHaveLength(15);
+      expect(res.body.modules).toHaveLength(18);
     });
 
-    test("the export is the whole filtered log, built by the worker, kept and emailed", async () => {
+    test("the export is the whole filtered log, made by the worker into the file the Audit Log downloads", async () => {
       expect((await as("viewer").post("/audit/exports").send({ module: "settings" })).status).toBe(202);
       const res = await as("admin").post("/audit/exports").send({ action: "settings.changed" });
       expect(res.status).toBe(202);
-      expect(res.body).toEqual({ queued: true, email: "femi@mycity.test" });
+      expect(res.body).toEqual({ document_id: expect.any(String), file_name: expect.stringMatching(/^audit-log-.+\.xlsx$/), status: "pending" });
       expect((await as("staff").post("/audit/exports").send({})).status).toBe(403);
 
       sent.length = 0;
       await drain();
-      const mails = sent.filter((s) => s.data && s.data.template === "audit-export");
-      expect(mails).toHaveLength(2);
-      const mine = mails.find((m) => m.data.to.email === "femi@mycity.test");
-      expect(mine.data.data).toEqual(expect.objectContaining({ capped: false, filters: "action = settings.changed" }));
-      expect(mine.data.data.entries).toBeGreaterThan(0);
-      const doc = await one("SELECT doc_type, sensitivity, mime FROM document WHERE document_id = $1", [
-        mine.data.attachments[0].document_id,
-      ]);
+      // Nothing is emailed: the screen that asked downloads the file.
+      expect(sent.filter((s) => s.queue === "email-send")).toEqual([]);
+      const file = await as("admin").get(`/exports/${res.body.document_id}`);
+      expect(file.body).toEqual({ ...res.body, status: "done" });
+      const doc = await one("SELECT doc_type, sensitivity, mime, uploaded_by FROM document WHERE document_id = $1", [res.body.document_id]);
       expect(doc).toEqual({
         doc_type: "audit_export",
         sensitivity: "restricted",
         mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        uploaded_by: people.admin.user.user_id,
       });
+      const content = await as("admin")
+        .get(`/documents/${res.body.document_id}/content`)
+        .buffer(true)
+        .parse((stream, done) => {
+          const chunks = [];
+          stream.on("data", (chunk) => chunks.push(chunk));
+          stream.on("end", () => done(null, Buffer.concat(chunks)));
+        });
+      expect(content.status).toBe(200);
+      // Its cover says what it holds: the filters, and how many entries.
+      const ExcelJS = require("exceljs");
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(content.body);
+      const cover = [];
+      wb.getWorksheet("Cover").eachRow((row) => cover.push(row.values.slice(1).join(" ")));
+      expect(cover.join("\n")).toContain("action = settings.changed");
+      expect(cover.join("\n")).toMatch(/Entries \d+/);
+      // The other export waits for its own asker alone.
+      expect((await as("viewer").get(`/exports/${res.body.document_id}`)).status).toBe(404);
     });
 
     test("the ledger cannot be edited", async () => {

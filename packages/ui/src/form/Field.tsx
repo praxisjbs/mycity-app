@@ -23,6 +23,8 @@ interface FieldContextValue extends ControlIds {
   labelledBy: boolean;
   hasHelp: boolean;
   hasError: boolean;
+  /** The field carries the Optional tag: it may be left empty. */
+  optional: boolean;
 }
 
 const FieldContext = createContext<FieldContextValue | null>(null);
@@ -46,6 +48,11 @@ export function useFieldControl(own: { id?: string; state?: FieldState; group?: 
 /** The id of the Field's label, so a control that opens a sheet can title it with the label's words. */
 export function useFieldLabelId(): string | undefined {
   return useContext(FieldContext)?.labelId;
+}
+
+/** Whether the Field around a control carries the Optional tag, so the control can offer to clear itself. */
+export function useFieldOptional(): boolean {
+  return useContext(FieldContext)?.optional ?? false;
 }
 
 export interface FieldProps {
@@ -74,7 +81,7 @@ export function Field({ label, help, info, optional, state, message, children, h
   const id = htmlFor ?? ids.id;
   const helpText = help ?? info;
   const hasError = state === "bad" && !!message;
-  const ctx: FieldContextValue = { ...ids, id, state, labelledBy: !!helpText, hasHelp: !!helpText, hasError };
+  const ctx: FieldContextValue = { ...ids, id, state, labelledBy: !!helpText, hasHelp: !!helpText, hasError, optional: !!optional };
   return (
     <FieldContext.Provider value={ctx}>
       <div className={cn("mb-3.5", className)} data-state={state}>

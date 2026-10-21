@@ -44,7 +44,8 @@
  *   workflow_instance  workflow_instance_id, workflow_definition_id, definition_key, module_key,
  *                      entity_type, entity_id, subject_employee_id, current_stage, state,
  *                      context jsonb, stage_approvers jsonb, stage_entered_at, stage_due_at,
- *                      opened_by, opened_at, completed_at;
+ *                      opened_by, opened_at, completed_at,
+ *                      excluded_employee_ids (1455: who never decides it, docs/guides/foundation.md §6.5);
  *                      UNIQUE (entity_type, entity_id) WHERE state = 'pending'
  *   workflow_decision  workflow_decision_id, workflow_instance_id, stage_key, actor_id,
  *                      decision, reason, decided_at
@@ -71,7 +72,7 @@ const TERMINAL = new Set([
 
 const COLUMNS = `workflow_instance_id, workflow_definition_id, definition_key, module_key, entity_type, entity_id,
   subject_employee_id, current_stage, state, context, stage_approvers, stage_entered_at, stage_due_at,
-  opened_by, opened_at, completed_at`;
+  opened_by, opened_at, completed_at, excluded_employee_ids`;
 
 function mustBeInTransaction(client, fn) {
   if (!inTransaction(client))
@@ -101,6 +102,7 @@ function payloadOf(instance, def, extra = {}) {
       instance.state === "pending" ? instance.stage_approvers : [],
     subject_employee_id: instance.subject_employee_id,
     opened_by: instance.opened_by,
+    excluded_employee_ids: instance.excluded_employee_ids || [],
     ...extra,
   };
 }
@@ -209,7 +211,9 @@ async function requiresApproval(client, definitionKey, context) {
  * Start an approval for a record.
  * @param {import("pg").PoolClient} client  inside atomically()
  * @param {{definition_key: string, entity: {type: string, id: string}, subject_employee_id?: string|null,
- *          context: object, actor: object|string|null}} opts
+ *          context: object, actor: object|string|null, exclude_employee_ids?: string[]}} opts
+ *   exclude_employee_ids  employees who never decide this approval, whatever role they hold
+ *                         (a temporary site's people; docs/guides/foundation.md §6.5)
  * @returns {Promise<object>} the instance
  */
 async function openInstance(
@@ -220,6 +224,7 @@ async function openInstance(
     subject_employee_id: subjectId = null,
     context = {},
     actor,
+    exclude_employee_ids: excluded = [],
   },
 ) {
   mustBeInTransaction(client, "openInstance");
@@ -236,8 +241,8 @@ async function openInstance(
     const { rows } = await client.query(
       `INSERT INTO workflow_instance
          (workflow_definition_id, definition_key, module_key, entity_type, entity_id, subject_employee_id,
-          current_stage, state, context, stage_approvers, opened_by, completed_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8::jsonb, '[]'::jsonb, $9, $10)
+          current_stage, state, context, stage_approvers, opened_by, completed_at, excluded_employee_ids)
+       VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8::jsonb, '[]'::jsonb, $9, $10, $11::uuid[])
        RETURNING ${COLUMNS}`,
       [
         def.workflow_definition_id,
@@ -250,6 +255,7 @@ async function openInstance(
         JSON.stringify(context),
         actorId(actor),
         first ? null : new Date(),
+        [...new Set(excluded || [])],
       ],
     );
     instance = rows[0];

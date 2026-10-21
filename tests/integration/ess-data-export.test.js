@@ -1,8 +1,8 @@
 "use strict";
 /**
  * Download My Data end to end (docs/guides/ess.md §3 step 8, §5, §6, §7): the real migrations on a
- * throwaway database, the whole app through HTTP, the worker's handler through the outbox, and
- * the workbook itself opened and read.
+ * throwaway database, the whole app through HTTP, the worker's handler through the outbox, the
+ * file the screen waits on and downloads, and the workbook itself opened and read.
  *
  *   RUN_DB_TESTS=1 DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mycity_test npx jest tests/integration/ess-data-export
  *
@@ -10,6 +10,7 @@
  */
 const request = require("supertest");
 const ExcelJS = require("exceljs");
+const c = require("@mycity/contract");
 const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
@@ -146,10 +147,11 @@ describeDb("Download My Data against the real migrations", () => {
     expect((await request(app).post("/api/v1/ess/profile/export").send({})).status).toBe(401);
   });
 
-  test("my own copy: queued at once, audited, built after commit, emailed to me, kept restricted", async () => {
+  test("my own copy: reserved at once and audited, made after commit into the file I download, never emailed", async () => {
     const res = await as("staff").post("/ess/profile/export");
     expect(res.status).toBe(202);
-    expect(res.body).toEqual({ queued: true, email: "staff@mycity.test" });
+    const file = c.documents.ExportFile.parse(res.body);
+    expect(file).toMatchObject({ status: "pending", file_name: expect.stringMatching(/^my-data-.+\.xlsx$/) });
 
     const audit = await q(
       "SELECT actor_user_id, entity_type, entity_id FROM audit_ledger WHERE action = 'employee.data_export_requested'",
@@ -158,27 +160,34 @@ describeDb("Download My Data against the real migrations", () => {
       { actor_user_id: people.staff.user.user_id, entity_type: "employee", entity_id: people.staff.employee.employee_id },
     ]);
 
+    // The screen waits on it: pending until the worker has made it, and nothing to download yet.
+    expect((await as("staff").get(`/exports/${file.document_id}`)).body.status).toBe("pending");
+    expect((await as("staff").get(`/documents/${file.document_id}/content`)).status).toBe(409);
+
     await drain();
-    const docs = await q("SELECT document_id, sensitivity, entity_type, subject_employee_id FROM document WHERE doc_type = 'data_export'");
-    expect(docs.rows).toHaveLength(1);
-    expect(docs.rows[0]).toMatchObject({ sensitivity: "restricted", entity_type: "data_export", subject_employee_id: null });
-    const mail = sent.filter((m) => m.name === "data-export");
-    expect(mail).toHaveLength(1);
-    expect(mail[0].data).toMatchObject({
-      to: { email: "staff@mycity.test" },
-      template: "data-export",
-      data: { subject_name: "Musa Danjuma", own: true, kept_days: 7 },
-      attachments: [{ document_id: docs.rows[0].document_id }],
-    });
+    const docs = await q("SELECT document_id, sensitivity, entity_type, subject_employee_id, render_status FROM document WHERE doc_type = 'data_export'");
+    expect(docs.rows).toEqual([
+      {
+        document_id: file.document_id,
+        sensitivity: "restricted",
+        entity_type: "data_export",
+        subject_employee_id: people.staff.employee.employee_id,
+        render_status: "done",
+      },
+    ]);
+    const done = await as("staff").get(`/exports/${file.document_id}`);
+    expect(c.documents.ExportFile.parse(done.body)).toEqual({ ...file, status: "done" });
+    expect(sent.filter((m) => m.queue === "email-send")).toEqual([]);
     const failed = await q("SELECT count(*)::int AS n FROM event_outbox WHERE event_key = 'employee.data_export_requested' AND status <> 'done'");
     expect(failed.rows[0].n).toBe(0);
 
-    // The person and the CEO may open it; their manager and People may not.
-    const file = (who) => as(who).get(`/documents/${docs.rows[0].document_id}/content`);
-    expect((await file("staff")).status).toBe(200);
-    expect((await file("ceo")).status).toBe(200);
-    expect((await file("manager")).status).toBe(404);
-    expect((await file("ops")).status).toBe(404);
+    // Only the person who asked waits on it; the person and the CEO may open it, nobody else.
+    expect((await as("ceo").get(`/exports/${file.document_id}`)).status).toBe(404);
+    const content = (who) => as(who).get(`/documents/${file.document_id}/content`);
+    expect((await content("staff")).status).toBe(200);
+    expect((await content("ceo")).status).toBe(200);
+    expect((await content("manager")).status).toBe(404);
+    expect((await content("ops")).status).toBe(404);
   });
 
   test("the workbook: a cover, a sheet per area, and nothing restricted in it", async () => {
@@ -218,16 +227,21 @@ describeDb("Download My Data against the real migrations", () => {
     expect(everything).not.toMatch(/Latitude|Longitude/);
   });
 
-  test("once a day: a second request is refused, and the CEO's counts against the same day", async () => {
+  test("once a day: pressing again hands back the same file, and the CEO is refused that day", async () => {
+    const first = (await q("SELECT document_id FROM document WHERE doc_type = 'data_export'")).rows[0];
     const again = await as("staff").post("/ess/profile/export");
-    expect(again.status).toBe(429);
-    expect(again.body.error.code).toBe("DATA_EXPORT_LIMIT");
-    expect(again.body.error.message).toMatch(/today/);
+    expect(again.status).toBe(202);
+    expect(c.documents.ExportFile.parse(again.body)).toMatchObject({ document_id: first.document_id, status: "done" });
+    expect((await q("SELECT count(*)::int AS n FROM document WHERE doc_type = 'data_export'")).rows[0].n).toBe(1);
+    expect((await q("SELECT count(*)::int AS n FROM audit_ledger WHERE action = 'employee.data_export_requested'")).rows[0].n).toBe(1);
+
     const ceo = await as("ceo").post(`/employees/${people.staff.employee.employee_id}/data-export`);
     expect(ceo.status).toBe(429);
+    expect(ceo.body.error.code).toBe("DATA_EXPORT_LIMIT");
+    expect(ceo.body.error.message).toMatch(/today/);
   });
 
-  test("Download Their Data is the CEO's alone, delivered to the CEO and audited with who asked", async () => {
+  test("Download Their Data is the CEO's alone, downloaded by the CEO and audited with who asked", async () => {
     const manager = people.manager.employee.employee_id;
     expect((await as("ops").post(`/employees/${manager}/data-export`)).status).toBe(403);
     expect((await as("manager").post(`/employees/${people.staff.employee.employee_id}/data-export`)).status).toBe(403);
@@ -235,7 +249,8 @@ describeDb("Download My Data against the real migrations", () => {
 
     const res = await as("ceo").post(`/employees/${manager}/data-export`);
     expect(res.status).toBe(202);
-    expect(res.body).toEqual({ queued: true, email: "ceo@mycity.test" });
+    const file = c.documents.ExportFile.parse(res.body);
+    expect(file.status).toBe("pending");
     const audit = await q(
       "SELECT actor_user_id FROM audit_ledger WHERE action = 'employee.data_export_requested' AND entity_id = $1",
       [manager],
@@ -243,33 +258,60 @@ describeDb("Download My Data against the real migrations", () => {
     expect(audit.rows).toEqual([{ actor_user_id: people.ceo.user.user_id }]);
 
     await drain();
-    const mail = sent.filter((m) => m.name === "data-export" && m.data.to.email === "ceo@mycity.test");
-    expect(mail).toHaveLength(1);
-    expect(mail[0].data.data).toMatchObject({ subject_name: "Kemi Alade", own: false });
-    const sheets = await open(mail[0].data.attachments[0].document_id);
+    expect((await as("ceo").get(`/exports/${file.document_id}`)).body.status).toBe("done");
+    expect(sent.filter((m) => m.queue === "email-send")).toEqual([]);
+    const sheets = await open(file.document_id);
     const cover = sheets.Cover.map((r) => r.join(" ")).join("\n");
     expect(cover).toContain("Kemi Alade");
     expect(cover).toContain("Amaka Eze");
+    // The person it is about may open it too.
+    expect((await as("manager").get(`/documents/${file.document_id}/content`)).status).toBe(200);
 
     // The manager's own request that day is the one a day already used.
     expect((await as("manager").post("/ess/profile/export")).status).toBe(429);
     expect((await as("ceo").post("/employees/00000000-0000-4000-8000-000000000000/data-export")).status).toBe(404);
   });
 
-  test("after seven days the cleanup removes the file from the vault", async () => {
-    const exportJs = require("../../src/modules/ess/ess.export");
-    const before = await q("SELECT document_id, storage_key FROM document WHERE doc_type = 'data_export' ORDER BY created_at");
-    expect(before.rows).toHaveLength(2);
-    expect(await exportJs.purgeExpired(new Date())).toEqual({ removed: 0 });
+  test("one its asker may no longer have fails, and a failed file does not use the day up", async () => {
+    const grantsCache = require("../../src/shared/rbac/grants-cache");
+    const setStatus = async (status) => {
+      await q("UPDATE app_user SET status = $2 WHERE user_id = $1", [people.ops.user.user_id, status]);
+      await grantsCache.invalidateUser(people.ops.user.user_id);
+    };
+    const res = await as("ops").post("/ess/profile/export");
+    expect(res.status).toBe(202);
+    const first = c.documents.ExportFile.parse(res.body);
+    // Suspended before the worker reached it: nothing is made, and the screen waiting is told.
+    await setStatus("suspended");
+    await drain();
+    await setStatus("active");
+    expect((await as("ops").get(`/exports/${first.document_id}`)).body.status).toBe("failed");
+    expect((await as("ops").get(`/documents/${first.document_id}/content`)).status).toBe(410);
 
-    await q("UPDATE document SET created_at = now() - interval '8 days' WHERE document_id = $1", [before.rows[0].document_id]);
-    expect(await exportJs.purgeExpired(new Date())).toEqual({ removed: 1 });
-    const after = await q("SELECT document_id FROM document WHERE doc_type = 'data_export'");
-    expect(after.rows.map((r) => r.document_id)).toEqual([before.rows[1].document_id]);
+    const again = await as("ops").post("/ess/profile/export");
+    expect(again.status).toBe(202);
+    const second = c.documents.ExportFile.parse(again.body);
+    expect(second.document_id).not.toBe(first.document_id);
+    await drain();
+    expect((await as("ops").get(`/exports/${second.document_id}`)).body.status).toBe("done");
+  });
+
+  test("a day later the export cleanup removes the file from the vault", async () => {
+    const exportFiles = require("../../src/shared/documents/exports");
+    const before = await q("SELECT document_id, storage_key FROM document WHERE doc_type = 'data_export' ORDER BY created_at");
+    expect(before.rows).toHaveLength(4);
+    expect(await exportFiles.purgeExpired(new Date())).toEqual({ removed: 0 });
+
+    await q("UPDATE document SET created_at = now() - interval '25 hours' WHERE document_id = $1", [before.rows[0].document_id]);
+    expect(await exportFiles.purgeExpired(new Date())).toEqual({ removed: 1 });
+    const after = await q("SELECT document_id FROM document WHERE doc_type = 'data_export' ORDER BY created_at");
+    expect(after.rows.map((r) => r.document_id)).toEqual(before.rows.slice(1).map((r) => r.document_id));
     expect(await storage.exists(before.rows[0].storage_key)).toBe(false);
     const removed = await q("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'document.removed' AND entity_id = $1", [
       before.rows[0].document_id,
     ]);
     expect(removed.rows[0].n).toBe(1);
+    // Gone from the vault, it is gone from the screen that waited on it too.
+    expect((await as("staff").get(`/exports/${before.rows[0].document_id}`)).status).toBe(404);
   });
 });

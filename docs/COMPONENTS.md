@@ -48,6 +48,9 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [KpiDetail](#kpidetail) | `KpiDetail` | The report model behind a KPI card: the records that make up the number, grouped, searchable and paged at 25. | stable |
 | Display | [KpiGrid](#kpigrid) | `KpiGrid` | The row of KPI cards: four across on desktop, two to a row on a phone. | stable |
 | Display | [LevelMeter](#levelmeter) | `LevelMeter` | A level drawn as a few short bars, filled up to the level: how much access a role has to a module. | stable |
+| Display | [LinkCard](#linkcard) | `LinkCard` | A link's card, as on WhatsApp: the page's picture, the site, the title and a line of its description, opening the page. | beta |
+| Display | [LinkText](#linktext) | `LinkText` | Text a person wrote, with every link in it clickable and, while searching, each match marked. | beta |
+| Display | [MediaTile](#mediatile) | `MediaTile`, `MediaAlbum` | A photo, a video's first frame or a file, drawn in place at its own shape before it has loaded; MediaAlbum puts four or more side by side, two by two. | beta |
 | Display | [Money](#money) | `Money` | An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word. | stable |
 | Display | [Pill](#pill) | `Pill`, `StatusPill` | A small rounded label in a status tone, with a dot; StatusPill draws one from a status record ({ tone, text }). | stable |
 | Display | [ProfileHeader](#profileheader) | `ProfileHeader`, `BackButton` | The head of a record page: who or what it is, in their photo or big initials, with its chips and its actions. | stable |
@@ -56,13 +59,14 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Result](#result) | `Result` | The outcome of something a person just did: clocking in, signing, a check that passed or failed. | stable |
 | Display | [ShareBar](#sharebar) | `ShareBar` | The share of a total, drawn behind a row of text rather than beside it. | stable |
 | Display | [Skeleton](#skeleton) | `Skeleton`, `Spinner` | A shimmering placeholder in the shape of what is loading: lines of text, a block or a circle; Spinner is the small turning ring for a wait with no shape. | stable |
+| Display | [StackBar](#stackbar) | `StackBar` | A whole split into named parts on one bar, with a key under it: memory by service, the disk by what fills it. | beta |
 | Display | [StatStrip](#statstrip) | `StatStrip` | A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts. | stable |
 | Display | [Sub](#sub) | `Sub` | The faint line under a heading or beside a value: the smallest secondary text there is. | stable |
 | Display | [Swatch](#swatch) | `Swatch` | A square of one palette token's colour, beside its name and its value. | stable |
 | Display | [TapList](#taplist) | `TapList` | A stack of rows that each open something: the phone's way into a record when a table would be wrong. | stable |
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
-| Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, which fill as it plays. | stable |
+| Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, drawn from its measured loudness, which fill as it plays. | stable |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
@@ -82,6 +86,8 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Feedback | [ErrorState](#errorstate) | `ErrorState` | Something did not load: one line saying so, and Try Again. | stable |
 | Feedback | [NotificationBanner](#notificationbanner) | `NotificationBanner` | The banner for a notification that arrives while the app is open: who or what it is about, its title and two lines, dropping in at the top for 3 seconds; notify() shows one from anywhere. | beta |
 | Feedback | [Toaster](#toaster) | `Toaster` | Where toasts appear: mounted once per app; toast(), toast.success(), toast.error() and toast.info() show one from anywhere, at the bottom; notify() shows a notification's banner at the top. | stable |
+| Feedback | [UrgentBar](#urgentbar) | `UrgentBar` | The red bar under the top bar on every screen while an urgent notice waits on the person: its title, how many wait, and Acknowledge or Open. | beta |
+| Forms | [AddressField](#addressfield) | `AddressField` | An address picked, never typed: suggestions from our own address search as the person types, a pin on the map, and the device's location while search is down. | stable |
 | Forms | [CardPicker](#cardpicker) | `CardPicker` | The cards a person puts on a KPI row: tick up to four, keep them in order with Move Up and Move Down, the cards their role fixes locked and first. | beta |
 | Forms | [ChannelGrid](#channelgrid) | `ChannelGrid` | Switches in a grid: one row per kind of thing (a notification category), one column per way it reaches a person (In App, Email, Push); each switch saves on its own. | beta |
 | Forms | [DateField](#datefield) | `DateField`, `DateRangeField`, `TimeField` | Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wire. With DateRangeField and TimeField. | stable |
@@ -92,10 +98,12 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
+| Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
 | Forms | [RadioCards](#radiocards) | `RadioCards` | Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2. | stable |
 | Forms | [RecordPicker](#recordpicker) | `RecordPicker` | Picks records the server searches: one page of 25, narrowed as the person types, never a dropdown of everything. | stable |
 | Forms | [RichTextField](#richtextfield) | `RichTextField` | Long text with the little formatting a message needs, loaded only when a composer opens. | stable |
 | Forms | [SearchInput](#searchinput) | `SearchInput`, `FilterSelect` | The one search box for a list, sent to the server as q; with FilterSelect, a labelled branded select in a filter row. | stable |
+| Forms | [SecretField](#secretfield) | `SecretField` | A password or an API key the server may already keep: Saved (with a key's last four) and Replace, never a character of what is saved. | beta |
 | Forms | [SelectField](#selectfield) | `SelectField`, `ChoiceField`, `SelectMenu` | Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField). | stable |
 | Forms | [SignatureField](#signaturefield) | `SignatureField` | A signature drawn with a finger or a mouse, which leaves as a PNG for the document it is stamped into. | stable |
 | Forms | [StepBar](#stepbar) | `StepBar` | Where a person is in a few steps: one bar per step, filled up to the step in hand, and Step 2 of 4. | stable |
@@ -107,21 +115,26 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Wizard](#wizard) | `Wizard` | A long form in steps: one topic per step, a step indicator, Back and Next, and a last button that names the result. | stable |
 | Data | [Calendar](#calendar) | `Calendar` | A month at a glance, Monday first, with what happens on each day. | stable |
 | Data | [DataView](#dataview) | `DataView`, `LoadingRows` | THE shared list: a dense table on desktop and a card list on a phone from the same rows, with the pager, server sort, selection, bulk actions and Export. | stable |
-| Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox. | stable |
+| Data | [ExportButton](#exportbutton) | `ExportButton` | Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it. | stable |
 | Data | [Kanban](#kanban) | `Kanban`, `KanbanCardBody` | A board of stages: columns of cards on desktop, and on a phone a stage switcher over the cards of one stage (F19). | stable |
 | Data | [Pager](#pager) | `Pager` | Page controls under a list, showing the server's true total ("312 employees") and Previous and Next. | stable |
 | Data | [Toolbar](#toolbar) | `Toolbar` | The row of controls above a list: its search box, filter selects and actions, wrapping on a narrow screen. | stable |
 | Charts | [AreaChart](#areachart) | `AreaChart` | A figure over time as a filled line: attendance across a month, signed value by week, headcount by quarter. | stable |
 | Charts | [BandChart](#bandchart) | `BandChart` | Salary bands: each grade's range on one scale, with its midpoint marked and its figures beside it. | stable |
-| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars: headcount by department, claims by month, interviews by stage. | stable |
+| Charts | [BarChart](#barchart) | `BarChart` | Figures side by side as bars: headcount by department, claims by month, spend by day. | stable |
 | Charts | [ChartFrame](#chartframe) | `ChartFrame` | The card every chart sits in: its title, its help, the desktop-only caption, and the values as text for anyone who cannot see it. | stable |
 | Charts | [DonutChart](#donutchart) | `DonutChart` | A ring: one share of a whole with the figure in its middle, or a few slices that add up to it. | stable |
 | Charts | [Sparkline](#sparkline) | `Sparkline` | A bare trend line with no axes, for inside a table cell or beside a figure. | stable |
-| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both. | stable |
+| Charts | [TrendChart](#trendchart) | `TrendChart` | One to three figures over time on one scale, with an optional target line, gaps where nothing was recorded, and a readout that follows the pointer. | beta |
+| Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
+| Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
+| Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
+| Documents | [PdfViewer](#pdfviewer) | `PdfViewer` | A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom. | beta |
 | Documents | [Reader](#reader) | `Reader`, `ArticleBody` | An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time. | stable |
+| Documents | [RichText](#richtext) | `RichText` | Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML. | beta |
 | Maps | [LocationLabel](#locationlabel) | `LocationLabel` | Where a point is, in words: the address our API looks up, with the coordinates until it arrives. | stable |
 | Maps | [MapView](#mapview) | `MapView` | A map with the points a screen cares about, drawn by Leaflet on tiles our own API serves. | stable |
 | Maps | [PlaceSearch](#placesearch) | `PlaceSearch` | Finds an address through our own API and hands back the place with its coordinates. | stable |
@@ -132,14 +145,17 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Shell | [DesktopShell](#desktopshell) | `DesktopShell` | The staff app's desktop frame: the rail at the left, the top bar, the module's tab strip and the page, which alone scrolls. | stable |
 | Shell | [FloatingButton](#floatingbutton) | `FloatingButton` | The phone's floating button, bottom right above the bottom bar: a tap fans out the screen's New action, Clock In or Out, Praxis AI and Help, with Hide Here last (F18). | stable |
 | Shell | [MoreSheet](#moresheet) | `MoreSheet` | The phone's More: a launcher in a bottom sheet with the person's row, a search bar, the modules they may open as tiles four to a row, and Sign Out (F17). | stable |
+| Shell | [NavCapsule](#navcapsule) | `NavCapsule` | Back, forward and refresh in one capsule at the start of the desktop top bar: a click on the arrow refreshes in place and a 0.6 s hold reloads the app (the Hold Ring); hovering an arrow names where it goes; a held or right clicked arrow opens the trail. | stable |
 | Shell | [NotificationCenter](#notificationcenter) | `NotificationCenter` | The bell's pane: All and Unread, the notifications grouped Today, Yesterday and Earlier, Mark All Read and the settings gear; a page from the right on a phone, a panel under the bell on desktop. | beta |
 | Shell | [NotificationRow](#notificationrow) | `NotificationRow` | One notification in the pane: who or what it is about (initials or the category's glyph), its title, two lines of its text, when it came, and a dot while unread; the whole row opens it. | stable |
 | Shell | [PhoneHeader](#phoneheader) | `PhoneHeader` | The phone's top: a bar with the pin at the left and search, the bell and the person's avatar at the right, over a title rail with the module's name and its tabs. | stable |
-| Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar. | stable |
+| Shell | [PhoneShell](#phoneshell) | `PhoneShell` | The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar. | stable |
 | Shell | [PublicPage](#publicpage) | `PublicPage`, `PageMessage` | The public site's page: the mark and the theme switch on top, the page on one card at most 704 px wide, and a short footer. | stable |
+| Shell | [PullIndicator](#pullindicator) | `PullIndicator` | The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch. | stable |
 | Shell | [Rail](#rail) | `Rail` | The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot. | stable |
 | Shell | [ShellNotice](#shellnotice) | `ShellNotice` | A small dark card floating at the foot of the shell for something about the app itself: a new version is ready, the app can be installed, the connection is back. | stable |
 | Shell | [TopBar](#topbar) | `TopBar`, `SearchButton` | The desktop top bar: the rail toggle, the search button that opens the command palette, and the person's quick actions (clock, bell). | stable |
+| Shell | [TrailMenu](#trailmenu) | `TrailMenu` | The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29). | stable |
 
 ## Foundations
 
@@ -285,6 +301,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 | `pad` | `boolean` |  | Inner padding (the default). `false` lets a table, a list or an image run to the card's edges. |
 | `as` | `"div" \| "section" \| "article"` |  | The element: `section` when the card has its own heading in a long page, `article` for one record. |
 | `details` | `ReactNode` |  | The one Details row at the foot of the card (a Details from |
+| `urgency` | `"normal" \| "important" \| "urgent"` |  | A notice's level: an amber edge when important; a red edge that pulses slowly when urgent (steady when motion is off). |
 | `children` | `ReactNode` |  | The card's content. |
 
 **CardHeader** props (`CardHeaderProps`)
@@ -303,6 +320,7 @@ The raised panel every section sits in, with an optional title row (CardHeader) 
 ```tsx
 <Card><CardHeader title="Leave Requests" actions={<Button size="sm">View All</Button>} />...</Card>
 <Card details={<Details>...</Details>}>...</Card>
+<Card urgency="urgent">...</Card>
 ```
 
 ### Grid
@@ -1150,6 +1168,121 @@ A level drawn as a few short bars, filled up to the level: how much access a rol
 <LevelMeter value={level.rank} label={level.name} decorative />
 ```
 
+### LinkCard
+
+A link's card, as on WhatsApp: the page's picture, the site, the title and a line of its description, opening the page.
+
+| | |
+|---|---|
+| Use | The first link of a chat message, under its text; the composer's card while a message with a link is written, with Remove Preview. |
+| Avoid | A link the product makes itself (a Button or a router Link); a mail's links (EmailFrame keeps them); a card for every link in a message (only the first gets one). |
+| Phone | The same card, the width of its bubble: a wide picture runs across its top, a small or square one sits at its side; the whole card is the tap target. |
+| Accessibility | The card is one link named by the page's title that says it opens a new tab; the picture is decorative beside the title; Remove Preview is a named button; a loading card says so. |
+| Status | beta |
+| Exports | `LinkCard` |
+| Import | `import { LinkCard } from "@mycity/ui";` |
+| File | `packages/ui/src/display/LinkCard.tsx` |
+| Test | `packages/ui/src/display/LinkCard.test.tsx` |
+| Gallery | `packages/ui/src/display/LinkCard.gallery.tsx` (`npm run gallery`, `#/LinkCard`) |
+
+**LinkCard** props (`LinkCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `href` | `string` | yes | Where the card opens: the link as posted. |
+| `title` | `string` |  | The page's title. |
+| `site` | `string` |  | The site, as the page names itself, else its host. |
+| `description` | `string \| null` |  | A line of the page's description, when it has one. |
+| `image` | `string \| null` |  | The page's picture, ready to draw (fetched with the session); null while it loads. |
+| `hasImage` | `boolean` |  | Whether the card has a picture at all, so its place is kept while it loads. |
+| `imageWidth` | `number \| null` |  | The picture's width in pixels: a wide one runs across the top. |
+| `imageHeight` | `number \| null` |  | The picture's height in pixels. |
+| `loading` | `boolean` |  | The composer's card while the page is read: its shape, shimmering. |
+| `onRemove` | `() => void` |  | The composer's card: a card that does not open, with Remove Preview. |
+| `tone` | `"mine" \| "theirs" \| "plain"` |  | Where it sits: in the sender's own bubble, in another's, or on the page (the composer). |
+| `onSeen` | `() => void` |  | Called once when the card first comes near the screen, so its picture is fetched only then. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<LinkCard href="https://nfelia.com/" title="Nfelia: Fashion in Lagos" site="Nfelia" description="Shop the latest." image={src} imageWidth={1200} imageHeight={630} hasImage />
+```
+
+### LinkText
+
+Text a person wrote, with every link in it clickable and, while searching, each match marked.
+
+| | |
+|---|---|
+| Use | A chat message, a caption, an announcement's body: anything a person typed that may hold a link (https://nfelia.com, www.mycityapp.io, nfelia.com). |
+| Avoid | Interface copy (it has no links); a mail body (use EmailFrame, which keeps the sender's own links); a link the product makes itself (a Button with asChild, or a router Link). |
+| Phone | The same; a link is tapped like any other, and long addresses wrap instead of pushing the bubble wider. |
+| Accessibility | Links are real anchors that open in a new tab with no opener and say so to assistive technology; the text keeps its line breaks and is marked as content. |
+| Status | beta |
+| Exports | `LinkText` |
+| Import | `import { LinkText } from "@mycity/ui";` |
+| File | `packages/ui/src/display/LinkText.tsx` |
+| Test | `packages/ui/src/display/LinkText.test.tsx` |
+| Gallery | `packages/ui/src/display/LinkText.gallery.tsx` (`npm run gallery`, `#/LinkText`) |
+
+**LinkText** props (`LinkTextProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `text` | `string` | yes | The text, as the person wrote it. |
+| `highlight` | `string` |  | A search term: each match is marked (`mark.hit`, which the search steps between). |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<LinkText text="See https://nfelia.com today" highlight="nfelia" />
+```
+
+### MediaTile
+
+A photo, a video's first frame or a file, drawn in place at its own shape before it has loaded; MediaAlbum puts four or more side by side, two by two.
+
+| | |
+|---|---|
+| Use | A photo or a video in a chat message, an album of them sent together, the picks in Send Files, a conversation's shared files on a profile. |
+| Avoid | A document someone needs to read (FileCard opens it); a picture to inspect closely in a page (ImageViewer); decoration (Illustration). |
+| Phone | The bubble's own width (256 px), its height from the picture's shape, a very tall or very wide one cropped to fit; the whole tile is the tap target. |
+| Accessibility | Each tile is a button named Open with the file's name; a video says it is one and how long; "+N" is read as how many more; Remove is a named button. The picture itself is decorative beside that name. |
+| Status | beta |
+| Exports | `MediaTile`, `MediaAlbum` |
+| Import | `import { MediaTile, MediaAlbum } from "@mycity/ui";` |
+| File | `packages/ui/src/display/MediaTile.tsx` |
+| Test | `packages/ui/src/display/MediaTile.test.tsx` |
+| Gallery | `packages/ui/src/display/MediaTile.gallery.tsx` (`npm run gallery`, `#/MediaTile`) |
+
+**MediaTile** props (`MediaTileProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `src` | `string \| null` | yes | The picture, ready to draw (fetched with the session): a photo's 960 px size, a video's poster; null while it loads or when there is none. |
+| `alt` | `string` | yes | The file's name: what the tile is, in words. |
+| `width` | `number \| null` |  | The picture's width, so its place is kept before it loads; a square when unknown. |
+| `height` | `number \| null` |  | The picture's height. |
+| `kind` | `"photo" \| "video" \| "file"` |  | A photo, a video (a play mark and its length over it), or another file (its glyph and name). |
+| `glyph` | `IconName` |  | The glyph of another file (`doc`, `sheet`, `slides`). |
+| `duration` | `string \| null` |  | A video's length as it is read ("0:42"). |
+| `more` | `number` |  | How many more an album holds past this, its fourth tile: "+N" over it. |
+| `fit` | `"bubble" \| "square"` |  | In a bubble at its own shape, or a square tile (an album, a grid of picks). |
+| `onOpen` | `() => void` |  | Opens it full screen. |
+| `onRemove` | `() => void` |  | Takes it out (Send Files): a small X in its corner. |
+| `onSeen` | `() => void` |  | Called once when it first comes near the screen, so its picture is fetched only then. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**MediaAlbum** props (`MediaAlbumProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tiles` | `Array<Omit<MediaTileProps, "fit" \| "more" \| "className"> & { key: string }>` | yes | The photos and videos sent together, in order; four or more. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<MediaTile src={src} alt="Set.jpg" width={1600} height={1200} onOpen={open} />
+<MediaAlbum tiles={photos.map((p) => ({ key: p.id, src: p.src, alt: p.name }))} />
+```
+
 ### Money
 
 An amount as people read it, from the wire string: ₦1,250,000.00 with kobo and tabular figures; a negative carries a minus sign, colour and a word.
@@ -1440,6 +1573,38 @@ A shimmering placeholder in the shape of what is loading: lines of text, a block
 <Spinner label="Loading payslips" />
 ```
 
+### StackBar
+
+A whole split into named parts on one bar, with a key under it: memory by service, the disk by what fills it.
+
+| | |
+|---|---|
+| Use | Showing how a capacity is shared out, in real units, where the parts and what is left matter more than a trend. |
+| Avoid | One share of a whole (use Meter); parts over time (use TrendChart); more than seven parts (group the small ones as Other first). |
+| Phone | The key wraps under the bar; nothing scrolls sideways. |
+| Accessibility | The bar is drawn for the eye only; the key is a list read in order, each part's name and figure, then what is left. Pass `label` to name the whole. |
+| Status | beta |
+| Exports | `StackBar` |
+| Import | `import { StackBar } from "@mycity/ui";` |
+| File | `packages/ui/src/display/StackBar.tsx` |
+| Test | `packages/ui/src/display/StackBar.test.tsx` |
+| Gallery | `packages/ui/src/display/StackBar.gallery.tsx` (`npm run gallery`, `#/StackBar`) |
+
+**StackBar** props (`StackBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `parts` | `StackBarPart[]` | yes | The parts, in the order they are drawn, left to right. |
+| `total` | `number` | yes | The whole, in the parts' units. What the parts leave of it is drawn as the empty track. |
+| `rest` | `{ label: string; figure: string }` |  | The name and figure of what the parts leave (Free 3.5 GB); left out of the key when unset. |
+| `label` | `string` | yes | The whole's name for assistive technology (Memory, Disk). |
+| `legend` | `boolean` |  | Draw the key under the bar (on unless false). |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<StackBar label="Memory" total={18432} parts={[{ key: "production", label: "Production", value: 1900, figure: "1.9 GB" }]} rest={{ label: "Free", figure: "3.5 GB" }} />
+```
+
 ### StatStrip
 
 A strip of labelled figures across the top of a record: smaller than KPI cards, for a record's own counts.
@@ -1621,12 +1786,12 @@ What happened to a record, newest or oldest first: a rail of dated events, each 
 
 ### Waveform
 
-A voice note's bars, which fill as it plays.
+A voice note's bars, drawn from its measured loudness, which fill as it plays.
 
 | | |
 |---|---|
 | Use | Beside the play button on a voice note: a community message, a review's dictated comment. |
-| Avoid | A real reading of the audio (these bars are a shape, not the sound); a progress figure a person reads (use ProgressBar). |
+| Avoid | A progress figure a person reads (use ProgressBar); measuring the audio in the browser (the worker measures it once, as `waveform`). |
 | Phone | The same bars at the width the bubble gives them; the play button beside it keeps its 44 px. |
 | Accessibility | Decorative: the length is said in words beside it and the button says whether it is playing, so nothing here needs reading. |
 | Status | stable |
@@ -1640,12 +1805,14 @@ A voice note's bars, which fill as it plays.
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `seconds` | `number` | yes | How long the note is, in seconds: it sets how fast the bars fill. |
-| `playing` | `boolean` |  | It is playing: the bars light in turn over the note's length. |
+| `seconds` | `number` | yes | How long the note is, in seconds: without `progress`, it sets how fast the bars fill. |
+| `peaks` | `number[] \| null` |  | The note's loudness, each 0 to 100 (the worker's `waveform`); a steady shape stands in until it is measured. |
+| `progress` | `number` |  | How far it has played, 0 to 1, read from the audio itself; the bars up to it are lit. |
+| `playing` | `boolean` |  | It is playing: without `progress`, the bars light in turn over the note's length. |
 | `className` | `string` |  | Layout classes only (width, height). |
 
 ```tsx
-<Waveform seconds={42} playing={playing} />
+<Waveform seconds={42} peaks={note.document.waveform} progress={position / 42} />
 ```
 
 ## Navigation
@@ -1825,13 +1992,13 @@ The full-screen lock over the staff app when a session ends: who is signed in, w
 | `photo` | `string \| null` |  | Their photo, if they have one; the initials otherwise. |
 | `title` | `string` | yes | At most 4 words, Title Case ("Session Locked"). |
 | `reason` | `string` | yes | Why it locked, one short line ("Locked after 30 minutes idle"). |
-| `children` | `ReactNode` | yes | The password field (in a Form whose id the footer's submit button names). |
-| `footer` | `ReactNode` | yes | Buttons only: the way out (Sign Out), then the primary (Unlock). |
+| `children` | `ReactNode` | yes | The credential field (in a Form whose id the footer's submit button names). |
+| `footer` | `ReactNode` | yes | Buttons only, stacked full width down one centred column: the primary (Unlock) and any alternates first, then the way out (Sign Out) in red, set apart below a hairline. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its frame). |
 | `className` | `string` |  | Layout classes for the card only. |
 
 ```tsx
-<LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{passwordField}</LockScreen>
+<LockScreen open name="Cynthia Osakunih" email="cynthia@mycityapp.io" title="Session Locked" reason="Locked after 30 minutes idle" footer={buttons}>{pinField}</LockScreen>
 ```
 
 ### Menu
@@ -1898,6 +2065,7 @@ THE modal: a centred dialog on desktop and a bottom sheet on a phone, opened wit
 | `side` | `boolean` |  | A side panel over the record on desktop instead of a centred dialog; a full sheet on a phone. SidePanel sets it. |
 | `dirty` | `boolean` |  | Unsaved changes: a dismissal asks once to discard them. Forms inside can also say so with useUnsavedChanges. |
 | `dismissible` | `boolean` |  | false: Esc, the scrim and a drag do nothing; the close button and the footer still close it. Default true. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation that must be answered. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -1935,7 +2103,7 @@ A full-screen page that slides in from the right over the screen on a phone, lik
 |---|---|
 | Use | A place a person goes into and comes back from without leaving the screen they were on: the notification pane, Notification Settings over it. |
 | Avoid | A form or a record on desktop (use Modal or SidePanel); a short choice (use Sheet); a real screen with its own address (a route). |
-| Phone | This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close. On desktop it draws the same page as a panel on the right. |
+| Phone | This is its phone form: the whole screen, under the status bar and above the home bar, swiped right or Back to close; the phone's own Back (Android's, the iPhone's edge swipe) closes it first (F29). With `onRefresh` its body pulls to refresh (F28). On desktop it draws the same page as a panel on the right. |
 | Accessibility | A modal dialog named by `title` (Radix underneath, through Vaul): focus moves in and is trapped, Esc and Back close it, focus returns to the opener. Back is a named button; `actions` are IconButtons with labels. |
 | Status | beta |
 | Exports | `PhonePage` |
@@ -1954,7 +2122,8 @@ A full-screen page that slides in from the right over the screen on a phone, lik
 | `actions` | `ReactNode` |  | IconButtons at the right of the header (Mark All Read, a gear). |
 | `bar` | `ReactNode` |  | Something fixed under the header that does not scroll away (a segmented control). |
 | `children` | `ReactNode` |  | The body; it scrolls. |
-| `bodyRef` | `(el: HTMLDivElement \| null) => void` |  | Called with the scrolling body, for a list that loads more near its end or pulls to refresh. |
+| `bodyRef` | `(el: HTMLDivElement \| null) => void` |  | Called with the scrolling body, for a list that loads more near its end. |
+| `onRefresh` | `() => Promise<unknown>` |  | Pull to refresh (F28): pulled down at its top, the body loads again; the pin turns until the promise settles. |
 | `container` | `HTMLElement \| null` |  | Where the page mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
 
@@ -2027,6 +2196,7 @@ The phone's bottom sheet: slides up with a spring, closes by dragging down, a ta
 | `footer` | `ReactNode` |  | Buttons for the footer; the main action is last and full width at the bottom. |
 | `children` | `ReactNode` |  | The body. |
 | `dismissible` | `boolean` |  | false: drag, scrim and Esc do nothing (the close button and Cancel still work). Default true. A sheet holding a text field ignores the drag and the scrim anyway. |
+| `blur` | `boolean` |  | Blur the screen behind the scrim, for a prompt that must be answered before anything else (the clock prompts). |
 | `role` | `"dialog" \| "alertdialog"` |  | `alertdialog` for a confirmation. Default `dialog`. |
 | `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
 | `bodyClassName` | `string` |  | Extra classes for the scrolling body. |
@@ -2330,7 +2500,82 @@ toast("Rule created")
 toast.success("Alert cleared", { undo: () => restore(alert) })
 ```
 
+### UrgentBar
+
+The red bar under the top bar on every screen while an urgent notice waits on the person: its title, how many wait, and Acknowledge or Open.
+
+| | |
+|---|---|
+| Use | An open urgent notice of the signed-in person (an urgent announcement, a change to who can do what, an approval past its time limit); each shell mounts one, fed by the app. |
+| Avoid | A notice that can wait (the bell and the banner carry it); a page's own warning (Banner); news after an action (a toast). |
+| Phone | Full width under the top bar: the title on one line, the count, the action at 44 px; swipe the bar sideways to step through several (the arrows are desktop only). |
+| Accessibility | An alert region, so a new urgent notice is announced without moving focus. The title opens the notice and the action is a real button named by its verb; the arrows are named Previous Notice and Next Notice. It pulses slowly, every 2 seconds and never flashing, and is steady red when motion is off. |
+| Status | beta |
+| Exports | `UrgentBar` |
+| Import | `import { UrgentBar } from "@mycity/ui";` |
+| File | `packages/ui/src/feedback/UrgentBar.tsx` |
+| Test | `packages/ui/src/feedback/UrgentBar.test.tsx` |
+| Gallery | `packages/ui/src/feedback/UrgentBar.gallery.tsx` (`npm run gallery`, `#/UrgentBar`) |
+
+**UrgentBar** props (`UrgentBarProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | yes | The notice's title: what waits on the person (their own notice, not interface copy). |
+| `position` | `number` |  | Which of the open urgent notices this is, from 1. |
+| `count` | `number` |  | How many urgent notices are open; "1 of 3" shows when more than one. |
+| `actionLabel` | `string` | yes | The action's verb: Acknowledge when only that closes the notice, else Open. |
+| `onAction` | `() => unknown` | yes | The action. Return the work and the button spins until it settles. |
+| `onOpen` | `() => unknown` |  | Opens what the notice is about (a tap on the title). |
+| `onPrevious` | `() => unknown` |  | The notice before (a desktop arrow, or a swipe right on a phone). |
+| `onNext` | `() => unknown` |  | The notice after (a desktop arrow, or a swipe left on a phone). |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<UrgentBar title="Fire drill at 11" position={1} count={2} actionLabel="Acknowledge" onAction={acknowledge} onNext={next} />
+```
+
 ## Forms
+
+### AddressField
+
+An address picked, never typed: suggestions from our own address search as the person types, a pin on the map, and the device's location while search is down.
+
+| | |
+|---|---|
+| Use | Every address or location a person enters, on both apps (F27, gate 22): a worksite, a field site, a client visit, a home, the company's address; `level="area"` for a vacancy's location or a partner's headquarters. `onPick` hands back the point where the form keeps its own. |
+| Avoid | A TextField for an address (gate 22); calling the provider from the browser (the key stays on the server); several cities (PlacesField); a search that keeps nothing (PlaceSearch). |
+| Phone | 44 px tall with 16 px text; the suggestions open under the field as 44 px rows inside the sheet's own scroll; the pin's map and its buttons fill the width. |
+| Accessibility | A combobox over a listbox: arrows move, Enter picks, Esc closes; the count found and an outage are announced. A held address is read out with its Change button, which the field's label names. Takes its label and error links from the Field around it. |
+| Status | stable |
+| Exports | `AddressField` |
+| Import | `import { AddressField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/AddressField.tsx` |
+| Test | `packages/ui/src/form/AddressField.test.tsx` |
+| Gallery | `packages/ui/src/form/AddressField.gallery.tsx` (`npm run gallery`, `#/AddressField`) |
+
+**AddressField** props (`AddressFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `PlaceValue \| null \| undefined` | yes | The address, from form.field(name): a pick's token, the device's location in an outage, and the details. |
+| `onChange` | `(value: PlaceValue \| null) => void` | yes | Called with the new address: a pick, a pin, the device's location, new details, or null when cleared. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `name` | `string` |  | The form field's name, on the search box. |
+| `id` | `string` |  | The control's id; the Field around it supplies one otherwise. |
+| `places` | `Places` | yes | The app's address search, pin and token reader, bound once (`features/shared/places.ts`). |
+| `level` | `PlaceLevel` |  | What a pick may be: a door (`address`, the default, with a Details line), anything to a city (`area`), a city. |
+| `onPick` | `(place: Place) => void` |  | Called with the place picked or pinned, its point included, after the address is set. |
+| `near` | `LatLon \| null` |  | Where the pin's map opens when the field holds no place: the form's own point. |
+| `placeholder` | `string` |  | A format example of at most 3 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<AddressField {...f.field("address")} places={places} onPick={(p) => f.set("latitude", p.lat.toFixed(6))} />
+<AddressField {...f.field("location")} places={places} level="area" />
+```
 
 ### CardPicker
 
@@ -2723,6 +2968,44 @@ Picks people the server searches: their name, job title and department, one page
 <PersonPicker list={employees} value={panel} onChange={setPanel} multiple />
 ```
 
+### PlacesField
+
+Several places picked from our own address search, each a chip with Remove: a proposal's cities.
+
+| | |
+|---|---|
+| Use | A list of cities (the default level) or areas a record covers, where each must be a real place (F27, gate 22). |
+| Avoid | One address (AddressField); city names typed into a TextField (gate 22); a short fixed list of options (ChoiceField, SelectField). |
+| Phone | The chips wrap above the field, each Remove a 44 px target; the suggestions open under the field as 44 px rows. |
+| Accessibility | A combobox over a listbox: arrows move, Enter adds, Esc closes; each chip's Remove names its place; the count found and an outage are announced. Takes its label and error links from the Field around it. |
+| Status | stable |
+| Exports | `PlacesField` |
+| Import | `import { PlacesField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/PlacesField.tsx` |
+| Test | `packages/ui/src/form/PlacesField.test.tsx` |
+| Gallery | `packages/ui/src/form/PlacesField.gallery.tsx` (`npm run gallery`, `#/PlacesField`) |
+
+**PlacesField** props (`PlacesFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `PlaceValue[]` | yes | The places picked, from form.field(name): each a token our search signed. |
+| `onChange` | `(value: PlaceValue[]) => void` | yes | Called with the new list, a place added or removed. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `name` | `string` |  | The form field's name, on the search box. |
+| `id` | `string` |  | The control's id; the Field around it supplies one otherwise. |
+| `places` | `Places` | yes | The app's address search and token reader, bound once (`features/shared/places.ts`). |
+| `level` | `Exclude<PlaceLevel, "address">` |  | What each pick may be: a city (the default), or anything to a city (`area`). |
+| `max` | `number` |  | How many may be picked; the box goes once that many are. |
+| `placeholder` | `string` |  | A format example of at most 3 words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PlacesField {...f.field("cities")} places={places} />
+```
+
 ### RadioCards
 
 Pick one of two to five options shown as stacked rows, each with an optional glyph before its words: the radio cards of FRONTEND_GUIDE §8.2.
@@ -2856,6 +3139,9 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `placeholder` | `string` |  | A format example of at most 3 words; Search. |
 | `label` | `string` |  | Names the box for assistive technology; the placeholder otherwise. |
 | `className` | `string` |  | Layout classes only. |
+| `controls` | `string` |  | The id of the list this box narrows, when it moves through it (a searchable SelectField). |
+| `activeId` | `string` |  | The id of that list's highlighted option. |
+| `onKeyDown` | `(e: KeyboardEvent<HTMLInputElement>) => void` |  | Keys pressed in the box (the arrow keys and Enter of that list). |
 
 **FilterSelect** props (`FilterSelectProps`)
 
@@ -2870,16 +3156,52 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 <SearchInput label="Search Employees" placeholder="Name or Email" value={q} onChange={setQ} />
 ```
 
+### SecretField
+
+A password or an API key the server may already keep: Saved (with a key's last four) and Replace, never a character of what is saved.
+
+| | |
+|---|---|
+| Use | A secret in a settings form that the server never sends back (a mail password, a provider's key), where leaving the field alone keeps the saved one. |
+| Avoid | Signing in or choosing your own password (use PasswordField); a value a person may read back (use TextField). |
+| Phone | The same: Replace and Keep Saved are 44 px buttons beside the line, and the field Replace opens fills the rest of the width. |
+| Accessibility | The saved line is a read-only field named by the Field's label; Replace moves focus into the new field and Keep Saved back to Replace. The caller passes `saved` and, for a key, `hint`. |
+| Status | beta |
+| Exports | `SecretField` |
+| Import | `import { SecretField } from "@mycity/ui";` |
+| File | `packages/ui/src/form/SecretField.tsx` |
+| Test | `packages/ui/src/form/SecretField.test.tsx` |
+| Gallery | `packages/ui/src/form/SecretField.gallery.tsx` (`npm run gallery`, `#/SecretField`) |
+
+**SecretField** props (`SecretFieldProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | yes | What was typed, from form.field(name). Empty keeps the saved one. |
+| `onChange` | `(value: string) => void` | yes | Called with the new value. |
+| `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `state` | `FieldState` |  | The mark; the Field around it supplies one otherwise. |
+| `message` | `string` |  | Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. |
+| `saved` | `boolean` |  | One is saved: the field reads Saved and offers Replace instead of an empty box. |
+| `hint` | `string \| null` |  | What may be shown of the saved one: a key's last four characters. Never any part of a password. |
+| `noun` | `"password" \| "key"` |  | What it is, for the show and hide button: password (the default) or key. |
+| `id` | `string` |  | The control's id when no Field gives one. |
+| `className` | `string` |  | Layout classes only (spacing, width). |
+
+```tsx
+<Field label="API Key"><SecretField saved={key.set} hint={key.hint} noun="key" {...form.field("api_key")} /></Field>
+```
+
 ### SelectField
 
 Pick one value: our own branded list (SelectMenu underneath), or for five options or fewer a segmented choice (ChoiceField).
 
 | | |
 |---|---|
-| Use | SelectField for more than five options; ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
+| Use | SelectField for more than five options, `searchable` once a fixed list is long enough to scroll (a purpose, a country); ChoiceField for two to five, so every option is visible at once; SelectMenu for a widget that styles its own button (FilterSelect, InlineSelect). |
 | Avoid | Long or server-held lists (people, records): use the server-searching picker; a yes or no (use CheckboxField or Switch); a raw <select> anywhere (gate 21: the browser's own picker is never shown). |
-| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker; ChoiceField segments are 44 px tall and wrap rather than scroll. |
-| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field. Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
+| Phone | SelectField opens a branded bottom sheet of 44 px rows with a tick on the chosen one, never the phone's own picker, and a searchable one a search box above them; ChoiceField segments are 44 px tall and wrap rather than scroll. |
+| Accessibility | Desktop: a Radix listbox (arrow keys, typing jumps, Enter chooses, Esc closes, focus returns to the button), named by its Field; a searchable one a search box that owns the listbox (arrow keys move through what matches, Enter chooses). Phone: a sheet named by the field's label holding a listbox. ChoiceField is a radio group with arrow-key movement. |
 | Status | stable |
 | Exports | `SelectField`, `ChoiceField`, `SelectMenu` |
 | Import | `import { SelectField, ChoiceField, SelectMenu } from "@mycity/ui";` |
@@ -2904,6 +3226,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `className` | `string` |  | Layout classes only. |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default. |
+| `searchable` | `boolean` |  | A search box above the options (SelectMenu's `searchable`). |
 
 **ChoiceField** props (`ChoiceFieldProps`)
 
@@ -2938,6 +3261,7 @@ Pick one value: our own branded list (SelectMenu underneath), or for five option
 | `disabled` | `boolean` |  | Shown but not usable. |
 | `name` | `string` |  | Its name in a submitted form. |
 | `container` | `HTMLElement \| null` |  | Where the list mounts; document.body by default (the gallery passes its themed frame). |
+| `searchable` | `boolean` |  | A search box above the options, narrowing them as the person types: for a fixed list long enough to scroll. |
 
 ```tsx
 <SelectField placeholder="Choose One" options={[["ops", "Operations"], ["hr", "People"]]} {...form.field("department")} />
@@ -3087,6 +3411,7 @@ The text input of the form system, with its typed relatives: password, whole num
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `autoComplete` | `"current-password" \| "new-password"` |  | new-password on sign-up and change, current-password on sign-in. |
+| `noun` | `"password" \| "key"` |  | What the show and hide button names: password (the default), or key for an API key. |
 
 **NumberField** props (`NumberFieldProps`, extends `BoundProps`, `NativeInput`)
 
@@ -3174,6 +3499,7 @@ The upload engine: the only file input in the product, with a percentage per fil
 | `kinds` | `string` |  | What kinds of file are wanted, lower case, for the line under the words ("PDF or Word"). |
 | `compact` | `boolean` |  | A tighter drop zone, inside a sheet or beside a form's footer. |
 | `trigger` | `(open: () => void) => ReactNode` |  | A control of the caller's instead of the drop zone (a composer's clip); the tray still shows. |
+| `autoOpen` | `boolean` |  | Open the device's picker as soon as the field shows, where the browser allows it (a sheet opened from a menu, such as Send Files); otherwise the person taps the drop zone. |
 | `handOff` | `boolean` |  | The caller lists what arrived itself (a composer's attachment chips), so a finished file leaves the tray once it is handed over and is never shown twice. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
@@ -3318,7 +3644,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 | `onRowClick` | `(row: R) => void` |  | Opens a row. A phone card becomes one tap target; a desktop row is reachable by Tab. |
 | `selectedKey` | `string \| null` |  | The row drawn as the one being looked at (a desktop list beside a panel). |
 | `selection` | `DataViewSelection` |  | Row selection and its bulk actions. |
-| `onExport` | `() => Promise<unknown>` |  | Queues the export of the whole filtered list on the server. |
+| `onExport` | `() => Promise<unknown>` |  | Makes the whole filtered list into a file on the server and saves it on this device (ExportButton). |
 | `noun` | `string` |  | What one row is, for the pager's count ("employee"). |
 | `nounPlural` | `string` |  | The plural, when it is not the noun with an s. |
 | `empty` | `{ title: ReactNode; text?: ReactNode; icon?: IconName }` |  | What to show when there are no rows. |
@@ -3340,14 +3666,14 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 
 ### ExportButton
 
-Asks the server for the whole filtered list as a file; the work goes to the worker and the file arrives in the Mailbox.
+Asks the server for the whole filtered list as a file and saves it on the device that pressed, once the worker has made it.
 
 | | |
 |---|---|
 | Use | Beside a list that a person needs outside the product (a payroll run, an attendance month, an expense claim set). |
-| Avoid | Building a file in the browser from the 25 rows on screen; a download that blocks the page while a large list is gathered. |
-| Phone | The same button, full width in the toolbar; the toast confirms where the file will arrive. |
-| Accessibility | Busy while the request is in flight, and the button stays pressable rather than disabled (FRONTEND_GUIDE §9.4). |
+| Avoid | Building a file in the browser from the 25 rows on screen; sending the file anywhere but the device that pressed. |
+| Phone | The same button, full width in the toolbar; the file goes to Downloads, or the share sheet on an iPhone app. |
+| Accessibility | Busy until the file is saved, and the button stays pressable rather than disabled (FRONTEND_GUIDE §9.4). |
 | Status | stable |
 | Exports | `ExportButton` |
 | Import | `import { ExportButton } from "@mycity/ui";` |
@@ -3359,13 +3685,13 @@ Asks the server for the whole filtered list as a file; the work goes to the work
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `onExport` | `() => Promise<unknown>` | yes | Queues the export on the server for the list's CURRENT filters, which the caller holds. It must ask the server for the whole filtered list, never the page on screen. |
+| `onExport` | `() => Promise<unknown>` | yes | Makes the file of the list's CURRENT filters, which the caller holds, and saves it on this device: it asks the server for the whole filtered list, never the page on screen, waits for the file and saves it. Resolves once it is saved; resolving `false` means nothing was saved and the person has already been told why, so no toast says otherwise. |
 | `children` | `string` |  | The label: Verb Noun, at most 3 words. "Export" unless set. |
-| `message` | `string` |  | What the toast says once it is queued. At most 8 words. |
+| `message` | `string` |  | What the toast says once the file is saved. At most 8 words. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
-<ExportButton onExport={() => api.call("POST /api/v1/exports", { body: { source: "employees", filters } })} />
+<ExportButton onExport={() => saveExport(api.call("POST /api/v1/audit/exports", { body: filters }))} />
 ```
 
 ### Kanban
@@ -3539,13 +3865,13 @@ Salary bands: each grade's range on one scale, with its midpoint marked and its 
 
 ### BarChart
 
-Figures side by side as bars: headcount by department, claims by month, interviews by stage.
+Figures side by side as bars: headcount by department, claims by month, spend by day.
 
 | | |
 |---|---|
-| Use | Comparing a handful of categories, where each figure matters as much as the shape. |
-| Avoid | A run of days (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars). |
-| Phone | No caption; the drawing scrolls inside its own card, so the page never scrolls sideways. |
+| Use | Comparing a handful of categories, or each day of a month, where each figure matters as much as the shape. |
+| Avoid | A run of days where only the shape matters (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars). |
+| Phone | No caption. Up to 12 bars every label shows and a narrow card scrolls the drawing inside it; past 12 (a month of days) labels that would touch are left off, never the first or the last. The page never scrolls sideways. |
 | Accessibility | The drawing is hidden from screen readers and the frame reads every bar as a label and a figure instead. |
 | Status | stable |
 | Exports | `BarChart` |
@@ -3677,17 +4003,55 @@ A bare trend line with no axes, for inside a table cell or beside a figure.
 <Sparkline label="Attendance" values={[18, 21, 22, 20, 24]} />
 ```
 
+### TrendChart
+
+One to three figures over time on one scale, with an optional target line, gaps where nothing was recorded, and a readout that follows the pointer.
+
+| | |
+|---|---|
+| Use | Behaviour over a window where the shape and the target both matter: response time against its target, the processor's busy and steal, data in and out. |
+| Avoid | A single figure where the target does not matter (use AreaChart); figures in different units on one scale (draw two charts); categories (use BarChart). |
+| Phone | No caption; a feature guide's §10 usually leaves trends off a phone, and the drawing never scrolls the page sideways. |
+| Accessibility | The drawing is hidden from screen readers; the frame reads every point with each series' figure, and the key names each series and its latest figure. |
+| Status | beta |
+| Exports | `TrendChart` |
+| Import | `import { TrendChart } from "@mycity/ui";` |
+| File | `packages/ui/src/charts/TrendChart.tsx` |
+| Test | `packages/ui/src/charts/TrendChart.test.tsx` |
+| Gallery | `packages/ui/src/charts/TrendChart.gallery.tsx` (`npm run gallery`, `#/TrendChart`) |
+
+**TrendChart** props (`TrendChartProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `labels` | `string[]` | yes | What each point is, in order (a time, a day): the readout and the screen reader's list. |
+| `ticks` | `string[]` |  | The shorter form under the chart, at its start, middle and end (14:00, Mon 19); the labels unless set. |
+| `lines` | `TrendLine[]` | yes | One to three lines, in the same units. |
+| `target` | `{ value: number; label: string }` |  | A dashed line across, and its name in the key (Target 800 ms). |
+| `max` | `number` |  | The top of the scale (100 for a share); the highest figure or the target, rounded up, unless set. |
+| `format` | `(value: number) => string` |  | Formats a figure for the scale, the readout and the screen reader (412 ms, 23%). |
+| `title` | `ReactNode` |  | The chart's title, Title Case, at most 4 words. |
+| `help` | `ReactNode` |  | Support text behind the title, at most 35 words. |
+| `actions` | `ReactNode` |  | What sits at the right of the title row. |
+| `caption` | `ReactNode` |  | The line under the chart, at most 8 words, desktop only. |
+| `label` | `string` |  | The drawing's accessible name, when there is no title or the title is not words. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<TrendChart title="Response Time" labels={times} lines={[{ name: "p95", values: p95 }]} target={{ value: 800, label: "Target 800 ms" }} format={(v) => `${v} ms`} />
+```
+
 ## Documents
 
 ### DocumentPreview
 
-A file from the vault as the browser draws it: a PDF inline, a picture in the image viewer, and Open in Tab on both.
+A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both.
 
 | | |
 |---|---|
-| Use | Looking at what someone attached: a receipt, a CV, a signed offer, a mail attachment, an imported sheet. |
-| Avoid | A document the product generated itself (use Paper, which prints right); shipping a PDF renderer of our own; a preview with no way out to the file. |
-| Phone | Shorter, and anything the browser will not draw inline becomes a Download card instead of an empty frame. |
+| Use | Looking at what someone attached beside a list: a receipt, a CV, a signed offer, a mail attachment, an imported sheet. |
+| Avoid | A document the product generated itself (use Paper, which prints right); a file opened full screen (MediaViewer); a preview with no way out to the file. |
+| Phone | Shorter; a PDF's pages scroll inside the frame, the same as on desktop, and anything else that cannot be drawn becomes a Download card instead of an empty frame. |
 | Accessibility | The frame is named by the file, Open in Tab and Download are real links, and a file that cannot be shown says so in words. |
 | Status | stable |
 | Exports | `DocumentPreview` |
@@ -3702,14 +4066,15 @@ A file from the vault as the browser draws it: a PDF inline, a picture in the im
 |---|---|---|---|
 | `name` | `string` | yes | The file's name, as the person uploaded it. |
 | `mime` | `string` | yes | Its type, as the SERVER decided, not as the browser guessed. |
-| `href` | `string` | yes | Where the vault streams it (`/api/v1/documents/:id/file`). |
+| `href` | `string` | yes | The file, ready for the browser (a blob URL the app fetched with the session): what Open in Tab and Download open. |
+| `file` | `Blob \| null` |  | A PDF's bytes, for PdfViewer to draw; null while they arrive. |
 | `sizeBytes` | `number` |  | Its size, for the line under the name. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall the frame is; `md` unless a sheet wants it shorter or a page taller. |
 | `actions` | `ReactNode` |  | What sits beside Open in Tab (Replace, Remove). |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
-<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={`/api/v1/documents/${id}/file`} />
+<DocumentPreview name="Receipt.pdf" mime="application/pdf" href={href} file={blob} />
 ```
 
 ### EmailFrame
@@ -3743,6 +4108,43 @@ One email body in a sealed frame: the sender's layout kept, scaled down to fit t
 <EmailFrame title="Client configuration settings" html={message.body_html} onMailto={(m) => compose(m)} />
 ```
 
+### FileCard
+
+A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download.
+
+| | |
+|---|---|
+| Use | A PDF, a Word, Excel or PowerPoint file, a CSV or a text file posted in a conversation; a file in a list someone opens or saves. |
+| Avoid | A photo or a video (MediaTile shows the picture itself); a document the product generated (Paper); reading the file in place (PdfViewer, DocumentPreview). |
+| Phone | The bubble's width (256 px); the card opens the file and Download saves it, each a 44 px target. |
+| Accessibility | The card's main button is named Open with the file's name and says its type; Download is a separate named button; the first page is decorative beside that name. |
+| Status | beta |
+| Exports | `FileCard` |
+| Import | `import { FileCard } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/FileCard.tsx` |
+| Test | `packages/ui/src/documents/FileCard.test.tsx` |
+| Gallery | `packages/ui/src/documents/FileCard.gallery.tsx` (`npm run gallery`, `#/FileCard`) |
+
+**FileCard** props (`FileCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | yes | The file's name, as it was sent. |
+| `mime` | `string` | yes | Its type, as the server decided. |
+| `sizeBytes` | `number \| null` |  | Its size. |
+| `pages` | `number \| null` |  | A PDF's pages, once the worker has counted them. |
+| `preview` | `string \| null` |  | A PDF's first page, ready to draw (fetched with the session); null while it loads or when there is none. |
+| `hasPreview` | `boolean` |  | Whether the first page exists, so its place is kept while it loads. |
+| `onOpen` | `() => void \| Promise<void>` |  | Opens the file: the viewer for a PDF, a download for a file the app does not show. |
+| `onDownload` | `() => void \| Promise<void>` |  | Saves the file to the device. |
+| `onSeen` | `() => void` |  | Called once when the card first comes near the screen, so its first page is fetched only then. |
+| `tone` | `"mine" \| "theirs" \| "plain"` |  | Where it sits: in the sender's own bubble, in another's, or on the page. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<FileCard name="Call sheet.pdf" mime="application/pdf" sizeBytes={245000} pages={3} preview={src} hasPreview onOpen={open} onDownload={save} />
+```
+
 ### ImageViewer
 
 A picture at a readable size, with zoom and a way to open it full size in a new tab.
@@ -3772,6 +4174,41 @@ A picture at a readable size, with zoom and a way to open it full size in a new 
 
 ```tsx
 <ImageViewer src={`/api/v1/documents/${id}/file`} alt="Receipt.jpg" />
+```
+
+### MediaViewer
+
+A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it.
+
+| | |
+|---|---|
+| Use | Opening a file someone sent or attached: a chat's photos, videos and PDFs, a conversation's shared files, a mail attachment, a document on My Documents. |
+| Avoid | A file the app cannot show (Word, Excel, PowerPoint: download it instead); a preview beside a list on desktop (DocumentPreview); a document the product generated (Paper). |
+| Phone | The whole screen on deep green: Close, who sent it and when, Forward, Share and Download along the top; swipe left or right to step, down to close; pinch or double tap a photo to zoom; the phone's Back closes it. |
+| Accessibility | A modal dialog named by the file: focus moves in and is trapped, Esc closes it and focus returns to what opened it; the arrow keys step on desktop; every control is a named button; a file that cannot be shown says so, with Download beside it. |
+| Status | beta |
+| Exports | `MediaViewer` |
+| Import | `import { MediaViewer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/MediaViewer.tsx` |
+| Test | `packages/ui/src/documents/MediaViewer.test.tsx` |
+| Gallery | `packages/ui/src/documents/MediaViewer.gallery.tsx` (`npm run gallery`, `#/MediaViewer`) |
+
+**MediaViewer** props (`MediaViewerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether it is showing. |
+| `items` | `ViewerItem[]` | yes | The files it steps through, in order. |
+| `index` | `number` | yes | Which one is showing. |
+| `onIndex` | `(index: number) => void` | yes | Called to show another: the arrows, the keyboard, a swipe. |
+| `onClose` | `() => void` | yes | Called to close it: Close, Esc, a swipe down, the phone's Back. |
+| `load` | `(item: ViewerItem) => Promise<Blob>` | yes | The file itself, fetched with the session: drawn here, and what Download and Share save. |
+| `save` | `(blob: Blob, name: string) => unknown` |  | How Download hands the file to this device (the app's own, which uses the share sheet where a download cannot land); the browser's download otherwise. |
+| `onForward` | `(item: ViewerItem) => void` |  | Forward the file on view to a chat; no Forward unless set. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<MediaViewer open={open} items={items} index={at} onIndex={setAt} onClose={close} load={(item) => fetchFile(item)} />
 ```
 
 ### Paper
@@ -3836,6 +4273,38 @@ A document the product generated, as it will print: white paper in both themes, 
 <Paper note="This is how the letter will print"><PaperLogo reference="OFF/2026/0041" /><PaperTitle>Offer of Employment</PaperTitle></Paper>
 ```
 
+### PdfViewer
+
+A PDF's pages drawn in the app by PDF.js, the same on Android, an iPhone and desktop, with the page number and zoom.
+
+| | |
+|---|---|
+| Use | Reading a PDF someone uploaded or sent: a chat file in the file viewer, a document's preview on My Documents, a mail attachment. |
+| Avoid | A document the product generated and prints (Paper); a photo (ImageViewer); editing or signing a PDF (it only shows one). |
+| Phone | Fills its frame; pages fit the width and scroll, Zoom In and Zoom Out sit at the foot with the page number, each a 44 px target. |
+| Accessibility | The pages are one focusable document named by the file and the page in view, scrolled by the keyboard; zoom buttons are named and the page number is announced; a PDF that cannot be opened says so in words. |
+| Status | beta |
+| Exports | `PdfViewer` |
+| Import | `import { PdfViewer } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/PdfViewer.tsx` |
+| Test | `packages/ui/src/documents/PdfViewer.test.tsx` |
+| Gallery | `packages/ui/src/documents/PdfViewer.gallery.tsx` (`npm run gallery`, `#/PdfViewer`) |
+
+**PdfViewer** props (`PdfViewerProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `data` | `Blob \| ArrayBuffer \| Uint8Array \| null` | yes | The PDF's bytes, fetched with the session; null while they arrive. |
+| `name` | `string` | yes | The file's name: the document's accessible name. |
+| `height` | `"sm" \| "md" \| "lg" \| "fill"` |  | A frame of fixed height (`sm`, `md`, `lg`, as DocumentPreview's), or `fill` its parent (the full-screen viewer). |
+| `tone` | `"card" \| "deep"` |  | The page area's backdrop: the muted card (`card`), or the viewer's deep green (`deep`). |
+| `onError` | `(reason: "password" \| "invalid") => void` |  | Called when the file cannot be drawn: locked with a password, or damaged. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<PdfViewer data={blob} name="Call sheet.pdf" height="md" />
+```
+
 ### Reader
 
 An article list beside the article: the Knowledge Hub's shape, and anything else read one piece at a time.
@@ -3874,6 +4343,35 @@ An article list beside the article: the Knowledge Hub's shape, and anything else
 
 ```tsx
 <Reader groups={groups} selected={key} onSelect={setKey}><ArticleBody title={article.title}>{article.body}</ArticleBody></Reader>
+```
+
+### RichText
+
+Formatted text the server sent as blocks (headings, paragraphs, lists, bold, italic, links), drawn as elements, never as injected HTML.
+
+| | |
+|---|---|
+| Use | A policy's text on Policy Updates and Knowledge Hub · Policies; any text a person wrote that the API gives back as blocks. |
+| Avoid | Text being written (use RichTextField); an email's own HTML (use EmailFrame); a short plain answer (a paragraph is enough). |
+| Phone | The same text at the phone's body size; long words and links wrap rather than push the page sideways. |
+| Accessibility | Real headings, lists and links in reading order, so a screen reader can move by heading; pass `top` so the headings sit under the page's own. |
+| Status | beta |
+| Exports | `RichText` |
+| Import | `import { RichText } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/RichText.tsx` |
+| Test | `packages/ui/src/documents/RichText.test.tsx` |
+| Gallery | `packages/ui/src/documents/RichText.gallery.tsx` (`npm run gallery`, `#/RichText`) |
+
+**RichText** props (`RichTextProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `blocks` | `RichTextBlock[]` | yes | The text, block by block, as the API sends it. |
+| `top` | `2 \| 3 \| 4` |  | The heading level the text's top headings take (2 unless set): one below the heading the text sits under. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<RichText blocks={version.body} top={3} />
 ```
 
 ## Maps
@@ -3936,6 +4434,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 | `zoom` | `number` |  | How close in; 15 unless set (a street), 11 for a city. |
 | `radiusMetres` | `number` |  | A circle around the first point, in metres: a worksite's geofence. |
 | `tileUrl` | `string` |  | Where the tiles come from; our own proxy unless a screen passes its own. |
+| `loadTile` | `LoadTile` |  | Fetches each tile with the app's session (our tile route is signed in); a plain image request otherwise. |
 | `onPick` | `(point: LatLon) => void` |  | Called with the point pressed, for choosing a place (setting up a worksite). |
 | `interactive` | `boolean` |  | Let the person drag and zoom. Off by default, so a map inside a page cannot swallow its scroll. |
 | `height` | `"sm" \| "md" \| "lg"` |  | How tall; `sm` in a card, `md` on a page, `lg` on a screen of its own. |
@@ -3945,6 +4444,7 @@ A map with the points a screen cares about, drawn by Leaflet on tiles our own AP
 ```tsx
 <MapView markers={[{ key: "in", lat, lon, label: "Clocked in 07:52" }]} />
 <MapView centre={site} radiusMetres={site.radius_metres} onPick={setPoint} interactive />
+<MapView markers={[site]} radiusMetres={site.radius_m} loadTile={loadTile} />
 ```
 
 ### PlaceSearch
@@ -3953,8 +4453,8 @@ Finds an address through our own API and hands back the place with its coordinat
 
 | | |
 |---|---|
-| Use | Setting up a worksite, giving a partner an address, naming where a field visit happened. |
-| Avoid | Calling the provider from the browser (the key must stay on the server); a free-text address box where a point is needed; a list of every result. |
+| Use | Finding a place to look at on a map, where nothing is kept as anyone's address. |
+| Avoid | Any address a person enters (AddressField, F27, gate 22); calling the provider from the browser (the key must stay on the server); a list of every result. |
 | Phone | Full width, each result a 44 px row; the chosen address shows above the box. |
 | Accessibility | A search box over a listbox of addresses, each a real option, with the count of what was found announced. |
 | Status | stable |
@@ -4139,6 +4639,7 @@ The staff app's desktop frame: the rail at the left, the top bar, the module's t
 | `children` | `ReactNode` | yes | The screen. |
 | `fit` | `boolean` |  | A fit page: it fills the height and only its panes scroll; scrolling past a pane's end slides the page's header away. |
 | `notice` | `ReactNode` |  | A notice floating at the foot of the page (ShellNotice: the update prompt, the install offer). |
+| `alert` | `ReactNode` |  | The urgent bar (UrgentBar), under the top bar on every screen while something urgent waits on the person. |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
 
 ```tsx
@@ -4211,6 +4712,44 @@ The phone's More: a launcher in a bottom sheet with the person's row, a search b
 
 ```tsx
 <MoreSheet open={open} onClose={close} person={{ name: "Cynthia Osakunih", subtitle: "Operations Manager" }} groups={groups} onSearch={openSearch} onSignOut={signOut} />
+```
+
+### NavCapsule
+
+Back, forward and refresh in one capsule at the start of the desktop top bar: a click on the arrow refreshes in place and a 0.6 s hold reloads the app (the Hold Ring); hovering an arrow names where it goes; a held or right clicked arrow opens the trail.
+
+| | |
+|---|---|
+| Use | Once, in TopBar's start slot after the rail toggle (F28, F29). `arrows` only while the app runs installed (useInstalled), where the window has no back or forward of its own; refresh always. |
+| Avoid | A phone (the page pulls to refresh, the system's Back goes back); a record's own way back to its list (a link); more buttons in the capsule. |
+| Phone | Never shown on a phone; its buttons are 44 px targets so the gallery's phone view passes. |
+| Accessibility | A group named History of three named buttons, each described by where it goes or what a hold does, aria-disabled with nothing back or ahead. An arrow opens the trail with a hold, a right click, Arrow Down or the menu key; Shift and Enter on Refresh reloads. Refresh is busy (aria-busy) until the screen's reads are in. |
+| Status | stable |
+| Exports | `NavCapsule` |
+| Import | `import { NavCapsule } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/NavCapsule.tsx` |
+| Test | `packages/ui/src/shell/NavCapsule.test.tsx` |
+| Gallery | `packages/ui/src/shell/NavCapsule.gallery.tsx` (`npm run gallery`, `#/NavCapsule`) |
+
+**NavCapsule** props (`NavCapsuleProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `arrows` | `boolean` |  | Back and forward. False in a browser tab, which has its own (F29). Default true. |
+| `back` | `string \| null` |  | Where Back goes, by name; null or absent when there is nowhere back. |
+| `forward` | `string \| null` |  | Where Forward goes, by name; null or absent when nothing is ahead. |
+| `onBack` | `() => void` |  | Back one place. |
+| `onForward` | `() => void` |  | Forward one place. |
+| `onRefresh` | `() => Promise<unknown>` | yes | Refresh in place: the arrow turns until its promise settles, and a second press waits. |
+| `onReload` | `() => unknown` | yes | The hold: restart the app. A promise it returns settles only if the page stays. |
+| `trail` | `TrailItem[]` |  | The trail, for the menu an arrow opens: the one ahead first, the place on screen, then back. |
+| `onGo` | `(offset: number) => void` |  | Go to a place on the trail, by its offset. |
+| `trailOpen` | `boolean` |  | The trail held open from elsewhere (the pin held); leave unset to let the capsule keep its own. |
+| `onTrailOpenChange` | `(open: boolean) => void` |  | Called when the trail opens or closes. |
+| `container` | `HTMLElement \| null` |  | Where the trail mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<NavCapsule arrows={installed} back="People · Employees" onBack={back} onRefresh={refresh} onReload={reload} trail={trail} onGo={go} />
 ```
 
 ### NotificationCenter
@@ -4298,9 +4837,9 @@ The phone's top: a bar with the pin at the left and search, the bell and the per
 
 | | |
 |---|---|
-| Use | Once, in PhoneShell's header slot. The title is the module's name; the tabs are the module's Tabs. Scrolling the page down slides the title away and keeps the tabs; scrolling up brings it back. |
+| Use | Once, in PhoneShell's header slot. The title is the module's name; the tabs are the module's Tabs. Scrolling the page down slides the title away and keeps the tabs; scrolling up brings it back. `onPinHold` opens the trail when the pin is held, in the installed app (F29). |
 | Avoid | Desktop (TopBar); a screen's own title (PageHeader carries that inside the page); more than three actions in the bar. |
-| Phone | The whole point: one line of bar (the pin alone, no word), a large one-line title shortened with an ellipsis when long, the tabs a sideways-scrolling strip; every control 44 px. |
+| Phone | The whole point: one line of bar (the pin alone, no word), a large one-line title shortened with an ellipsis when long, the tabs a sideways-scrolling strip; every control 44 px. There is no back button (F29): the phone's own Back goes back, and holding the pin opens the trail. |
 | Accessibility | The pin is a link named "MyCity App, Home". The title is text, not a heading (the screen's PageHeader holds the page's h1); while it is slid away it is hidden from assistive technology too. |
 | Status | stable |
 | Exports | `PhoneHeader` |
@@ -4318,6 +4857,7 @@ The phone's top: a bar with the pin at the left and search, the bell and the per
 | `actions` | `ReactNode` |  | The bar's actions, right to left as read: search, the bell, the avatar button. |
 | `homeHref` | `string` | yes | Where the pin goes: Home. |
 | `onNavigate` | `(href: string) => void` |  | Called with homeHref on a plain tap on the pin. |
+| `onPinHold` | `() => void` |  | The pin held (or right clicked): the trail of places, in the installed app (F29). |
 
 ```tsx
 <PhoneHeader title="Employee Self-Service" homeHref="/home" actions={<><IconButton icon="srch" label="Search" /><IconButton icon="bell" label="Notifications" /></>} tabs={<Tabs ... />} />
@@ -4325,13 +4865,13 @@ The phone's top: a bar with the pin at the left and search, the bell and the per
 
 ### PhoneShell
 
-The staff app's phone frame: the top bar and title rail, the page, which alone scrolls, the floating button, and the bottom bar.
+The staff app's phone frame: the top bar and title rail, the page, which alone scrolls and pulls to refresh, the floating button, and the bottom bar.
 
 | | |
 |---|---|
-| Use | Once, by the staff app's shell, at 760 px and below; it lays out PhoneHeader, the screen, FloatingButton and BottomBar, and tells them which way the page scrolls. |
+| Use | Once, by the staff app's shell, at 760 px and below; it lays out PhoneHeader, the screen, FloatingButton and BottomBar, and tells them which way the page scrolls. `onRefresh` and `onReload` give the page its pull (F28). |
 | Avoid | Desktop (DesktopShell); a screen drawing its own bottom bar or floating button; the public site (PublicPage). |
-| Phone | The whole point: a native app frame. The page keeps clear space under its content for the floating button (F18), so the button never hides data, and only the page scrolls. While the button's fan is open the page dims behind it. |
+| Phone | The whole point: a native app frame. The page keeps clear space under its content for the floating button (F18), so the button never hides data, and only the page scrolls. While the button's fan is open the page dims behind it. Pulled down at its top the page refreshes in place, and pulled on past the second notch it reloads the app (F28); a fit page has no pull, and the browser's own pull never runs. |
 | Accessibility | The page is the main landmark (with `landmarks`), marked data-ui="scroller" and data-ui="page" for the screen gates; the bottom bar is the Main navigation. |
 | Status | stable |
 | Exports | `PhoneShell` |
@@ -4349,9 +4889,12 @@ The staff app's phone frame: the top bar and title rail, the page, which alone s
 | `bottomBar` | `ReactNode` | yes | The BottomBar. |
 | `fab` | `ReactNode` |  | The FloatingButton; when given, the page keeps clear space under its content for it. |
 | `notice` | `ReactNode` |  | A notice floating above the bottom bar (ShellNotice). |
+| `alert` | `ReactNode` |  | The urgent bar (UrgentBar), under the header on every screen while something urgent waits on the person. |
 | `fit` | `boolean` |  | A fit page: it fills the height and only its panes scroll. |
 | `pageKey` | `string` |  | Changes when the screen changes (its path): the page scrolls back to the top and the title returns. |
 | `landmarks` | `boolean` |  | false draws the page without its main landmark, inside another page (the gallery). Default true. |
+| `onRefresh` | `() => Promise<unknown>` |  | Pull to refresh (F28): every read on the screen again, in place. The pin turns until its promise settles. |
+| `onReload` | `() => unknown` |  | Pulled on past the second notch: restart the app. A promise it returns settles only if the page stays. |
 
 ```tsx
 <PhoneShell header={<PhoneHeader ... />} bottomBar={<BottomBar ... />} fab={<FloatingButton ... />}>{screen}</PhoneShell>
@@ -4401,6 +4944,35 @@ The public site's page: the mark and the theme switch on top, the page on one ca
 <PageMessage icon="ok" tone="ok" title="Application Sent">We reply within five working days.</PageMessage>
 ```
 
+### PullIndicator
+
+The pull to refresh's Pin Drop: the pin in a disc that drops from under the header as the page is pulled, its yellow ring closing at the release point, Deep Green with the reload mark past the second notch.
+
+| | |
+|---|---|
+| Use | Drawn by PhoneShell and PhonePage while their page is pulled (F28), fed by their pull; a screen never draws one. `distance` sets it still, for the gallery and tests. |
+| Avoid | Desktop (the refresh button in NavCapsule); a list loading its first page (Skeleton); work inside the content (Spinner). |
+| Phone | The whole point. It follows the finger under the header, lands with a small bounce once the ring closes (64 px), turns while the screen refreshes and shows a tick when it is done; pulled on past 136 px it turns Deep Green with the reload mark. The page under it never moves. |
+| Accessibility | Hidden while it is only being pulled; while it works it is a status that says Refreshing or Reloading once. Anyone who cannot pull has Refresh Screen and Reload App in ⌘K. |
+| Status | stable |
+| Exports | `PullIndicator` |
+| Import | `import { PullIndicator } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/PullIndicator.tsx` |
+| Test | `packages/ui/src/shell/PullIndicator.test.tsx` |
+| Gallery | `packages/ui/src/shell/PullIndicator.gallery.tsx` (`npm run gallery`, `#/PullIndicator`) |
+
+**PullIndicator** props (`PullIndicatorProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `state` | `PullState` | yes | Where the pull is: idle, pulling, armed (the ring closed), deep (past the second notch), refreshing, reloading, done, settling. |
+| `distance` | `number` |  | A fixed pull in px, for a still picture; in use the pull writes it as the finger moves. |
+| `className` | `string` |  | Layout classes only. |
+
+```tsx
+<PullIndicator ref={indicator} state={state} />
+```
+
 ### Rail
 
 The desktop navigation: the pin and name, the modules the person may open grouped by area with their counts, and the person's own menu at the foot.
@@ -4410,7 +4982,7 @@ The desktop navigation: the pin and name, the modules the person may open groupe
 | Use | Once, in DesktopShell's rail slot. Items come from the module catalogue filtered by the person's grants; it collapses to icons (66 px) when the person asks, remembered per device by the app. |
 | Avoid | A phone (BottomBar and MoreSheet are the phone's navigation, gate 11); tabs inside a module (Tabs); actions (the top bar). |
 | Phone | Never shown on a phone; its items are still 44 px targets so the gallery's phone view passes. |
-| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
+| Accessibility | The whole rail is one navigation landmark named by `label` (the pin, the modules and the account); with `homeHref` the pin is a link Home, and with `onBrandHold` a hold or the menu key on it opens the trail (F29); the current module is aria-current="page"; collapsed, each item keeps its name for screen readers and as a hover title. The account button opens a Menu. |
 | Status | stable |
 | Exports | `Rail` |
 | Import | `import { Rail } from "@mycity/ui";` |
@@ -4430,6 +5002,8 @@ The desktop navigation: the pin and name, the modules the person may open groupe
 | `brandName` | `string` |  | The name beside the pin; MyCity App unless set. |
 | `foot` | `ReactNode` |  | A last line under the account (Engineered by JBS Praxis). |
 | `label` | `string` |  | Names the navigation landmark; Modules unless set. |
+| `homeHref` | `string` |  | With it the pin is a link Home, as on a phone. |
+| `onBrandHold` | `() => void` |  | The pin held (or right clicked): the trail of places, in the installed app (F29). |
 
 ```tsx
 <Rail items={items} current="people" onNavigate={navigate} account={{ name: "Cynthia Osakunih", subtitle: "Operations Manager", menu }} />
@@ -4502,12 +5076,47 @@ The desktop top bar: the rail toggle, the search button that opens the command p
 <TopBar start={<IconButton icon="panel" label="Collapse Menu" />} search={<SearchButton onClick={openPalette} />} actions={<IconButton icon="bell" label="Notifications" />} />
 ```
 
+### TrailMenu
+
+The trail: the last places a person went on this device and the one ahead, each with its glyph and how far it is, to jump straight to one (F29).
+
+| | |
+|---|---|
+| Use | Held open by the app's shell: under NavCapsule on desktop when an arrow or the pin is held, as a sheet on a phone when the pin is held. Items come from the app's trail, the one ahead first, then the place on screen, then back. |
+| Avoid | Moving between modules (Rail, BottomBar); finding a record (CommandPalette); a list of actions (Menu). |
+| Phone | A bottom sheet of 44 px rows titled Trail, the place on screen marked Now; a tap goes there and the sheet closes. The phone's Back closes it first. |
+| Accessibility | A menu named Trail of menu items, each read with its place and how far back or ahead it is; arrow keys move, Enter goes, Esc closes and focus returns to the control that opened it. |
+| Status | stable |
+| Exports | `TrailMenu` |
+| Import | `import { TrailMenu } from "@mycity/ui";` |
+| File | `packages/ui/src/shell/TrailMenu.tsx` |
+| Test | `packages/ui/src/shell/TrailMenu.test.tsx` |
+| Gallery | `packages/ui/src/shell/TrailMenu.gallery.tsx` (`npm run gallery`, `#/TrailMenu`) |
+
+**TrailMenu** props (`TrailMenuProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Whether it is showing. |
+| `onOpenChange` | `(open: boolean) => void` | yes | Called to open or close it. |
+| `items` | `TrailItem[]` | yes | The places, the one ahead first, then the place on screen (offset 0), then back. |
+| `onGo` | `(offset: number) => void` | yes | Go to a place, by its offset; the menu closes. |
+| `children` | `ReactElement` |  | On desktop, what it hangs under (the capsule); a phone needs nothing. |
+| `container` | `HTMLElement \| null` |  | Where it mounts; document.body by default (the gallery passes its themed frame). |
+
+```tsx
+<TrailMenu open={open} onOpenChange={setOpen} items={trail} onGo={(offset) => go(offset)}><NavCapsule ... /></TrailMenu>
+```
+
 ## Helpers
 
 Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/lib`).
 
 | Export | File | What it does |
 |---|---|---|
+| `captionsSupported` | `lib/captions.ts` | Whether this browser can caption a recording. |
+| `Captions` (type) | `lib/captions.ts` | A running caption: stop() ends it and answers what it heard. |
+| `startCaptions` | `lib/captions.ts` | Start captioning the microphone, in the person's language (Nigerian English when the browser names none). |
 | `cn` | `lib/cn.ts` | Join class names, skipping the falsy ones; of two that conflict, the later wins (`cn("h-control", "h-9")` is `h-9`). |
 | `referencedCids` | `lib/email-body.ts` | The content ids a body draws, so only those parts are fetched. |
 | `PreparedEmail` (type) | `lib/email-body.ts` |  |
@@ -4548,17 +5157,40 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `isNegative` | `lib/format.ts` | Is this amount below zero? (string check; no float) |
 | `formatCount` | `lib/format.ts` | Whole-number count with thousands separators. |
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
-| `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB" from a byte count. |
+| `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB", "23.4 GB", "1.25 TB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |
 | `formatPhone` | `lib/format.ts` | A stored number (E.164) as people read it: "+234 803 123 4567"; a number from abroad as stored. |
 | `formatPhoneLocal` | `lib/format.ts` | A stored number as a person types it at home, for a field to start from: "0803 123 4567". |
+| `HistoryChange` (type) | `lib/history.ts` | What changed in the window's history. |
+| `startHistory` | `lib/history.ts` | Once, by the app's router, before its first render. |
+| `historyStartedFresh` | `lib/history.ts` | Whether the window opened on an entry nothing had marked: a new window or a cold start of the app, never a reload. |
+| `currentStep` | `lib/history.ts` | The step on screen, and the place of the entry it is on. |
+| `pushStep` | `lib/history.ts` | A new step at this address. |
+| `replaceStep` | `lib/history.ts` | The step on screen at a new address: a filter, a search, a sort, a page. |
+| `onHistory` | `lib/history.ts` | Told after every change to the window's history; returns the way to stop. |
+| `goHistory` | `lib/history.ts` | Moves through the window's history by entries: -1 is Back, 1 is Forward; a trail jump passes the difference of two places. |
+| `restoreSteps` | `lib/history.ts` | Rebuilds the window's history from a trail kept on the device, the oldest first and the last one on screen, so Back works after the app was closed. |
+| `useBackClose` | `lib/history.ts` | On a phone, while `open`, the overlay holds an entry of its own, so Back closes it (`onClose`) before it leaves the screen. |
+| `resetHistoryForTest` | `lib/history.ts` | Tests only: back to a window nothing has marked. |
+| `HoldOptions` (type) | `lib/hold.ts` |  |
+| `HoldHandlers` (type) | `lib/hold.ts` | The handlers to spread on the control. |
+| `useHold` | `lib/hold.ts` |  |
 | `ControlIds` (type) | `lib/ids.ts` | The ids of one control and the parts that describe it. |
 | `useControlIds` | `lib/ids.ts` | The ids for one control, from a readable stem (the field name) and a page-unique suffix. |
 | `describedBy` | `lib/ids.ts` | A space-separated id list for aria-describedby, skipping the parts not shown; undefined when none are. |
+| `LINK_ENDINGS` | `lib/links.ts` | What counts as a link in a message (docs/guides/community.md §6). |
+| `FoundLink` (type) | `lib/links.ts` | One link found in text: where it is, as written, and where it goes. |
+| `findLinks` | `lib/links.ts` | Every link in a text, in order. |
+| `normaliseLink` | `lib/links.ts` | The form a link's card is asked for in: https:// added, the host in lower case, the fragment dropped. |
+| `firstLink` | `lib/links.ts` | The first link in a text in its card form, or null when there is none or it may not have a card. |
+| `hostOf` | `lib/links.ts` | The host a link goes to, without www., for a card's last line. |
 | `PHONE_QUERY` | `lib/media.ts` | A phone: 760 px wide and below (gate 11). |
 | `useMediaQuery` | `lib/media.ts` | true while the media query matches; false before the first render on a server. |
 | `useIsPhone` | `lib/media.ts` | true on a phone: the phone shell renders (gate 11). |
 | `useIsMobile` | `lib/media.ts` | The merged screens' name for useIsPhone. |
+| `INSTALLED_QUERY` | `lib/media.ts` | Running as an installed app: every display mode but a browser tab's. |
+| `isInstalled` | `lib/media.ts` | Running as an installed app right now, read once (outside React: the app's start). |
+| `useInstalled` | `lib/media.ts` | true while the app runs as an installed app (FRONTEND_FOUNDATION F29): its own window on a computer, or opened from the home screen of a phone, where an iPhone says so through navigator.standalone. |
 | `PlanMilestone` (type) | `lib/plan.ts` | One milestone from MILESTONES §4. |
 | `PlanScreen` (type) | `lib/plan.ts` | One screen's row in PROGRESS: its milestone, and which ticks it has. |
 | `DeliveryPlan` (type) | `lib/plan.ts` | The whole plan, as vite.shared.js deliveryPlan() writes it. |
@@ -4581,6 +5213,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `currentDensity` | `lib/preferences.ts` | The density in force: compact unless comfortable is set. |
 | `setDensity` | `lib/preferences.ts` | Applies and remembers a density. |
 | `useDensity` | `lib/preferences.ts` | Compact (the default on desktop) or Comfortable, remembered per person (F5). |
+| `useSeen` | `lib/seen.ts` | A ref that calls `onSeen` once, when its element first comes within `margin` of the screen: a chat's pictures are fetched as they scroll near, not all at once. |
 | `SLOTS` | `lib/slots.ts` | The slot names the screen gates read (five-second.js, two-shells.js): each shared component marks its text with `data-ui="<slot>"`, so a gate knows a page title from a button from a help text without guessing from markup. |
 | `Slot` (type) | `lib/slots.ts` | One slot name. |
 | `slot` | `lib/slots.ts` | Spread onto an element: `<h1 {...slot("page-title")}>`. |

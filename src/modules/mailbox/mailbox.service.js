@@ -17,7 +17,6 @@
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
-const { config } = require("../../config/env");
 const { logger } = require("../../config/logger");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
@@ -37,7 +36,9 @@ const {
   snippetOf,
   normaliseId,
 } = require("./threading");
-const { mapSmtpError, mapImapError, retryPlan } = require("./smtp-errors");
+const { mapSmtpError, mapImapError, retryPlan, stepCodeOf } = require("../../services/mail/smtp-errors");
+const integrations = require("../../shared/integrations/settings");
+const usage = require("../../shared/integrations/usage");
 const { cleanHtml, textToHtml } = require("./visible");
 const { outgoingHtml, textOf } = require("./compose");
 const signatures = require("./signature/signature.service");
@@ -69,13 +70,25 @@ function useProvider(factory) {
   makeProvider = factory || ((conn) => new ImapSmtpProvider(conn));
 }
 
-function serverSettings() {
-  return {
-    MAIL_IMAP_HOST: config.MAILBOX_IMAP_HOST,
-    MAIL_SMTP_HOST: config.MAILBOX_SMTP_HOST,
-    MAIL_IMAP_PORT: config.MAILBOX_IMAP_PORT,
-    MAIL_SMTP_PORT: config.MAILBOX_SMTP_PORT,
-  };
+/**
+ * The staff mail server in use: Settings · Integrations, else the MAILBOX_* values in the
+ * server file (docs/guides/integrations.md §6.3). It always has values: blank hosts are each
+ * address's own domain.
+ */
+async function serverValues() {
+  return (await integrations.of("mailbox_server")).values;
+}
+
+/** Where one address's mail is, on the staff mail server in use (autodiscover). */
+function settingsOn(email, v) {
+  const settings = autodiscover.settingsFor(email, {
+    MAIL_IMAP_HOST: v.imap_host,
+    MAIL_SMTP_HOST: v.smtp_host,
+    MAIL_IMAP_PORT: v.imap_port,
+    MAIL_SMTP_PORT: v.smtp_port,
+  });
+  if (v.tls === false) settings.tls = false;
+  return settings;
 }
 
 async function providerFor(db, acct, displayName = null) {
@@ -129,8 +142,7 @@ async function getConnection(user) {
 
 /** Test both directions with the password, then save it encrypted. Nothing is saved on a failure. */
 async function connect(body, user) {
-  const settings = autodiscover.settingsFor(body.email, serverSettings());
-  if (config.MAILBOX_TLS === false) settings.tls = false;
+  const settings = settingsOn(body.email, await serverValues());
   const provider = makeProvider({
     ...settings,
     email: body.email,
@@ -357,9 +369,15 @@ async function sync(accountId) {
       }
     }
     await repo.syncSucceeded(pool, a.mail_account_id);
+    usage.record("mailbox_server", "sync", { ok: true });
     return { mail_account_id: a.mail_account_id, filed };
   } catch (err) {
     const mapped = mapImapError(err);
+    // A refused password is the person's to fix, not the server's failure.
+    usage.record("mailbox_server", "sync", {
+      ok: mapped.code === "MAIL_AUTH_FAILED",
+      error_code: mapped.code === "MAIL_SERVER_NOT_FOUND" ? "SERVER_NOT_FOUND" : stepCodeOf(err),
+    });
     const after = await repo.syncFailed(pool, a.mail_account_id, mapped.code);
     if (after && after.status === "needs_reconnect") {
       await tx((client) =>
@@ -378,6 +396,40 @@ async function sync(accountId) {
     );
     return { mail_account_id: a.mail_account_id, filed, error: mapped.code };
   }
+}
+
+/**
+ * The staff mail server changed on Settings · Integrations (docs/guides/integrations.md §3
+ * step 8): every mailbox with a saved password moves to it, and is then synced again with
+ * that password (the caller queues the syncs). A refused password marks the mailbox
+ * needs_reconnect on that sync, which tells its owner and shows the Reconnect banner.
+ * @param {{event_id: string, payload: {integration_connection_id?: string}}} event
+ * @returns {Promise<string[]>} the mailboxes moved
+ */
+async function moveServer(event) {
+  const v = await serverValues();
+  const moved = [];
+  await tx(async (client) => {
+    for (const a of await repo.movable(client)) {
+      let to;
+      try {
+        to = settingsOn(String(a.email), v);
+      } catch {
+        continue; // an address autodiscover refuses was never connected through it
+      }
+      await repo.repoint(client, a.mail_account_id, to);
+      moved.push(a.mail_account_id);
+    }
+    if (moved.length && event.payload.integration_connection_id)
+      await emit(client, {
+        key: EVENTS.MAIL_ACCOUNT_SERVER_MOVED,
+        entity: { type: "integration", id: event.payload.integration_connection_id },
+        actor: null,
+        payload: { mailboxes: moved.length },
+        dedup_key: `mailbox:server_moved:${event.event_id}`,
+      });
+  });
+  return moved;
 }
 
 async function syncAll() {
@@ -612,20 +664,28 @@ async function getDraft(id, user) {
   return draftView(d);
 }
 
+/** Autosave. A scheduled draft's waiting send is kept in step, so what goes is what was last seen. */
 async function saveDraft(id, body, user) {
   const a = await account(user);
-  const saved = await repo.saveDraft(pool, {
-    id,
-    userId: user.user_id,
-    accountId: a.mail_account_id,
-    d: body,
+  await tx(async (client) => {
+    const saved = await repo.saveDraft(client, {
+      id,
+      userId: user.user_id,
+      accountId: a.mail_account_id,
+      d: body,
+    });
+    if (!saved) throw new AppError("NOT_FOUND", "There is no such draft", 404);
+    await repo.refreshQueued(client, user.user_id, id, body);
   });
-  if (!saved) throw new AppError("NOT_FOUND", "There is no such draft", 404);
   return getDraft(id, user);
 }
 
+/** Discard: a scheduled draft's send is cancelled with it, never left to go out on its own. */
 async function deleteDraft(id, user) {
-  await repo.deleteDraft(pool, user.user_id, id);
+  await tx(async (client) => {
+    await repo.cancelQueuedForDraft(client, user.user_id, id);
+    await repo.deleteDraft(client, user.user_id, id);
+  });
 }
 
 /** A file for the composer, held in the vault against the caller's mailbox. */
@@ -682,7 +742,10 @@ async function send(body, user, idempotencyKey) {
     });
   }
   const signature = await signatureOf(user, body, String(a.email));
+  const key = idempotencyKey ? `${user.user_id}:${idempotencyKey}` : null;
   const queued = await tx(async (client) => {
+    // A draft waits on the queue once: scheduling it again replaces the send it had.
+    await repo.cancelQueuedForDraft(client, user.user_id, body.mail_draft_id, key);
     await repo.saveDraft(client, {
       id: body.mail_draft_id,
       userId: user.user_id,
@@ -695,9 +758,7 @@ async function send(body, user, idempotencyKey) {
       mail_draft_id: body.mail_draft_id,
       payload: { ...body, release_at: undefined, signature },
       release_at: release,
-      idempotency_key: idempotencyKey
-        ? `${user.user_id}:${idempotencyKey}`
-        : null,
+      idempotency_key: key,
     });
     await emit(client, {
       key: EVENTS.MAIL_MESSAGE_QUEUED,
@@ -744,8 +805,11 @@ async function inlineParts(signature) {
   return out;
 }
 
-/** Recipients one account may send to in an hour, from the host's plan (mailbox.md §6). */
-const PER_HOUR = () => Number(config.MAILBOX_SEND_PER_HOUR) || 50;
+/**
+ * Recipients one account may send to in an hour, from the host's plan (mailbox.md §6), as
+ * the staff mail server in use says (Settings · Integrations, else the server file).
+ */
+const PER_HOUR = async () => Number((await serverValues()).per_person_per_hour) || 50;
 
 /** Deliver one queued message (worker). */
 async function deliver(q) {
@@ -760,7 +824,7 @@ async function deliver(q) {
       (p.bcc_addresses || []).length;
     if (
       (await repo.sentLastHour(pool, a.mail_account_id)) + count >
-      PER_HOUR()
+      (await PER_HOUR())
     ) {
       await repo.markFailed(pool, q.mail_send_queue_id, {
         code: "HOURLY_LIMIT",
@@ -881,9 +945,14 @@ async function deliver(q) {
         },
       });
     });
+    usage.record("mailbox_server", "send", { ok: true, units: count });
     return { mail_send_queue_id: q.mail_send_queue_id, sent: true };
   } catch (err) {
     const mapped = mapSmtpError(err);
+    // Counted against the server only when it refused or did not answer: a refused password,
+    // sender or recipient is the person's or the message's, not the server's.
+    if (a && !["MAIL_AUTH_FAILED", "SENDER_REFUSED", "RECIPIENT_REFUSED", "MESSAGE_REFUSED"].includes(mapped.code))
+      usage.record("mailbox_server", "send", { ok: false, error_code: stepCodeOf(err) });
     const plan = retryPlan(mapped, q.attempts);
     await repo.markFailed(pool, q.mail_send_queue_id, {
       code: mapped.code,
@@ -930,7 +999,17 @@ async function flush(queueId = null) {
   return out;
 }
 
+/**
+ * A mail attachment's stored file, for its mailbox's owner only: what Forward to Chat sends
+ * (docs/guides/community.md §3 step 19). Null for anyone else, or an attachment that is not there.
+ */
+async function attachmentFile(db, mailAttachmentId, user) {
+  const row = await repo.attachmentOf(db, mailAttachmentId, user.user_id);
+  return row ? vault.get(db, row.document_id) : null;
+}
+
 module.exports = {
+  attachmentFile,
   useProvider,
   connectionView,
   getConnection,
@@ -940,6 +1019,7 @@ module.exports = {
   ingest,
   sync,
   syncAll,
+  moveServer,
   listThreads,
   getThread,
   markRead,
