@@ -35,8 +35,21 @@
  *
  * Paced: at most the sender's hourly limit of recipients in any 60 minutes
  * (services/mail/pace.js). Over it, send() throws MailPacedError (code MAIL_PACED) before
- * anything goes out, and the job that called it postpones itself until a slot frees.
+ * anything goes out, and the job that called it postpones itself until a slot frees. A server
+ * that says its own sending limit is used up is read the same way, for an hour.
  * Every message that reached the server is counted (shared/integrations/usage.js).
+ *
+ * Paused: IT can pause system mail on the System Sender (docs/guides/integrations.md §6.15).
+ * Until it is resumed send() throws MailPausedError (code MAIL_PAUSED) before anything is
+ * rendered, except for WHILE_PAUSED: invitations and password resets, a person's only way in,
+ * and IT's own test. Each caller decides what paused mail becomes: a notice is pushed instead,
+ * a digest is dropped, anything else waits in its queue until Resume.
+ *
+ * Refused: an address the server refuses for good (a 5xx to RCPT TO: no such mailbox, a domain
+ * that takes no mail) is kept on the System Sender's Refused Addresses
+ * (shared/integrations/refusals.js) and send() throws MailRefusedError (code MAIL_REFUSED),
+ * which its caller records as done, never tried again. Mail accepted for an address takes it
+ * off that list.
  *
  * Rendering is the same engine as documents (shared/documents/render.js): escaped values,
  * house formats, the subject a template too, inside templates/email/layout.html. A plain
@@ -57,10 +70,25 @@ const routeCheck = require("./deliverability/route-check");
 const pace = require("./pace");
 const integrations = require("../../shared/integrations/settings");
 const usage = require("../../shared/integrations/usage");
+const refusals = require("../../shared/integrations/refusals");
 
 const EMAIL_RE = /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/;
 const MAX_RECIPIENTS = 50;
 const CAPTURE_LIMIT = 200;
+
+/**
+ * The templates that go out while system mail is paused (docs/guides/integrations.md §6.15):
+ * an invitation and a password reset, without which nobody can get in, and Send Test Email,
+ * which is how IT checks the sender before resuming.
+ */
+const WHILE_PAUSED = new Set(["user-invite", "password-reset", "integration-test"]);
+
+/**
+ * A server saying its own sending limit is used up, not that the address is wrong: cPanel's
+ * "has exceeded the max emails per hour", a sending quota, a rate limit.
+ */
+const OVER_LIMIT = /(emails|messages|recipients) per hour|sending (limit|quota|rate)|rate limit/i;
+const HOUR_MS = 60 * 60 * 1000;
 
 /** The SMTP transport and the settings it was built from, so a change builds a new one. */
 let transport = null;
@@ -77,8 +105,69 @@ class MailNotSetUpError extends Error {
   }
 }
 
+/** System mail paused on Settings · Integrations (guide §6.15). */
+class MailPausedError extends Error {
+  constructor() {
+    super("system mail is paused: Settings, Integrations, System Sender");
+    this.name = "MailPausedError";
+    this.code = "MAIL_PAUSED";
+  }
+}
+
+/**
+ * The mail server refused every recipient for good (guide §6.16). Its message names no
+ * address, so every refusal is one fault; `rejected` holds them.
+ */
+class MailRefusedError extends Error {
+  constructor({ rejected, smtpCode, reply }) {
+    super("system mail: the mail server refused the recipient");
+    this.name = "MailRefusedError";
+    this.code = "MAIL_REFUSED";
+    this.rejected = rejected;
+    this.smtpCode = smtpCode;
+    this.reply = reply;
+  }
+}
+
+/**
+ * A permanent refusal of the addresses themselves: a 5xx to RCPT TO for every recipient,
+ * not a server over its own sending limit. Null for anything else.
+ */
+function refusalOf(err) {
+  if (!err || err.code !== "EENVELOPE") return null;
+  const code = Number(err.responseCode) || 0;
+  const reply = String(err.response || "");
+  if (code < 500 || code > 599 || OVER_LIMIT.test(reply)) return null;
+  const rejected = (Array.isArray(err.rejected) ? err.rejected : []).map(String).filter(Boolean);
+  return rejected.length ? { rejected, smtpCode: code, reply: reply.slice(0, 300) } : null;
+}
+
+/** The server says its own hourly limit is used up: wait an hour, as at our own limit. */
+const overLimit = (err) => Boolean(err) && OVER_LIMIT.test(String(err.response || ""));
+
 /** The system sender in use, or null. */
 const senderSettings = () => integrations.of("mail_sender");
+
+/**
+ * A refusal as System Health keeps it (guide §6.16): one warning for every refused address,
+ * counted on Faults and never pushed; the addresses themselves are on Refused Addresses.
+ * @param {MailRefusedError} err
+ * @param {{queue: string, template: string}} where
+ */
+function reportRefused(err, { queue, template }) {
+  require("../../shared/observability/error-reporter").report(err, {
+    origin: "worker",
+    severity: "warning",
+    route: `job ${queue}`,
+    extra: { template, smtp_code: err.smtpCode || null, refused: (err.rejected || []).length },
+  });
+}
+
+/** Is system mail paused (guide §6.15)? Only invitations, resets and the test email go out. */
+async function paused() {
+  const s = await senderSettings();
+  return Boolean(s && s.paused_at);
+}
 
 /**
  * nodemailer's options for a sender's settings. `password` null: no sign-in (the test's
@@ -299,6 +388,7 @@ async function send(msg) {
   const recipient =
     msg.recipient || (typeof first === "object" ? first : { email: first });
   const { transport: t, settings } = await getTransport();
+  if (settings && settings.paused_at && !WHILE_PAUSED.has(msg.template)) throw new MailPausedError();
   const sender = settings ? settings.values : null;
   const recipients = to.length + (cc ? cc.length : 0);
   // A relay that hosts a recipient's domain but not its mail would accept the message and
@@ -343,9 +433,27 @@ async function send(msg) {
         units: recipients,
         error_code: require("./smtp-errors").stepCodeOf(err),
       });
+    const refused = sender ? refusalOf(err) : null;
+    if (refused) {
+      await refusals.record({ emails: refused.rejected, template: msg.template, smtp_code: refused.smtpCode, reply: refused.reply }, { db });
+      throw new MailRefusedError(refused);
+    }
+    if (sender && overLimit(err)) throw new pace.MailPacedError(HOUR_MS);
     throw err;
   }
-  if (sender) usage.record("mail_sender", "send", { ok: true, units: recipients });
+  if (sender) {
+    usage.record("mail_sender", "send", { ok: true, units: recipients });
+    await refusals.accepted((info.accepted || []).map(String), { db });
+    // Some recipients refused while others took it: theirs are kept, the message went.
+    const rejected = (info.rejected || []).map(String);
+    if (rejected.length) {
+      const why = (info.rejectedErrors || [])[0] || {};
+      await refusals.record(
+        { emails: rejected, template: msg.template, smtp_code: Number(why.responseCode) || null, reply: why.response || null },
+        { db },
+      );
+    }
+  }
   if (!sender) {
     captured.push({
       template: msg.template,
@@ -471,6 +579,8 @@ async function health() {
     return config.MAIL_UNSET === "capture"
       ? { status: "up", mode: "captured" }
       : { status: "degraded", mode: "not_set_up", error: "not set up: mail is held" };
+  // Paused on purpose: degraded, which keeps the release ready, and Status says why.
+  if (s.paused_at) return { status: "degraded", mode: "paused", paused_at: s.paused_at };
   try {
     const { transport: t } = await getTransport();
     await t.verify();
@@ -488,4 +598,21 @@ async function health() {
   }
 }
 
-module.exports = { send, sendPlain, renderEmail, textOf, capturedMail, health, verifyWith, smtpOptions, MailNotSetUpError, __reset };
+module.exports = {
+  send,
+  sendPlain,
+  paused,
+  renderEmail,
+  textOf,
+  capturedMail,
+  health,
+  verifyWith,
+  smtpOptions,
+  refusalOf,
+  reportRefused,
+  WHILE_PAUSED,
+  MailNotSetUpError,
+  MailPausedError,
+  MailRefusedError,
+  __reset,
+};

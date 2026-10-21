@@ -478,7 +478,11 @@ Administrator · `9210` AI providers on Settings · Integrations (TB, 20/10/2026
 of `integration_check` (`sync`) and `integration_usage` (`transcribe`, `rates`), and the new `ai_model`
 (each AI connection's model list: what each model does, whether the key can use it, its list price)
 · `9220` `exchange_rate` (every currency against the dollar, a table a day, read through
-`shared/money/fx.js`) · `9291` seed: the starting model lists (ids, capabilities and known prices only).
+`shared/money/fx.js`) · `9230` system mail paused and refused addresses (TB, 21/10/2026;
+`docs/guides/integrations.md` §6.15, §6.16): `integration_connection.paused_at` and `paused_by` (the
+System Sender's pause), and the new `mail_refusal` (one row per address the mail server refused for
+good, counted, deleted when mail to it is accepted or after 30 days) · `9291` seed: the starting model
+lists (ids, capabilities and known prices only).
 
 **Owes:** nothing from this list since 17/10/2026: two-step required per role and editing roles and
 their grants on screen came forward to M0 with foundation track C (`0400`, `0449`;

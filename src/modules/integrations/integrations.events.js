@@ -29,6 +29,8 @@ const EVENTS = defineEvents("integrations", {
   "integration.keys_replaced": { summary: "The web push key pair was replaced" },
   "integration.tested": { summary: "A connection was tested, a test email sent, or exchange rates synced" },
   "integration.quota_warning": { summary: "A connection used 80% of its daily limit" },
+  "integration.mail_paused": { summary: "System mail was paused: only invitations and password resets go out" },
+  "integration.mail_resumed": { summary: "System mail was resumed" },
   // Audit only, told to nobody: a model list is configuration, like a test (guide §1.2).
   "integration.model_added": { summary: "A model was added by hand to an AI connection's list" },
   "integration.model_removed": { summary: "A model added by hand was taken off an AI connection's list" },
@@ -77,17 +79,40 @@ defineNotification(EVENTS.INTEGRATION_QUOTA_WARNING, {
   push: { tag: (e) => `integration_quota:${e.payload.code}`, mode: "alert" },
 });
 
+defineNotification(EVENTS.INTEGRATION_MAIL_PAUSED, {
+  to: TO_IT,
+  who: WHO,
+  title: "System mail paused",
+  body: "Only invitations and password resets are sent.",
+  push: { tag: () => "integration:mail_sender", mode: "alert" },
+});
+
+defineNotification(EVENTS.INTEGRATION_MAIL_RESUMED, {
+  to: TO_IT,
+  who: WHO,
+  title: "System mail resumed",
+  body: "Mail held meanwhile goes out now.",
+  push: { tag: () => "integration:mail_sender", mode: "alert" },
+});
+
+/** Promote the `email-send` jobs held for `reason`; one waiting for the hourly limit keeps waiting. */
+async function releaseHeld(reason) {
+  const queue = queues.getQueue("email-send");
+  for (const job of await queue.getDelayed(0, 999)) {
+    if (job && job.data && job.data.held_for === reason) await job.promote().catch(() => undefined);
+  }
+}
+
 /**
  * A system sender saved: mail held because none was set up goes out now instead of at its
- * next 15 minute retry (guide §3 step 9). Only jobs held for that reason are released; one
- * waiting for the hourly limit keeps waiting.
+ * next 15 minute retry (guide §3 step 9). Only jobs held for that reason are released.
  */
 outbox.register(EVENTS.INTEGRATION_SAVED, "integrations.release_held_mail", async (event) => {
   if (event.payload.code !== "mail_sender") return;
-  const queue = queues.getQueue("email-send");
-  for (const job of await queue.getDelayed(0, 999)) {
-    if (job && job.data && job.data.held_for === "sender") await job.promote().catch(() => undefined);
-  }
+  await releaseHeld("sender");
 });
+
+/** System mail resumed: what waited while it was paused goes out now (guide §6.15). */
+outbox.register(EVENTS.INTEGRATION_MAIL_RESUMED, "integrations.release_paused_mail", () => releaseHeld("pause"));
 
 module.exports = { EVENTS };

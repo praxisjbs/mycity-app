@@ -1132,12 +1132,25 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 74 | Notifications | `notifications` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 75 | Appearance | `appearance` | M9 | GE | ☐ | ☐ | ☐ | Not started | |
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
+
+- 21/10/2026 · TB · Integrations (#77): Pause Mail and Resume Mail on the System Sender, for the Milestone 1
+  handover on the 50-an-hour plan (`docs/guides/integrations.md` §1.3, §6.15, §6.16; TB's answers of
+  21/10/2026). While paused only invitations, password resets, Send Test Email and the server's health alarm
+  go out; a notice due by email is pushed instead (past the person's push switch), digests are dropped, other
+  mail waits for Resume; Settings · Status reads Mail as Paused without a check-down notice. A queued
+  invitation or reset whose link was replaced or expired is dropped. An address the mail server refuses for
+  good (cPanel's 550) is not retried: one warning on Faults and a Refused Addresses list on the System Sender
+  with the person's name (`mail_refusal`, `9230`). A host over its own hourly limit is waited on for an hour.
+  The daily digest goes only to people who have signed in. A fault's Where is the stack's first "at" line.
+  Phone: the Paused pill on the card, the banner and Pause Mail in the sheet's footer, Refused Addresses as
+  cards. Left: press Pause Mail on each environment until the plan moves to 10,000 an hour, then raise the
+  Hourly Limit and Resume (`docs/runbooks/dns-and-mail.md` §5).
 
 - 20/10/2026 · TB · Integrations (#77) with AI Control (`docs/guides/ai-control.md` decision 26): the AI
   providers no longer send Daily Limit Near at 80%, and their Daily Limit help says so; an AI connection's In

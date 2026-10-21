@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
-import type { Integration, IntegrationCheck, IntegrationCode, SecretState } from "@mycity/contract/contract.gen.ts";
+import type { Integration, IntegrationCheck, IntegrationCode, MailRefusal, SecretState } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
@@ -7,6 +7,7 @@ import { useRouter } from "@/lib/router";
 import { hrefFor } from "@/lib/routes";
 import { useFreshSignIn } from "@/auth/FreshSignIn";
 import {
+  Banner,
   Bars,
   Button,
   Card,
@@ -38,7 +39,7 @@ import {
 } from "@mycity/ui";
 import { carriesSecret, EditSettings } from "./EditSettings";
 import { Models } from "./Models";
-import { dailyHelp, HELP, JOB, KIND, PLAN, PROBLEM, STATE, STEP } from "./words";
+import { dailyHelp, HELP, JOB, KIND, MAIL_WHAT, PLAN, PROBLEM, STATE, STEP } from "./words";
 import { Where } from "./Where";
 
 /** The AI connections: each keeps a model list, shown whether or not its key is set yet. */
@@ -93,6 +94,12 @@ function ConnectionPanel({ code, name, reopen }: { code: IntegrationCode; name: 
         <Pill tone={STATE[c.state].tone}>{STATE[c.state].text}</Pill>
         <Where row={c} />
       </div>
+      {c.paused_at && (
+        <Banner tone="warn" icon="pause">
+          <HelpTerm help={HELP.paused}>Mail paused</HelpTerm>
+          {c.paused_by_name ? ` by ${c.paused_by_name}` : ""}, {formatDateTime(c.paused_at)}
+        </Banner>
+      )}
       <SettingsCard c={c} />
       {code === "exchange_rates" && <Rates c={c} />}
       {AI_CODES.includes(code) && <Models code={code} reopen={reopen} />}
@@ -118,10 +125,16 @@ function ConnectionPanel({ code, name, reopen }: { code: IntegrationCode; name: 
       )}
       <LastTest check={c.last_check} />
       <Use c={c} />
+      {code === "mail_sender" && <Refused />}
       <Checks code={code} />
       <ModalFooter>
         {actions.more(c).length > 0 && <Menu label="More Actions" trigger={(p) => <IconButton {...p} icon="dots" label="More Actions" />} items={actions.more(c)} />}
         {canEdit && <Button onClick={() => actions.edit(c)}>Edit Settings</Button>}
+        {canEdit && code === "mail_sender" && (
+          <Button icon={c.paused_at ? "play" : "pause"} onClick={c.paused_at ? actions.resume : actions.pause}>
+            {c.paused_at ? "Resume Mail" : "Pause Mail"}
+          </Button>
+        )}
         {canEdit && (
           <Button variant="primary" onClick={() => actions.test(code === "geoapify" ? address : undefined)}>
             Test
@@ -191,6 +204,18 @@ function useActions(code: IntegrationCode, name: string, reopen: () => void) {
     reopen();
   });
 
+  /** Pause or resume system mail (guide §6.15): either is one press, undone by the other. */
+  const pauseOr = (resume: boolean) => async () => {
+    try {
+      await api.call(resume ? "POST /api/v1/integrations/mail_sender/resume" : "POST /api/v1/integrations/mail_sender/pause", { body: {} });
+      toast(resume ? "Mail resumed" : "Mail paused");
+    } catch (e) {
+      toast(problemOf(e));
+    } finally {
+      invalidate("/api/v1/integrations");
+    }
+  };
+
   const more = (c: Integration): MenuItem[] => {
     const items: MenuItem[] = [];
     if (can("integrations", "edit") && code === "mail_sender" && c.settings) items.push({ label: "Send Test Email", icon: "mail", onSelect: sendTestEmail });
@@ -202,7 +227,7 @@ function useActions(code: IntegrationCode, name: string, reopen: () => void) {
     return items;
   };
 
-  return { edit, test: (address?: string) => test(code, address), more };
+  return { edit, test: (address?: string) => test(code, address), pause: pauseOr(false), resume: pauseOr(true), more };
 }
 
 /* ───────────── Settings ───────────── */
@@ -411,6 +436,32 @@ function Use({ c }: { c: Integration }) {
         }))}
       />
     </Card>
+  );
+}
+
+/* ───────────── Refused Addresses ───────────── */
+
+/** The addresses the mail server would not take, newest first (guide §6.16). */
+function Refused() {
+  const list = usePaged("GET /api/v1/integrations/mail_sender/refusals");
+  return (
+    <DataView<MailRefusal>
+      list={list}
+      title="Refused Addresses"
+      caption="Refused Addresses"
+      help={HELP.refused}
+      noun="address"
+      nounPlural="addresses"
+      rowKey={(r) => r.mail_refusal_id}
+      empty={{ title: "No Refused Addresses", icon: "mail" }}
+      columns={[
+        { key: "email", label: "Address", render: (r) => <span data-copy="content">{r.email}</span> },
+        { key: "person", label: "Person", render: (r) => (r.person_name ? <span data-copy="content">{r.person_name}</span> : null) },
+        { key: "what", label: "Message", render: (r) => MAIL_WHAT[r.template] ?? r.template },
+        { key: "when", label: "Last Refused", render: (r) => formatDateTime(r.last_refused_at) },
+        { key: "times", label: "Times", align: "n", desktop: true, render: (r) => formatCount(r.refusals) },
+      ]}
+    />
   );
 }
 

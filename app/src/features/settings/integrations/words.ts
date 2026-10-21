@@ -129,7 +129,19 @@ export const HELP = {
   host: "Blank uses each address's own domain.",
   sync: "Minutes between syncs of every mailbox, behind live mail.",
   local: "Domains whose mailboxes are on this server, comma separated. Mail to them skips the route check.",
+  paused: "Only invitations, password resets and test emails are sent. Notices reach people by push and the bell.",
+  refused: "Addresses the mail server would not take: no such mailbox, or a misspelt domain. Correct the email in People, or create the mailbox.",
 } as const;
+
+/** What a refused message was, by its system mail template (Refused Addresses). */
+export const MAIL_WHAT: Record<string, string> = {
+  "user-invite": "Invitation",
+  "password-reset": "Password Reset",
+  notification: "Notice",
+  digest: "Daily Digest",
+  "scheduled-report": "Report",
+  "integration-test": "Test Email",
+};
 
 /** The AI connections: they warn nobody at 80% (docs/guides/ai-control.md decision 26). */
 const AI_CONNECTIONS: readonly string[] = ["gemini", "groq", "openai", "anthropic", "deepseek"];

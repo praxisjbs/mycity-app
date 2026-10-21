@@ -208,7 +208,7 @@ src/
 │   ├── integrations/  providers (the registry of Settings · Integrations' connections) · settings (the
 │   │                  one reader of a connection's values: saved here, else the server file) · state ·
 │   │                  usage (each provider call counted a day, flushed every 15 s) · quota (a Free plan's
-│   │                  daily limit as a hard stop)
+│   │                  daily limit as a hard stop) · refusals (the addresses the mail server refused)
 │   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms) ·
 │   │                  actions (⌘K actions: each screen's New action, Clock In, Request Leave)
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite

@@ -61,7 +61,14 @@ const CHECKS = [
 const BY_KEY = new Map(CHECKS.map((c) => [c.key, c]));
 
 const label = (key) => (BY_KEY.get(key) ? BY_KEY.get(key).label : key.replace(/_/g, " "));
-const lookAt = (key) => (BY_KEY.get(key) ? BY_KEY.get(key).look : "Open the logs for this service.");
+
+/** Mail paused on purpose (docs/guides/integrations.md §6.15): degraded, and where to undo it. */
+const pausedMail = (key, v) => key === "mail" && Boolean(v) && v.mode === "paused";
+
+function lookAt(key, v) {
+  if (pausedMail(key, v)) return "System mail is paused. Resume it on Settings, Integrations, System Sender.";
+  return BY_KEY.get(key) ? BY_KEY.get(key).look : "Open the logs for this service.";
+}
 
 /** A connection's failure (Settings · Integrations), in a few words. */
 const CONNECTION_ERROR = {
@@ -86,6 +93,7 @@ function detailOf(key, v) {
   if ((CONNECTIONS.has(key) || key === "ai") && v.error && CONNECTION_ERROR[v.error]) return `Failing: ${CONNECTION_ERROR[v.error]}`;
   if (CONNECTIONS.has(key) && v.error) return "Failing: not answering";
   if ((CONNECTIONS.has(key) || key === "mail") && v.mode === "not_set_up") return "Not set up";
+  if (pausedMail(key, v)) return "Paused: invitations and password resets only";
   if (v.error) return String(v.error).slice(0, 200);
   const bits = [];
   if (key === "exchange_rates" && v.rate_day) bits.push(`rates of ${require("../../shared/time/day-first").formatDate(v.rate_day)}`);
@@ -136,7 +144,7 @@ function presentCheck(key, v, since) {
     label: label(key),
     state,
     detail: detailOf(key, v),
-    look_at: state === "up" ? null : lookAt(key),
+    look_at: state === "up" ? null : lookAt(key, v),
     latency_ms: v.latency_ms ?? null,
     since: seen && seen.state === state && seen.since ? new Date(seen.since).toISOString() : null,
   };
@@ -562,6 +570,7 @@ module.exports = {
   label,
   lookAt,
   detailOf,
+  pausedMail,
   presentRow,
   status,
   faults,
