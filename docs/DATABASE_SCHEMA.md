@@ -69,7 +69,7 @@ erDiagram
 | Notifications | `notification`, `notification_preference`, `push_subscription`, `push_delivery`, `notification_rule`, `notification_rule_recipient`, `notification_reminder_rule`, `notification_setting`, `reminder`, `alert` | `shared/notifications` fan-out (`notification`); the notifications service (preferences and devices) and its push sender (`push_delivery`) | An outbox handler that calls the fan-out; never an insert into `notification` |
 | Settings | `setting`, `working_week`, `public_holiday`, `reference_value` | settings service | Read settings; a code list the code switches on is a `reference_value` domain |
 | Imports | `import_batch`, `import_row`, `import_mapping_profile` | `shared/import` engine | An importer in the module (`<module>.import.js`) |
-| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model`, `ai_chain`, `ai_provider_cap`, `ai_price_proposal` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
+| Errors, tokens, secrets, AI | `error_event`, `idempotency_key`, `public_token`, `integration_secret`, `ai_setting`, `ai_run`, `ai_run_step`, `ai_catalogue`, `ai_model`, `ai_chain`, `ai_provider_cap`, `ai_price_proposal`, `ai_price_run` | shared observability, http, security and AI layers | Not attached to directly; the AI reads through manifests only (A23) |
 
 Every core table above was checked against the shared code that writes it by running
 `tests/integration` on the real migrations (#26, #27): the code and the schema agree, and CI keeps
@@ -468,7 +468,11 @@ messages, citations · `10099` seed · `10200` AI Control, brought forward (`doc
 §4): `ai_chain` (each job's and action's chain, a row per model), `ai_provider_cap` (a paid provider's
 monthly cap), `ai_price_proposal` (Find Prices' proposals, one open per model), `ai_model`'s price of a
 thousand searches, and on `ai_run_step` the audio seconds, searches, naira prices and rate a step was
-charged at, with kind `search` · `10290` seed: the `ai_control` grants.
+charged at, with kind `search` · `10210` Find Prices in batches (`docs/guides/ai-control.md` §4,
+decisions 29 to 31): `ai_price_run` (one per Find Prices press: its progress, counts, outcome and the
+job's claim), `ai_model.price_not_listed_at` (asked again after 7 days), and the provider-listed
+`ai_model` rows decision 29 leaves off (`-latest` aliases, Gemma, repeated snapshots no chain uses)
+deleted · `10290` seed: the `ai_control` grants.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

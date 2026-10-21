@@ -299,7 +299,22 @@ function modelCounts(db, provider) {
  * @param {string} provider
  * @param {Array<{model: string, display_name: string, capabilities: string[]}>} models
  */
-async function keepModels(db, provider, models) {
+/** The models a chain saved on AI Control uses, as "provider:model" in lower case. */
+async function chainedModels(db, provider) {
+  try {
+    const { rows } = await db.query("SELECT DISTINCT lower(model::text) AS model FROM ai_chain WHERE provider = $1", [provider]);
+    return new Set(rows.map((r) => `${provider}:${r.model}`));
+  } catch (err) {
+    if (err && err.code === "42P01") return new Set();
+    throw err;
+  }
+}
+
+/**
+ * The same, and `dropped`: models the key can use that the list leaves off (catalogue.trim). One
+ * the provider listed goes; a seeded or hand-added one stays, available.
+ */
+async function keepModels(db, provider, models, dropped = []) {
   if (models.length)
     await db.query(
       `INSERT INTO ai_model (provider, model, display_name, capabilities, source, available, seen_at)
@@ -316,14 +331,20 @@ async function keepModels(db, provider, models) {
         models.map((m) => m.capabilities.join(",")),
       ],
     );
+  const off = dropped.map((m) => m.model);
   await db.query(
     `UPDATE ai_model SET available = false
       WHERE provider = $1
         AND NOT (model = ANY($2::citext[]))
+        AND NOT (model = ANY($3::citext[]))
         AND NOT (source = 'added' AND endpoint_url IS NOT NULL)
         AND available IS DISTINCT FROM false`,
-    [provider, models.map((m) => m.model)],
+    [provider, models.map((m) => m.model), off],
   );
+  if (off.length) {
+    await db.query("DELETE FROM ai_model WHERE provider = $1 AND source = 'provider' AND model = ANY($2::citext[])", [provider, off]);
+    await db.query("UPDATE ai_model SET available = true, seen_at = now() WHERE provider = $1 AND model = ANY($2::citext[])", [provider, off]);
+  }
 }
 
 /** Add Model. Null when the provider's list already holds that id. */
@@ -398,6 +419,7 @@ module.exports = {
   modelById,
   modelCounts,
   keepModels,
+  chainedModels,
   addModel,
   removeModel,
   putRates,

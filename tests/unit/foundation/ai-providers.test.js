@@ -94,6 +94,42 @@ describe("a model list, sorted", () => {
     expect(catalogue.capabilitiesOf("openai", { id: "dall-e-3" })).toBeNull();
     expect(catalogue.capabilitiesOf("groq", { id: "whisper-large-v3" })).toEqual(["audio"]);
   });
+
+  test("fewer models: no -latest alias, no Gemma, no snapshot of a model listed; a chained one stays", () => {
+    const list = (ids) => ids.map((model) => ({ model }));
+    const ids = (r) => r.map((m) => m.model);
+    const g = catalogue.trim(
+      "gemini",
+      list([
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemma-3-27b-it",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-preview-09-2025",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-001",
+        "gemini-2.0-flash-exp-1206",
+        "gemini-embedding-001",
+        "gemini-3.5-pro-preview",
+        "gemini-3.5-pro-preview-05-06",
+      ]),
+      new Set(["gemini:gemini-2.0-flash-001"]),
+    );
+    expect(ids(g.kept)).toEqual(["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-001", "gemini-embedding-001", "gemini-3.5-pro-preview"]);
+    expect(ids(g.dropped)).toEqual(["gemini-flash-latest", "gemma-3-27b-it", "gemini-2.5-flash-preview-09-2025", "gemini-2.0-flash-exp-1206", "gemini-3.5-pro-preview-05-06"]);
+    // A snapshot with no base on the list is the only name the model has, so it stays.
+    expect(ids(catalogue.trim("openai", list(["gpt-4o-2024-08-06", "gpt-4o-mini", "chatgpt-4o-latest"])).kept)).toEqual(["gpt-4o-2024-08-06", "gpt-4o-mini"]);
+    expect(ids(catalogue.trim("anthropic", list(["claude-sonnet-4-5", "claude-sonnet-4-5-20250929"])).kept)).toEqual(["claude-sonnet-4-5"]);
+  });
+});
+
+describe("Find Prices' search", () => {
+  const gemini = require("../../../src/services/ai/vendors/gemini");
+  test("thinking kept low: a level from Gemini 3, a budget on 2.x, nothing for another model", () => {
+    expect(gemini.thinkingOf("gemini-3.1-pro-preview")).toEqual({ thinkingConfig: { thinkingLevel: "low" } });
+    expect(gemini.thinkingOf("models/gemini-2.5-pro")).toEqual({ thinkingConfig: { thinkingBudget: 1024 } });
+    expect(gemini.thinkingOf("learnlm-2.0-flash")).toEqual({});
+  });
 });
 
 describe("each job's model until AI Control", () => {

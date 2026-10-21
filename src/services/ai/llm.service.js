@@ -438,7 +438,7 @@ async function search({
     const charged = await prices.forStep(db, link);
     const started = Date.now();
     try {
-      const res = await vendors[link.provider].search({ apiKey, model: link.model, system, prompt, timeoutMs: 120_000 });
+      const res = await vendors[link.provider].search({ apiKey, model: link.model, system, prompt, timeoutMs: 180_000 });
       await ledger.recordStep(db, runId, {
         step_no: i + 1,
         kind: "search",

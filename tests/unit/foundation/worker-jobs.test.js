@@ -32,6 +32,7 @@ describe("job registry", () => {
 
   test("the queue list is the README §5.15 list: M0, and the M1 jobs built so far", () => {
     expect(registry.JOBS.map((j) => j.queue).sort()).toEqual([
+      "ai-find-prices",
       "announcement-publish",
       "attendance-day-close",
       "av-transcode",

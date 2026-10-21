@@ -5,6 +5,7 @@ import type {
   AiJob,
   AiJobRow,
   AiPriceProposal,
+  AiPriceRun,
   AiProvider,
   AiSpend,
   AiSpendAction,
@@ -47,6 +48,8 @@ interface Model {
   capabilities: ModelCapability[];
   available: boolean | null;
   prices: Prices;
+  /** When the provider's page last did not price it. */
+  notListedAt?: number;
 }
 
 const model = (provider: AiProvider, id: string, name: string, capabilities: ModelCapability[], prices: Prices, available: boolean | null = true): Model => ({
@@ -200,10 +203,80 @@ const view = (m: Model): AiControlModel => ({
   ngn_per_audio_hour: naira(m.prices.usd_per_audio_hour),
   in_chains: inChains(m),
   proposed: PROPOSALS.some((p) => p.ai_model_id === m.ai_model_id),
+  not_listed: notListed(m),
 });
 
-let findingUntil = 0;
-let lastFound: string | null = AGO(60 * 3);
+const WEEK = 7 * 24 * 3600_000;
+/** Not Listed while the mark is under a week old and the model still has no price on the key. */
+const notListed = (m: Model) =>
+  m.notListedAt !== undefined &&
+  Date.now() - m.notListedAt < WEEK &&
+  !m.prices.input_usd_per_million &&
+  !m.prices.output_usd_per_million &&
+  !m.prices.usd_per_audio_hour &&
+  m.available !== false;
+/** What Find Prices would ask about: on a key, no price, nothing waiting, not Not Listed (§6.4). */
+const toPrice = () =>
+  MODELS.filter(
+    (m) =>
+      m.provider !== "anthropic" &&
+      m.available !== false &&
+      !m.prices.input_usd_per_million &&
+      !m.prices.output_usd_per_million &&
+      !m.prices.usd_per_audio_hour &&
+      !PROPOSALS.some((p) => p.ai_model_id === m.ai_model_id) &&
+      !notListed(m),
+  );
+
+/** The newest Find Prices run: one ended three hours ago, with the proposal still waiting. */
+let RUN: AiPriceRun = {
+  ai_price_run_id: sid("price_run:1"),
+  status: "done",
+  batches_total: 1,
+  batches_done: 1,
+  proposals: 1,
+  not_listed: 0,
+  error_code: null,
+  started_at: AGO(60 * 3 + 2),
+  finished_at: AGO(60 * 3),
+};
+/** A run here takes two batches, two seconds each. */
+const BATCH_MS = 2000;
+let runStarted = 0;
+let runAsked: Model[] = [];
+
+function propose(m: Model) {
+  PROPOSALS.push({
+    ai_price_proposal_id: sid(`proposal:${m.model}:${RUN.ai_price_run_id}`),
+    ai_model_id: m.ai_model_id,
+    provider: m.provider,
+    model: m.model,
+    display_name: m.display_name,
+    ...(m.provider === "deepseek" ? P("0.2700", "1.1000") : P("0.1000", "0.4000", { audio_usd_per_million: "0.3000" })),
+    source_url: m.provider === "deepseek" ? "https://api-docs.deepseek.com/quick_start/pricing" : "https://ai.google.dev/gemini-api/docs/pricing",
+    created_at: new Date().toISOString(),
+  });
+}
+
+/** Moves the running run on by the clock: each batch proposes all but the last model it asks. */
+function advance() {
+  if (RUN.status !== "running") return;
+  const due = Math.min(RUN.batches_total, Math.floor((Date.now() - runStarted) / BATCH_MS));
+  for (let b = RUN.batches_done; b < due; b += 1) {
+    const batch = runAsked.filter((_, i) => i % RUN.batches_total === b);
+    batch.forEach((m, i) => {
+      if (i === batch.length - 1 && batch.length > 1) {
+        m.notListedAt = Date.now();
+        RUN.not_listed += 1;
+      } else {
+        propose(m);
+        RUN.proposals += 1;
+      }
+    });
+    RUN.batches_done = b + 1;
+  }
+  if (RUN.batches_done >= RUN.batches_total) RUN = { ...RUN, status: "done", finished_at: new Date().toISOString() };
+}
 
 /* ───────────── Jobs and actions ───────────── */
 
@@ -281,35 +354,37 @@ route("DELETE /api/v1/ai-control/chains/action/:key", (req) => {
 
 /* ───────────── Models and prices ───────────── */
 
-route("GET /api/v1/ai-control/models", (req) =>
-  paged(MODELS.map(view), req, {
+/** In a chain first, then usable, then by provider and name (decision 32). */
+const listOrder = (a: AiControlModel, b: AiControlModel) =>
+  Number(!a.in_chains.length) - Number(!b.in_chains.length) ||
+  Number(a.available === false) - Number(b.available === false) ||
+  a.provider.localeCompare(b.provider) ||
+  a.display_name.localeCompare(b.display_name);
+
+route("GET /api/v1/ai-control/models", (req) => {
+  const show = req.query.show ?? "usable";
+  if (!["usable", "not_on_key", "all"].includes(show)) return invalid({ show: ["is not a choice"] });
+  const shown = MODELS.map(view)
+    .filter((m) => show === "all" || (show === "not_on_key" ? m.available === false : m.available !== false))
+    .sort(listOrder);
+  return paged(shown, { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "show")) }, {
     search: (m) => [m.model, m.display_name],
     filters: { provider: (m, v) => m.provider === v, capability: (m, v) => m.capabilities.includes(v as ModelCapability) },
-  }),
-);
+  });
+});
 
 route("GET /api/v1/ai-control/models/summary", () => {
-  const finding = Date.now() < findingUntil;
-  if (!finding && findingUntil) {
-    // The search has "ended": its proposals arrive once.
-    findingUntil = 0;
-    lastFound = new Date().toISOString();
-    for (const id of ["gemini-3.5-flash-lite", "deepseek-v4-flash"] as const) {
-      const m = MODELS.find((x) => x.model === id)!;
-      if (PROPOSALS.some((p) => p.ai_model_id === m.ai_model_id)) continue;
-      PROPOSALS.push({
-        ai_price_proposal_id: sid(`proposal:${id}:${lastFound}`),
-        ai_model_id: m.ai_model_id,
-        provider: m.provider,
-        model: m.model,
-        display_name: m.display_name,
-        ...(id === "deepseek-v4-flash" ? P("0.2700", "1.1000") : P("0.1000", "0.4000", { audio_usd_per_million: "0.3000" })),
-        source_url: id === "deepseek-v4-flash" ? "https://api-docs.deepseek.com/quick_start/pricing" : "https://ai.google.dev/gemini-api/docs/pricing",
-        created_at: lastFound,
-      });
-    }
-  }
-  return ok({ finding, last_found_at: lastFound, proposals: PROPOSALS.length, rate: RATE });
+  advance();
+  const finding = RUN.status === "running";
+  return ok({
+    finding,
+    run: RUN,
+    last_found_at: finding ? null : RUN.finished_at,
+    proposals: PROPOSALS.length,
+    to_price: toPrice().length,
+    not_listed: MODELS.filter(notListed).length,
+    rate: RATE,
+  });
 });
 
 const pricesOf = (b: Record<string, unknown>): Prices => {
@@ -331,12 +406,44 @@ route("PUT /api/v1/ai-control/models/:id/prices", (req) => {
 });
 
 route("POST /api/v1/ai-control/prices/find", () => {
-  if (Date.now() < findingUntil) return fail(409, "ALREADY_FINDING", "Find Prices is already running");
-  findingUntil = Date.now() + 4000;
-  return { status: 202, body: { requested_at: new Date().toISOString() } };
+  advance();
+  if (RUN.status === "running") return fail(409, "ALREADY_FINDING", "Find Prices is already running");
+  runAsked = toPrice();
+  runStarted = Date.now();
+  const total = runAsked.length ? Math.min(2, runAsked.length) : 0;
+  RUN = {
+    ai_price_run_id: sid(`price_run:${runStarted}`),
+    status: total ? "running" : "done",
+    batches_total: total,
+    batches_done: 0,
+    proposals: 0,
+    not_listed: 0,
+    error_code: null,
+    started_at: new Date(runStarted).toISOString(),
+    finished_at: total ? null : new Date(runStarted).toISOString(),
+  };
+  return { status: 202, body: { requested_at: RUN.started_at } };
 });
 
-route("GET /api/v1/ai-control/prices", (req) => paged(PROPOSALS, req));
+route("GET /api/v1/ai-control/prices", (req) => {
+  advance();
+  return paged(PROPOSALS, req);
+});
+
+route("POST /api/v1/ai-control/prices/accept-all", () => {
+  const accepted = PROPOSALS.length;
+  for (const p of PROPOSALS.splice(0)) {
+    const m = MODELS.find((x) => x.ai_model_id === p.ai_model_id)!;
+    m.prices = {
+      input_usd_per_million: p.input_usd_per_million,
+      output_usd_per_million: p.output_usd_per_million,
+      audio_usd_per_million: p.audio_usd_per_million,
+      usd_per_audio_hour: p.usd_per_audio_hour,
+      usd_per_thousand_searches: p.usd_per_thousand_searches,
+    };
+  }
+  return ok({ accepted });
+});
 
 route("POST /api/v1/ai-control/prices/:id/accept", (req) => {
   const i = PROPOSALS.findIndex((p) => p.ai_price_proposal_id === req.params.id);
