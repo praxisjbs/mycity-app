@@ -24,6 +24,12 @@ export interface FieldBinding<V> {
   state: FieldState;
   /** The error, at most 4 words, when the state is bad. */
   message: string | undefined;
+  /**
+   * Told by the control what only it can see, at most 4 words ("Not a real date", a typed day
+   * outside its range), or undefined once it is gone. The form marks the field with it and
+   * check() refuses it; `now` marks it at once, for a problem the person cannot be still typing.
+   */
+  onProblem?: (message: string | undefined, now?: boolean) => void;
 }
 
 /** A server error's fields (ApiError.fields): name to messages. */

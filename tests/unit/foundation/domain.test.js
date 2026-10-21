@@ -52,6 +52,22 @@ describe("numbering", () => {
     for (const [t, s] of Object.entries(SCHEMES)) expect([t, validateScheme(s)]).toEqual([t, []]);
   });
 
+  test("the contract holds a saved scheme to the same rules, on the field each is about", () => {
+    const { NumberingSchemeSave } = require("@mycity/contract").settings;
+    const problems = (s) => {
+      const r = NumberingSchemeSave.safeParse({ prefix: "EXP", padding: 4, separator: "-", reset: "never", include_period: false, ...s });
+      return r.success ? {} : Object.fromEntries(r.error.issues.map((i) => [i.path.join("."), i.message]));
+    };
+    // Fault #3, 21/10/2026: a yearly scheme without its period was refused only on Save.
+    expect(problems({ reset: "yearly" })).toEqual({ include_period: "Needed when it resets" });
+    expect(problems({ reset: "monthly", include_period: true })).toEqual({});
+    expect(problems({ prefix: "", padding: 0 })).toEqual({ padding: "Add sequence digits" });
+    expect(problems({ padding: 0 })).toEqual({ padding: "Add digits or period" });
+    expect(problems({ padding: 0, reset: "yearly", include_period: true })).toEqual({});
+    // Each default scheme saves as it stands.
+    for (const [t, s] of Object.entries(SCHEMES)) expect([t, problems(s)]).toEqual([t, {}]);
+  });
+
   test("allocate refuses to run outside a transaction", async () => {
     await expect(numbering.allocate(client(), "query")).rejects.toThrow(/inside atomically/);
   });

@@ -739,6 +739,7 @@ route("POST /api/v1/ess/leave", (req) => {
   if (!t) f.leave_type_id = ["Pick a type"];
   if (b.starts_on && b.starts_on < isoDaysAgo(0)) f.starts_on = ["Already past"];
   if (b.starts_on && b.ends_on && b.ends_on < b.starts_on) f.ends_on = ["Ends before it starts"];
+  else if (b.starts_on && b.ends_on && b.ends_on.slice(0, 4) !== b.starts_on.slice(0, 4)) f.ends_on = ["Ends in another year"];
   if (Object.keys(f).length) return invalid(f);
   const me = byKey(req.user)!;
   if (myLeave(req.user!).some((x) => ["submitted", "approved"].includes(x.status) && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
