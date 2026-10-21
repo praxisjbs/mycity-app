@@ -1,10 +1,10 @@
 /**
  * @component BarChart
  * @group Charts
- * @summary Figures side by side as bars: headcount by department, claims by month, interviews by stage.
- * @use Comparing a handful of categories, where each figure matters as much as the shape.
- * @avoid A run of days (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars).
- * @phone No caption; the drawing scrolls inside its own card, so the page never scrolls sideways.
+ * @summary Figures side by side as bars: headcount by department, claims by month, spend by day.
+ * @use Comparing a handful of categories, or each day of a month, where each figure matters as much as the shape.
+ * @avoid A run of days where only the shape matters (use AreaChart); shares of one whole (use DonutChart); a labelled list with its own values (use Bars).
+ * @phone No caption. Up to 12 bars every label shows and a narrow card scrolls the drawing inside it; past 12 (a month of days) labels that would touch are left off, never the first or the last. The page never scrolls sideways.
  * @a11y The drawing is hidden from screen readers and the frame reads every bar as a label and a figure instead.
  * @status stable
  * @example <BarChart title="Claims by Month" bars={months} caption="Approved claims only" />
@@ -19,7 +19,7 @@ const Draw = lazyDraw<BarDrawProps>(() => import("./BarChart.draw"));
 
 /** One bar. */
 export interface BarChartBar {
-  /** Its name under the bar, short enough to read (Jan, Finance, Offer). */
+  /** Its name under the bar, short enough to read (Jan, Finance, 14/10). Past 12 bars one that would touch its neighbour is left off the drawing, never off the read-out list. */
   label: string;
   /** Its figure. */
   value: number;

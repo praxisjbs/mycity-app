@@ -1,13 +1,16 @@
 /**
  * Sample figures for the Charts group's gallery pages: a fortnight of
- * attendance, a year of claims and a salary structure. Not exported from the
- * package; a screen's figures come from the API.
+ * attendance, a year of claims, a month of days and a salary structure. Not
+ * exported from the package; a screen's figures come from the API.
  */
 export const WORKING_DAYS = ["1", "2", "3", "4", "5", "6", "8", "9", "10", "11", "12", "13", "15", "16"];
 export const PRESENT = [44, 46, 45, 47, 46, 23, 45, 44, 46, 47, 45, 22, 46, 47];
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
 export const CLAIMS = [14, 22, 9, 18, 26, 21];
+
+/** A month of days, labelled day first without the year, and a figure for each. */
+export const MONTH_OF_DAYS = Array.from({ length: 31 }, (_, i) => ({ label: `${String(i + 1).padStart(2, "0")}/10`, value: 600 + ((i * 137) % 900) }));
 
 export const DEPARTMENTS = [
   { label: "Finance", value: 12 },

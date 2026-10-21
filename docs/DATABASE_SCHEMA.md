@@ -499,7 +499,9 @@ charged at, with kind `search` · `10210` Find Prices in batches (`docs/guides/a
 decisions 29 to 31): `ai_price_run` (one per Find Prices press: its progress, counts, outcome and the
 job's claim), `ai_model.price_not_listed_at` (asked again after 7 days), and the provider-listed
 `ai_model` rows decision 29 leaves off (`-latest` aliases, Gemma, repeated snapshots no chain uses)
-deleted · `10290` seed: the `ai_control` grants.
+deleted · `10220` the voice notes kept under the purpose `transcription` before the action registry
+moved onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` so the DOWN puts
+it back (`docs/guides/ai-control.md` §4, §6.5) · `10290` seed: the `ai_control` grants.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

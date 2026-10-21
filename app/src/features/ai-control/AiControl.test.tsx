@@ -307,4 +307,12 @@ describe("AI Control", () => {
       expect(m.call).toHaveBeenCalledWith("PUT /api/v1/ai-control/caps/:provider", { params: { provider: "gemini" }, body: { monthly_cap_ngn: "60000.00" } }),
     );
   });
+
+  it("Spend by Day: each day day first, without the year", () => {
+    m.data = { "GET /api/v1/ai-control/spend": SPEND };
+    m.rows = { "GET /api/v1/ai-control/spend/actions": [] };
+    page("spend");
+    expect(screen.getByText("19/10: 820")).toBeTruthy();
+    expect(screen.getByText("20/10: 410")).toBeTruthy();
+  });
 });

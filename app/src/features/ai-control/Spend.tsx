@@ -126,8 +126,8 @@ function ProviderCard({ p }: { p: AiProviderSpend }) {
   );
 }
 
-/** One day as a bar's label: "14 Oct". */
-const dayLabel = (iso: string) => formatDate(iso).split(" ").slice(0, 2).join(" ");
+/** One day as a bar's label, day first without the year: "14/10". */
+const dayLabel = (iso: string) => formatDate(iso).slice(0, 5);
 
 function Overall({ s }: { s: AiSpend }) {
   const { can } = useAuth();
@@ -185,9 +185,7 @@ export function Spend() {
             ))}
           </Grid>
           <DesktopOnly>
-            <Card className="mt-3">
-              <BarChart title="Spend by Day" bars={s.days.map((d) => ({ label: dayLabel(d.day), value: Number(d.spent_ngn) }))} />
-            </Card>
+            <BarChart className="mt-3" title="Spend by Day" bars={s.days.map((d) => ({ label: dayLabel(d.day), value: Number(d.spent_ngn) }))} />
           </DesktopOnly>
         </>
       )}

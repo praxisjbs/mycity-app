@@ -375,6 +375,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · My Attendance (#9): My Days as a chart labels each day 13/10 (it read 13/10/, with a stray slash), and the shared bar chart leaves off the days that would touch, every few days at an even step, the first and the last always.
 - 21/10/2026 · TB · With attendance's PR 2 (`attendance.md` §6.5): Download My Data names a punch whose location could not be proved Unclear, as every screen now does (Location Unclear); My Attendance (#9) reads Location Unclear with its help and a punch's location with its reason, and the clock panel reads the location through the feature's one reader (`app/src/features/attendance/location.ts`).
 - 21/10/2026 · TB · Built with attendance's PR 3: My Profile's Work Schedule reads the person's own week (`GET /attendance/me/schedule` beside the profile's `working_week`): each day Working or Off with its hours and place, the company hours when none is set. My Attendance (#9) gains the month's Deductions and Overtime and Give Real Time on a System Clock-Out (`attendance.md` §10).
 - 20/10/2026 · TB · Policy Updates (#89) built on `app/src/features/policies/PolicyUpdates.tsx` (every policy that applies to the person: To Acknowledge, All Policies, Waiting On You for an approver), described in `docs/guides/policies.md`; `features/ess/index.tsx` points there.
