@@ -283,11 +283,10 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
   const yDate = `${bind(yesterday.date)}::date`;
   const narrowed = personFilters(bind, filters);
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
+  // A materialised CTE is a fence: each person's flags are worked out once, not again in every
+  // count and filter that reads the status (which also cost the query a JIT compile on every call).
   return `
-    SELECT f.*, ${STATUS} AS status,
-           CASE WHEN f.clock_in_at IS NOT NULL AND (f.field_day OR NOT f.remote_day)
-                THEN f.clock_in_worksite END AS worksite
-      FROM (
+    WITH f AS MATERIALIZED (
         SELECT e.employee_id, e.first_name, e.last_name, e.job_title, e.department_id,
                d.name AS department, ${photoUrlSql("e")} AS photo_url, e.work_pattern, ${remoteDay("e.employee_id", date)} AS remote_day,
                ${fieldDay("e.employee_id", date)} AS field_day,
@@ -309,7 +308,11 @@ function rosterSql(day, yesterday, scope, params, filters = {}) {
          WHERE ${onRegister(date)}
            AND ${narrowed}
            ${s.and}
-      ) f`;
+    )
+    SELECT f.*, ${STATUS} AS status,
+           CASE WHEN f.clock_in_at IS NOT NULL AND (f.field_day OR NOT f.remote_day)
+                THEN f.clock_in_worksite END AS worksite
+      FROM f`;
 }
 
 /**

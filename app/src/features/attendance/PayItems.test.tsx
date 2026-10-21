@@ -84,7 +84,7 @@ async function signedInAs(email: string, screenUnderTest: ReactNode) {
 }
 
 /** People's list, as Cynthia (Operations, everyone) reads it. */
-const peopleItems = async (query: Record<string, string>) => attendance.PayItemPage.parse(await api.call("GET /api/v1/attendance/pay-items", { query })).data;
+const peopleItems = async (query: Record<string, string>): Promise<PayItem[]> => attendance.PayItemPage.parse(await api.call("GET /api/v1/attendance/pay-items", { query })).data;
 const emailOf = (x: PayItem) => `${byId(x.employee.employee_id)!.user_key}@mycityapp.io`;
 /** Steps My Attendance's month back to the item's month (the newest item may fall in the last one). */
 async function toMonthOf(date: string) {
