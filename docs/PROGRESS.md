@@ -1072,7 +1072,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 98 | Actions | `actions` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
-| 99 | Models | `models` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 99 | Models | `models` | M10 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 100 | Spend | `spend` | M10 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 
 **Notes**
@@ -1092,6 +1092,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   built in M10) and Find Prices; gate `check/ai-actions.js` fails a call that names no registered action.
   Tests: 10 integration, 11 unit, 6 screen. Left: Data Answers and the per-module switch's screen with M10's
   Assistant; set Find Prices' first prices on staging and production once the keys are in.
+- 21/10/2026 · TB · Find Prices fixed after the first run on staging proposed nothing for 129 models (the
+  answer was capped at 60 and cut short; decisions 29 to 32). Fewer models: a key's list now leaves off
+  `-latest` aliases, Gemma and snapshots of a model already listed, unless a chain uses one (migration 10210
+  clears those already stored). Find Prices asks only about models with no price, 20 to a request with
+  thinking kept low, and marks Not Listed what the page does not price (asked again after 7 days); each press
+  is an `ai_price_run` with its progress. Models: the New Prices sheet (Batch 2 of 4, each price with Accept
+  and Dismiss, Accept All, Find More, Still to Price and Not Listed), opened by Find Prices or Review Prices;
+  the list opens on models in a chain, with a Show filter (On Key, Not on Key, Any). Tests: 12 integration,
+  2 unit, 4 screen for Models. Left: on staging and production, press Test on the Gemini connection to re-read
+  its list, then Find Prices until Still to Price reaches 0.
 
 ### Settings
 

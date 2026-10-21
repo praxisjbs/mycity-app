@@ -33,6 +33,7 @@ CREATE INDEX IF NOT EXISTS ai_price_run_requested_by_idx ON ai_price_run (reques
 
 ALTER TABLE ai_model ADD COLUMN IF NOT EXISTS price_not_listed_at timestamptz;
 
+-- DESTRUCTIVE: provider-listed aliases, Gemma and repeated snapshots go; the next key test lists them again, trimmed
 DELETE FROM ai_model m
  WHERE m.source = 'provider'
    AND NOT EXISTS (SELECT 1 FROM ai_chain c WHERE c.provider = m.provider AND c.model = m.model)
