@@ -258,7 +258,8 @@ async function pipeline(client, { today, scopes }) {
  */
 async function dayStrip(client, { user, today }) {
   const cal = await workingWeek.loadCalendar(client);
-  const day = roster.dayOf(today, cal);
+  // A temporary site with its own hours sets the reader's hours today (attendance.md §6.11).
+  const day = await roster.dayFor(client, user.employee_id, today, cal);
   const own = { scope: "own", scope_ids: [user.employee_id] };
   const row =
     (await roster.page(client, { date: today }, own, { page: 1 })).data[0] ||

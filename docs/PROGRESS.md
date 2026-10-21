@@ -631,13 +631,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 21/10/2026 · TB · Overview (#1): Add Work Site's sheet opens on Hours (Usual Shift or Site Hours); on a day of a site with its own hours the Staff day strip's Shift Today shows the site's hours (`docs/guides/home.md` §3 step 10, §6). Left: nothing.
 - 20/10/2026 · TB · Overview (#1): Add Work Site (attendance's PR 4, `docs/guides/home.md` §3 step 10, `docs/guides/attendance.md` §6.11): a button beside New, an entry in New and, on a phone, the floating button's second action, each opening Attendance's temporary site sheet over the Overview (`?action=work-site`, also ⌘K's). The Purpose list is searchable (`SelectField searchable`, packages/ui). A present day on an approved site reads Field on the roster and Team, a Temporary Home Remote. Left: nothing.
 - 19/10/2026 · TB · Overview (#1): the clock-in prompt left Home (owner decision of 19/10/2026, replacing O12; `docs/guides/home.md` §3, §6). `HomeOverview.prompt_clock_in`, `dashboard.prompt.js` and the Overview's opener are gone; Attendance decides the prompt and the shell opens it on whatever screen comes first (`docs/guides/attendance.md` §6.14). The Overview still reads itself again after a clock-in (its screen test now punches directly). Left: nothing.
 - 19/10/2026 · TB · Overview (#1) and Reports (#3): the Overview's Export and Run Now download their file on the device that pressed instead of emailing it (`docs/guides/home.md` §3, §5 to §7, §10; foundation.md §6.12). The button is busy while the run's file is made, Recent Runs shows it Pending meanwhile, and the toast reads "RPT-0215 downloaded". `GET /home/overview/export/:id` lets Staff, who hold no `home.reports`, wait on their own Overview run. A schedule's runs are still emailed. Left: nothing.
@@ -749,7 +750,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 18/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 20/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
@@ -757,6 +758,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 21/10/2026 · TB · Work Location Requests (#87): Add Work Site opens on Hours, Usual Shift or Site Hours with a start and an end, and a site shows its hours (`docs/guides/attendance.md` §6.11). Left: nothing.
 - 20/10/2026 · TB · My Attendance (#9), Work Location Requests (#87) and Policy Updates (#89), attendance's PR 4 (`docs/guides/attendance.md` §6.11, §6.12, §6.15; `docs/guides/ess.md`): Work Location Requests lists the person's temporary sites with Add Work Site (header, full width on a phone, the floating button) and a site's view with its addresses on maps, its people, its approval and Withdraw Submission (a reason); `?site=` opens one; their requests made before PR 4 stay under the sites and New Request is gone. My Attendance shows Temporary Sites waiting, in progress or to come, and each day's route of check-ins between the punches. The clock panel names the site and its addresses and, once clocked in, offers Check In with the day's check-ins under it. Policy Updates reads the site section as At a Temporary Site. Left: nothing.
 - 20/10/2026 · TB · Policy Updates (#89) rebuilt for every policy (`app/src/features/policies/PolicyUpdates.tsx`, `docs/guides/policies.md`): To Acknowledge, All Policies and Waiting On You; a policy opens as its text or its sentences with what changed, its signatures, Download PDF and earlier versions; an approver approves with a signature or rejects with a reason; the acknowledge sheet after the clock (`AcknowledgeSheet.tsx`). Checked by 8 screen tests on the mock and, on the real API in Chromium (20/10/2026), the Attendance policy's Version 1 published with a drawn signature, a written policy for Engineering, the sign-in prompt then the sheet for each at 390 px with touch, Later holding until tomorrow, Acknowledge recorded, and the PDF made on the letterhead. Left: Tidy With AI against a real model (the local stub's answer is refused by the word check, as it should be).
 - 20/10/2026 · TB · Policy Updates (#89) moves to M1 with Knowledge Hub · Policies and will carry every policy that applies to the person, with the acknowledge sheet after the clock (`docs/guides/policies.md`); In progress until PR 1 rebuilds it. The attendance redesign of 20/10/2026 (`docs/guides/attendance.md` §1.1, four PRs) also changes My Attendance (#9: deductions, overtime, check-ins, System Clock-Out) and Work Location Requests (#87: becomes the person's temporary sites) in PRs 3 and 4; both stay Built until then.
@@ -882,14 +884,15 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 20/10/2026 |
+| 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 21/10/2026 · TB · Attendance (#25) and Worksites (#28), a temporary site's hours (owner decision, 21/10/2026; `docs/guides/attendance.md` §6.11): Add Work Site and Add Temporary Site open on Hours, Usual Shift or Site Hours with Starts At and Ends At, and a site shows its hours. Site Hours make every day of the site worked for its people, weekends and holidays included, on the site's own clock: the clock-in reminder and the start prompt at its start, lateness from it with the policy's grace, the closing prompt, overtime and the system clock-out from its end, and a day with no clock-in closed absent; the register and the roster count those days as worked. Migration `1475`. Left: nothing.
 - 20/10/2026 · TB · Attendance (#25) and Worksites (#28), attendance's PR 4 (`docs/guides/attendance.md` §6.11, §6.12, §10): Worksites has a Permanent and Temporary switch; Permanent is the worksites as before, alone. Temporary lists the sites in the reader's scope with state chips, Add Temporary Site (People's own, in force at once; ⌘K's too), and a site's view with Approve and Reject (through its approval; nobody on a site decides it), Take Off and Cancel Site with a reason; while a request or assignment made before PR 4 waits or is in force, Requests and Field sit beside the sites. People · Attendance loses Requests, Field and New Assignment; a day's evidence and an exception show the route of check-ins between the punches, and a check-in's flag is decided Accept or Reject. Backend: migrations 1450, 1455, 1460, seed 1470, `attendance.sites`, `.sites.repo`, `.check-ins`, the site first in `contextFor` with its time zone, the approval's exclusions in the workflow engine. Checked live in Chromium against the real API (1440 by 900 and a 390 px phone with touch): Add Work Site with the purpose searched and an address from the device while search was down, the approval on Worksites, a clock-in matched to the site, Check In listed Inside on the panel and on People's route, the phone's fan and full sheets. Left: PR 2's location reader is not merged, so Check In reads the location itself; PR 3's Location Flags do not yet count flagged check-ins.
 - 20/10/2026 · TB · Attendance redesign agreed (`docs/guides/attendance.md` §1.1, TB's decisions of 20/10/2026, after an audit of the clock path the same day), built in four PRs (§1.2): 1, policies foundation (in progress); 2, clock fixes; 3, rules and schedules (lateness from the start, alerts and queries from the policy, pending deductions, overtime, work schedules on a Work Schedule tab, reminders and the system clock-out); 4, places (permanent and temporary sites on Worksites #28, Add Work Site on Home, HR approval, check-ins). Attendance (#25), Worksites (#28) and Employees (#24) stay Built until their PR lands.
 - 19/10/2026 · TB · Attendance (#25), New Assignment, and Work Location Requests (#87), a client visit: each site shows its centre and fence on a map under the radius once both coordinates are real, a tap moving the centre (`SiteMap.tsx`, shared with Worksites #28; `docs/guides/attendance.md` §10). No address lookup on these two (worksites only). Nothing left on maps for these forms.

@@ -33,6 +33,7 @@ const guard = require("./attendance.clock-guard");
 const lateness = require("./attendance.lateness");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const sitesRepo = require("./attendance.sites.repo");
 const { EVENTS } = require("./attendance.events");
 
 /** How far back the day-close looks for days still open. */
@@ -384,8 +385,9 @@ async function closeDays({ now = new Date() } = {}) {
   if (start) {
     const cal = await workingWeek.loadCalendar(pool);
     for (let d = start > since ? start : since; d < today; d = lagos.addDays(d, 1)) {
-      if (!workingWeek.isWorkingDay(d, cal)) continue;
-      for (const e of await repo.withoutDay(pool, d)) count(await closeDay(e.employee_id, d));
+      // A day the organisation does not work is still worked on a site with its own hours (§6.11).
+      const people = workingWeek.isWorkingDay(d, cal) ? await repo.withoutDay(pool, d) : await sitesRepo.siteHoursWithoutDay(pool, d);
+      for (const e of people) count(await closeDay(e.employee_id, d));
     }
   }
   return { today, ...tally };

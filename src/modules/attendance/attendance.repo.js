@@ -19,7 +19,7 @@ const { scopeClause } = require("../../shared/rbac/scope");
 const { personJson } = require("../../shared/db/person");
 const lagos = require("../../shared/time/lagos");
 const approvers = require("../../shared/workflow/approvers");
-const { REGISTER_SITE } = require("./attendance.sites.repo");
+const { REGISTER_SITE, SITE_HOURS_DAY } = require("./attendance.sites.repo");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -37,6 +37,12 @@ const WORKING_DAY = (dateExpr) => `(
                        WHERE ww.weekday = extract(isodow FROM ${dateExpr})::int), false)
        ELSE extract(isodow FROM ${dateExpr}) <= 5 END
   AND NOT EXISTS (SELECT 1 FROM public_holiday h WHERE h.holiday_date = ${dateExpr}))`;
+
+/**
+ * Is `dateExpr` worked by the employee in `employeeCol`: the organisation works it, or a temporary
+ * site with its own hours they are on covers it (§6.11). The register and the roster read it.
+ */
+const WORKING_FOR = (employeeCol, dateExpr) => `(${WORKING_DAY(dateExpr)} OR ${SITE_HOURS_DAY(employeeCol, dateExpr)})`;
 
 /**
  * Is `dateExpr` a home day of a hybrid employee (§6.13): their pattern is hybrid and the schedule in
@@ -458,9 +464,9 @@ const REGISTER = `
          $1::date AS date,
          CASE WHEN ad.status IS NOT NULL THEN ad.status
               WHEN ${GRANTED_LEAVE("e.employee_id", "$1::date")} THEN 'leave'
-              WHEN NOT ${WORKING_DAY("$1::date")} THEN 'off'
+              WHEN NOT ${WORKING_FOR("e.employee_id", "$1::date")} THEN 'off'
               ELSE 'not_in' END AS status,
-         ${WORKING_DAY("$1::date")} AS working_day,
+         ${WORKING_FOR("e.employee_id", "$1::date")} AS working_day,
          ad.attendance_day_id, ad.first_clock_in_at AS clock_in_at, ad.last_clock_out_at AS clock_out_at,
          COALESCE(ad.worked_minutes, 0) AS worked_minutes, COALESCE(ad.late_minutes, 0) AS late_minutes,
          COALESCE(ad.overtime_minutes, 0) AS overtime_minutes, ad.closed_at,
@@ -651,9 +657,43 @@ async function dueForReminder(db, date) {
                            AND NOT ${EXCLUDED("ev")})
         AND NOT EXISTS (SELECT 1 FROM attendance_clock_reminder r
                          WHERE r.employee_id = e.employee_id AND r.work_date = $1::date AND r.kind = 'clock_in_due')
+        -- On a site with its own hours, the site's start reminds them (dueAtSite).
+        AND NOT ${SITE_HOURS_DAY("e.employee_id", "$1::date")}
       ORDER BY e.employee_id`,
     [date],
     { label: "people due a clock-in reminder" },
+  );
+  return rows;
+}
+
+/**
+ * The people on a temporary site with its own hours due its clock-in reminder on `date` (the site's
+ * own day): still on it, at work, with a login, not on granted leave, with no clock-in that counts
+ * that day and not yet reminded (§6.14).
+ */
+async function dueAtSite(db, siteId, date) {
+  // pagination:complete the watch reminds everyone on the site who is due
+  const { rows } = await completeQuery(
+    db,
+    `SELECT e.employee_id,
+            ARRAY(SELECT u.user_id FROM app_user u
+                   WHERE u.employee_id = e.employee_id AND u.status = 'active' ORDER BY u.user_id) AS user_ids
+       FROM attendance_temporary_site_member m
+       JOIN employee e ON e.employee_id = m.employee_id
+      WHERE m.temporary_site_id = $1 AND m.removed_at IS NULL
+        AND e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= $2::date)
+        AND (e.left_on IS NULL OR e.left_on > $2::date)
+        AND EXISTS (SELECT 1 FROM app_user u WHERE u.employee_id = e.employee_id AND u.status = 'active')
+        AND NOT ${GRANTED_LEAVE("e.employee_id", "$2::date")}
+        AND NOT EXISTS (SELECT 1 FROM attendance_event ev
+                         WHERE ev.employee_id = e.employee_id AND ev.work_date = $2::date
+                           AND ev.event_type = 'clock_in' AND ev.validation_state IN ('accepted', 'review')
+                           AND NOT ${EXCLUDED("ev")})
+        AND NOT EXISTS (SELECT 1 FROM attendance_clock_reminder r
+                         WHERE r.employee_id = e.employee_id AND r.work_date = $2::date AND r.kind = 'clock_in_due')
+      ORDER BY e.employee_id`,
+    [siteId, date],
+    { label: "people on a site due a clock-in reminder", ceiling: 25 },
   );
   return rows;
 }
@@ -1233,6 +1273,7 @@ module.exports = {
   ADDRESS_LINE,
   renameAddress,
   WORKING_DAY,
+  WORKING_FOR,
   HOME_DAY,
   lockEmployee,
   person,
@@ -1259,6 +1300,7 @@ module.exports = {
   unclosedDays,
   withoutDay,
   dueForReminder,
+  dueAtSite,
   firstSessionOn,
   recordReminder,
   reminderOn,

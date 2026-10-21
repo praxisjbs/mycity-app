@@ -66,6 +66,7 @@ const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const sitesRepo = require("./attendance.sites.repo");
 
 /** Home's statuses (packages/contract HomeRosterStatus), in display order. */
 const STATUSES = Object.freeze(["on_leave", "late", "on_site", "remote", "field", "absent", "not_in"]);
@@ -91,6 +92,20 @@ function dayOf(date, cal) {
   lagos.assertDate(date);
   const shift = rules.shiftFor(date, cal, rules.DEFAULT_POLICY);
   return { date, working_day: shift.working_day, starts_at: shift.starts_at, ends_at: shift.ends_at };
+}
+
+/**
+ * One person's hours on a day: a temporary site's own when they are on one with Site Hours that day
+ * (§6.11), else the day's as dayOf reads it. Home's day strip shows these.
+ * @param {import("pg").Pool|import("pg").PoolClient} db
+ * @param {string} employeeId
+ * @param {string} date  YYYY-MM-DD
+ * @param {import("../../shared/time/working-week").Calendar} cal
+ */
+async function dayFor(db, employeeId, date, cal) {
+  const site = await sitesRepo.siteOn(db, employeeId, date);
+  if (site && site.hours === "site") return { date, working_day: true, starts_at: site.starts_at, ends_at: site.ends_at };
+  return dayOf(date, cal);
 }
 
 /**
@@ -272,8 +287,9 @@ const binder = (params) => (value) => {
 function rosterSql(day, yesterday, scope, params, filters = {}) {
   const bind = binder(params);
   const date = `${bind(day.date)}::date`;
-  // Worked out in SQL, as the register does: a holiday entered a moment ago already counts.
-  const working = repo.WORKING_DAY(date);
+  // Worked out in SQL, as the register does: a holiday entered a moment ago already counts, and a
+  // temporary site with its own hours works its days for its people (§6.11).
+  const working = repo.WORKING_FOR("e.employee_id", date);
   const yDate = `${bind(yesterday.date)}::date`;
   const narrowed = personFilters(bind, filters);
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
@@ -516,7 +532,7 @@ async function personal(client, { employee_id: employeeId, from, to, today = lag
   for (let d = from; d <= to; d = lagos.addDays(d, 1)) dates.push(d);
 
   const { rows } = await client.query(
-    `SELECT dy.on_date, ${repo.WORKING_DAY("dy.on_date")} AS working_day, e.work_pattern,
+    `SELECT dy.on_date, ${repo.WORKING_FOR("e.employee_id", "dy.on_date")} AS working_day, e.work_pattern,
             ${remoteDay("e.employee_id", "dy.on_date")} AS remote_day,
             ${fieldDay("e.employee_id", "dy.on_date")} AS field_day,
             ${onRegister("dy.on_date")} AS on_register,
@@ -550,6 +566,7 @@ module.exports = {
   STATUSES,
   MAX_DAYS,
   dayOf,
+  dayFor,
   yesterdayOf,
   statusOf,
   outcomeOf,

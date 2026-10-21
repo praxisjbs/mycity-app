@@ -127,7 +127,8 @@ the saved reports, their schedules and runs, the per-role cards and each person'
    tables so every card has figures (§11). This is a build-order note, not a runtime mode.
 
 10. **Add Work Site** (attendance's PR 4, attendance.md §6.11). Beside New, and as an entry in it,
-    Add Work Site opens Attendance's temporary site sheet over the Overview: Purpose, Name, Addresses,
+    Add Work Site opens Attendance's temporary site sheet over the Overview: Hours (Usual Shift or
+    Site Hours with a start and an end, attendance.md §6.11), Purpose, Name, Addresses,
     First Day, Last Day, People (the reader and colleagues, from `GET /community/people`, open to all
     staff), Description, Submit for Approval (`POST /attendance/me/temporary-sites`). Home owns the
     button only: the sheet, the site and its approval are Attendance's. A present day on an approved
@@ -335,7 +336,8 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
     to a later one an agreement already starts in. Beside it the Partnership Pipeline (open
     opportunities by stage, and active partners with no contact in 30 days) and Goals This
     Quarter.
-  - Staff: the day strip (today's hours, and the reader's own row of today's roster: status,
+  - Staff: the day strip (today's hours, a temporary site's own when the reader is on one with
+    Site Hours today, and the reader's own row of today's roster: status,
     Clock-In, Clock-Out, the worksite of the clock-in, and Hours Today, first clock-in to last
     clock-out, none until they clock out), My Goals This Quarter (their targets due this quarter)
     and Upcoming Leave. A member of staff's Overview is their own day, so it draws no chart,
@@ -831,3 +833,4 @@ rows, and nothing in the code says where anything came from.
 - 19/10/2026 · TB · Run Now and the Overview's Export download on the device that pressed, never by email (`docs/guides/foundation.md` §6.12, TB's decision; §3 steps 7 and 8, §4, §5, §6, §7, §10): a run on demand is done once its file exists and is not emailed (`emailed_at` stays empty), the screens wait on the run and save its file (toast "RPT-0215 downloaded"), and `GET /home/overview/export/:id` lets every Home reader, Staff included, wait on their own Overview run. A schedule's runs are still emailed; the email's `scheduled` variable is gone with the branch it chose.
 - 20/10/2026 · TB · The Attendance policy becomes the one source of attendance thresholds (`attendance.md` §6.16, policies.md): from attendance's PR 3, Home's attendance alerts come from the policy's rules and their Home rules are read only; from its PR 4, Home · Overview gains an Add Work Site button beside New (and an entry in New) (`attendance.md` §6.11). Nothing else on Home changes.
 - 20/10/2026 · TB · Attendance's PR 4 built: Home · Overview's Add Work Site, beside New and as an entry in New, on desktop and in the phone's floating button fan, opens Attendance's temporary site sheet (§2, §3 step 10, §10); a present day on an approved temporary site reads Field on the roster and Team, a Temporary Home Remote (§6 Team, attendance.md §6.9). Nothing Home computes changed.
+- 21/10/2026 · TB · A temporary site's hours (attendance.md §6.11): Add Work Site's sheet opens on Usual Shift or Site Hours (§3 step 10); on a day of a site with its own hours the Staff day strip's Shift Today shows the site's (§6 Overview), and the roster counts the day as worked for its people (attendance.md §6.9).

@@ -161,6 +161,40 @@ describe("temporary sites", () => {
     expect(after.data.find((x) => x.number === "TS-0006")).toMatchObject({ status: "withdrawn", state: "withdrawn", cancel_reason: "The partner moved the training online", can_withdraw: false });
   }, 30000);
 
+  it("Site Hours ask for a start and an end, and the site keeps them; the Usual Shift asks for neither", async () => {
+    await signedInAs("chidera@mycityapp.io", <WorkLocationRequestsPage />);
+    fireEvent.click((await screen.findAllByRole("button", { name: "Add Work Site" }))[0]);
+    const dialog = await screen.findByRole("dialog", { name: "Add Work Site" });
+    // Hours come first, on the Usual Shift.
+    expect(within(dialog).getByRole("radio", { name: "Usual Shift" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(dialog).queryByLabelText("Starts At")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Site Hours" }));
+    fireEvent.click(within(dialog).getByRole("combobox", { name: "Purpose" }));
+    fireEvent.change(await screen.findByRole("searchbox", { name: "Search Purpose" }), { target: { value: "delivering" } });
+    fireEvent.click(within(screen.getByRole("listbox", { name: "Purpose" })).getByRole("option", { name: "Training (Delivering)" }));
+    fill(dialog, "Name", "Partner Sunday Training");
+    await pickAddress(dialog, "herbert", /21 Herbert Macaulay Way, Yaba/);
+    fill(dialog, "First Day", typed(5));
+    fill(dialog, "Last Day", typed(6));
+    fireEvent.change(within(dialog).getByPlaceholderText("Partner training, Lekki"), { target: { value: "Training the partner's staff on the ERP over two days." } });
+    pressIn(dialog, "Submit for Approval");
+    await waitFor(() => expect(within(dialog).getByLabelText("Starts At").getAttribute("aria-invalid")).toBe("true"));
+    expect(within(dialog).getByLabelText("Ends At").getAttribute("aria-invalid")).toBe("true");
+    fill(dialog, "Starts At", "15:00");
+    fill(dialog, "Ends At", "11:00");
+    pressIn(dialog, "Submit for Approval");
+    await waitFor(() => expect(within(dialog).getByText("Ends before it starts")).toBeTruthy());
+    fill(dialog, "Starts At", "11:00");
+    fill(dialog, "Ends At", "15:00");
+    pressIn(dialog, "Submit for Approval");
+    const row = await screen.findByText(/^TS-\d{4} · Partner Sunday Training$/);
+    const mine = await api.call("GET /api/v1/attendance/me/temporary-sites", { query: {} });
+    expect(mine.data.find((x) => x.name === "Partner Sunday Training")).toMatchObject({ hours: "site", starts_at: "11:00", ends_at: "15:00" });
+    fireEvent.click(row);
+    const view = await screen.findByRole("dialog", { name: /Partner Sunday Training$/ });
+    expect(within(view).getByText("11:00 to 15:00")).toBeTruthy();
+  }, 30000);
+
   it("People · Worksites: Permanent alone, then Temporary, where Operations & People reject or approve a waiting site", async () => {
     await signedInAs("cynthia@mycityapp.io", <Worksites />);
     await screen.findByText("Worksites", { selector: "h1" });

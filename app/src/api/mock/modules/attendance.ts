@@ -53,15 +53,17 @@ export function shiftOf(date: string) {
   if (dow === 0) return { working_day: false, starts_at: null, ends_at: null, grace_minutes: GRACE, off_reason: "Sunday" };
   return { working_day: true, starts_at: "09:00", ends_at: dow === 6 ? "15:00" : "17:00", grace_minutes: GRACE, off_reason: null };
 }
+type Shift = ReturnType<typeof shiftOf>;
+/**
+ * A temporary site's own hours for a person's day (§6.11), or null. Set once the sites below are
+ * built: the demonstration history, worked out before them, has none.
+ */
+let siteShift: (key: string, date: string) => Shift | null = () => null;
+/** A person's shift on a day: a site's own hours, else the working week's. */
+const shiftFor = (key: string, date: string): Shift => siteShift(key, date) ?? shiftOf(date);
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
-const lateOf = (date: string, iso: string) => {
-  const s = shiftOf(date);
-  return s.starts_at ? Math.max(0, minutesOf(formatTime(iso)) - (minutesOf(s.starts_at) + GRACE)) : 0;
-};
-const overtimeOf = (date: string, iso: string) => {
-  const s = shiftOf(date);
-  return s.ends_at ? Math.max(0, minutesOf(formatTime(iso)) - minutesOf(s.ends_at)) : 0;
-};
+const lateOf = (s: Shift, iso: string) => (s.starts_at ? Math.max(0, minutesOf(formatTime(iso)) - (minutesOf(s.starts_at) + GRACE)) : 0);
+const overtimeOf = (s: Shift, iso: string) => (s.ends_at ? Math.max(0, minutesOf(formatTime(iso)) - minutesOf(s.ends_at)) : 0);
 
 /** Metres between two points, on a sphere the size of the Earth. */
 function distanceM(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
@@ -121,10 +123,11 @@ function recompute(key: string, date: string) {
   d.first_clock_in_at = first?.occurred_at ?? null;
   d.last_clock_out_at = last?.occurred_at ?? null;
   d.clock_out_automatic = last?.source === "system";
-  d.late_minutes = first ? lateOf(date, first.occurred_at) : 0;
+  const shift = shiftFor(key, date);
+  d.late_minutes = first ? lateOf(shift, first.occurred_at) : 0;
   d.worked_minutes = first && last ? Math.max(0, Math.floor((Date.parse(last.occurred_at) - Date.parse(first.occurred_at)) / 60000)) : 0;
-  d.overtime_minutes = last ? overtimeOf(date, last.occurred_at) : 0;
-  if (d.status !== "leave") d.status = first ? (d.late_minutes > 0 ? "late" : "present") : d.closed_at && shiftOf(date).working_day ? "absent" : null;
+  d.overtime_minutes = last ? overtimeOf(shift, last.occurred_at) : 0;
+  if (d.status !== "leave") d.status = first ? (d.late_minutes > 0 ? "late" : "present") : d.closed_at && shift.working_day ? "absent" : null;
   d.open_exceptions = openCount(d.attendance_day_id);
   return d;
 }
@@ -469,9 +472,9 @@ export function todayOf(key: string): AttendanceToday {
     clock_out_at: outEv?.occurred_at ?? null,
     clock_out_automatic: outEv?.source === "system",
     // The mock has no sessions: every session it serves is the day's first (§6.14), and the device's mark keeps it to once.
-    sign_in_prompt: !onLeave && !inEv && shiftOf(date).working_day,
+    sign_in_prompt: !onLeave && !inEv && shiftFor(key, date).working_day,
     review: evs.some((e) => e.validation_state === "review"),
-    shift: shiftOf(date),
+    shift: shiftFor(key, date),
     work_pattern: p.work_pattern,
     location: approvedDay
       ? { kind: "approved_day", name: approvedDay.name, radius_m: null, home_state: homeState }
@@ -751,8 +754,9 @@ route("GET /api/v1/attendance/me/records/:id", (req) => {
 
 function registerRows(date: string, viewer: string): Array<RegisterRow & { key: string; working: boolean }> {
   const g = peopleGrant(viewer, "view");
-  const shift = shiftOf(date);
   return PEOPLE.filter((p) => g.sees(p.user_key) && p.start_date <= date).map((p) => {
+    // A site with its own hours works its days for its people (§6.11).
+    const shift = shiftFor(p.user_key, date);
     const day = DAYS.get(dk(p.user_key, date));
     // The person's own latest punch: an automatic clock-out has no location or device to show.
     const evs = activeOn(p.user_key, date).filter((e) => e.source !== "system");
@@ -823,7 +827,7 @@ route("GET /api/v1/attendance/register/:employee_id", (req) => {
   if (!row) return notFound();
   const day = DAYS.get(dk(p.user_key, date));
   const fence = fenceOf(p.user_key);
-  const { grace_minutes, working_day, starts_at, ends_at } = shiftOf(date);
+  const { grace_minutes, working_day, starts_at, ends_at } = shiftFor(p.user_key, date);
   const out: DayDetail = {
     employee: row.employee,
     date,
@@ -1223,6 +1227,7 @@ type Purpose = TemporarySite["purpose"];
 type MockLoc = { id: string; position: number; name: string | null; address: string; latitude: number; longitude: number; radius_m: number; timezone: string };
 type MockTemp = {
   id: string; number: string; purpose: Purpose; name: string; description: string; starts_on: string; ends_on: string; status: TemporarySite["status"];
+  hours: TemporarySite["hours"]; starts_at: string | null; ends_at: string | null;
   locations: MockLoc[]; by: string; submitted_at: string; wid: string | null; approved_at: string | null; approved_by: string | null;
   cancelled_at: string | null; cancel_reason: string | null;
   members: Array<{ key: string; added_at: string; removed_at: string | null; removed_reason: string | null }>;
@@ -1235,12 +1240,12 @@ const spanOf = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00
 const loc = (n: number, name: string | null, address: string, latitude: number, longitude: number, radius_m: number, timezone = TZ): MockLoc => ({
   id: sid(`ts-loc:${tempSeq + 1}:${n}`), position: n, name, address, latitude, longitude, radius_m, timezone,
 });
-const addTemp = (t: Omit<MockTemp, "id" | "number" | "wid" | "members" | "trail" | "approved_at" | "approved_by" | "cancelled_at" | "cancel_reason"> & Partial<MockTemp> & { keys: string[] }) => {
+const addTemp = (t: Omit<MockTemp, "id" | "number" | "wid" | "members" | "trail" | "approved_at" | "approved_by" | "cancelled_at" | "cancel_reason" | "hours" | "starts_at" | "ends_at"> & Partial<MockTemp> & { keys: string[] }) => {
   tempSeq += 1;
   const { keys, ...rest } = t;
   const row: MockTemp = {
     id: sid(`ts:${tempSeq}`), number: `TS-${String(tempSeq).padStart(4, "0")}`, wid: t.by === "cynthia" && t.status === "approved" ? null : sid(`ts-flow:${tempSeq}`),
-    approved_at: null, approved_by: null, cancelled_at: null, cancel_reason: null, trail: [],
+    approved_at: null, approved_by: null, cancelled_at: null, cancel_reason: null, trail: [], hours: "usual", starts_at: null, ends_at: null,
     members: keys.map((key) => ({ key, added_at: t.submitted_at, removed_at: null, removed_reason: null })), ...rest,
   };
   TEMP.unshift(row);
@@ -1258,6 +1263,10 @@ const addTemp = (t: Omit<MockTemp, "id" | "number" | "wid" | "members" | "trail"
 const onSite = (t: MockTemp, key: string) => t.members.some((m) => m.key === key && !m.removed_at);
 /** The approved site a person is still on, covering a day (one a day). */
 const siteOn = (key: string, date: string) => TEMP.find((t) => t.status === "approved" && t.starts_on <= date && t.ends_on >= date && onSite(t, key)) ?? null;
+siteShift = (key, date) => {
+  const t = siteOn(key, date);
+  return t && t.hours === "site" && t.starts_at && t.ends_at ? { working_day: true, starts_at: t.starts_at, ends_at: t.ends_at, grace_minutes: GRACE, off_reason: null } : null;
+};
 /** An address's name on the punch and the check-in: Temporary Home, the site's name, or the site and the address's label. */
 const nameOfAddress = (t: MockTemp, l: MockLoc) => (t.purpose === "temporary_home" ? "Temporary Home" : t.locations.length === 1 ? t.name : `${t.name}, ${l.name ?? `Address ${l.position}`}`);
 const tempState = (t: MockTemp): TemporarySite["state"] => {
@@ -1278,7 +1287,7 @@ const tempOut = (t: MockTemp, user: string): TemporarySite => {
   const place = !home || t.members.some((m) => m.key === user) || t.by === user || g.all;
   return {
     temporary_site_id: t.id, number: t.number, purpose: t.purpose, name: t.name, description: t.description, starts_on: t.starts_on, ends_on: t.ends_on,
-    days: spanOf(t.starts_on, t.ends_on), status: t.status, state: tempState(t),
+    days: spanOf(t.starts_on, t.ends_on), hours: t.hours, starts_at: t.starts_at, ends_at: t.ends_at, status: t.status, state: tempState(t),
     locations: t.locations.map((l) => ({
       temporary_site_location_id: l.id, position: l.position, name: l.name, radius_m: l.radius_m, timezone: l.timezone,
       address: home ? null : l.address, latitude: home ? null : l.latitude, longitude: home ? null : l.longitude,
@@ -1310,8 +1319,17 @@ function todaySite(key: string, date: string): AttendanceToday["temporary_site"]
 
 /** Add Work Site and Add Temporary Site: the contract's checks the API makes, then the site. */
 function createTemp(user: string, body: unknown, direct: boolean) {
-  const b = body as { purpose?: Purpose; name?: string; description?: string; starts_on?: string; ends_on?: string; locations?: Array<{ address?: unknown; name?: string; radius_m?: number }>; employee_ids?: string[] };
+  const b = body as {
+    hours?: TemporarySite["hours"]; starts_at?: string | null; ends_at?: string | null;
+    purpose?: Purpose; name?: string; description?: string; starts_on?: string; ends_on?: string; locations?: Array<{ address?: unknown; name?: string; radius_m?: number }>; employee_ids?: string[];
+  };
   const fields: Record<string, string[]> = {};
+  const hours = b.hours ?? "usual";
+  if (hours === "site") {
+    if (!b.starts_at) fields.starts_at = ["Pick a start"];
+    if (!b.ends_at) fields.ends_at = ["Pick an end"];
+    else if (b.starts_at && b.ends_at <= b.starts_at) fields.ends_at = ["Ends before it starts"];
+  } else if (b.starts_at || b.ends_at) fields.starts_at = ["Only for Site Hours"];
   if (!b.purpose) fields.purpose = ["Choose one"];
   if (!b.name || b.name.trim().length < 3) fields.name = ["At least 3 characters"];
   if (!b.description || b.description.trim().length < 30) fields.description = ["At least 30 characters"];
@@ -1343,6 +1361,7 @@ function createTemp(user: string, body: unknown, direct: boolean) {
   const now = new Date().toISOString();
   const t = addTemp({
     keys, by: user, purpose: b.purpose!, name: b.name!.trim(), description: b.description!.trim(), starts_on: b.starts_on!, ends_on: b.ends_on!,
+    hours, starts_at: hours === "site" ? b.starts_at! : null, ends_at: hours === "site" ? b.ends_at! : null,
     status: direct ? "approved" : "submitted", submitted_at: now, ...(direct && { approved_at: now, approved_by: user }),
     locations: locs.map((x, i) => loc(i + 1, x.name?.trim() || null, picked[i]!.line, picked[i]!.view.lat!, picked[i]!.view.lon!, x.radius_m!)),
   });

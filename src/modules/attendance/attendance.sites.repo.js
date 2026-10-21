@@ -22,6 +22,19 @@ const bind = (params, value) => `$${params.push(value)}`;
 
 const HOME = "'temporary_home'";
 
+/** A `time` column as the contract's HH:MM, or null. */
+const HHMM = (col) => `to_char(${col}, 'HH24:MI')`;
+
+/**
+ * Is `dateExpr` a day of an approved temporary site with its own hours that the employee in
+ * `employeeCol` is still on (§6.11): every such day is worked, whatever the organisation's week says.
+ */
+const SITE_HOURS_DAY = (employeeCol, dateExpr) => `EXISTS (
+  SELECT 1 FROM attendance_temporary_site sh
+    JOIN attendance_temporary_site_member mh ON mh.temporary_site_id = sh.temporary_site_id
+   WHERE mh.employee_id = ${employeeCol} AND mh.removed_at IS NULL AND sh.status = 'approved'
+     AND sh.hours = 'site' AND sh.starts_on <= ${dateExpr} AND sh.ends_on >= ${dateExpr})`;
+
 /** A site's addresses as JSON, in order; a Temporary Home's line and point only when `place` (a placeholder). */
 const LOCATIONS = (alias, place) => `COALESCE((
   SELECT json_agg(json_build_object(
@@ -67,6 +80,7 @@ function siteOn(db, employeeId, date) {
   return one(
     db,
     `SELECT s.temporary_site_id, s.number, s.name, s.purpose, s.starts_on::text AS starts_on, s.ends_on::text AS ends_on,
+            s.hours, ${HHMM("s.starts_at")} AS starts_at, ${HHMM("s.ends_at")} AS ends_at,
             ${CLOCK_LOCATIONS} AS locations
        FROM attendance_temporary_site s
        JOIN attendance_temporary_site_member m ON m.temporary_site_id = s.temporary_site_id
@@ -109,6 +123,49 @@ const REGISTER_SITE = (employeeCol, dateExpr) => `(SELECT min(CASE WHEN rs.purpo
     WHERE rm.employee_id = ${employeeCol} AND rm.removed_at IS NULL AND rs.status = 'approved'
       AND rs.starts_on <= ${dateExpr} AND rs.ends_on >= ${dateExpr})`;
 
+/**
+ * The people on an approved temporary site with its own hours on `date` who have no day yet, at
+ * work then: the day-close closes theirs on a day the organisation does not work (§6.11).
+ */
+async function siteHoursWithoutDay(db, date) {
+  // pagination:complete the day-close must see every person on such a site that day
+  const { rows } = await completeQuery(
+    db,
+    `SELECT e.employee_id
+       FROM employee e
+      WHERE e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= $1::date)
+        AND (e.left_on IS NULL OR e.left_on > $1::date)
+        AND ${SITE_HOURS_DAY("e.employee_id", "$1::date")}
+        AND NOT EXISTS (SELECT 1 FROM attendance_day ad
+                         WHERE ad.employee_id = e.employee_id AND ad.attendance_date = $1::date)
+      ORDER BY e.employee_id`,
+    [date],
+    { label: "people on a site with its own hours and no day" },
+  );
+  return rows;
+}
+
+/**
+ * The approved sites with their own hours whose days touch `from`..`to`, each with its start and
+ * its first address's zone: the clock watch reminds their people at the site's start (§6.14).
+ */
+async function siteHoursAround(db, from, to) {
+  // pagination:complete the watch reminds at every such site, not a page of them
+  const { rows } = await completeQuery(
+    db,
+    `SELECT s.temporary_site_id, s.starts_on::text AS starts_on, s.ends_on::text AS ends_on,
+            ${HHMM("s.starts_at")} AS starts_at,
+            (SELECT l.timezone FROM attendance_temporary_site_location l
+              WHERE l.temporary_site_id = s.temporary_site_id AND l.position = 1) AS timezone
+       FROM attendance_temporary_site s
+      WHERE s.status = 'approved' AND s.hours = 'site' AND s.starts_on <= $2::date AND s.ends_on >= $1::date
+      ORDER BY s.starts_on, s.temporary_site_id`,
+    [from, to],
+    { label: "temporary sites with their own hours round today" },
+  );
+  return rows;
+}
+
 /* ------------------------------------------------------------------ *
  * Writing a site
  * ------------------------------------------------------------------ */
@@ -146,10 +203,15 @@ function insertSite(client, x) {
   return one(
     client,
     `INSERT INTO attendance_temporary_site
-       (number, purpose, name, description, starts_on, ends_on, status, submitted_by, approved_at, approved_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 = 'approved' THEN now() END, $9)
+       (number, purpose, name, description, starts_on, ends_on, hours, starts_at, ends_at,
+        status, submitted_by, approved_at, approved_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $10 = 'approved' THEN now() END, $12)
      RETURNING temporary_site_id`,
-    [x.number, x.purpose, x.name, x.description, x.starts_on, x.ends_on, x.status, x.submitted_by, x.approved_by || null],
+    [
+      x.number, x.purpose, x.name, x.description, x.starts_on, x.ends_on,
+      x.hours, x.hours === "site" ? x.starts_at : null, x.hours === "site" ? x.ends_at : null,
+      x.status, x.submitted_by, x.approved_by || null,
+    ],
   );
 }
 
@@ -318,7 +380,9 @@ async function siteSelect(db, params, { today, place, reader = null, changer = n
   return {
     today: t,
     sql: `SELECT s.temporary_site_id, s.number, s.purpose, s.name, s.description, s.starts_on, s.ends_on,
-            (s.ends_on - s.starts_on + 1)::int AS days, s.status, ${STATE(t)} AS state,
+            (s.ends_on - s.starts_on + 1)::int AS days,
+            s.hours, ${HHMM("s.starts_at")} AS starts_at, ${HHMM("s.ends_at")} AS ends_at,
+            s.status, ${STATE(t)} AS state,
             ${LOCATIONS("s", p)} AS locations,
             COALESCE((
               SELECT json_agg(json_build_object('employee', ${personJson("me", "md")}, 'added_at', m.added_at,
@@ -542,11 +606,14 @@ function renameAddress(client, owner, key, line) {
 
 module.exports = {
   HOME,
+  SITE_HOURS_DAY,
   REGISTER_SITE,
   ADDRESS_LINE,
   renameAddress,
   siteOn,
   sitesAround,
+  siteHoursWithoutDay,
+  siteHoursAround,
   peopleOf,
   overlappingSite,
   insertSite,

@@ -161,6 +161,9 @@ async function create(user, body, { direct }) {
       description: body.description,
       starts_on: body.starts_on,
       ends_on: body.ends_on,
+      hours: body.hours || "usual",
+      starts_at: body.starts_at || null,
+      ends_at: body.ends_at || null,
       status,
       submitted_by: user.user_id,
       approved_by: direct ? user.user_id : null,
@@ -491,6 +494,11 @@ function nameOfAddress(site, location) {
  */
 function contextOf(site, { policy, shift }) {
   const home = isHome(site);
+  // Site Hours: every day of the site is worked, from its start to its end on its own clock (§6.11).
+  const hours =
+    site.hours === "site"
+      ? { working_day: true, starts_at: site.starts_at, ends_at: site.ends_at, grace_minutes: shift.grace_minutes, off_reason: null }
+      : shift;
   const addresses = site.locations.map((l) => ({
     field_site_id: l.temporary_site_location_id,
     name: nameOfAddress(site, l),
@@ -500,7 +508,7 @@ function contextOf(site, { policy, shift }) {
   }));
   return {
     policy: rules.forPlace(policy, home ? "home" : "site"),
-    shift,
+    shift: hours,
     timeZone: site.locations[0].timezone || rules.DEFAULT_TZ,
     fence: {
       kind: home ? "temporary_home" : "temporary_site",

@@ -6,7 +6,8 @@
  *
  *   remind     on a working day of the organisation's week (Lagos), in the first
  *              REMIND_WINDOW_MIN minutes after the start, everyone at work with a login, not on
- *              granted leave and with no clock-in that counts is reminded once
+ *              granted leave and with no clock-in that counts is reminded once; someone on a
+ *              temporary site with its own hours that day at the site's start instead
  *              (attendance_clock_reminder decides "once"; the notice goes to the bell and, as the
  *              person's Attendance and Leave preference allows, their devices). Someone in front
  *              of the app is not: the app's start prompt asks them, and a later run reminds them
@@ -36,6 +37,7 @@ const guard = require("./attendance.clock-guard");
 const reconcile = require("./attendance.reconcile");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const sitesRepo = require("./attendance.sites.repo");
 const { EVENTS } = require("./attendance.events");
 
 /** How long after the start a reminder may still go out. */
@@ -113,22 +115,36 @@ async function sendReminder(employeeId, date, startsAt) {
  */
 async function remind({ now = new Date() } = {}) {
   const today = lagos.today(now);
+  const tally = { reminded: 0, in_front: 0 };
   const cal = await workingWeek.loadCalendar(pool);
   const shift = rules.shiftFor(today, cal, rules.DEFAULT_POLICY);
-  if (!shift.working_day || !shift.starts_at) return { reminded: 0, in_front: 0 };
-  const start = rules.zonedInstant(today, shift.starts_at, rules.DEFAULT_TZ);
-  if (now < start || now.getTime() - start.getTime() >= REMIND_WINDOW_MIN * 60_000) return { reminded: 0, in_front: 0 };
-  let reminded = 0;
-  let inFront = 0;
-  for (const { employee_id: employeeId, user_ids: userIds } of await repo.dueForReminder(pool, today)) {
+  if (shift.working_day && shift.starts_at && inWindow(now, rules.zonedInstant(today, shift.starts_at, rules.DEFAULT_TZ)))
+    await remindEach(await repo.dueForReminder(pool, today), today, shift.starts_at, now, tally);
+  // A temporary site with its own hours reminds its people at its start, on its own clock and
+  // on any day of it (§6.11); the organisation's reminder leaves them out that day.
+  for (const site of await sitesRepo.siteHoursAround(pool, lagos.addDays(today, -1), lagos.addDays(today, 1))) {
+    const zone = site.timezone || rules.DEFAULT_TZ;
+    const date = rules.localDate(now, zone);
+    if (date < site.starts_on || date > site.ends_on) continue;
+    if (!inWindow(now, rules.zonedInstant(date, site.starts_at, zone))) continue;
+    await remindEach(await repo.dueAtSite(pool, site.temporary_site_id, date), date, site.starts_at, now, tally);
+  }
+  return tally;
+}
+
+/** In the first REMIND_WINDOW_MIN minutes after a start. Pure. */
+const inWindow = (now, start) => now >= start && now.getTime() - start.getTime() < REMIND_WINDOW_MIN * 60_000;
+
+/** Remind each person due who is not in front of the app, counting both in the tally. */
+async function remindEach(due, date, startsAt, now, tally) {
+  for (const { employee_id: employeeId, user_ids: userIds } of due) {
     const seen = await active.activity(userIds, now.getTime());
     if (seen.known && seen.active) {
-      inFront += 1;
+      tally.in_front += 1;
       continue;
     }
-    if (await sendReminder(employeeId, today, shift.starts_at)) reminded += 1;
+    if (await sendReminder(employeeId, date, startsAt)) tally.reminded += 1;
   }
-  return { reminded, in_front: inFront };
 }
 
 /* ------------------------------------------------------------------ *
