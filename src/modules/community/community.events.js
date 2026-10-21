@@ -101,17 +101,25 @@ async function others(event, client = pool, { skipMuted = false } = {}) {
   return rows.map((r) => r.user_id);
 }
 
+function pushTo(userIds, event, name) {
+  for (const userId of userIds) {
+    realtime.toUser(userId, name, {
+      community_channel_id: event.payload.community_channel_id,
+      community_message_id: event.payload.community_message_id ?? null,
+    });
+  }
+}
+
 async function pushToMembers(event, name) {
   const { rows } = await pool.query(
     "SELECT user_id FROM community_member WHERE community_channel_id = $1",
     [event.payload.community_channel_id],
   );
-  for (const r of rows) {
-    realtime.toUser(r.user_id, name, {
-      community_channel_id: event.payload.community_channel_id,
-      community_message_id: event.payload.community_message_id ?? null,
-    });
-  }
+  pushTo(
+    rows.map((r) => r.user_id),
+    event,
+    name,
+  );
 }
 
 for (const key of [
@@ -135,11 +143,18 @@ for (const key of [
     pushToMembers(event, "community.message_updated"),
   );
 }
-for (const key of [EVENTS.DIRECT_THREAD_READ, EVENTS.DIRECT_THREAD_DELIVERED]) {
-  outbox.register(key, `community.push_receipt.${key.split(".")[1]}`, (event) =>
-    pushToMembers(event, "community.receipt"),
-  );
-}
+/*
+ * Receipts (community.md §3 step 10): a read one goes to both, so the reader's other devices
+ * clear the count; a delivered one only to the other person, whose tick it is.
+ */
+outbox.register(EVENTS.DIRECT_THREAD_READ, "community.push_receipt.read", (event) =>
+  pushToMembers(event, "community.receipt"),
+);
+outbox.register(
+  EVENTS.DIRECT_THREAD_DELIVERED,
+  "community.push_receipt.delivered",
+  async (event) => pushTo(await others(event), event, "community.receipt"),
+);
 for (const key of [
   EVENTS.CHANNEL_CREATED,
   EVENTS.CHANNEL_UPDATED,

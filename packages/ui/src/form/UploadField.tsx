@@ -5,7 +5,7 @@
  * @use Anywhere a person attaches a file: a CV, a receipt, a signed offer, a mail attachment, an import sheet.
  * @avoid A raw `<input type="file">` anywhere else (gate 18); storing a path or a name instead of the `document_id`; a silent wait on a large file.
  * @phone The drop zone is a full-width tap target, since a phone cannot drop; every file shows its own percentage as it travels.
- * @a11y The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph.
+ * @a11y The words in the drop zone are a real button, which opens the picker; the progress is a named meter per file, and each file's state is in words as well as a glyph. A file that failed says why, with Retry (not for one too large) and Remove, each named for the file.
  * @status stable
  * @example <UploadField purpose="receipt" endpoint="/api/v1/documents" upload={api.upload} onUploaded={(docs) => form.set("receipts", docs)} />
  */
@@ -25,6 +25,8 @@ interface Travelling {
   percent: number;
   doc?: DocumentRef;
   error?: string;
+  /** The file itself while it may be sent again (Retry); never kept for one too large. */
+  file?: File;
 }
 
 /** 25 MB: what the vault takes, and what a phone photograph fits inside. */
@@ -115,6 +117,7 @@ export function UploadField({
       size: file.size,
       percent: 0,
       error: file.size > maxBytes ? `Larger than ${formatBytes(maxBytes)}` : undefined,
+      file: file.size > maxBytes ? undefined : file,
     }));
     setFiles((list) => (multiple ? [...list, ...added] : added));
 
@@ -125,9 +128,9 @@ export function UploadField({
 
     added.forEach((item, i) => {
       if (item.error) return;
-      upload({ endpoint, file: chosen[i]!, fields: { purpose, ...fields }, onProgress: (percent) => patch(item.key, { percent }) })
+      send(item.key, chosen[i]!)
         .then((doc) => {
-          patch(item.key, { percent: 100, doc });
+          patch(item.key, { percent: 100, doc, file: undefined });
           done[i] = doc;
         })
         .catch((e: Error) => patch(item.key, { error: e.message }))
@@ -142,6 +145,22 @@ export function UploadField({
           }
         });
     });
+  };
+
+  const send = (key: string, file: File) => upload({ endpoint, file, fields: { purpose, ...fields }, onProgress: (percent) => patch(key, { percent }) });
+
+  /** One failed file again (a lost connection, too many at once): handed over on its own when it arrives. */
+  const retry = (item: Travelling) => {
+    const file = item.file;
+    if (!file) return;
+    patch(item.key, { error: undefined, percent: 0 });
+    return send(item.key, file)
+      .then((doc) => {
+        patch(item.key, { percent: 100, doc, file: undefined });
+        onUploaded?.([doc]);
+        if (handOff) setFiles((list) => list.filter((f) => f.key !== item.key));
+      })
+      .catch((e: Error) => patch(item.key, { error: e.message }));
   };
 
   const open = () => input.current?.click();
@@ -215,13 +234,10 @@ export function UploadField({
                   <span className="min-w-0 flex-1 truncate">{file.name}</span>
                 </Tooltip>
                 {file.error ? (
-                  <IconButton
-                    icon="x"
-                    size="sm"
-                    label={`Remove ${file.name}`}
-                    className="-my-1 -mr-2"
-                    onClick={() => setFiles((list) => list.filter((f) => f.key !== file.key))}
-                  />
+                  <span className="-my-1 -mr-2 flex flex-none items-center">
+                    {file.file && <IconButton icon="refresh" size="sm" label={`Retry ${file.name}`} onClick={() => retry(file)} />}
+                    <IconButton icon="x" size="sm" label={`Remove ${file.name}`} onClick={() => setFiles((list) => list.filter((f) => f.key !== file.key))} />
+                  </span>
                 ) : (
                   <span className="flex-none text-2xs font-normal text-subtle-foreground tabular-nums">
                     {file.doc ? "Done" : `${file.percent}%`}

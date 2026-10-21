@@ -390,10 +390,15 @@ async function setPinned(channelId, on, user) {
   });
 }
 
+/*
+ * A mark is always stored, but tells anyone only when it covered a message it had not covered
+ * before (community.md §3 step 10): a receipt the other screen answers with a mark that changes
+ * nothing must not send another receipt back.
+ */
 async function markRead(channelId, user) {
   const m = await member(pool, channelId, user);
-  await repo.markRead(pool, channelId, user.user_id);
-  if (m.channel_type === "direct") {
+  const covered = await repo.markRead(pool, channelId, user.user_id);
+  if (m.channel_type === "direct" && covered) {
     await tx((client) =>
       emit(client, {
         key: EVENTS.DIRECT_THREAD_READ,
@@ -408,7 +413,7 @@ async function markRead(channelId, user) {
 async function markDelivered(channelId, upTo, user) {
   const m = await member(pool, channelId, user);
   if (m.channel_type !== "direct") return;
-  await repo.markDelivered(pool, channelId, user.user_id, upTo);
+  if (!(await repo.markDelivered(pool, channelId, user.user_id, upTo))) return;
   await tx((client) =>
     emit(client, {
       key: EVENTS.DIRECT_THREAD_DELIVERED,

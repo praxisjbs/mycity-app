@@ -538,6 +538,9 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await pin("bola", ids["pin-a"], false)).status).toBe(204);
     const dm = await as("bola").post("/community/direct").send({ employee_id: people.tunde.employee.employee_id });
     expect((await pin("bola", dm.body.community_channel_id)).status).toBe(204);
+    // Pinned while still empty, it waits for its first message to show (§3 step 7).
+    expect((await as("bola").get("/community/direct")).body.data.map((c) => c.community_channel_id)).not.toContain(dm.body.community_channel_id);
+    await as("tunde").post(`/community/channels/${dm.body.community_channel_id}/messages`).send({ message_type: "text", body: "Pinned you" });
     const convs = await as("bola").get("/community/direct");
     expect(convs.body.data[0]).toMatchObject({ community_channel_id: dm.body.community_channel_id, pinned: true });
 
@@ -646,6 +649,57 @@ describeDb("Staff Community against the real migrations", () => {
     const card = await as("bola").get(`/community/people/${people.tunde.employee.employee_id}/card`);
     expect(card.status).toBe(200);
     expect(card.body).toMatchObject({ work_email: "tunde@mycity.test", shared_channels: expect.arrayContaining(["general", "studio-crew"]) });
+  });
+
+  test("a conversation started and left empty is in nobody's list; Forward To offers the colleague as a person", async () => {
+    const listed = async (who) => (await as(who).get("/community/direct")).body.data.map((c) => c.community_channel_id);
+    const opened = await as("ceo").post("/community/direct").send({ employee_id: people.bola.employee.employee_id });
+    expect(opened.status).toBe(200);
+    expect(await listed("ceo")).not.toContain(opened.body.community_channel_id);
+    expect(await listed("bola")).not.toContain(opened.body.community_channel_id);
+    const offered = (await as("ceo").get("/community/forward-targets?q=bola")).body.data;
+    expect(offered).toEqual([expect.objectContaining({ kind: "person", employee_id: people.bola.employee.employee_id })]);
+
+    // The first message is what brings it in.
+    const notes = (await as("ceo").post("/community/direct").send({ employee_id: people.ceo.employee.employee_id })).body.community_channel_id;
+    expect(await listed("ceo")).not.toContain(notes);
+    await as("ceo").post(`/community/channels/${notes}/messages`).send({ message_type: "text", body: "Board pack by Friday" });
+    expect(await listed("ceo")).toContain(notes);
+    const self = (await as("ceo").get("/community/forward-targets?q=amaka")).body.data;
+    expect(self).toEqual([expect.objectContaining({ kind: "direct", community_channel_id: notes, is_self: true })]);
+  });
+
+  test("receipts: a mark tells only when it covered a new message; delivered goes to the sender only", async () => {
+    const id = (await as("ceo").post("/community/direct").send({ employee_id: people.tunde.employee.employee_id })).body.community_channel_id;
+    const receipts = () => realtime.toUser.mock.calls.filter(([, name, body]) => name === "community.receipt" && body.community_channel_id === id).map(([user]) => user);
+    const mark = async (who, what) => {
+      realtime.toUser.mockClear();
+      const res = await as(who).post(`/community/channels/${id}/${what}`).send(what === "delivered" ? { up_to: new Date().toISOString() } : {});
+      expect(res.status).toBe(204);
+      await drain();
+      return receipts();
+    };
+    await mark("ceo", "read");
+    await as("ceo").post(`/community/channels/${id}/messages`).send({ message_type: "text", body: "Bring the rate card" });
+    await drain();
+
+    // The message reaches Tunde's screen: the sender is told, Tunde's own devices are not.
+    expect(await mark("tunde", "delivered")).toEqual([people.ceo.user.user_id]);
+    // A receipt answered with another mark changes nothing, so nothing goes back: no loop.
+    expect(await mark("tunde", "delivered")).toEqual([]);
+    // The sender acknowledging their own message tells nobody.
+    expect(await mark("ceo", "delivered")).toEqual([]);
+    // Reading tells both: the sender's ticks and the reader's other devices.
+    expect((await mark("tunde", "read")).sort()).toEqual([people.ceo.user.user_id, people.tunde.user.user_id].sort());
+    expect(await mark("tunde", "read")).toEqual([]);
+    expect(await mark("ceo", "read")).toEqual([]);
+    const mine = (await as("ceo").get(`/community/channels/${id}/messages`)).body.data.at(-1);
+    expect(mine.status).toBe("read");
+
+    // A new message makes the next mark count again.
+    await as("ceo").post(`/community/channels/${id}/messages`).send({ message_type: "text", body: "And the brief" });
+    await drain();
+    expect(await mark("tunde", "delivered")).toEqual([people.ceo.user.user_id]);
   });
 
   test("announcements: People and the CEO only; published to #announcements with read tracking; scheduled ones wait", async () => {

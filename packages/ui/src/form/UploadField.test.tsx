@@ -69,6 +69,28 @@ describe("UploadField", () => {
     expect(screen.queryByText("bad.pdf")).toBeNull();
   });
 
+  it("sends a failed file again on Retry and hands it over when it arrives", async () => {
+    const onUploaded = vi.fn();
+    let tries = 0;
+    const flaky: Uploader = ({ file: f }) => (tries++ === 0 ? Promise.reject(new Error("Too many requests. Wait a moment and try again.")) : Promise.resolve(doc(f.name)));
+    const { container } = render(<UploadField purpose="attachment" upload={flaky} handOff onUploaded={onUploaded} />);
+    await userEvent.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, file("photo.pdf"));
+    expect(await screen.findByText("Too many requests. Wait a moment and try again.")).toBeInTheDocument();
+    expect(onUploaded).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Retry photo.pdf" }));
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledWith([doc("photo.pdf")]));
+    await waitFor(() => expect(screen.queryByText("photo.pdf")).toBeNull());
+    expect(tries).toBe(2);
+  });
+
+  it("offers no Retry for a file too large to send", async () => {
+    const { container } = render(<UploadField purpose="receipt" upload={fine} maxBytes={1024} />);
+    await userEvent.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, file("huge.pdf", 99999));
+    await screen.findByText("Larger than 1 KB");
+    expect(screen.queryByRole("button", { name: "Retry huge.pdf" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Remove huge.pdf" })).toBeInTheDocument();
+  });
+
   it("hands finished files to the caller and keeps only the failed ones", async () => {
     const onUploaded = vi.fn();
     const upload: Uploader = ({ file: f }) => (f.name === "bad.pdf" ? Promise.reject(new Error("Upload failed. Try again.")) : Promise.resolve(doc(f.name)));
