@@ -16,7 +16,7 @@ import { ScreenActionProvider, useRegisteredAction } from "@/shell/screen-action
 import { useClock } from "./ClockButton";
 import { MyAttendancePage } from "./EssAttendance";
 import { PeopleAttendance } from "./PeopleAttendance";
-import { lateBy } from "./labels";
+import { lateBy, PAY_STATUS } from "./labels";
 
 /**
  * Pending deductions and overtime, and Give Real Time, on the in-browser mock
@@ -126,6 +126,10 @@ describe("My Attendance's deductions and overtime", () => {
     expect(document.querySelector("table")).toBeNull();
     const card = (await screen.findAllByRole("button", { name: new RegExp(formatDate(someone.work_date)) }))[0].closest("li")!;
     expect(within(card).queryByText("Method")).toBeNull();
+    // The kind and the minutes share a line, so the amount and the status stay on the card.
+    expect(within(card).getByText("Kind").nextElementSibling?.textContent).toBe(`Late · ${lateBy(someone.minutes)}`);
+    expect(within(card).getByText("Status").nextElementSibling?.textContent).toBe(PAY_STATUS[someone.status].text);
+    expect(within(card).getByText("Amount")).toBeTruthy();
     fireEvent.click(within(card).getAllByRole("button")[0]);
     const sheet = await screen.findByRole("dialog", { name: "Late" });
     expect(within(sheet).getByText("Pro-Rata by Minute")).toBeTruthy();
@@ -256,6 +260,11 @@ describe("People · Attendance's deductions and overtime", () => {
     await screen.findByRole("heading", { name: "Deductions" }, { timeout: 5000 });
     expect(document.querySelector("table")).toBeNull();
     await waitFor(() => expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(0));
+    // The day, the kind and the minutes share a line, so the amount and the status stay on the card.
+    const card = screen.getAllByRole("checkbox").map((c) => c.closest("li")).find(Boolean)!;
+    expect(within(card).getByText("Day").nextElementSibling?.textContent).toMatch(/^\d{2}\/\d{2}\/\d{4} · .+ · .+$/);
+    expect(within(card).getByText("Amount")).toBeTruthy();
+    expect(within(card).getByText("Status")).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Overtime" })).toBeTruthy();
     expect(await axe(document.body)).toHaveNoViolations();
   }, 40000);

@@ -14,7 +14,7 @@ import { HomeLocationCard } from "./HomeLocation";
 import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAssignments";
 import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PAY_KIND, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
 import { payColumns, payDetails } from "./PayItems";
-import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, type FieldBinding, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, TimeField, toast, todayIso, useConfirm, useContractForm, useModal } from "@mycity/ui";
+import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, type FieldBinding, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, TimeField, toast, todayIso, useConfirm, useContractForm, useIsPhone, useModal } from "@mycity/ui";
 import { DayRoute, MyTemporarySites } from "./TemporarySites";
 
 /**
@@ -300,6 +300,7 @@ function GiveRealTime({ e, close }: { e: AttendanceEvent; close: () => void }) {
 function MyPayItems({ month, group }: { month: string; group: "deductions" | "overtime" }) {
   const modal = useModal();
   const list = usePaged("GET /api/v1/attendance/me/pay-items", { filters: { month, group } });
+  const phone = useIsPhone();
   if (list.rows.length === 0) return null;
   const open = (x: PayItem) =>
     modal.open({
@@ -321,7 +322,7 @@ function MyPayItems({ month, group }: { month: string; group: "deductions" | "ov
       rowKey={(x) => x.attendance_pay_item_id}
       onRowClick={open}
       noun={group === "deductions" ? "deduction" : "overtime item"}
-      columns={payColumns({ person: false, kind: group === "deductions" })}
+      columns={payColumns({ person: false, kind: group === "deductions", phone })}
     />
   );
 }

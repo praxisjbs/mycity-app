@@ -4,7 +4,7 @@ import { useEffect, useState, type MutableRefObject, type ReactNode } from "reac
 import { ApiError } from "@/api/client";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import { RESTRICTED_HELP } from "@/features/people/status";
-import { Button, Chips, DataView, type DataViewColumn, EmptyValue, Field, type FieldBinding, formatDate, FormFooter, HelpTerm, KeyValue, type KeyValueItem, Money, NumberField, Pill, TextAreaField, toast, useContractForm, useModal, Who } from "@mycity/ui";
+import { Button, Chips, DataView, type DataViewColumn, EmptyValue, Field, type FieldBinding, formatDate, FormFooter, HelpTerm, KeyValue, type KeyValueItem, Money, NumberField, Pill, TextAreaField, toast, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
 import { lateBy, PAY_AMOUNT_HELP, PAY_KIND, PAY_METHOD, PAY_STATUS } from "./labels";
 
 /**
@@ -43,17 +43,27 @@ export function payDetails(x: PayItem, { person = false } = {}): KeyValueItem[] 
   ];
 }
 
-/** The columns of a list of items; `person` adds who it is about, `kind` the kind (deductions only). */
-export function payColumns({ person, kind }: { person: boolean; kind: boolean }): DataViewColumn<PayItem>[] {
-  return [
-    ...(person ? [{ key: "e", label: "Employee", render: (x: PayItem) => <Who name={x.employee.display_name} sub={x.employee.department} /> }] : []),
-    { key: "work_date", label: "Date", sortable: person, render: (x) => formatDate(x.work_date) },
-    ...(kind ? [{ key: "kind", label: "Kind", render: (x: PayItem) => PAY_KIND[x.kind] }] : []),
-    { key: "minutes", label: "Minutes", sortable: person, align: "n", render: (x) => lateBy(x.minutes) },
+/**
+ * The columns of a list of items; `person` adds who it is about, `kind` the kind (deductions only).
+ * A phone card holds its title and three values, so on a phone the day, the kind and the minutes
+ * share one line and the amount and status stay on the card; Date and Minutes still sort there.
+ */
+export function payColumns({ person, kind, phone = false }: { person: boolean; kind: boolean; phone?: boolean }): DataViewColumn<PayItem>[] {
+  const who: DataViewColumn<PayItem> = { key: "e", label: "Employee", render: (x) => <Who name={x.employee.display_name} sub={x.employee.department} /> };
+  const date: DataViewColumn<PayItem> = { key: "work_date", label: "Date", sortable: person, render: (x) => formatDate(x.work_date) };
+  const minutes: DataViewColumn<PayItem> = { key: "minutes", label: "Minutes", sortable: person, align: "n", render: (x) => lateBy(x.minutes) };
+  const rest: DataViewColumn<PayItem>[] = [
     { key: "method", label: "Method", desktop: true, render: (x) => PAY_METHOD[x.method] },
     { key: "amount", label: <HelpTerm help={PAY_AMOUNT_HELP}>Amount</HelpTerm>, align: "n", render: payAmount },
     { key: "status", label: "Status", render: statusPill },
   ];
+  if (!phone) return [...(person ? [who] : []), date, ...(kind ? [{ key: "kind", label: "Kind", render: (x: PayItem) => PAY_KIND[x.kind] }] : []), minutes, ...rest];
+  const line: DataViewColumn<PayItem> = {
+    key: "line",
+    label: person ? "Day" : kind ? "Kind" : "Minutes",
+    render: (x) => [...(person ? [formatDate(x.work_date)] : []), ...(kind ? [PAY_KIND[x.kind]] : []), lateBy(x.minutes)].join(" · "),
+  };
+  return person ? [who, line, { ...date, desktop: true }, { ...minutes, desktop: true }, ...rest] : [date, line, ...rest];
 }
 
 /** The help on the Deductions list's title (tier 2): what Waive Selected does. */
@@ -78,6 +88,7 @@ const OVERTIME_CHIPS: Array<[PayItemStatus | "all", string]> = [
  */
 export function PayItemsView({ group, waiveRef, onCanWaive }: { group: "deductions" | "overtime"; waiveRef: MutableRefObject<(() => void) | null>; onCanWaive: (can: boolean) => void }) {
   const modal = useModal();
+  const phone = useIsPhone();
   const deductions = group === "deductions";
   const [status, setStatus] = useState<PayItemStatus | "all">("pending");
   const [picked, setPicked] = useState<string[]>([]);
@@ -120,7 +131,7 @@ export function PayItemsView({ group, waiveRef, onCanWaive }: { group: "deductio
               }
             : undefined
         }
-        columns={payColumns({ person: true, kind: deductions })}
+        columns={payColumns({ person: true, kind: deductions, phone })}
       />
     </>
   );
