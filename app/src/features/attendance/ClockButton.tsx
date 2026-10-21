@@ -8,15 +8,19 @@ import { useAuth, useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
 import { Banner, Button, Card, cn, Field, formatDate, formatTime, FormFooter, HelpTerm, Icon, Illustration, KeyValue, Menu, Pill, Result, TextAreaField, toast, Tooltip, useContractForm, useModal, zoneClock } from "@mycity/ui";
 import { checkInShown } from "./labels";
+import { fixFor, newKey, permission, secure, supported, useLocationReader, type Fix, type Reading } from "./location";
 import { claimSignIn, claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES, remindIn, type PromptKind } from "./prompts";
 
 /**
  * Clocking in and out, for the shell: the desktop top bar's ClockButton and the phone's floating
  * button (F18) both use useClock (docs/guides/attendance.md §10). The panel asks; the API decides.
- * It reads the location only after the person presses Clock In, and only when there is a place to
+ * It reads the location only after the person presses Clock In, through the feature's one reader
+ * (./location: up to ten seconds, the best fix, always ending), and only when there is a place to
  * match it to: a worksite, or for remote staff their approved home (asked too while they have none,
- * so People see where they were); every punch carries one Idempotency-Key, kept for a retry of the
- * same press, so a lost answer never makes a second punch. What the panel shows after a punch is
+ * so People see where they were). A reading that cannot prove the place names the fix for this
+ * device (Precise Location Off, Use Your Phone, Location Blocked, Secure Address Needed) and offers
+ * Clock In Anyway. Every punch carries one Idempotency-Key, kept for a retry of the same press, so a
+ * lost answer never makes a second punch. What the panel shows after a punch is
  * the server's. On a temporary site's day it names the site and its addresses, and once clocked in
  * offers Check In at each stop (§6.12), which reads the location at the press and keeps its key and
  * body for Try Again in the same way.
@@ -136,11 +140,9 @@ function useClockPanel() {
   );
 }
 
-type Fix = { latitude: number; longitude: number; accuracy_m: number };
 type Stage =
   | { kind: "ready" }
   | { kind: "ask" }
-  | { kind: "locating" }
   | { kind: "weak"; fix: Fix }
   | { kind: "no_location"; error: LocationError }
   | { kind: "sending"; body: PunchCreate; key: string }
@@ -148,17 +150,8 @@ type Stage =
   | { kind: "refused"; message: string }
   | { kind: "done"; res: PunchResult };
 
-const LOCATION_ERROR: Record<number, LocationError> = { 1: "denied", 2: "unavailable", 3: "timeout" };
-
-/** Has the person already let this site read their location? Then the browser will not ask again. */
-async function locationGranted(): Promise<boolean> {
-  try {
-    const p = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
-    return p?.state === "granted";
-  } catch {
-    return false;
-  }
-}
+/** No reading a retry could change: the browser has no location, or the page is not on its secure address. */
+const FINAL: ReadonlySet<LocationError> = new Set(["unsupported", "insecure"]);
 
 /** The workplace's wall clock, kept to the server's time rather than this device's. */
 function useServerClock(t: AttendanceToday | undefined) {
@@ -181,6 +174,10 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
   const { data: t, error, reload } = useApi("GET /api/v1/attendance/me/today");
   const [stage, setStage] = useState<Stage>({ kind: "ready" });
   const inFlight = useRef(false);
+  // The reading runs while the panel stays answerable; what it found is handled below, once the day is read.
+  const afterRead = useRef<(r: Reading) => void>(() => undefined);
+  const reader = useLocationReader((r) => afterRead.current(r));
+  const locating = reader.reading;
   const clock = useServerClock(t);
   const toDevices = () => (close(), navigate(hrefFor("ess", "my-devices")));
   // Shown since the start: the start prompt has nothing left to do today on this device.
@@ -246,26 +243,30 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
   };
 
   const punch = (where: Partial<Pick<PunchCreate, "latitude" | "longitude" | "accuracy_m" | "location_error">> = {}) =>
-    send({ event_type: eventType, device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, ...where }, crypto.randomUUID());
+    send({ event_type: eventType, device_at: new Date().toISOString(), latitude: null, longitude: null, accuracy_m: null, ...where }, newKey());
 
-  const locate = () => {
-    if (!navigator.geolocation) return setStage({ kind: "no_location", error: "unsupported" });
-    setStage({ kind: "locating" });
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        const fix = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) };
-        if (fix.accuracy_m > t.policy.max_accuracy_m) setStage({ kind: "weak", fix });
-        else punch(fix);
-      },
-      (e) => setStage({ kind: "no_location", error: LOCATION_ERROR[e.code] ?? "unavailable" }),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
+  // A fix fine enough is sent at once; a rough one, or none, waits on the person with its fix.
+  afterRead.current = (r) => {
+    if (r.error) setStage({ kind: "no_location", error: r.error });
+    else if (r.fix.accuracy_m > t.policy.max_accuracy_m) setStage({ kind: "weak", fix: r.fix });
+    else punch(r.fix);
   };
 
-  /** The press: the location is read now, after saying why, and the server matches it (or keeps it for People). */
+  const locate = () => {
+    setStage({ kind: "ready" });
+    reader.read();
+  };
+
+  /**
+   * The press: the location is read now, after saying why, and the server matches it (or keeps it
+   * for People). Blocked, the browser will not ask, so the panel says how to allow it instead.
+   */
   const start = async () => {
-    if (await locationGranted()) return locate();
-    setStage({ kind: "ask" });
+    if (!secure()) return setStage({ kind: "no_location", error: "insecure" });
+    if (!supported()) return setStage({ kind: "no_location", error: "unsupported" });
+    const allowed = await permission();
+    if (allowed === "granted") return locate();
+    setStage(allowed === "denied" ? { kind: "no_location", error: "denied" } : { kind: "ask" });
   };
 
   if (stage.kind === "done") return <PunchDone res={stage.res} close={close} again={() => setStage({ kind: "ready" })} toDevices={toDevices} />;
@@ -326,20 +327,27 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
         ? "Punches from a device you have not registered go to People for review. Register up to three in My Devices."
         : "Register up to three devices you clock in from in My Devices.";
 
+  // The fix for this device when the reading could not prove the place (§6.5): a banner of its own.
+  const fix = locating ? null : stage.kind === "weak" ? fixFor({ error: null, accuracy_m: stage.fix.accuracy_m }) : stage.kind === "no_location" ? fixFor({ error: stage.error }) : null;
   let step;
-  if (stage.kind === "ask") step = <Result tone="info" label="Location Check" title="Share Your Location" text={askText} icon="target" />;
-  else if (stage.kind === "locating") step = <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location when your browser asks." icon="target" />;
+  if (locating) step = <Result tone="info" label="Location Check" title="Finding Your Location" text="Allow location if your browser asks." icon="target" />;
+  else if (stage.kind === "ask") step = <Result tone="info" label="Location Check" title="Share Your Location" text={askText} icon="target" />;
+  else if (fix)
+    step = (
+      <Banner tone="warn" icon="target">
+        <b>{fix.title}</b>: {fix.text}
+      </Banner>
+    );
   else if (stage.kind === "weak") step = <Result tone="warn" label="Location Check" title="Weak Location Signal" text={`Accurate to about ${stage.fix.accuracy_m} m. Move near a window, then retry.`} icon="target" />;
   else if (stage.kind === "no_location")
     step =
-      stage.error === "denied" ? (
-        <Result tone="warn" label="Location Check" title="Location Is Off" text="Allow location for this site in your browser settings, then retry." icon="target" />
-      ) : stage.error === "unsupported" ? (
+      stage.error === "unsupported" ? (
         <Result tone="warn" label="Location Check" title="No Location Support" text="This browser cannot share a location." icon="target" />
       ) : (
         <Result tone="warn" label="Location Check" title="Location Not Found" text="Move near a window or outside, then retry." icon="target" />
       );
   else if (stage.kind === "sending") step = <Result tone="info" label={verb} title="Processing" icon="clock" />;
+  const idle = stage.kind === "ready" && !locating;
 
   const statePill =
     t.state === "clocked_in" ? (
@@ -367,16 +375,19 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
     );
   }
 
-  const primary =
-    stage.kind === "ask" ? (
-      <Button variant="primary" icon="target" onClick={locate}>Allow Location</Button>
-    ) : stage.kind === "weak" || stage.kind === "no_location" ? (
-      <Button variant="primary" icon="refresh" onClick={locate}>Retry Location</Button>
-    ) : (
-      <Button variant="primary" icon="clock" busy={stage.kind === "sending" || stage.kind === "locating"} onClick={() => start()}>
-        {verb}
-      </Button>
-    );
+  // While it reads, only Not Now: the reading ends by itself, and nothing holds the panel open meanwhile.
+  const finalError = stage.kind === "no_location" && FINAL.has(stage.error) ? stage.error : null;
+  const primary = locating ? null : stage.kind === "ask" ? (
+    <Button variant="primary" icon="target" onClick={locate}>Allow Location</Button>
+  ) : finalError ? (
+    <Button variant="primary" icon="clock" onClick={() => punch({ location_error: finalError })}>{`${verb} Anyway`}</Button>
+  ) : stage.kind === "weak" || stage.kind === "no_location" ? (
+    <Button variant="primary" icon="refresh" onClick={locate}>Retry Location</Button>
+  ) : (
+    <Button variant="primary" icon="clock" busy={stage.kind === "sending"} onClick={() => start()}>
+      {verb}
+    </Button>
+  );
 
   /** At the shift's end: bring the prompt back later instead of clocking out now. */
   const remindLater = (minutes: number) => {
@@ -408,17 +419,17 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
         <div className="mt-2">{statePill}</div>
       </div>
       {step && <div className="mb-3">{step}</div>}
-      {t.location.kind === "remote" && stage.kind === "ready" && (
+      {t.location.kind === "remote" && idle && (
         <Banner tone="warn" icon="home" action={t.location.home_state === "none" ? <Button size="sm" onClick={toHome}>Set Home</Button> : undefined}>
           {t.location.home_state === "pending" ? "Your home location is waiting for approval." : "No approved home location yet."}
         </Banner>
       )}
-      {t.location.kind === "none" && stage.kind === "ready" && (
+      {t.location.kind === "none" && idle && (
         <Banner tone="warn" icon="pin">
           No office assigned yet.
         </Banner>
       )}
-      {unregistered && t.policy.device_mode !== "off" && stage.kind === "ready" && (
+      {unregistered && t.policy.device_mode !== "off" && idle && (
         <Banner tone={t.policy.device_mode === "block" ? "err" : "warn"} icon="lock" action={t.device.can_register ? <Button size="sm" onClick={toDevices}>Register Device</Button> : undefined}>
           {t.policy.device_mode === "block" ? "Register this device to clock in." : "This device is not registered."}
         </Banner>
@@ -442,11 +453,11 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
           ]}
         />
       </Card>
-      {t.state === "clocked_in" && t.temporary_site && stage.kind === "ready" && <CheckInStep t={t} />}
+      {t.state === "clocked_in" && t.temporary_site && idle && <CheckInStep t={t} />}
       <FormFooter>
         {stage.kind === "weak" ? (
           <Button onClick={() => punch(stage.fix)}>{`${verb} Anyway`}</Button>
-        ) : stage.kind === "no_location" ? (
+        ) : stage.kind === "no_location" && !finalError ? (
           <Button onClick={() => punch({ location_error: stage.error })}>{`${verb} Anyway`}</Button>
         ) : (
           later
@@ -457,29 +468,23 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
   );
 }
 
-/** Reads the location once, at the press: a fix, or why there is none. */
-function readLocation(): Promise<{ fix?: Fix; error?: LocationError }> {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve({ error: "unsupported" });
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ fix: { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy_m: Math.round(p.coords.accuracy) } }),
-      (e) => resolve({ error: LOCATION_ERROR[e.code] ?? "unavailable" }),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  });
-}
-
-type CheckInStage = { kind: "ready" } | { kind: "done"; res: CheckInResult } | { kind: "lost"; body: CheckInCreate; key: string } | { kind: "refused"; message: string };
+type CheckInStage =
+  | { kind: "ready" }
+  | { kind: "sending" }
+  | { kind: "done"; res: CheckInResult }
+  | { kind: "lost"; body: CheckInCreate; key: string }
+  | { kind: "refused"; message: string };
 
 /**
- * Check In, on a temporary site's day once clocked in (§6.12): one press reads the location and
- * sends it with a new Idempotency-Key; a lost answer keeps that key and body for Try Again, so it
- * never records twice. The server matches it to the nearest address; it never touches the shift.
- * Under it, the day's check-ins so far.
+ * Check In, on a temporary site's day once clocked in (§6.12): one press reads the location through
+ * the same reader as a punch and sends it with a new Idempotency-Key; a lost answer keeps that key
+ * and body for Try Again, so it never records twice. The server matches it to the nearest address;
+ * it never touches the shift. Under it, the day's check-ins so far.
  */
 function CheckInStep({ t }: { t: AttendanceToday }) {
   const [stage, setStage] = useState<CheckInStage>({ kind: "ready" });
   const send = async (body: CheckInCreate, key: string) => {
+    setStage({ kind: "sending" });
     try {
       const res = await api.call("POST /api/v1/attendance/check-ins", { body, idempotencyKey: key });
       invalidate("/api/v1/attendance");
@@ -490,17 +495,19 @@ function CheckInStep({ t }: { t: AttendanceToday }) {
       else setStage({ kind: "refused", message: err.message });
     }
   };
-  const checkIn = async () => {
-    const at = await readLocation();
-    const body: CheckInCreate = {
-      device_at: new Date().toISOString(),
-      latitude: at.fix?.latitude ?? null,
-      longitude: at.fix?.longitude ?? null,
-      accuracy_m: at.fix?.accuracy_m ?? null,
-      ...(at.error && { location_error: at.error }),
-    };
-    return send(body, crypto.randomUUID());
-  };
+  // Whatever the reading found is sent: the server records a rough or missing one as Location Unclear.
+  const reader = useLocationReader((at) =>
+    send(
+      {
+        device_at: new Date().toISOString(),
+        latitude: at.fix?.latitude ?? null,
+        longitude: at.fix?.longitude ?? null,
+        accuracy_m: at.fix?.accuracy_m ?? null,
+        ...(at.error && { location_error: at.error }),
+      },
+      newKey(),
+    ),
+  );
   const flagged = stage.kind === "done" && stage.res.check_in.flagged;
   return (
     <div className="mt-3">
@@ -518,8 +525,10 @@ function CheckInStep({ t }: { t: AttendanceToday }) {
         <Banner tone="err" icon="offline" action={<Button size="sm" icon="refresh" onClick={() => send(stage.body, stage.key)}>Try Again</Button>}>
           Check-in not sent yet.
         </Banner>
+      ) : reader.reading ? (
+        <Result tone="info" label="Check In" title="Finding Your Location" icon="target" />
       ) : (
-        <Button block icon="pin" onClick={checkIn}>
+        <Button block icon="pin" busy={stage.kind === "sending"} onClick={reader.read}>
           Check In
         </Button>
       )}

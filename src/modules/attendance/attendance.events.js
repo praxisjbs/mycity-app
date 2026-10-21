@@ -11,6 +11,8 @@
  *   attendance.exception_explained  the person wrote why: People are told
  *   attendance.exception_decided    People decided: the person is told
  *   attendance.day_closed           the day-close closed a person's day
+ *   attendance.day_reprojected      leave recorded or granted for a day already closed recalculated
+ *                                   it (a day closed absent becomes leave): the screens reload
  *   attendance.export_requested     a month or the register asked for as a workbook, made
  *                                   after commit into the file the screen that asked is
  *                                   waiting on, and downloaded there (attendance.export.js)
@@ -80,6 +82,7 @@ const EVENTS = defineEvents("people", {
   "attendance.exception_explained": { summary: "An employee explained an attendance exception" },
   "attendance.exception_decided": { summary: "People decided an attendance exception" },
   "attendance.day_closed": { summary: "An attendance day was closed" },
+  "attendance.day_reprojected": { summary: "A closed attendance day was recalculated after leave was granted" },
   "attendance.export_requested": { summary: "An attendance export was requested" },
   "attendance.home_requested": { summary: "A remote employee asked for a home location" },
   "attendance.home_decided": { summary: "People decided a home location" },
@@ -125,7 +128,7 @@ defineDocumentType("attendance_export", {
 const WHAT = Object.freeze({
   outside_worksite: "outside the worksite",
   outside_home: "outside the approved home",
-  location_unverified: "location not verified",
+  location_unverified: "location unclear",
   unknown_device: "an unregistered device",
   suspicious_timestamp: "the device clock ahead",
   missing_clock_out: "no clock-out",
@@ -362,6 +365,7 @@ for (const key of [
   EVENTS.ATTENDANCE_EXCEPTION_DECIDED,
   EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED,
   EVENTS.ATTENDANCE_DAY_CLOSED,
+  EVENTS.ATTENDANCE_DAY_REPROJECTED,
   EVENTS.ATTENDANCE_HOME_REQUESTED,
   EVENTS.ATTENDANCE_HOME_DECIDED,
   EVENTS.LOCATION_REQUEST_APPROVED,
@@ -481,6 +485,17 @@ outbox.register(WORKFLOW.WORKFLOW_CANCELLED, "attendance.apply_temporary_site_wi
 outbox.register(EVENTS.TEMPORARY_SITE_APPROVED, "attendance.resolve_covered_exceptions", (event) =>
   sites().cover(event.entity.id),
 );
+
+/*
+ * Leave recorded by People, or granted through its approval, for days already closed re-projects
+ * those days after commit (§11): a day closed absent becomes leave, its pending absence deduction is
+ * waived ("Leave granted") and it stops counting toward the next Absence breach. The leave module's
+ * events, named by their keys; the reconcile is required when the handler runs.
+ */
+const reprojectLeave = (event) =>
+  require("./attendance.reconcile").reprojectLeave(event.payload.leave_request_id || event.entity.id);
+outbox.register("leave_request.recorded", "attendance.reproject_leave_days", reprojectLeave);
+outbox.register("leave_request.approved", "attendance.reproject_leave_days", reprojectLeave);
 
 /** Attendance addresses saved while search was down are named by the places-name job (F27). */
 for (const owner of Object.keys(require("./attendance.repo").ADDRESS_LINE))

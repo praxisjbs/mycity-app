@@ -100,11 +100,11 @@ async function judgementOf(client, person, date, { existing, events, close, ctx 
  * Recalculate a person's day from its punches, in the caller's transaction (after the
  * person's lock), and settle what follows from it (settle) unless `settle` is false: the caller
  * then settles once it has opened the day's exceptions, which the rules count. A day with
- * nothing to say (no counted punch, not closed, no leave) gets no row; one that has a row
- * keeps it.
+ * nothing to say (no counted punch, not closed, no leave) gets no row unless `keep` asks for one
+ * (a refused punch's exception is opened on its day, §6.7); one that has a row keeps it.
  * @returns {Promise<{day: object|null, events: object[], ctx: object, leave: object|null, judged: object}>}
  */
-async function recomputeDay(client, person, date, { close = false, settle: settleNow = true } = {}) {
+async function recomputeDay(client, person, date, { close = false, settle: settleNow = true, keep = false } = {}) {
   const ctx = await calendar.contextFor(client, person, date);
   const leave = await repo.grantedLeave(client, person.employee_id, date);
   const existing = await repo.getDay(client, person.employee_id, date);
@@ -123,7 +123,7 @@ async function recomputeDay(client, person, date, { close = false, settle: settl
     early: lateness.minutesEarly,
     overtime: lateness.minutesOvertime,
   });
-  if (!existing && projection.status === null) return { day: null, events, ctx, leave, judged };
+  if (!existing && projection.status === null && !keep) return { day: null, events, ctx, leave, judged };
   const day = await repo.upsertDay(client, person.employee_id, date, projection, { closed: close, judged: judged.record });
   const r = { day, events, ctx, leave, judged };
   if (settleNow) await settle(client, person, r);
@@ -164,19 +164,26 @@ async function settle(client, person, r) {
  * Exceptions
  * ------------------------------------------------------------------ */
 
+/** Why there was no reading at all (§6.5): the browser's own reason, or a reading with no accuracy. */
 const LOCATION_REASON = Object.freeze({
   denied: "location was not shared",
   unavailable: "no location reading",
   timeout: "the location reading timed out",
   unsupported: "the device cannot share its location",
+  insecure: "the page was not on its secure address",
   no_location: "no location reading",
-  poor_accuracy: "the reading was not accurate enough",
+  no_accuracy: "the reading had no accuracy",
 });
 
-/** One line saying what an exception is about, from its evidence; a check-in's says so (§6.12). */
+/**
+ * One line saying what an exception is about, from its evidence; a check-in's says so (§6.12), and
+ * so does a punch refused at the clock (§6.7). A location People could not judge names why: no
+ * reading, a rough reading, at the edge, no home, no office (§6.5).
+ */
 function detailOf(type, evidence = {}) {
   const ev = evidence || {};
   if (ev.check_in) return `Check-in: ${detailOf(type, { ...ev, check_in: false })}`;
+  if (ev.refused) return `Refused: ${detailOf(type, { ...ev, refused: false })}`;
   switch (type) {
     case "outside_worksite":
       return `${ev.distance_m} m from ${ev.place === "client_visit" ? "the client's site" : ev.worksite_name}, radius ${ev.radius_m} m`;
@@ -185,9 +192,11 @@ function detailOf(type, evidence = {}) {
     case "location_unverified":
       if (ev.reason === "no_home") return "No approved home";
       if (ev.reason === "no_worksite") return "No office assigned";
-      return ev.reason === "poor_accuracy" && ev.accuracy_m
-        ? `Reading accurate to ${Math.round(ev.accuracy_m)} m`
-        : `No location: ${LOCATION_REASON[ev.reason] || "no location reading"}`;
+      if (ev.reason === "poor_accuracy")
+        return ev.accuracy_m ? `Rough reading: accurate to ${Math.round(ev.accuracy_m)} m` : "Rough reading";
+      if (ev.reason === "edge")
+        return `At the edge: ${ev.distance_m} m from ${ev.place === "client_visit" ? "the client's site" : ev.worksite_name}, radius ${ev.radius_m} m, accurate to ${Math.round(ev.accuracy_m)} m`;
+      return `No reading: ${LOCATION_REASON[ev.reason] || "no location reading"}`;
     case "unknown_device":
       return ev.device_label ? `Unregistered device: ${ev.device_label}` : "No registered device";
     case "suspicious_timestamp":
@@ -224,6 +233,11 @@ const OUTCOME_TEXT = Object.freeze({
 const TAKES_TIME = new Set(["missing_clock_out", "automatic_clock_out"]);
 /** What a decision on a check-in's flag means to the person: it clears, or it stands. */
 const CHECK_IN_TEXT = Object.freeze({ accepted: "the check-in's flag is cleared", rejected: "the check-in's flag stands" });
+/** What a decision on a punch refused at the clock means to the person: neither makes it count (§6.8). */
+const REFUSED_TEXT = Object.freeze({
+  accepted: "the refusal stands",
+  rejected: "the refusal is noted as wrong, and the punch still does not count",
+});
 const outcomeText = (type, outcome) =>
   type === "automatic_clock_out" && outcome === "corrected" ? "the clock-out time was corrected" : OUTCOME_TEXT[outcome];
 
@@ -254,6 +268,9 @@ async function decide(actor, scope, id, body) {
   await tx(async (client) => {
     await repo.lockEmployee(client, x.employee_id);
     const person = await repo.person(client, x.employee_id);
+    // The punch it is about: one refused at the clock never counts, whatever People decide (§6.8).
+    const punch = x.attendance_event_id ? await repo.eventFor(client, x.attendance_event_id) : null;
+    const refused = Boolean(punch && punch.validation_state === "rejected");
     if (body.decision === "add_clock_out") {
       const ctx = await calendar.contextFor(client, person, x.work_date);
       const events = counted(await repo.eventsOn(client, x.employee_id, x.work_date));
@@ -285,8 +302,15 @@ async function decide(actor, scope, id, body) {
     }
     const done = await repo.resolveException(client, id, { outcome, resolution: body.resolution, by: actor.user_id });
     if (!done) throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
-    // A check-in is never the shift: deciding its flag leaves the day as it is.
-    if (!x.attendance_check_in_id) await recomputeDay(client, person, x.work_date);
+    // A check-in is never the shift: deciding its flag leaves the day as it is. A clock-out People
+    // reject frees its slot (§6.2): on a day already closed its shift is open again, so the missing
+    // clock-out opens now, as the day-close would have, and Add Clock-Out recalculates the day.
+    if (!x.attendance_check_in_id) {
+      const r = await recomputeDay(client, person, x.work_date, { settle: false });
+      if (body.decision === "reject" && punch && !refused && punch.event_type === "clock_out" && r.day && r.day.closed_at)
+        await openMissingClockOut(client, person, r);
+      await settle(client, person, r);
+    }
     await emit(client, {
       key: EVENTS.ATTENDANCE_EXCEPTION_DECIDED,
       entity: { type: "attendance_exception", id },
@@ -300,7 +324,11 @@ async function decide(actor, scope, id, body) {
         work_date: x.work_date,
         exception_type: x.exception_type,
         outcome,
-        outcome_text: x.attendance_check_in_id ? CHECK_IN_TEXT[outcome] : outcomeText(x.exception_type, outcome),
+        outcome_text: x.attendance_check_in_id
+          ? CHECK_IN_TEXT[outcome]
+          : refused
+            ? REFUSED_TEXT[outcome]
+            : outcomeText(x.exception_type, outcome),
       },
     });
   });
@@ -403,6 +431,44 @@ async function getFor(id, scope) {
  * ------------------------------------------------------------------ */
 
 /**
+ * A closed day whose shift is still open (a clock-in that counts, no clock-out that counts) gets its
+ * one missing clock-out, for People to Add Clock-Out on; the day-close opens it, and so does People's
+ * rejection of a clock-out on a day already closed (§6.8). In the caller's transaction, after the
+ * person's lock; the day's unique key means it opens once.
+ * @param {{day: object, events: object[], ctx: object}} r  recomputeDay()'s answer
+ * @returns {Promise<object|null>} the exception opened, or null
+ */
+async function openMissingClockOut(client, person, r) {
+  const active = counted(r.events);
+  if (!guard.isOpen(active)) return null;
+  const date = String(r.day.attendance_date).slice(0, 10);
+  const clockIn = active.find((e) => e.event_type === "clock_in");
+  const x = await repo.insertException(client, {
+    attendance_day_id: r.day.attendance_day_id,
+    attendance_event_id: null,
+    exception_type: "missing_clock_out",
+    severity: "medium",
+    evidence: { clock_in_at: clockIn ? clockIn.occurred_at : null, timezone: r.ctx.timeZone },
+  });
+  if (!x) return null;
+  await emit(client, {
+    key: EVENTS.ATTENDANCE_REVIEW_REQUIRED,
+    entity: { type: "attendance_exception", id: x.attendance_exception_id },
+    actor: null,
+    payload: {
+      attendance_day_id: r.day.attendance_day_id,
+      employee_id: person.employee_id,
+      subject_employee_id: person.employee_id,
+      employee_name: person.ref.display_name,
+      work_date: date,
+      types: ["missing_clock_out"],
+    },
+    dedup_key: `attendance-missing-out:${r.day.attendance_day_id}`,
+  });
+  return x;
+}
+
+/**
  * Close one person's day, once. In its own transaction, after the person's lock, so a
  * late clock-out arriving at the same moment is either in the day or refused. The day is judged
  * now if no clock-in judged it, and settled once its missing clock-out is open: it counts toward
@@ -419,35 +485,7 @@ async function closeDay(employeeId, date) {
     const r = await recomputeDay(client, person, date, { close: true, settle: false });
     if (!r.day) return null;
 
-    const active = counted(r.events);
-    let missing = false;
-    if (guard.isOpen(active)) {
-      const clockIn = active.find((e) => e.event_type === "clock_in");
-      const x = await repo.insertException(client, {
-        attendance_day_id: r.day.attendance_day_id,
-        attendance_event_id: null,
-        exception_type: "missing_clock_out",
-        severity: "medium",
-        evidence: { clock_in_at: clockIn ? clockIn.occurred_at : null, timezone: r.ctx.timeZone },
-      });
-      if (x) {
-        missing = true;
-        await emit(client, {
-          key: EVENTS.ATTENDANCE_REVIEW_REQUIRED,
-          entity: { type: "attendance_exception", id: x.attendance_exception_id },
-          actor: null,
-          payload: {
-            attendance_day_id: r.day.attendance_day_id,
-            employee_id: employeeId,
-            subject_employee_id: employeeId,
-            employee_name: person.ref.display_name,
-            work_date: date,
-            types: ["missing_clock_out"],
-          },
-          dedup_key: `attendance-missing-out:${r.day.attendance_day_id}`,
-        });
-      }
-    }
+    const missing = Boolean(await openMissingClockOut(client, person, r));
     await settle(client, person, r);
     await emit(client, {
       key: EVENTS.ATTENDANCE_DAY_CLOSED,
@@ -491,6 +529,55 @@ async function closeDays({ now = new Date() } = {}) {
   return { today, ...tally };
 }
 
+/* ------------------------------------------------------------------ *
+ * Leave granted for days already closed
+ * ------------------------------------------------------------------ */
+
+/**
+ * Re-project the closed days a granted leave covers, before today in Lagos (§11): each in its own
+ * transaction, after the person's lock, recalculated as the day-close would have closed it with the
+ * leave in place (a day closed absent becomes leave) and settled: its pending absence deduction is
+ * waived ("Leave granted") and it stops counting toward the next Absence breach; a breach already
+ * recorded stays (§6.16). A day still open is the day-close's. Run again, it changes nothing.
+ * @param {string} leaveRequestId
+ * @returns {Promise<number>} how many days were recalculated
+ */
+async function reprojectLeave(leaveRequestId, { now = new Date() } = {}) {
+  const leave = await repo.leaveRequestDays(pool, leaveRequestId);
+  if (!leave || !leave.granted) return 0;
+  const yesterday = lagos.addDays(lagos.today(now), -1);
+  const last = leave.ends_on < yesterday ? leave.ends_on : yesterday;
+  if (last < leave.starts_on) return 0;
+  let count = 0;
+  for (const date of await repo.closedDaysBetween(pool, leave.employee_id, leave.starts_on, last)) {
+    await tx(async (client) => {
+      await repo.lockEmployee(client, leave.employee_id);
+      const person = await repo.person(client, leave.employee_id);
+      if (!person) return;
+      const before = await repo.getDay(client, leave.employee_id, date);
+      const r = await recomputeDay(client, person, date);
+      if (!r.day) return;
+      count += 1;
+      await emit(client, {
+        key: EVENTS.ATTENDANCE_DAY_REPROJECTED,
+        entity: { type: "attendance_record", id: r.day.attendance_day_id },
+        actor: null,
+        before: { status: before ? before.status : null },
+        after: { status: r.day.status },
+        payload: {
+          attendance_day_id: r.day.attendance_day_id,
+          employee_id: leave.employee_id,
+          subject_employee_id: leave.employee_id,
+          work_date: date,
+          status: r.day.status,
+          leave_request_id: leaveRequestId,
+        },
+      });
+    });
+  }
+  return count;
+}
+
 module.exports = {
   CLOSE_LOOKBACK_DAYS,
   judgementOf,
@@ -506,4 +593,5 @@ module.exports = {
   getFor,
   closeDay,
   closeDays,
+  reprojectLeave,
 };

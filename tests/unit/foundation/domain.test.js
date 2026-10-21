@@ -90,7 +90,7 @@ describe("numbering", () => {
 });
 
 describe("geo", () => {
-  const office = { worksite_id: "w1", latitude: 6.4281, longitude: 3.4219, radius_m: 150 };
+  const office = { latitude: 6.4281, longitude: 3.4219 };
 
   test("Victoria Island to Ikeja is about 18 km", () => {
     const d = geo.distanceM(office, { latitude: 6.6018, longitude: 3.3515 });
@@ -98,25 +98,11 @@ describe("geo", () => {
     expect(d).toBeLessThan(21000);
   });
 
-  test("inside the radius: on site", () => {
-    const r = geo.evaluateClockIn({ point: { latitude: 6.4285, longitude: 3.4221 }, accuracy_m: 20, worksites: [office] });
-    expect(r).toMatchObject({ recorded: true, is_offsite: false, worksite_id: "w1", reason: null });
-  });
-
-  test("outside: recorded and flagged, not rejected", () => {
-    const r = geo.evaluateClockIn({ point: { latitude: 6.6018, longitude: 3.3515 }, worksites: [office] });
-    expect(r).toMatchObject({ recorded: true, is_offsite: true, worksite_id: null, reason: "outside_worksite" });
-  });
-
-  test("no location: not recorded; poor accuracy is reported, not decisive", () => {
-    expect(geo.evaluateClockIn({ point: null, worksites: [office] }).reason).toBe("no_location");
-    expect(geo.evaluateClockIn({ point: { latitude: null, longitude: 3 }, worksites: [office] }).recorded).toBe(false);
-    const r = geo.evaluateClockIn({ point: { latitude: 6.4285, longitude: 3.4221 }, accuracy_m: 500, worksites: [office] });
-    expect(r).toMatchObject({ is_offsite: false, low_accuracy: true });
-  });
-
-  test("no worksites yet: nobody is off-site", () => {
-    expect(geo.evaluateClockIn({ point: { latitude: 6.5, longitude: 3.4 }, worksites: [] })).toMatchObject({ is_offsite: false, reason: "no_worksites" });
+  test("a usable point has both coordinates, in range", () => {
+    expect(geo.isPoint({ latitude: 6.4285, longitude: 3.4221 })).toBe(true);
+    expect(geo.isPoint(null)).toBe(false);
+    expect(geo.isPoint({ latitude: null, longitude: 3 })).toBe(false);
+    expect(geo.isPoint({ latitude: 91, longitude: 3 })).toBe(false);
   });
 });
 

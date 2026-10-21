@@ -25,9 +25,12 @@ import { PeopleAttendance } from "./PeopleAttendance";
 
 type Position = { coords: { latitude: number; longitude: number; accuracy: number } };
 let answer: ((p: Position) => void) | null = null;
-const getCurrentPosition = vi.fn((ok: (p: Position) => void) => {
+const watchPosition = vi.fn((ok: (p: Position) => void) => {
   answer = ok;
+  return 1;
 });
+const clearWatch = vi.fn();
+const PHONE = "Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
 
 expect.extend(axeMatchers);
 installMatchMedia();
@@ -41,15 +44,18 @@ if (!("ResizeObserver" in window)) {
 
 beforeEach(() => {
   setViewport(1440);
-  getCurrentPosition.mockClear();
+  watchPosition.mockClear();
   answer = null;
-  Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
+  Object.defineProperty(navigator, "geolocation", { configurable: true, value: { watchPosition, clearWatch } });
+  // A phone, so a weak reading is the usual move-and-retry rather than Use Your Phone.
+  Object.defineProperty(navigator, "userAgent", { configurable: true, value: PHONE });
   Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: async () => ({ state: "prompt" }) } });
   byKey("chidera")!.work_pattern = "remote";
 });
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 let clock: ReturnType<typeof useClock> | null = null;
@@ -97,7 +103,7 @@ describe("remote staff's homes", () => {
     await screen.findByText("Share Your Location");
     expect(screen.getByText(/goes to People with your location/)).toBeTruthy();
     press("Allow Location");
-    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
     act(() => answer!({ coords: { latitude: 6.5, longitude: 3.37, accuracy: 15 } }));
     await screen.findByText("Review Required");
     expect(screen.getByText(/you have no approved home location yet/)).toBeTruthy();
@@ -109,15 +115,27 @@ describe("remote staff's homes", () => {
     expect(screen.getByText("Not Set")).toBeTruthy();
     press("Set Home Location");
     await screen.findByText("At Home Now");
-    expect(getCurrentPosition).not.toHaveBeenCalled();
+    expect(watchPosition).not.toHaveBeenCalled();
     expect(await axe(document.body)).toHaveNoViolations();
 
+    // A 240 m reading is kept while the reader looks for a better one, for ten seconds; only Not Now meanwhile.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     press("Use This Location");
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(1));
     act(() => answer!({ coords: { latitude: 6.5, longitude: 3.37, accuracy: 240 } }));
+    expect(screen.getByText("Finding Your Location")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Use This Location" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Not Now" })).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    vi.useRealTimers();
     await screen.findByText("Weak Location Signal");
+    expect(clearWatch).toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Send for Approval" })).toBeNull();
 
     press("Retry Location");
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(2));
     act(() => answer!({ coords: { latitude: 6.50012, longitude: 3.37008, accuracy: 14 } }));
     await screen.findByText("Location Found");
     expect(screen.getByText("Accurate to 14 m.")).toBeTruthy();

@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "1444b9447c761c02aab4a778512b3121aaae185ec33383406a56e3b738396c44",
+  "source_hash": "63c0c4deb858cb2efd8d210101d2765a167ae4329917c1a3d980285b17c6841f",
   "schemas": 810,
   "endpoints": 417,
   "inputs": {
@@ -12,7 +12,7 @@
     "packages/contract/schemas/announcements.js": "fd6e37d081b609ad75ee98a84357db39b3b07fa995369f55100a0d2d4f727af5",
     "packages/contract/schemas/assessments.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/assistant.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/attendance.js": "35185e0fb4600a7b3d9c66ab435c1a45963877057bc3914c7bd653963ca67ac3",
+    "packages/contract/schemas/attendance.js": "d5fc42e714f085f6b91d054a77a9375fbb4ec3d81aecf7f401d11103ac19e1f6",
     "packages/contract/schemas/audit.js": "0da325da2e49796743a8501459005a2cb952af522723ecc181498059f98458aa",
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/calendar.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

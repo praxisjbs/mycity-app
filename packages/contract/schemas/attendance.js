@@ -48,8 +48,8 @@ const ExceptionType = z.enum([
 ]);
 const ExceptionStatus = z.enum(["open", "resolved"]);
 const ExceptionOutcome = z.enum(["accepted", "rejected", "corrected"]);
-/** Why the browser gave no reading. */
-const LocationError = z.enum(["denied", "unavailable", "timeout", "unsupported"]);
+/** Why the browser gave no reading: refused, none found, too slow, no location at all, or a page off its secure address. */
+const LocationError = z.enum(["denied", "unavailable", "timeout", "unsupported", "insecure"]);
 const GeofenceVerdict = z.enum(["inside", "outside", "unverified", "not_applied"]);
 const DeviceState = z.enum(["registered", "observed", "removed", "none"]);
 const TodayState = z.enum(["not_clocked_in", "clocked_in", "clocked_out", "unavailable"]);

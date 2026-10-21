@@ -5,12 +5,14 @@
  *
  * A punch, in one transaction, after the person's advisory lock:
  *
- *   1. the idempotency key: a punch this key already made is answered again, unchanged
- *   2. the person: employed, and not on granted leave that day
+ *   1. the idempotency key: a punch this key already made is answered again, unchanged; the
+ *      same key sent for the other punch (a clock-out with a clock-in's key) is a 422
+ *   2. the person: employed
  *   3. the work date at the workplace (the server's time, the worksite's zone); a
- *      clock-out closes today's shift, or yesterday's while yesterday is still open
- *   4. the clock guard on that date's active events (attendance.clock-guard.js); a
- *      refusal writes nothing and is a 409
+ *      clock-out closes today's shift, or yesterday's while yesterday is still open; then
+ *      granted leave on that work date refuses it
+ *   4. the clock guard on that date's punches that count (attendance.clock-guard.js): a punch
+ *      People rejected frees its slot; a refusal writes nothing and is a 409
  *   5. the device: the session's known device, recorded by the devices service the first
  *      time it punches, judged by the device mode (devices.guard.js)
  *   6. the geofence: the reading against the expected worksite (for remote staff, the
@@ -24,11 +26,12 @@
  *      counts settled, and attendance.punched (and attendance.review_required) emitted, all
  *      committed together
  *
- * The unique index on active events is the backstop for anything the lock missed: its
- * violation is the same 409. A rejected punch is recorded as an attempt, counts for
- * nothing and opens no exception. A clock-in that counts reads the day's reminder to clock
- * in, and a clock-out the day's reminders to clock out, if the clock watch sent them
- * (attendance.clock-watch.js, which also makes the System Clock-Out).
+ * The unique index on the punches that count is the backstop for anything the lock missed: its
+ * violation is the same 409. A rejected punch is recorded as an attempt and counts for nothing,
+ * but opens the exception of each check that refused it (outside the fence, an unknown device),
+ * which are the only reasons it names, so People see every refusal. A clock-in that counts reads
+ * the day's reminder to clock in, and a clock-out the day's reminders to clock out, if the clock
+ * watch sent them (attendance.clock-watch.js, which also makes the System Clock-Out).
  */
 const crypto = require("node:crypto");
 const { pool } = require("../../config/db");
@@ -77,6 +80,15 @@ const SEVERITY = Object.freeze({
   automatic_clock_out: "low",
 });
 
+/** Why a location is unclear, as the person reads it inside a sentence (§6.5); anything else is no reading. */
+const UNCLEAR_TEXT = Object.freeze({
+  no_home: "you have no approved home location yet",
+  no_worksite: "you have no office assigned yet",
+  poor_accuracy: "your location reading was too rough",
+  edge: "your location reading was at the edge of the fence",
+  insecure: "the clock was opened from an address that is not secure",
+});
+
 /** What a person reads about each reason, inside a sentence. */
 function reasonText(code, ev) {
   switch (code) {
@@ -89,11 +101,7 @@ function reasonText(code, ev) {
         ? `you were ${ev.geofence.distance_m} m from your temporary home`
         : `you were ${ev.geofence.distance_m} m from your approved home`;
     case "location_unverified":
-      if (ev.geofence.reason === "no_home") return "you have no approved home location yet";
-      if (ev.geofence.reason === "no_worksite") return "you have no office assigned yet";
-      return ev.geofence.reason === "poor_accuracy"
-        ? "your location reading was not accurate enough"
-        : "your location could not be checked";
+      return UNCLEAR_TEXT[ev.geofence.reason] || "your location could not be checked";
     case "unknown_device":
       return "this device is not registered";
     case "suspicious_timestamp":
@@ -248,21 +256,17 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
 
   const outcome = await tx(async (client) => {
     await repo.lockEmployee(client, employeeId);
+    // A key the middleware no longer remembers (48 hours) is still on its punch: the same punch is
+    // answered again; the other one sent with it is the middleware's refusal, never the old answer.
     const prior = await repo.eventByKey(client, employeeId, idempotencyKey);
+    if (prior && prior.event_type !== body.event_type)
+      throw new AppError("IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was used for a different request. Use a new key.", 422);
     if (prior) return { row: prior, replayed: true };
 
     const person = await repo.person(client, employeeId);
     if (!person || person.status !== "active") throw notEmployed();
     const zone = await sites.zoneAt(client, person, now, calendar.zoneOf(person));
     const date = rules.localDate(now, zone);
-    const leave = await repo.grantedLeave(client, employeeId, date);
-    if (leave)
-      throw new AppError(
-        "ON_LEAVE",
-        `You are on ${leave.leave_type_name} leave from ${formatDate(leave.starts_on)} to ${formatDate(leave.ends_on)}.`,
-        422,
-      );
-
     let workDate = date;
     let dayEvents = await repo.eventsOn(client, employeeId, date);
     if (body.event_type === "clock_out" && !guard.isOpen(dayEvents)) {
@@ -272,6 +276,15 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         dayEvents = session.events;
       }
     }
+    // Leave is read on the day the punch belongs to: a clock-out closing yesterday's shift is yesterday's.
+    const leave = await repo.grantedLeave(client, employeeId, workDate);
+    if (leave)
+      throw new AppError(
+        "ON_LEAVE",
+        `You are on ${leave.leave_type_name} leave from ${formatDate(leave.starts_on)} to ${formatDate(leave.ends_on)}.`,
+        422,
+      );
+
     const transition = guard.evaluateClockTransition({ events: dayEvents, eventType: body.event_type });
     if (!transition.allowed) throw conflict(transition.reason, transition.message);
 
@@ -300,14 +313,13 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
     const timeResult = time.future ? "review" : "accepted";
     const result = rules.strictest(geofence.result, deviceDecision.result, timeResult);
 
+    // Each check that did not accept, with its own result: a refused punch names only those that refused it.
     const checks = [
-      geofence.result !== "accepted" ? geofence.exception || geofence.outside : null,
-      deviceDecision.result !== "accepted" ? "unknown_device" : null,
-      time.future ? "suspicious_timestamp" : null,
-    ].filter(Boolean);
-    const reasons = result === "rejected"
-      ? checks.filter((c) => (c === "unknown_device" ? deviceDecision.result : geofence.result) === "rejected")
-      : checks;
+      { type: geofence.exception, result: geofence.result },
+      { type: "unknown_device", result: deviceDecision.result },
+      { type: "suspicious_timestamp", result: timeResult },
+    ].filter((c) => c.result !== "accepted");
+    const reasons = checks.filter((c) => result !== "rejected" || c.result === "rejected").map((c) => c.type);
 
     const validation = {
       policy: {
@@ -377,37 +389,36 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
     }
     if (device) await devices.notePunch(client, device.attendance_device_id, now);
 
+    // Settled once the day's exceptions are open: Location Flags counts them (§6.16). A refused punch
+    // changes nothing on the day, but opens its exception there, so People see every refusal (§6.7).
     const opened = [];
-    let dayId = null;
-    if (result !== "rejected") {
-      // Settled once the day's exceptions are open: Location Flags counts them (§6.16).
-      const r = await reconcile.recomputeDay(client, person, workDate, { settle: false });
-      dayId = r.day ? r.day.attendance_day_id : null;
-      for (const type of reasons) {
-        const x = await repo.insertException(client, {
-          attendance_day_id: dayId,
-          attendance_event_id: row.attendance_event_id,
-          exception_type: type,
-          severity: SEVERITY[type],
-          evidence:
-            type === "unknown_device"
-              ? { device_label: validation.device.label, reason: deviceDecision.reason, event_type: body.event_type }
-              : type === "suspicious_timestamp"
-                ? { skew_seconds: time.skew_seconds, event_type: body.event_type }
-                : {
-                    reason: geofence.reason,
-                    place: geofence.place,
-                    distance_m: geofence.distance_m,
-                    radius_m: geofence.radius_m,
-                    worksite_name: geofence.worksite_name,
-                    accuracy_m: body.accuracy_m,
-                    event_type: body.event_type,
-                  },
-        });
-        if (x) opened.push(x);
-      }
-      await reconcile.settle(client, person, r);
+    const r = await reconcile.recomputeDay(client, person, workDate, { settle: false, keep: reasons.length > 0 });
+    const dayId = r.day ? r.day.attendance_day_id : null;
+    for (const type of reasons) {
+      const evidence =
+        type === "unknown_device"
+          ? { device_label: validation.device.label, reason: deviceDecision.reason, event_type: body.event_type }
+          : type === "suspicious_timestamp"
+            ? { skew_seconds: time.skew_seconds, event_type: body.event_type }
+            : {
+                reason: geofence.reason,
+                place: geofence.place,
+                distance_m: geofence.distance_m,
+                radius_m: geofence.radius_m,
+                worksite_name: geofence.worksite_name,
+                accuracy_m: body.accuracy_m,
+                event_type: body.event_type,
+              };
+      const x = await repo.insertException(client, {
+        attendance_day_id: dayId,
+        attendance_event_id: row.attendance_event_id,
+        exception_type: type,
+        severity: SEVERITY[type],
+        evidence: result === "rejected" ? { ...evidence, refused: true } : evidence,
+      });
+      if (x) opened.push(x);
     }
+    await reconcile.settle(client, person, r);
 
     // The day's reminders have done their work: a push still held is not sent.
     if (result !== "rejected") {

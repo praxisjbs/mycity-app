@@ -147,7 +147,7 @@ src/
 │   │                  clear-by-permission over the subject; a switched-off rule's alerts dismissed)
 │   ├── state/         state-history.js (time at stage, M4 M7 M8)
 │   ├── dedup/         dedup.js (scoring, advisory, never blocking)
-│   ├── geo/           geo.js (distance, inside-fence; M1 clock-in)
+│   ├── geo/           geo.js (distance, a usable point; M1 clock-in)
 │   ├── notifications/ categories.js · fanout.js
 │   ├── search/        provider.js · registry.js · search.service.js
 │   ├── ai/            manifest.js · registry.js · catalogue-sync.js · authorise.js ·

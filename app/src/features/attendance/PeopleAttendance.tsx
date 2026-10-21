@@ -9,7 +9,7 @@ import { useAuth, useMe } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
-import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, PATTERN, PUNCH_STATE, REGISTER_STATUS, VERDICT } from "./labels";
+import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, locationShown, PATTERN, PUNCH_STATE, REGISTER_STATUS, UNCLEAR_HELP, VERDICT } from "./labels";
 import { DayRoute } from "./TemporarySites";
 import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
 
@@ -227,7 +227,7 @@ const evidenceColumns = [
   { key: "a", label: "Server Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
   { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Not Counted" : PUNCH_STATE[e.validation_state].text}</Pill> },
   { key: "v", label: "Device Time", desktop: true, render: (e: AttendanceEvent) => (e.device_at ? `${formatTime(e.device_at)}${e.skew_seconds && Math.abs(e.skew_seconds) >= 60 ? `, ${Math.round(e.skew_seconds / 60)} min` : ""}` : null) },
-  { key: "l", label: "Location", render: (e: AttendanceEvent) => `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}` },
+  { key: "l", label: "Location", render: (e: AttendanceEvent) => locationShown(e) },
   { key: "c", label: "Accuracy", desktop: true, render: (e: AttendanceEvent) => (e.accuracy_m !== null ? `${Math.round(e.accuracy_m)} m` : null) },
   { key: "g", label: "Coordinates", desktop: true, render: (e: AttendanceEvent) => (e.latitude !== null && e.longitude !== null ? `${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}` : null) },
   { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
@@ -237,7 +237,7 @@ const evidenceColumns = [
 /** An exception's columns; `photo` (from usePhotos) puts the person's face beside their name. */
 const exceptionColumns = (photo: ((url: string | null) => string | null) | null) => [
   ...(photo ? [{ key: "e", label: "Employee", render: (x: AttendanceException) => <Who name={x.employee.display_name} sub={x.employee.department} src={photo(x.employee.photo_url)} /> }] : []),
-  { key: "t", label: "Exception", render: (x: AttendanceException) => EXCEPTION_TYPE[x.exception_type] },
+  { key: "t", label: "Exception", render: (x: AttendanceException) => (x.exception_type === "location_unverified" ? <HelpTerm help={UNCLEAR_HELP}>{EXCEPTION_TYPE[x.exception_type]}</HelpTerm> : EXCEPTION_TYPE[x.exception_type]) },
   { key: "w", label: "Date", render: (x: AttendanceException) => formatDate(x.work_date) },
   { key: "d", label: "Detail", desktop: true, render: (x: AttendanceException) => x.detail },
   { key: "n", label: "Note", desktop: true, render: (x: AttendanceException) => (x.employee_note ? <Pill tone="info">Explained</Pill> : null) },

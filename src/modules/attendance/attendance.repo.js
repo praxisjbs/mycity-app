@@ -152,6 +152,37 @@ function grantedLeave(db, employeeId, date) {
 }
 
 /**
+ * A leave request's person and dates, and whether it is granted (approved, or submitted with its
+ * approval already approved, as GRANTED_LEAVE reads it), or null.
+ */
+function leaveRequestDays(db, leaveRequestId) {
+  return one(
+    db,
+    `SELECT lr.employee_id, lr.starts_on::text AS starts_on, lr.ends_on::text AS ends_on,
+            (lr.status = 'approved' OR (lr.status = 'submitted' AND wi.state IN ('approved', 'timeout_approved'))) AS granted
+       FROM leave_request lr
+       LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = lr.workflow_instance_id
+      WHERE lr.leave_request_id = $1`,
+    [leaveRequestId],
+  );
+}
+
+/** A person's closed days from `from` to `to`, oldest first: those leave granted later re-projects. */
+async function closedDaysBetween(db, employeeId, from, to) {
+  // pagination:complete each day of one person's leave is recalculated, and a leave is a bounded span
+  const { rows } = await completeQuery(
+    db,
+    `SELECT ad.attendance_date::text AS attendance_date
+       FROM attendance_day ad
+      WHERE ad.employee_id = $1 AND ad.attendance_date BETWEEN $2::date AND $3::date AND ad.closed_at IS NOT NULL
+      ORDER BY ad.attendance_date`,
+    [employeeId, from, to],
+    { label: "a leave's closed days", ceiling: 400 },
+  );
+  return rows.map((r) => r.attendance_date);
+}
+
+/**
  * A work date's active events (accepted or under review), oldest first; `excluded` when
  * the day does not count it (EXCLUDED); `policy_version_id` the version each was judged by
  * (a punch from before policies names it as `attendance_policy_id`, the same id since 1405). Rejected attempts are left out: they change
@@ -190,14 +221,22 @@ function eventByKey(db, employeeId, key) {
   );
 }
 
+/**
+ * Record a punch. Its slot is how many punches of its type that day a decision had already excluded
+ * (1380): the unique index holds one active punch a slot, so a punch People rejected frees its place
+ * for the next, and two written at once still collide (§6.2).
+ */
 async function insertEvent(client, e) {
   const row = await one(
     client,
     `INSERT INTO attendance_event
        (employee_id, event_type, occurred_at, work_date, device_at, worksite_id, known_device_id,
         attendance_device_id, policy_version_id, latitude, longitude, accuracy_m, distance_m, source,
-        validation_state, validation, request_id, idempotency_key, note, recorded_by, reason)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21)
+        validation_state, validation, request_id, idempotency_key, note, recorded_by, reason, slot)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21,
+             (SELECT count(*)::smallint FROM attendance_event ev
+               WHERE ev.employee_id = $1 AND ev.work_date = $4::date AND ev.event_type = $2
+                 AND ev.validation_state IN ('accepted', 'review') AND ev.source <> 'system' AND ${EXCLUDED("ev")}))
      RETURNING attendance_event_id`,
     [
       e.employee_id,
@@ -322,11 +361,18 @@ function insertException(client, x) {
   );
 }
 
+/**
+ * A day's open exceptions that wait on People about the day: a refused punch's exception (§6.7) is
+ * People's to see, but the punch never counted, so it leaves the person's clock as it is.
+ */
 async function openExceptionCount(db, dayId) {
   if (!dayId) return 0;
   const r = await one(
     db,
-    "SELECT count(*)::int AS n FROM attendance_exception WHERE attendance_day_id = $1 AND status = 'open'",
+    `SELECT count(*)::int AS n
+       FROM attendance_exception x
+       LEFT JOIN attendance_event ev ON ev.attendance_event_id = x.attendance_event_id
+      WHERE x.attendance_day_id = $1 AND x.status = 'open' AND ev.validation_state IS DISTINCT FROM 'rejected'`,
     [dayId],
   );
   return r ? r.n : 0;
@@ -805,8 +851,8 @@ async function reminderOn(db, employeeId, date, kind) {
 }
 
 /**
- * Shifts still open on work dates from `from` to `to`: a clock-in that counts, no clock-out, and
- * a day not closed; with the person's active logins, whose presence decides whether a reminder to
+ * Shifts still open on work dates from `from` to `to`: a clock-in that counts, no clock-out that
+ * counts (one People rejected leaves the shift open, §6.2), and a day not closed; with the person's active logins, whose presence decides whether a reminder to
  * clock out is a push or the app's closing prompt.
  */
 async function openShifts(db, from, to) {
@@ -825,7 +871,8 @@ async function openShifts(db, from, to) {
         AND NOT ${EXCLUDED("ev")}
         AND NOT EXISTS (SELECT 1 FROM attendance_event o
                          WHERE o.employee_id = ev.employee_id AND o.work_date = ev.work_date
-                           AND o.event_type = 'clock_out' AND o.validation_state IN ('accepted', 'review'))
+                           AND o.event_type = 'clock_out' AND o.validation_state IN ('accepted', 'review')
+                           AND NOT ${EXCLUDED("o")})
       ORDER BY ev.work_date, ev.employee_id`,
     [from, to],
     { label: "open shifts" },
@@ -1722,11 +1769,14 @@ module.exports = {
   COMPANY_WORKS,
   WORKS_ON,
   EXPECTED_ON,
+  EXCLUDED,
   HAS_LOGIN,
   PLACE_REMOTE,
   lockEmployee,
   person,
   grantedLeave,
+  leaveRequestDays,
+  closedDaysBetween,
   eventsOn,
   eventByKey,
   insertEvent,
