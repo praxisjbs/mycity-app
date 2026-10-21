@@ -74,7 +74,7 @@ takes its migrations from its own part of the M1 block, so the four never collid
 | PR | Builds | Sections | Migrations | Status |
 |---|---|---|---|---|
 | 1 · Policies foundation | Knowledge Hub · Policies and ESS · Policy Updates for every policy (`policies.md`); the Attendance policy moved into it with today's rules; the clock reads its rules through `policies.rulesFor`; Settings · Attendance Policy retired | §6.1, §6.15 (the worksheet's existing rules, and the contract for every rule) | 1400 to 1419 | Built |
-| 2 · Clock fixes | The audit of 20/10/2026: the location reading, Location Unclear, Refuse opening an exception, a rejected punch freeing its slot, leave on the work date, the clock panel's location reader | §6.2, §6.3, §6.5, §6.7, §6.8, §11 | 1380 to 1389 | Not started |
+| 2 · Clock fixes | The audit of 20/10/2026: the location reading, Location Unclear, Refuse opening an exception, a rejected punch freeing its slot, leave on the work date, the clock panel's location reader | §6.2, §6.3, §6.5, §6.7, §6.8, §11 | 1380 to 1389 | Built (21/10/2026) |
 | 3 · Rules and schedules | Hours in the policy and work schedules; lateness from the start; the consequence rules (alerts, queries); pending deductions and overtime; reminders and the system clock-out; each day judged by its own version | §6.4, §6.13, §6.14, §6.15 (the rules' effects), §6.16, §6.17 | 1420 to 1449 | Built (21/10/2026) |
 | 4 · Places | Permanent and temporary sites, Add Work Site on Home, HR's approval, Check In at each stop; work location requests and field assignments retired | §6.11, §6.12 | 1450 to 1479 | Built |
 
@@ -130,23 +130,23 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
    after temporary sites (§6.11, §6.12 say how they ran).
 5. **The employee clocks in** (the clock panel). The panel names the place the day expects (the
    office, the home, a temporary site's addresses) and asks the browser for a reading only when Allow
-   Location is pressed (straight away when already allowed). It reads for up to ten seconds and keeps
-   the best fix; a reading too rough to prove the place offers the fix for that device and Clock In
-   Anyway (§6.5). It sends `POST /attendance/punches` with an `Idempotency-Key`, and shows the
+   Location is pressed (straight away when already allowed, and never when the browser has blocked
+   it: the panel then says how to allow it). It reads for up to ten seconds and keeps the best fix; a
+   reading too rough to prove the place offers the fix for that device and Clock In Anyway (§6.5). It sends `POST /attendance/punches` with an `Idempotency-Key`, and shows the
    server's answer. On a temporary site's day, Check In at each later stop sends
    `POST /attendance/check-ins` (§6.12).
 6. **The service decides the punch** (§6): the clock guard, the place against the day's fence, the
    device, the device's time. It records an `accepted`, `review` or `rejected` event with its
    evidence and the policy version, updates the day (`attendance_day`), opens exceptions (a refused
-   punch included, PR 2), counts the day against the policy's rules and settles its pay items
+   punch included), counts the day against the policy's rules and settles its pay items
    (§6.16, §6.17: a breach is recorded and `attendance.rule_breached` emitted here, with the punch),
    and emits `attendance.punched` in the same transaction.
 7. After commit the outbox pushes `attendance.updated` to the employee and to People within scope,
    `attendance.review_required` notifies People and the employee, and a breach's alert is raised
    (`attendance.raise_breach_alert`, §6.16).
 8. **People review.** They open the person's day from the register, read the evidence and decide
-   the exception: accept, reject (the punch stops counting and frees its slot, PR 2), or add the
-   missing clock-out time. The source event is never edited; a correction is a new event with
+   the exception: accept, reject (the punch stops counting and frees its slot), or add the missing
+   clock-out time. The source event is never edited; a correction is a new event with
    `source = 'admin'`. The decision recalculates the day, its pay items and its rule counts in its
    own transaction (§6.16, §6.17).
 9. **The clock asks at sign-in, at the start and at the end** (§6.14). The panel opens by itself
@@ -180,7 +180,7 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
 | `attendance_policy` (1000, 1300, 1310, 1370) | The rule columns, `status`, `version`, `effective_from` and who published or withdrew each version | **Frozen from PR 1**: its versions moved to `policy_version` with the same ids (`policies.md` §4, `1405`), their rules as `policy_version.rules`. Read by nothing; a later release drops it with `1000`'s booleans and `1300`'s `geofence_mode` (MIGRATIONS §8) |
 | `attendance_policy_acknowledgement` (1370) | `attendance_policy_id`, `employee_id`, `reminded_at`, `acknowledged_at` | **Frozen from PR 1**: moved to `policy_acknowledgement` (`1405`) |
 | `employee_attendance_policy` (1000) | `employee_id`, `attendance_policy_id`, `worksite_id`, `effective_from`, `effective_to` | Never written, and from PR 1 not read: one organisation policy (§6.1), and a person's own hours are their work schedule (§6.13). Dropped with `attendance_policy` |
-| `attendance_event` (1000, 1300, 1360) | `employee_id`, `event_type` (`clock_in`, `clock_out`), `work_date`, `occurred_at` (server time), `device_at`, `latitude`, `longitude`, `accuracy_m`, `distance_m`, `worksite_id`, `known_device_id`, `attendance_device_id`, `source` (`pwa`; `admin`, People's correction; `system`, an automatic clock-out, §6.14), `validation_state` (`accepted`, `review`, `rejected`), `validation` (evidence), `idempotency_key`, `attendance_policy_id` (to PR 1), `policy_version_id` (from PR 1, `1405`; a punch from before keeps its version in `attendance_policy_id`, the same id, since the table is append-only: read `COALESCE(policy_version_id, attendance_policy_id)`), `note`, `recorded_by`, `reason` | Append-only. Unique: one active (`accepted` or `review`) event of each type per person per work date among the person's and People's punches, and one automatic clock-out per person per work date (`1360`), so People's correction stands beside the automatic one it replaces; one event per person per idempotency key |
+| `attendance_event` (1000, 1300, 1360) | `employee_id`, `event_type` (`clock_in`, `clock_out`), `work_date`, `occurred_at` (server time), `device_at`, `latitude`, `longitude`, `accuracy_m`, `distance_m`, `worksite_id`, `known_device_id`, `attendance_device_id`, `source` (`pwa`; `admin`, People's correction; `system`, an automatic clock-out, §6.14), `validation_state` (`accepted`, `review`, `rejected`), `validation` (evidence), `idempotency_key`, `attendance_policy_id` (to PR 1), `policy_version_id` (from PR 1, `1405`; a punch from before keeps its version in `attendance_policy_id`, the same id, since the table is append-only: read `COALESCE(policy_version_id, attendance_policy_id)`), `note`, `recorded_by`, `reason`, `slot` (`1380`: how many punches of its type that day, among the person's and People's, a decision had already excluded when it was written; 0 for the first) | Append-only: `slot` is written once, with the punch. Unique: one active (`accepted` or `review`) event of each type per person, work date and slot among the person's and People's punches (`1380`), so a punch People rejected keeps its row and its slot and the next takes the next slot, while two written at once still collide; one automatic clock-out per person per work date (`1360`), so People's correction stands beside the automatic one it replaces; one event per person per idempotency key |
 | `attendance_day` (1000, 1300, 1425) | `employee_id`, `attendance_date`, `status` (`present`, `late`, `absent`, `leave`, or none while nothing on an open day counts), `first_clock_in_at`, `last_clock_out_at`, `worked_minutes`, `late_minutes`, `early_minutes` (1425), `overtime_minutes`, `closed_at`; what judged it (1425): `policy_version_id` (the version its first clock-in was judged by, or for a day with none the version in force on its date when it closed; null for the type's defaults), `attendance_work_schedule_id` (the schedule in force, null for the company hours), `shift_working`, `shift_starts_at`, `shift_ends_at` (the shift it was judged against) and `judged_at` (when they were recorded: the first clock-in, or the day-close) | The projection, recalculated from the day's events in the punch's transaction and by the day-close job. A day is judged once (§6.4): once `judged_at` is set, a recalculation reads the recorded version (`policies.rulesOfVersion`) and shift, never a newer one |
 | `attendance_exception` (1000, 1300, 1310, 1360) | `attendance_day_id`, `attendance_event_id`, `exception_type` (`outside_worksite`, `outside_home`, `location_unverified`, `unknown_device`, `suspicious_timestamp`, `missing_clock_out`, `automatic_clock_out`: opened only when the person explains one, §6.14), `severity`, `status` (`open`, `resolved`), `outcome` (`accepted`, `rejected`, `corrected`), `evidence`, `employee_note`, `reviewed_by`, `reviewed_at`, `resolution` | One per event and type, one day-level `missing_clock_out` per day (partial unique indexes), so a retried job adds none |
 | `attendance_device` (1300) | `employee_id`, `known_device_id` (unique), `label`, `status` (`observed`, `registered`, `removed`), `first_seen_at`, `last_punch_at`, `registered_at`, `removed_at`, `removed_by`, `removal_reason` | Owned by `devices`. A device first seen on a punch is `observed`; the employee registers it; a removed one may be registered again. The device cookie and its hash never leave identity |
@@ -223,8 +223,10 @@ seeded and nothing was judged by it: a policy is MyCity's choice, A26). Nothing 
 device, a punch, a holiday, a coordinate or a policy is seeded (A26).
 
 From the four PRs (§1.2), each in its own part of the M1 block: PR 1's `1400`, `1405` and `1396`
-(`policies.md` §4); PR 2's `1380` (a rejected punch frees its slot) and a seed renaming Location
-Unverified to Location Unclear; PR 3's work schedules, rule breaches and pay items, from `1420`;
+(`policies.md` §4); PR 2's `migrations/1380_attendance_rejected_punch_slot.sql` (`attendance_event.slot`
+and the unique index a slot at a time, in place of `1360`'s one per day: a rejected punch frees its
+slot) and `seeds/reference/1397_seed_attendance_location_unclear.sql` (the `location_unverified`
+label `1390` seeded renamed Location Unclear, unless someone changed it); PR 3's work schedules, rule breaches and pay items, from `1420`;
 PR 4's `migrations/1450_attendance_temporary_site.sql` (the three site tables),
 `migrations/1455_workflow_instance_excluded.sql` (`workflow_instance.excluded_employee_ids`),
 `migrations/1460_attendance_check_in.sql` (the check-in, the exception's link to it and `1300`'s
@@ -382,9 +384,12 @@ punch's point is never sent to the provider.
 
 - Active events are `accepted` and `review` ones; a `rejected` event never changes the state.
 - **A punch People rejected stops counting and frees its slot** (PR 2): the guard, the open-shift
-  reads and the unique index count only punches no decision excluded, so after People reject a
-  clock-in the person can clock in again that day, and after they reject a clock-out People can add
-  the missing one. Before PR 2 an excluded punch kept its slot.
+  reads (today's state, the clock watch's open shifts, the roster) and the unique index count only
+  punches no decision excluded, so after People reject a clock-in the person can clock in again that
+  day, and after they reject a clock-out they clock out again while the shift is open, or People add
+  the missing one (§6.8). The index holds one punch a slot (`attendance_event.slot`, `1380`): the
+  rejected punch keeps its row and its slot, and the next takes the next. A clock-out that still
+  counts after its clock-in was rejected ends the day: another clock-in is `SHIFT_DONE`.
 - A clock-in is allowed when the work date has no active clock-in. Once the day has a clock-in and a
   clock-out, another clock-in is refused (`SHIFT_DONE`): one shift a day, as both donors run it. A
   check-in at a stop (§6.12) is not a punch and never touches the shift.
@@ -407,8 +412,8 @@ punch's point is never sent to the provider.
   middleware replays a finished request's stored answer. The key is also stored on the event, unique
   per person, so a replay the middleware no longer remembers (48 hours) still returns the original
   result instead of a second punch. A key sent with a different body is the middleware's 422, and
-  from PR 2 the same is true after 48 hours: a stored key whose event differs from the body (a clock
-  out sent with a clock in's key) is 422 `IDEMPOTENCY_KEY_REUSED`, never the old answer.
+  the same is true after 48 hours: a stored key whose event differs from the body (a clock out sent
+  with a clock in's key) is 422 `IDEMPOTENCY_KEY_REUSED`, never the old answer (PR 2).
 
 ### 6.4 Time
 
@@ -478,24 +483,34 @@ punch's point is never sent to the provider.
   - **outside** when `d - a > r`: even the nearest point the reading allows is beyond the fence;
   - **unclear** otherwise: the reading's circle crosses the fence (`edge`), or it is rougher than
     `max_accuracy_m` (`poor_accuracy`). Unclear is never proof of being elsewhere.
-  Before PR 2: inside by the centre point alone whatever the accuracy, and a missing accuracy passed.
-- No coordinates (denied, unavailable, timed out, unsupported, an insecure page) is `unverified` with
-  that reason.
+  The verdict of an unclear reading is `unverified`, with its reason (`judgeReading`). The rule applies
+  to whichever place judges the punch: a temporary site's nearest address, a field assignment's nearer
+  site, a home or a Temporary Home, an office.
+- No coordinates (denied, unavailable, timed out, unsupported, an insecure page: `LocationError`'s
+  `insecure`) is `unverified` with that reason.
 - **The modes** for the day's place (§6.1). Off: accepted, the verdict kept as evidence. Flag
   (`warn`): outside, unclear or unverified is `review`, with an `outside_worksite` (`outside_home`
   against a home) or `location_unverified` exception. Refuse (`block`): outside is `rejected` **and
-  opens its exception** (PR 2: People see every refused punch; before it a rejected punch opened
-  none); unclear and unverified are `review`.
+  opens its exception** (PR 2: People see every refused punch; its detail reads Refused); unclear and
+  unverified are `review`.
 - `location_unverified` reads **Location Unclear** on every screen (PR 2, seed `1397`), with its
   reason: no reading, rough reading, at the edge, no home, no office.
 - **The fix for a rough reading** (PR 2, the clock panel, T10): an accuracy beyond 1,000 m on a phone
   is a phone set to approximate location (iPhone: Precise Location off; Android: Approximate chosen),
-  and the panel says how to turn on precise location; on a computer, Use Your Phone; denied, how to
-  allow location in that browser; an insecure page, that the clock needs the secure address. Clock In
-  Anyway sends the punch to review as Location Unclear. One location reader serves the clock, the
-  home and the temporary site sheet (`app/src/features/attendance/location.ts`): it watches for up to
-  10 seconds and keeps the best fix (stopping early at 50 m or better), takes no cached position, and
-  always ends, so Not Now and the close button work while it reads.
+  and the panel says how to turn on precise location (Precise Location Off); on a computer, Use Your
+  Phone; denied, how to allow location in that browser (Location Blocked), and a location the browser
+  has already blocked skips the ask step; an insecure page, that the clock needs the secure address
+  (Secure Address Needed). A browser with no location, or an insecure page, offers no Retry: a new
+  reading cannot change it. Clock In Anyway sends what was read (a rough fix as it is, or why there was
+  none), which the server judges: unclear, it reaches People as Location Unclear. One location reader
+  serves the clock's punch and Check In and the home's Use This Location
+  (`app/src/features/attendance/location.ts`): it watches for up to 10 seconds and keeps the best fix
+  (stopping early at 50 m or better), takes no cached position (`maximumAge` 0), and always ends (a
+  watchdog: 10 seconds, or 30 for the browser's own question to be answered, then 10 from its answer),
+  so Not Now, Esc and the close button work while it reads, and closing the panel stops it. The
+  temporary site sheet reads a location only through `AddressField`'s own device-location fallback
+  (F27), which stays as it is. A page without `crypto.randomUUID` (an insecure one) still gets each
+  punch's Idempotency-Key (`newKey`).
 - The radius of a home and of a temporary site's address is at least 150 m on a new version (T9); a
   permanent site keeps its own radius (25 to 1,000 m).
 - A punch against a home keeps `worksite_id` empty (the roster, §6.9, and Home read it as remote);
@@ -515,7 +530,7 @@ punch's point is never sent to the provider.
 - First seen on a punch, it is recorded as `observed` (devices register even when the policy is
   `off`). Known means `registered`; `observed`, `removed` or no device is unknown.
 - `off`: accepted. `warn` (Flag): unknown is `review` with an `unknown_device` exception. `block`
-  (Refuse): unknown is `rejected`, and from PR 2 opens the exception too. The policy suggests Flag
+  (Refuse): unknown is `rejected`, and opens the exception too (PR 2). The policy suggests Flag
   (Cynthia agreed an unknown device is flagged, 13 October); the code's default stays `off` until a
   version sets it.
 - At most three registered devices per person (the 12 and 13 October meetings). Registering needs a
@@ -524,10 +539,12 @@ punch's point is never sent to the provider.
 ### 6.7 The result
 
 - The punch's result is the strictest of the geofence, the device and the time checks (`rejected`,
-  then `review`, then `accepted`). A rejected punch is recorded with its evidence and, from PR 2,
-  opens its exception (outside, or unknown device) so People see every refusal and it counts toward
-  the Location Flags rule (§6.16); the person punches again from the right place or device. Its
-  `reasons` name only the checks that refused it (PR 2; before it a time check could be named).
+  then `review`, then `accepted`). A rejected punch is recorded with its evidence and opens its
+  exception (outside, or unknown device; its evidence marked `refused`, its detail reading Refused) on
+  its day, whose figures it leaves as they were, so People see every refusal and it counts toward the
+  Location Flags rule (§6.16); the person punches again from the right place or device. Its `reasons`,
+  and so the exceptions it opens, name only the checks that refused it (a device clock ahead is not
+  among them). Nothing waits on the person: the panel's Review Required leaves a refused punch out.
 
 ### 6.8 Deciding an exception
 
@@ -543,11 +560,14 @@ punch's point is never sent to the provider.
   (§6.4), so the day's worked minutes, early departure, overtime and pay items follow it. `reject` is
   refused (422 `DECISION_INVALID`): it would leave the shift open.
 - An exception on a rejected punch (PR 2) takes `accept`, which keeps the refusal as it was and
-  records that People saw it, or `reject`, which marks the refusal itself as wrong for the record;
-  neither turns a refused punch into one that counts: the person punches again.
+  records that People saw it ("the refusal stands"), or `reject`, which marks the refusal itself as
+  wrong for the record ("the refusal is noted as wrong, and the punch still does not count"); neither
+  turns a refused punch into one that counts: the person punches again.
 - A rejected punch frees its slot (§6.2, PR 2): after rejecting a clock-in the person can clock in
-  again; after rejecting a clock-out, Add Clock-Out works, also on a day already closed, which it
-  reopens for recalculation.
+  again; after rejecting a clock-out the person clocks out again while the shift is open, or People
+  Add Clock-Out on its missing clock-out. On a day already closed the rejection opens that missing
+  clock-out at once, as the day-close would have (`openMissingClockOut`), and Add Clock-Out
+  recalculates the closed day, its pay items and its rule counts; the day stays closed.
 - **A check-in's exception** (PR 4, §6.12; the exception carries `attendance_check_in_id`) is decided
   on the same route. `accept` clears the flag; `reject` confirms it, so it still counts toward
   Location Flags (§6.16). Neither touches a punch or the day, which is not recalculated.
@@ -796,8 +816,9 @@ Owner decisions of 20/10/2026 (T11, T14), replacing work location requests and f
 
 - On a day the person is on an approved temporary site, once clocked in, the clock panel offers
   **Check In** (T12): one reading from the same location reader, sent to `POST /attendance/check-ins`
-  with an `Idempotency-Key` (`attendance.check-ins.js`). Until PR 2's location reader lands, the
-  panel reads with the home's `useReading`.
+  with an `Idempotency-Key` (`attendance.check-ins.js`). The press reads through the feature's one
+  location reader (`location.ts`, §6.5), as a punch does: the panel stays answerable while it reads,
+  and whatever it found (a fix, a rough one, or why there was none) is sent.
 - **Refused** only when it is not a check-in at all: 428 with no key; 422 `NO_TEMPORARY_SITE` on a day
   with no approved site the person is still on; 409 `NOT_CLOCKED_IN` with no shift open (today's, or
   yesterday's still open, whose site it then checks against); 422 `CHECK_IN_LIMIT` for the 21st of a
@@ -1177,6 +1198,7 @@ Owner decisions of 20/10/2026 (T4, T6). The items are settled in the same transa
 | `attendance.exception_explained` | The person explains an exception | Notifies `people` approve holders within scope |
 | `attendance.exception_decided` | People decide an exception | Notifies the person; realtime refresh |
 | `attendance.day_closed` | The day-close job closes a person's day | Audit; realtime refresh |
+| `attendance.day_reprojected` (PR 2) | Leave recorded or granted for a day already closed recalculates that day after commit (outbox `attendance.reproject_leave_days` on the leave module's `leave_request.recorded` and `leave_request.approved`, `reconcile.reprojectLeave`) | Audit; realtime refresh; the day's pay items follow it (a waived absence deduction tells the person, `attendance.pay_item_waived`) |
 | `attendance.export_requested` | My Attendance or the register asks for a workbook | Outbox `attendance.build_export`: gathered 25 at a time into the file the request reserved, which the screen that asked downloads; nothing is emailed, and the file is removed a day later |
 | `device.registered`, `device.removed` | My Devices, People · Devices | Notifies the person when People removed it |
 | `worksite.created`, `worksite.updated` | People · Worksites | Audit |
@@ -1339,7 +1361,9 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - Suspended login: auth refuses the session, so no punch arrives. Archived or left employee: 422
   `NOT_EMPLOYED`.
 - Approved leave covering the work date: clock-in and clock-out are refused with the leave's dates
-  (422 `ON_LEAVE`); the day is `leave`.
+  (422 `ON_LEAVE`); the day is `leave`. Leave is read on the punch's work date, resolved first (PR 2):
+  a clock-out after midnight that closes yesterday's shift is judged by yesterday, so a leave day
+  starting today does not refuse it.
 - No worksite on a day at the office (an Office day, or anyone with no schedule who is not remote):
   the punch is recorded with its reading and goes to review (`location_unverified`,
   `no_worksite`) under warn and block, accepted under off; the panel says No Office Assigned.
@@ -1515,6 +1539,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 21/10/2026 · TB · PR 2 built (clock fixes): the reading judged with its accuracy (`attendance.geofence.js` `judgeReading`: inside, outside when even its nearest point is beyond the fence, else unclear at the `edge` or `poor_accuracy`; no accuracy is `no_accuracy`), on whichever place judges the punch; Refuse opens the refused punch's exception (outside or unknown device, its detail Refused) and its `reasons` name only the checks that refused it; `location_unverified` reads Location Unclear (`1397`, `labels.ts`, the mock, the exports) with its reason; a punch People reject frees its slot (`1380`, `attendance_event.slot`; the guard, the open shifts and the roster count only what no decision excluded), a clock-out rejected on a closed day opens its missing clock-out for Add Clock-Out; leave read on the work date, and leave granted for a closed day re-projects it (`attendance.day_reprojected`); a stored key reused for the other punch after 48 hours is 422; `LocationError` gains `insecure`; `shared/geo`'s second geofence (`evaluateClockIn`) removed. The clock panel, Check In and the home read through one reader (`location.ts`: up to ten seconds, the best fix, a watchdog, the fix for the device: Precise Location Off, Use Your Phone, Location Blocked, Secure Address Needed). §1.2, §3, §4, §6.2 to §6.8, §6.12, §7 and §11 updated; §6.5 now says the temporary site sheet reads only through `AddressField`.
 - 21/10/2026 · TB · A temporary site's hours (owner decision, 21/10/2026; §4, §6.9, §6.11, §6.14,
   §10, §11): the sheet's first choice is Usual Shift or Site Hours with a start and an end. Site
   Hours set the shift of every day of the site for the people on it (`calendar.shiftOn`, and

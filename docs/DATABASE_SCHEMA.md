@@ -208,7 +208,11 @@ per reminder to clock in sent, unique per person, day and kind), the `automatic_
 type, and 1300's one-active index split in two: one active event of each type a day among the
 person's and People's punches, and one automatic clock-out (`source = 'system'`) a day beside it,
 so People's correction of its time is written next to it · `1394` Automatic Clock-Out in the code
-list · `1370` the attendance policy's versions: on `attendance_policy` its `status` (draft,
+list · `1380` a punch People reject frees its slot (attendance.md §6.2, PR 2): `attendance_event.slot`
+(how many punches of its type that day a decision had already excluded when it was written; 0 for
+the first, written once) and `1360`'s one-active index for the person's and People's punches made one
+a slot · `1397` the `location_unverified` label renamed Location Unclear (unless someone changed it) ·
+`1370` the attendance policy's versions: on `attendance_policy` its `status` (draft,
 published, withdrawn; at most one draft), `version` (never used twice), `effective_from`, `note`,
 who published or withdrew it and why, who saved it, and the location check per place
 (`office_geofence_mode`, `home_geofence_mode`, `site_geofence_mode`, taking a row's one
@@ -259,8 +263,8 @@ are read by nothing after `1405` and are dropped by a later release (MIGRATIONS 
 use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
-- Attendance (attendance.md §4, §13): the redesign's tables above (PR 2; PR 3's are built in `1420`
-  to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
+- Attendance (attendance.md §4, §13): the redesign's tables above are built (PR 2's in `1380` and
+  `1397`, PR 3's in `1420` to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
   `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
   their tables exist; dropping `attendance_location_request` and the field assignment tables once no
   request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)

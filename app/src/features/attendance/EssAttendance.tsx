@@ -12,7 +12,7 @@ import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useClock } from "./ClockButton";
 import { HomeLocationCard } from "./HomeLocation";
 import { AssignmentView, MyFieldAssignments, useAssignmentLink } from "./FieldAssignments";
-import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PAY_KIND, PUNCH_STATE, VERDICT, dayStatus, hours, lateBy, recentMonths } from "./labels";
+import { DEVICE_STATUS, DEVICE_STATUS_HELP, EXCEPTION_TYPE, PAY_KIND, PUNCH_STATE, UNCLEAR_HELP, dayStatus, hours, lateBy, locationShown, recentMonths } from "./labels";
 import { payColumns, payDetails } from "./PayItems";
 import { Banner, BarChart, Button, Card, CardHeader, DataView, ErrorState, ExportButton, Field, type FieldBinding, formatDate, formatDateTime, formatMonth, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, PageHeader, Pager, Pill, SegmentedControl, TextAreaField, TextField, TimeField, toast, todayIso, useConfirm, useContractForm, useIsPhone, useModal } from "@mycity/ui";
 import { DayRoute, MyTemporarySites } from "./TemporarySites";
@@ -154,7 +154,7 @@ export function MyAttendancePage() {
           onRowClick={explain}
           noun="exception"
           columns={[
-            { key: "t", label: "Exception", render: (x) => EXCEPTION_TYPE[x.exception_type] },
+            { key: "t", label: "Exception", render: (x) => (x.exception_type === "location_unverified" ? <HelpTerm help={UNCLEAR_HELP}>{EXCEPTION_TYPE[x.exception_type]}</HelpTerm> : EXCEPTION_TYPE[x.exception_type]) },
             { key: "d", label: "Date", render: (x) => formatDate(x.work_date) },
             { key: "w", label: "Detail", desktop: true, render: (x) => x.detail },
             { key: "n", label: "Your Note", render: (x) => (x.employee_note ? <Pill tone="ok">Sent</Pill> : <Pill tone="warn">Explain</Pill>) },
@@ -239,7 +239,7 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
         columns={[
           { key: "t", label: "Punch", render: (e: AttendanceEvent) => (e.event_type === "clock_in" ? "Clock In" : "Clock Out") },
           { key: "a", label: "Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
-          { key: "l", label: "Location", render: (e: AttendanceEvent) => (e.worksite_name ? `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}` : VERDICT[e.geofence]) },
+          { key: "l", label: "Location", render: (e: AttendanceEvent) => locationShown(e) },
           { key: "d", label: "Device", desktop: true, render: (e: AttendanceEvent) => e.device_label },
           {
             key: "r",

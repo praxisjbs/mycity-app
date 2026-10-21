@@ -11,7 +11,7 @@
 const workingWeek = require("../../shared/time/working-week");
 const geo = require("../../shared/geo/geo");
 const guard = require("./attendance.clock-guard");
-const { decideGeofence } = require("./attendance.geofence");
+const { decideGeofence, judgeReading } = require("./attendance.geofence");
 const lateness = require("./attendance.lateness");
 const rules = require("./attendance.rules");
 const { detailOf } = require("./attendance.reconcile");
@@ -57,6 +57,23 @@ describe("the clock guard", () => {
     expect(decide([ev("clock_in"), ev("clock_out", "rejected")], "clock_out")).toMatchObject({ allowed: true });
   });
 
+  test("a punch People rejected frees its slot: the person clocks in, or out, again", () => {
+    const excluded = (event_type) => ({ event_type, validation_state: "review", excluded: true });
+    expect(decide([excluded("clock_in")], "clock_in")).toMatchObject({ allowed: true });
+    expect(decide([excluded("clock_in")], "clock_out")).toMatchObject({ allowed: false, reason: "NOT_CLOCKED_IN" });
+    expect(decide([excluded("clock_in"), ev("clock_in")], "clock_in")).toMatchObject({ reason: "ALREADY_CLOCKED_IN" });
+    expect(decide([ev("clock_in"), excluded("clock_out")], "clock_out")).toMatchObject({ allowed: true });
+    expect(decide([ev("clock_in"), excluded("clock_out")], "clock_in")).toMatchObject({ reason: "ALREADY_CLOCKED_IN" });
+    expect(guard.isOpen([ev("clock_in"), excluded("clock_out")])).toBe(true);
+    expect(guard.isOpen([excluded("clock_in")])).toBe(false);
+  });
+
+  test("a clock-out still counting after its clock-in was rejected ends the day", () => {
+    const day = [{ event_type: "clock_in", validation_state: "review", excluded: true }, ev("clock_out")];
+    expect(decide(day, "clock_in")).toMatchObject({ allowed: false, reason: "SHIFT_DONE" });
+    expect(decide(day, "clock_out")).toMatchObject({ allowed: false, reason: "NOT_CLOCKED_IN" });
+  });
+
   test("an unknown action is refused, and the messages carry no dashes", () => {
     expect(decide([], "break")).toMatchObject({ allowed: false, reason: "INVALID_EVENT_TYPE" });
     for (const m of Object.values(guard.MESSAGES)) expect(m).not.toMatch(/[–—]|--/);
@@ -98,20 +115,81 @@ describe("the geofence", () => {
     expect(judge({ point })).toMatchObject({ verdict: "inside", result: "accepted" });
   });
 
-  test("outside: off accepts with the evidence, warn reviews, block rejects", () => {
+  test("outside: off accepts with the evidence, warn reviews, block rejects and opens the exception", () => {
     const point = north(340);
     expect(judge({ point, mode: "off" })).toMatchObject({ verdict: "outside", result: "accepted", exception: null, distance_m: 340 });
     expect(judge({ point, mode: "warn" })).toMatchObject({ verdict: "outside", result: "review", exception: "outside_worksite" });
-    expect(judge({ point, mode: "block" })).toMatchObject({ verdict: "outside", result: "rejected", exception: null });
+    expect(judge({ point, mode: "block" })).toMatchObject({ verdict: "outside", result: "rejected", exception: "outside_worksite" });
   });
 
   test("no reading (permission denied, unavailable) is unverified: reviewed under warn and block, never rejected", () => {
-    for (const location_error of ["denied", "unavailable", "timeout", "unsupported", null]) {
+    for (const location_error of ["denied", "unavailable", "timeout", "unsupported", "insecure", null]) {
       const warn = judge({ point: null, location_error, mode: "warn" });
       expect(warn).toMatchObject({ verdict: "unverified", reason: location_error || "no_location", result: "review", exception: "location_unverified", retry_location: true });
       expect(judge({ point: null, location_error, mode: "block" })).toMatchObject({ result: "review" });
       expect(judge({ point: null, location_error, mode: "off" })).toMatchObject({ result: "accepted", exception: null });
     }
+  });
+
+  test("the reading rule, every case: inside, outside, at the edge, too rough (judgeReading)", () => {
+    const r = (d, a) => judgeReading({ distance_m: d, accuracy_m: a, radius_m: 100, max_accuracy_m: 100 });
+    // Inside: the centre within the radius and the reading as fine as the policy asks, the boundaries included.
+    expect(r(40, 20)).toEqual({ verdict: "inside", reason: null });
+    expect(r(100, 20)).toEqual({ verdict: "inside", reason: null });
+    expect(r(100, 100)).toEqual({ verdict: "inside", reason: null });
+    // Outside: even the nearest point the reading allows is beyond the fence, however rough it is.
+    expect(r(130, 20)).toEqual({ verdict: "outside", reason: null });
+    expect(r(5000, 1500)).toEqual({ verdict: "outside", reason: null });
+    // Unclear at the edge: the circle crosses the fence; d - a exactly the radius is not outside.
+    expect(r(101, 20)).toEqual({ verdict: "unverified", reason: "edge" });
+    expect(r(120, 20)).toEqual({ verdict: "unverified", reason: "edge" });
+    expect(r(180, 80)).toEqual({ verdict: "unverified", reason: "edge" });
+    // Unclear and too rough: rougher than the policy's accuracy, inside the radius or across it.
+    expect(r(40, 101)).toEqual({ verdict: "unverified", reason: "poor_accuracy" });
+    expect(r(150, 1200)).toEqual({ verdict: "unverified", reason: "poor_accuracy" });
+  });
+
+  test("an edge reading is unclear: reviewed under warn and block, never refused, with its distance", () => {
+    for (const mode of ["warn", "block"])
+      expect(judge({ point: north(115), accuracy_m: 30, mode })).toMatchObject({
+        verdict: "unverified", reason: "edge", result: "review", exception: "location_unverified", distance_m: 115, retry_location: true,
+      });
+    expect(judge({ point: north(115), accuracy_m: 30, mode: "off" })).toMatchObject({ verdict: "unverified", reason: "edge", result: "accepted", exception: null });
+  });
+
+  test("a rough reading whose whole circle is beyond the fence is outside, and refused under block", () => {
+    expect(judge({ point: north(3000), accuracy_m: 1500, mode: "block" })).toMatchObject({
+      verdict: "outside", accuracy: "poor", result: "rejected", exception: "outside_worksite", distance_m: 3000,
+    });
+    expect(judge({ point: north(1200), accuracy_m: 1500, mode: "block" })).toMatchObject({ verdict: "unverified", reason: "poor_accuracy", result: "review" });
+  });
+
+  test("coordinates with no accuracy, or an accuracy of 0 or less, are no reading", () => {
+    for (const accuracy_m of [null, undefined, 0, -5]) {
+      const r = judge({ point: north(10), accuracy_m, mode: "block" });
+      expect(r).toMatchObject({
+        verdict: "unverified", reason: "no_accuracy", accuracy: null, distance_m: null, result: "review", exception: "location_unverified", retry_location: true,
+      });
+    }
+    expect(judge({ point: north(5000), accuracy_m: 0, mode: "block" })).toMatchObject({ verdict: "unverified", reason: "no_accuracy", result: "review" });
+  });
+
+  test("a temporary site's addresses: the nearest judges the punch under the reading rule; a Temporary Home is judged as a home", () => {
+    const a1 = { field_site_id: "loc-1", name: "Gaborone Hall", latitude: OFFICE.latitude, longitude: OFFICE.longitude, radius_m: 150 };
+    const a2 = { field_site_id: "loc-2", name: "Depot", latitude: OFFICE.latitude + 0.05, longitude: OFFICE.longitude, radius_m: 150 };
+    const SITE = {
+      kind: "temporary_site", place: "temporary_site", worksite_id: null, attendance_home_id: null, temporary_site_id: "ts-1",
+      name: "Partner Training", latitude: a1.latitude, longitude: a1.longitude, radius_m: null, sites: [a1, a2],
+    };
+    expect(judge({ expected: SITE, point: north(100) })).toMatchObject({ verdict: "inside", site_id: "loc-1", worksite_name: "Gaborone Hall", radius_m: 150, place: "temporary_site" });
+    expect(judge({ expected: SITE, point: north(160), accuracy_m: 30, mode: "block" })).toMatchObject({ verdict: "unverified", reason: "edge", result: "review", site_id: "loc-1" });
+    expect(judge({ expected: SITE, point: north(900), mode: "block" })).toMatchObject({ verdict: "outside", result: "rejected", exception: "outside_worksite", site_id: "loc-1" });
+    expect(judge({ expected: SITE, point: north(100), accuracy_m: 400 })).toMatchObject({ verdict: "unverified", reason: "poor_accuracy" });
+    const TEMP_HOME = { ...SITE, kind: "temporary_home", place: "temporary_home", name: "Temporary Home", sites: [{ ...a1, name: "Temporary Home" }] };
+    expect(judge({ expected: TEMP_HOME, point: north(900), mode: "block" })).toMatchObject({
+      verdict: "outside", result: "rejected", exception: "outside_home", outside: "outside_home", place: "temporary_home", worksite_id: null,
+    });
+    expect(judge({ expected: TEMP_HOME, point: north(160), accuracy_m: 30, mode: "warn" })).toMatchObject({ verdict: "unverified", reason: "edge", exception: "location_unverified" });
   });
 
   test("a reading worse than the policy's accuracy is unverified, with the distance kept; fair accuracy still counts", () => {
@@ -135,7 +213,7 @@ describe("the geofence", () => {
       verdict: "inside", place: "home", home_id: "h-1", worksite_id: null,
     });
     expect(judge({ work_pattern: "hybrid", home_day: true, expected: HOME, point: north(400), mode: "block" })).toMatchObject({
-      verdict: "outside", result: "rejected", outside: "outside_home",
+      verdict: "outside", result: "rejected", outside: "outside_home", exception: "outside_home",
     });
     expect(judge({ work_pattern: "hybrid", home_day: true, expected: null, mode: "block" })).toMatchObject({
       verdict: "unverified", reason: "no_home", result: "review", exception: "location_unverified",
@@ -163,8 +241,10 @@ describe("the geofence", () => {
       verdict: "inside", result: "accepted", place: "home", home_id: "h-1", worksite_id: null, worksite_name: "Home", distance_m: 60,
     });
     expect(remote({ point: north(100) })).toMatchObject({ verdict: "inside", result: "accepted" });
-    expect(remote({ point: north(101), mode: "warn" })).toMatchObject({ verdict: "outside", result: "review", exception: "outside_home", worksite_id: null });
-    expect(remote({ point: north(2500), mode: "block" })).toMatchObject({ verdict: "outside", result: "rejected", exception: null });
+    expect(remote({ point: north(130), mode: "warn" })).toMatchObject({ verdict: "outside", result: "review", exception: "outside_home", worksite_id: null });
+    expect(remote({ point: north(2500), mode: "block" })).toMatchObject({ verdict: "outside", result: "rejected", exception: "outside_home" });
+    // Just past the radius with a 20 m reading: the circle crosses the fence, so it is unclear.
+    expect(remote({ point: north(101), mode: "block" })).toMatchObject({ verdict: "unverified", reason: "edge", result: "review", exception: "location_unverified" });
     expect(remote({ point: null, location_error: "denied", mode: "block" })).toMatchObject({
       verdict: "unverified", result: "review", exception: "location_unverified", retry_location: true,
     });
@@ -523,6 +603,14 @@ describe("what a person reads", () => {
     ).toBe("Not counted: you were 420 m from the client's site.");
   });
 
+  test("a Location Unclear punch says why: a rough reading, at the edge, no reading", () => {
+    const unclear = (reason) => messageOf(row("review", ["location_unverified"], { geofence: { reason, distance_m: 115, worksite_name: "Testbed Office" } }));
+    expect(unclear("poor_accuracy")).toBe("Clocked in at 08:58. People will review it: your location reading was too rough.");
+    expect(unclear("edge")).toBe("Clocked in at 08:58. People will review it: your location reading was at the edge of the fence.");
+    expect(unclear("no_accuracy")).toBe("Clocked in at 08:58. People will review it: your location could not be checked.");
+    expect(unclear("denied")).toBe("Clocked in at 08:58. People will review it: your location could not be checked.");
+  });
+
   test("an exception's detail comes from its evidence", () => {
     expect(detailOf("outside_worksite", { distance_m: 340, worksite_name: "Testbed Office", radius_m: 100 })).toBe(
       "340 m from Testbed Office, radius 100 m",
@@ -538,8 +626,17 @@ describe("what a person reads", () => {
     expect(detailOf("outside_worksite", { distance_m: 420, place: "client_visit", worksite_name: "Client Visit", radius_m: 200 })).toBe(
       "420 m from the client's site, radius 200 m",
     );
-    expect(detailOf("location_unverified", { reason: "denied" })).toBe("No location: location was not shared");
-    expect(detailOf("location_unverified", { reason: "poor_accuracy", accuracy_m: 180.4 })).toBe("Reading accurate to 180 m");
+    expect(detailOf("location_unverified", { reason: "denied" })).toBe("No reading: location was not shared");
+    expect(detailOf("location_unverified", { reason: "no_accuracy" })).toBe("No reading: the reading had no accuracy");
+    expect(detailOf("location_unverified", { reason: "insecure" })).toBe("No reading: the page was not on its secure address");
+    expect(detailOf("location_unverified", { reason: "poor_accuracy", accuracy_m: 180.4 })).toBe("Rough reading: accurate to 180 m");
+    expect(detailOf("location_unverified", { reason: "edge", distance_m: 115, worksite_name: "Testbed Office", radius_m: 100, accuracy_m: 30 })).toBe(
+      "At the edge: 115 m from Testbed Office, radius 100 m, accurate to 30 m",
+    );
+    expect(detailOf("outside_worksite", { distance_m: 340, worksite_name: "Testbed Office", radius_m: 100, refused: true })).toBe(
+      "Refused: 340 m from Testbed Office, radius 100 m",
+    );
+    expect(detailOf("unknown_device", { device_label: "Chrome on Android", refused: true })).toBe("Refused: Unregistered device: Chrome on Android");
     expect(detailOf("unknown_device", { device_label: "Chrome on Android" })).toBe("Unregistered device: Chrome on Android");
     expect(detailOf("suspicious_timestamp", { skew_seconds: -540 })).toBe("Device clock 9 min ahead");
     expect(detailOf("missing_clock_out", { clock_in_at: "2026-10-16T07:58:00Z", timezone: TZ })).toBe("Clocked in 08:58, no clock-out");

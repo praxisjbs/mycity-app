@@ -1,4 +1,4 @@
-import type { AttendanceDay, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PayItem, PayItemKind, PayItemStatus, PunchState, RegisterStatus, SchedulePlace, CheckIn, TemporarySitePurpose, TemporarySiteState } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, AttendanceEvent, DeviceStatus, ExceptionType, FieldAssignmentState, GeofenceVerdict, HomeStatus, LocationRequestStatus, LocationRequestType, PayItem, PayItemKind, PayItemStatus, PunchState, RegisterStatus, SchedulePlace, CheckIn, TemporarySitePurpose, TemporarySiteState } from "@mycity/contract/contract.gen.ts";
 
 /**
  * The words and tones the attendance screens show for the API's values (docs/guides/attendance.md
@@ -29,12 +29,15 @@ export const dayStatus = (d: Pick<AttendanceDay, "status" | "late_minutes">): Sh
 export const EXCEPTION_TYPE: Record<ExceptionType, string> = {
   outside_worksite: "Outside Worksite",
   outside_home: "Outside Home",
-  location_unverified: "Location Unverified",
+  location_unverified: "Location Unclear",
   unknown_device: "Unknown Device",
   suspicious_timestamp: "Device Time Ahead",
   missing_clock_out: "Missing Clock-Out",
   automatic_clock_out: "System Clock-Out",
 };
+
+/** The help on Location Unclear, wherever an exception names it (§10.1). */
+export const UNCLEAR_HELP = "The reading could not prove where you were.";
 
 export const PUNCH_STATE: Record<PunchState, Shown> = {
   accepted: { tone: "ok", text: "Accepted" },
@@ -45,9 +48,18 @@ export const PUNCH_STATE: Record<PunchState, Shown> = {
 export const VERDICT: Record<GeofenceVerdict, string> = {
   inside: "Inside",
   outside: "Outside",
-  unverified: "Unverified",
+  unverified: "Unclear",
   not_applied: "Not Checked",
 };
+
+/** Why a location is unclear (§6.5); any other reason is no reading at all. */
+const UNCLEAR_WHY: Record<string, string> = { poor_accuracy: "rough reading", edge: "at the edge", no_home: "no home", no_worksite: "no office" };
+
+/** A punch's location as its day lists it: the verdict and distance, or Unclear with why. */
+export const locationShown = (e: Pick<AttendanceEvent, "geofence" | "location_reason" | "distance_m">) =>
+  e.geofence === "unverified"
+    ? `Unclear, ${UNCLEAR_WHY[e.location_reason ?? ""] ?? "no reading"}`
+    : `${VERDICT[e.geofence]}${e.distance_m !== null ? `, ${e.distance_m} m` : ""}`;
 
 /** New is a device seen on a punch and not registered (`observed`). */
 export const DEVICE_STATUS: Record<DeviceStatus, Shown> = {

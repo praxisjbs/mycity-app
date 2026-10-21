@@ -139,7 +139,7 @@ const words = (v) =>
 
 const LEAVE_STATUS = Object.freeze({ submitted: "Pending", approved: "Approved", rejected: "Rejected", cancelled: "Cancelled" });
 const PUNCH = Object.freeze({ clock_in: "Clock In", clock_out: "Clock Out" });
-const VERDICT = Object.freeze({ inside: "Inside", outside: "Outside", unverified: "Unverified", not_applied: "Not Judged" });
+const VERDICT = Object.freeze({ inside: "Inside", outside: "Outside", unverified: "Unclear", not_applied: "Not Judged" });
 const METHOD = Object.freeze({
   password: "Password",
   password_totp: "Password and Code",

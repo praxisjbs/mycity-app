@@ -450,14 +450,23 @@ describeDb("attendance against the real migrations", () => {
       expect(remote.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none" });
     });
 
-    test("block: outside is rejected, counts for nothing and opens nothing; inside and the boundary are accepted", async () => {
+    test("block: outside is rejected and counts for nothing, but opens its exception for People; inside and the boundary are accepted", async () => {
       await setPolicy("block", "off");
       const at = nextMorning();
       const out = await punchAt("staff", at, { ...north(340) });
       expect(out).toMatchObject({ validation_state: "rejected", reasons: ["outside_worksite"] });
       expect(out.message).toBe("Not counted: you were 340 m from Testbed Office.");
+      // Nothing waits on the person: the clock is as it was.
+      expect(out.today).toMatchObject({ state: "not_clocked_in", review: false });
       const date = at.slice(0, 10);
-      expect(await repo.getDay(pool, people.staff.employee.employee_id, date)).toBeNull();
+      expect(await repo.getDay(pool, people.staff.employee.employee_id, date)).toMatchObject({ status: null, first_clock_in_at: null });
+      const opened = await q("SELECT exception_type, status, evidence FROM attendance_exception WHERE attendance_event_id = $1", [
+        out.attendance_event_id,
+      ]);
+      expect(opened.rows).toHaveLength(1);
+      expect(opened.rows[0]).toMatchObject({ exception_type: "outside_worksite", status: "open", evidence: { refused: true, distance_m: 340 } });
+      const listed = await as("ops").get(`/attendance/exceptions?employee_id=${people.staff.employee.employee_id}&date=${date}`);
+      expect(listed.body.data.map((x) => x.detail)).toEqual(["Refused: 340 m from Testbed Office, radius 100 m"]);
       // The rejected attempt does not block the next try.
       const edge = await punchAt("staff", at.replace("07:00", "07:01"), { ...north(100) });
       expect(edge).toMatchObject({ validation_state: "accepted", distance_m: 100 });
@@ -489,6 +498,9 @@ describeDb("attendance against the real migrations", () => {
       const blocked = await punchAt("other", nextMorning());
       expect(blocked).toMatchObject({ validation_state: "rejected", reasons: ["unknown_device"] });
       expect(blocked.message).toBe("Not counted: this device is not registered.");
+      // Refused, and opened for People, as an outside punch under block is.
+      const opened = await q("SELECT exception_type, evidence FROM attendance_exception WHERE attendance_event_id = $1", [blocked.attendance_event_id]);
+      expect(opened.rows).toEqual([expect.objectContaining({ exception_type: "unknown_device", evidence: expect.objectContaining({ refused: true }) })]);
 
       const reg = await as("other").post("/devices/mine", { label: "Zainab's phone" });
       expect(reg.status).toBe(201);
@@ -1023,13 +1035,20 @@ describeDb("attendance against the real migrations", () => {
       const blocked = await punchAt("remote", D(6), home(2400));
       expect(blocked).toMatchObject({ validation_state: "rejected", reasons: ["outside_home"] });
       expect(blocked.message).toBe("Not counted: you were 2400 m from your approved home.");
+      // Just past the radius with a 15 m reading: unclear at the edge, reviewed, never refused.
+      const edge = await punchAt("remote", D(13), home(105));
+      expect(edge).toMatchObject({ validation_state: "review", reasons: ["location_unverified"] });
+      expect(edge.message).toBe("Clocked in at 08:00. People will review it: your location reading was at the edge of the fence.");
 
       await setPolicy("warn", "off");
       const warned = await punchAt("remote", D(7), home(400));
       expect(warned).toMatchObject({ validation_state: "review", reasons: ["outside_home"], distance_m: 400 });
       expect(warned.message).toBe("Clocked in at 08:00. People will review it: you were 400 m from your approved home.");
       const x = await as("ops").get(`/attendance/exceptions?employee_id=${people.remote.employee.employee_id}&exception_type=outside_home`);
-      expect(x.body.data.map((e) => e.detail)).toEqual(["400 m from the approved home, radius 100 m"]);
+      expect(x.body.data.map((e) => e.detail)).toEqual([
+        "400 m from the approved home, radius 100 m",
+        "Refused: 2400 m from the approved home, radius 100 m",
+      ]);
 
       // The register and the day name the home; the roster still reads the punch as remote.
       const reg = await as("ops").get("/attendance/register?date=2026-08-07&q=femi");
@@ -1617,6 +1636,204 @@ describeDb("attendance against the real migrations", () => {
       expect(office.body.data[0]).toMatchObject({ expected_location: "Testbed Office" });
       const detail = await as("ops").get(`/attendance/register/${musa()}?date=${friday}`);
       expect(detail.body.expected_location).toEqual({ name: "Home", radius_m: 100 });
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * Clock fixes (PR 2): a refused punch's exception, a rejected punch's slot, leave on the work date
+   * ---------------------------------------------------------------- */
+
+  describe("clock fixes", () => {
+    const zainab = () => people.other.employee.employee_id;
+    /** July 2026 weekdays, in the past and untouched by the cases above: 08:00 Lagos is 07:00Z. */
+    const J = (day) => `2026-07-${String(day).padStart(2, "0")}`;
+    const exceptionOf = async (eventId) =>
+      (await q("SELECT attendance_exception_id, exception_type, status, outcome FROM attendance_exception WHERE attendance_event_id = $1", [eventId])).rows;
+    const decide = (id, body) => as("ops").post(`/attendance/exceptions/${id}/decision`, body);
+
+    beforeAll(() => setPolicy("warn", "off"));
+
+    test("a refused punch names only the checks that refused it: a device clock ahead is not among them", async () => {
+      await setPolicy("block", "off");
+      const at = `${J(6)}T07:00:00Z`;
+      const ahead = new Date(Date.parse(at) + 5 * 60_000).toISOString();
+      const r = await punchAt("other", at, { ...north(400), device_at: ahead });
+      expect(r).toMatchObject({ validation_state: "rejected", reasons: ["outside_worksite"] });
+      expect((await exceptionOf(r.attendance_event_id)).map((x) => x.exception_type)).toEqual(["outside_worksite"]);
+      await setPolicy("warn", "off");
+    });
+
+    test("a refused punch's exception: accept keeps the refusal, reject marks it wrong, and neither makes it count", async () => {
+      await setPolicy("block", "off");
+      const first = await punchAt("other", `${J(7)}T07:00:00Z`, { ...north(500) });
+      const second = await punchAt("other", `${J(7)}T07:05:00Z`, { ...north(600) });
+      const [a] = await exceptionOf(first.attendance_event_id);
+      const [b] = await exceptionOf(second.attendance_event_id);
+      expect((await decide(a.attendance_exception_id, { decision: "accept", resolution: "Seen; the refusal stands" })).body).toMatchObject({ outcome: "accepted" });
+      expect((await decide(b.attendance_exception_id, { decision: "reject", resolution: "The fence was set wrong that day" })).body).toMatchObject({ outcome: "rejected" });
+      expect(await repo.getDay(pool, zainab(), J(7))).toMatchObject({ status: null, first_clock_in_at: null });
+      const states = await q("SELECT validation_state FROM attendance_event WHERE employee_id = $1 AND work_date = $2", [zainab(), J(7)]);
+      expect(states.rows.map((r) => r.validation_state)).toEqual(["rejected", "rejected"]);
+      await drain();
+      const told = await q(
+        `SELECT body FROM notification WHERE user_id = $1 AND event_key = 'attendance.exception_decided' AND body LIKE '07/07/2026%' ORDER BY created_at`,
+        [people.other.user.user_id],
+      );
+      expect(told.rows.map((r) => r.body)).toEqual([
+        "07/07/2026: the refusal stands.",
+        "07/07/2026: the refusal is noted as wrong, and the punch still does not count.",
+      ]);
+      await setPolicy("warn", "off");
+    });
+
+    test("a clock-in People reject frees its slot: the person clocks in again that day, and that one counts", async () => {
+      const first = await punchAt("other", `${J(8)}T07:00:00Z`, { ...north(400) });
+      expect(first).toMatchObject({ validation_state: "review", reasons: ["outside_worksite"] });
+      // Before the decision a second clock-in is refused.
+      await expect(punchAt("other", `${J(8)}T07:30:00Z`)).rejects.toMatchObject({ code: "ALREADY_CLOCKED_IN" });
+      const [x] = await exceptionOf(first.attendance_event_id);
+      expect((await decide(x.attendance_exception_id, { decision: "reject", resolution: "Not at the office at all" })).status).toBe(200);
+      expect(await repo.getDay(pool, zainab(), J(8))).toMatchObject({ status: null, first_clock_in_at: null });
+
+      const again = await punchAt("other", `${J(8)}T08:10:00Z`);
+      expect(again).toMatchObject({ validation_state: "accepted", work_date: J(8) });
+      expect(again.today).toMatchObject({ state: "clocked_in" });
+      const day = await repo.getDay(pool, zainab(), J(8));
+      expect(day).toMatchObject({ status: "late", late_minutes: 10 });
+      const slots = await q("SELECT slot FROM attendance_event WHERE employee_id = $1 AND work_date = $2 ORDER BY occurred_at", [zainab(), J(8)]);
+      expect(slots.rows.map((r) => r.slot)).toEqual([0, 1]);
+      // One row for her on the register and the roster, with the clock-in that counts.
+      const reg = await as("ops").get(`/attendance/register?date=${J(8)}&q=Zainab`);
+      expect(reg.body.data).toHaveLength(1);
+      expect(reg.body.data[0].clock_in_at).toBe(new Date(`${J(8)}T08:10:00Z`).toISOString());
+      const roster = require("../../src/modules/attendance/attendance.roster");
+      const rows = (await roster.page(pool, { date: J(8), q: "Zainab" }, { scope: "all", scope_ids: null }, { page: 1 })).data;
+      expect(rows.filter((r) => r.employee_id === zainab())).toHaveLength(1);
+      // A third clock-in is still one too many, and the backstop holds a slot at a time.
+      await expect(punchAt("other", `${J(8)}T08:20:00Z`)).rejects.toMatchObject({ code: "ALREADY_CLOCKED_IN" });
+      await expect(
+        q(
+          `INSERT INTO attendance_event (employee_id, event_type, occurred_at, work_date, source, validation_state, slot)
+           VALUES ($1, 'clock_in', now(), $2, 'pwa', 'accepted', 1)`,
+          [zainab(), J(8)],
+        ),
+      ).rejects.toMatchObject({ code: "23505" });
+    });
+
+    test("a clock-out People reject frees its slot: the person clocks out again while the shift is open", async () => {
+      await punchAt("other", `${J(9)}T07:00:00Z`);
+      const out = await punchAt("other", `${J(9)}T15:00:00Z`, { event_type: "clock_out", ...north(900) });
+      expect(out).toMatchObject({ validation_state: "review", reasons: ["outside_worksite"] });
+      const [x] = await exceptionOf(out.attendance_event_id);
+      expect((await decide(x.attendance_exception_id, { decision: "reject", resolution: "Clocked out from home instead" })).status).toBe(200);
+      const open = await punchAt("other", `${J(9)}T16:05:00Z`, { event_type: "clock_out" });
+      expect(open).toMatchObject({ validation_state: "accepted", work_date: J(9) });
+      expect(await repo.getDay(pool, zainab(), J(9))).toMatchObject({ worked_minutes: 9 * 60 + 5 });
+    });
+
+    test("a clock-out rejected on a day already closed opens its missing clock-out; Add Clock-Out recalculates the closed day", async () => {
+      await punchAt("other", `${J(10)}T07:00:00Z`);
+      const out = await punchAt("other", `${J(10)}T13:00:00Z`, { event_type: "clock_out", ...north(900) });
+      await reconcile.closeDay(zainab(), J(10));
+      const closed = await repo.getDay(pool, zainab(), J(10));
+      expect(closed.closed_at).not.toBeNull();
+      const missingNow = () =>
+        q("SELECT attendance_exception_id FROM attendance_exception WHERE attendance_day_id = $1 AND exception_type = 'missing_clock_out'", [
+          closed.attendance_day_id,
+        ]);
+      expect((await missingNow()).rows).toHaveLength(0);
+
+      const [x] = await exceptionOf(out.attendance_event_id);
+      expect((await decide(x.attendance_exception_id, { decision: "reject", resolution: "Left at 13:00 for no reason" })).status).toBe(200);
+      const missing = (await missingNow()).rows;
+      expect(missing).toHaveLength(1);
+      expect(await repo.getDay(pool, zainab(), J(10))).toMatchObject({ status: "present", worked_minutes: 0 });
+      // Her own clock-out the next morning no longer reaches a closed day; People add it.
+      await expect(punchAt("other", `${J(11)}T07:00:00Z`, { event_type: "clock_out" })).rejects.toMatchObject({ code: "NOT_CLOCKED_IN" });
+      const added = await decide(missing[0].attendance_exception_id, { decision: "add_clock_out", resolution: "Gate log shows 17:00", clock_out_time: "17:00" });
+      expect(added.status).toBe(200);
+      expect(added.body).toMatchObject({ outcome: "corrected" });
+      const day = await repo.getDay(pool, zainab(), J(10));
+      expect(day).toMatchObject({ worked_minutes: 9 * 60 });
+      expect(day.closed_at).not.toBeNull();
+      const outs = await q(
+        "SELECT source, slot FROM attendance_event WHERE employee_id = $1 AND work_date = $2 AND event_type = 'clock_out' ORDER BY occurred_at",
+        [zainab(), J(10)],
+      );
+      expect(outs.rows).toEqual([{ source: "pwa", slot: 0 }, { source: "admin", slot: 1 }]);
+      await drain();
+      const review = await q(
+        "SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND event_key = 'attendance.review_required' AND entity_id = $2",
+        [people.other.user.user_id, missing[0].attendance_exception_id],
+      );
+      expect(review.rows[0].n).toBe(1);
+    });
+
+    test("leave is read on the work date: a clock-out after midnight closes yesterday's shift on a leave day", async () => {
+      const annual = (await q("SELECT leave_type_id FROM leave_type WHERE code = 'annual'")).rows[0].leave_type_id;
+      await q(
+        `INSERT INTO leave_request (employee_id, leave_type_id, starts_on, ends_on, amount, status)
+         VALUES ($1, $2, $3, $3, 1, 'approved')`,
+        [zainab(), annual, J(14)],
+      );
+      // In at 20:00 Lagos on Monday 13 July, out at 00:40 on Tuesday the 14th, her leave day.
+      await punchAt("other", `${J(13)}T19:00:00Z`);
+      const out = await punchAt("other", `${J(13)}T23:40:00Z`, { event_type: "clock_out" });
+      expect(out).toMatchObject({ validation_state: "accepted", work_date: J(13) });
+      // A punch of the leave day itself is still refused.
+      await expect(punchAt("other", `${J(14)}T07:00:00Z`)).rejects.toMatchObject({ code: "ON_LEAVE" });
+    });
+
+    test("leave granted after its day closed absent re-projects the day: leave, its deduction waived", async () => {
+      await setRules({ absence_deduction: { on: true } });
+      const day = J(15);
+      await reconcile.closeDay(zainab(), day);
+      expect(await repo.getDay(pool, zainab(), day)).toMatchObject({ status: "absent" });
+      const annual = (await q("SELECT leave_type_id FROM leave_type WHERE code = 'annual'")).rows[0].leave_type_id;
+      const leave = (
+        await q(
+          `INSERT INTO leave_request (employee_id, leave_type_id, starts_on, ends_on, amount, status)
+           VALUES ($1, $2, $3, $3, 1, 'submitted') RETURNING leave_request_id`,
+          [zainab(), annual, day],
+        )
+      ).rows[0].leave_request_id;
+      // Its approval ends after the day: the leave module copies it on and emits leave_request.approved.
+      await require("../../src/modules/leave/leave.service").settle(leave, "approved");
+      await drain();
+      const after = await repo.getDay(pool, zainab(), day);
+      expect(after).toMatchObject({ status: "leave" });
+      expect(after.closed_at).not.toBeNull();
+      const items = await q("SELECT kind, status, reason FROM attendance_pay_item WHERE employee_id = $1 AND work_date = $2", [zainab(), day]);
+      for (const item of items.rows) expect(item).toMatchObject({ kind: "absence", status: "waived", reason: "Leave granted" });
+      const events = await q("SELECT count(*)::int AS n FROM event_log WHERE event_key = 'attendance.day_reprojected' AND entity_id = $1", [after.attendance_day_id]);
+      expect(events.rows[0].n).toBe(1);
+      // Run again, it changes nothing.
+      expect(await reconcile.reprojectLeave(leave)).toBe(1);
+      expect(await repo.getDay(pool, zainab(), day)).toMatchObject({ status: "leave" });
+      await setRules({ absence_deduction: { on: false } });
+    });
+
+    test("a stored key the middleware forgot, sent for the other punch, is refused, never answered with the first", async () => {
+      const idem = key();
+      const first = await punch("outsider", {}, idem);
+      expect(first.status).toBe(201);
+      await q("DELETE FROM idempotency_key WHERE key = $1", [idem]);
+      const reused = await punch("outsider", { event_type: "clock_out" }, idem);
+      expect(reused.status).toBe(422);
+      expect(reused.body.error.code).toBe("IDEMPOTENCY_KEY_REUSED");
+      const same = await punch("outsider", {}, idem);
+      expect(same.body).toMatchObject({ attendance_event_id: first.body.attendance_event_id, replayed: true });
+    });
+
+    test("coordinates with no accuracy are no reading: Location Unclear, reviewed, named as such for People", async () => {
+      await setPolicy("block", "off");
+      const r = await punchAt("other", `${J(16)}T07:00:00Z`, { accuracy_m: 0 });
+      expect(r).toMatchObject({ validation_state: "review", reasons: ["location_unverified"], distance_m: null });
+      const listed = await as("ops").get(`/attendance/exceptions?employee_id=${zainab()}&date=${J(16)}`);
+      expect(listed.body.data.map((x) => x.detail)).toEqual(["No reading: the reading had no accuracy"]);
+      const label = await q("SELECT label FROM reference_value WHERE domain = 'attendance_exception' AND code = 'location_unverified'");
+      expect(label.rows[0].label).toBe("Location Unclear");
+      await setPolicy("warn", "off");
     });
   });
 });

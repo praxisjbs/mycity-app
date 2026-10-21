@@ -42,7 +42,7 @@ const STATUS = Object.freeze({
 const VERDICT = Object.freeze({
   inside: "Inside",
   outside: "Outside",
-  unverified: "Unverified",
+  unverified: "Unclear",
   not_applied: "Not Judged",
 });
 

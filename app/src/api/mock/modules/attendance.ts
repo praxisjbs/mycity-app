@@ -40,7 +40,6 @@ const POLICY_MODES = {
     return inForceRules().max_accuracy_m;
   },
 };
-const GOOD_ACCURACY_M = 50;
 const FUTURE_TOLERANCE_S = 120;
 
 type Ev = AttendanceEvent & { key: string };
@@ -162,13 +161,23 @@ const SEVERITY: Record<ExceptionType, "low" | "medium" | "high"> = {
   missing_clock_out: "medium",
   automatic_clock_out: "low",
 };
+/** Why there was no reading at all, as an exception's detail says it (§6.5). */
 const LOCATION_REASON: Record<string, string> = {
   denied: "location was not shared",
   unavailable: "no location reading",
   timeout: "the location reading timed out",
   unsupported: "the device cannot share its location",
+  insecure: "the page was not on its secure address",
   no_location: "no location reading",
-  poor_accuracy: "the reading was not accurate enough",
+  no_accuracy: "the reading had no accuracy",
+};
+/** Why a location is unclear, inside the sentence the person reads; anything else is no reading. */
+const UNCLEAR_TEXT: Record<string, string> = {
+  no_home: "you have no approved home location yet",
+  no_worksite: "you have no office assigned yet",
+  poor_accuracy: "your location reading was too rough",
+  edge: "your location reading was at the edge of the fence",
+  insecure: "the clock was opened from an address that is not secure",
 };
 
 /* ------------------------------------------------------------------ *
@@ -453,7 +462,7 @@ function settle(key: string, date: string, d: Day, r: AttendanceRules, shift: Sh
     if (key === "bashir" && daysBack === 2) {
       inEv.validation_state = "review";
       Object.assign(inEv, { latitude: null, longitude: null, accuracy_m: null, distance_m: null, geofence: "unverified", location_reason: "denied", reasons: ["location_unverified"] });
-      addException(key, h.date, "location_unverified", inEv, "No location: location was not shared");
+      addException(key, h.date, "location_unverified", inEv, "No reading: location was not shared");
     }
     recompute(key, h.date);
   }
@@ -712,16 +721,14 @@ const GUARD_MESSAGES = {
   ALREADY_CLOCKED_OUT: "You have already clocked out.",
 } as const;
 
-function reasonText(code: ExceptionType, ev: Ev, accuracy: number | null) {
+function reasonText(code: ExceptionType, ev: Ev) {
   switch (code) {
     case "outside_worksite":
       return `you were ${ev.distance_m} m from ${ev.worksite_name === "Client Visit" ? "the client's site" : ev.worksite_name}`;
     case "outside_home":
       return `you were ${ev.distance_m} m from your approved home`;
     case "location_unverified":
-      if (ev.location_reason === "no_home") return "you have no approved home location yet";
-      if (ev.location_reason === "no_worksite") return "you have no office assigned yet";
-      return ev.location_reason === "poor_accuracy" && accuracy ? "your location reading was not accurate enough" : "your location could not be checked";
+      return UNCLEAR_TEXT[ev.location_reason ?? ""] ?? "your location could not be checked";
     case "unknown_device":
       return "this device is not registered";
     case "suspicious_timestamp":
@@ -735,7 +742,7 @@ function messageOf(ev: Ev) {
   const action = ev.event_type === "clock_in" ? "Clocked in" : "Clocked out";
   const at = formatTime(ev.occurred_at);
   if (ev.validation_state === "accepted") return `${action} at ${at}.`;
-  const why = ev.reasons.map((r) => reasonText(r, ev, ev.accuracy_m)).join(" and ");
+  const why = ev.reasons.map((r) => reasonText(r, ev)).join(" and ");
   if (ev.validation_state === "review") return `${action} at ${at}. People will review it: ${why}.`;
   return `Not counted: ${why}.`;
 }
@@ -763,7 +770,9 @@ route("POST /api/v1/attendance/punches", (req) => {
   const evs = activeOn(key, date);
   const hasIn = evs.some((e) => e.event_type === "clock_in");
   const hasOut = evs.some((e) => e.event_type === "clock_out");
-  if (b.event_type === "clock_in" && hasIn) return fail(409, hasOut ? "SHIFT_DONE" : "ALREADY_CLOCKED_IN", hasOut ? GUARD_MESSAGES.SHIFT_DONE : GUARD_MESSAGES.ALREADY_CLOCKED_IN);
+  // A punch People rejected no longer counts and frees its slot; a clock-out still counting ends the day.
+  if (b.event_type === "clock_in" && hasOut) return fail(409, "SHIFT_DONE", GUARD_MESSAGES.SHIFT_DONE);
+  if (b.event_type === "clock_in" && hasIn) return fail(409, "ALREADY_CLOCKED_IN", GUARD_MESSAGES.ALREADY_CLOCKED_IN);
   if (b.event_type === "clock_out" && !hasIn) return fail(409, "NOT_CLOCKED_IN", GUARD_MESSAGES.NOT_CLOCKED_IN);
   if (b.event_type === "clock_out" && hasOut) return fail(409, "ALREADY_CLOCKED_OUT", GUARD_MESSAGES.ALREADY_CLOCKED_OUT);
 
@@ -780,7 +789,8 @@ route("POST /api/v1/attendance/punches", (req) => {
   const site = fence && nearest ? { ...fence, name: nearest.name, latitude: nearest.latitude, longitude: nearest.longitude, radius_m: nearest.radius_m } : fence;
   const approvedDay = approvedDayOf(key);
   const point = b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
-  const accuracy = point && b.accuracy_m !== null ? (b.accuracy_m <= GOOD_ACCURACY_M ? "good" : b.accuracy_m <= POLICY_MODES.max_accuracy_m ? "fair" : "poor") : null;
+  // A reading with no accuracy, or one of 0 or less, is no reading (§6.5).
+  const measured = point !== null && b.accuracy_m !== null && b.accuracy_m > 0;
   let geofence: GeofenceVerdict;
   let locationReason: string | null = null;
   let distance: number | null = null;
@@ -788,36 +798,33 @@ route("POST /api/v1/attendance/punches", (req) => {
   else if (!site && (p.work_pattern === "remote" || homeDay(key, date))) [geofence, locationReason] = ["unverified", "no_home"];
   else if (!site) [geofence, locationReason] = ["unverified", "no_worksite"];
   else if (!point) [geofence, locationReason] = ["unverified", b.location_error || "no_location"];
+  else if (!measured) [geofence, locationReason] = ["unverified", "no_accuracy"];
   else {
+    // Inside within the radius and as fine as the policy asks; outside when even the reading's nearest point is beyond it; else unclear.
     distance = distanceM(point, site);
-    if (accuracy === "poor") [geofence, locationReason] = ["unverified", "poor_accuracy"];
-    else geofence = distance <= (site.radius_m ?? 0) ? "inside" : "outside";
+    const a = b.accuracy_m!;
+    const r = site.radius_m ?? 0;
+    if (distance <= r && a <= POLICY_MODES.max_accuracy_m) geofence = "inside";
+    else if (distance - a > r) geofence = "outside";
+    else [geofence, locationReason] = ["unverified", a > POLICY_MODES.max_accuracy_m ? "poor_accuracy" : "edge"];
   }
-  const reasons: ExceptionType[] = [];
+  // Each check that did not accept, with its own result: a refused punch names only those that refused it.
+  const checks: Array<{ type: ExceptionType; result: PunchState }> = [];
   const mode = POLICY_MODES.geofence_mode as string;
-  let fenceResult: PunchState = "accepted";
-  if (mode !== "off" && geofence === "outside") {
-    fenceResult = mode === "block" ? "rejected" : "review";
-    reasons.push(site?.kind === "worksite" || site?.kind === "field" || site?.kind === "client_visit" || site?.kind === "temporary_site" ? "outside_worksite" : "outside_home");
-  } else if (mode !== "off" && geofence === "unverified") {
-    fenceResult = "review";
-    reasons.push("location_unverified");
-  }
+  if (mode !== "off" && geofence === "outside")
+    checks.push({
+      type: site?.kind === "worksite" || site?.kind === "field" || site?.kind === "client_visit" || site?.kind === "temporary_site" ? "outside_worksite" : "outside_home",
+      result: mode === "block" ? "rejected" : "review",
+    });
+  else if (mode !== "off" && geofence === "unverified") checks.push({ type: "location_unverified", result: "review" });
   const dev = sessionDevice(key);
   const known = dev.status === "registered";
   const deviceMode = POLICY_MODES.device_mode as string;
-  let deviceResult: PunchState = "accepted";
-  if (deviceMode !== "off" && !known) {
-    deviceResult = deviceMode === "block" ? "rejected" : "review";
-    reasons.push("unknown_device");
-  }
+  if (deviceMode !== "off" && !known) checks.push({ type: "unknown_device", result: deviceMode === "block" ? "rejected" : "review" });
   const skew = Math.round((Date.parse(now) - Date.parse(b.device_at)) / 1000);
-  let timeResult: PunchState = "accepted";
-  if (skew < -FUTURE_TOLERANCE_S) {
-    timeResult = "review";
-    reasons.push("suspicious_timestamp");
-  }
-  const state = strictest(fenceResult, deviceResult, timeResult);
+  if (skew < -FUTURE_TOLERANCE_S) checks.push({ type: "suspicious_timestamp", result: "review" });
+  const state = strictest("accepted", ...checks.map((c) => c.result));
+  const reasons = checks.filter((c) => state !== "rejected" || c.result === "rejected").map((c) => c.type);
   const ev: Ev = {
     key,
     attendance_event_id: sid(`event:${key}:${now}`),
@@ -845,28 +852,29 @@ route("POST /api/v1/attendance/punches", (req) => {
   };
   EVENTS.push(ev);
   dev.last_punch_at = now;
-  if (state !== "rejected") {
-    for (const r of reasons) {
-      const detail =
-        r === "outside_worksite"
-          ? `${distance} m from ${site!.kind === "client_visit" ? "the client's site" : site!.name}, radius ${site!.radius_m} m`
-          : r === "outside_home"
-            ? `${distance} m from the ${site!.kind === "temporary_home" ? "temporary" : "approved"} home, radius ${site!.radius_m} m`
-          : r === "location_unverified"
-            ? locationReason === "no_home"
-              ? "No approved home"
-              : locationReason === "no_worksite"
-              ? "No office assigned"
-              : locationReason === "poor_accuracy" && b.accuracy_m
-              ? `Reading accurate to ${Math.round(b.accuracy_m)} m`
-              : `No location: ${LOCATION_REASON[locationReason ?? ""] ?? "no location reading"}`
-            : r === "unknown_device"
-              ? `Unregistered device: ${dev.label}`
-              : `Device clock ${Math.max(1, Math.round(Math.abs(skew) / 60))} min ahead`;
-      addException(key, date, r, ev, detail);
-    }
-    recompute(key, date);
+  // A refused punch counts for nothing but opens its exception, so People see every refusal (§6.7).
+  for (const r of reasons) {
+    const detail =
+      r === "outside_worksite"
+        ? `${distance} m from ${site!.kind === "client_visit" ? "the client's site" : site!.name}, radius ${site!.radius_m} m`
+        : r === "outside_home"
+          ? `${distance} m from the ${site!.kind === "temporary_home" ? "temporary" : "approved"} home, radius ${site!.radius_m} m`
+        : r === "location_unverified"
+          ? locationReason === "no_home"
+            ? "No approved home"
+            : locationReason === "no_worksite"
+            ? "No office assigned"
+            : locationReason === "poor_accuracy" && b.accuracy_m
+            ? `Rough reading: accurate to ${Math.round(b.accuracy_m)} m`
+            : locationReason === "edge"
+            ? `At the edge: ${distance} m from ${site!.name}, radius ${site!.radius_m} m, accurate to ${Math.round(b.accuracy_m!)} m`
+            : `No reading: ${LOCATION_REASON[locationReason ?? ""] ?? "no location reading"}`
+          : r === "unknown_device"
+            ? `Unregistered device: ${dev.label}`
+            : `Device clock ${Math.max(1, Math.round(Math.abs(skew) / 60))} min ahead`;
+    addException(key, date, r, ev, state === "rejected" ? `Refused: ${detail}` : detail);
   }
+  recompute(key, date);
   const result: PunchResult = {
     attendance_event_id: ev.attendance_event_id,
     event_type: ev.event_type,

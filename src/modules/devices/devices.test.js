@@ -17,10 +17,10 @@ describe("the device decision", () => {
       expect(judge({ mode })).toEqual({ state: "registered", known: true, reason: null, result: "accepted", exception: null });
   });
 
-  test("an unregistered device: off accepts, warn reviews, block rejects", () => {
+  test("an unregistered device: off accepts, warn reviews, block rejects and opens the exception", () => {
     expect(judge({ mode: "off", status: "observed" })).toMatchObject({ known: false, result: "accepted", exception: null });
     expect(judge({ mode: "warn", status: "observed" })).toMatchObject({ known: false, result: "review", exception: "unknown_device", reason: "not_registered" });
-    expect(judge({ mode: "block", status: "observed" })).toMatchObject({ known: false, result: "rejected", exception: null });
+    expect(judge({ mode: "block", status: "observed" })).toMatchObject({ known: false, result: "rejected", exception: "unknown_device" });
   });
 
   test("a device seen for the first time is unknown, named new", () => {
