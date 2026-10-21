@@ -30,7 +30,8 @@
  *   zone       the worksite's timezone, else Africa/Lagos (a home has none of its own)
  *   shift      the person's own (§6.13, rules.shiftFor): their work schedule in force for that
  *              weekday, else the company hours (the policy's `hours`, else the working week of
- *              Settings · Organisation), the policy's grace, and whether the day is worked at all
+ *              Settings · Organisation), the policy's grace, and whether the day is worked at all;
+ *              on a day of a temporary site with its own hours, the site's (§6.11)
  */
 const workingWeek = require("../../shared/time/working-week");
 const lagos = require("../../shared/time/lagos");
@@ -85,10 +86,12 @@ async function companyHoursBetween(db, from, to) {
 async function shiftOn(db, person, date, { policy = null, calendar: cal = null } = {}) {
   const rulesThen = policy || (await policyFor(db, person.employee_id, date));
   const schedule = await repo.workScheduleOn(db, person.employee_id, date);
-  return rules.shiftFor(date, cal || (await workingWeek.loadCalendar(db)), rulesThen, {
+  const shift = rules.shiftFor(date, cal || (await workingWeek.loadCalendar(db)), rulesThen, {
     schedule,
     pattern: person.work_pattern,
   });
+  // A temporary site with its own hours sets the day: worked, from its start to its end (§6.11).
+  return temporarySites.siteShift(await temporarySites.siteOn(db, person.employee_id, date), shift);
 }
 
 /** Whether a shift's date is worked from home: a Remote day, or with no working day a remote pattern. */

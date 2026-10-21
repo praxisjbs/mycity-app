@@ -161,6 +161,9 @@ async function create(user, body, { direct }) {
       description: body.description,
       starts_on: body.starts_on,
       ends_on: body.ends_on,
+      hours: body.hours || "usual",
+      starts_at: body.starts_at || null,
+      ends_at: body.ends_at || null,
       status,
       submitted_by: user.user_id,
       approved_by: direct ? user.user_id : null,
@@ -483,6 +486,16 @@ function nameOfAddress(site, location) {
 }
 
 /**
+ * A person's shift on a day of a site (§6.11): with Site Hours, worked from its start to its end
+ * whatever their schedule or the company hours say, the policy's grace kept; on the Usual Shift,
+ * their own shift unchanged. Pure; calendar.shiftOn and the day's judgement apply it.
+ */
+function siteShift(site, shift) {
+  if (!site || site.hours !== "site") return shift;
+  return { ...shift, working_day: true, starts_at: site.starts_at, ends_at: site.ends_at, off_reason: null };
+}
+
+/**
  * A site's day as the clock judges it (§6.5, §6.11): its addresses through decideGeofence's `sites`
  * (each address's id as `field_site_id`, reported as `site_id`), judged with the site's mode, or a
  * home's for a Temporary Home, in its first address's zone. Pure.
@@ -582,6 +595,7 @@ module.exports = {
   getMine,
   present,
   nameOfAddress,
+  siteShift,
   contextOf,
   todayOf,
   zoneAt,

@@ -64,12 +64,22 @@ function companyDay(weekday: number, r: AttendanceRules): Hours {
   return { working: true, starts_at: "09:00", ends_at: weekday === 6 ? "15:00" : "17:00" };
 }
 
+type DayShift = { working_day: boolean; starts_at: string | null; ends_at: string | null; grace_minutes: number; off_reason: string | null };
+/**
+ * A temporary site's own hours for a person's day (§6.11), or null. Set once the sites below are
+ * built: the demonstration history, worked out before them, has none.
+ */
+let siteShift: (key: string, date: string) => DayShift | null = () => null;
+
 /**
  * A day's shift (§6.13): the person's work schedule in force that day, else the company hours of
  * the policy version in force then; with no person, the company hours. A schedule's working day
  * with no times takes the company hours, and is Off when they do not work it.
  */
-export function shiftOf(date: string, key?: string) {
+export function shiftOf(date: string, key?: string): DayShift {
+  // A temporary site with its own hours sets the day (§6.11).
+  const site = key ? siteShift(key, date) : null;
+  if (site) return site;
   const r = attendanceRulesOn(date);
   const company = companyDay(weekdayOf(date), r);
   const d = key ? scheduleOn(key, date)?.days[weekdayOf(date) - 1] : undefined;
@@ -1438,6 +1448,7 @@ type Purpose = TemporarySite["purpose"];
 type MockLoc = { id: string; position: number; name: string | null; address: string; latitude: number; longitude: number; radius_m: number; timezone: string };
 type MockTemp = {
   id: string; number: string; purpose: Purpose; name: string; description: string; starts_on: string; ends_on: string; status: TemporarySite["status"];
+  hours: TemporarySite["hours"]; starts_at: string | null; ends_at: string | null;
   locations: MockLoc[]; by: string; submitted_at: string; wid: string | null; approved_at: string | null; approved_by: string | null;
   cancelled_at: string | null; cancel_reason: string | null;
   members: Array<{ key: string; added_at: string; removed_at: string | null; removed_reason: string | null }>;
@@ -1450,12 +1461,12 @@ const spanOf = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00
 const loc = (n: number, name: string | null, address: string, latitude: number, longitude: number, radius_m: number, timezone = TZ): MockLoc => ({
   id: sid(`ts-loc:${tempSeq + 1}:${n}`), position: n, name, address, latitude, longitude, radius_m, timezone,
 });
-const addTemp = (t: Omit<MockTemp, "id" | "number" | "wid" | "members" | "trail" | "approved_at" | "approved_by" | "cancelled_at" | "cancel_reason"> & Partial<MockTemp> & { keys: string[] }) => {
+const addTemp = (t: Omit<MockTemp, "id" | "number" | "wid" | "members" | "trail" | "approved_at" | "approved_by" | "cancelled_at" | "cancel_reason" | "hours" | "starts_at" | "ends_at"> & Partial<MockTemp> & { keys: string[] }) => {
   tempSeq += 1;
   const { keys, ...rest } = t;
   const row: MockTemp = {
     id: sid(`ts:${tempSeq}`), number: `TS-${String(tempSeq).padStart(4, "0")}`, wid: t.by === "cynthia" && t.status === "approved" ? null : sid(`ts-flow:${tempSeq}`),
-    approved_at: null, approved_by: null, cancelled_at: null, cancel_reason: null, trail: [],
+    approved_at: null, approved_by: null, cancelled_at: null, cancel_reason: null, trail: [], hours: "usual", starts_at: null, ends_at: null,
     members: keys.map((key) => ({ key, added_at: t.submitted_at, removed_at: null, removed_reason: null })), ...rest,
   };
   TEMP.unshift(row);
@@ -1473,6 +1484,12 @@ const addTemp = (t: Omit<MockTemp, "id" | "number" | "wid" | "members" | "trail"
 const onSite = (t: MockTemp, key: string) => t.members.some((m) => m.key === key && !m.removed_at);
 /** The approved site a person is still on, covering a day (one a day). */
 const siteOn = (key: string, date: string) => TEMP.find((t) => t.status === "approved" && t.starts_on <= date && t.ends_on >= date && onSite(t, key)) ?? null;
+siteShift = (key, date) => {
+  const t = siteOn(key, date);
+  return t && t.hours === "site" && t.starts_at && t.ends_at
+    ? { working_day: true, starts_at: t.starts_at, ends_at: t.ends_at, grace_minutes: attendanceRulesOn(date).grace_minutes, off_reason: null }
+    : null;
+};
 /** An address's name on the punch and the check-in: Temporary Home, the site's name, or the site and the address's label. */
 const nameOfAddress = (t: MockTemp, l: MockLoc) => (t.purpose === "temporary_home" ? "Temporary Home" : t.locations.length === 1 ? t.name : `${t.name}, ${l.name ?? `Address ${l.position}`}`);
 const tempState = (t: MockTemp): TemporarySite["state"] => {
@@ -1493,7 +1510,7 @@ const tempOut = (t: MockTemp, user: string): TemporarySite => {
   const place = !home || t.members.some((m) => m.key === user) || t.by === user || g.all;
   return {
     temporary_site_id: t.id, number: t.number, purpose: t.purpose, name: t.name, description: t.description, starts_on: t.starts_on, ends_on: t.ends_on,
-    days: spanOf(t.starts_on, t.ends_on), status: t.status, state: tempState(t),
+    days: spanOf(t.starts_on, t.ends_on), hours: t.hours, starts_at: t.starts_at, ends_at: t.ends_at, status: t.status, state: tempState(t),
     locations: t.locations.map((l) => ({
       temporary_site_location_id: l.id, position: l.position, name: l.name, radius_m: l.radius_m, timezone: l.timezone,
       address: home ? null : l.address, latitude: home ? null : l.latitude, longitude: home ? null : l.longitude,
@@ -1525,8 +1542,17 @@ function todaySite(key: string, date: string): AttendanceToday["temporary_site"]
 
 /** Add Work Site and Add Temporary Site: the contract's checks the API makes, then the site. */
 function createTemp(user: string, body: unknown, direct: boolean) {
-  const b = body as { purpose?: Purpose; name?: string; description?: string; starts_on?: string; ends_on?: string; locations?: Array<{ address?: unknown; name?: string; radius_m?: number }>; employee_ids?: string[] };
+  const b = body as {
+    hours?: TemporarySite["hours"]; starts_at?: string | null; ends_at?: string | null;
+    purpose?: Purpose; name?: string; description?: string; starts_on?: string; ends_on?: string; locations?: Array<{ address?: unknown; name?: string; radius_m?: number }>; employee_ids?: string[];
+  };
   const fields: Record<string, string[]> = {};
+  const hours = b.hours ?? "usual";
+  if (hours === "site") {
+    if (!b.starts_at) fields.starts_at = ["Pick a start"];
+    if (!b.ends_at) fields.ends_at = ["Pick an end"];
+    else if (b.starts_at && b.ends_at <= b.starts_at) fields.ends_at = ["Ends before it starts"];
+  } else if (b.starts_at || b.ends_at) fields.starts_at = ["Only for Site Hours"];
   if (!b.purpose) fields.purpose = ["Choose one"];
   if (!b.name || b.name.trim().length < 3) fields.name = ["At least 3 characters"];
   if (!b.description || b.description.trim().length < 30) fields.description = ["At least 30 characters"];
@@ -1558,6 +1584,7 @@ function createTemp(user: string, body: unknown, direct: boolean) {
   const now = new Date().toISOString();
   const t = addTemp({
     keys, by: user, purpose: b.purpose!, name: b.name!.trim(), description: b.description!.trim(), starts_on: b.starts_on!, ends_on: b.ends_on!,
+    hours, starts_at: hours === "site" ? b.starts_at! : null, ends_at: hours === "site" ? b.ends_at! : null,
     status: direct ? "approved" : "submitted", submitted_at: now, ...(direct && { approved_at: now, approved_by: user }),
     locations: locs.map((x, i) => loc(i + 1, x.name?.trim() || null, picked[i]!.line, picked[i]!.view.lat!, picked[i]!.view.lon!, x.radius_m!)),
   });

@@ -41,6 +41,7 @@ const guard = require("./attendance.clock-guard");
 const reconcile = require("./attendance.reconcile");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const sites = require("./attendance.sites");
 const { EVENTS } = require("./attendance.events");
 
 /** How long after the start a reminder to clock in may still go out. */
@@ -143,7 +144,8 @@ async function remind({ now = new Date() } = {}) {
     const person = await repo.person(pool, employeeId);
     if (!person) continue;
     const shift = await calendar.shiftOn(pool, person, today, { policy, calendar: cal });
-    const start = shiftStart(today, shift, calendar.zoneOf(person));
+    // A temporary site's start is on the site's own clock (§6.11).
+    const start = shiftStart(today, shift, await sites.zoneAt(pool, person, now, calendar.zoneOf(person)));
     if (!start || now < start || now.getTime() - start.getTime() >= REMIND_WINDOW_MIN * 60_000) continue;
     const seen = await active.activity(userIds, now.getTime());
     if (seen.known && seen.active) {

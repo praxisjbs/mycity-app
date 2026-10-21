@@ -781,7 +781,7 @@ describe("the routes", () => {
       ["POST", "/me/temporary-sites/:id/withdraw"], ["POST", "/check-ins"], ["GET", "/me/check-ins"]])
       expect(by(method, path).contract.self).toBe(true);
     expect(Object.keys(shapeOf(by("POST", "/me/temporary-sites").contract.body)).sort()).toEqual([
-      "description", "employee_ids", "ends_on", "locations", "name", "purpose", "starts_on",
+      "description", "employee_ids", "ends_at", "ends_on", "hours", "locations", "name", "purpose", "starts_at", "starts_on",
     ]);
     expect(routes.some((r) => /decision|approve/.test(r.path) && r.path.startsWith("/temporary-sites"))).toBe(false);
   });
@@ -976,5 +976,25 @@ describe("the Attendance policy's rules", () => {
     ]);
     // Every sentence a person reads keeps to 20 words (FRONTEND_GUIDE §5.3).
     for (const mode of ["off", "warn", "block"]) for (const t of site(mode)) expect(t.split(/\s+/).length).toBeLessThanOrEqual(20);
+  });
+});
+
+describe("a temporary site's hours (§6.11)", () => {
+  const { siteShift } = require("./attendance.sites");
+  const sunday = { working_day: false, starts_at: null, ends_at: null, grace_minutes: 10, early_grace_minutes: 5, off_reason: "Off", place: null, attendance_work_schedule_id: null };
+
+  test("Site Hours make the day worked from its start to its end, the policy's grace kept", () => {
+    expect(siteShift({ hours: "site", starts_at: "11:00", ends_at: "15:00" }, sunday)).toEqual({
+      ...sunday,
+      working_day: true,
+      starts_at: "11:00",
+      ends_at: "15:00",
+      off_reason: null,
+    });
+  });
+
+  test("the Usual Shift, or no site, keeps the person's own shift", () => {
+    expect(siteShift({ hours: "usual", starts_at: null, ends_at: null }, sunday)).toBe(sunday);
+    expect(siteShift(null, sunday)).toBe(sunday);
   });
 });

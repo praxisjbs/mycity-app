@@ -239,7 +239,9 @@ append-only: its point, accuracy, matched address, distance, verdict, evidence a
 unique per person and Idempotency-Key), `attendance_exception.attendance_check_in_id` (a flag a
 check-in opened), and `1300`'s day index narrowed to exceptions of neither a punch nor a check-in ·
 `1470` the `temporary_site` numbering scheme and version 1 of the `attendance.temporary_site`
-approval (Operations & People, 48 hours).
+approval (Operations & People, 48 hours) · `1475` a temporary site's hours: `hours` (`usual`, `site`),
+`starts_at` and `ends_at` on `attendance_temporary_site`, both for Site Hours with the end after the
+start, neither for the Usual Shift.
 
 Home claims `1150` to `1159` and `1199` in this block (TB, 17/10/2026); attendance, devices and the
 other M1 modules take numbers outside them. The organogram takes `1160` to `1169` (TB, 19/10/2026). The
@@ -258,7 +260,7 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 
 **Owes:**
 - Attendance (attendance.md §4, §13): the redesign's tables above (PR 2; PR 3's are built in `1420`
-  to `1445`, PR 4's places in `1450` to `1470`); the foreign keys of
+  to `1445`, PR 4's places in `1450` to `1475`); the foreign keys of
   `attendance_rule_breach.employee_query_id` (M3) and `attendance_pay_item.payroll_run_id` (M6) once
   their tables exist; dropping `attendance_location_request` and the field assignment tables once no
   request or assignment made before PR 4 is still read, and `attendance_schedule` (frozen by `1420`)
