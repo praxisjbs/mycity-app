@@ -59,8 +59,7 @@ async function tx(fn) {
   }
 }
 
-const notFound = () =>
-  new AppError("NOT_FOUND", "That exception does not exist", 404);
+const notFound = () => new AppError("NOT_FOUND", "That exception does not exist", 404);
 
 /** The punches that count for the day: active, and not excluded by a decision. */
 const counted = (events) => events.filter((e) => !e.excluded);
@@ -72,53 +71,20 @@ const counted = (events) => events.filter((e) => !e.excluded);
  * now (`record`); else, not yet judged, what is in force on the date.
  * @returns {Promise<{rules: object, policy_version_id: string|null, shift: object, record: object|null}>}
  */
-async function judgementOf(
-  client,
-  person,
-  date,
-  { existing, events, close, ctx },
-) {
+async function judgementOf(client, person, date, { existing, events, close, ctx }) {
   if (existing && existing.judged_at) {
-    const v = await policies.rulesOfVersion(
-      client,
-      "attendance",
-      existing.policy_version_id,
-    );
-    return {
-      rules: v.rules,
-      policy_version_id: existing.policy_version_id,
-      shift: rules.recordedShift(existing, v.rules),
-      record: null,
-    };
+    const v = await policies.rulesOfVersion(client, "attendance", existing.policy_version_id);
+    return { rules: v.rules, policy_version_id: existing.policy_version_id, shift: rules.recordedShift(existing, v.rules), record: null };
   }
-  const clockIn =
-    counted(events).find((e) => e.event_type === "clock_in") || null;
-  if (!clockIn && !close)
-    return {
-      rules: ctx.policy,
-      policy_version_id: ctx.policy.policy_version_id,
-      shift: ctx.shift,
-      record: null,
-    };
+  const clockIn = counted(events).find((e) => e.event_type === "clock_in") || null;
+  if (!clockIn && !close) return { rules: ctx.policy, policy_version_id: ctx.policy.policy_version_id, shift: ctx.shift, record: null };
   const v = clockIn
-    ? await policies.rulesOfVersion(
-        client,
-        "attendance",
-        clockIn.policy_version_id,
-      )
+    ? await policies.rulesOfVersion(client, "attendance", clockIn.policy_version_id)
     : await policies.rulesFor(client, "attendance", date);
   const schedule = await repo.workScheduleOn(client, person.employee_id, date);
-  const own = rules.shiftFor(
-    date,
-    await workingWeek.loadCalendar(client),
-    v.rules,
-    { schedule, pattern: person.work_pattern },
-  );
+  const own = rules.shiftFor(date, await workingWeek.loadCalendar(client), v.rules, { schedule, pattern: person.work_pattern });
   // A temporary site with its own hours sets the day (§6.11), as calendar.shiftOn does.
-  const shift = temporarySites.siteShift(
-    await temporarySites.siteOn(client, person.employee_id, date),
-    own,
-  );
+  const shift = temporarySites.siteShift(await temporarySites.siteOn(client, person.employee_id, date), own);
   return {
     rules: v.rules,
     policy_version_id: v.policy_version_id,
@@ -141,22 +107,12 @@ async function judgementOf(
  * keeps it.
  * @returns {Promise<{day: object|null, events: object[], ctx: object, leave: object|null, judged: object}>}
  */
-async function recomputeDay(
-  client,
-  person,
-  date,
-  { close = false, settle: settleNow = true } = {},
-) {
+async function recomputeDay(client, person, date, { close = false, settle: settleNow = true } = {}) {
   const ctx = await calendar.contextFor(client, person, date);
   const leave = await repo.grantedLeave(client, person.employee_id, date);
   const existing = await repo.getDay(client, person.employee_id, date);
   const events = await repo.eventsOn(client, person.employee_id, date);
-  const judged = await judgementOf(client, person, date, {
-    existing,
-    events,
-    close,
-    ctx,
-  });
+  const judged = await judgementOf(client, person, date, { existing, events, close, ctx });
   const projection = rules.projectDay({
     events: counted(events),
     shift: judged.shift,
@@ -170,15 +126,8 @@ async function recomputeDay(
     early: lateness.minutesEarly,
     overtime: lateness.minutesOvertime,
   });
-  if (!existing && projection.status === null)
-    return { day: null, events, ctx, leave, judged };
-  const day = await repo.upsertDay(
-    client,
-    person.employee_id,
-    date,
-    projection,
-    { closed: close, judged: judged.record },
-  );
+  if (!existing && projection.status === null) return { day: null, events, ctx, leave, judged };
+  const day = await repo.upsertDay(client, person.employee_id, date, projection, { closed: close, judged: judged.record });
   const r = { day, events, ctx, leave, judged };
   if (settleNow) await settle(client, person, r);
   return r;
@@ -193,12 +142,7 @@ async function judgedOn(db, person, date) {
   const ctx = await calendar.contextFor(db, person, date);
   const existing = await repo.getDay(db, person.employee_id, date);
   const events = await repo.eventsOn(db, person.employee_id, date);
-  const judged = await judgementOf(db, person, date, {
-    existing,
-    events,
-    close: false,
-    ctx,
-  });
+  const judged = await judgementOf(db, person, date, { existing, events, close: false, ctx });
   return { judged, timeZone: ctx.timeZone, ctx };
 }
 
@@ -216,11 +160,7 @@ async function settle(client, person, r) {
     shift: r.judged.shift,
     policy_version_id: r.judged.policy_version_id,
   });
-  await rulesEngine.countDay(
-    client,
-    person,
-    String(r.day.attendance_date).slice(0, 10),
-  );
+  await rulesEngine.countDay(client, person, String(r.day.attendance_date).slice(0, 10));
 }
 
 /* ------------------------------------------------------------------ *
@@ -239,8 +179,7 @@ const LOCATION_REASON = Object.freeze({
 /** One line saying what an exception is about, from its evidence; a check-in's says so (§6.12). */
 function detailOf(type, evidence = {}) {
   const ev = evidence || {};
-  if (ev.check_in)
-    return `Check-in: ${detailOf(type, { ...ev, check_in: false })}`;
+  if (ev.check_in) return `Check-in: ${detailOf(type, { ...ev, check_in: false })}`;
   switch (type) {
     case "outside_worksite":
       return `${ev.distance_m} m from ${ev.place === "client_visit" ? "the client's site" : ev.worksite_name}, radius ${ev.radius_m} m`;
@@ -253,9 +192,7 @@ function detailOf(type, evidence = {}) {
         ? `Reading accurate to ${Math.round(ev.accuracy_m)} m`
         : `No location: ${LOCATION_REASON[ev.reason] || "no location reading"}`;
     case "unknown_device":
-      return ev.device_label
-        ? `Unregistered device: ${ev.device_label}`
-        : "No registered device";
+      return ev.device_label ? `Unregistered device: ${ev.device_label}` : "No registered device";
     case "suspicious_timestamp":
       return `Device clock ${Math.max(1, Math.round(Math.abs(ev.skew_seconds || 0) / 60))} min ahead`;
     case "missing_clock_out":
@@ -263,9 +200,7 @@ function detailOf(type, evidence = {}) {
         ? `Clocked in ${rules.localTime(ev.clock_in_at, ev.timezone || rules.DEFAULT_TZ)}, no clock-out`
         : "No clock-out";
     case "automatic_clock_out": {
-      const at = ev.clock_out_at
-        ? `System Clock-Out at ${rules.localTime(ev.clock_out_at, ev.timezone || rules.DEFAULT_TZ)}`
-        : "System Clock-Out";
+      const at = ev.clock_out_at ? `System Clock-Out at ${rules.localTime(ev.clock_out_at, ev.timezone || rules.DEFAULT_TZ)}` : "System Clock-Out";
       return ev.real_time ? `${at}; real time ${ev.real_time}` : at;
     }
     default:
@@ -277,20 +212,12 @@ function detailOf(type, evidence = {}) {
 function present(row) {
   if (!row) return row;
   const { evidence, employee_id: _e, ...out } = row;
-  return {
-    ...out,
-    detail: detailOf(row.exception_type, evidence),
-    real_time: (evidence && evidence.real_time) || null,
-  };
+  return { ...out, detail: detailOf(row.exception_type, evidence), real_time: (evidence && evidence.real_time) || null };
 }
 
 const presentPage = (page) => ({ ...page, data: page.data.map(present) });
 
-const OUTCOME = Object.freeze({
-  accept: "accepted",
-  reject: "rejected",
-  add_clock_out: "corrected",
-});
+const OUTCOME = Object.freeze({ accept: "accepted", reject: "rejected", add_clock_out: "corrected" });
 const OUTCOME_TEXT = Object.freeze({
   accepted: "the record stands",
   rejected: "the punch does not count",
@@ -299,14 +226,9 @@ const OUTCOME_TEXT = Object.freeze({
 /** The exception types a clock-out time decides: the missing one, or the real one in place of the system's. */
 const TAKES_TIME = new Set(["missing_clock_out", "automatic_clock_out"]);
 /** What a decision on a check-in's flag means to the person: it clears, or it stands. */
-const CHECK_IN_TEXT = Object.freeze({
-  accepted: "the check-in's flag is cleared",
-  rejected: "the check-in's flag stands",
-});
+const CHECK_IN_TEXT = Object.freeze({ accepted: "the check-in's flag is cleared", rejected: "the check-in's flag stands" });
 const outcomeText = (type, outcome) =>
-  type === "automatic_clock_out" && outcome === "corrected"
-    ? "the clock-out time was corrected"
-    : OUTCOME_TEXT[outcome];
+  type === "automatic_clock_out" && outcome === "corrected" ? "the clock-out time was corrected" : OUTCOME_TEXT[outcome];
 
 /**
  * People decide an open exception: accept it, reject the punch, or add the missing
@@ -314,51 +236,22 @@ const outcomeText = (type, outcome) =>
  */
 async function decide(actor, scope, id, body) {
   if (scope.scope !== "all")
-    throw new AppError(
-      "FORBIDDEN",
-      "Only People with access to everyone decide attendance exceptions",
-      403,
-    );
+    throw new AppError("FORBIDDEN", "Only People with access to everyone decide attendance exceptions", 403);
   const x = await repo.getException(pool, id);
   if (!x) throw notFound();
   if (x.employee_id === actor.employee_id)
-    throw new AppError(
-      "OWN_RECORD",
-      "Someone else decides your own attendance",
-      403,
-    );
-  if (x.status !== "open")
-    throw new AppError(
-      "EXCEPTION_DECIDED",
-      "This exception was already decided",
-      409,
-    );
+    throw new AppError("OWN_RECORD", "Someone else decides your own attendance", 403);
+  if (x.status !== "open") throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
   if (body.decision === "add_clock_out" && !TAKES_TIME.has(x.exception_type))
-    throw new AppError(
-      "DECISION_INVALID",
-      "Only a missing or automatic clock-out takes a time",
-      422,
-      {
-        decision: ["Not for this"],
-      },
-    );
-  // A check-in's flag is rejected as a punch's is: it stays counted toward Location Flags (§6.8, PR 4).
-  if (
-    body.decision === "reject" &&
-    !x.attendance_event_id &&
-    !x.attendance_check_in_id
-  )
-    throw new AppError("DECISION_INVALID", "There is no punch to reject", 422, {
+    throw new AppError("DECISION_INVALID", "Only a missing or automatic clock-out takes a time", 422, {
       decision: ["Not for this"],
     });
+  // A check-in's flag is rejected as a punch's is: it stays counted toward Location Flags (§6.8, PR 4).
+  if (body.decision === "reject" && !x.attendance_event_id && !x.attendance_check_in_id)
+    throw new AppError("DECISION_INVALID", "There is no punch to reject", 422, { decision: ["Not for this"] });
   // Rejecting a system clock-out would leave the shift open: keep its time or correct it.
   if (body.decision === "reject" && x.exception_type === "automatic_clock_out")
-    throw new AppError(
-      "DECISION_INVALID",
-      "Keep or correct a System Clock-Out",
-      422,
-      { decision: ["Not for this"] },
-    );
+    throw new AppError("DECISION_INVALID", "Keep or correct a System Clock-Out", 422, { decision: ["Not for this"] });
 
   const outcome = OUTCOME[body.decision];
   await tx(async (client) => {
@@ -366,24 +259,13 @@ async function decide(actor, scope, id, body) {
     const person = await repo.person(client, x.employee_id);
     if (body.decision === "add_clock_out") {
       const ctx = await calendar.contextFor(client, person, x.work_date);
-      const events = counted(
-        await repo.eventsOn(client, x.employee_id, x.work_date),
-      );
+      const events = counted(await repo.eventsOn(client, x.employee_id, x.work_date));
       const clockIn = events.find((e) => e.event_type === "clock_in");
-      const at = rules.zonedInstant(
-        x.work_date,
-        body.clock_out_time,
-        ctx.timeZone,
-      );
+      const at = rules.zonedInstant(x.work_date, body.clock_out_time, ctx.timeZone);
       if (!clockIn || at <= new Date(clockIn.occurred_at) || at > new Date())
-        throw new AppError(
-          "CLOCK_OUT_TIME",
-          "Give a time after the clock-in",
-          422,
-          {
-            clock_out_time: ["After the clock-in"],
-          },
-        );
+        throw new AppError("CLOCK_OUT_TIME", "Give a time after the clock-in", 422, {
+          clock_out_time: ["After the clock-in"],
+        });
       try {
         await repo.insertEvent(client, {
           employee_id: x.employee_id,
@@ -394,48 +276,26 @@ async function decide(actor, scope, id, body) {
           policy_version_id: ctx.policy.policy_version_id,
           source: "admin",
           validation_state: "accepted",
-          validation: {
-            correction: { attendance_exception_id: id },
-            reasons: [],
-          },
+          validation: { correction: { attendance_exception_id: id }, reasons: [] },
           recorded_by: actor.user_id,
           reason: body.resolution,
         });
       } catch (err) {
         if (err && err.code === "23505")
-          throw new AppError(
-            "ALREADY_CLOCKED_OUT",
-            "This day already has a clock-out",
-            409,
-          );
+          throw new AppError("ALREADY_CLOCKED_OUT", "This day already has a clock-out", 409);
         throw err;
       }
     }
-    const done = await repo.resolveException(client, id, {
-      outcome,
-      resolution: body.resolution,
-      by: actor.user_id,
-    });
-    if (!done)
-      throw new AppError(
-        "EXCEPTION_DECIDED",
-        "This exception was already decided",
-        409,
-      );
+    const done = await repo.resolveException(client, id, { outcome, resolution: body.resolution, by: actor.user_id });
+    if (!done) throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
     // A check-in is never the shift: deciding its flag leaves the day as it is.
-    if (!x.attendance_check_in_id)
-      await recomputeDay(client, person, x.work_date);
+    if (!x.attendance_check_in_id) await recomputeDay(client, person, x.work_date);
     await emit(client, {
       key: EVENTS.ATTENDANCE_EXCEPTION_DECIDED,
       entity: { type: "attendance_exception", id },
       actor,
       before: { status: "open", outcome: null },
-      after: {
-        status: "resolved",
-        outcome,
-        resolution: body.resolution,
-        clock_out_time: body.clock_out_time || null,
-      },
+      after: { status: "resolved", outcome, resolution: body.resolution, clock_out_time: body.clock_out_time || null },
       payload: {
         attendance_exception_id: id,
         employee_id: x.employee_id,
@@ -443,9 +303,7 @@ async function decide(actor, scope, id, body) {
         work_date: x.work_date,
         exception_type: x.exception_type,
         outcome,
-        outcome_text: x.attendance_check_in_id
-          ? CHECK_IN_TEXT[outcome]
-          : outcomeText(x.exception_type, outcome),
+        outcome_text: x.attendance_check_in_id ? CHECK_IN_TEXT[outcome] : outcomeText(x.exception_type, outcome),
       },
     });
   });
@@ -456,19 +314,10 @@ async function decide(actor, scope, id, body) {
 async function explain(user, id, body) {
   const x = await repo.getException(pool, id);
   if (!x || x.employee_id !== user.employee_id) throw notFound();
-  if (x.status !== "open")
-    throw new AppError(
-      "EXCEPTION_DECIDED",
-      "This exception was already decided",
-      409,
-    );
+  if (x.status !== "open") throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
   await tx(async (client) => {
     if (!(await repo.explainException(client, id, body.employee_note)))
-      throw new AppError(
-        "EXCEPTION_DECIDED",
-        "This exception was already decided",
-        409,
-      );
+      throw new AppError("EXCEPTION_DECIDED", "This exception was already decided", 409);
     await emit(client, {
       key: EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED,
       entity: { type: "attendance_exception", id },
@@ -495,44 +344,22 @@ async function explain(user, id, body) {
  * @param {string} eventId  the system clock-out
  * @param {{employee_note: string, real_time: string}} body  RealTimeGiven
  */
-async function explainAutomatic(
-  user,
-  eventId,
-  body,
-  { now = new Date() } = {},
-) {
+async function explainAutomatic(user, eventId, body, { now = new Date() } = {}) {
   const ev = await repo.eventFor(pool, eventId);
   if (!ev || ev.employee_id !== user.employee_id || !ev.attendance_day_id)
     throw new AppError("NOT_FOUND", "Not found", 404);
   if (ev.source !== "system" || ev.event_type !== "clock_out")
-    throw new AppError(
-      "NOT_AUTOMATIC",
-      "Only a System Clock-Out takes a real time",
-      422,
-    );
-  const already = () =>
-    new AppError(
-      "ALREADY_EXPLAINED",
-      "You have already given the real time",
-      409,
-    );
+    throw new AppError("NOT_AUTOMATIC", "Only a System Clock-Out takes a real time", 422);
+  const already = () => new AppError("ALREADY_EXPLAINED", "You have already given the real time", 409);
   const id = await tx(async (client) => {
     await repo.lockEmployee(client, ev.employee_id);
-    if (await repo.hasException(client, eventId, "automatic_clock_out"))
-      throw already();
+    if (await repo.hasException(client, eventId, "automatic_clock_out")) throw already();
     const person = await repo.person(client, ev.employee_id);
     const zone = ev.timezone || rules.DEFAULT_TZ;
-    const clockIn = counted(
-      await repo.eventsOn(client, ev.employee_id, ev.work_date),
-    ).find((e) => e.event_type === "clock_in");
+    const clockIn = counted(await repo.eventsOn(client, ev.employee_id, ev.work_date)).find((e) => e.event_type === "clock_in");
     const realAt = rules.zonedInstant(ev.work_date, body.real_time, zone);
     if (!clockIn || realAt <= new Date(clockIn.occurred_at) || realAt > now)
-      throw new AppError(
-        "REAL_TIME_INVALID",
-        "Give a time after your clock-in",
-        422,
-        { real_time: ["After your clock-in"] },
-      );
+      throw new AppError("REAL_TIME_INVALID", "Give a time after your clock-in", 422, { real_time: ["After your clock-in"] });
     const x = await repo.insertException(client, {
       attendance_day_id: ev.attendance_day_id,
       attendance_event_id: eventId,
@@ -547,20 +374,12 @@ async function explainAutomatic(
       },
     });
     if (!x) throw already();
-    await repo.explainException(
-      client,
-      x.attendance_exception_id,
-      body.employee_note,
-    );
+    await repo.explainException(client, x.attendance_exception_id, body.employee_note);
     await emit(client, {
       key: EVENTS.ATTENDANCE_EXCEPTION_EXPLAINED,
       entity: { type: "attendance_exception", id: x.attendance_exception_id },
       actor: user,
-      after: {
-        exception_type: "automatic_clock_out",
-        employee_note: body.employee_note,
-        real_time: body.real_time,
-      },
+      after: { exception_type: "automatic_clock_out", employee_note: body.employee_note, real_time: body.real_time },
       payload: {
         attendance_exception_id: x.attendance_exception_id,
         employee_id: ev.employee_id,
@@ -600,10 +419,7 @@ async function closeDay(employeeId, date) {
     if (existing && existing.closed_at) return null;
     const person = await repo.person(client, employeeId);
     if (!person) return null;
-    const r = await recomputeDay(client, person, date, {
-      close: true,
-      settle: false,
-    });
+    const r = await recomputeDay(client, person, date, { close: true, settle: false });
     if (!r.day) return null;
 
     const active = counted(r.events);
@@ -615,19 +431,13 @@ async function closeDay(employeeId, date) {
         attendance_event_id: null,
         exception_type: "missing_clock_out",
         severity: "medium",
-        evidence: {
-          clock_in_at: clockIn ? clockIn.occurred_at : null,
-          timezone: r.ctx.timeZone,
-        },
+        evidence: { clock_in_at: clockIn ? clockIn.occurred_at : null, timezone: r.ctx.timeZone },
       });
       if (x) {
         missing = true;
         await emit(client, {
           key: EVENTS.ATTENDANCE_REVIEW_REQUIRED,
-          entity: {
-            type: "attendance_exception",
-            id: x.attendance_exception_id,
-          },
+          entity: { type: "attendance_exception", id: x.attendance_exception_id },
           actor: null,
           payload: {
             attendance_day_id: r.day.attendance_day_id,
@@ -647,12 +457,7 @@ async function closeDay(employeeId, date) {
       entity: { type: "attendance_record", id: r.day.attendance_day_id },
       actor: null,
       after: { status: r.day.status, closed: true },
-      payload: {
-        attendance_day_id: r.day.attendance_day_id,
-        employee_id: employeeId,
-        work_date: date,
-        status: r.day.status,
-      },
+      payload: { attendance_day_id: r.day.attendance_day_id, employee_id: employeeId, work_date: date, status: r.day.status },
       dedup_key: `attendance-day-closed:${r.day.attendance_day_id}`,
     });
     return { status: r.day.status, missing_clock_out: missing };
@@ -677,19 +482,13 @@ async function closeDays({ now = new Date() } = {}) {
     if (r.missing_clock_out) tally.missing_clock_out += 1;
   };
 
-  for (const d of await repo.unclosedDays(pool, since, today))
-    count(await closeDay(d.employee_id, d.attendance_date));
+  for (const d of await repo.unclosedDays(pool, since, today)) count(await closeDay(d.employee_id, d.attendance_date));
 
   const start = await repo.attendanceStart(pool);
   if (start) {
-    for (
-      let d = start > since ? start : since;
-      d < today;
-      d = lagos.addDays(d, 1)
-    ) {
+    for (let d = start > since ? start : since; d < today; d = lagos.addDays(d, 1)) {
       const hours = await calendar.companyHoursOn(pool, d);
-      for (const e of await repo.withoutDay(pool, d, { hours }))
-        count(await closeDay(e.employee_id, d));
+      for (const e of await repo.withoutDay(pool, d, { hours })) count(await closeDay(e.employee_id, d));
     }
   }
   return { today, ...tally };
