@@ -88,6 +88,8 @@ const TemporarySitePurpose = z.enum([
   "other",
 ]);
 const TemporarySiteStatus = z.enum(["submitted", "approved", "rejected", "withdrawn", "cancelled"]);
+/** Its days' hours: the organisation's week (`usual`), or its own start and end on every day (`site`). */
+const TemporarySiteHours = z.enum(["usual", "site"]);
 /** Worked out on the day in Lagos: `submitted` while it waits (Awaiting Approval), else by its days or its status. */
 const TemporarySiteState = z.enum(["submitted", "upcoming", "in_progress", "done", "rejected", "withdrawn", "cancelled"]);
 
@@ -129,8 +131,10 @@ const TemporarySiteMember = z
   .strict();
 
 /**
- * A temporary site. `people` counts those still on it; `members` lists everyone who was (at most
- * 25). `waiting_on` is the approval stage it waits at. `can_decide`: that stage waits on the reader,
+ * A temporary site. `hours` is `usual` (the organisation's week, `starts_at` and `ends_at` null) or
+ * `site` (every day of it worked from `starts_at` to `ends_at` on its own clock). `people` counts
+ * those still on it; `members` lists everyone who was (at most 25). `waiting_on` is the approval
+ * stage it waits at. `can_decide`: that stage waits on the reader,
  * who is not on it; `can_change`: the reader may cancel it or take someone off; `can_withdraw`: the
  * reader submitted it and it still waits.
  */
@@ -144,6 +148,9 @@ const TemporarySite = z
     starts_on: isoDate,
     ends_on: isoDate,
     days: z.number().int().min(1),
+    hours: TemporarySiteHours,
+    starts_at: clockTime.nullable(),
+    ends_at: clockTime.nullable(),
     status: TemporarySiteStatus,
     state: TemporarySiteState,
     locations: z.array(TemporarySiteLocation).min(1).max(8),
@@ -175,10 +182,14 @@ const TemporarySiteLocationInput = z
 
 /**
  * POST /attendance/me/temporary-sites (Add Work Site) and POST /attendance/temporary-sites (People's
- * own). The dates against today, who may be on it and the one-a-day rule are the service's (guide §6.11).
+ * own). Site Hours take a start and an end on the same day; the Usual Shift takes neither. The
+ * dates against today, who may be on it and the one-a-day rule are the service's (guide §6.11).
  */
 const TemporarySiteCreate = z
   .object({
+    hours: TemporarySiteHours.default("usual"),
+    starts_at: clockTime.nullable().optional(),
+    ends_at: clockTime.nullable().optional(),
     purpose: TemporarySitePurpose,
     name: text(120).refine((v) => v.length >= 3, "At least 3 characters"),
     description: text(1000).refine((v) => v.length >= 30, "At least 30 characters"),
@@ -200,6 +211,16 @@ const TemporarySiteCreate = z
   .refine((v) => v.purpose !== "temporary_home" || v.locations.length === 1, {
     message: "One address only",
     path: ["locations"],
+  })
+  .refine((v) => v.hours !== "site" || Boolean(v.starts_at), { message: "Pick a start", path: ["starts_at"] })
+  .refine((v) => v.hours !== "site" || Boolean(v.ends_at), { message: "Pick an end", path: ["ends_at"] })
+  .refine((v) => v.hours !== "site" || !v.starts_at || !v.ends_at || v.ends_at > v.starts_at, {
+    message: "Ends before it starts",
+    path: ["ends_at"],
+  })
+  .refine((v) => v.hours !== "usual" || (!v.starts_at && !v.ends_at), {
+    message: "Only for Site Hours",
+    path: ["starts_at"],
   });
 
 /** GET /attendance/temporary-sites: within the reader's `people` scope, waiting first. */
@@ -1742,6 +1763,7 @@ module.exports = {
   OvertimePreApproval,
   TemporarySitePurpose,
   TemporarySiteStatus,
+  TemporarySiteHours,
   TemporarySiteState,
   TemporarySiteLocation,
   TemporarySiteMember,

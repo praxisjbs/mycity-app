@@ -1,6 +1,6 @@
 import attendance from "@mycity/contract/schemas/attendance.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { AttendanceEvent, CheckIn, TemporarySite, TemporarySiteCreate, TemporarySiteLocation, TemporarySitePurpose, TemporarySiteState } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceEvent, CheckIn, TemporarySite, TemporarySiteCreate, TemporarySiteHours, TemporarySiteLocation, TemporarySitePurpose, TemporarySiteState } from "@mycity/contract/contract.gen.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
@@ -8,14 +8,14 @@ import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, EmployeePicker } from "@/features/shared/pickers";
 import { lineOf, loadTile, places, zoomFor } from "@/features/shared/places";
-import { AddressField, Button, Card, CardHeader, Chips, DataView, DateField, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, Pill, SelectField, TextAreaField, TextField, Timeline, toast, todayIso, useContractForm, useModal, Who, type PlaceValue } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, ChoiceField, Chips, DataView, DateField, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, MapView, NumberField, Pill, SelectField, TextAreaField, TextField, TimeField, Timeline, toast, todayIso, useContractForm, useModal, Who, type PlaceValue } from "@mycity/ui";
 import { checkInShown, SITE_PURPOSE, SITE_STATE } from "./labels";
 import { RequestApproval } from "./WorkLocationRequests";
 
 /**
  * Temporary sites (docs/guides/attendance.md §6.11, §10): somewhere else to work for some days.
- * The Add Work Site sheet (Home · Overview and ESS · Work Location Requests, sent for approval;
- * People · Worksites' Add Temporary Site, in force once saved), a site's own view with its
+ * The Add Work Site sheet, opening on the site's hours (Home · Overview and ESS · Work Location
+ * Requests, sent for approval; People · Worksites' Add Temporary Site, in force once saved), a site's own view with its
  * addresses, people and approval, People's list on Worksites' Temporary side, and the person's own
  * on Work Location Requests and My Attendance. The API decides who may see, decide or change one;
  * `can_decide`, `can_change` and `can_withdraw` say what this reader may.
@@ -28,6 +28,13 @@ const RADIUS_HELP = "A punch within it counts here. Between 150 and 500 metres."
 const DESCRIPTION_HELP = "People approve from this; name an out-of-station letter if you have one.";
 
 export const sitePill = (s: Pick<TemporarySite, "state">) => <Pill tone={SITE_STATE[s.state].tone}>{SITE_STATE[s.state].text}</Pill>;
+/** A site's hours as people read them: Usual Shift, or its own start and end. */
+export const siteHours = (s: Pick<TemporarySite, "hours" | "starts_at" | "ends_at">) => (s.hours === "site" ? `${s.starts_at} to ${s.ends_at}` : "Usual Shift");
+const HOURS: Array<[TemporarySiteHours, string]> = [
+  ["usual", "Usual Shift"],
+  ["site", "Site Hours"],
+];
+const HOURS_HELP = "Site Hours: every day of the site, weekends too, from its start to its end. Usual Shift: your normal hours.";
 export const siteDates = (s: Pick<TemporarySite, "starts_on" | "ends_on">) =>
   s.starts_on === s.ends_on ? formatDate(s.starts_on) : `${formatDate(s.starts_on)} to ${formatDate(s.ends_on)}`;
 const peopleOf = (s: TemporarySite) => {
@@ -219,6 +226,7 @@ export function SiteView({ s, mine, close }: { s: TemporarySite; mine: boolean; 
           items={[
             ["Number", s.number],
             ["Purpose", SITE_PURPOSE[s.purpose]],
+            ["Hours", siteHours(s)],
             ["First Day", formatDate(s.starts_on)],
             ["Last Day", formatDate(s.ends_on)],
             ["Days", String(s.days)],
@@ -363,6 +371,9 @@ function ReasonForm({ site, action, employee, close }: { site: TemporarySite; ac
 type N = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 type AddressKey = "name" | "radius";
 type Values = {
+  hours: TemporarySiteHours;
+  starts_at: string;
+  ends_at: string;
   purpose: TemporarySitePurpose | "";
   name: string;
   description: string;
@@ -379,6 +390,9 @@ const num = (s: string) => (s.trim() === "" ? undefined : Number(s));
 const countOf = (v: Values) => (v.purpose === "temporary_home" ? 1 : v.count);
 /** The body the API takes. */
 const bodyOf = (v: Values) => ({
+  hours: v.hours,
+  // A time left empty is sent as none, so the contract asks for it.
+  ...(v.hours === "site" && { starts_at: v.starts_at || undefined, ends_at: v.ends_at || undefined }),
   purpose: v.purpose,
   name: v.name.trim(),
   description: v.description.trim(),
@@ -412,7 +426,8 @@ const pointOfPlace = (value: PlaceValue | null) => {
 };
 
 /**
- * Add Work Site (Home, ESS) or Add Temporary Site (People): the purpose, a name, one to eight
+ * Add Work Site (Home, ESS) or Add Temporary Site (People): its hours (the Usual Shift, or Site
+ * Hours with a start and an end), the purpose, a name, one to eight
  * picked addresses each with its radius, the days, the people and the description People approve
  * from. Add Work Site starts with the reader on it; People's own never puts the reader on it.
  */
@@ -421,6 +436,9 @@ export function WorkSiteForm({ close, direct }: { close: () => void; direct: boo
   const self: PersonRef = { employee_id: me.employee_id, display_name: me.display_name, job_title: me.job_title, department: me.department, photo_url: me.photo_url };
   const f = useContractForm<Values>(
     {
+      hours: "usual",
+      starts_at: "",
+      ends_at: "",
       purpose: "",
       name: "",
       description: "",
@@ -517,6 +535,19 @@ export function WorkSiteForm({ close, direct }: { close: () => void; direct: boo
 
   return (
     <>
+      <Field label={<HelpTerm help={HOURS_HELP}>Hours</HelpTerm>} {...f.status("hours")}>
+        <ChoiceField value={v.hours} onChange={(h) => f.set("hours", h)} options={HOURS} />
+      </Field>
+      {v.hours === "site" && (
+        <Grid cols={2}>
+          <Field label="Starts At" {...f.status("starts_at")}>
+            <TimeField {...f.field("starts_at")} />
+          </Field>
+          <Field label="Ends At" {...f.status("ends_at")}>
+            <TimeField {...f.field("ends_at")} />
+          </Field>
+        </Grid>
+      )}
       <Field label="Purpose" {...f.status("purpose")}>
         <SelectField searchable {...f.field("purpose")} onChange={(p) => f.set("purpose", p as TemporarySitePurpose)} options={PURPOSES} placeholder="Choose One" />
       </Field>

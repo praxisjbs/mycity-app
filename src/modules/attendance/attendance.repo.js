@@ -21,7 +21,7 @@ const { scopeClause } = require("../../shared/rbac/scope");
 const { personJson } = require("../../shared/db/person");
 const lagos = require("../../shared/time/lagos");
 const approvers = require("../../shared/workflow/approvers");
-const { REGISTER_SITE } = require("./attendance.sites.repo");
+const { REGISTER_SITE, SITE_HOURS_DAY } = require("./attendance.sites.repo");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -57,16 +57,17 @@ const SCHEDULE_DAY = (dateExpr) => `(ws.days -> (extract(isodow FROM ${dateExpr}
 /**
  * Is `dateExpr` worked by the employee in `employeeCol` (guide §6.4, §6.13): by the work schedule in
  * force then (a working day with its own times, or with none on a weekday the company hours work),
- * else by the company hours; never on a public holiday. The one rule the register, the roster and
- * the day agree on, written once for SQL (rules.shiftFor is the same in JavaScript).
+ * else by the company hours; never on a public holiday. A day of a temporary site with its own hours
+ * that they are still on is worked whatever else says (§6.11). The one rule the register, the roster
+ * and the day agree on, written once for SQL (calendar.shiftOn is the same in JavaScript).
  */
-const WORKS_ON = (employeeCol, dateExpr, hoursExpr) => `(
+const WORKS_ON = (employeeCol, dateExpr, hoursExpr) => `(${SITE_HOURS_DAY(employeeCol, dateExpr)} OR (
   NOT EXISTS (SELECT 1 FROM public_holiday h WHERE h.holiday_date = ${dateExpr})
   AND COALESCE((
     SELECT CASE WHEN NOT COALESCE((${SCHEDULE_DAY(dateExpr)} ->> 'working')::boolean, false) THEN false
                 WHEN ${SCHEDULE_DAY(dateExpr)} ->> 'starts_at' IS NOT NULL THEN true
                 ELSE ${COMPANY_WORKS(dateExpr, hoursExpr)} END
-      FROM ${SCHEDULE_IN_FORCE(employeeCol, dateExpr)}), ${COMPANY_WORKS(dateExpr, hoursExpr)}))`;
+      FROM ${SCHEDULE_IN_FORCE(employeeCol, dateExpr)}), ${COMPANY_WORKS(dateExpr, hoursExpr)})))`;
 
 /** Does the employee in `employeeCol` hold an active login: nobody else is expected to clock in (§6.4). */
 const HAS_LOGIN = (employeeCol) =>

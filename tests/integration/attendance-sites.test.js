@@ -33,6 +33,11 @@ const service = require("../../src/modules/attendance/attendance.service");
 const checkIns = require("../../src/modules/attendance/attendance.check-ins");
 const roster = require("../../src/modules/attendance/attendance.roster");
 const realtime = require("../../src/services/realtime/emitter");
+const active = require("../../src/services/realtime/active");
+const watch = require("../../src/modules/attendance/attendance.clock-watch");
+const reconcile = require("../../src/modules/attendance/attendance.reconcile");
+const attendanceRepo = require("../../src/modules/attendance/attendance.repo");
+const schedules = require("../../src/modules/attendance/attendance.schedule");
 
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async () => ({ id: "1" })),
@@ -588,6 +593,61 @@ describeDb("temporary sites and check-ins against the real migrations", () => {
     const onSite = notices.body.data.find((n) => n.title === "Temporary Site Approved");
     expect(onSite.link.path).toBe(`/ess?tab=work-location-requests&site=${site.temporary_site_id}`);
   });
+
+  test("a site with its own hours: every day of it worked, a Sunday too, judged from its start and end, reminded at its start, closed absent unworked", async () => {
+    await setPolicy("warn");
+    let sunday = day(60);
+    while (lagos.weekday(sunday) !== 7) sunday = lagos.addDays(sunday, 1);
+    const monday = lagos.addDays(sunday, 1);
+    const hours = { hours: "site", starts_at: "11:00", ends_at: "15:00" };
+    const send = (over) => as("ops").post("/attendance/temporary-sites", body({ name: "Partner Sunday Training", purpose: "training_delivering", starts_on: sunday, ends_on: monday, employee_ids: [id("outsider"), id("remote")], ...over }));
+    const fieldsOf = (res) => [res.status, Object.keys(res.body.error.fields || {})];
+    expect(fieldsOf(await send({ hours: "site" }))).toEqual([422, ["starts_at", "ends_at"]]);
+    expect(fieldsOf(await send({ ...hours, ends_at: "10:00" }))).toEqual([422, ["ends_at"]]);
+    expect(fieldsOf(await send({ hours: "usual", starts_at: "11:00" }))).toEqual([422, ["starts_at"]]);
+    const res = await send(hours);
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ hours: "site", starts_at: "11:00", ends_at: "15:00", status: "approved" });
+
+    // The reminder comes at the site's start, on any day of it; the organisation's leaves them out.
+    jest.spyOn(active, "activity").mockResolvedValue({ known: true, active: false, last_active_at: null });
+    const reminded = async (who, date) =>
+      (await q("SELECT count(*)::int AS n FROM attendance_clock_reminder WHERE employee_id = $1 AND work_date = $2", [id(who), date])).rows[0].n;
+    await watch.remind({ now: new Date(`${sunday}T09:55:00Z`) });
+    expect(await reminded("remote", sunday)).toBe(0);
+    await watch.remind({ now: new Date(`${sunday}T10:05:00Z`) });
+    expect([await reminded("remote", sunday), await reminded("outsider", sunday)]).toEqual([1, 1]);
+    await watch.remind({ now: new Date(`${monday}T08:05:00Z`) });
+    expect(await reminded("remote", monday)).toBe(0);
+    await watch.remind({ now: new Date(`${monday}T10:05:00Z`) });
+    expect(await reminded("remote", monday)).toBe(1);
+
+    // Sunday is worked, from 11:00 to 15:00 with the policy's grace: late from the site's start,
+    // overtime past its end, the system clock-out from its end.
+    const inAt = await punchAt("outsider", `${sunday}T10:30:00Z`, at(HALL, 10));
+    expect(inAt.today.shift).toMatchObject({ working_day: true, starts_at: "11:00", ends_at: "15:00", off_reason: null });
+    expect(inAt.today.shift.grace_minutes).toBeLessThan(30);
+    await service.punch(await actorOf("outsider"), { event_type: "clock_out", device_at: `${sunday}T15:30:00Z`, ...at(HALL, 10), accuracy_m: 15 }, { idempotencyKey: key(), now: new Date(`${sunday}T15:30:00Z`) });
+    const worked = (await q("SELECT status, late_minutes, overtime_minutes, worked_minutes FROM attendance_day WHERE employee_id = $1 AND attendance_date = $2", [id("outsider"), sunday])).rows[0];
+    expect(worked).toMatchObject({ status: "late", late_minutes: 30, overtime_minutes: 90, worked_minutes: 300 });
+    expect(watch.shiftEnd(sunday, inAt.today.shift, "Africa/Lagos").toISOString()).toBe(`${sunday}T14:00:00.000Z`);
+
+    // The register and the roster count the day as worked for the site's people only.
+    const reg = (who) => as("ops").get(`/attendance/register?date=${sunday}&q=${who}`).then((r) => r.body.data[0]);
+    expect(await reg("femi")).toMatchObject({ status: "not_in" });
+    expect(await reg("musa")).toMatchObject({ status: "off" });
+    // Home's day strip reads the same shift.
+    expect(await schedules.dayOn(pool, id("remote"), sunday)).toMatchObject({ working_day: true, starts_at: "11:00", ends_at: "15:00" });
+    expect((await schedules.dayOn(pool, id("staff"), sunday)).working_day).toBe(false);
+
+    // The day-close closes a Sunday on the site absent for someone who never clocked in, and leaves
+    // everyone else's Sunday alone.
+    jest.spyOn(attendanceRepo, "attendanceStart").mockResolvedValue(sunday);
+    await reconcile.closeDays({ now: new Date(`${monday}T23:30:00Z`) });
+    const closed = async (who) => (await q("SELECT status FROM attendance_day WHERE employee_id = $1 AND attendance_date = $2", [id(who), sunday])).rows[0];
+    expect(await closed("remote")).toMatchObject({ status: "absent" });
+    expect(await closed("staff")).toBeUndefined();
+  }, 60000);
 
   test("the assistant reads a page of sites in scope with no address; events, audit and notices carry none", async () => {
     const ai = require("../../src/shared/ai/registry");

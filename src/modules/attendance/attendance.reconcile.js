@@ -44,6 +44,7 @@ const pay = require("./attendance.pay");
 const rulesEngine = require("./attendance.rules-engine");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
+const temporarySites = require("./attendance.sites");
 const { EVENTS } = require("./attendance.events");
 
 /** How far back the day-close looks for days still open. */
@@ -66,8 +67,8 @@ const counted = (events) => events.filter((e) => !e.excluded);
 /**
  * What judges a day (§6.4): the version and shift recorded on it once judged; else, on its first
  * clock-in or when the day-close closes it, the version that clock-in was judged by (or the one in
- * force on the date) and the schedule in force on the date, to be recorded now (`record`); else,
- * not yet judged, what is in force on the date.
+ * force on the date) and the schedule in force on the date (or a site's own hours), to be recorded
+ * now (`record`); else, not yet judged, what is in force on the date.
  * @returns {Promise<{rules: object, policy_version_id: string|null, shift: object, record: object|null}>}
  */
 async function judgementOf(client, person, date, { existing, events, close, ctx }) {
@@ -81,7 +82,9 @@ async function judgementOf(client, person, date, { existing, events, close, ctx 
     ? await policies.rulesOfVersion(client, "attendance", clockIn.policy_version_id)
     : await policies.rulesFor(client, "attendance", date);
   const schedule = await repo.workScheduleOn(client, person.employee_id, date);
-  const shift = rules.shiftFor(date, await workingWeek.loadCalendar(client), v.rules, { schedule, pattern: person.work_pattern });
+  const own = rules.shiftFor(date, await workingWeek.loadCalendar(client), v.rules, { schedule, pattern: person.work_pattern });
+  // A temporary site with its own hours sets the day (§6.11), as calendar.shiftOn does.
+  const shift = temporarySites.siteShift(await temporarySites.siteOn(client, person.employee_id, date), own);
   return {
     rules: v.rules,
     policy_version_id: v.policy_version_id,
