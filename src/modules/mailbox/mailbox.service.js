@@ -1009,6 +1009,7 @@ async function attachmentFile(db, mailAttachmentId, user) {
 }
 
 module.exports = {
+  account,
   attachmentFile,
   useProvider,
   connectionView,

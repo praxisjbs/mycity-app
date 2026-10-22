@@ -286,6 +286,66 @@ function signature(user: string): MySignature {
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * Write With AI, Dictate and Summarise Thread (mailbox.md §3 steps 12 to 14): written answers in
+ * the contract's shapes, no model. A draft has no placeholder, as the real one may not.
+ * ------------------------------------------------------------------ */
+
+type AssistBody = { mode?: string; in_reply_to?: string | null; subject?: string; body_html?: string; quoted_html?: string; instruction?: string; note?: string; answers?: Array<{ question: string; answer: string }>; write_anyway?: boolean };
+const sentence = (s: string) => {
+  const t = s.trim().replace(/\s+/g, " ");
+  return t ? `${t[0]!.toUpperCase()}${t.slice(1)}${/[.!?]$/.test(t) ? "" : "."}` : "";
+};
+const spamRefused = () => fail(422, "SPAM_NOT_READ", "Spam is not read by AI");
+
+route("POST /api/v1/mailbox/assist", (req) => {
+  const b = live(req.user!);
+  if (!b) return noMailbox();
+  const body = req.body as AssistBody;
+  const thread = body.in_reply_to ? b.threads.find((t) => t.messages.some((m) => m.mail_message_id === body.in_reply_to)) : undefined;
+  if (thread?.folder === "spam") return spamRefused();
+  const own = text(body.body_html ?? "");
+  const instruction = String(body.instruction ?? "").trim();
+  const isNew = !body.in_reply_to && !text(body.quoted_html ?? "");
+  if (body.mode === "tidy" && !own) return fail(422, "NOTHING_TO_WRITE", "Write the email first", { body_html: ["Write the email first"] });
+  if (body.mode !== "tidy" && isNew && !instruction && !String(body.note ?? "").trim())
+    return fail(422, "NOTHING_TO_WRITE", "Say what to write", { instruction: ["Say what to write"] });
+  const answers = body.answers ?? [];
+  if (!body.write_anyway && !answers.length && /\b(when|date|day|time)\b/i.test(instruction))
+    return ok({ available: true, kind: "questions", subject: null, body_html: null, questions: ["Which day and time suit you?"], ai_run_id: uuid() });
+  const them = thread?.messages.map((m) => m.from).find((a) => a.address !== b.address);
+  const first = them?.name?.split(" ")[0];
+  const said = body.mode === "tidy" ? sentence(own) : [instruction ? "Thank you for your message." : "Thank you for your message; I will come back to you shortly.", sentence(instruction), ...answers.map((a) => sentence(a.answer))].filter(Boolean).join(" ");
+  const subject = isNew && !String(body.subject ?? "").trim() ? sentence(instruction).replace(/\.$/, "").split(" ").slice(0, 8).join(" ") || null : null;
+  return ok({ available: true, kind: "draft", subject, body_html: html(first ? `Dear ${first},` : "Good morning,", said, "Kind regards,"), questions: [], ai_run_id: uuid() });
+});
+
+route("POST /api/v1/mailbox/dictation/:id/transcript", (req) => {
+  if (!live(req.user!)) return noMailbox();
+  if (!UPLOADS.has(req.params.id)) return notFound();
+  UPLOADS.delete(req.params.id);
+  return ok({ text: "Thursday at eleven works for us, and I will send the visit list today.", draft: false });
+});
+
+route("POST /api/v1/mailbox/threads/:id/summary", (req) => {
+  const t = findThread(req.user!, req.params.id);
+  if (!t) return notFound();
+  if (t.folder === "spam") return spamRefused();
+  const lines = t.messages.flatMap((m) => text(m.body_html).split(/(?<=[.?!])\s+/)).filter((x) => x.split(" ").length > 3);
+  const asks = lines.filter((x) => /\?$|\b(please|kindly|could you|can you)\b/i.test(x)).slice(0, 5);
+  const from = last(t)!.from;
+  return ok({
+    available: true,
+    mail_thread_id: t.mail_thread_id,
+    gist: `${from.name ?? from.address} wrote about ${t.subject}.`.slice(0, 400),
+    key_points: lines.filter((x) => !asks.includes(x)).slice(0, 3).map((x) => x.slice(0, 300)),
+    asked_of_you: asks.map((x) => x.slice(0, 300)),
+    message_count: t.messages.length,
+    summarised_at: new Date().toISOString(),
+    ai_run_id: uuid(),
+  });
+});
+
 const configures = (user: string) => { const m = me(user); return m.is_ceo || m.capabilities.includes("mailbox.signature"); };
 const notConfigurer = () => fail(403, "CAPABILITY_REQUIRED", "This needs an authority you do not hold");
 

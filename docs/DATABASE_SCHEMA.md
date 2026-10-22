@@ -516,7 +516,11 @@ job's claim), `ai_model.price_not_listed_at` (asked again after 7 days), and the
 `ai_model` rows decision 29 leaves off (`-latest` aliases, Gemma, repeated snapshots no chain uses)
 deleted · `10220` the voice notes kept under the purpose `transcription` before the action registry
 moved onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` so the DOWN puts
-it back (`docs/guides/ai-control.md` §4, §6.5) · `10290` seed: the `ai_control` grants.
+it back (`docs/guides/ai-control.md` §4, §6.5) · `10290` seed: the `ai_control` grants · `10300`
+the mailbox's mail AI, brought forward (`docs/guides/mailbox.md` §1.1, §4): `mail_thread_summary`
+(Summarise Thread's answer, one row per conversation, kept until its newest message changes: the
+gist, up to five key points and things asked of the owner, the message count and newest message it
+covered, its AI run).
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

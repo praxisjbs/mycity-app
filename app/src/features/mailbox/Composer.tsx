@@ -5,6 +5,7 @@ import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
 import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, formatDateTime, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
+import { partsOf, WriteWithAi } from "./Assist";
 
 export interface ComposeInit {
   draft_id?: string;
@@ -125,6 +126,9 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   const [body, setBody] = useState(init.body_html ?? "");
   /* Hidden each time the composer opens, to keep the room for writing (TB, 19/10/2026). */
   const [showSignature, setShowSignature] = useState(false);
+  /* Write With AI (mailbox.md §3 step 12): mounted from its first opening, so Back keeps what was typed in it. */
+  const [ai, setAi] = useState({ mounted: false, open: false });
+  const parts = useMemo(() => (ai.mounted ? partsOf(body) : null), [ai.mounted, body]);
   const dirty = useRef(0);
 
   const payload = (): MailDraftSave => ({ to_addresses: to, cc_addresses: cc, bcc_addresses: bcc, subject, body_html: body, document_ids: files.map((f) => f.document_id), in_reply_to: init.in_reply_to ?? null });
@@ -183,9 +187,27 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   };
   const q = quickTimes();
   const timeBad = sched.tried && !/^([01]\d|2[0-3]):[0-5]\d$/.test(sched.time);
+  /* Use Draft: the draft takes the place of the person's own words, above the quoted mail; the subject only when it was empty. */
+  const useDraft = (draft: { body_html: string; subject: string | null }) => {
+    const quoted = parts?.quoted ?? "";
+    setBody(quoted ? `${draft.body_html}<p></p>${quoted}` : draft.body_html);
+    if (draft.subject && !subject.trim()) setSubject(draft.subject);
+    touch();
+    setAi({ mounted: true, open: false });
+    toast("Draft added");
+  };
 
   return (
-    <div className="flex min-h-full flex-col">
+    <>
+    {ai.mounted && parts && (
+      <WriteWithAi
+        hidden={!ai.open}
+        compose={{ in_reply_to: init.in_reply_to ?? null, to, cc, subject, attachments: files.map((f) => f.file_name), own_html: parts.own, quoted_html: parts.quoted }}
+        back={() => setAi({ mounted: true, open: false })}
+        use={useDraft}
+      />
+    )}
+    <div className={cn("min-h-full flex-col", ai.open ? "hidden" : "flex")}>
       <div className="flex min-h-10.5 items-center gap-2 border-b border-border py-1.5">
         <InlineLabel htmlFor="mfrom" className="w-14 flex-none text-xs font-semibold text-subtle-foreground">From</InlineLabel>
         <InlineSelect id="mfrom" className="h-7.5 rounded-ctl border border-border bg-background px-2 text-sm" value={from} onChange={() => undefined} options={[from]} />
@@ -206,7 +228,10 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           className="min-w-0 flex-1"
           onUploaded={(docs) => (setFiles((f) => [...f, ...docs]), touch())}
           trigger={(open) => (
-            <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground phone:size-tap"><Icon name="clip" /></button></Tooltip>
+            <span className="flex items-center gap-1">
+              <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground phone:size-tap"><Icon name="clip" /></button></Tooltip>
+              <Button size="sm" variant="ghost" icon="spark" onClick={() => setAi({ mounted: true, open: true })}>Write With AI</Button>
+            </span>
           )}
         />
         <span role="status" className="flex flex-none items-center gap-1 self-start pt-2 text-2xs text-subtle-foreground">
@@ -295,5 +320,6 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
         )}
       </div>
     </div>
+    </>
   );
 }

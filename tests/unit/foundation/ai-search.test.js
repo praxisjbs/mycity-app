@@ -16,6 +16,7 @@ const {
   redactExternal,
   redactForReasoning,
   redactValue,
+  shield,
 } = require("../../../src/services/ai/redact");
 const {
   jsonSchemaOf,
@@ -95,6 +96,29 @@ describe("redaction", () => {
     expect(redactValue("call 08031234567", { egress: "reasoning" })).toBe(
       "call 08031234567",
     );
+  });
+
+  test("shield: what the redaction masks leaves as tokens, one per value, and comes back in the answer", () => {
+    const t = "Call 0803 123 4567 or mail ada@mycityapp.io; account number 0123456789. Pay 2500000000.";
+    const s = shield({ latest: t, earlier: ["ada@mycityapp.io wrote"], n: 3 });
+    expect(JSON.stringify(s.value)).not.toMatch(/0803|ada@|0123456789/);
+    expect(s.value.latest).toContain("account number KEPT");
+    expect(s.value.latest).toContain("2500000000");
+    // The same value is the same token wherever it appears.
+    const mailToken = /mail (KEPT\d{3})/.exec(s.value.latest)[1];
+    expect(s.value.earlier[0]).toBe(`${mailToken} wrote`);
+    expect(s.value.n).toBe(3);
+    // Put back, also as a model may space it; a token never handed out stays as written.
+    expect(s.restore(`Reach me on ${mailToken} or KEPT ${mailToken.slice(4)}; KEPT099.`)).toBe(
+      "Reach me on ada@mycityapp.io or ada@mycityapp.io; KEPT099.",
+    );
+    expect(s.known(mailToken)).toBe(true);
+    expect(s.known("KEPT099")).toBe(false);
+    // Reasoning egress keeps contact details, as redactForReasoning does; extra patterns go first.
+    expect(shield("call 08031234567", { egress: "reasoning" }).value).toBe("call 08031234567");
+    expect(shield("see https://x.test/p", { also: [/https?:\/\/\S+/g] }).value).toBe("see KEPT001");
+    // The marks scrub() writes are unchanged by the shared steps.
+    expect(redactExternal(t)).toBe("Call [PHONE] or mail [EMAIL]; account number [NUM]. Pay 2500000000.");
   });
 });
 

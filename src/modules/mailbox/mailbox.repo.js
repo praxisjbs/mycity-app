@@ -404,6 +404,69 @@ async function emptyFolder(db, folderId) {
   return rows.map((r) => r.internet_message_id).filter(Boolean);
 }
 
+/** The conversation a message belongs to, and the folder the message is in: what a reply answers. */
+function threadOfMessage(db, accountId, messageId) {
+  return one(
+    db,
+    `SELECT m.mail_thread_id, f.kind AS folder
+       FROM mail_message m LEFT JOIN mail_folder f ON f.mail_folder_id = m.mail_folder_id
+      WHERE m.mail_message_id = $2 AND m.mail_account_id = $1`,
+    [accountId, messageId],
+  );
+}
+
+/** How many messages a conversation holds and its newest one, in the order the reader shows them. */
+function newestOf(db, threadId) {
+  return one(
+    db,
+    `SELECT count(*)::int AS message_count,
+            (SELECT m.mail_message_id FROM mail_message m WHERE m.mail_thread_id = $1
+              ORDER BY COALESCE(m.received_at, m.sent_at, m.created_at) DESC, m.mail_message_id DESC
+              LIMIT 1) AS last_message_id
+       FROM mail_message WHERE mail_thread_id = $1`,
+    [threadId],
+  );
+}
+
+/** Summarise Thread's kept answer for a conversation, or null. */
+function summaryOf(db, threadId) {
+  return one(
+    db,
+    `SELECT mail_thread_id, gist, key_points, asked_of_you, message_count, last_message_id, ai_run_id, summarised_at
+       FROM mail_thread_summary WHERE mail_thread_id = $1`,
+    [threadId],
+  );
+}
+
+/** Keep a fresh summary in place of the old one (mailbox.md §3 step 14). */
+function saveSummary(db, s) {
+  return one(
+    db,
+    `INSERT INTO mail_thread_summary (mail_thread_id, gist, key_points, asked_of_you, message_count, last_message_id, ai_run_id, summarised_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+     ON CONFLICT (mail_thread_id) DO UPDATE SET
+       gist = EXCLUDED.gist, key_points = EXCLUDED.key_points, asked_of_you = EXCLUDED.asked_of_you,
+       message_count = EXCLUDED.message_count, last_message_id = EXCLUDED.last_message_id,
+       ai_run_id = EXCLUDED.ai_run_id, summarised_at = EXCLUDED.summarised_at
+     RETURNING mail_thread_id, gist, key_points, asked_of_you, message_count, last_message_id, ai_run_id, summarised_at`,
+    [s.mail_thread_id, s.gist, s.key_points, s.asked_of_you, s.message_count, s.last_message_id, s.ai_run_id],
+  );
+}
+
+/** Colleagues' names by their work address, for a greeting on mail to them (mailbox.md §6). */
+async function staffNames(db, addresses) {
+  if (!addresses.length) return [];
+  const { rows } = await db.query(
+    `SELECT lower(e.work_email::text) AS address, COALESCE(NULLIF(e.preferred_name, ''), e.first_name) AS first_name, e.last_name
+       FROM employee e
+      WHERE lower(e.work_email::text) = ANY($1::text[])
+      ORDER BY e.employee_id
+      LIMIT 100 -- pagination:batch one lookup per recipient, at most 100 recipients on a message`,
+    [addresses.map((a) => String(a).toLowerCase())],
+  );
+  return rows;
+}
+
 function messageOf(db, accountId, messageId) {
   return one(
     db,
@@ -646,6 +709,11 @@ module.exports = {
   markThreadRead,
   moveThread,
   emptyFolder,
+  threadOfMessage,
+  newestOf,
+  summaryOf,
+  saveSummary,
+  staffNames,
   messageOf,
   draft,
   saveDraft,

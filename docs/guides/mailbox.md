@@ -3,19 +3,20 @@
 | | |
 |---|---|
 | Owner | GE |
-| Milestone | M1 |
+| Milestone | M1; Write With AI and Summarise Thread are M10's mail AI, brought forward by TB on 22/10/2026 (§1.1) |
 | Backend modules | `mailbox` |
 | Frontend paths | `app/src/features/mailbox/` |
 | Permission key(s) | `mailbox` |
 | Capabilities | `mailbox.signature` (Configure Signature): the company links and what shows on everyone's signature (§8) |
 | Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash, #94 Signature; the staff mail server's settings under Settings · Integrations (#77, `docs/guides/integrations.md`); the brand files under Settings · Organisation (#69, `docs/guides/foundation.md`) |
 | Status | Built |
-| Last changed | 20/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: MILESTONES §6.5 and D6; REUSE_MAP §2.5; the internal workflow meeting of 12 October 2026.
 The demo (`demo.html`, Mailbox) was updated the same day with the composer described here. Email
 signatures: TB's brief and answers of 19/10/2026 (design B, Street Sign, chosen from three on the
-design canvas; the eight answers are in §6).
+design canvas; the eight answers are in §6). Write With AI and Summarise Thread: TB's brief and
+answers of 22/10/2026 (§1.1).
 
 ---
 
@@ -40,14 +41,61 @@ person sees their signature on the Signature tab and changes only their numbers 
 company's links and what shows are set once, with Configure, by the holders of
 `mailbox.signature`.
 
+**AI on the person's own press** (§1.1). In the composer, **Write With AI** drafts a reply, a
+forward's note or a new message from the conversation, a line of what to say (typed or dictated)
+and an optional note, or tidies what the person wrote; the draft is ready to send, with no
+placeholder and nothing invented, and reaches the composer only when the person presses Use Draft.
+In the reader, **Summarise Thread** puts the conversation's gist, its key points and what is asked
+of the reader in a card above it. The AI writes nothing on its own: a draft is sent only when the
+person presses Send, and Praxis AI still reads no mail (§9).
+
+### 1.1 Decisions (TB, 22/10/2026, binding)
+
+REUSE_MAP §2.5 left the donor's `mail/assist/` (semantic search and OCR over mail) until M10, and
+§9 had no AI on mail. These answers bring M10's mail AI forward, as AI Control was on 20/10/2026;
+nothing of `mail/assist/` is ported (§12).
+
+1. **Write With AI in the composer, Summarise Thread in the reader.** Write With AI starts from
+   nothing but the conversation, from a line of what the mail should say, or tidies what the
+   person wrote (Tidy Up). Voice for people who would rather not type (Dictate), and a note for
+   context behind a checkbox (Add a Note).
+2. **The Default job, Gemini Flash first** (`ai-control.md` §6.2): drafting, tidying and the
+   summary are everyday drafting and summarising; the Fast job (Flash-Lite) is not for a draft a
+   person reads. Mail carries personal data, so DeepSeek is never asked. Dictation is the
+   Transcription job (Groq's Whisper, then Gemini).
+3. **The AI step opens inside the composer's own window**, since modals never stack, with Back to
+   the composer. The draft shows there first: **Use Draft** puts it in the composer in one press,
+   **Try Again** writes another; nothing in the composer changes until Use Draft.
+4. **Ready to send, or it asks.** When the mail needs a fact only the person knows (a date, a
+   price, a yes or no), the step shows up to three short questions before drafting, answered by
+   typing or Dictate; **Write Anyway** drafts without them, around what it does not know. Every
+   answer is checked on the server and sent back once if a placeholder slipped in.
+5. **A closing line only.** The draft ends "Kind regards," (or the conversation's own closing);
+   the signature that follows at send (§3 steps 8, 9) carries the name, title and numbers.
+6. **The summary is a card on top of the conversation**: the gist, Key Points and Asked of You
+   (with dates and amounts), Copy Summary and Close.
+7. **Kept until new mail.** A summary is kept with the conversation, only its owner sees it, and
+   reopening shows it at once at no cost; a new message makes the next press summarise afresh.
+8. **This conversation only.** The model reads the conversation's messages (quoted copies
+   stripped), who is on it, the person's name, title and department, the company's details,
+   today's date in Lagos and the attachments' names, never their contents and never other mail.
+9. **No tone choices.** The draft matches the conversation's formality, in British English or the
+   sender's language; the person steers it in What To Say ("keep it firm", "shorter").
+
+Refinements made while building, within those answers (TB to overrule): contact details and
+identifying numbers are swapped for tokens before anything leaves and put back in the draft (§6);
+Spam is never drafted from or summarised; a conversation is read to its last 30 messages; a
+dictation's recording is removed once it is transcribed.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Mailbox · Inbox (`inbox`) | Staff app | The mailbox owner only | Threads, newest first; the open message | Read, reply, reply all, forward, archive, move to spam or trash, download attachments |
-| Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | Staff app | Owner | The canonical six folders | As above; continue a draft; empty spam and trash |
+| Mailbox · Inbox (`inbox`) | Staff app | The mailbox owner only | Threads, newest first; the open message; the Summary card once asked for | Read, reply, reply all, forward, archive, move to spam or trash, download attachments; Summarise Thread |
+| Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | Staff app | Owner | The canonical six folders | As above (Spam: no Summarise Thread); continue a draft; empty spam and trash |
 | Mailbox · Connect (sheet) | Staff app | Owner | Opens over Mailbox when the user has no connection, or when the server refused the saved password | Connect with address and password; reconnect |
-| Composer (modal; full screen on mobile) | Staff app | Owner | From, To, Cc, Bcc, Subject, rich text body, attachments; the signature that will be added, behind Show Signature | Write, format, attach, send now or schedule, discard; preview the signature |
+| Composer (modal; full screen on mobile) | Staff app | Owner | From, To, Cc, Bcc, Subject, rich text body, attachments; the signature that will be added, behind Show Signature | Write, format, attach, send now or schedule, discard; preview the signature; Write With AI |
+| Composer · Write With AI (a step inside the composer) | Staff app | Owner | What To Say, Add a Note and the Note, each with Dictate; Write or Tidy Up when the composer holds the person's words; the AI's questions, or its draft | Write Draft, Tidy Email, answer the questions or Write Anyway, Try Again, Use Draft, Back |
 | Mailbox · Signature (`signature`) | Staff app | Every employee with `mailbox` view, their own | Their signature as it sends (New Mail, or Reply for the slim line), the details it is built from, their numbers | Edit Numbers (mobile, office line); show or hide the mobile and its WhatsApp link; Copy Signature |
 | Configure Signature (wizard over the Signature tab) | Staff app | `mailbox.signature` holders | The company's app and social links, and what shows on everyone's signature | Set the App Store and Google Play links, six social links, the confidentiality note; switch WhatsApp links, app links, social links and the legal line on or off |
 | Settings · Integrations, Staff Mail Server | Staff app | IT (`integrations` view) | The IMAP and SMTP hosts and ports every mailbox uses, the hourly limit per person, the sync interval and the live connections; no person's mailbox (TB, 20/10/2026: connecting stays in Mailbox) | IT changes them; a change re-points every mailbox (§3 step 11) |
@@ -133,6 +181,36 @@ company's links and what shows are set once, with Configure, by the holders of
    password marks it `needs_reconnect` as in step 2. The IDLE loop re-reads the settings every 30
    seconds and reopens its connections on the new hosts; the sync interval and the live connections
    apply at the next tick.
+12. **Write With AI** (§1.1; Write With AI in the composer's attach row). The composer's window
+   turns to the AI step (Back returns to the composer, and what was typed in the step is kept
+   while the composer is open). **Write** takes What To Say, optional on a reply or a forward and
+   needed on a new message, and behind **Add a Note** a Note; **Tidy Up**, offered when the
+   composer holds the person's own words, takes those words. **Write Draft** (or **Tidy Email**)
+   sends `POST /assist`. The service reads, for a reply, the conversation the reply answers
+   (`in_reply_to`, the owner's own, never Spam), and for a forward the quoted mail under the
+   person's words; the person and the company from the signature's model (step 7); and asks the
+   `mail-draft` or `mail-tidy` action (§9) with what §6 lists. The answer is one of two:
+   - **questions** (decision 4): up to three, each shown with its own answer field and Dictate.
+     Write Draft asks again with the answers; **Write Anyway** asks for a draft with no
+     questions allowed (`write_anyway`).
+   - **a draft**: drawn in its own frame, with the suggested subject when the composer's subject
+     is empty. **Try Again** asks again with the same inputs. **Use Draft** puts it in the
+     composer in place of the person's own words, above any quoted mail, and sets the subject only
+     when it was empty; the composer's Undo brings back what was there. The draft then saves and
+     sends as if typed: the AI saves nothing and sends nothing.
+13. **Dictate** (`VoiceField`, beside What To Say, the Note and each answer): records up to two
+   minutes in the browser, uploads the recording (`POST /dictation`, purpose `voice_note`, doc type
+   `mail_dictation`), then `POST /dictation/:id/transcript` transcribes it through `mail-dictation`
+   (Transcription: Groq's Whisper, then Gemini) and removes it from the vault whatever the outcome;
+   the words are added to the field. The doc type is `transient`: the vault makes no playable copy
+   of it, and one left behind by a closed tab is removed by the hourly `export-cleanup` sweep once
+   it is an hour old (§7).
+14. **Summarise Thread** (`POST /threads/:id/summary`; not in Spam). The kept summary
+   (`mail_thread_summary`) answers at once while the conversation's newest message is the one it
+   covered; otherwise the service asks `mail-summary` and keeps the answer in place of the old one
+   (`mail_thread.summarised`, audited, no mail text in the event). The card shows above the
+   messages until Close; Copy Summary copies its text; pressing again while it shows asks again
+   if new mail has arrived since.
 
 ## 4 · Data
 
@@ -150,11 +228,17 @@ The tables come from `1000_core_operations.sql`; `1120_mailbox.sql` adds what M1
 | `mail_send_queue` | `mail_send_queue_id`, `user_id`, `mail_draft_id`, `payload`, `status` (`queued` / `sending` / `sent` / `failed` / `cancelled`), `release_at`, `attempts`, `error_code`, `idempotency_key` (unique), `sent_message_id` | Scheduled send and retry; one `queued` row per draft at most (`1128`). `payload.signature` holds the baked signature: its HTML, its text and its inline parts (`content_id`, `document_id`) |
 | `mail_signature` (1127) | `mail_signature_id`, `user_id` (unique), `office_line`, `show_mobile`, `show_whatsapp` | A person's own choices; no row reads as both switches on and no office line. The mobile is `employee.phone`, never copied here |
 | `mail_signature_config` (1127) | `mail_signature_config_id`, one row at most; `app_store_url`, `google_play_url`, `instagram_url`, `tiktok_url`, `linkedin_url`, `x_url`, `facebook_url`, `youtube_url`, `confidentiality_note`, `show_whatsapp`, `show_app_links`, `show_social_links`, `show_legal`, `updated_by` | The company's links and switches (Configure). No row reads as no links and every switch on. Not seeded: the links are MyCity's to enter |
+| `mail_thread_summary` (10300, M10's block: mail AI brought forward) | `mail_thread_summary_id`, `mail_thread_id` (unique, cascades with its conversation), `gist`, `key_points` and `asked_of_you` (`text[]`, at most 5 each), `message_count`, `last_message_id` (the newest message it covered; set null if that message goes), `ai_run_id`, `summarised_at` | Summarise Thread's answer, kept until the conversation's newest message changes (decision 7). One row per conversation, replaced in place. Read only through the owner's own conversation |
 
 Signature pictures are documents of type `mail_signature_image` (module `mailbox`), one per distinct
 picture, found again by their hash (`entity_type` `mail_signature_image`, `entity_id` the SHA-256 of
 the bytes); any signed-in person may read one, since every recipient receives it. A sent message's
 pictures are `mail_attachment` rows with `inline` and a `content_id`, like an inbound logo.
+
+A dictation's recording is a document of type `mail_dictation` (module `mailbox`, personal,
+`transient`), held against the owner's `mail_account` only while it is transcribed (§3 step 13).
+A draft from Write With AI is not kept anywhere but the composer's own draft once Use Draft is
+pressed; its run is on `ai_run` like every AI call.
 
 ## 5 · API
 
@@ -179,6 +263,10 @@ All under `/api/v1/mailbox`. Every list is paged at 25.
 | `PATCH /signature` | `MySignatureSave` → `MySignature` | edit · own | | Only the fields sent: `office_line`, `show_mobile`, `show_whatsapp`, and `mobile`, which is written to the employee record through `organisation.service` (the path ESS Edit Profile takes) in the same transaction; an empty mobile leaves the record's as it is (Show Mobile hides it) |
 | `POST /signature/preview` | `SignaturePreviewRequest` → `SignaturePreview` | view · own | | The composer's preview: the recipients and `in_reply_to` in, the `variant` (`full` or `slim`) and its HTML out, chosen by `signatureFor` |
 | `GET /signature/config`, `PUT /signature/config` | → `SignatureConfig`; `SignatureConfigSave` → `SignatureConfig` | view · `mailbox.signature` | | Configure. A link is an `https://` address or empty |
+| `POST /assist` | `MailAssistRequest` → `MailAssist` | create · own | | Write With AI and Tidy Up (§3 step 12, §6): `mode` (`write`, `tidy`), `in_reply_to`, the recipients, subject, the person's own words (`body_html`) and the quoted mail under them (`quoted_html`), `instruction`, `note`, `answers`, `write_anyway` in; `available`, `kind` (`draft`, `questions`), `subject`, `body_html`, `questions`, `ai_run_id` out. 422 `NOTHING_TO_WRITE` on `instruction` for a new message with nothing to go on, on `body_html` for Tidy Up with no words; 422 `SPAM_NOT_READ` for a reply in Spam |
+| `POST /dictation` | multipart `file` → `DocumentRef` | create · own | | The recording (purpose `voice_note`, at most 10 MB), held only until it is transcribed |
+| `POST /dictation/:id/transcript` | empty → `MailDictation` | create · own | | Transcribes the caller's own recording, then removes it; `text`, and `draft` when only the stub answered (no provider set up) |
+| `POST /threads/:id/summary` | empty → `ThreadSummary` | view · own | | The kept summary, or a fresh one (§3 step 14): `available`, `gist`, `key_points`, `asked_of_you`, `message_count`, `summarised_at`, `ai_run_id`. 422 `SPAM_NOT_READ` in Spam |
 
 Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule on
 `mail_message` and `mail_account` lets only the mailbox owner open them.
@@ -222,6 +310,52 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
     band and the app icons on Deep Green tiles. Secondary text is `#32413D`, which keeps 10.7:1 on
     white and still 4.6:1 after a dark-mode inversion (MyCity's own paper greys fall to 2.8:1).
   - At most 400 px wide, so a phone shows it at full size instead of shrinking it.
+- **Write With AI, Tidy Up and Summarise Thread** (§1.1, TB, 22/10/2026):
+  - **What the model is given** (decision 8). The conversation's messages oldest first, at most
+    its last 30: who sent each to whom and when, whether it was the person's own, the attachments'
+    names, and its own words with the quoted history cut away (an "On … wrote:" or "Le … a écrit :"
+    line, an Outlook header block of From, Sent and To, "Original Message", a trailing run of `>`
+    lines), at most 6,000 characters each, 12,000 for the newest, 60,000 in all. The person, from
+    the signature's model (§3 step 7, so a mobile hidden there stays hidden): name, job title,
+    department, mailbox address, the numbers their signature shows, the company's name, website and
+    address. Today's date and time in Lagos. The composer: its recipients (with the names this
+    conversation gives them), its subject, the person's own words for Tidy Up, and for a forward
+    the quoted mail under them. What To Say, the Note and the answers, as facts from the person.
+    Nothing from other mail, another module or an attachment's contents.
+  - **Contact details never leave.** Every email address, phone number, account, card or IBAN
+    number, BVN, NIN, passport and tax number, and any long run of digits, is swapped for a token
+    (`KEPT001`) before the call (`services/ai/redact.js` `shield()`, the patterns the external
+    redaction masks); the prompt keeps tokens as they are, and the answer has the real values put
+    back, so a draft can say "call me on 0803 …" without the model ever seeing the number.
+  - **Ready to send** (decision 4). Before anyone sees it, every answer is checked
+    (`mailbox.assist.js` `placeholdersIn`): a gap left to fill (`[Your Name]`, `{name}`, `<date>`,
+    "Insert …", XXX), a redaction mark (`[EMAIL]`, `[PHONE]`) or a token that stands for nothing goes back
+    to the model once with the problem named (llm.service's corrective retry), and a second miss
+    fails the press with `AI_BAD_OUTPUT`. The prompt forbids inventing a date, time, amount, name,
+    promise or attachment that is not in what it was given.
+  - **Questions** only when a fact only the person knows is essential: at most three, each one short
+    line. Write Anyway (`write_anyway`) forbids them; the draft then writes around what it does not
+    know ("I will confirm the time by Friday") and never fills it in.
+  - **The closing** (decision 5): a closing line and nothing after it; the signature follows at
+    send. **Language and tone** (decision 9): the conversation's language and formality, British
+    English otherwise; dates day first ("Monday, 26 October 2026"), amounts as the mail writes them,
+    no em dashes. A new message gets a suggested subject of at most 8 words.
+  - **Form.** The model answers Markdown (paragraphs, lists, bold), made into the composer's HTML
+    by the one renderer (`shared/documents/markdown.js`); the send's own sanitiser still runs.
+  - **Tidy Up** keeps every fact, figure, name, date and commitment in the person's words and what
+    they meant; it fixes spelling, grammar, order and tone, using the conversation to get names and
+    references right.
+  - **The summary**: the gist in one or two sentences, up to 5 Key Points and up to 5 things Asked of
+    You (who asked, by when), nothing invented; an empty section is left out. Kept per
+    conversation until its newest message changes (decision 7).
+  - **Spam** is never drafted from or summarised (`SPAM_NOT_READ`); its bodies are not shown either.
+  - **Limits**: What To Say 2,000 characters, the Note 4,000, an answer 1,000; a dictation two
+    minutes and 10 MB.
+  - **AI off** (switched off, the month's cap reached, every model passed by, or no provider set up
+    so only the stub would answer): Write With AI answers `available: false` and the step says
+    "Write With AI is off"; Summarise Thread says "AI summaries are off". The composer and the mail
+    are untouched.
+  - Each press is one AI run under its action, on AI Control · Spend (`ai-control.md` §6.5).
 - **The mail host's limits** (Namecheap plan, `docs/runbooks/dns-and-mail.md` §4): IMAP and SMTP
   at `mycityapp.io` (993, 465), strict certificate check on that name. At most **30 IMAP connections
   at once from one IP address**, and production and staging share the server's address: production
@@ -249,6 +383,8 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
 | `mail_account.images_trusted` | Always Show Images or Stop Showing Images | Audit |
 | `mail_signature.changed` | A person saves their numbers or switches | Audit (the mobile's own change is the organisation service's `employee.updated`) |
 | `mail_signature.config_changed` | Configure saved | Audit, with the links before and after |
+| `mail_thread.summarised` | Summarise Thread kept a fresh summary (§3 step 14) | Audit: the conversation, its message count and the AI run; never the summary's text |
+| `document.stored`, `document.removed` (the vault's) | A dictation's recording stored, then removed once transcribed (§3 step 13) | Audit. A `transient` doc type gets no playable copy (`av-transcode` is not queued); `export-cleanup` (hourly, at twenty past) also removes any transient file older than an hour |
 
 Settings: the staff mail server on Settings · Integrations (`docs/guides/integrations.md` §6.3: the
 IMAP and SMTP hosts and ports, the hourly limit per person, Sync Every and Live Connections), read
@@ -261,15 +397,26 @@ in the file only (off for a local test server).
 
 | Role | Sees | Can do |
 |---|---|---|
-| Every employee with `mailbox` view | Their own mailbox only | Connect, read, send, manage their folders |
+| Every employee with `mailbox` view | Their own mailbox only | Connect, read, send, manage their folders; Summarise Thread (view) on their own conversations; Write With AI and Dictate (create) in their own composer |
 | People, CEO | Their own mailbox only | Same. No access to other mailboxes |
 | Leaver | Nothing | Connection to be disconnected and secret deleted on deactivation (not built: nothing raises a deactivation event yet, §13) |
 | Holders of `mailbox.signature` (by default System Administrator, which the CTO holds, and Implementation Team) | Their own mailbox; Configure on the Signature tab | Set the company's signature links and switches for everyone. Anyone else in Technology is given the capability directly (Settings · Roles & Permissions). Without it, Configure is not shown and the routes answer 403 `CAPABILITY_REQUIRED` |
 
 ## 9 · AI and search
 
-- **AI reads**: `// ai:none` in M1. Mail is private correspondence; the donor's mail assist is not
-  ported (REUSE_MAP §2.5) and nothing in M1 asks for it.
+- **AI reads**: `// ai:none`. Mail is private correspondence, and Praxis AI reads none of it: the
+  module has no read manifest, so no question to the assistant reaches anyone's mail (A23).
+- **Feature AI**, each run only when its owner presses it, on their own mail (§1.1, §3 steps 12 to
+  14, §6), registered in `services/ai/actions.js` with personal data, chosen by TB on 22/10/2026:
+
+  | Action | What presses it | Job | Prompt |
+  |---|---|---|---|
+  | `mail-draft` (Write Email) | Write Draft, Write Anyway, Try Again in Write | Default | `services/ai/prompts/mail-draft.md` |
+  | `mail-tidy` (Tidy Email) | Tidy Email, Write Anyway, Try Again in Tidy Up | Default | `services/ai/prompts/mail-tidy.md` |
+  | `mail-summary` (Thread Summary) | Summarise Thread, when no current summary is kept | Default | `services/ai/prompts/mail-summary.md` |
+  | `mail-dictation` (Mail Dictation) | Dictate | Transcription | `voice-note-transcription.md`, the one every transcription uses (`integrations.md` §6.14) |
+
+  The donor's `mail/assist/` (semantic search and OCR over mail) is not ported (§12).
 - **Search** (`mailbox.search.js`, ⌘K): the caller's own conversations by subject, the addresses
   on them and the senders' names. The provider is pinned to the caller's `user_id` (`owner`), so
   the CEO and People, whose grants reach everyone, still find only their own mail. A result opens
@@ -294,9 +441,10 @@ interface copy; the copy rules apply to the chrome around them.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Mailbox · Inbox (`inbox`) | "N messages · N unread" (desktop subtitle); Refresh, Compose; Folder, Messages, Unread, Attachments, Mailbox (desktop: the user's address); the message list (unread dot, sender, subject, time); the open message: sender avatar, subject, sender and address, time, Reply, Forward, the body as the sender laid it out in its own sealed frame (`EmailFrame`: nothing in it runs or reaches the app; a `mailto:` link opens our composer; signature logos drawn in place), "Remote images are hidden." with Load Images and Always Show Images when anything was held back, Show Quoted Text and Hide Quoted Text when the message quotes earlier mail, the attachments with their sizes (a photo, a video or a PDF opens full screen in the file viewer, with Download and, on a phone, Share; any other file downloads), each with Forward to Chat beside it (and in the viewer), which opens Community's Forward To; the thread menu adds Stop Showing Images for a trusted sender | None | Custom domain only, no Google or Microsoft, signing in with an address and a password, sending and receiving only with no link to other modules: §1, §3 step 1 (the page's ⓘ text is removed). What Refresh does: §3 step 2 |
+| Mailbox · Inbox (`inbox`) | "N messages · N unread" (desktop subtitle); Refresh, Compose; Folder, Messages, Unread, Attachments, Mailbox (desktop: the user's address); the message list (unread dot, sender, subject, time); the open message: sender avatar, subject, sender and address, time, Reply, Forward, the body as the sender laid it out in its own sealed frame (`EmailFrame`: nothing in it runs or reaches the app; a `mailto:` link opens our composer; signature logos drawn in place), "Remote images are hidden." with Load Images and Always Show Images when anything was held back, Show Quoted Text and Hide Quoted Text when the message quotes earlier mail, the attachments with their sizes (a photo, a video or a PDF opens full screen in the file viewer, with Download and, on a phone, Share; any other file downloads), each with Forward to Chat beside it (and in the viewer), which opens Community's Forward To; the thread menu adds Stop Showing Images for a trusted sender; Summarise Thread beside Reply and Forward (not in Spam), which opens the Summary card above the messages: Summary as its title, the gist, Key Points and Asked of You (each only when it has something), Copy Summary and Close, loading lines while it is written; toasts "Summary copied", "AI summaries are off" | Help term on the Summary card's title: "Written by AI from this conversation. Check dates and amounts against the mail before acting." | Custom domain only, no Google or Microsoft, signing in with an address and a password, sending and receiving only with no link to other modules: §1, §3 step 1 (the page's ⓘ text is removed). What Refresh does: §3 step 2. What the summary reads, how it is kept and when it is made again: §3 step 14, §6 |
 | Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | As Inbox, for that folder. Drafts lists scheduled mail as "Scheduled: subject" with its release time. Spam offers no Forward to Chat | None | Scheduled mail waiting in Drafts until release: §3 step 5. Spam bodies not rendered: §6 |
-| Composer (modal; full screen on mobile) | New Message, Reply or Forward as the title; From (the user's address), To (address chips, each removable; Cc Bcc), Cc, Bcc, Subject; the formatting bar (Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link with its address field and Add Link, Clear Formatting); Attach a File with "Draft saved" (or "Saving…") as quiet text at the end of its row, never in the footer; the body; Show Signature under it (Hide Signature once open), which opens the signature this message will carry, full or the slim line, in its own frame ("Signature not available" when it cannot be drawn); attachments as chips with their size and Remove, each with its upload bar while it travels and a Remove on one that failed; Schedule Send (Send Date, DD/MM/YYYY; Send Time, HH:MM; Cancel, Schedule Send). Footer: Discard, Schedule (Tomorrow at 08:00, Monday at 08:00, Pick Date and Time), Send; editing a scheduled mail (title Edit Scheduled Mail), the scheduled time in place of Schedule (the same menu, with Send Now) and Done in place of Send, the toast "Scheduled mail updated"; after Discard, Keep Editing and Discard Draft. Errors of at most 4 words where they happen: "Add a recipient" and "Not an email address" on the To row, "Not a real date", "Not a valid time", "Time already passed" | Help term on Send Time: "Lagos time, on the 24 hour clock: 08:30, 17:45." | How drafts save: §3 step 4. Scheduled mail and its release: §3 step 5. Which messages carry the full signature or the slim line, and where it lands: §3 steps 8 and 9. Link addresses limited to `https://` and `mailto:`: §6. The discard question ("Discard this draft and its attachments?") and the "That time has already passed" sentence are removed: the Discard Draft button and the field error say it (§6) |
+| Composer (modal; full screen on mobile) | New Message, Reply or Forward as the title; From (the user's address), To (address chips, each removable; Cc Bcc), Cc, Bcc, Subject; the formatting bar (Bold, Italic, Underline, Strikethrough, Heading, Bulleted List, Numbered List, Quote, Link with its address field and Add Link, Clear Formatting); Attach a File and Write With AI with "Draft saved" (or "Saving…") as quiet text at the end of their row, never in the footer; the body; Show Signature under it (Hide Signature once open), which opens the signature this message will carry, full or the slim line, in its own frame ("Signature not available" when it cannot be drawn); attachments as chips with their size and Remove, each with its upload bar while it travels and a Remove on one that failed; Schedule Send (Send Date, DD/MM/YYYY; Send Time, HH:MM; Cancel, Schedule Send). Footer: Discard, Schedule (Tomorrow at 08:00, Monday at 08:00, Pick Date and Time), Send; editing a scheduled mail (title Edit Scheduled Mail), the scheduled time in place of Schedule (the same menu, with Send Now) and Done in place of Send, the toast "Scheduled mail updated"; after Discard, Keep Editing and Discard Draft. Errors of at most 4 words where they happen: "Add a recipient" and "Not an email address" on the To row, "Not a real date", "Not a valid time", "Time already passed" | Help term on Send Time: "Lagos time, on the 24 hour clock: 08:30, 17:45." | How drafts save: §3 step 4. Scheduled mail and its release: §3 step 5. Which messages carry the full signature or the slim line, and where it lands: §3 steps 8 and 9. Link addresses limited to `https://` and `mailto:`: §6. The discard question ("Discard this draft and its attachments?") and the "That time has already passed" sentence are removed: the Discard Draft button and the field error say it (§6) |
+| Composer · Write With AI (a step inside the composer) | Write With AI as the step's title with Back; Write and Tidy Up as a choice when the composer holds the person's own words; What To Say (Optional on a reply or a forward) with Dictate; Add a Note (a checkbox) opening Note with Dictate; footer Write Draft, or Tidy Email in Tidy Up. The questions: each question with its answer box and Dictate; footer Write Anyway, Write Draft. The draft: the suggested subject (when the composer's is empty) and the draft in its own frame; footer Try Again, Use Draft. Dictate while recording: Stop Recording and the time; "Writing it down"; "Microphone not allowed", "Could not transcribe". Error "Say what to write" on What To Say. Toasts "Draft added", "Write With AI is off" | Help term on What To Say: "A line on what the mail should say: agree, decline or ask, and the facts it needs." | What the AI reads and never sees, the placeholder check, the questions and the closing line: §6. Which model answers: §9 and AI Control. Where the draft lands: §3 step 12 |
 | Mailbox · Signature (`signature`) | Signature as the title; Configure in the header for `mailbox.signature` holders; Your Signature: New Mail and Reply (a segmented switch), the signature in its own frame exactly as it sends, Copy Signature; Details: Name, Job Title, Department, Email; Numbers: Mobile, Office Line, the switches Show Mobile and WhatsApp Link (WhatsApp Link only when the company allows it), Edit Numbers. Edit Numbers (a modal): Mobile, Office Line (Optional); Cancel, Save Numbers; "Not a phone number" on the field. Toasts: "Numbers saved", "Signature copied" (or "Not copied. Try again."), "Mobile hidden", "Mobile shown", "WhatsApp link off", "WhatsApp link on" | Help term on the Details title: "From your employee record and your mailbox. People change your name, title and department." | The one design and why: §1. What each line is made of and where it comes from: §3 step 7. Full or slim, and where it lands in a message: §3 steps 8 and 9. Pictures sent inside the message: §3 step 9. Dark mode and phone widths: §6 |
 | Configure Signature (wizard) | Configure Signature as the title; three steps: App Links (App Store, Google Play, each Optional), Social Links (Instagram, TikTok, LinkedIn, X, Facebook, YouTube, each Optional), What Shows (WhatsApp Links, App Links, Social Links, Legal Line as checkboxes; Confidentiality Note, Optional); Back, Next, Save Signature; "Not a web address" on a link field. Toast: "Signature saved" | Help term on Confidentiality Note: "Printed under the company line with the RC number from Settings, Organisation, when Legal Line is ticked." (A checkbox's label cannot carry a help term: it would join the label.) | Who may configure: §8. An empty link shows nothing: §6 |
 | Mailbox · Connect (sheet) | Connect Mailbox as the title; Email Address, Password; Connect. On a refused password the banner over the list reads "Mail server refused the password" with Reconnect. Errors of at most 4 words on the field: "Not an email address", "Password refused", "Mail server not found" | None | Autodiscover, the test in both directions and where the password is kept: §3 step 1, §4 |
@@ -307,9 +455,10 @@ interface copy; the copy rules apply to the chrome around them.
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Mailbox · Inbox (`inbox`) | Refresh and Compose beside the title; four stat cards two to a row (Folder, Messages, Unread, Attachments); the message list, full width | The subtitle; the Mailbox address card; the reader beside the list; the resizable divider | Tap a message: the reader opens full screen with Back, Reply and Forward, and a message laid out wider than the phone is scaled down to its width, never scrolled sideways; Compose opens the composer full screen | Mailbox from the menu drawer (it is not on the bottom bar); the six folder tabs scroll sideways along the top |
+| Mailbox · Inbox (`inbox`) | Refresh and Compose beside the title; four stat cards two to a row (Folder, Messages, Unread, Attachments); the message list, full width | The subtitle; the Mailbox address card; the reader beside the list; the resizable divider | Tap a message: the reader opens full screen with Back, Reply and Forward, Summarise Thread as a 44 px icon button beside them, and a message laid out wider than the phone is scaled down to its width, never scrolled sideways; the Summary card sits full width under the subject, its Copy Summary and Close 44 px icon buttons; Compose opens the composer full screen | Mailbox from the menu drawer (it is not on the bottom bar); the six folder tabs scroll sideways along the top |
 | Mailbox · Sent (`sent`), Drafts (`drafts`), Archive (`archive`), Spam (`spam`), Trash (`trash`) | As Inbox | As Inbox | As Inbox | As Inbox |
-| Composer (modal; full screen on mobile) | A full screen sheet: From, To, Subject as compact 44 px rows; the formatting bar in two rows of 44 px buttons; the body; Show Signature under it as a 44 px button | Nothing: the same fields as desktop | One footer row: Discard and Schedule as 44 px icon buttons, Send taking the rest of the width | Close at the top of the sheet; Discard asks once in the footer (Keep Editing and Discard Draft share the row) |
+| Composer (modal; full screen on mobile) | A full screen sheet: From, To, Subject as compact 44 px rows; the formatting bar in two rows of 44 px buttons; Attach a File and Write With AI (a 44 px button with its word) under it; the body; Show Signature under it as a 44 px button | Nothing: the same fields as desktop | One footer row: Discard and Schedule as 44 px icon buttons, Send taking the rest of the width | Close at the top of the sheet; Discard asks once in the footer (Keep Editing and Discard Draft share the row) |
+| Composer · Write With AI (a step inside the composer) | The composer's full screen sheet turns to the step: Back and the title at the top; Write and Tidy Up as 44 px segments when offered; What To Say as a three line box with Dictate (44 px) under it; Add a Note as a 44 px checkbox row; the draft at full width in its frame | Nothing: the same step as desktop | One footer row: the primary (Write Draft, Tidy Email or Use Draft) taking the rest of the width, Write Anyway or Try Again beside it | Back at the top returns to the composer with what was typed in the step kept; the sheet's close closes the composer as before |
 | Mailbox · Signature (`signature`) | Your Signature first: the New Mail and Reply switch full width (44 px segments), the signature at full width (it is at most 400 px, so it is never shrunk), Copy Signature as a 44 px icon button; then Numbers with its two switches; Configure as a 44 px icon button beside the title for holders | The Details card: a Details row at the foot of Numbers, closed, opening Name, Job Title, Department and Email as a bottom sheet | Edit Numbers opens a bottom sheet, Save Numbers full width at its foot | Mailbox from More; the seven tabs scroll sideways along the top |
 | Configure Signature (wizard) | A full screen sheet: the step number and title, the step's fields, Next full width at the bottom | Nothing: the same steps as desktop | Save Signature full width on the last step | Close at the top of the sheet; Back on the steps after the first |
 | Mailbox · Connect (sheet) | A bottom sheet: Email Address, Password, Connect full width | Nothing | Connect | Opens by itself over Mailbox; Close returns to the menu |
@@ -345,6 +494,27 @@ interface copy; the copy rules apply to the chrome around them.
   clipboard to paste into that app's own signature setting.
 - **A brand file removed** in Settings · Organisation: the next signature carries the drawn pin and
   the company name again; sent mail keeps the picture it left with.
+- **AI off, capped or not set up**: Write With AI says "Write With AI is off" and Summarise Thread
+  "AI summaries are off"; nothing in the composer or the mail changes. With no provider set up (a
+  laptop, CI) the stub cannot write a real draft, so this is what a laptop shows.
+- **A placeholder in the answer twice**: the press fails with "The AI answer could not be used. Try
+  again, or write it yourself."; the composer is untouched.
+- **The model asks when it need not, or writes when it should ask**: Write Anyway always drafts;
+  a draft that guessed shows in the step before Use Draft, so the person reads it first.
+- **A reply to a conversation moved to Spam since the composer opened**: refused with
+  `SPAM_NOT_READ`; the composer stays as it was.
+- **The original of a reply is gone** (Trash emptied): Write With AI drafts from the quoted mail
+  in the composer instead, as for a forward.
+- **A long conversation**: its last 30 messages are read, each cut at its quoted history and
+  trimmed; the summary covers those.
+- **New mail while the Summary card shows**: the card keeps what it said; Summarise Thread again
+  asks afresh because the newest message changed.
+- **A dictation that fails**: "Could not transcribe" beside Dictate; the recording is removed all
+  the same, and the person can type.
+- **A closed tab mid dictation**: the recording waits at most an hour before `export-cleanup`
+  removes it.
+- **A token or a redaction mark the model made up** (KEPT099, [PHONE]): treated as a placeholder,
+  sent back once (§6).
 
 ## 12 · Donor code
 
@@ -354,6 +524,7 @@ interface copy; the copy rules apply to the chrome around them.
 | praxis-ls | `src/jobs/mail-sync.js`, `handlers/mail-sync-scheduler.js`, `mail-idle.js` | Into `src/jobs/` per README §5.15 |
 | praxis-ls | `client/src/features/comms/inbox/` incl. `composer/` (`toolbar.tsx`, `index.tsx`, `recipient-field.tsx`, `attachment-tray.tsx`) | The rich text composer, ported with MyCity branding |
 | praxis-ls | `doc/SMART_MAIL_ENGINEERING_GUIDE.md`, `doc/SMART_MAIL_FIELD_NOTES.md` | **Read the field notes before starting** |
+| praxis-ls | `src/modules/mail/assist/` (semantic search and OCR over mail) | Not taken (§1.1): Write With AI, Tidy Up and Summarise Thread are new, on `services/ai/llm.service` and AI Control's chains |
 | praxis-ls | `src/modules/mail/signature/` (`signature.resolve`, `signature.html`, the send-time bake in `outbox.service`) | Taken in a much smaller form: the pure model then email-safe HTML, lines left out when empty, `tel:` links of digits only, baked into the queued payload and never rewritten in sent mail. Left: templates and department defaults, the designer and palette roles, the PNG card and its batch export, languages, the render cache and its invalidation handlers, gap analysis. Changed: one design for everyone; pictures sent inline (`cid:`) instead of one hosted picture of the whole card, which an image-blocking reader never saw; the slim line on replies; placed above the quoted mail instead of after it |
 
 ## 13 · Open questions
@@ -367,6 +538,9 @@ interface copy; the copy rules apply to the chrome around them.
 - Leavers: which event disconnects a deactivated person's mailbox (needs a deactivation event from
   identity).
 - Search inside message bodies: wanted, given the cost of matching every body on each keystroke?
+- Write With AI reading an attachment's contents (a PDF, a photographed form) for context: that is
+  the Image Reading job and more of a person's files sent to a model. Wanted, and on which mail?
+- A monthly AI allowance per person for mail, beside AI Control's provider caps?
 
 ## 14 · Change log
 
@@ -400,3 +574,4 @@ interface copy; the copy rules apply to the chrome around them.
   (`mail_account.server_moved`) and syncs it as its retest (§3 step 11, §7, §11). The sync scheduler
   ticks every minute to honour a changed interval; `smtp-errors.js` moved to `services/mail/`.
 - 20/10/2026 · TB · Nothing in the mailbox changed. Always Show Images' `sender_address` is an email address, marked `address:none` in the contract so gate 22 (addresses picked, never typed, `docs/guides/addresses.md`) knows it is not a place.
+- 22/10/2026 · TB · Write With AI and Summarise Thread, from TB's brief and eight answers (§1.1; M10's mail AI brought forward): in the composer, a step that drafts a reply, a forward's note or a new message from the conversation, What To Say and a note (each dictated or typed), or tidies the person's words, asking up to three questions first when a fact only the person knows is missing, then Use Draft; in the reader, a Summary card (gist, Key Points, Asked of You) kept until new mail (`mail_thread_summary`, migration 10300). Actions `mail-draft`, `mail-tidy`, `mail-summary` (Default) and `mail-dictation` (Transcription), personal data. Contact details are swapped for tokens before anything leaves and put back in the draft; every answer is checked for placeholders. §1, §1.1, §2 to §14 updated.
