@@ -1,6 +1,7 @@
 import { created, fail, invalid, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, managerOf, refKey, teamOf } from "../data/people";
 import type {
+  AnalyticsPerson,
   KeyResult,
   KeyResultDetail,
   KeyResultMonth,
@@ -8,6 +9,7 @@ import type {
   KpiMonth,
   Objective,
   OrganisationalGoal,
+  PerformanceAnalytics,
   PerformancePeriod,
   Plan,
   PlanDetail,
@@ -16,25 +18,13 @@ import type {
   ScorecardLine,
   TargetChange,
 } from "@mycity/contract/contract.gen.ts";
+import { exportFile } from "./shared";
 import { CONTRIBUTIONS, DEPT, deptId, KPIS as FUNCTION_KPIS, OBJECTIVES, ORG_GOALS, PERIOD, PLANS, SCORECARDS, TARGET_CHANGES } from "../data/performance";
-
-route("GET /api/v1/performance/analytics", () =>
-  ok({
-    goals_on_track: "11 of 14", reviews_completed: "18 of 25", average_self: "4.1", average_manager: "3.9",
-    completion: { labels: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"], values: [52, 58, 61, 67, 71, 78] },
-    by_department: [
-      { label: "Content", pct: 88, value: "88%" }, { label: "Engineering", pct: 81, value: "81%" }, { label: "Operations", pct: 76, value: "76%" },
-      { label: "Finance", pct: 72, value: "72%" }, { label: "Marketing & Sales", pct: 58, value: "58%", emphasis: "warn" }, { label: "Studio", pct: 66, value: "66%" },
-    ],
-    gap: [["Content", "4.3", "4.0", "-0.3"], ["Finance", "4.5", "4.4", "-0.1"], ["Engineering", "4.0", "4.0", "0.0"], ["Operations", "4.1", "3.9", "-0.2"], ["Marketing & Sales", "4.0", "3.6", "-0.4"], ["Studio", "3.8", "3.7", "-0.1"]].map(([department, self, manager, gap]) => ({ department, self, manager, gap })),
-    gap_cycle: "Q3 2026",
-  }),
-);
 
 /* ------------------------------------------------------------------ *
  * The contract's endpoints (docs/guides/performance.md §5), on the data in ../data/performance.ts.
- * The interim Analytics route above keeps that screen working until PR 5 replaces it; the reviews'
- * endpoints are in ./reviews.ts. Each PR wires the rest of the contract's endpoints as it lands.
+ * The reviews' endpoints are in ./reviews.ts; Analytics is at the foot of this file. Each PR
+ * wires the rest of the contract's endpoints as it lands.
  * ------------------------------------------------------------------ */
 
 const PERIODS: PerformancePeriod[] = [PERIOD];
@@ -803,3 +793,89 @@ route("POST /api/v1/performance/scorecards/:id/submit", (req) => {
   c.updated_at = now();
   return ok(cardFor(req, c));
 });
+
+/* ------------------------------------------------------------------ *
+ * Analytics (§6.21, PR 5): the quarter's figures from the data above, and the rounds, reviews and
+ * commitments PRs 3 and 4 will write, invented here in the contract's shapes.
+ * ------------------------------------------------------------------ */
+
+const mean = (scores: Array<string | null>) => {
+  const s = scores.filter((x): x is string => x !== null).map(Number);
+  return s.length ? String(Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 10000) / 10000) : null;
+};
+
+function analyticsOf(departmentId: string | undefined): PerformanceAnalytics {
+  const months = PERIOD.months;
+  const objectives = OBJECTIVES.filter((o) => !departmentId || o.department_id === null || o.department_id === departmentId);
+  const functions = [...new Set(objectives.map((o) => o.department_id))].sort((a, b) => (a === null ? -1 : b === null ? 1 : 0));
+  const scores = functions.map((d) => ({
+    department_id: d,
+    department: d === null ? null : objectives.find((o) => o.department_id === d)?.department ?? null,
+    months: months.map((m, i) => ({ month: m, score: i === 0 ? mean(objectives.filter((o) => o.department_id === d).map((o) => o.score)) : null })),
+  }));
+  const krs = OBJECTIVES.filter((o) => !departmentId || o.department_id === departmentId).flatMap((o) => o.key_results);
+  const status = (s: string) => krs.filter((k) => k.latest?.status === s).length;
+  const company = OBJECTIVES.filter((o) => o.department_id === null).map((o) => o.score);
+  const onTime = (due: number, on: number) => ({ due, on_time: on });
+  return {
+    period: { performance_period_id: PERIOD.performance_period_id, name: PERIOD.name, starts_on: PERIOD.starts_on, ends_on: PERIOD.ends_on },
+    months,
+    company_score: company.length ? mean(company) : mean(OBJECTIVES.map((o) => o.score)),
+    scores,
+    key_results: {
+      key_results: krs.length,
+      not_started: status("not_started"),
+      on_track: status("on_track"),
+      at_risk: status("at_risk"),
+      off_track: status("off_track"),
+      done: status("done"),
+      missed: status("missed"),
+      awaiting_report: krs.filter((k) => !k.latest).length,
+      recovery: krs.filter((k) => k.latest?.band === "recovery").length,
+    },
+    ratings: {
+      month: "2026-10-01",
+      counts: (["exceeds", "meets", "partly_meets", "below"] as const).map((rating) => ({ rating, count: SCORECARDS.filter((c) => c.rating === rating).length })),
+    },
+    commitments: onTime(13, 10),
+    commitments_by_function: [{ department_id: deptId, department: DEPT, months: [{ month: months[0], ...onTime(9, 7) }, { month: months[1], ...onTime(4, 3) }, { month: months[2], ...onTime(0, 0) }] }],
+    check_ins: onTime(2, 2),
+    check_ins_by_month: months.map((month, i) => ({ month, ...(i === 0 ? onTime(2, 2) : onTime(0, 0)) })),
+    reviews_closed: onTime(2, 1),
+    reviews_closed_by_month: months.map((month, i) => ({ month, ...(i === 0 ? onTime(2, 1) : onTime(0, 0)) })),
+    self_against_final: [{ department_id: deptId, department: DEPT, gap: "0.06", lines: 10 }],
+  };
+}
+
+route("GET /api/v1/performance/analytics", (req) => {
+  if (req.query.period_id && req.query.period_id !== PERIOD.performance_period_id) return notFound();
+  return ok(analyticsOf(req.query.department_id || undefined));
+});
+
+const analyticsPeople = (): AnalyticsPerson[] =>
+  SCORECARDS.filter((c) => c.status !== "draft").map((c) => ({
+    scorecard_id: c.scorecard_id,
+    employee: c.employee,
+    department: c.department,
+    reviewer: c.reviewer,
+    score_to_date: c.score_to_date,
+    rating: c.rating,
+    months_scored: c.rating ? 1 : 0,
+  }));
+
+route("GET /api/v1/performance/analytics/people", (req) =>
+  paged(analyticsPeople(), req, {
+    search: (p) => [p.employee.display_name],
+    filters: {
+      period_id: () => true,
+      department_id: (p, v) => SCORECARDS.find((c) => c.scorecard_id === p.scorecard_id)?.department_id === v,
+      rating: (p, v) => p.rating === v,
+    },
+    sort: {
+      score_to_date: (a, b) => Number(a.score_to_date ?? -1) - Number(b.score_to_date ?? -1),
+      employee: (a, b) => a.employee.display_name.localeCompare(b.employee.display_name),
+    },
+  }),
+);
+
+route("POST /api/v1/performance/analytics/people/export", (req) => exportFile(req.user!, "performance-people"));

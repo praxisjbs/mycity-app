@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 1 | 0 | 9 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 0 | 0 | 10 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
-| **Total** | **99** | **43** | **0** | **56** | **0** | **0** |
+| **Total** | **99** | **42** | **0** | **57** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -644,10 +644,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Notes**
 
+- 22/10/2026 · TB · Overview (#1) and Team (#86), with Performance PR 5 (`docs/guides/performance.md` §6.21, `docs/guides/home.md` §6): Goals On Track and My Scorecard (My Targets relabelled) are live and lead the CEO's and Staff's cards; Goals This Quarter shows each goal's progress, My Goals each line's score, the Org KPI the company's and each department's score, and the Team roster's KPI each person's score to date where the reader's Performance view reaches them. Left: nothing on Home; Open Tasks on Team waits for Workspace.
 - 22/10/2026 · TB · Overview (#1): Add Work Site offers Temporary Home only while the Attendance policy's Home Location is on (`docs/guides/attendance.md` §1.3, H6).
 - 21/10/2026 · TB · Reports (#3), from the Milestone 1 handover (a Daily Attendance report filtered to Absent came back empty: nobody is Absent until the 01:30 day-close has closed the day, so a same-day report could never list them): Daily Attendance takes a Day (Today So Far, or Last Working Day, the closed day before) and Statuses, any of them ticked (Absent only on the Last Working Day, Not In only Today; the contract's `ROSTER_STATUSES_ON`), the roster reads `statuses` together, and the file names its day and date. `1152` turns a saved report's one status into a list. Tests: `reports.test.js`, `home-contract.test.js`, `home-reports.test.js` (an absentee on the last working day is in the file), `Reports.test.tsx`. Left: nothing.
 - 21/10/2026 · TB · Overview (#1): Add Work Site's sheet opens on Hours (Usual Shift or Site Hours); on a day of a site with its own hours the Staff day strip's Shift Today shows the site's hours (`docs/guides/home.md` §3 step 10, §6). Left: nothing.
@@ -1003,7 +1004,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
-| 33 | Analytics | `analytics` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 33 | Analytics | `analytics` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Build plan** (`docs/guides/performance.md` §1.2, where each PR's checklist is ticked; PR 1 and PR 2 in
 order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
@@ -1014,10 +1015,11 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards and the contribution check, the quarter plan and its approval, agreement, target changes, the three importers; Goals, Scorecards, KPIs | PR 1 | Built | 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, the review chain, conduct, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews, ESS · My Performance | PR 2 | Built | 22/10/2026 |
 | 4 · Workspace | `m2/perf-workspace` | Commitments and their view, the month-end report, Counts Towards, initiatives, the weekly summary, performance dates on the calendar, My Commitments | PR 2 | Built | 22/10/2026 |
-| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard, the Team roster's score; the demo walk | PR 2 | Not started | |
+| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard, the Team roster's score; the demo walk | PR 2 | Built | 22/10/2026 |
 
 **Notes**
 
+- 22/10/2026 · TB · Performance PR 5 (Analytics) built: Analytics (#33) on both shells, from `GET /performance/analytics` worked out in SQL within the reader's scope: the company score as Goals shows it, the company's and each function's scores by month, key results by status with those in recovery, the rating spread at the latest closed round, commitments on time by function and month, check-ins and reviews closed on time against their Lagos deadlines (a head by the head deadline), self against final; the people table paged at 25 by score with Search People and Export (built in the worker in the asker's scope); a phone leaves off Self Against Final and lists five people with View All. Home's performance figures live (see Home's note). The assistant reads Analytics (`goals.analytics`). Tested on fixtures of the rows PRs 3 and 4 write, then against their merged code. Left: the M2 demo walk (`performance.md` §3.7), written and walked on staging once this PR is deployed there.
 - 22/10/2026 · TB · Performance PR 3 (Reviews) built: monthly rounds (job `review-cycles` on the next month's first business day, Open Round, Close Round), the check-in with evidence, automatic lines and proposed scores, self first (409 `CHECK_IN_FIRST`), the reviewer's scores, corrective actions as tasks, Ask For Input and Give Input, the `performance.review` chain (second level, HR's Close Review, Request Changes), Mark Conduct, the review PDF, PIPs, probation reviews (Confirm, Extend 3 Months, End Employment), Dictate and Tidy With AI, the five reminders, Send Scorecard for a mid-quarter scorecard; Reviews (#32) built on both shells; My Performance (#10) API ticked and its screen built on both shells but My Commitments (PR 4), so UI and Mobile are ticked with PR 4; Home's reviews adapter on the new stages; October's staging round at every stage. Left: Score Without Check-In and a leaver's Withdrawn review (guide §11), My Commitments (PR 4).
 - 22/10/2026 · TB · Performance PR 4 (Workspace) built: commitments as Workspace tasks sent as a month and approved through `performance.commitments` (the reviewer, or the CEO for a head; a month sent by its own reviewer approved as sent), original dates fixed on approval, Rescope by the same flow, states worked out on every read, Set Recovery for a missed one, the `commitments_due` reminder; the Commitments view on Scorecards (#30) with the month, filters and search kept in the address, the figures, Waiting On You with Approve Month and Request Changes, rows opening their task and Back returning, and Export Report (the month-end delivery report per function); Counts Towards; My Week and Team This Week with Tidy With AI (`week-summary`, Default, TB 22/10/2026); performance dates on the calendar; My Commitments on ESS · My Performance (#10); ⌘K New Commitment; the staging seed. Scorecards (#30) built on both shells. Left: PRs 3 and 5; a commitment set opens no page of its own (`search:none`).
 - 22/10/2026 · TB · Performance PR 2 review fixes: plan approval binds scorecards and schedules agreement reminders; approved target changes apply to lines and re-propose key results; TBC targets unscored until locked; confirmed scores reach Scored From company key results; role reviewers agree; plan detail and lists honour scope; import reverts refused once used; Report Month per function with recovery fields when the score needs them; Edit Lines keeps every field; Goals and KPIs figures counted on the server; Change Target, Edit KPI and Record Actual follow the API. Left: PRs 3, 4 and 5.

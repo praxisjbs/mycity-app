@@ -191,13 +191,13 @@ describe("Home · Overview, by Home view", () => {
     expect(document.body.textContent).not.toMatch(TIER_3);
   }, 30000);
 
-  it("CEO: Organisational Goals and the Org KPI with no figure until it is measured, and no attendance chart", async () => {
+  it("CEO: Organisational Goals and the Org KPI with their scores, Goals On Track first, and no attendance chart", async () => {
     await overviewAs("ifeoma@mycityapp.io");
     const h = headings();
     for (const title of ["Organisational Goals", "Org KPI", "Partnership Pipeline", "Need You", "Activity Today", "Your Week"]) expect(h).toContain(title);
     // The goals are the CEO's chart, so Goals This Quarter is not drawn twice.
     for (const title of ["Attendance, 14 Working Days", "On Time", "Goals This Quarter", "My Goals This Quarter", "Upcoming Leave"]) expect(h).not.toContain(title);
-    expect(cardTitles()).toEqual(["Awaiting Your Approval", "Signed Value", "Open High Alerts", "Clocked In Today"]);
+    expect(cardTitles()).toEqual(["Goals On Track", "Awaiting Your Approval", "Signed Value", "Open High Alerts"]);
     // The CEO clears alerts: Need You says how many wait, beside the requests.
     expect(await screen.findByText("No Requests Waiting")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Clear \d+ Alerts?$/ })).toBeTruthy();
@@ -223,7 +223,7 @@ describe("Home · Overview, by Home view", () => {
     for (const label of ["Shift Today", "Clock-In", "Worksite", "Status", "Hours Today"]) expect(within(strip).getByText(label)).toBeTruthy();
     const cards = document.querySelector("ul.grid-cols-2")!;
     expect(strip.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(cardTitles()).toEqual(["My Overdue Tasks", "My Reviews Due", "My Attendance", "My Leave Left"]);
+    expect(cardTitles()).toEqual(["My Scorecard", "My Overdue Tasks", "My Reviews Due", "My Attendance"]);
     const h = headings();
     for (const title of ["My Goals This Quarter", "Upcoming Leave", "Need You", "Activity Today", "Your Week"]) expect(h).toContain(title);
     for (const title of ["Attendance, 14 Working Days", "On Time", "Partnership Pipeline", "Goals This Quarter", "Org KPI"]) expect(h).not.toContain(title);

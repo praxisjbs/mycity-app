@@ -43,6 +43,7 @@ import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS, teamOf, type MockPerson } f
 import { HISTORY, TODAY, type TodayStatus } from "../data/attendance";
 import { PARTNERS, STAGES } from "../data/partners";
 import { REQUESTS } from "../data/expenses";
+import { DEPT as PERF_DEPT, OBJECTIVES, SCORECARDS } from "../data/performance";
 import { shiftOf, todayOf } from "./attendance";
 import { attendanceRulesInForce, attendanceVersionInForce } from "./policies";
 import { me } from "./identity";
@@ -288,6 +289,26 @@ const expenseScope = (user: string) => (full(user) ? () => true : own(user));
 const OPEN_STAGES = STAGES.filter((s) => s !== "Partnership signed" && s !== "Active partnership" && s !== "On hold");
 const QUIET_DAYS = 30;
 
+/** A key result's latest status as Goals On Track's records word it (the server's tiles/work.js). */
+const KR_STATUS: Record<string, [Tone, string]> = {
+  on_track: ["ok", "On Track"],
+  done: ["ok", "Done"],
+  at_risk: ["warn", "At Risk"],
+  off_track: ["err", "Off Track"],
+  missed: ["err", "Missed"],
+  not_started: ["neutral", "Not Started"],
+  awaiting_report: ["neutral", "Awaiting Report"],
+};
+const KR_GROUPS = Object.entries(KR_STATUS).map(([value, [, label]]) => [value, label] as [string, string]);
+const SECTION: Record<string, string> = { results: "Results", kpis: "KPIs", accountability: "Accountability" };
+/** The quarter's Meets band: a line at or above it is on track. */
+const MEETS = 0.75;
+/** The mean of scores, as a whole percentage; null when none. */
+const percentOf = (scores: Array<string | null>) => {
+  const s = scores.filter((x): x is string => x !== null).map(Number);
+  return s.length ? Math.round((s.reduce((a, b) => a + b, 0) / s.length) * 100) : null;
+};
+
 const CARDS: MockCard[] = [
   /* People */
   {
@@ -520,6 +541,54 @@ const CARDS: MockCard[] = [
       columns: [["task", "Task"], ["due", "Due", { phone: true }], ["priority", "Priority", { phone: true }]],
       rows: (u) => TASKS.filter(([, who]) => who === u).map(([title, , days, p]) => rec(sid(`task:${title}`), { task: text(title), due: time(at(days, "17:00")), priority: pill(...PRIORITY[p]) }, "/workspace?tab=tasks")),
     },
+  },
+  {
+    key: "goals_on_track",
+    title: "Goals On Track",
+    domain: "work",
+    unit: "pair",
+    module: "performance",
+    records: {
+      title: "Goals On Track",
+      columns: [["key_result", "Key Result"], ["status", "Status", { phone: true }], ["score", "Score", { numeric: true, phone: true }], ["owner", "Owner"]],
+      groups: KR_GROUPS,
+      rows: () =>
+        OBJECTIVES.flatMap((o) => o.key_results).map((kr) => {
+          const status = kr.latest?.status ?? "awaiting_report";
+          const [tone, label] = KR_STATUS[status];
+          return rec(kr.okr_key_result_id, { key_result: text(`${kr.code} ${kr.statement}`), status: pill(tone, label), score: kr.latest?.score ? text(Number(kr.latest.score).toFixed(2)) : null, owner: kr.accountable ? { kind: "person", person: kr.accountable } : null }, `/performance?tab=goals&id=${kr.okr_key_result_id}`, [status]);
+        }),
+    },
+    figure: (rows) => {
+      const g = tally(rows);
+      return counted((g.on_track ?? 0) + (g.done ?? 0), { denominator: rows.length, groups: g });
+    },
+    summary: (f) => `${f.value} of ${f.denominator} key results on track or done`,
+  },
+  {
+    key: "my_targets_on_track",
+    title: "My Scorecard",
+    domain: "work",
+    unit: "pair",
+    module: "ess",
+    records: {
+      title: "My Scorecard",
+      columns: [["line", "Line"], ["section", "Section"], ["score", "Score", { numeric: true, phone: true }], ["weight", "Weight", { numeric: true, phone: true }]],
+      groups: [["on_track", "On Track"], ["behind", "Behind"], ["not_scored", "Not Scored"]],
+      rows: (u) =>
+        SCORECARDS.filter((c) => c.employee.employee_id === byKey(u)?.employee_id).flatMap((c) =>
+          c.lines.map((l) => {
+            const g = l.score === null ? "not_scored" : Number(l.score) >= MEETS ? "on_track" : "behind";
+            return rec(l.employee_target_id, { line: text(l.title), section: text(SECTION[l.section]), score: l.score === null ? pill("neutral", "Not Scored") : pill(g === "on_track" ? "ok" : "warn", Number(l.score).toFixed(2)), weight: text(`${l.weight}%`) }, `/ess?tab=my-performance&id=${l.employee_target_id}`, [g]);
+          }),
+        ),
+    },
+    figure: (rows) => {
+      const g = tally(rows);
+      return counted(g.on_track ?? 0, { denominator: (g.on_track ?? 0) + (g.behind ?? 0), groups: g });
+    },
+    caption: (f) => ((f.groups.behind ?? 0) > 0 ? `${f.groups.behind} behind` : null),
+    summary: (f) => `${f.value} of ${f.denominator} scored lines at Meets or above`,
   },
   {
     key: "approvals_awaiting_you",
@@ -780,20 +849,25 @@ const VIEWS: Record<string, { chart?: HomeChart["kind"]; donut?: HomeDonut["kind
   staff: { staff: true },
 };
 
-/** The organisation's goals this quarter. Progress is null until Performance measures it (M2). */
-const GOALS: HomeGoal[] = [
-  ["Revenue, FY Target ₦180M", 75],
-  ["Ember to Remember Delivered", 40],
-  ["Headcount, 30 by Q1", 60],
-  ["Partner Network, 10 Signed", 70],
-  ["On Time Attendance 90%", 74],
-].map(([title, days]) => ({ title: title as string, progress: null, due_on: isoDaysAhead(days as number), link: "/performance?tab=goals" }));
-const MY_GOALS: HomeGoal[] = [
-  ["24 Pieces Published", 70],
-  ["Enugu Shot List", 12],
-  ["Channel Growth", 74],
-  ["Team Reviews Filed", 9],
-].map(([title, days]) => ({ title: title as string, progress: null, due_on: isoDaysAhead(days as number), link: "/ess?tab=my-performance" }));
+/** The organisation's goals this quarter, each with its company objectives' score as a percentage; null for one with nothing scored. */
+const GOALS: HomeGoal[] = (
+  [
+    ["Revenue, FY Target ₦180M", 75, 64],
+    ["Ember to Remember Delivered", 40, 48],
+    ["Headcount, 30 by Q1", 60, 71],
+    ["Partner Network, 10 Signed", 70, 55],
+    ["On Time Attendance 90%", 74, null],
+  ] as Array<[string, number, number | null]>
+).map(([title, days, progress]) => ({ title, progress, due_on: isoDaysAhead(days), link: "/performance?tab=goals" }));
+/** A member of staff's scorecard lines due this quarter, each with its score from closed reviews; null until one closes. */
+const MY_GOALS: HomeGoal[] = (
+  [
+    ["24 Pieces Published", 70, 80],
+    ["Enugu Shot List", 12, 100],
+    ["Channel Growth", 74, 68],
+    ["Team Reviews Filed", 9, null],
+  ] as Array<[string, number, number | null]>
+).map(([title, days, progress]) => ({ title, progress, due_on: isoDaysAhead(days), link: "/ess?tab=my-performance" }));
 
 /** Who was in on each of the last 14 working days, today the last when it is one. */
 function attendanceDays(user: string) {
@@ -946,7 +1020,14 @@ function overviewOf(user: string): HomeOverview {
   };
   const donuts: Record<HomeDonut["kind"], () => HomeDonut | null> = {
     on_time: () => (may("people") ? onTimeDonut(user) : null),
-    org_kpi: () => (may("performance") ? { kind: "org_kpi", percent: null, departments: DEPARTMENTS.map((name) => ({ department_id: departmentId(name), department: name, percent: null })) } : null),
+    org_kpi: () =>
+      may("performance")
+        ? {
+            kind: "org_kpi",
+            percent: percentOf(OBJECTIVES.map((o) => o.score)),
+            departments: DEPARTMENTS.map((name) => ({ department_id: departmentId(name), department: name, percent: name === PERF_DEPT ? percentOf(OBJECTIVES.filter((o) => o.department === name).map((o) => o.score)) : null })),
+          }
+        : null,
   };
   return {
     greeting_name: m.first_name,
@@ -1838,8 +1919,8 @@ const teamRowOf = (r: RosterRow): HomeTeamRow => ({
   clock_out_at: r.clock_out_at,
   worksite: r.worksite,
   no_clock_out_yesterday: r.no_clock_out_yesterday,
-  // Performance measures KPIs and Tasks counts open tasks from M2: the server sends neither yet.
-  kpi_percent: null,
+  // The person's score to date on this quarter's scorecard; Open Tasks waits for Workspace.
+  kpi_percent: ((score) => (score ? Math.round(Number(score) * 100) : null))(SCORECARDS.find((c) => c.employee.employee_id === r.person.employee_id)?.score_to_date ?? null),
   open_tasks: null,
 });
 

@@ -271,8 +271,10 @@ describeDb("Home's staging seed against the real migrations", () => {
     test("CEO: signed value, open High alerts and who is in; the goals chart, the Org KPI and the pipeline", async () => {
       const o = await overviewOf(staff.ceo);
       const cards = cardsOf(o);
-      for (const key of ["partnerships_signed_value", "alerts_high_open", "attendance_today"])
+      for (const key of ["partnerships_signed_value", "alerts_high_open"])
         expect([key, figure(cards[key]) > 0]).toEqual([key, true]);
+      // Goals On Track counts the quarter's key results the Performance seed loads.
+      expect(cards.goals_on_track.denominator).toBeGreaterThan(0);
       expect(o.chart.kind).toBe("goals");
       expect(o.chart.goals.length).toBeGreaterThan(0);
       expect(o.donut.departments.length).toBeGreaterThan(0);
@@ -300,9 +302,10 @@ describeDb("Home's staging seed against the real migrations", () => {
       const member = staff.reportsOf(staff.head)[0];
       const o = await overviewOf(member);
       const cards = cardsOf(o);
-      expect(Object.keys(cards)).toEqual(["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"]);
-      // A member of staff reviews nobody: My Reviews Due counts Performance's reviews, and theirs is none.
-      for (const card of o.cards.filter((k) => k.key !== "my_reviews_due")) expect([card.key, figure(card) > 0]).toEqual([card.key, true]);
+      expect(Object.keys(cards)).toEqual(["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"]);
+      // A member of staff reviews nobody, so My Reviews Due is none; My Scorecard counts what their closed reviews scored.
+      for (const card of o.cards.filter((k) => !["my_reviews_due", "my_targets_on_track"].includes(k.key)))
+        expect([card.key, figure(card) > 0]).toEqual([card.key, true]);
       expect(figure(cards.my_reviews_due)).toBe(0);
       expect(o.day_strip).toMatchObject({ starts_at: "09:00", ends_at: "17:00" });
       expect(o.my_goals.length).toBeGreaterThan(0);

@@ -1,14 +1,16 @@
 "use strict";
 /**
  * Goals: the HTTP edge for Performance · Goals (docs/guides/performance.md §5): quarters,
- * organisational goals, the OKR tree, Report Month and Confirm Score, plans and target changes.
+ * organisational goals, the OKR tree, Report Month and Confirm Score, plans and target changes;
+ * and Performance · Analytics (§6.21).
  */
-const { ok, created, noContent } = require("../../shared/http/respond");
+const { ok, created, accepted, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf } = require("../../shared/rbac/scope");
 const { withActor } = require("../../shared/events/emit");
 const service = require("./goals.service");
 const okrs = require("./goals.okrs");
+const analytics = require("./goals.analytics");
 
 const id = (req) => req.validated.params.id;
 
@@ -49,4 +51,8 @@ module.exports = {
 
   changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query)),
   requestChange: async (req, res) => created(res, await service.requestChange(withActor(req), scopeOf(req), req.validated.body)),
+
+  analytics: async (req, res) => ok(res, await analytics.figures(req.validated.query, scopeOf(req))),
+  analyticsPeople: async (req, res) => sendPaged(res, await analytics.people(req.validated.query, scopeOf(req))),
+  exportAnalyticsPeople: async (req, res) => accepted(res, await analytics.requestExport(withActor(req), req.validated.body)),
 };

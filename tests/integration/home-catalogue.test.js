@@ -179,11 +179,11 @@ describeDb("the KPI catalogue against the real migrations", () => {
       });
       expect(await pick("ceo", "ceo")).toEqual({
         source: "view",
-        ids: ["approvals_awaiting_you", "partnerships_signed_value", "alerts_high_open", "attendance_today"],
+        ids: ["goals_on_track", "approvals_awaiting_you", "partnerships_signed_value", "alerts_high_open"],
       });
       expect(await pick("staff", "staff")).toEqual({
         source: "view",
-        ids: ["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"],
+        ids: ["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"],
       });
     });
   });

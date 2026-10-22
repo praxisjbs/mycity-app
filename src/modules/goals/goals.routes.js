@@ -18,6 +18,8 @@
  *   GET   /plans · /plans/:id                              `performance` view
  *   POST  /plans/:id/submit                                `performance` create, goals.company or goals.function
  *   GET   /target-changes · POST /target-changes           view · edit: opens performance.target_change
+ *   GET   /analytics · /analytics/people                   `performance` view: the quarter's figures and its people, in scope
+ *   POST  /analytics/people/export                         `performance` export: the people table as a workbook (202)
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -91,5 +93,13 @@ route(router, "get", "/target-changes",
 route(router, "post", "/target-changes",
   { body: g.TargetChangeCreate, response: g.TargetChange, summary: "Ask to change a binding target" },
   requirePermission("performance", "edit"), controller.requestChange);
+
+route(router, "get", "/analytics",
+  { query: g.PerformanceAnalyticsQuery, response: g.PerformanceAnalytics, summary: "Performance Analytics" }, view, controller.analytics);
+route(router, "get", "/analytics/people",
+  { query: g.AnalyticsPeopleQuery, response: g.AnalyticsPersonPage, summary: "The quarter's people, by score" }, view, controller.analyticsPeople);
+route(router, "post", "/analytics/people/export",
+  { body: g.AnalyticsExportRequest, response: c.documents.ExportFile, summary: "Export the quarter's people as a workbook" },
+  requirePermission("performance", "export"), controller.exportAnalyticsPeople);
 
 module.exports = { basePath: "/performance", surface: "staff", router };

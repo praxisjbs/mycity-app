@@ -329,12 +329,21 @@ missed commitment's Recovery task (Performance PR 4).
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,
   `ends_at`, `all_day`) through `calendar.source.js`; `organisational_goal` (`organisational_goal_id`,
   `level`, `title`, `status`, `starts_on`, `ends_on`), `employee_target` (`employee_target_id`,
-  `employee_id`, `title`, `due_on`, `scorecard_id`) and `scorecard` (`scorecard_id`, `status`) through
-  `goals.source.js`; `performance_review`
+  `employee_id`, `title`, `due_on`, `scorecard_id`, `section`, `position`, `weight`), `scorecard`
+  (`scorecard_id`, `status`, `performance_period_id`, `employee_id`, `score_to_date`), `performance_period`
+  (`performance_period_id`, `starts_on`, `ends_on`, `rules`), `okr_objective` (`okr_objective_id`,
+  `performance_period_id`, `department_id`, `organisational_goal_id`), `okr_key_result` (`okr_key_result_id`,
+  `okr_objective_id`, `code`, `statement`, `accountable_employee_id`), `okr_key_result_month`
+  (`okr_key_result_month_id`, `okr_key_result_id`, `month`, `status`, `proposed_score`, `confirmed_score`) and,
+  for a line's score, `performance_review` (`performance_review_id`, `performance_cycle_id`, `review_kind`,
+  `status`), `performance_review_item` (`performance_review_id`, `employee_target_id`, `score`) and
+  `performance_cycle` (`performance_cycle_id`, `month`) through `goals.source.js`, which owes nothing since
+  Performance PR 5 (goal progress, the Org KPI, Goals On Track, My Scorecard and the Team roster's score live,
+  22/10/2026); `performance_review`
   (`performance_review_id`, `performance_cycle_id`, `employee_id`, `reviewer_employee_id`,
   `review_type`, `status`) with `performance_cycle` (`performance_cycle_id`, `name`,
   `closes_at`) through `reviews.source.js`. The PR that changes any of these updates the adapter in
-  the same PR, and the one that defines a goal's progress makes Goals On Track and My Targets live.
+  the same PR (Performance PR 5 defined a goal's progress and made Goals On Track and My Scorecard live).
   Indexes asked by Home: `task (due_at) WHERE archived_at IS NULL AND completed_at IS NULL`,
   `calendar_event (owner_employee_id, starts_at)`, `organisational_goal (level, starts_on, ends_on)`,
   `employee_target (employee_id, due_on)`.

@@ -109,7 +109,7 @@ by PR), so the parallel three do not edit the same file; the shared exceptions a
 | 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards with the contribution check, the quarter plan and its approval, agreement, target changes and the lock, the three importers; Goals, Scorecards and KPIs screens; Home's goals adapter kept true | §3.1, §3.2, §3.5, §3.6, §6.3 to §6.7, §6.19 | 2200 to 2299 | PR 1 | Built 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, self-first, the reviewer, dotted input, second level, HR close, conduct cap, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews tab and ESS · My Performance; Home's reviews adapter kept true | §3.3, §6.10, §6.12, §6.14 to §6.17 | 2300 to 2399 | PR 2 | Built 22/10/2026 |
 | 4 · Workspace | `m2/perf-workspace` | Commitments and their approval, the Commitments view and month-end report, Counts Towards, initiatives on the board, the weekly summary with Tidy, performance dates on the calendar, My Commitments on ESS | §3.4, §6.11, §6.18 | 2400 to 2499 | PR 2 | Built 22/10/2026 |
-| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard and the Team roster's score; the M2 demo walk | §3.7, §6.21 | 2500 to 2599 | PR 2 | Not started |
+| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard and the Team roster's score; the M2 demo walk | §3.7, §6.21 | 2500 to 2599 | PR 2 | Built 22/10/2026; the demo walk waits for staging |
 
 Until a PR lands, the screens its sections build stay as they are (Coming Soon on production, the
 mock on a laptop).
@@ -189,12 +189,12 @@ line. Nothing is ticked until it is merged.
 
 **PR 5 · Analytics**
 
-- [ ] `GET /performance/analytics` (§6.21) in the `goals` module (`goals.analytics.js`), within the reader's scope
-- [ ] Analytics tab, both shells, with Export of the people table
-- [ ] Home: goal progress on Goals This Quarter, the Org KPI donut (company and per department), Goals On Track and My Scorecard tiles live, the Team roster's score; `goals.source.js` OWES cleared; `docs/DATABASE_SCHEMA.md` M2 Owes paid; `docs/guides/home.md` updated
-- [ ] Gates 9 and 10 for the whole module (every read and record type covered)
-- [ ] The M2 demo walk written into §3.7 and walked on staging
-- [ ] Docs and progress: #33 ticked; Status of #29 to #33 and #10 to Built where all three ticks stand; summary counts; this guide's §14
+- [x] 22/10/2026 · `GET /performance/analytics` (§6.21) in the `goals` module (`goals.analytics.js`), within the reader's scope, every figure in SQL; the people table `GET /performance/analytics/people` (25 a page, by score) and its Export (`POST /performance/analytics/people/export`, 202, built in the worker); integration tests on fixtures of the rows PR 3 and PR 4 write (`tests/integration/performance-analytics.test.js`)
+- [x] 22/10/2026 · Analytics tab, both shells, with Export of the people table; the mock in the contract's shapes, its INTERIM types gone
+- [x] 22/10/2026 · Home: goal progress on Goals This Quarter, the Org KPI donut (company and per department), Goals On Track and My Scorecard tiles live (My Targets relabelled), each line's score on My Goals, the Team roster's score; `goals.source.js` OWES cleared; `docs/DATABASE_SCHEMA.md` M2 Owes paid; `docs/guides/home.md` updated
+- [x] 22/10/2026 · Gates 9 and 10 for the whole module (every read and record type covered): the assistant's `goals.analytics` read and its route; `review` and `improvement_plan` stay `search:none` until PR 3 builds `reviews.search.js`
+- [ ] The M2 demo walk written into §3.7 and walked on staging: PRs 3 and 4 are merged; it is walked once this PR is deployed to staging, and written into §3.7 by the PR that records it
+- [x] 22/10/2026 · Docs and progress: #33 ticked; Status of #29 to #33 and #10 to Built where all three ticks stand (#33; #30, #32 and #10 wait for PRs 3 and 4); summary counts; this guide's §14
 
 ### 1.3 Prompts for new chats
 
@@ -402,7 +402,7 @@ and Home rows of §2 and §10.
 | Performance · Scorecards (`targets`), Commitments view | staff app | `performance` view · own, team, all | The month's commitments: commitment, person, original date, date now, state; Commitments, On Time, Late or Missed, Awaiting Approval; Waiting On You (each person's month sent to the reader) | Approve Month and Request Changes (as the flow names them); open a commitment's task and come back; Export Report (the month-end delivery report) |
 | Performance · KPIs (`kpis`) | staff app | `performance` view | The functions' operational KPIs: code, name, target, direction, frequency, October to December results and actuals, data source | New KPI and edit (`goals.function`, own function); Record Actual |
 | Performance · Reviews (`reviews`) | staff app | `performance` view · scope, plus any review that names the reader (reviewer, second level, dotted input) | The month's round: check-ins in, with reviewers, with second level and HR, closed; Waiting On You; every review in scope with its stage; PIPs | Open Round, Close Round (`performance.manage`); open a review: score, Ask For Input, Give Input, Submit Review, approve or Request Changes, Close Review, Mark Conduct, Start PIP, a probation outcome |
-| Performance · Analytics (`analytics`) | staff app | `performance` view · scope | Company and function scores by month, key results by status, the rating spread, commitments on time, check-ins and reviews on time, self against final score, people's scores | Choose the quarter and function; open a figure's records; Export |
+| Performance · Analytics (`analytics`) | staff app | `performance` view · scope | Company and function scores by month, key results by status, the rating spread, commitments on time, check-ins and reviews on time, self against final score, people's scores | Choose the quarter and function; search and sort the people; Export (`performance` export) |
 | ESS · My Performance (`my-performance`) | staff app | the employee | Score to date, rating, this month's check-in, commitments on time, agreement; My Scorecard; This Month's Check-In; My Commitments; Rolls Up To; My Reviews; a PIP when open | Agree Scorecard, Disagree With Reason; Start Check-In, Save Draft, Submit Check-In, Dictate, Tidy With AI, Add Evidence, Change Score; read a closed review and download its PDF |
 | My Workspace · Today (`today`) | staff app | every employee; managers also see their team | My Week (done this week, planned next week, blocked) with Support Needed; Team This Week for managers | write Support Needed, Tidy With AI; open a person's week |
 | My Workspace · Tasks (`tasks`) | staff app | as Workspace | Commitment and Counts Towards on the task form and panel; a Commitment pill on cards; a commitment's state, original date and recovery on its panel; initiatives, corrective actions and recovery tasks as tasks | mark a task a commitment with acceptance criteria; Send Commitments (for oneself, or a manager for someone in scope); pick the line or key result it counts towards; Rescope Commitment; Approve or Request Changes on a rescope named to the reader; Set Recovery on a missed commitment |
@@ -531,9 +531,9 @@ October round is opened for the backfill (§6.19).
 
 ### 3.7 The demo walk (PR 5 writes it)
 
-Left for PR 5 to write once PR 3 and PR 4 are merged: who signs in, in what order, on staging, to
-show the cascade, a plan's approval, an agreement, a check-in with a dictated action, a review
-through its chain, a commitment's month and Analytics.
+Left to write once PR 3 and PR 4 are merged (PR 5 merged before them, on 22/10/2026): who signs in,
+in what order, on staging, to show the cascade, a plan's approval, an agreement, a check-in with a
+dictated action, a review through its chain, a commitment's month and Analytics.
 
 ## 4 · Data
 
@@ -626,7 +626,9 @@ routes file; the module that owns each route is named.
 | `POST /performance/plans/:id/submit` | `EmptyBody` → `PlanDetail` | create, `goals.function` (or `goals.company` for the company plan) | | refuses `CONTRIBUTION_REBALANCE`, `WEIGHTS_NOT_100`, `PLAN_EMPTY`; opens `performance.plan` |
 | `POST /performance/target-changes` | `TargetChangeCreate` → `TargetChange` | edit · scope | | a binding key result or line; opens `performance.target_change` |
 | `GET /performance/target-changes` | `TargetChangeListQuery` → `TargetChangePage` | view · scope | yes, 25 | |
-| `GET /performance/analytics` (PR 5) | `PerformanceAnalyticsQuery` → `PerformanceAnalytics` | view · scope | no (aggregates); its people table is `GET /performance/analytics/people`, paged at 25 | §6.21 |
+| `GET /performance/analytics` (PR 5) | `PerformanceAnalyticsQuery` → `PerformanceAnalytics` | view · scope | no (aggregates) | `period_id` (the current quarter when none; `period` null before the first), `department_id`; §6.21 |
+| `GET /performance/analytics/people` (PR 5) | `AnalyticsPeopleQuery` → `AnalyticsPersonPage` | view · scope | yes, 25 | `period_id`, `department_id`, `rating`, `q`; sort `score_to_date`, `employee` |
+| `POST /performance/analytics/people/export` (PR 5) | `AnalyticsExportRequest` → `ExportFile` | export · scope | | 202; the people table as filtered, made in the worker (`shared/documents/exports`) |
 
 **KPIs** (`kpis`)
 
@@ -1113,22 +1115,50 @@ People, Head of Department and the others) are roles, not departments, and stay.
 
 ### 6.21 Analytics (PR 5)
 
-For the quarter and, optionally, one function, within the reader's scope, Africa/Lagos:
+For the quarter (the current one when none is picked) and, optionally, one function, Africa/Lagos,
+every figure worked out in SQL (`goals.analytics.js`). The OKR figures read the whole tree, the
+company's shared plan (§8); scorecards, reviews and commitments are read in the reader's
+`performance` scope, over the person each is about.
 
-- **Scores by month**: the company's and each function's month scores (§6.8), October, November, December.
-- **Key results by status**: counts of the latest month's statuses, and how many are in Recovery.
-- **Rating spread**: scorecards by rating at the latest closed round.
-- **Commitments on time**: per function per month, delivered on time ÷ due (§6.11).
-- **Check-ins on time** and **reviews closed on time**: per month, against their due dates.
-- **Self against final**: per department, the mean of (self score, or proposed where unchanged) minus the
-  final score over closed reviews' scored lines.
-- **People**: employee, department, reviewer, score to date, rating, months scored; paged at 25, sorted by
-  score; Export through `shared/documents/exports`.
-- **Home** (§2): Goals This Quarter progress is the mean of the latest scores of the company objectives
-  serving the goal; the Org KPI is the company's latest month score and each department's function
-  score; Goals On Track is the company and function key results On Track or Done ÷ all; My Scorecard is
-  the reader's lines at or above 0.75 ÷ their scored lines; the Team roster's score is each person's score
-  to date.
+- **Company Score**: the score Goals shows: each key result at its latest month (confirmed, else
+  proposed), each objective the mean of its key results to two places, the company the mean of the
+  company objectives. Home's Org KPI is the same figure (`goals.cascade.js` `objectiveScores`, the
+  roll-up in SQL beside its JavaScript twin).
+- **Scores by month**: the company's and each function's month scores (§6.8), October, November,
+  December, each key result's score for that month; a month with nothing scored is blank. With a
+  function picked: the company and that function.
+- **Key results by status**: the latest month's status of each key result (the function's, or every
+  one, the company's included), Awaiting Report for one with no month yet, and In Recovery: a latest
+  score under the quarter's Watch band.
+- **Rating spread**: scorecards by rating at the latest closed round (its monthly reviews closed
+  with a rating); none before a round closes.
+- **Commitments on time**: per function (the assignee's department) per month, and for the
+  quarter, counted as the Commitments view counts them (§6.11, the tasks module's commitment state):
+  the month's approved commitments not rescoped are due, open ones included, and on time when done
+  by the end of their original date in Lagos.
+- **Check-ins on time** and **reviews closed on time**: per month, and for the quarter, over the
+  quarter's monthly reviews. A check-in is due once its deadline has ended (the round's staff
+  deadline, or its head deadline for a function's head, `department.head_employee_id`) or it is in,
+  and on time when submitted by then; a review likewise against the round's close deadline and its
+  `closed_at`.
+- **Self against final**: per function, the mean of (self score, or proposed where unchanged) minus
+  the final score over the scored lines of closed monthly reviews; above zero, people rate
+  themselves higher.
+- **People**: the quarter's scorecards past draft, in scope: employee, function, reviewer, score to
+  date, rating, months scored (closed monthly reviews); paged at 25, sorted by score (highest first
+  on screen) or name, filtered by function, rating and name. **Export** (`performance` export): the
+  table as filtered, built in the worker in the asker's scope at that moment
+  (`analytics.export_requested`) and downloaded where it was asked for (`shared/documents/exports`).
+- **Home** (§2), over the quarter today falls in, each figure null (never zero) while nothing
+  behind it is scored, read through `dashboard/sources/goals.source.js`: Goals This Quarter
+  progress is the mean of the latest scores of the company objectives serving the goal; the Org KPI
+  is the company's score and each department's function score, as Goals shows them; Goals On Track
+  is the quarter's key results (the company's and every function's) whose latest month is On Track
+  or Done ÷ all of them; My Scorecard is the reader's lines at or above the quarter's Meets band ÷
+  their scored lines, a line's score being its closed monthly reviews' final scores (a Results
+  line its latest month's, a KPI or Accountability line the mean of its months, §6.9), which My
+  Goals This Quarter shows as each line's progress; the Team roster's score is each person's score
+  to date, where the reader's `performance` view reaches them.
 
 ## 7 · Events, jobs and notifications
 
@@ -1156,6 +1186,7 @@ For the quarter and, optionally, one function, within the reader's scope, Africa
 | `review.conduct_marked` | Mark Conduct | audit; the employee is not told by the system |
 | `improvement_plan.started` · `improvement_plan.closed` | Start PIP; Close PIP | notice to the employee and their reviewer |
 | `employee.probation_ending` (people, existing) | Probation Ending | handler opens the probation review; the reviewer is told |
+| `analytics.export_requested` | Export on Analytics | outbox `goals.analytics_export`: the people workbook in the asker's scope, failed when they are no longer active or may no longer export; the screen downloads it (foundation.md §6.12) |
 | `probation.decided` | HR's outcome | `organisation.service` confirms or extends; the employee is told |
 | `commitments.submitted` · `commitments.approved` · `commitments.returned` | Send Commitments; approval; Request Changes | the engine tells the approver; the person is told when someone else sent it, and of the approval or the reason it came back |
 | `commitment.rescope_requested` · `commitment.rescoped` · `commitment.rescope_refused` | Rescope Commitment; approval; Request Changes | the engine tells the approver; the person is told the outcome |
@@ -1206,14 +1237,16 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
 
 - **AI reads** (A23, paged at 25, within permissions): `goals.ai.js`: `goals.okrs` (a function's or the
   company's objectives and key results with the latest status and score: "how is Marketing doing on Q4"),
-  `goals.trace` (what a key result rolls up to). `kpis.ai.js`: `kpis.list` (KPIs with the latest results).
+  `goals.trace` (what a key result rolls up to), `goals.analytics` (a quarter's Analytics in the asker's
+  scope, scores and counts only, citing nothing). `kpis.ai.js`: `kpis.list` (KPIs with the latest results).
   `targets.ai.js`: `scorecards.list` (score to date and rating in scope; "who is below Meets"),
   `commitments.list` (a month's commitments and their states in scope; "what did Marketing miss in
   October"). `reviews.ai.js`: `reviews.list` (stages and scores only; never
   actions, evidence, transcripts, comments, input, conduct or PIPs).
 - **AI routes**: "do my check-in" → `ess.my-performance` with `check_in=1`; "set my commitments" →
   `workspace.tasks` with `new=1&commitment=1` (New Task with Commitment ticked); "open Ada's scorecard" → `performance.targets` with the
-  scorecard; "report the month" → `performance.goals` with `report=1`.
+  scorecard; "report the month" → `performance.goals` with `report=1`; "see performance analytics" →
+  `performance.analytics`.
 - **Feature AI** (§6.17, §6.18): `review-dictation` (Transcription), `review-cleanup` (Default),
   `week-summary` (Default), each registered in `src/services/ai/actions.js` with `chosen_by` TB,
   `chosen_at` 2026-10-22, `personal_data` true, and its prompt in `src/services/ai/prompts/<key>.md`.
@@ -1246,7 +1279,7 @@ is listed here as tier 1 or tier 2.**
 | Performance · Scorecards (`targets`) | The quarter (desktop subtitle); Scorecards and Commitments switch. **Scorecards**: Scorecards, Agreed, Awaiting Agreement, Below Meets; filters Department, Status, Reviewer; New Scorecard; the list (Employee, Department, Reviewer, Status, Score to Date, Rating). A scorecard: the person, designation, department, reviewer, dotted line, scope; Score to Date, Rating, Weights, Agreed; Results, KPIs, Accountability, each with its weight and lines (Goal or KPI, Target, Linked To, Due, Weight, Oct, Nov, Dec, Score, an Auto pill); Contribution (key result, shares, target, OK or Rebalance); Edit Lines, Copy Last Quarter, Agree Scorecard, Disagree With Reason, Change Target, Change Reviewer. **Commitments**: the month switcher; Commitments, On Time, Late or Missed, Awaiting Approval; filters Department and State; Search People; Waiting On You (person, month, commitments, sent) with Approve Month and Request Changes (asks Reason); the list (Commitment, Person, Original Date, Due Now, State: Not Sent, Awaiting Approval, Returned, Due, On Time, Late, Missed, Rescoped); Export Report | Help term on Linked To: "The key result or KPI this line feeds. Its figures come from there." On Auto: "Worked out by the system. Your reviewer can change it with a reason." On Original Date: "The date agreed when the month was approved. It never moves." | The section weights' origin, sources and measures: §6.5. Contribution rules: §6.5. Commitment states' arithmetic: §6.11 |
 | Performance · KPIs (`kpis`) | The quarter (desktop subtitle); function chips; KPIs, Met Last Month, Not Met, Awaiting Actual; New KPI; the list (KPI ID, KPI, Target, Direction, Oct, Nov, Dec as Met, Not Met or N/A with the actual). A KPI opens: Formula, Unit, Direction, Target, Frequency, Data Source, the months with actual and comment, Lines Using It; Record Actual, Edit KPI | Help term on N/A: "No eligible cases this month. It never counts as met." | That KPIs are not scored at function level and never repeat a key result: §6.5 |
 | Performance · Reviews (`reviews`) | The month (desktop subtitle); the month switcher; Check-Ins In, With Reviewers, With HR, Closed; Waiting On You (each review that needs the reader: Score, Approve, Give Input); the list (Employee, Reviewer, Stage, Due, Score, Rating), filters Department, Stage, Kind; Reviews and PIPs switch; Open Round, Close Round. A review: the person, month, reviewer, stage (Chain: Check-In, Reviewer, Second Level, HR); per line the target, actual, evidence, the employee's action, Proposed, Self (with reason), Final, an Auto pill; Input from the dotted manager; Done This Month, Ongoing, Next Month; This Month (on time, late and absent days; recognitions received); Score This Month, Score to Date, Rating; Corrective Actions; Comment; Submit Review, Ask For Input, Approve, Request Changes, Close Review, Mark Conduct, Start PIP; for a probation review Confirm, Extend 3 Months, End Employment; Download PDF once closed. Waiting state: "Waiting for the check-in." | Help term on Proposed: "Worked out from the actual against the target." On Self: "The employee's own score, with their reason." On Not Assessable: "No evidence was given, so it does not count either way." | The self-first rule, what each reader may see, the chain's conditions and skips: §6.12, §6.13. Scoring rules: §6.9 |
-| Performance · Analytics (`analytics`) | The quarter (desktop subtitle); quarter and function switchers; Company Score, Commitments On Time, Check-Ins On Time, Reviews Closed On Time; Scores by Month; Key Results by Status; Rating Spread; Commitments On Time; Self Against Final; People (Employee, Department, Reviewer, Score to Date, Rating), Export | Help term on Self Against Final: "The employee's score minus the final score, on average. Above zero means people rate themselves higher." | How each figure is worked out: §6.21 |
+| Performance · Analytics (`analytics`) | The quarter (desktop subtitle); quarter and function switchers; Company Score, Commitments On Time, Check-Ins On Time, Reviews Closed On Time (each a percentage, with "12 of 15" under it); Scores by Month (Function, Oct, Nov, Dec; the company as Company); Key Results by Status (On Track, Done, At Risk, Off Track, Missed, Not Started, Awaiting Report, In Recovery); Rating Spread (the four ratings, the round's month under it on desktop; "No Closed Round" before one); Commitments On Time (Function, Oct, Nov, Dec as "7 of 9"); Self Against Final (Function, Self Against Final, Lines Scored); People (Employee, Department, Reviewer, Score to Date, Rating) with Search People, and Export for a reader who may export; empty: "No Quarter Yet" | Help term on Self Against Final: "The employee's score minus the final score, on average. Above zero means people rate themselves higher." | How each figure is worked out: §6.21 |
 | ESS · My Performance (`my-performance`) | The quarter and reviewer (desktop subtitle); Score to Date, Rating, This Month, Commitments On Time, Agreement; a banner when something waits: Agree Scorecard with Disagree With Reason, or Start Check-In with its due date; My Scorecard (the three sections and their lines with months and scores); This Month's Check-In (per line: Goal, Target, Actual, Evidence with Add Evidence, Action with Dictate and Tidy With AI, Proposed, Change Score; automatic lines with their figures; Done This Month, Ongoing, Next Month; Save Draft, Submit Check-In); My Commitments (this month's, each with its state and original date; Send Commitments while some are not sent); Rolls Up To (a line's path to the organisational goal); My Reviews (month, score, rating, status; a closed review opens with its final scores and Download PDF); My PIP when one is open. A dictation shows As Spoken and Tidied with Use Tidied and Keep Original | Help term on Score to Date: "Your scored lines, weighted. December's is your quarter's final." On Change Score: "Give a reason. Your reviewer sees both scores." On Evidence: "Link a task or record, attach a file, or name the source." | That the reviewer cannot see it until submitted, scoring rules, the review chain: §6.9, §6.12. How tidying works: §6.17 |
 | My Workspace · Today (`today`) (PR 4) | My Week (Done This Week, Planned Next Week, Blocked, each with its count and its tasks), Support Needed and the accepted Summary, Write Support Needed (Support Needed, Tidy With AI, Save Line; a summary shows with Use Summary and Discard Summary); Team This Week for managers (Person, Done, Planned, Blocked, Support Needed), a row opening that person's week | Help term on Support Needed: "One line on what would help you this week. Your manager sees it." | That the weekly tracker retired: this guide §3.4 |
 | My Workspace · Tasks (`tasks`) (PR 4) | On the task form: Counts Towards (Optional), Commitment (a checkbox), and once it is ticked Acceptance Criteria and Month; on a card a Commitment pill; on the panel Counts Towards (with Open), State, Original Date, Recovery (owner and date); Rescope Commitment (asks Reason), Approve Rescope and Request Changes for its approver, Set Recovery on a missed one (Owner, Due); Send Commitments in the page header, which opens Person (Optional, for a manager), Month, that month's commitments and Send Commitments | Help term on Counts Towards: "The scorecard line or key result this work is for. Done tasks show as evidence." On Commitment: "A priority for the month. Its date is fixed once approved." | Commitment approval and on-time rules: §6.11 |
@@ -1261,7 +1294,7 @@ is listed here as tier 1 or tier 2.**
 | Performance · Scorecards (`targets`) | The Scorecards and Commitments switch; Scorecards as person cards (name, rating pill, score to date); Commitments as cards (commitment, person, state pill, original date) under the month switcher | The figures (a summary line instead); the contribution table (in the scorecard's sheet) | Agree Scorecard or Approve Month, full width in the sheet; New Scorecard in the floating button | As above; a commitment card opens its task, Back returns to the list |
 | Performance · KPIs (`kpis`) | Function chips, then KPIs as cards (code, name, latest result pill) | Formula and data source (in the KPI's sheet) | Record Actual, full width in the sheet | As above |
 | Performance · Reviews (`reviews`) | Waiting On You as cards first, then the month's reviews as cards (person, stage pill, due) | The figures (a summary line instead); the list's filters behind Filter | A review opens full screen with one line per card and Submit Review, Approve or Close Review in its footer | As above |
-| Performance · Analytics (`analytics`) | The four figures two to a row, then Scores by Month | Self Against Final and the People table beyond 5 rows (View All opens a sheet) | none | As above |
+| Performance · Analytics (`analytics`) | The quarter and function switchers, the four figures two to a row, then Scores by Month | Self Against Final; the People table beyond 5 rows (View All opens a sheet with Search People and Export) | none | As above |
 | ESS · My Performance (`my-performance`) | The banner when something waits, the five figures two to a row, then icon cards: My Scorecard, This Month's Check-In, My Commitments, Rolls Up To, My Reviews | The subtitle; the month columns of My Scorecard (the latest score per line, months in the line's sheet) | Start Check-In, full width; the check-in is a full-screen sheet, one line per card, Dictate a 44 px round button, Submit Check-In in its footer | Bottom bar Self-Service; the ESS tabs along the top |
 | My Workspace · Today (`today`) (PR 4) | My Week as one card (three counts and Support Needed) under the existing Today cards | Team This Week beyond 5 people (View All opens a sheet) | Write Support Needed in the card's sheet | Bottom bar Workspace |
 
@@ -1334,7 +1367,7 @@ are created by the PR that writes them: an empty prompt or template would be loa
 | 2 | `goals/*` (but not `goals.analytics.js`), `kpis/*`, `targets.{service,repo,routes,controller,events,ai,search,import,weights}.js`; `shared/import` (`extract`); `dashboard/sources/goals.source.js` | `Goals.tsx`, `Kpis.tsx`, `Scorecards.tsx` | `seeds/staging/45_performance_plan.js`; `seeds/staging/performance/` (the two workbooks) |
 | 3 | `reviews/*`; `targets.progress.js`; `ess.performance.js` and the ESS routes; `dashboard/sources/reviews.source.js`; `services/ai/prompts/review-{dictation,cleanup}.md`; `templates/documents/review-summary.html` | `Reviews.tsx`, `ReviewPage.tsx`, `CheckIn.tsx`; `my/MyScorecard.tsx`, `my/MyReviews.tsx`; `app/src/features/ess/Performance.tsx` | `seeds/staging/46_performance_reviews.js` |
 | 4 | `targets.commitments.js` and its routes in `targets.routes.js`, its events and flow handler in `targets.events.js`, its read in `targets.ai.js`; `tasks/*`, `calendar/*`, `workspace/*`; `services/ai/prompts/week-summary.md`; `commitment_set` in `shared/route-map.js` | `Commitments.tsx` and the Scorecards and Commitments switch at the top of `Scorecards.tsx`; `my/MyCommitments.tsx`; `app/src/features/workspace/*`; its mock routes in `app/src/api/mock/modules/workspace.ts` | `migrations/2400_performance_commitments.sql`; `seeds/staging/47_performance_commitments.js`; `docs/guides/workspace.md` |
-| 5 | `goals.analytics.js` and its route; `dashboard/{dashboard.layout,dashboard.team}.js`, `dashboard/kpi-catalog/tiles/work.js` | `Analytics.tsx` | `docs/guides/home.md` |
+| 5 | `goals.analytics.js` and its routes; `dashboard/{dashboard.layout,dashboard.team}.js`, `dashboard/kpi-catalog/tiles/work.js`; built: also `goals.{routes,controller,events,ai}.js` (a few lines each), `goals.cascade.js` (`objectiveScores`), `dashboard/sources/goals.source.js`, `dashboard/dashboard.controller.js` | `Analytics.tsx`; built: also the Analytics and Home mocks and `app/src/api/types/performance.ts` (Analytics left it) | `docs/guides/home.md` |
 
 Shared files more than one parallel PR touches, merged by rebase: `src/services/ai/actions.js` (PR 3 and
 PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actions), `contract.gen.ts`
@@ -1354,6 +1387,20 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 - **M3 hand-off**: the caution letter and the conduct mark from upheld sanctions. GE, at M3's start.
 
 ## 14 · Change log
+
+- 22/10/2026 · TB · PR 5 built: Performance Analytics (`GET /performance/analytics`, its people table
+  and Export), every figure in SQL within the reader's scope (§6.21); the Analytics tab on both shells;
+  Home's goal progress, Org KPI, Goals On Track, My Scorecard (My Targets relabelled), each line's score
+  on My Goals and the Team roster's score; the assistant's `goals.analytics`. What differs from §5,
+  §6.21 and §10: the analytics contract was reshaped to what §6.21 and §10 name (scores by month per
+  function, key results by every status, the round's ratings, check-ins, reviews and commitments on
+  time by month, self against final, people with their reviewer and months scored, the export request);
+  the Company Score and Home's Org KPI are the score Goals shows (each key result at its latest month),
+  one SQL definition in `goals.cascade.js`; Key Results by Status adds In Recovery; a function's head
+  checks in by the head deadline; the people table sorts by score or name and Export is `performance`
+  export. §2: a figure does not open its records (§10 lists none, and Scorecards does not yet open a
+  scorecard from a link); the people are searched and sorted. Merged after PRs 3 and 4: commitments on
+  time count as the Commitments view does (open ones due). The demo walk (§3.7) waits for staging.
 
 - 22/10/2026 · TB · PR 3 merged with PR 4: the automatic commitments line (§6.10) and My Performance's
   Commitments On Time read `targets.commitments` `monthFigures`, PR 4's own count, so the line, the
