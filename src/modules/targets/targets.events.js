@@ -21,6 +21,16 @@ const EVENTS = defineEvents("performance", {
   "scorecard.agree_due": { summary: "A binding scorecard is still waiting for an agreement" },
   "scorecard.bound": { summary: "A scorecard became binding with its function's plan" },
   "scorecard.line_target_changed": { summary: "A scorecard line's target changed on an approved target change" },
+  "scorecard.sent": { summary: "A scorecard drafted after its plan bound was sent for approval on its own" },
+  "scorecard.amendment_decided": { summary: "A scorecard sent on its own was approved or returned" },
+});
+
+defineNotification(EVENTS.SCORECARD_AMENDMENT_DECIDED, {
+  to: [{ users: (e, client) => loginsOf(client, e.payload.tell_employee_ids || []) }],
+  who: "The employee and the reviewer on approval; the sender on a return",
+  title: (e) => (e.payload.approved ? `Your ${e.payload.period || ""} scorecard is ready to agree`.replace("  ", " ") : e.payload.employee_name ? `${e.payload.employee_name}'s scorecard needs changes` : "A scorecard needs changes"),
+  body: (e) => (e.payload.approved ? "It was approved." : e.payload.reason || ""),
+  include_actor: true,
 });
 
 defineNotification(EVENTS.SCORECARD_AGREED, {

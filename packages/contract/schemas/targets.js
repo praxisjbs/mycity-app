@@ -186,6 +186,8 @@ const ScorecardDetail = Scorecard.extend({
   contributions: z.array(Contribution),
   can_edit: z.boolean(),
   can_agree: z.boolean(),
+  can_send: z.boolean(),
+  amendment_instance_id: uuid.nullable(),
 }).strict();
 
 /** Where a new scorecard's lines come from: the person's last quarter, a colleague's scorecard, or none. */
@@ -395,6 +397,8 @@ const TABLES = {
       contributions: "the split key results its lines share",
       can_edit: "the reader may change its lines now",
       can_agree: "the reader is its employee or reviewer and has not agreed",
+      can_send: "a scorecard drafted after its plan bound, ready for the reader to send as a plan amendment (§11)",
+      amendment_instance_id: "the pending performance.plan approval holding this scorecard alone, if sent",
     },
   },
   ScorecardCreate: {

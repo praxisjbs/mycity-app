@@ -169,15 +169,62 @@ const ReviewItem = z
   })
   .strict();
 
-/** A task done in the review's month, as the review lists it. */
+/** Where a task of the month stands for the check-in: done in it, still open in it, due the month after. */
+const TaskBucket = z.enum(["done", "ongoing", "next_month"]);
+
+/** A task of the review's month, as the check-in and the review list it (P15). */
 const ReviewTask = z
   .object({
     task_id: uuid,
     number: z.string(),
     title: z.string(),
     status: z.string(),
+    due_at: isoDateTime.nullable(),
     completed_at: isoDateTime.nullable(),
     employee_target_id: uuid.nullable(),
+    bucket: TaskBucket,
+  })
+  .strict();
+
+/** How many tasks each bucket holds: the lists carry the first 25 of each. */
+const ReviewTaskCounts = z
+  .object({
+    done: z.number().int().min(0),
+    ongoing: z.number().int().min(0),
+    next_month: z.number().int().min(0),
+  })
+  .strict();
+
+/** The month around a review, read only and never scored (G6): attendance and recognitions. */
+const ReviewContext = z
+  .object({
+    on_time: z.number().int().min(0),
+    late: z.number().int().min(0),
+    absent: z.number().int().min(0),
+    recognitions: z.number().int().min(0),
+  })
+  .strict();
+
+/** A corrective action as the review shows it; its task is made when the reviewer submits. */
+const ReviewAction = z
+  .object({
+    performance_review_item_id: uuid,
+    title: z.string(),
+    owner: PersonRef,
+    due_on: isoDate,
+    task_id: uuid.nullable(),
+    task_number: z.string().nullable(),
+    task_status: z.string().nullable(),
+  })
+  .strict();
+
+/** One step of a review's chain, as the review and its PDF show it. */
+const ReviewStep = z
+  .object({
+    key: z.enum(["check_in", "reviewer", "second_level", "hr"]),
+    state: z.enum(["done", "current", "waiting", "skipped"]),
+    person: z.string().nullable(),
+    at: isoDateTime.nullable(),
   })
   .strict();
 
@@ -192,12 +239,15 @@ const ReviewAllowed = z
     give_input: z.boolean(),
     mark_conduct: z.boolean(),
     decide_probation: z.boolean(),
+    decide: z.boolean(),
+    start_pip: z.boolean(),
   })
   .strict();
 
 /** GET /performance/reviews/:id */
 const ReviewDetail = Review.extend({
   dotted: PersonRef.nullable(),
+  second_level: PersonRef.nullable(),
   dotted_input: z.string().nullable(),
   dotted_input_at: isoDateTime.nullable(),
   conduct_breach: z.boolean(),
@@ -208,10 +258,21 @@ const ReviewDetail = Review.extend({
   workflow_instance_id: uuid.nullable(),
   items: z.array(ReviewItem),
   tasks: z.array(ReviewTask),
+  task_counts: ReviewTaskCounts,
+  actions: z.array(ReviewAction),
+  chain: z.array(ReviewStep),
+  context: ReviewContext.nullable(),
+  improvement_plan_id: uuid.nullable(),
   can: ReviewAllowed,
 }).strict();
 
-/** A corrective action, created as a task for its owner pointing at the review (§6.16). */
+/** :id and :item_id of a review's item (its dictation). */
+const ReviewItemParams = z.object({ id: uuid, item_id: uuid }).strict();
+
+/**
+ * A corrective action on an item scored below its target (§6.16): kept on the item while the
+ * reviewer works, and made a task for its owner, pointing at the review, when the review is submitted.
+ */
 const CorrectiveAction = z
   .object({
     performance_review_item_id: uuid,
@@ -300,8 +361,12 @@ const ReviewCheckIn = z
     reviewer: PersonRef,
     items: z.array(ReviewItem),
     tasks: z.array(ReviewTask),
+    task_counts: ReviewTaskCounts,
   })
   .strict();
+
+/** POST /ess/performance/check-in/evidence: the fields beside the file, the item it is evidence for. */
+const EvidenceUpload = z.object({ performance_review_item_id: uuid }).strict();
 
 /** PUT /ess/performance/check-in: Save Draft. */
 const ReviewCheckInSave = z.object({ items: z.array(ReviewCheckInItemSave).max(60) }).strict();
@@ -431,6 +496,52 @@ const PipClose = z
     path: ["ends_on"],
   });
 
+/* ------------------------------------------------------------------ *
+ * The closed review's PDF (templates/documents/review-summary.html, §6.12)
+ * ------------------------------------------------------------------ */
+
+/** One line of the PDF: what was aimed for, what came in, and each score. */
+const ReviewSummaryLine = z
+  .object({
+    section: z.string(),
+    title: z.string(),
+    target: z.string(),
+    actual: z.string(),
+    evidence: z.string(),
+    proposed: z.string(),
+    self: z.string(),
+    final: z.string(),
+    auto: z.boolean(),
+    note: z.string().nullable(),
+    action: z.string().nullable(),
+  })
+  .strict();
+
+/** The variables of templates/documents/review-summary.html, every value as it is printed. */
+const ReviewSummaryVars = z
+  .object({
+    title: z.string(),
+    employee_name: z.string(),
+    job_title: z.string().nullable(),
+    department: z.string().nullable(),
+    reviewer_name: z.string(),
+    month: z.string(),
+    closed_on: z.string(),
+    score_month: z.string(),
+    score_to_date: z.string(),
+    rating: z.string(),
+    conduct_note: z.string().nullable(),
+    outcome: z.string().nullable(),
+    lines: z.array(ReviewSummaryLine),
+    done: z.array(z.string()),
+    ongoing: z.array(z.string()),
+    next_month: z.array(z.string()),
+    actions: z.array(z.object({ title: z.string(), owner: z.string(), due: z.string() }).strict()),
+    input: z.object({ name: z.string(), text: z.string() }).strict().nullable(),
+    chain: z.array(z.object({ step: z.string(), name: z.string(), at: z.string() }).strict()),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const REVIEW_VIRTUAL = {
   round_name: "performance_cycle.name",
@@ -457,24 +568,49 @@ const TABLES = {
       evidence_link: "linkFor(evidence_entity_type, evidence_entity_id)",
     },
   },
-  ReviewTask: { table: "task" },
+  ReviewTask: {
+    table: "task",
+    virtual: { bucket: "done, ongoing or due next month, from completed_at and due_at against the review's month" },
+  },
+  ReviewTaskCounts: { table: null, reason: "how many tasks each bucket holds" },
+  ReviewContext: { table: null, reason: "the month's attendance and recognitions, counted from their own modules" },
+  ReviewAction: {
+    table: "performance_review_item",
+    virtual: {
+      title: "performance_review_item.corrective_title",
+      owner: "the person in performance_review_item.corrective_owner_id",
+      due_on: "performance_review_item.corrective_due_on",
+      task_id: "performance_review_item.corrective_task_id",
+      task_number: "the task's number",
+      task_status: "the task's status",
+    },
+  },
+  ReviewStep: { table: null, reason: "a step of the review's chain, from the review and its approval's decisions" },
+  ReviewItemParams: { table: null, reason: "path parameters" },
+  EvidenceUpload: { table: null, reason: "the multipart fields beside an evidence file" },
   ReviewAllowed: { table: null, reason: "what the reader may do now, worked out" },
   ReviewDetail: {
     table: "performance_review",
     virtual: {
       ...REVIEW_VIRTUAL,
       dotted: "the person in performance_review.dotted_employee_id",
+      second_level: "the person in performance_review.second_level_employee_id",
       items: "its performance_review_item rows",
-      tasks: "the employee's tasks done in the month",
+      tasks: "the employee's tasks of the month: done, ongoing and due next month",
+      task_counts: "how many tasks each bucket holds",
+      actions: "the corrective actions on its items",
+      chain: "its steps, from the review and its approval's decisions",
+      context: "the month's attendance and recognitions, for the reviewer, second level, Operations & People and the CEO",
+      improvement_plan_id: "the improvement plan started from it, if any",
       can: "what the reader may do now",
     },
   },
   CorrectiveAction: {
-    table: "task",
+    table: "performance_review_item",
     virtual: {
-      performance_review_item_id: "the item it corrects; the task points at the review",
-      owner_employee_id: "written to task.primary_assignee_id",
-      due_on: "written to task.due_at: the end of that working day, Africa/Lagos",
+      title: "written to performance_review_item.corrective_title, then task.title",
+      owner_employee_id: "written to corrective_owner_id, then task.primary_assignee_id",
+      due_on: "written to corrective_due_on, then task.due_at: the end of that working day, Africa/Lagos",
     },
   },
   ItemScore: { table: "performance_review_item" },
@@ -495,7 +631,8 @@ const TABLES = {
       due_on: "the round's check-in deadline for the person",
       reviewer: "the person in performance_review.reviewer_employee_id",
       items: "its performance_review_item rows",
-      tasks: "the employee's tasks done in the month",
+      tasks: "the employee's tasks of the month: done, ongoing and due next month",
+      task_counts: "how many tasks each bucket holds",
     },
   },
   ReviewCheckInSave: { table: null, reason: "the employee's check-in items" },
@@ -523,6 +660,8 @@ const TABLES = {
     virtual: { lines: "replaces the improvement_plan_line rows" },
   },
   PipClose: { table: "improvement_plan" },
+  ReviewSummaryLine: { table: null, reason: "a line of the review's PDF, as printed" },
+  ReviewSummaryVars: { table: null, reason: "the variables of templates/documents/review-summary.html, not a row" },
 };
 
 module.exports = {
@@ -544,9 +683,16 @@ module.exports = {
   ReviewListQuery,
   ItemLine,
   ReviewItem,
+  TaskBucket,
   ReviewTask,
+  ReviewTaskCounts,
+  ReviewContext,
+  ReviewAction,
+  ReviewStep,
   ReviewAllowed,
   ReviewDetail,
+  ReviewItemParams,
+  EvidenceUpload,
   CorrectiveAction,
   ItemScore,
   ReviewScoresSave,
@@ -570,4 +716,6 @@ module.exports = {
   PipCreate,
   PipEdit,
   PipClose,
+  ReviewSummaryLine,
+  ReviewSummaryVars,
 };

@@ -8,8 +8,8 @@
  * nothing a wrong employee id could slip past; the service reads the employee
  * from `req.user` and there is no parameter that names another.
  *
- * My Profile, My Documents (M0, track B) and My Leave (M1) are on the real API. The other
- * tabs are added here as their milestones land.
+ * My Profile, My Documents (M0, track B), My Leave (M1) and My Performance (M2) are on the
+ * real API. The other tabs are added here as their milestones land.
  */
 const express = require("express");
 const c = require("@mycity/contract");
@@ -95,5 +95,40 @@ route(router, "post", "/leave/:id/cancel",
   { params: c.common.IdParams, body: c.leave.LeaveCancel, response: c.leave.LeaveRequest,
     self: true, summary: "Cancel one of my leave requests" },
   controller.cancelLeave);
+
+/* My Performance: my quarter, my check-in and my reviews (docs/guides/performance.md §5). */
+
+route(router, "get", "/performance",
+  { response: c.ess.MyPerformance, self: true, summary: "My quarter at a glance" },
+  controller.performance);
+
+route(router, "get", "/performance/check-in",
+  { response: c.reviews.ReviewCheckIn, self: true, summary: "My open check-in" },
+  controller.checkIn);
+
+route(router, "put", "/performance/check-in",
+  { body: c.reviews.ReviewCheckInSave, response: c.reviews.ReviewCheckIn, self: true,
+    summary: "Save my check-in as a draft" },
+  controller.saveCheckIn);
+
+route(router, "post", "/performance/check-in/submit",
+  { body: c.common.EmptyBody, response: c.reviews.ReviewCheckIn, self: true,
+    summary: "Submit my check-in to my reviewer" },
+  controller.submitCheckIn);
+
+route(router, "post", "/performance/check-in/dictation",
+  { body: c.reviews.DictationRequest, response: c.reviews.Dictation, self: true,
+    summary: "Dictate my check-in's action or reason" },
+  upload.single("file", { purpose: "voice_note" }), controller.dictateCheckIn);
+
+route(router, "post", "/performance/check-in/evidence",
+  { body: c.reviews.EvidenceUpload, response: c.documents.DocumentRef, self: true,
+    summary: "Add a file as a line's evidence" },
+  upload.single("file", { purpose: "performance_evidence" }), controller.addEvidence);
+
+route(router, "get", "/performance/reviews",
+  { query: c.ess.MyReviewListQuery, response: c.ess.MyReviewPage, self: true,
+    summary: "My reviews" },
+  controller.myReviews);
 
 module.exports = { basePath: "/ess", surface: "staff", router };

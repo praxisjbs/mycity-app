@@ -66,6 +66,25 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-20",
     built: true,
   }),
+  // Performance PR 3 (docs/guides/performance.md §6.17, P19): both carry personal data.
+  "review-dictation": Object.freeze({
+    label: "Review Dictation",
+    module: "performance",
+    job: "transcription",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-10-22",
+    built: true,
+  }),
+  "review-cleanup": Object.freeze({
+    label: "Tidy Review",
+    module: "performance",
+    job: "default",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-10-22",
+    built: true,
+  }),
   "integration-test": Object.freeze({
     label: "Connection Test",
     module: "integrations",

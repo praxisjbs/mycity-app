@@ -19,4 +19,5 @@ module.exports = {
   agree: async (req, res) => ok(res, await service.agree(withActor(req), scopeOf(req), id(req))),
   disagree: async (req, res) => ok(res, await service.disagree(withActor(req), scopeOf(req), id(req), req.validated.body)),
   contributions: async (req, res) => sendPaged(res, await service.contributions(req.validated.query)),
+  submit: async (req, res) => ok(res, await service.submit(withActor(req), scopeOf(req), id(req))),
 };
