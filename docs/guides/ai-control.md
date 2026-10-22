@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | AI Control · Actions, Models and Spend (#98 to #100) |
 | Status | Built |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: TB's answers of 20/10/2026 on AI providers, transcription and AI Control (§1.1, with
 `integrations.md` §1.2), MILESTONES §15 (M10: governance, spend caps, model configuration, per-module
@@ -115,9 +115,13 @@ With Praxis AI's guide (21/10/2026, `praxis-ai.md` §1.1):
 
 33. **Data Answers may run up to 5 reads a question**, one after another, each checked as decision 22
     says. Decision 22's "one of the modules' reads" becomes "up to five". Still never SQL.
-34. **Cannot Use Tools.** Data Answers chooses its reads by calling tools, which only Gemini's
-    vendor does. On an action marked `tools`, a model of any other provider is passed by and shows
-    **Cannot Use Tools**, as Cannot Search does for Find Prices.
+34. **Every text model IT can choose answers, tools included.** Data Answers chooses its reads by
+    calling tools (function calling), which Gemini, Anthropic, DeepSeek, Groq and OpenAI all offer.
+    Each provider's vendor file sends tools and returns the calls, so any text model put first or as
+    a fallback on Data Answers' chain works. Groq's and OpenAI's text models, which Edit Chain
+    already accepts, gain the text answer `llm.service` never called them for: until now such a
+    link was passed by without a word. DeepSeek stays off Data Answers by decision 23 (personal
+    data), not by this one.
 35. **Voice Question** (`praxis-ai-voice`) is registered on Transcription, personal data: a question
     spoken on Praxis AI · Ask. Data Answers is now built.
 
@@ -218,9 +222,7 @@ returned by the press.
    - **Skipped**: its provider said its quota is used up and the reset time it gave has not passed;
    - **At Cap**: its provider has reached its monthly cap;
    - **Personal Data**: it is DeepSeek and the action carries personal data;
-   - **Cannot Search**: the action searches (Find Prices) and the model has no search;
-   - **Cannot Use Tools**: the action calls tools (Data Answers) and the model's provider cannot
-     (decision 34).
+   - **Cannot Search**: the action searches (Find Prices) and the model has no search.
    The rest are **Ready**.
 3. Call the first Ready model. A refusal for quota or rate limit, a failure, or no answer within
    30 seconds moves to the next. A refusal that says when the provider will take requests again
@@ -301,7 +303,7 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 - Registered in PR2: Voice Note Transcription (Transcription, personal data, TB), Tidy Policy
   (Default, personal data, TB, `policies.md` §9), Data Answers (Default, personal data, TB,
   decision 27), Find Prices (Deep Reasoning, none, TB). With Praxis AI (`praxis-ai.md` §6.7): Data
-  Answers built and marked `tools`, and Voice Question (Transcription, personal data). Settings · Integrations' connection test
+  Answers built, and Voice Question (Transcription, personal data). Settings · Integrations' connection test
   (`integration-test`) is registered as direct: it calls the model under test and has no chain.
 - `scripts/check/ai-actions.js` fails a build when an AI call names an action that is not
   registered, names it with anything but a literal, or a registry entry lacks its job, its
@@ -360,7 +362,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| AI Control · Actions (`actions`) | AI Control as the title; each job as a card (desktop) with its chain as First and Fallback 1 to 3, each model's name, provider and state pill (Ready, Not Set Up, Not on Key, Daily Limit, Skipped Until a time, At Cap, Personal Data, Cannot Search); Make First on each fallback (Cannot Use Tools joins the pills, decision 34); Edit Chain (First Choice, Fallback 1 to 3, each a model picker searching the models that can do the job; Embeddings First Choice only; Save Chain); Locked on Embeddings once indexed; the actions with job, first choice, Personal Data, Own Chain and Not Built Yet pills, Calls Today; an action's sheet with Make First, Edit Chain and Use Job Chain; toasts "Moved to first", "Chain saved", "Back on its job's chain" | Help terms on each job's name (what it is for, from §6.2), on Personal Data (DeepSeek is passed by) and on Own Chain | How the chain is walked and when a provider is skipped: §6.1 |
+| AI Control · Actions (`actions`) | AI Control as the title; each job as a card (desktop) with its chain as First and Fallback 1 to 3, each model's name, provider and state pill (Ready, Not Set Up, Not on Key, Daily Limit, Skipped Until a time, At Cap, Personal Data, Cannot Search); Make First on each fallback; Edit Chain (First Choice, Fallback 1 to 3, each a model picker searching the models that can do the job; Embeddings First Choice only; Save Chain); Locked on Embeddings once indexed; the actions with job, first choice, Personal Data, Own Chain and Not Built Yet pills, Calls Today; an action's sheet with Make First, Edit Chain and Use Job Chain; toasts "Moved to first", "Chain saved", "Back on its job's chain" | Help terms on each job's name (what it is for, from §6.2), on Personal Data (DeepSeek is passed by) and on Own Chain | How the chain is walked and when a provider is skipped: §6.1 |
 | AI Control · Models (`models`) | Models as the title; Find Prices; the New Prices sheet, opened by Find Prices and by Review Prices while proposals wait: the run's progress ("Batch 2 of 4"), each proposed price (model, provider, price, page) with Accept and Dismiss, Accept All, and Find More once the run ends with models still to price; Still to Price and Not Listed counts; a failed run's reason as a pill ("No Search Model"), in the sheet and beside Find Prices once it is closed; the models: name, provider and what it does, On Key (Available, Not on Key, Not Checked), Price ("$0.30 / $2.50 per M", "$0.111 an hour"), In Naira, In Chains; Provider and Show (On Key, Not on Key, Any) filters; a model's sheet with its prices, Per 1,000 Searches, In Chains, Edit Price (Input per Million, Output per Million, Audio per Million, Per Audio Hour, Per 1,000 Searches, each Optional) and Open Connection; toasts "Finding prices", "12 prices saved", "Prices saved", "Proposal dismissed" | Help terms on In Naira (the day's rate it used) and Not Listed (models the provider's page does not price; asked again after 7 days) | How Find Prices searches and why IT confirms: §1.1 decision 20, §6.4 |
 | AI Control · Spend (`spend`) | Spend as the title; All AI: spent, against its cap (a meter, the percent and "₦19K of ₦100K cap"), Month Of, One Dollar, Rates Of; each provider: Free or Paid, Not Set Up, At Cap, spent, against its cap or "no cap", calls this month; Set Cap on All AI and each paid provider (Monthly Cap, Optional; blank removes it); Spend by Day (desktop): a bar a day, each labelled 14/10, every few days on a narrow screen; By Action: action, job, calls, spent; toasts "Cap set", "Cap removed" | Help terms on All AI and on Monthly Cap (what happens once reached) | How spend is summed: §6.3 |
 
@@ -410,6 +412,7 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Decision 34 rewritten: no Cannot Use Tools state. Every provider's vendor file takes tools, so any text model IT chooses answers on Data Answers' chain, first or fallback; Groq's and OpenAI's text models, which Edit Chain accepted but no call used, answer too. §6.1 and §10.1 lose the state.
 - 21/10/2026 · GE · Decisions 33 to 35 with Praxis AI's guide (`praxis-ai.md`): up to 5 reads a question for Data Answers, the Cannot Use Tools state, Voice Question registered; §2, §6.1, §6.5 and §10.1 follow. To be built with Praxis AI.
 - 21/10/2026 · TB · Spend fixed after staging showed Spend by Day's labels run together and a bare `transcription` row in By Action: each day reads 14/10 on the shared bar chart, which keeps its labels 11 px and leaves off those that would touch (§10.1); migration 10220 moves the voice notes kept under `transcription` before the registry onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` (§4, §6.5).
 - 20/10/2026 · TB · Decisions 29 to 32 after the first Find Prices on staging returned nothing for 129 models (the answer was capped at 60 and cut short): fewer models kept, Find Prices in requests of 20 over every unpriced model with Not Listed marks, the New Prices sheet with Accept All and Find More, the Models tab opening on the models in a chain and on the key.

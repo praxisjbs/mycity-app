@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | Praxis AI · Ask and History (#67, #68) |
 | Status | Draft |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: MILESTONES §15 (M10's assistant, its definition of done) and A23 (it reads, it never
 writes), BACKEND_STRUCTURE §14 (the AI pipe, the manifests, the registry), `ai-control.md` (jobs,
@@ -65,7 +65,7 @@ their own screens would show them, and nothing more.
 | Praxis AI · History (`history`) | Staff app | `praxis_ai` view, own conversations only | This month's questions, conversations and records read; the conversations, 25 a page; questions by module | Open a conversation (back on Ask), Delete Conversation, Clear History, search conversations |
 | Floating button (phone) | Staff app, every screen | `praxis_ai` view | Praxis AI in the fan (built, F18) | Opens Ask |
 | ⌘K | Staff app | `praxis_ai` view | Ask, History, the person's own conversations, New Conversation | Open them |
-| AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; a model that cannot call tools shows Cannot Use Tools on Data Answers' chain | As built (`ai-control.md`) |
+| AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
 | Every module's manifest | Backend | | The reads Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9) |
 
 ## 3 · How the screens relate
@@ -229,13 +229,18 @@ The server turns it into `AiAnswer`:
 
 ### 6.7 The registry, AI Control and jobs
 
-- `data-answers` becomes built, and gains `tools: true`.
+- `data-answers` becomes built.
 - New action `praxis-ai-voice` (Transcription, personal data).
-- `services/ai/jobs.js` gains `TOOLS` (the providers whose vendor calls tools: Gemini) and the
-  state `cannot_use_tools` (Cannot Use Tools) for a model on an action with `tools: true` whose
-  provider is not in it. Anthropic, DeepSeek and Groq models on Data Answers' chain are passed by.
+- **Any text model IT chooses answers** (`ai-control.md` decision 34). The chain on AI Control stays
+  free: a first choice and up to three fallbacks from any connected provider. Each vendor file
+  sends tools and returns the model's calls in one shape (`toolCalls`): Gemini already does;
+  Anthropic and DeepSeek gain it; Groq and OpenAI gain a text answer with tools, which
+  `llm.service` never called them for. No state is added. DeepSeek is still passed by on Data
+  Answers because it carries personal data (decision 23).
 - `llm.service` gains `converse()`: one round with tools, through the same chain walk, redaction,
-  ledger, skips and caps as `complete()`. The assistant's loop calls it; nothing else does.
+  ledger, skips and caps as `complete()`. A model that fails mid-question hands over to the next
+  link with the conversation so far, so a fallback carries on where the first choice stopped. The
+  assistant's loop calls it; nothing else does.
 
 ### 6.8 Suggestions
 
@@ -376,6 +381,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · §6.7: no Cannot Use Tools state. Every provider's vendor file takes tools, so any text model on Data Answers' chain answers, first choice or fallback, as AI Control promises (`ai-control.md` decision 34 rewritten).
 - 21/10/2026 · GE · Written from the decisions of 21/10/2026 (§1.1), Ifeoma's request at the M1
   handover (21/10/2026) and REUSE_MAP §11: reads through the manifests only, up to 5 a question,
   routes for changes, voice in, History own only, tables from the rows. To be built.
