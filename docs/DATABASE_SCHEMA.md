@@ -317,10 +317,12 @@ scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance 
 `2300` the statuses a round (`open`, `closed`) and a review (`check_in`, `with_reviewer`, `second_level`,
 `with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
 the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action
-(`corrective_title`, `corrective_owner_id`, `corrective_due_on`, `corrective_task_id`) (Performance PR 3).
+(`corrective_title`, `corrective_owner_id`, `corrective_due_on`, `corrective_task_id`) (Performance PR 3). ·
+`2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
+missed commitment's Recovery task (Performance PR 4).
 
 **Owes:**
-- PRs 3 to 5 of `docs/guides/performance.md` use 2300 to 2599 only for a gap. The numbers 2020, 2030 and
+- PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and
   2091 were used on a withdrawn branch and are not reused.
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;

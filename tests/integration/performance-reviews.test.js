@@ -206,7 +206,12 @@ describeDb("performance reviews against the real migrations", () => {
     // Someone the review does not name and their scope does not reach: not found.
     expect((await as("musa").get(`/performance/reviews/${ids.reviewAda}`)).status).toBe(404);
     const mine = await as("ada").get("/ess/performance");
-    expect(mine.body).toMatchObject({ scorecard: expect.objectContaining({ status: "binding" }), check_in: { status: "check_in" } });
+    expect(mine.body).toMatchObject({
+      scorecard: expect.objectContaining({ status: "binding" }),
+      check_in: { status: "check_in" },
+      // This month's commitments, as the commitments module counts them: none sent yet.
+      commitments: { set_status: null, due: 0, delivered_on_time: 0 },
+    });
   });
 
   test("the check-in: proposed scores, automatic lines, a changed score needs a reason, no evidence is Not Assessable", async () => {

@@ -85,6 +85,16 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-22",
     built: true,
   }),
+  // Performance PR 4 (docs/guides/performance.md §6.18): Tidy With AI on the week, only when pressed.
+  "week-summary": Object.freeze({
+    label: "Week Summary",
+    module: "workspace",
+    job: "default",
+    personal_data: true,
+    chosen_by: "TB",
+    chosen_at: "2026-10-22",
+    built: true,
+  }),
   "integration-test": Object.freeze({
     label: "Connection Test",
     module: "integrations",

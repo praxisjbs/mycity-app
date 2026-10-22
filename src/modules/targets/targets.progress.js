@@ -7,7 +7,8 @@
  *                   the business days it came after its date, a monthly standard met, nearly met or
  *                   missed, a binary met or not. No evidence: Not Assessable, and no score
  *   commitments     approved commitments due in the month delivered by their original date ÷ those
- *                   due (overdue stay in, rescoped leave), scored as a standard. None due: blank
+ *                   due (overdue stay in, rescoped leave), as targets.commitments counts them,
+ *                   scored as a standard. None due: blank
  *   update_on_time  the check-in submitted by its due date: 1 or 0; a month before the quarter went
  *                   live, or still open before its date: blank
  *   team_reviews    the person's reviews of the round's people submitted by the review date ÷ those
@@ -84,22 +85,6 @@ function proposeOwn(line, item, { rules, cal, month, now = new Date() }) {
 /* ------------------------------------------------------------------ *
  * The automatic lines
  * ------------------------------------------------------------------ */
-
-/** Commitments due in the month (approved sets only), delivered by the end of their original date. */
-async function commitments(db, employeeId, m) {
-  return one(
-    db,
-    `SELECT count(*)::int AS due,
-            count(*) FILTER (WHERE t.completed_at IS NOT NULL
-              AND t.completed_at < ((timezone('Africa/Lagos', t.original_due_at)::date + 1)::timestamp AT TIME ZONE 'Africa/Lagos'))::int AS on_time
-       FROM task t
-       JOIN commitment_set cs ON cs.commitment_set_id = t.commitment_set_id AND cs.status = 'approved'
-      WHERE t.is_commitment AND t.primary_assignee_id = $1 AND t.commitment_month = $2::date
-        AND t.rescoped_at IS NULL AND t.status <> 'cancelled' AND t.original_due_at IS NOT NULL
-        AND t.original_due_at >= $3 AND t.original_due_at < $4`,
-    [employeeId, m.first, m.from, m.to],
-  );
-}
 
 /** The person's reviews of the round's people: submitted by the review date, and those due or done. */
 async function teamReviews(db, employeeId, cycleId, now) {
@@ -193,11 +178,12 @@ async function automatic(db, review, lines, { rules, now = new Date() }) {
     let actualText = null;
     let s = null;
     if (line.source === "commitments") {
-      const c = await commitments(db, review.employee_id, m);
-      if (c.due > 0) {
-        const pct = (100 * c.on_time) / c.due;
+      // The commitments module's own count (§6.11), so the line and the Commitments view agree.
+      const c = await require("./targets.commitments").monthFigures(db, review.employee_id, m.first);
+      if (c && c.due > 0) {
+        const pct = (100 * c.delivered_on_time) / c.due;
         actualValue = quantity(pct);
-        actualText = `${c.on_time} of ${c.due} on time`;
+        actualText = `${c.delivered_on_time} of ${c.due} on time`;
         s = scoring.standardScore({ actual: pct, target: line.target_value ?? 80, direction: "higher", unit: "%" }, r);
       }
     } else if (line.source === "update_on_time") {

@@ -1019,6 +1019,14 @@ async function openProbation(employeeId, dueOn = null) {
  * ------------------------------------------------------------------ */
 
 /** GET /ess/performance: the caller's quarter at a glance. */
+/** This month's commitments of a person, as the commitments module counts them (§6.11). */
+async function commitmentsOf(employeeId) {
+  const month = `${lagos.today().slice(0, 7)}-01`;
+  const figures = await require("../targets/targets.commitments").monthFigures(pool, employeeId, month);
+  const set = (await pool.query("SELECT status FROM commitment_set WHERE employee_id = $1 AND month = $2::date", [employeeId, month])).rows[0];
+  return { month, set_status: set ? set.status : null, due: figures ? figures.due : 0, delivered_on_time: figures ? figures.delivered_on_time : 0 };
+}
+
 async function myPerformance(actor) {
   const me = actor && actor.employee_id;
   let period = null;
@@ -1045,7 +1053,7 @@ async function myPerformance(actor) {
     check_in: open
       ? { performance_review_id: open.performance_review_id, month: day(open.month), due_on: open.status === "check_in" ? checkInDueOf(open) : day(open.due_on), status: open.status }
       : null,
-    commitments: null,
+    commitments: me ? await commitmentsOf(me) : null,
     open_pip: pip ? { improvement_plan_id: pip.improvement_plan_id, review_on: day(pip.review_on) } : null,
   };
 }

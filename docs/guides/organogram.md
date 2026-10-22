@@ -320,6 +320,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · Nothing on the Org Chart changed. Beside it in `app/src/features/ess/`, My Performance gains My Commitments (Performance PR 4, `docs/guides/ess.md`).
 - 21/10/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them, the employee record's Attendance tab becomes Work Schedule, after Job (`Employee360.tsx`, attendance's PR 3, `docs/guides/attendance.md` §6.13, §10); Reporting Line and Change Manager are untouched.
 - 19/10/2026 · TB · No change to the Org Chart: My Documents, in the ESS folder this guide shares, opens a PDF or a photo in the file viewer and draws a PDF's preview in the app (`docs/guides/ess.md` §10).
 - 19/10/2026 · TB · Download PDF downloads on the device that pressed, never by email (`docs/guides/foundation.md` §6.12, TB's decision; §3, §5 to §7, §11): the request reads and lays out the chart and queues it through `documents.generate`, answers 202 with the file pending (`ExportFile`), and the screen waits on `GET /exports/:id` and saves it. `org-chart.export.js`, the `org-chart-export` email, the three outbox handlers and the "Your organogram PDF failed" notice are gone; the `org_chart` type is an export, kept a day and never locked. A login with no email is no longer refused.

@@ -68,6 +68,8 @@ mycity-app/
 │                             goals and the workbooks in performance/ through the import engine;
 │                             46_performance_reviews.js: October 2026's round with a review at
 │                             every stage, through the reviews service and the approval engine;
+│                             47_performance_commitments.js: October's and November's commitments
+│                             in every state, through the services and the approval flow;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
 ├── seeds/staff/              MyCity's real staff (track A): staff-list.xlsx (the sheet) and roles.json
 ├── seeds/lib/                code shared by the build and staging seeds (leave-sample.js)
@@ -415,7 +417,7 @@ for this device), tested in `app/src/features/attendance/location.test.ts`.
 |---|---|
 | `tasks` | `.audience` (reporting line scope), `.recurrence` |
 | `calendar` | |
-| `workspace` | `.today`, `.analytics` (aggregator) |
+| `workspace` | `.today`, `.analytics` (aggregator), `.week` (My Week, Team This Week and Tidy With AI, Performance PR 4), `.events` (`week.summary_saved`); the screens' commitment and week parts in `app/src/features/workspace/` `Commitment.tsx` and `Week.tsx` |
 | `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.authority` (who sets which goals: the CEO, `goals.company`, `goals.function` and the function's head), `.plans` (one plan per function per quarter), `.okrs` (objectives, key results, Report Month, Confirm Score and the workbook import's writes), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the plan and target change completions: `performance.plan`, `performance.target_change`), `.workbook` (MyCity's OKR workbook as it is kept), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5) |
 | `targets` | `.weights` (sections and the contribution check), `.progress` (automatic lines, PR 3), `.commitments` (commitments and their approval, PR 4), `.import` (`scorecards`); agreement and its reminder in `.service` |
 | `kpis` | `.import` (`okr_kpis`) |
@@ -426,7 +428,11 @@ The files each Performance pull request fills are listed in `docs/guides/perform
 PR); a file still empty says which PR fills it there.
 
 Shared first filled: `shared/time/recurrence`, `services/calendar/ics`, `services/ai`
-(`llm.service`, `transcription`, prompts `review-cleanup.md` and `review-dictation.md`).
+(`llm.service`, `transcription`, prompts `review-cleanup.md`, `review-dictation.md` and `week-summary.md`).
+
+Migration `2400_performance_commitments.sql` (Performance PR 4: a rescope's reason on the task, a task
+pointing at a task for a recovery). Integration tests `tests/integration/performance-commitments.test.js`
+and `performance-commitments-seed.test.js` (the staging seed).
 
 ### 5.6 M3 · Queries & Consequence Management · GE · 26 to 30 Oct
 

@@ -7,6 +7,7 @@ import roster from "../data/roster.json";
 import { askDataExport } from "./ess";
 import { decideLocationRequest, locationRequestInstance, locationRequestsWaitingOn } from "./attendance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
+import { decideCommitment } from "./workspace";
 
 /**
  * The organisation module on the mock, in the contract's own shapes
@@ -655,8 +656,10 @@ route("POST /api/v1/leave/requests/:id/cancel", (req) => {
 /* The decision on a waiting request: the approval's own routes, for the mock's leave flows and, passed on, its work location requests and performance reviews. */
 const decide = (req: { params: Record<string, string>; user: string | null; body?: unknown }, approve: boolean) => {
   const l = LEAVE.find((x) => x.workflow_instance_id === req.params.id);
-  const reason = (req.body as { reason?: string } | undefined)?.reason;
-  if (!l) return decideLocationRequest(req.user!, req.params.id, approve, reason) ?? decideReview(req.user!, req.params.id, approve, reason) ?? notFound();
+  if (!l) {
+    const reason = (req.body as { reason?: string } | undefined)?.reason;
+    return decideLocationRequest(req.user!, req.params.id, approve, reason) ?? decideReview(req.user!, req.params.id, approve, reason) ?? decideCommitment(req.user!, req.params.id, approve, reason) ?? notFound();
+  }
   if (l.status !== "submitted") return notFound();
   if (l.key === req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
   if (approve && l.days > 5 && l.waiting_on === "Line Manager") {

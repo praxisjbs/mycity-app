@@ -7,9 +7,20 @@ import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { useSearchParams } from "@/lib/router";
+import { Link, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { useScreenAction } from "@/shell/screen-action";
+import { useScreenAction, useUrlAction } from "@/shell/screen-action";
+import {
+  COMMITMENT_HELP,
+  CommitmentActions,
+  commitmentItems,
+  commitmentMonths,
+  COUNTS_HELP,
+  CountsTowardsField,
+  type CountsChoice,
+  SendCommitmentsForm,
+} from "./Commitment";
+import { MyWeekCard, TeamWeekCard } from "./Week";
 import {
   AreaChart,
   Avatar,
@@ -19,6 +30,7 @@ import {
   Card,
   CardHeader,
   CheckboxField,
+  ChoiceField,
   DataView,
   DateField,
   ErrorState,
@@ -28,9 +40,12 @@ import {
   formatTime,
   FormFooter,
   Grid,
+  HelpTerm,
   Kanban,
   KeyValue,
+  formatMonth,
   LoadingRows,
+  Modal,
   monthName,
   PageHeader,
   Pill,
@@ -52,20 +67,22 @@ import {
 /**
  * My Workspace: Today, Tasks, Calendar and Analytics (#4 to #7; docs/guides/workspace.md §10).
  * A manager sets the week and the day for their reporting line; the employee adds their own
- * beside it (A24). Every list is the server's page of 25.
+ * beside it (A24). A month's priority tasks are commitments, sent and approved as a set; Today
+ * carries the week (docs/guides/performance.md §6.11, §6.18). Every list is the server's page of 25.
  */
-export default function Workspace({ tab }: ModuleScreenProps) {
+export default function Workspace({ tab, id }: ModuleScreenProps) {
   const [params, setParams] = useSearchParams();
   const modal = useModal();
-  /* Deep link from Home's New button or the assistant: /workspace?tab=tasks&new=1&title=… */
+  /* Deep link from Home's New button or the assistant: /workspace?tab=tasks&new=1&title=… (&commitment=1) */
   useEffect(() => {
     if (params.get("new") !== "1") return;
     const title = params.get("title") ?? "";
-    setParams({ new: null, title: null }, { replace: true });
+    const commitment = params.get("commitment") === "1";
+    setParams({ new: null, title: null, commitment: null }, { replace: true });
     if (tab === "calendar") modal.open({ title: "New Event", body: (close) => <EventForm close={close} title={title} /> });
-    else modal.open({ title: "New Task", body: (close) => <TaskForm close={close} title={title} /> });
+    else modal.open({ title: commitment ? "New Commitment" : "New Task", body: (close) => <TaskForm close={close} title={title} commitment={commitment} /> });
   }, [params, setParams, modal, tab]);
-  if (tab === "tasks") return <Tasks />;
+  if (tab === "tasks") return <Tasks openId={id} />;
   if (tab === "calendar") return <CalendarTab />;
   if (tab === "analytics") return <Analytics />;
   return <Today />;
@@ -112,6 +129,7 @@ function TaskCard({ t, onClick }: { t: Task; onClick: () => void }) {
       <b className="mb-1.5 block text-xs leading-snug font-semibold" data-copy="content">{t.title}</b>
       <span className="flex flex-wrap items-center gap-1.5">
         <Pill tone={pill.tone}>{pill.text}</Pill>
+        {t.is_commitment && <Pill tone="info">Commitment</Pill>}
         {t.blocked_reason && <Pill tone="err">Blocked</Pill>}
         {setByOther && t.set_by && <Avatar name={t.set_by.display_name} size={21} />}
       </span>
@@ -133,7 +151,7 @@ function TaskPanel({ id, close }: { id: string; close: () => void }) {
   const [view, setView] = useState<"details" | "comments" | "history">("details");
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!t) return <LoadingRows count={5} />;
-  const items: Array<[string, React.ReactNode]> = [
+  const items: Array<[React.ReactNode, React.ReactNode]> = [
     ["Number", t.number],
     ["Assignee", t.assignee?.display_name ?? "Nobody"],
     ["Set By", t.set_by?.display_name ?? "Nobody"],
@@ -142,9 +160,19 @@ function TaskPanel({ id, close }: { id: string; close: () => void }) {
     ["Status", LABEL[t.status]],
   ];
   if (t.cadence) items.push(["Cadence", CADENCE[t.cadence]]);
-  if (t.counts_towards) items.push(["Counts Towards", t.counts_towards.title]);
+  if (t.counts_towards)
+    items.push([
+      <HelpTerm key="ct" help={COUNTS_HELP}>Counts Towards</HelpTerm>,
+      <span key="cv" data-copy="content">
+        {t.counts_towards.title}
+        {t.counts_towards.link && (
+          <Link className="ml-2 text-xs font-semibold text-primary underline" to={t.counts_towards.link.path}>Open</Link>
+        )}
+      </span>,
+    ]);
   if (t.blocked_reason) items.push(["Blocked", t.blocked_reason]);
   if (t.cancel_reason) items.push(["Cancelled", t.cancel_reason]);
+  items.push(...commitmentItems(t));
   const changed = () => {
     reload();
     refresh();
@@ -157,10 +185,10 @@ function TaskPanel({ id, close }: { id: string; close: () => void }) {
           <>
             <KeyValue items={items} />
             {t.description && <p className="mt-3 text-xs text-muted-foreground" data-copy="content">{t.description}</p>}
-            {t.link && (
-              <a className="mt-3 inline-block text-xs font-semibold text-primary underline" href={t.link.path}>
+            {t.link && !(t.counts_towards && t.counts_towards.kind === "key_result") && (
+              <Link className="mt-3 inline-block text-xs font-semibold text-primary underline" to={t.link.path}>
                 Open Record
-              </a>
+              </Link>
             )}
           </>
         )}
@@ -187,6 +215,7 @@ function TaskPanel({ id, close }: { id: string; close: () => void }) {
             Cancel Task
           </Button>
         )}
+        {t.is_commitment && <CommitmentActions t={t} onChanged={changed} />}
       </FormFooter>
     </>
   );
@@ -297,10 +326,21 @@ function Comments({ id, onAdded }: { id: string; onAdded: () => void }) {
 
 /* ───────────── New and Edit Task ───────────── */
 
-export function TaskForm({ close, title = "", task }: { close: () => void; title?: string; task?: TaskDetail }) {
+/** What a task counts towards, as the picker holds it. */
+const choiceOf = (t?: TaskDetail): CountsChoice[] =>
+  t?.counts_towards
+    ? [{ kind: t.counts_towards.kind, employee_target_id: t.counts_towards.employee_target_id, okr_key_result_id: t.counts_towards.okr_key_result_id, title: t.counts_towards.title, sub: null }]
+    : [];
+
+export function TaskForm({ close, title = "", task, commitment = false }: { close: () => void; title?: string; task?: TaskDetail; commitment?: boolean }) {
   const me = useMe();
+  const months = commitmentMonths();
   const [who, setWho] = useState<PersonRef[]>(task?.assignee && task.assignee.employee_id !== me.employee_id ? [task.assignee] : []);
+  const [counts, setCounts] = useState<CountsChoice[]>(choiceOf(task));
   const canAssign = !task || task.can_reassign;
+  // An approved commitment keeps its person, mark, month and criteria; its date may still move.
+  const fixed = Boolean(task?.is_commitment && task.original_due_at);
+  const mayMark = !fixed && (!task || task.status !== "done");
   const f = useContractForm(
     {
       title: task?.title ?? title,
@@ -308,22 +348,49 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
       due_on: task?.due_at ? task.due_at.slice(0, 10) : "",
       priority: (task?.priority ?? "normal") as string,
       description: task?.description ?? "",
+      is_commitment: task?.is_commitment ?? commitment,
+      acceptance_criteria: task?.acceptance_criteria ?? "",
+      commitment_month: task?.commitment_month ?? months[0][0],
     },
     tasks.TaskCreate,
   );
   const createTask = useMutation("POST /api/v1/tasks");
   const editTask = useMutation("PATCH /api/v1/tasks/:id");
+  const isCommitment = Boolean(f.values.is_commitment);
+  /** Counts Towards as the body names it: a line, or a key result as the task's record. */
+  const pointer = () => {
+    const c = counts[0];
+    if (c?.kind === "line") return { employee_target_id: c.employee_target_id, ...(task?.entity_type === "key_result" ? { entity_type: null, entity_id: null } : {}) };
+    if (c?.kind === "key_result") return { employee_target_id: null, entity_type: "key_result" as const, entity_id: c.okr_key_result_id };
+    return { employee_target_id: null, ...(task?.entity_type === "key_result" ? { entity_type: null, entity_id: null } : {}) };
+  };
+  const commitmentBody = () =>
+    mayMark
+      ? isCommitment
+        ? { is_commitment: true, acceptance_criteria: f.values.acceptance_criteria || null, commitment_month: f.values.commitment_month || null }
+        : task?.is_commitment
+          ? { is_commitment: false }
+          : {}
+      : {};
   const submit = async () => {
     if (!f.check()) return;
     const v = f.values;
     try {
       if (task) {
-        const body = task.can_reassign
-          ? { title: v.title, priority: v.priority, cadence: v.cadence || null, due_on: v.due_on || null, description: v.description || null, ...(who[0] ? { primary_assignee_id: who[0].employee_id } : {}) }
-          : { priority: v.priority, description: v.description || null };
+        const managed = task.can_reassign
+          ? {
+              title: v.title,
+              cadence: v.cadence || null,
+              due_on: v.due_on || null,
+              ...(who[0] && !fixed ? { primary_assignee_id: who[0].employee_id } : {}),
+              ...pointer(),
+            }
+          : {};
+        const body = { priority: v.priority, description: v.description || null, ...managed, ...commitmentBody() };
         await editTask.run({ params: { id: task.task_id }, body: body as never });
         toast("Task saved");
       } else {
+        const c = counts[0];
         const t = await createTask.run({
           body: {
             title: v.title,
@@ -332,6 +399,9 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
             ...(v.due_on && { due_on: v.due_on }),
             ...(v.description && { description: v.description }),
             ...(who[0] && { primary_assignee_id: who[0].employee_id }),
+            ...(c?.kind === "line" && c.employee_target_id && { employee_target_id: c.employee_target_id }),
+            ...(c?.kind === "key_result" && c.okr_key_result_id && { entity_type: "key_result" as const, entity_id: c.okr_key_result_id }),
+            ...(isCommitment && { is_commitment: true, acceptance_criteria: v.acceptance_criteria, commitment_month: v.commitment_month }),
           },
         });
         toast(who[0] ? `${t.number} set for ${who[0].display_name}` : `${t.number} created`);
@@ -343,10 +413,12 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
       else say(e);
     }
   };
+  const assigneeId = who[0]?.employee_id ?? task?.assignee?.employee_id ?? null;
+  const month = isCommitment && f.values.commitment_month ? String(f.values.commitment_month) : `${(f.values.due_on || todayIso()).slice(0, 7)}-01`;
   return (
     <>
       {canAssign && <Field label="Task" {...f.field("title")}><TextField {...f.field("title")} placeholder="Visit the venue" /></Field>}
-      {me.manages_people && canAssign && (
+      {me.manages_people && canAssign && !fixed && (
         <Field label="Assign To" optional>
           <EmployeePicker value={who} onChange={setWho} placeholder="Your team" />
         </Field>
@@ -356,8 +428,34 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
           <SelectField options={[["", "None"], ["daily", "Daily"], ["weekly", "Weekly"]]} {...f.field("cadence")} />
         </Field>
       )}
-      {canAssign && <Field label="Due" optional {...f.field("due_on")}><DateField {...f.field("due_on")} min={todayIso()} /></Field>}
+      {canAssign && (
+        <Field label="Due" optional={!isCommitment} {...f.field("due_on")}>
+          <DateField {...f.field("due_on")} min={task ? undefined : todayIso()} />
+        </Field>
+      )}
       <Field label="Priority"><SelectField options={[["urgent", "Urgent"], ["high", "High"], ["normal", "Normal"], ["low", "Low"]]} {...f.field("priority")} /></Field>
+      {canAssign && (
+        <Field label="Counts Towards" optional help={COUNTS_HELP}>
+          <CountsTowardsField assigneeId={assigneeId} month={month} value={counts} onChange={setCounts} />
+        </Field>
+      )}
+      {mayMark && (
+        <Field label="Commitment" help={COMMITMENT_HELP} optional>
+          <CheckboxField label="Mark as Commitment" value={isCommitment} onChange={(on) => f.field("is_commitment").onChange(on)} />
+        </Field>
+      )}
+      {mayMark && isCommitment && (
+        <>
+          <Field label="Acceptance Criteria" {...f.field("acceptance_criteria")}><TextAreaField {...f.field("acceptance_criteria")} /></Field>
+          <Field label="Month" {...f.field("commitment_month")}>
+            <ChoiceField
+              value={String(f.values.commitment_month)}
+              onChange={(m) => f.field("commitment_month").onChange(m)}
+              options={task?.commitment_month && !months.some(([m]) => m === task.commitment_month) ? [[task.commitment_month, formatMonth(task.commitment_month)], ...months] : months}
+            />
+          </Field>
+        </>
+      )}
       <Field label="Notes" optional><TextAreaField {...f.field("description")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -370,6 +468,7 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
 /* ───────────── Today ───────────── */
 
 function Today() {
+  const me = useMe();
   const { data, error, reload } = useApi("GET /api/v1/workspace/today");
   const openTask = useTaskPanel();
   const modal = useModal();
@@ -426,6 +525,14 @@ function Today() {
           {!data.since.data.length && <p className="text-2xs text-subtle-foreground">Nothing new.</p>}
         </Card>
       </Grid>
+      {me.manages_people ? (
+        <Grid cols={2}>
+          <MyWeekCard />
+          <TeamWeekCard />
+        </Grid>
+      ) : (
+        <MyWeekCard />
+      )}
     </>
   );
 }
@@ -439,9 +546,10 @@ const COLS: Array<[BoardStatus, string, string]> = [
   ["done", "Done", "var(--chart-1)"],
 ];
 
-function Tasks() {
+function Tasks({ openId }: { openId: string | null }) {
   const me = useMe();
   const modal = useModal();
+  const [, setParams] = useSearchParams();
   const [scope, setScope] = useState<"mine" | "team">("mine");
   const [q, setQ] = useState("");
   const [cancelled, setCancelled] = useState(false);
@@ -456,7 +564,10 @@ function Tasks() {
   const move = useMutation("POST /api/v1/tasks/:id/move");
   const openTask = useTaskPanel();
   const add = () => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> });
+  const addCommitment = () => modal.open({ title: "New Commitment", body: (close) => <TaskForm close={close} commitment /> });
+  const sendMonth = () => modal.open({ title: "Send Commitments", wide: true, body: (close) => <SendCommitmentsForm close={close} /> });
   useScreenAction({ label: "New Task", onSelect: add });
+  useUrlAction("commitment", addCommitment);
   const all = Object.values(cols).flatMap((c) => c.rows);
 
   const onMove = async (card: string, _from: string, to: string) => {
@@ -477,6 +588,7 @@ function Tasks() {
         actions={
           <>
             {me.manages_people && <SegmentedControl value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            <Button icon="send" onClick={sendMonth}>Send Commitments</Button>
             <Button variant="primary" icon="plus" onClick={add}>New Task</Button>
           </>
         }
@@ -515,6 +627,7 @@ function Tasks() {
               meta: (
                 <>
                   <Pill tone={pill.tone}>{pill.text}</Pill>
+                  {t.is_commitment && <Pill tone="info">Commitment</Pill>}
                   {t.blocked_reason && <Pill tone="err">Blocked</Pill>}
                 </>
               ),
@@ -542,6 +655,10 @@ function Tasks() {
           ]}
         />
       )}
+      {/* A task opened from a link (?id=): the Commitments view, the bell, a calendar date. */}
+      <Modal open={Boolean(openId)} onClose={() => setParams({ id: null }, { replace: true })} title="Task">
+        {(close) => (openId ? <TaskPanel id={openId} close={close} /> : null)}
+      </Modal>
     </>
   );
 }
@@ -556,6 +673,23 @@ function usePagedColumn(status: BoardStatus, scope: "mine" | "team", q: string) 
 
 /* ───────────── Calendar ───────────── */
 
+/** What a performance date is, as Coming Up names it (performance.md §10). */
+const PERFORMANCE_DATES: Record<NonNullable<CalendarItem["performance_kind"]>, string> = {
+  check_in_due: "Check-In Due",
+  review_due: "Review Due",
+  key_result_due: "Key Result Due",
+  pip_review: "PIP Review",
+};
+/** What Coming Up says at the end of an item's row. */
+function endOf(e: CalendarItem): string {
+  if (e.performance_kind) return PERFORMANCE_DATES[e.performance_kind];
+  if (e.item_kind === "task") return "Deadline";
+  if (e.item_kind === "leave") return "Leave";
+  return e.all_day ? "All Day" : formatTime(e.starts_at);
+}
+/** An item's day in Lagos: an all-day item starts at its midnight there, which is the day before in UTC. */
+const dayOf = (e: CalendarItem) => (e.all_day ? new Date(Date.parse(e.starts_at) + 3600_000).toISOString().slice(0, 10) : e.starts_at.slice(0, 10));
+
 function CalendarTab() {
   const now = todayIso();
   const [ym, setYm] = useState<[number, number]>([Number(now.slice(0, 4)), Number(now.slice(5, 7)) - 1]);
@@ -566,11 +700,13 @@ function CalendarTab() {
   const step = (n: number) => setYm(([y, m]) => (m + n < 0 ? [y - 1, 11] : m + n > 11 ? [y + 1, 0] : [y, m + n]));
   const add = () => modal.open({ title: "New Event", body: (close) => <EventForm close={close} /> });
   useScreenAction({ label: "New Event", onSelect: add });
+  const { navigate } = useRouter();
   const openItem = (i: CalendarItem) => {
     if (i.item_kind === "task") openTask(i.item_id, i.title);
     else if (i.item_kind === "event") modal.open({ title: i.title, body: (close) => <EventPanel id={i.item_id} close={close} /> });
+    else if (i.item_kind === "performance" && i.link) navigate(i.link.path);
   };
-  const upcoming = list.rows.filter((e) => e.starts_at.slice(0, 10) >= now);
+  const upcoming = list.rows.filter((e) => dayOf(e) >= now);
   return (
     <>
       <PageHeader
@@ -589,7 +725,7 @@ function CalendarTab() {
         <Calendar
           year={ym[0]}
           month={ym[1]}
-          events={list.rows.map((e) => ({ date: e.starts_at.slice(0, 10), label: e.title, highlight: e.item_kind === "task", onSelect: () => openItem(e) }))}
+          events={list.rows.map((e) => ({ date: dayOf(e), label: e.title, highlight: e.item_kind === "task" || e.item_kind === "performance", onSelect: () => openItem(e) }))}
         />
         <Card>
           <CardHeader title="Coming Up" />
@@ -600,7 +736,7 @@ function CalendarTab() {
               key: e.item_kind + e.item_id,
               title: <span data-copy="content">{e.title}</span>,
               sub: formatDate(e.starts_at),
-              end: e.item_kind === "task" ? "Deadline" : e.item_kind === "leave" ? "Leave" : e.all_day ? "All Day" : formatTime(e.starts_at),
+              end: endOf(e),
               onSelect: () => openItem(e),
             }))}
           />

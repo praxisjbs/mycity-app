@@ -1,13 +1,14 @@
 /**
  * ESS · My Performance (docs/guides/performance.md §10, §12), composed of its parts in
  * features/performance/my/: the figures, a banner when something waits on the person, My
- * Scorecard, This Month's Check-In (features/performance/CheckIn.tsx), Rolls Up To, My Reviews and
- * My PIP while one is open. My Commitments joins with Performance PR 4.
+ * Scorecard, This Month's Check-In (features/performance/CheckIn.tsx), My Commitments (PR 4), Rolls
+ * Up To, My Reviews and My PIP while one is open.
  */
 import { useEffect, useRef } from "react";
 import type { MyPerformance } from "@mycity/contract/contract.gen.ts";
 import { useApi } from "@/api/hooks";
 import { CheckInSheet } from "@/features/performance/CheckIn";
+import { MyCommitments, useMyCommitmentsLine } from "@/features/performance/my/MyCommitments";
 import { MyReviewsList } from "@/features/performance/my/MyReviews";
 import { MyScorecard, RollsUpTo } from "@/features/performance/my/MyScorecard";
 import { rating, reviewStatus, score } from "@/features/performance/shared";
@@ -24,6 +25,7 @@ export function MyPerformancePage() {
   const modal = useModal();
   const [params, setParams] = useSearchParams();
   const { data: p, error, reload } = useApi("GET /api/v1/ess/performance");
+  const commitmentsLine = useMyCommitmentsLine();
   const card = p?.scorecard;
   const checkIn = p?.check_in;
   const due = checkIn?.status === "check_in";
@@ -46,7 +48,7 @@ export function MyPerformancePage() {
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={6} />;
-  const commitments = p.commitments ? `${p.commitments.delivered_on_time} of ${p.commitments.due}` : "–";
+  const commitments = p.commitments?.due ? `${p.commitments.delivered_on_time} of ${p.commitments.due}` : "–";
   const agreement = !card ? "–" : card.employee_agreed_at ? "Agreed" : card.status === "draft" ? "Draft" : "Not Yet";
 
   const checkInBody = (
@@ -88,9 +90,10 @@ export function MyPerformancePage() {
         items={[
           ...(card ? [{ icon: "target" as const, title: "My Scorecard", sub: `${score(card.score_to_date)} · ${rating(card.rating).text}`, body: <MyScorecard id={card.scorecard_id} />, wide: true }] : []),
           { icon: "check" as const, title: "This Month's Check-In", sub: checkInText(checkIn ?? null), body: checkInBody },
+          { icon: "flag" as const, title: "My Commitments", sub: commitmentsLine, body: <MyCommitments bare />, wide: true },
           ...(card ? [{ icon: "up" as const, title: "Rolls Up To", sub: "To the company goals", body: <RollsUpTo id={card.scorecard_id} /> }] : []),
           { icon: "doc" as const, title: "My Reviews", sub: "Month by month", body: <MyReviewsList /> },
-          ...(pipBody ? [{ icon: "flag" as const, title: "My PIP", sub: `Review ${formatDate(p.open_pip!.review_on)}`, body: pipBody }] : []),
+          ...(pipBody ? [{ icon: "alert" as const, title: "My PIP", sub: `Review ${formatDate(p.open_pip!.review_on)}`, body: pipBody }] : []),
         ]}
       />
       <DesktopOnly>
@@ -120,6 +123,9 @@ export function MyPerformancePage() {
             </Card>
           )}
         </Grid>
+        <div className="mt-3">
+          <MyCommitments />
+        </div>
         <div className="mt-3">
           <MyReviewsList />
         </div>
