@@ -5,7 +5,8 @@
  * (scripts/check/lib/catalogue.js), with no database:
  *
  *  - each says which module, milestone and owner its tables belong to, what that milestone
- *    still owes, and, in its header, that the milestone's builder updates it in the same PR;
+ *    still owes (nothing, once it is paid), and, in its header, that the milestone's builder
+ *    updates it in the same PR;
  *  - every table and column it declares exists, in a table of the milestone it names;
  *  - every query it runs names only the columns it declares, so `tables` is the whole of
  *    what a later milestone must keep true (each function is run against a client that
@@ -42,6 +43,12 @@ const CALLS = {
   goals: {
     organisationGoals: [{ from: "2026-10-01", to: "2026-12-31" }, QUERY],
     targetsOf: [{ employee_id: ID, from: "2026-10-01", to: "2026-12-31" }, QUERY],
+    orgScores: [{ today: TODAY }],
+    keyResultsOnTrack: [{ today: TODAY }],
+    keyResultsPage: [{ today: TODAY, group: "on_track" }, QUERY],
+    scorecardFigure: [{ employee_id: ID, today: TODAY }],
+    scorecardLinesPage: [{ employee_id: ID, today: TODAY, group: "behind" }, QUERY],
+    scoresOf: [{ today: TODAY, employee_ids: [ID] }, TEAM],
   },
   reviews: {
     dueCount: [{ today: TODAY }, TEAM],
@@ -118,7 +125,7 @@ describe.each(ADAPTERS)("the %s source adapter", (name) => {
     expect(adapter.module).toBe(name);
     expect(adapter.milestone).toMatch(/^M([2-9]|1[01])$/);
     expect(OWNERS.has(adapter.owner)).toBe(true);
-    expect(Array.isArray(adapter.owes) && adapter.owes.length > 0).toBe(true);
+    expect(Array.isArray(adapter.owes)).toBe(true);
     for (const item of adapter.owes) expect(typeof item).toBe("string");
   });
 
