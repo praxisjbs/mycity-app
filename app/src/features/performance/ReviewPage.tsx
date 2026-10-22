@@ -157,7 +157,7 @@ export function ReviewSheet({ id, close }: { id: string; close: () => void }) {
         />
       )}
       {r.can.score ? (
-        <ScoreForm r={r} close={close} reload={reload} />
+        <ScoreForm r={r} close={close} reload={reload} ask={ask} />
       ) : (
         <FormFooter>
           <Button onClick={close}>Close</Button>
@@ -258,7 +258,7 @@ type ScoreRow = { score: string; override_reason: string; comment: string; actio
 const behind = (row: ScoreRow) => row.score !== "" && Number(row.score) < 1;
 
 /** The reviewer's side: each line's final score, a reason where it differs, a comment and the actions. */
-function ScoreForm({ r, close, reload }: { r: ReviewDetail; close: () => void; reload: () => void }) {
+function ScoreForm({ r, close, reload, ask }: { r: ReviewDetail; close: () => void; reload: () => void; ask: () => Promise<void> }) {
   const modal = useModal();
   const [rows, setRows] = useState<Record<string, ScoreRow>>(() =>
     Object.fromEntries(
@@ -368,6 +368,7 @@ function ScoreForm({ r, close, reload }: { r: ReviewDetail; close: () => void; r
       <FormFooter>
         <Button onClick={close}>Close</Button>
         {r.can.return_check_in && <Button onClick={() => modal.open({ title: "Return Check-In", body: (done) => <ReturnForm id={r.performance_review_id} close={() => (done(), close())} /> })}>Return Check-In</Button>}
+        {r.can.ask_input && <Button onClick={ask}>Ask For Input</Button>}
         <Button onClick={save}>Save Scores</Button>
         {r.can.submit && <Button variant="primary" onClick={submit}>Submit Review</Button>}
       </FormFooter>
