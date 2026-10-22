@@ -1089,7 +1089,7 @@ async function withdrawLeaverIn(client, employeeId, leftOn) {
     await withdrawIn(client, r, { reason: leaverNote(leftOn), leaver: true, tell: [r.reviewer_employee_id, r.second_level_employee_id] });
     ended += 1;
   }
-  await require("../targets/targets.service").closeOfLeaver(client, employeeId, lagos.today());
+  await require("../targets/targets.service").closeOfLeaver(client, employeeId);
   return ended;
 }
 
@@ -1129,10 +1129,10 @@ async function leaverArchived(employeeId) {
  * The leaving date's reminder, in its firing's transaction: still archived and the day come, it
  * fires; a date moved later waits for it; a record restored ends it.
  */
-async function leaverCheck(client, row) {
+async function leaverCheck(client, row, ctx = {}) {
   const e = await leaverOf(client, row.entity_id);
   if (!e || e.status !== "archived") return null;
-  if (e.left_on && e.left_on > lagos.today()) return { later: leavingAt(e.left_on) };
+  if (e.left_on && e.left_on > lagos.dateOf(ctx.now || new Date())) return { later: leavingAt(e.left_on) };
   return { entity: { type: "employee", id: row.entity_id }, payload: { employee_id: row.entity_id, left_on: e.left_on } };
 }
 

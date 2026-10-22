@@ -200,7 +200,7 @@ describeDb("performance plan against the real migrations", () => {
     const b = await as("head").post("/performance/scorecards", { employee_id: emp("musa"), performance_period_id: ids.period, copy_from: ids.cardA });
     ids.cardB = b.body.scorecard_id;
 
-    const accountability = a.body.lines.map((l) => ({ ...l, team_key_result_ids: [], key_result: undefined, kpi: undefined, team_key_results: undefined, months: undefined, score: undefined, scorecard_id: undefined, position: undefined }));
+    const accountability = a.body.lines.map((l) => ({ ...l, team_key_result_ids: [], key_result: undefined, kpi: undefined, team_key_results: undefined, months: undefined, score: undefined, can_change_target: undefined, pending_change: undefined, scorecard_id: undefined, position: undefined }));
     const strip = (l) => Object.fromEntries(Object.entries(l).filter(([, v]) => v !== undefined && v !== null));
     const lines = (share, kpiWeight = "25") => [
       { section: "results", title: "Users in my territories", measure: "numeric", source: "own", target_value: share, weight: "60", okr_key_result_id: ids.kr1, share_value: share },
@@ -450,16 +450,20 @@ describeDb("performance plan against the real migrations", () => {
 
   test("a line's target change: the CEO decides it; whoever reads its scorecard reads it, nobody else", async () => {
     const line = await one("SELECT employee_target_id FROM employee_target WHERE scorecard_id = $1 ORDER BY position LIMIT 1", [ids.cardA]);
-    const res = await as("head").post("/performance/target-changes", {
-      employee_target_id: line.employee_target_id,
-      to_value: "12",
-      from_month: "2026-11-01",
-      reason: "Fewer events in November",
-    });
+    const lineOf = async (who) => (await as(who).get(`/performance/scorecards/${ids.cardA}`)).body.lines.find((l) => l.employee_target_id === line.employee_target_id);
+    // Change Target is the reviewer's or the function head's, never the employee's, nor anyone else's.
+    expect([(await lineOf("head")).can_change_target, (await lineOf("ada")).can_change_target, (await lineOf("ops")).can_change_target]).toEqual([true, false, false]);
+    const body = { employee_target_id: line.employee_target_id, to_value: "12", from_month: "2026-11-01", reason: "Fewer events in November" };
+    expect((await as("ada").post("/performance/target-changes", body)).status).toBe(403);
+    expect((await as("ops").post("/performance/target-changes", body)).status).toBe(403);
+    const res = await as("head").post("/performance/target-changes", body);
     expect(res.status).toBe(201);
     const id = res.body.target_change_id;
+    // While it waits, the line shows it and offers no second Change Target.
+    expect(await lineOf("head")).toMatchObject({ can_change_target: false, pending_change: { target_change_id: id, to_value: "12", from_month: "2026-11-01" } });
+    expect((await as("head").post("/performance/target-changes", { ...body, to_value: "11" })).body.error.code).toBe("CHANGE_PENDING");
     const [row] = (await as("ceo").get("/performance/approvals")).body.data;
-    expect(row).toMatchObject({ kind: "target_change", record_id: id, key_result_code: null, department: "Branding & Marketing" });
+    expect(row).toMatchObject({ kind: "target_change", record_id: id, key_result_code: null, department: "Branding & Marketing", employee: { employee_id: emp("ada") } });
     expect(row.line_title).toEqual(expect.any(String));
     const sheet = await as("ceo").get(`/performance/target-changes/${id}`);
     expect(sheet.body).toMatchObject({ key_result: null, line: { employee_target_id: line.employee_target_id, employee: { employee_id: emp("ada") } } });

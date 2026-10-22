@@ -301,17 +301,17 @@ const lineWithCard = (db, id) =>
     [id],
   );
 
-/** A person's scorecards still running on a day: not closed, in a quarter that has not ended (§11). */
-async function runningOf(db, employeeId, onDate) {
-  // pagination:complete a person's scorecards in this quarter and the next at most
+/** A person's scorecards not yet closed, oldest quarter first (§11). */
+async function runningOf(db, employeeId) {
+  // pagination:complete a person's scorecards not closed: a few quarters' at most
   const { rows } = await completeQuery(
     db,
     `SELECT s.scorecard_id, s.status, s.performance_period_id, p.name AS period_name
        FROM scorecard s JOIN performance_period p ON p.performance_period_id = s.performance_period_id
-      WHERE s.employee_id = $1 AND s.status IN ('draft', 'binding', 'agreed') AND p.ends_on >= $2::date
+      WHERE s.employee_id = $1 AND s.status IN ('draft', 'binding', 'agreed')
       ORDER BY p.starts_on, s.scorecard_id`,
-    [employeeId, onDate],
-    { label: "a leaver's running scorecards", ceiling: 20 },
+    [employeeId],
+    { label: "a leaver's scorecards not closed", ceiling: 40 },
   );
   return rows;
 }

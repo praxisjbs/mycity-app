@@ -612,13 +612,13 @@ async function settleAmendment(id, { state, reason = null, opened_by: openedBy =
 }
 
 /**
- * A leaver's scorecards still running close (§11), in the caller's transaction: no round reviews
+ * A leaver's scorecards not yet closed close (§11), in the caller's transaction: no round reviews
  * them again and a draft's waiting amendment is withdrawn. Their lines, scores and commitments stay
  * as they are, so the quarter still reports them. Returns how many closed.
  */
-async function closeOfLeaver(client, employeeId, onDate) {
+async function closeOfLeaver(client, employeeId) {
   const reminders = require("../notifications/notifications.reminders");
-  const cards = await repo.runningOf(client, employeeId, onDate);
+  const cards = await repo.runningOf(client, employeeId);
   for (const card of cards) {
     const open = card.status === "draft" ? await amendmentOf(client, card.scorecard_id) : null;
     if (open) await workflow.cancel(client, { instance_id: open.workflow_instance_id, actor: { user_id: open.opened_by }, reason: "The employee left" });

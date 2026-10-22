@@ -242,7 +242,7 @@ reminders.defineReminder(KR_REPORT_REMINDER, {
 reminders.defineReminder(LEAVER_REMINDER, {
   event: EVENTS.REVIEW_LEAVER_DUE,
   module: "performance",
-  check: (client, row) => require("./reviews.service").leaverCheck(client, row),
+  check: (client, row, ctx) => require("./reviews.service").leaverCheck(client, row, ctx),
 });
 
 /* ------------------------------------------------------------------ *
