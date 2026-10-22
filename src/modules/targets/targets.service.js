@@ -208,7 +208,12 @@ async function list(query, scope) {
 }
 
 async function get(id, actor, scope) {
-  const card = await repo.get(pool, id);
+  // A line's link (the route map's `target`, a task's Counts Towards) opens its scorecard (§6.18).
+  let card = await repo.get(pool, id);
+  if (!card) {
+    const line = await repo.lineWithCard(pool, id);
+    card = line ? await repo.get(pool, line.scorecard_id) : null;
+  }
   if (!card) throw notFound();
   await assertMayRead(pool, card, actor, scope);
   return detail(pool, card, actor, scope);

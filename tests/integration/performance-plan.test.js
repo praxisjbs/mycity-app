@@ -451,6 +451,8 @@ describeDb("performance plan against the real migrations", () => {
   test("a line's target change: the CEO decides it; whoever reads its scorecard reads it, nobody else", async () => {
     const line = await one("SELECT employee_target_id FROM employee_target WHERE scorecard_id = $1 ORDER BY position LIMIT 1", [ids.cardA]);
     const lineOf = async (who) => (await as(who).get(`/performance/scorecards/${ids.cardA}`)).body.lines.find((l) => l.employee_target_id === line.employee_target_id);
+    // A line's own link (a task's Counts Towards) opens its scorecard.
+    expect((await as("head").get(`/performance/scorecards/${line.employee_target_id}`)).body.scorecard_id).toBe(ids.cardA);
     // Change Target is the reviewer's or the function head's, never the employee's, nor anyone else's.
     expect([(await lineOf("head")).can_change_target, (await lineOf("ada")).can_change_target, (await lineOf("ops")).can_change_target]).toEqual([true, false, false]);
     const body = { employee_target_id: line.employee_target_id, to_value: "12", from_month: "2026-11-01", reason: "Fewer events in November" };

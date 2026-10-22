@@ -82,8 +82,9 @@ export function useScorecardSheet() {
 }
 
 /**
- * A link to a scorecard (the bell, ⌘K, the assistant, the route map's `scorecard` and `target`)
- * opens its sheet over the list once, then leaves the address, so a reload does not open it again.
+ * A link to a scorecard (the bell, ⌘K, the assistant, the route map's `scorecard`, and `target` for a
+ * line, whose scorecard the API answers) opens its sheet over the list once, then leaves the
+ * address, so a reload does not open it again.
  */
 function useScorecardLink(open: (id: string) => void) {
   const [params, setParams] = useSearchParams();
@@ -260,11 +261,11 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   const sendBack = () =>
     amendmentId &&
     modal.open({ title: "Request Changes", body: (done) => <ReasonForm instanceId={amendmentId} close={() => (done(), refreshApprovals())} done="Scorecard sent back" /> });
-  const reopen = () => modal.open({ title: "Scorecard", wide: true, body: (done) => <ScorecardSheet id={id} close={done} /> });
+  const reopen = () => modal.open({ title: "Scorecard", wide: true, body: (done) => <ScorecardSheet id={c.scorecard_id} close={done} /> });
   const openLine = (line: ScorecardLine) => modal.open({ title: "Scorecard Line", body: () => <LineSheet line={line} back={reopen} /> });
   const agreeCard = async () => {
     try {
-      await agree.run({ params: { id }, body: {} });
+      await agree.run({ params: { id: c.scorecard_id }, body: {} });
       reload();
       toast("Scorecard agreed");
     } catch (e) {
@@ -274,7 +275,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   // A scorecard drafted after its plan bound goes through the plan's flow on its own (§6.4).
   const sendCard = async () => {
     try {
-      await send.run({ params: { id }, body: {} });
+      await send.run({ params: { id: c.scorecard_id }, body: {} });
       reload();
       toast("Scorecard sent for approval");
     } catch (e) {
@@ -331,9 +332,9 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
         <Button onClick={close}>Close</Button>
         {c.can_edit && <Button onClick={() => modal.open({ title: "Edit Lines", wide: true, body: (done) => <LinesForm card={c} close={() => (done(), reload())} /> })}>Edit Lines</Button>}
         {hasCapability(me, "performance.manage") && c.status !== "closed" && (
-          <Button onClick={() => modal.open({ title: "Change Reviewer", body: (done) => <ReviewerForm id={id} close={() => (done(), reload())} /> })}>Change Reviewer</Button>
+          <Button onClick={() => modal.open({ title: "Change Reviewer", body: (done) => <ReviewerForm id={c.scorecard_id} close={() => (done(), reload())} /> })}>Change Reviewer</Button>
         )}
-        {c.can_agree && mine && <Button onClick={() => modal.open({ title: "Disagree With Reason", body: (done) => <DisagreeForm id={id} close={() => (done(), reload())} /> })}>Disagree With Reason</Button>}
+        {c.can_agree && mine && <Button onClick={() => modal.open({ title: "Disagree With Reason", body: (done) => <DisagreeForm id={c.scorecard_id} close={() => (done(), reload())} /> })}>Disagree With Reason</Button>}
         {c.can_agree && <Button variant="primary" onClick={agreeCard}>Agree Scorecard</Button>}
         {c.can_send && <Button variant="primary" onClick={sendCard}>Send Scorecard</Button>}
         {w?.can_decide && <Button onClick={sendBack}>Request Changes</Button>}

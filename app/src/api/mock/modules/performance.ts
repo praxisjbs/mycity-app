@@ -949,7 +949,8 @@ route("GET /api/v1/performance/scorecards", (req) =>
   ),
 );
 route("GET /api/v1/performance/scorecards/:id", (req) => {
-  const c = SCORECARDS.find((x) => x.scorecard_id === req.params.id);
+  // A line's link opens its scorecard, as the API does.
+  const c = SCORECARDS.find((x) => x.scorecard_id === req.params.id || x.lines.some((l) => l.employee_target_id === req.params.id));
   return c && visibleCard(req, c) ? ok(cardFor(req, c)) : notFound();
 });
 route("POST /api/v1/performance/scorecards", (req) => {

@@ -664,7 +664,7 @@ routes file; the module that owns each route is named.
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
 | `GET /performance/scorecards` | `ScorecardListQuery` → `ScorecardPage` | view · own, team, all | yes, 25 | `period_id`, `department_id`, `status`, `reviewer_id`, `rating`, `q`; sort `employee`, `score_to_date` |
-| `GET /performance/scorecards/:id` | → `ScorecardDetail` | view · scope, or its reviewer or dotted manager | | sections, lines, months, contribution, agreement; each line's `can_change_target` (the reader may ask now) and `pending_change` (the change waiting on the CEO) |
+| `GET /performance/scorecards/:id` | → `ScorecardDetail` | view · scope, or its reviewer or dotted manager | | sections, lines, months, contribution, agreement; each line's `can_change_target` (the reader may ask now) and `pending_change` (the change waiting on the CEO); a line's id answers its scorecard, so the route map's `target` (a task's Counts Towards) opens it |
 | `POST /performance/scorecards` | `ScorecardCreate` → `ScorecardDetail` | create · team or all (never one's own) | | `employee_id`, `copy_from` (`last_quarter`, a scorecard id, none) |
 | `PUT /performance/scorecards/:id/lines` | `ScorecardLinesSave` → `ScorecardDetail` | edit · scope | | draft or returned plan; each section's weights must total its section weight to send the plan |
 | `PATCH /performance/scorecards/:id` | `ScorecardEdit` → `ScorecardDetail` | edit · scope; reviewer fields need `performance.manage` | | scope text, reviewer (person or role) with reason, dotted manager |
