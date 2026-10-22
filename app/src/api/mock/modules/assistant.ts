@@ -47,8 +47,14 @@ function answerFor(question: string, view: string): Draft {
     });
   if (l.includes("leave"))
     return said("You have 14 of 20 annual leave days left this year.", { reads: [{ key: "my_leave.balances", rows: 1, total: 1 }] });
+  if (l.includes("next 25"))
+    return said("Here are the next people, 4 to 6 of 312.", {
+      table: { columns: ["Name"], rows: [["Bashir Lawal"], ["Tobi Ojo"], ["Emeka Obi"]], numeric: [] },
+      reads: [{ key: "employees.list", rows: 3, total: 312 }],
+      more: true,
+    });
   if (l.includes("who") || l.includes("staff") || l.includes("people")) {
-    const cites = ["ada", "tunde", "amaka"].map(personCite).filter((c): c is AiCitation => c !== null);
+    const cites = ["cynthia", "ifeoma", "ngozi"].map(personCite).filter((c): c is AiCitation => c !== null);
     return said(`There are 312 people in all; here are the first ${cites.length}.`, {
       table: { columns: ["Name"], rows: cites.map((c) => [c.label]), numeric: [] },
       citations: cites,

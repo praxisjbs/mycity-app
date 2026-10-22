@@ -112,4 +112,35 @@ describe("VoiceField", () => {
     const { container } = render(<VoiceField label="Comments" transcribe={vi.fn()} onTranscript={vi.fn()} />);
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  describe("compact, in a message box", () => {
+    it("is the microphone alone, named for what is dictated, with the time and Stop while it records", async () => {
+      const onTranscript = vi.fn();
+      render(<VoiceField compact label="Question" transcribe={vi.fn().mockResolvedValue("Who is late today?")} onTranscript={onTranscript} />);
+      const record = screen.getByRole("button", { name: "Record Question" });
+      expect(record).toHaveTextContent("");
+      await userEvent.click(record);
+      const stop = await screen.findByRole("button", { name: "Stop Recording" });
+      expect(stop).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByText("0:00")).toHaveAttribute("aria-live", "polite");
+      await userEvent.click(stop);
+      await waitFor(() => expect(onTranscript).toHaveBeenCalledWith("Who is late today?"));
+      expect(screen.getByRole("button", { name: "Record Question" })).toBeInTheDocument();
+    });
+
+    it("says it is writing the words down while it waits, to a screen reader", async () => {
+      let finish: (text: string) => void = () => undefined;
+      render(<VoiceField compact label="Question" transcribe={() => new Promise((r) => (finish = r))} onTranscript={vi.fn()} />);
+      await userEvent.click(screen.getByRole("button", { name: "Record Question" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Stop Recording" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("Writing it down");
+      finish("done");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Record Question" })).toBeInTheDocument());
+    });
+
+    it("has no accessibility violations", async () => {
+      const { container } = render(<VoiceField compact label="Question" transcribe={vi.fn()} onTranscript={vi.fn()} />);
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
 });

@@ -163,6 +163,12 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["event", "meeting", "book a meeting", "calendar", "schedule a meeting"],
   }),
+  a("new_conversation", "New Conversation", {
+    screen: "praxis_ai.ask",
+    params: { action: "new" },
+    need: ["praxis_ai", "create"],
+    words: ["ask praxis ai", "ask ai", "new question", "start a conversation", "assistant"],
+  }),
   a("request_leave", "Request Leave", {
     screen: "ess.my-leave",
     params: { action: "new" },

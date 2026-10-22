@@ -8,10 +8,11 @@
  * @a11y The button says whether it is recording, the elapsed time is a live region, and the transcript lands in the field where a screen reader can read and edit it.
  * @status stable
  * @example <VoiceField label="Comments" transcribe={api.transcribe} onTranscript={(text) => f.set("comments", text)} />
+ * @example <VoiceField compact label="Question" transcribe={transcribe} onTranscript={setText} />
  */
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/cn";
-import { Button } from "../actions/Button";
+import { Button, IconButton } from "../actions/Button";
 import { Icon } from "../icons/Icon";
 import { Spinner } from "../display/Skeleton";
 
@@ -29,13 +30,15 @@ export interface VoiceFieldProps {
   maxSeconds?: number;
   /** Nothing can be recorded (the form is closed, or the browser refused the microphone). */
   disabled?: boolean;
+  /** The microphone alone, for a message box beside its Send: Record and Stop are icon buttons, the time shows while it records. */
+  compact?: boolean;
   /** Layout classes only (spacing). */
   className?: string;
 }
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, disabled, className }: VoiceFieldProps) {
+export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, disabled, compact, className }: VoiceFieldProps) {
   const [state, setState] = useState<"idle" | "recording" | "working">("idle");
   const [seconds, setSeconds] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
@@ -104,6 +107,38 @@ export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, 
     }, 1000);
   };
 
+  const elapsed = (
+    <span aria-live="polite" className="flex items-center gap-1.5 text-xs font-semibold text-destructive tabular-nums">
+      <span aria-hidden="true" className="size-2 animate-pulse-dot rounded-full bg-destructive" />
+      {clock(seconds)}
+    </span>
+  );
+  const trouble = problem && (
+    <span role="status" className="flex items-center gap-1.5 text-xs text-destructive">
+      <Icon name="alert" size="s" />
+      {problem}
+    </span>
+  );
+
+  if (compact)
+    return (
+      <div className={cn("flex flex-none items-center gap-1.5", className)}>
+        {state === "recording" ? (
+          <>
+            {elapsed}
+            <IconButton icon="stop" label="Stop Recording" onClick={stop} aria-pressed className="text-destructive hover:text-destructive" />
+          </>
+        ) : state === "working" ? (
+          <Spinner label="Writing it down" className="size-control justify-center" />
+        ) : (
+          <>
+            {trouble}
+            <IconButton icon="mic" label={`Record ${label}`} onClick={start} disabled={disabled} aria-pressed={false} />
+          </>
+        )}
+      </div>
+    );
+
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {state === "recording" ? (
@@ -111,10 +146,7 @@ export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, 
           <Button icon="stop" variant="danger" onClick={stop} aria-pressed>
             Stop Recording
           </Button>
-          <span aria-live="polite" className="flex items-center gap-1.5 text-xs font-semibold text-destructive tabular-nums">
-            <span aria-hidden="true" className="size-2 animate-pulse-dot rounded-full bg-destructive" />
-            {clock(seconds)}
-          </span>
+          {elapsed}
         </>
       ) : state === "working" ? (
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -126,12 +158,7 @@ export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, 
           Record Answer
         </Button>
       )}
-      {problem && (
-        <span role="status" className="flex items-center gap-1.5 text-xs text-destructive">
-          <Icon name="alert" size="s" />
-          {problem}
-        </span>
-      )}
+      {trouble}
     </div>
   );
 }
