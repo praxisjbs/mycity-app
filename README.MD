@@ -150,6 +150,10 @@ mycity-app/
 │   ├── handoff/              a build carried across sessions: its decisions, plan and log
 │   │                         (push-notifications)
 │   └── manual/               user manual, one file per module (M11, written as each ships)
+│       └── performance-guide/ the Performance training and test guide, A4 for trainers and MyCity:
+│                             template.html, img/ (screenshots on the staging seed), brand/ (logos,
+│                             fonts) and build.js (the standalone page in dist/; --check fits each
+│                             page to A4, at most 16, and prints the PDF)
 ├── .github/
 │   ├── workflows/            ci.yml (`npm run ci` as four parallel jobs, backend, frontend, screens and checks, and the `ci` check over them; none on a draft PR), release.yml, rollback.yml, uptime.yml
 │   │                         (the uptime probe every 10 minutes)
