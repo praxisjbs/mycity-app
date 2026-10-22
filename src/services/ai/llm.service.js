@@ -36,6 +36,9 @@
  * The result is provisional: a person accepts it (or not) on screen, and the module
  * saves it through its own service with the run_id on the audit row.
  *
+ * The assistant talks to a model over several rounds with tools: converse() keeps one run for the
+ * whole question on this same path (docs/guides/praxis-ai.md §6.7).
+ *
  * Everything the caller puts in `input` is presented to the model as data, and the
  * instructions say so, so a CV that contains "ignore your instructions" stays a CV.
  *
@@ -67,10 +70,13 @@ const PROMPTS_DIR = path.join(__dirname, "prompts");
 const PURPOSE_RE = /^[a-z][a-z0-9-]{1,63}$/;
 const RETRY_DELAY_MS = 1500;
 
+/** Every provider with a text model AI Control may put in a chain (docs/guides/ai-control.md decision 34). */
 const DEFAULT_VENDORS = Object.freeze({
   gemini: require("./vendors/gemini"),
   anthropic: require("./vendors/anthropic"),
   deepseek: require("./vendors/deepseek"),
+  groq: require("./vendors/groq"),
+  openai: require("./vendors/openai"),
   stub: require("./vendors/stub"),
 });
 
@@ -132,17 +138,18 @@ function systemText(body, schema) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * One completion on one provider, from the same messages: Anthropic takes the system part on its
- * own, DeepSeek has no schema mode.
+ * One completion on one provider, from the same messages (OpenAI's shape, tool calls and results
+ * included): Anthropic takes the system part on its own, DeepSeek has no schema mode. Tools go to
+ * every provider; each vendor file sends them in its own API's form.
  */
-function ask(vendor, provider, { apiKey, model, messages, output, temperature, maxTokens }) {
+function ask(vendor, provider, { apiKey, model, messages, output, tools = null, temperature, maxTokens }) {
   const timeoutMs = config.AI_REQUEST_TIMEOUT_MS;
   if (provider === "anthropic") {
     const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
-    return vendor.complete({ apiKey, model, system, messages: messages.filter((m) => m.role !== "system"), maxTokens, timeoutMs });
+    return vendor.complete({ apiKey, model, system, messages: messages.filter((m) => m.role !== "system"), tools, maxTokens, timeoutMs });
   }
-  if (provider === "deepseek") return vendor.complete({ apiKey, model, messages, temperature, maxTokens, timeoutMs });
-  return vendor.complete({ apiKey, model, messages, json: Boolean(output), schema: output, temperature, maxTokens, timeoutMs });
+  if (provider === "deepseek") return vendor.complete({ apiKey, model, messages, tools, temperature, maxTokens, timeoutMs });
+  return vendor.complete({ apiKey, model, messages, json: Boolean(output), schema: output, tools, temperature, maxTokens, timeoutMs });
 }
 
 /**
@@ -392,6 +399,213 @@ async function complete(req) {
 }
 
 /**
+ * A conversation with tools, for the assistant (docs/guides/praxis-ai.md §6.1, §6.7): one run for
+ * the whole question, one step for each round with a model. The caller keeps the conversation,
+ * in OpenAI's shape (system, user, assistant with `tool_calls`, tool with `tool_call_id`), and
+ * sends all of it each round; every vendor file takes that shape and answers in it.
+ *
+ *   const talk = await ai.converse({ purpose: "data-answers", module: "praxis_ai", actor, egress: "reasoning" });
+ *   const r = await talk.round({ messages, tools });       // { text, toolCalls, finish_reason, provider, model }
+ *   ...
+ *   await talk.finish();                                    // or: throw await talk.fail(code, message, status)
+ *
+ * The same path as complete(): governance before anything, the action's chain (jobs.js), the run
+ * opened before anything leaves, user and tool turns redacted on the caller's egress, each round
+ * recorded with its tokens and prices, a quota refusal skipping its provider until it resets.
+ * A round asks the model that answered last (the first Ready one to start with); one that fails
+ * hands the same conversation to the next model in the chain, so a fallback carries on where the
+ * first choice stopped. When none is left the run fails and the round throws AI_UNAVAILABLE, or
+ * AI_VENDOR_CONFIG when a wrong key or model was the last word. With no provider set up, the stub
+ * answers every round.
+ *
+ * @param {object} req
+ * @param {string} req.purpose  the registered action; its prompt is loaded and recorded on the run
+ * @param {string} req.module
+ * @param {object|string|null} [req.actor]
+ * @param {string} [req.prompt]  the prompt file, when not the purpose's
+ * @param {"external"|"reasoning"} [req.egress]
+ * @param {string[]} [req.keep]
+ * @param {number} [req.temperature]
+ * @param {number} [req.maxTokens]
+ * @param {{query: Function}} [req.db]
+ * @param {object} [req.vendors]  tests
+ * @param {string} [req.promptsDir]  tests
+ */
+async function converse(req) {
+  const {
+    purpose,
+    module,
+    actor = null,
+    prompt = purpose,
+    egress = "external",
+    keep = [],
+    temperature = 0.2,
+    maxTokens = config.AI_MAX_OUTPUT_TOKENS,
+    db = require("../../config/db").pool,
+    vendors = DEFAULT_VENDORS,
+    promptsDir = PROMPTS_DIR,
+  } = req || {};
+  if (!PURPOSE_RE.test(String(purpose || "")))
+    throw new Error(`ai.converse: purpose is kebab-case, got "${purpose}"`);
+  if (!catalog.isModule(module))
+    throw new Error(`ai.converse: "${module}" is not a module key`);
+  const p = loadPrompt(prompt, promptsDir);
+
+  let g;
+  try {
+    g = await governance.check(db, { module });
+  } catch (err) {
+    if (err instanceof AppError)
+      await ledger.refused(db, { purpose, module, actor, error: err });
+    throw err;
+  }
+
+  const chain = g.settings.forced_stub ? null : await jobs.resolve(purpose, { db });
+  const setUp = Boolean(chain) && chain.links.some((l) => l.state !== "not_set_up" && vendors[l.provider]);
+  const links = setUp
+    ? chain.links.filter((l) => l.state === "ready" && vendors[l.provider])
+    : [{ provider: "stub", model: "stub", position: 1 }];
+
+  if (!links.length) {
+    const runId = await ledger.startRun(db, { purpose, module, actor, vendor: chain.links[0].provider, model: chain.links[0].model, prompt: p });
+    const why = chain.links.map((l) => `${l.provider} ${l.model}: ${l.state}`).join("; ");
+    await ledger.finishRun(db, runId, { status: "failed", error_code: "AI_UNAVAILABLE", error: `every model was passed by (${why})` });
+    throw new AppError("AI_UNAVAILABLE", "The AI service is not answering. Try again in a few minutes.", 503);
+  }
+
+  const runId = await ledger.startRun(db, { purpose, module, actor, vendor: links[0].provider, model: links[0].model, prompt: p });
+  const contexts = new Map();
+  const contextOf = async (link) => {
+    const key = `${link.provider}:${link.model}`;
+    if (!contexts.has(key))
+      contexts.set(key, {
+        vendor: vendors[link.provider],
+        apiKey: link.provider === "stub" ? null : await integrations.secret(link.provider, "api_key", { db }),
+        prices: link.provider === "stub" ? prices.zero() : await prices.forStep(db, link),
+      });
+    return contexts.get(key);
+  };
+  /** The person's words and what the reads returned leave redacted; ours (system) and the model's own do not. */
+  const safe = (messages) =>
+    messages.map((m) =>
+      (m.role === "user" || m.role === "tool") && typeof m.content === "string"
+        ? { ...m, content: redactValue(m.content, { egress, keep }) }
+        : m,
+    );
+
+  let at = 0;
+  let step = 0;
+  let cost = "0.00";
+  let answered = null;
+  let closed = false;
+
+  const close = async (fields) => {
+    if (closed) return;
+    closed = true;
+    await ledger.finishRun(db, runId, fields);
+  };
+
+  /**
+   * One round: the model that answered last, else the next one Ready.
+   * @param {{messages: Array<object>, tools?: Array<object>|null, output?: import("zod").ZodTypeAny|null, kind?: "completion"|"retry"}} r
+   *   output  ask for one JSON object of this shape (no tools in the same round)
+   */
+  const round = async ({ messages, tools = null, output = null, kind = "completion" }) => {
+    if (closed) throw new Error("ai.converse: this conversation's run is already closed");
+    const msgs = safe(messages);
+    let last = null;
+    for (let i = at; i < links.length; i += 1) {
+      const link = links[i];
+      if (i > at && link.provider !== "stub" && (await skips.until(link.provider))) continue;
+      const ctx = await contextOf(link);
+      const tries = links.length === 1 ? 2 : 1;
+      for (let attempt = 1; attempt <= tries; attempt += 1) {
+        step += 1;
+        const started = Date.now();
+        const counted = link.provider !== "stub";
+        try {
+          const res = await ask(ctx.vendor, link.provider, { apiKey: ctx.apiKey, model: link.model, messages: msgs, output, tools, temperature, maxTokens });
+          const c = await ledger.recordStep(db, runId, {
+            step_no: step,
+            kind,
+            vendor: link.provider,
+            model: res.model || link.model,
+            usage: res.usage,
+            prices: ctx.prices,
+            latency_ms: Date.now() - started,
+            finish_reason: res.finish_reason,
+            outcome: "ok",
+          });
+          cost = money.toWire(money.money(cost).plus(money.money(c)));
+          if (counted) usage.record(link.provider, "call", { ok: true });
+          at = i;
+          answered = link;
+          return {
+            text: res.text || "",
+            toolCalls: Array.isArray(res.toolCalls) ? res.toolCalls : [],
+            finish_reason: res.finish_reason || null,
+            provider: link.provider,
+            model: res.model || link.model,
+          };
+        } catch (err) {
+          last = err;
+          if (counted) usage.record(link.provider, "call", { ok: false, error_code: callCode(err) });
+          await ledger.recordStep(db, runId, {
+            step_no: step,
+            kind,
+            vendor: link.provider,
+            model: link.model,
+            prices: ctx.prices,
+            latency_ms: Date.now() - started,
+            outcome: "failed",
+            error: err.message,
+          });
+          if (err.kind === "config") {
+            logger.error(
+              { err, purpose, provider: link.provider, model: link.model },
+              "AI vendor configuration error: check the key on Settings · Integrations and the model on AI Control",
+            );
+            require("../../shared/observability/error-reporter").report(err, { origin: "ai", severity: "error", route: `ai ${purpose}` });
+            break;
+          }
+          if (resets(err)) {
+            await skips.mark(link.provider, err.retryAfterMs, callCode(err));
+            break;
+          }
+          if (attempt < tries) await sleep(RETRY_DELAY_MS);
+        }
+      }
+    }
+    at = links.length;
+    if (last && last.kind === "config") {
+      await close({ status: "failed", error_code: "AI_VENDOR_CONFIG", error: last.message });
+      throw new AppError("AI_VENDOR_CONFIG", "The AI service is not set up correctly. An administrator has been told.", 503);
+    }
+    await close({ status: "failed", error_code: "AI_UNAVAILABLE", error: last ? last.message : "every model was skipped" });
+    throw new AppError("AI_UNAVAILABLE", "The AI service is not answering. Try again in a few minutes.", 503);
+  };
+
+  return {
+    run_id: runId,
+    prompt: p,
+    round,
+    /** The run's spend so far, naira as a string. */
+    cost: () => cost,
+    /** The model that answered last, or null before any did. */
+    answered: () => (answered ? { provider: answered.provider, model: answered.model } : null),
+    /** Close the run as answered, naming the model that answered last. */
+    finish: () => close({ status: "ok", vendor: answered ? answered.provider : links[0].provider, model: answered ? answered.model : links[0].model }),
+    /** Close the run as failed and hand back the error to throw. */
+    fail: async (code, message, status, detail) => {
+      await close({ status: "failed", error_code: code, error: detail || message });
+      return new AppError(code, message, status);
+    },
+    /** Whether the stub is answering (no provider set up). */
+    stub: links[0].provider === "stub",
+  };
+}
+
+/**
  * Ask with the web searched (Find Prices, docs/guides/ai-control.md §6.4): governance, the
  * action's chain and the ledger as complete() takes them, on the models that can search
  * (jobs.SEARCHES: Gemini with Google Search). Each model is asked once; there is no stub, since
@@ -595,6 +809,7 @@ function __clearPrompts() {
 
 module.exports = {
   complete,
+  converse,
   search,
   checkKey,
   testAnswer,

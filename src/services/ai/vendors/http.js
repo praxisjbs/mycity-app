@@ -119,4 +119,73 @@ async function request(vendor, url, { method = "GET", headers = {}, body, timeou
   return { status: res.status, data, headers: res.headers };
 }
 
-module.exports = { VendorError, classify, request, retryAfterOf, durationMs, detailOf };
+/**
+ * A tool call as every vendor file returns it: OpenAI's shape, the one the conversation is kept
+ * in whichever provider answers (docs/guides/praxis-ai.md §6.7). `arguments` is a JSON string.
+ * @param {object} call  as the vendor sent it
+ * @param {number} i     its place in the reply, for a call that came without an id
+ * @returns {{id: string, type: "function", function: {name: string, arguments: string}}|null}
+ */
+function toolCallOf(call, i) {
+  const fn = call && call.function;
+  if (!fn || typeof fn.name !== "string" || !fn.name) return null;
+  const args = fn.arguments;
+  return {
+    // Anything else the vendor attached stays: Gemini's thought signatures ride in `extra_content`
+    // and must go back with the call on the next round (chatMessages).
+    ...call,
+    id: typeof call.id === "string" && call.id ? call.id : `call_${i + 1}`,
+    type: "function",
+    function: {
+      name: fn.name,
+      arguments: typeof args === "string" ? args : JSON.stringify(args || {}),
+    },
+  };
+}
+
+/**
+ * The conversation as an OpenAI-compatible vendor takes it: each tool call cut to `id`, `type` and
+ * `function`, plus the fields named in `keep` (Gemini keeps `extra_content`). A conversation a
+ * Gemini model began can then be handed to another provider, whose API refuses fields it does
+ * not know.
+ * @param {Array<object>} messages
+ * @param {string[]} [keep]
+ */
+function chatMessages(messages, keep = []) {
+  return (messages || []).map((m) => {
+    if (!Array.isArray(m.tool_calls)) return m;
+    return {
+      ...m,
+      tool_calls: m.tool_calls.map((c) => {
+        const out = { id: c.id, type: "function", function: { name: c.function.name, arguments: c.function.arguments } };
+        for (const k of keep) if (c[k] !== undefined) out[k] = c[k];
+        return out;
+      }),
+    };
+  });
+}
+
+/**
+ * The answer of an OpenAI-compatible chat completion (DeepSeek, Groq, OpenAI), as every vendor
+ * file returns it.
+ * @param {object} data   the reply
+ * @param {string} model  the model asked, when the reply does not name one
+ * @returns {{text: string, toolCalls: Array, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}}
+ */
+function chatResult(data, model) {
+  const choice = (data && Array.isArray(data.choices) && data.choices[0]) || {};
+  const msg = choice.message || {};
+  const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
+  return {
+    text: typeof msg.content === "string" ? msg.content : "",
+    toolCalls: calls.map(toolCallOf).filter(Boolean),
+    usage: {
+      input_tokens: Number(data && data.usage && data.usage.prompt_tokens) || 0,
+      output_tokens: Number(data && data.usage && data.usage.completion_tokens) || 0,
+    },
+    model: (data && data.model) || model,
+    finish_reason: choice.finish_reason || null,
+  };
+}
+
+module.exports = { VendorError, classify, request, retryAfterOf, durationMs, detailOf, toolCallOf, chatMessages, chatResult };

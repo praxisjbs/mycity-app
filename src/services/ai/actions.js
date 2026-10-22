@@ -56,6 +56,16 @@ const ACTIONS = Object.freeze({
     ]),
     built: false,
   }),
+  // A question spoken on Praxis AI · Ask (docs/guides/praxis-ai.md §6.6).
+  "praxis-ai-voice": Object.freeze({
+    label: "Voice Question",
+    module: "praxis_ai",
+    job: "transcription",
+    personal_data: true,
+    chosen_by: "GE",
+    chosen_at: "2026-10-22",
+    built: false,
+  }),
   "find-prices": Object.freeze({
     label: "Find Prices",
     module: "ai_control",

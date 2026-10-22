@@ -412,6 +412,7 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Decision 34 built: every vendor file takes tools in one conversation shape, Groq and OpenAI answer text, `llm.service.converse()` keeps one run per question and hands a failing model's conversation to the next link; Voice Question registered (decision 35), not built yet.
 - 22/10/2026 · GE · Decision 34 rewritten: no Cannot Use Tools state. Every provider's vendor file takes tools, so any text model IT chooses answers on Data Answers' chain, first or fallback; Groq's and OpenAI's text models, which Edit Chain accepted but no call used, answer too. §6.1 and §10.1 lose the state.
 - 21/10/2026 · GE · Decisions 33 to 35 with Praxis AI's guide (`praxis-ai.md`): up to 5 reads a question for Data Answers, the Cannot Use Tools state, Voice Question registered; §2, §6.1, §6.5 and §10.1 follow. To be built with Praxis AI.
 - 21/10/2026 · TB · Spend fixed after staging showed Spend by Day's labels run together and a bare `transcription` row in By Action: each day reads 14/10 on the shared bar chart, which keeps its labels 11 px and leaves off those that would touch (§10.1); migration 10220 moves the voice notes kept under `transcription` before the registry onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` (§4, §6.5).
