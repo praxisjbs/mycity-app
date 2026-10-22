@@ -125,7 +125,7 @@ async function scoresByMonth(db, period, months, departmentId) {
 /** The company's score as Goals shows it: the mean of the company objectives at their latest. */
 async function companyScore(db, period) {
   const { rows } = await db.query(
-    `WITH ${objectiveScores("$1")}
+    `WITH objective_score AS (${objectiveScores("$1")})
      SELECT trim_scale(round(avg(os.score) FILTER (WHERE os.department_id IS NULL), 4))::text AS company_score
        FROM objective_score os`,
     [period.performance_period_id],

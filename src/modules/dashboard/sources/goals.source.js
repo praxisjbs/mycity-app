@@ -112,7 +112,7 @@ const MEETS = "COALESCE((pq.rules -> 'bands' ->> 'meets')::numeric, $3)";
 function organisationGoals(client, { from, to }, query) {
   return pageQuery(
     client,
-    `WITH ${objectiveScores(QUARTERS_OVERLAPPING)}
+    `WITH objective_score AS (${objectiveScores(QUARTERS_OVERLAPPING)})
      SELECT g.organisational_goal_id, g.title, g.status, g.starts_on, g.ends_on,
             (SELECT round(avg(os.score) * 100)::int FROM objective_score os
               WHERE os.organisational_goal_id = g.organisational_goal_id AND os.department_id IS NULL) AS progress,
@@ -161,7 +161,7 @@ async function orgScores(client, { today }) {
   // pagination:complete the company and the functions with objectives this quarter, a handful
   const { rows } = await completeQuery(
     client,
-    `WITH ${objectiveScores(QUARTER_OF_TODAY)}
+    `WITH objective_score AS (${objectiveScores(QUARTER_OF_TODAY)})
      SELECT os.department_id, round(avg(os.score) * 100)::int AS percent
        FROM objective_score os
       GROUP BY os.department_id
@@ -232,17 +232,16 @@ function keyResultsPage(client, { today, group = null }, query) {
 
 /**
  * A person's lines on their scorecard for the quarter `today` falls in, once it binds, each with
- * its score and the quarter's Meets band: a CTE named scored_line.
+ * its score and the quarter's Meets band: the body of a CTE named scored_line.
  */
-const SCORED_LINES = `scored_line AS (
+const SCORED_LINES = `
     SELECT t.employee_target_id, t.title, t.section, t.position, t.weight, ${LINE_SCORE} AS score, ${MEETS} AS meets
       FROM scorecard s
       JOIN performance_period pq ON pq.performance_period_id = s.performance_period_id
       JOIN employee_target t ON t.scorecard_id = s.scorecard_id
       ${LINE_SCORES}
      WHERE s.employee_id = $1 AND s.status IN ('binding', 'agreed', 'closed')
-       AND pq.starts_on <= $2::date AND pq.ends_on >= $2::date
-  )`;
+       AND pq.starts_on <= $2::date AND pq.ends_on >= $2::date`;
 
 /**
  * My Scorecard: the reader's lines at or above the quarter's Meets band, out of their scored lines,
@@ -252,7 +251,7 @@ const SCORED_LINES = `scored_line AS (
  */
 async function scorecardFigure(client, { employee_id: employeeId, today }) {
   const { rows } = await client.query(
-    `WITH ${SCORED_LINES}
+    `WITH scored_line AS (${SCORED_LINES})
      SELECT count(*) FILTER (WHERE sl.score >= sl.meets)::int AS value,
             count(*) FILTER (WHERE sl.score IS NOT NULL)::int AS denominator,
             count(*) FILTER (WHERE sl.score < sl.meets)::int AS behind,
@@ -278,7 +277,7 @@ async function scorecardFigure(client, { employee_id: employeeId, today }) {
 function scorecardLinesPage(client, { employee_id: employeeId, today, group = null }, query) {
   return pageQuery(
     client,
-    `WITH ${SCORED_LINES}
+    `WITH scored_line AS (${SCORED_LINES})
      SELECT sl.employee_target_id, sl.title, sl.section, trim_scale(sl.weight)::text AS weight,
             trim_scale(round(sl.score, 4))::text AS score, (sl.score >= sl.meets) AS on_track, ${TOTAL_COL}
        FROM scored_line sl

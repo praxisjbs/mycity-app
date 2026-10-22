@@ -40,11 +40,12 @@ const objectiveScore = (keyResults) => scoring.meanScore(keyResults.map((kr) => 
 /**
  * The quarter's objectives with the score Goals shows for each, in SQL: each key result at its
  * latest month, confirmed else proposed, and the objective the mean of them to two places, as
- * objectiveScore() works it out. A CTE named objective_score (okr_objective_id, department_id,
- * organisational_goal_id, score), over the quarters `periods` names: a placeholder ("$1") or a
+ * objectiveScore() works it out. The body of a CTE the caller names objective_score
+ * (`WITH objective_score AS (${objectiveScores("$1")})`): okr_objective_id, department_id,
+ * organisational_goal_id, score, over the quarters `periods` names: a placeholder ("$1") or a
  * subquery of their ids.
  */
-const objectiveScores = (periods) => `objective_score AS (
+const objectiveScores = (periods) => `
     SELECT o.okr_objective_id, o.department_id, o.organisational_goal_id,
            round(avg(COALESCE(km.confirmed_score, km.proposed_score)), 2) AS score
       FROM okr_objective o
@@ -52,7 +53,6 @@ const objectiveScores = (periods) => `objective_score AS (
       LEFT JOIN okr_key_result_month km ON km.okr_key_result_id = k.okr_key_result_id
        AND km.month = (SELECT max(kx.month) FROM okr_key_result_month kx WHERE kx.okr_key_result_id = k.okr_key_result_id)
      WHERE o.performance_period_id IN (${periods})
-     GROUP BY o.okr_objective_id, o.department_id, o.organisational_goal_id
-  )`;
+     GROUP BY o.okr_objective_id, o.department_id, o.organisational_goal_id`;
 
 module.exports = { nextObjectiveCode, nextKeyResultCode, monthScore, objectiveScore, objectiveScores };
