@@ -208,7 +208,7 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
 | `task.blocked` / `task.unblocked` | Mark Blocked / Clear Blocker | notification to the setter |
 | `task.cancelled` | Cancel Task | notification to the assignee |
 | `task.commented` | a comment is saved | notification to the assignee and setter, not the author |
-| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day (counted from today when its day has passed, so a task days overdue repeats once); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task) |
+| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day (counted from today when its day has passed, so a task days overdue repeats once, and never late at birth: a day whose due time has already gone gives the rule's next day); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task) |
 | `calendar_event.created`, `.changed`, `.cancelled` | save, change, call off | notification to the attendees (an ICS file by email is §13) |
 | `calendar_event.answered` | an attendee accepts or declines | notification to the owner |
 | `week.summary_saved` | Support Needed or a summary saved | audit; Team This Week reads it |
@@ -311,6 +311,7 @@ is listed here as tier 1 or tier 2.**
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · §7: a repeating task swept after its next day's due time comes round on the rule's following day; it was made late at birth and repeated again on the next sweep (found when the integration suite ran on a Thursday evening).
 - 22/10/2026 · GE · §9: Praxis AI's "create a task" and "book a meeting" open New Task and New Event filled with what the person said (`TaskPrefill`, `CalendarEventPrefill`, `praxis-ai.md` §6.4); the forms read their own fields from the address, so the deep link no longer passes the title itself.
 - 22/10/2026 · TB · Performance PR 4 (`docs/guides/performance.md` §6.11, §6.18): §1 to §11 now cover
   commitments on tasks (marked by the person or their manager, sent as a month, approved with their

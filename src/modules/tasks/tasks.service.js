@@ -611,7 +611,10 @@ async function repeatOne(id, cal, now = new Date()) {
     const today = lagos.today(now);
     const dueDay = t.due_at ? lagos.dateOf(new Date(t.due_at)) : today;
     const lastDay = dueDay < today ? lagos.addDays(today, -1) : dueDay;
-    const day = recurrence.nextDay(t.recurrence, lastDay, cal);
+    let day = recurrence.nextDay(t.recurrence, lastDay, cal);
+    // A sweep after that day's due time would make the next task late at birth, and the sweep after
+    // would repeat it again: it comes round on the following day of the rule instead.
+    while (new Date(recurrence.dueInstant(day, cal)) <= now) day = recurrence.nextDay(t.recurrence, day, cal);
     const { number } = await numbering.allocate(client, "task");
     const childId = await repo.insert(client, {
       number,

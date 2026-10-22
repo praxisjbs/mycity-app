@@ -61,7 +61,8 @@ export function Reviews() {
   const manage = hasCapability(me, "performance.manage");
   const rounds = usePaged("GET /api/v1/performance/rounds", { filters: { period_id: quarter.periodId }, enabled: Boolean(quarter.periodId) });
   const [roundId, setRoundId] = useState("");
-  const round: Round | undefined = rounds.rows.find((r) => r.performance_cycle_id === roundId) ?? rounds.rows.at(-1);
+  // The API lists rounds newest month first, so the newest round is the one shown until another is picked.
+  const round: Round | undefined = rounds.rows.find((r) => r.performance_cycle_id === roundId) ?? rounds.rows[0];
   const departments = useApi("GET /api/v1/departments", { query: {} });
   const [view, setView] = useState<"reviews" | "pips">("reviews");
   const [dept, setDept] = useState("");

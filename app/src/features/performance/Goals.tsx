@@ -233,7 +233,7 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
           ["Start", k.starts_on ? formatDate(k.starts_on) : "–"],
           ["Finish", k.finishes_on ? formatDate(k.finishes_on) : "–"],
           ["Baseline", k.baseline_text ?? "–"],
-          ["Target", `${k.target_text ?? k.target_value ?? "–"}${k.unit ? ` ${k.unit}` : ""}${was ? ` · Was ${was.from_text ?? was.from_value}` : ""}`],
+          ["Target", `${k.target_text ?? k.target_value ?? "–"}${k.unit ? ` ${k.unit}` : ""}${was ? ` · Was ${was.from_text ?? was.from_value ?? "not set"}` : ""}`],
           ["Feeds", k.linked_company_key_results.map((c) => c.code).join(", ") || "–"],
           ["Fed By", k.contributing.map((c) => c.code).join(", ") || "–"],
           ["Rolls Up To", k.trace.steps.filter((s) => s.kind !== "key_result").map((s) => s.code ?? s.title).join(" › ") || "–"],
