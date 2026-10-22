@@ -25,6 +25,7 @@ const { scoring } = require("@mycity/contract");
 const reminders = require("../notifications/notifications.reminders");
 const targetsRepo = require("../targets/targets.repo");
 const progress = require("../targets/targets.progress");
+const periods = require("../goals/goals.periods");
 const repo = require("./reviews.repo");
 const { EVENTS, CHECK_IN_REMINDER, REVIEW_REMINDER, CLOSE_REMINDER } = require("./reviews.events");
 
@@ -45,29 +46,14 @@ async function tx(fn) {
 /** A quarter's rules, with the code's defaults for anything it does not carry. */
 const rulesOf = (period) => scoring.ScoringRules.safeParse(period && period.rules).success ? period.rules : scoring.DEFAULT_RULES;
 
-/**
- * A month's deadlines: the n-th business day of the month after it (§6.2, G2, G3).
- * @param {string} month  the month's first day
- */
+/** A month's deadlines (§6.2, G2, G3): the quarter's rules counted in business days (goals.periods.js). */
 function deadlines(month, rules, cal) {
-  const next = lagos.addMonths(day(month), 1).slice(0, 7);
-  const d = rules.due_business_days;
-  const nth = (n) => workingWeek.nthBusinessDay(next, n, cal);
-  return {
-    check_in_due_on: nth(d.check_in),
-    head_check_in_due_on: nth(d.head_check_in),
-    review_due_on: nth(d.review),
-    second_level_due_on: nth(d.second_level),
-    close_due_on: nth(d.close),
-  };
+  const { opens_on: opensOn, ...due } = periods.roundDates(day(month), rules, cal);
+  return { opens_on: opensOn, ...due };
 }
 
 /** The months of a quarter, as their first days. */
-function monthsOf(period) {
-  const out = [];
-  for (let m = day(period.starts_on).slice(0, 7) + "-01"; m <= day(period.ends_on); m = lagos.addMonths(m, 1)) out.push(m);
-  return out;
-}
+const monthsOf = (period) => periods.monthsOf(day(period.starts_on));
 
 /** A round as the contract's Round. */
 function roundView(r, counts = null) {
@@ -154,9 +140,9 @@ async function scheduleCheckIn(client, reviewId, dueOn, cal, now = new Date()) {
 async function openRound(client, actor, period, month) {
   const rules = rulesOf(period);
   const cal = await workingWeek.loadCalendar(client);
-  const due = deadlines(month, rules, cal);
+  const { opens_on: _opens, ...due } = deadlines(month, rules, cal);
   const { last } = lagos.monthBounds(month);
-  const name = formatMonth(month);
+  const name = periods.roundName(month);
   const id = await repo.insertRound(client, {
     performance_period_id: period.performance_period_id,
     name,
@@ -233,7 +219,7 @@ async function openDueRounds(today = lagos.today()) {
       const { last } = lagos.monthBounds(month);
       if (last >= today) continue;
       if (period.live_from && last < day(period.live_from)) continue;
-      if (today < workingWeek.nthBusinessDay(lagos.addMonths(month, 1).slice(0, 7), 1, cal)) continue;
+      if (today < deadlines(month, rulesOf(period), cal).opens_on) continue;
       if (await repo.roundOf(pool, period.performance_period_id, month)) continue;
       const r = await tx((client) => openRound(client, null, period, month));
       if (r.created) done.push(`${formatMonth(month)} (${r.reviews} reviews)`);
