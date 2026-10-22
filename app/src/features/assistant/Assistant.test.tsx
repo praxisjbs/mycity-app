@@ -80,7 +80,7 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
   link: { label: "Open Leave", path: "/people?tab=leave" },
   citations: Array.from({ length: 8 }, (_, i) => ({ entity_type: "employee", entity_id: `00000000-0000-4000-8000-00000000000${i}`, label: `Person ${i + 1}`, link: `/people?tab=employees&id=${i}`, read_key: "employees.list" })),
   citations_total: 8,
-  reads: [{ key: "leave.requests", rows: 2, total: 2, page: 1 }],
+  reads: [{ key: "leave.requests", rows: 2, total: 2, first: 1 }],
   declined: null,
   more: false,
   feedback: null,
@@ -140,7 +140,7 @@ describe("Ask", () => {
   });
 
   it("an open conversation shows its turns; Show Next 25 asks for the next page in it", async () => {
-    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ key: "employees.list", rows: 2, total: 312, page: 1 }] })];
+    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ key: "employees.list", rows: 2, total: 312, first: 1 }] })];
     m.call.mockImplementation(async () => answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", question: "Show the next 25.", content: "Here are the next people." }));
     ui("ask", CONV);
     expect(screen.getByText("Showing 2 of 312")).toBeTruthy();
@@ -217,7 +217,7 @@ describe("Ask", () => {
   });
 
   it("the second page of a list says which rows it shows", () => {
-    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [] }, reads: [{ key: "employees.list", rows: 25, total: 312, page: 2 }], citations: [], citations_total: 0 })];
+    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [] }, reads: [{ key: "employees.list", rows: 25, total: 312, first: 26 }], citations: [], citations_total: 0 })];
     ui("ask", CONV);
     expect(screen.getByText("Showing 26 to 50 of 312")).toBeTruthy();
   });

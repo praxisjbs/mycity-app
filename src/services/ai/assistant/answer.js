@@ -108,7 +108,7 @@ function build({ draft, reads, routes, screens }) {
     params: r.params,
     rows: r.rows.length,
     total: r.ok ? r.total : null,
-    page: r.ok && r.page ? r.page.number : null,
+    first: r.ok && r.page ? (r.page.number - 1) * r.page.size + 1 : null,
   }));
   const more = Boolean(draft.more) && ok.some((r) => r.page && r.page.has_next);
   const shown = {
@@ -117,7 +117,7 @@ function build({ draft, reads, routes, screens }) {
     link,
     citations,
     citations_total: all.length,
-    reads: madeReads.map(({ key, rows, total, page }) => ({ key, rows, total, page })),
+    reads: madeReads.map(({ key, rows, total, first }) => ({ key, rows, total, first })),
     declined,
     more,
     rows_read: ok.reduce((n, r) => n + r.rows.length, 0),

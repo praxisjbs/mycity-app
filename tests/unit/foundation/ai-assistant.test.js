@@ -254,7 +254,7 @@ describe("what the screen shows", () => {
     });
     expect(shown).toMatchObject({ more: true, rows_read: 2, module_key: "ess", citations_total: 2, declined: null });
     expect(shown.citations[0]).toEqual({ entity_type: "leave_request", entity_id: "l1", label: "Ayo Bello", link: "/x?id=l1", read_key: "leave.requests" });
-    expect(shown.metadata.reads).toEqual([{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 40, page: 1 }]);
+    expect(shown.metadata.reads).toEqual([{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 40, first: 1 }]);
   });
 
   test("the screen button is an offered route by its intent, with only the prefill its schema takes", () => {

@@ -63,15 +63,16 @@ const AiAnswerLink = z
   .strict();
 
 /**
- * A read an answer made: which, how many rows it returned, how many there are in all, and which
- * page of the list it read (null for a read of one record, or one that returned nothing).
+ * A read an answer made: which, how many rows it returned, how many there are in all, and where
+ * its rows start in the whole list (26 for page 2; null for a read of one record, or one that
+ * returned nothing), so the screen can say Showing 26 to 50 of 312 without a page size of its own.
  */
 const AiReadMade = z
   .object({
     key: z.string(),
     rows: z.number().int().min(0).max(25),
     total: z.number().int().min(0).nullable(),
-    page: z.number().int().min(1).nullable(),
+    first: z.number().int().min(1).nullable(),
   })
   .strict();
 

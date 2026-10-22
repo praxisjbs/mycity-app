@@ -82,7 +82,7 @@ describe("an answer as History shows it", () => {
         metadata: {
           table: { columns: ["Employee"], rows: [["Ayo Bello"]], numeric: [] },
           link: null,
-          reads: [{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 2, page: 1 }],
+          reads: [{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 2, first: 1 }],
           declined: null,
           more: false,
         },
@@ -94,7 +94,7 @@ describe("an answer as History shows it", () => {
     );
     const c = require("@mycity/contract");
     expect(c.assistant.AiAnswer.safeParse(shown).success).toBe(true);
-    expect(shown.reads).toEqual([{ key: "leave.requests", rows: 2, total: 2, page: 1 }]);
+    expect(shown.reads).toEqual([{ key: "leave.requests", rows: 2, total: 2, first: 1 }]);
     expect(shown.citations[0]).toMatchObject({ entity_type: "employee", label: "Ayo Bello", read_key: "employees.list" });
     expect(shown.citations[0].link).toMatch(/^\/people\?/);
     expect(shown.created_at).toBe("2026-10-22T09:30:00.000Z");

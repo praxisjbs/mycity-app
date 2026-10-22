@@ -58,8 +58,6 @@ const CHIPS = 6;
 const NEXT_PAGE = "Show the next 25.";
 /** The longest question the contract takes (AiAsk), typed or spoken. */
 const QUESTION_MAX = 500;
-/** A list read's page size, for Showing 26 to 50 of 312. */
-const PAGE_SIZE = 25;
 
 /* ───────────────────────── Ask ───────────────────────── */
 
@@ -339,7 +337,7 @@ function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: Ai
   const more = a.citations_total - cites.length;
   /* The read the table was drawn from, when it had more rows than the page it returned. */
   const paged = a.table?.rows.length ? a.reads.find((r) => r.rows === a.table!.rows.length && r.total != null && r.total > r.rows) : undefined;
-  const from = paged?.page ? (paged.page - 1) * PAGE_SIZE + 1 : null;
+  const from = paged?.first ?? null;
   return (
     <article aria-label="Answer" className="flex max-w-11/12 flex-col gap-2.5 bubble-them border border-border bg-card p-3 max-md:max-w-full">
       <p data-copy="content" className="text-sm whitespace-pre-line wrap-any">

@@ -51,7 +51,7 @@ function present(row, citations = []) {
     link: md.link || null,
     citations: citations.map(citationOf),
     citations_total: Number(row.citations_total) || 0,
-    reads: (md.reads || []).map((r) => ({ key: r.key, rows: r.rows, total: r.total === undefined ? null : r.total, page: r.page || null })),
+    reads: (md.reads || []).map((r) => ({ key: r.key, rows: r.rows, total: r.total === undefined ? null : r.total, first: r.first || null })),
     declined: md.declined || null,
     more: Boolean(md.more),
     feedback: row.feedback || null,
