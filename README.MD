@@ -99,7 +99,9 @@ mycity-app/
 │   │   └── lib/sources.js    string literals, call arguments and frontend files for the static halves
 │   │                         of check/five-second.js, check/forms.js, check/dashes.js
 │   ├── db/                   migrate, seed, create-admin, load-staff.js (MyCity's own staff from
-│   │                         seeds/staff/, run by every deploy); backup.sh (nightly) and
+│   │                         seeds/staff/, run by every deploy) with staff-nomenclature.js (the
+│   │                         names of functions, posts and seats, seeds/staff/nomenclature.json);
+│   │                         backup.sh (nightly) and
 │   │                         restore-drill.js (weekly), installed on the server as mycity-backup,
 │   │                         mycity-restore-drill
 │   ├── import/               command-line import
@@ -410,10 +412,14 @@ for this device), tested in `app/src/features/attendance/location.test.ts`.
 | `tasks` | `.audience` (reporting line scope), `.recurrence` |
 | `calendar` | |
 | `workspace` | `.today`, `.analytics` (aggregator) |
-| `goals` | `.cascade`, `.trace` (KPI → organisational goal), `.approval` (A16) |
-| `targets` | `.progress`, `.approval` |
-| `kpis` | `.weights` (must total 100) |
-| `reviews` | `.cycle`, `.sequence` (self rating first, A17), `.autoscore`, `.metrics`, `.pdf`, `.dictation` (A18), `.analytics` |
+| `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the quarter plan, `performance.plan`), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5) |
+| `targets` | `.weights` (sections and the contribution check), `.approval` (agreement and target changes), `.progress` (automatic lines, PR 3), `.commitments` (commitments and their approval, PR 4), `.import` (`scorecards`) |
+| `kpis` | `.import` (`okr_kpis`) |
+| `reviews` | `.cycle` (monthly rounds, `review-cycle-open`), `.sequence` (self first, A17, and the stages), `.pip` (improvement plans), `.pdf`, `.dictation` (A18) |
+| `ess` | `.performance` (My Performance and the check-in, PR 3) |
+
+The files each Performance pull request fills are listed in `docs/guides/performance.md` §12 (Files by
+PR); a file still empty says which PR fills it there.
 
 Shared first filled: `shared/time/recurrence`, `services/calendar/ics`, `services/ai`
 (`llm.service`, `transcription`, prompt `review-cleanup.md`).

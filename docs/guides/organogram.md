@@ -68,7 +68,7 @@ The organogram reads one tree and nobody keeps a second copy.
 | Table | Key columns | Notes |
 |---|---|---|
 | `employee` | `line_manager_id` (self-FK, nullable for the CEO), `dotted_manager_id` (self-FK, nullable), `department_id` | `line_manager_id` already exists in the contract (`organisation.js`). `dotted_manager_id` is the net-new column for the matrix (full matrix in v1) |
-| `department` | `id`, `name` | Department name is the node chip |
+| `department` | `id`, `name`, `code`, `head_employee_id` or `head_seat_id` (2100) | Department name is the node chip. A department's head is a person or a vacant seat, never both; while the seat is vacant the person above it acts (`organisation.headOf()`, `docs/guides/performance.md` §6.20). MyCity's five departments, their codes and heads are kept true by the staff loader (`seeds/staff/nomenclature.json`, `docs/guides/foundation.md` §6.1) |
 | `org_seat` (vacant seat) | `title`, `department_id`, `line_manager_id` or `line_manager_seat_id`, `status` (vacant, filled, closed), `filled_by_employee_id` | A seat with no employee. A vacant seat can carry reports: an employee whose manager's post is empty points at it through `employee.line_manager_seat_id` (or `dotted_manager_seat_id` for a dotted line), never at both a person and a seat. Modelled so the line never breaks when a role is unfilled |
 
 Migration file: `migrations/0110_employee_profile.sql` (M0) adds `dotted_manager_id`, the two seat
@@ -80,6 +80,13 @@ adds archiving, so a record that leaves the tree keeps its history.
 `dotted_manager_node_id` and `dotted_line_to` (the dotted manager's name, ready to draw). A manager
 who is no longer an active node (archived, or left) is dropped from the line, so their former
 reports show as roots the builder flags rather than vanishing (§11).
+
+**Who heads a department** (TB, 22/10/2026). `GET /api/v1/departments` gives each department its
+`head` (a person, the person in a filled head seat, or the vacant seat, as a `ManagerRef`) and its
+`acting_head` (the person who acts: the head, or the first person above a vacant head seat, through
+any vacant seats between). `PATCH /api/v1/departments/:id` sets `head_employee_id` or `head_seat_id`;
+naming one clears the other. There is no department form on screen in M2: the staff loader sets the
+heads, and a later screen may edit them.
 
 **Who answers for an empty seat** (TB, 19/10/2026). The view `employee_effective_manager`
 (`migrations/1160_employee_effective_manager.sql`) gives every employee the person they answer to:
@@ -399,3 +406,4 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 - 20/10/2026 · GE · Nothing on the Organogram or Org Chart changed. The organisation module gains `setBirthday` (service and repo), which records a birthday known only as a day and month (`employee.birth_day`, `birth_month`, migration `1180`) for the staff loader; it emits `employee.updated` with the two fields before and after (foundation guide §6.1, community guide §3 step 3).
 - 20/10/2026 · TB · Nothing on the Organogram or Org Chart changed. An employee's home address is a picked place (F27, `docs/guides/addresses.md`): `EmployeeCreate` and `EmployeeUpdate.home_address` take a `PlaceInput` (left out, it stays), the organisation service keeps it through `shared/places` (owner `employee.home_address`) and registers how its line is rewritten in `organisation.events.js`. No People form asks for it; `create-admin` no longer types one.
 - 20/10/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them, the employee record (`app/src/features/people/Employee360.tsx`) names its place on the hub's trail with the person's name (`useTrailTitle`, FRONTEND_FOUNDATION F29; `docs/guides/foundation.md` §14).
+- 22/10/2026 · TB · Performance PR 1: a department carries its code and its head, a person or a vacant seat (`head_employee_id`, `head_seat_id`, migration 2100), with `head` and `acting_head` on `Department` and `organisation.headOf()`; MyCity's five departments, the chart's titles and seven vacant seats are kept true by the staff loader (`seeds/staff/nomenclature.json`).

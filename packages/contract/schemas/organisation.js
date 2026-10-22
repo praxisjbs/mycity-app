@@ -362,6 +362,10 @@ const EmployeeHistoryPage = Paged(EmployeeHistoryEntry);
  * Departments
  * ------------------------------------------------------------------ */
 
+/**
+ * A function's head: a person, or a vacant seat (the person above it acts). `head` names who
+ * is set; `acting_head` is who acts while the seat is vacant (docs/guides/performance.md §6.20).
+ */
 const Department = z
   .object({
     department_id: uuid,
@@ -370,6 +374,10 @@ const Department = z
     parent_department_id: uuid.nullable(),
     active: z.boolean(),
     headcount: z.number().int(),
+    head_employee_id: uuid.nullable(),
+    head_seat_id: uuid.nullable(),
+    head: ManagerRef.nullable(),
+    acting_head: PersonRef.nullable(),
   })
   .strict();
 
@@ -379,24 +387,34 @@ const DepartmentListQuery = listQuery({ active: z.enum(["true", "false"]).option
 ]);
 const DepartmentPage = Paged(Department);
 
+const ONE_HEAD = { message: "A person or a vacant seat, not both", path: ["head_seat_id"] };
+
 const DepartmentCreate = z
   .object({
     name: text(100),
+    code: z.string().trim().min(2).max(10).regex(/^[A-Za-z]+$/, "Letters only").optional(),
     parent_department_id: uuid.optional(),
     description: optionalText(300),
+    head_employee_id: blank(uuid),
+    head_seat_id: blank(uuid),
   })
-  .strict();
+  .strict()
+  .refine((v) => !(v.head_employee_id && v.head_seat_id), ONE_HEAD);
 
 const DepartmentUpdate = z
   .object({
     name: text(100),
+    code: z.string().trim().min(2).max(10).regex(/^[A-Za-z]+$/, "Letters only"),
     parent_department_id: uuid.nullable(),
     description: optionalText(300),
     active: z.boolean(),
+    head_employee_id: uuid.nullable(),
+    head_seat_id: uuid.nullable(),
   })
   .partial()
   .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" });
+  .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
+  .refine((v) => !(v.head_employee_id && v.head_seat_id), ONE_HEAD);
 
 /* ------------------------------------------------------------------ *
  * Vacant seats and the reporting tree
@@ -649,7 +667,11 @@ const TABLES = {
   EmployeeHistoryPage: { table: null, reason: "a page of one record's history" },
   Department: {
     table: "department",
-    virtual: { headcount: "how many active people are in it, counted" },
+    virtual: {
+      headcount: "how many active people are in it, counted",
+      head: "the person in department.head_employee_id, or the seat in department.head_seat_id",
+      acting_head: "organisation.headOf(): the head, or the person above a vacant head seat",
+    },
   },
   DepartmentListQuery: { table: null, reason: "list controls and the active filter, not a row" },
   DepartmentPage: { table: null, reason: "a page of departments" },

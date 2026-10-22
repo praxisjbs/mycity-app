@@ -12,7 +12,8 @@
  *    version; a request already open keeps the version it started on.
  *
  * A stage, as the engine stores it (shared/workflow/conditions.js):
- *   approvers   who decides: a role, one login, the subject's line manager, or the CEO
+ *   approvers   who decides: a role, one login, the subject's line manager, the CEO, or the
+ *               person the request names in one of its uuid fields (employee_in_context)
  *   condition   comparisons against the request's values, all of which must hold; an
  *               empty list means the stage always applies
  *   sla_hours   how long it may wait before on_timeout applies
@@ -24,7 +25,7 @@ const { ModuleKey } = require("./identity");
 const KEY = /^[a-z][a-z0-9_]*$/;
 
 const ApprovalState = z.enum(["pending", "approved", "rejected", "cancelled", "timeout_approved", "timeout_rejected"]);
-const ApproverType = z.enum(["role", "user", "manager_of_subject", "ceo"]);
+const ApproverType = z.enum(["role", "user", "manager_of_subject", "ceo", "employee_in_context"]);
 const ContextType = z.enum(["money", "number", "date", "text", "uuid", "boolean"]);
 const ConditionOp = z.enum([">=", ">", "=", "<", "<=", "in"]);
 const OnTimeout = z.enum(["escalate", "auto_approve", "auto_reject"]);
@@ -49,7 +50,7 @@ const StageCondition = z
   })
   .strict();
 
-/** Who decides, as authored: `value` is the role code or the user id. */
+/** Who decides, as authored: `value` is the role code, the user id, or the uuid field naming the person. */
 const StageApprover = z
   .object({
     type: ApproverType,

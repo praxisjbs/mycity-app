@@ -9,6 +9,16 @@
  *   workingWeek.addWorkingDays("2026-10-14", 5, cal)           // SLA due dates, leave end dates
  *   workingWeek.countWorkingDays("2026-10-01", "2026-10-31", cal)   // payroll proration, leave days
  *
+ * Business days are a second, narrower count: Monday to Friday and not a public
+ * holiday, whatever the working week says. MyCity's reporting deadlines are written in
+ * them (performance.md G2: the 3rd business day of November 2026 is 4 November, of
+ * January 2027 the 6th), while attendance and SLAs use the working week, which
+ * includes Saturday (A22).
+ *
+ *   workingWeek.isBusinessDay("2026-11-07", cal)               // false: a Saturday
+ *   workingWeek.nthBusinessDay("2026-11", 3, cal)              // "2026-11-04"
+ *   workingWeek.addBusinessDays("2026-11-04", 2, cal)          // "2026-11-06"
+ *
  * The calculations are pure (a calendar object in, dates out) so they are
  * tested without a database. loadCalendar() reads the two settings tables and
  * caches the result for a minute per process; a settings change calls
@@ -112,6 +122,57 @@ function countWorkingDays(from, to, cal) {
   return n;
 }
 
+/* ---------------- business days ---------------- */
+
+/** Monday to Friday and not a public holiday (G2). */
+function isBusinessDay(date, cal) {
+  const d = weekday(date);
+  return d >= 1 && d <= 5 && !cal.holidays.has(date);
+}
+
+/**
+ * The n-th business day (1-based) of a month given as YYYY-MM.
+ * @param {string} month  YYYY-MM
+ * @param {number} n      1 or more
+ */
+function nthBusinessDay(month, n, cal) {
+  if (!/^\d{4}-\d{2}$/.test(String(month))) throw new Error(`business days: "${month}" is not a month as YYYY-MM`);
+  if (!Number.isInteger(n) || n < 1) throw new Error("business days: n must be a whole number from 1");
+  let d = `${month}-01`;
+  let left = n;
+  for (let guard = 0; guard < MAX_SCAN_DAYS; guard += 1) {
+    if (isBusinessDay(d, cal)) {
+      left -= 1;
+      if (left === 0) return d;
+    }
+    d = addDays(d, 1);
+  }
+  throw new Error("business days: none within ten years");
+}
+
+/** Move n business days from `date` (n may be negative); day 0 is `date` itself. */
+function addBusinessDays(date, n, cal) {
+  let d = assertDate(date);
+  const step = n >= 0 ? 1 : -1;
+  let left = Math.abs(n);
+  for (let guard = 0; left > 0; guard += 1) {
+    if (guard > MAX_SCAN_DAYS) throw new Error("business days: none within ten years");
+    d = addDays(d, step);
+    if (isBusinessDay(d, cal)) left -= 1;
+  }
+  return d;
+}
+
+/** Business days from `from` to `to`, both included. Zero when to is before from. */
+function countBusinessDays(from, to, cal) {
+  const span = daysBetween(from, to);
+  if (span < 0) return 0;
+  if (span > MAX_SCAN_DAYS) throw new Error("business days: range longer than ten years");
+  let n = 0;
+  for (let i = 0, d = from; i <= span; i += 1, d = addDays(d, 1)) if (isBusinessDay(d, cal)) n += 1;
+  return n;
+}
+
 /* ---------------- loading ---------------- */
 
 let cached = null;
@@ -162,6 +223,10 @@ module.exports = {
   nextWorkingDay,
   addWorkingDays,
   countWorkingDays,
+  isBusinessDay,
+  nthBusinessDay,
+  addBusinessDays,
+  countBusinessDays,
   loadCalendar,
   invalidateCalendar,
 };

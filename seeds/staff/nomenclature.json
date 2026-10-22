@@ -1,0 +1,40 @@
+{
+  "note": "MyCity's names for its functions, posts and seats, checked against the Org Chart (October) on 22/10/2026 (docs/guides/performance.md §6.20, P4, P5). The staff loader applies this on every deploy, before and after the sheet: a department named under `was` is renamed in place (same id, nobody moved out), a department in `merge` gives its people to this one and is retired when empty, a post or seat still holding an old title takes the new one, the posts under `moves` go to their department, and an empty head is filled. Each step changes only what still holds the old value, so an edit made on screen stays and a second deploy changes nothing. No names: people are matched by their post. TB, 22/10/2026.",
+  "departments": [
+    { "name": "General Management", "code": "GM", "was": [], "head": { "post": "Chief Executive Officer" } },
+    {
+      "name": "Technology & Back-office Ops",
+      "code": "TBO",
+      "was": ["Backend Operations"],
+      "merge": ["Technology"],
+      "head": { "post": "Chief Technology Officer" }
+    },
+    { "name": "Branding & Marketing", "code": "BM", "was": ["Sales & Marketing"], "head": { "post": "Head, PR, Marketing & Brand Strategy" } },
+    { "name": "Partnership & Growth", "code": "PG", "was": [], "head": { "seat": "Head, Strategy, Partnerships & Growth" } },
+    { "name": "People & Culture", "code": "PC", "was": ["HR & Operations"], "head": { "post": "Operations & People Lead" } }
+  ],
+  "job_titles": {
+    "Back-end Manager": "Backend Operations Manager",
+    "Graphics Design Associate": "Graphics Associate",
+    "Head PR, Marketing & Brand Strategy": "Head, PR, Marketing & Brand Strategy",
+    "Marketing & Growth Officer - *": "Growth Officer - *"
+  },
+  "seats": {
+    "Head Sales & Revenue": "Head, Strategy, Partnerships & Growth"
+  },
+  "moves": [
+    {
+      "department": "Partnership & Growth",
+      "from": ["Branding & Marketing"],
+      "posts": ["Marketing Lead - *", "Growth Officer - *", "Head, Strategy, Partnerships & Growth"]
+    }
+  ],
+  "lines": [
+    {
+      "post": "PR & Marketing Lead - MyLagosApp",
+      "from_seat": "Head, Strategy, Partnerships & Growth",
+      "to_post": "Head, PR, Marketing & Brand Strategy",
+      "note": "David reports to Chinyere (P5); the dotted line to her ends, since she is now his line."
+    }
+  ]
+}

@@ -57,10 +57,12 @@ const CalendarEvent = z
   .strict();
 
 /**
- * One thing on a person's month: an event, an open task's deadline, or a day of
- * their approved leave. `item_id` is the event, task or leave request.
+ * One thing on a person's month: an event, an open task's deadline, a day of their
+ * approved leave, or a performance date (their check-in due, a review they must write, a
+ * key result they must finish, a PIP review; docs/guides/performance.md §6.18).
+ * `item_id` is the event, task, leave request, review, key result or PIP.
  */
-const CalendarItemKind = z.enum(["event", "task", "leave"]);
+const CalendarItemKind = z.enum(["event", "task", "leave", "performance"]);
 const CalendarItem = z
   .object({
     item_kind: CalendarItemKind,

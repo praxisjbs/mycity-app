@@ -1,6 +1,8 @@
 import type { Goal, KpiAssignment, ReviewRow, Status, Step, Target, Trail } from "@/api/types/performance";
 import { at, created, fail, invalid, notFound, ok, paged, route, sid, isoDaysAhead } from "../core";
 import { byId, PEOPLE, refKey } from "../data/people";
+import type { PerformancePeriod, PlanDetail } from "@mycity/contract/contract.gen.ts";
+import { CONTRIBUTIONS, KPIS as FUNCTION_KPIS, OBJECTIVES, PERIOD, PLANS, ROUNDS, SCORECARDS } from "../data/performance";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const step = (label: string, state: Step["state"] = null): Step => ({ label, state });
@@ -181,4 +183,111 @@ route("GET /api/v1/performance/analytics", () =>
     gap: [["Content", "4.3", "4.0", "-0.3"], ["Finance", "4.5", "4.4", "-0.1"], ["Engineering", "4.0", "4.0", "0.0"], ["Operations", "4.1", "3.9", "-0.2"], ["Marketing & Sales", "4.0", "3.6", "-0.4"], ["Studio", "3.8", "3.7", "-0.1"]].map(([department, self, manager, gap]) => ({ department, self, manager, gap })),
     gap_cycle: "Q3 2026",
   }),
+);
+
+/* ------------------------------------------------------------------ *
+ * The contract's endpoints (docs/guides/performance.md §5), on the data in ../data/performance.ts.
+ * The interim routes above keep the interim screens working until PRs 2, 3 and 5 replace those
+ * screens and their routes; each PR wires the rest of the contract's endpoints here as it lands.
+ * ------------------------------------------------------------------ */
+
+const PERIODS: PerformancePeriod[] = [PERIOD];
+const currentPeriod = () => PERIODS.find((p) => p.status === "active") ?? PERIODS.find((p) => p.status === "planning");
+const quarterName = (startsOn: string) => `Q${Math.floor((Number(startsOn.slice(5, 7)) - 1) / 3) + 1} ${startsOn.slice(0, 4)}`;
+const addMonths = (d: string, n: number) => {
+  const x = new Date(`${d}T00:00:00Z`);
+  x.setUTCMonth(x.getUTCMonth() + n);
+  return x.toISOString().slice(0, 10);
+};
+
+route("GET /api/v1/performance/periods", (req) =>
+  paged(PERIODS, req, { filters: { status: (p, v) => p.status === v }, search: (p) => [p.name], sort: { starts_on: (a, b) => a.starts_on.localeCompare(b.starts_on) } }),
+);
+route("GET /api/v1/performance/periods/current", () => {
+  const p = currentPeriod();
+  return p ? ok(p) : fail(404, "NO_QUARTER", "No quarter has been set up yet");
+});
+route("GET /api/v1/performance/periods/:id", (req) => {
+  const p = PERIODS.find((x) => x.performance_period_id === req.params.id);
+  return p ? ok(p) : notFound();
+});
+route("POST /api/v1/performance/periods", (req) => {
+  const b = req.body as { starts_on?: string; name?: string; targets_lock_on?: string; live_from?: string };
+  if (!b.starts_on || !/-(01|04|07|10)-01$/.test(b.starts_on)) return invalid({ starts_on: ["Pick a quarter's first day"] });
+  if (PERIODS.some((p) => p.starts_on === b.starts_on)) return fail(409, "PERIOD_EXISTS", "That quarter is already set up", { starts_on: ["Already set up"] });
+  const last = [...PERIODS].sort((a, c) => c.starts_on.localeCompare(a.starts_on))[0];
+  const p: PerformancePeriod = {
+    ...last,
+    performance_period_id: sid(`perf:period:${b.starts_on}`),
+    name: b.name || quarterName(b.starts_on),
+    starts_on: b.starts_on,
+    ends_on: new Date(Date.parse(`${addMonths(b.starts_on, 3)}T00:00:00Z`) - 86400000).toISOString().slice(0, 10),
+    plan_year_starts_on: `${b.starts_on.slice(0, 4)}-01-01`,
+    targets_lock_on: b.targets_lock_on || null,
+    live_from: b.live_from || null,
+    status: "planning",
+    months: [0, 1, 2].map((n) => addMonths(b.starts_on!, n)),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  PERIODS.push(p);
+  return created(p);
+});
+route("PATCH /api/v1/performance/periods/:id", (req) => {
+  const p = PERIODS.find((x) => x.performance_period_id === req.params.id);
+  if (!p) return notFound();
+  const b = req.body as Partial<PerformancePeriod>;
+  if (b.status === "active" && PERIODS.some((x) => x !== p && x.status === "active")) return fail(409, "PERIOD_ACTIVE_EXISTS", "Close the active quarter first", { status: ["Another is active"] });
+  Object.assign(p, b, { updated_at: new Date().toISOString() });
+  return ok(p);
+});
+
+route("GET /api/v1/performance/okrs", (req) =>
+  paged(OBJECTIVES, req, {
+    search: (o) => [o.code, o.title, ...o.key_results.flatMap((k) => [k.code, k.statement])],
+    filters: { period_id: (o, v) => o.performance_period_id === v, department_id: (o, v) => (v === "company" ? o.department_id === null : o.department_id === v), status: (o, v) => o.plan_status === v },
+    sort: { position: (a, b) => a.position - b.position, code: (a, b) => a.code.localeCompare(b.code) },
+  }),
+);
+
+route("GET /api/v1/performance/scorecards", (req) =>
+  paged(
+    SCORECARDS.map(({ scope_text: _s, reviewer_reason: _r, disagree_reason: _d, results_weight: _a, kpis_weight: _b, accountability_weight: _c, lines: _l, weight_problems: _w, contributions: _x, can_edit: _e, can_agree: _g, ...row }) => row),
+    req,
+    {
+      search: (s) => [s.employee.display_name],
+      filters: { period_id: (s, v) => s.performance_period_id === v, department_id: (s, v) => s.department_id === v, status: (s, v) => s.status === v, reviewer_id: (s, v) => s.reviewer?.employee_id === v, rating: (s, v) => s.rating === v },
+      sort: { employee: (a, b) => a.employee.display_name.localeCompare(b.employee.display_name), score_to_date: (a, b) => Number(a.score_to_date ?? 0) - Number(b.score_to_date ?? 0) },
+    },
+  ),
+);
+route("GET /api/v1/performance/scorecards/:id", (req) => {
+  const s = SCORECARDS.find((x) => x.scorecard_id === req.params.id);
+  return s ? ok(s) : notFound();
+});
+
+route("GET /api/v1/performance/plans", (req) =>
+  paged(PLANS, req, {
+    filters: { period_id: (p, v) => p.performance_period_id === v, status: (p, v) => p.status === v, department_id: (p, v) => (v === "company" ? p.department_id === null : p.department_id === v) },
+    sort: { department: (a, b) => (a.department ?? "").localeCompare(b.department ?? ""), status: (a, b) => a.status.localeCompare(b.status) },
+  }),
+);
+route("GET /api/v1/performance/plans/:id", (req) => {
+  const p = PLANS.find((x) => x.performance_plan_id === req.params.id);
+  if (!p) return notFound();
+  const detail: PlanDetail = {
+    ...p,
+    objectives: OBJECTIVES.filter((o) => o.performance_plan_id === p.performance_plan_id),
+    kpis: FUNCTION_KPIS.filter((k) => k.department_id === p.department_id),
+    scorecards: SCORECARDS.filter((s) => s.department_id === p.department_id).map(({ scope_text: _s, reviewer_reason: _r, disagree_reason: _d, results_weight: _a, kpis_weight: _b, accountability_weight: _c, lines: _l, weight_problems: _w, contributions: _x, can_edit: _e, can_agree: _g, ...row }) => row),
+    contributions: CONTRIBUTIONS,
+    problems: [],
+    can_submit: false,
+  };
+  return ok(detail);
+});
+route("GET /api/v1/performance/contributions", (req) => paged(CONTRIBUTIONS, req, { filters: { plan_id: () => true, key_result_id: (c, v) => c.okr_key_result_id === v }, sort: { code: (a, b) => a.code.localeCompare(b.code) } }));
+
+route("GET /api/v1/performance/rounds", (req) =>
+  paged(ROUNDS, req, { filters: { period_id: (r, v) => r.performance_period_id === v, status: (r, v) => r.status === v }, sort: { month: (a, b) => a.month.localeCompare(b.month) } }),
 );

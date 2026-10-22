@@ -60,7 +60,7 @@ const SCREENS = Object.freeze([
   s("people", "organogram", "Organogram", ["org chart", "structure", "reporting lines", "seats", "hierarchy"]),
 
   s("performance", "goals", "Goals", ["goal", "objectives", "okr", "cascade"]),
-  s("performance", "targets", "Targets", ["target", "monthly targets", "quota"]),
+  s("performance", "targets", "Scorecards", ["scorecard", "scorecards", "targets", "commitments"]),
   s("performance", "kpis", "KPIs", ["kpi", "indicators", "metrics", "scorecard"]),
   s("performance", "reviews", "Reviews", ["review", "appraisal", "evaluation"]),
   s("performance", "analytics", "Analytics", ["performance analytics", "trends"]),

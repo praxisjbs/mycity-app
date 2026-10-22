@@ -301,13 +301,24 @@ performance cycles, reviews and review items · `2010` a task's number, setter (
 cadence, KPI (`employee_target_id`), record pointer (`entity_type`, `entity_id`), the cancelled
 status, blockers and `task_activity`; calendar visibility, record pointer, called-off events and
 `calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2090` the
-`task` numbering scheme and the cancelled status · `2099` seed.
+`task` numbering scheme and the cancelled status · `2099` seed · `2100` the Performance foundation
+(`docs/guides/performance.md` §4, PR 1, 22/10/2026): department heads (`head_employee_id`,
+`head_seat_id`); quarters with their rules (`performance_period`); organisational goals' MyCity columns
+and their quarterly targets; function and company plans, objectives, key results, their links, monthly
+reports and former codes; KPIs' function columns and monthly actuals (`kpi_month`); scorecards, whose
+lines are `employee_target` (section, measure, source, key result, share), Team result links and
+target changes; monthly rounds on `performance_cycle` with their deadlines; one review per scorecard per
+round on `performance_review` (probation reviews without a round), its items' check-in, evidence, action
+and scores; improvement plans and their lines; commitments on `task` and `commitment_set`; weekly
+summaries · `2190` seed: the five Performance capabilities and their holders, the four flows, the code
+lists.
 
 **Owes:**
-- Goals cascade as A16 sets it (organisational, annual, monthly, departmental, individual KPI),
-  with code, strategic theme, success measure, baseline and the CEO's final approval.
-- Reviews: the second-level and HR stages and their workflow; dictation transcript, cleaned text
-  and `ai_run_id` (A18).
+- PRs 2 to 5 of `docs/guides/performance.md` use 2200 to 2599 only for a gap. The numbers 2020, 2030 and
+  2091 were used on a withdrawn branch and are not reused.
+- Status CHECKs on `organisational_goal`, `employee_target`, `performance_cycle` and `performance_review`
+  (Home's staging rows still hold the old values): PR 2 for goals and lines, PR 3 for rounds and
+  reviews, once their staging seeds have replaced those rows.
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,

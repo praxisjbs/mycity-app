@@ -44,7 +44,11 @@
  *   key          unique within the definition, snake_case; stored on the instance
  *   name         shown to people
  *   approvers    any of: { type: "role", value: <role code> }, { type: "user", value: <user id> },
- *                { type: "manager_of_subject" }, { type: "ceo" }. `approver` (one) is accepted.
+ *                { type: "manager_of_subject" }, { type: "ceo" },
+ *                { type: "employee_in_context", value: <uuid context field> }: the employee the
+ *                request names in that field (a review's second level, a commitment's reviewer).
+ *                An empty field skips the stage, so the field may be left out of the context.
+ *                `approver` (one) is accepted; `field` is read as `value` for that kind.
  *   condition    null (always applies), one comparison, or a list of them
  *   sla_hours    how long the stage may wait before on_timeout applies (default 48)
  *   on_timeout   "escalate" (default; re-arm and tell the CEO), "auto_approve", "auto_reject"
@@ -60,7 +64,7 @@ const OPS = new Set([">=", ">", "=", "<", "<=", "in"]);
 const ORDERED = new Set([">=", ">", "<", "<="]);
 const TYPES = new Set(["money", "number", "date", "text", "uuid", "boolean"]);
 const ORDERABLE = new Set(["money", "number", "date"]);
-const APPROVER_TYPES = new Set(["role", "user", "manager_of_subject", "ceo"]);
+const APPROVER_TYPES = new Set(["role", "user", "manager_of_subject", "ceo", "employee_in_context"]);
 const ON_TIMEOUT = new Set(["escalate", "auto_approve", "auto_reject"]);
 const ON_APPROVE = new Set(["next", "complete"]);
 const ON_REJECT = new Set(["reject", "return"]);
@@ -173,9 +177,27 @@ function evaluate(condition, context, types) {
 
 function normaliseApprover(a) {
   if (!a || typeof a !== "object") return a;
-  return a.value === undefined
-    ? { type: a.type }
-    : { type: a.type, value: a.value };
+  const value = a.value === undefined && a.type === "employee_in_context" ? a.field : a.value;
+  return value === undefined ? { type: a.type } : { type: a.type, value };
+}
+
+/** The context fields a stage's employee_in_context approvers read. */
+function namedFields(stage) {
+  return stage.approvers.filter((a) => a && a.type === "employee_in_context").map((a) => a.value);
+}
+
+/** Does a context field hold a value? */
+const present = (v) => v !== undefined && v !== null && v !== "";
+
+/**
+ * Does a stage apply to this context: its condition holds and, when every approver is a person the
+ * request names, at least one of those fields names someone.
+ */
+function stageApplies(stage, context, types) {
+  if (!evaluate(stage.condition, context, types)) return false;
+  const named = namedFields(stage);
+  if (named.length && named.length === stage.approvers.length) return named.some((f) => present(context[f]));
+  return true;
 }
 
 /** The canonical shape of one authored stage. */
@@ -199,6 +221,13 @@ function normaliseStage(raw) {
   };
 }
 
+/** The fields a condition reads. */
+function conditionFields(condition) {
+  if (condition === null || condition === undefined) return [];
+  if (Array.isArray(condition)) return condition.flatMap(conditionFields);
+  return [condition.field];
+}
+
 /** Stages in order, normalised. Accepts the stored row or the authored object. */
 function stagesOf(definition) {
   return ((definition && definition.stages) || []).map(normaliseStage);
@@ -211,9 +240,7 @@ function typesOf(definition) {
 /** Stages that apply to this context, in order. */
 function applicableStages(definition, context) {
   const types = typesOf(definition);
-  return stagesOf(definition).filter((stage) =>
-    evaluate(stage.condition, context, types),
-  );
+  return stagesOf(definition).filter((stage) => stageApplies(stage, context, types));
 }
 
 /** Does this request need any approval at all? */
@@ -232,7 +259,7 @@ function nextApplicableStage(definition, context, afterKey) {
   const at = all.findIndex((s) => s.key === afterKey);
   const types = typesOf(definition);
   return (
-    all.slice(at + 1).find((s) => evaluate(s.condition, context, types)) || null
+    all.slice(at + 1).find((s) => stageApplies(s, context, types)) || null
   );
 }
 
@@ -338,6 +365,8 @@ function validateDefinition(def) {
         out.push(`${where}: a ${a.type} approver needs a value`);
       } else if (a.type === "user" && !checkValue("uuid", a.value)) {
         out.push(`${where}: a user approver's value is a user id`);
+      } else if (a.type === "employee_in_context" && (types || {})[a.value] !== "uuid") {
+        out.push(`${where}: a named person's value is a uuid field of the context`);
       }
     }
     if (
@@ -373,7 +402,13 @@ function contextProblems(definition, context) {
   const out = [];
   if (!context || typeof context !== "object" || Array.isArray(context))
     return ["context is an object"];
+  // A field only a named-person approver reads may be empty: the stage is then skipped.
+  const optional = new Set(stagesOf(definition).flatMap(namedFields));
+  for (const field of optional) {
+    if (stagesOf(definition).some((st) => conditionFields(st.condition).includes(field))) optional.delete(field);
+  }
   for (const [field, type] of Object.entries(types)) {
+    if (optional.has(field) && !present(context[field])) continue;
     if (context[field] === undefined || context[field] === null)
       out.push(`context is missing "${field}"`);
     else if (!checkValue(type, context[field]))
@@ -393,6 +428,7 @@ module.exports = {
   DEFAULT_SLA_HOURS,
   evaluate,
   normaliseStage,
+  namedFields,
   stagesOf,
   typesOf,
   applicableStages,

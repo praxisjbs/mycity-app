@@ -82,6 +82,12 @@ function toTask(row, now = new Date()) {
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
     recurrence: row.recurrence || null,
     comment_count: row.comment_count || 0,
+    is_commitment: Boolean(row.is_commitment),
+    acceptance_criteria: row.acceptance_criteria ?? null,
+    commitment_month: row.commitment_month ?? null,
+    original_due_at: iso(row.original_due_at),
+    rescoped_at: iso(row.rescoped_at),
+    commitment_set_id: row.commitment_set_id ?? null,
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
   };

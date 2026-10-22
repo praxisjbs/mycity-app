@@ -333,6 +333,10 @@ route("GET /api/v1/departments", (req) =>
       parent_department_id: d.parent_department_id,
       active: d.active,
       headcount: PEOPLE.filter((p) => p.department === d.name && visible(p)).length,
+      head_employee_id: null,
+      head_seat_id: null,
+      head: null,
+      acting_head: null,
     })),
     req,
     { search: (r) => [r.name], filters: { active: (r, v) => String(r.active) === v } },
@@ -346,7 +350,7 @@ route("POST /api/v1/departments", (req) => {
   const d = { department_id: uuid(), code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"), name, parent_department_id: null, active: true, order: DEPTS.length };
   DEPTS.push(d);
   DEPARTMENTS.push(name);
-  return created({ ...d, headcount: 0, order: undefined, department_id: d.department_id, code: d.code, name, parent_department_id: null, active: true });
+  return created({ ...d, headcount: 0, order: undefined, department_id: d.department_id, code: d.code, name, parent_department_id: null, active: true, head_employee_id: null, head_seat_id: null, head: null, acting_head: null });
 });
 
 route("PATCH /api/v1/departments/:id", (req) => {
@@ -355,7 +359,7 @@ route("PATCH /api/v1/departments/:id", (req) => {
   const b = req.body as { name?: string; active?: boolean };
   if (b.name) d.name = b.name;
   if (typeof b.active === "boolean") d.active = b.active;
-  return ok({ department_id: d.department_id, code: d.code, name: d.name, parent_department_id: null, active: d.active, headcount: PEOPLE.filter((p) => p.department === d.name).length });
+  return ok({ department_id: d.department_id, code: d.code, name: d.name, parent_department_id: null, active: d.active, headcount: PEOPLE.filter((p) => p.department === d.name).length, head_employee_id: null, head_seat_id: null, head: null, acting_head: null });
 });
 
 const seatRow = (s: (typeof SEATS)[number]): OrgSeat => {

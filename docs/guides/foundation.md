@@ -285,6 +285,18 @@ longer than 4.5 seconds.
   gives it to the seat (the roster only while the seat has none), so the sheet places an open post
   as it places a person. MyCity's sheet names both (TB, 19/10/2026): Head Sales & Revenue under the
   Program Manager, Technical Assistant under the CEO.
+- **MyCity's names are kept true on every deploy** (TB, 22/10/2026; `docs/guides/performance.md`
+  §6.20). The loader keeps what the app already has, so a new name in the sheet would never reach a
+  department or person already loaded. `seeds/staff/nomenclature.json`, applied by
+  `scripts/db/staff-nomenclature.js` through the organisation service before the sheet is imported and
+  again after it, renames a department from a former name in place (same id, nobody moved out), creates
+  one the sheet names and the database lacks with its code, gives each department MyCity's short code
+  (GM, TBO, BM, PG, PC) where the system made one from the name, retires a department merged into
+  another once empty (Technology into Technology & Back-office Ops), gives posts and open seats the
+  chart's titles, moves the Partnership & Growth posts out of Branding & Marketing, moves David's line to
+  Chinyere, and fills an empty department head. Each step changes only what still holds the old value,
+  so an edit made on screen stays and a second deploy changes nothing; the deploy log lists what it
+  changed. The sheet and `roles.json` carry the same names, so a fresh database ends the same way.
 - **The sheet was corrected on 19/10/2026 (TB).** Aaron Agama's team is Sales & Marketing (the
   sheet said Marketing, a department of one); Markerting is Marketing in three titles; Operations&
   People Lead is Operations & People Lead, and its `roles.json` key with it; two work emails had a
@@ -418,7 +430,14 @@ As built (17/10/2026):
   TB, 19/10/2026); one with nobody above them goes to the CEO (the engine's rule). The leave module (M1, `src/modules/leave`) opens it with `{ days }`
   in the transaction that saves the request, and copies its outcome onto the request after commit
   (`docs/guides/ess.md` §6). People · Leave decides with the same approve and reject routes.
-- **Editing** changes a stage's name, its approver (Line Manager, a role, one login, or the CEO), when
+- **A person the request names** (`employee_in_context`, TB, 22/10/2026; `docs/guides/performance.md`
+  §6.13): a stage's approver may be the employee in one of the flow's uuid values (`{ type:
+  "employee_in_context", value: "second_level_employee_id" }`), resolved when the stage starts. An empty
+  value skips the stage, so the module may leave it out of the context; a stage started with nobody
+  named goes to the CEO. Settings · Approvals shows it as Named Person, with the value it reads (Named
+  In), offered only on a flow that carries one. Performance's review and commitments flows use it.
+- **Editing** changes a stage's name, its approver (Line Manager, a role, one login, the CEO, or a
+  named person), when
   it applies (Always, or one comparison on a number the flow carries: Over, At Least, Under, At Most,
   Exactly) and its time limit in hours; stages are added, removed and moved up or down. Save Stages
   writes the whole list as the next version. The flow's key, name, values and the timeout, approve and
@@ -1074,3 +1093,4 @@ screen.
 - 20/10/2026 · TB · §6.13: addresses are picked, never typed (F27), with their own guide, `docs/guides/addresses.md`, which now covers the `maps` module (taken off this guide's header). The reverse lookup became `GET /maps/pin`, open to everyone signed in for a point they pin as an address.
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) is dropped: policies live on Knowledge Hub · Policies (`docs/guides/policies.md`), brought forward from M10; §2 and §6.8 say so, and Settings · Approvals gains the Policy Approval route (and the Temporary Site route with attendance's PR 4).
 - 20/10/2026 · TB · §6.5: an approval may exclude people from deciding it (`exclude_employee_ids` on `openInstance`, `workflow_instance.excluded_employee_ids`, `1455`), read by `canAct`, `waitingOnClause` and the stage's notice; attendance's temporary sites exclude everyone on them (attendance.md §6.11). §6.7: ⌘K's Add Work Site and Add Temporary Site; a screen may register a second action for the floating button (`useScreenAction(action, { second: true })`, Home's Add Work Site beside New). §6.8's Temporary Site route is built as it says.
+- 22/10/2026 · TB · Performance PR 1: §6.5 adds the named-person approver (`employee_in_context`) and Settings · Approvals shows it; §6.1 adds MyCity's names (`seeds/staff/nomenclature.json`, applied by the loader before and after the sheet), the sheet and `roles.json` renamed to the October chart (five departments, the chart's titles, seven vacant seats, David under Chinyere).

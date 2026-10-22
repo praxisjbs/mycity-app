@@ -141,6 +141,17 @@ Two things the screen cannot do yet:
   retires a department yet. It no longer counts on People · Employees, which counts departments that
   have people.
 
+### 6.1 The October chart's names (22/10/2026)
+
+Nothing to do by hand. From Performance PR 1 the loader applies `seeds/staff/nomenclature.json` on
+every deploy, before and after the sheet (`docs/guides/foundation.md` §6.1, `docs/guides/performance.md`
+§6.20): Sales & Marketing becomes Branding & Marketing, Backend Operations becomes Technology &
+Back-office Ops (Technology merged into it and retired), HR & Operations becomes People & Culture, all
+in place; Partnership & Growth is created and takes its posts; the chart's titles, David's line to
+Chinyere, the department codes and heads, and the seven new vacant seats follow. The deploy log lists
+each change under `names:`; a second deploy lists none. A title already corrected on screen to something
+else is left as it is.
+
 ## 7 · Check
 
 ```sh

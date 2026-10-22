@@ -16,12 +16,16 @@
  * its shapes belong here when they do.
  */
 const { z } = require("zod");
-const { uuid, optionalText, isoDate, listQuery, phone, blank } = require("./common");
+const { uuid, optionalText, isoDate, isoDateTime, listQuery, phone, blank, Paged } = require("./common");
 const { UploadPurpose } = require("./documents");
 const { LeaveStatus } = require("./leave");
 const { EmployeeStatus, EmploymentType, WorkPattern, ManagerRef } = require("./organisation");
 const { PlaceInput, PlaceView } = require("./maps");
 const { SchedulePlace } = require("./attendance");
+const { ScoreValue, Rating } = require("./scoring");
+const { MonthStart } = require("./kpis");
+const { ScorecardStatus, CommitmentSetStatus } = require("./targets");
+const { ReviewStatus } = require("./reviews");
 
 /* ------------------------------------------------------------------ *
  * My Profile
@@ -148,8 +152,80 @@ const EssLeaveBalanceQuery = z
   .object({ year: z.coerce.number().int().min(2000).max(2100).optional() })
   .strict();
 
+/* ------------------------------------------------------------------ *
+ * My Performance (docs/guides/performance.md §5, §10)
+ * ------------------------------------------------------------------ */
+
+/** GET /ess/performance: the caller's quarter at a glance. Each part is null when it does not apply. */
+const MyPerformance = z
+  .object({
+    period: z.object({ performance_period_id: uuid, name: z.string() }).strict().nullable(),
+    scorecard: z
+      .object({
+        scorecard_id: uuid,
+        status: ScorecardStatus,
+        score_to_date: ScoreValue.nullable(),
+        rating: Rating.nullable(),
+        employee_agreed_at: isoDateTime.nullable(),
+        reviewer_name: z.string().nullable(),
+      })
+      .strict()
+      .nullable(),
+    check_in: z
+      .object({
+        performance_review_id: uuid,
+        month: MonthStart.nullable(),
+        due_on: isoDate.nullable(),
+        status: ReviewStatus,
+      })
+      .strict()
+      .nullable(),
+    commitments: z
+      .object({
+        month: MonthStart,
+        set_status: CommitmentSetStatus.nullable(),
+        due: z.number().int().min(0),
+        delivered_on_time: z.number().int().min(0),
+      })
+      .strict()
+      .nullable(),
+    open_pip: z.object({ improvement_plan_id: uuid, review_on: isoDate }).strict().nullable(),
+  })
+  .strict();
+
+/** One of the caller's reviews; a closed one carries its final scores and its PDF. */
+const MyReview = z
+  .object({
+    performance_review_id: uuid,
+    round_name: z.string().nullable(),
+    month: MonthStart.nullable(),
+    review_kind: z.enum(["monthly", "probation"]),
+    status: ReviewStatus,
+    score_month: ScoreValue.nullable(),
+    score_to_date: ScoreValue.nullable(),
+    rating: Rating.nullable(),
+    closed_at: isoDateTime.nullable(),
+    document_id: uuid.nullable(),
+  })
+  .strict();
+
+const MyReviewPage = Paged(MyReview);
+
+/** GET /ess/performance/reviews */
+const MyReviewListQuery = listQuery({}, ["month"]);
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  MyPerformance: { table: null, reason: "the caller's quarter: scorecard, check-in, commitments and an open PIP" },
+  MyReview: {
+    table: "performance_review",
+    virtual: {
+      round_name: "performance_cycle.name",
+      month: "performance_cycle.month",
+    },
+  },
+  MyReviewPage: { table: null, reason: "a page of the caller's reviews" },
+  MyReviewListQuery: { table: null, reason: "list controls for the caller's own reviews" },
   EssDocumentUpload: {
     table: null,
     reason:
@@ -192,4 +268,8 @@ module.exports = {
   EssLeaveListQuery,
   EssLeaveBalanceQuery,
   EssLeaveCalendarQuery,
+  MyPerformance,
+  MyReview,
+  MyReviewPage,
+  MyReviewListQuery,
 };

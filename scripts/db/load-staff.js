@@ -38,6 +38,10 @@
  *   9. Records a birthday the sheet gives as a day and month with no year (the DOB the
  *      importer drops in step 4) for each person with no date of birth and no birthday
  *      yet, so the celebrations can post it. This runs on every deploy, loaded sheet or not.
+ *  10. Keeps MyCity's names for its functions, posts and seats true (`nomenclature.json`,
+ *      scripts/db/staff-nomenclature.js), before the sheet is imported, so the sheet finds
+ *      each department under its new name, and after, for the codes, heads and lines of
+ *      what the sheet created. This also runs on every deploy, loaded sheet or not.
  *
  * It is safe to run again: every step looks before it writes, and an edit made on screen
  * is never written over.
@@ -50,6 +54,7 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const STAFF_DIR = path.join(ROOT, "seeds", "staff");
 const SHEET = path.join(STAFF_DIR, "staff-list.xlsx");
 const ROLES = path.join(STAFF_DIR, "roles.json");
+const NOMENCLATURE = path.join(STAFF_DIR, "nomenclature.json");
 const IMPORTER = "employees";
 
 /**
@@ -343,7 +348,37 @@ async function applyBirthdays({ pool, atomically, book }) {
  * @param {{db: import("pg").Pool, log?: Function, dryRun?: boolean, sheet?: string, rolesFile?: string}} opts
  * @returns {Promise<{status: string, stats?: object, logins?: object, batch?: string, dropped?: Array}>}
  */
-async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, rolesFile = ROLES }) {
+/** The department names a sheet uses, from its Team column. */
+function sheetTeams(book) {
+  const out = new Set();
+  for (const s of book.sheets || []) {
+    const rows = s.rows || [];
+    const at = rows.findIndex((r) => (r || []).some((c) => /^\s*team\s*$/i.test(String(c ?? ""))));
+    if (at === -1) continue;
+    const col = rows[at].findIndex((c) => /^\s*team\s*$/i.test(String(c ?? "")));
+    for (const r of rows.slice(at + 1)) {
+      const v = String((r || [])[col] ?? "").trim();
+      if (v) out.add(v);
+    }
+  }
+  return [...out];
+}
+
+/** Step 10: the nomenclature, in its own transactions; a problem is logged, never fatal. */
+async function applyNames({ db, atomically, log, file, book }) {
+  const { applyNomenclature } = require("./staff-nomenclature");
+  try {
+    const r = await applyNomenclature({ pool: db, atomically, log, actor: SYSTEM, file, teams: sheetTeams(book) });
+    const changed = Object.values(r).reduce((a, b) => a + b, 0);
+    if (changed) log(`names: ${JSON.stringify(r)}`);
+    return r;
+  } catch (err) {
+    log(`WARNING: names not applied: ${err.message}`);
+    return null;
+  }
+}
+
+async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, rolesFile = ROLES, nomenclatureFile = NOMENCLATURE }) {
   if (!fs.existsSync(sheet)) {
     log(`no staff sheet in this build (${path.relative(ROOT, sheet)}); nothing to load`);
     return { status: "no_sheet" };
@@ -364,17 +399,22 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
 
   const loaded = await alreadyLoaded(db, checksum);
   if (loaded && !dryRun) {
-    log(`this sheet is already loaded (batch ${loaded.number}); checking logins and lines only`);
+    log(`this sheet is already loaded (batch ${loaded.number}); checking names, logins and lines only`);
+    const loadedBook = await readSheets({ buffer, filename: path.basename(sheet) });
+    const names = await applyNames({ db, atomically, log, file: nomenclatureFile, book: loadedBook });
     const logins = await applyRoles({ pool: db, atomically, log, roles });
     const lines = await applyLines({ pool: db, atomically, log, roles });
-    const birthdays = await applyBirthdays({ pool: db, atomically, book: await readSheets({ buffer, filename: path.basename(sheet) }) });
+    const birthdays = await applyBirthdays({ pool: db, atomically, book: loadedBook });
     log(`birthdays by day and month: ${birthdays.set} recorded, ${birthdays.unmatched} matched nobody`);
     await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
-    return { status: "already_loaded", batch: loaded.import_batch_id, logins, lines, birthdays };
+    return { status: "already_loaded", batch: loaded.import_batch_id, names, logins, lines, birthdays };
   }
 
-  /* The sheet is read here as well as by the engine, for the emails it names. */
+  /* The sheet is read here as well as by the engine, for the emails and teams it names. */
   const book = await readSheets({ buffer, filename: path.basename(sheet) });
+
+  /* 0. MyCity's names first, so the sheet finds each department under its new name. */
+  if (!dryRun) await applyNames({ db, atomically, log, file: nomenclatureFile, book });
 
   /* 1. The file goes to the engine, with the roster's own options. */
   const batch = await withTx(db, atomically, (client) =>
@@ -434,6 +474,7 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
 
   /* 4. Logins and roles, the lines of posts outside the sheet, then the counter past the
         numbers the sheet brought. */
+  const names = await applyNames({ db, atomically, log, file: nomenclatureFile, book });
   const logins = await applyRoles({ pool: db, atomically, log, roles });
   const lines = await applyLines({ pool: db, atomically, log, roles });
   const birthdays = await applyBirthdays({ pool: db, atomically, book });
@@ -441,7 +482,7 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
   const highest = await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
   log(`staff numbers continue after ${highest}`);
   log(`logins: ${logins.created} invited, ${logins.kept} already had one, ${logins.failed} failed`);
-  return { status: "loaded", batch: batch.import_batch_id, stats: committed.stats, logins, lines, birthdays, dropped };
+  return { status: "loaded", batch: batch.import_batch_id, stats: committed.stats, names, logins, lines, birthdays, dropped };
 }
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -511,7 +552,9 @@ module.exports = {
   SYSTEM,
   SHEET,
   ROLES,
+  NOMENCLATURE,
   IMPORTER,
+  sheetTeams,
   loadImporters,
   readRoles,
   rolesForTitle,

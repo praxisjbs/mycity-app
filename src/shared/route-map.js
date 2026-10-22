@@ -275,10 +275,18 @@ const ENTITY_ROUTES = Object.freeze({
   device: { ...screen("people", "devices"), self: screen("ess", "my-devices") },
   worksite: screen("people", "worksites"),
 
-  // Performance
-  // search:none not built yet (src/modules/goals)
+  // Performance (docs/guides/performance.md §9)
+  // search:none the same record as organisational_goal, found under that type; Home and older tasks link it as goal
   goal: {
     ...screen("performance", "goals"),
+    self: screen("ess", "my-performance"),
+  },
+  organisational_goal: screen("performance", "goals"),
+  objective: screen("performance", "goals"),
+  key_result: screen("performance", "goals"),
+  // search:none not built yet (src/modules/targets)
+  scorecard: {
+    ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
   // search:none not built yet (src/modules/targets)
@@ -292,6 +300,18 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("performance", "reviews"),
     self: screen("ess", "my-performance"),
   },
+  // search:none the same record as review, found under that type; a task's pointer names it this way
+  performance_review: {
+    ...screen("performance", "reviews"),
+    self: screen("ess", "my-performance"),
+  },
+  // search:none sensitive: an improvement plan is reached from its review, never from search
+  improvement_plan: {
+    ...screen("performance", "reviews"),
+    self: screen("ess", "my-performance"),
+  },
+  // search:none a quarter is picked on Performance · Goals, never searched for
+  performance_period: screen("performance", "goals"),
 
   // Queries & Sanctions
   query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") }, // search:none not built yet (src/modules/queries)

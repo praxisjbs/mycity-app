@@ -49,6 +49,10 @@ const CONDITION_HELP = "A stage runs only for requests that match. Others skip i
 const OPS: Array<[string, string]> = [[">", "Over"], [">=", "At Least"], ["<", "Under"], ["<=", "At Most"], ["=", "Exactly"]];
 const OP_WORD: Record<string, string> = { ">": "over", ">=": "at least", "<": "under", "<=": "at most", "=": "is", in: "is one of" };
 const APPROVERS: Array<[string, string]> = [["manager_of_subject", "Line Manager"], ["role", "Role"], ["user", "Person"], ["ceo", "CEO"]];
+const NAMED: [string, string] = ["employee_in_context", "Named Person"];
+
+/** The flow's fields that name a person: a named-person stage reads one of them. */
+const personFields = (context: Record<string, string>) => Object.keys(context).filter((k) => context[k] === "uuid");
 
 const fieldLabel = (key: string) => key.split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 const hours = (h: number) => (h === 1 ? "1 hour" : `${h} hours`);
@@ -254,6 +258,7 @@ interface StageValues extends Record<string, unknown> {
   approver: string;
   role: string;
   user_id: string;
+  named: string;
   when: string;
   op: string;
   value: string;
@@ -272,7 +277,14 @@ function keyFrom(name: string, taken: string[]): string {
 function toStage(v: StageValues, context: Record<string, string>, base: ApprovalStageInput | null, taken: string[]): ApprovalStageInput {
   const type = context[v.when];
   const value = type === "money" ? toMoneyString(v.value) : type === "number" ? Number(v.value) : v.value.trim();
-  const approver = v.approver === "role" ? { type: "role" as const, value: v.role } : v.approver === "user" ? { type: "user" as const, value: v.user_id } : { type: v.approver as "ceo" | "manager_of_subject" };
+  const approver =
+    v.approver === "role"
+      ? { type: "role" as const, value: v.role }
+      : v.approver === "user"
+        ? { type: "user" as const, value: v.user_id }
+        : v.approver === "employee_in_context"
+          ? { type: "employee_in_context" as const, value: v.named }
+          : { type: v.approver as "ceo" | "manager_of_subject" };
   return {
     key: base?.key ?? keyFrom(v.name, taken),
     name: v.name.trim(),
@@ -288,7 +300,7 @@ function toStage(v: StageValues, context: Record<string, string>, base: Approval
 /** The contract's ApprovalStageInput, checked against the form's fields. */
 function stageRules(context: Record<string, string>, base: ApprovalStageInput | null, taken: string[]): ContractSchema {
   const fieldOf = (v: StageValues, path: PropertyKey[]) => {
-    if (path[0] === "approvers") return v.approver === "role" ? "role" : v.approver === "user" ? "user_id" : "approver";
+    if (path[0] === "approvers") return v.approver === "role" ? "role" : v.approver === "user" ? "user_id" : v.approver === "employee_in_context" ? "named" : "approver";
     if (path[0] === "condition") return path[2] === "field" ? "when" : path[2] === "op" ? "op" : "value";
     return String(path[0] ?? "name");
   };
@@ -298,6 +310,7 @@ function stageRules(context: Record<string, string>, base: ApprovalStageInput | 
       const issues: Array<{ path: PropertyKey[]; message: string; code?: string }> = [];
       if (v.approver === "role" && !v.role) issues.push({ path: ["role"], message: "Pick a role" });
       if (v.approver === "user" && !v.user_id) issues.push({ path: ["user_id"], message: "Pick a person" });
+      if (v.approver === "employee_in_context" && !v.named) issues.push({ path: ["named"], message: "Pick who" });
       if (v.when && !v.value.trim()) issues.push({ path: ["value"], message: "Enter a value" });
       const r = workflow.ApprovalStageInput.safeParse(toStage(v, context, base, taken));
       if (!r.success) for (const i of r.error.issues) issues.push({ path: [fieldOf(v, i.path)], message: i.message, code: i.code });
@@ -327,6 +340,7 @@ function StageForm({ flow, stage, label, taken, onCancel, onDone }: {
       approver: first?.type ?? "manager_of_subject",
       role: first?.type === "role" ? (first.value ?? "") : "",
       user_id: first?.type === "user" ? (first.value ?? "") : "",
+      named: first?.type === "employee_in_context" ? (first.value ?? "") : "",
       when: cond?.field ?? "",
       op: cond?.op ?? ">",
       value: cond === undefined || Array.isArray(cond.value) ? "" : String(cond.value),
@@ -336,11 +350,13 @@ function StageForm({ flow, stage, label, taken, onCancel, onDone }: {
   );
   const v = f.values;
   const type = context[v.when];
+  const named = personFields(context);
+  const kinds = named.length ? [...APPROVERS, NAMED] : APPROVERS;
   const done = () => {
     if (!f.check()) return;
     const next = toStage(v, context, stage, taken);
     const who =
-      v.approver === "role" ? (roles.rows.find((r) => r.code === v.role)?.name ?? v.role) : v.approver === "user" ? (person[0]?.display_name ?? "") : (APPROVERS.find(([k]) => k === v.approver)?.[1] ?? "");
+      v.approver === "role" ? (roles.rows.find((r) => r.code === v.role)?.name ?? v.role) : v.approver === "user" ? (person[0]?.display_name ?? "") : (kinds.find(([k]) => k === v.approver)?.[1] ?? "");
     onDone(next, who);
   };
 
@@ -350,8 +366,13 @@ function StageForm({ flow, stage, label, taken, onCancel, onDone }: {
         <TextField {...f.field("name")} />
       </Field>
       <Field label="Approver" {...f.status("approver")}>
-        <ChoiceField options={APPROVERS} {...f.field("approver")} />
+        <ChoiceField options={kinds} {...f.field("approver")} />
       </Field>
+      {v.approver === "employee_in_context" && (
+        <Field label="Named In" {...f.status("named")}>
+          <SelectField placeholder="Choose One" options={named.map((k) => [k, fieldLabel(k)] as [string, string])} {...f.field("named")} />
+        </Field>
+      )}
       {v.approver === "role" && (
         <Field label="Role" {...f.status("role")}>
           <SelectField placeholder="Choose One" options={roles.rows.map((r) => [r.code, r.name] as [string, string])} {...f.field("role")} />

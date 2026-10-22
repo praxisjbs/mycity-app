@@ -11,9 +11,14 @@
  *   todo, in_progress, in_review, done   the four columns, moved by drag
  *   cancelled                           reached only through Cancel Task, with a reason
  *
- * A task points at a record (a partner, a vacancy, a goal) by `entity_type` and
- * `entity_id`, and at the KPI it counts towards by `employee_target_id`. The link
- * to either is worked out on every read from the route map and never stored.
+ * A task points at a record (a partner, a vacancy, a goal, a key result, a scorecard,
+ * a review or a PIP) by `entity_type` and `entity_id`, and at the scorecard line it counts
+ * towards by `employee_target_id`. The link to either is worked out on every read from the
+ * route map and never stored.
+ *
+ * A commitment is a task with `is_commitment`, its acceptance criteria and its month
+ * (docs/guides/performance.md §6.11). `original_due_at` is fixed when the month's set is
+ * approved; a later due date moves `due_at` only.
  */
 const { z } = require("zod");
 const {
@@ -35,7 +40,7 @@ const TaskPriority = z.enum(["low", "normal", "high", "urgent"]);
 /** A24: the horizon a manager sets work on. Null for a task with no horizon. */
 const TaskCadence = z.enum(["daily", "weekly"]);
 /** Records a task may point at in M2; each is a key of shared/route-map ENTITY_ROUTES. */
-const TaskEntityType = z.enum(["partner", "vacancy", "goal"]);
+const TaskEntityType = z.enum(["partner", "vacancy", "goal", "key_result", "scorecard", "performance_review", "improvement_plan"]);
 /** `mine`: tasks the caller is assigned, set or shares. `team`: everyone in their workspace scope. */
 const TaskScope = z.enum(["mine", "team"]);
 
@@ -105,6 +110,12 @@ const Task = z
     link: Link.nullable(),
     recurrence: Recurrence.nullable(),
     comment_count: z.number().int().min(0),
+    is_commitment: z.boolean(),
+    acceptance_criteria: z.string().nullable(),
+    commitment_month: isoDate.nullable(),
+    original_due_at: isoDateTime.nullable(),
+    rescoped_at: isoDateTime.nullable(),
+    commitment_set_id: uuid.nullable(),
     created_at: isoDateTime,
     updated_at: isoDateTime,
   })
