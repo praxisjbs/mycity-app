@@ -210,7 +210,7 @@ const ScorecardLineInput = z
     direction: Direction.default("higher"),
     unit: optionalText(40),
     target_value: blank(Quantity),
-    target_text: optionalText(500),
+    target_text: optionalText(1000),
     milestone_due_on: blank(isoDate),
     due_on: blank(isoDate),
     frequency_text: optionalText(100),
@@ -252,6 +252,27 @@ const ScorecardEdit = z
 
 /** POST /performance/scorecards/:id/disagree */
 const DisagreeBody = z.object({ disagree_reason: text(1000) }).strict();
+
+/**
+ * One line of a person's sheet in MyCity's scorecards workbook, as the scorecards importer reads
+ * it: whose (by name), their reviewer and scope, and the line as written. `line_key` is the
+ * person and the line's number, so a second import finds the same line.
+ */
+const ScorecardImportRow = z
+  .object({
+    line_key: text(240),
+    employee: text(200),
+    reviewer: optionalText(300),
+    scope: optionalText(2000),
+    position: z.number().int().min(1).max(40),
+    section: Section,
+    title: text(300),
+    target: optionalText(1000),
+    linked: optionalText(100),
+    due: optionalText(100),
+    weight: z.number().min(0).max(100),
+  })
+  .strict();
 
 /* ------------------------------------------------------------------ *
  * Commitments (PR 4)
@@ -341,6 +362,7 @@ const SCORECARD_VIRTUAL = {
   line_count: "how many lines it has, counted",
 };
 const TABLES = {
+  ScorecardImportRow: { table: null, reason: "a scorecard line of the scorecards workbook as the importer reads it" },
   KeyResultRef: { table: "okr_key_result" },
   KpiRef: { table: "kpi_definition" },
   LineMonth: { table: null, reason: "one month of a line's score, from performance_review_item" },
@@ -407,6 +429,7 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  ScorecardImportRow,
   ScorecardStatus,
   Section,
   LineMeasure,

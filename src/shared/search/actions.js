@@ -157,6 +157,33 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
   }),
+  // Performance (docs/guides/performance.md §9).
+  a("new_goal", "New Goal", {
+    screen: "performance.goals",
+    params: { action: "new" },
+    need: ["performance", "create"],
+    words: ["objective", "key result", "okr", "organisational goal", "set a goal"],
+  }),
+  a("report_month", "Report Month", {
+    screen: "performance.goals",
+    params: { action: "report" },
+    need: ["performance", "edit"],
+    capability: "goals.function",
+    words: ["monthly report", "report the month", "key result update", "okr update", "function report"],
+  }),
+  a("new_scorecard", "New Scorecard", {
+    screen: "performance.targets",
+    params: { action: "new" },
+    need: ["performance", "create"],
+    words: ["scorecard", "targets", "draft a scorecard", "set targets"],
+  }),
+  a("new_kpi", "New KPI", {
+    screen: "performance.kpis",
+    params: { action: "new" },
+    need: ["performance", "create"],
+    capability: "goals.function",
+    words: ["kpi", "operational kpi", "indicator"],
+  }),
   a("new_event", "New Event", {
     screen: "workspace.calendar",
     params: { action: "new" },

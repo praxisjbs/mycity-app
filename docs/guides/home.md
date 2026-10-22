@@ -181,7 +181,7 @@ column to the migrated schema, and the schema gate holds every query to them.
 | Adapter | Owning module · milestone · owner | Reads |
 |---|---|---|
 | `tasks.source.js` | tasks · M2 · AJ | `task`: overdue tasks and what is due this week (a person's Open Tasks on Team stays empty until M2) |
-| `goals.source.js` | goals and targets · M2 · AJ | `organisational_goal`, `employee_target`: Goals This Quarter and My Goals, without progress until M2 defines it (Goals On Track stays hidden, §13; the CEO's Org KPI is drawn from the organisation's departments, each with no score until M2 defines KPI scores, §6, §13) |
+| `goals.source.js` | goals and targets · M2 · TB | `organisational_goal`, `employee_target`, `scorecard`: Goals This Quarter (the organisational goals) and My Goals (a person's scorecard lines once the scorecard binds, and any target outside a scorecard), without progress until Performance PR 5 adds it (Goals On Track stays hidden, §13; the CEO's Org KPI is drawn from the organisation's departments, each with no score until then, §6, §13) |
 | `reviews.source.js` | reviews · M2 · AJ | `performance_review`, `performance_cycle`: reviews due |
 | `calendar.source.js` | calendar · M2 · AJ | `calendar_event`: Your Week |
 | `vacancies.source.js` | vacancies and candidates · M4 · TB | `vacancy`: open vacancies; `application`, `candidate`: applications left at one stage too long (Recruitment SLA alerts) |
@@ -826,6 +826,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · Performance PR 2: `goals.source.js` pays three of its four owed items (the cascade, a target's statuses: My Goals lists a person's lines once their scorecard binds, and the indexes of migration 2100); progress stays owed to Performance PR 5. §11: `seeds/staging/45_performance_plan.js` loads MyCity's Q4 2026 plan before Home's seed and takes Home's forward rows out of `organisational_goal` and `employee_target` (lib/home-staging-rows.js steps 1 to 3); `lib/forward-rows.js` keeps the review cycle until Performance PR 3. Home's seed tests run the Performance seed after the Workspace seed.
 - 21/10/2026 · TB · Daily Attendance's day and statuses, from the M1 handover (a report filtered to Absent came back empty, because nobody is Absent until the day-close has closed the day): New Report's Day (Today So Far or Last Working Day) and Statuses (any of them, ticked; Absent only on the Last Working Day, Not In only Today), the roster reading `statuses` together, the file naming its day and date, and `1152` turning a saved report's one status into a list (§6 Reports, §10.1, §11).
 
 - 21/10/2026 · TB · Built with attendance's PR 3: the `late_arrivals` and `missing_clock_out` metrics left the list and their rules are switched off (`1445`); attendance's alerts are the policy's breaches, on the five rules the system keeps (metric `attendance_policy`, People Approvers, no Over By), raised after commit by `attendance.raise_breach_alert`; Alert Rules opens with the Attendance Policy card (`GET /home/alert-rules/policy`), and a policy alert offers Set in Attendance Policy in place of Edit Rule. Alert Sources counts them as Attendance Policy. The staging seed keeps two rules.

@@ -14,31 +14,33 @@
  * docs/DATABASE_SCHEMA.md M2 Owes). A unit test holds `tables` to the migrated schema and
  * the queries to `tables`.
  *
- * What these queries do NOT give is how far along a goal is. That is M2's rule to write
- * (A16: the cascade, weights, a KPI's direction), so the Goals On Track and My Targets cards
- * stay hidden in the catalogue with no query, and a goal's progress is null on screen until
- * M2 adds it here.
+ * What these queries do NOT give yet is how far along a goal is (Performance PR 5), so the
+ * Goals On Track and My Targets cards stay hidden in the catalogue with no query, and a goal's
+ * progress is null on screen until it is added here.
  */
 const { pageQuery, TOTAL_COL } = require("../../../shared/http/paged");
 
 /** The forward tables and the columns these queries read. */
 const TABLES = Object.freeze({
   organisational_goal: ["organisational_goal_id", "level", "title", "status", "starts_on", "ends_on"],
-  employee_target: ["employee_target_id", "employee_id", "title", "due_on"],
+  employee_target: ["employee_target_id", "employee_id", "title", "due_on", "scorecard_id"],
+  scorecard: ["scorecard_id", "status"],
 });
 
-/** What M2 still owes these queries. */
+/**
+ * What M2 still owes these queries. Paid in Performance PR 2: the cascade (organisational goals
+ * stay at level `organisation`; the rest of A16's cascade is objectives and key results, which
+ * Home does not read), a target's statuses (a line counts once its scorecard binds), and the
+ * indexes (migration 2100).
+ */
 const OWES = Object.freeze([
-  "The goal cascade as A16 sets it (DATABASE_SCHEMA M2): the levels organisation, department, team, role and " +
-    "individual may change.",
-  "Progress: how far along a goal or target is, and when it is on track; Goals On Track and My Targets wait for it.",
-  "A target's statuses: until they are agreed every target due in the period is listed.",
-  "Index organisational_goal (level, starts_on, ends_on) and employee_target (employee_id, due_on) (asked by Home).",
+  "Progress: how far along a goal or target is, and when it is on track; Goals On Track and My Targets wait for it " +
+    "(Performance PR 5, docs/guides/performance.md §6.21).",
 ]);
 
 /**
  * One page of the organisation's own goals live in the period `from` to `to` (dates,
- * both included), soonest ending first. Drafts and goals awaiting approval are left out.
+ * both included), soonest ending first, closed ones too.
  * @param {{query: Function}} client
  * @param {{from: string, to: string}} period  YYYY-MM-DD
  * @param {{page?: number}} query
@@ -48,7 +50,7 @@ function organisationGoals(client, { from, to }, query) {
     client,
     `SELECT g.organisational_goal_id, g.title, g.status, g.starts_on, g.ends_on, ${TOTAL_COL}
        FROM organisational_goal g
-      WHERE g.level = 'organisation' AND g.status IN ('active', 'completed')
+      WHERE g.level = 'organisation' AND g.status IN ('active', 'closed')
         AND g.starts_on <= $2::date AND g.ends_on >= $1::date
       ORDER BY g.ends_on, g.organisational_goal_id`,
     [from, to],
@@ -58,7 +60,8 @@ function organisationGoals(client, { from, to }, query) {
 
 /**
  * One page of a person's targets due in the period `from` to `to` (dates, both included),
- * soonest due first.
+ * soonest due first: the lines of their scorecard once it binds (a draft is not yet theirs to
+ * meet), and any target outside a scorecard.
  * @param {{query: Function}} client
  * @param {{employee_id: string, from: string, to: string}} period
  * @param {{page?: number}} query
@@ -68,7 +71,9 @@ function targetsOf(client, { employee_id: employeeId, from, to }, query) {
     client,
     `SELECT t.employee_target_id, t.title, t.due_on, ${TOTAL_COL}
        FROM employee_target t
+       LEFT JOIN scorecard s ON s.scorecard_id = t.scorecard_id
       WHERE t.employee_id = $1 AND t.due_on >= $2::date AND t.due_on <= $3::date
+        AND (t.scorecard_id IS NULL OR s.status IN ('binding', 'agreed', 'closed'))
       ORDER BY t.due_on, t.employee_target_id`,
     [employeeId, from, to],
     query,

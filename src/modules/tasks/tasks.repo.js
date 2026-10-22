@@ -11,7 +11,7 @@
  *
  * Open means not done, not cancelled and not archived.
  */
-const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { personJson } = require("../../shared/db/person");
 
@@ -398,8 +398,23 @@ async function dueBetween(db, from, to, after, batch) {
   return rows;
 }
 
+/** The tasks still open that carry out one record (a key result's initiatives). */
+async function openForRecord(db, entityType, entityId) {
+  // pagination:complete every open task of one record, each cancelled with it
+  const { rows } = await completeQuery(
+    db,
+    `SELECT task_id, status FROM task
+      WHERE entity_type = $1 AND entity_id = $2 AND status NOT IN ('done', 'cancelled')
+      ORDER BY task_id`,
+    [entityType, entityId],
+    { label: "a record's open tasks", ceiling: 500 },
+  );
+  return rows;
+}
+
 module.exports = {
   SORTS,
+  openForRecord,
   list,
   summary,
   get,

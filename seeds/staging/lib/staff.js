@@ -34,7 +34,7 @@ async function register(db) {
        LEFT JOIN department d ON d.department_id = e.department_id
        LEFT JOIN app_user u ON u.employee_id = e.employee_id AND u.status = 'active'
       WHERE e.status = 'active'
-      ORDER BY e.created_at, e.employee_id`,
+      ORDER BY e.created_at, e.staff_number, e.employee_id`,
   );
   return rows;
 }

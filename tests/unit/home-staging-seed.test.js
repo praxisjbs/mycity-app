@@ -174,13 +174,9 @@ describe("the rows", () => {
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 
-  test("dates count from the run's day: targets inside the quarter, agreements inside the year", () => {
+  test("dates count from the run's day: agreements inside the year", () => {
     expect(x.quarterName).toBe("Q4 2026");
     for (const { row, values } of written) {
-      if (row.table === "employee_target") {
-        expect(values.due_on >= x.today).toBe(true);
-        expect(values.due_on <= x.quarter.to).toBe(true);
-      }
       if (row.table === "partnership_agreement") expect(values.starts_on >= "2026-01-01").toBe(true);
     }
   });

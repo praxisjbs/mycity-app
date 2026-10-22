@@ -303,6 +303,24 @@ const OkrListQuery = listQuery(
   ["position", "code"],
 );
 
+/** GET /performance/okrs/summary: the Goals figures, over the quarter or one function. */
+const OkrSummaryQuery = z
+  .object({
+    period_id: uuid,
+    department_id: z.union([uuid, z.literal("company")]).optional(),
+  })
+  .strict();
+
+const OkrSummary = z
+  .object({
+    company_score: ScoreValue.nullable(),
+    key_results: z.number().int().min(0),
+    on_track: z.number().int().min(0),
+    in_recovery: z.number().int().min(0),
+    awaiting_report: z.number().int().min(0),
+  })
+  .strict();
+
 /** POST /performance/objectives. No department: a company objective. The code is given (G1). */
 const ObjectiveCreate = z
   .object({
@@ -407,6 +425,9 @@ const TraceStep = z
 /** GET /performance/key-results/:id/trace: key result → company key result → objective → goal. */
 const Trace = z.object({ steps: z.array(TraceStep) }).strict();
 
+/** The assistant's read of a trace (goals.trace): which key result. */
+const TraceQuery = z.object({ okr_key_result_id: uuid }).strict();
+
 /** A target change, as the history beside a target lists it. */
 const TargetChangeStatus = z.enum(["pending", "approved", "rejected"]);
 
@@ -440,6 +461,7 @@ const KeyResultDetail = KeyResult.extend({
   months: z.array(KeyResultMonth),
   target_history: z.array(TargetChange),
   trace: Trace,
+  can_change_target: z.boolean(),
 }).strict();
 
 /* ------------------------------------------------------------------ *
@@ -590,6 +612,43 @@ const TargetChangeListQuery = listQuery(
 );
 
 /* ------------------------------------------------------------------ *
+ * Import (§6.19)
+ * ------------------------------------------------------------------ */
+
+/** A month's score as a workbook holds it: a number from 0 to 1. */
+const WorkbookScore = z.number().min(0).max(1);
+
+/**
+ * One key result of MyCity's OKR workbook as the okr_workbook importer reads it: the sheet's
+ * function (or Company), its objective, the key result's cells as written, its former IDs from
+ * the change map.
+ */
+const OkrWorkbookRow = z
+  .object({
+    function: text(120),
+    objective_code: text(20),
+    objective: text(500),
+    code: text(20),
+    statement: text(1000),
+    kr_type: optionalText(200),
+    accountable: optionalText(300),
+    linked: optionalText(500),
+    baseline: optionalText(1000),
+    starts_on: isoDate.optional(),
+    finishes_on: isoDate.optional(),
+    initiatives: optionalText(6000),
+    scored_from: optionalText(20),
+    status: optionalText(60),
+    actual: optionalText(1000),
+    update: optionalText(4000),
+    october: WorkbookScore.optional(),
+    november: WorkbookScore.optional(),
+    december: WorkbookScore.optional(),
+    former_codes: optionalText(300),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
  * Analytics (§6.21, PR 5)
  * ------------------------------------------------------------------ */
 
@@ -671,6 +730,7 @@ const PLAN_VIRTUAL = {
   scorecard_count: "how many scorecards of the department's people, counted",
 };
 const TABLES = {
+  OkrWorkbookRow: { table: null, reason: "a key result of the OKR workbook as the importer reads it" },
   PerformancePeriod: {
     table: "performance_period",
     virtual: { months: "the quarter's three months, worked out from starts_on" },
@@ -726,6 +786,8 @@ const TABLES = {
   },
   ObjectivePage: { table: null, reason: "a page of objectives with their key results" },
   OkrListQuery: { table: null, reason: "list controls and filters for the OKR tree" },
+  OkrSummaryQuery: { table: null, reason: "which quarter and function the Goals figures count" },
+  OkrSummary: { table: null, reason: "the Goals figures, counted over the quarter's key results" },
   ObjectiveCreate: { table: "okr_objective" },
   ObjectiveEdit: { table: "okr_objective" },
   KeyResultCreate: {
@@ -742,6 +804,7 @@ const TABLES = {
   },
   TraceStep: { table: null, reason: "one record a key result rolls up to" },
   Trace: { table: null, reason: "what a key result rolls up to, in order" },
+  TraceQuery: { table: null, reason: "the key result whose trace the assistant reads" },
   TargetChange: {
     table: "target_change",
     virtual: { requested_by: "the employee of target_change.requested_by" },
@@ -759,6 +822,7 @@ const TABLES = {
       months: "its okr_key_result_month rows",
       target_history: "its target_change rows",
       trace: "what it rolls up to",
+      can_change_target: "the reader may ask to change its target now (goals.authority)",
     },
   },
   KeyResultReport: {
@@ -806,6 +870,7 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  OkrWorkbookRow,
   PeriodStatus,
   PerformancePeriod,
   PeriodPage,
@@ -832,6 +897,8 @@ module.exports = {
   Objective,
   ObjectivePage,
   OkrListQuery,
+  OkrSummaryQuery,
+  OkrSummary,
   ObjectiveCreate,
   ObjectiveEdit,
   KeyResultCreate,
@@ -839,6 +906,7 @@ module.exports = {
   Initiative,
   TraceStep,
   Trace,
+  TraceQuery,
   TargetChangeStatus,
   TargetChange,
   KeyResultDetail,

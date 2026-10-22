@@ -165,6 +165,7 @@ const SCHEDULERS = Object.freeze([
   "integrations-purge",
   "exchange-rates",
   "places-name",
+  "targets-lock",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

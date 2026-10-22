@@ -70,6 +70,23 @@ const KpiListQuery = listQuery(
   ["code", "name"],
 );
 
+/** GET /performance/kpis/summary: the KPIs figures for a month, over every active KPI or one function's. */
+const KpiSummaryQuery = z
+  .object({
+    department_id: uuid.optional(),
+    month: MonthStart,
+  })
+  .strict();
+
+const KpiSummary = z
+  .object({
+    kpis: z.number().int().min(0),
+    met: z.number().int().min(0),
+    not_met: z.number().int().min(0),
+    awaiting: z.number().int().min(0),
+  })
+  .strict();
+
 /** A scorecard line that is scored from this KPI. */
 const KpiLineRef = z
   .object({
@@ -85,6 +102,7 @@ const KpiLineRef = z
 const KpiDetail = Kpi.extend({
   months: z.array(KpiMonth),
   lines: z.array(KpiLineRef),
+  can_edit: z.boolean(),
 }).strict();
 
 /** POST /performance/kpis. The code is the function's next free one (TBO-K04). */
@@ -133,6 +151,25 @@ const KpiActual = z
   })
   .strict();
 
+/** One row of a function sheet's Operational KPIs table, as the okr_kpis importer reads it. */
+const KpiImportRow = z
+  .object({
+    function: text(120),
+    code: text(20),
+    name: text(200),
+    formula: optionalText(1000),
+    unit: optionalText(40),
+    direction: optionalText(40),
+    target: optionalText(500),
+    frequency: optionalText(100),
+    data_source: optionalText(500),
+    result: optionalText(40),
+    actual: optionalText(500),
+    comment: optionalText(2000),
+    former_codes: optionalText(300),
+  })
+  .strict();
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   KpiMonth: {
@@ -148,6 +185,8 @@ const TABLES = {
   },
   KpiPage: { table: null, reason: "a page of KPIs" },
   KpiListQuery: { table: null, reason: "list controls and filters for the KPIs" },
+  KpiSummaryQuery: { table: null, reason: "which function and month the KPIs figures count" },
+  KpiSummary: { table: null, reason: "the KPIs figures, counted over the active KPIs" },
   KpiLineRef: {
     table: "employee_target",
     virtual: { employee: "the person in employee_target.employee_id" },
@@ -159,11 +198,13 @@ const TABLES = {
       latest: "the KPI's latest kpi_month",
       months: "the KPI's kpi_month rows",
       lines: "the employee_target rows with this kpi_definition_id",
+      can_edit: "the reader may change it and record its months (goals.authority)",
     },
   },
   KpiCreate: { table: "kpi_definition" },
   KpiEdit: { table: "kpi_definition" },
   KpiActual: { table: "kpi_month" },
+  KpiImportRow: { table: null, reason: "a KPI of the OKR workbook as the importer reads it" },
 };
 
 module.exports = {
@@ -175,9 +216,12 @@ module.exports = {
   Kpi,
   KpiPage,
   KpiListQuery,
+  KpiSummaryQuery,
+  KpiSummary,
   KpiLineRef,
   KpiDetail,
   KpiCreate,
   KpiEdit,
   KpiActual,
+  KpiImportRow,
 };

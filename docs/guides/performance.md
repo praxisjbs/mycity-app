@@ -106,7 +106,7 @@ by PR), so the parallel three do not edit the same file; the shared exceptions a
 | PR | Branch | Builds | Sections | Migrations | Depends on | Status |
 |---|---|---|---|---|---|---|
 | 1 · Foundation | `m2/perf-foundation` | The org's names and seats; department heads; the whole schema, contract and scoring library; business days; the second-level approver; the four approval flows; capabilities; quarters and their rules (the first API); screens registered and laid out; the mock | §4, §6.1, §6.2, §6.8, §6.9 (the maths), §6.13, §6.20 | 2100 to 2199 | none | Built 22/10/2026 |
-| 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards with the contribution check, the quarter plan and its approval, agreement, target changes and the lock, the three importers; Goals, Scorecards and KPIs screens; Home's goals adapter kept true | §3.1, §3.2, §3.5, §3.6, §6.3 to §6.7, §6.19 | 2200 to 2299 | PR 1 | Not started |
+| 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards with the contribution check, the quarter plan and its approval, agreement, target changes and the lock, the three importers; Goals, Scorecards and KPIs screens; Home's goals adapter kept true | §3.1, §3.2, §3.5, §3.6, §6.3 to §6.7, §6.19 | 2200 to 2299 | PR 1 | Built 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, self-first, the reviewer, dotted input, second level, HR close, conduct cap, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews tab and ESS · My Performance; Home's reviews adapter kept true | §3.3, §6.10, §6.12, §6.14 to §6.17 | 2300 to 2399 | PR 2 | Not started |
 | 4 · Workspace | `m2/perf-workspace` | Commitments and their approval, the Commitments view and month-end report, Counts Towards, initiatives on the board, the weekly summary with Tidy, performance dates on the calendar, My Commitments on ESS | §3.4, §6.11, §6.18 | 2400 to 2499 | PR 2 | Not started |
 | 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard and the Team roster's score; the M2 demo walk | §3.7, §6.21 | 2500 to 2599 | PR 2 | Not started |
@@ -139,21 +139,21 @@ line. Nothing is ticked until it is merged.
 
 **PR 2 · Plan**
 
-- [ ] Organisational goals (`goals.organisation`): create, edit, close; quarterly targets per quarter; Home's `goals.source.js` kept true to what is written
-- [ ] Objectives and key results (`goals.company`, `goals.function`): draft editing, codes (G1), links to company key results, Scored From, accountable and co-accountable, TBC, the trace
-- [ ] Initiatives: a key result's dated initiatives created as tasks for its owner through the tasks service (`entity_type` `key_result`)
-- [ ] Report Month (§6.8): the head's key results and KPIs for the month in one save; Confirm Score (`goals.confirm`); a score below 0.4 requires a recovery owner and date
-- [ ] KPIs (§6.5): create and edit for a function, monthly actuals with Met, Not Met or N/A, the lines that use each
-- [ ] Scorecards (§6.5): draft, lines by section with weights, measures and sources, Copy Last Quarter and Copy From Colleague, reviewer resolution and override (person or role, with reason), dotted input default
-- [ ] Contribution check (§6.5): shares against each split key result, OK or Rebalance; a plan cannot be sent while one reads Rebalance
-- [ ] Quarter plan (§6.4): assemble, send, `performance.plan` with its conditions, Request Changes, binding on the CEO's approval (objectives, key results, KPIs and scorecards together)
-- [ ] Agreement (§6.6): Agree Scorecard and Disagree With Reason, notices and the agreement reminder
-- [ ] Target change and lock (§6.7): the request, `performance.target_change`, the `targets-lock` job on the lock date, history beside the target
-- [ ] Import (§6.19): the `extract` hook in `shared/import` (GE reviews), importers `okr_workbook`, `okr_kpis`, `scorecards`, with aliases from the change map; tests on trimmed copies of the two workbooks
-- [ ] Screens, both shells: Goals, Scorecards (the Scorecards view and a scorecard), KPIs; ⌘K actions New Scorecard and Report Month
-- [ ] AI reads `goals.ai.js`, `kpis.ai.js`, `targets.ai.js` (scorecards); search providers for key results, objectives, organisational goals, KPIs, scorecards
-- [ ] Staging seed `seeds/staging/45_performance_plan.js`: Home's forward rows removed (`removeHomeStagingRows`), Q4 2026 loaded through the services from the trimmed workbooks; Home's seed tests updated
-- [ ] Docs and progress: #29, #31 and the Scorecards half of #30 ticked; this guide's §14
+- [x] 22/10/2026 · Organisational goals (`goals.organisation`): create, edit, close; quarterly targets per quarter; Home's `goals.source.js` kept true to what is written (its cascade, statuses and indexes paid; progress is PR 5's). New Goal on screen records one; edit and close are through the API until Analytics (PR 5) shows a goal's page
+- [x] 22/10/2026 · Objectives and key results (`goals.company`, `goals.function`): draft editing, codes (G1), links to company key results, Scored From, accountable and co-accountable, TBC, the trace (`goals.authority.js` says who may set what)
+- [x] 22/10/2026 · Initiatives: a key result's dated initiatives created as tasks for its owner through the tasks service (`entity_type` `key_result`), by the OKR workbook import; the key result's panel lists them
+- [x] 22/10/2026 · Report Month (§6.8): the head's key results and KPIs for the month in one save; Confirm Score (`goals.confirm`); a score below 0.4 requires a recovery owner and date
+- [x] 22/10/2026 · KPIs (§6.5): create and edit for a function, monthly actuals with Met, Not Met or N/A, the lines that use each
+- [x] 22/10/2026 · Scorecards (§6.5): draft, lines by section with weights, measures and sources, Copy Last Quarter and Copy From Colleague (the API; New Scorecard on screen offers Last Quarter or Start Blank), reviewer resolution and override (person or role, with reason), dotted input default
+- [x] 22/10/2026 · Contribution check (§6.5): shares against each split key result, OK or Rebalance; a plan cannot be sent while one reads Rebalance
+- [x] 22/10/2026 · Quarter plan (§6.4): assemble, send, `performance.plan` with its conditions, Request Changes, binding on the CEO's approval (objectives, key results, KPIs and scorecards together); each stage decides in the Approvals inbox
+- [x] 22/10/2026 · Agreement (§6.6): Agree Scorecard and Disagree With Reason, notices and the agreement reminder (`scorecard_agree_due`, scheduled when the plan binds)
+- [x] 22/10/2026 · Target change and lock (§6.7): the request, `performance.target_change`, the `targets-lock` job on the lock date, history beside the target
+- [x] 22/10/2026 · Import (§6.19): the `extract` hook in `shared/import` (GE reviews), importers `okr_workbook`, `okr_kpis`, `scorecards`, with aliases from the change map; tests on the copies staging loads (`seeds/staging/performance/`: the sheets the importers read, see §14)
+- [x] 22/10/2026 · Screens, both shells: Goals, Scorecards (the Scorecards view and a scorecard), KPIs; ⌘K actions New Goal, Report Month, New Scorecard and New KPI
+- [x] 22/10/2026 · AI reads `goals.ai.js`, `kpis.ai.js`, `targets.ai.js` (scorecards); search providers for key results, objectives, organisational goals, KPIs, scorecards
+- [x] 22/10/2026 · Staging seed `seeds/staging/45_performance_plan.js`: Home's forward rows removed (`removeHomeStagingRows`), Q4 2026 loaded through the services from the workbooks; Home's seed tests updated
+- [x] 22/10/2026 · Docs and progress: #29, #31 and the Scorecards half of #30 ticked; this guide's §14
 
 **PR 3 · Reviews**
 
@@ -165,7 +165,8 @@ line. Nothing is ticked until it is merged.
 - [ ] PIP (§6.16): Start PIP from a Below review, its lines, review date and reminder, Close PIP with its outcome
 - [ ] Probation review (§6.16): opened on `employee.probation_ending`; Confirm, Extend 3 Months or End Employment through `organisation.service`
 - [ ] Dictation and Tidy (§6.17): actions `review-dictation` (Transcription) and `review-cleanup` (Default) registered with `chosen_by` TB, `chosen_at` 2026-10-22, `personal_data` true; prompts; `VoiceField`
-- [ ] Reminders (§7): check-in due, review due, HR close, PIP review
+- [ ] Reminders (§7): check-in due, review due, HR close, PIP review, and `kr_report_due` (the heads' monthly report, left by PR 2)
+- [ ] Mid-quarter scorecards (§11, left by PR 2): a manager drafts a scorecard for someone who joins after the plan binds (PR 2 refuses it with 409 `PLAN_NOT_OPEN`), and Send Scorecard opens a plan amendment, a new `performance.plan` instance holding only that scorecard, which binds it on approval; touches `targets.service.js` `create` and `goals.approval.js`, so say so in the PR
 - [ ] Screens, both shells: Reviews (the round, Waiting On You, the list, a review) and ESS · My Performance (everything but My Commitments); ⌘K action Start Check-In
 - [ ] AI read `reviews.ai.js` (stages and scores only); `reviews.search.js`; PIPs `search:none` with the reason
 - [ ] Home's `reviews.source.js` kept true to the new stages (Reviews Due, My Reviews Due), its OWES cleared
@@ -343,6 +344,9 @@ Build the "PR 3 · Reviews" checklist of guide §1.2 against guide §3.3, §6.10
 - Register the two AI actions before the first call; prompts in src/services/ai/prompts/. The tidy
   never adds a fact, figure, name or judgement, and the person chooses which text to keep.
 - My Commitments on ESS is PR 4's file: leave its slot as PR 1 laid it out.
+- Mid-quarter scorecards (§11) are yours: PR 2 refuses a scorecard once its plan is sent (409
+  PLAN_NOT_OPEN); build the plan amendment that holds only that scorecard and binds it on approval.
+  It touches targets.service.js and goals.approval.js (PR 2's): say so in the PR.
 ```
 
 ```text
@@ -589,11 +593,12 @@ routes file; the module that owns each route is named.
 | `POST /performance/goals` | `OrganisationalGoalCreate` → `OrganisationalGoal` | create, `goals.organisation` | | active at once |
 | `PATCH /performance/goals/:id` | `OrganisationalGoalEdit` → `OrganisationalGoal` | edit, `goals.organisation` | | |
 | `GET /performance/okrs` | `OkrListQuery` → `ObjectivePage` | view · scope | yes, 25 objectives, each with its key results and latest month | `period_id`, `department_id` (`company` for the company), `status`, `q` |
+| `GET /performance/okrs/summary` | `OkrSummaryQuery` → `OkrSummary` | view | | the Goals figures over the quarter or one function: company score, key results on track, in recovery, awaiting a report |
 | `POST /performance/objectives` | `ObjectiveCreate` → `Objective` | create, `goals.company` (company) or `goals.function` (own function) | | the service checks which, and that the plan is draft or returned |
 | `PATCH /performance/objectives/:id` · `DELETE` | `ObjectiveEdit` → `Objective` | edit · delete, as above | | draft or returned plan only |
 | `POST /performance/key-results` | `KeyResultCreate` → `KeyResult` | create, as above | | |
 | `PATCH /performance/key-results/:id` · `DELETE` | `KeyResultEdit` → `KeyResult` | edit · delete, as above | | draft: every field; binding: none (target changes go through §3.5; reports through `/report`) |
-| `GET /performance/key-results/:id` | → `KeyResultDetail` | view · scope | | links both ways, initiatives (tasks), months, target history, trace |
+| `GET /performance/key-results/:id` | → `KeyResultDetail` | view · scope | | links both ways, initiatives (tasks), months, target history, trace; `can_change_target` (the reader may ask) |
 | `GET /performance/key-results/:id/trace` | → `Trace` | view · scope | | key result → company key result → organisational goal |
 | `POST /performance/reports` | `MonthReport` → `MonthReportResult` | edit · the function's head or acting head; for company key results their accountable person | | `month`, `department_id` (null for company key results), each key result's and KPI's figures in one save (§6.8) |
 | `POST /performance/key-results/:id/confirm` | `ConfirmScore` → `KeyResultMonth` | approve, `goals.confirm` | | `month`, `score` |
@@ -609,7 +614,8 @@ routes file; the module that owns each route is named.
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
 | `GET /performance/kpis` | `KpiListQuery` → `KpiPage` | view | yes, 25 | `department_id`, `period_id` (its months), `active`, `q` |
-| `GET /performance/kpis/:id` | → `KpiDetail` | view | | months, the scorecard lines that use it |
+| `GET /performance/kpis/summary` | `KpiSummaryQuery` → `KpiSummary` | view | | a month's Met, Not Met and awaiting over the active KPIs, or one function's |
+| `GET /performance/kpis/:id` | → `KpiDetail` | view | | months, the scorecard lines that use it; `can_edit` (the reader may edit and record) |
 | `POST /performance/kpis` · `PATCH /performance/kpis/:id` | `KpiCreate`, `KpiEdit` → `Kpi` | create · edit, `goals.function` (own function) | | |
 | `POST /performance/kpis/:id/actuals` | `KpiActual` → `KpiMonth` | edit, `goals.function` (own function) | | `month`, `result`, `actual_value` or `actual_text`, `comment` |
 
@@ -771,10 +777,16 @@ grant, as above.
 ### 6.7 Target changes and the lock (PR 2)
 
 - Before `targets_lock_on`, a TBC target (`target_provisional`) is edited by its owner directly and
-  shows a TBC pill. On the lock date the `targets-lock` job sets `target_locked_at` and clears TBC.
+  shows a TBC pill. On the lock date the `targets-lock` job sets `target_locked_at` and clears TBC, and
+  the months reported while it was TBC are scored on the locked target.
 - After the lock, and on any binding non-TBC target, Change Target opens **`performance.target_change`**
-  (one stage, `ceo`). On approval the target and `from_month` apply; earlier months keep the scores
-  they had; the line or key result shows Was beside the target.
+  (one stage, `ceo`). One change to a target waits at a time (409 `CHANGE_PENDING`). On approval the
+  target and `from_month` apply; earlier months keep the scores they had; the months from `from_month`
+  not yet confirmed are proposed again; the line or key result shows Was beside the target. A month is
+  scored on the target in force then: the last change approved that applies from it or earlier, else
+  the target before any change.
+- Change Target is offered to whoever the API would let ask: the accountable person, or someone who
+  sets the function's goals (`can_change_target` on the key result).
 
 ### 6.8 Key result scoring and the roll-up (PR 1 maths, PR 2 screens)
 
@@ -787,7 +799,10 @@ From the OKR workbook's Read Me (A14), held in the quarter's `rules.key_results`
 - **Bands**: 0.7 or above Good; 0.4 to under 0.7 Watch; under 0.4 Recovery, which needs a recovery
   owner and date in the report (`RECOVERY_REQUIRED`).
 - The head proposes the score in Report Month; the CEO confirms it (`goals.confirm`); the confirmed
-  score counts, else the proposed one shows marked Proposed.
+  score counts, else the proposed one shows marked Proposed. Report Month sends only the key results
+  the head changed; a month reported again keeps what the report leaves out (an imported actual, a
+  recovery owner), and keeps its confirmation unless its score changes. A confirmed score reaches the
+  company key results Scored From it.
 - **Scored From**: a company key result wholly delivered by a function key result takes that key
   result's month (status, actual, update, scores); nothing is entered twice.
 - **Roll-up**: an objective's month score is the mean of its key results' scores for that month
@@ -987,6 +1002,17 @@ Worked out whenever a check-in opens or is read, and again at the review's submi
   errors the person resolves in the preview (pick, or skip). A line whose text names a different figure
   from its key result's target (the Marketing team line's 40,000 against 64,000) is listed as a warning:
   the key result's target is the one scored.
+- A key result's status, actual and update are its latest scored month's, else the month just ended
+  (within the quarter); a KPI's result is that month's too, which the KPIs figures count. A month
+  imported again keeps what was reported in the app that the workbook leaves blank (a status, a
+  figure, a recovery owner and date, a score).
+- Reverting an import is refused once anything rests on a record it created: a key result a
+  scorecard line, a target change or a confirmed score uses; a KPI a scorecard line or a review uses; a
+  line whose scorecard has been agreed, bound, reassigned or edited since (by a person or a later
+  import), or whose target a change names. Records an import only updated stay as they are. Reverting
+  the OKR workbook cancels its initiatives' open tasks and returns a plan left empty to draft; a
+  reverted KPI goes with its months and former codes, and its next import creates it again. An import
+  never brings back a KPI a person retired.
 - Imported plans are created binding and imported scorecards agreed (they were approved and signed in
   September); the October round is opened with `live_from` the import date.
 
@@ -1036,10 +1062,12 @@ For the quarter and, optionally, one function, within the reader's scope, Africa
 | `key_result.reported` | Report Month | lines fed by it recount (outbox); the CEO's monthly confirm list refreshes |
 | `key_result.score_confirmed` | Confirm Score | the function's and company's scores refresh |
 | `plan.submitted` · `plan.binding` · `plan.returned` | Send Plan; the CEO's approval; Request Changes | the engine tells each stage; on binding each employee and reviewer is told "Your Q4 2026 scorecard is ready to agree" |
+| `plan.reopened` | reverting the import of a plan's last objectives | audit only: the plan is a draft again |
 | `scorecard.agreed` · `scorecard.disagreed` | agreement | notice to the other party; disagreement to the reviewer |
 | `target_change.requested` · `target_change.decided` | request; the CEO's decision | the requester is told; the target applies on approval |
 | job `targets-lock` (daily 00:15 Lagos) | the quarter's lock date | TBC targets lock; the heads are told which locked |
 | `kpi.actual_recorded` | Record Actual or Report Month | lines fed by it recount |
+| `kpi.removed` | reverting the import that created a KPI | audit only: the KPI, its months and former codes are gone |
 | job `review-cycles` (06:00 Lagos) with handler `review-cycle-open` | the first business day after a month ends | opens the round and its reviews (idempotent per scorecard and month); `review_round.opened` tells each person their check-in is due |
 | `review.check_in_submitted` | Submit Check-In | notice to the reviewer "Ada's check-in is in"; input asked of the dotted manager |
 | `review.input_asked` · `review.input_given` | Ask For Input; Give Input | notice to the dotted manager; notice to the reviewer |
@@ -1154,7 +1182,8 @@ is listed here as tier 1 or tier 2.**
   request (F26); the second answers 409 and the screen reloads.
 - **A person joins mid-quarter**: their manager drafts a scorecard; it goes through a function plan
   amendment (a new instance of `performance.plan` holding only that scorecard). Months before it is
-  binding are not reviewed.
+  binding are not reviewed. PR 3 builds the amendment; until then a scorecard is drafted only while its
+  function's plan is open (409 `PLAN_NOT_OPEN`).
 - **A person leaves**: their open review closes as Withdrawn at HR's stage with a note; the scorecard
   closes; their commitments stay reportable.
 - **A person moves department mid-quarter**: their scorecard stays with the quarter it was approved in;
@@ -1202,7 +1231,7 @@ are created by the PR that writes them: an empty prompt or template would be loa
 | PR | Backend | Frontend | Other |
 |---|---|---|---|
 | 1 | `organisation` (department head, `headOf`); `goals.periods.js`, `goals.routes.js` (periods), `goals.controller.js`, `goals.service.js`, `goals.repo.js`, `goals.events.js` (periods), `goals.search.js` (key results, objectives, organisational goals); `shared/time/working-week.js`; `shared/workflow/{conditions,approvers,definitions,engine}.js`; `shared/access/access.catalog.js`; `shared/route-map.js`; `shared/search/screens.js`; `scripts/db/{load-staff,staff-nomenclature}.js`; the empty files the later PRs fill: `goals.{import,analytics}.js`, `kpis.{search,import}.js`, `targets.{weights,commitments,import,search}.js`, `reviews.{search,pip}.js`, `ess.performance.js` (the stubs `kpis.weights.js`, `reviews.{autoscore,metrics,analytics}.js` are gone) | `app/src/features/performance/index.tsx`; empty parts `Goals.tsx`, `Kpis.tsx`, `Scorecards.tsx`, `Commitments.tsx`, `Reviews.tsx`, `ReviewPage.tsx`, `CheckIn.tsx`, `Analytics.tsx`; `app/src/features/ess/Performance.tsx` composed of the parts in `app/src/features/performance/my/` (`MyScorecard.tsx`, `MyCommitments.tsx`, `MyReviews.tsx`, with `CheckIn.tsx`); `app/src/api/mock/modules/performance.ts` | `migrations/2100_*`, `seeds/reference/2190_*`; every contract file; `seeds/staff/*` |
-| 2 | `goals/*` (but not `goals.analytics.js`), `kpis/*`, `targets.{service,repo,routes,controller,events,ai,search,import,weights,approval}.js`; `shared/import` (`extract`); `dashboard/sources/goals.source.js` | `Goals.tsx`, `Kpis.tsx`, `Scorecards.tsx` | `seeds/staging/45_performance_plan.js`; `tests/fixtures/performance/` |
+| 2 | `goals/*` (but not `goals.analytics.js`), `kpis/*`, `targets.{service,repo,routes,controller,events,ai,search,import,weights}.js`; `shared/import` (`extract`); `dashboard/sources/goals.source.js` | `Goals.tsx`, `Kpis.tsx`, `Scorecards.tsx` | `seeds/staging/45_performance_plan.js`; `seeds/staging/performance/` (the two workbooks) |
 | 3 | `reviews/*`; `targets.progress.js`; `ess.performance.js` and the ESS routes; `dashboard/sources/reviews.source.js`; `services/ai/prompts/review-{dictation,cleanup}.md`; `templates/documents/review-summary.html` | `Reviews.tsx`, `ReviewPage.tsx`, `CheckIn.tsx`; `my/MyScorecard.tsx`, `my/MyReviews.tsx`; `app/src/features/ess/Performance.tsx` | `seeds/staging/46_performance_reviews.js` |
 | 4 | `targets.commitments.js` and its routes in `targets.routes.js`; `tasks/*`, `calendar/*`, `workspace/*`; `services/ai/prompts/week-summary.md` | `Commitments.tsx`; `my/MyCommitments.tsx`; `app/src/features/workspace/*` | `seeds/staging/47_performance_commitments.js`; `docs/guides/workspace.md` |
 | 5 | `goals.analytics.js` and its route; `dashboard/{dashboard.layout,dashboard.team}.js`, `dashboard/kpi-catalog/tiles/work.js` | `Analytics.tsx` | `docs/guides/home.md` |
@@ -1225,6 +1254,43 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 - **M3 hand-off**: the caution letter and the conduct mark from upheld sanctions. GE, at M3's start.
 
 ## 14 · Change log
+
+- 22/10/2026 · TB · PR 2 review fixes: the CEO's approval binds the plan's scorecards and schedules
+  agreement reminders; an approved target change applies to its line or re-proposes its key result's
+  months; a TBC target not yet locked is reported but not scored; a confirmed score reaches the company
+  key results scored from it; a role reviewer's first holder to agree becomes the reviewer; a reader
+  sees only the scorecards they may read, in the plan too; a scorecard is drafted only on an open plan;
+  import reverts are refused once anything rests on them (§6.19); one target change waits at a time,
+  a month is scored on the target in force then, and TBC months are scored on the lock date (§6.7); a
+  month reported again keeps what the report leaves out and its confirmation unless its score changes
+  (§6.8); mid-quarter scorecards wait for PR 3's plan amendment (§11). On screen: Report Month is one
+  function's (picked at its top), sends only the key results changed, keeps them while its pages turn,
+  and shows Recovery Owner and Date whenever the score needs them with errors on their rows; Edit
+  Lines keeps each line's unit, direction, frequency, share and links, keeps a target's words and
+  number together, asks a copied line for its link and a milestone for its date, and shows every
+  field's error in four words or fewer; the KPIs figures count the month just ended; the figures come from `GET /performance/okrs/summary` and
+  `GET /performance/kpis/summary`; Change Target, Edit KPI and Record Actual follow the API's
+  `can_change_target` and `can_edit`; the OKR tree pages. Reference seed 2290 aligns `goal_status`.
+
+- 22/10/2026 · TB · PR 2 built: organisational goals, the OKR tree, Report Month and Confirm Score, KPIs,
+  scorecards with the contribution check, the quarter plan and its approval, agreement and its reminder,
+  target changes and the lock, the three importers, the Goals, Scorecards and KPIs screens on both
+  shells, the AI reads and search, the staging seed, Home's goals adapter. What differs from §1.2 and
+  §10: the workbooks live in `seeds/staging/performance/` (a release ships `seeds/`, not `tests/`), they
+  keep only the sheets the importers read, and the tests read them there; the import engine also gives
+  a text field a longer limit (`max`) and reads a formula saved without its result as blank (the OKR
+  workbook's Company sheet is formulas with no saved results), and an importer may name a capability it
+  needs besides its grant (the three need `performance.manage`, which runs imports, §8); the scorecards
+  importer matches a name two letters out when one person fits ("Iyersehen" is Precious Iyeserhen); gates, enabling and output
+  key results import as dated, the rest as numeric, with the workbook's month scores as proposed scores;
+  an imported key result an import changed is not put back by revert (the workbook keeps no
+  before-image). On screen: the tree shows each key result's latest month (its History is in the
+  panel), the function switch is a select, and the plan's stages decide in the Approvals inbox, so the
+  Plan Approval card shows the plan's state and Send Plan. Organisational goals are recorded with New
+  Goal and changed through the API. `kr_report_due` moves to PR 3's reminders. `targets.approval.js`
+  is gone: agreement lives in `targets.service.js`, completions in `goals.approval.js`. The 2026
+  Organisational Goals sheet never arrived, so staging records four goals from the workbook's 2026
+  references.
 
 - 22/10/2026 · TB · PR 1 built: the org's names (`seeds/staff/nomenclature.json`, applied by the staff
   loader before and after the sheet), department heads, migration 2100 and seed 2190, the whole contract

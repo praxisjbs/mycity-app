@@ -284,17 +284,16 @@ const ENTITY_ROUTES = Object.freeze({
   organisational_goal: screen("performance", "goals"),
   objective: screen("performance", "goals"),
   key_result: screen("performance", "goals"),
-  // search:none not built yet (src/modules/targets)
   scorecard: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
-  // search:none not built yet (src/modules/targets)
+  // search:none a line is found through its scorecard, which search reaches
   target: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
-  kpi: screen("performance", "kpis"), // search:none not built yet (src/modules/kpis)
+  kpi: screen("performance", "kpis"),
   // search:none not built yet (src/modules/reviews)
   review: {
     ...screen("performance", "reviews"),

@@ -611,6 +611,7 @@ describe("schedules and heartbeat", () => {
       "system-health-digest",
       "system-health-purge",
       "system-health-sample",
+      "targets-lock",
       "task-recurrence",
       "urgent-repeats",
       "workflow-timeout",

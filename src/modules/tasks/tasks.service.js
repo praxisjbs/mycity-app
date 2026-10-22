@@ -190,11 +190,14 @@ async function checkAssignee(db, scope, employeeId) {
  * @param {object} actor  withActor(req)
  * @param {object} scope  scopeOf(req) under `workspace` create
  * @param {object} body   TaskCreate
+ * @param {{client?: object}} [opts]  the caller's transaction, when it has one
  */
-async function create(actor, scope, body) {
+async function create(actor, scope, body, { client: within = null } = {}) {
   if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee can hold tasks", 403);
   const assigneeId = body.primary_assignee_id || actor.employee_id;
-  return tx(async (client) => {
+  // An importer sets tasks inside its own transaction (a key result's initiatives).
+  const run = within ? (fn) => atomically(within, () => fn(within)) : tx;
+  return run(async (client) => {
     await checkAssignee(client, scope, assigneeId);
     await checkTarget(client, body.employee_target_id, assigneeId);
     const cal = await workingWeek.loadCalendar(client);
@@ -409,6 +412,33 @@ async function cancel(actor, scope, id, { cancel_reason: reason }) {
   });
 }
 
+/**
+ * A record that tasks carry out is gone (an imported key result reverted): its open tasks are
+ * cancelled with it, in the caller's transaction.
+ */
+async function cancelForRecord(client, actor, { entity_type: entityType, entity_id: entityId, reason }) {
+  for (const t of await repo.openForRecord(client, entityType, entityId)) {
+    await repo.update(client, t.task_id, { status: "cancelled", cancelled_at: new Date(), cancel_reason: reason });
+    await repo.addActivity(client, {
+      task_id: t.task_id,
+      actor_user_id: actor ? actor.user_id : null,
+      kind: "cancelled",
+      from_status: t.status,
+      to_status: "cancelled",
+      detail: reason,
+    });
+    const after = await repo.get(client, t.task_id);
+    await emit(client, {
+      key: EVENTS.TASK_CANCELLED,
+      entity: { type: "task", id: t.task_id },
+      actor,
+      before: { status: t.status },
+      after: { status: "cancelled" },
+      payload: payloadOf(after, { cancel_reason: reason, from_status: t.status }),
+    });
+  }
+}
+
 async function comment(actor, scope, id, { body }) {
   return tx(async (client) => {
     const task = await visible(client, id, scope);
@@ -525,6 +555,7 @@ async function sweep(now = new Date()) {
 }
 
 module.exports = {
+  cancelForRecord,
   toTask,
   windows,
   list,

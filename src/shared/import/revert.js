@@ -77,9 +77,11 @@ async function revert(
           for (const r of rows) {
             if (changed.has(r.target_id))
               blocked.push(`row ${r.row_number} was changed after the import`);
+            // Only a record the revert would archive matters here: an updated one stays.
             else if (
+              r.action === "create" &&
               imp.isReferenced &&
-              (await imp.isReferenced(client, r.target_id))
+              (await imp.isReferenced(client, r.target_id, { batch }))
             )
               blocked.push(`row ${r.row_number} is now used elsewhere`);
           }

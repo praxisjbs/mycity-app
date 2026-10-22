@@ -1,12 +1,13 @@
 /**
  * The Performance mock in the contract's shapes (docs/guides/performance.md §12, PR 1): one quarter,
- * a function's OKRs and KPIs as MyCity's Q4 workbook lays out Branding & Marketing, its plan, and
- * two scorecards with their lines, so PRs 2 to 5 build screens before their API lands. Every person
+ * the year's organisational goals, a function's OKRs and KPIs as MyCity's Q4 workbook lays them
+ * out, its plan, and two scorecards with their lines, so PRs 2 to 5 build screens before their API lands. Every person
  * and figure is invented; the shapes are the contract's, so a screen built on this reads the API
  * unchanged.
  */
 import type {
   Contribution,
+  OrganisationalGoal,
   Kpi,
   KeyResult,
   KeyResultMonth,
@@ -16,6 +17,7 @@ import type {
   Round,
   ScorecardDetail,
   ScorecardLine,
+  TargetChange,
 } from "@mycity/contract/contract.gen.ts";
 import { at, sid } from "../core";
 import { byKey, refKey } from "./people";
@@ -42,8 +44,9 @@ export const PERIOD: PerformancePeriod = {
   updated_at: at(2, "09:00"),
 };
 
-const DEPT = "Branding & Marketing";
-const deptId = sid("perf:dept:bm");
+/** The mock's Marketing & Sales department, laid out as the workbook lays out Branding & Marketing. */
+export const DEPT = "Marketing & Sales";
+export const deptId = sid(`dept:${DEPT}`);
 const planId = sid("perf:plan:bm");
 const head = refKey("ngozi");
 
@@ -100,7 +103,32 @@ const kr = (
   latest,
 });
 
-/** Branding & Marketing's objectives and key results, with October reported. */
+/** The year's organisational goals, set by the CEO. */
+export const ORG_GOALS: OrganisationalGoal[] = [
+  ["ORG-2026-01", "Growth", "Reach 2 million active residents", "Monthly active users", "1.1M"],
+  ["ORG-2026-02", "Revenue", "Partnership revenue of ₦180M", "Signed partnership value", "₦96M"],
+  ["ORG-2026-03", "Expansion", "Operate in 12 Nigerian cities", "Cities live", "8"],
+].map(([code, theme, title, measure, baseline]) => ({
+  organisational_goal_id: sid(`perf:goal:${code}`),
+  code,
+  title,
+  strategic_theme: theme,
+  detail: null,
+  success_measure: measure,
+  reference_target: null,
+  baseline,
+  key_decisions: null,
+  function_cascade: null,
+  plan_year_starts_on: "2026-01-01",
+  starts_on: "2026-01-01",
+  ends_on: "2026-12-31",
+  status: "active" as const,
+  owner: refKey("ifeoma"),
+  created_at: at(60, "09:00"),
+  updated_at: at(60, "09:00"),
+}));
+
+/** The function's objectives and key results, with October reported. */
 export const OBJECTIVES: Objective[] = [
   {
     okr_objective_id: sid("perf:obj:BM-O1"),
@@ -110,7 +138,7 @@ export const OBJECTIVES: Objective[] = [
     department: DEPT,
     code: "BM-O1",
     title: "Make MyCity the first app a resident opens for their city",
-    organisational_goal_id: null,
+    organisational_goal_id: sid("perf:goal:ORG-2026-01"),
     position: 0,
     plan_status: "binding",
     score: "0.68",
@@ -127,7 +155,7 @@ export const OBJECTIVES: Objective[] = [
     department: DEPT,
     code: "BM-O2",
     title: "Build a brand partners trust",
-    organisational_goal_id: null,
+    organisational_goal_id: sid("perf:goal:ORG-2026-02"),
     position: 1,
     plan_status: "binding",
     score: "0.9",
@@ -207,7 +235,7 @@ const line = (
   score,
 });
 
-const card = (key: string, reviewer: string, lines: ScorecardLine[], score: string, rating: ScorecardDetail["rating"]): ScorecardDetail => {
+const card = (key: string, reviewer: string, lines: ScorecardLine[], score: string, rating: ScorecardDetail["rating"], agreed = true): ScorecardDetail => {
   const p = refKey(key);
   return {
     scorecard_id: sid(`perf:card:${key}`),
@@ -216,13 +244,13 @@ const card = (key: string, reviewer: string, lines: ScorecardLine[], score: stri
     employee: p,
     department_id: deptId,
     department: DEPT,
-    status: "agreed",
+    status: agreed ? "agreed" : "binding",
     reviewer: refKey(reviewer),
     reviewer_role_code: null,
     reviewer_role: null,
     dotted: null,
-    employee_agreed_at: at(20, "11:00"),
-    reviewer_agreed_at: at(20, "15:00"),
+    employee_agreed_at: agreed ? at(20, "11:00") : null,
+    reviewer_agreed_at: agreed ? at(20, "15:00") : null,
     disagreed_at: null,
     score_to_date: score,
     rating,
@@ -243,7 +271,7 @@ const card = (key: string, reviewer: string, lines: ScorecardLine[], score: stri
   };
 };
 
-/** Two scorecards of the function's people, agreed in September. */
+/** Two scorecards of the function's people: one agreed, one awaiting agreement. */
 export const SCORECARDS: ScorecardDetail[] = [
   card(
     "adedotun",
@@ -270,6 +298,7 @@ export const SCORECARDS: ScorecardDetail[] = [
     ],
     "0.62",
     "partly_meets",
+    false,
   ),
 ];
 
@@ -292,6 +321,9 @@ export const PLANS: Plan[] = [
     updated_at: at(21, "16:00"),
   },
 ];
+
+/** Target changes asked for this quarter. */
+export const TARGET_CHANGES: TargetChange[] = [];
 
 /** No key result here is split between people, so the check has nothing to rebalance. */
 export const CONTRIBUTIONS: Contribution[] = [];

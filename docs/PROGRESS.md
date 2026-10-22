@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 6 | 0 | 4 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 3 | 1 | 6 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
-| **Total** | **99** | **48** | **0** | **51** | **0** | **0** |
+| **Total** | **99** | **45** | **1** | **53** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -995,9 +995,9 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 29 | Goals | `goals` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
-| 30 | Scorecards | `targets` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
-| 31 | KPIs | `kpis` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☐ | ☐ | In progress | 22/10/2026 |
+| 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 32 | Reviews | `reviews` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 | 33 | Analytics | `analytics` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 
@@ -1007,13 +1007,15 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | PR | Branch | Builds | Depends on | Status | Updated |
 |---|---|---|---|---|---|
 | 1 · Foundation | `m2/perf-foundation` | Department names and seats, department heads, the whole schema, contract and scoring library, business days, the second-level approver, the four flows, capabilities, quarters and rules, screens laid out, the mock | none | Built | 22/10/2026 |
-| 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards and the contribution check, the quarter plan and its approval, agreement, target changes, the three importers; Goals, Scorecards, KPIs | PR 1 | Not started | |
+| 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards and the contribution check, the quarter plan and its approval, agreement, target changes, the three importers; Goals, Scorecards, KPIs | PR 1 | Built | 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, the review chain, conduct, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews, ESS · My Performance | PR 2 | Not started | |
 | 4 · Workspace | `m2/perf-workspace` | Commitments and their view, the month-end report, Counts Towards, initiatives, the weekly summary, performance dates on the calendar, My Commitments | PR 2 | Not started | |
 | 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard, the Team roster's score; the demo walk | PR 2 | Not started | |
 
 **Notes**
 
+- 22/10/2026 · TB · Performance PR 2 review fixes: plan approval binds scorecards and schedules agreement reminders; approved target changes apply to lines and re-propose key results; TBC targets unscored until locked; confirmed scores reach Scored From company key results; role reviewers agree; plan detail and lists honour scope; import reverts refused once used; Report Month per function with recovery fields when the score needs them; Edit Lines keeps every field; Goals and KPIs figures counted on the server; Change Target, Edit KPI and Record Actual follow the API. Left: PRs 3, 4 and 5.
+- 22/10/2026 · TB · Performance PR 2 (Plan) built: organisational goals (the CEO; quarterly targets), the OKR tree for the company and each function (codes G1, links to company key results, Scored From, owner and co-owner, TBC, the trace), Report Month for a function's key results and KPIs in one save with Recovery below 0.4 and Confirm Score for the CEO, KPIs with monthly Met, Not Met or N/A, scorecards (Accountability lines prefilled, Copy Last Quarter or a colleague's, reviewer override with a reason, dotted line), the contribution check, the quarter plan and `performance.plan` (binding on the CEO's approval with its scorecards), one-tap agreement with its daily reminder, target changes to the CEO and the `targets-lock` job; importers `okr_workbook`, `okr_kpis` and `scorecards` reading MyCity's workbooks as they are (the import engine's new `extract` hook); staging loads MyCity's Q4 2026 plan through them and Home's forward goal and target rows are gone; Home's goals adapter lists a person's lines once their scorecard binds. Goals (#29) and KPIs (#31) built on both shells; Scorecards (#30) has its Scorecards view and a scorecard, the Commitments view is PR 4. Left: PRs 3, 4 and 5 in parallel.
 - 22/10/2026 · TB · Performance PR 1 (Foundation) built: MyCity's five departments, the chart's titles and seven vacant seats kept true by the staff loader (`seeds/staff/nomenclature.json`, renamed in place on staging and production); department heads; migration 2100 (every table of the guide's §4) and seed 2190 (capabilities, the four flows, code lists); the whole contract (`goals`, `kpis`, `targets`, `reviews`, `scoring`, and additions to `ess`, `tasks`, `calendar`, `workspace`, `organisation`) and the scoring library with the workbooks' tests; business days; the named-person approver on Settings · Approvals; the quarters API; the record types and ⌘K over key results, objectives and goals; Performance · Targets labelled Scorecards (#30); the screens split one file per tab and ESS · My Performance composed of its parts, behaviour unchanged; the mock in the contract's shapes. No screen ticked. Left: PR 2, then PRs 3 to 5.
 - 22/10/2026 · TB · Performance (#29 to #33, #10): the engineering guide `docs/guides/performance.md` written and agreed, from MyCity's two Q4 workbooks (OKRs V2, Individual Scorecards), the handbook, the October org chart, the weekly tracker, the monthly report template, the caution letter and the meetings of 2, 10 and 12 October, with TB's 22 decisions: their sheets are the source of truth; quarter plans scored monthly; one nomenclature, five departments named as the OKR functions (General Management, Technology & Back-office Ops, Branding & Marketing, Partnership & Growth, People & Culture), checked against the org chart; the chart's job titles and vacant seats, David under Chinyere, the Strategy seat vacant (Abubakar has left); both scoring rule sets kept, configurable; one plan per function (the head's line manager, Operations & People, the CEO); one-tap agreement; target changes to the CEO; commitments as Workspace tasks with a view under Performance; Targets relabelled Scorecards; self, reviewer, second level, HR; the line manager reviews, a dotted line gives input, another reviewer may be named; one monthly check-in with automatic lines and a factual proposed score; the weekly tracker retired; AI on Default when pressed, Transcription for speech, no DeepSeek; both workbooks imported; corrective actions, PIPs and probation reviews; five PRs. Nothing built; no screen moved. Left: PR 1, then PR 2, then PRs 3 to 5. Open: the 2026 Organisational Goals sheet and the paper review form (never received), whether Emmanuel Aneke has left, and the delivery dates against the 23/10 demo.
 - 21/10/2026 · AJ · Performance (#29 to #33, #10) left out of M2's PR, as the lead asked (21/10/2026): it is new, the donors do not have it, and TB builds it from MyCity's sheets on the Google Drive. The API, migrations 2020 and 2030, seed 2091, contracts and screens built on 19 and 20/10 are removed from the branch (they stay in its history, commit d820732); the screens are back on the mock. Rows back to Not started, owner TB.
