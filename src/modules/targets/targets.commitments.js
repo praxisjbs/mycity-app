@@ -77,13 +77,13 @@ const ROW = `
          EXISTS (SELECT 1 FROM workflow_instance wi
                   WHERE wi.entity_type = 'task' AND wi.entity_id = t.task_id::text
                     AND wi.state = 'pending' AND wi.definition_key = '${FLOW}') AS rescope_pending,
-         (SELECT json_build_object('task_id', r.task_id, 'number', r.number::text,
-                                   'assignee', ${personJson("re", "rd")}, 'due_at', r.due_at)
+         (SELECT (array_agg(json_build_object('task_id', r.task_id, 'number', r.number::text,
+                                              'assignee', ${personJson("re", "rd")}, 'due_at', r.due_at)
+                            ORDER BY r.created_at, r.task_id))[1]
             FROM task r
             LEFT JOIN employee re ON re.employee_id = r.primary_assignee_id
             LEFT JOIN department rd ON rd.department_id = re.department_id
-           WHERE r.entity_type = 'task' AND r.entity_id = t.task_id AND r.status <> 'cancelled'
-           ORDER BY r.created_at, r.task_id LIMIT 1) AS recovery,
+           WHERE r.entity_type = 'task' AND r.entity_id = t.task_id AND r.status <> 'cancelled') AS recovery,
          t.employee_target_id, e.first_name, e.last_name,
          search_fold(t.title || ' ' || COALESCE(t.number::text, '') || ' ' || e.first_name || ' ' || e.last_name) AS haystack
     FROM task t
@@ -94,7 +94,7 @@ const ROW = `
 
 /** A row as the contract's Commitment. */
 function view(r) {
-  const recovery = r.recovery
+  const rec = r.recovery
     ? { task_id: r.recovery.task_id, number: r.recovery.number || "", assignee: r.recovery.assignee, due_at: iso(r.recovery.due_at) }
     : null;
   return {
@@ -113,7 +113,7 @@ function view(r) {
     set_status: r.set_status,
     state: r.state,
     rescope_pending: Boolean(r.rescope_pending),
-    recovery,
+    recovery: rec,
     employee_target_id: r.employee_target_id,
     link: linkFor("task", r.task_id),
   };
@@ -219,9 +219,8 @@ const SET_ROW = `
            AND t.is_commitment AND t.status <> 'cancelled') AS task_count,
          ${personJson("e", "d")} AS employee, e.first_name, e.last_name,
          CASE WHEN cs.status = 'returned' THEN
-           (SELECT wd.reason FROM workflow_decision wd
-             WHERE wd.workflow_instance_id = cs.workflow_instance_id AND wd.decision IN ('reject', 'request_changes')
-             ORDER BY wd.decided_at DESC LIMIT 1)
+           (SELECT (array_agg(wd.reason ORDER BY wd.decided_at DESC))[1] FROM workflow_decision wd
+             WHERE wd.workflow_instance_id = cs.workflow_instance_id AND wd.decision IN ('reject', 'request_changes'))
          END AS returned_reason
     FROM commitment_set cs
     JOIN employee e ON e.employee_id = cs.employee_id
