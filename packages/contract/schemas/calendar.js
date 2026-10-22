@@ -115,6 +115,22 @@ const CalendarEventCreate = z
   .strict()
   .refine(endsAfterStart, ENDS_BEFORE);
 
+/**
+ * What a screen button may fill on New Event through the address (docs/guides/praxis-ai.md
+ * §6.4): the fields the form shows, each optional and checked on its own. Attendees are picked
+ * on the form; an interview is booked from Recruitment.
+ */
+const CalendarEventPrefill = z
+  .object({
+    title: text(200).optional(),
+    event_type: CalendarEventType.exclude(["interview"]).optional(),
+    starts_at: isoDateTime.optional(),
+    ends_at: isoDateTime.optional(),
+    // address:none a meeting's room or call link, not a street address
+    location: optionalText(200),
+  })
+  .strict();
+
 /** PATCH /calendar/:id: the owner changes it; attendees are told. */
 const CalendarEventEdit = z
   .object({
@@ -169,6 +185,7 @@ const TABLES = {
       reminder_minutes: "scheduled in the shared reminder engine",
     },
   },
+  CalendarEventPrefill: { table: "calendar_event" },
   CalendarEventEdit: {
     table: "calendar_event",
     virtual: {
@@ -194,6 +211,7 @@ module.exports = {
   CalendarItemPage,
   CalendarListQuery,
   CalendarEventCreate,
+  CalendarEventPrefill,
   CalendarEventEdit,
   CalendarRespond,
 };

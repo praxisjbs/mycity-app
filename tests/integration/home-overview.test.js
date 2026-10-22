@@ -735,6 +735,43 @@ describeDb("Home · Overview against the real migrations", () => {
       expect(items[24].occurred_at).toBe(at(busy, "09:05").toISOString());
     });
 
+    test("the assistant's activity.list: the same events, one person's by id or by name, each cited as its record", async () => {
+      const read = (who, params) => authorise.runRead(pool, users[who], "activity.list", params);
+      const MUSA = [
+        ["recognition.posted", "Musa Danjuma", "Zainab Lawal"],
+        ["leave_request.approved", null, "Musa Danjuma"],
+        ["employee.created", "Tunde Bakare", "Musa Danjuma"],
+      ];
+      const byId = await read("ops", { date: DAY, employee_id: employeeOf("staff") });
+      expect(byId.data.map((r) => [r.event_key, r.actor_name, r.subject])).toEqual(MUSA);
+      expect(byId.page).toMatchObject({ number: 1, total: 3, has_next: false });
+      const byName = await read("ops", { date: DAY, q: "musa" });
+      expect(byName.data.map((r) => [r.event_key, r.actor_name, r.subject])).toEqual(MUSA);
+      expect(byName.citations.map((ct) => ct.type)).toEqual(["recognition", "leave_request", "employee"]);
+      expect(byName.citations[2]).toMatchObject({ id: employeeOf("staff"), label: "Musa Danjuma", link: `/people?tab=employees&id=${employeeOf("staff")}` });
+
+      // The same rules as Home: Kemi's People scope is her team, so Zainab's record is not hers; #general is.
+      expect((await read("manager", { date: DAY, employee_id: employeeOf("other") })).data.map((r) => r.event_key)).toEqual(["recognition.posted"]);
+      // Today unless a day is asked for.
+      const today = await activity.forAssistant(pool, users.ops, {}, { now: at(DAY, "12:00") });
+      expect(today.data.map((r) => r.event_key)).toEqual(["recognition.posted", "leave_request.approved", "employee.created", "employee.created"]);
+    });
+
+    test("the assistant's activity.list pages at 25, as every read does", async () => {
+      const busy = "2026-10-06";
+      for (let n = 0; n < 30; n += 1)
+        await logEvent("celebration.posted", "community", { type: "channel_message", id: crypto.randomUUID() }, {
+          occurred: at(busy, `09:${String(n).padStart(2, "0")}`),
+          payload: { subject_employee_id: employeeOf("other") },
+        });
+      const first = await authorise.runRead(pool, users.staff, "activity.list", { date: busy });
+      expect(first.data).toHaveLength(25);
+      expect(first.page).toMatchObject({ number: 1, total: 30, has_next: true });
+      const second = await authorise.runRead(pool, users.staff, "activity.list", { date: busy, page: 2 });
+      expect(second.data).toHaveLength(5);
+      expect(second.data[4].occurred_at).toBe(at(busy, "09:00").toISOString());
+    });
+
     test("every allowed key is declared by the module it names", async () => {
       require("../../src/modules/organisation/organisation.events");
       require("../../src/modules/leave/leave.events");

@@ -357,7 +357,7 @@ describe("AI manifests", () => {
           intent: "add an employee",
           screen: "people.employees",
           params: { action: "new" },
-          prefill: c.organisation.EmployeeCreate,
+          prefill: c.organisation.EmployeePrefill,
         },
       ],
     });
@@ -370,6 +370,18 @@ describe("AI manifests", () => {
       tab: "employees",
       path: "/people?tab=employees&action=new",
     });
+  });
+
+  test("a prefill is the form's own fields: a restricted one, or a word the address uses, is refused", () => {
+    const route = (over) => ({ intent: "add an employee", screen: "people.employees", params: { action: "new" }, ...over });
+    // EmployeeCreate carries pay, bank and personal fields: an address is kept in the browser's history.
+    expect(() => defineManifest({ module: "people", routes: [route({ prefill: c.organisation.EmployeeCreate })] })).toThrow(
+      /prefill field "date_of_birth" is restricted/,
+    );
+    expect(() => defineManifest({ module: "people", routes: [route({ params: { first_name: "x" }, prefill: c.organisation.EmployeePrefill })] })).toThrow(
+      /prefill field "first_name" is a word the address already uses/,
+    );
+    expect(() => defineManifest({ module: "people", routes: [route({ prefill: c.common.IdParams })] })).toThrow(/prefill field "id" is a word the address already uses/);
   });
 
   test("anything like a write is refused (A23)", () => {

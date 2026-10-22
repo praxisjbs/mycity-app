@@ -517,6 +517,13 @@ As built (17/10/2026):
   Screen and Reload App (`run` `refresh` and `reload`, FRONTEND_FOUNDATION F28): the same refresh in
   place as the pull and the refresh button, and the same reload as holding it, which a person using a
   screen reader reaches here.
+- An address that opens a form may also fill it: Praxis AI's screen buttons add the form's own fields
+  (`?new=1&starts_on=2026-10-26`; `useNewLink` opens a screen's New action on `new=1`), checked by
+  the contract's `<Thing>Prefill` schema. The form
+  reads them as it opens and takes them out of the address (`useAddressPrefill`,
+  `app/src/shell/screen-action.tsx`), so Back and a reload do not fill it again; nothing is saved
+  until the person presses the form's button (`docs/guides/praxis-ai.md` §6.4). Add Employee and
+  Request Leave read it; Record Leave on People · Leave never does.
 - **The gate** (`scripts/check/search-coverage.js`): every screen in the route map has a search entry
   whose label equals the shell's; every entity type in `ENTITY_ROUTES` is declared by a provider or its
   line carries `// search:none <reason>`; every `useScreenAction({ label })` in the app is an action in
@@ -915,6 +922,7 @@ screen.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · §6.7: an address that opens a form may fill it with the contract's prefill fields (`useAddressPrefill`); People · Employees' Add Employee and ESS · My Leave's Request Leave read them for Praxis AI's screen buttons (`praxis-ai.md` §6.4).
 - 22/10/2026 · TB · Performance PR 3: upload purpose `performance_evidence` (`documents.js` `UploadPurpose`, 15 MB in `body-limits.js`, PDF, images and Office files in `mime-policy.js`) for a check-in line's evidence file (`docs/guides/performance.md` §6.14). A route whose multipart body is strict accepts the `purpose` field the upload engine sends beside the file, as `EssDocumentUpload` does.
 - 22/10/2026 · TB · Search (§6.7): a record provider may name `available(client)`, asked before its query; false leaves its group out for everyone. Home Locations uses it while the Attendance policy's Home Location is off (`attendance.md` §1.3).
 - 21/10/2026 · TB · Settings · Appearance (#75) built (§6.15, §2, §5, §7, §10): the hub's dark palette from four colours derived by the contract's maths with every pair at AA, presets with the samples file, a live preview, contrast, two fonts from a vetted list, the theme and density everyone starts on; `/auth/me` carries it, `app/public/boot.js` paints it before first paint; each person's Text Size from the account menu, More and ⌘K.

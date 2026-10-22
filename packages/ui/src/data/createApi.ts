@@ -521,11 +521,13 @@ export function createApi<E>(config: ApiConfig) {
       };
     }, [resetKey, pages, opts.enabled, tick]);
 
+    // What is shown belongs to this key: after a change of key nothing is, until its first page lands.
+    const current = state.reset === resetKey;
     const more = useCallback(() => {
-      if (!state.loading && state.page?.has_next) setPages((n) => n + 1);
-    }, [state.loading, state.page]);
+      if (current && !state.loading && state.page?.has_next) setPages((n) => n + 1);
+    }, [current, state.loading, state.page]);
 
-    return { rows: state.reset === resetKey ? state.rows : [], page: state.page, loading: state.loading, error: state.error, more, reload };
+    return { rows: current ? state.rows : [], page: current ? state.page : undefined, loading: state.loading, error: current ? state.error : null, more, reload };
   }
 
   /** A write. `fields` holds the server's per-field messages after a 422, for the marks on the form. */

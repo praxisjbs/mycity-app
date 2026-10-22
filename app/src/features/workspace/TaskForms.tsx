@@ -1,12 +1,13 @@
 /** The forms a task opens: New and Edit Task, and the small ones its panel and the board ask. */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import tasks from "@mycity/contract/schemas/tasks.js";
 import type { Task, TaskDetail } from "@mycity/contract/contract.gen.ts";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, EmployeePicker } from "@/features/shared/pickers";
+import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
 import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { LABEL, LATE_OPTIONS, refresh, say, type BoardStatus, type LateReason } from "./shared";
@@ -25,10 +26,24 @@ const choiceOf = (t?: TaskDetail): CountsChoice[] =>
     ? [{ kind: t.counts_towards.kind, employee_target_id: t.counts_towards.employee_target_id, okr_key_result_id: t.counts_towards.okr_key_result_id, title: t.counts_towards.title, sub: null }]
     : [];
 
-export function TaskForm({ close, title = "", task, commitment = false }: { close: () => void; title?: string; task?: TaskDetail; commitment?: boolean }) {
+export function TaskForm({ close, task, commitment = false }: { close: () => void; task?: TaskDetail; commitment?: boolean }) {
   const me = useMe();
   const months = commitmentMonths();
+  const filled = useAddressPrefill(tasks.TaskPrefill, !task);
   const [who, setWho] = useState<PersonRef[]>(task?.assignee && task.assignee.employee_id !== me.employee_id ? [task.assignee] : []);
+  // An assignee named in the address shows by name: a manager's picker holds the person, not an id.
+  const assignee = me.manages_people && filled.primary_assignee_id !== me.employee_id ? filled.primary_assignee_id : undefined;
+  useEffect(() => {
+    if (!assignee) return;
+    let live = true;
+    api.call("GET /api/v1/community/people/:id/card", { params: { id: assignee } }).then(
+      (card) => live && setWho((now) => (now.length ? now : [card.person])),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [assignee]);
   const [counts, setCounts] = useState<CountsChoice[]>(choiceOf(task));
   const canAssign = !task || task.can_reassign;
   // An approved commitment keeps its person, mark, month and criteria; its date may still move.
@@ -36,11 +51,11 @@ export function TaskForm({ close, title = "", task, commitment = false }: { clos
   const mayMark = !fixed && (!task || task.status !== "done");
   const f = useContractForm(
     {
-      title: task?.title ?? title,
-      cadence: task?.cadence ?? "",
-      due_on: task?.due_at ? task.due_at.slice(0, 10) : "",
-      priority: (task?.priority ?? "normal") as string,
-      description: task?.description ?? "",
+      title: task?.title ?? filled.title ?? "",
+      cadence: task?.cadence ?? filled.cadence ?? "",
+      due_on: task?.due_at ? task.due_at.slice(0, 10) : (filled.due_on ?? ""),
+      priority: (task?.priority ?? filled.priority ?? "normal") as string,
+      description: task?.description ?? filled.description ?? "",
       is_commitment: task?.is_commitment ?? commitment,
       acceptance_criteria: task?.acceptance_criteria ?? "",
       commitment_month: task?.commitment_month ?? months[0][0],

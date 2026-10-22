@@ -1,8 +1,7 @@
-import type { AiAnswer, AiTurn, Article, Block, Faq, Overdue, Resource } from "@/api/types/knowledge";
+import type { Article, Block, Faq, Overdue, Resource } from "@/api/types/knowledge";
 import type { Status } from "@/api/types/performance";
-import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail } from "../core";
-import { byKey, refKey, SIGN_INS } from "../data/people";
-import { PARTNERS } from "../data/partners";
+import { created, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, fail } from "../core";
+import { refKey, SIGN_INS } from "../data/people";
 
 const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
 const P = (text: string): Block => ({ type: "p", text });
@@ -131,55 +130,3 @@ route("POST /api/v1/knowledge/training", (req) => {
   return created(r);
 });
 
-/* ── Praxis AI: answers from the mock records, within the asker's view. It never writes. ── */
-const TURNS: AiTurn[] = [
-  ["Which partnerships have gone inactive?", 5, "09:12", "partnership, interaction log, employee", 2140, "18.00"],
-  ["Who has overdue tasks?", 5, "08:40", "task, employee", 1890, "16.00"],
-  ["What is budget versus actual this month?", 6, "16:22", "expense, budget", 2610, "22.00"],
-  ["Which candidates are awaiting feedback?", 6, "11:05", "applicant, interview round", 1740, "15.00"],
-  ["Who is due for confirmation?", 7, "09:30", "employee", 980, "8.00"],
-  ["How many late arrivals this month?", 7, "08:14", "attendance, employee", 1420, "12.00"],
-  ["Which contracts renew before March?", 8, "15:40", "contract, partnership", 1180, "10.00"],
-].map((t, i) => ({ turn_id: sid(`turn:${i}`), question: t[0] as string, asked_at: at(t[1] as number, t[2] as string), sources: t[3] as string, tokens: t[4] as number, cost: t[5] as string }));
-route("GET /api/v1/ai/suggestions", () => ok(["Which partnerships have gone inactive, and who owns them?", "Who is due for confirmation in the next 30 days?", "Which contracts renew before March?", "Which candidates are waiting on panel feedback?", "How many late arrivals this month, and by whom?", "What is budget versus actual this month?"]));
-route("POST /api/v1/ai/ask", async (req) => {
-  const q = String(req.body.question ?? "").trim();
-  if (q.length < 4) return invalid({ question: ["Ask a question"] });
-  await new Promise((r) => setTimeout(r, 600));
-  const l = q.toLowerCase();
-  const view = SIGN_INS[req.user!]?.view ?? "staff";
-  const base = { turn_id: sid(`turn:${Date.now()}`), question: q, table: null, note: null, sources: [], action: null, declined: false };
-  let a: AiAnswer;
-  if (/\b(create|add|delete|approve|send|update|raise)\b/.test(l)) {
-    a = { ...base, text: "I do not create or change records. I can take you to the right screen, and a person does it there.", note: "Praxis AI reads. Every write happens in the module that owns it, by a person.", action: l.includes("task") ? { label: "Open Tasks", link: "/workspace?tab=tasks&new=1" } : null, declined: true };
-  } else if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
-    if (view === "staff") a = { ...base, text: "Partnership records are outside what your role can open, so I cannot answer this. The answer is shorter, never wider." };
-    else {
-      const quiet = PARTNERS.filter((p) => p.quiet_days > 30).sort((x, y) => y.quiet_days - x.quiet_days);
-      a = { ...base, text: `${quiet.length} partnerships have had no recorded contact in over 30 days.`, table: { columns: ["Partner", "Owner", "Days quiet"], rows: quiet.map((p) => [p.name, byKey(p.owner)!.display_name, String(p.quiet_days)]), numeric: [2] }, note: "Each one has an inactivity alert open on its owner.", sources: [{ label: "partnership", count: quiet.length }, { label: "interaction log", count: quiet.length * 3 }, { label: "employee", count: new Set(quiet.map((p) => p.owner)).size }], action: { label: "Open the Pipeline", link: "/partnerships?tab=pipeline" } };
-    }
-  } else if (l.includes("renew") || l.includes("contract")) {
-    a = { ...base, text: "Two documents renew in the next six months.", table: { columns: ["Document", "Partner", "Renews"], rows: [["Sponsorship agreement", "ProvidusBank", "31/12/2026"], ["Platform partnership MOU", "MTN Nigeria", "13/03/2027"]], numeric: [] }, sources: [{ label: "contract", count: 4 }, { label: "partnership", count: 2 }], action: { label: "Open Contracts & MOUs", link: "/partnerships?tab=contracts-and-mous" } };
-  } else if (l.includes("confirm") || l.includes("probation")) {
-    a = { ...base, text: "Two people are on probation; Chidera Nwosu's decision is due first.", table: { columns: ["Employee", "Started", "Decision due"], rows: [["Chidera Nwosu", "24/07/2026", "24/10/2026"], ["Samuel Akpan", "13/04/2026", "Overdue"]], numeric: [] }, sources: [{ label: "employee", count: 25 }], action: { label: "Open Employees", link: "/people?tab=employees" } };
-  } else if (l.includes("late")) {
-    a = { ...base, text: "Seven late arrivals this month, from four people. One person has reached the query threshold.", table: { columns: ["Employee", "Late arrivals"], rows: [["Bashir Lawal", "3"], ["Tobi Ojo", "2"], ["Emeka Obi", "1"], ["Cynthia Osakunih", "1"]], numeric: [1] }, sources: [{ label: "attendance", count: 412 }, { label: "employee", count: 4 }], action: { label: "Open Attendance", link: "/people?tab=attendance" } };
-  } else if (l.includes("candidate") || l.includes("panel")) {
-    a = { ...base, text: "One panel is waiting on a panellist: Adaeze Nnamdi, Partnerships Associate, two of three submitted.", sources: [{ label: "applicant", count: 12 }, { label: "interview round", count: 3 }], action: { label: "Open Interviews", link: "/recruitment?tab=interviews" } };
-  } else if (l.includes("budget")) {
-    a = { ...base, text: "There are no budget lines this year. MyCity starts budgeting operating expense in 2027, so there is nothing to compare against.", sources: [{ label: "budget", count: 0 }, { label: "expense", count: 13 }], action: { label: "Open Expenses", link: "/expenses?tab=budgets" } };
-  } else {
-    a = { ...base, text: "I could not match that to the records I can read. Try asking about partnerships, attendance, recruitment, contracts or expenses.", sources: [] };
-  }
-  TURNS.unshift({ turn_id: a.turn_id, question: q, asked_at: new Date().toISOString(), sources: a.sources.map((s) => s.label).join(", ") || "none", tokens: 600 + q.length * 12, cost: `${Math.max(1, Math.round(q.length / 6))}.00` });
-  return ok(a);
-});
-route("GET /api/v1/ai/history/summary", () => {
-  const spend = TURNS.reduce((s, t) => s + Number(t.cost), 0) + 1739;
-  return ok({ questions_this_month: 84, yours: TURNS.length + 24, spend: `${spend}.00`, cap: "25000.00", trend: { labels: ["Jun", "Jul", "Aug", "Sep", "Oct"], values: ["420.00", "780.00", "1240.00", "1610.00", `${spend}.00`] }, topics: [{ label: "Partnerships", pct: 100, value: "26" }, { label: "Attendance", pct: 73, value: "19" }, { label: "Tasks", pct: 58, value: "15" }, { label: "Recruitment", pct: 46, value: "12" }, { label: "Expenses", pct: 35, value: "9" }, { label: "Payroll", pct: 12, value: "3", emphasis: "brand" }] });
-});
-route("GET /api/v1/ai/history", (req) => paged(TURNS, req, { search: (t) => [t.question, t.sources] }));
-route("DELETE /api/v1/ai/history", () => {
-  TURNS.length = 0;
-  return noContent();
-});

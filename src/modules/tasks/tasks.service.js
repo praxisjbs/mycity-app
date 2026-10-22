@@ -1014,7 +1014,9 @@ async function repeatOne(id, cal, now = new Date()) {
     const today = lagos.today(now);
     const dueDay = t.due_at ? lagos.dateOf(new Date(t.due_at)) : today;
     const lastDay = dueDay < today ? lagos.addDays(today, -1) : dueDay;
-    const day = recurrence.nextDay(t.recurrence, lastDay, cal);
+    let day = recurrence.nextDay(t.recurrence, lastDay, cal);
+    // Caught up after today's close: the next copy is the one still ahead, never one already late.
+    for (let i = 0; i < 31 && new Date(recurrence.dueInstant(day, cal)) <= now; i += 1) day = recurrence.nextDay(t.recurrence, day, cal);
     const { number } = await numbering.allocate(client, "task");
     const childId = await repo.insert(client, {
       number,

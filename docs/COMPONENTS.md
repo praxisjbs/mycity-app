@@ -3635,10 +3635,12 @@ Speak instead of typing: records, sends the audio to be transcribed, and drops t
 | `onTranscript` | `(text: string) => void` | yes | Called with the words once they arrive. |
 | `maxSeconds` | `number` |  | The longest recording taken, in seconds; 120 unless set. |
 | `disabled` | `boolean` |  | Nothing can be recorded (the form is closed, or the browser refused the microphone). |
+| `compact` | `boolean` |  | The microphone alone, for a message box beside its Send: Record and Stop are icon buttons, the time shows while it records, and a problem is a toast. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
 <VoiceField label="Comments" transcribe={api.transcribe} onTranscript={(text) => f.set("comments", text)} />
+<VoiceField compact label="Question" transcribe={transcribe} onTranscript={setText} />
 ```
 
 ### Wizard

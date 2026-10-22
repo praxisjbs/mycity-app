@@ -7,6 +7,9 @@
  *                their Overview paints them: the cards they may see, each in their scope
  *   team.today   today's roster as the asker's Team tab lists it, a page of 25 in their
  *                `home` scope; an empty page for someone without `home.team`
+ *   activity.list   a day's Activity Today (today unless a date is given), by its allow-list
+ *                and the asker's scope on each module it comes from; one person's with
+ *                `employee_id` or a name in `q`; a page of 25, each event cited as its record
  *
  * Every login holds `home` view, which is all the assistant checks, so nothing here reads
  * past what the asker's own screen shows: who may see each card, and who may open the Team
@@ -18,6 +21,7 @@ const c = require("@mycity/contract");
 const { defineManifest } = require("../../shared/ai/manifest");
 const service = require("./dashboard.service");
 const team = require("./dashboard.team");
+const activity = require("./dashboard.activity");
 
 module.exports = defineManifest({
   module: "home",
@@ -38,11 +42,20 @@ module.exports = defineManifest({
       run: (client, params, actor) => team.forAssistant(client, actor, params),
       cite: (row) => ({ type: "employee", id: row.employee.employee_id, label: row.employee.display_name }),
     },
+    {
+      key: "activity.list",
+      description: "List a day's events as my Home's Activity Today shows them, today unless dated: who did what and who it was about; one person's by employee_id or a name in q",
+      params: c.dashboard.HomeActivityQuery,
+      permission: ["home", "view"],
+      run: (client, params, actor) => activity.forAssistant(client, actor, params),
+      cite: (row) => ({ type: row.entity_type, id: row.entity_id, label: row.subject || row.actor_name }),
+    },
   ],
   routes: [
     { intent: "choose the cards on my Home", screen: "home.overview" },
     { intent: "see who has clocked in today, by status", screen: "home.overview", params: { kpi: "attendance_today" } },
     { intent: "see the requests waiting on my approval", screen: "home.overview", params: { kpi: "approvals_awaiting_you" } },
     { intent: "see my team's attendance", screen: "home.team" },
+    { intent: "see what happened today", screen: "home.overview" },
   ],
 });

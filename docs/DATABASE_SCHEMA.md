@@ -534,12 +534,14 @@ it back (`docs/guides/ai-control.md` §4, §6.5) · `10290` seed: the `ai_contro
 the mailbox's mail AI, brought forward (`docs/guides/mailbox.md` §1.1, §4): `mail_thread_summary`
 (Summarise Thread's answer, one row per conversation, kept until its newest message changes: the
 gist, up to five key points and things asked of the owner, the message count and newest message it
-covered, its AI run).
+covered, its AI run) · `10310` Praxis AI's Ask and History (`docs/guides/praxis-ai.md` §4):
+`ai_conversation` gains `last_asked_at` and `questions`; `ai_message` gains `rows_read`, `module_key`
+and a CHECK on `role`; `ai_message_citation` gains `entity_type`, `entity_id`, `read_key` and
+`position`, so a citation names a database record and keeps the answer's order.
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).
 - Article audiences by role and department; MyCity's categories (SOPs, FAQs, Training).
-- Citations of a database record, not only an article or a document (MILESTONES §15).
 - The embedding dimension, fixed to the model `services/ai` uses, and its vector index.
 
 ### M11 Handover · 11000 to 11999 · TB

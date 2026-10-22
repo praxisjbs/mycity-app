@@ -990,7 +990,7 @@ This keeps a broad question from timing out the AI call or the request behind it
 | M2 | `prompts/review-cleanup.md` (`transcription.js` came early, 20/10/2026: Groq, then Gemini, then the browser's captions, `docs/guides/integrations.md` §6.14; keys on Settings · Integrations) | `complete()`, ledger |
 | M4 | `prompts/jd-draft.md`, `prompts/cv-screen.md` | structured output, provisional flag |
 | M7 | `prompts/proposal-draft.md`, `prompts/mou-draft.md` | same |
-| M10 | `services/ai/assistant/` (retrieve, choose reads, answer, cite), embeddings with pgvector, spend screen | catalogue, authorise, cite, ledger, governance |
+| M10 | `services/ai/assistant/` (choose reads, answer, cite; `docs/guides/praxis-ai.md`), the Knowledge Hub's search read on its embeddings with pgvector, spend screen | catalogue, authorise, cite, ledger, governance, `converse()` |
 
 ---
 

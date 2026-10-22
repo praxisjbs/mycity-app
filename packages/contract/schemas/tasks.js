@@ -360,6 +360,22 @@ const TaskCreate = z
   .superRefine(commitmentProblems);
 
 /**
+ * What a screen button may fill on New Task through the address (docs/guides/praxis-ai.md
+ * §6.4): the fields the form shows, each optional and checked on its own. The person still
+ * presses Create Task.
+ */
+const TaskPrefill = z
+  .object({
+    title: text(200).optional(),
+    description: optionalText(2000),
+    priority: TaskPriority.optional(),
+    cadence: TaskCadence.optional(),
+    due_on: isoDate.optional(),
+    primary_assignee_id: uuid.optional(),
+  })
+  .strict();
+
+/**
  * PATCH /tasks/:id. The assignee may change the notes and priority of their own task;
  * the title, due day, cadence, assignee, KPI and record belong to the setter (§6).
  * `null` clears an optional link.
@@ -612,6 +628,10 @@ const TABLES = {
     table: "task",
     virtual: { due_on: "written to task.due_at: the end of that working day, Africa/Lagos" },
   },
+  TaskPrefill: {
+    table: "task",
+    virtual: { due_on: "written to task.due_at when the form is saved" },
+  },
   TaskEdit: {
     table: "task",
     virtual: { due_on: "written to task.due_at: the end of that working day, Africa/Lagos" },
@@ -685,6 +705,7 @@ module.exports = {
   TaskSummaryQuery,
   TaskSummary,
   TaskCreate,
+  TaskPrefill,
   TaskEdit,
   TaskMove,
   TaskBlock,

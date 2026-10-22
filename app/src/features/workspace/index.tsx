@@ -19,14 +19,16 @@ export { TaskForm } from "./TaskForms";
 export default function Workspace({ tab, id }: ModuleScreenProps) {
   const [params, setParams] = useSearchParams();
   const modal = useModal();
-  /* Deep link from Home's New button or the assistant: /workspace?tab=tasks&new=1&title=… (&commitment=1) */
+  /*
+   * Deep link from Home's New button or the assistant: /workspace?tab=tasks&new=1&title=… (&commitment=1).
+   * The form reads its own fields from the address (TaskPrefill, CalendarEventPrefill).
+   */
   useEffect(() => {
     if (params.get("new") !== "1") return;
-    const title = params.get("title") ?? "";
     const commitment = params.get("commitment") === "1";
-    setParams({ new: null, title: null, commitment: null }, { replace: true });
-    if (tab === "calendar") modal.open({ title: "New Event", body: (close) => <EventForm close={close} title={title} /> });
-    else modal.open({ title: commitment ? "New Commitment" : "New Task", body: (close) => <TaskForm close={close} title={title} commitment={commitment} /> });
+    setParams({ new: null, commitment: null }, { replace: true });
+    if (tab === "calendar") modal.open({ title: "New Event", body: (close) => <EventForm close={close} /> });
+    else modal.open({ title: commitment ? "New Commitment" : "New Task", body: (close) => <TaskForm close={close} commitment={commitment} /> });
   }, [params, setParams, modal, tab]);
   if (tab === "tasks") return <Tasks openId={id} />;
   if (tab === "calendar") return <CalendarTab />;

@@ -4,7 +4,7 @@
  * from China, so only work that carries no personal data may be sent to it
  * (docs/guides/ai-control.md decision 23). Called from services/ai/ only.
  */
-const { VendorError, request } = require("./http");
+const { VendorError, request, chatMessages, chatResult } = require("./http");
 
 const BASE_URL = "https://api.deepseek.com";
 
@@ -23,15 +23,19 @@ async function listModels({ apiKey, timeoutMs = 20_000, fetchImpl }) {
 }
 
 /**
- * One chat completion.
- * @param {{apiKey: string, model: string, messages: Array<{role: string, content: string}>,
+ * One chat completion, with tools when they are given (DeepSeek's API takes OpenAI's).
+ * @param {{apiKey: string, model: string, messages: Array<object>, tools?: Array<object>|null,
  *          maxTokens?: number, temperature?: number, timeoutMs?: number, fetchImpl?: typeof fetch}} req
- * @returns {Promise<{text: string, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}>}
+ * @returns {Promise<{text: string, toolCalls: Array, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}>}
  */
-async function complete({ apiKey, model, messages, maxTokens, temperature = 0.2, timeoutMs = 60_000, fetchImpl }) {
+async function complete({ apiKey, model, messages, tools = null, maxTokens, temperature = 0.2, timeoutMs = 60_000, fetchImpl }) {
   if (!apiKey) throw new VendorError("deepseek: no API key", "config");
-  const body = { model, messages, temperature };
+  const body = { model, messages: chatMessages(messages), temperature };
   if (maxTokens) body.max_tokens = maxTokens;
+  if (tools && tools.length) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
   const { data } = await request("deepseek", `${BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { ...auth(apiKey), "Content-Type": "application/json" },
@@ -39,17 +43,7 @@ async function complete({ apiKey, model, messages, maxTokens, temperature = 0.2,
     timeoutMs,
     fetchImpl,
   });
-  const choice = (Array.isArray(data.choices) && data.choices[0]) || {};
-  const msg = choice.message || {};
-  return {
-    text: typeof msg.content === "string" ? msg.content : "",
-    usage: {
-      input_tokens: Number(data.usage && data.usage.prompt_tokens) || 0,
-      output_tokens: Number(data.usage && data.usage.completion_tokens) || 0,
-    },
-    model: data.model || model,
-    finish_reason: choice.finish_reason || null,
-  };
+  return chatResult(data, model);
 }
 
 module.exports = { name: "deepseek", BASE_URL, listModels, complete };

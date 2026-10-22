@@ -20,5 +20,5 @@ module.exports = defineManifest({
       cite: (row) => ({ type: row.item_kind === "event" ? "calendar_event" : row.item_kind === "task" ? "task" : "leave_request", id: row.item_id, label: row.title }),
     },
   ],
-  routes: [{ intent: "book a meeting", screen: "workspace.calendar", params: { new: "1" }, prefill: c.calendar.CalendarEventCreate }],
+  routes: [{ intent: "book a meeting", screen: "workspace.calendar", params: { new: "1" }, prefill: c.calendar.CalendarEventPrefill }],
 });

@@ -5,11 +5,12 @@
 import { useEffect, useState } from "react";
 import type { CalendarEvent, CalendarItem } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
+import calendar from "@mycity/contract/schemas/calendar.js";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { ColleaguePicker } from "@/features/shared/pickers";
 import { useRouter, useSearchParams } from "@/lib/router";
-import { useScreenAction } from "@/shell/screen-action";
+import { useAddressPrefill, useScreenAction } from "@/shell/screen-action";
 import {
   Button,
   Calendar,
@@ -22,6 +23,7 @@ import {
   formatTime,
   FormFooter,
   Grid,
+  IconButton,
   KeyValue,
   LoadingRows,
   monthName,
@@ -34,8 +36,10 @@ import {
   TimeField,
   toast,
   todayIso,
+  Tooltip,
   useContractForm,
   useModal,
+  zoneClock,
 } from "@mycity/ui";
 import { say } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
@@ -139,6 +143,7 @@ export function CalendarTab() {
   const monday = mondayOf(anchor);
   const title = view === "month" ? `${monthName(Number(month.slice(5, 7)) - 1)} ${month.slice(0, 4)}` : view === "week" ? `Week of ${formatDate(monday)}` : formatDate(anchor);
   const loading = here.loading && !here.rows.length;
+  const unit = view === "month" ? "Month" : view === "week" ? "Week" : "Day";
 
   return (
     <>
@@ -147,10 +152,15 @@ export function CalendarTab() {
         sub={title}
         actions={
           <>
+            {/* Today stands apart; the arrows beside it step by the view, not by a day. */}
+            <Tooltip label={zoneClock(new Date(), "Africa/Lagos").day}>
+              <Button onClick={() => setAnchor(today)}>Today</Button>
+            </Tooltip>
+            <span className="flex items-center">
+              <IconButton icon="left" label={`Previous ${unit}`} onClick={() => step(-1)} />
+              <IconButton icon="right" label={`Next ${unit}`} onClick={() => step(1)} />
+            </span>
             <SegmentedControl label="Calendar View" value={view} onChange={setView} options={[["month", "Month"], ["week", "Week"], ["day", "Day"]]} />
-            <Button onClick={() => step(-1)} aria-label="Previous" icon="left" />
-            <Button onClick={() => setAnchor(today)}>Today</Button>
-            <Button onClick={() => step(1)} aria-label="Next" icon="right" />
             <Button variant="primary" icon="plus" onClick={add}>New Event</Button>
           </>
         }
@@ -257,16 +267,19 @@ function EventPanel({ id, close }: { id: string; close: () => void }) {
 /** Lagos wall clock on a day → the instant on the wire. */
 const lagosInstant = (day: string, hm: string) => new Date(`${day}T${hm}:00+01:00`).toISOString();
 
-function EventForm({ close, title = "", day = "", event }: { close: () => void; title?: string; day?: string; event?: CalendarEvent }) {
+function EventForm({ close, day = "", event }: { close: () => void; day?: string; event?: CalendarEvent }) {
   const [who, setWho] = useState<PersonRef[]>(event ? event.attendees.map((a) => a.employee) : []);
+  // A new event takes what the address names (the assistant, Home's New button); a start with no end is an hour long.
+  const filled = useAddressPrefill(calendar.CalendarEventPrefill, !event);
+  const ends = filled.ends_at ?? (filled.starts_at ? new Date(Date.parse(filled.starts_at) + 3_600_000).toISOString() : undefined);
   const f = useContractForm(
     {
-      title: event?.title ?? title,
-      day: event ? lagosDay(event.starts_at) : day,
-      start: event ? lagosClock(event.starts_at) : "10:00",
-      end: event ? lagosClock(event.ends_at) : "11:00",
-      event_type: (event?.event_type ?? "meeting") as string,
-      location: event?.location ?? "",
+      title: event?.title ?? filled.title ?? "",
+      day: event ? lagosDay(event.starts_at) : filled.starts_at ? lagosDay(filled.starts_at) : day,
+      start: event ? lagosClock(event.starts_at) : filled.starts_at ? lagosClock(filled.starts_at) : "10:00",
+      end: event ? lagosClock(event.ends_at) : ends ? lagosClock(ends) : "11:00",
+      event_type: (event?.event_type ?? filled.event_type ?? "meeting") as string,
+      location: event?.location ?? filled.location ?? "",
       visibility: (event?.visibility ?? "attendees") as string,
       remind: event ? (event.reminder_minutes[0] !== undefined ? String(event.reminder_minutes[0]) : "") : "15",
     },
