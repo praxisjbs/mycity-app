@@ -193,7 +193,7 @@ async function getFor(id, scope, actor = null) {
   return {
     ...toTask(row),
     can_edit: true,
-    can_reassign: manage && !approved,
+    can_reassign: manage,
     can_cancel: manage && row.status !== "cancelled" && !approved,
     set_status: row.set_status || null,
     rescope,
