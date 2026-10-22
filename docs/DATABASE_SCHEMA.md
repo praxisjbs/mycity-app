@@ -313,10 +313,12 @@ and scores; improvement plans and their lines; commitments on `task` and `commit
 summaries · `2190` seed: the five Performance capabilities and their holders, the four flows, the code
 lists · `2200` the statuses an organisational goal (`active`, `closed`; active by default) and a
 scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance PR 2) · `2290` seed: the
-`goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired).
+`goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired) ·
+`2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
+missed commitment's Recovery task (Performance PR 4).
 
 **Owes:**
-- PRs 3 to 5 of `docs/guides/performance.md` use 2300 to 2599 only for a gap. The numbers 2020, 2030 and
+- PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and
   2091 were used on a withdrawn branch and are not reused.
 - Status CHECKs on `performance_cycle` and `performance_review` (Home's staging rows still hold the old
   values): PR 3, once its staging seed has replaced those rows.

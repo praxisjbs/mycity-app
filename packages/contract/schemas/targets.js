@@ -18,7 +18,7 @@
 const { z } = require("zod");
 const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
-const { Link } = require("./tasks");
+const { Link, CommitmentState, CommitmentSetStatus, CommitmentRecoveryRef } = require("./tasks");
 const { ScoreValue, Quantity, Direction, Rating } = require("./scoring");
 const { MonthStart } = require("./kpis");
 
@@ -278,9 +278,6 @@ const ScorecardImportRow = z
  * Commitments (PR 4)
  * ------------------------------------------------------------------ */
 
-const CommitmentState = z.enum(["awaiting_approval", "due", "on_time", "late", "missed", "rescoped"]);
-const CommitmentSetStatus = z.enum(["draft", "submitted", "approved", "returned"]);
-
 /** A month as the commitments routes name it: "2026-11". */
 const MonthKey = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "must be a month as YYYY-MM");
 
@@ -297,15 +294,52 @@ const Commitment = z
     original_due_at: isoDateTime.nullable(),
     completed_at: isoDateTime.nullable(),
     rescoped_at: isoDateTime.nullable(),
+    rescope_reason: z.string().nullable(),
     commitment_set_id: uuid.nullable(),
     set_status: CommitmentSetStatus.nullable(),
     state: CommitmentState,
+    rescope_pending: z.boolean(),
+    recovery: CommitmentRecoveryRef.nullable(),
     employee_target_id: uuid.nullable(),
     link: Link.nullable(),
   })
   .strict();
 
 const CommitmentPage = Paged(Commitment);
+
+/** GET /performance/commitments/summary: the Commitments view's figures for one month. */
+const CommitmentSummaryQuery = z
+  .object({
+    month: MonthKey,
+    department_id: uuid.optional(),
+    employee_id: uuid.optional(),
+  })
+  .strict();
+
+/** A month's commitments by state, within the reader's scope (performance.md §6.11). */
+const CommitmentSummary = z
+  .object({
+    month: MonthStart,
+    commitments: z.number().int().min(0),
+    awaiting_approval: z.number().int().min(0),
+    due: z.number().int().min(0),
+    on_time: z.number().int().min(0),
+    late: z.number().int().min(0),
+    missed: z.number().int().min(0),
+    rescoped: z.number().int().min(0),
+  })
+  .strict();
+
+/** POST /performance/commitments/:id/rescope: why the commitment cannot be delivered as agreed. */
+const CommitmentRescope = z.object({ reason: text(500) }).strict();
+
+/** POST /performance/commitments/:id/recovery: who recovers a missed commitment, and by when. */
+const CommitmentRecovery = z
+  .object({
+    primary_assignee_id: uuid,
+    due_on: isoDate,
+  })
+  .strict();
 
 /** GET /performance/commitments */
 const CommitmentListQuery = listQuery(
@@ -332,6 +366,24 @@ const CommitmentSet = z
     task_count: z.number().int().min(0),
   })
   .strict();
+
+/** A set as Waiting On You and My Commitments list it: its person, and why it came back. */
+const CommitmentSetRow = CommitmentSet.extend({
+  employee: PersonRef,
+  returned_reason: z.string().nullable(),
+}).strict();
+const CommitmentSetPage = Paged(CommitmentSetRow);
+
+/** GET /performance/commitments/sets */
+const CommitmentSetListQuery = listQuery(
+  {
+    month: MonthKey.optional(),
+    employee_id: uuid.optional(),
+    status: CommitmentSetStatus.optional(),
+    waiting_on_me: z.enum(["true", "false"]).optional(),
+  },
+  ["submitted_at", "employee"],
+);
 
 /** POST /performance/commitments/sets/:employee_id/:month/submit */
 const CommitmentSetParams = z.object({ employee_id: uuid, month: MonthKey }).strict();
@@ -414,9 +466,28 @@ const TABLES = {
       employee: "the person in task.primary_assignee_id",
       set_status: "commitment_set.status",
       state: "worked out (§6.11) from the set, the dates and completion",
+      rescope_pending: "a pending performance.commitments instance over the task",
+      recovery: "the task whose entity_type is task and entity_id this commitment",
       link: "linkFor(\"task\", task_id)",
     },
   },
+  CommitmentSummaryQuery: { table: null, reason: "which month, function and person the figures cover" },
+  CommitmentSummary: { table: null, reason: "counts over task by commitment state" },
+  CommitmentRescope: { table: null, reason: "the reason a rescope is asked, kept on its workflow instance" },
+  CommitmentRecovery: {
+    table: "task",
+    virtual: { due_on: "written to the Recovery task's due_at: the end of that working day, Africa/Lagos" },
+  },
+  CommitmentSetRow: {
+    table: "commitment_set",
+    virtual: {
+      task_count: "how many commitments it holds, counted",
+      employee: "the person in commitment_set.employee_id",
+      returned_reason: "the reason of the decision that returned it",
+    },
+  },
+  CommitmentSetPage: { table: null, reason: "a page of commitment sets" },
+  CommitmentSetListQuery: { table: null, reason: "list controls and filters for the sets" },
   CommitmentPage: { table: null, reason: "a page of commitments" },
   CommitmentListQuery: { table: null, reason: "list controls and filters for the commitments" },
   CommitmentSet: {
@@ -461,7 +532,14 @@ module.exports = {
   Commitment,
   CommitmentPage,
   CommitmentListQuery,
+  CommitmentSummaryQuery,
+  CommitmentSummary,
+  CommitmentRescope,
+  CommitmentRecovery,
   CommitmentSet,
+  CommitmentSetRow,
+  CommitmentSetPage,
+  CommitmentSetListQuery,
   CommitmentSetParams,
   CommitmentReportRequest,
 };

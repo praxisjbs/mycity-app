@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 3 | 1 | 6 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 2 | 1 | 7 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
-| **Total** | **99** | **45** | **1** | **53** | **0** | **0** |
+| **Total** | **99** | **44** | **1** | **54** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -743,13 +743,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 22/10/2026 · TB · My Workspace (#4 to #7), Performance PR 4 built (`docs/guides/performance.md` §6.11, §6.18; `workspace.md`): Tasks marks a task as a Commitment (Acceptance Criteria, Month, a due date in it), sends the month with Send Commitments, and shows a commitment's state, original date, Rescope Commitment, a rescope's decision and Set Recovery on its panel; an approved commitment's mark, month and criteria are fixed and it cannot be cancelled; Counts Towards picks one of the assignee's scorecard lines or key results, and a key result's initiatives name it on the board; Today has My Week (Done This Week, Planned Next Week, Blocked, Support Needed, Tidy With AI with Use Summary) and Team This Week for managers, the weekly tracker retired; the calendar shows performance dates. Migration 2400, staging seed `47_performance_commitments.js`, integration tests on the real migrations. Left: nothing on these four; check-in and review dates fill the calendar once Performance PR 3 opens rounds.
 - 22/10/2026 · TB · My Workspace (#4 to #7): Performance PR 4 (`docs/guides/performance.md` §1.2) will add commitments (a task marked Commitment, approved monthly, its original date fixed), Counts Towards a scorecard line or key result, key results' initiatives as tasks, My Week and Team This Week on Today in place of the weekly tracker, and performance dates on the calendar; `workspace.md` is brought up to it in that PR. Nothing changed yet.
 - 21/10/2026 · AJ · My Workspace (#4 to #7), the CI run after the second merge with `main` (7 failures in 4 suites, all from Workspace meeting `main`'s tests): Settings · Documents & Numbering lists 23 schemes, 3 resetting (Project and Task added; `settings.test.js`); `task-recurrence` is on the worker's scheduler list (`worker.test.js`); New Event no longer answers "invite", which is Invite User's (`search.test.js`); the Workspace seed takes the run's date as Home's does, sets Operations and the head's first report an overdue task and puts this week's meetings on its Monday, so Home's seed tests read them on their fixed day (`home-staging-seed.test.js`). Settings and search pass here on PGlite; worker and Home's seed suites take longer than this harness allows, checked by what they read; CI decides.
 - 21/10/2026 · AJ · My Workspace (#4 to #7) after the merge with `main`: a task due on a day off failed to save (the working week now keeps no hours for a day off, and `shared/time/working-week.js` loadCalendar hands that back as the text "null"; GE to look at the loader), so a day with no closing time now closes at 17:00 (`tasks.recurrence.js`, with a unit test). An event's Location is marked `address:none` for gate 22 (a room or call link, not an address). Checks, backend and frontend groups pass (typecheck, lint, 359 app tests, build, no mock); the workspace, home-schema and home-team integration suites pass on PGlite, bar the known Postgres 17 error code in home-schema; the staging seed lands and re-runs clean. Not run here: Home's overview and staging-seed suites and the browser screen gates (CI).
@@ -764,7 +765,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
-| 10 | My Performance | `my-performance` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 10 | My Performance | `my-performance` | M2 | TB | ☐ | ☐ | ☐ | In progress | 22/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
@@ -777,6 +778,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 22/10/2026 · TB · My Performance (#10), Performance PR 4: My Commitments (this month's commitments, their state and original date, Send Commitments while some are not sent, a row opening its task) is on the page, a card on desktop and an icon card on a phone. Left: the rest of the page, its API and its ticks, Performance PR 3.
 - 22/10/2026 · TB · My Attendance (#9) and Work Location Requests (#87), the Attendance policy's Home Location switch (`docs/guides/attendance.md` §1.3, TB's ten answers after the Milestone 1 handover; off by default and on every version before it): while it is off there is no Home Location card, the clock panel asks for no location on a day from home (Clock Location reads Not Checked, no Set Home banner) and the punch keeps none, and Add Work Site leaves Temporary Home out of the purposes. Switched on, everyone who needs a home and has none is pushed once, Set your home location, which opens the sheet (`?home=`). My Profile's Home Address is unchanged. Left: MyCity told it ships off; TB to confirm the Working From Home sentence.
 - 21/10/2026 · TB · My Leave (#12), faults #1 and #2 of the 21/10 System Health brief (the server refused LEAVE_SPANS_YEARS and LEAVE_IN_THE_PAST after Send Request): Request Leave's types read what is left of the First Day's year ("Annual · 12 days left", from `GET /ess/leave/balances?year=`), a Last Day in another year reads "Ends in another year" as it is typed (`schemas/leave.js`, for Record Leave too), and a typed day before today "Pick 21/10/2026 or later" at once (the shared `DateField`, M0 note). Tests: `app/src/features/people/Leave.test.tsx`, `leave.test.js`, `tests/integration/leave.test.js`. Left: nothing.
 - 21/10/2026 · TB · My Attendance (#9): My Days as a chart labels each day 13/10 (it read 13/10/, with a
@@ -996,7 +998,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
-| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☐ | ☐ | In progress | 22/10/2026 |
+| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 32 | Reviews | `reviews` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 | 33 | Analytics | `analytics` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
@@ -1009,11 +1011,12 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 1 · Foundation | `m2/perf-foundation` | Department names and seats, department heads, the whole schema, contract and scoring library, business days, the second-level approver, the four flows, capabilities, quarters and rules, screens laid out, the mock | none | Built | 22/10/2026 |
 | 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards and the contribution check, the quarter plan and its approval, agreement, target changes, the three importers; Goals, Scorecards, KPIs | PR 1 | Built | 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, the review chain, conduct, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews, ESS · My Performance | PR 2 | Not started | |
-| 4 · Workspace | `m2/perf-workspace` | Commitments and their view, the month-end report, Counts Towards, initiatives, the weekly summary, performance dates on the calendar, My Commitments | PR 2 | Not started | |
+| 4 · Workspace | `m2/perf-workspace` | Commitments and their view, the month-end report, Counts Towards, initiatives, the weekly summary, performance dates on the calendar, My Commitments | PR 2 | Built | 22/10/2026 |
 | 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard, the Team roster's score; the demo walk | PR 2 | Not started | |
 
 **Notes**
 
+- 22/10/2026 · TB · Performance PR 4 (Workspace) built: commitments as Workspace tasks sent as a month and approved through `performance.commitments` (the reviewer, or the CEO for a head; a month sent by its own reviewer approved as sent), original dates fixed on approval, Rescope by the same flow, states worked out on every read, Set Recovery for a missed one, the `commitments_due` reminder; the Commitments view on Scorecards (#30) with the month, filters and search kept in the address, the figures, Waiting On You with Approve Month and Request Changes, rows opening their task and Back returning, and Export Report (the month-end delivery report per function); Counts Towards; My Week and Team This Week with Tidy With AI (`week-summary`, Default, TB 22/10/2026); performance dates on the calendar; My Commitments on ESS · My Performance (#10); ⌘K New Commitment; the staging seed. Scorecards (#30) built on both shells. Left: PRs 3 and 5; a commitment set opens no page of its own (`search:none`).
 - 22/10/2026 · TB · Performance PR 2 review fixes: plan approval binds scorecards and schedules agreement reminders; approved target changes apply to lines and re-propose key results; TBC targets unscored until locked; confirmed scores reach Scored From company key results; role reviewers agree; plan detail and lists honour scope; import reverts refused once used; Report Month per function with recovery fields when the score needs them; Edit Lines keeps every field; Goals and KPIs figures counted on the server; Change Target, Edit KPI and Record Actual follow the API. Left: PRs 3, 4 and 5.
 - 22/10/2026 · TB · Performance PR 2 (Plan) built: organisational goals (the CEO; quarterly targets), the OKR tree for the company and each function (codes G1, links to company key results, Scored From, owner and co-owner, TBC, the trace), Report Month for a function's key results and KPIs in one save with Recovery below 0.4 and Confirm Score for the CEO, KPIs with monthly Met, Not Met or N/A, scorecards (Accountability lines prefilled, Copy Last Quarter or a colleague's, reviewer override with a reason, dotted line), the contribution check, the quarter plan and `performance.plan` (binding on the CEO's approval with its scorecards), one-tap agreement with its daily reminder, target changes to the CEO and the `targets-lock` job; importers `okr_workbook`, `okr_kpis` and `scorecards` reading MyCity's workbooks as they are (the import engine's new `extract` hook); staging loads MyCity's Q4 2026 plan through them and Home's forward goal and target rows are gone; Home's goals adapter lists a person's lines once their scorecard binds. Goals (#29) and KPIs (#31) built on both shells; Scorecards (#30) has its Scorecards view and a scorecard, the Commitments view is PR 4. Left: PRs 3, 4 and 5 in parallel.
 - 22/10/2026 · TB · Performance PR 1 (Foundation) built: MyCity's five departments, the chart's titles and seven vacant seats kept true by the staff loader (`seeds/staff/nomenclature.json`, renamed in place on staging and production); department heads; migration 2100 (every table of the guide's §4) and seed 2190 (capabilities, the four flows, code lists); the whole contract (`goals`, `kpis`, `targets`, `reviews`, `scoring`, and additions to `ess`, `tasks`, `calendar`, `workspace`, `organisation`) and the scoring library with the workbooks' tests; business days; the named-person approver on Settings · Approvals; the quarters API; the record types and ⌘K over key results, objectives and goals; Performance · Targets labelled Scorecards (#30); the screens split one file per tab and ESS · My Performance composed of its parts, behaviour unchanged; the mock in the contract's shapes. No screen ticked. Left: PR 2, then PRs 3 to 5.

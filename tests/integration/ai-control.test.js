@@ -217,12 +217,12 @@ describeDb("AI Control against the real migrations", () => {
       ]);
       expect(by.embeddings.chain.links.map((l) => [l.model, l.state])).toEqual([["text-embedding-3-small", "not_set_up"]]);
       expect(by.top_tier.chain.links.map((l) => l.model)).toEqual(["gemini-2.5-pro", "claude-sonnet-5-5"]);
-      expect(by.default.actions).toBe(1); // Tidy Policy; Data Answers has its own chain
+      expect(by.default.actions).toBe(2); // Tidy Policy and Week Summary; Data Answers has its own chain
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
       const res = await as("admin").get("/ai-control/actions");
-      expect(res.body.data.map((a) => a.key)).toEqual(["voice-note-transcription", "policy-tidy", "data-answers", "find-prices"]);
+      expect(res.body.data.map((a) => a.key)).toEqual(["voice-note-transcription", "policy-tidy", "data-answers", "find-prices", "week-summary"]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
       expect(by["data-answers"]).toMatchObject({ job: "default", built: false, own_chain: true, personal_data: true, chosen_by: "TB" });
       expect(by["data-answers"].chain.links.map((l) => l.model)).toEqual(["gemini-3.8-flash", "gemini-2.5-pro"]);

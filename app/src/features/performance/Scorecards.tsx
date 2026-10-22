@@ -2,7 +2,8 @@
  * Performance · Scorecards (the `targets` tab; docs/guides/performance.md §2, §3.3, §6.5, §6.6,
  * §10): each person's quarter scorecard. The list with its figures and filters; New Scorecard for
  * a manager; a scorecard's sections and lines with Edit Lines, Change Reviewer, Agree Scorecard and
- * Disagree With Reason. PR 4 adds the Commitments view beside it (Commitments.tsx).
+ * Disagree With Reason. The Scorecards and Commitments switch opens the Commitments view beside it
+ * (Commitments.tsx; `?view=commitments`, or `?set=` from an approval's link).
  */
 import { useState } from "react";
 import targetsContract from "@mycity/contract/schemas/targets.js";
@@ -14,6 +15,7 @@ import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { PagedTable } from "@/features/shared/sections";
+import { useSearchParams } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -30,6 +32,7 @@ import {
   HelpTerm,
   KeyValue,
   PageHeader,
+  SegmentedControl,
   SelectField,
   StatusPill,
   TextField,
@@ -38,13 +41,33 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
+import { Commitments } from "./Commitments";
 import { cardStatus, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
 const AUTO = new Set(["key_result", "team_result", "function_kpi", "commitments", "update_on_time", "team_reviews", "tasks"]);
 
+/** The Scorecards and Commitments switch; the view lives in the address. */
+function ViewSwitch({ view }: { view: "scorecards" | "commitments" }) {
+  const [, setParams] = useSearchParams();
+  return (
+    <SegmentedControl
+      value={view}
+      onChange={(v) => setParams({ view: v === "commitments" ? "commitments" : null, set: null }, { replace: true })}
+      options={[["scorecards", "Scorecards"], ["commitments", "Commitments"]]}
+    />
+  );
+}
+
 export function Scorecards() {
+  const [params] = useSearchParams();
+  const commitments = params.get("view") === "commitments" || Boolean(params.get("set"));
+  if (commitments) return <Commitments switcher={<ViewSwitch view="commitments" />} />;
+  return <ScorecardsView />;
+}
+
+function ScorecardsView() {
   const me = useMe();
   const modal = useModal();
   const quarter = useQuarter();
@@ -74,7 +97,12 @@ export function Scorecards() {
       <PageHeader
         title="Scorecards"
         sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined}
-        actions={mayDraft && period ? <Button variant="primary" icon="plus" onClick={newCard}>New Scorecard</Button> : undefined}
+        actions={
+          <>
+            <ViewSwitch view="scorecards" />
+            {mayDraft && period && <Button variant="primary" icon="plus" onClick={newCard}>New Scorecard</Button>}
+          </>
+        }
       />
       <Toolbar>
         <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
