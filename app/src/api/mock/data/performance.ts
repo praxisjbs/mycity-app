@@ -268,6 +268,8 @@ const card = (key: string, reviewer: string, lines: ScorecardLine[], score: stri
     contributions: [],
     can_edit: false,
     can_agree: false,
+    can_send: false,
+    amendment_instance_id: null,
   };
 };
 

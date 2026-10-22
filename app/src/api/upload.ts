@@ -31,6 +31,8 @@ function pretend({ endpoint, file, onProgress }: UploadOptions): Promise<Documen
         ...(endpoint.includes("/mailbox/") ? { attachment_id: id } : {}),
         /* A conversation's upload answers its MediaRef: the shape and sizes, none made on a laptop. */
         ...(endpoint.includes("/community/") ? { width: null, height: null, page_count: null, duration_ms: null, waveform: null, variants: [] } : {}),
+        /* A dictation answers its transcript beside the recording kept (docs/guides/performance.md §6.17). */
+        ...(endpoint.endsWith("/dictation") ? { transcript: "um two features move to november both are drafted and the venues are confirmed", ai_run_id: null } : {}),
         file_name: file.name,
         size_bytes: file.size,
         mime_type: file.type || "application/octet-stream",

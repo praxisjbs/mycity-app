@@ -1,100 +1,309 @@
 /**
- * Performance · Reviews: the interim screen, on the in-browser mock until its pull request lands.
- * PR 3 replaces this with the monthly round, Waiting On You, the list and a review (ReviewPage.tsx).
+ * Performance · Reviews (the `reviews` tab; docs/guides/performance.md §2, §3.3, §6.12, §10): the
+ * month's round. Its figures, Waiting On You, every review in scope with its stage, and the PIPs;
+ * Open Round and Close Round for Operations & People. A review opens in ReviewPage.tsx.
  */
+import { useEffect, useRef, useState } from "react";
+import reviewsContract from "@mycity/contract/schemas/reviews.js";
+import type { Pip, Review, Round } from "@mycity/contract/contract.gen.ts";
+import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import "@/api/types/performance";
-import type { ReviewRow } from "@/api/types/performance";
+import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { ChainCard, KvCard, PagedTable } from "@/features/shared/sections";
-import { Button, Card, CardHeader, DateField, Field, formatDate, FormFooter, Grid, IconButton, PageHeader, Quote, StatusPill, TextField, toast, useContractForm, useModal } from "@mycity/ui";
-import { person } from "./shared";
+import { PagedTable } from "@/features/shared/sections";
+import { useSearchParams } from "@/lib/router";
+import { hasCapability } from "@/shell/access";
+import { useScreenAction } from "@/shell/screen-action";
+import {
+  Button,
+  DataView,
+  DateField,
+  DesktopOnly,
+  Field,
+  FilterSelect,
+  formatDate,
+  formatMonth,
+  FormFooter,
+  KeyValue,
+  PageHeader,
+  PhoneOnly,
+  SegmentedControl,
+  SelectField,
+  StatusPill,
+  Sub,
+  TextAreaField,
+  toast,
+  Toolbar,
+  useContractForm,
+  useModal,
+} from "@mycity/ui";
+import { ReviewSheet } from "./ReviewPage";
+import { person, rating, reviewStatus, score, STAGE_OPTIONS, useQuarter } from "./shared";
+
+const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const KIND_OPTIONS: Array<[string, string]> = [["", "All Kinds"], ["monthly", "Monthly"], ["probation", "Probation"]];
+const PIP_STATUS: Record<Pip["status"], { tone: "ok" | "warn" | "err" | "neutral"; text: string }> = {
+  open: { tone: "warn", text: "Open" },
+  extended: { tone: "warn", text: "Extended" },
+  passed: { tone: "ok", text: "Passed" },
+  not_met: { tone: "err", text: "Not Met" },
+};
+
+/** What the reader does next on a review that waits on them. */
+const nextStep = (r: Review, me: string | null) =>
+  r.status === "with_reviewer" || r.status === "returned" ? (r.reviewer.employee_id === me ? "Score" : "Give Input") : "Approve";
 
 export function Reviews() {
+  const me = useMe();
   const modal = useModal();
-  const s = useApi("GET /api/v1/performance/reviews/summary");
-  const list = usePaged("GET /api/v1/performance/reviews");
+  const [params] = useSearchParams();
+  const quarter = useQuarter();
+  const manage = hasCapability(me, "performance.manage");
+  const rounds = usePaged("GET /api/v1/performance/rounds", { filters: { period_id: quarter.periodId }, enabled: Boolean(quarter.periodId) });
+  const [roundId, setRoundId] = useState("");
+  const round: Round | undefined = rounds.rows.find((r) => r.performance_cycle_id === roundId) ?? rounds.rows.at(-1);
+  const departments = useApi("GET /api/v1/departments", { query: {} });
+  const [view, setView] = useState<"reviews" | "pips">("reviews");
+  const [dept, setDept] = useState("");
+  const [stage, setStage] = useState("");
+  const [kind, setKind] = useState("");
+  const ready = Boolean(round);
+  const base = round ? { round_id: round.performance_cycle_id } : {};
+  const list = usePaged("GET /api/v1/performance/reviews", {
+    filters: { ...base, ...(dept ? { department_id: dept } : {}), ...(stage ? { status: stage as Review["status"] } : {}), ...(kind ? { kind: kind as Review["review_kind"] } : {}) },
+    enabled: ready,
+  });
+  const waiting = usePaged("GET /api/v1/performance/reviews", { filters: { ...base, waiting_on_me: "true" }, enabled: ready });
+  const pips = usePaged("GET /api/v1/performance/pips", { enabled: view === "pips" });
+  const closeRound = useMutation("POST /api/v1/performance/rounds/:id/close");
+
+  const reload = () => {
+    invalidate("/api/v1/performance/reviews");
+    invalidate("/api/v1/performance/rounds");
+    invalidate("/api/v1/performance/pips");
+  };
+  const openReview = (id: string) => modal.open({ title: "Review", wide: true, full: true, body: (close) => <ReviewSheet id={id} close={() => (close(), reload())} /> });
+  const openPip = (p: Pip) => modal.open({ title: "Improvement Plan", body: (close) => <PipSheet pip={p} manage={manage} close={() => (close(), reload())} /> });
+  const openRound = () => modal.open({ title: "Open Round", body: (close) => <OpenRoundForm periodId={quarter.periodId} months={quarter.period?.months ?? []} taken={rounds.rows.map((r) => r.month)} close={close} onOpened={(r) => (setRoundId(r.performance_cycle_id), reload())} /> });
+  const close = async () => {
+    if (!round) return;
+    try {
+      await closeRound.run({ params: { id: round.performance_cycle_id }, body: {} });
+      reload();
+      toast(`${round.name} closed`);
+    } catch (e) {
+      say(e);
+    }
+  };
+  useScreenAction(manage && quarter.period ? { label: "Open Round", onSelect: openRound } : null);
+
+  // A link to one review (a notification, ⌘K, Need You) opens it once.
+  const linked = params.get("id");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (linked && opened.current !== linked) {
+      opened.current = linked;
+      openReview(linked);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked]);
+
+  const c = round?.counts;
+  const withHr = c ? c.second_level + c.with_hr : 0;
+  const deptOptions: Array<[string, string]> = [["", "All Departments"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
+  const monthOptions: Array<[string, string]> = rounds.rows.map((r) => [r.performance_cycle_id, r.name]);
+
   return (
     <>
       <PageHeader
         title="Reviews"
-        sub={s.data ? `${s.data.cycle} cycle opens ${formatDate(s.data.opens_on)}` : " "}
+        sub={round ? `${round.name} · closes ${formatDate(round.close_due_on)}` : quarter.period?.name}
         actions={
-          <>
-            <Button icon="doc" onClick={() => modal.open({ title: "Review Form", body: <FormOutline /> })}>Review Form</Button>
-            <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "Open Cycle", body: (close) => <CycleForm close={close} /> })}>Open Cycle</Button>
-          </>
+          manage ? (
+            <>
+              {round?.status === "open" && <Button onClick={close}>Close Round</Button>}
+              {quarter.period && <Button variant="primary" icon="plus" onClick={openRound}>Open Round</Button>}
+            </>
+          ) : undefined
         }
       />
-      {s.data && (
+      <Toolbar>
+        <FilterSelect label="Month" value={round?.performance_cycle_id ?? ""} onChange={setRoundId} options={monthOptions} />
+        <SegmentedControl label="Reviews or PIPs" value={view} onChange={setView} options={[["reviews", "Reviews"], ["pips", "PIPs"]]} />
+      </Toolbar>
+      {view === "reviews" && (
         <>
-          <KpiTiles items={[{ label: "Cycle", value: s.data.cycle }, { label: "Opens", value: formatDate(s.data.opens_on) }, { label: "Last Cycle", value: s.data.last_cycle }, { label: "Average Rating", value: s.data.average_rating }]} />
-          <ChainCard steps={s.data.chain} note="The manager cannot see the form until the employee has submitted their own rating." />
+          {c && (
+            <>
+              <DesktopOnly>
+                <KpiTiles
+                  items={[
+                    { label: "Check-Ins In", value: `${c.total - c.check_in} of ${c.total}` },
+                    { label: "With Reviewers", value: String(c.with_reviewer), tone: c.with_reviewer ? "warn" : undefined },
+                    { label: "With HR", value: String(withHr) },
+                    { label: "Closed", value: String(c.closed), tone: c.closed ? "ok" : undefined },
+                  ]}
+                />
+              </DesktopOnly>
+              <PhoneOnly>
+                <Sub>{`${c.total - c.check_in} of ${c.total} in · ${c.closed} closed`}</Sub>
+              </PhoneOnly>
+            </>
+          )}
+          {waiting.rows.length > 0 && (
+            <DataView
+              className="mt-3"
+              title="Waiting On You"
+              rows={waiting.rows}
+              rowKey={(r) => r.performance_review_id}
+              onRowClick={(r) => openReview(r.performance_review_id)}
+              columns={[
+                { key: "employee", label: "Employee", render: (r) => person(r.employee) },
+                { key: "stage", label: "Stage", render: (r) => <StatusPill s={reviewStatus(r.status)} /> },
+                { key: "due", label: "Due", render: (r) => (r.due_on ? formatDate(r.due_on) : "–") },
+                { key: "next", label: "Next", render: (r) => nextStep(r, me.employee_id ?? null), desktop: true },
+              ]}
+            />
+          )}
+          <Toolbar>
+            <FilterSelect label="Department" value={dept} onChange={setDept} options={deptOptions} />
+            <FilterSelect label="Stage" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
+            <FilterSelect label="Kind" value={kind} onChange={setKind} options={KIND_OPTIONS} />
+          </Toolbar>
+          <PagedTable
+            title={round ? round.name : "Reviews"}
+            list={list}
+            search="Search People"
+            rowKey={(r) => r.performance_review_id}
+            noun="review"
+            onRowClick={(r) => openReview(r.performance_review_id)}
+            empty={{ title: round ? "No Reviews" : "No Round Yet" }}
+            columns={[
+              { key: "employee", label: "Employee", render: (r) => person(r.employee) },
+              { key: "reviewer", label: "Reviewer", render: (r) => r.reviewer.display_name, desktop: true },
+              { key: "stage", label: "Stage", render: (r) => <StatusPill s={reviewStatus(r.status)} /> },
+              { key: "due", label: "Due", render: (r) => (r.due_on ? formatDate(r.due_on) : "–") },
+              { key: "score", label: "Score", align: "n", render: (r) => score(r.score_month), desktop: true },
+              { key: "rating", label: "Rating", render: (r) => <StatusPill s={rating(r.rating)} />, desktop: true },
+            ]}
+          />
         </>
       )}
-      <PagedTable<ReviewRow>
-        title="Review History"
-        list={list}
-        search="Search people"
-        rowKey={(r) => r.review_id}
-        noun="review"
-        columns={[
-          { key: "emp", label: "Employee", render: (r) => person(r.employee) },
-          { key: "c", label: "Cycle", render: (r) => r.cycle },
-          { key: "self", label: "Self Rating", align: "n", render: (r) => r.self_rating ?? "Not yet" },
-          { key: "mgr", label: "Manager", align: "n", render: (r) => r.manager_rating ?? "Not yet" },
-          { key: "sec", label: "Second Level", render: (r) => r.second_level ?? "Not yet", desktop: true },
-          { key: "s", label: "Status", render: (r) => <StatusPill s={r.status} /> },
-        ]}
-      />
-      <Grid cols={2} className="mt-3">
-        <Card>
-          <CardHeader title="Dictate Your Answer" right={<StatusPill s={{ tone: "info", text: "AI assisted" }} />} />
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-muted p-3">
-            <IconButton icon="spark" label="Record an answer" className="rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" onClick={() => toast("Dictation opens when the review cycle starts")} />
-            <span className="text-2xs text-subtle-foreground">Tap to record your answer to “What went well this quarter?”</span>
-          </div>
-          <Quote className="mt-3">“We closed the Providus sponsorship and got the Lagos venues confirmed, but I was slow on the Eko follow-up.”</Quote>
-        </Card>
-        <FormOutlineCard />
-      </Grid>
+      {view === "pips" && (
+        <PagedTable
+          title="Improvement Plans"
+          list={pips}
+          search="Search People"
+          rowKey={(p) => p.improvement_plan_id}
+          noun="plan"
+          onRowClick={openPip}
+          empty={{ title: "No Improvement Plans" }}
+          columns={[
+            { key: "employee", label: "Employee", render: (p) => person(p.employee) },
+            { key: "starts", label: "Starts", render: (p) => formatDate(p.starts_on), desktop: true },
+            { key: "review", label: "Review On", render: (p) => formatDate(p.review_on) },
+            { key: "status", label: "Status", render: (p) => <StatusPill s={PIP_STATUS[p.status]} /> },
+          ]}
+        />
+      )}
     </>
   );
 }
 
-const OUTLINE: Array<[string, string]> = [
-  ["Section 1", "Rate each of your KPIs, with a comment"],
-  ["Section 2", "What went well this quarter"],
-  ["Section 3", "What did not, and why"],
-  ["Section 4", "What support you need"],
-  ["Section 5", "Your rating out of 5"],
-  ["Manager sees", "All of it, only after you submit"],
-  ["Second level", "The manager’s own line manager approves"],
-];
-const FormOutlineCard = () => <KvCard title="Review Form" items={OUTLINE} />;
-const FormOutline = () => <KvCard title="Quarterly Review" items={OUTLINE} />;
-
-function CycleForm({ close }: { close: () => void }) {
-  const f = useContractForm({ name: "", opens_on: "" }, { name: (v) => (!v.trim() ? "Name the cycle" : null), opens_on: (v) => (!v ? "Pick the opening day" : null) });
-  const save = useMutation("POST /api/v1/performance/reviews/cycles");
+/** Open Round: a month of the quarter that has ended and has no round yet. */
+function OpenRoundForm({ periodId, months, taken, close, onOpened }: { periodId: string; months: string[]; taken: string[]; close: () => void; onOpened: (r: Round) => void }) {
+  const free = months.filter((m) => !taken.includes(m));
+  const f = useContractForm({ performance_period_id: periodId, month: free[0] ?? "" }, reviewsContract.RoundCreate);
+  const save = useMutation("POST /api/v1/performance/rounds");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: { name: f.values.name.trim(), opens_on: f.values.opens_on } });
-      invalidate("/api/v1/performance/reviews");
+      const r = await save.run({ body: f.values });
       close();
-      toast(`${f.values.name} opens ${formatDate(f.values.opens_on)}`);
-    } catch {
-      f.setServerErrors(save.fields);
+      onOpened(r);
+      toast(`${r.name} opened`);
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
     }
   };
   return (
     <>
-      <Field label="Cycle" {...f.field("name")}><TextField {...f.field("name")} placeholder="Q1 2027" /></Field>
-      <Field label="Opens On" {...f.field("opens_on")}><DateField {...f.field("opens_on")} /></Field>
+      <Field label="Month" {...f.status("month")}>
+        <SelectField options={free.map((m) => [m, formatMonth(m)] as [string, string])} {...f.field("month")} />
+      </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={save.pending} onClick={submit}>Open Cycle</Button>
+        <Button variant="primary" onClick={submit}>Open Round</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/** One improvement plan: its dates and lines; Operations & People close it. */
+function PipSheet({ pip, manage, close }: { pip: Pip; manage: boolean; close: () => void }) {
+  const modal = useModal();
+  const live = pip.status === "open" || pip.status === "extended";
+  return (
+    <>
+      <KeyValue
+        items={[
+          ["Employee", pip.employee.display_name],
+          ["Starts", formatDate(pip.starts_on)],
+          ["Ends", formatDate(pip.ends_on)],
+          ["Review On", formatDate(pip.review_on)],
+          ["Status", <StatusPill key="s" s={PIP_STATUS[pip.status]} />],
+          ...(pip.summary ? ([["Summary", pip.summary]] as Array<[string, string]>) : []),
+          ...(pip.outcome_note ? ([["Outcome", pip.outcome_note]] as Array<[string, string]>) : []),
+        ]}
+      />
+      <DataView
+        className="mt-3"
+        title="Lines"
+        rows={pip.lines}
+        rowKey={(l) => l.improvement_plan_line_id}
+        columns={[
+          { key: "text", label: "Line", render: (l) => l.text },
+          { key: "target", label: "Target", render: (l) => l.target_text ?? "–" },
+        ]}
+      />
+      <FormFooter>
+        <Button onClick={close}>Close</Button>
+        {manage && live && <Button variant="primary" onClick={() => modal.open({ title: "Close Plan", body: (done) => <ClosePipForm pip={pip} close={() => (done(), close())} /> })}>Close Plan</Button>}
+      </FormFooter>
+    </>
+  );
+}
+
+function ClosePipForm({ pip, close }: { pip: Pip; close: () => void }) {
+  const f = useContractForm({ status: "passed" as "passed" | "extended" | "not_met", outcome_note: "", ends_on: "", review_on: "" }, reviewsContract.PipClose);
+  const save = useMutation("POST /api/v1/performance/pips/:id/close");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id: pip.improvement_plan_id }, body: f.values });
+      close();
+      toast("Plan closed");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Outcome" {...f.status("status")}>
+        <SelectField options={[["passed", "Passed"], ["extended", "Extended"], ["not_met", "Not Met"]]} {...f.field("status")} />
+      </Field>
+      {f.values.status === "extended" && (
+        <>
+          <Field label="Ends On" {...f.status("ends_on")}><DateField {...f.field("ends_on")} /></Field>
+          <Field label="Review On" {...f.status("review_on")}><DateField {...f.field("review_on")} /></Field>
+        </>
+      )}
+      <Field label="Note" {...f.status("outcome_note")}><TextAreaField {...f.field("outcome_note")} rows={3} /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" onClick={submit}>Close Plan</Button>
       </FormFooter>
     </>
   );
