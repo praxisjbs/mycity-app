@@ -18,6 +18,7 @@ const { Link } = require("./tasks");
 const { ScoreValue, Quantity, Rating } = require("./scoring");
 const { MonthStart } = require("./kpis");
 const { Section, LineMeasure, LineSource, Weight } = require("./targets");
+const { UploadPurpose } = require("./documents");
 
 /* ------------------------------------------------------------------ *
  * Rounds
@@ -365,8 +366,11 @@ const ReviewCheckIn = z
   })
   .strict();
 
-/** POST /ess/performance/check-in/evidence: the fields beside the file, the item it is evidence for. */
-const EvidenceUpload = z.object({ performance_review_item_id: uuid }).strict();
+/**
+ * POST /ess/performance/check-in/evidence: the fields beside the file, the item it is evidence for.
+ * The upload engine sends the purpose too; the route's own (performance_evidence) decides.
+ */
+const EvidenceUpload = z.object({ purpose: UploadPurpose.optional(), performance_review_item_id: uuid }).strict();
 
 /** PUT /ess/performance/check-in: Save Draft. */
 const ReviewCheckInSave = z.object({ items: z.array(ReviewCheckInItemSave).max(60) }).strict();
@@ -378,6 +382,8 @@ const ReviewCheckInSave = z.object({ items: z.array(ReviewCheckInItemSave).max(6
 /** Which text a recording is for. */
 const DictationRequest = z
   .object({
+    /** Sent by the upload engine; the route's own (voice_note) decides. */
+    purpose: UploadPurpose.optional(),
     performance_review_item_id: blank(uuid),
     field: z.enum(["action_text", "self_reason", "comment", "dotted_input"]).default("action_text"),
   })

@@ -217,6 +217,7 @@ function LinesTable({ r }: { r: ReviewDetail }) {
 
 /** The month around the review: its tasks from Workspace, attendance and recognitions. */
 function MonthCard({ r }: { r: ReviewDetail }) {
+  const ctx = r.context;
   return (
     <>
       <KeyValue
@@ -225,10 +226,10 @@ function MonthCard({ r }: { r: ReviewDetail }) {
           ["Done This Month", String(r.task_counts.done)],
           ["Ongoing", String(r.task_counts.ongoing)],
           ["Next Month", String(r.task_counts.next_month)],
-          ...(r.context.on_time + r.context.late + r.context.absent > 0
+          ...(ctx
             ? ([
-                ["This Month", `${r.context.on_time} on time · ${r.context.late} late · ${r.context.absent} absent`],
-                ["Recognitions", String(r.context.recognitions)],
+                ["This Month", `${ctx.on_time} on time · ${ctx.late} late · ${ctx.absent} absent`],
+                ["Recognitions", String(ctx.recognitions)],
               ] as Array<[string, string]>)
             : []),
         ]}
@@ -277,7 +278,7 @@ function ScoreForm({ r, close, reload }: { r: ReviewDetail; close: () => void; r
     return {
       items: r.items.map((i) => {
         const x = rows[i.performance_review_item_id];
-        return { performance_review_item_id: i.performance_review_item_id, score: x.score === "" ? null : x.score, override_reason: x.override_reason.trim() || null, comment: x.comment.trim() || null };
+        return { performance_review_item_id: i.performance_review_item_id, score: x.score === "" ? null : x.score, override_reason: x.override_reason.trim() || undefined, comment: x.comment.trim() || undefined };
       }),
       actions: withAction.map((i) => {
         const x = rows[i.performance_review_item_id];
@@ -452,7 +453,7 @@ function ChangesForm({ instanceId, close }: { instanceId: string; close: () => v
 
 /** Mark Conduct: a confirmed breach caps the rating at Partly Meets (§6.15). */
 function ConductForm({ id, close }: { id: string; close: () => void }) {
-  const f = useContractForm({ breach: "true" as "true" | "false", conduct_note: "" }, {
+  const f = useContractForm({ breach: "true", conduct_note: "" }, {
     safeParse: (v: unknown) => {
       const x = v as { breach: string; conduct_note: string };
       return reviewsContract.ConductMark.safeParse({ conduct_breach: x.breach === "true", conduct_note: x.conduct_note });
@@ -494,7 +495,7 @@ function PipForm({ r, close }: { r: ReviewDetail; close: () => void }) {
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ body: { performance_review_id: r.performance_review_id, starts_on: f.values.starts_on, summary: f.values.summary.trim() || null, lines } });
+      await save.run({ body: { performance_review_id: r.performance_review_id, starts_on: f.values.starts_on, summary: f.values.summary.trim() || undefined, lines } });
       close();
       toast("Improvement plan started");
     } catch (e) {

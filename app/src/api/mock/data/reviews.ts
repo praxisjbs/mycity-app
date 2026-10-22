@@ -137,7 +137,7 @@ export const REVIEWS: ReviewDetail[] = [
   reviewOf("cynthia", 0, "ifeoma"),
   reviewOf("tobi", 0),
   reviewOf("adedotun", 1),
-  reviewOf("kemi", 2),
+  reviewOf("zainab", 2),
   reviewOf("obinna", 3),
   reviewOf("funke", 4),
 ];

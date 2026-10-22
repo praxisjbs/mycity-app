@@ -15,8 +15,9 @@ import { myReviewOf, PIPS, REVIEWS, reviewOf } from "../data/reviews";
 
 const now = () => new Date().toISOString();
 const meOf = (user: string | null) => byKey(user);
-/** Operations & People and the CEO read every review (§8). */
+/** Operations & People and the CEO read every review and run the cycle (§8); the HR stage is Operations & People's alone. */
 const isHr = (user: string | null) => SIGN_INS[user ?? ""]?.view === "operations" || SIGN_INS[user ?? ""]?.view === "ceo";
+const isOperations = (user: string | null) => SIGN_INS[user ?? ""]?.view === "operations";
 const WITH_REVIEWER = ["with_reviewer", "returned"];
 
 function rolesOf(r: ReviewDetail, user: string | null) {
@@ -27,13 +28,14 @@ function rolesOf(r: ReviewDetail, user: string | null) {
   const second = Boolean(me) && r.second_level?.employee_id === me?.employee_id;
   const hr = isHr(user);
   const full = !employee && (second || hr);
+  const hrStage = isOperations(user);
   const inScope = Boolean(me) && teamOf(me!.user_key).some((p) => p.employee_id === r.employee.employee_id);
-  return { employee, reviewer, dotted, second, hr, full, inScope, named: employee || reviewer || dotted || second || full };
+  return { employee, reviewer, dotted, second, hr, hrStage, full, inScope, named: employee || reviewer || dotted || second || full };
 }
 
 /** May the reader decide the review's stage in its approval now? */
 const mayDecide = (r: ReviewDetail, roles: ReturnType<typeof rolesOf>) =>
-  !roles.employee && ((r.status === "second_level" && roles.second) || (r.status === "with_hr" && roles.hr));
+  !roles.employee && ((r.status === "second_level" && roles.second) || (r.status === "with_hr" && roles.hrStage));
 
 const waitingOnMe = (r: ReviewDetail, user: string | null) => {
   const roles = rolesOf(r, user);
@@ -70,7 +72,7 @@ function view(r: ReviewDetail, user: string | null): ReviewDetail {
     score_to_date: parts.scores ? r.score_to_date : null,
     rating: parts.scores ? r.rating : null,
     actions: parts.notes ? r.actions : [],
-    context: team ? r.context : { on_time: 0, late: 0, absent: 0, recognitions: 0 },
+    context: team ? r.context : null,
     waiting_on_me: waitingOnMe(r, user),
     can: {
       check_in: roles.employee && r.status === "check_in",
@@ -80,7 +82,7 @@ function view(r: ReviewDetail, user: string | null): ReviewDetail {
       ask_input: scoring_ && Boolean(r.dotted) && !r.dotted_input,
       give_input: roles.dotted && Boolean(r.check_in_submitted_at) && WITH_REVIEWER.includes(r.status),
       mark_conduct: roles.hr && !roles.employee && r.status !== "check_in",
-      decide_probation: roles.hr && !roles.employee && r.review_kind === "probation" && r.status === "with_hr",
+      decide_probation: roles.hrStage && !roles.employee && r.review_kind === "probation" && r.status === "with_hr",
       decide: mayDecide(r, roles),
       start_pip: roles.hr && !roles.employee && closed && r.rating === "below" && !PIPS.some((p) => p.performance_review_id === r.performance_review_id),
     },
@@ -361,7 +363,7 @@ route("POST /api/v1/performance/reviews/:id/probation-outcome", (req) => {
   const got = readable(req);
   if ("refused" in got) return got.refused;
   const r = got.r;
-  if (!isHr(req.user) || rolesOf(r, req.user).employee) return fail(403, "PERMISSION_DENIED", "Operations & People decide probation");
+  if (!isOperations(req.user) || rolesOf(r, req.user).employee) return fail(403, "PERMISSION_DENIED", "Operations & People decide probation");
   if (r.review_kind !== "probation" || r.status !== "with_hr") return fail(409, "REVIEW_NOT_WITH_HR", "Choose the outcome when the review is with Operations & People");
   const b = req.body as { probation_outcome?: ReviewDetail["probation_outcome"] };
   if (!b.probation_outcome) return invalid({ probation_outcome: ["Pick an outcome"] });

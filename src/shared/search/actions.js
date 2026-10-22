@@ -177,6 +177,13 @@ const ACTIONS = Object.freeze([
     need: ["performance", "create"],
     words: ["scorecard", "targets", "draft a scorecard", "set targets"],
   }),
+  a("open_round", "Open Round", {
+    screen: "performance.reviews",
+    params: { action: "new" },
+    need: ["performance", "create"],
+    capability: "performance.manage",
+    words: ["review round", "monthly round", "open the month", "start reviews", "review cycle"],
+  }),
   a("start_check_in", "Start Check-In", {
     screen: "ess.my-performance",
     params: { check_in: "1" },

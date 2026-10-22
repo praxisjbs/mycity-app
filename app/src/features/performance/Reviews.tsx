@@ -276,12 +276,12 @@ function PipSheet({ pip, manage, close }: { pip: Pip; manage: boolean; close: ()
 }
 
 function ClosePipForm({ pip, close }: { pip: Pip; close: () => void }) {
-  const f = useContractForm({ status: "passed" as "passed" | "extended" | "not_met", outcome_note: "", ends_on: "", review_on: "" }, reviewsContract.PipClose);
+  const f = useContractForm({ status: "passed", outcome_note: "", ends_on: "", review_on: "" }, reviewsContract.PipClose);
   const save = useMutation("POST /api/v1/performance/pips/:id/close");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await save.run({ params: { id: pip.improvement_plan_id }, body: f.values });
+      await save.run({ params: { id: pip.improvement_plan_id }, body: { ...f.values, status: f.values.status as "passed" | "extended" | "not_met" } });
       close();
       toast("Plan closed");
     } catch (e) {

@@ -2,7 +2,7 @@
  * Performance · Scorecards (the `targets` tab; docs/guides/performance.md §2, §3.3, §6.5, §6.6,
  * §10): each person's quarter scorecard. The list with its figures and filters; New Scorecard for
  * a manager; a scorecard's sections and lines with Edit Lines, Change Reviewer, Agree Scorecard and
- * Disagree With Reason. PR 4 adds the Commitments view beside it (Commitments.tsx).
+ * Disagree With Reason, and Send Scorecard for one drafted after its plan bound (PR 3). PR 4 adds the Commitments view beside it (Commitments.tsx).
  */
 import { useState } from "react";
 import targetsContract from "@mycity/contract/schemas/targets.js";
@@ -158,6 +158,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   const read = useApi("GET /api/v1/performance/scorecards/:id", { params: { id } });
   const period = useApi("GET /api/v1/performance/periods/:id", { params: { id: read.data?.performance_period_id ?? "" }, enabled: Boolean(read.data) });
   const agree = useMutation("POST /api/v1/performance/scorecards/:id/agree");
+  const send = useMutation("POST /api/v1/performance/scorecards/:id/submit");
   const c = read.data;
   if (!c) return null;
   const months = period.data?.months ?? [];
@@ -171,6 +172,16 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
       await agree.run({ params: { id }, body: {} });
       reload();
       toast("Scorecard agreed");
+    } catch (e) {
+      say(e);
+    }
+  };
+  // A scorecard drafted after its plan bound goes through the plan's flow on its own (§6.4).
+  const sendCard = async () => {
+    try {
+      await send.run({ params: { id }, body: {} });
+      reload();
+      toast("Scorecard sent for approval");
     } catch (e) {
       say(e);
     }
@@ -196,6 +207,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
           ["Rating", rating(c.rating).text],
           ["Weights", c.weight_problems.length ? "Check" : "100%"],
           ["Agreed", agreedText],
+          ...(c.amendment_instance_id ? ([["Approval", "Awaiting Approval"]] as Array<[string, string]>) : []),
           ...(c.disagree_reason && c.disagreed_at ? ([["Disagreed", c.disagree_reason]] as Array<[string, string]>) : []),
         ]}
       />
@@ -227,6 +239,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
         )}
         {c.can_agree && mine && <Button onClick={() => modal.open({ title: "Disagree With Reason", body: (done) => <DisagreeForm id={id} close={() => (done(), reload())} /> })}>Disagree With Reason</Button>}
         {c.can_agree && <Button variant="primary" onClick={agreeCard}>Agree Scorecard</Button>}
+        {c.can_send && <Button variant="primary" onClick={sendCard}>Send Scorecard</Button>}
       </FormFooter>
     </>
   );
