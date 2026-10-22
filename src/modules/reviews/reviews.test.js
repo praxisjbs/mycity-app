@@ -194,6 +194,7 @@ describe("the routes", () => {
       ["POST", "/rounds/:id/close"],
       ["POST", "/reviews/:id/conduct"],
       ["POST", "/reviews/:id/probation-outcome"],
+      ["POST", "/reviews/:id/withdraw"],
       ["POST", "/pips"],
       ["PATCH", "/pips/:id"],
       ["POST", "/pips/:id/close"],

@@ -122,6 +122,20 @@ async function mayRead(db, card, actor, scope) {
   }
 }
 
+/**
+ * May the reader ask for a change to a line's target on this scorecard (§3.5, §6.7)? Its reviewer or
+ * the function's head (or acting head), on a binding or agreed scorecard; never its employee, whose
+ * reviewer changes their targets.
+ */
+async function mayChangeLineTarget(db, card, actor) {
+  if (!actor || !actor.employee_id || card.employee_id === actor.employee_id) return false;
+  if (!["binding", "agreed"].includes(card.status)) return false;
+  if (await isReviewer(db, card, actor)) return true;
+  if (!card.department_id) return false;
+  const organisation = require("../organisation/organisation.service");
+  return (await organisation.headOf(db, card.department_id)) === actor.employee_id;
+}
+
 /** The pending plan amendment holding a mid-quarter scorecard alone, if it was sent. */
 const amendmentOf = (db, scorecardId) => workflow.findOpenInstance(db, { type: "scorecard", id: scorecardId });
 
@@ -146,8 +160,23 @@ async function editable(db, card, actor, scope) {
 }
 
 async function detail(db, card, actor, scope) {
-  const [lines, months] = await Promise.all([repo.lines(db, card.scorecard_id), repo.lineMonths(db, card.scorecard_id)]);
-  const views = lines.map((l) => lineView(l, months));
+  const [lines, months, waiting] = await Promise.all([
+    repo.lines(db, card.scorecard_id),
+    repo.lineMonths(db, card.scorecard_id),
+    repo.pendingChanges(db, card.scorecard_id),
+  ]);
+  // A line waiting on a change shows it, and offers no second Change Target (§6.7).
+  const changeable = await mayChangeLineTarget(db, card, actor);
+  const views = lines.map((l) => {
+    const change = waiting.find((c) => c.employee_target_id === l.employee_target_id);
+    return {
+      ...lineView(l, months),
+      can_change_target: changeable && !change,
+      pending_change: change
+        ? { target_change_id: change.target_change_id, to_value: change.to_value, to_text: change.to_text, from_month: change.from_month }
+        : null,
+    };
+  });
   const splits = await repo.contributions(db, { scorecardId: card.scorecard_id });
   const reviewer = await isReviewer(db, card, actor);
   const mine = actor && card.employee_id === actor.employee_id;
@@ -582,6 +611,31 @@ async function settleAmendment(id, { state, reason = null, opened_by: openedBy =
   });
 }
 
+/**
+ * A leaver's scorecards still running close (§11), in the caller's transaction: no round reviews
+ * them again and a draft's waiting amendment is withdrawn. Their lines, scores and commitments stay
+ * as they are, so the quarter still reports them. Returns how many closed.
+ */
+async function closeOfLeaver(client, employeeId, onDate) {
+  const reminders = require("../notifications/notifications.reminders");
+  const cards = await repo.runningOf(client, employeeId, onDate);
+  for (const card of cards) {
+    const open = card.status === "draft" ? await amendmentOf(client, card.scorecard_id) : null;
+    if (open) await workflow.cancel(client, { instance_id: open.workflow_instance_id, actor: { user_id: open.opened_by }, reason: "The employee left" });
+    await repo.update(client, card.scorecard_id, { status: "closed" });
+    await reminders.cancel(client, { key: AGREE_REMINDER, entity: { type: "scorecard", id: card.scorecard_id } });
+    await emit(client, {
+      key: EVENTS.SCORECARD_CLOSED,
+      entity: { type: "scorecard", id: card.scorecard_id },
+      actor: null,
+      before: { status: card.status },
+      after: { status: "closed" },
+      payload: { scorecard_id: card.scorecard_id, employee_id: employeeId, period: card.period_name },
+    });
+  }
+  return cards.length;
+}
+
 /* ------------------------------------------------------------------ *
  * What a plan's approval and a target change do to scorecards (goals.approval.js)
  * ------------------------------------------------------------------ */
@@ -780,6 +834,8 @@ module.exports = {
   bindDepartment,
   applyTargetChange,
   mayRead,
+  mayChangeLineTarget,
+  closeOfLeaver,
   scheduleAgreementReminders,
   agreementCheck,
   importLine,

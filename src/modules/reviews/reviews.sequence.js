@@ -8,6 +8,13 @@
  *   second_level   the reviewer's own line manager approves or sends it back
  *   with_hr        Operations & People close it (their approval), and may mark conduct
  *   closed         the employee sees the reviewer's scores, comments and actions, and the PDF
+ *   withdrawn      closed at HR's stage without a score: its person left, or Operations & People
+ *                  withdrew it with a reason (§11)
+ *
+ * Once the check-in's due date has passed and it is still not in, the reviewer opens the review
+ * without it (nothing of the employee's drafts, not even a proposed score) and may Score Without
+ * Check-In, with a reason: the drafts stay the employee's for good, and their own lines are Not
+ * Assessable unless the reviewer scores them with a reason (§11).
  *
  * The parts of a review are restricted (§8): a check-in's actions, evidence notes and transcripts,
  * the reviewer's comments, the dotted manager's input and conduct reach only the employee (their
@@ -25,6 +32,8 @@ const repo = require("./reviews.repo");
 const WITH_REVIEWER = Object.freeze(["with_reviewer", "returned"]);
 /** The stages the approval engine holds. */
 const IN_APPROVAL = Object.freeze(["second_level", "with_hr"]);
+/** The stages a review ends in. */
+const ENDED = Object.freeze(["closed", "withdrawn"]);
 
 const checkInFirst = () =>
   new AppError("CHECK_IN_FIRST", "Waiting for the check-in", 409);
@@ -77,21 +86,25 @@ async function rolesOf(db, review, actor, scope = null) {
 
 /**
  * Refuse a reader the review does not name and their scope does not reach (404), and the reviewer
- * before the check-in is in (409 CHECK_IN_FIRST, A17).
+ * before the check-in is in (409 CHECK_IN_FIRST, A17) unless its due date has passed (`late`).
  */
-function assertMayRead(review, roles) {
+function assertMayRead(review, roles, { late = false } = {}) {
   if (!roles.named && !roles.in_scope) throw notFound();
-  if (roles.reviewer && !roles.employee && review.status === "check_in") throw checkInFirst();
+  if (roles.reviewer && !roles.employee && review.status === "check_in" && !late) throw checkInFirst();
 }
 
 /** Which parts of a review a reader is sent (§6.12, §8). */
 function partsFor(review, roles) {
   const closed = review.status === "closed";
-  const submitted = Boolean(review.check_in_submitted_at) || review.status !== "check_in";
+  // Not yet in, or scored without it: the employee's drafts are theirs alone (A17, §11).
+  const unsent = !review.check_in_submitted_at && (review.status === "check_in" || Boolean(review.no_check_in_at));
   const team = roles.reviewer || roles.full;
+  // A reviewer opening a late check-in sees no proposed or self score worked out from the drafts.
+  const waiting = review.status === "check_in" && roles.reviewer && !roles.employee;
   return {
-    check_in: roles.employee || (submitted && (team || roles.dotted)),
-    scores: team || (closed && (roles.employee || roles.in_scope)),
+    check_in: roles.employee || (!unsent && (team || roles.dotted)),
+    self: roles.employee || !unsent,
+    scores: (team && !waiting) || (closed && (roles.employee || roles.in_scope)),
     reviewer_notes: team || (closed && roles.employee),
     input: team || roles.dotted || (closed && roles.employee),
     conduct: team || (closed && roles.employee),
@@ -114,6 +127,7 @@ function itemFor(item, parts) {
       out.self_score = null;
     }
   }
+  if (!parts.self) out.self_score = null;
   if (!parts.scores) out.score = null;
   if (!parts.reviewer_notes) {
     out.override_reason = null;
@@ -126,10 +140,11 @@ function itemFor(item, parts) {
  * What the reader may do to the review now.
  * @param {object} review
  * @param {object} roles   rolesOf()
- * @param {{decide: boolean, has_pip: boolean}} extra  whether the reader may decide its approval's
- *   stage now (the engine's canAct), and whether a PIP was started from it
+ * @param {{decide: boolean, has_pip: boolean, late: boolean}} extra  whether the reader may decide its
+ *   approval's stage now (the engine's canAct), whether a PIP was started from it, and whether its
+ *   check-in's due date has passed
  */
-function allowed(review, roles, { decide = false, has_pip: hasPip = false } = {}) {
+function allowed(review, roles, { decide = false, has_pip: hasPip = false, late = false } = {}) {
   const scoring = roles.reviewer && WITH_REVIEWER.includes(review.status);
   return {
     check_in: roles.employee && review.status === "check_in",
@@ -139,10 +154,12 @@ function allowed(review, roles, { decide = false, has_pip: hasPip = false } = {}
     ask_input: scoring && Boolean(review.dotted_employee_id) && !review.dotted_input,
     give_input:
       roles.dotted && Boolean(review.check_in_submitted_at) && WITH_REVIEWER.includes(review.status),
-    mark_conduct: roles.hr && !roles.employee && review.status !== "check_in",
+    mark_conduct: roles.hr && !roles.employee && review.status !== "check_in" && review.status !== "withdrawn",
     decide_probation: roles.hr && !roles.employee && review.review_kind === "probation" && review.status === "with_hr",
     decide: decide && IN_APPROVAL.includes(review.status) && !roles.employee,
     start_pip: roles.hr && !roles.employee && review.status === "closed" && review.rating === "below" && !hasPip,
+    score_without_check_in: roles.reviewer && !roles.employee && review.status === "check_in" && late,
+    withdraw: roles.hr && !roles.employee && !ENDED.includes(review.status),
   };
 }
 
@@ -159,6 +176,7 @@ async function mayOpenFile(client, user, doc) {
 module.exports = {
   WITH_REVIEWER,
   IN_APPROVAL,
+  ENDED,
   checkInFirst,
   notFound,
   isHr,

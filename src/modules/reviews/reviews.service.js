@@ -20,6 +20,13 @@
  * a milestone, standard or binary line every month, a numeric (Results) line in the quarter's last
  * month only, because October and November are progress against the quarter (P3). The CEO's own
  * review (the Board's) closes on the CEO's check-in, scored on their own figures.
+ *
+ * Two ways a review leaves the usual path (§11). Once the check-in's due date has passed and it is
+ * not in, the reviewer may Score Without Check-In, with a reason: the employee is told, their own
+ * lines are Not Assessable (their drafts stay theirs) and Monthly Update On Time scores 0. And a
+ * review ends Withdrawn at HR's stage, without a score: when its person leaves (People archive
+ * them, or on their leaving date when it is still ahead, through the reminder engine), which also
+ * closes their scorecard, or when Operations & People withdraw it with a reason.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -27,6 +34,7 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const routeMap = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
+const { formatDate } = require("../../shared/time/day-first");
 const workingWeek = require("../../shared/time/working-week");
 const workflow = require("../../shared/workflow/engine");
 const approvers = require("../../shared/workflow/approvers");
@@ -39,7 +47,7 @@ const cycle = require("./reviews.cycle");
 const sequence = require("./reviews.sequence");
 const pdf = require("./reviews.pdf");
 const repo = require("./reviews.repo");
-const { EVENTS, REVIEW_FLOW, CHECK_IN_REMINDER, REVIEW_REMINDER, CLOSE_REMINDER } = require("./reviews.events");
+const { EVENTS, REVIEW_FLOW, CHECK_IN_REMINDER, REVIEW_REMINDER, CLOSE_REMINDER, LEAVER_REMINDER } = require("./reviews.events");
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -63,6 +71,10 @@ const rulesOf = (r) => cycle.rulesOf({ rules: r.rules });
 
 /** The person's check-in deadline: a function head's falls on the later day (§6.2). */
 const checkInDueOf = (r) => day(r.is_head ? r.head_check_in_due_on : r.check_in_due_on);
+
+/** Has a review's check-in deadline ended (Lagos) with the check-in still not in (§11)? */
+const checkInLate = (r, now = new Date()) =>
+  r.status === "check_in" && Boolean(checkInDueOf(r)) && now >= lagos.endOfDayExclusive(checkInDueOf(r));
 
 /* ------------------------------------------------------------------ *
  * Views
@@ -182,17 +194,24 @@ function chainOf(r, decisions) {
   const hr = lastApproval("operations_people");
   const selfReview = r.review_type === "self";
   const skipSecond = selfReview || (r.submitted_at && !r.second_level_employee_id);
-  const state = (i) => (at > i ? "done" : at === i ? "current" : "waiting");
+  // Withdrawn ends at HR's stage: the steps that happened stay done, the rest are skipped.
+  const withdrawn = r.status === "withdrawn";
+  const state = (i, happened) => (withdrawn ? (happened ? "done" : "skipped") : at > i ? "done" : at === i ? "current" : "waiting");
   return [
-    { key: "check_in", state: state(0), person: r.employee.display_name, at: iso(r.check_in_submitted_at) },
-    { key: "reviewer", state: selfReview ? "skipped" : state(1), person: r.reviewer.display_name, at: iso(r.submitted_at) },
+    { key: "check_in", state: state(0, Boolean(r.check_in_submitted_at)), person: r.employee.display_name, at: iso(r.check_in_submitted_at) },
+    { key: "reviewer", state: selfReview ? "skipped" : state(1, Boolean(r.submitted_at)), person: r.reviewer.display_name, at: iso(r.submitted_at) },
     {
       key: "second_level",
-      state: skipSecond ? "skipped" : state(2),
+      state: skipSecond ? "skipped" : state(2, Boolean(second)),
       person: second ? second.name : r.second_level ? r.second_level.display_name : null,
       at: second ? iso(second.decided_at) : null,
     },
-    { key: "hr", state: selfReview ? "skipped" : state(3), person: hr ? hr.name : "Operations & People", at: hr ? iso(hr.decided_at) : null },
+    {
+      key: "hr",
+      state: selfReview && !withdrawn ? "skipped" : state(3, true),
+      person: hr ? hr.name : "Operations & People",
+      at: withdrawn ? iso(r.withdrawn_at) : hr ? iso(hr.decided_at) : null,
+    },
   ];
 }
 
@@ -221,6 +240,10 @@ async function detail(db, r, actor, roles) {
     conduct_note: parts.conduct ? r.conduct_note : null,
     probation_outcome: r.probation_outcome,
     returned_reason: roles.named ? r.returned_reason : null,
+    no_check_in_at: iso(r.no_check_in_at),
+    no_check_in_reason: roles.named ? r.no_check_in_reason : null,
+    withdrawn_at: iso(r.withdrawn_at),
+    withdrawn_reason: roles.named ? r.withdrawn_reason : null,
     document_id: r.status === "closed" && (roles.named || roles.in_scope) ? r.document_id : null,
     workflow_instance_id: r.workflow_instance_id,
     items: rows.map((i) => sequence.itemFor(itemView(i), parts)),
@@ -230,7 +253,7 @@ async function detail(db, r, actor, roles) {
     chain: chainOf(r, decisions),
     context: parts.context ? await contextOf(db, r) : null,
     improvement_plan_id: pip && (roles.full || roles.employee || roles.reviewer) ? pip.improvement_plan_id : null,
-    can: sequence.allowed(r, roles, { decide, has_pip: Boolean(pip) }),
+    can: sequence.allowed(r, roles, { decide, has_pip: Boolean(pip), late: checkInLate(r) }),
   };
 }
 
@@ -251,7 +274,7 @@ async function loadFor(db, id, actor, scope) {
   const r = await repo.get(db, id, actor, await repo.roleCodesOfUser(db, actor && actor.user_id));
   if (!r) throw sequence.notFound();
   const roles = await sequence.rolesOf(db, r, actor, scope);
-  sequence.assertMayRead(r, roles);
+  sequence.assertMayRead(r, roles, { late: checkInLate(r) });
   return { r, roles };
 }
 
@@ -288,7 +311,8 @@ async function refreshScores(client, r, { now = new Date(), submittedAt = r.chec
       await repo.updateItem(client, i.performance_review_item_id, { ...figures, assessable: true, auto: true });
       continue;
     }
-    const p = progress.proposeOwn(i, i, { rules, cal, month, now });
+    // Scored without the check-in (§11): the employee's own lines had no check-in to assess.
+    const p = r.no_check_in_at ? { proposed_score: null, assessable: false } : progress.proposeOwn(i, i, { rules, cal, month, now });
     await repo.updateItem(client, i.performance_review_item_id, { ...p, auto: false });
   }
 }
@@ -511,6 +535,8 @@ async function forReviewer(client, id, actor, scope) {
   await repo.lock(client, id);
   const { r, roles } = await loadFor(client, id, actor, scope);
   if (!roles.reviewer) throw new AppError("PERMISSION_DENIED", "Only the reviewer can do that", 403);
+  // A late check-in is opened, not scored, until the reviewer chooses Score Without Check-In (§11).
+  if (r.status === "check_in") throw sequence.checkInFirst();
   if (!sequence.WITH_REVIEWER.includes(r.status)) throw new AppError("REVIEW_NOT_WITH_REVIEWER", "This review is not with its reviewer", 409);
   return { r, roles };
 }
@@ -672,6 +698,49 @@ async function returnCheckIn(actor, scope, id, body) {
     });
   });
   return reviewView(await repo.get(pool, id));
+}
+
+/**
+ * POST /performance/reviews/:id/score-without-check-in (§11): the check-in's due date has passed and
+ * it is not in, so the reviewer scores without it. The review goes to the reviewer with the reason
+ * kept; the employee's own lines are Not Assessable and Monthly Update On Time scores 0; the
+ * employee is told.
+ */
+async function scoreWithoutCheckIn(actor, scope, id, body) {
+  await tx(async (client) => {
+    await repo.lock(client, id);
+    const { r, roles } = await loadFor(client, id, actor, scope);
+    if (!roles.reviewer || roles.employee) throw new AppError("PERMISSION_DENIED", "Only the reviewer can do that", 403);
+    if (r.status !== "check_in") throw new AppError("CHECK_IN_SENT", "The check-in is already in", 409);
+    if (!checkInLate(r)) throw new AppError("CHECK_IN_NOT_LATE", "The check-in is not due yet", 409);
+    const now = new Date();
+    await repo.update(client, id, {
+      status: "with_reviewer",
+      no_check_in_at: now,
+      no_check_in_reason: body.no_check_in_reason,
+      returned_reason: null,
+      ...(r.reviewer_employee_id === actor.employee_id ? {} : { reviewer_employee_id: actor.employee_id }),
+    });
+    const after = await repo.get(client, id);
+    await refreshScores(client, after, { now, submittedAt: null });
+    await reminders.cancel(client, { key: CHECK_IN_REMINDER, entity: { type: "performance_review", id } });
+    await emit(client, {
+      key: EVENTS.REVIEW_SCORED_WITHOUT_CHECK_IN,
+      entity: { type: "performance_review", id },
+      actor,
+      before: { status: "check_in" },
+      after: { status: "with_reviewer" },
+      payload: {
+        performance_review_id: id,
+        employee_id: r.employee_id,
+        subject_employee_id: r.employee_id,
+        round_name: r.round_name,
+        reason: body.no_check_in_reason,
+      },
+    });
+    await cycle.scheduleReview(client, after, await workingWeek.loadCalendar(client), now);
+  });
+  return get(actor, scope, id);
 }
 
 /** The dotted manager asked for input, in the caller's transaction. */
@@ -958,6 +1027,125 @@ async function changesRequested(reviewId, payload) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Withdrawn: a leaver's open review, or one Operations & People withdraw (§11)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Close an open review as Withdrawn at HR's stage, without a score, in the caller's transaction:
+ * its pending approval and reminders end, and the people it names are told. `tell` are the
+ * employees told (the actor never is).
+ */
+async function withdrawIn(client, r, { reason, actor = null, leaver = false, tell = [] }) {
+  const id = r.performance_review_id;
+  const instance = await workflow.findOpenInstance(client, { type: "performance_review", id });
+  if (instance) await workflow.cancel(client, { instance_id: instance.workflow_instance_id, actor: { user_id: instance.opened_by }, reason });
+  await repo.update(client, id, { status: "withdrawn", withdrawn_at: new Date(), withdrawn_reason: reason });
+  for (const key of [CHECK_IN_REMINDER, REVIEW_REMINDER, CLOSE_REMINDER]) await reminders.cancel(client, { key, entity: { type: "performance_review", id } });
+  await emit(client, {
+    key: EVENTS.REVIEW_WITHDRAWN,
+    entity: { type: "performance_review", id },
+    actor,
+    before: { status: r.status },
+    after: { status: "withdrawn" },
+    payload: {
+      performance_review_id: id,
+      employee_id: r.employee_id,
+      subject_employee_id: r.employee_id,
+      employee_name: r.employee.display_name,
+      round_name: r.round_name,
+      reason,
+      leaver,
+      tell_employee_ids: [...new Set(tell.filter(Boolean))],
+    },
+  });
+}
+
+/** POST /performance/reviews/:id/withdraw: Operations & People withdraw an open review, with a reason. */
+async function withdraw(actor, scope, id, body) {
+  await tx(async (client) => {
+    await repo.lock(client, id);
+    const { r, roles } = await loadFor(client, id, actor, scope);
+    if (sequence.ENDED.includes(r.status)) throw new AppError("REVIEW_ENDED", "This review is already closed", 409);
+    if (!sequence.allowed(r, roles).withdraw) throw new AppError("PERMISSION_DENIED", "Operations & People withdraw a review", 403);
+    await withdrawIn(client, r, { reason: body.withdrawn_reason, actor, tell: [r.employee_id, r.reviewer_employee_id, r.second_level_employee_id] });
+  });
+  return get(actor, scope, id);
+}
+
+/** The note a leaver's withdrawn review carries. */
+const leaverNote = (leftOn) => (leftOn ? `The employee left on ${formatDate(leftOn)}.` : "The employee left.");
+
+/**
+ * A leaver's open reviews end Withdrawn and their running scorecards close, in the caller's
+ * transaction; their commitments stay as they are, reportable. Returns how many reviews ended.
+ */
+async function withdrawLeaverIn(client, employeeId, leftOn) {
+  let ended = 0;
+  for (const id of await repo.openIdsOf(client, employeeId)) {
+    await repo.lock(client, id);
+    const r = await repo.get(client, id);
+    if (!r || sequence.ENDED.includes(r.status)) continue;
+    // The reviewer stops waiting on it; the leaver is not told.
+    await withdrawIn(client, r, { reason: leaverNote(leftOn), leaver: true, tell: [r.reviewer_employee_id, r.second_level_employee_id] });
+    ended += 1;
+  }
+  await require("../targets/targets.service").closeOfLeaver(client, employeeId, lagos.today());
+  return ended;
+}
+
+/** The leaver's record as their leaving reads it: archived or not, and the day they leave. */
+async function leaverOf(db, employeeId) {
+  const { rows } = await db.query("SELECT status, to_char(left_on, 'YYYY-MM-DD') AS left_on FROM employee WHERE employee_id = $1", [employeeId]);
+  return rows[0] || null;
+}
+
+/** The instant a leaving date is acted on: its first morning, Lagos. */
+const leavingAt = (leftOn) => lagos.instant(leftOn, "06:00");
+
+/**
+ * `employee.archived`: the person has left. With a leaving date still ahead, their reviews and
+ * scorecard end on that date (the reminder engine brings it back, LEAVER_REMINDER); otherwise now.
+ * Safe to run again.
+ */
+async function leaverArchived(employeeId) {
+  return tx(async (client) => {
+    const e = await leaverOf(client, employeeId);
+    if (!e || e.status !== "archived") return null;
+    if (e.left_on && e.left_on > lagos.today()) {
+      await reminders.schedule(client, {
+        key: LEAVER_REMINDER,
+        entity: { type: "employee", id: employeeId },
+        occurrence: e.left_on,
+        at: leavingAt(e.left_on),
+        payload: { employee_id: employeeId, left_on: e.left_on },
+      });
+      return "scheduled";
+    }
+    return withdrawLeaverIn(client, employeeId, e.left_on);
+  });
+}
+
+/**
+ * The leaving date's reminder, in its firing's transaction: still archived and the day come, it
+ * fires; a date moved later waits for it; a record restored ends it.
+ */
+async function leaverCheck(client, row) {
+  const e = await leaverOf(client, row.entity_id);
+  if (!e || e.status !== "archived") return null;
+  if (e.left_on && e.left_on > lagos.today()) return { later: leavingAt(e.left_on) };
+  return { entity: { type: "employee", id: row.entity_id }, payload: { employee_id: row.entity_id, left_on: e.left_on } };
+}
+
+/** `review.leaver_due`: the leaving date came. */
+async function withdrawLeaver(employeeId) {
+  return tx(async (client) => {
+    const e = await leaverOf(client, employeeId);
+    if (!e || e.status !== "archived") return null;
+    return withdrawLeaverIn(client, employeeId, e.left_on);
+  });
+}
+
+/* ------------------------------------------------------------------ *
  * Probation reviews (§6.16)
  * ------------------------------------------------------------------ */
 
@@ -1100,6 +1288,7 @@ module.exports = {
   saveScores,
   submit,
   returnCheckIn,
+  scoreWithoutCheckIn,
   askInput,
   giveInput,
   markConduct,
@@ -1110,6 +1299,11 @@ module.exports = {
   settle,
   stageMoved,
   changesRequested,
+  withdraw,
+  leaverArchived,
+  leaverCheck,
+  withdrawLeaver,
+  checkInLate,
   openProbation,
   myPerformance,
   myReviews,

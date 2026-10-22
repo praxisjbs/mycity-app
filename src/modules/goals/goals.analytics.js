@@ -265,6 +265,8 @@ async function onTime(db, period, months, departmentId, scope, now, kind) {
          JOIN performance_cycle c ON c.performance_cycle_id = rv.performance_cycle_id
          JOIN scorecard s ON s.scorecard_id = rv.scorecard_id
         WHERE c.performance_period_id = $1 AND rv.review_kind = 'monthly'
+          -- A withdrawn review (a leaver's, §11) was never due.
+          AND rv.status <> 'withdrawn'
           AND ($4::uuid IS NULL OR s.department_id = $4) ${s.and}
      ), marked AS (
        SELECT rd.month,

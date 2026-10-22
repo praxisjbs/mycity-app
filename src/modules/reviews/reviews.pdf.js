@@ -4,6 +4,8 @@
  * reviewer and month; each line with its target, actual, evidence, the proposed, self and final
  * score (Auto where the system worked it out, and the reason a score was changed); the month's
  * tasks; the corrective actions; the dotted manager's input; and the chain with names and dates.
+ * A review scored without its check-in (§11) prints the reviewer's reason, and no check-in for the
+ * employee's own lines (their unsent drafts stay theirs).
  *
  * Generated in the closing transaction through documents.generate(): the worker renders it after
  * commit, and the document is filed on the review (entity performance_review), personal.
@@ -54,6 +56,8 @@ const evidenceOf = (i) => {
  */
 function variables(review, items, tasks, chain) {
   const month = review.round_name || "Probation Review";
+  // Scored without the check-in: the employee's own lines had none, whatever their drafts held.
+  const unsent = (i) => Boolean(review.no_check_in_at) && !i.auto;
   return {
     title: `${review.employee.display_name} · ${month} Review`,
     employee_name: review.employee.display_name,
@@ -67,20 +71,21 @@ function variables(review, items, tasks, chain) {
     rating: RATING[review.rating] || "Not rated",
     conduct_note: review.conduct_breach ? text(review.conduct_note) : null,
     outcome: review.probation_outcome ? OUTCOME[review.probation_outcome] : null,
+    no_check_in_reason: review.no_check_in_at ? text(review.no_check_in_reason) : null,
     lines: items.map((i) => ({
       section: i.section ? SECTION[i.section] : "Probation",
       title: i.line ? i.line.title : CRITERION[i.criterion] || text(i.criterion),
       target: targetOf(i.line),
-      actual: actualOf(i),
-      evidence: evidenceOf(i),
+      actual: unsent(i) ? "No check-in" : actualOf(i),
+      evidence: unsent(i) ? "No check-in" : evidenceOf(i),
       proposed: score(i.proposed_score),
-      self: i.self_score === null ? "As proposed" : score(i.self_score),
+      self: unsent(i) ? "No check-in" : i.self_score === null ? "As proposed" : score(i.self_score),
       final: score(i.score),
       auto: Boolean(i.auto),
-      note: [i.self_reason ? `Self: ${i.self_reason}` : null, i.override_reason ? `Reviewer: ${i.override_reason}` : null, i.comment]
+      note: [!unsent(i) && i.self_reason ? `Self: ${i.self_reason}` : null, i.override_reason ? `Reviewer: ${i.override_reason}` : null, i.comment]
         .filter(Boolean)
         .join(" · ") || null,
-      action: i.action_text || null,
+      action: unsent(i) ? null : i.action_text || null,
     })),
     done: tasks.done,
     ongoing: tasks.ongoing,

@@ -806,37 +806,43 @@ function approvalsWaiting(db, reader, roleCodes, mayDecide, query) {
   params.push(mayDecide, query.q ? `%${escapeLike(query.q)}%` : null);
   const may = params.length - 1;
   const q = params.length;
+  // A plan, a target change, or a mid-quarter scorecard sent on its own through the plan's flow (§11).
   return pageQuery(
     db,
     `SELECT v.*, ${TOTAL_COL} FROM (
-       SELECT CASE WHEN wi.entity_type = 'performance_plan' THEN 'plan' ELSE 'target_change' END AS kind,
-              coalesce(pl.performance_plan_id, tc.target_change_id) AS record_id,
+       SELECT CASE wi.entity_type WHEN 'performance_plan' THEN 'plan' WHEN 'scorecard' THEN 'scorecard' ELSE 'target_change' END AS kind,
+              coalesce(pl.performance_plan_id, tc.target_change_id, am.scorecard_id) AS record_id,
               wi.workflow_instance_id, wd.stages, wi.current_stage, wi.stage_entered_at,
               (wi.stage_due_at IS NOT NULL AND wi.stage_due_at < now()) AS overdue,
               p.name AS period_name, d.name AS department, kr.code::text AS key_result_code, et.title AS line_title,
+              ${personJson("pe", "pd")} AS employee,
               ${personJson("oe", "od")} AS requested_by
          FROM workflow_instance wi
          JOIN workflow_definition wd ON wd.workflow_definition_id = wi.workflow_definition_id
          LEFT JOIN performance_plan pl ON wi.entity_type = 'performance_plan' AND pl.performance_plan_id::text = wi.entity_id
+         LEFT JOIN scorecard am ON wi.entity_type = 'scorecard' AND am.scorecard_id::text = wi.entity_id
          LEFT JOIN target_change tc ON wi.entity_type = 'target_change' AND tc.target_change_id::text = wi.entity_id
          LEFT JOIN okr_key_result kr ON kr.okr_key_result_id = tc.okr_key_result_id
          LEFT JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
          LEFT JOIN employee_target et ON et.employee_target_id = tc.employee_target_id
          LEFT JOIN scorecard sc ON sc.scorecard_id = et.scorecard_id
-         LEFT JOIN department d ON d.department_id = coalesce(pl.department_id, o.department_id, sc.department_id)
+         LEFT JOIN department d ON d.department_id = coalesce(pl.department_id, o.department_id, sc.department_id, am.department_id)
          LEFT JOIN performance_period p
-           ON p.performance_period_id = coalesce(pl.performance_period_id, o.performance_period_id, sc.performance_period_id)
+           ON p.performance_period_id = coalesce(pl.performance_period_id, o.performance_period_id, sc.performance_period_id, am.performance_period_id)
+         LEFT JOIN employee pe ON pe.employee_id = coalesce(am.employee_id, sc.employee_id)
+         LEFT JOIN department pd ON pd.department_id = pe.department_id
          LEFT JOIN app_user ou ON ou.user_id = wi.opened_by
          LEFT JOIN employee oe ON oe.employee_id = ou.employee_id
          LEFT JOIN department od ON od.department_id = oe.department_id
         WHERE wi.state = 'pending' AND $${may}::boolean
-          AND ((wi.definition_key = 'performance.plan' AND pl.performance_plan_id IS NOT NULL)
+          AND ((wi.definition_key = 'performance.plan' AND (pl.performance_plan_id IS NOT NULL OR am.scorecard_id IS NOT NULL))
             OR (wi.definition_key = 'performance.target_change' AND tc.target_change_id IS NOT NULL))
           AND ${named}
      ) v
      WHERE ($${q}::text IS NULL
             OR search_fold(coalesce(v.department, 'Company') || ' ' || coalesce(v.key_result_code, '') || ' '
-                           || coalesce(v.line_title, '') || ' ' || coalesce(v.requested_by->>'display_name', ''))
+                           || coalesce(v.line_title, '') || ' ' || coalesce(v.employee->>'display_name', '') || ' '
+                           || coalesce(v.requested_by->>'display_name', ''))
                LIKE search_fold($${q}::text))
      ORDER BY v.stage_entered_at, v.workflow_instance_id`,
     params,

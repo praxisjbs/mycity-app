@@ -10,6 +10,9 @@
  *                           employee is told (and M3 reads the rating from the event)
  *   a probation is ending   a probation review opens for the person's line manager
  *   a PIP starts or closes  the employee and their reviewer are told
+ *   scored without check-in the employee is told, with the reviewer's reason (§11)
+ *   withdrawn               the people it named are told; a leaver's (People archived them) ends
+ *                           at once, or on their leaving date through the reminder engine
  *
  * The approval's outcome (performance.review) is settled here as an outbox handler: approved closes
  * the review, refused returns it to the reviewer with the reason. Its stage moving on (second level
@@ -29,6 +32,9 @@ const vault = require("../../shared/documents/vault");
 const { formatDate } = require("../../shared/time/day-first");
 const reminders = require("../notifications/notifications.reminders");
 const { loginsOf } = require("../tasks/tasks.events");
+
+/** People's own key (organisation.events.js): a record archived is someone who has left. */
+const EMPLOYEE_ARCHIVED = "employee.archived";
 
 const REVIEW_FLOW = "performance.review";
 
@@ -58,6 +64,9 @@ const EVENTS = defineEvents("performance", {
   "improvement_plan.closed": { summary: "An improvement plan was closed with its outcome" },
   "improvement_plan.review_due": { summary: "An improvement plan's review date is near" },
   "key_result.report_due": { summary: "A function's key results are still to be reported for the month" },
+  "review.scored_without_check_in": { summary: "A reviewer scored a review whose check-in was not in by its due date" },
+  "review.withdrawn": { summary: "An open review closed as Withdrawn: its person left, or Operations & People withdrew it" },
+  "review.leaver_due": { summary: "A leaver's leaving date came: their open reviews are withdrawn" },
 });
 
 /* ------------------------------------------------------------------ *
@@ -123,6 +132,20 @@ defineNotification(EVENTS.REVIEW_RETURNED, {
   body: (e) => (e.payload.reason ? `Reason: ${e.payload.reason}` : ""),
 });
 
+defineNotification(EVENTS.REVIEW_SCORED_WITHOUT_CHECK_IN, {
+  to: [{ users: (e, client) => loginsOf(client, [e.payload.employee_id]) }],
+  who: "The employee",
+  title: (e) => `Your ${e.payload.round_name || "monthly"} review goes ahead`,
+  body: (e) => (e.payload.reason ? `Scored without your check-in: ${e.payload.reason}` : "Scored without your check-in."),
+});
+
+defineNotification(EVENTS.REVIEW_WITHDRAWN, {
+  to: [{ users: (e, client) => loginsOf(client, e.payload.tell_employee_ids || []) }],
+  who: "The employee, the reviewer and the second level; for a leaver, the reviewer and the second level",
+  title: (e) => `${e.payload.employee_name}'s ${e.payload.round_name || "probation"} review was withdrawn`,
+  body: (e) => e.payload.reason || "",
+});
+
 defineNotification(EVENTS.REVIEW_CLOSE_DUE, {
   to: [{ users: (e, client) => loginsOf(client, e.payload.hr_employee_ids || []) }],
   who: "Operations & People",
@@ -181,6 +204,7 @@ const REVIEW_REMINDER = "review_due";
 const CLOSE_REMINDER = "review_close_due";
 const PIP_REMINDER = "pip_review_due";
 const KR_REPORT_REMINDER = "kr_report_due";
+const LEAVER_REMINDER = "review_leaver_withdraw";
 
 reminders.defineReminder(CHECK_IN_REMINDER, {
   event: EVENTS.REVIEW_CHECK_IN_DUE,
@@ -212,6 +236,13 @@ reminders.defineReminder(KR_REPORT_REMINDER, {
   // On the 2nd business day of each month, from 09:00: each function with key results unreported.
   find: (client, { now }) => require("./reviews.cycle").reportsDue(client, now),
   check: (client, row) => require("./reviews.cycle").reportReminder(client, row),
+});
+
+// A leaver archived ahead of their leaving date: their reviews end on that date (§11).
+reminders.defineReminder(LEAVER_REMINDER, {
+  event: EVENTS.REVIEW_LEAVER_DUE,
+  module: "performance",
+  check: (client, row) => require("./reviews.service").leaverCheck(client, row),
 });
 
 /* ------------------------------------------------------------------ *
@@ -257,6 +288,15 @@ outbox.register(reminders.PEOPLE_EVENTS.EMPLOYEE_PROBATION_ENDING, "reviews.prob
   require("./reviews.service").openProbation(event.payload.employee_id, event.payload.confirmation_due_on || null),
 );
 
+// A leaver (§11): People archived them, so their open reviews end Withdrawn and their scorecard closes.
+outbox.register(EMPLOYEE_ARCHIVED, "reviews.leaver", (event) =>
+  require("./reviews.service").leaverArchived(event.entity && event.entity.id),
+);
+
+outbox.register(EVENTS.REVIEW_LEAVER_DUE, "reviews.leaver_on_date", (event) =>
+  require("./reviews.service").withdrawLeaver(event.payload.employee_id),
+);
+
 module.exports = {
   EVENTS,
   REVIEW_FLOW,
@@ -266,4 +306,5 @@ module.exports = {
   CLOSE_REMINDER,
   PIP_REMINDER,
   KR_REPORT_REMINDER,
+  LEAVER_REMINDER,
 };
