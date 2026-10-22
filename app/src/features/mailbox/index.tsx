@@ -14,6 +14,8 @@ import { Composer, type ComposeInit } from "./Composer";
 import { ApiError } from "@/api/client";
 import { Avatar, Banner, Button, cn, EmailFrame, EmptyState, ErrorState, Field, fileTypeOf, formatBytes, formatDateTime, formatWhen, FormFooter, Icon, IconButton, LoadingRows, Menu, PageHeader, PasswordField, Pill, prepareEmail, referencedCids, SearchInput, splitQuoted, SplitPanes, StatStrip, TextField, toast, useContractForm, useIsMobile, useModal, useSplitPanes, type Mailto, type MenuItem, type SplitState } from "@mycity/ui";
 import { MailSignature } from "./MailSignature";
+import { SummaryCard } from "./Assist";
+import type { ThreadSummary } from "@mycity/contract/contract.gen.ts";
 
 const NAMES: Record<MailFolder, string> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", spam: "Spam", trash: "Trash" };
 const who = (a: MailAddress | null) => (a ? a.name || a.address : "(no recipient)");
@@ -181,6 +183,9 @@ function quote(m: MailMessage) {
 function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () => void; compose: (init: ComposeInit, title?: string) => void; onMoved: () => void }) {
   const t = useApi("GET /api/v1/mailbox/threads/:id", { params: { id: row.mail_thread_id } });
   const [images, setImages] = useState(false);
+  const mobile = useIsMobile();
+  /* Summarise Thread (mailbox.md §3 step 14): the card shows loading lines until the summary arrives. */
+  const [summary, setSummary] = useState<{ open: boolean; data: ThreadSummary | null }>({ open: false, data: null });
   /* Opening a thread marks it read on the server too (mailbox.md §3). */
   useEffect(() => {
     if (row.unread) void api.call("POST /api/v1/mailbox/threads/:id/read", { params: { id: row.mail_thread_id }, body: {} }).then(() => invalidate("/api/v1/mailbox/threads"));
@@ -217,6 +222,18 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
   const mailto = (m: Mailto) => compose({ to: m.to, cc: m.cc, subject: m.subject ?? "", body_html: m.body ? `<p>${escapeHtml(m.body)}</p>` : "" }, "New Message");
   const forward = () =>
     compose({ subject: /^fwd:/i.test(thread.subject) ? thread.subject : `Fwd: ${thread.subject}`, body_html: quote(lastMsg), attachments: lastMsg.attachments.map(({ document_id, file_name, size_bytes, mime_type }) => ({ document_id, file_name, size_bytes, mime_type })) }, "Forward");
+  const summarise = async () => {
+    setSummary((s) => ({ open: true, data: s.data }));
+    try {
+      const r = await api.call("POST /api/v1/mailbox/threads/:id/summary", { params: { id: row.mail_thread_id }, body: {} });
+      if (r.available) return setSummary({ open: true, data: r });
+      setSummary((s) => ({ open: Boolean(s.data), data: s.data }));
+      toast("AI summaries are off");
+    } catch (e) {
+      setSummary((s) => ({ open: Boolean(s.data), data: s.data }));
+      toast(e instanceof ApiError ? e.message : "AI summaries are off");
+    }
+  };
   const moves: MenuItem[] = [
     ...(row.folder !== "archive" ? [{ label: "Archive", icon: "book" as const, onSelect: () => void move("archive") }] : []),
     ...(row.folder !== "inbox" && row.folder !== "sent" ? [{ label: "Move to Inbox", icon: "mail" as const, onSelect: () => void move("inbox") }] : []),
@@ -240,9 +257,11 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
           {!spam && <Button icon="send" onClick={() => reply(false)}>Reply</Button>}
           {!spam && lastMsg.to.length + lastMsg.cc.length > 1 && <Button onClick={() => reply(true)}>Reply All</Button>}
           {!spam && <Button onClick={forward}>Forward</Button>}
+          {!spam && (mobile ? <IconButton icon="spark" label="Summarise Thread" onClick={summarise} /> : <Button icon="spark" onClick={summarise}>Summarise Thread</Button>)}
           <Menu trigger={(p) => <IconButton {...p} icon="dots" label="Move this message" />} items={moves} />
         </span>
       </div>
+      {summary.open && !spam && <SummaryCard summary={summary.data} close={() => setSummary({ open: false, data: summary.data })} />}
       {thread.messages.map((m, i) => (
         <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} forwardable={!spam} />
       ))}

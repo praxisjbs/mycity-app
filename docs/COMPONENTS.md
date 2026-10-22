@@ -3630,6 +3630,7 @@ Speak instead of typing: records, sends the audio to be transcribed, and drops t
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `label` | `string` | yes | What is being dictated, Title Case, at most 4 words: names the button. |
+| `action` | `string` |  | The button's own words, Verb Noun, at most 3: Record Answer unless set (Dictate beside a field that takes a whole message). |
 | `transcribe` | `Transcribe` | yes | Sends the audio and answers with the words. An AI tidies them server side without changing the meaning (A18). |
 | `onTranscript` | `(text: string) => void` | yes | Called with the words once they arrive. |
 | `maxSeconds` | `number` |  | The longest recording taken, in seconds; 120 unless set. |

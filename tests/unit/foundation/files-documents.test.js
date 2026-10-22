@@ -357,6 +357,17 @@ describe("document types, served types, derived file names", () => {
     expect(exportFiles.present({ ...doc, render_status: null }).status).toBe("done");
   });
 
+  test("a transient type is read by its request and removed: no derived copies, swept after an hour", () => {
+    types.defineDocumentType("unit_dictation", { label: "Unit dictation", module: "mailbox", sensitivity: "personal", transient: true });
+    expect(types.typeOf("unit_dictation")).toMatchObject({ transient: true, export: false });
+    expect(types.isTransient("unit_dictation")).toBe(true);
+    expect(types.isTransient("unit_offer_letter")).toBe(false);
+    expect(types.isTransient("constructor")).toBe(false);
+    expect(types.transientTypes()).toContain("unit_dictation");
+    expect(types.transientTypes()).not.toContain("unit_offer_letter");
+    expect(vault.TRANSIENT_MINUTES).toBe(60);
+  });
+
   test("only allow-listed types are served as themselves", () => {
     expect(mimePolicy.servedType("application/pdf")).toBe("application/pdf");
     expect(mimePolicy.servedType("text/html")).toBe("application/octet-stream");
