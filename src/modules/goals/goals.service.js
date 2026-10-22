@@ -266,7 +266,7 @@ async function deleteGoal(actor, id) {
     if (!before) throw new AppError("NOT_FOUND", "That goal does not exist", 404);
     const uses = await repo.goalUses(client, id);
     if (uses.objectives > 0)
-      throw new AppError("GOAL_IN_USE", "A company objective serves this goal: unlink it first", 409);
+      throw new AppError("GOAL_IN_USE", "A company objective serves this goal", 409);
     if (uses.other > 0) throw new AppError("GOAL_IN_USE", "Another record names this goal", 409);
     await repo.deleteGoal(client, id);
     await emit(client, {
@@ -513,7 +513,7 @@ async function requestChange(actor, scope, body) {
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
     if (ctx.plan_status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
     if (okrs.tbcOpen(ctx))
-      throw new AppError("TARGET_TBC", "Set a TBC target directly until its lock date", 409);
+      throw new AppError("TARGET_TBC", "Set this TBC target directly", 409);
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };

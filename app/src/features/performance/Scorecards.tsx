@@ -29,6 +29,7 @@ import {
   Field,
   FilterSelect,
   formatDate,
+  formatNumber,
   FormFooter,
   HelpTerm,
   KeyValue,
@@ -43,7 +44,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { Commitments } from "./Commitments";
-import { cardStatus, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, useQuarter } from "./shared";
+import { cardStatus, figureOf, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, targetOf, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
@@ -254,8 +255,8 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
           rowKey={(x) => x.okr_key_result_id}
           columns={[
             { key: "kr", label: "Key Result", render: (x) => x.code },
-            { key: "shares", label: "Shares", render: (x) => x.shares.map((s) => `${s.employee.display_name} ${s.share_value}`).join(", ") },
-            { key: "target", label: "Target", align: "n", render: (x) => x.target_value ?? "–" },
+            { key: "shares", label: "Shares", render: (x) => x.shares.map((s) => `${s.employee.display_name} ${formatNumber(s.share_value)}`).join(", ") },
+            { key: "target", label: "Target", align: "n", render: (x) => figureOf(x.target_value) ?? "–" },
             { key: "status", label: "Status", render: (x) => <StatusPill s={x.status === "ok" ? { tone: "ok", text: "OK" } : { tone: "err", text: "Rebalance" }} /> },
           ]}
         />
@@ -295,7 +296,7 @@ function SectionLines({ section, card, months }: { section: ScorecardLine["secti
             </span>
           ),
         },
-        { key: "target", label: "Target", render: (l) => `${l.target_text ?? l.target_value ?? "–"}${l.unit && l.target_value ? (l.unit === "%" ? "%" : ` ${l.unit}`) : ""}` },
+        { key: "target", label: "Target", render: (l) => targetOf(l) },
         {
           key: "linked",
           label: <HelpTerm help="The key result or KPI this line feeds. Its figures come from there.">Linked To</HelpTerm>,

@@ -358,7 +358,7 @@ const ObjectiveCreate = z
 const ObjectiveEdit = z
   .object({
     title: text(500),
-    organisational_goal_id: uuid.nullable(),
+    organisational_goal_id: clearable(uuid),
     position: z.number().int().min(0),
   })
   .partial()
@@ -497,6 +497,7 @@ const TargetChange = z
 /** GET /performance/key-results/:id */
 const KeyResultDetail = KeyResult.extend({
   objective: ObjectiveRef,
+  performance_period_id: uuid,
   department_id: uuid.nullable(),
   department: z.string().nullable(),
   plan_status: PlanStatus,
@@ -982,6 +983,7 @@ const TABLES = {
     virtual: {
       ...KR_VIRTUAL,
       objective: "its okr_objective",
+      performance_period_id: "okr_objective.performance_period_id",
       department_id: "okr_objective.department_id",
       department: "department.name; null for a company key result",
       plan_status: "performance_plan.status",

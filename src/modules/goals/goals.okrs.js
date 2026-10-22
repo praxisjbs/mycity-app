@@ -407,6 +407,7 @@ async function getKeyResultDetail(id, actor = null) {
   return {
     ...keyResultView(kr, latest, ctx.rules),
     objective: { okr_objective_id: objective.okr_objective_id, code: objective.code, title: objective.title },
+    performance_period_id: objective.performance_period_id,
     department_id: objective.department_id,
     department: objective.department,
     plan_status: objective.plan_status,
