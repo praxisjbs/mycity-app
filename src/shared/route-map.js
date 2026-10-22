@@ -350,7 +350,8 @@ const ENTITY_ROUTES = Object.freeze({
   knowledge_announcement: screen("knowledge", "announcements"), // search:none not built yet (src/modules/knowledge)
 
   // Praxis AI
-  ai_conversation: screen("praxis_ai", "history"), // search:none not built yet (src/modules/assistant)
+  // A conversation opens on Ask, where it can be read and continued (docs/guides/praxis-ai.md §9).
+  ai_conversation: screen("praxis_ai", "ask"),
 
   // Settings
   department: screen("settings", "organisation"),

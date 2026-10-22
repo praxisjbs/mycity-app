@@ -179,16 +179,15 @@ const AiFeedback = z
  * Voice (§6.6)
  * ------------------------------------------------------------------ */
 
-/** POST /ai/transcribe: a recording just uploaded through the upload engine. */
-const AiTranscribe = z
-  .object({
-    document_id: uuid,
-  })
-  .strict();
-
-/** The words, and whether they are the browser's captions rather than a model's. */
+/**
+ * POST /ai/transcribe takes the recording itself, through the upload engine (multipart, body
+ * `documents.DocumentUpload`); it is kept only until its words come back. This is the answer:
+ * the recording's id (already removed; the upload engine resolves on a document id, as an import's
+ * batch does), the words, and whether they are a placeholder rather than a model's.
+ */
 const AiTranscript = z
   .object({
+    document_id: uuid,
     text: z.string(),
     draft: z.boolean(),
   })
@@ -233,7 +232,6 @@ const TABLES = {
   AiTurnPage: { table: null, reason: "a page of a conversation's answers" },
   AiHistorySummary: { table: null, reason: "counts over the caller's ai_conversation and ai_message rows this Lagos month" },
   AiFeedback: { table: "ai_message" },
-  AiTranscribe: { table: null, reason: "a recording in the vault, by its document" },
   AiTranscript: { table: null, reason: "the words of a recording, not kept" },
 };
 
@@ -256,6 +254,5 @@ module.exports = {
   AiTurnPage,
   AiHistorySummary,
   AiFeedback,
-  AiTranscribe,
   AiTranscript,
 };

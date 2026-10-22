@@ -6,7 +6,8 @@
  * citations are the records the reads returned (shared/ai/cite.js), never the answer's words.
  *
  *   const shown = answer.build({ draft, reads, routes, screens });
- *   // → { content, table, link, citations, citations_total, reads, declined, more, rows_read, module_key, metadata }
+ *   // → { content, table, link, citations, citations_total, reads, declined, more, rows_read, module_key,
+ *   //     metadata, stored_citations }
  */
 const { mergeCitations } = require("../../../shared/ai/cite");
 const routeMap = require("../../../shared/route-map");
@@ -91,14 +92,14 @@ function build({ draft, reads, routes, screens }) {
   const ok = reads.filter((r) => r.ok);
   const table = tableOf(draft.table, reads);
   const link = linkOf(draft.route, draft.prefill, routes, screens);
-  const all = mergeCitations(ok.map((r) => r.citations || []));
-  const citations = all.slice(0, MAX_CITATIONS).map((c) => ({
+  const all = mergeCitations(ok.map((r) => r.citations || [])).map((c) => ({
     entity_type: c.type,
     entity_id: c.id,
     label: c.label || c.type,
     link: c.link,
     read_key: c.read,
   }));
+  const citations = all.slice(0, MAX_CITATIONS);
   let declined = null;
   if (link) declined = "change";
   else if (reads.some((r) => r.declined) && !ok.length) declined = "not_available";
@@ -116,8 +117,10 @@ function build({ draft, reads, routes, screens }) {
     rows_read: ok.reduce((n, r) => n + r.rows.length, 0),
     module_key: ok.length ? ok[0].module : null,
   };
-  // What is kept on the answer's message, for History and the next turn's replay.
+  // What is kept on the answer's message, for History and the next turn's replay, and every
+  // citation, whose count History shows beside the first fifty.
   shown.metadata = { table, link, reads: madeReads, declined, more };
+  shown.stored_citations = all;
   return shown;
 }
 

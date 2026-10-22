@@ -1,0 +1,95 @@
+"use strict";
+/**
+ * Praxis AI's module without a database (docs/guides/praxis-ai.md §5, §6.5, §6.8): who may reach
+ * each route, a conversation's title, the questions Try Asking offers, and an answer as History
+ * shows it. Asking, History and voice run against Postgres in tests/integration/assistant.test.js.
+ *
+ * Every person and record here is invented.
+ */
+const { routesOf } = require("../../http/route");
+const { titleOf } = require("./assistant.service");
+const suggestions = require("./assistant.suggestions");
+const { present } = require("./assistant.history");
+
+describe("the routes", () => {
+  const routes = routesOf(require("./assistant.routes").router);
+  const by = Object.fromEntries(routes.map((r) => [`${r.method} ${r.path}`, r]));
+
+  test("asking, feedback and voice need praxis_ai create; reading and removing one's own words need view", () => {
+    expect(Object.keys(by).sort()).toEqual([
+      "DELETE /conversations/:id",
+      "DELETE /history",
+      "GET /conversations",
+      "GET /conversations/:id/turns",
+      "GET /history/summary",
+      "GET /suggestions",
+      "POST /answers/:id/feedback",
+      "POST /ask",
+      "POST /transcribe",
+    ]);
+    for (const key of ["POST /ask", "POST /answers/:id/feedback", "POST /transcribe"])
+      expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "create" });
+    for (const key of ["GET /suggestions", "GET /conversations", "GET /conversations/:id/turns", "DELETE /conversations/:id", "DELETE /history", "GET /history/summary"])
+      expect(by[key].permission).toMatchObject({ key: "praxis_ai", action: "view" });
+    for (const r of routes) expect(r.capability).toBeNull();
+  });
+});
+
+describe("a conversation's title", () => {
+  test("its first question, cut at 120 characters on a word", () => {
+    expect(titleOf("  Who is   late today? ")).toBe("Who is late today?");
+    const long = `${"Which leave requests are waiting on me and ".repeat(4)}end`;
+    const t = titleOf(long);
+    expect(t.length).toBeLessThanOrEqual(120);
+    expect(long.startsWith(t)).toBe(true);
+    expect(t.endsWith(" ")).toBe(false);
+  });
+});
+
+describe("Try Asking", () => {
+  test("only questions the person's reads can answer, six at most, most useful first", () => {
+    expect(suggestions.forReads([{ key: "my_leave.balances" }, { key: "holidays.list" }])).toEqual([
+      "How many leave days do I have left?",
+      "When is the next public holiday?",
+    ]);
+    const all = suggestions.QUESTIONS.map(([key]) => ({ key }));
+    expect(suggestions.forReads(all)).toHaveLength(6);
+    expect(suggestions.forReads(all)[0]).toBe("Who is in today, and who is late?");
+    expect(suggestions.forReads([{ key: "payroll.runs" }])).toEqual([]);
+  });
+
+  test("every question belongs to a read some module declares", () => {
+    const registry = require("../../shared/ai/registry");
+    for (const [key] of suggestions.QUESTIONS) expect(registry.read(key)).not.toBeNull();
+  });
+});
+
+describe("an answer as History shows it", () => {
+  test("its table, button and reads from what was kept; a citation's link worked out now", () => {
+    const shown = present(
+      {
+        ai_message_id: "00000000-0000-4000-8000-000000000001",
+        ai_conversation_id: "00000000-0000-4000-8000-000000000002",
+        question: "Whose leave waits on me?",
+        content: "Two requests wait on you.",
+        metadata: {
+          table: { columns: ["Employee"], rows: [["Ayo Bello"]], numeric: [] },
+          link: null,
+          reads: [{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 2 }],
+          declined: null,
+          more: false,
+        },
+        feedback: "up",
+        created_at: new Date("2026-10-22T09:30:00Z"),
+        citations_total: 1,
+      },
+      [{ entity_type: "employee", entity_id: "00000000-0000-4000-8000-000000000003", label: "Ayo Bello", read_key: "employees.list" }],
+    );
+    const c = require("@mycity/contract");
+    expect(c.assistant.AiAnswer.safeParse(shown).success).toBe(true);
+    expect(shown.reads).toEqual([{ key: "leave.requests", rows: 2, total: 2 }]);
+    expect(shown.citations[0]).toMatchObject({ entity_type: "employee", label: "Ayo Bello", read_key: "employees.list" });
+    expect(shown.citations[0].link).toMatch(/^\/people\?/);
+    expect(shown.created_at).toBe("2026-10-22T09:30:00.000Z");
+  });
+});

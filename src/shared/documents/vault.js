@@ -227,6 +227,8 @@ async function prepare(buffer, type, purpose) {
  * @param {boolean} [opts.stranger]  sent by someone outside (public surface): quarantine and scan
  * @param {string} [opts.title]
  * @param {string} [opts.expires_on]  YYYY-MM-DD (an ID card, a certificate)
+ * @param {boolean} [opts.transient]  held only for a moment and removed by the caller (a spoken
+ *        question while it is transcribed): no derived files are made for it
  * @param {object|string|null} opts.actor
  * @returns {Promise<object>} the document row
  */
@@ -294,7 +296,7 @@ async function store(client, opts) {
 
   const needs = [];
   if (stranger) needs.push("scan");
-  else if (sniffed.kind === "audio" || sniffed.kind === "video")
+  else if (!opts.transient && (sniffed.kind === "audio" || sniffed.kind === "video"))
     needs.push("av");
   else if (sniffed.mime === "application/pdf") needs.push("pdf");
   await emit(client, {

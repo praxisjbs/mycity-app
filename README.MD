@@ -518,7 +518,7 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 | Module | Files beyond the template |
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
-| `assistant` | `.history` (Ask, History). Engine in `services/ai/assistant/{orchestrator, answer}.js`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read (`docs/guides/praxis-ai.md`) |
+| `assistant` | `.history` (History: conversations, turns, the month's summary, Delete Conversation, Clear History), `.suggestions` (Try Asking: a question per read), `.search` (the caller's own conversations), `.events` (audit only, and the `ai_voice_question` document type). Engine in `services/ai/assistant/{orchestrator, answer}.js`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read (`docs/guides/praxis-ai.md`) |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
 The assistant **reads only** (A23). It answers from the manifests every module has carried since M1.
@@ -545,7 +545,7 @@ timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 | M7 | `partner-inactivity`, `agreement-renewal` | `partner-inactivity`, `agreement-renewals` |
 | M8 | `budget-threshold`, `approval-ageing` | `budget-threshold`, `approval-ageing` |
 | M9 | | `system-health` (faults grouped, a readiness snapshot taken and anything open a day escalated, every 5 minutes), `system-health-digest` (the summary at 08:00 Lagos), `system-health-purge` (fault occurrences after 90 days; snapshots, traffic, samples and process beats after 30, nightly), `system-health-sample` (the whole server and whether the API answers, every minute), `integrations-watch` (the connections whose test is free tested, and each daily limit checked, every 15 minutes), `integrations-purge` (connection checks after 90 days, their use after 30, nightly), `exchange-rates` (today's exchange rates after midnight Lagos, and again within the hour if that failed) |
-| M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | |
+| M10 | `knowledge-embed`, `ai-find-prices` (a Find Prices run, its requests of 20 models one after another; brought forward with AI Control) | `assistant-voice-sweep` (a spoken question to Praxis AI left in the vault by a request that never finished, removed within the hour; `docs/guides/praxis-ai.md` §6.6) |
 
 `partner-inactivity` (M7) and `budget-threshold` and `approval-ageing` (M8) are superseded by Home's
 `home-alert-sweeps` (`src/modules/alerts/alerts.metrics.js`): partner inactivity and budget threshold

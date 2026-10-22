@@ -23,6 +23,7 @@ import "./modules/payroll";
 import "./modules/partnerships";
 import "./modules/expenses";
 import "./modules/knowledge";
+import "./modules/assistant";
 import "./modules/policies";
 import "./modules/settings";
 import "./modules/system_health";

@@ -1,4 +1,4 @@
--- M10 Praxis AI: conversation counters, what each answer read, and citations that name a record (docs/guides/praxis-ai.md §4).
+-- M10 Praxis AI: conversation counters, what each answer read, and citations that name a record, in order (docs/guides/praxis-ai.md §4).
 -- UP
 
 -- A conversation keeps when it was last asked in and how many questions it holds, for Recent and History.
@@ -48,6 +48,8 @@ CREATE INDEX IF NOT EXISTS ai_message_run_idx ON ai_message (ai_run_id);
 ALTER TABLE ai_message_citation ADD COLUMN IF NOT EXISTS entity_type text;
 ALTER TABLE ai_message_citation ADD COLUMN IF NOT EXISTS entity_id text;
 ALTER TABLE ai_message_citation ADD COLUMN IF NOT EXISTS read_key text;
+-- The order the answer cited them in, kept: they are all written in one statement, at one now().
+ALTER TABLE ai_message_citation ADD COLUMN IF NOT EXISTS position integer NOT NULL DEFAULT 0;
 
 ALTER TABLE ai_message_citation DROP CONSTRAINT IF EXISTS ai_message_citation_check;
 
@@ -80,6 +82,7 @@ BEGIN
       ADD CONSTRAINT ai_message_citation_check CHECK (knowledge_article_version_id IS NOT NULL OR document_id IS NOT NULL);
   END IF;
 END $$;
+ALTER TABLE ai_message_citation DROP COLUMN IF EXISTS position;
 ALTER TABLE ai_message_citation DROP COLUMN IF EXISTS read_key;
 ALTER TABLE ai_message_citation DROP COLUMN IF EXISTS entity_id;
 ALTER TABLE ai_message_citation DROP COLUMN IF EXISTS entity_type;

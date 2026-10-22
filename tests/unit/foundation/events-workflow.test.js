@@ -246,7 +246,7 @@ describe("route map", () => {
     expect(routeMap.linkFor("query", "q1")).toEqual({ module: "queries", tab: "queries", id: "q1", path: "/queries?tab=queries&id=q1" });
     expect(routeMap.linkFor("payslip", "p1", { self: true }).path).toBe("/ess?tab=my-payslips&id=p1");
     expect(routeMap.linkFor("payslip", "p1").path).toBe("/payroll?tab=payslips&id=p1");
-    expect(routeMap.linkFor("ai_conversation", "a1").path).toBe("/praxis-ai?tab=history&id=a1");
+    expect(routeMap.linkFor("ai_conversation", "a1").path).toBe("/praxis-ai?tab=ask&id=a1");
     expect(routeMap.linkFor("unknown_type", "x")).toBeNull();
     expect(routeMap.linkFor("query", "")).toBeNull();
   });

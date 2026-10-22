@@ -154,6 +154,7 @@ const SCHEDULERS = Object.freeze([
   "home-alert-sweeps",
   "scheduled-reports",
   "export-cleanup",
+  "assistant-voice-sweep",
   "task-recurrence",
   "urgent-repeats",
   "reminders",

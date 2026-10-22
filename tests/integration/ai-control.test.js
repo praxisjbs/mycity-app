@@ -229,7 +229,7 @@ describeDb("AI Control against the real migrations", () => {
       expect(by["policy-tidy"]).toMatchObject({ own_chain: false, chain: expect.objectContaining({ scope: "job", key: "default" }) });
       expect(by["find-prices"]).toMatchObject({ job: "deep_reasoning", personal_data: false });
       // A question spoken on Praxis AI · Ask (docs/guides/praxis-ai.md §6.6): on Transcription's chain, never DeepSeek.
-      expect(by["praxis-ai-voice"]).toMatchObject({ job: "transcription", personal_data: true, built: false, own_chain: false });
+      expect(by["praxis-ai-voice"]).toMatchObject({ job: "transcription", personal_data: true, built: true, own_chain: false });
       expect((await as("admin").get("/ai-control/actions?job=transcription")).body.data.map((a) => a.key)).toEqual(["voice-note-transcription", "praxis-ai-voice"]);
     });
   });

@@ -64,7 +64,7 @@ const ACTIONS = Object.freeze({
     personal_data: true,
     chosen_by: "GE",
     chosen_at: "2026-10-22",
-    built: false,
+    built: true,
   }),
   "find-prices": Object.freeze({
     label: "Find Prices",

@@ -107,7 +107,7 @@ const ACTIONS: Action[] = [
   { key: "voice-note-transcription", label: "Voice Note Transcription", module: "community", job: "transcription", personal_data: true, built: true },
   { key: "policy-tidy", label: "Tidy Policy", module: "knowledge", job: "default", personal_data: true, built: true },
   { key: "data-answers", label: "Data Answers", module: "praxis_ai", job: "default", personal_data: true, built: true, chain: [["gemini", "gemini-3.8-flash"], ["gemini", "gemini-2.5-pro"]] },
-  { key: "praxis-ai-voice", label: "Voice Question", module: "praxis_ai", job: "transcription", personal_data: true, built: false },
+  { key: "praxis-ai-voice", label: "Voice Question", module: "praxis_ai", job: "transcription", personal_data: true, built: true },
   { key: "find-prices", label: "Find Prices", module: "ai_control", job: "deep_reasoning", personal_data: false, built: true, searches: true },
 ];
 const CALLS_TODAY: Record<string, number> = { "voice-note-transcription": 37, "policy-tidy": 4, "data-answers": 0, "praxis-ai-voice": 0, "find-prices": 0 };

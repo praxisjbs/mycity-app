@@ -56,6 +56,7 @@ describe("job registry", () => {
     expect([...registry.SCHEDULERS].sort()).toEqual([
       "alert-ageing",
       "announcement-release",
+      "assistant-voice-sweep",
       "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",

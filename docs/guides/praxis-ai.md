@@ -99,7 +99,7 @@ Migration `10300_assistant.sql` (M10's block). The tables are `10000`'s; this bu
 |---|---|---|
 | `ai_conversation` (10000) | `user_id`, `title` (the first question, cut at 120 characters), `status` (`active`), adds `last_asked_at`, `questions` (10300) | One per conversation, always the asker's own. Index (`user_id`, `last_asked_at` desc) |
 | `ai_message` (10000) | `ai_conversation_id`, `parent_message_id` (an answer's question), `role` (`user`, `assistant`, `system` as seeded in `10099`; CHECK added in 10300), `content` (the question, or the answer's words), `ai_run_id`, `feedback` (`up`, `down` or null; CHECK added), adds `rows_read` (the rows its reads returned) and `module_key` (the module of its first read) (10300), `metadata` | History reports on `rows_read` and `module_key`, so they are columns. An answer's `metadata` holds what is only shown: its table (columns, rows, numeric columns), its screen button, the reads it made (key, rows returned, total), `declined` and `more`. Indexes on the conversation, the parent and the run (10300) |
-| `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` (10300); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10300 widens it to accept a record (`entity_type` and `entity_id`) |
+| `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` and `position` (the order the answer cited them in) (10300); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10300 widens it to accept a record (`entity_type` and `entity_id`) |
 | `ai_run`, `ai_run_step` (M0, 10200) | `purpose` `data-answers` or `praxis-ai-voice` | One run per question, one step per round with the model. No question or answer text is kept here |
 
 No reference seed: `praxis_ai` grants are `0290`'s. Nothing is seeded on production; staging's
@@ -119,10 +119,10 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 | `DELETE /history` | → `no_content` | `praxis_ai` view · own | | Every conversation of the caller |
 | `GET /history/summary` | → `AiHistorySummary` | `praxis_ai` view · own | no | This Lagos month: questions, conversations, records read; questions by module |
 | `POST /answers/:id/feedback` | `AiFeedback` (`up`, `down` or null) → `no_content` | `praxis_ai` create · own | | |
-| `POST /transcribe` | `AiTranscribe` (`document_id`) → `AiTranscript` (`text`, `draft`) | `praxis_ai` create | | The recording is removed from the vault once its words return |
+| `POST /transcribe` | the recording, multipart through the upload engine (`documents.DocumentUpload`, purpose `voice_note`) → `AiTranscript` (the recording's `document_id`, already removed, which the upload engine resolves on; `text`, `draft`) | `praxis_ai` create | | One request: stored, transcribed, removed (§6.6) |
 
-Errors: 404 `NOT_FOUND` (a conversation that is not the caller's reads as missing); 409
-`CONVERSATION_DELETED`; 422 the contract's; governance's `AI_DISABLED`, `AI_MODULE_DISABLED`,
+Errors: 404 `NOT_FOUND` (a conversation or answer that is not the caller's, or no longer exists,
+reads as missing); 422 the contract's; governance's `AI_DISABLED`, `AI_MODULE_DISABLED`,
 `AI_CAP_REACHED`; `AI_UNAVAILABLE` (503) when every model is passed by or fails. A refused read is
 not an error: it becomes an answer that says the information is not available (§6.3).
 
@@ -219,12 +219,14 @@ The server turns it into `AiAnswer`:
 
 ### 6.6 Voice
 
-- `VoiceField` (120 seconds at most) records; the screen uploads the audio through the upload engine
-  (purpose `voice_note`) and calls `POST /ai/transcribe` with its `document_id`.
+- `VoiceField` (120 seconds at most) records; the screen sends the recording in one request,
+  `POST /ai/transcribe`, through the upload engine (purpose `voice_note`).
 - The words come from `services/ai/transcription.transcribe` under the action `praxis-ai-voice`
   (Transcription job, personal data, so never DeepSeek; Groq, then Gemini, then the browser's
   captions as a draft, `integrations.md` §6.14).
-- The recording is removed from the vault once its words return, or after a day if they never do.
+- The recording is held in the vault (document type `ai_voice_question`, stored `transient`, so no
+  derived files are queued for it) only while it is transcribed, and removed in the same request whatever happens. One a request left behind (the
+  process stopped mid-way) is removed within the hour by the `assistant-voice-sweep` scheduler.
 - The words land in the box; nothing is asked until the person sends it.
 
 ### 6.7 The registry, AI Control and jobs
@@ -277,7 +279,7 @@ the prompt or the loop ships; not in CI, which has no key.
 | `assistant.conversation_deleted` | Delete Conversation | Audit only |
 | `assistant.history_cleared` | Clear History | Audit only |
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
-| `assistant-voice-sweep` (daily, under the cron lock) | 03:00 Lagos | Removes recordings older than a day whose words never returned |
+| `assistant-voice-sweep` (hourly, under the cron lock) | Every hour at 25 past | Removes recordings an hour old: their request never finished (§6.6) |
 
 Nobody is notified of anything.
 
@@ -299,8 +301,8 @@ module grant. Restricted fields reach the model only for a person who sees them 
   assistant never reads its own history as data.
 - **AI routes**: none.
 - **Search** (`assistant.search.js`): the person's own conversations by title, pinned to their
-  `user_id` like the mailbox (`owner`), opening History's record (`ai_conversation`, already in the
-  route map). Words: conversation, question, chat, asked. Screens: Ask ("ai", "assistant", "ask",
+  `user_id` like the mailbox (`owner`), opening the conversation on Ask (`ai_conversation` in the
+  route map, `/praxis-ai?tab=ask&id=`). Words: conversation, question, chat, asked. Screens: Ask ("ai", "assistant", "ask",
   "chat", "question"), History ("ai history", "past questions"), and New Conversation as Ask's New
   action.
 
@@ -349,10 +351,11 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **A person loses a grant after asking**: their History keeps the old answer's words; a citation
   opens through the screen's own check, which may now refuse.
 - **A cited record is deleted later**: the citation opens the screen's not-found state.
-- **A conversation deleted in another tab while asking**: 409 `CONVERSATION_DELETED`; the screen
-  starts a new conversation with the same question in the box.
+- **A conversation deleted in another tab**: asking in it is 404 and the screen starts a new
+  conversation with the same question in the box; deleted while its answer was being made, the
+  question is saved in a new conversation.
 - **A recording that never transcribes**: the box stays empty with a short message; the recording
-  is swept after a day.
+  is removed in the same request, or by the sweep within the hour.
 - **A question in another language**: answered in English.
 
 ## 12 · Donor code
@@ -381,6 +384,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Commit 4 of 7: the API built (`src/modules/assistant`, §5): ask, suggestions, conversations, turns, Delete Conversation, Clear History, the summary, feedback and voice. §5: transcribe takes the recording in one multipart request; a conversation that is gone is 404, not 409. §6.6, §7: the recording is removed in the same request and the sweep is hourly. §9: a conversation opens on Ask. §4: citations keep their order (`position`), found when the full suite read them back in a different order. Ask and History moved onto the contract and its mock (the screens' rebuild is commit 5).
 - 22/10/2026 · GE · Commit 3 of 7: §6.1 to §6.4 built as the engine (`services/ai/assistant/{orchestrator, answer}.js`); the prompt is `prompts/data-answers.md`, named after its action as the AI-actions gate requires.
 - 22/10/2026 · GE · Commit 2 of 7: §6.7 built: tools on every text model's vendor file, `converse()`, Voice Question registered (built with the API, commit 4).
 - 22/10/2026 · GE · Commit 1 of 7: the contract (`assistant.js`) and migration `10300_assistant.sql` built. §4: `ai_message` gains `rows_read` and `module_key` as columns (History reports on them), the role CHECK keeps the three roles `10099` seeds, and the 10000 tables gain their indexes and update triggers; numbered 10300, after AI Control's 10200 to 10220, so no server applies it out of order. §5: `ai_conversation_id`, the column's name.
