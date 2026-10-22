@@ -50,6 +50,7 @@ describe("job registry", () => {
       "notification-push",
       "pdf-render",
       "reminders",
+      "review-cycle-open",
       "scheduled-report",
       "task-recurrence",
     ]);
@@ -71,6 +72,7 @@ describe("job registry", () => {
       "outbox-dispatch",
       "places-name",
       "reminders",
+      "review-cycles",
       "scheduled-reports",
       "system-health",
       "system-health-digest",

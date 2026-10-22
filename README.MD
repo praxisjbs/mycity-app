@@ -66,6 +66,8 @@ mycity-app/
 │                             (40_workspace.js: My Workspace's tasks and calendar through their
 │                             services; 45_performance_plan.js: MyCity's Q4 2026 plan, its quarter,
 │                             goals and the workbooks in performance/ through the import engine;
+│                             46_performance_reviews.js: October 2026's round with a review at
+│                             every stage, through the reviews service and the approval engine;
 │                             47_performance_commitments.js: October's and November's commitments
 │                             in every state, through the services and the approval flow;
 │                             60_home.js: Home's figures, its HOME_STAGING_ROWS manifest; lib/)
@@ -384,7 +386,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `ess` | AJ | `.profile`, `.earnings`, `.attendance`, `.documents`, `.leave` (aggregator: the caller's own, through each module's service), `.export` (Download My Data: the person's data as a workbook, built in the worker, downloaded where it was asked for, removed a day later) |
 | `community` | GE | `.presence`, `.recognition` (A19), `.celebrations` (A20), `.links` (link cards: fetched once per address and kept for a week, their pictures in the vault) |
 | `announcements` | GE | |
-| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test`; `.assist` (Write With AI, Tidy Up, Dictate and Summarise Thread, M10's mail AI brought forward: the conversation read, contact details shielded, every answer held to ready to send, summaries kept; docs/guides/mailbox.md §1.1), the prompts `services/ai/prompts/mail-{draft,tidy,summary}.md`, `migrations/10300_mail_thread_summary.sql`; on screen `app/src/features/mailbox/Assist.tsx` (the AI step inside the composer and the Summary card) |
+| `mailbox` | GE | `.search` (owner only), `providers/imap-smtp.provider.js`, `threading`, `folders`, `autodiscover`, `compose`, `visible`, `binding/` (M7); `signature/` (docs/guides/mailbox.md §3): `signature.resolve` (the model from records), `signature.html` (the full signature and the slim line, HTML and text), `signature.glyphs` (the pin and the service marks), `signature.images` (the pictures, inline and stored once), `signature.place` (where it goes in a message), `signature.repo`, `signature.service` (the tab, Configure, the preview and the send-time bake), `signature.test`; `.assist` (Write With AI, Tidy Up, Dictate and Summarise Thread, M10's mail AI brought forward: the conversation read, contact details shielded, every answer held to ready to send, summaries kept; docs/guides/mailbox.md §1.1), the prompts `services/ai/prompts/mail-{draft,tidy,summary,dictation}.md`, `migrations/10300_mail_thread_summary.sql`; on screen `app/src/features/mailbox/Assist.tsx` (the AI step inside the composer and the Summary card) |
 
 Shared pieces first filled in M1: `middleware/upload`, `shared/files`, `shared/documents/vault`,
 `services/media/image-pipeline`, `services/media/av-pipeline` (voice notes), `services/media/pdf-pipeline`
@@ -419,14 +421,14 @@ for this device), tested in `app/src/features/attendance/location.test.ts`.
 | `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.authority` (who sets which goals: the CEO, `goals.company`, `goals.function` and the function's head), `.plans` (one plan per function per quarter), `.okrs` (objectives, key results, Report Month, Confirm Score and the workbook import's writes), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the plan and target change completions: `performance.plan`, `performance.target_change`), `.workbook` (MyCity's OKR workbook as it is kept), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5) |
 | `targets` | `.weights` (sections and the contribution check), `.progress` (automatic lines, PR 3), `.commitments` (commitments and their approval, PR 4), `.import` (`scorecards`); agreement and its reminder in `.service` |
 | `kpis` | `.import` (`okr_kpis`) |
-| `reviews` | `.cycle` (monthly rounds, `review-cycle-open`), `.sequence` (self first, A17, and the stages), `.pip` (improvement plans), `.pdf`, `.dictation` (A18) |
+| `reviews` | `.cycle` (monthly rounds, `review-cycle-open`), `.sequence` (self first, A17, and the stages), `.pip` (improvement plans), `.pdf` (`templates/documents/review-summary.html`), `.dictation` (A18); migration `2300_performance_reviews.sql` (status CHECKs, the second level, corrective actions); tested by `tests/integration/performance-reviews.test.js`; on the in-browser mock in `app/src/api/mock/{data,modules}/reviews.ts` |
 | `ess` | `.performance` (My Performance and the check-in, PR 3) |
 
 The files each Performance pull request fills are listed in `docs/guides/performance.md` §12 (Files by
 PR); a file still empty says which PR fills it there.
 
 Shared first filled: `shared/time/recurrence`, `services/calendar/ics`, `services/ai`
-(`llm.service`, `transcription`, prompts `review-cleanup.md` and `week-summary.md`).
+(`llm.service`, `transcription`, prompts `review-cleanup.md`, `review-dictation.md` and `week-summary.md`).
 
 Migration `2400_performance_commitments.sql` (Performance PR 4: a rescope's reason on the task, a task
 pointing at a task for a recovery). Integration tests `tests/integration/performance-commitments.test.js`

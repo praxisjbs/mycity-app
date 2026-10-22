@@ -290,9 +290,10 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
   (Default, personal data, TB, `policies.md` §9), Data Answers (Default, personal data, TB,
   decision 27), Find Prices (Deep Reasoning, none, TB). Settings · Integrations' connection test
   (`integration-test`) is registered as direct: it calls the model under test and has no chain.
-- Registered since: Week Summary (Default, personal data, TB, 22/10/2026, `performance.md` §6.18);
-  the mailbox's Write Email, Tidy Email and Thread Summary (Default) and Mail Dictation
-  (Transcription), all personal data, TB, 22/10/2026 (`mailbox.md` §1.1, §9).
+- Registered since: Review Dictation (Transcription) and Tidy Review (Default), personal data, TB,
+  22/10/2026 (`performance.md` §6.17); Week Summary (Default, personal data, TB, 22/10/2026,
+  `performance.md` §6.18); the mailbox's Write Email, Tidy Email and Thread Summary (Default) and
+  Mail Dictation (Transcription), all personal data, TB, 22/10/2026 (`mailbox.md` §1.1, §9).
 - `redact.js` `shield()` swaps what the external redaction would mask for tokens (`KEPT001`) and
   hands back a `restore()` that puts the real values into the answer, for a feature whose answer
   must carry them (a mail draft) without the model ever seeing them (`mailbox.md` §6).
@@ -397,10 +398,9 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 1. **The per-module switch** (`ai_setting.disabled_modules`, M0) has no screen yet; M10 decides
    whether it goes on AI Control.
-2. **Actions registered later**: review dictation, review cleanup, JD draft, CV screening,
-   proposal draft, MOU draft and image reading are registered by the build that makes each one,
-   asking the person which job (CLAUDE.md, §6.5). The mailbox's four were registered on
-   22/10/2026 (§6.5).
+2. **Actions registered later**: JD draft, CV screening, proposal draft, MOU draft and image
+   reading are registered by the build that makes each one, asking the person which job
+   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5).
 
 ## 14 · Change log
 

@@ -414,7 +414,7 @@ in the file only (off for a local test server).
   | `mail-draft` (Write Email) | Write Draft, Write Anyway, Try Again in Write | Default | `services/ai/prompts/mail-draft.md` |
   | `mail-tidy` (Tidy Email) | Tidy Email, Write Anyway, Try Again in Tidy Up | Default | `services/ai/prompts/mail-tidy.md` |
   | `mail-summary` (Thread Summary) | Summarise Thread, when no current summary is kept | Default | `services/ai/prompts/mail-summary.md` |
-  | `mail-dictation` (Mail Dictation) | Dictate | Transcription | `voice-note-transcription.md`, the one every transcription uses (`integrations.md` §6.14) |
+  | `mail-dictation` (Mail Dictation) | Dictate | Transcription | `services/ai/prompts/mail-dictation.md`: word for word, as the reviews' dictation (`integrations.md` §6.14) |
 
   The donor's `mail/assist/` (semantic search and OCR over mail) is not ported (§12).
 - **Search** (`mailbox.search.js`, ⌘K): the caller's own conversations by subject, the addresses

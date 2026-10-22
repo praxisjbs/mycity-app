@@ -217,7 +217,7 @@ describeDb("AI Control against the real migrations", () => {
       ]);
       expect(by.embeddings.chain.links.map((l) => [l.model, l.state])).toEqual([["text-embedding-3-small", "not_set_up"]]);
       expect(by.top_tier.chain.links.map((l) => l.model)).toEqual(["gemini-2.5-pro", "claude-sonnet-5-5"]);
-      expect(by.default.actions).toBe(5); // Tidy Policy, Week Summary and the mailbox's three; Data Answers has its own chain
+      expect(by.default.actions).toBe(6); // Tidy Policy, Review Cleanup, Week Summary and the mailbox's three; Data Answers has its own chain
     });
 
     test("the registered actions: their job, personal data, own chain and today's calls", async () => {
@@ -227,6 +227,8 @@ describeDb("AI Control against the real migrations", () => {
         "policy-tidy",
         "data-answers",
         "find-prices",
+        "review-dictation",
+        "review-cleanup",
         "week-summary",
         "mail-draft",
         "mail-tidy",
@@ -241,7 +243,11 @@ describeDb("AI Control against the real migrations", () => {
       // The mailbox's (mailbox.md §9): Default for writing, tidying and summaries, Transcription for Dictate.
       expect(by["mail-draft"]).toMatchObject({ job: "default", personal_data: true, own_chain: false, chosen_by: "TB" });
       expect(by["mail-dictation"]).toMatchObject({ job: "transcription", personal_data: true });
-      expect((await as("admin").get("/ai-control/actions?job=transcription")).body.data.map((a) => a.key)).toEqual(["voice-note-transcription", "mail-dictation"]);
+      expect((await as("admin").get("/ai-control/actions?job=transcription")).body.data.map((a) => a.key)).toEqual([
+        "voice-note-transcription",
+        "review-dictation",
+        "mail-dictation",
+      ]);
     });
   });
 

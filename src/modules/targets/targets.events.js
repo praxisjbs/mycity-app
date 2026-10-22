@@ -33,6 +33,8 @@ const EVENTS = defineEvents("performance", {
   "scorecard.agree_due": { summary: "A binding scorecard is still waiting for an agreement" },
   "scorecard.bound": { summary: "A scorecard became binding with its function's plan" },
   "scorecard.line_target_changed": { summary: "A scorecard line's target changed on an approved target change" },
+  "scorecard.sent": { summary: "A scorecard drafted after its plan bound was sent for approval on its own" },
+  "scorecard.amendment_decided": { summary: "A scorecard sent on its own was approved or returned" },
   "commitments.submitted": { summary: "A person's commitments for a month were sent for approval" },
   "commitments.approved": { summary: "A person's commitments for a month were approved" },
   "commitments.returned": { summary: "A person's commitments for a month were returned with a reason" },
@@ -42,6 +44,14 @@ const EVENTS = defineEvents("performance", {
   "commitment.rescoped": { summary: "A commitment was rescoped on approval" },
   "commitment.rescope_refused": { summary: "A rescope of a commitment was refused" },
   "commitment.recovery_set": { summary: "A recovery owner and date were set for a missed commitment" },
+});
+
+defineNotification(EVENTS.SCORECARD_AMENDMENT_DECIDED, {
+  to: [{ users: (e, client) => loginsOf(client, e.payload.tell_employee_ids || []) }],
+  who: "The employee and the reviewer on approval; the sender on a return",
+  title: (e) => (e.payload.approved ? `Your ${e.payload.period || ""} scorecard is ready to agree`.replace("  ", " ") : e.payload.employee_name ? `${e.payload.employee_name}'s scorecard needs changes` : "A scorecard needs changes"),
+  body: (e) => (e.payload.approved ? "It was approved." : e.payload.reason || ""),
+  include_actor: true,
 });
 
 defineNotification(EVENTS.SCORECARD_AGREED, {

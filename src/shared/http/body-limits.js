@@ -38,6 +38,8 @@ const UPLOAD_CAPS = Object.freeze({
   import_sheet: 10 * MB,
   signature: 2 * MB,
   brand: 5 * MB,
+  // A check-in's evidence: a report, a screenshot, a sheet (docs/guides/performance.md §6.14).
+  performance_evidence: 15 * MB,
 });
 
 /** "15 MB", for messages people read. */

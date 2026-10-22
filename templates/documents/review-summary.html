@@ -1,0 +1,64 @@
+<style>
+  .rv-meta { margin: 0 0 1mm 0; font-size: 9pt; color: #71717A; }
+  .rv-meta strong { color: #014339; font-weight: 600; }
+  .rv-figures { margin: 4mm 0 2mm 0; }
+  .rv-figure { display: inline-block; vertical-align: top; width: 38mm; margin: 0 4mm 3mm 0; padding: 2mm 3mm; border: 0.3mm solid #E4E4E7; border-radius: 2mm; }
+  .rv-figure .rv-label { font-size: 8pt; color: #71717A; }
+  .rv-figure .rv-value { font-size: 12pt; font-weight: 600; color: #09090B; }
+  .rv-note { margin: 2mm 0 4mm 0; padding: 2mm 3mm; font-size: 9pt; color: #3F3F46; background: #F8FAFA; border-left: 1mm solid #FFDF55; }
+  .rv-body h2 { font-size: 11pt; margin: 6mm 0 2mm 0; }
+  .rv-body table { font-size: 8.5pt; margin: 0; width: 100%; }
+  .rv-body thead { display: table-header-group; }
+  .rv-body thead th { border-bottom: 2px solid #014339; text-align: left; }
+  .rv-body tr { page-break-inside: avoid; }
+  .rv-sub { display: block; color: #71717A; font-size: 8pt; }
+  .rv-auto { color: #014339; font-weight: 600; font-size: 7.5pt; }
+  .rv-list { margin: 0 0 2mm 0; padding-left: 5mm; font-size: 9pt; }
+  .rv-empty { margin: 0 0 2mm 0; font-size: 9pt; color: #71717A; }
+</style>
+<div class="rv-body">
+  <p class="rv-meta"><strong>{{ month }}</strong> · Closed {{ closed_on }}</p>
+  <p class="rv-meta">{{ employee_name }}{{#if job_title}} · {{ job_title }}{{/if}}{{#if department}} · {{ department }}{{/if}}</p>
+  <p class="rv-meta">Reviewer {{ reviewer_name }}</p>
+  <div class="rv-figures">
+    <div class="rv-figure"><div class="rv-label">Score This Month</div><div class="rv-value">{{ score_month }}</div></div>
+    <div class="rv-figure"><div class="rv-label">Score to Date</div><div class="rv-value">{{ score_to_date }}</div></div>
+    <div class="rv-figure"><div class="rv-label">Rating</div><div class="rv-value">{{ rating }}</div></div>
+    {{#if outcome}}<div class="rv-figure"><div class="rv-label">Outcome</div><div class="rv-value">{{ outcome }}</div></div>{{/if}}
+  </div>
+  {{#if conduct_note}}<p class="rv-note">Conduct: {{ conduct_note }}</p>{{/if}}
+
+  <h2>Lines</h2>
+  <table>
+    <thead><tr><th>Line</th><th>Target</th><th>Actual</th><th>Evidence</th><th class="amount">Proposed</th><th class="amount">Self</th><th class="amount">Final</th></tr></thead>
+    <tbody>{{#each lines}}<tr>
+      <td>{{ title }}<span class="rv-sub">{{ section }}{{#if auto}} · <span class="rv-auto">Auto</span>{{/if}}</span>{{#if note}}<span class="rv-sub">{{ note }}</span>{{/if}}{{#if action}}<span class="rv-sub">Action: {{ action }}</span>{{/if}}</td>
+      <td>{{ target }}</td><td>{{ actual }}</td><td>{{ evidence }}</td>
+      <td class="amount">{{ proposed }}</td><td class="amount">{{ self }}</td><td class="amount">{{ final }}</td>
+    </tr>{{/each}}</tbody>
+  </table>
+
+  <h2>The Month's Tasks</h2>
+  <p class="rv-meta"><strong>Done This Month</strong></p>
+  {{#if done}}<ul class="rv-list">{{#each done}}<li>{{ this }}</li>{{/each}}</ul>{{else}}<p class="rv-empty">None.</p>{{/if}}
+  <p class="rv-meta"><strong>Ongoing</strong></p>
+  {{#if ongoing}}<ul class="rv-list">{{#each ongoing}}<li>{{ this }}</li>{{/each}}</ul>{{else}}<p class="rv-empty">None.</p>{{/if}}
+  <p class="rv-meta"><strong>Next Month</strong></p>
+  {{#if next_month}}<ul class="rv-list">{{#each next_month}}<li>{{ this }}</li>{{/each}}</ul>{{else}}<p class="rv-empty">None.</p>{{/if}}
+
+  <h2>Corrective Actions</h2>
+  {{#if actions}}<table>
+    <thead><tr><th>Action</th><th>Owner</th><th>Due</th></tr></thead>
+    <tbody>{{#each actions}}<tr><td>{{ title }}</td><td>{{ owner }}</td><td>{{ due }}</td></tr>{{/each}}</tbody>
+  </table>{{else}}<p class="rv-empty">None.</p>{{/if}}
+
+  {{#if input}}<h2>Input</h2>
+  <p class="rv-meta"><strong>{{ input.name }}</strong></p>
+  <p class="rv-note">{{ input.text }}</p>{{/if}}
+
+  <h2>Chain</h2>
+  <table>
+    <thead><tr><th>Step</th><th>Who</th><th>When</th></tr></thead>
+    <tbody>{{#each chain}}<tr><td>{{ step }}</td><td>{{ name }}</td><td>{{ at }}</td></tr>{{/each}}</tbody>
+  </table>
+</div>

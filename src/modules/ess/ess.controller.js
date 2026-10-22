@@ -59,4 +59,14 @@ module.exports = {
 
   cancelLeave: async (req, res) =>
     ok(res, await service.leave.cancel(withActor(req), id(req), req.validated.body || {})),
+
+  performance: async (req, res) => ok(res, await service.performance.overview(req.user)),
+  checkIn: async (req, res) => ok(res, await service.performance.checkIn(req.user)),
+  saveCheckIn: async (req, res) => ok(res, await service.performance.saveCheckIn(withActor(req), req.validated.body)),
+  submitCheckIn: async (req, res) => ok(res, await service.performance.submitCheckIn(withActor(req))),
+  dictateCheckIn: async (req, res) =>
+    ok(res, await service.performance.dictate(withActor(req), req.validated.body || {}, readUpload(req))),
+  addEvidence: async (req, res) =>
+    created(res, await service.performance.addEvidence(withActor(req), readUpload(req), req.validated.body)),
+  myReviews: async (req, res) => sendPaged(res, await service.performance.myReviews(req.user, req.validated.query)),
 };

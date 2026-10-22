@@ -296,7 +296,6 @@ const ENTITY_ROUTES = Object.freeze({
     self: screen("ess", "my-performance"),
   },
   kpi: screen("performance", "kpis"),
-  // search:none not built yet (src/modules/reviews)
   review: {
     ...screen("performance", "reviews"),
     self: screen("ess", "my-performance"),

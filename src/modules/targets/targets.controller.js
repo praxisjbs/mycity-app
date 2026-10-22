@@ -21,6 +21,7 @@ module.exports = {
   agree: async (req, res) => ok(res, await service.agree(withActor(req), scopeOf(req), id(req))),
   disagree: async (req, res) => ok(res, await service.disagree(withActor(req), scopeOf(req), id(req), req.validated.body)),
   contributions: async (req, res) => sendPaged(res, await service.contributions(req.validated.query)),
+  submit: async (req, res) => ok(res, await service.submit(withActor(req), scopeOf(req), id(req))),
   commitments: async (req, res) => sendPaged(res, await commitments.list(req.validated.query, scopeOf(req), withActor(req))),
   commitmentSummary: async (req, res) => ok(res, await commitments.summary(req.validated.query, scopeOf(req))),
   commitmentSets: async (req, res) => sendPaged(res, await commitments.sets(req.validated.query, scopeOf(req), withActor(req))),
