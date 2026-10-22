@@ -264,6 +264,23 @@ ol.next{margin:0;padding-left:5mm;font-size:8.6pt;}
 ol.next li{margin-bottom:1.2mm;}
 ol.next li::marker{color:var(--teal);font-family:var(--ff-m);font-size:7.6pt;}
 table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
+.fixes2 td:nth-child(1){width:6mm;color:var(--muted);font-family:var(--ff-m);font-size:7pt;}
+.fixes2 td:nth-child(2){width:58mm;}
+.fixes2 td:nth-child(4){width:24mm;}
+.fixes2 td{font-size:7.9pt;}
+.imp{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm 4mm;}
+.imp .g{border:1px solid var(--line);border-top:2px solid var(--teal-d);padding:2.2mm 2.8mm 1.4mm;}
+.imp .g b{display:block;font-family:var(--ff-h);font-weight:800;font-size:8.8pt;margin-bottom:1mm;}
+.imp .g ul{margin:0;padding-left:3.6mm;font-size:7.7pt;line-height:1.45;}
+.imp .g li{margin-bottom:.6mm;}
+.imp .g li::marker{color:var(--teal-d);}
+.imp .g.n{background:var(--navy);border-color:var(--navy);border-top-color:var(--teal);}
+.imp .g.n b{color:#fff;}
+.imp .nums{display:grid;grid-template-columns:1fr 1fr;gap:1.6mm 3mm;font-size:7.2pt;color:rgba(255,255,255,.62);line-height:1.3;}
+.imp .nums i{display:block;font-style:normal;font-family:var(--ff-h);font-weight:800;font-size:13pt;color:var(--teal);line-height:1.1;}
+.ready td:nth-child(1){width:34mm;}
+.ready td:nth-child(3){width:16mm;}
+.ready td{font-size:8pt;}
 
 </style>
 </head><body>
@@ -310,7 +327,7 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
         <div><div class="lbl">Handover meeting</div><span data-b="meeting">Wednesday 21 October 2026</span>, 12:00 WAT<br><span style="color:rgba(255,255,255,.6)">Google Meet, demonstrated on staging</span></div>
         <div><div class="lbl">Date · Reference</div><span data-b="date">22 October 2026</span><br><span style="color:rgba(255,255,255,.6)" data-b="ref">HSO/JBSP/MCA-ERP/2026-M1</span></div>
         <div><div class="lbl">Contract</div>Statement of Work SOW/JBSP/MCA-ERP/2026-01<br><span style="color:rgba(255,255,255,.6)">Clauses 4, 6.2 and 6.3 · Annexure A §1 and §9</span></div>
-        <div><div class="lbl">In this pack</div>Cover · Sign-off sheet (2 pages) · Attendance register<br><span style="color:rgba(255,255,255,.6)">Sent with Change Report 01, Invoice 002 and the Running Costs note</span></div>
+        <div><div class="lbl">In this pack</div>Cover · Sign-off sheet (3 pages) · Attendance register<br><span style="color:rgba(255,255,255,.6)">Sent with Change Report 01, Invoice 002 and the Running Costs note</span></div>
       </div>
       <div style="height:9mm"></div>
     </div>
@@ -321,7 +338,7 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
 <!-- ================= SHEET 1 ================= -->
 <section class="page">
   <div class="pc">
-    <div class="strip"><div class="t">Milestone 1 <em>Sign-off</em> · Core Operations &amp; Employee Management</div><div class="r">Sheet 1 of 2</div></div>
+    <div class="strip"><div class="t">Milestone 1 <em>Sign-off</em> · Core Operations &amp; Employee Management</div><div class="r">Sheet 1 of 3</div></div>
     <div class="inner">
       <div class="sec" style="margin-top:1mm"><span class="n">01</span><h2>At a Glance</h2></div>
       <div class="glance">
@@ -376,17 +393,17 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
 <!-- ================= SHEET 2 ================= -->
 <section class="page">
   <div class="pc">
-    <div class="strip"><div class="t">Milestone 1 <em>Sign-off</em> · Points Raised and Acceptance</div><div class="r">Sheet 2 of 2</div></div>
+    <div class="strip"><div class="t">Milestone 1 <em>Sign-off</em> · Points Raised and Fixes</div><div class="r">Sheet 2 of 3</div></div>
     <div class="inner">
       <div class="sec" style="margin-top:1mm"><span class="n">04</span><h2>Points Raised on 21 October</h2><span class="aside">Each one closed or on the plan</span></div>
       <table class="t tight points">
         <thead><tr><th>#</th><th>Point raised</th><th>What we did</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td>01</td><td><b>Dark theme too green</b><span class="by">Edidiong, Cynthia</span></td><td>Settings · Appearance: four dark themes (Deep Green, Charcoal, Black, Dark Grey) or MyCity's own colours, all at readable contrast.</td><td><span class="pill ok">Closed</span></td></tr>
+          <tr><td>01</td><td><b>Dark theme too green</b><span class="by">Edidiong, Cynthia</span></td><td>Settings · Appearance: four dark themes (Deep Green, Charcoal, Black, Dark Grey) or MyCity's own, all readable.</td><td><span class="pill ok">Closed</span></td></tr>
           <tr><td>02</td><td><b>KPI tiles of uneven height</b><span class="by">Edidiong</span></td><td>Every tile holds three lines, the third carrying its alert once data arrives, so each row lines up.</td><td><span class="pill ok">Closed</span></td></tr>
           <tr><td>03</td><td><b>Simpler celebration cards</b><span class="by">Cynthia</span></td><td>Built from Cynthia's picks: a quiet birthday card, a City Green anniversary card, Send Wishes and confetti.</td><td><span class="pill ok">Closed</span></td></tr>
           <tr><td>04</td><td><b>Home location for remote staff</b><span class="by">Edidiong, Cynthia</span></td><td>A Home Location switch in the Attendance policy. MyCity keeps remote clock-ins checked at home, as Cynthia decided.</td><td><span class="pill ok">Closed</span></td></tr>
-          <tr><td>05</td><td><b>Attendance report empty for Absent</b><span class="by">Found in the demo</span></td><td>The report picks the day (today so far, or the last working day once closed) and any statuses, so absences show.</td><td><span class="pill ok">Closed</span></td></tr>
+          <tr><td>05</td><td><b>Daily report missed absences</b><span class="by">Found in the demo</span></td><td>The report picks the day (today so far, or the last working day once closed) and any statuses, so absences show.</td><td><span class="pill ok">Closed</span></td></tr>
           <tr><td>06</td><td><b>New message opened an older chat</b><span class="by">Found in the demo</span></td><td>New Message opens a conversation with the person picked. A chat that flickered and refused photos is fixed too.</td><td><span class="pill ok">Closed</span></td></tr>
           <tr><td>07</td><td><b>Leave year</b><span class="by">Cynthia</span></td><td>Leave runs January to December; a request crossing New Year is flagged as it is typed.</td><td><span class="pill ok">Closed</span></td></tr>
           <tr><td>08</td><td><b>Pay deductions and the courts</b><span class="by">Edidiong; Cynthia to confirm</span></td><td>Deductions are policy switches, off until MyCity confirms the legal position. Staff acknowledge a policy before it applies.</td><td><span class="pill ok">Closed</span></td></tr>
@@ -398,16 +415,76 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
       </table>
 
       <div class="sec"><span class="n">05</span><h2>Fixed in Handover Week</h2><span class="aside">Found by System Health and our own testing</span></div>
-      <ul class="ticks check fixes">
-        <li>A typed date keeps its year in every form.</li>
-        <li>Leave in the past or across New Year is flagged.</li>
-        <li>A map search that blips is retried, not lost.</li>
-        <li>A bounced mail address is listed, not retried.</li>
-        <li>Chats load 25 at a time and scroll like WhatsApp.</li>
-        <li>On a phone, ticking a card selects it.</li>
-      </ul>
+      <table class="t tight fixes2">
+        <thead><tr><th>#</th><th>What was wrong</th><th>What it does now</th><th>Found by</th></tr></thead>
+        <tbody>
+          <tr><td>01</td><td>A typed date could lose its year</td><td>Every date keeps what is typed; bad dates are flagged</td><td><span class="pill teal">System Health</span></td></tr>
+          <tr><td>02</td><td>Leave errors showed only after sending</td><td>New Year and past dates are flagged as they are typed</td><td><span class="pill teal">System Health</span></td></tr>
+          <tr><td>03</td><td>Numbering rules showed as missing</td><td>Each rule is marked as it is filled</td><td><span class="pill teal">System Health</span></td></tr>
+          <tr><td>04</td><td>System mail to staff was refused</td><td>Mail to mycityapp.io is delivered on the mail host</td><td><span class="pill teal">System Health</span></td></tr>
+          <tr><td>05</td><td>One slow map search alerted IT as an error</td><td>A dropped search is retried once, logged as a warning</td><td><span class="pill teal">System Health</span></td></tr>
+          <tr><td>06</td><td>Monitoring jobs had not started after a deploy</td><td>Started; a stopped job now shows, and fails the build</td><td><span class="pill plan">Staging test</span></td></tr>
+          <tr><td>07</td><td>A rescheduled mail could have gone twice</td><td>One send per draft; edits and Discard reach it</td><td><span class="pill plan">Staging test</span></td></tr>
+          <tr><td>08</td><td>Open chats flickered and refused photos</td><td>Receipts no longer loop; chats scroll like WhatsApp</td><td><span class="pill plan">Staging test</span></td></tr>
+          <tr><td>09</td><td>On a phone, ticking a card opened it</td><td>The tick selects the card for bulk actions</td><td><span class="pill plan">Staging test</span></td></tr>
+          <tr><td>10</td><td>AI spend chart labels ran together</td><td>Each day reads 14/10 and no label overlaps</td><td><span class="pill plan">Staging test</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="pf"><span>JBS Praxis · <span data-b="ref">HSO/JBSP/MCA-ERP/2026-M1</span></span><span>MyCity App ERP · Page <span data-pg></span> of <span data-pgs></span></span></div>
+</section>
 
-      <div class="sec"><span class="n">06</span><h2>Acceptance</h2><span class="aside">SOW clause 6.2</span></div>
+<!-- ================= SHEET 3 ================= -->
+<section class="page">
+  <div class="pc">
+    <div class="strip"><div class="t">Milestone 1 <em>Sign-off</em> · Improvements, Readiness and Acceptance</div><div class="r">Sheet 3 of 3</div></div>
+    <div class="inner">
+      <div class="sec" style="margin-top:1mm"><span class="n">06</span><h2>Improvements Beyond the Brief</h2><span class="aside">In Milestone 1, at no extra cost</span></div>
+      <div class="imp">
+        <div class="g"><b>Attendance</b><ul>
+          <li>Temporary work sites with their own hours</li>
+          <li>Clock prompts with snooze, and automatic clock-out</li>
+          <li>Devices registered with a PIN; others flagged</li>
+          <li>Location help when a device's signal is weak</li></ul></div>
+        <div class="g"><b>Security</b><ul>
+          <li>Two-step sign-in with an authenticator app</li>
+          <li>Passkeys: fingerprint or face to sign in</li>
+          <li>PIN lock when idle; sessions IT can end</li>
+          <li>Full audit log; sensitive fields hidden by role</li></ul></div>
+        <div class="g"><b>People and ESS</b><ul>
+          <li>Download My Data, the whole record at once</li>
+          <li>History of every change to a profile</li>
+          <li>Organogram from records, with its PDF</li>
+          <li>Bulk import from Excel with a column check</li></ul></div>
+        <div class="g"><b>Staff Community</b><ul>
+          <li>Voice notes with written transcripts</li>
+          <li>Forward to five chats; pin for a day to a month</li>
+          <li>Announcements to chosen departments</li>
+          <li>Recognition and celebration cards with wishes</li></ul></div>
+        <div class="g"><b>The Platform</b><ul>
+          <li>An installed app with push notifications</li>
+          <li>Notification settings, quiet hours, digest</li>
+          <li>One search for any record, screen or action</li>
+          <li>Addresses picked from a map, never typed</li></ul></div>
+        <div class="g n"><b>In Numbers</b>
+          <div class="nums"><div><i>32</i>M1 screens, Mailbox included</div><div><i>15</i>more built ahead</div><div><i>360</i>automated test files</div><div><i>40</i>checks on every change</div></div></div>
+      </div>
+
+      <div class="sec"><span class="n">07</span><h2>Ready for Production</h2><span class="aside">What stands behind the live system</span></div>
+      <table class="t tight ready">
+        <tbody>
+          <tr><td><b>Two environments</b></td><td>Staging and production on separate databases; a staging login cannot read a production row.</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td><b>Clean live data</b></td><td>Production holds MyCity's real staff and nothing invented; demonstration data stays on staging.</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td><b>Quality checks</b></td><td>Every change runs the full test suite and 40 automated checks, phone and desktop layouts included.</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td><b>Release path</b></td><td>Every change reaches staging first; production only after a person approves it.</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td><b>Security</b></td><td>Permissions checked on every request; two-step sign-in for admin roles; passwords and keys encrypted.</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td><b>Monitoring</b></td><td>System Health watches status, performance and faults, and emails the team when something fails.</td><td><span class="pill ok">Ready</span></td></tr>
+          <tr><td><b>Backups</b></td><td>Databases and files copied nightly and before every release; a restore rehearsed every Sunday. Offsite copy at go-live.</td><td><span class="pill ok">Ready</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="sec"><span class="n">08</span><h2>Acceptance</h2><span class="aside">SOW clause 6.2</span></div>
       <p class="decl">MyCity App Ltd confirms that Milestone 1 was demonstrated on staging on <span data-b="meeting">Wednesday 21 October 2026</span> and handed over for testing, that the points above are closed or planned as recorded, and accepts Milestone 1 under clause 6.2 of the Statement of Work. JBS Praxis then releases it to production and invoices the fee of <b class="num" data-b="fee" data-f="N0">₦384,000</b>, due within seven (7) working days.</p>
       <div class="accept">
         <div class="sig"><div class="lbl">Accepted for MyCity App Ltd</div><div class="space"></div>
@@ -430,7 +507,7 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
   <div class="pc">
     <div class="strip"><div class="t">Attendance <em>Register</em> · Milestone 1 Handover</div><div class="r">Handover meeting</div></div>
     <div class="inner">
-      <div class="sec" style="margin-top:1mm"><span class="n">07</span><h2>The Meeting</h2></div>
+      <div class="sec" style="margin-top:1mm"><span class="n">09</span><h2>The Meeting</h2></div>
       <div class="glance">
         <div><div class="lbl">Meeting</div>MyCity ERP · Milestone 1 Handover and Sign-off</div>
         <div><div class="lbl">Date</div><span data-b="meeting">Wednesday 21 October 2026</span>, 12:00 WAT</div>
@@ -440,7 +517,7 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
         <div><div class="lbl">Length</div>About two hours</div>
       </div>
 
-      <div class="sec"><span class="n">08</span><h2>Those Present</h2></div>
+      <div class="sec"><span class="n">10</span><h2>Those Present</h2></div>
       <table class="t reg">
         <thead><tr><th>#</th><th>Name</th><th>Organisation</th><th>Role</th><th>Signature</th></tr></thead>
         <tbody>
@@ -456,7 +533,7 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
         </tbody>
       </table>
 
-      <div class="sec"><span class="n">09</span><h2>Run of the Session</h2><span class="aside">Times from the meeting record</span></div>
+      <div class="sec"><span class="n">11</span><h2>Run of the Session</h2><span class="aside">Times from the meeting record</span></div>
       <div class="run">
         <div><span>00:06</span><span>Sign-in: passkey, password reset, PIN</span></div>
         <div><span>01:00</span><span>Temporary work sites and their approval</span></div>
@@ -483,7 +560,7 @@ table.t.reg td{padding-top:1.5mm;padding-bottom:1.5mm;}
       <div class="callout navy" style="margin-top:3.4mm">
         <h3>What Happens Next</h3>
         <ol class="next">
-          <li>MyCity signs sheet 2. Milestone 1 is released to production at <b>hub.mycityapp.io</b>.</li>
+          <li>MyCity signs sheet 3. Milestone 1 is released to production at <b>hub.mycityapp.io</b>.</li>
           <li>Invoice 002 for Milestone 1 falls due seven working days after acceptance.</li>
           <li>MyCity decides on Change Report 01 (Mailbox), at its own pace.</li>
           <li>Milestone 2, Productivity &amp; Performance, is demonstrated next, two days after its planned date as agreed, and recorded.</li>

@@ -17,7 +17,7 @@ Client documents for the Milestone 1 sign-off, from the handover meeting of 21 O
 
 | File | What it is |
 | --- | --- |
-| `MyCity-ERP_M1-Handover-and-Signoff.html` | Cover, the two-page sign-off sheet (completion against Annexure A, work built ahead, the points raised and how each closed, acceptance) and the attendance register. 4 pages |
+| `MyCity-ERP_M1-Handover-and-Signoff.html` | Cover, the three-page sign-off sheet (completion against Annexure A, work built ahead, the points raised and how each closed, the fixes of handover week, improvements beyond the brief, production readiness, acceptance) and the attendance register. 5 pages |
 | `MyCity-ERP_Change-Report-01_Mailbox.html` | Change Report 01 for the Mailbox, ₦250,000 one-off, with MyCity's choice to keep it or have it switched off at no charge. 4 pages |
 | `MyCity-ERP_Invoice-002_Milestone-1.html` | Invoice 002, Milestone 1, ₦384,000, due seven working days after acceptance. 1 page |
 | `MyCity-ERP_Invoice-003_Change-Order-01.html` | Invoice 003, Change Order 01, ₦250,000, payable only if Change Report 01 is approved. 1 page |
