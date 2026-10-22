@@ -68,6 +68,11 @@ export function WriteWithAi({ compose, hidden, back, use }: { compose: ComposeNo
   const [shown, setShown] = useState<Shown>(null);
   const [asked, setAsked] = useState<string[]>([]);
   const result = useRef<HTMLDivElement>(null);
+  /* Opening the step moves focus to its title, so a keyboard or a screen reader starts there. */
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (!hidden) title.current?.focus();
+  }, [hidden]);
   useEffect(() => {
     if (shown) result.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [shown]);
@@ -117,7 +122,7 @@ export function WriteWithAi({ compose, hidden, back, use }: { compose: ComposeNo
         <Button size="sm" variant="ghost" icon="left" onClick={back}>
           Back
         </Button>
-        <h3 data-ui="title" className="flex items-center gap-1.5 text-sm font-semibold">
+        <h3 ref={title} tabIndex={-1} data-ui="title" className="flex items-center gap-1.5 text-sm font-semibold">
           <Icon name="spark" />
           Write With AI
         </h3>
@@ -226,37 +231,39 @@ export function SummaryCard({ summary, close }: { summary: ThreadSummary | null;
           </span>
         }
       />
-      {!summary ? (
-        <Skeleton lines={4} />
-      ) : (
-        <div className="flex flex-col gap-2 text-sm">
-          <p data-copy="content">{summary.gist}</p>
-          {summary.key_points.length > 0 && (
-            <>
-              <h4 data-ui="title" className="text-xs font-semibold text-subtle-foreground">
-                Key Points
-              </h4>
-              <ul data-copy="content" className="m-0 list-disc pl-5">
-                {summary.key_points.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          {summary.asked_of_you.length > 0 && (
-            <>
-              <h4 data-ui="title" className="text-xs font-semibold text-subtle-foreground">
-                Asked of You
-              </h4>
-              <ul data-copy="content" className="m-0 list-disc pl-5">
-                {summary.asked_of_you.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
+      <div aria-live="polite">
+        {!summary ? (
+          <Skeleton lines={4} />
+        ) : (
+          <div className="flex flex-col gap-2 text-sm">
+            <p data-copy="content">{summary.gist}</p>
+            {summary.key_points.length > 0 && (
+              <>
+                <h4 data-ui="title" className="text-xs font-semibold text-subtle-foreground">
+                  Key Points
+                </h4>
+                <ul data-copy="content" className="m-0 list-disc pl-5">
+                  {summary.key_points.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {summary.asked_of_you.length > 0 && (
+              <>
+                <h4 data-ui="title" className="text-xs font-semibold text-subtle-foreground">
+                  Asked of You
+                </h4>
+                <ul data-copy="content" className="m-0 list-disc pl-5">
+                  {summary.asked_of_you.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }

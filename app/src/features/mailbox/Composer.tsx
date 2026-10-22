@@ -128,6 +128,12 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   const [showSignature, setShowSignature] = useState(false);
   /* Write With AI (mailbox.md §3 step 12): mounted from its first opening, so Back keeps what was typed in it. */
   const [ai, setAi] = useState({ mounted: false, open: false });
+  const aiButton = useRef<HTMLButtonElement>(null);
+  /* Back to the composer, its Write With AI button focused as it was left. */
+  const closeAi = () => {
+    setAi({ mounted: true, open: false });
+    requestAnimationFrame(() => aiButton.current?.focus());
+  };
   const parts = useMemo(() => (ai.mounted ? partsOf(body) : null), [ai.mounted, body]);
   const dirty = useRef(0);
 
@@ -193,7 +199,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
     setBody(quoted ? `${draft.body_html}<p></p>${quoted}` : draft.body_html);
     if (draft.subject && !subject.trim()) setSubject(draft.subject);
     touch();
-    setAi({ mounted: true, open: false });
+    closeAi();
     toast("Draft added");
   };
 
@@ -203,7 +209,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       <WriteWithAi
         hidden={!ai.open}
         compose={{ in_reply_to: init.in_reply_to ?? null, to, cc, subject, attachments: files.map((f) => f.file_name), own_html: parts.own, quoted_html: parts.quoted }}
-        back={() => setAi({ mounted: true, open: false })}
+        back={closeAi}
         use={useDraft}
       />
     )}
@@ -230,7 +236,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           trigger={(open) => (
             <span className="flex items-center gap-1">
               <Tooltip label="Attach File"><button type="button" aria-label="Attach a file" onMouseDown={(e) => e.preventDefault()} onClick={open} className="flex h-7.5 min-w-7.5 items-center justify-center rounded-ctl text-muted-foreground hover:bg-accent hover:text-foreground phone:size-tap"><Icon name="clip" /></button></Tooltip>
-              <Button size="sm" variant="ghost" icon="spark" onClick={() => setAi({ mounted: true, open: true })}>Write With AI</Button>
+              <Button ref={aiButton} size="sm" variant="ghost" icon="spark" onClick={() => setAi({ mounted: true, open: true })}>Write With AI</Button>
             </span>
           )}
         />
