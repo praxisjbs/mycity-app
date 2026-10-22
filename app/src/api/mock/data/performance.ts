@@ -233,6 +233,8 @@ const line = (
   share_value: null,
   months: [{ month: "2026-10-01", score }],
   score,
+  can_change_target: false,
+  pending_change: null,
 });
 
 const card = (key: string, reviewer: string, lines: ScorecardLine[], score: string, rating: ScorecardDetail["rating"], agreed = true): ScorecardDetail => {
@@ -303,6 +305,27 @@ export const SCORECARDS: ScorecardDetail[] = [
     false,
   ),
 ];
+
+/**
+ * Grace joined after the function's plan bound: her manager drafted her scorecard and the head sent
+ * it on its own (§11). It waits on Operations & People, then the CEO (FLOWS in modules/performance.ts).
+ */
+const graceLines = [
+  line("grace", 0, "results", "Partner venues signed in Lekki", "60", "numeric", "own", "8", null),
+  line("grace", 1, "kpis", "Partner replies within 48 hours", "25", "standard", "function_kpi", "90", null),
+  line("grace", 2, "accountability", "On-time commitment delivery", "10", "standard", "commitments", "80", null),
+  line("grace", 3, "accountability", "Monthly update on time", "5", "binary", "update_on_time", null, null),
+].map((l) => ({ ...l, months: [], score: null }));
+export const GRACE_CARD: ScorecardDetail = {
+  ...card("grace", "bashir", graceLines, "0", null, false),
+  status: "draft",
+  score_to_date: null,
+  rating: null,
+  created_at: at(4, "09:00"),
+  updated_at: at(2, "10:00"),
+  amendment_instance_id: sid("perf:wf:amend:grace"),
+};
+SCORECARDS.push(GRACE_CARD);
 
 /** The function's plan, binding; and Content's, sent and waiting on Operations & People. */
 export const PLANS: Plan[] = [

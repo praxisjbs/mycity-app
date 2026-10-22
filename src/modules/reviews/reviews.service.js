@@ -198,7 +198,13 @@ function chainOf(r, decisions) {
   const withdrawn = r.status === "withdrawn";
   const state = (i, happened) => (withdrawn ? (happened ? "done" : "skipped") : at > i ? "done" : at === i ? "current" : "waiting");
   return [
-    { key: "check_in", state: state(0, Boolean(r.check_in_submitted_at)), person: r.employee.display_name, at: iso(r.check_in_submitted_at) },
+    {
+      key: "check_in",
+      // Scored without the check-in (§11): that step never happened.
+      state: r.no_check_in_at && !r.check_in_submitted_at ? "skipped" : state(0, Boolean(r.check_in_submitted_at)),
+      person: r.employee.display_name,
+      at: iso(r.check_in_submitted_at),
+    },
     { key: "reviewer", state: selfReview ? "skipped" : state(1, Boolean(r.submitted_at)), person: r.reviewer.display_name, at: iso(r.submitted_at) },
     {
       key: "second_level",

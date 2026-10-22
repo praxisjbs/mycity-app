@@ -3,6 +3,8 @@
  * input, the month's tasks and attendance, corrective actions and the chain (docs/guides/
  * performance.md §3.3, §6.12, §6.15, §6.16, §10). What the reader may do comes from the review's
  * `can`; what they may not see arrives empty (A17). Opened from the Reviews tab and from links.
+ * A late check-in offers its reviewer Score Without Check-In; Operations & People may Withdraw
+ * Review on any open one (§11). Both ask for a reason, which the review then shows.
  */
 import { useState } from "react";
 import reviewsContract from "@mycity/contract/schemas/reviews.js";
@@ -118,10 +120,13 @@ export function ReviewSheet({ id, close }: { id: string; close: () => void }) {
           ["Stage", <StatusPill key="s" s={reviewStatus(r.status)} />],
           ["Due", r.due_on ? formatDate(r.due_on) : null],
           ...(r.probation_outcome ? ([["Outcome", OUTCOME[r.probation_outcome]]] as Array<[string, string]>) : []),
+          ...(r.no_check_in_reason ? ([["No Check-In", r.no_check_in_reason]] as Array<[string, string]>) : []),
+          ...(r.withdrawn_reason ? ([["Withdrawn", r.withdrawn_reason]] as Array<[string, string]>) : []),
         ]}
       />
       <Chain className="mt-3" steps={steps} label="Review chain" />
       {r.returned_reason && r.status === "returned" && <Banner className="mt-3" tone="err">{r.returned_reason}</Banner>}
+      {r.status === "check_in" && r.can.score_without_check_in && <Banner className="mt-3" tone="info">Waiting for the check-in.</Banner>}
       <LinesTable r={r} />
       {(r.dotted_input || r.can.give_input) && (
         <Card className="mt-3">
@@ -167,6 +172,18 @@ export function ReviewSheet({ id, close }: { id: string; close: () => void }) {
           {r.can.decide_probation && (["confirm", "extend", "end"] as const).map((code) => <Button key={code} onClick={() => choose(code)}>{OUTCOME[code]}</Button>)}
           {r.can.decide && r.workflow_instance_id && (
             <Button onClick={() => modal.open({ title: "Request Changes", body: (done) => <ChangesForm instanceId={r.workflow_instance_id!} close={() => (done(), reload())} /> })}>Request Changes</Button>
+          )}
+          {r.can.withdraw && (
+            // search:none Withdraw Review is on the review, which search finds
+            <Button variant="danger" onClick={() => modal.open({ title: "Withdraw Review", body: (done) => <WithdrawForm id={id} close={() => (done(), reload())} /> })}>
+              Withdraw Review
+            </Button>
+          )}
+          {r.can.score_without_check_in && (
+            // search:none Score Without Check-In is on the review, which search finds
+            <Button variant="primary" onClick={() => modal.open({ title: "Score Without Check-In", body: (done) => <NoCheckInForm id={id} close={() => (done(), reload())} /> })}>
+              Score Without Check-In
+            </Button>
           )}
           {r.can.decide && <Button variant="primary" onClick={decide}>{r.status === "with_hr" ? "Close Review" : "Approve"}</Button>}
           {closed && r.document_id && <Button variant="primary" icon="download" onClick={pdf}>Download PDF</Button>}
@@ -371,6 +388,58 @@ function ScoreForm({ r, close, reload, ask }: { r: ReviewDetail; close: () => vo
         {r.can.ask_input && <Button onClick={ask}>Ask For Input</Button>}
         <Button onClick={save}>Save Scores</Button>
         {r.can.submit && <Button variant="primary" onClick={submit}>Submit Review</Button>}
+      </FormFooter>
+    </>
+  );
+}
+
+/** Score Without Check-In (§11): the check-in is late, so the reviewer scores without it, saying why. */
+function NoCheckInForm({ id, close }: { id: string; close: () => void }) {
+  const f = useContractForm({ no_check_in_reason: "" }, reviewsContract.ScoreWithoutCheckIn);
+  const save = useMutation("POST /api/v1/performance/reviews/:id/score-without-check-in");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id }, body: f.values });
+      close();
+      toast("Scoring without the check-in");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Reason" {...f.status("no_check_in_reason")}><TextAreaField {...f.field("no_check_in_reason")} /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" onClick={submit}>Score Review</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/** Withdraw Review (§11): Operations & People close an open review as Withdrawn, with a reason. */
+function WithdrawForm({ id, close }: { id: string; close: () => void }) {
+  const f = useContractForm({ withdrawn_reason: "" }, reviewsContract.ReviewWithdraw);
+  const save = useMutation("POST /api/v1/performance/reviews/:id/withdraw");
+  const submit = async () => {
+    if (!f.check()) return;
+    try {
+      await save.run({ params: { id }, body: f.values });
+      close();
+      toast("Review withdrawn");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
+    }
+  };
+  return (
+    <>
+      <Field label="Reason" {...f.status("withdrawn_reason")}><TextAreaField {...f.field("withdrawn_reason")} /></Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="danger" onClick={submit}>Withdraw Review</Button>
       </FormFooter>
     </>
   );

@@ -2,7 +2,8 @@
  * ESS · My Performance (docs/guides/performance.md §10, §12), composed of its parts in
  * features/performance/my/: the figures, a banner when something waits on the person, My
  * Scorecard, This Month's Check-In (features/performance/CheckIn.tsx), My Commitments (PR 4), Rolls
- * Up To, My Reviews and My PIP while one is open.
+ * Up To, My Reviews and My PIP while one is open. The person's own scorecard link (the route map's
+ * `scorecard` self, `?id=`) opens My Scorecard once, then leaves the address.
  */
 import { useEffect, useRef } from "react";
 import type { MyPerformance } from "@mycity/contract/contract.gen.ts";
@@ -45,6 +46,17 @@ export function MyPerformancePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asked, p]);
+
+  // A link to their own scorecard (a binding or agreement notice, ⌘K) opens My Scorecard once.
+  const linked = params.get("id");
+  const shown = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linked || !card || linked !== card.scorecard_id || shown.current === linked) return;
+    shown.current = linked;
+    setParams({ id: null }, { replace: true });
+    openScorecard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked, card?.scorecard_id]);
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!p) return <LoadingRows count={6} />;
