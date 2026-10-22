@@ -1156,7 +1156,7 @@ const ruleShape = {
   home_location: z.object({ on: z.boolean() }).strict(), // address:none a switch, not a place
   home_geofence_mode: PolicyMode,
   site_geofence_mode: PolicyMode,
-  /** At least 150 on a new version (T9); an older version keeps what it set, down to 50. */
+  /** At least 150 on a new version while Home Location is on (T9); an older version keeps what it set, down to 50. */
   home_radius_m: z.number().int().min(50).max(500, "At most 500"),
   max_accuracy_m: z.number().int().min(50, "At least 50").max(250, "At most 250"),
   device_mode: PolicyMode,
@@ -1213,16 +1213,17 @@ const deductionInRange = (d) => !d.on || d.method === "pro_rata" || !d.amount ||
 
 /**
  * The rules as People save them in a draft: every rule given, and the rules a new version must
- * meet (guide §6.15): a home and a temporary site are Flag or Refuse, never Off (a home's mode is
- * kept while Home Location is off, so switching it on needs nothing else); a home's radius is at
- * least 150 m; a fixed deduction or overtime paid per hour names its amount.
+ * meet (guide §6.15): a temporary site is Flag or Refuse, never Off; while Home Location is on, a
+ * home is too and its radius is at least 150 m (off, both are kept as they were and checked only
+ * once it is switched on, when the worksheet shows them); a fixed deduction or overtime paid per
+ * hour names its amount.
  */
 const AttendanceRulesDraft = z
   .object(ruleShape)
   .strict()
-  .refine((r) => r.home_geofence_mode !== "off", { message: "Flag or Refuse", path: ["home_geofence_mode"] })
+  .refine((r) => !r.home_location.on || r.home_geofence_mode !== "off", { message: "Flag or Refuse", path: ["home_geofence_mode"] })
   .refine((r) => r.site_geofence_mode !== "off", { message: "Flag or Refuse", path: ["site_geofence_mode"] })
-  .refine((r) => r.home_radius_m >= 150, { message: "At least 150", path: ["home_radius_m"] })
+  .refine((r) => !r.home_location.on || r.home_radius_m >= 150, { message: "At least 150", path: ["home_radius_m"] })
   .refine((r) => amountGiven(r.late_deduction), { message: "Enter the amount", path: ["late_deduction", "amount"] })
   .refine((r) => amountGiven(r.early_deduction), { message: "Enter the amount", path: ["early_deduction", "amount"] })
   .refine((r) => !r.overtime.on || r.overtime.method === "multiplier" || Boolean(r.overtime.amount), {

@@ -548,8 +548,8 @@ punch's point is never sent to the provider.
   temporary site sheet reads a location only through `AddressField`'s own device-location fallback
   (F27), which stays as it is. A page without `crypto.randomUUID` (an insecure one) still gets each
   punch's Idempotency-Key (`newKey`).
-- The radius of a home and of a temporary site's address is at least 150 m on a new version (T9); a
-  permanent site keeps its own radius (25 to 1,000 m).
+- The radius of a home (while Home Location is on) and of a temporary site's address is at least
+  150 m on a new version (T9); a permanent site keeps its own radius (25 to 1,000 m).
 - A punch against a home keeps `worksite_id` empty (the roster, §6.9, and Home read it as remote);
   its evidence names the place `home` and the home record it was judged against. A punch at a
   temporary site names the site and the address it was matched to (PR 4): place `temporary_site`
@@ -1108,8 +1108,8 @@ version, and to a rule a version predates (a new rule reads as off on an older v
 | Overtime | `overtime`: `on`, `after_minutes`, `approval`, `method`, `multiplier`, `amount`, `rest_day_multiplier`, `monthly_cap_hours` | A switch; counts after 0 to 120 minutes; approved by Line Manager After, Pre-Approved or Automatic; paid at a multiple of the hourly rate (1.0 to 3.0) or a fixed amount per hour (₦1 to ₦1,000,000); Sundays and holidays at a multiple (1.0 to 3.0); a monthly cap (1 to 100 hours) | 30 minutes; Line Manager After; 1.5 times; 2.0 times on rest days; 20 hours | Off | Built (§6.17) |
 | Location Checks | `office_geofence_mode` | Off, Flag, Refuse | Flag | Flag | Built |
 | Location Checks | `home_location`: `on` (Home Location) | A switch; while it is on, Home Check and Home Radius beneath it | Off | Off | Built 22/10/2026 (§1.3): off, no home is asked for, sent, approved or checked, and a remote day is not checked |
-| Location Checks | `home_geofence_mode` (Home Check), `site_geofence_mode` (Temporary Site Check) | Flag, Refuse (Off only on an older version) | Flag | Flag | Built; Off removed from new versions in PR 1; from PR 4 the site's applies to a temporary site's addresses and its check-ins; the home's only while Home Location is on |
-| Location Checks | `home_radius_m` | 150 to 500 m (a new version) | 150 | 150 | Built; the minimum in PR 1 (T9); used only while Home Location is on |
+| Location Checks | `home_geofence_mode` (Home Check), `site_geofence_mode` (Temporary Site Check) | Flag, Refuse (Off only on an older version) | Flag | Flag | Built; Off removed from new versions in PR 1; from PR 4 the site's applies to a temporary site's addresses and its check-ins; the home's applies, and is checked in a draft, only while Home Location is on |
+| Location Checks | `home_radius_m` | 150 to 500 m (a new version) | 150 | 150 | Built; the minimum in PR 1 (T9); used, and checked in a draft, only while Home Location is on |
 | Location Checks | `max_accuracy_m` | 50 to 250 m | 100 | 100 | Built; its meaning in PR 2 (§6.5) |
 | Devices | `device_mode` | Off, Flag, Refuse | Flag | Off | Built |
 | Clock Prompts | `clock_out_reminder_minutes` | 15 to 60 minutes | 30 | 30 | Built (§6.14) |
@@ -1118,9 +1118,9 @@ version, and to a rule a version predates (a new rule reads as off on an older v
 - **The contract** (`packages/contract/schemas/attendance.js`): `AttendanceRules` reads a version
   (every key optional, each filled with its default); `AttendanceRulesDraft` checks a draft (every key
   present; a switch that is on needs its figures: a count or hours, an amount for a fixed method;
-  hours end after they start, at least one working day; a home and a temporary site Flag or Refuse
-  (the home's kept, and checked, while Home Location is off, so switching it on needs nothing else);
-  the home radius at least 150; Home Location given (22/10/2026); from PR 3, a fixed deduction's amount and overtime's amount per hour
+  hours end after they start, at least one working day; a temporary site Flag or Refuse; while Home
+  Location is on, a home Flag or Refuse and its radius at least 150 (off, both are kept as they were
+  and checked once it is switched on, when the worksheet shows them); Home Location given (22/10/2026); from PR 3, a fixed deduction's amount and overtime's amount per hour
   from ₦1.00 to ₦1,000,000.00, each refused on its own field). PR 1 writes both in full, so PRs 3
   and 4 add behaviour, not keys.
   `latest_clock_out_minutes` is not carried into the rules: the system clock-out replaces it.
@@ -1631,7 +1631,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
-- 22/10/2026 · TB · The Home Location switch (§1.3, TB's ten answers after the Milestone 1 handover): `home_location` joins the Attendance policy (Location Checks, Home Check and Home Radius beneath it), off by default and on every version before it. Off, no home is asked for, sent, listed, approved, searched or notified (409 `HOME_LOCATION_OFF` on the home routes), a remote day, an approved Temporary Home and an older temporary home or remote day request are not checked (no reading asked or kept, `not_applied`, `home_location_off`), Temporary Home leaves Add Work Site, its days offer no Check In, the register names a remote day Remote, and Working From Home reads one sentence. Homes stay as they were. Switched on, the reminder `attendance_home_needed` pushes Set your home location once a stretch to whoever needs one (`policies.heldSince` gives the stretch's first day, which names it). `AttendanceToday` gains `policy.home_location` and `location.checked`. The rule is a switch named like a place, so it is marked `address:none` in the contract for gate 22 (`addresses.md`). §1 to §11 and §13 updated.
+- 22/10/2026 · TB · The Home Location switch (§1.3, TB's ten answers after the Milestone 1 handover): `home_location` joins the Attendance policy (Location Checks, Home Check and Home Radius beneath it), off by default and on every version before it. Off, no home is asked for, sent, listed, approved, searched or notified (409 `HOME_LOCATION_OFF` on the home routes), a remote day, an approved Temporary Home and an older temporary home or remote day request are not checked (no reading asked or kept, `not_applied`, `home_location_off`), Temporary Home leaves Add Work Site, its days offer no Check In, the register names a remote day Remote, and Working From Home reads one sentence. Homes stay as they were. Switched on, the reminder `attendance_home_needed` pushes Set your home location once a stretch to whoever needs one (`policies.heldSince` gives the stretch's first day, which names it). `AttendanceToday` gains `policy.home_location` and `location.checked`. The rule is a switch named like a place, so it is marked `address:none` in the contract for gate 22 (`addresses.md`). A draft checks a home's Home Check and Home Radius only while Home Location is on, when the worksheet shows them, so an older version's Off or 100 m never blocks a draft on a hidden field. §1 to §11 and §13 updated.
 - 21/10/2026 · TB · The shared roster's `page()` takes `statuses`, any of several (Home's Daily Attendance report: Late and Absent together, `home.md` §6 Reports); nothing it reads or decides changed.
 - 21/10/2026 · TB · Every attendance date field keeps what is typed and refuses a day outside its range as it is typed (the shared `DateField`, fault #2 of the 21/10 brief: a typed 28/10/2026 had become 2020-10-28, so a temporary site, a schedule or overtime from a typed date was refused as Already Past after Save). People · Attendance's Export takes the Period's own message ("Pick 21/10/2026 or earlier") through `DateRangeField`'s `onProblem`.
 - 21/10/2026 · TB · My Days as a chart (`EssAttendance.tsx`, `ess.md`) labels each day 13/10, not 13/10/; the shared bar chart leaves off the days that would touch.

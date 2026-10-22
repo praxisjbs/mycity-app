@@ -1078,6 +1078,21 @@ describe("the Attendance policy's rules", () => {
     expect(paths(draft({ late_deduction: { on: true, method: "per_day", amount: null } }))).toEqual(["late_deduction.amount"]);
   });
 
+  test("a home's check and radius are checked only while Home Location is on, as the worksheet shows them (§1.3)", () => {
+    const s = type.suggestions();
+    expect(s.home_location).toEqual({ on: false });
+    const draft = (over) => c.attendance.AttendanceRulesDraft.safeParse({ ...s, ...over });
+    const paths = (r) => (r.success ? [] : r.error.issues.map((i) => i.path.join(".")));
+    // An older version's Off and 100 m are kept, hidden, while it is off: the draft still saves.
+    expect(paths(draft({ home_geofence_mode: "off", home_radius_m: 100 }))).toEqual([]);
+    const on = { home_location: { on: true } };
+    expect(paths(draft({ ...on, home_radius_m: 100 }))).toEqual(["home_radius_m"]);
+    expect(paths(draft({ ...on, home_geofence_mode: "off" }))).toEqual(["home_geofence_mode"]);
+    expect(paths(draft({ ...on, home_geofence_mode: "block", home_radius_m: 150 }))).toEqual([]);
+    // A temporary site is Flag or Refuse whatever the switch says.
+    expect(paths(draft({ site_geofence_mode: "off" }))).toEqual(["site_geofence_mode"]);
+  });
+
   test("a temporary site's sentences cover its addresses and check-ins, and always end with where to add one", () => {
     const site = (mode) => type.sections({ ...RULES, site_geofence_mode: mode }).find((x) => x.key === "site").sentences.map((x) => x.text);
     expect(site("warn")).toEqual([
