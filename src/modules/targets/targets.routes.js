@@ -10,6 +10,7 @@
  *   PATCH /scorecards/:id           `performance` edit · scope; the reviewer needs performance.manage
  *   POST  /scorecards/:id/agree     `performance` view: the employee or the reviewer
  *   POST  /scorecards/:id/disagree  `performance` view: the employee or the reviewer
+ *   POST  /scorecards/:id/submit    `performance` edit · scope: a scorecard drafted after its plan bound
  *   GET   /contributions            `performance` view: a plan's split key results, OK or Rebalance
  *
  *   GET   /commitments              `performance` view · own, team, all, or those waiting on the reader
@@ -56,6 +57,10 @@ route(router, "post", "/scorecards/:id/agree",
 route(router, "post", "/scorecards/:id/disagree",
   { params: c.common.IdParams, body: t.DisagreeBody, response: t.ScorecardDetail, summary: "Disagree with a scorecard" },
   requirePermission("performance", "view"), controller.disagree);
+
+route(router, "post", "/scorecards/:id/submit",
+  { params: c.common.IdParams, body: c.common.EmptyBody, response: t.ScorecardDetail, summary: "Send a mid-quarter scorecard for approval" },
+  requirePermission("performance", "edit"), controller.submit);
 
 route(router, "get", "/contributions",
   { query: t.ContributionQuery, response: t.ContributionPage, summary: "Split key results and their shares" },

@@ -107,7 +107,7 @@ by PR), so the parallel three do not edit the same file; the shared exceptions a
 |---|---|---|---|---|---|---|
 | 1 · Foundation | `m2/perf-foundation` | The org's names and seats; department heads; the whole schema, contract and scoring library; business days; the second-level approver; the four approval flows; capabilities; quarters and their rules (the first API); screens registered and laid out; the mock | §4, §6.1, §6.2, §6.8, §6.9 (the maths), §6.13, §6.20 | 2100 to 2199 | none | Built 22/10/2026 |
 | 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards with the contribution check, the quarter plan and its approval, agreement, target changes and the lock, the three importers; Goals, Scorecards and KPIs screens; Home's goals adapter kept true | §3.1, §3.2, §3.5, §3.6, §6.3 to §6.7, §6.19 | 2200 to 2299 | PR 1 | Built 22/10/2026 |
-| 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, self-first, the reviewer, dotted input, second level, HR close, conduct cap, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews tab and ESS · My Performance; Home's reviews adapter kept true | §3.3, §6.10, §6.12, §6.14 to §6.17 | 2300 to 2399 | PR 2 | Not started |
+| 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, self-first, the reviewer, dotted input, second level, HR close, conduct cap, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews tab and ESS · My Performance; Home's reviews adapter kept true | §3.3, §6.10, §6.12, §6.14 to §6.17 | 2300 to 2399 | PR 2 | Built 22/10/2026 |
 | 4 · Workspace | `m2/perf-workspace` | Commitments and their approval, the Commitments view and month-end report, Counts Towards, initiatives on the board, the weekly summary with Tidy, performance dates on the calendar, My Commitments on ESS | §3.4, §6.11, §6.18 | 2400 to 2499 | PR 2 | Built 22/10/2026 |
 | 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard and the Team roster's score; the M2 demo walk | §3.7, §6.21 | 2500 to 2599 | PR 2 | Not started |
 
@@ -157,21 +157,21 @@ line. Nothing is ticked until it is merged.
 
 **PR 3 · Reviews**
 
-- [ ] Monthly rounds (§6.12): job `review-cycles` (handler `review-cycle-open`) opens each month's round on the next month's first business day, with one review per binding scorecard and the due dates of §6.2; Open Round and Close Round
-- [ ] Check-in (§6.12, §6.14): actual, evidence and action per line; proposed scores; self score with reason; automatic lines (`targets.progress.js`, §6.10); the month's tasks from Workspace; Save Draft, Submit Check-In
-- [ ] Self first (A17): the reviewer gets 409 `CHECK_IN_FIRST` and none of the content until the check-in is in
-- [ ] Reviewer: final scores, override reasons, corrective actions as tasks, Ask For Input and Give Input, Submit Review opening `performance.review`
-- [ ] Second level and HR (§6.12): approve or Request Changes; Close Review on HR's approval; Mark Conduct; score to date and rating kept on the scorecard; the letterheaded PDF through `documents.generate()`
-- [ ] PIP (§6.16): Start PIP from a Below review, its lines, review date and reminder, Close PIP with its outcome
-- [ ] Probation review (§6.16): opened on `employee.probation_ending`; Confirm, Extend 3 Months or End Employment through `organisation.service`
-- [ ] Dictation and Tidy (§6.17): actions `review-dictation` (Transcription) and `review-cleanup` (Default) registered with `chosen_by` TB, `chosen_at` 2026-10-22, `personal_data` true; prompts; `VoiceField`
-- [ ] Reminders (§7): check-in due, review due, HR close, PIP review, and `kr_report_due` (the heads' monthly report, left by PR 2)
-- [ ] Mid-quarter scorecards (§11, left by PR 2): a manager drafts a scorecard for someone who joins after the plan binds (PR 2 refuses it with 409 `PLAN_NOT_OPEN`), and Send Scorecard opens a plan amendment, a new `performance.plan` instance holding only that scorecard, which binds it on approval; touches `targets.service.js` `create` and `goals.approval.js`, so say so in the PR
-- [ ] Screens, both shells: Reviews (the round, Waiting On You, the list, a review) and ESS · My Performance (everything but My Commitments); ⌘K action Start Check-In
-- [ ] AI read `reviews.ai.js` (stages and scores only); `reviews.search.js`; PIPs `search:none` with the reason
-- [ ] Home's `reviews.source.js` kept true to the new stages (Reviews Due, My Reviews Due), its OWES cleared
-- [ ] Staging seed `seeds/staging/46_performance_reviews.js`: October's round with reviews at every stage
-- [ ] Docs and progress: #32 and #10 ticked; this guide's §14
+- [x] 22/10/2026 · Monthly rounds (§6.12): job `review-cycles` (handler `review-cycle-open`) opens each month's round on the next month's first business day, with one review per binding scorecard and the due dates of §6.2; Open Round and Close Round. A round reviews only the scorecards bound by its month's end (a plan's `binding_at`, or an amendment's approval)
+- [x] 22/10/2026 · Check-in (§6.12, §6.14): actual, evidence and action per line; proposed scores; self score with reason; automatic lines (`targets.progress.js`, §6.10); the month's tasks from Workspace; Save Draft, Submit Check-In; Add Evidence uploads a file as a line's evidence (`POST /ess/performance/check-in/evidence`, purpose `performance_evidence`)
+- [x] 22/10/2026 · Self first (A17): the reviewer gets 409 `CHECK_IN_FIRST` and none of the content until the check-in is in
+- [x] 22/10/2026 · Reviewer: final scores, override reasons, corrective actions as tasks, Ask For Input and Give Input, Submit Review opening `performance.review`; Return Check-In. Score Without Check-In (§11) is not built: a check-in not in by its due date waits on the employee
+- [x] 22/10/2026 · Second level and HR (§6.12): approve or Request Changes; Close Review on HR's approval; Mark Conduct; score to date and rating kept on the scorecard; the letterheaded PDF through `documents.generate()`
+- [x] 22/10/2026 · PIP (§6.16): Start PIP from a Below review, its lines, review date and reminder, Close PIP with its outcome
+- [x] 22/10/2026 · Probation review (§6.16): opened on `employee.probation_ending`; Confirm, Extend 3 Months or End Employment through `organisation.service`
+- [x] 22/10/2026 · Dictation and Tidy (§6.17): actions `review-dictation` (Transcription) and `review-cleanup` (Default) registered with `chosen_by` TB, `chosen_at` 2026-10-22, `personal_data` true; prompts; `VoiceField`
+- [x] 22/10/2026 · Reminders (§7): check-in due, review due, HR close, PIP review, and `kr_report_due` (the heads' monthly report, left by PR 2)
+- [x] 22/10/2026 · Mid-quarter scorecards (§11, left by PR 2): a manager drafts a scorecard for someone who joins after the plan binds (PR 2 refuses it with 409 `PLAN_NOT_OPEN`), and Send Scorecard opens a plan amendment, a new `performance.plan` instance holding only that scorecard, which binds it on approval; touches `targets.service.js` `create` and `goals.approval.js`, so say so in the PR
+- [x] 22/10/2026 · Screens, both shells: Reviews (the round, Waiting On You, the list, a review) and ESS · My Performance (everything but My Commitments); ⌘K action Start Check-In
+- [x] 22/10/2026 · AI read `reviews.ai.js` (stages and scores only); `reviews.search.js`; PIPs `search:none` with the reason
+- [x] 22/10/2026 · Home's `reviews.source.js` kept true to the new stages (Reviews Due, My Reviews Due), its OWES cleared
+- [x] 22/10/2026 · Staging seed `seeds/staging/46_performance_reviews.js`: October's round with reviews at every stage
+- [x] 22/10/2026 · Docs and progress: #32 and #10 ticked; this guide's §14
 
 **PR 4 · Workspace**
 
@@ -574,6 +574,13 @@ Status CHECKs on the four 2000 tables Home's staging rows fill (`organisational_
 lines, PR 3 for rounds and reviews), each in its own block; until then the services hold them to the
 contract. Every new table has its CHECKs.
 
+PR 3's `2300_performance_reviews.sql` adds what the review needed and §4 did not hold: the
+`performance_cycle` and `performance_review` status CHECKs (`NOT VALID`, so rows written before them
+are left alone, and the defaults become `open` and `check_in`); `performance_review.second_level_employee_id`
+(the reviewer's effective line manager at submit, NULL when the reviewer is the CEO); and on
+`performance_review_item` a corrective action kept while the reviewer works, `corrective_title`,
+`corrective_owner_id`, `corrective_due_on`, and `corrective_task_id` once Submit Review makes it a task.
+
 Indexes: every foreign key; `okr_key_result_month (month)`, `kpi_month (month)`,
 `performance_review (performance_cycle_id, status)`, `performance_review (reviewer_employee_id) WHERE
 status <> 'closed'`, `task (commitment_month, primary_assignee_id) WHERE is_commitment`, and the two
@@ -642,6 +649,7 @@ routes file; the module that owns each route is named.
 | `PATCH /performance/scorecards/:id` | `ScorecardEdit` → `ScorecardDetail` | edit · scope; reviewer fields need `performance.manage` | | scope text, reviewer (person or role) with reason, dotted manager |
 | `POST /performance/scorecards/:id/agree` | `EmptyBody` → `ScorecardDetail` | view · the employee or the reviewer (the service checks which) | | |
 | `POST /performance/scorecards/:id/disagree` | `DisagreeBody` (`disagree_reason`) → `ScorecardDetail` | as above | | |
+| `POST /performance/scorecards/:id/submit` (PR 3) | `EmptyBody` → `ScorecardDetail` | edit · scope | | Send Scorecard: a draft scorecard of a binding plan opens its own `performance.plan` instance (entity `scorecard`, §11) and binds on approval; `can_send` says it may be sent, `amendment_instance_id` names the instance while it waits; 409 `PLAN_NOT_BINDING`, `SCORECARD_LOCKED` |
 | `GET /performance/contributions` | `ContributionQuery` → `ContributionPage` | view | yes, 25 | `plan_id` or `key_result_id`: each split key result with its shares, sum, target, OK or Rebalance |
 | `GET /performance/commitments` (PR 4) | `CommitmentListQuery` → `CommitmentPage` | view · own, team, all | yes, 25 | `month`, `department_id`, `employee_id`, `state` (`awaiting_approval`, `due`, `on_time`, `late`, `missed`, `rescoped`), `waiting_on_me`, `q`; rows are tasks |
 | `POST /performance/commitments/sets/:employee_id/:month/submit` (PR 4) | `EmptyBody` → `CommitmentSetRow` | `workspace` edit · scope (the person or their manager) | | `month` is `YYYY-MM`; opens `performance.commitments` |
@@ -661,19 +669,20 @@ routes file; the module that owns each route is named.
 | `GET /performance/reviews/:id` | → `ReviewDetail` | view · scope, or a person the review names | | §6.12 decides which parts the reader sees |
 | `PUT /performance/reviews/:id/scores` | `ReviewScoresSave` → `ReviewDetail` | the reviewer | | after the check-in only (409 `CHECK_IN_FIRST`) |
 | `POST /performance/reviews/:id/submit` | `EmptyBody` → `ReviewDetail` | the reviewer | | needs every assessable line scored and a corrective action on each missed one; opens `performance.review` |
-| `POST /performance/reviews/:id/return` | `ReturnCheckIn` → `ReviewDetail` | the reviewer | | sends a submitted check-in back to the employee with a reason |
+| `POST /performance/reviews/:id/return` | `ReturnCheckIn` → `Review` | the reviewer | | sends a submitted check-in back to the employee with a reason; answers the list row, since the reviewer may not read the check-in again until it is resubmitted (A17) |
 | `POST /performance/reviews/:id/input` | `ReviewInput` → `ReviewDetail` | the dotted manager | | `POST /performance/reviews/:id/ask-input` (`EmptyBody`, the reviewer) asks for it |
 | `POST /performance/reviews/:id/conduct` | `ConductMark` → `ReviewDetail` | edit, `performance.manage` | | caps the rating (§6.15) |
 | `POST /performance/reviews/:id/probation-outcome` | `ProbationOutcome` → `ReviewDetail` | approve, `performance.manage` | | probation reviews at HR's stage |
-| `POST /performance/reviews/:id/items/:item_id/dictation` | multipart `file` + `DictationRequest` → `Dictation` | the reviewer | | transcript; the tidy is separate |
+| `POST /performance/reviews/:id/items/:item_id/dictation` | multipart `file` + `DictationRequest` → `Dictation` | the reviewer, or the dotted manager for `dotted_input` | | transcript; the tidy is separate. The upload engine's `purpose` field is accepted and the route's own (`voice_note`) decides |
 | `POST /performance/tidy` | `TidyRequest` → `TidyResult` | view · the writer of the text | | `kind` `check_in` or `review`, the item, the text; one `review-cleanup` run |
 | `GET /performance/pips` | `PipListQuery` → `PipPage` | view · scope | yes, 25 | |
 | `POST /performance/pips` · `PATCH /performance/pips/:id` · `POST /performance/pips/:id/close` | `PipCreate`, `PipEdit`, `PipClose` → `Pip` | create · edit, `performance.manage` | | from a closed review rated Below |
-| `GET /api/v1/ess/performance` | → `MyPerformance` | `ess` · own | | score to date, rating, the open check-in, agreement, commitments this month (PR 4), the reviews, an open PIP |
+| `GET /api/v1/ess/performance` | → `MyPerformance` | `ess` · own | | the quarter, the scorecard (score to date, rating, agreement, reviewer), the open check-in, this month's commitments (due and delivered on time, as `targets.commitments` `monthFigures` counts them, and the set's status), an open PIP; the reviews are `GET /ess/performance/reviews` |
 | `GET /api/v1/ess/performance/check-in` · `PUT` | → `ReviewCheckIn` · `ReviewCheckInSave` → `ReviewCheckIn` | `ess` · own | | the open month; 404 `NO_OPEN_CHECK_IN` when none (`reviews.js`: attendance already has a `CheckIn`) |
 | `POST /api/v1/ess/performance/check-in/submit` | `EmptyBody` → `ReviewCheckIn` | `ess` · own | | |
-| `POST /api/v1/ess/performance/check-in/dictation` | multipart `file` + `DictationRequest` → `Dictation` | `ess` · own | | |
-| `GET /api/v1/ess/performance/reviews` | `MyReviewListQuery` → `MyReviewPage` | `ess` · own | yes, 25 | closed reviews show final scores and the PDF |
+| `POST /api/v1/ess/performance/check-in/dictation` | multipart `file` + `DictationRequest` → `Dictation` | `ess` · own | | the transcript lands in the item's `action_transcript` |
+| `POST /api/v1/ess/performance/check-in/evidence` (PR 3) | multipart `file` + `EvidenceUpload` → `DocumentRef` | `ess` · own | | a file (purpose `performance_evidence`, 15 MB) kept in the vault against the review as one line's evidence, and the line's score proposed again |
+| `GET /api/v1/ess/performance/reviews` | `MyReviewListQuery` → `MyReviewPage` | `ess` · own | yes, 25 | closed reviews show final scores and the PDF; a review opens through `GET /performance/reviews/:id`, which sends the employee their own parts |
 
 **My Workspace** (`workspace`, `tasks`, `calendar`; PR 4)
 
@@ -923,7 +932,10 @@ Worked out whenever a check-in opens or is read, and again at the review's submi
 - **Sequence** (A17, P12): `check_in` → the employee submits → `with_reviewer` → the reviewer submits →
   `second_level` → approved → `with_hr` → Operations & People approve → `closed`. Request Changes at
   second level or HR returns it to the reviewer (`returned`, then `with_reviewer` again); the reviewer
-  may return a check-in to the employee with a reason.
+  may return a check-in to the employee with a reason (back to `check_in`, its submission cleared).
+  On screen Request Changes is the engine's reject with a reason (the instance ends and the reviewer's
+  next submit opens a new one); an engine `request-changes` on the flow, which would go back to the
+  first stage, is read the same way: the instance is cancelled and the review returns to its reviewer.
 - **What each reader sees**: the employee sees their check-in, and the reviewer's scores, comments and
   corrective actions only once closed. The reviewer sees nothing of the check-in until it is submitted
   (409 `CHECK_IN_FIRST` on read and save). The dotted manager sees the check-in once submitted and
@@ -985,7 +997,10 @@ Worked out whenever a check-in opens or is read, and again at the review's submi
 
 - **Corrective action**: every line scored below its target in the month needs an action with an owner
   and a date before the reviewer submits (`CORRECTIVE_ACTION_REQUIRED`); it is created as a task for its
-  owner pointing at the review (their PC-KR1.1).
+  owner pointing at the review (their PC-KR1.1). "Below its target in the month" (PR 3): a milestone,
+  standard or yes-or-no line whose final score is under 1; a numeric line only in the quarter's last
+  month, since a quarter's count is reached across its three months. The screen offers an action on
+  any line scored under 1; the rule above is what Submit Review requires.
 - **PIP**: on a closed review rated Below, Operations & People may Start PIP: the lines to improve and
   their targets, the period (default 30 days), the review date (default its end), a summary. Actions are
   tasks. A reminder fires 3 business days before the review date. Close PIP records Passed, Extended
@@ -1127,6 +1142,7 @@ For the quarter and, optionally, one function, within the reader's scope, Africa
 | `plan.submitted` · `plan.binding` · `plan.returned` | Send Plan; the CEO's approval; Request Changes | the engine tells each stage; on binding each employee and reviewer is told "Your Q4 2026 scorecard is ready to agree" |
 | `plan.reopened` | reverting the import of a plan's last objectives | audit only: the plan is a draft again |
 | `scorecard.agreed` · `scorecard.disagreed` | agreement | notice to the other party; disagreement to the reviewer |
+| `scorecard.sent` · `scorecard.amendment_decided` (PR 3) | Send Scorecard; the plan flow's decision on it | the stages are told; on approval the scorecard binds and its people are told to agree it |
 | `target_change.requested` · `target_change.decided` | request; the CEO's decision | the requester is told; the target applies on approval |
 | job `targets-lock` (daily 00:15 Lagos) | the quarter's lock date | TBC targets lock; the heads are told which locked |
 | `kpi.actual_recorded` | Record Actual or Report Month | lines fed by it recount |
@@ -1135,6 +1151,7 @@ For the quarter and, optionally, one function, within the reader's scope, Africa
 | `review.check_in_submitted` | Submit Check-In | notice to the reviewer "Ada's check-in is in"; input asked of the dotted manager |
 | `review.input_asked` · `review.input_given` | Ask For Input; Give Input | notice to the dotted manager; notice to the reviewer |
 | `review.submitted` · `review.returned` | Submit Review; Request Changes | the engine tells the stage; a return tells the reviewer (or the employee for a returned check-in) |
+| `review.advanced` | second level approves | the review moves to `with_hr`; Operations & People are told |
 | `review.closed` | HR's approval | PDF generated; scorecard score and rating written; the employee told "Your October review is closed"; carries the rating for M3 |
 | `review.conduct_marked` | Mark Conduct | audit; the employee is not told by the system |
 | `improvement_plan.started` · `improvement_plan.closed` | Start PIP; Close PIP | notice to the employee and their reviewer |
@@ -1148,6 +1165,7 @@ For the quarter and, optionally, one function, within the reader's scope, Africa
 | `week.summary_saved` | Support Needed or a summary saved | the manager's Team This Week refreshes |
 | reminder `check_in_due` | 2 business days before the due date and on it, 09:00 | the person |
 | reminder `review_due` | the day after the check-in and on the due date | the reviewer |
+| reminder `review_close_due` | the round's close date, 09:00, while the review is with Operations & People | Operations & People |
 | reminder `kr_report_due` | the 2nd business day of the month, 09:00 | the heads with key results unreported |
 | reminder `commitments_due` | the 2nd business day, 09:00 Lagos | each active person with a login and no set sent or approved for the month |
 | reminder `scorecard_agree_due` | §6.6 | each side not yet agreed |
@@ -1253,10 +1271,13 @@ is listed here as tier 1 or tier 2.**
   request (F26); the second answers 409 and the screen reloads.
 - **A person joins mid-quarter**: their manager drafts a scorecard; it goes through a function plan
   amendment (a new instance of `performance.plan` holding only that scorecard). Months before it is
-  binding are not reviewed. PR 3 builds the amendment; until then a scorecard is drafted only while its
-  function's plan is open (409 `PLAN_NOT_OPEN`).
+  binding are not reviewed. Built by PR 3: a draft scorecard of a binding plan is
+  edited until Send Scorecard (`POST /performance/scorecards/:id/submit`); a round reviews it from the
+  first month that ends after it binds. A scorecard is refused only while its plan is with the
+  approvers (409 `PLAN_NOT_OPEN`).
 - **A person leaves**: their open review closes as Withdrawn at HR's stage with a note; the scorecard
-  closes; their commitments stay reportable.
+  closes; their commitments stay reportable. Not built in PR 3: a leaver's open review stays where it
+  is until Operations & People act on it.
 - **A manager sends someone's commitments and is also their reviewer**: the set is approved as it is sent
   (§6.11); a manager who is not the reviewer sends it to the reviewer as the person would.
 - **A commitment's date moves into the next month**: it stays in its own month; not done when that month
@@ -1277,7 +1298,7 @@ is listed here as tier 1 or tier 2.**
 - **A key result is reported late**: lines fed by it read the previous month's figure until the report;
   the reviewer may override.
 - **No check-in by the due date**: the reviewer may start scoring after the due date passes (Score Without
-  Check-In, with a reason); Monthly Update On Time scores 0.
+  Check-In, with a reason); Monthly Update On Time scores 0. Not built in PR 3: the review waits on the check-in.
 - **The round opens on a holiday**: it opens on the next business day.
 - **A function KPI reads N/A**: lines fed by it are blank that month.
 - **Import errors**: a row that cannot be matched is skipped only when the person says so; nothing partial
@@ -1334,6 +1355,22 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · PR 3 merged with PR 4: the automatic commitments line (§6.10) and My Performance's
+  Commitments On Time read `targets.commitments` `monthFigures`, PR 4's own count, so the line, the
+  Commitments view and ESS agree; My Commitments sits on ESS · My Performance with the rest (§10).
+- 22/10/2026 · TB · PR 3 Reviews built: monthly rounds (job `review-cycles`, Open Round, Close Round),
+  the check-in with evidence, automatic lines (`targets.progress.js`), self first (409 `CHECK_IN_FIRST`),
+  the reviewer's scores and corrective actions as tasks, Ask For Input and Give Input, the
+  `performance.review` chain with second level and HR, Mark Conduct, the review PDF, PIPs, probation
+  reviews, Dictate and Tidy With AI (`review-dictation`, `review-cleanup`), the reminders, Send
+  Scorecard for a mid-quarter scorecard, the Reviews tab and ESS · My Performance (but My
+  Commitments), Home's reviews adapter on the new stages, October's staging round. Decided on the way
+  (§4, §5, §6.12, §6.16, §11): migration 2300 adds the status CHECKs (`NOT VALID`), the second level
+  and the corrective action's columns; Request Changes is the engine's reject, and a request-changes
+  is read the same way; Return Check-In answers the list row (A17); a round reviews only scorecards
+  bound by its month's end; a scorecard line's months read closed reviews only; a numeric line is
+  missed only in the quarter's last month; Add Evidence has its own route; the upload bodies accept
+  the engine's `purpose`. Not built: Score Without Check-In and a leaver's Withdrawn review (§11).
 - 22/10/2026 · TB · PR 4 built: commitments on tasks with their month's approval, original dates,
   rescope and recovery; the Commitments view with its figures, Waiting On You and Export Report; Counts
   Towards; My Week and Team This Week with Tidy With AI; performance dates on the calendar; My

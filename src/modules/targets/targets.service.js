@@ -9,6 +9,10 @@
  * effective line manager, worked out when it is drafted (the CEO has none); Operations & People
  * may name another person or a role, with a reason. Both the employee and the reviewer agree with
  * one tap; Disagree With Reason clears both agreements and tells the reviewer.
+ *
+ * Someone who joins after their function's plan binds (§11) is drafted a scorecard all the same; Send
+ * Scorecard opens a plan amendment, a `performance.plan` approval holding that scorecard alone, and
+ * the CEO's approval binds it (goals.approval.js). While a plan is sent, no scorecard is drafted in it.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -16,6 +20,7 @@ const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
 const { assertInScope } = require("../../shared/rbac/scope");
 const { scoring } = require("@mycity/contract");
+const workflow = require("../../shared/workflow/engine");
 const authority = require("../goals/goals.authority");
 const plans = require("../goals/goals.plans");
 const weights = require("./targets.weights");
@@ -117,11 +122,18 @@ async function mayRead(db, card, actor, scope) {
   }
 }
 
-/** A draft scorecard whose plan is still open may be edited by a manager in scope (never their own). */
+/** The pending plan amendment holding a mid-quarter scorecard alone, if it was sent. */
+const amendmentOf = (db, scorecardId) => workflow.findOpenInstance(db, { type: "scorecard", id: scorecardId });
+
+/**
+ * A draft scorecard may be edited by a manager in scope (never their own) while its plan is a draft
+ * or returned, or once the plan binds (a mid-quarter scorecard) until it is sent as an amendment.
+ */
 async function editable(db, card, actor, scope) {
   if (card.status !== "draft") return false;
   const plan = await plans.planFor(db, card.performance_period_id, card.department_id);
-  if (plan && !["draft", "returned"].includes(plan.status)) return false;
+  if (plan && plan.status === "submitted") return false;
+  if (plan && plan.status === "binding" && (await amendmentOf(db, card.scorecard_id))) return false;
   if (!actor) return false;
   if (actor.is_ceo) return true;
   if (card.employee_id === actor.employee_id) return false;
@@ -140,6 +152,9 @@ async function detail(db, card, actor, scope) {
   const reviewer = await isReviewer(db, card, actor);
   const mine = actor && card.employee_id === actor.employee_id;
   const agreeable = ["binding", "agreed"].includes(card.status);
+  const canEdit = await editable(db, card, actor, scope);
+  const plan = card.status === "draft" ? await plans.planFor(db, card.performance_period_id, card.department_id) : null;
+  const amendment = plan && plan.status === "binding" ? await amendmentOf(db, card.scorecard_id) : null;
   return {
     ...cardView(card),
     scope_text: card.scope_text,
@@ -151,8 +166,10 @@ async function detail(db, card, actor, scope) {
     lines: views,
     weight_problems: weights.weightProblems(card, views),
     contributions: splits.map(weights.contribution),
-    can_edit: await editable(db, card, actor, scope),
+    can_edit: canEdit,
     can_agree: agreeable && ((mine && !card.employee_agreed_at) || (reviewer && !card.reviewer_agreed_at)),
+    can_send: canEdit && Boolean(plan && plan.status === "binding") && !weights.weightProblems(card, views).length,
+    amendment_instance_id: amendment ? amendment.workflow_instance_id : null,
   };
 }
 
@@ -228,8 +245,9 @@ async function create(actor, scope, body, opts = {}) {
       throw new AppError("SCORECARD_EXISTS", "They already have a scorecard this quarter", 409, { employee_id: ["Already has one"] });
     if (person.department_id) {
       const plan = await plans.ensurePlan(client, period.performance_period_id, person.department_id);
-      // A sent or binding plan takes no new scorecard: it would bind unchecked, or never bind.
-      if (!opts.system && !["draft", "returned"].includes(plan.status))
+      // A sent plan takes no new scorecard: it would bind unchecked. A binding one takes it as an
+      // amendment, sent on its own (§11).
+      if (!opts.system && plan.status === "submitted")
         throw new AppError("PLAN_NOT_OPEN", "This function's plan is already sent for the quarter", 409);
     }
     const sections = period.rules.sections;
@@ -473,6 +491,98 @@ async function contributions(query) {
 }
 
 /* ------------------------------------------------------------------ *
+ * A mid-quarter scorecard: Send Scorecard and its amendment (§11)
+ * ------------------------------------------------------------------ */
+
+/**
+ * POST /performance/scorecards/:id/submit: Send Scorecard. A scorecard drafted after its plan bound
+ * goes through the plan's chain alone, as an amendment of the function's plan.
+ */
+async function submit(actor, scope, id) {
+  const card = await repo.get(pool, id);
+  if (!card) throw notFound();
+  const plan = card.department_id ? await plans.planFor(pool, card.performance_period_id, card.department_id) : null;
+  if (!plan || plan.status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Send the function's plan instead", 409);
+  if (!(await editable(pool, card, actor, scope))) throw new AppError("SCORECARD_LOCKED", "This scorecard is already sent", 409);
+  const views = (await repo.lines(pool, id)).map((l) => lineView(l, []));
+  const problems = weights.weightProblems(card, views);
+  if (problems.length)
+    throw new AppError("WEIGHTS_NOT_100", "Each section's weights must add up first", 409, {
+      problems: problems.map((w) => `${w.section} weights add to ${w.total}, not ${w.expected}`),
+    });
+  const goalsRepo = require("../goals/goals.repo");
+  const organisation = require("../organisation/organisation.service");
+  const head = await organisation.headOf(pool, card.department_id);
+  const headManager = head ? await goalsRepo.effectiveManagerOf(pool, head) : null;
+  const context = {
+    head_reports_to_ceo: !headManager || (await goalsRepo.isCeoEmployee(pool, headManager)),
+    by_operations_people: Boolean(actor && (actor.role_ids || []).length && (await goalsRepo.holdsRoleCode(pool, actor.role_ids, "operations_people"))),
+    is_company: false,
+  };
+  await tx(async (client) => {
+    await workflow.openInstance(client, {
+      definition_key: "performance.plan",
+      entity: { type: "scorecard", id },
+      subject_employee_id: head,
+      context,
+      actor,
+      exclude_employee_ids: [card.employee_id],
+    });
+    await emit(client, {
+      key: EVENTS.SCORECARD_SENT,
+      entity: { type: "scorecard", id },
+      actor,
+      payload: { scorecard_id: id, employee_id: card.employee_id, subject_employee_id: card.employee_id, period: card.period_name },
+    });
+  });
+  return get(id, actor, scope);
+}
+
+/**
+ * The amendment's approval finished: approved binds the scorecard alone and asks both sides to
+ * agree; refused leaves it a draft to change and send again. Safe to run again.
+ */
+async function settleAmendment(id, { state, reason = null, opened_by: openedBy = null }) {
+  return tx(async (client) => {
+    const card = await repo.get(client, id);
+    if (!card || card.status !== "draft") return null;
+    const approved = state === "approved" || state === "timeout_approved";
+    if (approved) {
+      await repo.update(client, id, { status: "binding" });
+      await client.query("UPDATE employee_target SET status = 'active' WHERE scorecard_id = $1 AND status = 'draft'", [id]);
+      await emit(client, {
+        key: EVENTS.SCORECARD_BOUND,
+        entity: { type: "scorecard", id },
+        actor: null,
+        after: { status: "binding" },
+        payload: { scorecard_id: id, employee_id: card.employee_id, period: card.period_name },
+      });
+      await scheduleAgreementReminders(client, [{ scorecard_id: id }]);
+    }
+    if (state === "cancelled") return null;
+    const { rows } = await client.query("SELECT employee_id FROM app_user WHERE user_id = $1", [openedBy]);
+    await emit(client, {
+      key: EVENTS.SCORECARD_AMENDMENT_DECIDED,
+      entity: { type: "scorecard", id },
+      actor: null,
+      payload: {
+        scorecard_id: id,
+        employee_id: card.employee_id,
+        subject_employee_id: card.employee_id,
+        approved,
+        reason,
+        period: card.period_name,
+        employee_name: card.employee ? card.employee.display_name : null,
+        tell_employee_ids: approved
+          ? [card.employee_id, card.reviewer_employee_id].filter(Boolean)
+          : [rows[0] ? rows[0].employee_id : null].filter(Boolean),
+      },
+    });
+    return approved ? "binding" : "returned";
+  });
+}
+
+/* ------------------------------------------------------------------ *
  * What a plan's approval and a target change do to scorecards (goals.approval.js)
  * ------------------------------------------------------------------ */
 
@@ -687,4 +797,6 @@ module.exports = {
   agree,
   disagree,
   contributions,
+  submit,
+  settleAmendment,
 };

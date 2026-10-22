@@ -118,7 +118,8 @@ describe.each(ADAPTERS)("the %s source adapter", (name) => {
     expect(adapter.module).toBe(name);
     expect(adapter.milestone).toMatch(/^M([2-9]|1[01])$/);
     expect(OWNERS.has(adapter.owner)).toBe(true);
-    expect(Array.isArray(adapter.owes) && adapter.owes.length > 0).toBe(true);
+    // Empty once the milestone has paid everything it owed (reviews, Performance PR 3).
+    expect(Array.isArray(adapter.owes)).toBe(true);
     for (const item of adapter.owes) expect(typeof item).toBe("string");
   });
 

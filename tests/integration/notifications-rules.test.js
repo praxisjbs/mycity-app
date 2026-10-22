@@ -173,7 +173,8 @@ describeDb("Settings · Notifications, reminders, the digest and quiet hours", (
       expect(approvals.body.data.every((n) => n.category === "approvals")).toBe(true);
 
       const found = await as("pat").get("/notifications/rules?q=probation");
-      expect(found.body.data.map((n) => n.event_key)).toEqual(["employee.probation_ending"]);
+      // Performance's probation review and its outcome name probation too (docs/guides/performance.md §7).
+      expect(found.body.data.map((n) => n.event_key)).toEqual(["employee.probation_ending", "probation.decided", "review.opened"]);
       expect(found.body.data[0].who).toEqual(["People · Approve"]);
 
       const posts = await as("pat").get("/notifications/rules?q=posted%20in%20a%20channel");
