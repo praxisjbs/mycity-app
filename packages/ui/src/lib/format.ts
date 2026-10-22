@@ -140,6 +140,37 @@ export const isNegative = (amount: string | null | undefined) => !!amount && amo
 /** Whole-number count with thousands separators. */
 export const formatCount = (n: number | null | undefined) => (n == null ? "" : group(String(n)));
 
+/* ------------------------------------------------------------------ *
+ * Quantities: "64000.0000" → "64,000", with its unit
+ * ------------------------------------------------------------------ */
+
+/** A sign written before the figure rather than after it. */
+const CURRENCY_SIGN = /^[₦$£€]$/;
+
+/** A JS number as plain digits: never "1e-7". */
+const plainDigits = (n: number) => (Number.isFinite(n) ? (/e/i.test(String(n)) ? n.toFixed(4) : String(n)) : "");
+
+/**
+ * A target, actual, baseline or KPI figure as people write it: thousands grouped, trailing zeros
+ * dropped, a per cent sign against it ("40%"), a currency sign before it ("₦30,000,000") and any
+ * other unit after it ("64,000 users"). Formatted from the decimal string's digits, never through a
+ * float, so every place it carries is kept. Empty for nothing; words that are not a number come back
+ * as they are. Money with kobo is formatMoney's.
+ */
+export function formatNumber(value: string | number | null | undefined, unit?: string | null): string {
+  if (value == null || value === "") return "";
+  const raw = typeof value === "number" ? plainDigits(value) : value.trim();
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(raw);
+  if (!m) return raw;
+  const whole = (m[2] ?? "").replace(/^0+(?=\d)/, "");
+  const frac = (m[3] ?? "").replace(/0+$/, "");
+  const neg = m[1] === "-" && /[1-9]/.test(whole + frac);
+  const figure = `${group(whole)}${frac ? `.${frac}` : ""}`;
+  const u = (unit ?? "").trim();
+  const body = !u ? figure : u === "%" ? `${figure}%` : CURRENCY_SIGN.test(u) ? `${u}${figure}` : `${figure} ${u}`;
+  return neg ? `−${body}` : body;
+}
+
 /** Initials for an avatar: "Cynthia Osakunih" → "CO". */
 export function initials(name: string | null | undefined): string {
   if (!name) return "";
