@@ -7,11 +7,13 @@
  *   GET   /periods · /periods/current · /periods/:id      `performance` view
  *   POST  /periods · PATCH /periods/:id                    create · edit, performance.manage
  *   GET   /goals · /goals/:id                              `performance` view
- *   POST  /goals · PATCH /goals/:id                        create · edit, goals.organisation
+ *   POST  /goals · PATCH · DELETE /goals/:id               create · edit · delete, goals.organisation
  *   GET   /okrs                                            `performance` view: 25 objectives a page, with their key results
  *   GET   /okrs/summary                                    `performance` view: the figures over the quarter or a function
+ *   GET   /objectives/:id                                  `performance` view: one objective, with its key results
  *   POST  /objectives · PATCH · DELETE /objectives/:id     goals.company or goals.function: a draft plan only
- *   POST  /key-results · PATCH · DELETE /key-results/:id   as objectives; a binding TBC target by its owner
+ *   GET   /key-results                                     `performance` view: a quarter's key results for a picker
+ *   POST  /key-results · PATCH · DELETE /key-results/:id   as objectives; a binding TBC target by its owner or head
  *   GET   /key-results/:id · /key-results/:id/trace        `performance` view
  *   POST  /reports                                         `performance` edit: the head, or the accountable person
  *   POST  /key-results/:id/confirm                         `performance` approve, goals.confirm
@@ -53,9 +55,13 @@ route(router, "post", "/goals",
 route(router, "patch", "/goals/:id",
   { params: id, body: g.OrganisationalGoalEdit, response: g.OrganisationalGoal, summary: "Change an organisational goal" },
   requirePermission("performance", "edit"), requireCapability("goals.organisation"), controller.updateGoal);
+route(router, "delete", "/goals/:id",
+  { params: id, no_content: true, summary: "Remove an organisational goal no company objective serves" },
+  requirePermission("performance", "delete"), requireCapability("goals.organisation"), controller.deleteGoal);
 
 route(router, "get", "/okrs", { query: g.OkrListQuery, response: g.ObjectivePage, summary: "The OKR tree" }, view, controller.okrs);
 route(router, "get", "/okrs/summary", { query: g.OkrSummaryQuery, response: g.OkrSummary, summary: "The Goals figures" }, view, controller.okrSummary);
+route(router, "get", "/objectives/:id", { params: id, response: g.Objective, summary: "One objective" }, view, controller.objective);
 route(router, "post", "/objectives",
   { body: g.ObjectiveCreate, response: g.Objective, summary: "Set an objective" },
   requirePermission("performance", "create"), setsGoals, controller.createObjective);
@@ -64,8 +70,10 @@ route(router, "patch", "/objectives/:id",
   requirePermission("performance", "edit"), setsGoals, controller.updateObjective);
 route(router, "delete", "/objectives/:id",
   { params: id, no_content: true, summary: "Remove a draft objective" },
-  requirePermission("performance", "delete"), setsGoals, controller.deleteObjective);
+  requirePermission("performance", "edit"), setsGoals, controller.deleteObjective);
 
+route(router, "get", "/key-results",
+  { query: g.KeyResultListQuery, response: g.KeyResultRefPage, summary: "A quarter's key results, for a picker" }, view, controller.keyResults);
 route(router, "post", "/key-results",
   { body: g.KeyResultCreate, response: g.KeyResult, summary: "Set a key result" },
   requirePermission("performance", "create"), setsGoals, controller.createKeyResult);
@@ -76,7 +84,7 @@ route(router, "patch", "/key-results/:id",
   requirePermission("performance", "edit"), controller.updateKeyResult);
 route(router, "delete", "/key-results/:id",
   { params: id, no_content: true, summary: "Remove a draft key result" },
-  requirePermission("performance", "delete"), setsGoals, controller.deleteKeyResult);
+  requirePermission("performance", "edit"), setsGoals, controller.deleteKeyResult);
 route(router, "post", "/reports",
   { body: g.MonthReport, response: g.MonthReportResult, summary: "Report a function's month" },
   requirePermission("performance", "edit"), controller.report);

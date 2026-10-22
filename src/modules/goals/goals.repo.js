@@ -28,8 +28,9 @@ function listPeriods(db, query) {
        FROM performance_period p
       WHERE ($1::text IS NULL OR p.status = $1)
         AND ($2::text IS NULL OR search_fold(p.name) LIKE '%' || search_fold($2) || '%')
+        AND ($3::int IS NULL OR p.plan_year_starts_on = make_date($3, 1, 1))
       ORDER BY ${orderBy(sorted, PERIOD_SORTS, "p.performance_period_id")}`,
-    [query.status || null, query.q || null],
+    [query.status || null, query.q || null, query.plan_year || null],
     query,
   );
 }
@@ -63,7 +64,7 @@ const periodStarting = (db, startsOn) =>
 const otherActive = (db, id) =>
   one(
     db,
-    `SELECT ${PERIOD} FROM performance_period p WHERE p.status = 'active' AND p.performance_period_id <> $1`,
+    `SELECT ${PERIOD} FROM performance_period p WHERE p.status = 'active' AND p.performance_period_id IS DISTINCT FROM $1::uuid`,
     [id],
   );
 
@@ -72,9 +73,9 @@ function insertPeriod(client, p) {
     client,
     `INSERT INTO performance_period
        (name, starts_on, ends_on, plan_year_starts_on, targets_lock_on, live_from, status, rules)
-     VALUES ($1, $2, $3, $4, $5, $6, 'planning', $7::jsonb)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
      RETURNING performance_period_id`,
-    [p.name, p.starts_on, p.ends_on, p.plan_year_starts_on, p.targets_lock_on, p.live_from, JSON.stringify(p.rules)],
+    [p.name, p.starts_on, p.ends_on, p.plan_year_starts_on, p.targets_lock_on, p.live_from, p.status || "planning", JSON.stringify(p.rules)],
   );
 }
 
@@ -179,6 +180,25 @@ const goalCodeTaken = async (db, planYear, code, except = null) =>
     ),
   );
 
+/**
+ * What keeps a goal from being deleted: the company objectives serving it, and any older row naming
+ * it (a line or a goal under it, from before the OKR tree).
+ */
+async function goalUses(db, goalId) {
+  const { rows } = await db.query(
+    `SELECT (SELECT count(*) FROM okr_objective WHERE organisational_goal_id = $1 AND department_id IS NULL)::int AS objectives,
+            (SELECT count(*) FROM employee_target WHERE organisational_goal_id = $1)::int
+              + (SELECT count(*) FROM organisational_goal WHERE parent_goal_id = $1)::int AS other`,
+    [goalId],
+  );
+  return rows[0];
+}
+
+/** Delete a goal; its quarterly targets go with it, and a function objective naming it lets go. */
+async function deleteGoal(client, id) {
+  await client.query("DELETE FROM organisational_goal WHERE organisational_goal_id = $1 AND level = 'organisation'", [id]);
+}
+
 /** The company objectives serving a goal, in quarter order. */
 async function companyObjectivesOf(db, goalId) {
   // pagination:complete the company objectives under one goal: a few a quarter
@@ -280,6 +300,25 @@ function listObjectives(db, query) {
 }
 
 const getObjective = (db, id) => one(db, `SELECT ${OBJECTIVE} ${OBJECTIVE_FROM} WHERE o.okr_objective_id = $1`, [id]);
+
+const KEY_RESULT_REF_SORTS = { code: "kr.code" };
+
+/** A quarter's key results as a picker names them: the company's, the functions' or one function's. */
+function listKeyResultRefs(db, query) {
+  return pageQuery(
+    db,
+    `SELECT kr.okr_key_result_id, kr.code::text AS code, kr.statement, ${TOTAL_COL}
+       FROM okr_key_result kr
+       JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
+      WHERE o.performance_period_id = $1
+        AND ($2::text IS NULL OR ($2 = 'company') = (o.department_id IS NULL))
+        AND ($3::uuid IS NULL OR o.department_id = $3)
+        AND ($4::text IS NULL OR search_fold(kr.code || ' ' || kr.statement) LIKE '%' || search_fold($4) || '%')
+      ORDER BY ${orderBy(query, KEY_RESULT_REF_SORTS, "kr.okr_key_result_id")}`,
+    [query.period_id, query.level || null, query.department_id || null, query.q || null],
+    query,
+  );
+}
 
 /** A plan's objectives, in order (a plan is read whole). */
 async function objectivesOfPlan(db, planId) {
@@ -878,6 +917,9 @@ module.exports = {
   initiativeExists,
   listGoals,
   getGoal,
+  goalUses,
+  deleteGoal,
+  listKeyResultRefs,
   goalTargets,
   insertGoal,
   updateGoal,

@@ -80,7 +80,9 @@ async function currentPeriod(db = pool) {
 
 /**
  * Set up a quarter: its name, end and plan year follow from its first day unless given; its rules
- * are copied from the quarter before it (the code's defaults for the first).
+ * are those given (Set Up Quarter starts them from the last quarter's), else copied from the quarter
+ * before it (the code's defaults for the first). It is planning unless set active while no other
+ * quarter is; the next quarter is set up while this one runs.
  */
 async function createPeriod(actor, body) {
   const startsOn = body.starts_on;
@@ -90,8 +92,11 @@ async function createPeriod(actor, body) {
   const id = await tx(async (client) => {
     if (await repo.periodStarting(client, startsOn))
       throw new AppError("PERIOD_EXISTS", "That quarter is already set up", 409, { starts_on: ["Already set up"] });
+    const status = body.status || "planning";
+    if (status === "active" && (await repo.otherActive(client, null)))
+      throw new AppError("PERIOD_ACTIVE_EXISTS", "Close the active quarter first", 409, { status: ["Another is active"] });
     const before = await repo.periodBefore(client, startsOn);
-    const rules = scoring.ScoringRules.parse(before ? before.rules : scoring.DEFAULT_RULES);
+    const rules = scoring.ScoringRules.parse(body.rules || (before ? before.rules : scoring.DEFAULT_RULES));
     const row = await repo.insertPeriod(client, {
       name: body.name || periods.quarterName(startsOn),
       starts_on: startsOn,
@@ -99,6 +104,7 @@ async function createPeriod(actor, body) {
       plan_year_starts_on: body.plan_year_starts_on || periods.planYearOf(startsOn),
       targets_lock_on: body.targets_lock_on || null,
       live_from: body.live_from || null,
+      status,
       rules,
     });
     const after = await repo.getPeriod(client, row.performance_period_id);
@@ -107,7 +113,12 @@ async function createPeriod(actor, body) {
       entity: { type: "performance_period", id: row.performance_period_id },
       actor,
       after,
-      payload: { performance_period_id: row.performance_period_id, name: after.name, copied_from: before ? before.performance_period_id : null },
+      payload: {
+        performance_period_id: row.performance_period_id,
+        name: after.name,
+        status,
+        copied_from: body.rules ? null : before ? before.performance_period_id : null,
+      },
     });
     return row.performance_period_id;
   });
@@ -245,6 +256,29 @@ async function updateGoal(actor, id, patch) {
   return goalView(await repo.getGoal(pool, id));
 }
 
+/**
+ * DELETE /performance/goals/:id: refused while a company objective serves the goal (or an older line
+ * or goal names it); its quarterly targets go with it.
+ */
+async function deleteGoal(actor, id) {
+  await tx(async (client) => {
+    const before = await repo.getGoal(client, id);
+    if (!before) throw new AppError("NOT_FOUND", "That goal does not exist", 404);
+    const uses = await repo.goalUses(client, id);
+    if (uses.objectives > 0)
+      throw new AppError("GOAL_IN_USE", "A company objective serves this goal: unlink it first", 409);
+    if (uses.other > 0) throw new AppError("GOAL_IN_USE", "Another record names this goal", 409);
+    await repo.deleteGoal(client, id);
+    await emit(client, {
+      key: EVENTS.ORGANISATIONAL_GOAL_DELETED,
+      entity: { type: "organisational_goal", id },
+      actor,
+      before: goalView(before),
+      payload: { organisational_goal_id: id, code: before.code, title: before.title },
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Plans (§6.4)
  * ------------------------------------------------------------------ */
@@ -312,7 +346,7 @@ async function planDetail(id, actor, scope = null) {
   const targets = require("../targets/targets.service");
   const targetsRepo = require("../targets/targets.repo");
   const weights = require("../targets/targets.weights");
-  const objectives = await okrs.objectivesOfPlan(pool, id);
+  const objectives = await okrs.objectivesOfPlan(pool, id, actor);
   const cards = plan.department_id ? await targetsRepo.ofDepartment(pool, plan.performance_period_id, plan.department_id) : [];
   const details = [];
   for (const c of cards) details.push(await targets.detail(pool, c, { ...actor, is_ceo: true }, { scope: "all", scope_ids: null }));
@@ -478,6 +512,8 @@ async function requestChange(actor, scope, body) {
     const ctx = await repo.keyResultContext(pool, body.okr_key_result_id);
     if (!ctx) throw new AppError("NOT_FOUND", "That key result does not exist", 404);
     if (ctx.plan_status !== "binding") throw new AppError("PLAN_NOT_BINDING", "Edit a draft's target directly", 409);
+    if (okrs.tbcOpen(ctx))
+      throw new AppError("TARGET_TBC", "Set a TBC target directly until its lock date", 409);
     const owner = actor && actor.employee_id === ctx.accountable_employee_id;
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };
@@ -560,6 +596,7 @@ module.exports = {
   getGoal,
   createGoal,
   updateGoal,
+  deleteGoal,
   planView,
   listPlans,
   planDetail,
