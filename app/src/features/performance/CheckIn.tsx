@@ -175,7 +175,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
     if (!text) return;
     try {
       const t = await tidy.run({ body: { kind: "check_in", performance_review_item_id: id, text } });
-      if (!t.available || !t.tidied) return toast("Tidy is off just now");
+      if (!t.available || !t.tidied) return toast("Tidy is off");
       set(id, { tidied: t.tidied, action_ai_run_id: t.ai_run_id ?? "" });
     } catch (e) {
       say(e);

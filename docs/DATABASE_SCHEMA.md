@@ -313,13 +313,15 @@ and scores; improvement plans and their lines; commitments on `task` and `commit
 summaries · `2190` seed: the five Performance capabilities and their holders, the four flows, the code
 lists · `2200` the statuses an organisational goal (`active`, `closed`; active by default) and a
 scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance PR 2) · `2290` seed: the
-`goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired).
+`goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired) ·
+`2300` the statuses a round (`open`, `closed`) and a review (`check_in`, `with_reviewer`, `second_level`,
+`with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
+the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action
+(`corrective_title`, `corrective_owner_id`, `corrective_due_on`, `corrective_task_id`) (Performance PR 3).
 
 **Owes:**
 - PRs 3 to 5 of `docs/guides/performance.md` use 2300 to 2599 only for a gap. The numbers 2020, 2030 and
   2091 were used on a withdrawn branch and are not reused.
-- Status CHECKs on `performance_cycle` and `performance_review` (Home's staging rows still hold the old
-  values): PR 3, once its staging seed has replaced those rows.
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,
@@ -328,15 +330,15 @@ scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance 
   `employee_id`, `title`, `due_on`, `scorecard_id`) and `scorecard` (`scorecard_id`, `status`) through
   `goals.source.js`; `performance_review`
   (`performance_review_id`, `performance_cycle_id`, `employee_id`, `reviewer_employee_id`,
-  `review_type`, `submitted_at`) with `performance_cycle` (`performance_cycle_id`, `name`,
+  `review_type`, `status`) with `performance_cycle` (`performance_cycle_id`, `name`,
   `closes_at`) through `reviews.source.js`. The PR that changes any of these updates the adapter in
   the same PR, and the one that defines a goal's progress makes Goals On Track and My Targets live.
   Indexes asked by Home: `task (due_at) WHERE archived_at IS NULL AND completed_at IS NULL`,
   `calendar_event (owner_employee_id, starts_at)`, `organisational_goal (level, starts_on, ends_on)`,
   `employee_target (employee_id, due_on)`.
-  **Staging holds Home's demonstration rows** in `performance_cycle` and `performance_review`
-  (`seeds/staging/60_home.js`, decision O11); `task` and `calendar_event` were taken away by
-  `40_workspace.js`, `organisational_goal` and `employee_target` by `45_performance_plan.js`. Their ids are written out in `HOME_STAGING_ROWS`
+  **Home's demonstration rows are gone from staging**: `task` and `calendar_event` were taken away by
+  `40_workspace.js`, `organisational_goal` and `employee_target` by `45_performance_plan.js`, and
+  `performance_cycle` and `performance_review` by `46_performance_reviews.js` (Performance PR 3). Their ids are written out in `HOME_STAGING_ROWS`
   (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
   takes them away once, in the three steps that file starts with: that seed calls
   `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes

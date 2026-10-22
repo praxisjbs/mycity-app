@@ -28,7 +28,8 @@ function rolesOf(r: ReviewDetail, user: string | null) {
   const second = Boolean(me) && r.second_level?.employee_id === me?.employee_id;
   const hr = isHr(user);
   const full = !employee && (second || hr);
-  const hrStage = isOperations(user);
+  // Operations & People's own review is closed by the CEO (guide §11): the reviewee never decides it.
+  const hrStage = isOperations(user) || (SIGN_INS[user ?? ""]?.view === "ceo" && isOperations(byId(r.employee.employee_id)?.user_key ?? null));
   const inScope = Boolean(me) && teamOf(me!.user_key).some((p) => p.employee_id === r.employee.employee_id);
   return { employee, reviewer, dotted, second, hr, hrStage, full, inScope, named: employee || reviewer || dotted || second || full };
 }
