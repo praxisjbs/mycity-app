@@ -41,7 +41,7 @@ afterEach(() => {
 let auth: ReturnType<typeof useAuth> | null = null;
 function Harness({ show }: { show: boolean }) {
   auth = useAuth();
-  return show && auth.status === "signed-in" ? <Performance tab="analytics" /> : null;
+  return show && auth.status === "signed-in" ? <Performance tab="analytics" id={null} /> : null;
 }
 const app = (show: boolean) => (
   <RouterProvider>
