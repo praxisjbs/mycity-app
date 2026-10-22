@@ -9,6 +9,7 @@ import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
+import { useAddressPrefill } from "@/shell/screen-action";
 import { LeaveAllowances, LeaveTypes } from "./LeaveSettings";
 import {
   Button,
@@ -308,7 +309,9 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
   const [who, setWho] = useState<PersonRef[]>([]);
   const [whoError, setWhoError] = useState(false);
   const types = usePaged("GET /api/v1/leave/types", { filters: { active: "true" } });
-  const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", reason: "" }, leave.LeaveRequestCreate);
+  // My Leave opened by Praxis AI's Request Leave button carries the type, the days and the note.
+  const filled = useAddressPrefill(leave.LeaveRequestPrefill, !onBehalf);
+  const f = useContractForm({ leave_type_id: "", starts_on: "", ends_on: "", reason: "", ...filled }, leave.LeaveRequestCreate);
   // My Leave: each type with what is left of the year the First Day falls in, so a request past it is seen before Send.
   const year = Number((f.values.starts_on || todayIso()).slice(0, 4));
   const balances = useApi("GET /api/v1/ess/leave/balances", { query: { year }, enabled: !onBehalf });

@@ -273,6 +273,16 @@ const HomeActivityItem = z
   })
   .strict();
 
+/**
+ * The assistant's `activity.list` (home.md §9): Activity Today's events for one Lagos day, today
+ * unless `date` is given. `employee_id`, or part of a name in `q`, keeps what one person did and
+ * what is about them.
+ */
+const HomeActivityQuery = listQuery({
+  date: isoDate.optional(),
+  employee_id: uuid.optional(),
+});
+
 /** One working day of Your Week: its hours, a public holiday, the reader's leave, and what is due. */
 const HomeWeekDay = z
   .object({
@@ -552,6 +562,7 @@ const TABLES = {
   },
   HomeRoleKpisSave: { table: "role_kpi" },
   HomeKpiParams: { table: null, reason: "the :key path parameter, a KPI catalogue key" },
+  HomeActivityQuery: { table: null, reason: "list controls, the day and the person of the assistant's activity read" },
   HomeKpiColumn: { table: null, reason: "a column a KPI catalogue entry declares for its list" },
   HomeKpiGroup: { table: null, reason: "a group a KPI catalogue entry declares, counted over its records" },
   HomeKpiDetailMeta: { table: null, reason: "a KPI catalogue entry's list, described for the reader" },
@@ -586,6 +597,7 @@ module.exports = {
   HomeLeaveBalance,
   HomeUpcomingLeave,
   HomeActivityItem,
+  HomeActivityQuery,
   HomeWeekDay,
   HomeOverview,
   HomeKpiPicker,

@@ -27,7 +27,7 @@
  * The model list and transcription use Google's own API beside the compatible one: its list says
  * what each model does and its display name, and it takes audio inline as MP3.
  */
-const { VendorError, classify, request, retryAfterOf } = require("./http");
+const { VendorError, classify, request, retryAfterOf, toolCallOf, chatMessages } = require("./http");
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
 const NATIVE_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -69,7 +69,7 @@ function toolSchema(node) {
  * @param {object} req
  * @param {string} req.apiKey
  * @param {string} req.model
- * @param {Array<{role: string, content: string}>} req.messages
+ * @param {Array<object>} req.messages  OpenAI's shape, tool calls and results included (vendors/http.js)
  * @param {boolean} [req.json]       ask for one JSON object
  * @param {Array<object>} [req.tools]  OpenAI-style function tools
  * @param {number} [req.temperature]
@@ -92,7 +92,8 @@ async function complete({
   if (!apiKey) throw new VendorError("gemini: no API key", "config");
   const body = {
     model,
-    messages,
+    // Gemini's thought signatures ride on its tool calls and go back with them.
+    messages: chatMessages(messages, ["extra_content"]),
     temperature,
     reasoning_effort: reasoningEffort(model),
   };
@@ -167,7 +168,7 @@ async function complete({
   const usage = data.usage || {};
   return {
     text: typeof msg.content === "string" ? msg.content : "",
-    toolCalls: Array.isArray(msg.tool_calls) ? msg.tool_calls : [],
+    toolCalls: (Array.isArray(msg.tool_calls) ? msg.tool_calls : []).map(toolCallOf).filter(Boolean),
     usage: {
       input_tokens: Number(usage.prompt_tokens) || 0,
       output_tokens: Number(usage.completion_tokens) || 0,

@@ -589,6 +589,25 @@ const EmployeeCreate = z
   .strict();
 
 /**
+ * What a screen button may fill on Add Employee through the address (docs/guides/praxis-ai.md
+ * §6.4): the names and the job, each optional and checked on its own. Nothing contact, personal
+ * or pay: an address sits in the browser's history.
+ */
+const EmployeePrefill = z
+  .object({
+    first_name: text(100).optional(),
+    middle_name: optionalText(100),
+    last_name: text(100).optional(),
+    job_title: text(150).optional(),
+    department_id: uuid.optional(),
+    start_date: isoDate.optional(),
+    employment_type: EmploymentType.optional(),
+    work_pattern: WorkPattern.optional(),
+    contract_ends_on: isoDate.optional(),
+  })
+  .strict();
+
+/**
  * scripts/db/create-admin.js input. The same employee fields as
  * EmployeeCreate, except the department is named rather than picked: on a
  * clean database there is no department to pick yet, so the script finds it
@@ -619,6 +638,7 @@ const AdminBootstrap = z
  */
 const TABLES = {
   EmployeeCreate: { table: "employee" },
+  EmployeePrefill: { table: "employee" },
   EmployeeUpdate: { table: "employee" },
   EmployeeArchive: { table: "employee" },
   EmployeeReportingUpdate: {
@@ -749,6 +769,7 @@ module.exports = {
   PersonRef,
   ManagerRef,
   EmployeeCreate,
+  EmployeePrefill,
   EmployeeUpdate,
   EmployeeArchive,
   EmployeeReportingUpdate,

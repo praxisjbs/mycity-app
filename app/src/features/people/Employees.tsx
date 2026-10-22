@@ -6,7 +6,7 @@ import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { toBars } from "@/features/shared/wire";
 import { hrefFor, useRouter } from "@/lib/router";
-import { useScreenAction } from "@/shell/screen-action";
+import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
   Bars,
   Button,
@@ -55,6 +55,8 @@ export function Employees() {
   const open = (r: EmployeeRow) => navigate(hrefFor("people", "employees", { id: r.employee_id }));
   const add = () => modal.open({ title: "Add Employee", wide: true, body: (close) => <AddEmployee close={close} /> });
   useScreenAction(canCreate ? { label: "Add Employee", onSelect: add } : null);
+  // The assistant's Add Employee button: ?new=1 and the names and job (docs/guides/praxis-ai.md §6.4).
+  useNewLink(canCreate ? add : null);
 
   return (
     <>

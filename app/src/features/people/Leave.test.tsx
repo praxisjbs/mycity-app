@@ -44,6 +44,7 @@ vi.mock("@/api/download", () => ({ usePhotos: () => ({}) }));
 vi.mock("@/auth/AuthProvider", () => ({ useMe: () => null }));
 vi.mock("@/features/shared/pickers", () => ({ EmployeePicker: () => <div>Employee Picker</div> }));
 
+import { RouterProvider } from "@/lib/router";
 import { LeaveForm } from "./Leave";
 
 installMatchMedia();
@@ -63,7 +64,7 @@ afterEach(() => {
 describe("Request Leave", () => {
   it("lists each type with what is left of the First Day's year", async () => {
     const user = userEvent.setup();
-    render(<LeaveForm close={() => undefined} />);
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
     expect(await optionLabels(screen.getByRole("combobox", { name: "Leave Type" }))).toEqual(["Annual · 12 days left", "Unpaid"]);
     expect(m.years.at(-1)).toBe(2026);
     await user.type(screen.getByLabelText("First Day"), "05/01/2027");
@@ -72,7 +73,7 @@ describe("Request Leave", () => {
 
   it("flags a Last Day in another year as it is typed, and sends nothing", async () => {
     const user = userEvent.setup();
-    render(<LeaveForm close={() => undefined} />);
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
     await user.type(screen.getByLabelText("First Day"), "28/12/2026");
     await user.type(screen.getByLabelText("Last Day"), "04/01/2027");
     await user.tab();
@@ -83,13 +84,13 @@ describe("Request Leave", () => {
 
   it("refuses a First Day typed before today at once", async () => {
     const user = userEvent.setup();
-    render(<LeaveForm close={() => undefined} />);
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
     await user.type(screen.getByLabelText("First Day"), "28/10/2020");
     expect(screen.getByText("Pick 21/10/2026 or later")).toBeTruthy();
   });
 
   it("records leave for someone else without the caller's own year beside the types", async () => {
-    render(<LeaveForm close={() => undefined} onBehalf />);
+    render(<LeaveForm close={() => undefined} onBehalf />, { wrapper: RouterProvider });
     expect(await optionLabels(screen.getByRole("combobox", { name: "Leave Type" }))).toEqual(["Annual", "Unpaid"]);
     expect(m.years).toEqual([]);
   });

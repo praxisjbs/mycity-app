@@ -186,7 +186,11 @@ every capability and every field until handover, and training runs from it (TB, 
   in <department>", "which roles are vacant". Read only (A23), reading the same tree, in pages of
   25. No write.
 - **AI routes**: "show me the org chart" opens ESS · Org Chart (or People · Organogram for HR),
-  optionally focused on a named person.
+  optionally focused on a named person; "add an employee" opens People · Employees on
+  `new=1` (`useNewLink`), Add Employee filled with the names and the job the person gave
+  (`organisation.EmployeePrefill`: names, job title, department, start date, employment type,
+  work pattern, contract end; never the phone, email, pay, bank or personal details, since an
+  address is kept in the browser's history; `docs/guides/praxis-ai.md` §6.4).
 - **Search** (`organisation.search.js`): a person by name, role, staff number, work email or work
   phone reaches their record; the phone is matched however it is typed (0803 123 4567, +234 803...,
   the last four digits) or the name they go by. An open seat is found by its title or department and
@@ -320,6 +324,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · §9: Praxis AI's "add an employee" opens Add Employee on `?new=1`, which the screen now reads (`useNewLink`; it never opened the form before), filled from `organisation.EmployeePrefill` (`praxis-ai.md` §6.4).
 - 22/10/2026 · TB · Nothing on the Org Chart changed. Beside it in `app/src/features/ess/`, My Performance gains My Commitments (Performance PR 4, `docs/guides/ess.md`).
 - 21/10/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them, the employee record's Attendance tab becomes Work Schedule, after Job (`Employee360.tsx`, attendance's PR 3, `docs/guides/attendance.md` §6.13, §10); Reporting Line and Change Manager are untouched.
 - 19/10/2026 · TB · No change to the Org Chart: My Documents, in the ESS folder this guide shares, opens a PDF or a photo in the file viewer and draws a PDF's preview in the app (`docs/guides/ess.md` §10).

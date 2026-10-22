@@ -23,5 +23,6 @@ export default {
     "On Its Own": () => <VoiceField label="Comments" transcribe={slowTranscribe} onTranscript={() => undefined} />,
     Dictate: () => <VoiceField label="What To Say" action="Dictate" transcribe={slowTranscribe} onTranscript={() => undefined} />,
     Disabled: () => <VoiceField label="Comments" transcribe={slowTranscribe} onTranscript={() => undefined} disabled />,
+    "In a Message Box": () => <VoiceField compact label="Question" transcribe={slowTranscribe} onTranscript={() => undefined} />,
   },
 } satisfies GalleryEntry;

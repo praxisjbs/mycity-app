@@ -5,6 +5,7 @@ import type { Employee360, EmployeeCreate } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { hrefFor, useRouter } from "@/lib/router";
+import { useAddressPrefill } from "@/shell/screen-action";
 import {
   Button,
   DateField,
@@ -86,7 +87,9 @@ function useDepartments() {
 export function AddEmployee({ close }: { close: () => void }) {
   const departments = useDepartments();
   const [manager, setManager] = useState<PersonRef[]>([]);
-  const f = useContractForm<Values>(blank, organisation.EmployeeCreate);
+  // Opened by Praxis AI's Add Employee button: the names and the job it was told, nothing personal.
+  const filled = useAddressPrefill(organisation.EmployeePrefill);
+  const f = useContractForm<Values>({ ...blank, ...filled }, organisation.EmployeeCreate);
   const save = useMutation("POST /api/v1/employees");
   const { navigate } = useRouter();
 

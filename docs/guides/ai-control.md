@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | AI Control · Actions, Models and Spend (#98 to #100) |
 | Status | Built |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: TB's answers of 20/10/2026 on AI providers, transcription and AI Control (§1.1, with
 `integrations.md` §1.2), MILESTONES §15 (M10: governance, spend caps, model configuration, per-module
@@ -111,6 +111,20 @@ After the first Find Prices on staging returned nothing for a list of 129 models
 32. **The Models tab opens on what matters**: the models in a chain first, then the rest the key
     can use. The Not on Key models (Gemini 2.5, retired 16/10/2026) are behind the Show filter.
 
+With Praxis AI's guide (21/10/2026, `praxis-ai.md` §1.1):
+
+33. **Data Answers may run up to 5 reads a question**, one after another, each checked as decision 22
+    says. Decision 22's "one of the modules' reads" becomes "up to five". Still never SQL.
+34. **Every text model IT can choose answers, tools included.** Data Answers chooses its reads by
+    calling tools (function calling), which Gemini, Anthropic, DeepSeek, Groq and OpenAI all offer.
+    Each provider's vendor file sends tools and returns the calls, so any text model put first or as
+    a fallback on Data Answers' chain works. Groq's and OpenAI's text models, which Edit Chain
+    already accepts, gain the text answer `llm.service` never called them for: until now such a
+    link was passed by without a word. DeepSeek stays off Data Answers by decision 23 (personal
+    data), not by this one.
+35. **Voice Question** (`praxis-ai-voice`) is registered on Transcription, personal data: a question
+    spoken on Praxis AI · Ask. Data Answers is now built.
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
@@ -119,7 +133,7 @@ After the first Find Prices on staging returned nothing for a list of 129 models
 | AI Control · Models (`models`) | Staff app | `ai_control` view | The models in a chain first, then the rest the key can use, 25 a page (Not on Key and Any behind the filter): what each does, its price in dollars and naira, the chains it is in; the New Prices sheet: Find Prices' progress, the prices it proposed with their pages, how many models are still to price or not listed | Find Prices, Accept All, Accept, Edit Price, Dismiss, Find More (edit); open the provider's connection |
 | AI Control · Spend (`spend`) | Staff app | `ai_control` view | This Lagos month: each provider's spend against its cap, all AI against the overall cap, the day's rate, spend by day and, 25 a page, spend by action | Set Cap on a paid provider, Set Cap on all AI (edit) |
 | Settings · Integrations (`integrations`) | Staff app | `integrations` view | Each AI connection's In Use reads AI Control's chains, and links to AI Control · Actions | As built (`integrations.md`) |
-| Praxis AI · Ask | Staff app | Everyone with Praxis AI | Data Answers is registered on Default (decision 27) | Built in M10 |
+| Praxis AI · Ask | Staff app | Everyone with Praxis AI | Data Answers on Default (decision 27) and Voice Question on Transcription (decision 35) | `praxis-ai.md` |
 
 ## 3 · How the screens relate
 
@@ -288,7 +302,8 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
   Tier a `reason`; optionally its own chain in code (Data Answers).
 - Registered in PR2: Voice Note Transcription (Transcription, personal data, TB), Tidy Policy
   (Default, personal data, TB, `policies.md` §9), Data Answers (Default, personal data, TB,
-  decision 27), Find Prices (Deep Reasoning, none, TB). Settings · Integrations' connection test
+  decision 27), Find Prices (Deep Reasoning, none, TB). With Praxis AI (`praxis-ai.md` §6.7): Data
+  Answers built, and Voice Question (Transcription, personal data). Settings · Integrations' connection test
   (`integration-test`) is registered as direct: it calls the model under test and has no chain.
 - Registered since: Review Dictation (Transcription) and Tidy Review (Default), personal data, TB,
   22/10/2026 (`performance.md` §6.17); Week Summary (Default, personal data, TB, 22/10/2026,
@@ -404,6 +419,11 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Data Answers built (Praxis AI's engine, `praxis-ai.md` §6.1): its Not Built Yet pill goes.
+- 22/10/2026 · GE · Decision 35 built with Praxis AI's API (`praxis-ai.md` §6.6): Voice Question transcribes a spoken question and the recording is removed in the same request; its action is marked built. Praxis AI's audit: a Claude model on Data Answers' chain keeps its tools on a round that may call none (`tool_choice: none`) and gets its own thinking blocks back unchanged, so a Claude fallback no longer fails mid-question; `converse()` takes the question's deadline, so no call starts past 60 seconds.
+- 22/10/2026 · GE · Decision 34 built: every vendor file takes tools in one conversation shape, Groq and OpenAI answer text, `llm.service.converse()` keeps one run per question and hands a failing model's conversation to the next link; Voice Question registered (decision 35), not built yet.
+- 22/10/2026 · GE · Decision 34 rewritten: no Cannot Use Tools state. Every provider's vendor file takes tools, so any text model IT chooses answers on Data Answers' chain, first or fallback; Groq's and OpenAI's text models, which Edit Chain accepted but no call used, answer too. §6.1 and §10.1 lose the state.
+- 21/10/2026 · GE · Decisions 33 to 35 with Praxis AI's guide (`praxis-ai.md`): up to 5 reads a question for Data Answers, the Cannot Use Tools state, Voice Question registered; §2, §6.1, §6.5 and §10.1 follow. To be built with Praxis AI.
 - 22/10/2026 · TB · §6.5 and §13: the mailbox's Write Email (`mail-draft`), Tidy Email (`mail-tidy`) and Thread Summary (`mail-summary`) on Default and Mail Dictation (`mail-dictation`) on Transcription, personal data, chosen by TB (`mailbox.md` §1.1); `redact.js` gains `shield()`, which Tidy Policy now uses too.
 - 21/10/2026 · TB · Spend fixed after staging showed Spend by Day's labels run together and a bare `transcription` row in By Action: each day reads 14/10 on the shared bar chart, which keeps its labels 11 px and leaves off those that would touch (§10.1); migration 10220 moves the voice notes kept under `transcription` before the registry onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` (§4, §6.5).
 - 20/10/2026 · TB · Decisions 29 to 32 after the first Find Prices on staging returned nothing for 129 models (the answer was capped at 60 and cut short): fewer models kept, Find Prices in requests of 20 over every unpriced model with Not Listed marks, the New Prices sheet with Accept All and Find More, the Models tab opening on the models in a chain and on the key.

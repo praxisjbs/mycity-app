@@ -226,6 +226,7 @@ describeDb("AI Control against the real migrations", () => {
         "voice-note-transcription",
         "policy-tidy",
         "data-answers",
+        "praxis-ai-voice",
         "find-prices",
         "review-dictation",
         "review-cleanup",
@@ -236,15 +237,18 @@ describeDb("AI Control against the real migrations", () => {
         "mail-dictation",
       ]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
-      expect(by["data-answers"]).toMatchObject({ job: "default", built: false, own_chain: true, personal_data: true, chosen_by: "TB" });
+      expect(by["data-answers"]).toMatchObject({ job: "default", built: true, own_chain: true, personal_data: true, chosen_by: "TB" });
       expect(by["data-answers"].chain.links.map((l) => l.model)).toEqual(["gemini-3.8-flash", "gemini-2.5-pro"]);
       expect(by["policy-tidy"]).toMatchObject({ own_chain: false, chain: expect.objectContaining({ scope: "job", key: "default" }) });
       expect(by["find-prices"]).toMatchObject({ job: "deep_reasoning", personal_data: false });
+      // A question spoken on Praxis AI · Ask (docs/guides/praxis-ai.md §6.6): on Transcription's chain, never DeepSeek.
+      expect(by["praxis-ai-voice"]).toMatchObject({ job: "transcription", personal_data: true, built: true, own_chain: false });
       // The mailbox's (mailbox.md §9): Default for writing, tidying and summaries, Transcription for Dictate.
       expect(by["mail-draft"]).toMatchObject({ job: "default", personal_data: true, own_chain: false, chosen_by: "TB" });
       expect(by["mail-dictation"]).toMatchObject({ job: "transcription", personal_data: true });
       expect((await as("admin").get("/ai-control/actions?job=transcription")).body.data.map((a) => a.key)).toEqual([
         "voice-note-transcription",
+        "praxis-ai-voice",
         "review-dictation",
         "mail-dictation",
       ]);

@@ -1351,20 +1351,23 @@ describe("the prune, the assistant and ⌘K", () => {
     expect(prune.mock.calls).toEqual([[ID], [ID], [ID]]);
   });
 
-  test("the assistant reads the asker's own cards and their Team, and routes to Home's tabs; it writes nothing", () => {
+  test("the assistant reads the asker's own cards, their Team and the day's activity, and routes to Home's tabs; it writes nothing", () => {
     const manifest = require("./dashboard.ai");
     expect(manifest.module).toBe("home");
     expect(manifest.reads.map((r) => [r.key, r.permission, r.list])).toEqual([
       ["cards.mine", ["home", "view"], false],
       ["team.today", ["home", "view"], true],
+      ["activity.list", ["home", "view"], true],
     ]);
     expect(manifest.reads[0].params).toBe(c.common.EmptyBody);
     expect(manifest.reads[1].params).toBe(c.dashboard.HomeTeamQuery);
+    expect(manifest.reads[2].params).toBe(c.dashboard.HomeActivityQuery);
     expect(manifest.routes.map((route) => route.screen)).toEqual([
       "home.overview",
       "home.overview",
       "home.overview",
       "home.team",
+      "home.overview",
     ]);
     for (const route of manifest.routes)
       if (route.params) expect([route.params.kpi, kpi.isPickable(route.params.kpi)]).toEqual([route.params.kpi, true]);

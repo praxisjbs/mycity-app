@@ -276,8 +276,10 @@ People's or a manager's. The workbook opens for the person it is about and the C
   year (`my_leave.balances`); `leave.ai.js` reads leave requests within the asker's `people` scope.
   Still to come: the caller's own profile summary, latest payslip
   summary, open queries count. Never another person's record. Paged at 25.
-- **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave · Request Leave; "change my
-  password" → My Security; "upload my photo" → My Profile.
+- **AI routes**: "my payslip" → My Payslips; "request leave" → My Leave with `new=1`, Request
+  Leave open and filled with the type, the days and the note the person gave
+  (`leave.LeaveRequestPrefill`, `docs/guides/praxis-ai.md` §6.4); "change my password" → My
+  Security; "upload my photo" → My Profile.
 - **Search** (`ess.search.js`, ⌘K): the tabs by name and the words people use: payslip, salary
   slip, leave, holiday, query, sanction, documents, contract, password, two-step.
 
@@ -382,6 +384,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · §9: Praxis AI's "request leave" opens My Leave on `?new=1` (`useNewLink`) with Request Leave filled (`LeaveRequestPrefill`: type, first and last day, note), read from the address and taken out of it as the form opens (`praxis-ai.md` §6.4). Record Leave on People · Leave is never filled this way.
 - 22/10/2026 · TB · Performance PR 4: ESS · My Performance (#10) gains My Commitments (`app/src/features/performance/my/MyCommitments.tsx`, `docs/guides/performance.md` §6.11, §10): a card on desktop after My KPIs and Rolls Up To, an icon card on a phone whose sheet holds the list. The rest of the page is unchanged until Performance PR 3. §10.
 - 22/10/2026 · TB · My Attendance (#9): the Home Location card shows only while the Attendance policy's Home Location is on (`attendance.md` §1.3); a link carrying `?home=`, from the clock panel's Set Home or the push to set a home, opens Set Home Location while the person has no home approved or waiting. My Profile's Home Address is untouched (H10).
 - 21/10/2026 · TB · My Leave (#12), from the 21/10 System Health brief (faults #1 and #2): Request Leave's types show what is left of the First Day's year ("Annual · 12 days left"), crossing New Year is the contract's check and marks the Last Day as it is typed, and a typed day before today is refused at once by the shared date field, which had turned a typed 28/10/2026 into 2020-10-28 (refused as Already Past). §6, §10.

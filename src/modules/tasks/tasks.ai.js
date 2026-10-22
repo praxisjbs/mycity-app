@@ -22,7 +22,7 @@ module.exports = defineManifest({
     },
   ],
   routes: [
-    { intent: "create a task", screen: "workspace.tasks", params: { new: "1" }, prefill: c.tasks.TaskCreate },
+    { intent: "create a task", screen: "workspace.tasks", params: { new: "1" }, prefill: c.tasks.TaskPrefill },
     { intent: "set my commitments", screen: "workspace.tasks", params: { new: "1", commitment: "1" } },
     { intent: "see my tasks", screen: "workspace.tasks" },
   ],
