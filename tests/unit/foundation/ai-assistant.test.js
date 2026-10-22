@@ -231,6 +231,7 @@ describe("what the screen shows", () => {
       { id: "l1", employee: "Ayo Bello", starts_on: "2026-10-27", days: 3, amount: "125000.00", tags: ["a"] },
       { id: "l2", employee: "Ngozi Eze", starts_on: "2026-11-02", days: 1, amount: "0.00", tags: [] },
     ],
+    refs: [{ type: "leave_request", id: "l1" }, null],
     total: 40,
     page: { number: 1, size: 25, total: 40, pages: 2, has_next: true },
     citations: [
@@ -254,7 +255,14 @@ describe("what the screen shows", () => {
         ["Ngozi Eze", "02/11/2026", "1", "₦0.00"],
       ],
       numeric: [2, 3],
+      // Each row opens its record; a row with no record opens nothing.
+      links: ["/people?tab=leave&id=l1", null],
     });
+    // What is kept is the record, not its link, which is worked out each time the answer is shown.
+    expect(shown.metadata.table.refs).toEqual([{ type: "leave_request", id: "l1" }, null]);
+    expect(shown.metadata.table.links).toBeUndefined();
+    // From: the kind of record and how many, never each record by name (decision 9).
+    expect(shown.sources).toEqual([{ kind: "type", entity_type: "leave_request", label: "leave request", count: 2, link: null }]);
     expect(shown).toMatchObject({ more: true, rows_read: 2, module_key: "ess", citations_total: 2, declined: null });
     expect(shown.citations[0]).toEqual({ entity_type: "leave_request", entity_id: "l1", label: "Ayo Bello", link: "/x?id=l1", read_key: "leave.requests" });
     expect(shown.metadata.reads).toEqual([{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 40, first: 1 }]);

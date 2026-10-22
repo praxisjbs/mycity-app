@@ -1,21 +1,26 @@
 import { useCallback } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, refresh, useApi, usePaged, type PagedResult } from "@/api/hooks";
-import type { AiConversation } from "@mycity/contract/contract.gen.ts";
+import type { AiConversation, AiQuestion } from "@mycity/contract/contract.gen.ts";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { hrefFor } from "@/lib/routes";
 import { moduleByKey } from "@/shell/catalogue";
 import { useFitPage } from "@/shell/layout-context";
 import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
+import { saveExport } from "@/api/exports";
 import { BarsCard } from "@/features/shared/sections";
 import { Conversation } from "./Conversation";
 import {
+  AreaChart,
   Button,
   CardHeader,
   DataView,
   DesktopOnly,
+  ExportButton,
+  formatCount,
   formatDateTime,
+  formatMoney,
   formatMonth,
   formatWhen,
   Grid,
@@ -23,6 +28,7 @@ import {
   KpiCard,
   KpiGrid,
   Menu,
+  monthName,
   PageHeader,
   PhoneOnly,
   SplitPanes,
@@ -105,7 +111,7 @@ function History() {
   const { navigate } = useRouter();
   const confirm = useConfirm();
   const s = useApi("GET /api/v1/ai/history/summary");
-  const list = usePaged("GET /api/v1/ai/conversations");
+  const list = usePaged("GET /api/v1/ai/history/questions");
 
   /** After a confirmation, one removal; a refusal is said in the toast. */
   const removing = async (ask: Parameters<typeof confirm>[0], work: () => Promise<unknown>, done: string) => {
@@ -119,9 +125,20 @@ function History() {
     }
   };
   const clear = () => removing({ title: "Clear History", body: "Every conversation is removed.", destructive: true }, () => api.call("DELETE /api/v1/ai/history"), "History cleared");
-  const remove = (c: AiConversation) =>
-    removing({ title: "Delete Conversation", destructive: true }, () => api.call("DELETE /api/v1/ai/conversations/:id", { params: { id: c.ai_conversation_id } }), "Conversation deleted");
+  const remove = (q: AiQuestion) =>
+    removing({ title: "Delete Conversation", destructive: true }, () => api.call("DELETE /api/v1/ai/conversations/:id", { params: { id: q.ai_conversation_id } }), "Conversation deleted");
+  const exportQuestions = () => saveExport(api.call("POST /api/v1/ai/history/export", { body: {} }));
+  const exportFromMenu = async () => {
+    try {
+      if ((await exportQuestions()) !== false) toast("Export downloaded");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Export failed. Try again.");
+    }
+  };
 
+  const f = s.data;
+  const company = f?.view === "company";
+  const month = f ? formatMonth(f.month) : "";
   return (
     <>
       <PageHeader
@@ -129,54 +146,83 @@ function History() {
         actions={
           <>
             <DesktopOnly>
+              <ExportButton onExport={exportQuestions} />
               <Button icon="trash" onClick={clear}>
                 Clear History
               </Button>
             </DesktopOnly>
             <PhoneOnly>
-              <Menu trigger={(p) => <IconButton {...p} icon="dots" label="History Actions" />} items={[{ label: "Clear History", icon: "trash", danger: true, onSelect: () => void clear() }]} />
+              <Menu
+                trigger={(p) => <IconButton {...p} icon="dots" label="History Actions" />}
+                items={[
+                  { label: "Export", icon: "download", onSelect: () => void exportFromMenu() },
+                  { label: "Clear History", icon: "trash", danger: true, onSelect: () => void clear() },
+                ]}
+              />
             </PhoneOnly>
           </>
         }
       />
-      {s.data && (
-        <KpiGrid cols={3} className="mb-3">
-          <KpiCard title="Questions" value={String(s.data.questions_this_month)} caption={formatMonth(s.data.month)} />
-          <KpiCard title="Conversations" value={String(s.data.conversations)} caption={formatMonth(s.data.month)} />
-          <KpiCard title="Records Read" value={String(s.data.rows_read_this_month)} caption={formatMonth(s.data.month)} help="How many records this month's answers were read from." />
+      {f && (
+        <KpiGrid cols={company ? 4 : 3} className="mb-3">
+          <KpiCard title="Questions This Month" value={formatCount(f.questions_this_month)} caption={company ? `Everyone, ${month}` : month} />
+          <KpiCard title="Your Questions" value={formatCount(f.your_questions)} caption={company ? month : "All Time"} />
+          <KpiCard
+            title={company ? "Spend" : "Your Spend"}
+            value={formatMoney(f.spend_ngn)}
+            caption={month}
+            help={company ? "What Praxis AI cost this month, everyone's questions and recordings, priced as AI Control prices them." : "What your questions and recordings cost this month, priced as AI Control prices them."}
+          />
+          {company && (
+            <KpiCard
+              title="Monthly Cap"
+              value={f.cap_ngn ? formatMoney(f.cap_ngn) : "No Cap"}
+              tone={f.cap_ngn ? "ok" : undefined}
+              caption="All AI"
+              help="The most all AI may spend in a month. Set in AI Control."
+            />
+          )}
         </KpiGrid>
       )}
-      <DataView<AiConversation>
-        title="Conversations"
+      <DataView<AiQuestion>
+        title="Your Questions"
         list={list}
-        search="Search Conversations"
-        rowKey={(c) => c.ai_conversation_id}
-        noun="conversation"
-        onRowClick={(c) => navigate(hrefFor("praxis_ai", "ask", { id: c.ai_conversation_id }))}
+        search="Search Questions"
+        rowKey={(q) => q.ai_message_id}
+        noun="question"
+        onRowClick={(q) => navigate(hrefFor("praxis_ai", "ask", { id: q.ai_conversation_id }))}
         empty={{ title: "No Questions Yet", text: "Ask one on the Ask tab." }}
         columns={[
-          { key: "title", label: "Title", sortable: true, render: (c) => c.title },
-          { key: "last_asked_at", label: "Last Asked", sortable: true, render: (c) => (c.last_asked_at ? formatDateTime(c.last_asked_at) : null) },
-          { key: "questions", label: "Questions", align: "n", render: (c) => String(c.questions) },
-          { key: "rows_read", label: "Records Read", align: "n", desktop: true, render: (c) => String(c.rows_read) },
+          { key: "question", label: "Question", render: (q) => <span data-copy="content">{q.question}</span> },
+          { key: "asked_at", label: "Asked", sortable: true, render: (q) => formatDateTime(q.asked_at) },
+          { key: "sources", label: "Sources Read", desktop: true, render: (q) => (q.sources.length ? q.sources.join(", ") : "None") },
+          { key: "tokens", label: "Tokens", align: "n", desktop: true, render: (q) => formatCount(q.tokens) },
+          { key: "cost_ngn", label: "Cost", align: "n", render: (q) => formatMoney(q.cost_ngn) },
           {
             key: "act",
             label: "",
-            render: (c) => (
+            render: (q) => (
               <Menu
-                trigger={(p) => <IconButton {...p} size="sm" icon="dots" label="Conversation Actions" />}
-                items={[{ label: "Delete Conversation", icon: "trash", danger: true, onSelect: () => void remove(c) }]}
+                trigger={(p) => <IconButton {...p} size="sm" icon="dots" label="Question Actions" />}
+                items={[{ label: "Delete Conversation", icon: "trash", danger: true, onSelect: () => void remove(q) }]}
               />
             ),
           },
         ]}
       />
-      {s.data && s.data.by_module.length > 0 && (
+      {f && (
         <DesktopOnly unmount>
           <Grid cols={2} className="mt-3">
+            <AreaChart
+              title="Spend per Month, Naira"
+              values={f.spend_by_month.map((m) => Number(m.spend_ngn))}
+              labels={f.spend_by_month.map((m) => monthName(Number(m.month.slice(5, 7)) - 1).slice(0, 3))}
+              format={(v) => formatMoney(v.toFixed(2))}
+              caption={company && f.cap_ngn ? `Against a ${formatMoney(f.cap_ngn)} monthly cap` : undefined}
+            />
             <BarsCard
               title="Questions by Module"
-              rows={s.data.by_module.map((m) => ({ label: m.label, value: String(m.questions), pct: Math.round((m.questions / Math.max(1, s.data!.questions_this_month)) * 100) }))}
+              rows={f.by_module.map((m) => ({ label: m.label, value: String(m.questions), pct: Math.round((m.questions / Math.max(1, ...f.by_module.map((x) => x.questions))) * 100) }))}
             />
           </Grid>
         </DesktopOnly>

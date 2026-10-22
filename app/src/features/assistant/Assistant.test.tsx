@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AiAnswer, AiConversation, AiHistorySummary } from "@mycity/contract/contract.gen.ts";
+import type { AiAnswer, AiHistorySummary, AiQuestion } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider } from "@mycity/ui";
 
 /* Praxis AI's screens (docs/guides/praxis-ai.md §10) against stand-ins for the API: every person and record is invented. */
@@ -18,6 +18,7 @@ const m = vi.hoisted(() => ({
   setParams: vi.fn(),
   action: null as null | { label: string; onSelect: () => void },
   turnsError: null as unknown,
+  saveExport: vi.fn(async (asked: Promise<unknown>) => (await asked, true)),
 }));
 vi.mock("@/api/hooks", () => ({
   invalidate: m.invalidate,
@@ -34,6 +35,7 @@ vi.mock("@/api/hooks", () => ({
 }));
 vi.mock("@/api/client", async () => ({ api: { call: m.call }, ApiError: (await import("@mycity/ui")).ApiError }));
 vi.mock("@/api/upload", () => ({ upload: vi.fn() }));
+vi.mock("@/api/exports", () => ({ saveExport: m.saveExport }));
 vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate }), useSearchParams: () => [new URLSearchParams(), m.setParams] }));
 vi.mock("@/shell/layout-context", () => ({ useFitPage: () => undefined }));
 vi.mock("@/shell/screen-action", () => ({
@@ -76,10 +78,14 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
   ai_conversation_id: CONV,
   question: "Whose leave waits on me?",
   content: "Two requests wait on you.",
-  table: { columns: ["Employee", "Days"], rows: [["Ayo Bello", "3"], ["Kemi Ade", "2"]], numeric: [1] },
+  table: { columns: ["Employee", "Days"], rows: [["Ayo Bello", "3"], ["Kemi Ade", "2"]], numeric: [1], links: ["/people?tab=leave&id=l1", "/people?tab=leave&id=l2"] },
   link: { label: "Open Leave", path: "/people?tab=leave" },
   citations: Array.from({ length: 8 }, (_, i) => ({ entity_type: "employee", entity_id: `00000000-0000-4000-8000-00000000000${i}`, label: `Person ${i + 1}`, link: `/people?tab=employees&id=${i}`, read_key: "employees.list" })),
   citations_total: 8,
+  sources: [
+    { kind: "type", entity_type: "leave_request", label: "leave request", count: 2, link: null },
+    { kind: "type", entity_type: "employee", label: "employee", count: 8, link: null },
+  ],
   reads: [{ key: "leave.requests", rows: 2, total: 2, first: 1 }],
   declined: null,
   more: false,
@@ -116,11 +122,28 @@ describe("Ask", () => {
     expect(within(card).getByRole("table").textContent).toContain("Ayo Bello");
     await userEvent.click(within(card).getByRole("button", { name: "Open Leave" }));
     expect(m.navigate).toHaveBeenCalledWith("/people?tab=leave");
-    // The first six records read, then the rest behind +2 More.
-    expect(within(card).getByRole("button", { name: "Person 6" })).toBeTruthy();
-    expect(within(card).queryByRole("button", { name: "Person 7" })).toBeNull();
-    await userEvent.click(within(card).getByRole("button", { name: "+2 More" }));
-    expect(within(card).getByRole("button", { name: "Person 8" })).toBeTruthy();
+    // From names the kinds of record and how many, never each record (decision 9).
+    expect(within(card).getByText("leave request ×2")).toBeTruthy();
+    expect(within(card).getByText("employee ×8")).toBeTruthy();
+    expect(within(card).queryByText("Person 1")).toBeNull();
+    // Each row of the table opens its own record.
+    await userEvent.click(within(card).getByRole("row", { name: /Ayo Bello/ }));
+    expect(m.navigate).toHaveBeenCalledWith("/people?tab=leave&id=l1");
+  });
+
+  it("an answer that rests on one record names it in From, and opens it", async () => {
+    m.turns[CONV] = [
+      answer({
+        table: null,
+        citations: [],
+        citations_total: 1,
+        sources: [{ kind: "record", entity_type: "employee", label: "Ayo Bello", count: 1, link: "/people?tab=employees&id=e1" }],
+      }),
+    ];
+    ui("ask", CONV);
+    const card = screen.getByRole("article", { name: "Answer" });
+    await userEvent.click(within(card).getByRole("button", { name: "Ayo Bello" }));
+    expect(m.navigate).toHaveBeenCalledWith("/people?tab=employees&id=e1");
   });
 
   it("the first answer opens the conversation, and the next question is asked in it", async () => {
@@ -237,29 +260,64 @@ describe("Ask", () => {
   });
 
   it("the second page of a list says which rows it shows", () => {
-    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [] }, reads: [{ key: "employees.list", rows: 25, total: 312, first: 26 }], citations: [], citations_total: 0 })];
+    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [], links: Array.from({ length: 25 }, () => null) }, reads: [{ key: "employees.list", rows: 25, total: 312, first: 26 }], citations: [], citations_total: 0 })];
     ui("ask", CONV);
     expect(screen.getByText("Showing 26 to 50 of 312")).toBeTruthy();
   });
 });
 
 describe("History", () => {
-  const conv: AiConversation = { ai_conversation_id: CONV, title: "Whose leave waits on me?", last_asked_at: "2026-10-22T09:30:00.000Z", questions: 3, rows_read: 14 };
-  const summary: AiHistorySummary = { month: "2026-10", questions_this_month: 3, conversations: 1, rows_read_this_month: 14, by_module: [{ module_key: "people", label: "People", questions: 3 }] };
+  const question: AiQuestion = {
+    ai_message_id: "00000000-0000-4000-8000-0000000000a1",
+    ai_conversation_id: CONV,
+    question: "Whose leave waits on me?",
+    asked_at: "2026-10-22T09:30:00.000Z",
+    sources: ["leave request", "employee"],
+    tokens: 2140,
+    cost_ngn: "18.00",
+  };
+  const months = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"].map((month, i) => ({ month, spend_ngn: `${(i + 1) * 300}.00` }));
+  const company: AiHistorySummary = { month: "2026-10", view: "company", questions_this_month: 84, your_questions: 31, spend_ngn: "1840.00", cap_ngn: "25000.00", spend_by_month: months, by_module: [{ module_key: "people", label: "People", questions: 3 }] };
+  const own: AiHistorySummary = { ...company, view: "own", questions_this_month: 3, your_questions: 120, spend_ngn: "410.00", cap_ngn: null };
 
-  it("this month's figures and the conversations; a row opens it on Ask", async () => {
-    m.data["GET /api/v1/ai/history/summary"] = summary;
-    m.rows["GET /api/v1/ai/conversations"] = [conv];
+  it("for AI Control: the company's questions, spend and cap; Your Questions with sources, tokens and cost; a row opens it on Ask", async () => {
+    m.data["GET /api/v1/ai/history/summary"] = company;
+    m.rows["GET /api/v1/ai/history/questions"] = [question];
     ui("history");
     expect(screen.getByRole("heading", { name: "History", level: 1 })).toBeTruthy();
-    expect(screen.getAllByText("October 2026")).toHaveLength(3);
-    await userEvent.click(screen.getByRole("row", { name: /Whose leave waits on me/ }));
+    expect(screen.getByText("Questions This Month")).toBeTruthy();
+    expect(screen.getByText("Everyone, October 2026")).toBeTruthy();
+    expect(screen.getByText("₦25,000.00")).toBeTruthy();
+    const row = screen.getByRole("row", { name: /Whose leave waits on me/ });
+    expect(row.textContent).toContain("leave request, employee");
+    expect(row.textContent).toContain("2,140");
+    expect(row.textContent).toContain("₦18.00");
+    await userEvent.click(row);
     expect(m.navigate).toHaveBeenCalledWith(`/praxis-ai?tab=ask&id=${CONV}`);
   });
 
+  it("for everyone else: their own figures, all their questions, no cap", () => {
+    m.data["GET /api/v1/ai/history/summary"] = own;
+    m.rows["GET /api/v1/ai/history/questions"] = [question];
+    ui("history");
+    expect(screen.getByText("Your Spend")).toBeTruthy();
+    expect(screen.getByText("All Time")).toBeTruthy();
+    expect(screen.queryByText("Monthly Cap")).toBeNull();
+    expect(screen.queryByText(/^Everyone/)).toBeNull();
+  });
+
+  it("Export asks for the workbook of one's questions", async () => {
+    m.data["GET /api/v1/ai/history/summary"] = own;
+    m.rows["GET /api/v1/ai/history/questions"] = [question];
+    ui("history");
+    await userEvent.click(screen.getAllByRole("button", { name: "Export" })[0]);
+    await waitFor(() => expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai/history/export", { body: {} }));
+    expect(m.saveExport).toHaveBeenCalledTimes(1);
+  });
+
   it("Clear History asks first, then removes every conversation", async () => {
-    m.data["GET /api/v1/ai/history/summary"] = summary;
-    m.rows["GET /api/v1/ai/conversations"] = [conv];
+    m.data["GET /api/v1/ai/history/summary"] = own;
+    m.rows["GET /api/v1/ai/history/questions"] = [question];
     ui("history");
     await userEvent.click(screen.getAllByRole("button", { name: "Clear History" })[0]);
     const dialog = await screen.findByRole("alertdialog");
@@ -269,3 +327,4 @@ describe("History", () => {
     expect(m.invalidate).toHaveBeenCalledWith("/api/v1/ai");
   });
 });
+

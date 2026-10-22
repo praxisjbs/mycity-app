@@ -26,8 +26,6 @@ import {
 
 /** Praxis AI's conversation (docs/guides/praxis-ai.md §10): what is asked, what came back, and the box. */
 
-/** The most citations an answer shows before "+N More". */
-const CHIPS = 6;
 /** What Show Next 25 asks, as a follow-up in the same conversation (§11). */
 const NEXT_PAGE = "Show the next 25.";
 /** The longest question the contract takes (AiAsk), typed or spoken. */
@@ -256,9 +254,6 @@ function Question({ words }: { words: string }) {
 
 function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: AiFeedbackValue | null; onFeedback: (value: AiFeedbackValue | null) => Promise<void>; onNext?: () => Promise<void> }) {
   const { navigate } = useRouter();
-  const [all, setAll] = useState(false);
-  const cites = all ? a.citations : a.citations.slice(0, CHIPS);
-  const more = a.citations_total - cites.length;
   /* The read the table was drawn from, when it had more rows than the page it returned. */
   const paged = a.table?.rows.length ? a.reads.find((r) => r.rows === a.table!.rows.length && r.total != null && r.total > r.rows) : undefined;
   const from = paged?.first ?? null;
@@ -289,24 +284,21 @@ function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: Ai
           </Button>
         </div>
       )}
-      {cites.length > 0 && (
+      {a.sources.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-dashed border-border pt-2.5">
           <span className="text-2xs font-strong tracking-caps text-subtle-foreground uppercase">
-            <HelpTerm help="The records this answer was read from, as you would see them.">From</HelpTerm>
+            <HelpTerm help="The kinds of record this answer was read from, as you would see them. A table's rows open their own records.">From</HelpTerm>
           </span>
-          {cites.map((c) => (
-            <ItemChip key={`${c.entity_type}:${c.entity_id}`} onSelect={c.link ? () => navigate(c.link!) : undefined}>
-              {c.label}
-            </ItemChip>
-          ))}
-          {more > 0 &&
-            (!all && a.citations.length > cites.length ? (
-              <Button size="sm" variant="ghost" onClick={() => setAll(true)}>
-                +{more} More
-              </Button>
+          {/* Kinds of record with how many (decision 9); the one record, named and opening it, when the answer rests on one. */}
+          {a.sources.map((s) =>
+            s.kind === "record" ? (
+              <ItemChip key={`record:${s.entity_type}`} onSelect={s.link ? () => navigate(s.link!) : undefined}>
+                {s.label}
+              </ItemChip>
             ) : (
-              <span className="text-2xs text-subtle-foreground">+{more} More</span>
-            ))}
+              <ItemChip key={`type:${s.entity_type}`}>{s.count > 1 ? `${s.label} ×${s.count}` : s.label}</ItemChip>
+            ),
+          )}
         </div>
       )}
       <div className="flex items-center gap-1">
@@ -319,16 +311,21 @@ function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: Ai
   );
 }
 
-type Row = { key: string; cells: string[] };
+type Row = { key: string; cells: string[]; link: string | null };
 
-/** The answer's table, drawn from the rows its read returned (§6.4): a table on desktop, cards on a phone. */
+/**
+ * The answer's table, drawn from the rows its read returned (§6.4): a table on desktop, cards on a
+ * phone. Each row opens its record when every row has one (a table of one kind of record).
+ */
 function AnswerTable({ a }: { a: AiAnswer }) {
+  const { navigate } = useRouter();
   const t = a.table!;
-  const rows: Row[] = t.rows.map((cells, i) => ({ key: String(i), cells }));
+  const rows: Row[] = t.rows.map((cells, i) => ({ key: String(i), cells, link: t.links[i] ?? null }));
   const columns: DataViewColumn<Row>[] = t.columns.map((label, i) => ({ key: `c${i}`, label, ...(t.numeric.includes(i) ? { align: "n" as const } : {}), render: (r) => r.cells[i] ?? "" }));
+  const opens = rows.length > 0 && rows.every((r) => r.link);
   return (
     <div data-copy="content" className="-mx-3">
-      <DataView<Row> bare rows={rows} columns={columns} rowKey={(r) => r.key} caption={a.question} />
+      <DataView<Row> bare rows={rows} columns={columns} rowKey={(r) => r.key} caption={a.question} onRowClick={opens ? (r) => navigate(r.link!) : undefined} />
     </div>
   );
 }

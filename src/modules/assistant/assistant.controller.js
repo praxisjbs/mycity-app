@@ -4,12 +4,13 @@
  * Praxis AI: the HTTP edge (docs/guides/praxis-ai.md §5). Everything is the caller's own; the
  * service pins every query to their user.
  */
-const { ok, noContent } = require("../../shared/http/respond");
+const { ok, noContent, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { withActor } = require("../../shared/events/emit");
 const { readUpload } = require("../../middleware/upload");
 const service = require("./assistant.service");
 const history = require("./assistant.history");
+const historyExport = require("./assistant.export");
 
 const params = (req) => req.validated.params;
 
@@ -27,6 +28,8 @@ module.exports = {
     noContent(res);
   },
   summary: async (req, res) => ok(res, await history.summary(req.user)),
+  questions: async (req, res) => sendPaged(res, await history.questions(req.validated.query, req.user)),
+  exportHistory: async (req, res) => accepted(res, await historyExport.requestExport(withActor(req))),
   feedback: async (req, res) => {
     await service.feedback(params(req).id, req.validated.body, withActor(req));
     noContent(res);

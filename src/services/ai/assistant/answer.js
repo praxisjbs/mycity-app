@@ -6,10 +6,10 @@
  * citations are the records the reads returned (shared/ai/cite.js), never the answer's words.
  *
  *   const shown = answer.build({ draft, reads, routes, screens });
- *   // → { content, table, link, citations, citations_total, reads, declined, more, rows_read, module_key,
- *   //     metadata, stored_citations }
+ *   // → { content, table, link, citations, citations_total, sources, reads, declined, more, rows_read,
+ *   //     module_key, metadata, stored_citations }
  */
-const { mergeCitations } = require("../../../shared/ai/cite");
+const { mergeCitations, linkOfRef, sourcesOf } = require("../../../shared/ai/cite");
 const routeMap = require("../../../shared/route-map");
 const { formatDate, formatDateTime } = require("../../../shared/time/day-first");
 const { formatNaira } = require("../../../shared/money/money");
@@ -34,8 +34,9 @@ function cell(field, v) {
 }
 
 /**
- * The table the draft asked for, drawn from the read's rows. A field the rows do not carry, or that
- * holds a list or an object, is left out; a table with no field left is no table.
+ * The table the draft asked for, drawn from the read's rows, with each row's record (`refs`, kept in
+ * the answer's metadata; its link is worked out when shown, presentTable). A field the rows do not
+ * carry, or that holds a list or an object, is left out; a table with no field left is no table.
  */
 function tableOf(spec, reads) {
   if (!spec) return null;
@@ -53,7 +54,26 @@ function tableOf(spec, reads) {
     columns: cols.map((c) => c.label),
     rows: read.rows.map((_, r) => cols.map((c) => c.values[r].text)),
     numeric: cols.map((c, i) => (c.values.some((v) => v.text !== "") && c.values.every((v) => v.text === "" || v.numeric) ? i : -1)).filter((i) => i >= 0),
+    refs: read.rows.map((_, r) => (read.refs && read.refs[r]) || null),
   };
+}
+
+/** A kept table as the screen shows it: each row's record as a link, worked out now. */
+function presentTable(t) {
+  if (!t) return null;
+  const refs = Array.isArray(t.refs) ? t.refs : [];
+  return { columns: t.columns, rows: t.rows, numeric: t.numeric, links: t.rows.map((_, i) => linkOfRef(refs[i])) };
+}
+
+/** Citations grouped by record type, in the order first cited. */
+function groupsOf(citations) {
+  const out = new Map();
+  for (const c of citations) {
+    const g = out.get(c.entity_type);
+    if (g) g.count += 1;
+    else out.set(c.entity_type, { entity_type: c.entity_type, count: 1 });
+  }
+  return [...out.values()];
 }
 
 /** The values of a prefill its route's schema takes, each checked on its own; never one of the route's params. */
@@ -102,6 +122,7 @@ function build({ draft, reads, routes, screens }) {
     read_key: c.read,
   }));
   const citations = all.slice(0, MAX_CITATIONS);
+  const sources = sourcesOf(groupsOf(all), all.length === 1 ? all[0] : null);
   let declined = null;
   if (link) declined = "change";
   else if (reads.some((r) => r.declined) && !ok.length) declined = "not_available";
@@ -115,10 +136,11 @@ function build({ draft, reads, routes, screens }) {
   const more = Boolean(draft.more) && ok.some((r) => r.page && r.page.has_next);
   const shown = {
     content: draft.text,
-    table,
+    table: presentTable(table),
     link,
     citations,
     citations_total: all.length,
+    sources,
     reads: madeReads.map(({ key, rows, total, first }) => ({ key, rows, total, first })),
     declined,
     more,
@@ -132,4 +154,4 @@ function build({ draft, reads, routes, screens }) {
   return shown;
 }
 
-module.exports = { build, tableOf, linkOf, prefillOf, cell, MAX_CITATIONS };
+module.exports = { build, tableOf, presentTable, groupsOf, linkOf, prefillOf, cell, MAX_CITATIONS };

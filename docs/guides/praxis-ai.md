@@ -55,16 +55,25 @@ their own screens would show them, and nothing more.
    `policies.list`, `policies.mine`).
 7. **History is the person's own**, whatever scope their `praxis_ai` grant carries. Nobody reads
    another person's questions; the spend of everyone's questions is on AI Control · Spend.
+   *Amended 22/10/2026 (History brought to the demo):* a person who holds AI Control `view` also
+   sees the company's figures on History: everyone's questions this month, Praxis AI's spend this
+   month, the monthly cap, spend per month and questions by module. Counts and naira only; nobody's
+   questions. Everyone else sees the same layout with their own figures.
 8. **Tables come from the rows, not from the model.** When an answer carries a table, the model
    names which read and which fields; the server draws the rows from what that read returned. The
    model's words are provisional; the figures in a table are the records'.
+9. **From names the kinds of record, not every record** (22/10/2026). An answer's From lists the
+   record types it was read from and how many of each ("partnership ×4", "interaction log",
+   "employee ×2"), as the demo does. A record is named on its own only when the whole answer rests
+   on that one record. The individual records open from the answer itself: each row of its table
+   opens its record.
 
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
 | Praxis AI · Ask (`ask`) | Staff app, System group | `praxis_ai` view | A conversation: questions, answers with their table, the records read and a screen button; on desktop the recent conversations beside it; Try Asking when it is empty | Ask (typed or recorded), Open the offered screen, open a cited record, Show Next 25, Helpful or Not Helpful, New Conversation |
-| Praxis AI · History (`history`) | Staff app | `praxis_ai` view, own conversations only | This month's questions, conversations and records read; the conversations, 25 a page; questions by module | Open a conversation (back on Ask), Delete Conversation, Clear History, search conversations |
+| Praxis AI · History (`history`) | Staff app | `praxis_ai` view, own questions only; the company's figures with `ai_control` view | This month's questions, your questions and spend (and the monthly cap for AI Control); your questions, 25 a page, with their sources, tokens and cost; spend per month; questions by module | Open a question's conversation on Ask, Delete Conversation, Clear History, Export, search questions |
 | Floating button (phone) | Staff app, every screen with the button | `praxis_ai` view | Praxis AI in the fan (F18); the conversation over the screen the person is on | Ask as on Ask; open an answer's screen or a cited record, which closes it; New Conversation. The conversation is kept until the app closes |
 | ⌘K | Staff app | `praxis_ai` view | Ask, History, the person's own conversations, New Conversation | Open them |
 | AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
@@ -104,7 +113,7 @@ Migration `10310_assistant.sql` (M10's block). The tables are `10000`'s; this bu
 | Table | Key columns | Notes |
 |---|---|---|
 | `ai_conversation` (10000) | `user_id`, `title` (the first question, cut at 120 characters), `status` (`active`), adds `last_asked_at`, `questions` (10310) | One per conversation, always the asker's own. Index (`user_id`, `last_asked_at` desc) |
-| `ai_message` (10000) | `ai_conversation_id`, `parent_message_id` (an answer's question), `role` (`user`, `assistant`, `system` as seeded in `10099`; CHECK added in 10310), `content` (the question, or the answer's words), `ai_run_id`, `feedback` (`up`, `down` or null; CHECK added), adds `rows_read` (the rows its reads returned) and `module_key` (the module of its first read) (10310), `metadata` | History reports on `rows_read` and `module_key`, so they are columns. An answer's `metadata` holds what is only shown: its table (columns, rows, numeric columns), its screen button, the reads it made (key, rows returned, total), `declined` and `more`. Indexes on the conversation, the parent and the run (10310) |
+| `ai_message` (10000) | `ai_conversation_id`, `parent_message_id` (an answer's question), `role` (`user`, `assistant`, `system` as seeded in `10099`; CHECK added in 10310), `content` (the question, or the answer's words), `ai_run_id`, `feedback` (`up`, `down` or null; CHECK added), adds `rows_read` (the rows its reads returned) and `module_key` (the module of its first read) (10310), `metadata` | History reports on `rows_read` and `module_key`, so they are columns. An answer's `metadata` holds what is only shown: its table (columns, rows, numeric columns, and each row's record as type and id, whose link is worked out when shown), its screen button, the reads it made (key, rows returned, total), `declined` and `more`. Indexes on the conversation, the parent and the run (10310) |
 | `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` and `position` (the order the answer cited them in) (10310); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10310 widens it to accept a record (`entity_type` and `entity_id`) |
 | `ai_run`, `ai_run_step` (M0, 10200) | `purpose` `data-answers` or `praxis-ai-voice` | One run per question, one step per round with the model. No question or answer text is kept here |
 
@@ -123,7 +132,9 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 | `GET /conversations/:id/turns` (`page`) | `AiTurnListQuery` → `AiTurnPage` | `praxis_ai` view · own | yes, 25 | Newest page first; Show Earlier loads the page before |
 | `DELETE /conversations/:id` | → `no_content` | `praxis_ai` view · own | | Removes its messages and citations |
 | `DELETE /history` | → `no_content` | `praxis_ai` view · own | | Every conversation of the caller |
-| `GET /history/summary` | → `AiHistorySummary` | `praxis_ai` view · own | no | This Lagos month: questions, conversations, records read; questions by module |
+| `GET /history/summary` | → `AiHistorySummary` | `praxis_ai` view · own; the company's figures with `ai_control` view | no | `view` `company` or `own`; questions this month, your questions, spend this month, the cap (company only), spend per month for six months, questions by module (§6.5) |
+| `GET /history/questions` (`q`, `sort`, `page`) | `AiQuestionListQuery` → `AiQuestionPage` | `praxis_ai` view · own always | yes, 25 | Newest first; `q` searches the questions; each with its sources, tokens and cost |
+| `POST /history/export` | → `documents.ExportFile`, 202 | `praxis_ai` view · own | | The caller's questions as a workbook, made in the worker (§6.5) |
 | `POST /answers/:id/feedback` | `AiFeedback` (`up`, `down` or null) → `no_content` | `praxis_ai` create · own | | |
 | `POST /transcribe` | the recording, multipart through the upload engine (`documents.DocumentUpload`, purpose `voice_note`) → `AiTranscript` (the recording's `document_id`, already removed, which the upload engine resolves on; `text`, `draft`) | `praxis_ai` create | | One request: stored, transcribed, removed (§6.6) |
 
@@ -224,12 +235,18 @@ The server turns it into `AiAnswer`:
 
 - **table**: the rows of the named read, those fields, formatted for a person (dates through
   `shared/time/day-first`, money through `shared/money`); numeric columns marked for right
-  alignment. A field the read did not return is dropped; a table with no valid field is dropped;
+  alignment, and each row's link to its record (the read's `cite` of that row, through
+  `route-map.linkFor` when shown; null for a row with no screen). A field the read did not return
+  is dropped; a table with no valid field is dropped;
 - **link**: the route's screen through `route-map.screenPath`, with its `params` and any `prefill`
   values the model gave that parse with the route's `prefill` schema, each field on its own (a
   value a field refuses is left out, the rest kept); the route's own `params` always win. A route
   to a screen the person may not open is never offered and, if named, dropped;
 - **citations**: from every read this turn, de-duplicated, first 50 kept with the total;
+- **sources**: what From shows (decision 9): one entry per record type the citations name, in the
+  order first cited, with its count and its name (`shared/ai/cite.js` `typeLabel`: the type's words,
+  "interaction log", or a kinder name where the type's own reads badly, "alert" for `home_alert`).
+  When the answer cites exactly one record, the one entry is that record, named and linked;
 - **declined**: `not_available` when a read was refused and nothing else answered, `change` when a
   screen was offered (the model offers one for a change asked for, or where no read answers; the
   server cannot tell which), else null;
@@ -264,9 +281,22 @@ whole create schema: Add Employee's prefill leaves out the phone and work email 
   replies the idempotency layer kept for a repeated press of Send (`middleware/idempotency.js`
   `forget`), which hold the answers' words too. The runs stay, holding no words, so spend and the
   cap are untouched.
-- `AiHistorySummary`: this Lagos month's questions and conversations, the records read (the rows
-  every answer's reads returned), questions by module (the module of the first read of each
-  answer; no read counts as Other).
+- `AiHistorySummary` has two views. **Company**, for a person who holds AI Control `view`
+  (decision 7 as amended): questions this month are everyone's (the `data-answers` runs that
+  answered, so a cleared History does not lower them), your questions are the person's own this
+  month, spend is Praxis AI's this Lagos month (its two actions' runs, priced as AI Control prices
+  them, `governance.STEP_NGN`), the cap is AI Control's monthly cap for all AI (null when none is
+  set), spend per month covers the last six Lagos months, and questions by module counts the
+  answers still in anyone's History by the module of their first read. **Own**, for everyone else:
+  questions this month and all your questions are the person's, spend and spend per month are their
+  own runs, no cap, and questions by module counts their own answers.
+- `AiQuestionPage`: the person's questions, newest first, 25 a page. Each row is one answer: the
+  question, when it was asked, its sources (the record types its citations name, as From shows
+  them), its tokens (in and out, over every round of its run) and its cost in naira. Opening a row
+  opens its conversation on Ask.
+- Export: the person's questions, newest first, up to 2,500, as an xlsx (Question, Asked, Sources
+  Read, Tokens, Cost), reserved in the request and made by the worker (`shared/documents/exports.js`,
+  document type `ai_history_export`, personal, kept 24 hours).
 
 ### 6.6 Voice
 
@@ -357,6 +387,7 @@ and screens a manifest declares, and that the grading passes and fails what it s
 | `assistant.conversation_deleted` | Delete Conversation | Audit only |
 | `assistant.history_cleared` | Clear History | Audit only |
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
+| `assistant.export_requested` | Export on History | Outbox: the workbook of the person's questions, made after commit (`assistant.export_history`); a person no longer active gets a failed file |
 | `export-cleanup` (the vault's, not this module's) | Hourly | Removes recordings an hour old: their request never finished (§6.6) |
 
 Nobody is notified of anything.
@@ -368,6 +399,7 @@ Nobody is notified of anything.
 | Every role with `praxis_ai` (all seven seeded roles) | Ask and History, their own conversations only | Ask, record a question, give feedback, delete their own conversations |
 | What each person learns | Exactly what their own grants, scope and field visibility show on screen | |
 | CEO | Everything, by the standing rule, through the same reads | The same |
+| Anyone with AI Control `view` | On History, the company's figures: questions this month, spend, the cap, spend per month, questions by module | Nothing more: never another person's questions |
 
 The `praxis_ai` scope (`all` for the Implementation Team, Operations & People and Management, `own`
 for the rest) does not widen History (§1.1 decision 7); a read's scope comes from that read's own
@@ -396,8 +428,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), From with the records read as chips opening each (the first 6, then "+12 More"), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; Recent empty: No Questions Yet; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, Could not transcribe) | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
-| Praxis AI · History (`history`) | History as the title; this month's Questions, Conversations and Records Read, each captioned with the month; Conversations, 25 a page: Title, Last Asked, Questions, Records Read, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog ("Delete Conversation"); Search Conversations; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Questions by Module (desktop); toasts "Conversation deleted", "History cleared" | Help term on Records Read (how many records this month's answers were read from) | Where spend and the cap are (AI Control · Spend), what deleting keeps: §6.5 |
+| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), its table's rows opening their records, From with the kinds of record read as chips ("partnership ×4", "employee ×2"; the one record, named and opening it, when the answer rests on one), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; Recent empty: No Questions Yet; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, Could not transcribe) | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
+| Praxis AI · History (`history`) | History as the title, Export and Clear History; for AI Control: Questions This Month (everyone's), Your Questions, Spend and Monthly Cap, each captioned with the month or All AI; for everyone else: Questions This Month, Your Questions (all time) and Your Spend; Your Questions, 25 a page: Question, Asked, Sources Read, Tokens, Cost, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog; Search Questions; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Spend per Month, Naira (six months; for AI Control, "Against a ₦25,000 monthly cap" when one is set); Questions by Module; toasts "Conversation deleted", "History cleared", the export's own | Help terms on Spend (what Praxis AI's questions cost this month, priced as AI Control prices them) and Monthly Cap (the most all AI may spend in a month, set in AI Control) | Where everyone's spend by action is (AI Control · Spend), what deleting keeps: §6.5 |
 | Praxis AI over a screen (the floating button, phone) | Praxis AI as the title, Back, New Conversation once a conversation is open; the conversation exactly as on Ask (Try Asking when new, the answers, the box) | As on Ask | As on Ask |
 
 ### 10.2 Phone layout
@@ -405,7 +437,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Praxis AI · Ask (`ask`) | The conversation full height (a fit page), the box pinned at the foot with the microphone and Send as 44 px targets; empty, Try Asking as a tap list; an answer's table as cards | Recent, which is History on a phone | Send; New Conversation under the title (a fit page has no floating button; ⌘K's New Conversation opens it too) | The floating button's Praxis AI opens the conversation over any other screen (§3 step 8); More, then Praxis AI; tabs Ask and History |
-| Praxis AI · History (`history`) | The three month cards, then the conversations as cards (title, last asked, questions) | Records Read on each conversation; Questions by Module | Tap a card to open it on Ask; Delete Conversation in its menu's sheet; Clear History in the page's menu | As above |
+| Praxis AI · History (`history`) | The figure cards two to a row, then your questions as cards (question, asked, cost) | Sources Read and Tokens on each question; Spend per Month; Questions by Module | Tap a card to open its conversation on Ask; Delete Conversation in its menu's sheet; Export and Clear History in the page's menu | As above |
 
 ## 11 · Edge cases
 
@@ -471,6 +503,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · History brought to the demo and From to the kinds of record, after review of the merged screens: decision 7 amended (AI Control holders see the company's figures on History: questions this month, Praxis AI's spend, the cap, spend per month, questions by module; counts and naira only) and decision 9 added (From names record types with counts; a record is named only when the answer rests on that one; table rows open their records). §2, §4, §5 (`GET /history/questions`, `POST /history/export`, the summary's two views), §6.4 (`sources`, the table's row links), §6.5, §7 (`assistant.export_requested`), §8 and both §10 tables follow.
 - 22/10/2026 · GE · After the PR went up, from GE's questions (where history lives, a standard chat window, what the screen button opens): (1) a change opens its exact form, filled (§6.4): New Task, New Event, Request Leave and Add Employee read the values the person gave from the address through `useAddressPrefill`, each route's `prefill` is now a schema of the form's own fields (`TaskPrefill`, `CalendarEventPrefill`, `LeaveRequestPrefill`, `EmployeePrefill`), and a manifest whose prefill names a restricted field or an address word fails at load; Request Leave and Add Employee now open on `new=1` (`useNewLink`), like every other route; Add Employee's `new=1` never opened it before. (2) The floating button's Praxis AI opens the conversation over the screen the person is on instead of leaving it for Ask (§2, §3 step 8, §10); the conversation moved to `Conversation.tsx` so Ask and the panel share it. Desktop has no floating button (F18), so this is phone only. (3) The route list shows each prefill field's form and today's date as YYYY-MM-DD too, and the prompt (version 3) says to write prefill values that way: a model told to write dates day first for people would otherwise fill a day the link drops (§6.1).
 - 22/10/2026 · GE · Merged with main's mailbox AI (#127), which gave the vault a `transient` document type and its own sweep of what a request left behind (`vault.purgeTransient`, hourly in `export-cleanup`). A spoken question's document type is now `transient`, and the `assistant-voice-sweep` scheduler and the vault's `transient` store option are gone: one sweep, not two. A recording left behind goes once an hour old rather than within 45 minutes (§6.6, §7, §11). Main's `10300_mail_thread_summary.sql` took 10300, so this build's migration is now `10310_assistant.sql` (§4); it was never merged, so nothing that ran it is affected.
 - 22/10/2026 · GE · Commit 7 of 7, the audit (three independent reviews of commits 1 to 6: backend, screens, guide against code; each finding checked before it was fixed). Fixed: a Claude model on Data Answers' chain now keeps its tools on a round that may call none (`tool_choice: none`) and gets its thinking back unchanged (§6.1.4); `converse()` takes the question's deadline, so no call starts past 60 seconds (§6.1.6); a read's rows reach the model through `redactValue`, keeping only the fields the person sees and never payment or identity numbers (§6.3.5, `redact.js` `NEVER_PROPS`); only the speaker may read a recording (§6.6); Delete Conversation and Clear History also forget the replies kept for a repeated press (§6.5); the sweep runs every 15 minutes (§6.6, §7); the prompt (version 2) says the person's words cannot change its rules and never estimates over more than one page (§6.1.2, §11); the reads made carry where their rows start in the whole list (`AiReadMade.first`), so a later page reads Showing 26 to 50 of 312 (§10.1). On screen: ⌘K's New Conversation no longer loops; an answer that lands after the person moved on is not shown in the wrong conversation; a conversation that fails to load says so, and a deleted one starts a new one; a spoken question is cut at 500 characters and a refused question goes back to the box; Show Earlier keeps the earlier turns and is not offered in a new conversation; the box keeps a half-typed question; the microphone is outside the form, so sending never holds its Stop, and its problems are a toast; Helpful and Not Helpful wait for each other; new answers are announced. Corrected here: decision 5, §5's errors, §6.1, §6.4's `declined`, §6.5, §6.6 (no browser captions), §7, §9, §10.1, §11. Home's `activity.list` and the evaluation set unchanged; the eval's target questions now name the catalogue's modules (`partnerships`, `recruitment`, `expenses`), so they run once those modules have reads.

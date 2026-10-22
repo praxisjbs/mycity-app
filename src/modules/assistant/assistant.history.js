@@ -1,8 +1,9 @@
 "use strict";
 /**
- * Praxis AI · History (docs/guides/praxis-ai.md §6.5): the person's own conversations and their
- * answers, this month's counts, and the two ways to remove the words (one conversation, or all
- * of them). The runs stay, holding no words, so the spend and the caps are untouched.
+ * Praxis AI · History (docs/guides/praxis-ai.md §6.5): the person's own conversations, questions
+ * and answers, History's figures (the company's for a person who holds AI Control, §1.1 decision 7),
+ * and the two ways to remove the words (one conversation, or all of them). The runs stay, holding
+ * no words, so the spend and the caps are untouched.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -12,6 +13,11 @@ const catalog = require("../../shared/access/access.catalog");
 const routeMap = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
 const idempotency = require("../../middleware/idempotency");
+const { scopeFor } = require("../../middleware/rbac");
+const governance = require("../../services/ai/governance");
+const { presentTable } = require("../../services/ai/assistant/answer");
+const { sourcesOf, typeLabel } = require("../../shared/ai/cite");
+const money = require("../../shared/money/money");
 const repo = require("./assistant.repo");
 const { EVENTS } = require("./assistant.events");
 
@@ -36,21 +42,25 @@ function citationOf(c) {
 }
 
 /**
- * An answer as the screen shows it (AiAnswer), from its row and its first citations.
+ * An answer as the screen shows it (AiAnswer), from its row, its first citations and its citations
+ * by record type (repo.sourceGroups).
  * @param {object} row  repo.turns / repo.answerOf
  * @param {object[]} citations
+ * @param {Array<{entity_type: string, count: number}>} groups
  */
-function present(row, citations = []) {
+function present(row, citations = [], groups = []) {
   const md = row.metadata || {};
+  const shown = citations.map(citationOf);
   return {
     ai_message_id: row.ai_message_id,
     ai_conversation_id: row.ai_conversation_id,
     question: row.question || "",
     content: row.content,
-    table: md.table || null,
+    table: presentTable(md.table || null),
     link: md.link || null,
-    citations: citations.map(citationOf),
+    citations: shown,
     citations_total: Number(row.citations_total) || 0,
+    sources: sourcesOf(groups, shown.length === 1 ? shown[0] : null),
     reads: (md.reads || []).map((r) => ({ key: r.key, rows: r.rows, total: r.total === undefined ? null : r.total, first: r.first || null })),
     declined: md.declined || null,
     more: Boolean(md.more),
@@ -79,8 +89,9 @@ async function conversations(query, actor) {
 async function turns(id, query, actor) {
   if (!(await repo.conversationOf(pool, id, actor.user_id))) throw new AppError("NOT_FOUND", "Not found", 404);
   const page = await repo.turns(pool, id, actor.user_id, query);
-  const cites = await repo.citationsOf(pool, page.data.map((r) => r.ai_message_id));
-  return { ...page, data: page.data.map((r) => present(r, cites.get(r.ai_message_id) || [])) };
+  const ids = page.data.map((r) => r.ai_message_id);
+  const [cites, groups] = await Promise.all([repo.citationsOf(pool, ids), repo.sourceGroups(pool, ids)]);
+  return { ...page, data: page.data.map((r) => present(r, cites.get(r.ai_message_id) || [], groups.get(r.ai_message_id) || [])) };
 }
 
 /**
@@ -126,20 +137,37 @@ async function clearHistory(actor) {
   });
 }
 
-/** GET /ai/history/summary: this Lagos month, the caller's own. */
+/** How many Lagos months Spend per Month covers, this one included. */
+const SPEND_MONTHS = 6;
+
+/**
+ * GET /ai/history/summary (§6.5). A person who holds AI Control `view` sees the company's figures
+ * (decision 7 as amended): everyone's questions, Praxis AI's spend, the cap. Everyone else sees
+ * their own, with all their questions beside this month's.
+ */
 async function summary(actor, now = new Date()) {
-  const today = lagos.today(now);
-  const { first } = lagos.monthBounds(today);
-  const from = lagos.instant(first);
-  const to = lagos.instant(lagos.addMonths(first, 1));
-  const s = await repo.summary(pool, actor.user_id, from, to);
+  const company = Boolean(await scopeFor(actor, "ai_control", "view"));
+  const { first } = lagos.monthBounds(lagos.today(now));
+  const months = Array.from({ length: SPEND_MONTHS }, (_, i) => lagos.addMonths(first, i - SPEND_MONTHS + 1));
+  const f = await repo.summaryFigures(pool, {
+    userId: actor.user_id,
+    company,
+    from: lagos.instant(first),
+    to: lagos.instant(lagos.addMonths(first, 1)),
+    since: lagos.instant(months[0]),
+  });
+  const spent = new Map(f.spend.map((r) => [r.month, r.spend]));
+  const byMonth = months.map((m) => ({ month: m.slice(0, 7), spend_ngn: money.toWire(spent.get(m.slice(0, 7)) || "0") }));
   const labels = new Map(catalog.MODULE_CATALOG.map((m) => [m.key, m.label]));
   return {
     month: first.slice(0, 7),
-    questions_this_month: s.questions,
-    conversations: s.conversations,
-    rows_read_this_month: s.rows_read,
-    by_module: s.by_module.slice(0, 25).map((r) => ({
+    view: company ? "company" : "own",
+    questions_this_month: company ? f.company_month : f.own_month,
+    your_questions: company ? f.own_month : f.own_all,
+    spend_ngn: byMonth[byMonth.length - 1].spend_ngn,
+    cap_ngn: company ? (await governance.settings(pool)).monthly_cap_ngn : null,
+    spend_by_month: byMonth,
+    by_module: f.by_module.slice(0, 25).map((r) => ({
       module_key: r.module_key,
       label: r.module_key ? labels.get(r.module_key) || r.module_key : "Other",
       questions: r.questions,
@@ -147,4 +175,22 @@ async function summary(actor, now = new Date()) {
   };
 }
 
-module.exports = { present, citationOf, conversations, turns, replay, deleteConversation, clearHistory, summary };
+/** GET /ai/history/questions: the caller's questions, each with its sources, tokens and cost. */
+async function questions(query, actor) {
+  const page = await repo.questions(pool, actor.user_id, query);
+  const groups = await repo.sourceGroups(pool, page.data.map((r) => r.ai_message_id));
+  return {
+    ...page,
+    data: page.data.map((r) => ({
+      ai_message_id: r.ai_message_id,
+      ai_conversation_id: r.ai_conversation_id,
+      question: r.question || "",
+      asked_at: iso(r.asked_at),
+      sources: (groups.get(r.ai_message_id) || []).map((g) => typeLabel(g.entity_type)),
+      tokens: r.tokens,
+      cost_ngn: money.toWire(r.cost_ngn),
+    })),
+  };
+}
+
+module.exports = { present, citationOf, conversations, turns, questions, replay, deleteConversation, clearHistory, summary, SPEND_MONTHS };

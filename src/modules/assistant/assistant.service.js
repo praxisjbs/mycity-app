@@ -105,6 +105,7 @@ async function ask(body, actor) {
     link: shown.link,
     citations: shown.citations,
     citations_total: shown.citations_total,
+    sources: shown.sources,
     reads: shown.reads,
     declined: shown.declined,
     more: shown.more,

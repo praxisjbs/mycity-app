@@ -28,6 +28,7 @@ const { logger } = require("../../../config/logger");
 const { AppError } = require("../../../shared/errors");
 const authorise = require("../../../shared/ai/authorise");
 const registry = require("../../../shared/ai/registry");
+const { refsFor } = require("../../../shared/ai/cite");
 const routeMap = require("../../../shared/route-map");
 const lagos = require("../../../shared/time/lagos");
 const { formatDate } = require("../../../shared/time/day-first");
@@ -248,7 +249,7 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
         return JSON.stringify({ error: "already_read", message: "You read this already; use that result." });
       }
       seen.add(sig);
-      const made = { n, key, params, ok: false, declined: false, rows: [], total: null, page: null, citations: [], module: null };
+      const made = { n, key, params, ok: false, declined: false, rows: [], refs: [], total: null, page: null, citations: [], module: null };
       try {
         const res = await authorise.runRead(db, actor, key, params);
         const rd = registry.read(key);
@@ -259,6 +260,8 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
         made.page = res.page;
         made.total = res.list ? res.page.total : made.rows.length;
         made.citations = res.citations;
+        // Each row's record, in order, so a table drawn from this read opens its rows' records.
+        made.refs = refsFor(rd, made.rows);
         reads.push(made);
         return resultContent(n, made, keep);
       } catch (err) {
