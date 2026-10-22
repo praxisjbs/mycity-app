@@ -208,89 +208,6 @@
   padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
 
-/* The celebration card's drifting pieces (Confetti) and its slow sheen. Each
-   piece's place, pace and head start come from its own CSS variables, so the
-   component sets four values and the shape and size are decided here. The
-   reduced-motion rule in base's @layer base stops all of it. */
-@keyframes mc-fall {
-  0% {
-    transform: translateY(-10px) rotate(0);
-  }
-  100% {
-    transform: translateY(190px) rotate(540deg);
-  }
-}
-@keyframes mc-sheen {
-  0% {
-    background-position: 120% 0;
-  }
-  60%,
-  100% {
-    background-position: -120% 0;
-  }
-}
-@layer components {
-  .confetti > i {
-    position: absolute;
-    top: -14px;
-    width: 7px;
-    height: 11px;
-    border-radius: 2px;
-    opacity: 0.9;
-    left: var(--piece-left);
-    background: var(--piece-ink);
-    animation: mc-fall linear infinite var(--piece-time);
-    animation-delay: var(--piece-delay);
-  }
-  .confetti > i:nth-child(3n) {
-    border-radius: 50%;
-    width: 7px;
-    height: 7px;
-  }
-  .confetti > i:nth-child(4n) {
-    width: 4px;
-    height: 13px;
-  }
-  .confetti.stars > i {
-    border-radius: 1px;
-    width: 11px;
-    height: 11px;
-    clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  }
-}
-@utility sheen {
-  &::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background: linear-gradient(105deg, transparent 35%, color-mix(in oklab, var(--on-deep) 10%, transparent) 50%, transparent 65%);
-    background-size: 250% 100%;
-    animation: mc-sheen 5s ease-in-out infinite;
-  }
-}
-
-/* A celebration card's own background: warm for a birthday, cool for a work
-   anniversary. Both are the brand's own tokens over Deep Green. */
-@utility celebrate-warm {
-  background:
-    radial-gradient(120% 140% at 100% 0%, color-mix(in oklab, var(--primary) 20%, transparent), transparent 55%),
-    linear-gradient(135deg, var(--secondary), var(--deep));
-}
-@utility celebrate-cool {
-  background:
-    radial-gradient(120% 140% at 0% 100%, color-mix(in oklab, var(--chart-3) 22%, transparent), transparent 55%),
-    linear-gradient(135deg, var(--deep), var(--secondary));
-}
-/* The spinning ring around a celebration's initials. */
-@utility ring-warm {
-  background: conic-gradient(var(--primary), color-mix(in oklab, var(--primary) 15%, transparent), var(--primary), color-mix(in oklab, var(--primary) 15%, transparent), var(--primary));
-}
-@utility ring-cool {
-  background: conic-gradient(var(--chart-2), color-mix(in oklab, var(--chart-3) 15%, transparent), var(--primary), color-mix(in oklab, var(--chart-3) 15%, transparent), var(--chart-2));
-}
-
 /* A column of a two-column Grid on desktop: at most the height under the top bar and the
    tabs, so two cards side by side each scroll on their own, as the mailbox's panes do. */
 @utility max-h-card-pane {
@@ -382,6 +299,11 @@
 }
 @utility cols-two-and-action {
   grid-template-columns: 1fr 1fr auto;
+}
+/* A figure beside the words it belongs to, at the figure's own width: the work
+   anniversary card's medal beside the person (Staff Community). */
+@utility cols-figure {
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
 /* The reader's two columns on a wide screen: a fixed list beside the article

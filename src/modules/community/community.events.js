@@ -56,6 +56,12 @@ const EVENTS = defineEvents("community", {
   "celebration.posted": {
     summary: "A birthday or work anniversary card was posted",
   },
+  "celebration.wished": {
+    summary: "Someone sent wishes on a birthday or work anniversary card",
+  },
+  "celebration.wish_deleted": {
+    summary: "A wish on a birthday or work anniversary card was deleted",
+  },
 });
 
 /**
@@ -138,6 +144,8 @@ for (const key of [
   EVENTS.CHANNEL_MESSAGE_DELETED,
   EVENTS.CHANNEL_MESSAGE_PINNED,
   EVENTS.CHANNEL_MESSAGE_LINK_PREVIEWED,
+  EVENTS.CELEBRATION_WISHED,
+  EVENTS.CELEBRATION_WISH_DELETED,
 ]) {
   outbox.register(key, `community.push_update.${key.split(".")[1]}`, (event) =>
     pushToMembers(event, "community.message_updated"),
@@ -245,6 +253,15 @@ defineNotification(EVENTS.CHANNEL_MESSAGE_POSTED, {
   // Every post alerts each device, replacing the channel's notification, which counts them (TB, 19/10/2026).
   push: { tag: conversation, mode: "alert" },
   who: "The channel's members",
+});
+
+/* A wish tells the person the card is for; a card's wishes share one notification on a phone. */
+defineNotification(EVENTS.CELEBRATION_WISHED, {
+  to: [{ subject: true }],
+  title: (e) =>
+    e.payload.from_name ? `${e.payload.from_name} sent you wishes` : "You have new wishes",
+  body: firstLine,
+  push: { tag: (e) => `community_message:${e.payload.community_message_id}`, mode: "alert" },
 });
 
 defineNotification(EVENTS.RECOGNITION_POSTED, {

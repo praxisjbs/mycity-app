@@ -1,4 +1,4 @@
-import type { Announcement, AnnouncementStats, Channel, Conversation, LinkPreview, MediaRef, Member, Message, ProfileCard } from "@/api/types/community";
+import type { Announcement, AnnouncementStats, Channel, Conversation, LinkPreview, MediaRef, Member, Message, ProfileCard, Wish } from "@/api/types/community";
 import { firstLink, hostOf } from "@mycity/ui";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, fold } from "../core";
 import { byId, byKey, DEPARTMENTS, PEOPLE, SIGN_INS } from "../data/people";
@@ -26,7 +26,15 @@ const person = (key: string): PersonRef => {
 const uid = (key: string) => sid(`user:${key}`);
 const keyOfUser = (userId: string) => PEOPLE.find((p) => uid(p.user_key) === userId)?.user_key;
 
-type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _noLink?: boolean; _pinnedAt?: number };
+/** A wish under a celebration card, as the mock keeps it. */
+interface MWish {
+  id: string;
+  by: string;
+  body: string;
+  at: string;
+  deleted: boolean;
+}
+type MMsg = Message & { _by: string | null; _fans: string[]; _votes: Record<string, number>; _wishes: MWish[]; _noLink?: boolean; _pinnedAt?: number };
 let seq = 0;
 function msg(type: Message["message_type"], by: string | null, when: string, over: Partial<Message> = {}): MMsg {
   return {
@@ -59,6 +67,7 @@ function msg(type: Message["message_type"], by: string | null, when: string, ove
     _by: by,
     _fans: [],
     _votes: {},
+    _wishes: [],
   };
 }
 /** A file as a message carries it: its shape and the sizes the worker made (a laptop holds no bytes, so the bubbles keep their places). */
@@ -107,10 +116,14 @@ const album = (by: string, when: string, names: string[], caption: string) => {
   const key = sid(`album:${names[0]}`);
   return names.map((n, i) => msg("image", by, when, { document: photoRef(n, 420, i % 3 === 1 ? 1080 : 1600, i % 3 === 1 ? 1350 : 1200), album_key: key, body: i === 0 ? caption : null }));
 };
-const card = (type: "birthday" | "anniversary", who: string, when: string, fans: string[], years: number | null): MMsg => {
+let wishSeq = 0;
+const card = (type: "birthday" | "anniversary", who: string, when: string, fans: string[], years: number | null, wishes: Array<[string, string]> = []): MMsg => {
   const m = msg(type, null, when, { body: (type === "birthday" ? BDAY : ANNIV)[0] });
   m._fans = fans;
-  m.celebration = { subject: person(who), years, count: fans.length, mine: false, fans: [] };
+  // An anniversary keeps the day the person joined: the card's own day, `years` back.
+  const since = type === "anniversary" && years ? `${Number(when.slice(0, 4)) - years}${when.slice(4, 10)}` : null;
+  m.celebration = { subject: person(who), years, since, count: fans.length, mine: false, fans: [], wishes: [], wish_count: 0 };
+  m._wishes = wishes.map(([by, body], i) => ({ id: sid(`wish:${++wishSeq}`), by, body, at: new Date(new Date(when).getTime() + (i + 1) * 9 * 60 * 1000).toISOString(), deleted: false }));
   return m;
 };
 
@@ -193,9 +206,16 @@ const CHANNELS: Chan[] = [
     "general",
     everyone,
     [
-      card("anniversary", "emeka", at(1, "05:00"), ["ngozi", "adedotun", "chidera"], 3),
+      card("anniversary", "emeka", at(1, "05:00"), ["ngozi", "adedotun", "chidera"], 3, [
+        ["ngozi", "Three years! The studio would not run without you."],
+        ["adedotun", "Congratulations, Emeka. Well deserved."],
+      ]),
       msg("text", "ngozi", at(1, "17:42"), { body: "Congratulations Emeka, three years of the studio running like clockwork." }),
-      card("birthday", "hauwa", at(0, "05:00"), ["adedotun", "tolu", "ngozi"], null),
+      card("birthday", "hauwa", at(0, "05:00"), ["adedotun", "tolu", "ngozi"], null, [
+        ["tolu", "Happy birthday, Hauwa! Have the best day."],
+        ["adedotun", "Many happy returns."],
+        ["ngozi", "Enjoy every minute of it."],
+      ]),
       rec,
       msg("text", "adedotun", at(0, "08:31"), { body: "Happy birthday Hauwa! Cake at the Abuja hub at 4?" }),
       poll,
@@ -268,9 +288,14 @@ function lineOf(m: Message | undefined): string | null {
   return t === "audio" ? "Voice note" : t === "poll" ? `Poll: ${m.body}` : t === "recognition" ? "Recognition" : t === "birthday" ? "Birthday" : t === "anniversary" ? "Work anniversary" : m.body;
 }
 
+/** A wish as `user` sees it: its author or a moderator of the card's channel deletes it. */
+function wishOut(w: MWish, m: MMsg, user: string, c: Chan): Wish {
+  return { community_wish_id: w.id, community_message_id: m.community_message_id, author: person(w.by), mine: w.by === user, body: w.body, created_at: w.at, can_delete: w.by === user || moderates(c, user) };
+}
+
 /** A message as `user` sees it: theirs or not, their reaction and vote, and the ticks. */
 function view(m: MMsg, user: string, c: Chan): Message {
-  const { _by, _fans, _votes, _noLink, _pinnedAt, ...rest } = m;
+  const { _by, _fans, _votes, _wishes, _noLink, _pinnedAt, ...rest } = m;
   const mine = _by === user;
   const voted = Object.keys(_votes).length > 0;
   const closed = Boolean(m.poll?.closed);
@@ -289,7 +314,10 @@ function view(m: MMsg, user: string, c: Chan): Message {
     const acked = !!a && a.urgency === "urgent" && a.read.has(user);
     out.announcement = { ...m.announcement, in_audience: !!a && inAudience(a, user), acknowledged_at: acked ? m.sent_at : null };
   }
-  if (m.celebration) out.celebration = { ...m.celebration, count: _fans.length, mine: _fans.includes(user), fans: _fans.slice(0, 3).map(person) };
+  if (m.celebration) {
+    const live = _wishes.filter((w) => !w.deleted);
+    out.celebration = { ...m.celebration, count: _fans.length, mine: _fans.includes(user), fans: _fans.slice(0, 3).map(person), wishes: live.slice(-2).map((w) => wishOut(w, m, user, c)), wish_count: live.length };
+  }
   if (m.recognition) out.recognition = { ...m.recognition, count: _fans.length, mine: _fans.includes(user) };
   if (m.poll) {
     const votes = Object.values(_votes);
@@ -687,6 +715,36 @@ route("POST /api/v1/community/messages/:id/reactions", (req) => {
   if (!f || !isMember(f.c, req.user!)) return notFound();
   f.m._fans = f.m._fans.includes(req.user!) ? f.m._fans.filter((k) => k !== req.user) : [...f.m._fans, req.user!];
   return ok(view(f.m, req.user!, f.c));
+});
+/* Wishes under a celebration card (community.md §3 step 3): never in the channel's stream. */
+const isCard = (m: MMsg) => m.message_type === "birthday" || m.message_type === "anniversary";
+route("GET /api/v1/community/messages/:id/wishes", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (!isCard(f.m)) return fail(422, "NOT_A_CARD", "Wishes go on a birthday or anniversary card");
+  return paged([...f.m._wishes].filter((w) => !w.deleted).reverse().map((w) => wishOut(w, f.m, req.user!, f.c)), req);
+});
+route("POST /api/v1/community/messages/:id/wishes", (req) => {
+  const f = located(req.params.id);
+  if (!f || !isMember(f.c, req.user!) || f.m.deleted) return notFound();
+  if (!isCard(f.m)) return fail(422, "NOT_A_CARD", "Wishes go on a birthday or anniversary card");
+  const body = String(req.body.body ?? "").trim();
+  if (!body) return invalid({ body: ["Write a wish"] });
+  if (body.length > 280) return invalid({ body: ["At most 280 characters"] });
+  f.m._wishes.push({ id: sid(`wish:${++wishSeq}`), by: req.user!, body, at: new Date().toISOString(), deleted: false });
+  return created(view(f.m, req.user!, f.c));
+});
+route("DELETE /api/v1/community/wishes/:id", (req) => {
+  for (const c of CHANNELS) {
+    for (const m of c.msgs) {
+      const w = m._wishes.find((x) => x.id === req.params.id && !x.deleted);
+      if (!w || !isMember(c, req.user!)) continue;
+      if (w.by !== req.user && !moderates(c, req.user!)) return fail(403, "NOT_YOURS", "Only its author or a moderator deletes a wish");
+      w.deleted = true;
+      return noContent();
+    }
+  }
+  return notFound();
 });
 route("POST /api/v1/community/messages/:id/vote", (req) => {
   const f = located(req.params.id);

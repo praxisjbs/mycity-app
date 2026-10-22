@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "@/api/client";
-import { invalidate } from "@/api/hooks";
+import { invalidate, usePaged } from "@/api/hooks";
 import { useFileUrl } from "@/api/download";
-import type { Message } from "@/api/types/community";
+import type { Message, Wish } from "@/api/types/community";
+import { useAuth } from "@/auth/AuthProvider";
+import community from "@mycity/contract/schemas/community.js";
 import { usePhoto, usePhotos } from "@/api/download";
-import { Avatar, Button, Card, cn, Confetti, formatDate, formatDateTime, formatTime, Icon, LinkText, Pill, ShareBar, toast, Tooltip, Waveform } from "@mycity/ui";
+import { ActionGroup, Avatar, Button, Card, cn, Confetti, Field, Form, formatDate, formatDateTime, FormFooter, formatTime, Icon, IconButton, LinkText, Pager, Pill, ShareBar, TextAreaField, toast, Tooltip, useConfirm, useContractForm, useModal, Waveform, YearsMedal } from "@mycity/ui";
 import { AlbumMedia, MessageLink, MessageMedia } from "./Media";
+import { cardSeen, markCardSeen } from "./seen";
 
 /** Highlight search hits inside a heading (a message's own text is LinkText, which also opens its links). */
 export function Hl({ text, q }: { text: string; q: string }) {
@@ -15,54 +18,426 @@ export function Hl({ text, q }: { text: string; q: string }) {
 }
 
 
-/** Birthday and work anniversary posts: the celebration card. */
-function Celebration({ m, onCelebrate }: { m: Message; onCelebrate: () => void }) {
-  const c = m.celebration!;
-  const photo = usePhotos([c.subject.photo_url, ...c.fans.map((f) => f.photo_url)]);
-  const bday = m.message_type === "birthday";
-  const first = c.subject.display_name.split(" ")[0];
-  const names = c.fans.slice(0, 2).map((f) => f.display_name.split(" ")[0]);
-  const more = c.count - names.length;
-  const who = c.count ? `${names.join(", ")}${more > 0 ? ` and ${more} other${more > 1 ? "s" : ""}` : ""} celebrated` : "Be the first to celebrate";
+/** "Three years at MyCity today.": the years in words up to ten, as the card reads them aloud. */
+const WORDS = [
+  "",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+];
+function yearsLine(years: number | null) {
+  if (!years) return "Another year at MyCity today.";
+  return `${WORDS[years] ?? years} ${years === 1 ? "year" : "years"} at MyCity today.`;
+}
+
+/** Send Wishes: a short wish that stays under the card (community.md §3 step 3). */
+function SendWishes({
+  m,
+  close,
+  done,
+}: {
+  m: Message;
+  close: () => void;
+  done: (m: Message) => void;
+}) {
+  const f = useContractForm({ body: "" }, community.WishCreate);
+  const send = f.submit(async ({ body }) => {
+    try {
+      done(
+        await api.call("POST /api/v1/community/messages/:id/wishes", {
+          params: { id: m.community_message_id },
+          body: { body },
+        }),
+      );
+      close();
+      toast("Wishes sent");
+    } catch (e) {
+      if (e instanceof ApiError)
+        f.setServerErrors(
+          e.fields.body ? { body: e.fields.body } : { body: [e.message] },
+        );
+    }
+  });
   return (
-    <div
+    <Form onSubmit={send}>
+      <Field label="Wish" {...f.status("body")}>
+        <TextAreaField {...f.field("body")} rows={3} />
+      </Field>
+      <FormFooter>
+        <Button onClick={close}>Cancel</Button>
+        <Button variant="primary" type="submit" icon="msg">
+          Send Wishes
+        </Button>
+      </FormFooter>
+    </Form>
+  );
+}
+
+/** Ask once, then delete a wish; the card reads its wishes again. */
+function useDeleteWish(changed: () => void) {
+  const confirm = useConfirm();
+  return async (w: Wish) => {
+    if (
+      !(await confirm({
+        title: "Delete Wish",
+        body: "It is removed from the card for everyone.",
+        confirmLabel: "Delete Wish",
+        cancelLabel: "Keep It",
+        destructive: true,
+      }))
+    )
+      return;
+    try {
+      await api.call("DELETE /api/v1/community/wishes/:id", {
+        params: { id: w.community_wish_id },
+      });
+      toast("Wish deleted");
+      changed();
+    } catch (e) {
+      toast.error(
+        e instanceof ApiError ? e.message : "Not deleted. Try again.",
+      );
+    }
+  };
+}
+
+/** One wish: the face, the first name and the words; Delete Wish for its author or a moderator. */
+function WishRow({
+  w,
+  photo,
+  onDelete,
+  when,
+  brand,
+}: {
+  w: Wish;
+  photo: string | null | undefined;
+  onDelete: (w: Wish) => Promise<void>;
+  when?: boolean;
+  /** On the anniversary card's City Green: the delete control takes the light ink. */
+  brand?: boolean;
+}) {
+  return (
+    <li className="flex items-start gap-2 text-sm leading-normal">
+      <Avatar
+        name={w.author.display_name}
+        src={photo}
+        size="xs"
+        className="mt-0.5"
+      />
+      <p data-copy="content" className="min-w-0 flex-1 wrap-any">
+        <b className="font-strong">
+          {w.mine ? "You" : w.author.display_name.split(" ")[0]}
+        </b>{" "}
+        {w.body}
+        {when && (
+          <span className="ml-1.5 text-2xs text-subtle-foreground">
+            {formatDateTime(w.created_at)}
+          </span>
+        )}
+      </p>
+      {w.can_delete && (
+        <IconButton
+          icon="trash"
+          label="Delete Wish"
+          size="sm"
+          className={cn("-my-1 flex-none", brand && "text-on-deep-soft")}
+          onClick={() => onDelete(w)}
+        />
+      )}
+    </li>
+  );
+}
+
+/** Wishes: every wish on the card, newest first, 25 at a time. */
+function Wishes({
+  m,
+  close,
+  changed,
+}: {
+  m: Message;
+  close: () => void;
+  changed: () => void;
+}) {
+  const list = usePaged("GET /api/v1/community/messages/:id/wishes", {
+    params: { id: m.community_message_id },
+  });
+  const photo = usePhotos(list.rows.map((w) => w.author.photo_url));
+  const remove = useDeleteWish(() => (list.reload(), changed()));
+  return (
+    <>
+      <ul aria-label="Wishes" className="grid gap-3">
+        {list.rows.map((w) => (
+          <WishRow
+            key={w.community_wish_id}
+            w={w}
+            photo={photo(w.author.photo_url)}
+            onDelete={remove}
+            when
+          />
+        ))}
+      </ul>
+      <Pager
+        page={list.page}
+        onPage={list.setPage}
+        noun="wish"
+        nounPlural="wishes"
+        label="Wishes"
+        className="mt-3"
+      />
+      <FormFooter>
+        <Button variant="primary" onClick={close}>
+          Close
+        </Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/**
+ * Birthday and work anniversary cards (community.md §3 step 3, §10), Cynthia's picks: a plain
+ * birthday card, and a City Green anniversary card with the years in a laurel. Confetti bursts
+ * the first time the person sees the card on this device, and from Celebrate when they press it.
+ */
+function Celebration({
+  m,
+  onCelebrate,
+  onChange,
+  onReload,
+}: {
+  m: Message;
+  onCelebrate: () => Promise<unknown>;
+  onChange: (m: Message) => void;
+  onReload: () => void;
+}) {
+  const c = m.celebration!;
+  const bday = m.message_type === "birthday";
+  const { me } = useAuth();
+  const modal = useModal();
+  const photo = usePhotos([
+    c.subject.photo_url,
+    ...c.fans.map((f) => f.photo_url),
+    ...c.wishes.map((w) => w.author.photo_url),
+  ]);
+  const button = useRef<HTMLButtonElement>(null);
+  const origin = useRef<HTMLSpanElement>(null);
+  const [presses, setPresses] = useState(0);
+  const [fresh] = useState(
+    () => !cardSeen(m.community_message_id, me?.user_id),
+  );
+  const removeWish = useDeleteWish(onReload);
+
+  const first = c.subject.display_name.split(" ")[0];
+  const names = c.fans
+    .slice(0, 2)
+    .map((f) =>
+      f.employee_id === me?.employee_id ? "You" : f.display_name.split(" ")[0],
+    );
+  const more = c.count - names.length;
+  const who = c.count
+    ? `${names.join(", ")}${more > 0 ? ` and ${more} other${more > 1 ? "s" : ""}` : ""} celebrated`
+    : "Be the first to celebrate";
+  const role = bday
+    ? c.subject.job_title
+    : [c.subject.job_title, c.subject.department].filter(Boolean).join(", ");
+  const face = (cls: string) => (
+    <Avatar
+      name={c.subject.display_name}
+      src={photo(c.subject.photo_url)}
+      tone="brand"
+      className={cls}
+    />
+  );
+
+  const celebrate = () => {
+    if (!c.mine) setPresses((n) => n + 1);
+    return onCelebrate();
+  };
+  const sendWishes = () =>
+    modal.open({
+      title: "Send Wishes",
+      body: (close) => <SendWishes m={m} close={close} done={onChange} />,
+    });
+  const viewWishes = () =>
+    modal.open({
+      title: "Wishes",
+      body: (close) => <Wishes m={m} close={close} changed={onReload} />,
+    });
+
+  return (
+    <article
+      aria-label={
+        bday
+          ? `Birthday, ${c.subject.display_name}`
+          : `Work anniversary, ${c.subject.display_name}`
+      }
       className={cn(
-        "sheen relative isolate flex max-w-144 animate-celeb-in items-center gap-4 overflow-hidden rounded-sheet p-4.5 pb-4 text-on-deep max-md:gap-3 max-md:p-3.5",
-        bday ? "celebrate-warm" : "celebrate-cool",
+        "relative isolate w-full max-w-144 overflow-hidden rounded-sheet",
+        bday
+          ? "border border-border bg-card p-5 shadow-1 phone:p-4"
+          : "bg-secondary p-6 text-secondary-foreground phone:p-5",
       )}
     >
-      <Confetti shape={bday ? "paper" : "stars"} />
-      <span className="relative flex-none">
-        <span className={cn("relative block size-18 animate-spin-slow rounded-full p-1 max-md:size-14", bday ? "ring-warm" : "ring-cool")}>
-          <Avatar name={c.subject.display_name} src={photo(c.subject.photo_url)} size="2xl" tone="brand" className="flex size-full animate-spin-slow-reverse border-2 border-deep text-2xl" />
-        </span>
-        <span className="absolute -right-1.5 -bottom-1 flex size-7 animate-bob items-center justify-center rounded-full bg-white text-md shadow-3" aria-hidden="true">
-          {bday ? "🎂" : "🏆"}
-        </span>
-      </span>
-      <div className="min-w-0 flex-1">
-        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-bold tracking-caps uppercase", bday ? "bg-primary text-primary-foreground" : "bg-chart-2 text-deep")}>
-          {bday ? "Birthday" : "Work Anniversary"}
-        </span>
-        <h2 data-copy="content" className="mt-2 text-xl leading-tight tracking-tight max-md:text-lg">
-          {bday ? <>Happy birthday, <em className="text-primary not-italic">{first}</em></> : c.years ? <><em className="text-primary not-italic">{c.years} {c.years === 1 ? "year" : "years"}</em> at MyCity, {first}</> : <><em className="text-primary not-italic">Another year</em> at MyCity, {first}</>}
-        </h2>
-        <p className="mt-1 text-sm text-on-deep-soft">{m.body}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-2.5">
-          <button type="button" onClick={onCelebrate} className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-strong", c.mine ? "border-primary bg-primary text-primary-foreground" : "border-white/20 bg-white/10 text-on-deep")}>
-            {bday ? "🎉" : "👏"} Celebrate · {c.count}
-          </button>
+      <Confetti
+        shape={bday ? "paper" : "stars"}
+        on={bday ? "card" : "brand"}
+        burstOnView={fresh}
+        viewFrom={origin}
+        onViewBurst={() => markCardSeen(m.community_message_id, me?.user_id)}
+        burst={presses}
+        from={button}
+      />
+      {bday ? (
+        <div className="flex items-center gap-4 phone:gap-3.5">
+          <span
+            ref={origin}
+            className="relative flex-none rounded-full bg-primary p-0.75"
+          >
+            {face(
+              "size-16 border-3 border-card text-2xl phone:size-13 phone:text-xl",
+            )}
+            <span
+              aria-hidden="true"
+              className="absolute -right-1.5 -bottom-1 grid size-7 place-items-center rounded-full bg-card text-eyebrow shadow-2"
+            >
+              <Icon name="cake" />
+            </span>
+          </span>
+          <div data-copy="content" className="min-w-0">
+            <h3 className="text-2xl leading-tight font-semibold tracking-tight phone:text-xl">
+              Happy Birthday, {first}
+            </h3>
+            <p className="mt-0.5 text-base text-muted-foreground">
+              {role
+                ? `${c.subject.display_name}, ${role}`
+                : c.subject.display_name}
+            </p>
+            <p className="mt-1.5 text-md">{m.body}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid cols-figure items-center gap-x-6 gap-y-3 phone:gap-x-4">
+          <span ref={origin} className="relative row-span-2 phone:row-span-1">
+            <YearsMedal years={c.years} />
+            {face(
+              "absolute -right-2 -bottom-1.5 size-9 border-2 border-secondary text-xs desk:hidden",
+            )}
+          </span>
+          <div className="flex min-w-0 items-center gap-3 self-end phone:self-center">
+            {face("size-11 border-2 border-primary text-sm phone:hidden")}
+            <div data-copy="content" className="min-w-0">
+              <h3 className="text-2xl leading-tight font-semibold phone:text-xl">
+                {c.subject.display_name}
+              </h3>
+              {role && <p className="text-base text-on-deep-soft">{role}</p>}
+            </div>
+          </div>
+          <div data-copy="content" className="self-start phone:col-span-2">
+            <p className="text-lg">
+              {yearsLine(c.years)} {m.body}
+            </p>
+            {c.since && (
+              <p className="mt-1 text-xs text-on-deep-dim">
+                Joined {formatDate(c.since)}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      <ActionGroup>
+        <div className="mt-4.5 flex flex-wrap gap-2.5 phone:gap-2">
+          <Button
+            ref={button}
+            variant={c.mine ? "default" : "primary"}
+            icon="party"
+            aria-pressed={c.mine}
+            onClick={celebrate}
+            className="phone:flex-1"
+          >
+            {c.mine ? "Celebrated" : "Celebrate"}
+          </Button>
+          <Button icon="msg" onClick={sendWishes} className="phone:flex-1">
+            Send Wishes
+          </Button>
+        </div>
+      </ActionGroup>
+      <div
+        className={cn(
+          "mt-4 border-t pt-3",
+          bday ? "border-border" : "border-on-deep/15",
+        )}
+      >
+        <div className="flex items-center gap-2">
           {c.fans.length > 0 && (
-            <span className="flex items-center">
-              {c.fans.slice(0, 3).map((f, i) => (
-                <Avatar key={f.employee_id} name={f.display_name} src={photo(f.photo_url)} size="xs" className={cn("size-5.5 border-2 border-deep", i > 0 && "-ml-1.5")} />
+            <span className="flex flex-none">
+              {c.fans.map((f, i) => (
+                <Avatar
+                  key={f.employee_id}
+                  name={f.display_name}
+                  src={photo(f.photo_url)}
+                  size="sm"
+                  className={cn(
+                    "border-2",
+                    bday ? "border-card" : "border-secondary",
+                    i > 0 && "-ml-2",
+                  )}
+                />
               ))}
             </span>
           )}
-          <small className="text-2xs text-on-deep-dim">{who}</small>
+          <small
+            data-copy="content"
+            className={cn(
+              "text-xs",
+              bday ? "text-muted-foreground" : "text-on-deep-soft",
+            )}
+          >
+            {who}
+          </small>
         </div>
+        {c.wishes.length > 0 && (
+          <ul aria-label="Wishes" className="mt-2.5 grid gap-2">
+            {c.wishes.map((w) => (
+              <WishRow
+                key={w.community_wish_id}
+                w={w}
+                photo={photo(w.author.photo_url)}
+                onDelete={removeWish}
+                brand={!bday}
+              />
+            ))}
+          </ul>
+        )}
+        {c.wish_count > 2 && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <small
+              data-copy="content"
+              className={cn(
+                "text-xs",
+                bday ? "text-muted-foreground" : "text-on-deep-soft",
+              )}
+            >
+              {c.wish_count} wishes
+            </small>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconRight="right"
+              onClick={viewWishes}
+              className={bday ? undefined : "text-secondary-foreground"}
+            >
+              View All
+            </Button>
+          </div>
+        )}
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -288,12 +663,12 @@ export function AlbumPost({ ms, q, dm, onView, menu }: { ms: Message[]; q: strin
 }
 
 /** One post in a channel or a conversation. */
-export function Post({ m, q, dm, onCelebrate, onVote, onView, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => void; onVote: (i: number) => void; onView?: (key: string) => void; menu?: ReactNode }) {
+export function Post({ m, q, dm, onCelebrate, onVote, onView, onChange, onReload, menu }: { m: Message; q: string; dm?: boolean; onCelebrate: () => Promise<unknown>; onVote: (i: number) => void; onView?: (key: string) => void; onChange?: (m: Message) => void; onReload?: () => void; menu?: ReactNode }) {
   const authorPhoto = usePhoto(m.mine ? null : m.author?.photo_url);
   const toPhoto = usePhoto(m.recognition?.to.photo_url);
   /* A card keeps its look; its menu sits beside it. */
   const withMenu = (card: ReactNode) => (menu ? <div className={cn("flex items-start gap-1", m.mine && "flex-row-reverse")}>{card}{menu}</div> : card);
-  if (!m.deleted && (m.message_type === "birthday" || m.message_type === "anniversary")) return m.celebration ? withMenu(<Celebration m={m} onCelebrate={onCelebrate} />) : null;
+  if (!m.deleted && (m.message_type === "birthday" || m.message_type === "anniversary")) return m.celebration ? withMenu(<Celebration m={m} onCelebrate={onCelebrate} onChange={onChange ?? (() => undefined)} onReload={onReload ?? (() => undefined)} />) : null;
   if (!m.deleted && m.message_type === "recognition" && m.recognition) {
     const r = m.recognition!;
     return withMenu(

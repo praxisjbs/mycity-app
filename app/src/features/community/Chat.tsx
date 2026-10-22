@@ -793,7 +793,7 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
             {ms.length > 1 ? (
               <AlbumPost ms={ms} q={t.q} dm={dm} onView={view} menu={picking ? undefined : albumMenu(ms)} />
             ) : (
-              <Post m={m} q={t.q} dm={dm} onCelebrate={() => void react(m)} onVote={(i) => void vote(m, i)} onView={view} menu={picking ? undefined : menuOf(m)} />
+              <Post m={m} q={t.q} dm={dm} onCelebrate={() => react(m)} onVote={(i) => void vote(m, i)} onView={view} onChange={t.replace} onReload={t.reload} menu={picking ? undefined : menuOf(m)} />
             )}
           </div>
         </div>

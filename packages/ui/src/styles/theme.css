@@ -83,10 +83,6 @@
   /* An urgent notice's slow red halo, every 2 s (UrgentBar, Card urgency): never a flash; off with reduced motion. */
   --animate-urgent: urgent 2s ease-in-out infinite;
   --animate-slide-in: slide-in .2s ease-out;
-  --animate-celeb-in: celeb-in .55s cubic-bezier(.2, .9, .3, 1.25) both;
-  --animate-spin-slow: spin 8s linear infinite;
-  --animate-spin-slow-reverse: spin 8s linear infinite reverse;
-  --animate-bob: bob 2.4s ease-in-out infinite;
   --animate-shimmer: shimmer 1.1s linear infinite;
   /* The sign-in screen's city scenes (CityScenes); all stop under reduced motion. */
   --animate-drift: drift 16s ease-out both;
@@ -225,8 +221,6 @@
 @keyframes pulse-dot { 50% { opacity: .25; } }
 @keyframes urgent { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--destructive) 28%, transparent); } }
 @keyframes slide-in { from { transform: translateX(-100%); } }
-@keyframes celeb-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
-@keyframes bob { 50% { transform: translateY(-4px) rotate(-8deg); } }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @keyframes drift { from { transform: scale(1.07) translateX(1.2%); } to { transform: scale(1) translateX(0); } }
 @keyframes ken-1 { from { transform: scale(1.05) translate3d(1%, 0, 0); } to { transform: scale(1.14) translate3d(-1.5%, -0.6%, 0); } }

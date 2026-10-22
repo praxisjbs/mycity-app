@@ -909,6 +909,72 @@ describeDb("Staff Community against the real migrations", () => {
     expect(c.body.celebration).toMatchObject({ count: 1, mine: true, fans: [{ display_name: "Amaka Eze" }] });
   });
 
+  test("wishes stay under a celebration card, tell the person it is for, and go only by their author or a moderator", async () => {
+    const g = await general("ceo");
+    const page = await as("ceo").get(`/community/channels/${g.community_channel_id}/messages`);
+    const bday = page.body.data.find((m) => m.message_type === "birthday");
+    const anniv = page.body.data.find((m) => m.message_type === "anniversary");
+    // The 08:00 anniversary keeps the day the person joined; a birthday shows no date.
+    const today = lagos.today();
+    expect(anniv.celebration.since).toBe(`${Number(today.slice(0, 4)) - 3}-${today.slice(5)}`);
+    expect(bday.celebration).toMatchObject({ since: null, wishes: [], wish_count: 0 });
+
+    const card = `/community/messages/${bday.community_message_id}/wishes`;
+    let last;
+    for (const [who, body] of [["tunde", "Happy birthday, Bola!"], ["ceo", "Many happy returns."], ["tunde", "Enjoy the day."]]) {
+      last = await as(who).post(card).send({ body });
+      expect(last.status).toBe(201);
+    }
+    // The card carries the latest two, oldest first, and counts them all.
+    expect(last.body.celebration.wish_count).toBe(3);
+    expect(last.body.celebration.wishes.map((w) => w.body)).toEqual(["Many happy returns.", "Enjoy the day."]);
+    expect(last.body.celebration.wishes[1]).toMatchObject({ mine: true, can_delete: true, author: { display_name: "Tunde Ola" } });
+    // Never in the channel's stream.
+    const stream = await as("bola").get(`/community/channels/${g.community_channel_id}/messages`);
+    expect(stream.body.data.filter((m) => m.body === "Enjoy the day.")).toEqual([]);
+
+    // The person it is for is told of each wish, and the card updates for the channel.
+    await drain();
+    const told = async () =>
+      (await q("SELECT title, body FROM notification WHERE user_id = $1 AND event_key = 'celebration.wished'", [people.bola.user.user_id])).rows;
+    expect((await told()).map((n) => n.title).sort()).toEqual(["Amaka Eze sent you wishes", "Tunde Ola sent you wishes", "Tunde Ola sent you wishes"]);
+    expect((await told()).map((n) => n.body)).toContain("Happy birthday, Bola!");
+    expect(realtime.toUser).toHaveBeenCalledWith(
+      people.bola.user.user_id,
+      "community.message_updated",
+      expect.objectContaining({ community_message_id: bday.community_message_id }),
+    );
+    // A thank you from the person celebrated tells nobody.
+    expect((await as("bola").post(card).send({ body: "Thank you all!" })).status).toBe(201);
+    await drain();
+    expect(await told()).toHaveLength(3);
+
+    // View All Wishes: newest first; each wish deleted by its author or a moderator only.
+    const list = (await as("bola").get(card)).body.data;
+    expect(list.map((w) => w.body)).toEqual(["Thank you all!", "Enjoy the day.", "Many happy returns.", "Happy birthday, Bola!"]);
+    expect(list.map((w) => w.can_delete)).toEqual([true, false, false, false]);
+    const first = list[3];
+    expect((await as("bola").del(`/community/wishes/${first.community_wish_id}`)).status).toBe(403);
+    expect((await as("ceo").del(`/community/wishes/${first.community_wish_id}`)).status).toBe(204);
+    expect((await as("ceo").del(`/community/wishes/${first.community_wish_id}`)).status).toBe(404);
+    expect((await as("tunde").del(`/community/wishes/${list[1].community_wish_id}`)).status).toBe(204);
+    expect((await as("bola").get(card)).body.data.map((w) => w.body)).toEqual(["Thank you all!", "Many happy returns."]);
+
+    // A wish is 1 to 280 characters, and only on a celebration card.
+    const empty = await as("tunde").post(card).send({ body: "   " });
+    expect(empty.status).toBe(422);
+    expect(empty.body.error.fields.body).toEqual(["Write a wish"]);
+    expect((await as("tunde").post(card).send({ body: "x".repeat(281) })).status).toBe(422);
+    const text = await as("tunde").post(`/community/channels/${g.community_channel_id}/messages`).send({ message_type: "text", body: "Lunch at one?" });
+    const notCard = await as("tunde").post(`/community/messages/${text.body.community_message_id}/wishes`).send({ body: "Hi" });
+    expect(notCard.status).toBe(422);
+    expect(notCard.body.error.code).toBe("NOT_A_CARD");
+
+    // A deleted card takes its wishes from view and takes no more.
+    expect((await as("ceo").del(`/community/messages/${bday.community_message_id}`)).status).toBe(204);
+    expect((await as("tunde").post(card).send({ body: "Late wish" })).status).toBe(404);
+  });
+
   test("a voice note's transcript: a draft while nothing can answer, kept for everyone once Groq does", async () => {
     const ch = (await channelsOf("bola")).find((c) => c.name === "studio-crew");
     const page = await as("bola").get(`/community/channels/${ch.community_channel_id}/messages`);

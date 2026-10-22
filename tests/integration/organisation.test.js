@@ -791,7 +791,7 @@ describeDb("the organisation module against the real migrations", () => {
       expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0002'")).toEqual({ birth_day: 26, birth_month: 9 });
       const due = await require("../../src/modules/community/community.repo").celebrationsOn(pool, "2026-09-17");
       const sade = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0004'");
-      expect(due).toContainEqual({ employee_id: sade.employee_id, occasion: "birthday", years: null });
+      expect(due).toContainEqual({ employee_id: sade.employee_id, occasion: "birthday", years: null, since: null });
     });
 
     test("a day and month cell reads day first, and a full date or nonsense is not one", () => {

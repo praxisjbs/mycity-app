@@ -14,7 +14,7 @@ const merge = extendTailwindMerge({
       radius: ["ctl", "box", "card", "sheet"],
       shadow: ["1", "2", "3"],
       "font-weight": ["strong"],
-      animate: ["rise", "buzz", "pulse-dot", "slide-in", "celeb-in", "spin-slow", "spin-slow-reverse", "bob", "shimmer"],
+      animate: ["rise", "buzz", "pulse-dot", "slide-in", "shimmer"],
     },
   },
 });

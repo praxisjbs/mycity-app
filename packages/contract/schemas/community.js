@@ -11,7 +11,7 @@
  * message of message_type "announcement" in #announcements.
  */
 const { z } = require("zod");
-const { uuid, text, optionalText, isoDateTime, listQuery, Paged } = require("./common");
+const { uuid, text, optionalText, isoDate, isoDateTime, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 const { MediaRef } = require("./documents");
 const { NotificationUrgency } = require("./notifications");
@@ -166,6 +166,37 @@ const LinkPreviewRequest = z.object({ url: z.string().trim().min(4).max(2048) })
 /** The card, or null when the page offers none, cannot be reached, or is not on the public web. */
 const LinkPreviewAnswer = z.object({ preview: LinkPreview.nullable() }).strict();
 
+/** The longest wish under a celebration card (community.md §6). */
+const WISH_MAX = 280;
+
+/**
+ * A wish under a birthday or anniversary card (community.md §3 step 3): kept under the card,
+ * never in the channel's stream. A deleted wish is not listed.
+ */
+const Wish = z
+  .object({
+    community_wish_id: uuid,
+    community_message_id: uuid,
+    author: PersonRef,
+    mine: z.boolean(),
+    body: z.string(),
+    created_at: isoDateTime,
+    can_delete: z.boolean(),
+  })
+  .strict();
+
+/** POST /community/messages/:id/wishes: a wish under a celebration card. */
+const WishCreate = z
+  .object({ body: z.string().trim().max(WISH_MAX) })
+  .strict()
+  .superRefine((b, ctx) => {
+    if (!b.body) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Write a wish" });
+  });
+
+/** GET /community/messages/:id/wishes: a card's wishes, newest first. */
+const WishListQuery = listQuery();
+const WishPage = Paged(Wish);
+
 /** One message, for the caller. The block that matches message_type is set; the rest are null. */
 const Message = z
   .object({
@@ -186,9 +217,14 @@ const Message = z
       .object({
         subject: PersonRef,
         years: z.number().int().min(1).nullable(),
+        /** The day an anniversary counts from, kept on the card when it was posted. */
+        since: isoDate.nullable(),
         count: z.number().int().min(0),
         mine: z.boolean(),
         fans: z.array(PersonRef).max(3),
+        /** The latest two wishes, oldest first; wish_count counts them all. */
+        wishes: z.array(Wish).max(2),
+        wish_count: z.number().int().min(0),
       })
       .strict()
       .nullable(),
@@ -475,7 +511,7 @@ const TABLES = {
       link: "the first link's card, from community_link_preview by community_link_preview_id",
       forwarded: "whether it is a forwarded copy, from metadata",
       duration_s: "a voice note's length, from metadata",
-      celebration: "a birthday or anniversary card: its person (a PersonRef with photo_url) from metadata, reactions counted",
+      celebration: "a birthday or anniversary card: its person (a PersonRef with photo_url), years and since from metadata, reactions counted, its latest wishes from community_wish",
       recognition: "a recognition card: who it recognises (a PersonRef with photo_url) from peer_recognition, reactions counted",
       poll: "a poll's options from metadata and the votes in community_poll_vote",
       announcement: "the announcement this message publishes, from announcement",
@@ -510,6 +546,17 @@ const TABLES = {
     },
   },
   RecognitionCreate: { table: "peer_recognition" },
+  Wish: {
+    table: "community_wish",
+    virtual: {
+      author: "who sent it, from user_id, as a PersonRef with their photo_url",
+      mine: "whether the caller sent it",
+      can_delete: "whether the caller may delete it: its author, or a moderator of the card's channel",
+    },
+  },
+  WishCreate: { table: "community_wish" },
+  WishListQuery: { table: null, reason: "list controls for a card's wishes" },
+  WishPage: { table: null, reason: "a page of wishes" },
   PollVote: { table: "community_poll_vote" },
   Transcript: { table: "community_message", virtual: { draft: "the browser's captions, not a stored transcript" } },
   Conversation: {
@@ -568,6 +615,11 @@ module.exports = {
   MessagePage,
   MessageCreate,
   RecognitionCreate,
+  WISH_MAX,
+  Wish,
+  WishCreate,
+  WishListQuery,
+  WishPage,
   MessageEdit,
   PIN_PERIODS,
   MessagePin,

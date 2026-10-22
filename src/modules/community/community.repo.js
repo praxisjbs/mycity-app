@@ -139,6 +139,12 @@ async function yearsServed(db, employeeId, onDate) {
   return row && row.years >= 1 ? row.years : null;
 }
 
+/** The day an employee started, as YYYY-MM-DD; null when it is not known. */
+async function startDate(db, employeeId) {
+  const row = await one(db, "SELECT start_date FROM employee WHERE employee_id = $1", [employeeId]);
+  return row ? row.start_date : null;
+}
+
 /** Active logins for employees and for whole departments, deduplicated. */
 async function usersFor(db, { employeeIds = [], departmentIds = [] }) {
   if (!employeeIds.length && !departmentIds.length) return [];
@@ -812,6 +818,78 @@ async function fans(db, messageIds) {
   return new Map(rows.map((r) => [r.community_message_id, r.fans]));
 }
 
+/* ------------------------------------------------------------------ *
+ * Wishes under a celebration card (community.md §3 step 3)
+ * ------------------------------------------------------------------ */
+
+const WISH_FROM = `
+    FROM community_wish w
+    JOIN app_user u ON u.user_id = w.user_id
+    JOIN employee e ON e.employee_id = u.employee_id
+    LEFT JOIN department d ON d.department_id = e.department_id`;
+
+function insertWish(db, w) {
+  return one(
+    db,
+    `INSERT INTO community_wish (community_message_id, user_id, body) VALUES ($1, $2, $3) RETURNING *`,
+    [w.community_message_id, w.user_id, w.body],
+  );
+}
+
+/** A card's live wishes, newest first. */
+function listWishes(db, messageId, query) {
+  return pageQuery(
+    db,
+    `SELECT w.community_wish_id, w.community_message_id, w.user_id, w.body, w.created_at,
+            ${PERSON()} AS author, ${TOTAL_COL} ${WISH_FROM}
+      WHERE w.community_message_id = $1 AND w.deleted_at IS NULL
+      ORDER BY w.created_at DESC, w.community_wish_id DESC`,
+    [messageId],
+    query,
+  );
+}
+
+/** Each card's latest two live wishes, oldest first, and how many it has. */
+async function latestWishes(db, messageIds) {
+  if (!messageIds.length) return new Map();
+  const { rows } = await db.query(
+    `SELECT f.community_message_id, max(f.total)::int AS wish_count,
+            json_agg(json_build_object(
+              'community_wish_id', f.community_wish_id, 'community_message_id', f.community_message_id,
+              'user_id', f.user_id, 'body', f.body, 'created_at', f.created_at, 'author', f.author)
+              ORDER BY f.created_at, f.community_wish_id) AS wishes
+       FROM (SELECT w.community_wish_id, w.community_message_id, w.user_id, w.body, w.created_at,
+                    ${PERSON()} AS author,
+                    row_number() OVER (PARTITION BY w.community_message_id ORDER BY w.created_at DESC, w.community_wish_id DESC) AS n,
+                    count(*) OVER (PARTITION BY w.community_message_id) AS total
+               ${WISH_FROM}
+              WHERE w.community_message_id = ANY($1::uuid[]) AND w.deleted_at IS NULL) f
+      WHERE f.n <= 2
+      GROUP BY f.community_message_id`,
+    [messageIds],
+  );
+  return new Map(rows.map((r) => [r.community_message_id, { wishes: r.wishes, count: r.wish_count }]));
+}
+
+/** A wish with its card's channel, locked for a delete. */
+function lockWish(db, wishId) {
+  return one(
+    db,
+    `SELECT w.*, x.community_channel_id
+       FROM community_wish w JOIN community_message x ON x.community_message_id = w.community_message_id
+      WHERE w.community_wish_id = $1 FOR UPDATE OF w`,
+    [wishId],
+  );
+}
+
+function deleteWish(db, wishId) {
+  return one(
+    db,
+    "UPDATE community_wish SET deleted_at = now() WHERE community_wish_id = $1 AND deleted_at IS NULL RETURNING *",
+    [wishId],
+  );
+}
+
 /** Votes per option for polls, and the caller's own vote. */
 async function votes(db, messageIds, userId) {
   if (!messageIds.length) return new Map();
@@ -970,7 +1048,7 @@ async function channelsInCommon(db, userA, userB) {
 async function celebrationsOn(db, date) {
   const { rows } = await db.query(
     `WITH day AS (SELECT $1::date AS d)
-     SELECT e.employee_id, 'birthday' AS occasion, NULL::int AS years
+     SELECT e.employee_id, 'birthday' AS occasion, NULL::int AS years, NULL::date AS since
        FROM employee e, day,
             LATERAL (SELECT COALESCE(to_char(e.date_of_birth, 'MM-DD'),
                                      lpad(e.birth_month::text, 2, '0') || '-' || lpad(e.birth_day::text, 2, '0')) AS md) b
@@ -979,7 +1057,7 @@ async function celebrationsOn(db, date) {
              OR (b.md = '02-29' AND to_char(day.d, 'MM-DD') = '02-28'
                  AND NOT (extract(year FROM day.d)::int % 4 = 0 AND (extract(year FROM day.d)::int % 100 <> 0 OR extract(year FROM day.d)::int % 400 = 0))))
      UNION ALL
-     SELECT e.employee_id, 'anniversary', (extract(year FROM day.d) - extract(year FROM e.start_date))::int
+     SELECT e.employee_id, 'anniversary', (extract(year FROM day.d) - extract(year FROM e.start_date))::int, e.start_date
        FROM employee e, day
       WHERE e.status = 'active' AND e.archived_at IS NULL
         AND e.start_date < day.d
@@ -1005,6 +1083,12 @@ function celebrationPosted(db, channelId, employeeId, occasion, date) {
 
 module.exports = {
   yearsServed,
+  startDate,
+  insertWish,
+  listWishes,
+  latestWishes,
+  lockWish,
+  deleteWish,
   membershipPinned,
   pinsLocked,
   setPinned,

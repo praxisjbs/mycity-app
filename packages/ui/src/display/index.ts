@@ -38,3 +38,4 @@ export * from "./ThemePreview";
 export * from "./Tile";
 export * from "./Timeline";
 export * from "./Waveform";
+export * from "./YearsMedal";

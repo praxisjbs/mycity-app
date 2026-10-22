@@ -147,6 +147,7 @@ const ENTITY_ROUTES = Object.freeze({
   direct_message: screen("community", "direct-messages"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
   announcement: screen("community", "announcements"),
   recognition: screen("community", "channels"), // search:none membership decides who sees a conversation, and a provider is gated by the module grant alone
+  community_wish: screen("community", "channels"), // search:none a wish lives under its celebration card, whose conversation membership decides who sees it
   community_link_preview: screen("community", "channels"), // search:none a page's card, kept once per address; found through the message that posts the link
   mail_thread: screen("mailbox", "inbox"), // opens the conversation by id, whichever folder it is in
   mail_message: screen("mailbox", "inbox"), // search:none a message is found through its conversation (mailbox.search.js)

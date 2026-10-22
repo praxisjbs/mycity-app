@@ -37,6 +37,8 @@ interface BoundProps {
   state?: FieldState;
   /** Unused here (the Field shows it); accepted so {...form.field(name)} spreads cleanly. */
   message?: string;
+  /** Unused here (a typed value these controls hold is always the form's); accepted so {...form.field(name)} spreads cleanly instead of reaching the element. */
+  onProblem?: (message: string | undefined, now?: boolean) => void;
 }
 
 function Mark({ state }: { state: FieldState }) {
@@ -50,7 +52,7 @@ export interface TextFieldProps extends BoundProps, NativeInput {
   type?: "text" | "email" | "url" | "search" | "tel";
 }
 
-export function TextField({ value, onChange, onBlur, state, message: _message, type = "text", className, id, ...rest }: TextFieldProps) {
+export function TextField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, type = "text", className, id, ...rest }: TextFieldProps) {
   const a = useFieldControl({ id, state });
   return (
     <span className="relative flex items-center">
@@ -75,7 +77,7 @@ export interface PasswordFieldProps extends BoundProps, NativeInput {
   noun?: "password" | "key";
 }
 
-export function PasswordField({ value, onChange, onBlur, state, message: _message, className, id, autoComplete = "current-password", noun = "password", ...rest }: PasswordFieldProps) {
+export function PasswordField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, className, id, autoComplete = "current-password", noun = "password", ...rest }: PasswordFieldProps) {
   const a = useFieldControl({ id, state });
   const [shown, setShown] = useState(false);
   return (
@@ -109,7 +111,7 @@ export interface NumberFieldProps extends BoundProps, NativeInput {
 }
 
 /** A count or quantity, kept as the string typed so the form never meets a float. */
-export function NumberField({ value, onChange, onBlur, state, message: _message, decimal, className, id, ...rest }: NumberFieldProps) {
+export function NumberField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, decimal, className, id, ...rest }: NumberFieldProps) {
   const a = useFieldControl({ id, state });
   const clean = (s: string) => (decimal ? s.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") : s.replace(/\D/g, ""));
   return (
@@ -134,7 +136,7 @@ export interface PhoneFieldProps extends BoundProps, NativeInput {
 }
 
 /** A Nigerian number: +234 shown, the rest as typed; the contract normalises it to E.164. */
-export function PhoneField({ value, onChange, onBlur, state, message: _message, countryCode = "+234", className, id, ...rest }: PhoneFieldProps) {
+export function PhoneField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, countryCode = "+234", className, id, ...rest }: PhoneFieldProps) {
   const a = useFieldControl({ id, state });
   return (
     <span className="relative flex items-center">
@@ -162,7 +164,7 @@ export interface TextAreaFieldProps extends BoundProps, Omit<TextareaHTMLAttribu
   rows?: number;
 }
 
-export function TextAreaField({ value, onChange, onBlur, state, message: _message, rows = 4, className, id, ...rest }: TextAreaFieldProps) {
+export function TextAreaField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, rows = 4, className, id, ...rest }: TextAreaFieldProps) {
   const a = useFieldControl({ id, state });
   return (
     <textarea
