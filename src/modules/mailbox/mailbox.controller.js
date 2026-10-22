@@ -1,9 +1,10 @@
 "use strict";
-// ai:none mail is private correspondence; nothing in M1 asks the assistant to read it (mailbox.md §9)
+// ai:none mail is private correspondence; the assistant reads none of it (mailbox.md §9). Write With AI and Summarise Thread are the owner's own presses (mailbox.assist.js)
 const { ok, created, noContent } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { readUpload } = require("../../middleware/upload");
 const service = require("./mailbox.service");
+const assist = require("./mailbox.assist");
 const signatures = require("./signature/signature.service");
 
 const id = (req) => req.validated.params.id;
@@ -52,6 +53,11 @@ module.exports = {
       ),
     ),
   cancel: async (req, res) => ok(res, await service.cancel(id(req), req.user)),
+  assist: async (req, res) => ok(res, await assist.assist(req.validated.body, req.user)),
+  storeDictation: async (req, res) =>
+    created(res, await assist.storeDictation(readUpload(req), req.user)),
+  transcript: async (req, res) => ok(res, await assist.transcript(id(req), req.user)),
+  summary: async (req, res) => ok(res, await assist.summary(id(req), req.user)),
   signature: async (req, res) => ok(res, await signatures.mine(req.user)),
   saveSignature: async (req, res) =>
     ok(res, await signatures.saveMine(req.validated.body, req.user)),
