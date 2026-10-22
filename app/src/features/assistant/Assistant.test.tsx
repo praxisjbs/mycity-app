@@ -123,6 +123,26 @@ describe("Ask", () => {
     expect(within(card).getByRole("button", { name: "Person 8" })).toBeTruthy();
   });
 
+  it("the first answer opens the conversation, and the next question is asked in it", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    m.call.mockImplementationOnce(async () => answer()).mockImplementationOnce(async () => answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", question: "And this week?", content: "One more this week." }));
+    const view = ui("ask");
+    const box = screen.getByRole("textbox", { name: "Ask a Question" });
+    await userEvent.type(box, "Whose leave waits on me?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Two requests wait on you.")).toBeTruthy();
+    // The router moves the address to the new conversation, as onOpened asked.
+    view.rerender(
+      <ModalProvider>
+        <Assistant tab="ask" id={CONV} />
+      </ModalProvider>,
+    );
+    await userEvent.type(box, "And this week?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("One more this week.")).toBeTruthy();
+    expect(asked().map((a) => a.body)).toEqual([{ question: "Whose leave waits on me?" }, { question: "And this week?", ai_conversation_id: CONV }]);
+  });
+
   it("a failed question keeps its words and tries again with the same key", async () => {
     m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
     m.call.mockRejectedValueOnce(new ApiError(503, { error: { code: "AI_UNAVAILABLE", message: "Praxis AI is not answering just now" } }));

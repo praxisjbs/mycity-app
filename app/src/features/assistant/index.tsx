@@ -143,6 +143,8 @@ function Conversation({ id, onOpened, onGone, onAnswered }: { id: string | null;
   const asking = useRef(false);
   /* The conversation this screen is showing: an answer that opens one moves the address here, without starting over. */
   const showing = useRef(id);
+  /* Counts the times the person moved to another conversation: an answer asked before the last move is not shown. */
+  const moves = useRef(0);
   /* Whether the screen is still open: an answer that lands after the person left changes nothing here. */
   const live = useRef(true);
   /* The latest callbacks, for an answer that lands after a render or two. */
@@ -160,6 +162,7 @@ function Conversation({ id, onOpened, onGone, onAnswered }: { id: string | null;
   useEffect(() => {
     if (id === showing.current) return;
     showing.current = id;
+    moves.current += 1;
     asking.current = false;
     setGiven([]);
     setPending(null);
@@ -188,8 +191,9 @@ function Conversation({ id, onOpened, onGone, onAnswered }: { id: string | null;
     const question = words.trim();
     if (!question || asking.current) return;
     const from = showing.current;
-    /** Still on the conversation this question was asked in. */
-    const here = () => live.current && showing.current === from;
+    const move = moves.current;
+    /** Still where this question was asked: the screen open and no other conversation picked since (an answer opening its own conversation is not a move). */
+    const here = () => live.current && moves.current === move;
     asking.current = true;
     setPending({ question, key, error: null });
     try {
