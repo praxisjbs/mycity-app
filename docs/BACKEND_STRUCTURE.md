@@ -937,6 +937,18 @@ ai.complete({ purpose, module, actor, input, output: ContractSchema })
 
 ### 14.3 The manifest every module carries
 
+**Why every module has one.** The assistant never writes SQL (`docs/guides/praxis-ai.md` §1.1
+decision 1). It can only run reads a module has written, tested and named for it, with the asking
+person's own grant and scope. The manifest is where a module declares them: what may be read
+(the same repo queries its screens use), how a row is cited, and which screen and form to open when
+someone asks for a change. It lives in the module, not in a central AI file, because the module's
+owner knows its data and its permission rules, and a change to the module changes its manifest in
+the same PR. So the assistant reaches a module the day it ships, with no change to the assistant,
+and never around the module's own rules. Gate 9 fails a module with records and no manifest unless
+its controller says `// ai:none <reason>` (mail, sign-in security and the Audit Log do); gate 19
+fails a manifest that declares anything like a write (A23). Modules a later milestone builds carry
+an empty manifest until then.
+
 ```js
 // src/modules/organisation/organisation.ai.js
 module.exports = defineManifest({
@@ -952,15 +964,20 @@ module.exports = defineManifest({
     },
   ],
   routes: [                                           // A23: writes are routed, never executed
-    { intent: "add an employee", screen: "people.employees", params: { action: "new" },
-      prefill: c.organisation.EmployeeCreate },       // screen is "<module>.<tab>" from route-map SCREENS
+    { intent: "add an employee", screen: "people.employees", params: { new: "1" },
+      prefill: c.organisation.EmployeePrefill },      // screen is "<module>.<tab>" from route-map SCREENS
   ],
 });
 ```
 
 `defineManifest()` validates the shape at load. It **rejects a `write` key** (A23), and any other
 write-shaped key (`writes`, `actions`, `executor`, `execute`, `mutations`). A read needs the `view`
-grant; its `params` and a route's `prefill` must be schemas exported from `packages/contract`. `reads[].run`
+grant; its `params` and a route's `prefill` must be schemas exported from `packages/contract`. A
+`prefill` is the form's own fields (`<Thing>Prefill`), never a restricted one (`shared/rbac/field-mask`)
+nor a word the address already uses (`tab`, `id`, `action`, `new`, the route's params), because it
+travels in the address bar; the form reads it with `useAddressPrefill` (`docs/guides/praxis-ai.md`
+§6.4). Gate 19 also refuses an `action` key anywhere in a manifest, so a route opens its form with
+`new: "1"`. `reads[].run`
 receives the caller's own scope, so a manifest read returns exactly what the same person would see on
 screen; field masking is applied to its rows by `authorise.js` before the model sees them.
 
