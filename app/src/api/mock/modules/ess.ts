@@ -6,8 +6,6 @@ import { byKey, managerOf } from "../data/people";
 import { workWeekOf } from "./attendance";
 import { pickAnAddress, placeOf, typedPlace, type KeptPlace } from "./maps";
 
-const fmt = (iso: string) => iso.split("-").reverse().join("/");
-
 /* My Profile, in the contract's shapes (packages/contract/schemas/ess.js EssProfile). */
 const AREA = ["Lekki Phase 1", "Surulere", "Gbagada", "Yaba", "Ikeja", "Ajah", "Magodo"];
 const PATCHES = new Map<string, Record<string, string>>();
@@ -92,28 +90,6 @@ route("PATCH /api/v1/ess/profile", (req) => {
     ...(HISTORY.get(req.user!) ?? []),
   ]);
   return ok(profile(req.user!));
-});
-
-route("GET /api/v1/ess/performance", (req) => {
-  const p = byKey(req.user)!;
-  const m = managerOf(p);
-  return ok({
-    period: new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
-    set_by: m?.display_name ?? "The board",
-    stats: [{ label: "KPI Score", value: "71%" }, { label: "On Track", value: "2 of 4" }, { label: "Weight Assigned", value: "100%" }, { label: "Last Review", value: "4.0 · Q3" }, { label: "Next Cycle", value: `Opens ${fmt(isoDaysAhead(6)).slice(0, 5)}` }],
-    kpis: [{ label: "Partnership MOUs", pct: 75, value: "3 of 4" }, { label: "Staff Onboarded", pct: 100, value: "2 of 2", emphasis: "brand" as const }, { label: "Expense Turnaround", pct: 60, value: "3.1 days" }, { label: "Policy Refresh", pct: 40, value: "2 of 5" }],
-    chain: [
-      { title: "ORG-2026-03 · Scale to 12 cities", level: "Organisational · set by the CEO", top: true },
-      { title: "Operational readiness for 4 new cities", level: "Annual · set by management" },
-      { title: "Reduce approval turnaround to 2 days", level: "Monthly · set by management" },
-      { title: `${p.department} efficiency, Q4`, level: `Departmental · set by ${m?.display_name ?? "management"}` },
-      { title: "Expense turnaround, 3.1 days", level: "Your KPI · 60% complete", mine: true },
-    ],
-    reviews: [["Q3 2026", "4.2", "4.0", "Approved", "ok", "Closed"], ["Q2 2026", "3.9", "4.1", "Approved", "ok", "Closed"], ["Q1 2026", "4.0", "3.9", "Approved", "ok", "Closed"], ["Q4 2026", null, null, null, "warn", `Opens ${fmt(isoDaysAhead(6)).slice(0, 5)}`]].map((r, i) => ({
-      review_id: sid(`rev:${req.user}:${i}`), cycle: r[0] as string, self: r[1], manager: r[2], second: r[3], status: { tone: r[4] as "ok", text: r[5] as string },
-      manager_comment: r[1] ? "Strong quarter on partnerships. Turnaround still above the 2 day target." : null,
-    })),
-  });
 });
 
 const ARCH = (user: string) =>

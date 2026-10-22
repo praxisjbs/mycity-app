@@ -92,6 +92,11 @@ const JOBS = Object.freeze([
     summary: "A day's birthday and work anniversary cards posted again, by hand",
   },
   {
+    queue: "review-cycle-open",
+    concurrency: 1,
+    summary: "A day's monthly review rounds opened again, by hand",
+  },
+  {
     queue: "announcement-publish",
     concurrency: 1,
     summary: "A scheduled announcement released at its time",
@@ -154,7 +159,6 @@ const SCHEDULERS = Object.freeze([
   "home-alert-sweeps",
   "scheduled-reports",
   "export-cleanup",
-  "assistant-voice-sweep",
   "task-recurrence",
   "urgent-repeats",
   "reminders",
@@ -167,6 +171,7 @@ const SCHEDULERS = Object.freeze([
   "exchange-rates",
   "places-name",
   "targets-lock",
+  "review-cycles",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

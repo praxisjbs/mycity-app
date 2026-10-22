@@ -34,6 +34,11 @@
  *
  * Patterns, not a named-entity model: what leaks in this data is structured, and a
  * model call on every egress to find names would cost more than it saves.
+ *
+ * shield() is for an answer that must carry what the model may not see (a mail draft that
+ * gives the sender's number): each value the redaction would mask is swapped for a token
+ * (KEPT001), the same value always for the same token, and restore() puts the values back
+ * into the answer. The model reasons about "KEPT003" and never sees the number.
  */
 const { FIELDS, maskData, applyMask } = require("../../shared/rbac/field-mask");
 
@@ -66,28 +71,55 @@ const PHONE_NG = /\b0[789][01]\d[\s.-]?\d{3}[\s.-]?\d{4}\b/g;
 const TIN = /\b\d{8}-\d{4}\b/g;
 
 /**
+ * What is masked, in order. Each step replaces a value through `put(kind, value)`: scrub() puts
+ * the kind's mark ([EMAIL]), shield() a token it can restore. A labelled number keeps its label.
+ * `contact` steps run on external egress only.
+ */
+const STEPS = [
+  { contact: false, run: (s, put) => s.replace(IBAN, (m) => put("IBAN", m)) },
+  {
+    contact: false,
+    run: (s, put) =>
+      s
+        .replace(CARD, (m) => put("CARD", m))
+        .replace(CARD_AMEX, (m) => put("CARD", m))
+        .replace(CARD_PLAIN, (m) => put("CARD", m)),
+  },
+  { contact: true, run: (s, put) => s.replace(TIN, (m) => put("TIN", m)) },
+  { contact: true, run: (s, put) => s.replace(EMAIL, (m) => put("EMAIL", m)) },
+  {
+    contact: true,
+    run: (s, put) => s.replace(PHONE_INTL, (m) => put("PHONE", m)).replace(PHONE_NG, (m) => put("PHONE", m)),
+  },
+  {
+    contact: false,
+    run: (s, put) =>
+      s.replace(BVN, (_m, label, n) => label + put("BVN", n)).replace(NIN, (_m, label, n) => label + put("NIN", n)),
+  },
+  {
+    contact: false,
+    run: (s, put) =>
+      s
+        .replace(PASSPORT_LABELLED, (_m, label, gap, n) => `${label}${gap}${put("PASSPORT", n)}`)
+        .replace(PASSPORT_TRAILING, (m) => put("PASSPORT", m)),
+  },
+  { contact: false, run: (s, put) => s.replace(ACCOUNT_NUM, (_m, label, n) => label + put("NUM", n)) },
+  { contact: false, run: (s, put) => s.replace(LONG_RUN, (m) => put("NUM", m)) },
+];
+
+/** Every step a text goes through, contact ones only when `contact`. */
+function apply(text, contact, put) {
+  let s = String(text ?? "");
+  for (const step of STEPS) if (contact || !step.contact) s = step.run(s, put);
+  return s;
+}
+
+/**
  * @param {string} text
  * @param {boolean} contact  also mask contact details and the tax number
  */
 function scrub(text, contact) {
-  let s = String(text ?? "");
-  s = s.replace(IBAN, "[IBAN]");
-  s = s
-    .replace(CARD, "[CARD]")
-    .replace(CARD_AMEX, "[CARD]")
-    .replace(CARD_PLAIN, "[CARD]");
-  if (contact) {
-    s = s.replace(TIN, "[TIN]");
-    s = s.replace(EMAIL, "[EMAIL]");
-    s = s.replace(PHONE_INTL, "[PHONE]").replace(PHONE_NG, "[PHONE]");
-  }
-  s = s.replace(BVN, "$1[BVN]").replace(NIN, "$1[NIN]");
-  s = s
-    .replace(PASSPORT_LABELLED, (_m, label, gap) => `${label}${gap}[PASSPORT]`)
-    .replace(PASSPORT_TRAILING, "[PASSPORT]");
-  s = s.replace(ACCOUNT_NUM, "$1[NUM]");
-  s = s.replace(LONG_RUN, "[NUM]");
-  return s;
+  return apply(text, contact, (kind) => `[${kind}]`);
 }
 
 /** Strict: for text that is kept, indexed or shown to others. */
@@ -143,10 +175,58 @@ function redactValue(value, { egress = "external", keep = [] } = {}) {
   );
 }
 
+/** A token shield() hands out, as a model may write it back. */
+const TOKEN = /\bKEPT ?(\d{3,})\b/g;
+
+/**
+ * Swap what the redaction would mask for tokens the model can use, and give back the way home.
+ *
+ *   const s = shield({ thread }, { egress: "external" });
+ *   const run = await ai.complete({ input: s.value, egress: "external", ... });
+ *   const draft = s.restore(run.text);
+ *
+ * Restricted fields are still emptied by complete()'s own redaction; a token never stands for one.
+ * @param {*} value  text or data; every string inside is shielded
+ * @param {{egress?: "external"|"reasoning", also?: RegExp[]}} [opts]
+ *   also  more patterns (each with the g flag) shielded first, a whole match each: what a task
+ *         needs kept word for word (a policy's links)
+ * @returns {{value: *, restore: (text: string) => string, known: (token: string) => boolean}}
+ */
+function shield(value, { egress = "external", also = [] } = {}) {
+  const tokens = new Map();
+  const values = [];
+  const put = (_kind, original) => {
+    let token = tokens.get(original);
+    if (!token) {
+      values.push(original);
+      token = `KEPT${String(values.length).padStart(3, "0")}`;
+      tokens.set(original, token);
+    }
+    return token;
+  };
+  const one = (text) => {
+    let s = String(text ?? "");
+    for (const re of also) s = s.replace(re, (m) => put("KEPT", m));
+    return apply(s, egress !== "reasoning", put);
+  };
+  const out = scrubStrings(value, one);
+  const at = (n) => values[Number(n) - 1];
+  return {
+    value: out,
+    restore: (text) => String(text ?? "").replace(TOKEN, (m, n) => at(n) ?? m),
+    known: (token) => {
+      const m = /^KEPT ?(\d{3,})$/.exec(String(token).trim());
+      return Boolean(m) && at(m[1]) !== undefined;
+    },
+  };
+}
+
 module.exports = {
   redactExternal,
   redactForReasoning,
   redact: redactExternal,
   redactValue,
   NEVER_PROPS,
+  shield,
+  TOKEN,
 };

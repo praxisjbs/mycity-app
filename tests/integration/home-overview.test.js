@@ -226,13 +226,13 @@ describeDb("Home · Overview against the real migrations", () => {
       expect(Array.isArray(o.activity)).toBe(true);
     });
 
-    test("the CEO: every live card is theirs to see, the goals chart and the Org KPI donut, each score null until M2", async () => {
+    test("the CEO: every live card is theirs to see, the goals chart and the Org KPI donut, each score null while nothing is scored", async () => {
       const o = await overviewOf("ceo");
       expect(keysOf(o.cards)).toEqual([
+        "goals_on_track",
         "approvals_awaiting_you",
         "partnerships_signed_value",
         "alerts_high_open",
-        "attendance_today",
       ]);
       expect(o.chart).toEqual({ kind: "goals", goals: expect.any(Array) });
       expect(o.donut.kind).toBe("org_kpi");
@@ -268,7 +268,7 @@ describeDb("Home · Overview against the real migrations", () => {
     test("Staff: the day strip, My Goals and Upcoming Leave, their own cards, and no card People gates", async () => {
       const o = await overviewOf("staff");
       expect(o.greeting_name).toBe("Musa");
-      expect(keysOf(o.cards)).toEqual(["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"]);
+      expect(keysOf(o.cards)).toEqual(["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"]);
       expect(o.cards.every((card) => kpi.BY_ID.get(card.key).module !== "people")).toBe(true);
       expect(o.day_strip).not.toBeNull();
       expect(Array.isArray(o.my_goals)).toBe(true);
@@ -439,7 +439,7 @@ describeDb("Home · Overview against the real migrations", () => {
       expect(o.day_strip).toMatchObject({ status: "late", worksite: "Head Office" });
     });
 
-    test("the CEO: the organisation's own goals live this quarter, progress null until M2", async () => {
+    test("the CEO: the organisation's own goals live this quarter, progress null while nothing is scored", async () => {
       const o = d.HomeOverview.parse(await at14("ceo"));
       expect(o.chart.goals).toEqual([
         { title: "Reach Three New States", progress: null, link: expect.stringMatching(/^\/performance\?tab=goals&id=/) },
@@ -808,7 +808,7 @@ describeDb("Home · Overview against the real migrations", () => {
     });
 
     test("refused: a card they may not see, one never offered, a hidden one, more than four, one twice", async () => {
-      for (const ids of [["headcount"], ["team_present"], ["goals_on_track"], ["not_a_card"]]) {
+      for (const ids of [["headcount"], ["team_present"], ["payroll_run_state"], ["not_a_card"]]) {
         const res = await picks("staff", ids);
         expect([ids[0], res.status]).toEqual([ids[0], 422]);
         expect(res.body.error.fields.kpi_ids).toBeDefined();
@@ -862,7 +862,7 @@ describeDb("Home · Overview against the real migrations", () => {
       expect(res.status).toBe(200);
       const cards = d.HomeRoleKpis.parse(res.body);
       expect(cards).toMatchObject({ role_id: staffRole, configured: false, default_ids: [], locked_ids: [] });
-      expect(cards.view_default_ids).toEqual(["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"]);
+      expect(cards.view_default_ids).toEqual(["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"]);
       expect(cards.cards.some((card) => card.key === "headcount")).toBe(false);
       expect(cards.cards.some((card) => card.key === "my_leave_left")).toBe(true);
     });
@@ -1005,7 +1005,7 @@ describeDb("Home · Overview against the real migrations", () => {
 
   describe("the records behind a card", () => {
     test("a card the reader may not see is a 404, never a 403, and so is one that does not exist", async () => {
-      for (const key of ["headcount", "team_present", "goals_on_track", "not_a_card"]) {
+      for (const key of ["headcount", "team_present", "payroll_run_state", "not_a_card"]) {
         expect([key, (await as("staff").get(`/home/kpi/${key}/meta`)).status]).toEqual([key, 404]);
         expect([key, (await as("staff").get(`/home/kpi/${key}`)).status]).toEqual([key, 404]);
       }

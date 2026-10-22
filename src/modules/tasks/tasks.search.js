@@ -1,8 +1,8 @@
 "use strict";
 /**
  * ⌘K for tasks: a task found by its number or title, among the tasks of the people in
- * the reader's `workspace` scope, as the board lists them. A result opens the task on
- * My Workspace · Tasks (shared/route-map.js task).
+ * the reader's `workspace` scope, as the board lists them; a commitment is a task, found the
+ * same way. A result opens the task on My Workspace · Tasks (shared/route-map.js task).
  */
 const { recordProvider } = require("../../shared/search/provider");
 
@@ -10,7 +10,7 @@ module.exports = recordProvider({
   type: "task",
   module: "workspace",
   label: "Tasks",
-  words: ["tasks", "to do", "todo"],
+  words: ["tasks", "to do", "todo", "commitment", "commitments"],
   from: "task t",
   key: "t.task_id",
   columns: ["t.number", "t.title"],

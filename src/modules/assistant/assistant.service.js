@@ -6,8 +6,8 @@
  * not saved: the screen offers Try Again with the same words.
  *
  * Voice (§6.6): the recording is held in the vault only while it is transcribed, then removed;
- * one whose removal never ran is swept within the hour (purgeRecordings, the assistant-voice-sweep
- * scheduler).
+ * its document type is transient, so one whose removal never ran goes with the vault's sweep
+ * (vault.purgeTransient).
  */
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
@@ -24,9 +24,6 @@ const repo = require("./assistant.repo");
 const history = require("./assistant.history");
 const suggestions = require("./assistant.suggestions");
 const { EVENTS, VOICE_QUESTION } = require("./assistant.events");
-
-/** A recording older than this was left behind by a request that never finished (a transcription takes a minute at most). */
-const RECORDING_KEPT_MINUTES = 30;
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -156,7 +153,6 @@ async function transcribe(file, actor) {
       purpose: "voice_note",
       doc_type: VOICE_QUESTION,
       entity: { type: VOICE_QUESTION, id: actor.user_id },
-      transient: true,
       actor,
     }),
   );
@@ -171,19 +167,9 @@ async function transcribe(file, actor) {
     return { document_id: doc.document_id, text: t.text, draft: t.draft };
   } finally {
     await removeRecording(doc.document_id, actor).catch((err) =>
-      logger.warn({ err, document_id: doc.document_id }, "Praxis AI: a spoken question's recording was not removed; the sweep will"),
+      logger.warn({ err, document_id: doc.document_id }, "Praxis AI: a spoken question's recording was not removed; the vault's sweep will"),
     );
   }
 }
 
-/** The assistant-voice-sweep scheduler: recordings left by a request that never finished. */
-async function purgeRecordings() {
-  let removed = 0;
-  for (const id of await repo.staleRecordings(pool, RECORDING_KEPT_MINUTES)) {
-    await removeRecording(id, null);
-    removed += 1;
-  }
-  return { removed };
-}
-
-module.exports = { ask, suggestionsFor, feedback, transcribe, purgeRecordings, titleOf, RECORDING_KEPT_MINUTES };
+module.exports = { ask, suggestionsFor, feedback, transcribe, titleOf };

@@ -19,16 +19,20 @@
  * roster, so each card's figure is the number of records its own list (GET /home/kpi/:key)
  * holds. A card whose figure cannot be read is left out, never shown as 0 (home.md §6).
  *
- * KPI and Open Tasks on a roster row are null until M2 builds performance scores and tasks
- * (home.md §6 Team, §13).
+ * KPI on a roster row is the person's score to date on this quarter's scorecard, as a percentage
+ * (goals.source.js scoresOf), for a reader whose `performance` view reaches them; null otherwise,
+ * and until a review of theirs closes. Open Tasks is null until it is built (home.md §6 Team, §13).
  */
 const { pool } = require("../../config/db");
+const { logger } = require("../../config/logger");
+const { scopeFor } = require("../../middleware/rbac");
 const { envelope, pageOf } = require("../../shared/http/paged");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const lagos = require("../../shared/time/lagos");
 const attendance = require("../attendance/attendance.roster");
 const kpi = require("./kpi-catalog");
 const resolve = require("./kpi-catalog/resolve");
+const goals = require("./sources/goals.source");
 
 /** The authority that opens the Team tab (access.catalog.js CAPABILITY_CATALOG). */
 const CAPABILITY = "home.team";
@@ -94,8 +98,8 @@ function filtersOf(query, date) {
   };
 }
 
-/** A roster row as the Team Roster shows it (HomeTeamRow). */
-const rowOf = (r) => ({
+/** A roster row as the Team Roster shows it (HomeTeamRow), with its score from `scores` (employee id → percent). */
+const rowOf = (r, scores = new Map()) => ({
   employee: personOf(r),
   department_id: r.department_id,
   status: r.status,
@@ -103,9 +107,25 @@ const rowOf = (r) => ({
   clock_out_at: r.clock_out_at,
   worksite: r.worksite,
   no_clock_out_yesterday: r.no_clock_out_yesterday,
-  kpi_percent: null,
+  kpi_percent: scores.get(r.employee_id) ?? null,
   open_tasks: null,
 });
+
+/**
+ * Each person's score to date on a page of the roster, for a reader whose `performance` view
+ * (`performance`, its scope; null without it) reaches them. A read that fails is logged and the
+ * scores left out, never drawn as zero (home.md §6).
+ */
+async function scoresFor(db, rows, performance, today) {
+  if (!performance || rows.length === 0) return new Map();
+  try {
+    const found = await goals.scoresOf(db, { today, employee_ids: rows.map((r) => r.employee_id) }, performance);
+    return new Map(found.map((r) => [r.employee_id, r.percent]));
+  } catch (err) {
+    logger.warn({ err, part: "team_scores" }, "the roster's scores could not be read");
+    return new Map();
+  }
+}
 
 /** A person's month as Attendance This Month shows it (HomeTeamAttendanceRow). */
 const monthRowOf = (r) => ({
@@ -141,19 +161,17 @@ async function summary(user, scope, { now = new Date(), db = pool } = {}) {
 
 /**
  * GET /home/team (HomeTeamPage): one page of today's roster in the scope, filtered, searched
- * and sorted in SQL.
+ * and sorted in SQL, each person with their score to date where the reader may see it.
  * @param {{scope: string, scope_ids: string[]|null}} scope  the `home` view scope
  * @param {object} query  a validated HomeTeamQuery
- * @param {{now?: Date, db?: {query: Function}}} [at]
+ * @param {{now?: Date, db?: {query: Function}, performance?: object|null}} [at]
+ *   performance  the reader's `performance` view scope (rbac scopeFor), null without it
  */
-async function roster(scope, query, { now = new Date(), db = pool } = {}) {
-  const page = await attendance.page(
-    db,
-    filtersOf(query, lagos.today(now)),
-    scope,
-    query,
-  );
-  return { data: page.data.map(rowOf), page: page.page };
+async function roster(scope, query, { now = new Date(), db = pool, performance = null } = {}) {
+  const today = lagos.today(now);
+  const page = await attendance.page(db, filtersOf(query, today), scope, query);
+  const scores = await scoresFor(db, page.data, performance, today);
+  return { data: page.data.map((r) => rowOf(r, scores)), page: page.page };
 }
 
 /**
@@ -196,7 +214,7 @@ async function mayOpen(db, user) {
  */
 async function forAssistant(db, actor, query, { now = new Date() } = {}) {
   if (!(await mayOpen(db, actor))) return envelope([], pageOf(query).number, 0);
-  return roster(actor.scope, query, { now, db });
+  return roster(actor.scope, query, { now, db, performance: await scopeFor(actor, "performance", "view") });
 }
 
 assertCards();

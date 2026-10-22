@@ -80,6 +80,32 @@ async function sourcesOf(db, userId) {
   };
 }
 
+/**
+ * Who a message is from, for Write With AI (mailbox.md §6): the signature's own model, so a
+ * mobile hidden from the signature stays out of the draft too. Null without an employee record.
+ */
+async function senderOf(db, userId) {
+  let src;
+  try {
+    src = await sourcesOf(db, userId);
+  } catch (err) {
+    if (err instanceof AppError && err.code === "NO_EMPLOYEE_RECORD") return null;
+    throw err;
+  }
+  const m = src.model;
+  return {
+    name: m.name || null,
+    job_title: m.job_title,
+    department: m.department,
+    email: m.email,
+    mobile: m.mobile ? m.mobile.display : null,
+    office_line: m.office ? m.office.display : null,
+    company: m.company || null,
+    website: m.website ? m.website.display : null,
+    company_address: m.address,
+  };
+}
+
 /** The full signature and its pictures, drawn; the band says what was actually drawn on it. */
 async function drawFull(db, src) {
   const pics = await images.picturesFor(db, src.model, src.org);
@@ -220,4 +246,4 @@ async function bake(client, userId, message, from) {
   return { variant, ...full(model, inline.pics), parts: inline.parts };
 }
 
-module.exports = { signatureFor, domainOf, mine, saveMine, preview, config, saveConfig, bake };
+module.exports = { signatureFor, domainOf, senderOf, mine, saveMine, preview, config, saveConfig, bake };

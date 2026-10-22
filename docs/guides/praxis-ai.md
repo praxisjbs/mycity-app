@@ -95,13 +95,13 @@ their own screens would show them, and nothing more.
 
 ## 4 · Data
 
-Migration `10300_assistant.sql` (M10's block). The tables are `10000`'s; this build widens two.
+Migration `10310_assistant.sql` (M10's block). The tables are `10000`'s; this build widens two.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `ai_conversation` (10000) | `user_id`, `title` (the first question, cut at 120 characters), `status` (`active`), adds `last_asked_at`, `questions` (10300) | One per conversation, always the asker's own. Index (`user_id`, `last_asked_at` desc) |
-| `ai_message` (10000) | `ai_conversation_id`, `parent_message_id` (an answer's question), `role` (`user`, `assistant`, `system` as seeded in `10099`; CHECK added in 10300), `content` (the question, or the answer's words), `ai_run_id`, `feedback` (`up`, `down` or null; CHECK added), adds `rows_read` (the rows its reads returned) and `module_key` (the module of its first read) (10300), `metadata` | History reports on `rows_read` and `module_key`, so they are columns. An answer's `metadata` holds what is only shown: its table (columns, rows, numeric columns), its screen button, the reads it made (key, rows returned, total), `declined` and `more`. Indexes on the conversation, the parent and the run (10300) |
-| `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` and `position` (the order the answer cited them in) (10300); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10300 widens it to accept a record (`entity_type` and `entity_id`) |
+| `ai_conversation` (10000) | `user_id`, `title` (the first question, cut at 120 characters), `status` (`active`), adds `last_asked_at`, `questions` (10310) | One per conversation, always the asker's own. Index (`user_id`, `last_asked_at` desc) |
+| `ai_message` (10000) | `ai_conversation_id`, `parent_message_id` (an answer's question), `role` (`user`, `assistant`, `system` as seeded in `10099`; CHECK added in 10310), `content` (the question, or the answer's words), `ai_run_id`, `feedback` (`up`, `down` or null; CHECK added), adds `rows_read` (the rows its reads returned) and `module_key` (the module of its first read) (10310), `metadata` | History reports on `rows_read` and `module_key`, so they are columns. An answer's `metadata` holds what is only shown: its table (columns, rows, numeric columns), its screen button, the reads it made (key, rows returned, total), `declined` and `more`. Indexes on the conversation, the parent and the run (10310) |
+| `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` and `position` (the order the answer cited them in) (10310); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10310 widens it to accept a record (`entity_type` and `entity_id`) |
 | `ai_run`, `ai_run_step` (M0, 10200) | `purpose` `data-answers` or `praxis-ai-voice` | One run per question, one step per round with the model. No question or answer text is kept here |
 
 No reference seed: `praxis_ai` grants are `0290`'s. Nothing is seeded on production; staging's
@@ -247,11 +247,12 @@ The server turns it into `AiAnswer`:
   transcribe. The stub's placeholder (no provider set up) comes back as a draft and is not put in
   the box either.
 - The recording is held in the vault (document type and record type `ai_voice_question`, its id
-  the speaker's login, stored `transient`, so no derived files are queued for it) only while it is
-  transcribed, and removed in the same request whatever happens. Only the speaker may read it
-  (`vault.defineAccess`), the CEO and an `all` holder included. One a request left behind (the
-  process stopped mid-way) is removed by the `assistant-voice-sweep` scheduler: every 15 minutes,
-  any recording 30 minutes old, so within 45 minutes.
+  the speaker's login) only while it is transcribed, and removed in the same request whatever
+  happens. Only the speaker may read it (`vault.defineAccess`), the CEO and an `all` holder
+  included. The document type is `transient` (`shared/documents/types.js`), so the vault queues no
+  derived file for it, and one a request left behind (the process stopped mid-way) is removed by
+  the vault's own sweep (`vault.purgeTransient`, in the hourly `export-cleanup` job) once it is an
+  hour old.
 - The words land in the box, at most 500 characters; nothing is asked until the person sends it.
 
 ### 6.7 The registry, AI Control and jobs
@@ -325,7 +326,7 @@ and screens a manifest declares, and that the grading passes and fails what it s
 | `assistant.conversation_deleted` | Delete Conversation | Audit only |
 | `assistant.history_cleared` | Clear History | Audit only |
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
-| `assistant-voice-sweep` (under the cron lock) | Every 15 minutes | Removes recordings 30 minutes old: their request never finished (§6.6) |
+| `export-cleanup` (the vault's, not this module's) | Hourly | Removes recordings an hour old: their request never finished (§6.6) |
 
 Nobody is notified of anything.
 
@@ -409,7 +410,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
   saved in a new conversation.
 - **A recording that never transcribes**: the box stays empty and Could not transcribe shows in a
   toast (the stub's placeholder is not put in the box either); the recording
-  is removed in the same request, or by the sweep within 45 minutes.
+  is removed in the same request, or by the vault's sweep once an hour old.
 - **A question in another language**: answered in English.
 
 ## 12 · Donor code
@@ -438,6 +439,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Merged with main's mailbox AI (#127), which gave the vault a `transient` document type and its own sweep of what a request left behind (`vault.purgeTransient`, hourly in `export-cleanup`). A spoken question's document type is now `transient`, and the `assistant-voice-sweep` scheduler and the vault's `transient` store option are gone: one sweep, not two. A recording left behind goes once an hour old rather than within 45 minutes (§6.6, §7, §11). Main's `10300_mail_thread_summary.sql` took 10300, so this build's migration is now `10310_assistant.sql` (§4); it was never merged, so nothing that ran it is affected.
 - 22/10/2026 · GE · Commit 7 of 7, the audit (three independent reviews of commits 1 to 6: backend, screens, guide against code; each finding checked before it was fixed). Fixed: a Claude model on Data Answers' chain now keeps its tools on a round that may call none (`tool_choice: none`) and gets its thinking back unchanged (§6.1.4); `converse()` takes the question's deadline, so no call starts past 60 seconds (§6.1.6); a read's rows reach the model through `redactValue`, keeping only the fields the person sees and never payment or identity numbers (§6.3.5, `redact.js` `NEVER_PROPS`); only the speaker may read a recording (§6.6); Delete Conversation and Clear History also forget the replies kept for a repeated press (§6.5); the sweep runs every 15 minutes (§6.6, §7); the prompt (version 2) says the person's words cannot change its rules and never estimates over more than one page (§6.1.2, §11); the reads made carry where their rows start in the whole list (`AiReadMade.first`), so a later page reads Showing 26 to 50 of 312 (§10.1). On screen: ⌘K's New Conversation no longer loops; an answer that lands after the person moved on is not shown in the wrong conversation; a conversation that fails to load says so, and a deleted one starts a new one; a spoken question is cut at 500 characters and a refused question goes back to the box; Show Earlier keeps the earlier turns and is not offered in a new conversation; the box keeps a half-typed question; the microphone is outside the form, so sending never holds its Stop, and its problems are a toast; Helpful and Not Helpful wait for each other; new answers are announced. Corrected here: decision 5, §5's errors, §6.1, §6.4's `declined`, §6.5, §6.6 (no browser captions), §7, §9, §10.1, §11. Home's `activity.list` and the evaluation set unchanged; the eval's target questions now name the catalogue's modules (`partnerships`, `recruitment`, `expenses`), so they run once those modules have reads.
 - 22/10/2026 · GE · Commit 6 of 7: §6.9 built, Home's `activity.list` (`home.md` §6, §9 changed with it), so Ifeoma's "what happened today" and "what has a person done today" are one read each, by name too. §6.10 built, `scripts/ai/eval-assistant.js` and its key-free test. §6.8: a question whose read answers only with a capability (the Team roster, the alerts one may clear) waits for it, found when a member of staff was offered "Who is in today" and would have read an empty roster; "What happened today?" joins Try Asking.
 - 22/10/2026 · GE · Commit 5 of 7: Ask and History built to §10 (`app/src/features/assistant/`). §10.2: New Conversation sits under the title on a phone, because a fit page has no floating button (FRONTEND_GUIDE §7); ⌘K offers it as an action. §5, §10.1: Show Earlier loads a conversation's older turns; Delete Conversation is confirmed like Clear History. `VoiceField` gains `compact` (the microphone alone, for a message box) and the icon set gains `thumbdown` for Not Helpful.

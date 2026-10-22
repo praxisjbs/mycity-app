@@ -328,14 +328,13 @@ describeDb("Praxis AI against the real migrations", () => {
     expect((await one("SELECT count(*)::int AS n FROM document WHERE doc_type = 'ai_voice_question'")).n).toBe(0);
   });
 
-  test("a recording whose request never finished is the speaker's alone, and swept within the hour", async () => {
+  test("a recording whose request never finished is the speaker's alone, and swept once it is an hour old", async () => {
     const doc = await tx((client) =>
       vault.store(client, {
         file: { buffer: WEBM, originalname: "q.webm" },
         purpose: "voice_note",
         doc_type: VOICE_QUESTION,
         entity: { type: VOICE_QUESTION, id: people.staff.user_id },
-        transient: true,
         actor: null,
       }),
     );
@@ -344,9 +343,12 @@ describeDb("Praxis AI against the real migrations", () => {
     expect(await vault.canRead(pool, userOf("staff"), stored)).toBe(true);
     expect(await vault.canRead(pool, userOf("ceo"), stored)).toBe(false);
     expect(await vault.canRead(pool, userOf("ops"), stored)).toBe(false);
-    expect((await assistant.purgeRecordings()).removed).toBe(0);
-    await q("UPDATE document SET created_at = now() - interval '2 hours' WHERE document_id = $1", [doc.document_id]);
-    expect((await assistant.purgeRecordings()).removed).toBe(1);
+    // Transient: no derived file is queued for it, and the vault's sweep removes it once an hour old.
+    expect(await one("SELECT payload->'needs' AS needs FROM event_log WHERE entity_type = 'document' AND entity_id = $1", [doc.document_id])).toEqual({ needs: [] });
+    await vault.purgeTransient();
+    expect(await one("SELECT document_id FROM document WHERE document_id = $1", [doc.document_id])).not.toBeNull();
+    await q("UPDATE document SET created_at = now() - interval '61 minutes' WHERE document_id = $1", [doc.document_id]);
+    expect((await vault.purgeTransient()).removed).toBeGreaterThanOrEqual(1);
     expect(await one("SELECT document_id FROM document WHERE document_id = $1", [doc.document_id])).toBeNull();
   });
 });

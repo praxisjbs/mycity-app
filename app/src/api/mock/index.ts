@@ -17,6 +17,7 @@ import "./modules/community";
 import "./modules/mailbox";
 import "./modules/shared";
 import "./modules/performance";
+import "./modules/reviews";
 import "./modules/queries";
 import "./modules/recruitment";
 import "./modules/payroll";

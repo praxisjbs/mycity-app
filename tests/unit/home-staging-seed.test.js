@@ -201,12 +201,12 @@ describe("the rows", () => {
 
   test("a row whose unique key would take a value a row before it holds is left out", () => {
     const keys = new Map(forward.DELETE_ORDER.map((table) => [table, []]));
-    keys.set("performance_review", [["performance_cycle_id", "employee_id", "reviewer_employee_id", "review_type"]]);
-    // One person in both posts: the Line Manager's team is the Head's, reviewed once.
-    const plan = forward.planOf(forward.ROWS, x, { ...staff, manager: staff.head }, keys);
-    const reviews = [...plan.values()].filter((p) => p.row.table === "performance_review").map((p) => p.row.key);
-    expect(reviews).toHaveLength(6);
-    expect(reviews.every((key) => /:head_team:\d$/.test(key))).toBe(true);
+    // A key of one line per budget: each budget's first line is written, its second left out.
+    keys.set("budget_line", [["budget_id"]]);
+    const plan = forward.planOf(forward.ROWS, x, staff, keys);
+    const lines = [...plan.values()].filter((p) => p.row.table === "budget_line").map((p) => p.row.key);
+    expect(lines).toEqual(["operations-quarter:office", "marketing-quarter:travel"]);
+    keys.set("budget_line", []);
     expect(forward.planOf(forward.ROWS, x, staff, keys).size).toBe(forward.ROWS.length);
   });
 });

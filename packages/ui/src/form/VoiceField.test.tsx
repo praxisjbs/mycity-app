@@ -43,6 +43,11 @@ describe("VoiceField", () => {
     expect(button).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("says the action in its own words when given, still named for what is dictated", () => {
+    render(<VoiceField label="What To Say" action="Dictate" transcribe={vi.fn()} onTranscript={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Record What To Say" })).toHaveTextContent("Dictate");
+  });
+
   it("records, then hands the words to the field", async () => {
     const transcribe = vi.fn().mockResolvedValue("He met every goal this quarter.");
     const onTranscript = vi.fn();

@@ -52,3 +52,53 @@ describe("a month's round (G2, G3)", () => {
     expect(periods.commitmentsDueOn("2026-12-01", scoring.DEFAULT_RULES, cal)).toBe("2026-12-03");
   });
 });
+
+describe("Analytics (§6.21)", () => {
+  const c = require("@mycity/contract");
+  const { routesOf } = require("../../http/route");
+  const routes = routesOf(require("./goals.routes").router);
+  const find = (method, path) => routes.find((r) => r.method === method && r.path === path);
+  const analytics = require("./goals.analytics");
+  const ALL = { scope: "all", scope_ids: null, employee_id: null };
+
+  test("its routes: the figures and the people behind `performance` view, the export behind export", () => {
+    expect(find("GET", "/analytics")).toMatchObject({
+      contract: { query: c.goals.PerformanceAnalyticsQuery, response: c.goals.PerformanceAnalytics },
+      permission: { key: "performance", action: "view" },
+    });
+    expect(find("GET", "/analytics/people")).toMatchObject({
+      contract: { query: c.goals.AnalyticsPeopleQuery, response: c.goals.AnalyticsPersonPage },
+      permission: { key: "performance", action: "view" },
+    });
+    expect(find("POST", "/analytics/people/export")).toMatchObject({
+      contract: { body: c.goals.AnalyticsExportRequest, response: c.documents.ExportFile },
+      permission: { key: "performance", action: "export" },
+    });
+  });
+
+  test("before the first quarter: empty figures and an empty page, from one read", async () => {
+    const db = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+    const a = await analytics.figures({}, ALL, { db });
+    expect(c.goals.PerformanceAnalytics.parse(a)).toEqual(a);
+    expect(a).toMatchObject({ period: null, scores: [], ratings: { month: null } });
+    expect(a.ratings.counts.map((r) => r.rating)).toEqual(["exceeds", "meets", "partly_meets", "below"]);
+    expect(db.query).toHaveBeenCalledTimes(1);
+    const page = await analytics.people({ page: 2 }, ALL, { db });
+    expect(c.goals.AnalyticsPersonPage.parse(page)).toEqual(page);
+    expect(page.page).toMatchObject({ number: 2, total: 0 });
+  });
+
+  test("a quarter named that does not exist is a 404", async () => {
+    const db = { query: jest.fn().mockResolvedValue({ rows: [] }) };
+    await expect(analytics.figures({ period_id: "8a6e0804-2bd0-4672-b79d-d97027f9071a" }, ALL, { db })).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  test("the people table sorts by score or name, never by a column the contract does not allow", () => {
+    expect(c.goals.AnalyticsPeopleQuery.safeParse({ sort: "-score_to_date" }).success).toBe(true);
+    expect(c.goals.AnalyticsPeopleQuery.safeParse({ sort: "rating" }).success).toBe(false);
+    expect(c.goals.ScoreGap.safeParse("-0.12").success).toBe(true);
+    expect(c.goals.ScoreGap.safeParse("1.5").success).toBe(false);
+  });
+});

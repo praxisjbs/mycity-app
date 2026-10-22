@@ -23,6 +23,10 @@
  * (shared/documents/exports.js): made for them, downloaded on the device they pressed it on,
  * never locked, and removed from the vault after exports.KEPT_HOURS.
  *
+ * `transient: true` marks a file kept only while the request that stored it reads it (a mail
+ * dictation's recording, transcribed then removed): the vault makes no derived copy of it, and
+ * one its request left behind is removed after vault.TRANSIENT_MINUTES (vault.purgeTransient).
+ *
  * `module` decides who may open the file: reading follows the module that owns
  * the document, never a Settings grant. Leave it out and reading follows the
  * record the document is attached to (its entity type's module in the route
@@ -50,7 +54,7 @@ const TYPES = new Map();
 /**
  * @param {string} docType  snake_case
  * @param {{label: string, module?: string|null, sensitivity?: "normal"|"personal"|"restricted",
- *          signable?: boolean, wet?: boolean, export?: boolean}} spec
+ *          signable?: boolean, wet?: boolean, export?: boolean, transient?: boolean}} spec
  */
 function defineDocumentType(docType, spec) {
   if (!DOC_TYPE_RE.test(String(docType || "")))
@@ -79,6 +83,7 @@ function defineDocumentType(docType, spec) {
     signable: spec.signable === true,
     wet: spec.wet === true,
     export: spec.export === true,
+    transient: spec.transient === true,
   });
   const existing = TYPES.get(docType);
   if (existing) {
@@ -141,6 +146,19 @@ function exportTypes() {
     .map((t) => t.doc_type);
 }
 
+/** Whether a doc type's files are kept only while their request reads them: no derived copies. */
+function isTransient(docType) {
+  const spec = typeOf(docType);
+  return Boolean(spec && spec.transient);
+}
+
+/** Every transient doc type, for the export-cleanup job's sweep of what a request left behind. */
+function transientTypes() {
+  return all()
+    .filter((t) => t.transient)
+    .map((t) => t.doc_type);
+}
+
 /* The types the shared layer itself stores. */
 defineDocumentType("import_source", {
   label: "Imported spreadsheet",
@@ -155,4 +173,6 @@ module.exports = {
   all,
   isExport,
   exportTypes,
+  isTransient,
+  transientTypes,
 };

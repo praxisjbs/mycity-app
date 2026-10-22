@@ -108,3 +108,41 @@ describe("the routes", () => {
     for (const k of ["limit", "offset", "per_page", "page_size"]) expect(keys).not.toContain(k);
   });
 });
+
+describe("commitments on the task form (docs/guides/performance.md §6.11)", () => {
+  const base = { title: "Launch the Lekki guide", is_commitment: true, acceptance_criteria: "Live on the app", commitment_month: "2026-11-01", due_on: "2026-11-12" };
+  const problems = (body) => {
+    const r = c.tasks.TaskCreate.safeParse(body);
+    return r.success ? {} : Object.fromEntries(r.error.issues.map((i) => [i.path.join("."), i.message]));
+  };
+
+  test("a commitment carries its criteria, its month and a due date in that month", () => {
+    expect(problems(base)).toEqual({});
+    expect(problems({ ...base, acceptance_criteria: undefined })).toEqual({ acceptance_criteria: "Give the criteria" });
+    expect(problems({ ...base, commitment_month: undefined })).toEqual({ commitment_month: "Pick the month" });
+    expect(problems({ ...base, due_on: undefined })).toEqual({ due_on: "Pick a due date" });
+    expect(problems({ ...base, due_on: "2026-12-01" })).toEqual({ due_on: "Not in that month" });
+  });
+
+  test("a month is its first day; a plain task needs none of it", () => {
+    expect(problems({ ...base, commitment_month: "2026-11-15" })).toHaveProperty("commitment_month");
+    expect(problems({ title: "Call the venue" })).toEqual({});
+  });
+
+  test("Counts Towards names a line or a key result, with its link", () => {
+    const { toTask } = require("./tasks.service");
+    const row = { task_id: "t", title: "x", status: "todo", priority: "normal", comment_count: 0, is_commitment: false };
+    expect(toTask({ ...row, employee_target_id: "l", target_title: "Publish 12 stories" }).counts_towards).toMatchObject({
+      kind: "line",
+      employee_target_id: "l",
+      title: "Publish 12 stories",
+      link: expect.objectContaining({ module: "performance", tab: "targets" }),
+    });
+    expect(toTask({ ...row, entity_type: "key_result", entity_id: "k", kr_code: "BM-KR1.1", kr_statement: "Grow users" }).counts_towards).toMatchObject({
+      kind: "key_result",
+      okr_key_result_id: "k",
+      title: "BM-KR1.1 Grow users",
+    });
+    expect(toTask(row).counts_towards).toBeNull();
+  });
+});

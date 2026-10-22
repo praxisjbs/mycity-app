@@ -288,13 +288,14 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
+  // search:none a person's month of commitments is reached from its approval and the Commitments view; its commitments are tasks, which search finds
+  commitment_set: { ...screen("performance", "targets"), param: "set" },
   // search:none a line is found through its scorecard, which search reaches
   target: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
   kpi: screen("performance", "kpis"),
-  // search:none not built yet (src/modules/reviews)
   review: {
     ...screen("performance", "reviews"),
     self: screen("ess", "my-performance"),

@@ -50,13 +50,13 @@ describe("job registry", () => {
       "notification-push",
       "pdf-render",
       "reminders",
+      "review-cycle-open",
       "scheduled-report",
       "task-recurrence",
     ]);
     expect([...registry.SCHEDULERS].sort()).toEqual([
       "alert-ageing",
       "announcement-release",
-      "assistant-voice-sweep",
       "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",
@@ -72,6 +72,7 @@ describe("job registry", () => {
       "outbox-dispatch",
       "places-name",
       "reminders",
+      "review-cycles",
       "scheduled-reports",
       "system-health",
       "system-health-digest",

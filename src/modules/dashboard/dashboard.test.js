@@ -169,11 +169,7 @@ describe("the catalogue", () => {
       expect(typeof e.value).toBe("function");
       expect(typeof e.detail.list).toBe("function");
     }
-    expect(HIDDEN.map((e) => [e.id, e.until])).toEqual([
-      ["goals_on_track", "M2"],
-      ["my_targets_on_track", "M2"],
-      ["payroll_run_state", "M6"],
-    ]);
+    expect(HIDDEN.map((e) => [e.id, e.until])).toEqual([["payroll_run_state", "M6"]]);
     for (const e of HIDDEN) {
       expect(e.value).toBeUndefined();
       expect(e.caption).toBeUndefined();
@@ -333,8 +329,8 @@ describe("figures", () => {
 
   test("a hidden card answers null and an unknown id is left out; neither reads anything", async () => {
     const query = jest.fn();
-    const figures = await kpi.figuresFor({ query }, ["goals_on_track", "no_such_card", "goals_on_track"], ctx);
-    expect(figures).toEqual({ goals_on_track: null });
+    const figures = await kpi.figuresFor({ query }, ["payroll_run_state", "no_such_card", "payroll_run_state"], ctx);
+    expect(figures).toEqual({ payroll_run_state: null });
     expect(query).not.toHaveBeenCalled();
   });
 
@@ -587,14 +583,19 @@ describe("which cards a person's Overview shows", () => {
       { source: "view", ids: ["attendance_today", "tasks_overdue", "expenses_pending", "partnerships_active"] },
     ],
     [
-      "the CEO's view: a card hidden until M2 is skipped and the fifth fills its place",
+      "the CEO's view: Goals On Track leads, the first four",
       { picks: null, roleCards: [], homeView: "ceo", eligible: everything },
+      { source: "view", ids: ["goals_on_track", "approvals_awaiting_you", "partnerships_signed_value", "alerts_high_open"] },
+    ],
+    [
+      "the CEO's view without Performance: the fifth fills the place",
+      { picks: null, roleCards: [], homeView: "ceo", eligible: without("goals_on_track") },
       { source: "view", ids: ["approvals_awaiting_you", "partnerships_signed_value", "alerts_high_open", "attendance_today"] },
     ],
     [
-      "Staff: My Targets waits for M2, My Leave Left fills the row",
+      "Staff: My Scorecard leads, the first four",
       { picks: null, roleCards: [], homeView: "staff", eligible: everything },
-      { source: "view", ids: ["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"] },
+      { source: "view", ids: ["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"] },
     ],
     [
       "a view's card the reader may not see is not substituted: the row shrinks",
@@ -674,7 +675,7 @@ describe("which cards a person's Overview shows", () => {
     [
       "junk, repeats, hidden and Team cards in a pick are dropped",
       {
-        picks: ["headcount", 7, null, "headcount", "no_such_card", "goals_on_track", "team_present", "proposals_out"],
+        picks: ["headcount", 7, null, "headcount", "no_such_card", "payroll_run_state", "team_present", "proposals_out"],
         roleCards: [],
         homeView: "staff",
         eligible: everything,
@@ -720,7 +721,8 @@ describe("which cards a person's Overview shows", () => {
   });
 
   test("a role's view defaults, as the role may see them", () => {
-    expect(resolve.viewDefaults("staff", everything)).toEqual(["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"]);
+    expect(resolve.viewDefaults("staff", everything)).toEqual(["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"]);
+    expect(resolve.viewDefaults("staff", without("my_targets_on_track"))).toEqual(["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"]);
     expect(resolve.viewDefaults("operations", without("tasks_overdue"))).toEqual([
       "attendance_today",
       "expenses_pending",
@@ -1210,7 +1212,8 @@ describe("the Team tab", () => {
     expect(team.filtersOf({}, "2026-10-14").no_clock_out_yesterday).toBeUndefined();
   });
 
-  test("a roster row is a Team Roster row; KPI and Open Tasks stay null until M2", () => {
+  test("a roster row is a Team Roster row; KPI is the score asked for, Open Tasks stays null", () => {
+    expect(team.rowOf(rosterRow(), new Map([[ID, 82]])).kpi_percent).toBe(82);
     const row = team.rowOf(rosterRow());
     expect(row).toMatchObject({
       employee: { employee_id: ID, display_name: "Ada Obi", job_title: "Field Officer", department: "Programmes" },
@@ -1318,7 +1321,7 @@ describe("the Team tab", () => {
 
     const sent = res();
     await controller.team(req, sent);
-    expect(list).toHaveBeenCalledWith(TEAM, { page: 1 });
+    expect(list).toHaveBeenCalledWith(TEAM, { page: 1 }, { performance: null });
     expect(sent.json.mock.calls[0][0].data[0].employee.display_name).toBe("Ada Obi");
     await controller.teamAttendance(req, res());
     expect(month).toHaveBeenCalledWith(TEAM, { page: 1 });
@@ -1372,7 +1375,7 @@ describe("the prune, the assistant and ⌘K", () => {
 
   test("⌘K: the cards the reader may see, by title, paged at 25, opening the Overview on the card", async () => {
     const provider = require("./dashboard.search");
-    const shown = new Set(["my_leave_left", "leave_pending", "team_present", "goals_on_track"]);
+    const shown = new Set(["my_leave_left", "leave_pending", "team_present", "payroll_run_state"]);
     jest.spyOn(eligibility, "forUser").mockResolvedValue({ eligible: shown, scopes: new Map() });
     const result = await provider.search({}, { term: "Leave", page: 1, user: { user_id: ID } });
     expect(result.items.map((i) => i.id)).toEqual(["leave_pending", "my_leave_left"]);
@@ -1386,9 +1389,9 @@ describe("the prune, the assistant and ⌘K", () => {
       link: "/home?tab=overview&id=my_leave_left",
     });
     expect(result.page).toMatchObject({ number: 1, size: 25, total: 2, has_next: false });
-    // A Team card belongs to its tab, and a hidden one to M2: neither is found.
+    // A Team card belongs to its tab, and a hidden one to M6: neither is found.
     expect((await provider.search({}, { term: "present", page: 1, user: {} })).items).toEqual([]);
-    expect((await provider.search({}, { term: "goals", page: 1, user: {} })).items).toEqual([]);
+    expect((await provider.search({}, { term: "payroll", page: 1, user: {} })).items).toEqual([]);
   });
 
   test("⌘K pages the whole catalogue at 25", async () => {

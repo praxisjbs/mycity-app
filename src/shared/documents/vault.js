@@ -49,7 +49,7 @@
  */
 const crypto = require("node:crypto");
 const { AppError } = require("../errors");
-const { inTransaction } = require("../db/tx");
+const { atomically, inTransaction } = require("../db/tx");
 const { sniff, typeForExt } = require("../files/sniff");
 const policy = require("../files/mime-policy");
 const { variantKey } = require("../files/variant-key");
@@ -227,8 +227,6 @@ async function prepare(buffer, type, purpose) {
  * @param {boolean} [opts.stranger]  sent by someone outside (public surface): quarantine and scan
  * @param {string} [opts.title]
  * @param {string} [opts.expires_on]  YYYY-MM-DD (an ID card, a certificate)
- * @param {boolean} [opts.transient]  held only for a moment and removed by the caller (a spoken
- *        question while it is transcribed): no derived files are made for it
  * @param {object|string|null} opts.actor
  * @returns {Promise<object>} the document row
  */
@@ -294,9 +292,12 @@ async function store(client, opts) {
   });
   await insertVariants(client, id, variants);
 
+  // A transient file is read by the request that stored it and then removed: nothing derived.
   const needs = [];
   if (stranger) needs.push("scan");
-  else if (!opts.transient && (sniffed.kind === "audio" || sniffed.kind === "video"))
+  else if (docType.transient) {
+    /* nothing to derive */
+  } else if (sniffed.kind === "audio" || sniffed.kind === "video")
     needs.push("av");
   else if (sniffed.mime === "application/pdf") needs.push("pdf");
   await emit(client, {
@@ -444,6 +445,41 @@ async function remove(client, documentId, { actor = null, reason } = {}) {
 /** After commit: delete the bytes remove() gave back. A file already gone is not an error. */
 async function removeFiles(keys) {
   for (const key of keys || []) await storage.remove(key);
+}
+
+/** How long a transient file (types.js) may outlive the request that stored it. */
+const TRANSIENT_MINUTES = 60;
+
+/**
+ * The export-cleanup job's second sweep: a transient file its request did not remove (the
+ * process stopped mid-request, a tab closed between upload and transcript) leaves the vault once
+ * it is TRANSIENT_MINUTES old, its row with `document.removed` on the record, then its bytes.
+ * @param {Date} [now]
+ * @returns {Promise<{removed: number}>}
+ */
+async function purgeTransient(now = new Date(), { db = require("../../config/db").pool } = {}) {
+  const types = docTypes.transientTypes();
+  if (types.length === 0) return { removed: 0 };
+  const { rows } = await db.query(
+    `SELECT document_id FROM document
+      WHERE doc_type = ANY($1::text[]) AND created_at < $2::timestamptz - make_interval(mins => $3::int)
+      ORDER BY created_at, document_id`,
+    [types, now.toISOString(), TRANSIENT_MINUTES],
+  );
+  let removed = 0;
+  for (const { document_id: id } of rows) {
+    const client = await db.connect();
+    let keys;
+    try {
+      keys = await atomically(client, () => remove(client, id, { reason: `transient, left ${TRANSIENT_MINUTES} minutes` }));
+    } finally {
+      client.release();
+    }
+    if (!keys) continue;
+    await removeFiles(keys);
+    removed += 1;
+  }
+  return { removed };
 }
 
 async function get(client, documentId) {
@@ -755,6 +791,8 @@ module.exports = {
   lock,
   remove,
   removeFiles,
+  TRANSIENT_MINUTES,
+  purgeTransient,
   get,
   getReadable,
   variantOf,

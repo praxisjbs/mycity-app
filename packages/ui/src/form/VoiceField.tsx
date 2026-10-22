@@ -23,6 +23,8 @@ export type Transcribe = (audio: Blob) => Promise<string>;
 export interface VoiceFieldProps {
   /** What is being dictated, Title Case, at most 4 words: names the button. */
   label: string;
+  /** The button's own words, Verb Noun, at most 3: Record Answer unless set (Dictate beside a field that takes a whole message). */
+  action?: string;
   /** Sends the audio and answers with the words. An AI tidies them server side without changing the meaning (A18). */
   transcribe: Transcribe;
   /** Called with the words once they arrive. */
@@ -39,7 +41,7 @@ export interface VoiceFieldProps {
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, disabled, compact, className }: VoiceFieldProps) {
+export function VoiceField({ label, action = "Record Answer", transcribe, onTranscript, maxSeconds = 120, disabled, compact, className }: VoiceFieldProps) {
   const [state, setState] = useState<"idle" | "recording" | "working">("idle");
   const [seconds, setSeconds] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
@@ -157,7 +159,7 @@ export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, 
         </span>
       ) : (
         <Button icon="mic" onClick={start} disabled={disabled} aria-pressed={false} aria-label={`Record ${label}`}>
-          Record Answer
+          {action}
         </Button>
       )}
       {trouble}

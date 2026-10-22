@@ -18,7 +18,7 @@ const { uuid, text, optionalText, isoDate, isoDateTime, blank, listQuery, Paged 
 const { PersonRef } = require("./organisation");
 const { ScoreValue, Quantity, Direction, KrBand, Rating, ScoringRules } = require("./scoring");
 const { MonthStart, Kpi, KpiMonth, KpiResult } = require("./kpis");
-const { KeyResultRef, Scorecard, Contribution, MonthKey, CommitmentState } = require("./targets");
+const { KeyResultRef, Scorecard, Contribution } = require("./targets");
 
 /* ------------------------------------------------------------------ *
  * Quarters
@@ -652,68 +652,137 @@ const OkrWorkbookRow = z
  * Analytics (§6.21, PR 5)
  * ------------------------------------------------------------------ */
 
-/** GET /performance/analytics */
+const count = z.number().int().min(0);
+
+/** GET /performance/analytics: a quarter (the current one when none is named) and, optionally, one function. */
 const PerformanceAnalyticsQuery = z
   .object({
     period_id: uuid.optional(),
     department_id: uuid.optional(),
-    month: MonthKey.optional(),
   })
   .strict();
 
-const FunctionScore = z
+/** One score taken from another, signed and up to four places ("-0.12"): above zero, the first was higher. */
+const ScoreGap = z.string().regex(/^-?(0(\.\d{1,4})?|1(\.0{1,4})?)$/, "must be a difference of scores, like -0.12");
+
+/** How many were due, and how many of those were done by their date. */
+const OnTime = z.object({ due: count, on_time: count }).strict();
+
+/** One month's due and on time. */
+const MonthOnTime = z.object({ month: MonthStart, due: count, on_time: count }).strict();
+
+/** A function's month scores (§6.8), October to December; the company's when `department_id` is null. */
+const FunctionScores = z
   .object({
     department_id: uuid.nullable(),
-    department: z.string(),
-    score: ScoreValue.nullable(),
-    key_results_good: z.number().int().min(0),
-    key_results_watch: z.number().int().min(0),
-    key_results_recovery: z.number().int().min(0),
-    key_results_unscored: z.number().int().min(0),
+    department: z.string().nullable(),
+    months: z.array(z.object({ month: MonthStart, score: ScoreValue.nullable() }).strict()),
   })
   .strict();
 
-const RatingCount = z.object({ rating: Rating, count: z.number().int().min(0) }).strict();
-const CommitmentCount = z.object({ state: CommitmentState, count: z.number().int().min(0) }).strict();
+/** The key results by their latest month's status; those with no month yet await a report. */
+const KeyResultStatusCounts = z
+  .object({
+    key_results: count,
+    not_started: count,
+    on_track: count,
+    at_risk: count,
+    off_track: count,
+    done: count,
+    missed: count,
+    awaiting_report: count,
+    recovery: count,
+  })
+  .strict();
 
+const RatingCount = z.object({ rating: Rating, count }).strict();
+
+/** Scorecards by rating at the latest closed round: its month, and the four ratings, Exceeds first. */
+const RatingSpread = z
+  .object({
+    month: MonthStart.nullable(),
+    counts: z.array(RatingCount),
+  })
+  .strict();
+
+/** A function's commitments delivered on time, month by month (§6.11). */
+const FunctionCommitments = z
+  .object({
+    department_id: uuid.nullable(),
+    department: z.string().nullable(),
+    months: z.array(MonthOnTime),
+  })
+  .strict();
+
+/** A function's self score (or the proposed one, left unchanged) less the final score, on average. */
+const SelfAgainstFinal = z
+  .object({
+    department_id: uuid.nullable(),
+    department: z.string().nullable(),
+    gap: ScoreGap.nullable(),
+    lines: count,
+  })
+  .strict();
+
+/**
+ * Performance Analytics (§6.21) for a quarter, within the reader's scope. The OKR figures are the
+ * company's shared plan, read whole; scorecards, reviews and commitments are the reader's scope's.
+ */
 const PerformanceAnalytics = z
   .object({
-    period: z.object({ performance_period_id: uuid, name: z.string() }).strict().nullable(),
-    month: MonthStart.nullable(),
+    period: z
+      .object({ performance_period_id: uuid, name: z.string(), starts_on: isoDate, ends_on: isoDate })
+      .strict()
+      .nullable(),
+    months: z.array(MonthStart),
     company_score: ScoreValue.nullable(),
-    functions: z.array(FunctionScore),
-    ratings: z.array(RatingCount),
-    reviews_due: z.number().int().min(0),
-    reviews_on_time: z.number().int().min(0),
-    reviews_closed: z.number().int().min(0),
-    commitments: z.array(CommitmentCount),
+    scores: z.array(FunctionScores),
+    key_results: KeyResultStatusCounts,
+    ratings: RatingSpread,
+    commitments: OnTime,
+    commitments_by_function: z.array(FunctionCommitments),
+    check_ins: OnTime,
+    check_ins_by_month: z.array(MonthOnTime),
+    reviews_closed: OnTime,
+    reviews_closed_by_month: z.array(MonthOnTime),
+    self_against_final: z.array(SelfAgainstFinal),
   })
   .strict();
 
-/** One person in the analytics people table. */
+/** One person in the analytics people table: their quarter's scorecard. */
 const AnalyticsPerson = z
   .object({
-    employee: PersonRef,
     scorecard_id: uuid,
+    employee: PersonRef,
     department: z.string().nullable(),
+    reviewer: PersonRef.nullable(),
     score_to_date: ScoreValue.nullable(),
     rating: Rating.nullable(),
-    month_score: ScoreValue.nullable(),
-    reviews_closed: z.number().int().min(0),
+    months_scored: count,
   })
   .strict();
 
 const AnalyticsPersonPage = Paged(AnalyticsPerson);
 
-/** GET /performance/analytics/people */
+/** GET /performance/analytics/people: the quarter's scorecards in scope, sorted by score. */
 const AnalyticsPeopleQuery = listQuery(
   {
     period_id: uuid.optional(),
     department_id: uuid.optional(),
     rating: Rating.optional(),
   },
-  ["employee", "score_to_date"],
+  ["score_to_date", "employee"],
 );
+
+/** POST /performance/analytics/people/export: the people table, as it is filtered, as a workbook. */
+const AnalyticsExportRequest = z
+  .object({
+    period_id: uuid.optional(),
+    department_id: uuid.optional(),
+    rating: Rating.optional(),
+    q: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const KR_VIRTUAL = {
@@ -858,14 +927,28 @@ const TABLES = {
   TargetChangeCreate: { table: "target_change" },
   TargetChangePage: { table: null, reason: "a page of target changes" },
   TargetChangeListQuery: { table: null, reason: "list controls and filters for target changes" },
-  PerformanceAnalyticsQuery: { table: null, reason: "which quarter, function and month to count" },
-  FunctionScore: { table: null, reason: "a function's score and key results by band, worked out" },
+  PerformanceAnalyticsQuery: { table: null, reason: "which quarter and function to count" },
+  OnTime: { table: null, reason: "how many were due and how many on time, counted" },
+  MonthOnTime: { table: null, reason: "one month's due and on time, counted" },
+  FunctionScores: { table: null, reason: "a function's month scores, rolled up from okr_key_result_month" },
+  KeyResultStatusCounts: { table: null, reason: "key results by their latest month's status, counted" },
   RatingCount: { table: null, reason: "how many scorecards carry a rating, counted" },
-  CommitmentCount: { table: null, reason: "how many commitments are in a state, counted" },
+  RatingSpread: { table: null, reason: "the latest closed round's ratings, counted" },
+  FunctionCommitments: { table: null, reason: "a function's commitments on time by month, counted from task" },
+  SelfAgainstFinal: { table: null, reason: "the mean of self less final over closed reviews' items, worked out" },
   PerformanceAnalytics: { table: null, reason: "aggregates within the reader's scope (§6.21)" },
-  AnalyticsPerson: { table: null, reason: "one person's quarter, from scorecard and its reviews" },
+  AnalyticsPerson: {
+    table: "scorecard",
+    virtual: {
+      employee: "the person in scorecard.employee_id",
+      department: "department.name of scorecard.department_id",
+      reviewer: "the person in scorecard.reviewer_employee_id",
+      months_scored: "how many of its monthly reviews are closed, counted",
+    },
+  },
   AnalyticsPersonPage: { table: null, reason: "a page of the analytics people table" },
   AnalyticsPeopleQuery: { table: null, reason: "list controls and filters for the people table" },
+  AnalyticsExportRequest: { table: null, reason: "the people table's filters for an export" },
 };
 
 module.exports = {
@@ -924,11 +1007,18 @@ module.exports = {
   TargetChangePage,
   TargetChangeListQuery,
   PerformanceAnalyticsQuery,
-  FunctionScore,
+  ScoreGap,
+  OnTime,
+  MonthOnTime,
+  FunctionScores,
+  KeyResultStatusCounts,
   RatingCount,
-  CommitmentCount,
+  RatingSpread,
+  FunctionCommitments,
+  SelfAgainstFinal,
   PerformanceAnalytics,
   AnalyticsPerson,
   AnalyticsPersonPage,
   AnalyticsPeopleQuery,
+  AnalyticsExportRequest,
 };

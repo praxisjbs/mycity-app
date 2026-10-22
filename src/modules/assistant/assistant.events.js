@@ -22,10 +22,12 @@ const EVENTS = defineEvents("praxis_ai", {
   "assistant.feedback_given": { summary: "A person marked an answer of the assistant Helpful or Not Helpful" },
 });
 
+/** A spoken question (praxis-ai.md §6.6): kept only while it is transcribed, never played. */
 defineDocumentType(VOICE_QUESTION, {
   label: "Voice question",
   module: "praxis_ai",
   sensitivity: "personal",
+  transient: true,
 });
 
 vault.defineAccess(VOICE_QUESTION, async (_client, user, doc) => doc.entity_id === user.user_id);

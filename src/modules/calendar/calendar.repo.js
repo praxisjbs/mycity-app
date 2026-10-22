@@ -1,8 +1,8 @@
 "use strict";
 /**
  * Calendar: the SQL. Reads a person's month (events, their tasks' deadlines, their
- * approved leave) and writes only calendar_event and calendar_event_attendee.
- * Never emits (BACKEND_GUIDE §2).
+ * approved leave, their performance dates) and writes only calendar_event and
+ * calendar_event_attendee. Never emits (BACKEND_GUIDE §2).
  *
  * Who sees an event: its owner, its attendees, and everyone when its visibility is
  * `everyone` (docs/guides/workspace.md §6). A month is always the reader's own, so
@@ -15,9 +15,59 @@ const SEES = (me) => `(ce.owner_employee_id = ${me} OR ce.visibility = 'everyone
   OR EXISTS (SELECT 1 FROM calendar_event_attendee x
               WHERE x.calendar_event_id = ce.calendar_event_id AND x.employee_id = ${me}))`;
 
+/** A business date as the instant its Lagos day starts, and the next day's. */
+const DAY_START = (d) => `((${d})::timestamp AT TIME ZONE 'Africa/Lagos')`;
+const DAY_END = (d) => `(((${d}) + 1)::timestamp AT TIME ZONE 'Africa/Lagos')`;
+
 /**
- * One page of a month: the reader's events, the deadlines of their open tasks, and the
- * days of their approved leave, by start.
+ * The reader's performance dates (docs/guides/performance.md §6.18), all day: their check-in due
+ * (a head's on the 3rd business day), the reviews they must write, the key results they are
+ * accountable for finishing in a binding plan, and the review dates of open PIPs that are theirs
+ * or whose review they wrote. $1 the reader, $4 and $5 the month's first and last day.
+ */
+const PERFORMANCE_DATES = `
+         SELECT 'performance', r.performance_review_id, 'Check-In: ' || c.name,
+                ${DAY_START("x.due")}, ${DAY_END("x.due")}, true, NULL, NULL, NULL, 'review', true, 'check_in_due'
+           FROM performance_review r
+           JOIN performance_cycle c ON c.performance_cycle_id = r.performance_cycle_id
+           CROSS JOIN LATERAL (
+             SELECT CASE WHEN EXISTS (SELECT 1 FROM department hd LEFT JOIN org_seat hs ON hs.org_seat_id = hd.head_seat_id
+                                       WHERE hd.head_employee_id = $1 OR (hs.status = 'filled' AND hs.filled_by_employee_id = $1))
+                         THEN COALESCE(c.head_check_in_due_on, c.check_in_due_on) ELSE c.check_in_due_on END AS due
+           ) x
+          WHERE r.employee_id = $1 AND r.review_kind = 'monthly' AND r.status = 'check_in'
+            AND x.due BETWEEN $4::date AND $5::date
+         UNION ALL
+         SELECT 'performance', r.performance_review_id, 'Review: ' || re.first_name || ' ' || re.last_name,
+                ${DAY_START("c.review_due_on")}, ${DAY_END("c.review_due_on")}, true, NULL, NULL, NULL, 'review', false, 'review_due'
+           FROM performance_review r
+           JOIN performance_cycle c ON c.performance_cycle_id = r.performance_cycle_id
+           JOIN employee re ON re.employee_id = r.employee_id
+          WHERE r.reviewer_employee_id = $1 AND r.status IN ('with_reviewer', 'returned')
+            AND c.review_due_on BETWEEN $4::date AND $5::date
+         UNION ALL
+         SELECT 'performance', kr.okr_key_result_id, kr.code || ' ' || kr.statement,
+                ${DAY_START("kr.finishes_on")}, ${DAY_END("kr.finishes_on")}, true, NULL, NULL, NULL, 'key_result', false, 'key_result_due'
+           FROM okr_key_result kr
+           JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
+           JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
+          WHERE kr.accountable_employee_id = $1 AND pl.status = 'binding'
+            AND kr.finishes_on BETWEEN $4::date AND $5::date
+         UNION ALL
+         SELECT 'performance', ip.improvement_plan_id,
+                CASE WHEN ip.employee_id = $1 THEN 'PIP Review' ELSE 'PIP Review: ' || pe.first_name || ' ' || pe.last_name END,
+                ${DAY_START("ip.review_on")}, ${DAY_END("ip.review_on")}, true, NULL, NULL, NULL, 'improvement_plan',
+                ip.employee_id = $1, 'pip_review'
+           FROM improvement_plan ip
+           JOIN employee pe ON pe.employee_id = ip.employee_id
+          WHERE ip.status = 'open' AND ip.review_on BETWEEN $4::date AND $5::date
+            AND (ip.employee_id = $1
+                 OR EXISTS (SELECT 1 FROM performance_review pr
+                             WHERE pr.performance_review_id = ip.performance_review_id AND pr.reviewer_employee_id = $1))`;
+
+/**
+ * One page of a month: the reader's events, the deadlines of their open tasks, the days of
+ * their approved leave and their performance dates, by start.
  * @param {{query: Function}} db
  * @param {{employee_id: string, from: Date, to: Date, fromDay: string, toDay: string}} at
  * @param {{item_kind?: string, q?: string, sort?: object, page?: number}} query
@@ -27,28 +77,30 @@ function month(db, at, query) {
   return pageQuery(
     db,
     `SELECT v.item_kind, v.item_id, v.title, v.starts_at, v.ends_at, v.all_day, v.event_type,
-            v.location, v.my_response, v.link_type, ${TOTAL_COL}
+            v.location, v.my_response, v.link_type, v.link_self, v.performance_kind, ${TOTAL_COL}
        FROM (
          SELECT 'event' AS item_kind, ce.calendar_event_id AS item_id, ce.title, ce.starts_at,
                 ce.ends_at, ce.all_day, ce.event_type, ce.location,
                 (SELECT a.response FROM calendar_event_attendee a
                   WHERE a.calendar_event_id = ce.calendar_event_id AND a.employee_id = $1) AS my_response,
-                'calendar_event' AS link_type
+                'calendar_event' AS link_type, false AS link_self, NULL::text AS performance_kind
            FROM calendar_event ce
           WHERE ce.cancelled_at IS NULL AND ce.starts_at < $3 AND ce.ends_at > $2 AND ${SEES("$1")}
          UNION ALL
          SELECT 'task', t.task_id, t.title, t.due_at, t.due_at + interval '1 minute', false, 'deadline',
-                NULL, NULL, 'task'
+                NULL, NULL, 'task', false, NULL
            FROM task t
           WHERE t.primary_assignee_id = $1 AND t.archived_at IS NULL
             AND t.status NOT IN ('done', 'cancelled') AND t.due_at >= $2 AND t.due_at < $3
          UNION ALL
          SELECT 'leave', lr.leave_request_id, lt.name, (lr.starts_on::timestamp AT TIME ZONE 'Africa/Lagos'),
-                ((lr.ends_on + 1)::timestamp AT TIME ZONE 'Africa/Lagos'), true, NULL, NULL, NULL, 'leave_request'
+                ((lr.ends_on + 1)::timestamp AT TIME ZONE 'Africa/Lagos'), true, NULL, NULL, NULL, 'leave_request', false, NULL
            FROM leave_request lr
            JOIN leave_type lt ON lt.leave_type_id = lr.leave_type_id
           WHERE lr.employee_id = $1 AND lr.status = 'approved'
             AND lr.starts_on <= $5::date AND lr.ends_on >= $4::date
+         UNION ALL
+         ${PERFORMANCE_DATES}
        ) v
       WHERE ($6::text IS NULL OR v.item_kind = $6)
         AND ($7::text IS NULL OR search_fold(v.title) LIKE '%' || search_fold($7) || '%')

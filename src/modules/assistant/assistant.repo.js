@@ -186,17 +186,6 @@ async function summary(db, userId, from, to) {
   return { ...counts, by_module: byModule };
 }
 
-/** Spoken questions still in the vault an hour on: their words never came back (§6.6). */
-async function staleRecordings(db, olderThanMinutes) {
-  const { rows } = await db.query(
-    `SELECT document_id FROM document
-      WHERE doc_type = 'ai_voice_question' AND created_at < now() - make_interval(mins => $1::int)
-      ORDER BY created_at, document_id`,
-    [olderThanMinutes],
-  );
-  return rows.map((r) => r.document_id);
-}
-
 module.exports = {
   conversationOf,
   insertConversation,
@@ -211,5 +200,4 @@ module.exports = {
   clearHistory,
   setFeedback,
   summary,
-  staleRecordings,
 };

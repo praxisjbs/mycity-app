@@ -592,7 +592,6 @@ describe("schedules and heartbeat", () => {
     expect(ids).toEqual([
       "alert-ageing",
       "announcement-release",
-      "assistant-voice-sweep",
       "attendance-clock-watch",
       "attendance-day-close",
       "celebrations",
@@ -607,6 +606,7 @@ describe("schedules and heartbeat", () => {
       "media-reconcile",
       "places-name",
       "reminders",
+      "review-cycles",
       "scheduled-reports",
       "system-health",
       "system-health-digest",
