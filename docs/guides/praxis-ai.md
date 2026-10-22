@@ -93,13 +93,13 @@ their own screens would show them, and nothing more.
 
 ## 4 · Data
 
-Migration `10100_assistant.sql` (M10's block). The tables are `10000`'s; this build widens two.
+Migration `10300_assistant.sql` (M10's block). The tables are `10000`'s; this build widens two.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `ai_conversation` (10000) | `user_id`, `title` (the first question, cut at 120 characters), `status` (`active`), adds `last_asked_at`, `questions` (10100) | One per conversation, always the asker's own. Index (`user_id`, `last_asked_at` desc) |
-| `ai_message` (10000) | `ai_conversation_id`, `role` (`user`, `assistant`; CHECK added in 10100), `content` (the question, or the answer's words), `ai_run_id`, `feedback` (`up`, `down` or null; CHECK added), `metadata` | An answer's `metadata` holds its table (columns, rows, numeric columns), its screen button, the reads it made (key, parameters, rows returned, total), `declined` and `more` |
-| `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` (10100); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10100 widens it to accept a record (`entity_type` and `entity_id`) |
+| `ai_conversation` (10000) | `user_id`, `title` (the first question, cut at 120 characters), `status` (`active`), adds `last_asked_at`, `questions` (10300) | One per conversation, always the asker's own. Index (`user_id`, `last_asked_at` desc) |
+| `ai_message` (10000) | `ai_conversation_id`, `parent_message_id` (an answer's question), `role` (`user`, `assistant`, `system` as seeded in `10099`; CHECK added in 10300), `content` (the question, or the answer's words), `ai_run_id`, `feedback` (`up`, `down` or null; CHECK added), adds `rows_read` (the rows its reads returned) and `module_key` (the module of its first read) (10300), `metadata` | History reports on `rows_read` and `module_key`, so they are columns. An answer's `metadata` holds what is only shown: its table (columns, rows, numeric columns), its screen button, the reads it made (key, rows returned, total), `declined` and `more`. Indexes on the conversation, the parent and the run (10300) |
+| `ai_message_citation` (10000) | `ai_message_id`, `label`; adds `entity_type`, `entity_id`, `read_key` (10300); `knowledge_article_version_id`, `document_id` stay | 10000's CHECK required an article or a document; 10300 widens it to accept a record (`entity_type` and `entity_id`) |
 | `ai_run`, `ai_run_step` (M0, 10200) | `purpose` `data-answers` or `praxis-ai-voice` | One run per question, one step per round with the model. No question or answer text is kept here |
 
 No reference seed: `praxis_ai` grants are `0290`'s. Nothing is seeded on production; staging's
@@ -111,7 +111,7 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `POST /ask` | `AiAsk` (`question` up to 500 characters, `conversation_id` optional) → `AiAnswer` | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed |
+| `POST /ask` | `AiAsk` (`question` up to 500 characters, `ai_conversation_id` optional) → `AiAnswer` | `praxis_ai` create | no | `Idempotency-Key`; one answer whole, never streamed |
 | `GET /suggestions` | → `AiSuggestions` (up to 6 questions) | `praxis_ai` view | no | Only questions the person's reads can answer (§6.8) |
 | `GET /conversations` (`q`, `sort`, `page`) | `AiConversationListQuery` → `AiConversationPage` | `praxis_ai` view · own always | yes, 25 | Newest first; `q` searches titles |
 | `GET /conversations/:id/turns` (`page`) | `AiTurnListQuery` → `AiTurnPage` | `praxis_ai` view · own | yes, 25 | Newest page first; the screen loads older ones as it scrolls up |
@@ -381,6 +381,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Commit 1 of 7: the contract (`assistant.js`) and migration `10300_assistant.sql` built. §4: `ai_message` gains `rows_read` and `module_key` as columns (History reports on them), the role CHECK keeps the three roles `10099` seeds, and the 10000 tables gain their indexes and update triggers; numbered 10300, after AI Control's 10200 to 10220, so no server applies it out of order. §5: `ai_conversation_id`, the column's name.
 - 22/10/2026 · GE · §6.7: no Cannot Use Tools state. Every provider's vendor file takes tools, so any text model on Data Answers' chain answers, first choice or fallback, as AI Control promises (`ai-control.md` decision 34 rewritten).
 - 21/10/2026 · GE · Written from the decisions of 21/10/2026 (§1.1), Ifeoma's request at the M1
   handover (21/10/2026) and REUSE_MAP §11: reads through the manifests only, up to 5 a question,

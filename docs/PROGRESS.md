@@ -52,8 +52,8 @@ saying who agreed and when.
 | M7 Partnerships, CRM & Trackers | 6 | 6 | 0 | 0 | 0 | 0 |
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
-| M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
-| **Total** | **99** | **48** | **0** | **51** | **0** | **0** |
+| M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 2 | 3 | 0 | 0 |
+| **Total** | **99** | **46** | **2** | **51** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -1097,11 +1097,12 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 67 | Ask | `ask` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
-| 68 | History | `history` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| 67 | Ask | `ask` | M10 | TB | ☐ | ☐ | ☐ | In progress | 22/10/2026 |
+| 68 | History | `history` | M10 | TB | ☐ | ☐ | ☐ | In progress | 22/10/2026 |
 
 **Notes**
 
+- 22/10/2026 · GE · Praxis AI brought forward from M10 (`docs/guides/praxis-ai.md`, decisions of 21/10/2026), commit 1 of 7: the contract `packages/contract/schemas/assistant.js` (ask, the answer and its draft, conversations, turns, the history summary, feedback, transcribe) and migration `10300_assistant.sql` (conversation counters, `rows_read` and `module_key` on answers, citations that name a record, the missing indexes and update triggers on the 10000 tables). UP, DOWN, UP passes on Postgres 16 with pgvector. Left: tools on every text model and `converse()` (2), the engine (3), the API (4), the screens on the contract (5), reads and the evaluation set (6), the audit (7).
 - 15/10/2026 · AJ · Frontend built in `app/src/features/assistant/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/knowledge.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 - 15/10/2026 · AJ · Fixed a blank screen on Ask: the scroll effect returned a value, which crashed React in browsers where `scrollIntoView` returns a Promise. The shell now wraps every screen in an error boundary, so a crash in one screen shows an error card there and the menu and back button keep working.
 
