@@ -18,6 +18,7 @@ import {
   ActionGroup,
   Button,
   DataView,
+  DesktopOnly,
   ExportButton,
   FilterSelect,
   formatDate,
@@ -25,6 +26,7 @@ import {
   formatMonth,
   HelpTerm,
   PageHeader,
+  PhoneOnly,
   StatusPill,
   toast,
   todayIso,
@@ -97,15 +99,21 @@ export function Commitments({ switcher }: { switcher: ReactNode }) {
         <FilterSelect label="State" value={state} onChange={set("state")} options={STATE_OPTIONS} />
         <ExportButton onExport={exportReport} message="Report saved">Export Report</ExportButton>
       </Toolbar>
-      <KpiTiles
-        mobileCols={2}
-        items={[
-          { label: "Commitments", value: count(s?.commitments) },
-          { label: "On Time", value: count(s?.on_time), tone: "ok" },
-          { label: "Late or Missed", value: count(s ? s.late + s.missed : undefined), tone: s && s.late + s.missed ? "err" : undefined },
-          { label: "Awaiting Approval", value: count(s?.awaiting_approval), tone: s?.awaiting_approval ? "warn" : undefined },
-        ]}
-      />
+      <DesktopOnly>
+        <KpiTiles
+          items={[
+            { label: "Commitments", value: count(s?.commitments) },
+            { label: "On Time", value: count(s?.on_time), tone: "ok" },
+            { label: "Late or Missed", value: count(s ? s.late + s.missed : undefined), tone: s && s.late + s.missed ? "err" : undefined },
+            { label: "Awaiting Approval", value: count(s?.awaiting_approval), tone: s?.awaiting_approval ? "warn" : undefined },
+          ]}
+        />
+      </DesktopOnly>
+      {s && (
+        <PhoneOnly>
+          <p className="mb-3 text-xs text-muted-foreground">{`${s.commitments} commitments · ${s.on_time} on time · ${s.late + s.missed} late or missed · ${s.awaiting_approval} awaiting`}</p>
+        </PhoneOnly>
+      )}
       {(waiting.page?.total ?? 0) > 0 && <WaitingOnYou list={waiting} />}
       <PagedTable
         title="Commitments"

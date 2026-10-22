@@ -184,7 +184,7 @@ async function summary(query, scope, db = pool) {
   const r = await one(
     db,
     `SELECT count(*)::int AS commitments,
-            count(*) FILTER (WHERE v.state = 'awaiting_approval')::int AS awaiting_approval,
+            count(*) FILTER (WHERE v.state = 'awaiting_approval' AND v.set_status = 'submitted')::int AS awaiting_approval,
             count(*) FILTER (WHERE v.state = 'due')::int AS due,
             count(*) FILTER (WHERE v.state = 'on_time')::int AS on_time,
             count(*) FILTER (WHERE v.state = 'late')::int AS late,

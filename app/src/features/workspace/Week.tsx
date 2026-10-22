@@ -8,7 +8,7 @@ import { useState } from "react";
 import workspace from "@mycity/contract/schemas/workspace.js";
 import type { Task, TeamWeek, WeekView } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { invalidate, useApi, useMutation, usePaged, type PagedResult } from "@/api/hooks";
 import {
   Button,
   Card,
@@ -181,20 +181,51 @@ function SupportNeededForm({ week, close }: { week: WeekView; close: () => void 
   );
 }
 
-/** Team This Week, for a manager: one row per person in their scope; a row opens that person's week. */
+/**
+ * Team This Week, for a manager: one row per person in their scope; a row opens that person's week.
+ * A phone shows the first five, View All the rest in a sheet.
+ */
 export function TeamWeekCard() {
   const list = usePaged("GET /api/v1/workspace/team-weeks", { sort: "employee" });
   const modal = useModal();
   const open = (r: TeamWeek) =>
     modal.open({ title: r.employee.display_name, wide: true, body: () => <PersonWeek employeeId={r.employee.employee_id} /> });
+  const all = () => modal.open({ title: "Team This Week", full: true, body: () => <TeamWeekList list={list} onOpen={open} bare /> });
+  return (
+    <>
+      <DesktopOnly>
+        <TeamWeekList list={list} onOpen={open} />
+      </DesktopOnly>
+      <PhoneOnly>
+        <Card>
+          <CardHeader title="Team This Week" actions={(list.page?.total ?? 0) > 5 ? <Button size="sm" onClick={all}>View All</Button> : undefined} />
+          <TapList
+            flat
+            label="Team This Week"
+            items={list.rows.slice(0, 5).map((r) => ({
+              key: r.employee.employee_id,
+              title: r.employee.display_name,
+              sub: `${r.done} done · ${r.planned} planned · ${r.blocked} blocked`,
+              onSelect: () => open(r),
+            }))}
+          />
+        </Card>
+      </PhoneOnly>
+    </>
+  );
+}
+
+function TeamWeekList({ list, onOpen, bare = false }: { list: PagedResult<TeamWeek>; onOpen: (r: TeamWeek) => void; bare?: boolean }) {
   return (
     <DataView
-      title="Team This Week"
+      title={bare ? undefined : "Team This Week"}
+      caption="Team This Week"
+      bare={bare}
       list={list}
       rowKey={(r) => r.employee.employee_id}
       noun="person"
       nounPlural="people"
-      onRowClick={open}
+      onRowClick={onOpen}
       empty={{ title: "Nobody in Your Team" }}
       columns={[
         { key: "employee", label: "Person", render: (r) => r.employee.display_name },

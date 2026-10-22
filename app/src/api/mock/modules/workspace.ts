@@ -549,7 +549,7 @@ route("GET /api/v1/performance/commitments/summary", (req) => {
   const month = monthOf(req.query.month);
   const rows = commitmentsFor(req.user!).filter((t) => t.commitment_month === month && (!req.query.employee_id || t.assignee?.employee_id === req.query.employee_id)).map(commitmentOf);
   const n = (s: Commitment["state"]) => rows.filter((c) => c.state === s).length;
-  return ok({ month, commitments: rows.length, awaiting_approval: n("awaiting_approval"), due: n("due"), on_time: n("on_time"), late: n("late"), missed: n("missed"), rescoped: n("rescoped") });
+  return ok({ month, commitments: rows.length, awaiting_approval: rows.filter((c) => c.state === "awaiting_approval" && c.set_status === "submitted").length, due: n("due"), on_time: n("on_time"), late: n("late"), missed: n("missed"), rescoped: n("rescoped") });
 });
 route("GET /api/v1/performance/commitments/sets", (req) => {
   const { waiting_on_me, month, ...query } = req.query;
