@@ -211,8 +211,8 @@ describeDb("performance analytics against the real migrations", () => {
     const res = await as("ops").get("/performance/analytics");
     expect(res.status).toBe(200);
     expect(c.goals.PerformanceAnalytics.parse(res.body)).toMatchObject({ period: null, scores: [], company_score: null });
-    const people = await as("ops").get("/performance/analytics/people");
-    expect(people.body.page.total).toBe(0);
+    const page = await as("ops").get("/performance/analytics/people");
+    expect(page.body.page.total).toBe(0);
   });
 
   test("the quarter, its OKR tree, scorecards, rounds, reviews and commitments", async () => {
