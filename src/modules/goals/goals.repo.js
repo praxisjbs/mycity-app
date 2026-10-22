@@ -7,6 +7,9 @@
  */
 const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
+const { scopeClause } = require("../../shared/rbac/scope");
+const { escapeLike } = require("../../shared/search/provider");
+const approvers = require("../../shared/workflow/approvers");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -208,6 +211,8 @@ const holdsRoleCode = async (db, roleIds, code) =>
 const PLAN = `pl.performance_plan_id, pl.performance_period_id, p.name AS period_name, pl.department_id,
   d.name AS department, d.code::text AS department_code, pl.status, pl.workflow_instance_id, pl.submitted_by,
   pl.submitted_at, pl.returned_reason, pl.binding_at, pl.created_at, pl.updated_at,
+  (SELECT ${personJson("se", "sd")} FROM app_user su JOIN employee se ON se.employee_id = su.employee_id
+     LEFT JOIN department sd ON sd.department_id = se.department_id WHERE su.user_id = pl.submitted_by) AS submitted_by_person,
   (SELECT count(*)::int FROM okr_objective o WHERE o.performance_plan_id = pl.performance_plan_id) AS objective_count,
   (SELECT count(*)::int FROM scorecard s
     WHERE s.performance_period_id = pl.performance_period_id AND s.department_id = pl.department_id) AS scorecard_count`;
@@ -728,15 +733,20 @@ const CHANGE = `tc.target_change_id, tc.okr_key_result_id, tc.employee_target_id
      LEFT JOIN department rd ON rd.department_id = re.department_id WHERE ru.user_id = tc.requested_by) AS requested_by,
   tc.decided_at, tc.created_at`;
 
-function listChanges(db, query) {
+/** Target changes: a key result's for every reader (the OKR tree is shared), a line's within the reader's scope. */
+function listChanges(db, query, scope = { scope: "all" }) {
+  const params = [query.status || null, query.okr_key_result_id || null, query.employee_target_id || null];
+  const s = scopeClause(scope, { column: "et.employee_id" }, params);
   return pageQuery(
     db,
     `SELECT ${CHANGE}, ${TOTAL_COL} FROM target_change tc
+       LEFT JOIN employee_target et ON et.employee_target_id = tc.employee_target_id
       WHERE ($1::text IS NULL OR tc.status = $1)
         AND ($2::uuid IS NULL OR tc.okr_key_result_id = $2)
         AND ($3::uuid IS NULL OR tc.employee_target_id = $3)
+        ${s.and ? `AND (tc.employee_target_id IS NULL OR ${s.and.slice(4)})` : ""}
       ORDER BY ${orderBy(query, { created_at: "tc.created_at" }, "tc.target_change_id")}`,
-    [query.status || null, query.okr_key_result_id || null, query.employee_target_id || null],
+    params,
     query,
   );
 }
@@ -753,6 +763,86 @@ async function changesOf(db, keyResultId) {
 }
 
 const getChange = (db, id) => one(db, `SELECT ${CHANGE} FROM target_change tc WHERE tc.target_change_id = $1`, [id]);
+
+/** One change with what it changes: the key result or the line, its function and quarter. */
+const getChangeDetail = (db, id) =>
+  one(
+    db,
+    `SELECT ${CHANGE},
+            CASE WHEN kr.okr_key_result_id IS NULL THEN NULL
+                 ELSE json_build_object('okr_key_result_id', kr.okr_key_result_id, 'code', kr.code::text, 'statement', kr.statement) END
+              AS key_result,
+            coalesce(kr.unit, et.unit) AS unit,
+            CASE WHEN et.employee_target_id IS NULL THEN NULL
+                 ELSE json_build_object('employee_target_id', et.employee_target_id, 'title', et.title, 'employee', ${personJson("le", "ld")}) END
+              AS line,
+            et.employee_id AS line_employee_id, et.scorecard_id AS line_scorecard_id, d.name AS department,
+            p.name AS period_name
+       FROM target_change tc
+       LEFT JOIN okr_key_result kr ON kr.okr_key_result_id = tc.okr_key_result_id
+       LEFT JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
+       LEFT JOIN employee_target et ON et.employee_target_id = tc.employee_target_id
+       LEFT JOIN scorecard sc ON sc.scorecard_id = et.scorecard_id
+       LEFT JOIN employee le ON le.employee_id = et.employee_id
+       LEFT JOIN department ld ON ld.department_id = le.department_id
+       LEFT JOIN department d ON d.department_id = coalesce(o.department_id, sc.department_id)
+       LEFT JOIN performance_period p ON p.performance_period_id = coalesce(o.performance_period_id, sc.performance_period_id)
+      WHERE tc.target_change_id = $1`,
+    [id],
+  );
+
+/* ------------------------------------------------------------------ *
+ * Approvals waiting on the reader
+ * ------------------------------------------------------------------ */
+
+/**
+ * Goals · Waiting On You: the pending plan stages and target changes whose current stage names the
+ * reader (approvers.waitingOnClause), oldest first, 25 a page. `mayDecide` is false for a reader
+ * without `performance` approve, whose list is then empty, as the engine would refuse them.
+ */
+function approvalsWaiting(db, reader, roleCodes, mayDecide, query) {
+  const params = [];
+  const named = approvers.waitingOnClause("wi", reader, roleCodes, params);
+  params.push(mayDecide, query.q ? `%${escapeLike(query.q)}%` : null);
+  const may = params.length - 1;
+  const q = params.length;
+  return pageQuery(
+    db,
+    `SELECT v.*, ${TOTAL_COL} FROM (
+       SELECT CASE WHEN wi.entity_type = 'performance_plan' THEN 'plan' ELSE 'target_change' END AS kind,
+              coalesce(pl.performance_plan_id, tc.target_change_id) AS record_id,
+              wi.workflow_instance_id, wd.stages, wi.current_stage, wi.stage_entered_at,
+              (wi.stage_due_at IS NOT NULL AND wi.stage_due_at < now()) AS overdue,
+              p.name AS period_name, d.name AS department, kr.code::text AS key_result_code, et.title AS line_title,
+              ${personJson("oe", "od")} AS requested_by
+         FROM workflow_instance wi
+         JOIN workflow_definition wd ON wd.workflow_definition_id = wi.workflow_definition_id
+         LEFT JOIN performance_plan pl ON wi.entity_type = 'performance_plan' AND pl.performance_plan_id::text = wi.entity_id
+         LEFT JOIN target_change tc ON wi.entity_type = 'target_change' AND tc.target_change_id::text = wi.entity_id
+         LEFT JOIN okr_key_result kr ON kr.okr_key_result_id = tc.okr_key_result_id
+         LEFT JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
+         LEFT JOIN employee_target et ON et.employee_target_id = tc.employee_target_id
+         LEFT JOIN scorecard sc ON sc.scorecard_id = et.scorecard_id
+         LEFT JOIN department d ON d.department_id = coalesce(pl.department_id, o.department_id, sc.department_id)
+         LEFT JOIN performance_period p
+           ON p.performance_period_id = coalesce(pl.performance_period_id, o.performance_period_id, sc.performance_period_id)
+         LEFT JOIN app_user ou ON ou.user_id = wi.opened_by
+         LEFT JOIN employee oe ON oe.employee_id = ou.employee_id
+         LEFT JOIN department od ON od.department_id = oe.department_id
+        WHERE wi.state = 'pending' AND $${may}::boolean
+          AND ((wi.definition_key = 'performance.plan' AND pl.performance_plan_id IS NOT NULL)
+            OR (wi.definition_key = 'performance.target_change' AND tc.target_change_id IS NOT NULL))
+          AND ${named}
+     ) v
+     WHERE ($${q}::text IS NULL
+            OR search_fold(coalesce(v.department, 'Company') || ' ' || coalesce(v.key_result_code, '') || ' '
+                           || coalesce(v.line_title, '') || ' ' || coalesce(v.requested_by->>'display_name', ''))
+               LIKE search_fold($${q}::text))
+     ORDER BY v.stage_entered_at, v.workflow_instance_id`,
+    params,
+    query,
+  );
+}
 const getChangeRow = (db, id) => one(db, "SELECT * FROM target_change WHERE target_change_id = $1", [id]);
 
 async function insertChange(client, row) {
@@ -799,6 +889,8 @@ module.exports = {
   holdsRoleCode,
   listPlans,
   getPlan,
+  getChangeDetail,
+  approvalsWaiting,
   updatePlan,
   listObjectives,
   getObjective,

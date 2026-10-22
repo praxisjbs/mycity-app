@@ -304,7 +304,7 @@ export const SCORECARDS: ScorecardDetail[] = [
   ),
 ];
 
-/** The function's plan, binding. */
+/** The function's plan, binding; and Content's, sent and waiting on Operations & People. */
 export const PLANS: Plan[] = [
   {
     performance_plan_id: planId,
@@ -314,6 +314,7 @@ export const PLANS: Plan[] = [
     department: DEPT,
     status: "binding",
     workflow_instance_id: sid("perf:wf:plan:bm"),
+    submitted_by: refKey("ngozi"),
     submitted_at: at(25, "10:00"),
     returned_reason: null,
     binding_at: at(21, "16:00"),
@@ -322,10 +323,47 @@ export const PLANS: Plan[] = [
     created_at: at(30, "09:00"),
     updated_at: at(21, "16:00"),
   },
+  {
+    performance_plan_id: sid("perf:plan:content"),
+    performance_period_id: PERIOD.performance_period_id,
+    period_name: PERIOD.name,
+    department_id: sid("dept:Content"),
+    department: "Content",
+    status: "submitted",
+    workflow_instance_id: sid("perf:wf:plan:content"),
+    submitted_by: refKey("tolu"),
+    submitted_at: at(1, "11:00"),
+    returned_reason: null,
+    binding_at: null,
+    objective_count: 0,
+    scorecard_count: 0,
+    created_at: at(6, "09:00"),
+    updated_at: at(1, "11:00"),
+  },
 ];
 
-/** Target changes asked for this quarter. */
-export const TARGET_CHANGES: TargetChange[] = [];
+/** Target changes asked for this quarter: one waiting on the CEO. */
+const changed = OBJECTIVES.flatMap((o) => o.key_results).find((k) => k.target_value !== null);
+export const TARGET_CHANGES: TargetChange[] = changed
+  ? [
+      {
+        target_change_id: sid("perf:change:seed"),
+        okr_key_result_id: changed.okr_key_result_id,
+        employee_target_id: null,
+        from_value: changed.target_value,
+        from_text: changed.target_text,
+        to_value: String(Math.round(Number(changed.target_value) * 0.8)),
+        to_text: null,
+        from_month: "2026-11-01",
+        reason: "Two partner events moved to January",
+        status: "pending",
+        workflow_instance_id: sid("perf:wf:change:seed"),
+        requested_by: refKey("ngozi"),
+        decided_at: null,
+        created_at: at(1, "15:30"),
+      },
+    ]
+  : [];
 
 /** No key result here is split between people, so the check has nothing to rebalance. */
 export const CONTRIBUTIONS: Contribution[] = [];

@@ -154,8 +154,11 @@ function RescopeForm({ id, close }: { id: string; close: () => void }) {
   );
 }
 
-/** Request Changes on a waiting approval: a refusal with its reason (performance.md §6.11). */
-export function ReasonForm({ instanceId, close, done = "Sent back" }: { instanceId: string; close: () => void; done?: string }) {
+/**
+ * Request Changes on a waiting approval: a refusal with its reason (performance.md §6.11). `action`
+ * names the button where the refusal reads otherwise (Refuse Change on a target change, §6.7).
+ */
+export function ReasonForm({ instanceId, close, done = "Sent back", action = "Request Changes" }: { instanceId: string; close: () => void; done?: string; action?: string }) {
   const f = useContractForm({ reason: "" }, workflow.ReasonBody);
   const reject = useMutation("POST /api/v1/workflow/instances/:id/reject");
   const submit = async () => {
@@ -174,7 +177,7 @@ export function ReasonForm({ instanceId, close, done = "Sent back" }: { instance
       <Field label="Reason" {...f.field("reason")}><TextAreaField {...f.field("reason")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={submit}>Request Changes</Button>
+        <Button variant="primary" onClick={submit}>{action}</Button>
       </FormFooter>
     </>
   );

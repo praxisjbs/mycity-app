@@ -198,8 +198,8 @@ describe("Home · Overview, by Home view", () => {
     // The goals are the CEO's chart, so Goals This Quarter is not drawn twice.
     for (const title of ["Attendance, 14 Working Days", "On Time", "Goals This Quarter", "My Goals This Quarter", "Upcoming Leave"]) expect(h).not.toContain(title);
     expect(cardTitles()).toEqual(["Goals On Track", "Awaiting Your Approval", "Signed Value", "Open High Alerts"]);
-    // The CEO clears alerts: Need You says how many wait, beside the requests.
-    expect(await screen.findByText("No Requests Waiting")).toBeTruthy();
+    // The CEO clears alerts: Need You says how many wait, beside the requests: here a target change to decide.
+    expect(await screen.findByText("Target Change")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Clear \d+ Alerts?$/ })).toBeTruthy();
     expect(copyProblems()).toEqual([]);
     expect(document.body.textContent).not.toMatch(TIER_3);

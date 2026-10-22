@@ -146,7 +146,7 @@ line. Nothing is ticked until it is merged.
 - [x] 22/10/2026 · KPIs (§6.5): create and edit for a function, monthly actuals with Met, Not Met or N/A, the lines that use each
 - [x] 22/10/2026 · Scorecards (§6.5): draft, lines by section with weights, measures and sources, Copy Last Quarter and Copy From Colleague (the API; New Scorecard on screen offers Last Quarter or Start Blank), reviewer resolution and override (person or role, with reason), dotted input default
 - [x] 22/10/2026 · Contribution check (§6.5): shares against each split key result, OK or Rebalance; a plan cannot be sent while one reads Rebalance
-- [x] 22/10/2026 · Quarter plan (§6.4): assemble, send, `performance.plan` with its conditions, Request Changes, binding on the CEO's approval (objectives, key results, KPIs and scorecards together); each stage decides in the Approvals inbox
+- [x] 22/10/2026 · Quarter plan (§6.4): assemble, send, `performance.plan` with its conditions, Request Changes, binding on the CEO's approval (objectives, key results, KPIs and scorecards together); each stage decides on Goals · Waiting On You (built after PR 5, see §14)
 - [x] 22/10/2026 · Agreement (§6.6): Agree Scorecard and Disagree With Reason, notices and the agreement reminder (`scorecard_agree_due`, scheduled when the plan binds)
 - [x] 22/10/2026 · Target change and lock (§6.7): the request, `performance.target_change`, the `targets-lock` job on the lock date, history beside the target
 - [x] 22/10/2026 · Import (§6.19): the `extract` hook in `shared/import` (GE reviews), importers `okr_workbook`, `okr_kpis`, `scorecards`, with aliases from the change map; tests on the copies staging loads (`seeds/staging/performance/`: the sheets the importers read, see §14)
@@ -397,7 +397,7 @@ and Home rows of §2 and §10.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Performance · Goals (`goals`) | staff app | `performance` view: everyone sees the whole tree (the OKRs are the company's shared plan, as their sheets are) | The quarter's OKR tree: organisational goals; company and function objectives with their key results (code, statement, owner, finish, status, October, November, December scores, TBC); each function's plan and its approval chain | New Goal (as their capability allows); edit a draft; Send Plan; approve as a stage names them; Report Month (heads); Confirm Score (CEO); Change Target; open a key result's panel and its initiatives |
+| Performance · Goals (`goals`) | staff app | `performance` view: everyone sees the whole tree (the OKRs are the company's shared plan, as their sheets are) | The quarter's OKR tree: organisational goals; company and function objectives with their key results (code, statement, owner, finish, status, October, November, December scores, TBC); each function's plan; Waiting On You (the plan stages and target changes the reader decides) | New Goal (as their capability allows); edit a draft; Send Plan; open a plan stage and Approve Plan or Request Changes, or a target change and Approve Change or Refuse Change, as the flow names them; Report Month (heads); Confirm Score (CEO); Change Target; open a key result's panel and its initiatives |
 | Performance · Scorecards (`targets`), Scorecards view | staff app | `performance` view · own, team, all | Every scorecard in scope: person, department, reviewer, status, score to date, rating; a scorecard: its three sections and lines, weights, monthly scores, links, agreement, contribution check | New Scorecard, Edit Lines (draft), Copy Last Quarter, Agree Scorecard, Disagree With Reason, Change Target, Change Reviewer (`performance.manage`) |
 | Performance · Scorecards (`targets`), Commitments view | staff app | `performance` view · own, team, all | The month's commitments: commitment, person, original date, date now, state; Commitments, On Time, Late or Missed, Awaiting Approval; Waiting On You (each person's month sent to the reader) | Approve Month and Request Changes (as the flow names them); open a commitment's task and come back; Export Report (the month-end delivery report) |
 | Performance · KPIs (`kpis`) | staff app | `performance` view | The functions' operational KPIs: code, name, target, direction, frequency, October to December results and actuals, data source | New KPI and edit (`goals.function`, own function); Record Actual |
@@ -444,8 +444,11 @@ and Home rows of §2 and §10.
 4. **The head sends the function's plan** (Send Plan): `POST /performance/plans/:id/submit` opens
    `performance.plan` (§6.4) over the objectives, key results, KPIs and scorecards together. The
    Program Manager (or the CEO for Technology & Back-office Ops), then Operations & People, then the
-   CEO approve on the plan's own page or in My Approvals. Request Changes returns it to draft with
-   the reason.
+   CEO decide on Performance · Goals, Waiting On You: a stage opens the plan's sheet (what it binds,
+   the chain, Approve Plan, Request Changes); the bell, Home's Need You and ⌘K's Waiting on You open
+   the same sheet (`?plan=`). Request Changes is a refusal with a reason (`POST
+   /workflow/instances/:id/reject`): the plan comes back Returned with the reason, the head edits it
+   and sends again.
 5. **The CEO's approval makes it binding** (`workflow.onCompleted` → `plan.binding`): codes freeze
    (G1), each scorecard goes to its employee and reviewer to agree (P8), Home and My Performance
    start counting it.
@@ -515,9 +518,13 @@ and Home rows of §2 and §10.
 ### 3.5 Changing a target (PR 2)
 
 Change Target on a binding key result or scorecard line asks for the new target and a reason;
-`performance.target_change` goes to the CEO. On approval the new target applies from that month,
-the original stays beside it, and scores already given stay. Before the lock date a TBC target is
-edited in place by its owner; on the lock date (job `targets-lock`) every TBC target locks.
+`performance.target_change` goes to the CEO, who decides it on Goals · Waiting On You (or from the
+bell, Need You or ⌘K, `?change=`): the change's sheet shows the target, old and new, the month and
+the reason, with Approve Change or Refuse Change (a refusal with a reason). While it waits, the key
+result shows Change Waiting and offers no second Change Target. On approval the new target applies
+from that month, the original stays beside it, and scores already given stay. Before the lock date a
+TBC target is edited in place by its owner (through the API; no screen edits it yet); on the lock date
+(job `targets-lock`) every TBC target locks.
 
 ### 3.6 Import at go-live (PR 2)
 
@@ -621,11 +628,13 @@ routes file; the module that owns each route is named.
 | `GET /performance/key-results/:id/trace` | → `Trace` | view · scope | | key result → company key result → organisational goal |
 | `POST /performance/reports` | `MonthReport` → `MonthReportResult` | edit · the function's head or acting head; for company key results their accountable person | | `month`, `department_id` (null for company key results), each key result's and KPI's figures in one save (§6.8) |
 | `POST /performance/key-results/:id/confirm` | `ConfirmScore` → `KeyResultMonth` | approve, `goals.confirm` | | `month`, `score` |
-| `GET /performance/plans` | `PlanListQuery` → `PlanPage` | view | yes, 25 | `period_id`, `status` |
-| `GET /performance/plans/:id` | → `PlanDetail` | view · scope | | objectives, key results, KPIs, scorecards, contribution checks, the chain |
+| `GET /performance/plans` | `PlanListQuery` → `PlanPage` | view | yes, 25 | `period_id`, `status`, `department_id`; each plan names who sent it (`submitted_by`) |
+| `GET /performance/plans/:id` | → `PlanDetail` | view · scope | | objectives, key results, KPIs, scorecards, contribution checks; the chain and `can_decide` come from `GET /workflow/instances/:workflow_instance_id` |
+| `GET /performance/approvals` | `PerformanceApprovalQuery` → `PerformanceApprovalPage` | view | yes, 25 | the plan stages and target changes waiting on the reader (`approvers.waitingOnClause`), oldest first, empty without `performance` approve; `q` finds a function, a key result or who asked. Deciding is the engine's |
 | `POST /performance/plans/:id/submit` | `EmptyBody` → `PlanDetail` | create, `goals.function` (or `goals.company` for the company plan) | | refuses `CONTRIBUTION_REBALANCE`, `WEIGHTS_NOT_100`, `PLAN_EMPTY`; opens `performance.plan` |
 | `POST /performance/target-changes` | `TargetChangeCreate` → `TargetChange` | edit · scope | | a binding key result or line; opens `performance.target_change` |
-| `GET /performance/target-changes` | `TargetChangeListQuery` → `TargetChangePage` | view · scope | yes, 25 | |
+| `GET /performance/target-changes` | `TargetChangeListQuery` → `TargetChangePage` | view · scope | yes, 25 | a key result's change for every reader; a line's within the reader's scope |
+| `GET /performance/target-changes/:id` | → `TargetChangeDetail` | view · scope | | one change with its key result or line, unit, function and quarter; a line's is for whoever may read its scorecard (scope, its person, reviewer or dotted manager), its requester, or whoever runs the cycle |
 | `GET /performance/analytics` (PR 5) | `PerformanceAnalyticsQuery` → `PerformanceAnalytics` | view · scope | no (aggregates) | `period_id` (the current quarter when none; `period` null before the first), `department_id`; §6.21 |
 | `GET /performance/analytics/people` (PR 5) | `AnalyticsPeopleQuery` → `AnalyticsPersonPage` | view · scope | yes, 25 | `period_id`, `department_id`, `rating`, `q`; sort `score_to_date`, `employee` |
 | `POST /performance/analytics/people/export` (PR 5) | `AnalyticsExportRequest` → `ExportFile` | export · scope | | 202; the people table as filtered, made in the worker (`shared/documents/exports`) |
@@ -768,8 +777,13 @@ grant, as above.
   Ops goes Operations & People, CEO; People & Culture goes Program Manager, CEO; the company plan
   goes CEO. 72 hours a stage (Approvals Waiting reminders apply).
 - On completion (`workflow.onCompleted("performance.plan", …)`): plan `binding`, codes frozen,
-  scorecards `binding`, each employee and reviewer told to agree. Request Changes sets `returned`
-  with the reason; the head edits and sends again (a new instance).
+  scorecards `binding`, each employee and reviewer told to agree. Request Changes is a refusal with a
+  reason (`/reject`, never `/request-changes`, which would send the instance back to its first stage
+  and leave the plan Awaiting Approval): it sets `returned` with the reason; the head edits and sends
+  again (a new instance).
+- Each stage decides on Goals · Waiting On You, `GET /performance/approvals`, and the plan's sheet.
+  The CEO may decide any stage; the sender never decides their own unless they are the CEO
+  (`approvers.canAct`).
 
 ### 6.5 Scorecards, lines, KPIs and the contribution check (PR 2)
 
@@ -815,7 +829,10 @@ grant, as above.
   scored on the target in force then: the last change approved that applies from it or earlier, else
   the target before any change.
 - Change Target is offered to whoever the API would let ask: the accountable person, or someone who
-  sets the function's goals (`can_change_target` on the key result).
+  sets the function's goals (`can_change_target` on the key result), and not while a change to that
+  target waits.
+- The CEO decides a change on Goals · Waiting On You: Approve Change, or Refuse Change with a reason
+  (`/reject`); a refused change keeps the target, and its reason stays on the request's decisions.
 
 ### 6.8 Key result scoring and the roll-up (PR 1 maths, PR 2 screens)
 
@@ -1170,11 +1187,11 @@ company's shared plan (§8); scorecards, reviews and commitments are read in the
 | `objective.saved` · `key_result.saved` | save | search reindex |
 | `key_result.reported` | Report Month | lines fed by it recount (outbox); the CEO's monthly confirm list refreshes |
 | `key_result.score_confirmed` | Confirm Score | the function's and company's scores refresh |
-| `plan.submitted` · `plan.binding` · `plan.returned` | Send Plan; the CEO's approval; Request Changes | the engine tells each stage; on binding each employee and reviewer is told "Your Q4 2026 scorecard is ready to agree" |
+| `plan.submitted` · `plan.binding` · `plan.returned` | Send Plan; the CEO's approval; Request Changes | the engine tells each stage, and its notice opens the plan's sheet on Goals (`?plan=`); on binding each employee and reviewer is told "Your Q4 2026 scorecard is ready to agree" |
 | `plan.reopened` | reverting the import of a plan's last objectives | audit only: the plan is a draft again |
 | `scorecard.agreed` · `scorecard.disagreed` | agreement | notice to the other party; disagreement to the reviewer |
 | `scorecard.sent` · `scorecard.amendment_decided` (PR 3) | Send Scorecard; the plan flow's decision on it | the stages are told; on approval the scorecard binds and its people are told to agree it |
-| `target_change.requested` · `target_change.decided` | request; the CEO's decision | the requester is told; the target applies on approval |
+| `target_change.requested` · `target_change.decided` | request; the CEO's decision | the CEO's notice opens the change's sheet on Goals (`?change=`); the requester is told; the target applies on approval |
 | job `targets-lock` (daily 00:15 Lagos) | the quarter's lock date | TBC targets lock; the heads are told which locked |
 | `kpi.actual_recorded` | Record Actual or Report Month | lines fed by it recount |
 | `kpi.removed` | reverting the import that created a KPI | audit only: the KPI, its months and former codes are gone |
@@ -1258,13 +1275,17 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   appraisal, check-in. PIPs: `search:none` (sensitive; reached from the review). Commitments are tasks:
   `tasks.search.js` finds them with the words commitment and commitments too. A commitment set is reached
   from its approval and the Commitments view (`search:none`; route map `commitment_set` →
-  `performance.targets` with `?set=`). The week is a view over tasks (`search:none`, `ai:none` as the
+  `performance.targets` with `?set=`). A quarter plan and a target change are reached from their approval
+  and from Goals (`search:none`); ⌘K's Waiting on You lists them and opens their sheets. The week is a view over tasks (`search:none`, `ai:none` as the
   rest of the `workspace` module). ⌘K actions: New Scorecard, Report Month, Start Check-In, New Commitment
   (`workspace.tasks` with `action=commitment`).
 - **Route map** record types (PR 1): `organisational_goal`, `objective`, `key_result` → `performance.goals`;
   `kpi` → `performance.kpis`; `scorecard` and `target` (a line) → `performance.targets`, self →
   `ess.my-performance`; `review` → `performance.reviews`, self → `ess.my-performance`;
-  `improvement_plan` → `performance.reviews`, self → `ess.my-performance`.
+  `improvement_plan` → `performance.reviews`, self → `ess.my-performance`. After PR 5: `performance_plan`
+  → `performance.goals` with `?plan=`, self → `ess.my-performance` (a binding notice to someone who
+  cannot open Goals), and `target_change` → `performance.goals` with `?change=`, so the bell, Need You,
+  ⌘K and the assistant's citations open their sheets.
 
 ## 10 · On screen and mobile
 
@@ -1276,7 +1297,7 @@ is listed here as tier 1 or tier 2.**
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Performance · Goals (`goals`) | The quarter and its dates (desktop subtitle); the quarter switcher; New Goal (Organisational Goal, Objective, Key Result as the reader may); Company Score, On Track, In Recovery, Awaiting Report; function chips (Company and the four functions, each with its score); Organisational Goals (code, theme, goal); per objective its code and title, its key results (code, key result, owner, finish, status, October, November, December, a TBC pill); Plan Approval (the Chain of the function's stages and where it is) with Send Plan or Approve and Request Changes for the stage named; Report Month for the head. A key result opens a panel: Key Result, Type, Owner, Start, Finish, Baseline, Target (with Was after a change), Feeds, Fed By, Initiatives (each task with its date), This Month (Status, Actual, Source, Update, Recovery Owner and Date, Proposed, Confirmed), History, Rolls Up To; Change Target, Confirm Score (CEO) | Help term on the score figures: "Scores run from 0 to 1. Green is 0.7 or above; amber 0.4 to 0.7; red below 0.4 needs a recovery plan." On TBC: "A provisional target, locked on the quarter's lock date." On Scored From: "This key result takes its figures from the function key result named." | The cascade rules, who sets which level, codes and why links are by id: §6.1, §6.3. How plans are approved: §6.4. Their KR types explained: the manual |
+| Performance · Goals (`goals`) | The quarter and its dates (desktop subtitle); the quarter switcher; New Goal (Organisational Goal, Objective, Key Result as the reader may); Company Score, On Track, In Recovery, Awaiting Report; function chips (Company and the four functions, each with its score); Organisational Goals (code, theme, goal); per objective its code and title, its key results (code, key result, owner, finish, status, October, November, December, a TBC pill); Plan Approval (status, objectives, scorecards, what stops it) with Send Plan; Waiting On You (hidden when empty): Request (the function's plan, or Target Change and its code), From, Stage, Waiting Since; a row opens its sheet. A plan's sheet: Function, Quarter, Status, Stage, Sent By, Sent On, Objectives, Key Results, Scorecards, the Chain of its stages, what was returned and what warns, Objectives (code, objective, key results) and Scorecards (person, reviewer, lines, status); Request Changes and Approve Plan for its approver. A target change's sheet: Key Result (or Line and Person), Function, Quarter, Old Target, New Target, From Month, Reason, Asked By, Asked On, Status; Refuse Change and Approve Change for the CEO; Report Month for the head. A key result opens a panel: Key Result, Type, Owner, Start, Finish, Baseline, Target (with Was after a change), Change Waiting (the new target and its month, while a change waits), Feeds, Fed By, Initiatives (each task with its date), This Month (Status, Actual, Source, Update, Recovery Owner and Date, Proposed, Confirmed), History, Rolls Up To; Change Target, Confirm Score (CEO) | Help term on the score figures: "Scores run from 0 to 1. Green is 0.7 or above; amber 0.4 to 0.7; red below 0.4 needs a recovery plan." On TBC: "A provisional target, locked on the quarter's lock date." On Scored From: "This key result takes its figures from the function key result named." | The cascade rules, who sets which level, codes and why links are by id: §6.1, §6.3. How plans are approved: §6.4. Their KR types explained: the manual |
 | Performance · Scorecards (`targets`) | The quarter (desktop subtitle); Scorecards and Commitments switch. **Scorecards**: Scorecards, Agreed, Awaiting Agreement, Below Meets; filters Department, Status, Reviewer; New Scorecard; the list (Employee, Department, Reviewer, Status, Score to Date, Rating). A scorecard: the person, designation, department, reviewer, dotted line, scope; Score to Date, Rating, Weights, Agreed; Results, KPIs, Accountability, each with its weight and lines (Goal or KPI, Target, Linked To, Due, Weight, Oct, Nov, Dec, Score, an Auto pill); Contribution (key result, shares, target, OK or Rebalance); Edit Lines, Copy Last Quarter, Agree Scorecard, Disagree With Reason, Change Target, Change Reviewer. **Commitments**: the month switcher; Commitments, On Time, Late or Missed, Awaiting Approval; filters Department and State; Search People; Waiting On You (person, month, commitments, sent) with Approve Month and Request Changes (asks Reason); the list (Commitment, Person, Original Date, Due Now, State: Not Sent, Awaiting Approval, Returned, Due, On Time, Late, Missed, Rescoped); Export Report | Help term on Linked To: "The key result or KPI this line feeds. Its figures come from there." On Auto: "Worked out by the system. Your reviewer can change it with a reason." On Original Date: "The date agreed when the month was approved. It never moves." | The section weights' origin, sources and measures: §6.5. Contribution rules: §6.5. Commitment states' arithmetic: §6.11 |
 | Performance · KPIs (`kpis`) | The quarter (desktop subtitle); function chips; KPIs, Met Last Month, Not Met, Awaiting Actual; New KPI; the list (KPI ID, KPI, Target, Direction, Oct, Nov, Dec as Met, Not Met or N/A with the actual). A KPI opens: Formula, Unit, Direction, Target, Frequency, Data Source, the months with actual and comment, Lines Using It; Record Actual, Edit KPI | Help term on N/A: "No eligible cases this month. It never counts as met." | That KPIs are not scored at function level and never repeat a key result: §6.5 |
 | Performance · Reviews (`reviews`) | The month (desktop subtitle); the month switcher; Check-Ins In, With Reviewers, With HR, Closed; Waiting On You (each review that needs the reader: Score, Approve, Give Input); the list (Employee, Reviewer, Stage, Due, Score, Rating), filters Department, Stage, Kind; Reviews and PIPs switch; Open Round, Close Round. A review: the person, month, reviewer, stage (Chain: Check-In, Reviewer, Second Level, HR); per line the target, actual, evidence, the employee's action, Proposed, Self (with reason), Final, an Auto pill; Input from the dotted manager; Done This Month, Ongoing, Next Month; This Month (on time, late and absent days; recognitions received); Score This Month, Score to Date, Rating; Corrective Actions; Comment; Submit Review, Ask For Input, Approve, Request Changes, Close Review, Mark Conduct, Start PIP; for a probation review Confirm, Extend 3 Months, End Employment; Download PDF once closed. Waiting state: "Waiting for the check-in." | Help term on Proposed: "Worked out from the actual against the target." On Self: "The employee's own score, with their reason." On Not Assessable: "No evidence was given, so it does not count either way." | The self-first rule, what each reader may see, the chain's conditions and skips: §6.12, §6.13. Scoring rules: §6.9 |
@@ -1291,7 +1312,7 @@ is listed here as tier 1 or tier 2.**
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Performance · Goals (`goals`) | The quarter switcher, the four figures two to a row, function chips scrolling sideways, then objectives as cards with their key results as rows (code, status pill, latest score) | The Organisational Goals strip (behind a card that opens a sheet); the month columns (latest month only, the rest in the key result's sheet) | Report Month (heads) or New Goal, the floating button; a key result opens a sheet with Change Target and Confirm Score at its foot | Bottom bar More, Performance; the five tabs along the top |
+| Performance · Goals (`goals`) | The quarter switcher, the four figures two to a row, function chips scrolling sideways, Waiting On You as cards (request, from, stage, since) when something waits, then objectives as cards with their key results as rows (code, status pill, latest score) | The Organisational Goals strip (behind a card that opens a sheet); the month columns (latest month only, the rest in the key result's sheet) | Report Month (heads) or New Goal, the floating button; a key result opens a sheet with Change Target and Confirm Score at its foot; a plan stage opens a full-screen sheet with Request Changes and Approve Plan at its foot, a target change a sheet with Refuse Change and Approve Change | Bottom bar More, Performance; the five tabs along the top |
 | Performance · Scorecards (`targets`) | The Scorecards and Commitments switch; Scorecards as person cards (name, rating pill, score to date); Commitments as cards (commitment, person, state pill, original date) under the month switcher | The figures (a summary line instead); the contribution table (in the scorecard's sheet) | Agree Scorecard or Approve Month, full width in the sheet; New Scorecard in the floating button | As above; a commitment card opens its task, Back returns to the list |
 | Performance · KPIs (`kpis`) | Function chips, then KPIs as cards (code, name, latest result pill) | Formula and data source (in the KPI's sheet) | Record Actual, full width in the sheet | As above |
 | Performance · Reviews (`reviews`) | Waiting On You as cards first, then the month's reviews as cards (person, stage pill, due) | The figures (a summary line instead); the list's filters behind Filter | A review opens full screen with one line per card and Submit Review, Approve or Close Review in its footer | As above |
@@ -1303,6 +1324,9 @@ is listed here as tier 1 or tier 2.**
 
 - **Double press** on Send Plan, Agree Scorecard, Submit Check-In, Submit Review or an approval: one
   request (F26); the second answers 409 and the screen reloads.
+- **A link to a request already decided, or one the reader does not decide** (a stale bell notice,
+  a staff member's binding notice): the plan's or change's sheet opens on its record with its status
+  and no decision buttons (`can_decide` false, or the instance closed).
 - **A person joins mid-quarter**: their manager drafts a scorecard; it goes through a function plan
   amendment (a new instance of `performance.plan` holding only that scorecard). Months before it is
   binding are not reviewed. Built by PR 3: a draft scorecard of a binding plan is
@@ -1370,6 +1394,8 @@ are created by the PR that writes them: an empty prompt or template would be loa
 | 4 | `targets.commitments.js` and its routes in `targets.routes.js`, its events and flow handler in `targets.events.js`, its read in `targets.ai.js`; `tasks/*`, `calendar/*`, `workspace/*`; `services/ai/prompts/week-summary.md`; `commitment_set` in `shared/route-map.js` | `Commitments.tsx` and the Scorecards and Commitments switch at the top of `Scorecards.tsx`; `my/MyCommitments.tsx`; `app/src/features/workspace/*`; its mock routes in `app/src/api/mock/modules/workspace.ts` | `migrations/2400_performance_commitments.sql`; `seeds/staging/47_performance_commitments.js`; `docs/guides/workspace.md` |
 | 5 | `goals.analytics.js` and its routes; `dashboard/{dashboard.layout,dashboard.team}.js`, `dashboard/kpi-catalog/tiles/work.js`; built: also `goals.{routes,controller,events,ai}.js` (a few lines each), `goals.cascade.js` (`objectiveScores`), `dashboard/sources/goals.source.js`, `dashboard/dashboard.controller.js` | `Analytics.tsx`; built: also the Analytics and Home mocks and `app/src/api/types/performance.ts` (Analytics left it) | `docs/guides/home.md` |
 
+| After 5 | `goals.{repo,service,controller,routes,okrs}.js` (`GET /approvals`, `GET /target-changes/:id`, `submitted_by`, a line's change kept to scope, no second Change Target while one waits); `shared/route-map.js` (`performance_plan`, `target_change`) | `Approvals.tsx` (Waiting On You and the plan and target change sheets), mounted by `Goals.tsx`; `ReasonForm`'s `action` (`workspace/Commitment.tsx`); the plan and change flows in the mock (`api/mock/modules/performance.ts`, `organisation.ts`) | |
+
 Shared files more than one parallel PR touches, merged by rebase: `src/services/ai/actions.js` (PR 3 and
 PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actions), `contract.gen.ts`
 (regenerate, never hand-merge), `docs/PROGRESS.md` and this guide (each edits its own rows and lines).
@@ -1388,6 +1414,22 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 - **M3 hand-off**: the caution letter and the conduct mark from upheld sanctions. GE, at M3's start.
 
 ## 14 · Change log
+
+- 22/10/2026 · TB · Approvals on screen, found while writing the training guide: nothing in the hub
+  decided a Quarter Plan stage or a Target Change (§1.2 and the PR 2 entry said an Approvals inbox
+  did; none exists), and their notices and Need You rows opened nothing. Goals now has Waiting On
+  You (`GET /performance/approvals`: the plan stages and target changes naming the reader, oldest
+  first, 25 a page) and two sheets: a plan's (what it binds, the chain, Request Changes and Approve
+  Plan) and a target change's (`GET /performance/target-changes/:id`; Refuse Change and Approve
+  Change). Request Changes and Refuse Change are refusals with a reason (`/reject`). The route map's
+  `performance_plan` and `target_change` open them (`?plan=`, `?change=`), so the bell, Need You, ⌘K
+  and the assistant reach them (§3.2, §3.5, §5, §6.4, §6.7, §7, §9, §10, §11, §12). Also: Plan names
+  who sent it; a key result shows Change Waiting and offers no second Change Target while one waits;
+  `GET /target-changes` keeps a line's change to the reader's scope, as §5 said; its sheet is for
+  whoever may read the line's scorecard; a binding notice opens My Performance for staff who cannot
+  open Goals. Left: a mid-quarter
+  scorecard's own `performance.plan` (Send Scorecard) still has no screen to decide it, and the
+  Scorecards tab does not open a scorecard from a link (§14, PR 3).
 
 - 22/10/2026 · TB · Fix after PR 5, found while walking staging's data for the training guide: `okr_kpis`
   named every KPI after its code, because the column finder took the first header starting with "KPI"

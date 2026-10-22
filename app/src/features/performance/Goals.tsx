@@ -1,8 +1,9 @@
 /**
  * Performance · Goals (docs/guides/performance.md §2, §3.1, §3.2, §3.5, §10): the quarter's OKR
  * tree. Organisational goals; the company's and each function's objectives with their key results;
- * the function's plan and its approval; Report Month for the head, Confirm Score for the CEO and
- * Change Target on a binding key result. Everyone sees the whole tree.
+ * the function's plan and its approval; Waiting On You, the plan stages and target changes the
+ * reader decides (./Approvals); Report Month for the head, Confirm Score for the CEO and Change
+ * Target on a binding key result. Everyone sees the whole tree.
  */
 import { useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -41,6 +42,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
+import { useApprovalLinks, WaitingOnYou } from "./Approvals";
 import { band, fieldMessage, krStatus, KR_STATUS_OPTIONS, planStatus, reportingMonth, score, useQuarter } from "./shared";
 
 type KrMonthStatus = KeyResultMonth["status"];
@@ -96,6 +98,7 @@ export function Goals() {
     });
   useScreenAction(mayGoal && period ? { label: "New Goal", onSelect: newGoal } : null);
   useUrlAction("report", hasCapability(me, "goals.function") && period && departments.data ? report : null);
+  useApprovalLinks();
   const openKr = (kr: KeyResult) => modal.open({ title: kr.code, wide: true, body: (close) => <KeyResultSheet id={kr.okr_key_result_id} close={close} /> });
 
   return (
@@ -117,6 +120,7 @@ export function Goals() {
         <FilterSelect label="Function" value={dept} onChange={setDept} options={chips} />
       </Toolbar>
       <KpiTiles items={tiles} mobileCols={2} />
+      <WaitingOnYou />
       {plan && <PlanCard id={plan.performance_plan_id} />}
       <PagedTable
         title="Organisational Goals"
@@ -223,6 +227,7 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
     }
   };
   const was = k.target_history.filter((c) => c.status === "approved").at(0);
+  const waiting = k.target_history.find((c) => c.status === "pending");
   return (
     <>
       <KeyValue
@@ -234,6 +239,9 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
           ["Finish", k.finishes_on ? formatDate(k.finishes_on) : "–"],
           ["Baseline", k.baseline_text ?? "–"],
           ["Target", `${k.target_text ?? k.target_value ?? "–"}${k.unit ? ` ${k.unit}` : ""}${was ? ` · Was ${was.from_text ?? was.from_value ?? "not set"}` : ""}`],
+          ...(waiting
+            ? ([["Change Waiting", `${waiting.to_text ?? waiting.to_value ?? "–"}${k.unit ? ` ${k.unit}` : ""} from ${formatMonth(waiting.from_month)}`]] as Array<[string, string]>)
+            : []),
           ["Feeds", k.linked_company_key_results.map((c) => c.code).join(", ") || "–"],
           ["Fed By", k.contributing.map((c) => c.code).join(", ") || "–"],
           ["Rolls Up To", k.trace.steps.filter((s) => s.kind !== "key_result").map((s) => s.code ?? s.title).join(" › ") || "–"],

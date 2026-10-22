@@ -382,6 +382,8 @@ is listed here as tier 1 or tier 2.**
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · `ReasonForm` takes an `action`, the button's words where a refusal reads otherwise (Refuse Change on a target change, performance.md §6.7); Request Changes stays the default.
+
 - 22/10/2026 · GE · Calendar's toolbar: Today stands on its own before the arrows, which are named by the view (Previous Month, Next Week, Next Day), so the forward arrow no longer reads as "tomorrow" (team feedback, 22/10/2026).
 
 - 22/10/2026 · TB · §7: a repeating task swept after its next day's due time comes round on the rule's following day; it was made late at birth and repeated again on the next sweep (found when the integration suite ran on a Thursday evening).

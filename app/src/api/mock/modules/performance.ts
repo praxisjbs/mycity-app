@@ -1,7 +1,9 @@
-import { created, fail, invalid, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
+import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, managerOf, refKey, teamOf } from "../data/people";
 import type {
   AnalyticsPerson,
+  ApprovalInstance,
+  ApprovalWaiting,
   KeyResult,
   KeyResultDetail,
   KeyResultMonth,
@@ -10,6 +12,7 @@ import type {
   Objective,
   OrganisationalGoal,
   PerformanceAnalytics,
+  PerformanceApproval,
   PerformancePeriod,
   Plan,
   PlanDetail,
@@ -17,6 +20,7 @@ import type {
   ScorecardDetail,
   ScorecardLine,
   TargetChange,
+  TargetChangeDetail,
 } from "@mycity/contract/contract.gen.ts";
 import { exportFile } from "./shared";
 import { CONTRIBUTIONS, DEPT, deptId, KPIS as FUNCTION_KPIS, OBJECTIVES, ORG_GOALS, PERIOD, PLANS, SCORECARDS, TARGET_CHANGES } from "../data/performance";
@@ -93,6 +97,7 @@ const planOf = (periodId: string, departmentId: string | null) => {
       department: departmentId ? (departmentId === deptId ? DEPT : "Function") : null,
       status: "draft",
       workflow_instance_id: null,
+      submitted_by: null,
       submitted_at: null,
       returned_reason: null,
       binding_at: null,
@@ -142,7 +147,10 @@ const krDetail = (kr: KeyResult, req: Req): KeyResultDetail => {
     months: kr.latest ? [kr.latest] : [],
     target_history: TARGET_CHANGES.filter((c) => c.okr_key_result_id === kr.okr_key_result_id),
     trace: traceOf(kr),
-    can_change_target: o.plan_status === "binding" && (kr.accountable?.employee_id === meOf(req)?.employee_id || setsGoalsFor(req, o.department_id)),
+    can_change_target:
+      o.plan_status === "binding" &&
+      !TARGET_CHANGES.some((c) => c.okr_key_result_id === kr.okr_key_result_id && c.status === "pending") &&
+      (kr.accountable?.employee_id === meOf(req)?.employee_id || setsGoalsFor(req, o.department_id)),
   };
 };
 
@@ -409,7 +417,8 @@ const planProblems = (p: Plan) => {
   return out;
 };
 const planDetail = (req: Req, p: Plan): PlanDetail => {
-  const problems = planProblems(p);
+  // A sent plan was clear when it went; what is left to fix is worked out while it is open.
+  const problems = open(p.status) ? planProblems(p) : [];
   const me = meOf(req);
   const head = p.department_id === deptId ? me?.user_key === "ngozi" : isCeo(req);
   return {
@@ -438,7 +447,10 @@ route("POST /api/v1/performance/plans/:id/submit", (req) => {
   if (!p) return notFound();
   const d = planDetail(req, p);
   if (!d.can_submit) return fail(409, "PLAN_NOT_READY", d.problems.find((x) => x.blocking)?.message ?? "The plan cannot be sent");
-  Object.assign(p, { status: "submitted", submitted_at: now(), returned_reason: null, updated_at: now() });
+  const wid = sid(`perf:wf:plan:${p.performance_plan_id}:${Date.now()}`);
+  const sentBy = req.user!;
+  FLOWS.push({ wid, planId: p.performance_plan_id, stages: stagesFor(p, sentBy), at: 0, by: sentBy, entered: now(), opened: now(), moves: [] });
+  Object.assign(p, { status: "submitted", workflow_instance_id: wid, submitted_by: refKey(sentBy), submitted_at: now(), returned_reason: null, updated_at: now() });
   for (const o of OBJECTIVES) if (o.performance_plan_id === p.performance_plan_id) o.plan_status = "submitted";
   return ok(planDetail(req, p));
 });
@@ -457,6 +469,8 @@ route("POST /api/v1/performance/target-changes", (req) => {
   if (b.okr_key_result_id && !k) return invalid({ okr_key_result_id: ["Pick a key result"] });
   if (!b.to_value && !b.to_text) return invalid({ to_value: ["Enter the new target"] });
   if (!b.reason?.trim()) return invalid({ reason: ["Required"] });
+  if (TARGET_CHANGES.some((x) => x.status === "pending" && x.okr_key_result_id === (b.okr_key_result_id || null) && x.employee_target_id === (b.employee_target_id || null)))
+    return fail(409, "CHANGE_PENDING", "A change to this target is already waiting for a decision");
   const c: TargetChange = {
     target_change_id: sid(`perf:change:${Date.now()}`),
     okr_key_result_id: b.okr_key_result_id || null,
@@ -476,6 +490,263 @@ route("POST /api/v1/performance/target-changes", (req) => {
   TARGET_CHANGES.unshift(c);
   return created(c);
 });
+
+route("GET /api/v1/performance/target-changes/:id", (req) => {
+  const c = TARGET_CHANGES.find((x) => x.target_change_id === req.params.id);
+  if (!c) return notFound();
+  const k = c.okr_key_result_id ? krById(c.okr_key_result_id) : undefined;
+  const detail: TargetChangeDetail = {
+    ...c,
+    key_result: k ? { okr_key_result_id: k.okr_key_result_id, code: k.code, statement: k.statement } : null,
+    unit: k?.unit ?? null,
+    line: null,
+    department: k ? objectiveOf(k).department : null,
+    period_name: PERIOD.name,
+  };
+  return ok(detail);
+});
+
+/*
+ * Approvals: a plan's stages and a target change's, decided through the workflow mock
+ * (organisation.ts), as performance.plan and performance.target_change read. A function's plan
+ * goes to its head's line manager unless that is the CEO, then to Operations & People unless they
+ * sent it, then to the CEO; the company plan and every target change to the CEO, who may also
+ * decide any stage. 72 hours a stage.
+ */
+type PlanStage = "line_manager" | "operations_people" | "ceo";
+const STAGE_NAMES: Record<PlanStage, string> = { line_manager: "Line Manager", operations_people: "Operations & People", ceo: "CEO" };
+const STAGE_HOURS = 72;
+type Move = { stage: PlanStage; decision: "approve" | "reject"; by: string; reason: string | null; at: string };
+type Flow = { wid: string; planId: string; stages: PlanStage[]; at: number; by: string; entered: string; opened: string; moves: Move[] };
+const FLOWS: Flow[] = [
+  { wid: sid("perf:wf:plan:content"), planId: sid("perf:plan:content"), stages: ["operations_people", "ceo"], at: 0, by: "tolu", entered: at(1, "11:00"), opened: at(1, "11:00"), moves: [] },
+];
+const CHANGE_MOVES: Record<string, Move> = {};
+const planById = (id: string) => PLANS.find((p) => p.performance_plan_id === id);
+const headKeyOf = (p: Plan) => (p.department_id === deptId ? "ngozi" : p.department === "Content" ? "tolu" : null);
+const keyOf = (ref: { employee_id: string } | null) => (ref ? byId(ref.employee_id)?.user_key ?? null : null);
+function stagesFor(p: Plan, sentBy: string): PlanStage[] {
+  if (!p.department_id) return ["ceo"];
+  const head = headKeyOf(p);
+  const manager = head ? byKey(head)?.manager : null;
+  return [...(manager && manager !== "ifeoma" ? (["line_manager"] as const) : []), ...(sentBy === "cynthia" ? [] : (["operations_people"] as const)), "ceo"];
+}
+const approverOf = (f: Flow, stage: PlanStage) => {
+  if (stage === "ceo") return "ifeoma";
+  if (stage === "operations_people") return "cynthia";
+  const p = planById(f.planId);
+  return p ? byKey(headKeyOf(p) ?? "")?.manager ?? null : null;
+};
+const pending = (f: Flow) => planById(f.planId)?.status === "submitted" && planById(f.planId)?.workflow_instance_id === f.wid;
+const waitsOnPlan = (f: Flow, user: string) => pending(f) && f.by !== user && approverOf(f, f.stages[f.at]) === user;
+const mayDecidePlan = (f: Flow, user: string) => pending(f) && (user === "ifeoma" || (f.by !== user && approverOf(f, f.stages[f.at]) === user));
+const dueOf = (entered: string) => new Date(Date.parse(entered) + STAGE_HOURS * 3600000).toISOString();
+const APPROVER_VIEW: Record<PlanStage, ApprovalInstance["route"][number]["approvers"][number]> = {
+  line_manager: { type: "manager_of_subject", value: null, label: "Line Manager" },
+  operations_people: { type: "role", value: "operations_people", label: "Operations & People" },
+  ceo: { type: "ceo", value: null, label: "CEO" },
+};
+const decisionsOf = (wid: string, moves: Move[]): ApprovalInstance["decisions"] =>
+  moves.map((m, i) => ({
+    workflow_decision_id: sid(`${wid}:${i}`),
+    stage_key: m.stage,
+    stage_name: STAGE_NAMES[m.stage],
+    actor_id: byKey(m.by)?.employee_id ?? null,
+    actor_name: byKey(m.by)?.display_name ?? null,
+    decision: m.decision,
+    reason: m.reason,
+    decided_at: m.at,
+  }));
+
+function planInstance(user: string, f: Flow): ApprovalInstance {
+  const p = planById(f.planId)!;
+  const head = byKey(headKeyOf(p) ?? "");
+  const open = pending(f);
+  const stateOf = (k: PlanStage): ApprovalInstance["route"][number]["state"] => {
+    const i = f.stages.indexOf(k);
+    if (i < 0) return "skipped";
+    const move = f.moves.find((m) => m.stage === k);
+    if (move) return move.decision === "approve" ? "done" : "stopped";
+    return open ? (i === f.at ? "now" : "todo") : "skipped";
+  };
+  const state = open ? "pending" : f.moves.some((m) => m.decision === "reject") ? "rejected" : "approved";
+  return {
+    workflow_instance_id: f.wid,
+    definition_key: "performance.plan",
+    definition_name: "Quarter Plan",
+    version: 1,
+    module_key: "performance",
+    entity_type: "performance_plan",
+    entity_id: p.performance_plan_id,
+    subject_employee_id: head?.employee_id ?? null,
+    subject_name: head?.display_name ?? null,
+    state,
+    current_stage: open ? f.stages[f.at] : null,
+    stage_name: open ? STAGE_NAMES[f.stages[f.at]] : null,
+    context: { head_reports_to_ceo: !f.stages.includes("line_manager"), by_operations_people: f.by === "cynthia", is_company: !p.department_id },
+    stage_entered_at: f.entered,
+    stage_due_at: open ? dueOf(f.entered) : null,
+    opened_by: null,
+    opened_by_name: byKey(f.by)?.display_name ?? null,
+    opened_at: f.opened,
+    completed_at: open ? null : (f.moves.at(-1)?.at ?? null),
+    route: (["line_manager", "operations_people", "ceo"] as PlanStage[]).map((k) => ({ key: k, name: STAGE_NAMES[k], state: stateOf(k), approvers: [APPROVER_VIEW[k]] })),
+    decisions: decisionsOf(f.wid, f.moves),
+    can_decide: mayDecidePlan(f, user),
+    can_withdraw: false,
+    can_reassign: false,
+    link: `/performance?tab=goals&plan=${p.performance_plan_id}`,
+  };
+}
+
+function changeInstance(user: string, c: TargetChange): ApprovalInstance {
+  const asker = byKey(keyOf(c.requested_by) ?? "");
+  const move = CHANGE_MOVES[c.workflow_instance_id ?? ""];
+  const open = c.status === "pending";
+  return {
+    workflow_instance_id: c.workflow_instance_id!,
+    definition_key: "performance.target_change",
+    definition_name: "Target Change",
+    version: 1,
+    module_key: "performance",
+    entity_type: "target_change",
+    entity_id: c.target_change_id,
+    subject_employee_id: asker?.employee_id ?? null,
+    subject_name: asker?.display_name ?? null,
+    state: open ? "pending" : c.status === "approved" ? "approved" : "rejected",
+    current_stage: open ? "ceo" : null,
+    stage_name: open ? "CEO" : null,
+    context: {},
+    stage_entered_at: c.created_at,
+    stage_due_at: open ? dueOf(c.created_at) : null,
+    opened_by: null,
+    opened_by_name: asker?.display_name ?? null,
+    opened_at: c.created_at,
+    completed_at: c.decided_at,
+    route: [{ key: "ceo", name: "CEO", state: open ? "now" : move?.decision === "reject" ? "stopped" : "done", approvers: [APPROVER_VIEW.ceo] }],
+    decisions: move ? decisionsOf(c.workflow_instance_id!, [move]) : [],
+    can_decide: open && user === "ifeoma",
+    can_withdraw: false,
+    can_reassign: false,
+    link: `/performance?tab=goals&change=${c.target_change_id}`,
+  };
+}
+
+/** A plan's or a target change's request, or null when the instance is neither (the workflow mock passes it on). */
+export function performanceInstance(user: string, wid: string): ApprovalInstance | null {
+  const f = FLOWS.find((x) => x.wid === wid);
+  if (f) return planInstance(user, f);
+  const c = TARGET_CHANGES.find((x) => x.workflow_instance_id === wid);
+  return c ? changeInstance(user, c) : null;
+}
+
+/** Decide a plan's stage, or null when the instance is not a plan's. Request Changes is a refusal: the plan comes back Returned. */
+export function decidePlan(user: string, wid: string, approve: boolean, reason?: string | null) {
+  const f = FLOWS.find((x) => x.wid === wid);
+  if (!f) return null;
+  const p = planById(f.planId);
+  if (!p || !pending(f)) return fail(409, "WORKFLOW_CLOSED", "This approval is already decided");
+  if (!mayDecidePlan(f, user)) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  const why = String(reason ?? "").trim();
+  if (!approve && !why) return invalid({ reason: ["is required"] });
+  f.moves.push({ stage: f.stages[f.at], decision: approve ? "approve" : "reject", by: user, reason: why || null, at: now() });
+  const settle = (status: Plan["status"]) => {
+    Object.assign(p, { status, updated_at: now(), ...(status === "binding" ? { binding_at: now() } : { returned_reason: why }) });
+    for (const o of OBJECTIVES) if (o.performance_plan_id === p.performance_plan_id) o.plan_status = status;
+  };
+  if (!approve) settle("returned");
+  else if (f.at < f.stages.length - 1) {
+    f.at += 1;
+    f.entered = now();
+  } else settle("binding");
+  return ok(planInstance(user, f));
+}
+
+/** Decide a target change, or null when the instance is not one: the CEO's alone. An approved change sets the key result's target. */
+export function decideTargetChange(user: string, wid: string, approve: boolean, reason?: string | null) {
+  const c = TARGET_CHANGES.find((x) => x.workflow_instance_id === wid);
+  if (!c) return null;
+  if (c.status !== "pending") return fail(409, "WORKFLOW_CLOSED", "This approval is already decided");
+  if (user !== "ifeoma") return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
+  const why = String(reason ?? "").trim();
+  if (!approve && !why) return invalid({ reason: ["is required"] });
+  CHANGE_MOVES[wid] = { stage: "ceo", decision: approve ? "approve" : "reject", by: user, reason: why || null, at: now() };
+  Object.assign(c, { status: approve ? "approved" : "rejected", decided_at: now() });
+  const k = approve && c.okr_key_result_id ? krById(c.okr_key_result_id) : undefined;
+  if (k) Object.assign(k, { target_value: c.to_value, target_text: c.to_text, target_provisional: false });
+  return ok(changeInstance(user, c));
+}
+
+/** The approvals waiting on this login, oldest first: Goals · Waiting On You. */
+function approvalsFor(user: string): PerformanceApproval[] {
+  const plans = FLOWS.filter((f) => waitsOnPlan(f, user)).map((f): PerformanceApproval => {
+    const p = planById(f.planId)!;
+    return {
+      kind: "plan",
+      record_id: p.performance_plan_id,
+      workflow_instance_id: f.wid,
+      period_name: p.period_name,
+      department: p.department,
+      key_result_code: null,
+      line_title: null,
+      requested_by: refKey(f.by),
+      stage_name: STAGE_NAMES[f.stages[f.at]],
+      waiting_since: f.entered,
+      overdue: Date.parse(dueOf(f.entered)) < Date.now(),
+    };
+  });
+  const changes = user === "ifeoma"
+    ? TARGET_CHANGES.filter((c) => c.status === "pending" && c.workflow_instance_id && keyOf(c.requested_by) !== user).map((c): PerformanceApproval => {
+        const k = c.okr_key_result_id ? krById(c.okr_key_result_id) : undefined;
+        return {
+          kind: "target_change",
+          record_id: c.target_change_id,
+          workflow_instance_id: c.workflow_instance_id!,
+          period_name: PERIOD.name,
+          department: k ? objectiveOf(k).department : null,
+          key_result_code: k?.code ?? null,
+          line_title: null,
+          requested_by: c.requested_by,
+          stage_name: "CEO",
+          waiting_since: c.created_at,
+          overdue: Date.parse(dueOf(c.created_at)) < Date.now(),
+        };
+      })
+    : [];
+  return [...plans, ...changes].sort((a, b) => a.waiting_since.localeCompare(b.waiting_since));
+}
+route("GET /api/v1/performance/approvals", (req) =>
+  paged(approvalsFor(req.user!), req, { search: (r) => [r.department ?? "Company", r.key_result_code, r.line_title, r.requested_by?.display_name] }),
+);
+
+/** The same requests as Home's Need You rows (GET /workflow/mine). */
+export function performanceWaitingOn(user: string): ApprovalWaiting[] {
+  return approvalsFor(user).map((r) => {
+    const plan = r.kind === "plan" ? planById(r.record_id) : undefined;
+    const flow = r.kind === "plan" ? FLOWS.find((f) => f.wid === r.workflow_instance_id) : undefined;
+    const head = plan ? byKey(headKeyOf(plan) ?? "") : undefined;
+    return {
+      workflow_instance_id: r.workflow_instance_id,
+      definition_key: r.kind === "plan" ? "performance.plan" : "performance.target_change",
+      definition_name: r.kind === "plan" ? "Quarter Plan" : "Target Change",
+      module_key: "performance",
+      entity_type: r.kind === "plan" ? "performance_plan" : "target_change",
+      entity_id: r.record_id,
+      subject_employee_id: plan ? (head?.employee_id ?? null) : (r.requested_by?.employee_id ?? null),
+      subject_name: plan ? (head?.display_name ?? null) : (r.requested_by?.display_name ?? null),
+      current_stage: flow ? flow.stages[flow.at] : "ceo",
+      stage_name: r.stage_name,
+      context: {},
+      stage_entered_at: r.waiting_since,
+      stage_due_at: dueOf(r.waiting_since),
+      overdue: r.overdue,
+      opened_by: null,
+      opened_by_name: r.requested_by?.display_name ?? null,
+      opened_at: r.waiting_since,
+      link: r.kind === "plan" ? `/performance?tab=goals&plan=${r.record_id}` : `/performance?tab=goals&change=${r.record_id}`,
+    };
+  });
+}
 
 /* KPIs */
 function recordKpi(req: Req, kpi: Kpi, b: Record<string, string | undefined>): KpiMonth {

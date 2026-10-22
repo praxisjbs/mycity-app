@@ -356,10 +356,10 @@ async function deleteKeyResult(actor, id) {
   });
 }
 
-/** GET /performance/key-results/:id */
 /** May the reader ask to change this key result's target? requestChange's checks, as a yes or no. */
 async function mayChangeTarget(actor, planStatus, ctx) {
   if (!actor || planStatus !== "binding") return false;
+  if (await repo.changePending(pool, { okr_key_result_id: ctx.okr_key_result_id })) return false;
   if (!(await scopeFor(actor, "performance", "edit"))) return false;
   if (actor.employee_id && actor.employee_id === ctx.accountable_employee_id) return true;
   return authority.maySetGoals(pool, actor, ctx.department_id);

@@ -261,6 +261,7 @@ function planView(p) {
     department: p.department,
     status: p.status,
     workflow_instance_id: p.workflow_instance_id,
+    submitted_by: p.submitted_by_person || null,
     submitted_at: iso(p.submitted_at),
     returned_reason: p.returned_reason,
     binding_at: iso(p.binding_at),
@@ -399,10 +400,74 @@ async function submitPlan(actor, id, scope = null) {
  * Target changes (§6.7)
  * ------------------------------------------------------------------ */
 
-async function listChanges(query) {
+async function listChanges(query, scope) {
   const okrs = require("./goals.okrs");
-  const page = await repo.listChanges(pool, query);
+  const page = await repo.listChanges(pool, query, scope);
   return { ...page, data: page.data.map(okrs.changeView) };
+}
+
+/**
+ * GET /performance/target-changes/:id: one change for its sheet. A key result's is anyone's to read
+ * (the OKR tree is shared); a line's is for whoever may read its scorecard (in scope, its person, its
+ * reviewer or dotted manager), its requester, or whoever runs the cycle (the CEO decides it).
+ */
+async function changeDetail(id, actor, scope) {
+  const okrs = require("./goals.okrs");
+  const row = await repo.getChangeDetail(pool, id);
+  if (!row) throw new AppError("NOT_FOUND", "That target change does not exist", 404);
+  const asked = Boolean(actor && row.requested_by && row.requested_by.employee_id === actor.employee_id);
+  if (row.line_employee_id && !asked && !(await authority.runsTheCycle(actor))) {
+    const targets = require("../targets/targets.service");
+    const card = await require("../targets/targets.repo").get(pool, row.line_scorecard_id);
+    if (!card || !(await targets.mayRead(pool, card, actor, scope)))
+      throw new AppError("NOT_FOUND", "That target change does not exist", 404);
+  }
+  return {
+    ...okrs.changeView(row),
+    key_result: row.key_result,
+    unit: row.unit,
+    line: row.line,
+    department: row.department,
+    period_name: row.period_name,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Approvals waiting on the reader (§6.4, §6.7)
+ * ------------------------------------------------------------------ */
+
+/**
+ * GET /performance/approvals: the plan stages and target changes the reader decides, oldest first.
+ * Deciding stays the engine's (POST /workflow/instances/:id/approve or reject); the outcome is
+ * goals.approval.js's.
+ */
+async function approvals(query, actor) {
+  const approvers = require("../../shared/workflow/approvers");
+  const cond = require("../../shared/workflow/conditions");
+  const { scopeFor } = require("../../middleware/rbac");
+  // The engine refuses a decision without `performance` approve (workflow.service.decide); the CEO approves everywhere.
+  const mayDecide = actor.is_ceo === true || Boolean(await scopeFor(actor, "performance", "approve"));
+  const roleCodes = await approvers.roleCodesOf(pool, actor.role_ids || []);
+  const page = await repo.approvalsWaiting(pool, actor, roleCodes, mayDecide, query);
+  return {
+    ...page,
+    data: page.data.map((r) => {
+      const stage = cond.stageByKey({ stages: r.stages }, r.current_stage);
+      return {
+        kind: r.kind,
+        record_id: r.record_id,
+        workflow_instance_id: r.workflow_instance_id,
+        period_name: r.period_name,
+        department: r.department,
+        key_result_code: r.key_result_code,
+        line_title: r.line_title,
+        requested_by: r.requested_by,
+        stage_name: stage ? stage.name : r.current_stage,
+        waiting_since: iso(r.stage_entered_at),
+        overdue: r.overdue,
+      };
+    }),
+  };
 }
 
 /** POST /performance/target-changes: a binding key result's or line's target, to the CEO. */
@@ -500,6 +565,8 @@ module.exports = {
   planDetail,
   submitPlan,
   listChanges,
+  changeDetail,
+  approvals,
   requestChange,
   lockTargets,
 };

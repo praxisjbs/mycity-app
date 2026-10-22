@@ -49,7 +49,9 @@ module.exports = {
   plan: async (req, res) => ok(res, await service.planDetail(id(req), withActor(req), scopeOf(req))),
   submitPlan: async (req, res) => ok(res, await service.submitPlan(withActor(req), id(req), scopeOf(req))),
 
-  changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query)),
+  changes: async (req, res) => sendPaged(res, await service.listChanges(req.validated.query, scopeOf(req))),
+  change: async (req, res) => ok(res, await service.changeDetail(id(req), withActor(req), scopeOf(req))),
+  approvals: async (req, res) => sendPaged(res, await service.approvals(req.validated.query, withActor(req))),
   requestChange: async (req, res) => created(res, await service.requestChange(withActor(req), scopeOf(req), req.validated.body)),
 
   analytics: async (req, res) => ok(res, await analytics.figures(req.validated.query, scopeOf(req))),

@@ -284,6 +284,11 @@ const ENTITY_ROUTES = Object.freeze({
   organisational_goal: screen("performance", "goals"),
   objective: screen("performance", "goals"),
   key_result: screen("performance", "goals"),
+  // A plan's binding notice opens My Performance for someone who cannot open Goals, where they agree their scorecard.
+  // search:none a function's quarter plan is opened from its approval (the bell, Need You, ⌘K's Waiting on You) and read on Goals
+  performance_plan: { ...screen("performance", "goals"), param: "plan", self: screen("ess", "my-performance") },
+  // search:none a target change is opened from its approval and from the key result it changes, which search finds
+  target_change: { ...screen("performance", "goals"), param: "change" },
   scorecard: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),

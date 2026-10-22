@@ -85,6 +85,18 @@ export const planStatus = (s: string) => {
   return { tone, text };
 };
 
+const CHANGE: Record<string, [string, Tone]> = {
+  pending: ["Awaiting Approval", "warn"],
+  approved: ["Approved", "ok"],
+  rejected: ["Refused", "err"],
+};
+
+/** A target change's status as a pill. */
+export const changeStatus = (s: string) => {
+  const [text, tone] = CHANGE[s] ?? [s, "neutral"];
+  return { tone, text };
+};
+
 const CARD: Record<string, [string, Tone]> = {
   draft: ["Draft", "neutral"],
   binding: ["Awaiting Agreement", "warn"],

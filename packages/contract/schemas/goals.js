@@ -534,6 +534,7 @@ const Plan = z
     department: z.string().nullable(),
     status: PlanStatus,
     workflow_instance_id: uuid.nullable(),
+    submitted_by: PersonRef.nullable(),
     submitted_at: isoDateTime.nullable(),
     returned_reason: z.string().nullable(),
     binding_at: isoDateTime.nullable(),
@@ -610,6 +611,52 @@ const TargetChangeListQuery = listQuery(
   },
   ["created_at"],
 );
+
+/** The scorecard line a target change is for. */
+const TargetChangeLine = z
+  .object({
+    employee_target_id: uuid,
+    title: z.string(),
+    employee: PersonRef,
+  })
+  .strict();
+
+/** GET /performance/target-changes/:id: one change, named in full, for its sheet. */
+const TargetChangeDetail = TargetChange.extend({
+  key_result: KeyResultRef.nullable(),
+  unit: z.string().nullable(),
+  line: TargetChangeLine.nullable(),
+  department: z.string().nullable(),
+  period_name: z.string().nullable(),
+}).strict();
+
+/* ------------------------------------------------------------------ *
+ * Approvals waiting on the reader (§6.4, §6.7)
+ * ------------------------------------------------------------------ */
+
+const PerformanceApprovalKind = z.enum(["plan", "target_change"]);
+
+/** A plan stage or a target change the reader decides: Goals · Waiting On You. */
+const PerformanceApproval = z
+  .object({
+    kind: PerformanceApprovalKind,
+    record_id: uuid,
+    workflow_instance_id: uuid,
+    period_name: z.string().nullable(),
+    department: z.string().nullable(),
+    key_result_code: z.string().nullable(),
+    line_title: z.string().nullable(),
+    requested_by: PersonRef.nullable(),
+    stage_name: z.string(),
+    waiting_since: isoDateTime,
+    overdue: z.boolean(),
+  })
+  .strict();
+
+const PerformanceApprovalPage = Paged(PerformanceApproval);
+
+/** GET /performance/approvals: oldest first; `q` finds a function, a key result or who asked. */
+const PerformanceApprovalQuery = listQuery({});
 
 /* ------------------------------------------------------------------ *
  * Import (§6.19)
@@ -793,6 +840,7 @@ const KR_VIRTUAL = {
 };
 const GOAL_VIRTUAL = { owner: "the person in organisational_goal.owner_employee_id" };
 const PLAN_VIRTUAL = {
+  submitted_by: "the employee of performance_plan.submitted_by",
   period_name: "performance_period.name",
   department: "department.name; null for the company plan",
   objective_count: "how many objectives it holds, counted",
@@ -927,6 +975,24 @@ const TABLES = {
   TargetChangeCreate: { table: "target_change" },
   TargetChangePage: { table: null, reason: "a page of target changes" },
   TargetChangeListQuery: { table: null, reason: "list controls and filters for target changes" },
+  TargetChangeLine: { table: "employee_target", virtual: { employee: "the line's employee" } },
+  TargetChangeDetail: {
+    table: "target_change",
+    virtual: {
+      requested_by: "the employee of target_change.requested_by",
+      key_result: "the okr_key_result it changes",
+      unit: "the key result's or the line's unit",
+      line: "the employee_target it changes",
+      department: "the function of the key result or of the line's scorecard",
+      period_name: "the quarter of the key result or of the line's scorecard",
+    },
+  },
+  PerformanceApproval: {
+    table: null,
+    reason: "a pending performance.plan or performance.target_change workflow_instance naming the reader, with its record",
+  },
+  PerformanceApprovalPage: { table: null, reason: "a page of approvals waiting on the reader" },
+  PerformanceApprovalQuery: { table: null, reason: "list controls for the approvals waiting on the reader" },
   PerformanceAnalyticsQuery: { table: null, reason: "which quarter and function to count" },
   OnTime: { table: null, reason: "how many were due and how many on time, counted" },
   MonthOnTime: { table: null, reason: "one month's due and on time, counted" },
@@ -1006,6 +1072,12 @@ module.exports = {
   TargetChangeCreate,
   TargetChangePage,
   TargetChangeListQuery,
+  TargetChangeLine,
+  TargetChangeDetail,
+  PerformanceApprovalKind,
+  PerformanceApproval,
+  PerformanceApprovalPage,
+  PerformanceApprovalQuery,
   PerformanceAnalyticsQuery,
   ScoreGap,
   OnTime,

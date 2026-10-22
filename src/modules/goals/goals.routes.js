@@ -17,7 +17,9 @@
  *   POST  /key-results/:id/confirm                         `performance` approve, goals.confirm
  *   GET   /plans · /plans/:id                              `performance` view
  *   POST  /plans/:id/submit                                `performance` create, goals.company or goals.function
- *   GET   /target-changes · POST /target-changes           view · edit: opens performance.target_change
+ *   GET   /target-changes · POST /target-changes           view (a line's within scope) · edit: opens performance.target_change
+ *   GET   /target-changes/:id                              `performance` view: one change, named in full
+ *   GET   /approvals                                       `performance` view: plan stages and target changes waiting on the reader
  *   GET   /analytics · /analytics/people                   `performance` view: the quarter's figures and its people, in scope
  *   POST  /analytics/people/export                         `performance` export: the people table as a workbook (202)
  */
@@ -90,9 +92,14 @@ route(router, "post", "/plans/:id/submit",
 
 route(router, "get", "/target-changes",
   { query: g.TargetChangeListQuery, response: g.TargetChangePage, summary: "Target changes" }, view, controller.changes);
+route(router, "get", "/target-changes/:id",
+  { params: id, response: g.TargetChangeDetail, summary: "One target change" }, view, controller.change);
 route(router, "post", "/target-changes",
   { body: g.TargetChangeCreate, response: g.TargetChange, summary: "Ask to change a binding target" },
   requirePermission("performance", "edit"), controller.requestChange);
+route(router, "get", "/approvals",
+  { query: g.PerformanceApprovalQuery, response: g.PerformanceApprovalPage, summary: "Plan stages and target changes waiting on you" },
+  view, controller.approvals);
 
 route(router, "get", "/analytics",
   { query: g.PerformanceAnalyticsQuery, response: g.PerformanceAnalytics, summary: "Performance Analytics" }, view, controller.analytics);
