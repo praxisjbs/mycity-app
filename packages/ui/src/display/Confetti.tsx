@@ -116,7 +116,7 @@ function draw(ctx: CanvasRenderingContext2D, p: Piece) {
 
 /** The pieces in flight on one canvas, drawn a frame at a time until the last has fallen out of the box. */
 function engineFor(canvas: HTMLCanvasElement): Engine | null {
-  let ctx: CanvasRenderingContext2D | null = null;
+  let ctx: CanvasRenderingContext2D | null;
   try {
     ctx = canvas.getContext("2d");
   } catch {
