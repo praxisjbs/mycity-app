@@ -18,8 +18,8 @@ reason for needing the ERP"; tasks stay in the workspace, performance is its own
 Performance Management System (goals, scorecards, KPIs, reviews) is TB's, built from MyCity's own
 sheets (`docs/guides/performance.md`); this guide covers what it brings into the workspace (its PR 4):
 commitments on tasks, Counts Towards a scorecard line or a key result, the week on Today and
-performance dates on the calendar. The demo (`demo.html`, My Workspace) is a visual reference; where it
-differs, this guide wins.
+performance dates on the calendar. The demo (`demo.html`, My Workspace) is a visual reference: the
+screens keep its layout, cards and figures (GE, 22/10/2026); where it differs on behaviour, this guide wins.
 
 ---
 
@@ -36,10 +36,10 @@ board itself (My Week), so MyCity's weekly tracker retires.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| My Workspace · Today (`today`) | staff app | every employee, own scope; managers also their team's weeks | the day's tasks (own and set by the manager, overdue first), Due Today, Overdue, In Review, Done This Week, the day's diary (calendar events), Since You Were Away (the task activity on their tasks since their last visit); My Week (done this week, planned next week, blocked) with Support Needed; Team This Week for a manager | open a task and move it on; Add Task; Write Support Needed, Tidy With AI; open a person's week |
-| My Workspace · Tasks (`tasks`) | staff app | every employee; a manager switches to My Team | the board: To Do, In Progress, In Review, Done; four KPI cards (Open, Due This Week, Overdue, Done This Week); search; Cancelled behind a filter; a Commitment pill on a commitment's card | New Task (for themselves, or for someone in their reporting line); mark it a commitment with acceptance criteria and its month; Send Commitments; drag a card between columns and within one; open a task: edit, comment, pick the scorecard line or key result it counts towards, mark blocked, cancel, Rescope Commitment, Set Recovery on a missed commitment, decide a rescope named to them |
-| My Workspace · Calendar (`calendar`) | staff app | every employee | the month: their own events, events they are invited to, events shared with everyone, their tasks' deadlines, their approved leave, their performance dates (check-in due, reviews to write, key results finishing, PIP reviews); Coming Up | New Event (with attendees); answer an invitation; open a task from its deadline; open a performance date's record |
-| My Workspace · Analytics (`analytics`) | staff app | every employee for themselves; managers for their reporting line; CEO and `all` scope for everyone | completion rate, overdue, average completion time, tasks completed per week, workload by person, tasks by priority | switch Mine and My Team; choose the period (30 days, 90 days, this year); open a figure's tasks |
+| My Workspace · Today (`today`) | staff app | every employee, own scope; managers also their team's weeks | Due Today, Overdue, Meetings (today's events), Clocked In (their own clock-in, from attendance); Your Day (open tasks overdue or due today, overdue first); From Your Manager (open tasks someone else set); the day's diary; Recent Activity (what others did to their tasks since the previous working day); My Week (done this week, planned next week, blocked) with Support Needed; Team This Week for a manager | open a task and work it in its panel; Add Task; Write Support Needed, Tidy With AI; open a person's week |
+| My Workspace · Tasks (`tasks`) | staff app | every employee; a manager switches to My Team | Board or List; four KPI cards (Open, Due This Week, Overdue, Completed, 30d); the board To Do, In Progress, In Review, Done, each its own server list with Load More; the list as a DataView; search; Cancelled behind a filter; a Commitment pill on a commitment's card | New Task (for themselves, or for someone in their reporting line); mark it a commitment with acceptance criteria and its month; Send Commitments; drag a card between columns, Move Up and Move Down within one (Move To on a phone); open a task's panel: steps, waiting on, watchers, reminders, nudge, hold and clear, why late, comments, history, edit, cancel; pick the scorecard line or key result it counts towards; Rescope Commitment, Set Recovery on a missed commitment, decide a rescope named to them |
+| My Workspace · Calendar (`calendar`) | staff app | every employee | Month, Week or Day: their own events, events they are invited to, events shared with everyone, their tasks' deadlines, their approved leave, their performance dates (check-in due, reviews to write, key results finishing, PIP reviews); Coming Up for the next 30 days | New Event (with attendees); edit or call off their own; answer an invitation; open a task from its deadline; open a performance date's record |
+| My Workspace · Analytics (`analytics`) | staff app | every employee for themselves; managers for their reporting line; CEO and `all` scope for everyone | completion rate, overdue, average completion time, open tasks, tasks completed per week, workload by person, tasks by priority, overdue tasks by reason, overdue aging, done, cancelled, average cycle time, blocked work | switch Mine and My Team; choose the period (30 days, 90 days, this year); open a blocked task |
 | Home · Overview, Team (M1, TB) | staff app | as Home | Overdue Tasks and My Overdue Tasks cards, Your Week, Open Tasks on the roster | read only, through `dashboard/sources/tasks.source.js` and `calendar.source.js` |
 | ESS · My Performance (M2) | staff app | the employee | My Commitments: this month's commitments and their states; a line measured in tasks counts its done tasks | Send Commitments (performance.md §10) |
 | Performance · Scorecards (M2), Commitments view | staff app | `performance` view · scope | the month's commitments, which are tasks; Waiting On You | Approve Month, Request Changes; a row opens its task here and Back returns (performance.md §10) |
@@ -57,7 +57,7 @@ board itself (My Week), so MyCity's weekly tracker retires.
    says who set it (A24).
 3. **Work moves.** Dragging a card to another column (or Move To, on a phone and by keyboard) calls
    `POST /api/v1/tasks/:id/move` with the new status; the API also takes the card it now sits above
-   (`before_task_id`), which the board will use once `Kanban` reorders within a column. The service
+   (`before_task_id`), which Move Up and Move Down on a card's menu use to reorder within a column. The service
    sets `status`, `sort_order`, `started_at`/`completed_at`, and emits `task.status_changed`
    (`task.completed` into Done, `task.reopened` out of it). Today, Analytics, Home and the setter's
    board read the change.
@@ -79,13 +79,28 @@ board itself (My Week), so MyCity's weekly tracker retires.
    events, plus each open task with a due date (kind Deadline), plus their approved leave (read
    through the leave service), plus their performance dates (kind `performance`). A task opened there
    is the same task panel.
-8. **A blockage.** Mark Blocked asks for a reason; `task.blocked` notifies the setter and the
-   project owner. Clearing it emits `task.unblocked`.
-9. **A task points at a record.** A task created from a partner, a vacancy, a key result (an
-   initiative), a review (a corrective action), a PIP or a missed commitment (a Recovery task) carries
-   `entity_type` and `entity_id`; the panel's Open link is `linkFor(entity_type, entity_id)` worked
-   out on every read, never stored (§6). A link from elsewhere (`/workspace?tab=tasks&id=…`, the
-   Commitments view, the bell) opens the task's panel on Tasks.
+8. **A blockage.** Mark Blocked asks what is blocking it and, optionally, the day it is expected to
+    clear; it writes a `task_blockage` (one open per task) and `task.blocked` notifies the assignee,
+    the setter and the watchers. Clear Blocker takes an optional note and, unless unticked, moves the
+    due time on by the days the hold lasted (at least one), recorded on the hold. Earlier holds stay
+    as the task's history (Blocked Before on the History view).
+9. **A task waits on another.** Add Link on the panel picks a task the reader can see; a loop is
+    a 422. While what it waits on is not Done, the task does not leave To Do (409 `TASK_WAITING`)
+    unless someone with the task presses Go Ahead, which records who, when and why on the link.
+    When the prerequisite is done, the assignees of the tasks waiting on it are told.
+10. **Steps, watchers, nudges and reminders.** The assignee or the setter adds steps; anyone who can
+    see the task ticks one. Anyone who can see it watches it; the assignee or the setter adds others.
+    Watchers hear when it is done, blocked, cancelled or commented on. Send Nudge tells the assignee,
+    the watchers or both. Set Reminders keeps up to three for the assignee, each a lead time before
+    the due time (it moves with it) or a fixed time, through the shared reminder engine.
+11. **Late.** On an overdue task the panel asks Why Late (Waiting on Others, Underestimated,
+    Deprioritised, Other); moving an overdue card to Done asks the same before it moves. Analytics
+    counts the overdue by it.
+12. **A task points at a record.** A task created from a partner, a vacancy, a key result (an
+    initiative), a review (a corrective action), a PIP or a missed commitment (a Recovery task) carries
+    `entity_type` and `entity_id`; the panel's Open link is `linkFor(entity_type, entity_id)` worked
+    out on every read, never stored (§6). A link from elsewhere (`/workspace?tab=tasks&id=…`, the
+    Commitments view, the bell) opens the task's panel on Tasks.
 
 ## 4 · Data
 
@@ -97,13 +112,20 @@ board itself (My Week), so MyCity's weekly tracker retires.
 | `task_activity` (2010) | `task_id`, `actor_user_id`, `kind`, `from_status`, `to_status`, `detail` | history the panel and Since You Were Away read; never updated (trigger), removed only with its task |
 | `calendar_event` (2000, 2010) | `calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`, `ends_at`, `all_day`, `location`, `visibility`, `entity_type`, `entity_id`, `cancelled_at` | `event_type` CHECK `meeting`, `deadline`, `campaign`, `event`, `interview`; `visibility` CHECK `private`, `attendees`, `everyone`. `entity_type`/`entity_id` point at an interview (M4) or a partner meeting (M7) without a foreign key into a later milestone. Read by Home |
 | `calendar_event_attendee` (2010) | `calendar_event_id`, `employee_id`, `response` | `response` CHECK `pending`, `accepted`, `declined`; UNIQUE (event, employee) |
+| `task.late_reason` (2020) | `late_reason` | CHECK `waiting_on_others`, `underestimated`, `deprioritised`, `other` or NULL |
+| `task_step` (2020) | `task_step_id`, `task_id`, `title`, `due_on`, `done_at`, `done_by`, `sort_order`, `created_by` | at most 25 a task (the service); removed with its task |
+| `task_dependency` (2020) | `task_id` (waits), `depends_on_task_id`, `overridden_at`, `overridden_by`, `override_reason`, `created_by` | UNIQUE pair; CHECK not itself; loops refused by the service (a walk 50 deep); at most 25 each way |
+| `task_watcher` (2020) | `task_id`, `employee_id`, `created_by` | UNIQUE pair; at most 25 a task |
+| `task_blockage` (2020) | `task_id`, `note`, `estimated_resolve_on`, `raised_by`, `raised_at`, `resolved_at`, `resolved_by`, `resolve_note`, `due_shift_days` | one open per task (partial unique index); `task.blocked_reason`/`blocked_at` carry the open one for readers of the task alone |
+| `reminder` (0480, shared) | key `task_reminder`, entity `task`, occurrence `1` to `3`, payload `minutes_before` | the shared reminder engine (notifications.md §7.1); no table of the module's own |
 | `project` (2000) | `project_id`, `number`, `name`, `owner_employee_id` | kept for grouping; no screen in M2 (§13) |
 | `commitment_set` (2100, performance) | `commitment_set_id`, `employee_id`, `month`, `status`, `workflow_instance_id`, `submitted_at`, `approved_at` | one person's commitments for a month, approved as one; written by the targets service (performance.md §4) |
 | `weekly_summary` (2100) | `weekly_summary_id`, `employee_id`, `week_starts_on`, `support_needed`, `summary_text`, `ai_run_id` | the week's one line and an accepted summary; UNIQUE (employee, week); written by the workspace service |
 
-Schema migration file(s): `migrations/2010_workspace.sql`; Performance's `2100_performance_foundation.sql`
-(the commitment columns, `commitment_set`, `weekly_summary`) and `2400_performance_commitments.sql`
-(`entity_type` `task`, a Recovery task's pointer; `rescope_reason`). Reference-data file(s):
+Schema migration file(s): `migrations/2010_workspace.sql`, `migrations/2020_workspace_collaboration.sql`
+(numbered below 2100 already merged; it applies out of order, which MIGRATIONS.md §3 allows); Performance's
+`2100_performance_foundation.sql` (the commitment columns, `commitment_set`, `weekly_summary`) and
+`2400_performance_commitments.sql` (`entity_type` `task`, a Recovery task's pointer; `rescope_reason`). Reference-data file(s):
 `seeds/reference/2090_seed_workspace.sql` (the `task` numbering scheme, the status, priority and
 event type codes, `cancelled`).
 
@@ -115,19 +137,32 @@ event type codes, `cancelled`).
 | `GET /api/v1/workspace/analytics` | `AnalyticsQuery` → `WorkspaceAnalytics` | `workspace` view · own, team or all | no (aggregates) | `scope` `mine` or `team`; `period` `30d`, `90d`, `year`. `team` answers for the reader's `scope_ids` |
 | `GET /api/v1/tasks` | `TaskListQuery` → `TaskPage` | `workspace` view · own, team, all | yes, 25 | filters `status`, `scope` (`mine`, `team`), `assignee_id`, `cadence`, `priority`, `due` (`overdue`, `today`, `week`), `employee_target_id`, `is_commitment`, `commitment_month`, `q`; sort `sort_order` (default), `due_at`, `priority`, `created_at` |
 | `GET /api/v1/tasks/counts-towards` | `CountsTowardsQuery` → `CountsTowardsPage` | `workspace` view · the assignee is the caller or in scope | yes, 25 | `assignee_id`, `month`, `q`: the assignee's scorecard lines and key results (performance.md §6.18) |
-| `GET /api/v1/tasks/summary` | `TaskSummaryQuery` → `TaskSummary` | `workspace` view | no | the four KPI cards for `mine` or `team` |
-| `GET /api/v1/tasks/:id` | → `TaskDetail` | `workspace` view · scope | | 404 outside scope; a commitment's state, pending rescope, recovery and what the reader may do to it |
+| `GET /api/v1/tasks/summary` | `TaskSummaryQuery` → `TaskSummary` | `workspace` view | no | the KPI cards for `mine` or `team`, with `done_30d` |
+| `GET /api/v1/tasks/:id` | → `TaskDetail` | `workspace` view · scope | | 404 outside scope; steps, waiting on, holding up, watchers, the open hold, reminders, `can_plan`; a commitment's state, pending rescope, recovery and what the reader may do to it |
 | `POST /api/v1/tasks` | `TaskCreate` → `Task` | `workspace` create · scope | | `primary_assignee_id` must be the caller or in their `scope_ids`; `is_commitment` with `acceptance_criteria`, `commitment_month` and a `due_on` in that month |
 | `PATCH /api/v1/tasks/:id` | `TaskEdit` → `Task` | `workspace` edit · scope | | the assignee may edit their own task's status, notes and commitment fields; title, due and assignee only the setter or someone with the setter's scope; an approved commitment keeps its mark, month and criteria (409 `COMMITMENT_APPROVED`) |
 | `POST /api/v1/tasks/:id/move` | `TaskMove` → `Task` | `workspace` edit · scope | | `status` and `before_task_id` (null = end of column) |
-| `POST /api/v1/tasks/:id/block` | `TaskBlock` → `Task` | `workspace` edit · scope | | `blocked_reason`; `EmptyBody` on `/unblock` |
+| `POST /api/v1/tasks/:id/move` (late) | `TaskMove.late_reason` | | | optional; recorded when the move is to Done |
+| `POST /api/v1/tasks/:id/block` | `TaskBlock` → `Task` | `workspace` edit · scope | | `blocked_reason`, `estimated_resolve_on`; 409 when already blocked |
+| `POST /api/v1/tasks/:id/unblock` | `TaskUnblock` → `Task` | `workspace` edit · scope | | `resolve_note`, `push_due` (default true) |
+| `GET /api/v1/tasks/:id/blockages` | `TaskBlockageListQuery` → `TaskBlockagePage` | `workspace` view · scope | yes, 25 | newest first |
+| `POST /api/v1/tasks/:id/steps` | `TaskStepCreate` → `TaskStep` | `workspace` edit · scope | | assignee or setter; 409 past 25 |
+| `PATCH /api/v1/tasks/:id/steps/:child_id` | `TaskStepEdit` → `TaskStep` | `workspace` edit · scope | | `done` by anyone who sees the task; title and due by the assignee or setter |
+| `DELETE /api/v1/tasks/:id/steps/:child_id` | → `TaskDetail` | `workspace` edit · scope | | assignee or setter |
+| `POST /api/v1/tasks/:id/waiting-on` | `TaskDependencyCreate` → `TaskDetail` | `workspace` edit · scope | | a task the caller can see; 422 on a loop |
+| `DELETE /api/v1/tasks/:id/waiting-on/:child_id` | → `TaskDetail` | `workspace` edit · scope | | |
+| `POST /api/v1/tasks/:id/waiting-on/:child_id/override` | `TaskDependencyOverride` → `TaskDetail` | `workspace` edit · scope | | Go Ahead, with an optional reason |
+| `POST /api/v1/tasks/:id/watchers` | `TaskWatcherAdd` → `TaskDetail` | `workspace` view · scope | | no `employee_id`: the caller; someone else: assignee or setter |
+| `DELETE /api/v1/tasks/:id/watchers/:child_id` | → `TaskDetail` | `workspace` view · scope | | `child_id` is the employee |
+| `POST /api/v1/tasks/:id/ping` | `TaskPing` → `Task` | `workspace` view · scope | | `to` `assignee`, `watchers`, `everyone`; never the sender |
+| `PUT /api/v1/tasks/:id/reminders` | `TaskReminderSet` → `TaskDetail` | `workspace` edit · scope | | up to three; a lead time needs a due time; replaces the set |
 | `POST /api/v1/tasks/:id/cancel` | `TaskCancel` → `Task` | `workspace` edit · scope | | `cancel_reason`; setter only; never an approved commitment (409 `COMMITMENT_APPROVED`: rescope it) |
 | `GET /api/v1/tasks/:id/comments` | `CommentListQuery` → `TaskCommentPage` | `workspace` view · scope | yes, 25 | |
 | `POST /api/v1/tasks/:id/comments` | `TaskCommentCreate` → `TaskComment` | `workspace` view · scope | | anyone who can see the task may comment |
 | `GET /api/v1/tasks/:id/activity` | `ActivityListQuery` → `TaskActivityPage` | `workspace` view · scope | yes, 25 | |
 | `GET /api/v1/calendar` | `CalendarListQuery` → `CalendarItemPage` | `workspace` view · own | yes, 25 | `month` (YYYY-MM) required; events, task deadlines, approved leave and performance dates (`item_kind` `performance`, named by `performance_kind`), by start |
-| `POST /api/v1/calendar` | `CalendarEventCreate` → `CalendarEvent` | `workspace` create · own | | attendees are any employees on the staff (an invitation, like a message in Community) |
-| `PATCH /api/v1/calendar/:id` | `CalendarEventEdit` → `CalendarEvent` | `workspace` edit · own | | owner only |
+| `POST /api/v1/calendar` | `CalendarEventCreate` → `CalendarEvent` | `workspace` create · own | | attendees are any employees on the staff (an invitation, like a message in Community); `reminder_minutes` up to three lead times |
+| `PATCH /api/v1/calendar/:id` | `CalendarEventEdit` → `CalendarEvent` | `workspace` edit · own | | owner only; `reminder_minutes` replaces the lead times, a new start moves them |
 | `POST /api/v1/calendar/:id/cancel` | `EmptyBody` → `CalendarEvent` | `workspace` edit · own | | owner only; attendees are told |
 | `POST /api/v1/calendar/:id/respond` | `CalendarRespond` → `CalendarEvent` | `workspace` view · own | | an attendee's `response` |
 | `GET /api/v1/workspace/week` | `WeekQuery` → `WeekView` | `workspace` view · own (a manager may read someone in scope) | no (each list is its first 25 with a total) | `week_starts_on` (a Monday; this week unless given), `employee_id` |
@@ -185,13 +220,40 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
   tasks per priority. Cancelled tasks count nowhere except a Cancelled figure.
 - **Recurrence.** A task may repeat Daily, Weekly (chosen days) or Monthly (day of month). The
   next occurrence is created when the current one is Done or its due day passes, by an outbox job;
-  any other rule is a 422 naming `recurrence` (ported canonicaliser).
+  any other rule is a 422 naming `recurrence` (ported canonicaliser). A series counts from its due
+  day, so a repeating task must have one: a repeat without a due date, or clearing the due date of
+  a repeating task, is a 422 naming `recurrence`. Set Repeat on the panel belongs to whoever manages
+  the task (a setter field).
+- **Order within a column.** Move Up and Move Down on a card's menu, or a drop onto a card, place it
+  above that card (`before_task_id`); a drop on the column's space puts it at the foot. Order is
+  kept per assignee (`sort_order`), so on My Team a card is placed among its own assignee's cards.
+- **Event reminders.** Up to three lead times before the start (`reminder_minutes`), kept in the
+  shared reminder engine (`calendar_event_reminder`, occurrences 1 to 3). New Event offers one,
+  15 minutes before unless changed. Moving the start moves them; one whose time has passed is left
+  out; calling the event off drops them. It fires to the owner and every attendee who has not
+  declined, while the event stands and has not started.
 - **Calendar.** An event is visible to its owner, its attendees, and everyone when `visibility` is
   `everyone`. Times are stored as instants and shown in Africa/Lagos. A month is always the reader's
   own (their events, invitations, open tasks' deadlines, approved leave, performance dates); a manager
   follows their team's work on Tasks, not on the calendar. A called-off event leaves every month.
   Performance dates are all day: their check-in due, the reviews they must write, the key results they
   own finishing, PIP reviews of theirs or of reviews they wrote (performance.md §6.18).
+- **Planning a task.** Steps, what it waits on and its reminders belong to its assignee and to whoever
+  manages it (`can_plan`); ticking a step and watching are open to anyone who sees the task. A task
+  waiting on one not yet Done cannot leave To Do; Go Ahead satisfies the link. A prerequisite the
+  reader cannot open is named "A task you cannot open" with no assignee. A cancelled prerequisite
+  never satisfies a link by itself.
+- **A hold.** One open per task. Clearing it moves an open task's due time on by the whole days it
+  lasted, rounded up, unless `push_due` is false; the shift is kept on the hold. Moving a blocked
+  task to Done clears its hold without a shift.
+- **Reminders.** Up to three per task in the shared engine (`task_reminder`, occurrences 1 to 3). A
+  lead time is kept as minutes before the due time and follows it when the due date changes; one
+  whose time has passed after a change is dropped. Done or Cancelled drops them all; the engine's
+  check fires only for an open task.
+- **Analytics' added figures.** Open = open tasks now; cycle time = mean of `completed_at −
+  started_at` over tasks done in the period; overdue aging = open overdue tasks by days late (1 to 3,
+  4 to 7, 8 to 14, 15 and more); overdue by reason = open overdue tasks by `late_reason` (none
+  recorded counts); blocked work = open tasks with an open hold, oldest first, the first page.
 - **Since You Were Away** lists what other people did to the reader's tasks (assigned or set) from
   the start of the previous working day, newest first, one page.
 - **Today's Your Day** is the reader's open tasks overdue or due today, overdue first; **Set by
@@ -203,14 +265,20 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
 |---|---|---|
 | `task.created` | a task is saved | notification to the assignee when the setter is someone else ("Ifeoma set you a task") |
 | `task.status_changed` | a move commits | activity row; realtime to the setter's board |
-| `task.completed` | a task enters Done | notification to the setter when it is someone else; carries the line it counts towards and the month, which Performance reads (performance.md §6.18) |
+| `task.completed` | a task enters Done | notification to the setter when it is someone else, the watchers, and the assignees of open tasks waiting on it; carries the line it counts towards and the month, which Performance reads (performance.md §6.18) |
 | `task.reopened` | a task leaves Done | as above, without a notice |
-| `task.blocked` / `task.unblocked` | Mark Blocked / Clear Blocker | notification to the setter |
+| `task.blocked` / `task.unblocked` | Mark Blocked / Clear Blocker | notification to the assignee, the setter and the watchers (blocked) |
 | `task.cancelled` | Cancel Task | notification to the assignee |
 | `task.commented` | a comment is saved | notification to the assignee and setter, not the author |
+| `task.step_changed` | a step added, ticked, unticked or removed | history line |
+| `task.waiting_changed` | a link added, removed or overridden | history line |
+| `task.watchers_changed` | someone watches or stops | the person added by someone else is told |
+| `task.pinged` | Send Nudge | notification to whoever it names, never the sender |
+| `task.reminder_due` | a reminder set on the task comes due (reminder engine, `task_reminder`) | notification to the assignee |
 | job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day (counted from today when its day has passed, so a task days overdue repeats once, and never late at birth: a day whose due time has already gone gives the rule's next day); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task) |
 | `calendar_event.created`, `.changed`, `.cancelled` | save, change, call off | notification to the attendees (an ICS file by email is §13) |
 | `calendar_event.answered` | an attendee accepts or declines | notification to the owner |
+| `calendar_event.reminder_due` | an event's reminder comes due (reminder engine, `calendar_event_reminder`) | notification to the owner and the attendees who have not declined |
 | `week.summary_saved` | Support Needed or a summary saved | audit; Team This Week reads it |
 | `commitments.*`, `commitment.*`, reminder `commitments_due` | sending, approving, rescoping and recovering commitments | Performance's (performance.md §7) |
 
@@ -258,19 +326,19 @@ is listed here as tier 1 or tier 2.**
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| My Workspace · Today (`today`) | The date (desktop subtitle); Due Today, Overdue, In Review, Done This Week; Your Day (task cards, overdue first, with an Overdue pill count); Set by Your Manager with Add Task; Diary (time or All Day, title, place, Accepted, Pending or Declined); Since You Were Away (who did what, to which task, when); empty lines "Nothing due today.", "Nothing set for you.", "Nothing in the diary.", "Nothing new."; My Week (Done This Week, Planned Next Week, Blocked, each with its count and its tasks; Support Needed and the accepted Summary; Write Support Needed, which opens Support Needed with Tidy With AI and Save Line, a summary showing with Use Summary and Discard Summary); Team This Week for a manager (Person, Done, Planned, Blocked, Support Needed; a row opens that person's week) | Help term on Support Needed: "One line on what would help you this week. Your manager sees it." | That manager-set and own tasks share one list: §3. That the weekly tracker retired: performance.md §3.4 |
-| My Workspace · Tasks (`tasks`) | Mine and My Team (for a reader with a reporting line); New Task; Send Commitments; Open, Due This Week, Overdue, Done This Week; Search Tasks; Show Cancelled; the board To Do, In Progress, In Review, Done, each with its count; a card: title, due pill, priority dot, assignee avatar, Set By avatar when someone else set it, a Blocked pill, a Commitment pill. A task opens its panel: Number, Assignee, Set By, Due, Priority, Cadence, Counts Towards (Open), Linked To (Open), Status, Notes, Comments, History; for a commitment its Acceptance Criteria, State, Original Date and Recovery; Edit Task, Mark Blocked or Clear Blocker, Cancel Task (setter; asks Reason, Keep Task or Cancel Task), Rescope Commitment (asks Reason), Approve Rescope and Request Changes (its approver; asks Reason), Set Recovery (a missed commitment; Owner, Due). Details, Comments and History switch on the panel. New Task: Task, Assign To (Optional; shown to someone with a reporting line), Cadence (Optional), Due (Optional), Priority, Counts Towards (Optional), Commitment (a checkbox; ticked, it asks Acceptance Criteria and Month and needs Due), Notes (Optional); Cancel, Create Task. Send Commitments: Person (Optional; for someone with a reporting line), Month, the month's commitments not yet approved (title, due, state); Cancel, Send Commitments | Help term on Cadence: "Daily is due by the end of the day. Weekly is due by the end of the week."; on Counts Towards: "The scorecard line or key result this work is for. Done tasks show as evidence."; on Commitment: "A priority for the month. Its date is fixed once approved."; on Original Date: "The date agreed when the month was approved. It never moves." | "Click a card to move it along" is removed. Fractional ordering, recurrence mechanics: §6. Commitment approval and on-time rules: performance.md §6.11 |
-| My Workspace · Calendar (`calendar`) | The month and year (desktop subtitle); Previous Month, Today, Next Month; New Event; the month grid (events, task deadlines highlighted, leave, performance dates highlighted); Coming Up (date, title, time, Deadline, Leave, Check-In Due, Review Due, Key Result Due or PIP Review); a performance date opens its record. New Event: Event, Date, Start, End, Kind, Attendees (Optional), Location (Optional), Who Can See (Attendees, Everyone, Only Me); Cancel, Add Event. An event opens When, Organiser, Where, Attendees with Accept and Decline for an invitee, Call Off for its owner | None | "Leave, interviews, payday and campaign dates all land here" is removed. Visibility rules: §6 |
-| My Workspace · Analytics (`analytics`) | The period's dates (desktop subtitle); Mine and My Team; 30 Days, 90 Days, This Year; Completion Rate, Overdue, Avg Completion Time, Done; Tasks Completed per Week; Workload by Person; Tasks by Priority | Help on Tasks Completed per Week: "Tasks done, out of those done or due in the period, gives the completion rate." | How each figure is worked out: §6 |
+| My Workspace · Today (`today`) | The date (desktop subtitle); Due Today, Overdue, Meetings, Clocked In (their clock-in time, or Not Yet); Your Day (task cards, overdue first, with an Overdue pill count); From Your Manager with Add Task; a card's pills: due, Urgent or High, Blocked, Waiting, steps done (2/5), and who set it; Diary (time or All Day, title, place, Confirmed, Tentative, Declined or Deadline); Recent Activity (who did what, to which task, when); empty lines "Nothing due today.", "Nothing set for you.", "Nothing in the diary.", "Nothing new."; My Week (Done This Week, Planned Next Week, Blocked, each with its count and its tasks; Support Needed and the accepted Summary; Write Support Needed, which opens Support Needed with Tidy With AI and Save Line, a summary showing with Use Summary and Discard Summary); Team This Week for a manager (Person, Done, Planned, Blocked, Support Needed; a row opens that person's week) | Help term on Support Needed: "One line on what would help you this week. Your manager sees it." | That manager-set and own tasks share one list: §3. That the weekly tracker retired: performance.md §3.4 |
+| My Workspace · Tasks (`tasks`) | Board and List; Mine and My Team (for a reader with a reporting line); New Task; Send Commitments; Open, Due This Week, Overdue, Completed, 30d; Search Tasks; Show Cancelled; the board To Do, In Progress, In Review, Done, each with its count, Load More under a column the server holds more of, "Nothing here" on an empty one, and No Tasks Yet with New Task on an empty board; a card: title, the pills as on Today and a Commitment pill, assignee avatar; the list: Task, Assignee, Status, Due, Priority. A task opens its panel (a side panel; a full sheet on a phone) with Details, Steps n/m, Comments and History. Details: the open hold (Blocked, its note, Expected Clear, days held), Number, Assignee, Set By, Due, Priority, Status, Cadence, Counts Towards (Open), Why Late, Cancelled, Notes, Open Record; for a commitment its Acceptance Criteria, State, Original Date and Recovery; Waiting On with Add Link, each line's status, Go Ahead and remove; Holding Up; Watchers with Watch or Stop Watching and Add Watcher; Reminders. Steps: a tick per step, its due day or who did it, Add Step, remove. History: the lines, then Blocked Before. Details also shows Repeats (Every working day; Weekly, Mon, Wed; Monthly, day 5) when it repeats. Footer: Close, Edit Task, Mark Blocked or Clear Blocker, and More Actions (Send Nudge, Set Reminders, Set Repeat or Change Repeat for whoever manages it, Say Why Late on an overdue task, Cancel Task); on a commitment Rescope Commitment (asks Reason), Approve Rescope and Request Changes (its approver; asks Reason), Set Recovery (a missed commitment; Owner, Due). A card's menu: Move Up and Move Down within its column, then Move to each other column. Mark Done asks Why Late when an overdue card moves to Done. Forms: New Task (Task, Assign To Optional, Cadence Optional, Due Optional, Priority, Counts Towards Optional, Commitment (a checkbox; ticked, it asks Acceptance Criteria and Month and needs Due), Notes Optional; Cancel, Create Task); Send Commitments (Person Optional, for someone with a reporting line; Month; the month's commitments not yet approved: title, due, state; Cancel, Send Commitments); Mark Blocked (What Is Blocking It, Expected Clear Optional); Clear Blocker (How It Cleared Optional, Due Date: Move it on); Add Step (Step, Due Optional); Wait On Task (Waits On); Go Ahead (Reason Optional); Add Watcher (Watcher); Send Nudge (Message, Send To when it has watchers); Set Reminders (First, Second Optional, Third Optional); Repeat (Repeat: Does Not Repeat, Every Working Day, Weekly, Monthly; On: Monday to Saturday when Weekly; On Day when Monthly; Save Repeat); Why Late (Why Late) | Help term on Cadence: "Daily is due by the end of the day. Weekly is due by the end of the week."; on Due Date (Clear Blocker): "The due date moves on by the days the task was blocked."; on Counts Towards: "The scorecard line or key result this work is for. Done tasks show as evidence."; on Commitment: "A priority for the month. Its date is fixed once approved."; on Original Date: "The date agreed when the month was approved. It never moves." | Fractional ordering, recurrence mechanics, the loop walk, the reminder engine: §6. Commitment approval and on-time rules: performance.md §6.11 |
+| My Workspace · Calendar (`calendar`) | The period (desktop subtitle: the month, Week of the Monday, or the day); Today (its hover label the day's date, desktop) on its own, then the two arrows, named by the view (Previous Month, Next Week, Next Day); Month, Week and Day; New Event; the month grid (events, task deadlines highlighted, leave, performance dates highlighted); the week as seven days, each with its lines (a day opens Day); the day's lines (time or All Day, title, place, Meeting, Deadline, Leave, Campaign, Interview, Event, Check-In Due, Review Due, Key Result Due or PIP Review); Coming Up for the next 30 days (title, day, what it is); a performance date opens its record. New Event and Edit Event: Event, Date, Start, End, Kind, Attendees (Optional), Location (Optional), Who Can See, Reminder (Optional: None, At Start, 15 Minutes Before, 1 Hour Before, 1 Day Before); Cancel, Add Event or Save Event. An event opens When, Kind, Organiser, Reminder, Where, Attendees with their answers, Accept and Decline for an invitee, Edit Event and Call Off for its owner | None | Visibility rules: §6 |
+| My Workspace · Analytics (`analytics`) | The period's dates (desktop subtitle); Mine and My Team; 30 Days, 90 Days, This Year; Completion Rate, Overdue, Avg Completion, Open Tasks; Tasks Completed per Week; Workload by Person; Tasks by Priority; Overdue Tasks by Reason (Reason, Count, Share); Overdue Aging (1 to 3, 4 to 7, 8 to 14, 15 Days or More) with Done, Cancelled and Avg Cycle Time; Blocked Work (Task, Blocked By, Held For), a row opens the task | Help on Tasks Completed per Week: "Tasks done, out of those done or due in the period, gives the completion rate." | How each figure is worked out: §6 |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| My Workspace · Today (`today`) | the four KPI cards two to a row, then Your Day as task cards, then My Week as one card (three counts and Support Needed) | Team This Week beyond 5 people (View All opens a sheet); a count's tasks (tapping the count opens them in a sheet) | New Task, the floating button; Write Support Needed in the card's sheet | bottom bar Workspace; the four tabs along the top |
-| My Workspace · Tasks (`tasks`) | the stage tabs (To Do, In Progress, In Review, Done) with counts, one column of cards at a time | the KPI cards (a summary line under the tabs instead) | New Task, the floating button; Send Commitments in the header; a card opens a sheet with Move To and, for a commitment, its actions at the foot | bottom bar Workspace; drag is replaced by Move To in the sheet |
-| My Workspace · Calendar (`calendar`) | the month grid at phone height, then Coming Up as 44 px rows | nothing | New Event, the floating button | bottom bar Workspace |
-| My Workspace · Analytics (`analytics`) | the four KPI cards, then Tasks Completed per Week | Workload by Person beyond the first 5 (View All opens a sheet) | none | bottom bar Workspace |
+| My Workspace · Today (`today`) | the four KPI cards two to a row, then Your Day as task cards, then My Week as one card (three counts and Support Needed) | Team This Week beyond 5 people (View All opens a sheet); a count's tasks (tapping the count opens them in a sheet); From Your Manager, Diary and Recent Activity follow below | New Task, the floating button; Write Support Needed in the card's sheet | bottom bar Workspace; the four tabs along the top |
+| My Workspace · Tasks (`tasks`) | the stage chips (To Do, In Progress, In Review, Done) with counts, one stage's cards at a time, Load More under them; List shows cards from the same rows | nothing | New Task, the floating button; Send Commitments in the header; a card's Move To sheet; the task panel is a full-screen sheet, a commitment's actions at its foot | bottom bar Workspace; drag is replaced by Move To |
+| My Workspace · Calendar (`calendar`) | the month grid at phone height (or the week's days, or the day), then Coming Up as 44 px rows | nothing | New Event, the floating button | bottom bar Workspace |
+| My Workspace · Analytics (`analytics`) | the four KPI cards, then Tasks Completed per Week | Workload by Person beyond the first 5 (View All shows the rest) | none | bottom bar Workspace |
 
 ## 11 · Edge cases
 
@@ -287,6 +355,9 @@ is listed here as tier 1 or tier 2.**
 - **A link to a task the reader cannot see** (`?id=`): the board opens with no panel, as for a task that
   is gone.
 - **Huge column**: each column is its own paged list (25 a page, Load More at the foot).
+- **A loop**: A waits on B, B on C, and C is asked to wait on A: a 422 naming `depends_on_task_id`.
+- **Blocked twice**: a second Mark Blocked while one is open is a 409; clear the first.
+- **A reminder in the past**: refused when set; one a due-date change puts in the past is dropped.
 - **Empty board**: "No Tasks Yet" with New Task.
 
 ## 12 · Donor code
@@ -297,28 +368,40 @@ is listed here as tier 1 or tier 2.**
 | praxis | `tasks.repo.js` | `pageQuery`, `scopeClause`, `orderBy`; no hand `LIMIT` |
 | praxis | `tasks.validator.js` | becomes the contract (`packages/contract/schemas/tasks.js`) |
 | praxis | `recurrence.js`, `workspace.time.js` | Africa/Lagos and the working week from `shared/time` |
-| praxis | `client/src/features/workspace/*` | rebuilt on `@mycity/ui` (Kanban, Calendar, charts); analytics figures cut to §6 |
+| praxis | `client/src/features/workspace/*` | rebuilt on `@mycity/ui` (Kanban, Calendar, charts, SidePanel); the task panel's steps, waiting on with override, watchers, nudge, reminders and holds; the list layout; week and day views; analytics' cycle time, overdue aging and blocked work |
+| praxis | the workspace migrations (subtasks, dependencies, watchers, blockages) | `task_step`, `task_dependency`, `task_watcher`, `task_blockage` (2020): our naming, uuid keys, `updated_at` triggers; operations-file stages and child tasks left out (MyCity has no operations files; `parent_task_id` is the recurrence chain) |
+| praxis | its reminder table | not ported: the shared reminder engine (`notifications.reminders`) holds task reminders |
 
 ## 13 · Open questions
 
 - Projects: the table exists (2000) but no screen asked for it; kept out of M2 screens. AJ, at the
   23/10 demo.
-- Late reasons (the demo's Overdue Reasons card) need a reason captured when a late task closes;
-  not in the definition of done, left off. Cynthia, at the 23/10 demo.
+- Late reasons: built with four codes (Waiting on Others, Underestimated, Deprioritised, Other).
+  Whether MyCity wants other codes: Cynthia, at the 23/10 demo.
 - An ICS invitation by email beside the in-app notice (`services/calendar/ics`). AJ, after the demo.
-- Reordering within a column on the board: the API takes `before_task_id`; `Kanban` moves between
-  columns only today. AJ, after the demo.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Calendar's toolbar: Today stands on its own before the arrows, which are named by the view (Previous Month, Next Week, Next Day), so the forward arrow no longer reads as "tomorrow" (team feedback, 22/10/2026).
+
 - 22/10/2026 · TB · §7: a repeating task swept after its next day's due time comes round on the rule's following day; it was made late at birth and repeated again on the next sweep (found when the integration suite ran on a Thursday evening).
+
 - 22/10/2026 · GE · §9: Praxis AI's "create a task" and "book a meeting" open New Task and New Event filled with what the person said (`TaskPrefill`, `CalendarEventPrefill`, `praxis-ai.md` §6.4); the forms read their own fields from the address, so the deep link no longer passes the title itself.
+
+- 22/10/2026 · GE · Merged with Performance PR 4: §1 to §11 carry both the donor port and the commitments,
+  Counts Towards, the week on Today and performance dates; the task panel holds both sets of actions.
+
+- 22/10/2026 · GE · The three donor features still open after the port: Set Repeat on the task panel (Every Working Day, chosen weekdays, a day of the month), with a repeat refused without a due date to count from; reminders on calendar events (up to three lead times through the shared reminder engine, to the owner and attendees still going; New Event offers 15 minutes before); and order within a column (Move Up, Move Down, a drop onto a card; `Kanban` gains `reorder`, off for boards that keep no order) (§5, §6, §7, §10).
+
+- 22/10/2026 · GE · The Workspace donor port and the demo's layout (audit of M2, 22/10/2026): a task's steps, the tasks it waits on with Go Ahead and loop refusal, watchers, Send Nudge, up to three reminders through the shared reminder engine, holds with their note, expected day and due-date shift, and Why Late (migration 2020; §3 to §7). Screens to the demo: Today's Meetings and Clocked In, From Your Manager and Recent Activity; Tasks' Completed, 30d, Board and List, Load More per column and the empty board (`Kanban` gains `onMore` and `empty`), the side-panel task panel; Calendar's Week and Day, Coming Up for 30 days, Edit Event; Analytics' Open Tasks, Overdue by Reason, Overdue Aging, cycle time and Blocked Work (§10). A link to a task or an event opens it. Staging seed across all four columns with six weeks of finished work.
+
 - 22/10/2026 · TB · Performance PR 4 (`docs/guides/performance.md` §6.11, §6.18): §1 to §11 now cover
   commitments on tasks (marked by the person or their manager, sent as a month, approved with their
   original dates fixed, rescoped or recovered from the panel), Counts Towards a scorecard line or a key
   result picked from the assignee's own, My Week and Team This Week on Today with Tidy With AI
   (`week-summary`), performance dates on the calendar, a task opened from a link by `?id=`, the `task`
   pointer of a Recovery task (2400) and New Commitment on ⌘K. §13's note on PR 4 is settled.
+
 - 22/10/2026 · TB · `tasks.service.create` takes the caller's transaction (`{ client }`), so Performance's OKR workbook import sets a key result's dated initiatives as tasks for its owner inside the import (`entity_type` `key_result`); nothing on screen changes.
 - 22/10/2026 · TB · §13: Performance PR 4's changes to this module, agreed in `performance.md`, noted; the module is unchanged until that PR.
 - 21/10/2026 · AJ · An event's Location stays free text, marked `address:none` for gate 22 (F27): a meeting's room or call link, not a street address.

@@ -300,7 +300,10 @@ use M10's `knowledge_article` tables, which stay for SOPs, FAQs and training.
 performance cycles, reviews and review items · `2010` a task's number, setter (`set_by_employee_id`),
 cadence, KPI (`employee_target_id`), record pointer (`entity_type`, `entity_id`), the cancelled
 status, blockers and `task_activity`; calendar visibility, record pointer, called-off events and
-`calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2090` the
+`calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2020` a task's
+steps (`task_step`), the tasks it waits on (`task_dependency`, with override), its watchers
+(`task_watcher`), its holds with their note, expected day and due-date shift (`task_blockage`), its
+`late_reason`, and the history kinds for them (docs/guides/workspace.md §4, GE 22/10/2026) · `2090` the
 `task` numbering scheme and the cancelled status · `2099` seed · `2100` the Performance foundation
 (`docs/guides/performance.md` §4, PR 1, 22/10/2026): department heads (`head_employee_id`,
 `head_seat_id`); quarters with their rules (`performance_period`); organisational goals' MyCity columns

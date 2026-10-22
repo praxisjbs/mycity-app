@@ -47,6 +47,13 @@ const TaskCadence = z.enum(["daily", "weekly"]);
 const TaskEntityType = z.enum(["partner", "vacancy", "goal", "key_result", "scorecard", "performance_review", "improvement_plan", "task"]);
 /** `mine`: tasks the caller is assigned, set or shares. `team`: everyone in their workspace scope. */
 const TaskScope = z.enum(["mine", "team"]);
+/**
+ * Why an overdue task is late: asked on the panel of an overdue task, and when a task
+ * moves to Done after its due time. Analytics counts the overdue by it.
+ */
+const LateReason = z.enum(["waiting_on_others", "underestimated", "deprioritised", "other"]);
+/** Who a ping reaches: the assignee, the watchers, or both. */
+const PingAudience = z.enum(["assignee", "watchers", "everyone"]);
 
 /**
  * How a task repeats. Anything else is refused with a 422 naming `recurrence`,
@@ -166,12 +173,16 @@ const Task = z
     cancel_reason: z.string().nullable(),
     blocked_reason: z.string().nullable(),
     blocked_at: isoDateTime.nullable(),
+    late_reason: LateReason.nullable(),
     counts_towards: CountsTowards.nullable(),
     entity_type: TaskEntityType.nullable(),
     entity_id: uuid.nullable(),
     link: Link.nullable(),
     recurrence: Recurrence.nullable(),
     comment_count: z.number().int().min(0),
+    steps_total: z.number().int().min(0),
+    steps_done: z.number().int().min(0),
+    waiting: z.boolean(),
     is_commitment: z.boolean(),
     acceptance_criteria: z.string().nullable(),
     commitment_month: isoDate.nullable(),
@@ -185,15 +196,91 @@ const Task = z
   })
   .strict();
 
+/** Another task, as a line on a panel names it. `visible` false: the reader may not open it. */
+const TaskRef = z
+  .object({
+    task_id: uuid,
+    number: z.string(),
+    title: z.string(),
+    status: TaskStatus,
+    assignee: PersonRef.nullable(),
+    visible: z.boolean(),
+  })
+  .strict();
+
+/** A step inside a task: done or not. */
+const TaskStep = z
+  .object({
+    task_step_id: uuid,
+    task_id: uuid,
+    title: z.string(),
+    due_on: isoDate.nullable(),
+    done_at: isoDateTime.nullable(),
+    done_by: PersonRef.nullable(),
+    sort_order: z.number().int(),
+    created_at: isoDateTime,
+  })
+  .strict();
+
 /**
- * GET /tasks/:id: the task and what the caller may do to it. A commitment also says where its
+ * A task this one waits on (or, under holding_up, one that waits on this). Satisfied when
+ * the other is Done, or when someone said to go ahead anyway (overridden).
+ */
+const TaskDependency = z
+  .object({
+    task_dependency_id: uuid,
+    task: TaskRef,
+    satisfied: z.boolean(),
+    overridden_at: isoDateTime.nullable(),
+    override_reason: z.string().nullable(),
+  })
+  .strict();
+
+/** A hold on a task: why, until when it is expected, and how it cleared. */
+const TaskBlockage = z
+  .object({
+    task_blockage_id: uuid,
+    note: z.string(),
+    estimated_resolve_on: isoDate.nullable(),
+    raised_by: PersonRef.nullable(),
+    raised_at: isoDateTime,
+    resolved_at: isoDateTime.nullable(),
+    resolved_by: PersonRef.nullable(),
+    resolve_note: z.string().nullable(),
+    due_shift_days: z.number().int().nullable(),
+    blocked_days: z.number().min(0),
+  })
+  .strict();
+const TaskBlockagePage = Paged(TaskBlockage);
+const TaskBlockageListQuery = listQuery({}, ["raised_at"]);
+
+/** One of a task's reminders to its assignee: a time, or minutes before the due time. */
+const TaskReminder = z
+  .object({
+    slot: z.number().int().min(1).max(3),
+    remind_at: isoDateTime,
+    minutes_before: z.number().int().min(0).nullable(),
+  })
+  .strict();
+
+/**
+ * GET /tasks/:id: the task, what hangs off it (steps, what it waits on and holds up, watchers,
+ * its open hold, reminders) and what the caller may do to it. A commitment also says where its
  * month's set stands, a rescope waiting on approval, its Recovery task, and whether the caller may
  * ask a rescope or set its recovery.
  */
 const TaskDetail = Task.extend({
+  steps: z.array(TaskStep).max(25),
+  waiting_on: z.array(TaskDependency).max(25),
+  holding_up: z.array(TaskDependency).max(25),
+  watchers: z.array(PersonRef).max(25),
+  watching: z.boolean(),
+  blockage: TaskBlockage.nullable(),
+  reminders: z.array(TaskReminder).max(3),
   can_edit: z.boolean(),
   can_reassign: z.boolean(),
   can_cancel: z.boolean(),
+  can_plan: z.boolean(),
   set_status: CommitmentSetStatus.nullable(),
   rescope: PendingRescope.nullable(),
   recovery: CommitmentRecoveryRef.nullable(),
@@ -227,6 +314,7 @@ const TaskSummary = z
     due_this_week: z.number().int().min(0),
     overdue: z.number().int().min(0),
     done_this_week: z.number().int().min(0),
+    done_30d: z.number().int().min(0),
   })
   .strict();
 
@@ -304,6 +392,7 @@ const TaskEdit = z
     entity_type: TaskEntityType.nullable().optional(),
     entity_id: uuid.nullable().optional(),
     recurrence: Recurrence.nullable().optional(),
+    late_reason: LateReason.nullable().optional(),
     is_commitment: z.boolean().optional(),
     acceptance_criteria: z.string().trim().max(1000).nullable().optional(),
     commitment_month: MonthStart.nullable().optional(),
@@ -321,11 +410,73 @@ const TaskMove = z
   .object({
     status: BoardStatus,
     before_task_id: uuid.nullable().default(null),
+    late_reason: blank(LateReason),
   })
   .strict();
 
-/** POST /tasks/:id/block */
-const TaskBlock = z.object({ blocked_reason: text(500) }).strict();
+/** POST /tasks/:id/block: a hold, with the day it is expected to clear. */
+const TaskBlock = z
+  .object({
+    blocked_reason: text(500),
+    estimated_resolve_on: blank(isoDate),
+  })
+  .strict();
+
+/** POST /tasks/:id/unblock: the hold cleared; the due time moves on by the days it lasted unless told not to. */
+const TaskUnblock = z
+  .object({
+    resolve_note: optionalText(500),
+    push_due: z.boolean().default(true),
+  })
+  .strict();
+
+/** /tasks/:id/steps/:child_id, /tasks/:id/waiting-on/:child_id, /tasks/:id/watchers/:child_id */
+const TaskChildParams = z.object({ id: uuid, child_id: uuid }).strict();
+
+/** POST /tasks/:id/steps */
+const TaskStepCreate = z
+  .object({
+    title: text(300),
+    due_on: blank(isoDate),
+  })
+  .strict();
+
+/** PATCH /tasks/:id/steps/:child_id: rename, re-date, tick or untick. */
+const TaskStepEdit = z
+  .object({
+    title: text(300).optional(),
+    due_on: isoDate.nullable().optional(),
+    done: z.boolean().optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, "Change at least one field");
+
+/** POST /tasks/:id/waiting-on: this task waits on another. */
+const TaskDependencyCreate = z.object({ depends_on_task_id: uuid }).strict();
+
+/** POST /tasks/:id/waiting-on/:child_id/override: go ahead without it. */
+const TaskDependencyOverride = z.object({ override_reason: optionalText(500) }).strict();
+
+/** POST /tasks/:id/watchers: someone told when the task moves; the caller when no one is named. */
+const TaskWatcherAdd = z.object({ employee_id: blank(uuid) }).strict();
+
+/** POST /tasks/:id/ping: a nudge with a line of text. */
+const TaskPing = z
+  .object({
+    message: text(500),
+    to: PingAudience.default("assignee"),
+  })
+  .strict();
+
+/** PUT /tasks/:id/reminders: up to three, each a time or minutes before the due time. */
+const TaskReminderInput = z
+  .object({
+    minutes_before: z.number().int().min(0).max(20160).optional(),
+    remind_at: isoDateTime.optional(),
+  })
+  .strict()
+  .refine((v) => (v.minutes_before === undefined) !== (v.remind_at === undefined), "Pick a time or a lead time");
+const TaskReminderSet = z.object({ reminders: z.array(TaskReminderInput).max(3) }).strict();
 
 /** POST /tasks/:id/cancel */
 const TaskCancel = z.object({ cancel_reason: text(500) }).strict();
@@ -356,6 +507,17 @@ const TaskActivityKind = z.enum([
   "unblocked",
   "cancelled",
   "commented",
+  "step_added",
+  "step_done",
+  "step_reopened",
+  "step_removed",
+  "waiting_added",
+  "waiting_removed",
+  "waiting_overridden",
+  "watcher_added",
+  "watcher_removed",
+  "pinged",
+  "reminders_set",
 ]);
 
 const TaskActivity = z
@@ -385,6 +547,9 @@ const TABLES = {
       counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
       link: "linkFor(task.entity_type, task.entity_id), never stored",
       comment_count: "count of task_comment not deleted",
+      steps_total: "count of task_step",
+      steps_done: "count of task_step with done_at",
+      waiting: "a task_dependency of the task not satisfied",
       commitment_state: "worked out from the commitment's dates, completion and month (performance.md §6.11)",
     },
   },
@@ -397,10 +562,21 @@ const TABLES = {
       counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
       link: "linkFor(task.entity_type, task.entity_id), never stored",
       comment_count: "count of task_comment not deleted",
+      steps_total: "count of task_step",
+      steps_done: "count of task_step with done_at",
+      waiting: "a task_dependency of the task not satisfied",
+      steps: "task_step rows of the task",
+      waiting_on: "task_dependency rows where the task waits",
+      holding_up: "task_dependency rows where another task waits on it",
+      watchers: "task_watcher rows of the task, as people",
+      watching: "the caller is a task_watcher",
+      blockage: "the task_blockage not yet resolved",
+      reminders: "the reminder engine's pending task_reminder occurrences",
       commitment_state: "worked out from the commitment's dates, completion and month (performance.md §6.11)",
       can_edit: "the caller is the setter, or has the setter's scope over the assignee",
       can_reassign: "as can_edit",
       can_cancel: "as can_edit",
+      can_plan: "the caller manages the task or is its assignee: steps, waiting on, reminders",
       set_status: "commitment_set.status of the commitment's set",
       rescope: "the pending performance.commitments instance over the task",
       recovery: "the task whose entity_type is task and entity_id this commitment",
@@ -408,6 +584,42 @@ const TABLES = {
       can_set_recovery: "a missed commitment with no recovery, the caller its person or in scope",
     },
   },
+  TaskRef: { table: null, reason: "another task as a panel line names it" },
+  TaskStep: {
+    table: "task_step",
+    virtual: { done_by: "the employee of task_step.done_by" },
+  },
+  TaskDependency: {
+    table: "task_dependency",
+    virtual: {
+      task: "the task on the other end of the edge",
+      satisfied: "the other task is done, or overridden_at is set",
+    },
+  },
+  TaskBlockage: {
+    table: "task_blockage",
+    virtual: {
+      raised_by: "the employee of task_blockage.raised_by",
+      resolved_by: "the employee of task_blockage.resolved_by",
+      blocked_days: "resolved_at (or now) less raised_at, in days",
+    },
+  },
+  TaskBlockagePage: { table: null, reason: "a page of a task's holds" },
+  TaskBlockageListQuery: { table: null, reason: "list controls for a task's holds" },
+  TaskReminder: { table: null, reason: "an occurrence in the shared reminder engine" },
+  TaskUnblock: {
+    table: "task_blockage",
+    virtual: { push_due: "moves task.due_at on by the days the hold lasted" },
+  },
+  TaskChildParams: { table: null, reason: "path parameters" },
+  TaskStepCreate: { table: "task_step" },
+  TaskStepEdit: { table: "task_step", virtual: { done: "sets or clears task_step.done_at" } },
+  TaskDependencyCreate: { table: "task_dependency" },
+  TaskDependencyOverride: { table: "task_dependency" },
+  TaskWatcherAdd: { table: "task_watcher" },
+  TaskPing: { table: null, reason: "a notification and a task_activity line" },
+  TaskReminderInput: { table: null, reason: "one reminder for the shared reminder engine" },
+  TaskReminderSet: { table: null, reason: "the task's reminders in the shared reminder engine" },
   TaskPage: { table: null, reason: "a page of tasks" },
   TaskListQuery: { table: null, reason: "list controls and filters for the board" },
   TaskSummaryQuery: { table: null, reason: "whose figures: mine or my team" },
@@ -428,7 +640,10 @@ const TABLES = {
     table: "task",
     virtual: { before_task_id: "the card it now sits above; decides task.sort_order" },
   },
-  TaskBlock: { table: "task" },
+  TaskBlock: {
+    table: "task",
+    virtual: { estimated_resolve_on: "written to the task_blockage it raises" },
+  },
   TaskCancel: { table: "task" },
   TaskComment: {
     table: "task_comment",
@@ -463,6 +678,8 @@ module.exports = {
   TaskCadence,
   TaskEntityType,
   TaskScope,
+  LateReason,
+  PingAudience,
   Recurrence,
   Link,
   CommitmentState,
@@ -475,6 +692,13 @@ module.exports = {
   CountsTowardsPage,
   CountsTowardsQuery,
   Task,
+  TaskRef,
+  TaskStep,
+  TaskDependency,
+  TaskBlockage,
+  TaskBlockagePage,
+  TaskBlockageListQuery,
+  TaskReminder,
   TaskDetail,
   TaskPage,
   TaskListQuery,
@@ -485,6 +709,16 @@ module.exports = {
   TaskEdit,
   TaskMove,
   TaskBlock,
+  TaskUnblock,
+  TaskChildParams,
+  TaskStepCreate,
+  TaskStepEdit,
+  TaskDependencyCreate,
+  TaskDependencyOverride,
+  TaskWatcherAdd,
+  TaskPing,
+  TaskReminderInput,
+  TaskReminderSet,
   TaskCancel,
   TaskComment,
   TaskCommentPage,

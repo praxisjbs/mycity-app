@@ -127,6 +127,12 @@ async function cancel(client, { key, entity, occurrence = null }) {
   return repo.cancelReminders(client, { key, entityType: entity.type, entityId: entity.id, occurrence });
 }
 
+/** A record's pending occurrences of a reminder, for a screen that shows them. */
+async function pendingFor(db, { key, entity }) {
+  known(key, "pendingFor");
+  return repo.pendingReminders(db, { key, entityType: entity.type, entityId: entity.id });
+}
+
 /* ------------------------------------------------------------------ *
  * The company's reminder rules
  * ------------------------------------------------------------------ */
@@ -425,6 +431,7 @@ module.exports = {
   defineReminder,
   schedule,
   cancel,
+  pendingFor,
   tick,
   rules,
   sendDigest,
