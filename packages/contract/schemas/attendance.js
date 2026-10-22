@@ -1153,7 +1153,7 @@ const ruleShape = {
   overtime: Overtime,
   office_geofence_mode: PolicyMode,
   /** Homes at all (guide §1.3): off, nobody sets one and a day worked from home is not checked. */
-  home_location: z.object({ on: z.boolean() }).strict(),
+  home_location: z.object({ on: z.boolean() }).strict(), // address:none a switch, not a place
   home_geofence_mode: PolicyMode,
   site_geofence_mode: PolicyMode,
   /** At least 150 on a new version (T9); an older version keeps what it set, down to 50. */
