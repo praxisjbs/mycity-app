@@ -142,10 +142,40 @@ describe("the Attendance policy type", () => {
   });
 
   test("no grace says so; Refuse at home names the radius", () => {
-    const rules = { ...attendanceType.suggestions(), grace_minutes: 0, home_geofence_mode: "block", home_radius_m: 200 };
+    const rules = {
+      ...attendanceType.suggestions(),
+      grace_minutes: 0,
+      home_location: { on: true },
+      home_geofence_mode: "block",
+      home_radius_m: 200,
+    };
     const text = attendanceType.sections(rules).flatMap((s) => s.sentences.map((x) => x.text)).join(" ");
     expect(text).toMatch(/There is no grace period/);
     expect(text).toMatch(/more than 200 m from your approved home is refused/);
+  });
+
+  test("Home Location starts off; off, working from home is not checked and no home is named", () => {
+    const s = attendanceType.suggestions();
+    expect(s.home_location).toEqual({ on: false });
+    const home = attendanceType.sections({ ...s, home_geofence_mode: "block" }).find((x) => x.key === "home");
+    expect(home.sentences.map((x) => x.text)).toEqual(["Working from home, your location is not checked."]);
+  });
+
+  test("off, a home's mode is not a check in use: with the rest off, nothing is sent for review", () => {
+    const rules = { ...attendanceType.suggestions(), office_geofence_mode: "off", site_geofence_mode: "off", home_geofence_mode: "block" };
+    const where = attendanceType.sections(rules).find((x) => x.key === "location").sentences.map((x) => x.text);
+    expect(where.join(" ")).not.toMatch(/sent to People for review/);
+    const on = attendanceType.sections({ ...rules, home_location: { on: true } }).find((x) => x.key === "location");
+    expect(on.sentences.map((x) => x.text).join(" ")).toMatch(/sent to People for review/);
+  });
+
+  test("switching Home Location on is one change, its line and its section tagged", () => {
+    const before = attendanceType.suggestions();
+    const after = { ...before, home_location: { on: true } };
+    expect(attendanceType.changed(before, after)).toEqual(["home_location"]);
+    expect(attendanceType.changeLines(before, after)).toEqual(["Home Location: Off to On"]);
+    const out = attendanceType.sections(after, ["home_location"]);
+    expect(out.find((x) => x.key === "home").sentences.every((x) => x.changed)).toBe(true);
   });
 
   test("the read schema names every rule the draft schema does, each with its default", () => {
@@ -193,6 +223,50 @@ describe("the rules of the version that judged something (rulesOfVersion, §6.8)
     });
     expect(none.asked).toEqual([]);
     expect((await service.rulesOfVersion(db(null), "attendance", VERSION_ID)).policy_version_id).toBeNull();
+  });
+});
+
+describe("since when a rule has held (heldSince, §6.8)", () => {
+  const service = require("./policies.service");
+  /** Published versions; the client answers the in-force read for the date it is asked about. */
+  const db = (versions) => ({
+    query: async (_sql, [, date]) => {
+      const inForce = versions
+        .filter((x) => x.effective_from <= date)
+        .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || b.version - a.version)[0];
+      return { rows: inForce ? [inForce] : [] };
+    },
+  });
+  const v = (n, from, on) => ({ policy_version_id: `version-${n}`, version: n, effective_from: from, rules: { home_location: { on } } });
+  const on = (r) => r.home_location.on === true;
+
+  test("the first version of the unbroken run that passes, up to the one in force", async () => {
+    const versions = [v(1, "2026-10-01", false), v(2, "2026-10-10", true), v(3, "2026-10-20", true)];
+    expect(await service.heldSince(db(versions), "attendance", "2026-10-25", on)).toEqual({
+      policy_version_id: "version-2",
+      effective_from: "2026-10-10",
+    });
+  });
+
+  test("null when the version in force fails, or before any version when the defaults do", async () => {
+    const versions = [v(1, "2026-10-01", true), v(2, "2026-10-10", false)];
+    expect(await service.heldSince(db(versions), "attendance", "2026-10-12", on)).toBeNull();
+    expect(await service.heldSince(db(versions), "attendance", "2026-09-30", on)).toBeNull();
+  });
+
+  test("switched off and on again is a new stretch, named by the version that switched it back", async () => {
+    const versions = [v(1, "2026-10-01", true), v(2, "2026-10-10", false), v(3, "2026-10-20", true)];
+    expect((await service.heldSince(db(versions), "attendance", "2026-10-05", on)).policy_version_id).toBe("version-1");
+    expect((await service.heldSince(db(versions), "attendance", "2026-10-21", on)).policy_version_id).toBe("version-3");
+  });
+
+  test("defaults that pass are a run of their own, with no version", async () => {
+    const versions = [v(1, "2026-10-10", false)];
+    const off = (r) => r.home_location.on === false;
+    expect(await service.heldSince(db(versions), "attendance", "2026-10-12", off)).toEqual({
+      policy_version_id: null,
+      effective_from: null,
+    });
   });
 });
 

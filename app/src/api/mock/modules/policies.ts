@@ -118,6 +118,7 @@ const VISIBLE = [
   "location_rule",
   "overtime",
   "office_geofence_mode",
+  "home_location",
   "home_geofence_mode",
   "site_geofence_mode",
   "home_radius_m",
@@ -141,6 +142,7 @@ const RULE_LABEL: Record<Visible, string> = {
   location_rule: "Location Flags",
   overtime: "Overtime",
   office_geofence_mode: "Office Check",
+  home_location: "Home Location",
   home_geofence_mode: "Home Check",
   site_geofence_mode: "Temporary Site Check",
   home_radius_m: "Home Radius",
@@ -219,6 +221,8 @@ function ruleValue(k: Visible, r: AttendanceRules): string {
       return deductionValue(r[k]);
     case "absence_deduction":
       return r.absence_deduction.on ? "A Day's Pay" : "Off";
+    case "home_location":
+      return r.home_location.on ? "On" : "Off";
     case "overtime":
       return overtimeValue(r.overtime);
     default:
@@ -297,7 +301,8 @@ function office(mode: string) {
   if (mode === "warn") return ["At the office, a clock-in outside your office's radius is accepted and sent to People for review."];
   return ["At the office, a clock-in outside your office's radius is refused, and People see it. Clock in again from inside it."];
 }
-function home(mode: string, radius: number) {
+function home(on: boolean, mode: string, radius: number) {
+  if (!on) return ["Working from home, your location is not checked."];
   if (mode === "off") return ["Working from home, your location is recorded with each clock-in and clock-out. Nothing is flagged."];
   const away = `Working from home, a clock-in more than ${metres(radius)} from your approved home`;
   return [mode === "warn" ? `${away} is accepted and sent for review.` : `${away} is refused, and People see it.`, "Until People approve your home, your clock-ins are sent for review."];
@@ -310,7 +315,9 @@ function site(mode: string) {
   return ["At a temporary site, a clock-in outside its addresses is refused, and People see it.", "A check-in outside them is sent for review.", ELSEWHERE];
 }
 function location(r: AttendanceRules) {
-  const checked = [r.office_geofence_mode, r.home_geofence_mode, r.site_geofence_mode].some((m) => m !== "off");
+  // A home's mode counts only while Home Location is on.
+  const modes = [r.office_geofence_mode, ...(r.home_location.on ? [r.home_geofence_mode] : []), r.site_geofence_mode];
+  const checked = modes.some((m) => m !== "off");
   return [
     `Your phone's location must be accurate to within ${metres(r.max_accuracy_m)}. A weaker reading cannot confirm where you are.`,
     ...(checked ? ["When your location cannot be confirmed, your clock-in is sent to People for review."] : []),
@@ -348,7 +355,7 @@ const SECTIONS: Array<{ key: string; title: string; rules: readonly Visible[]; t
   },
   { key: "overtime", title: "Overtime", rules: ["overtime"], text: (r) => overtime(r.overtime) },
   { key: "office", title: "At the Office", rules: ["office_geofence_mode"], text: (r) => office(r.office_geofence_mode) },
-  { key: "home", title: "Working From Home", rules: ["home_geofence_mode", "home_radius_m"], text: (r) => home(r.home_geofence_mode, r.home_radius_m) },
+  { key: "home", title: "Working From Home", rules: ["home_location", "home_geofence_mode", "home_radius_m"], text: (r) => home(r.home_location.on, r.home_geofence_mode, r.home_radius_m) },
   { key: "site", title: "At a Temporary Site", rules: ["site_geofence_mode"], text: (r) => site(r.site_geofence_mode) },
   { key: "location", title: "Your Location", rules: ["max_accuracy_m"], text: location },
   { key: "devices", title: "Your Devices", rules: ["device_mode"], text: (r) => device(r.device_mode) },
@@ -770,6 +777,16 @@ export function attendanceVersionInForce(): { policy_version_id: string; version
 }
 /** Each published version's rules, read once: a published version never changes, and the clock's mock reads them for every day it judges. */
 const READ_RULES = new WeakMap<Ver, AttendanceRules>();
+/**
+ * Tests only: switch the Home Location of the version in force (attendance.md §1.3), which the
+ * mock's versions leave off, as production starts. In the app a published version never changes.
+ */
+export function setMockHomeLocation(on: boolean) {
+  const v = inForce(ATTENDANCE.policy_id);
+  if (!v || !v.rules) return;
+  v.rules = { ...v.rules, home_location: { on } };
+  READ_RULES.delete(v);
+}
 const NO_VERSION: AttendanceRules = attendanceContract.AttendanceRules.parse({});
 /** The Attendance policy's rules in force on a date: the version a day is judged by. Read only. */
 export function attendanceRulesOn(date: string): AttendanceRules {

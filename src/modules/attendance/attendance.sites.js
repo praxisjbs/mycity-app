@@ -132,6 +132,12 @@ function employedOn(person, date) {
 async function create(user, body, { direct }) {
   const today = lagos.today();
   checkDates(body, today);
+  // A Temporary Home is a home: offered only while the policy's Home Location is on (§6.11, H6).
+  // Required here, not above: attendance.home reads the calendar, which reads this file.
+  if (isHome(body) && !(await require("./attendance.home").onDate(pool, today)))
+    throw new AppError("HOME_LOCATION_OFF", "Temporary Home is off in the Attendance policy", 422, {
+      purpose: ["Not available"],
+    });
   const ids = [...body.employee_ids].sort();
   if (direct && user.employee_id && ids.includes(user.employee_id))
     throw new AppError("OWN_RECORD", "Add a site you are on from Home, for approval", 403, {

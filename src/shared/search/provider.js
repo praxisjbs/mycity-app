@@ -25,6 +25,10 @@
  * search service runs the provider only for a reader holding that capability (the CEO holds every
  * one), as the route behind the screen checks it.
  *
+ * `available: async (client) => boolean` is for records a feature can switch off (the Attendance
+ * policy's Home Location, docs/guides/attendance.md §1.3): asked before the query, false leaves
+ * the group out for everyone, as the routes behind it refuse while it is off.
+ *
  * `owner: { column }` is for records that belong to one person whatever their grant says
  * (their own mail): the query always adds `column = <the caller's user_id>`, so a scope of
  * `all` (the CEO, People) still finds only the caller's own rows. Without a caller it
@@ -103,6 +107,8 @@ function recordProvider(spec) {
     throw new Error(`search provider ${spec.type}: "${spec.capability}" is not a catalogued capability`);
   if (spec.phones !== undefined && (!Array.isArray(spec.phones) || spec.phones.some((col) => !col)))
     throw new Error(`search provider ${spec.type}: phones is a list of columns`);
+  if (spec.available !== undefined && typeof spec.available !== "function")
+    throw new Error(`search provider ${spec.type}: available is (client) => boolean`);
   const words = (spec.words || [])
     .map((w) => String(w).toLowerCase().trim())
     .filter(Boolean);
@@ -117,6 +123,7 @@ function recordProvider(spec) {
    */
   async function search(c, { term, page = 1, fuzzy = false, scope, user }) {
     if (spec.owner && !(user && user.user_id)) return { page: null, items: [] };
+    if (spec.available && !(await spec.available(c))) return { page: null, items: [] };
     const useFuzzy = fuzzy && term.length >= 4;
     // $3 (the bare term) only when the typo pass uses it: an unused parameter has no type.
     const params = [

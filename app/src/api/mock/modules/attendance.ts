@@ -39,6 +39,9 @@ const POLICY_MODES = {
   get max_accuracy_m() {
     return inForceRules().max_accuracy_m;
   },
+  get home_location() {
+    return inForceRules().home_location.on === true;
+  },
 };
 const FUTURE_TOLERANCE_S = 120;
 
@@ -548,9 +551,24 @@ function needsHome(key: string) {
   return remote(workWeekOf(key)) || (!!next && remote(weekOn(key, next.effective_from, next)));
 }
 
+/** Whether the Attendance policy in force on a date uses homes at all: its Home Location (attendance.md §1.3). */
+const homesOn = (date = todayIso()) => attendanceRulesOn(date).home_location.on === true;
+const HOME_LOCATION_OFF = () => fail(409, "HOME_LOCATION_OFF", "Home locations are off in the Attendance policy.");
+/** A day from home while Home Location is off: no fence, and no reading asked or kept (§6.5). */
+function uncheckedOn(key: string, date: string) {
+  if (homesOn(date)) return false;
+  const ts = siteOn(key, date);
+  if (ts) return ts.purpose === "temporary_home";
+  if (fieldOn(key, date)) return false;
+  const r = approvedReqOn(key, date);
+  if (r) return r.request_type !== "client_visit";
+  return isRemote(key) || homeDay(key, date);
+}
+
 /** Where a person's punch is judged: their approved home when they work remotely, else their worksite. */
 type Fence = { kind: "worksite" | "home" | "temporary_home" | "field" | "client_visit" | "temporary_site"; name: string; latitude: number; longitude: number; radius_m: number | null; sites?: MockSite[] };
 function fenceOf(key: string): Fence | null {
+  if (uncheckedOn(key, todayIso())) return null;
   // An approved temporary site covering today decides the place before anything (§6.11), then a
   // field assignment or an approved work location request made before PR 4.
   const ts = siteOn(key, todayIso());
@@ -580,6 +598,7 @@ function fenceOf(key: string): Fence | null {
 
 /** Today's approved remote day or client visit with no fence: the approval is the check. */
 function approvedDayOf(key: string): { name: string } | null {
+  if (uncheckedOn(key, todayIso())) return null;
   if (siteOn(key, todayIso()) || fieldOn(key, todayIso())) return null;
   const r = approvedReqOn(key, todayIso());
   if (!r || r.request_type === "temporary_home" || (r.request_type === "client_visit" && r.site_latitude !== null) || (r.request_type === "remote_day" && homeOf(key, "approved"))) return null;
@@ -590,6 +609,7 @@ const asLocation = (h: Home | null): HomeLocation | null =>
   h && { attendance_home_id: h.id, status: h.status, home_address: h.address, home_latitude: h.latitude, home_longitude: h.longitude, accuracy_m: h.accuracy_m, radius_m: HOME_RADIUS_M, requested_at: h.requested_at, decided_at: h.decided_at, decision_reason: h.reason };
 
 function myHome(key: string): MyHome {
+  if (!homesOn()) return { needed: false, approved: null, pending: null, rejected: null, max_accuracy_m: POLICY_MODES.max_accuracy_m };
   const newest = newestHome(key);
   return { needed: needsHome(key), approved: asLocation(homeOf(key, "approved")), pending: asLocation(homeOf(key, "pending")), rejected: asLocation(newest?.status === "rejected" ? newest : null), max_accuracy_m: POLICY_MODES.max_accuracy_m };
 }
@@ -619,6 +639,7 @@ route("GET /api/v1/attendance/me/home", (req) => ok(myHome(req.user!)));
 route("POST /api/v1/attendance/me/home", (req) => {
   const key = req.user!;
   const b = req.body as { home_address: unknown; home_latitude: number; home_longitude: number; accuracy_m: number };
+  if (!homesOn()) return HOME_LOCATION_OFF();
   if (!needsHome(key)) return fail(422, "HOME_NOT_NEEDED", "Only staff who work from home set a home location.");
   // Picked, pinned or the device's location (F27): never typed.
   const place = placeOf(b.home_address);
@@ -633,6 +654,7 @@ route("POST /api/v1/attendance/me/home", (req) => {
 route("GET /api/v1/attendance/homes", (req) => {
   const g = peopleGrant(req.user!, "view");
   if (!g.may) return forbidden();
+  if (!homesOn()) return HOME_LOCATION_OFF();
   const waitingFirst = (a: HomeRequest, b: HomeRequest) => Number(b.status === "pending") - Number(a.status === "pending") || b.requested_at.localeCompare(a.requested_at);
   const rows = HOMES.filter((h) => g.sees(h.key)).map((h) => homeOut(h, g.all));
   return paged(rows, req, {
@@ -645,6 +667,7 @@ route("GET /api/v1/attendance/homes", (req) => {
 route("GET /api/v1/attendance/homes/:id", (req) => {
   const g = peopleGrant(req.user!, "view");
   if (!g.may) return forbidden();
+  if (!homesOn()) return HOME_LOCATION_OFF();
   const h = HOMES.find((x) => x.id === req.params.id);
   return h && g.sees(h.key) ? ok(homeOut(h, g.all)) : notFound();
 });
@@ -652,6 +675,7 @@ route("GET /api/v1/attendance/homes/:id", (req) => {
 route("POST /api/v1/attendance/homes/:id/decision", (req) => {
   const g = peopleGrant(req.user!, "approve");
   if (!g.may || !g.all) return forbidden();
+  if (!homesOn()) return HOME_LOCATION_OFF();
   const h = HOMES.find((x) => x.id === req.params.id);
   if (!h) return notFound();
   if (h.key === req.user) return fail(403, "OWN_RECORD", "Someone else decides your own home location");
@@ -677,8 +701,9 @@ export function todayOf(key: string): AttendanceToday {
   const date = todayIso();
   const fence = fenceOf(key);
   const approvedDay = approvedDayOf(key);
-  const fromHome = isRemote(key) || homeDay(key, date);
-  const homeState = fromHome ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null;
+  const unchecked = uncheckedOn(key, date);
+  const fromHome = isRemote(key) || homeDay(key, date) || unchecked;
+  const homeState = fromHome && homesOn(date) ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null;
   const evs = activeOn(key, date);
   const inEv = evs.find((e) => e.event_type === "clock_in");
   const outEv = evs.find((e) => e.event_type === "clock_out");
@@ -701,14 +726,14 @@ export function todayOf(key: string): AttendanceToday {
     shift: shiftOf(date, key),
     work_pattern: p.work_pattern,
     location: approvedDay
-      ? { kind: "approved_day", name: approvedDay.name, radius_m: null, home_state: homeState }
+      ? { kind: "approved_day", name: approvedDay.name, radius_m: null, home_state: homeState, checked: true }
       : fence
-        ? { kind: fence.kind, name: fence.name, radius_m: fence.radius_m, home_state: homeState }
-        : { kind: fromHome ? "remote" : "none", name: null, radius_m: null, home_state: homeState },
+        ? { kind: fence.kind, name: fence.name, radius_m: fence.radius_m, home_state: homeState, checked: true }
+        : { kind: fromHome ? "remote" : "none", name: null, radius_m: null, home_state: homeState, checked: !unchecked },
     policy: POLICY_MODES,
     device: { state: dev.status, label: dev.label, registered_count: count, can_register: dev.status !== "registered" && count < MAX_REGISTERED },
-    temporary_site: todaySite(key, date),
-    check_ins: siteOn(key, date) ? checkInsOn(key, date) : [],
+    temporary_site: unchecked ? null : todaySite(key, date),
+    check_ins: siteOn(key, date) && !unchecked ? checkInsOn(key, date) : [],
   };
 }
 
@@ -788,13 +813,16 @@ route("POST /api/v1/attendance/punches", (req) => {
     : fence?.sites?.[0];
   const site = fence && nearest ? { ...fence, name: nearest.name, latitude: nearest.latitude, longitude: nearest.longitude, radius_m: nearest.radius_m } : fence;
   const approvedDay = approvedDayOf(key);
-  const point = b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
+  // A day from home while Home Location is off keeps no reading, whatever was sent (§6.5).
+  const unchecked = uncheckedOn(key, date);
+  const point = !unchecked && b.latitude !== null && b.longitude !== null ? { latitude: b.latitude, longitude: b.longitude } : null;
   // A reading with no accuracy, or one of 0 or less, is no reading (§6.5).
   const measured = point !== null && b.accuracy_m !== null && b.accuracy_m > 0;
   let geofence: GeofenceVerdict;
   let locationReason: string | null = null;
   let distance: number | null = null;
-  if (approvedDay) [geofence, locationReason] = ["not_applied", "approved_request"];
+  if (unchecked) [geofence, locationReason] = ["not_applied", "home_location_off"];
+  else if (approvedDay) [geofence, locationReason] = ["not_applied", "approved_request"];
   else if (!site && (p.work_pattern === "remote" || homeDay(key, date))) [geofence, locationReason] = ["unverified", "no_home"];
   else if (!site) [geofence, locationReason] = ["unverified", "no_worksite"];
   else if (!point) [geofence, locationReason] = ["unverified", b.location_error || "no_location"];
@@ -1000,7 +1028,7 @@ function registerRows(date: string, viewer: string): Array<RegisterRow & { key: 
       clock_out_at: day?.last_clock_out_at ?? null,
       worked_minutes: day?.worked_minutes ?? 0,
       late_minutes: day?.late_minutes ?? 0,
-      expected_location: fieldOn(p.user_key, date)?.sites.map((x) => x.name).join(" or ") ?? (p.work_pattern === "remote" || homeDay(p.user_key, date) ? (homeOf(p.user_key, "approved") ? "Home" : "Remote") : (site?.name ?? null)),
+      expected_location: fieldOn(p.user_key, date)?.sites.map((x) => x.name).join(" or ") ?? (p.work_pattern === "remote" || homeDay(p.user_key, date) ? (homesOn(date) && homeOf(p.user_key, "approved") ? "Home" : "Remote") : (site?.name ?? null)),
       location_verdict: last?.geofence ?? null,
       device_label: last?.device_label ?? null,
       device_state: last?.device_state ?? null,
@@ -1572,6 +1600,7 @@ function createTemp(user: string, body: unknown, direct: boolean) {
   const locs = b.locations ?? [];
   if (!locs.length) fields.locations = ["Add an address"];
   if (b.purpose === "temporary_home" && locs.length > 1) fields.locations = ["One address only"];
+  if (b.purpose === "temporary_home" && !homesOn()) return fail(422, "HOME_LOCATION_OFF", "Temporary Home is off in the Attendance policy", { purpose: ["Not available"] });
   // Each address is picked or pinned (F27): never typed, and it must carry a point.
   const picked = locs.map((x) => (x.address === undefined ? null : placeOf(x.address)));
   locs.forEach((x, i) => {
@@ -1738,7 +1767,7 @@ route("POST /api/v1/attendance/check-ins", (req) => {
   if ((b.latitude === null) !== (b.longitude === null)) return invalid({ longitude: ["Send both coordinates or neither"] });
   const date = todayIso();
   const t = siteOn(key, date);
-  if (!t) return fail(422, "NO_TEMPORARY_SITE", "Check In is for a temporary site's day.");
+  if (!t || uncheckedOn(key, date)) return fail(422, "NO_TEMPORARY_SITE", "Check In is for a temporary site's day.");
   const evs = activeOn(key, date);
   if (!evs.some((e) => e.event_type === "clock_in") || evs.some((e) => e.event_type === "clock_out")) return fail(409, "NOT_CLOCKED_IN", "Clock in before you check in.");
   if (CHECK_INS.filter((c) => c.key === key && c.work_date === date).length >= 20) return fail(422, "CHECK_IN_LIMIT", "At most 20 check-ins a day.");
@@ -1798,7 +1827,7 @@ function scheduleOut(key: string, viewer: string, editable = true): WorkSchedule
     employee: person(p),
     work_pattern: p.work_pattern,
     worksite: site ? { worksite_id: site.worksite_id, name: site.name, radius_m: site.radius_m } : null,
-    home_state: needsHome(key) ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null,
+    home_state: homesOn() && needsHome(key) ? (homeOf(key, "approved") ? "approved" : homeOf(key, "pending") ? "pending" : "none") : null,
     week: workWeekOf(key),
     current: versionOut(scheduleOn(key, todayIso())),
     next: versionOut(scheduleAfter(key, todayIso())),

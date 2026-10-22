@@ -1,5 +1,6 @@
 import policies from "@mycity/contract/schemas/policies.js";
 import type { AttendanceRules, Policy, PolicyDraftSave, PolicyMode, WorkPattern } from "@mycity/contract/contract.gen.ts";
+import type { ReactNode } from "react";
 import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
@@ -239,7 +240,7 @@ export function DraftEditor({ p }: { p: Policy }) {
   );
 
   /** One rule's row: its label and help, its control, and a switch's figures when it is on. */
-  const ruleField = (rule: VisibleRule) => {
+  const ruleField = (rule: VisibleRule): ReactNode => {
     if (isNumberRule(rule))
       return (
         <Field key={rule} label={label(rule)} help={RULE_HELP[rule]} {...f.status(rule)}>
@@ -318,6 +319,21 @@ export function DraftEditor({ p }: { p: Policy }) {
         <Field key={rule} label={label(rule)} help={RULE_HELP[rule]} {...f.status("absence_deduction_on")}>
           {tick("absence_deduction_on", "On")}
         </Field>
+      );
+    // Homes at all (attendance.md §1.3): Home Check and Home Radius only matter, and show, while it is on.
+    if (rule === "home_location")
+      return (
+        <div key={rule}>
+          <Field label={label(rule)} help={RULE_HELP[rule]} {...f.status("home_location_on")}>
+            {tick("home_location_on", "On")}
+          </Field>
+          {flag("home_location_on") && (
+            <>
+              {ruleField("home_geofence_mode")}
+              {ruleField("home_radius_m")}
+            </>
+          )}
+        </div>
       );
     return (
       <div key={rule}>

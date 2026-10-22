@@ -55,6 +55,8 @@ module.exports = [
       "h.attendance_home_id AS id, to_char(h.requested_at, 'DD/MM/YYYY') AS ref, btrim(e.first_name || ' ' || e.last_name) AS title, h.status AS sub, h.status AS status",
     order: "h.requested_at DESC",
     scope: { column: "h.employee_id" },
+    // Found only while the Attendance policy's Home Location is on (§1.3), as Homes is shown.
+    available: (client) => require("./attendance.home").onDate(client),
   }),
   recordProvider({
     type: "attendance_location_request",

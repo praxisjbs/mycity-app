@@ -359,7 +359,10 @@ const AttendanceToday = z
      * temporary home (`temporary_home`, fenced), a client visit's site (`client_visit`, fenced), or
      * an approved remote day, or a client visit sent before sites were asked for, with no fence
      * (`approved_day`, named in `name`). `home_state` is the home of a remote employee, or of a
-     * hybrid employee on a home day: approved, waiting on People, or none; null for anyone else.
+     * hybrid employee on a home day: approved, waiting on People, or none; null for anyone else, and
+     * for everyone while the policy's Home Location is off. `checked` is false on a day worked from
+     * home while Home Location is off (`remote`, guide §6.5): the panel reads no location and the
+     * punch carries none; true wherever a reading is asked for.
      */
     location: z
       .object({
@@ -367,11 +370,20 @@ const AttendanceToday = z
         name: z.string().nullable(),
         radius_m: z.number().int().nullable(),
         home_state: z.enum(["approved", "pending", "none"]).nullable(),
+        checked: z.boolean(),
       })
       .strict(),
-    /** The policy in force today: `geofence_mode` is the location check for today's place (§6.1). */
+    /**
+     * The policy in force today: `geofence_mode` is the location check for today's place (§6.1);
+     * `home_location` is its Home Location switch (§1.3), which every screen that shows a home reads.
+     */
     policy: z
-      .object({ geofence_mode: PolicyMode, device_mode: PolicyMode, max_accuracy_m: z.number().int().min(1) })
+      .object({
+        geofence_mode: PolicyMode,
+        device_mode: PolicyMode,
+        max_accuracy_m: z.number().int().min(1),
+        home_location: z.boolean(),
+      })
       .strict(),
     device: z
       .object({
@@ -709,7 +721,10 @@ const HomeLocation = z
   })
   .strict();
 
-/** GET /attendance/me/home: the home in force, the one waiting, and the last one rejected since. */
+/**
+ * GET /attendance/me/home: the home in force, the one waiting, and the last one rejected since.
+ * While the policy's Home Location is off (guide §1.3), `needed` is false and no home is given.
+ */
 const MyHome = z
   .object({
     needed: z.boolean(),
@@ -992,8 +1007,9 @@ const WorkDay = z
  * `week` is each weekday (Monday first) as worked today, by the schedule in force or, with none
  * (`current` null), the company hours at the place the work pattern gives; `next` is a schedule
  * waiting to start. `worksite` is the office an Office day is matched to, when one is assigned and
- * active. `home_state` is the home of someone whose week has a Remote day, else null. `can_edit`
- * says whether the reader may set the schedule.
+ * active. `home_state` is the home of someone whose week has a Remote day, else null, and null for
+ * everyone while the policy's Home Location is off (guide §1.3). `can_edit` says whether the reader
+ * may set the schedule.
  */
 const WorkSchedule = z
   .object({
@@ -1109,6 +1125,8 @@ const DEFAULT_RULES = Object.freeze({
     monthly_cap_hours: 20,
   },
   office_geofence_mode: "warn",
+  // Off until People switch it on (guide §1.3, H2): every version before it reads it off too.
+  home_location: { on: false },
   home_geofence_mode: "warn",
   site_geofence_mode: "warn",
   home_radius_m: 150,
@@ -1134,6 +1152,8 @@ const ruleShape = {
   location_rule: CountRule,
   overtime: Overtime,
   office_geofence_mode: PolicyMode,
+  /** Homes at all (guide §1.3): off, nobody sets one and a day worked from home is not checked. */
+  home_location: z.object({ on: z.boolean() }).strict(),
   home_geofence_mode: PolicyMode,
   site_geofence_mode: PolicyMode,
   /** At least 150 on a new version (T9); an older version keeps what it set, down to 50. */
@@ -1167,6 +1187,7 @@ const AttendanceRules = z.object({
   location_rule: ruleShape.location_rule.default(() => structuredClone(DEFAULT_RULES.location_rule)),
   overtime: ruleShape.overtime.default(() => structuredClone(DEFAULT_RULES.overtime)),
   office_geofence_mode: ruleShape.office_geofence_mode.default(() => structuredClone(DEFAULT_RULES.office_geofence_mode)),
+  home_location: ruleShape.home_location.default(() => structuredClone(DEFAULT_RULES.home_location)),
   home_geofence_mode: ruleShape.home_geofence_mode.default(() => structuredClone(DEFAULT_RULES.home_geofence_mode)),
   site_geofence_mode: ruleShape.site_geofence_mode.default(() => structuredClone(DEFAULT_RULES.site_geofence_mode)),
   home_radius_m: ruleShape.home_radius_m.default(() => structuredClone(DEFAULT_RULES.home_radius_m)),
@@ -1192,8 +1213,9 @@ const deductionInRange = (d) => !d.on || d.method === "pro_rata" || !d.amount ||
 
 /**
  * The rules as People save them in a draft: every rule given, and the rules a new version must
- * meet (guide §6.15): a home and a temporary site are Flag or Refuse, never Off; a home's radius is
- * at least 150 m; a fixed deduction or overtime paid per hour names its amount.
+ * meet (guide §6.15): a home and a temporary site are Flag or Refuse, never Off (a home's mode is
+ * kept while Home Location is off, so switching it on needs nothing else); a home's radius is at
+ * least 150 m; a fixed deduction or overtime paid per hour names its amount.
  */
 const AttendanceRulesDraft = z
   .object(ruleShape)

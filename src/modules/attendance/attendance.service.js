@@ -54,6 +54,7 @@ const clockWatch = require("./attendance.clock-watch");
 const guard = require("./attendance.clock-guard");
 const { decideGeofence } = require("./attendance.geofence");
 const reconcile = require("./attendance.reconcile");
+const homeLocations = require("./attendance.home");
 const attendanceExport = require("./attendance.export");
 const rules = require("./attendance.rules");
 const repo = require("./attendance.repo");
@@ -172,9 +173,11 @@ async function today(user, { now = new Date() } = {}) {
   const clockOut = active.find((e) => e.event_type === "clock_out") || null;
   const device = await devices.statusForSession(pool, user);
   // Working from home: a Remote day of the person's week, or remote staff with no schedule (§6.13).
+  // Their home is told only while the policy's Home Location is on (§1.3).
   const remote = ctx.home_day;
+  const homesOn = ctx.policy.home_location.on === true;
   let homeState = null;
-  if (person.work_pattern === "remote" || remote) {
+  if (homesOn && (person.work_pattern === "remote" || remote)) {
     const homes = await repo.homesOf(pool, user.employee_id);
     homeState = homes.approved ? "approved" : homes.pending ? "pending" : "none";
   }
@@ -203,14 +206,15 @@ async function today(user, { now = new Date() } = {}) {
     shift: shiftOut(judged.shift, ctx.shift.off_reason),
     work_pattern: person.work_pattern,
     location: ctx.approved
-      ? { kind: "approved_day", name: ctx.approved.name, radius_m: null, home_state: homeState }
+      ? { kind: "approved_day", name: ctx.approved.name, radius_m: null, home_state: homeState, checked: true }
       : ctx.fence
-        ? { kind: ctx.fence.kind, name: ctx.fence.name, radius_m: ctx.fence.radius_m, home_state: homeState }
-        : { kind: remote ? "remote" : "none", name: null, radius_m: null, home_state: homeState },
+        ? { kind: ctx.fence.kind, name: ctx.fence.name, radius_m: ctx.fence.radius_m, home_state: homeState, checked: true }
+        : { kind: remote ? "remote" : "none", name: null, radius_m: null, home_state: homeState, checked: !ctx.unchecked },
     policy: {
       geofence_mode: ctx.policy.geofence_mode,
       device_mode: ctx.policy.device_mode,
       max_accuracy_m: ctx.policy.max_accuracy_m,
+      home_location: homesOn,
     },
     device,
     temporary_site: sites.todayOf(ctx.site || null),
@@ -297,16 +301,20 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
       first_seen: device ? device.first_seen : false,
       has_session_device: Boolean(device),
     });
-    const point = body.latitude === null ? null : { latitude: body.latitude, longitude: body.longitude };
+    // A day worked from home while Home Location is off keeps no reading, whatever was sent (§6.5).
+    const unchecked = ctx.unchecked === true;
+    const point = unchecked || body.latitude === null ? null : { latitude: body.latitude, longitude: body.longitude };
+    const accuracyM = unchecked ? null : body.accuracy_m;
     const geofence = decideGeofence({
       mode: ctx.policy.geofence_mode,
       point,
-      accuracy_m: body.accuracy_m,
+      accuracy_m: accuracyM,
       location_error: body.location_error || null,
       expected: ctx.fence,
       approved: ctx.approved || null,
       work_pattern: person.work_pattern,
       home_day: ctx.home_day,
+      unchecked,
       max_accuracy_m: ctx.policy.max_accuracy_m,
     });
     const time = rules.timeCheck({ server_at: now, device_at: body.device_at });
@@ -370,7 +378,7 @@ async function punch(user, body, { idempotencyKey, now = new Date() } = {}) {
         policy_version_id: ctx.policy.policy_version_id,
         latitude: point ? point.latitude : null,
         longitude: point ? point.longitude : null,
-        accuracy_m: body.accuracy_m,
+        accuracy_m: accuracyM,
         distance_m: geofence.distance_m,
         source: "pwa",
         validation_state: result,
@@ -539,11 +547,15 @@ const dateOf = (query, now = new Date()) => query.date || lagos.today(now);
 
 /**
  * The register for a day: each person by their own day (their schedule, else the company hours in
- * force on the date, which the SQL takes as a parameter; §6.9, §6.13).
+ * force on the date, which the SQL takes as a parameter; §6.9, §6.13), and a day from home named
+ * Home only while the policy's Home Location was on that date (§1.3).
  */
 async function register(query, scope) {
   const date = dateOf(query);
-  return repo.register(pool, date, query, scope, { hours: await calendar.companyHoursOn(pool, date) });
+  return repo.register(pool, date, query, scope, {
+    hours: await calendar.companyHoursOn(pool, date),
+    homes: await homeLocations.onDate(pool, date),
+  });
 }
 
 async function summary(query, scope) {
@@ -555,7 +567,10 @@ async function summary(query, scope) {
 async function dayDetail(employeeId, query, scope) {
   assertInScope(scope, employeeId);
   const date = dateOf(query);
-  const row = await repo.registerRow(pool, date, employeeId, { hours: await calendar.companyHoursOn(pool, date) });
+  const row = await repo.registerRow(pool, date, employeeId, {
+    hours: await calendar.companyHoursOn(pool, date),
+    homes: await homeLocations.onDate(pool, date),
+  });
   if (!row) throw new AppError("NOT_FOUND", "Not found", 404);
   const person = await repo.person(pool, employeeId);
   const { judged, ctx } = await reconcile.judgedOn(pool, person, date);

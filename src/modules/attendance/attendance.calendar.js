@@ -27,6 +27,9 @@
  *              worksite fences
  *   home_day   the date is worked from home by the schedule or the pattern, so having no fence
  *              means no approved home (no_home) rather than no office (no_worksite)
+ *   unchecked  the policy's Home Location is off (§1.3) and the date is worked from home (a Remote
+ *              day, an approved Temporary Home, a temporary home or remote day made before PR 4):
+ *              no fence, no reading asked or kept, the place accepted (geofence home_location_off)
  *   zone       the worksite's timezone, else Africa/Lagos (a home has none of its own)
  *   shift      the person's own (§6.13, rules.shiftFor): their work schedule in force for that
  *              weekday, else the company hours (the policy's `hours`, else the working week of
@@ -114,6 +117,21 @@ async function homeFence(db, person, policy, extra = {}) {
 }
 
 /**
+ * A day worked from home while the policy's Home Location is off (§1.3, H5): no fence, no reading
+ * asked or kept, accepted for its place under every mode. `timeZone` is the day's own (a Temporary
+ * Home keeps its site's).
+ */
+const uncheckedDay = (policy, shift, timeZone) => ({
+  policy: rules.forPlace(policy, "home"),
+  fence: null,
+  approved: null,
+  timeZone,
+  shift,
+  home_day: true,
+  unchecked: true,
+});
+
+/**
  * Everything a punch or a day of a person on `date` is judged with.
  * @param {{query: Function}} db
  * @param {{employee_id: string, worksite_id: string|null, work_pattern: string}} person  repo.person()
@@ -122,8 +140,12 @@ async function homeFence(db, person, policy, extra = {}) {
 async function contextFor(db, person, date) {
   const policy = await policyFor(db, person.employee_id, date);
   const shift = await shiftOn(db, person, date, { policy });
-  // A temporary site the person is still on that day comes first (§6.11).
+  const homes = policy.home_location.on === true;
+  // A temporary site the person is still on that day comes first (§6.11); a Temporary Home is a
+  // home, so with Home Location off its days are worked from home, unchecked, in its own zone.
   const site = await temporarySites.siteOn(db, person.employee_id, date);
+  if (site && !homes && site.purpose === "temporary_home")
+    return uncheckedDay(policy, shift, site.locations[0].timezone || rules.DEFAULT_TZ);
   if (site) return temporarySites.contextOf(site, { policy, shift });
   const assignment = await repo.fieldAssignmentOn(db, person.employee_id, date);
   if (assignment)
@@ -136,6 +158,8 @@ async function contextFor(db, person, date) {
       home_day: false,
     };
   const request = await repo.approvedRequestOn(db, person.employee_id, date);
+  // A temporary home or a remote day made before PR 4 is a day from home: unchecked while it is off.
+  if (request && !homes && request.request_type !== "client_visit") return uncheckedDay(policy, shift, zoneOf(person));
   if (request)
     return {
       policy: rules.forPlace(policy, request.request_type === "client_visit" ? "site" : "home"),
@@ -145,6 +169,7 @@ async function contextFor(db, person, date) {
       ...(await requestPlace(db, person, request, policy)),
     };
   if (homeDay(person, shift)) {
+    if (!homes) return uncheckedDay(policy, shift, zoneOf(person));
     return {
       policy: rules.forPlace(policy, "home"),
       fence: await homeFence(db, person, policy),

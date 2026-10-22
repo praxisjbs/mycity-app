@@ -224,6 +224,10 @@ const ENTITY_ROUTES = Object.freeze({
     param: "home",
     self: screen("ess", "my-attendance"),
   },
+  // The push to set a home once the Attendance policy's Home Location is switched on (§6.10): the
+  // person's notice opens My Attendance with Set Home Location (`?home=`).
+  // search:none a notice to the person, not a record anyone looks up
+  attendance_home_needed: { ...screen("ess", "my-attendance"), param: "home" },
   // A work location request made before attendance's PR 4: People · Worksites opens it in
   // Temporary, Requests (`?request=`); the person's own opens on Work Location Requests.
   attendance_location_request: {

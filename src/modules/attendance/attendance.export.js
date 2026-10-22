@@ -17,6 +17,7 @@
 const { pool } = require("../../config/db");
 const { formatDate, formatMonth } = require("../../shared/time/day-first");
 const lagos = require("../../shared/time/lagos");
+const homes = require("./attendance.home");
 const repo = require("./attendance.repo");
 
 /** The most rows one export file holds. */
@@ -101,7 +102,9 @@ async function registerRows(scope, { from, to, ...filters }) {
   let total = 0;
   let capped = false;
   for (let d = from; d <= to && !capped; d = lagos.addDays(d, 1)) {
-    const day = await gather((n) => repo.register(pool, d, { ...filters, page: n }, scope));
+    // A day from home is named Home only while the policy's Home Location was on that date (§1.3).
+    const homesOn = await homes.onDate(pool, d);
+    const day = await gather((n) => repo.register(pool, d, { ...filters, page: n }, scope, { homes: homesOn }));
     total += day.total;
     for (const r of day.rows) {
       if (rows.length >= EXPORT_CEILING) {

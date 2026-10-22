@@ -22,7 +22,9 @@
  *                              home yet (no_home), or someone expected at an office with none
  *                              assigned (no_worksite)
  *                 not_applied  an approved remote day, or a client visit sent before sites were
- *                              asked for, with no fence: the approval is the check (approved_request)
+ *                              asked for, with no fence: the approval is the check (approved_request);
+ *                              or a day worked from home while the policy's Home Location is off:
+ *                              nothing is checked and no reading is kept (home_location_off, §1.3)
  *
  *   mode off      every verdict is accepted; it is kept as evidence
  *   mode warn     outside or unverified goes to review, with an exception
@@ -77,6 +79,7 @@ function judgeReading({ distance_m: d, accuracy_m: a, radius_m: r, max_accuracy_
  *          day with no fence
  * @param {"on_site"|"hybrid"|"remote"} input.work_pattern
  * @param {boolean} [input.home_day]  the date is worked from home by the schedule (a Remote day)
+ * @param {boolean} [input.unchecked]  worked from home while Home Location is off: never checked
  * @param {number} input.max_accuracy_m
  * @returns {{verdict: string, reason: string|null, distance_m: number|null, radius_m: number|null,
  *            accuracy: "good"|"fair"|"poor"|null, place: "worksite"|"home"|null, worksite_id: string|null,
@@ -84,7 +87,28 @@ function judgeReading({ distance_m: d, accuracy_m: a, radius_m: r, max_accuracy_
  *            assignment_id: string|null, site_id: string|null, outside: string,
  *            result: "accepted"|"review"|"rejected", exception: string|null, retry_location: boolean}}
  */
-function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected: given, approved = null, work_pattern: pattern, home_day: homeDay = false, max_accuracy_m: maxAccuracyM }) {
+function decideGeofence({ mode, point, accuracy_m: accuracyM, location_error: locationError, expected: given, approved = null, work_pattern: pattern, home_day: homeDay = false, unchecked = false, max_accuracy_m: maxAccuracyM }) {
+  if (unchecked) {
+    // Home Location off (§1.3): no place to match and no reading to judge, under every mode.
+    return {
+      verdict: "not_applied",
+      reason: "home_location_off",
+      distance_m: null,
+      radius_m: null,
+      accuracy: null,
+      place: null,
+      worksite_id: null,
+      worksite_name: null,
+      home_id: null,
+      request_id: null,
+      assignment_id: null,
+      site_id: null,
+      outside: "outside_home",
+      retry_location: false,
+      result: "accepted",
+      exception: null,
+    };
+  }
   const hasPoint = geo.isPoint(point);
   // A temporary site's or a field assignment's day: judged as at the address the reading is nearest, named by it.
   const site = given && Array.isArray(given.sites) && given.sites.length ? nearestSite(given.sites, point) : null;

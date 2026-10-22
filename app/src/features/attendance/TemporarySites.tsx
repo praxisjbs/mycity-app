@@ -458,6 +458,9 @@ export function WorkSiteForm({ close, direct }: { close: () => void; direct: boo
   );
   const mine = useMutation("POST /api/v1/attendance/me/temporary-sites");
   const theirs = useMutation("POST /api/v1/attendance/temporary-sites");
+  // Temporary Home is a home: offered only while the policy's Home Location is on (attendance.md §1.3).
+  const homesOn = useApi("GET /api/v1/attendance/me/today").data?.policy.home_location === true;
+  const purposes = homesOn ? PURPOSES : PURPOSES.filter(([p]) => p !== "temporary_home");
   const v = f.values;
   const shown = countOf(v);
 
@@ -549,7 +552,7 @@ export function WorkSiteForm({ close, direct }: { close: () => void; direct: boo
         </Grid>
       )}
       <Field label="Purpose" {...f.status("purpose")}>
-        <SelectField searchable {...f.field("purpose")} onChange={(p) => f.set("purpose", p as TemporarySitePurpose)} options={PURPOSES} placeholder="Choose One" />
+        <SelectField searchable {...f.field("purpose")} onChange={(p) => f.set("purpose", p as TemporarySitePurpose)} options={purposes} placeholder="Choose One" />
       </Field>
       <Field label="Name" {...f.status("name")}>
         <TextField {...f.field("name")} placeholder="Partner Training Week" maxLength={120} />

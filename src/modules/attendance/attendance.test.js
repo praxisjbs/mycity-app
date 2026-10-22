@@ -131,6 +131,30 @@ describe("the geofence", () => {
     }
   });
 
+  test("a day from home while Home Location is off is not checked, under every mode, whatever was read (§1.3)", () => {
+    for (const mode of ["off", "warn", "block"])
+      for (const point of [north(40), north(5000), null]) {
+        const r = judge({ mode, point, expected: null, work_pattern: "remote", home_day: true, unchecked: true });
+        expect(r).toMatchObject({
+          verdict: "not_applied",
+          reason: "home_location_off",
+          result: "accepted",
+          exception: null,
+          distance_m: null,
+          accuracy: null,
+          place: null,
+          home_id: null,
+          retry_location: false,
+        });
+      }
+    // On, the same remote day with no approved home is reviewed, as before.
+    expect(judge({ point: north(40), expected: null, work_pattern: "remote", home_day: true })).toMatchObject({
+      verdict: "unverified",
+      reason: "no_home",
+      result: "review",
+    });
+  });
+
   test("the reading rule, every case: inside, outside, at the edge, too rough (judgeReading)", () => {
     const r = (d, a) => judgeReading({ distance_m: d, accuracy_m: a, radius_m: 100, max_accuracy_m: 100 });
     // Inside: the centre within the radius and the reading as fine as the policy asks, the boundaries included.
