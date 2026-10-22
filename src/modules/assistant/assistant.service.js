@@ -23,10 +23,10 @@ const transcription = require("../../services/ai/transcription");
 const repo = require("./assistant.repo");
 const history = require("./assistant.history");
 const suggestions = require("./assistant.suggestions");
-const { EVENTS } = require("./assistant.events");
+const { EVENTS, VOICE_QUESTION } = require("./assistant.events");
 
-/** A recording older than this was left behind by a request that never finished. */
-const RECORDING_KEPT_MINUTES = 60;
+/** A recording older than this was left behind by a request that never finished (a transcription takes a minute at most). */
+const RECORDING_KEPT_MINUTES = 30;
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -154,8 +154,8 @@ async function transcribe(file, actor) {
     vault.store(client, {
       file,
       purpose: "voice_note",
-      doc_type: "ai_voice_question",
-      entity: { type: "app_user", id: actor.user_id },
+      doc_type: VOICE_QUESTION,
+      entity: { type: VOICE_QUESTION, id: actor.user_id },
       transient: true,
       actor,
     }),

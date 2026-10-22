@@ -11,8 +11,12 @@ const { AppError } = require("../../shared/errors");
 const catalog = require("../../shared/access/access.catalog");
 const routeMap = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
+const idempotency = require("../../middleware/idempotency");
 const repo = require("./assistant.repo");
 const { EVENTS } = require("./assistant.events");
+
+/** The route whose replies the idempotency layer keeps for a repeated press. */
+const ASK = Object.freeze({ method: "POST", path: "/api/v1/ai/ask" });
 
 async function tx(fn) {
   const client = await pool.connect();
@@ -47,7 +51,7 @@ function present(row, citations = []) {
     link: md.link || null,
     citations: citations.map(citationOf),
     citations_total: Number(row.citations_total) || 0,
-    reads: (md.reads || []).map((r) => ({ key: r.key, rows: r.rows, total: r.total === undefined ? null : r.total })),
+    reads: (md.reads || []).map((r) => ({ key: r.key, rows: r.rows, total: r.total === undefined ? null : r.total, page: r.page || null })),
     declined: md.declined || null,
     more: Boolean(md.more),
     feedback: row.feedback || null,
@@ -96,6 +100,8 @@ async function deleteConversation(id, actor) {
   await tx(async (client) => {
     const gone = await repo.deleteConversation(client, id, actor.user_id);
     if (!gone) throw new AppError("NOT_FOUND", "Not found", 404);
+    // The replies kept for a repeated press hold the answers' words too (§6.5).
+    await idempotency.forget(client, { userId: actor.user_id, ...ASK, field: "ai_conversation_id", value: id });
     await emit(client, {
       key: EVENTS.ASSISTANT_CONVERSATION_DELETED,
       entity: { type: "ai_conversation", id },
@@ -109,6 +115,7 @@ async function deleteConversation(id, actor) {
 async function clearHistory(actor) {
   await tx(async (client) => {
     const removed = await repo.clearHistory(client, actor.user_id);
+    await idempotency.forget(client, { userId: actor.user_id, ...ASK });
     if (!removed) return;
     await emit(client, {
       key: EVENTS.ASSISTANT_HISTORY_CLEARED,

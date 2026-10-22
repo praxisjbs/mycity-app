@@ -27,7 +27,7 @@ function answerFor(question: string, view: string): Draft {
       link: l.includes("task") ? { label: "Open Tasks", path: "/workspace?tab=tasks&new=1" } : l.includes("meeting") ? { label: "Open Calendar", path: "/workspace?tab=calendar&new=1" } : null,
     });
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
-    if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [{ key: "partners.list", rows: 0, total: null }] });
+    if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [{ key: "partners.list", rows: 0, total: null, page: null }] });
     const quiet = PARTNERS.filter((p) => p.quiet_days > 30).sort((x, y) => y.quiet_days - x.quiet_days);
     return said(`${quiet.length} partnerships have had no recorded contact in over 30 days. Each has an inactivity alert open on its owner.`, {
       table: { columns: ["Partner", "Owner", "Days Quiet"], rows: quiet.map((p) => [p.name, byKey(p.owner)?.display_name ?? "", String(p.quiet_days)]), numeric: [2] },
@@ -47,26 +47,26 @@ function answerFor(question: string, view: string): Draft {
         ],
         numeric: [],
       },
-      reads: [{ key: "activity.list", rows: 4, total: 4 }],
+      reads: [{ key: "activity.list", rows: 4, total: 4, page: 1 }],
       link: { label: "Open Home", path: "/home?tab=overview" },
     });
   if (l.includes("late"))
     return said("Seven late arrivals this month, from four people. One person has reached the query threshold.", {
       table: { columns: ["Employee", "Late Arrivals"], rows: [["Bashir Lawal", "3"], ["Tobi Ojo", "2"], ["Emeka Obi", "1"], ["Cynthia Osakunih", "1"]], numeric: [1] },
-      reads: [{ key: "attendance.exceptions", rows: 7, total: 7 }],
+      reads: [{ key: "attendance.exceptions", rows: 7, total: 7, page: 1 }],
       link: { label: "Open Attendance", path: "/people?tab=attendance" },
     });
   if (l.includes("confirm") || l.includes("probation"))
     return said("Two people are on probation; Chidera Nwosu's decision is due first.", {
       table: { columns: ["Employee", "Started", "Decision Due"], rows: [["Chidera Nwosu", "24/07/2026", "24/10/2026"], ["Samuel Akpan", "13/04/2026", "Overdue"]], numeric: [] },
-      reads: [{ key: "employees.list", rows: 2, total: 2 }],
+      reads: [{ key: "employees.list", rows: 2, total: 2, page: 1 }],
     });
   if (l.includes("leave"))
-    return said("You have 14 of 20 annual leave days left this year.", { reads: [{ key: "my_leave.balances", rows: 1, total: 1 }] });
+    return said("You have 14 of 20 annual leave days left this year.", { reads: [{ key: "my_leave.balances", rows: 1, total: 1, page: null }] });
   if (l.includes("next 25"))
-    return said("Here are the next people, 4 to 6 of 312.", {
+    return said("Here are the next people on the list.", {
       table: { columns: ["Name"], rows: [["Bashir Lawal"], ["Tobi Ojo"], ["Emeka Obi"]], numeric: [] },
-      reads: [{ key: "employees.list", rows: 3, total: 312 }],
+      reads: [{ key: "employees.list", rows: 3, total: 312, page: 2 }],
       more: true,
     });
   if (l.includes("who") || l.includes("staff") || l.includes("people")) {
@@ -74,7 +74,7 @@ function answerFor(question: string, view: string): Draft {
     return said(`There are 312 people in all; here are the first ${cites.length}.`, {
       table: { columns: ["Name"], rows: cites.map((c) => [c.label]), numeric: [] },
       citations: cites,
-      reads: [{ key: "employees.list", rows: cites.length, total: 312 }],
+      reads: [{ key: "employees.list", rows: cites.length, total: 312, page: 1 }],
       more: true,
     });
   }

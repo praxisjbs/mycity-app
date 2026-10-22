@@ -27,13 +27,20 @@
  *
  * Structured data first (redactValue): the restricted fields of shared/rbac/field-mask
  * (salary, bank, personal, statutory) are emptied wherever they appear, whoever is
- * asking, unless the caller names a field key in `keep` because the task needs it.
+ * asking, unless the caller names a field key in `keep` because the task needs it. The
+ * payment and identity numbers among them (NEVER_PROPS) are emptied whatever `keep` says,
+ * since a key in `keep` brings its whole field (NIN sits with the personal details).
  * Then every string inside is scrubbed as above.
  *
  * Patterns, not a named-entity model: what leaks in this data is structured, and a
  * model call on every egress to find names would cost more than it saves.
  */
-const { FIELDS, maskData } = require("../../shared/rbac/field-mask");
+const { FIELDS, maskData, applyMask } = require("../../shared/rbac/field-mask");
+
+/** Payment and identity numbers, by name: emptied on every path, whatever a caller keeps. */
+const NEVER_PROPS = Object.freeze(
+  new Set(["account_number", "bank_account_number", "bvn", "nin", "tax_id", "tin", "pension_pin", "nhf_number", "nsitf_number", "passport_number"]),
+);
 
 const CARD = /\b\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{1,7}\b/g;
 const CARD_AMEX = /\b\d{4}[\s-]\d{6}[\s-]\d{5}\b/g;
@@ -123,9 +130,12 @@ function scrubStrings(value, fn, depth = 0) {
 function redactValue(value, { egress = "external", keep = [] } = {}) {
   for (const k of keep)
     if (!FIELDS[k]) throw new Error(`redactValue: "${k}" is not a field key`);
-  const masked = maskData(
-    value,
-    ALL_FIELD_KEYS.filter((k) => !keep.includes(k)),
+  const masked = applyMask(
+    maskData(
+      value,
+      ALL_FIELD_KEYS.filter((k) => !keep.includes(k)),
+    ),
+    NEVER_PROPS,
   );
   return scrubStrings(
     masked,
@@ -138,4 +148,5 @@ module.exports = {
   redactForReasoning,
   redact: redactExternal,
   redactValue,
+  NEVER_PROPS,
 };

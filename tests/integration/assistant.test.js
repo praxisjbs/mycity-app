@@ -42,7 +42,7 @@ const vault = require("../../src/shared/documents/vault");
 const suggestions = require("../../src/modules/assistant/assistant.suggestions");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
 const assistant = require("../../src/modules/assistant/assistant.service");
-require("../../src/modules/assistant/assistant.events");
+const { VOICE_QUESTION } = require("../../src/modules/assistant/assistant.events");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 const q = (sql, params) => pool.query(sql, params);
@@ -285,6 +285,20 @@ describeDb("Praxis AI against the real migrations", () => {
     fresh();
   });
 
+  test("a reply kept for a repeated press goes with its conversation: deleted, the words are not kept there either", async () => {
+    script(say({ text: "Kept once." }), say({ text: "Asked again." }));
+    const key = "6f1c2a0e-2222-4c2b-9a77-0a7e8f3c1d22";
+    const kept = async () => (await one("SELECT count(*)::int AS n FROM idempotency_key WHERE key = $1", [key])).n;
+    const first = await as("ops").post("/ai/ask").set("Idempotency-Key", key).send({ question: "Keep this" });
+    expect(first.status).toBe(200);
+    expect(await kept()).toBe(1);
+    expect((await as("ops").delete(`/ai/conversations/${first.body.ai_conversation_id}`)).status).toBe(204);
+    expect(await kept()).toBe(0);
+    const again = await as("ops").post("/ai/ask").set("Idempotency-Key", key).send({ question: "Keep this" });
+    expect(again.body.ai_message_id).not.toBe(first.body.ai_message_id);
+    expect((await as("ops").delete(`/ai/conversations/${again.body.ai_conversation_id}`)).status).toBe(204);
+  });
+
   test("Delete Conversation and Clear History remove the words; the runs, holding no words, stay for the spend", async () => {
     const runs = (await one("SELECT count(*)::int AS n FROM ai_run WHERE purpose = 'data-answers'")).n;
     expect((await as("ops").delete(`/ai/conversations/${opsConversation}`)).status).toBe(204);
@@ -294,7 +308,12 @@ describeDb("Praxis AI against the real migrations", () => {
     expect((await one("SELECT count(*)::int AS n FROM ai_conversation c JOIN app_user u ON u.user_id = c.user_id WHERE u.email = 'ops@mycity.test'")).n).toBe(0);
     expect((await one("SELECT count(*)::int AS n FROM ai_run WHERE purpose = 'data-answers'")).n).toBe(runs);
     expect((await as("staff").get("/ai/conversations")).body.data.length).toBeGreaterThan(0);
-    const keys = (await q("SELECT event_key FROM event_log WHERE event_key IN ('assistant.conversation_deleted', 'assistant.history_cleared')")).rows.map((r) => r.event_key);
+    const keys = (
+      await q(
+        "SELECT event_key FROM event_log WHERE (event_key = 'assistant.conversation_deleted' AND entity_id::text = $1) OR event_key = 'assistant.history_cleared'",
+        [opsConversation],
+      )
+    ).rows.map((r) => r.event_key);
     expect(keys.sort()).toEqual(["assistant.conversation_deleted", "assistant.history_cleared"]);
   });
 
@@ -309,10 +328,22 @@ describeDb("Praxis AI against the real migrations", () => {
     expect((await one("SELECT count(*)::int AS n FROM document WHERE doc_type = 'ai_voice_question'")).n).toBe(0);
   });
 
-  test("a recording whose request never finished is swept within the hour", async () => {
+  test("a recording whose request never finished is the speaker's alone, and swept within the hour", async () => {
     const doc = await tx((client) =>
-      vault.store(client, { file: { buffer: WEBM, originalname: "q.webm" }, purpose: "voice_note", doc_type: "ai_voice_question", entity: { type: "app_user", id: people.staff.user_id }, actor: null }),
+      vault.store(client, {
+        file: { buffer: WEBM, originalname: "q.webm" },
+        purpose: "voice_note",
+        doc_type: VOICE_QUESTION,
+        entity: { type: VOICE_QUESTION, id: people.staff.user_id },
+        transient: true,
+        actor: null,
+      }),
     );
+    // History is one's own whatever the grant (decision 7): the CEO and an `all` holder read no one's recording.
+    const stored = await vault.get(pool, doc.document_id);
+    expect(await vault.canRead(pool, userOf("staff"), stored)).toBe(true);
+    expect(await vault.canRead(pool, userOf("ceo"), stored)).toBe(false);
+    expect(await vault.canRead(pool, userOf("ops"), stored)).toBe(false);
     expect((await assistant.purgeRecordings()).removed).toBe(0);
     await q("UPDATE document SET created_at = now() - interval '2 hours' WHERE document_id = $1", [doc.document_id]);
     expect((await assistant.purgeRecordings()).removed).toBe(1);

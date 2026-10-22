@@ -1,21 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
-import { invalidate, refresh, useApi, useInfinite, usePaged } from "@/api/hooks";
+import { invalidate, refresh, useApi, useInfinite, usePaged, type PagedResult } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import type { AiAnswer, AiConversation, AiFeedbackValue, AiTranscript } from "@mycity/contract/contract.gen.ts";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { hrefFor } from "@/lib/routes";
+import { moduleByKey } from "@/shell/catalogue";
 import { useFitPage } from "@/shell/layout-context";
 import { useScreenAction } from "@/shell/screen-action";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { BarsCard } from "@/features/shared/sections";
 import {
+  ActionGroup,
   Button,
   CardHeader,
   cn,
   DataView,
   DesktopOnly,
   EmptyState,
+  ErrorState,
   Form,
   formatDateTime,
   formatMonth,
@@ -47,39 +50,53 @@ export default function Assistant({ tab, id }: ModuleScreenProps) {
   return tab === "history" ? <History /> : <Ask id={id} />;
 }
 
+/** The assistant's name, written once in the shell's catalogue (§1.1 decision 5). */
+const NAME = moduleByKey("praxis_ai")?.label ?? "Assistant";
 /** The most citations an answer shows before "+N More". */
 const CHIPS = 6;
 /** What Show Next 25 asks, as a follow-up in the same conversation (§11). */
 const NEXT_PAGE = "Show the next 25.";
+/** The longest question the contract takes (AiAsk), typed or spoken. */
+const QUESTION_MAX = 500;
+/** A list read's page size, for Showing 26 to 50 of 312. */
+const PAGE_SIZE = 25;
 
 /* ───────────────────────── Ask ───────────────────────── */
 
 function Ask({ id }: { id: string | null }) {
   const mobile = useIsMobile();
   useFitPage(true);
+  const { navigate } = useRouter();
   const [, setParams] = useSearchParams();
   const split = useSplitPanes("praxis-ai", 280);
-  const open = useCallback((next: string | null) => setParams({ id: next }), [setParams]);
-  const fresh = useCallback(() => open(null), [open]);
+  const recent = usePaged("GET /api/v1/ai/conversations", { enabled: !mobile });
+  const open = useCallback((next: string) => setParams({ id: next }), [setParams]);
+  // A new address rather than a change to this one: ⌘K's New Conversation arrives as ?action=new,
+  // which a change made from this render's address would put back.
+  const fresh = useCallback(() => navigate(hrefFor("praxis_ai", "ask")), [navigate]);
   // A fit page has no floating button: ⌘K's New Conversation (?action=new) runs this.
   useScreenAction({ label: "New Conversation", onSelect: fresh });
+  const reloadRecent = recent.reload;
+  const answered = useCallback(() => {
+    if (!mobile) void reloadRecent();
+    void refresh("/api/v1/ai/history");
+  }, [mobile, reloadRecent]);
 
-  const conversation = <Conversation id={id} onOpened={(next) => setParams({ id: next }, { replace: true })} onGone={fresh} />;
+  const conversation = <Conversation id={id} onOpened={(next) => setParams({ id: next }, { replace: true })} onGone={fresh} onAnswered={answered} />;
   return (
     <>
-      <PageHeader title="Praxis AI" actions={id ? <Button icon="plus" onClick={fresh}>New Conversation</Button> : undefined} />
+      <PageHeader title={NAME} actions={id ? <Button icon="plus" onClick={fresh}>New Conversation</Button> : undefined} />
       {mobile ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card">{conversation}</div>
       ) : (
-        <SplitPanes split={split} open list={<Recent current={id} onOpen={open} />} detail={conversation} />
+        <SplitPanes split={split} open list={<Recent list={recent} current={id} onOpen={open} />} detail={conversation} />
       )}
     </>
   );
 }
 
 /** Beside the conversation on desktop: the person's conversations, newest first. On a phone this is History. */
-function Recent({ current, onOpen }: { current: string | null; onOpen: (id: string) => void }) {
-  const list = usePaged("GET /api/v1/ai/conversations");
+function Recent({ list, current, onOpen }: { list: PagedResult<AiConversation>; current: string | null; onOpen: (id: string) => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-3">
       <CardHeader title="Recent" className="px-3.5" />
@@ -111,11 +128,13 @@ async function transcribe(audio: Blob): Promise<string> {
   const type = audio.type || "audio/webm";
   const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
   const reply = (await upload({ endpoint: "/api/v1/ai/transcribe", file: new File([audio], `question.${ext}`, { type }), fields: { purpose: "voice_note" } })) as unknown as AiTranscript;
-  if (!reply.text.trim()) throw new Error("No words heard");
+  // A draft is a placeholder, not the person's words (no provider answered): nothing lands in the box.
+  if (reply.draft || !reply.text.trim()) throw new Error("No words heard");
   return reply.text.trim();
 }
 
-function Conversation({ id, onOpened, onGone }: { id: string | null; onOpened: (id: string) => void; onGone: () => void }) {
+function Conversation({ id, onOpened, onGone, onAnswered }: { id: string | null; onOpened: (id: string) => void; onGone: () => void; onAnswered: () => void }) {
+  const formId = useId();
   const turns = useInfinite("GET /api/v1/ai/conversations/:id/turns", { params: { id: id ?? "" }, enabled: Boolean(id) });
   const suggestions = useApi("GET /api/v1/ai/suggestions", { enabled: !id });
   /* Answers given on this screen, shown at once; the saved page catches up behind them. */
@@ -126,15 +145,35 @@ function Conversation({ id, onOpened, onGone }: { id: string | null; onOpened: (
   const asking = useRef(false);
   /* The conversation this screen is showing: an answer that opens one moves the address here, without starting over. */
   const showing = useRef(id);
+  /* Whether the screen is still open: an answer that lands after the person left changes nothing here. */
+  const live = useRef(true);
+  /* The latest callbacks, for an answer that lands after a render or two. */
+  const calls = useRef({ onOpened, onGone, onAnswered });
+  calls.current = { onOpened, onGone, onAnswered };
   const end = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (id === showing.current) return;
     showing.current = id;
+    asking.current = false;
     setGiven([]);
     setPending(null);
-    setText("");
   }, [id]);
+
+  // Deleted in another tab, or not the person's: a new conversation instead of an empty pane (§11).
+  const gone = Boolean(id) && turns.error?.status === 404;
+  useEffect(() => {
+    if (!gone) return;
+    toast("That conversation was deleted");
+    calls.current.onGone();
+  }, [gone]);
 
   const answers = useMemo(() => {
     const saved = [...turns.rows].reverse();
@@ -150,40 +189,61 @@ function Conversation({ id, onOpened, onGone }: { id: string | null; onOpened: (
   const ask = async (words: string, key: string = crypto.randomUUID()) => {
     const question = words.trim();
     if (!question || asking.current) return;
+    const from = showing.current;
+    /** Still on the conversation this question was asked in. */
+    const here = () => live.current && showing.current === from;
     asking.current = true;
     setPending({ question, key, error: null });
-    setText("");
     try {
-      const a = await api.call("POST /api/v1/ai/ask", { body: id ? { question, ai_conversation_id: id } : { question }, idempotencyKey: key });
+      const a = await api.call("POST /api/v1/ai/ask", { body: from ? { question, ai_conversation_id: from } : { question }, idempotencyKey: key });
+      calls.current.onAnswered();
+      if (!here()) return;
       setGiven((g) => [...g, a]);
       setPending(null);
-      if (a.ai_conversation_id !== id) {
+      if (a.ai_conversation_id !== from) {
         showing.current = a.ai_conversation_id;
-        onOpened(a.ai_conversation_id);
+        calls.current.onOpened(a.ai_conversation_id);
       }
-      void refresh("/api/v1/ai/conversations", "/api/v1/ai/history");
     } catch (e) {
+      if (!here()) return;
       const err = e instanceof ApiError ? e : new ApiError(0, null);
-      if (err.status === 404 && id) {
+      if (err.status === 404 && from) {
         // Deleted in another tab: a new conversation, with the question back in the box.
         showing.current = null;
         setGiven([]);
         setPending(null);
         setText(question);
-        onGone();
+        calls.current.onGone();
         toast("That conversation was deleted");
+      } else if (err.status >= 400 && err.status < 500 && err.status !== 409) {
+        // Asking again would be refused the same way: the words go back to the box to change.
+        setPending(null);
+        setText(question);
+        toast.error(err.fields?.question?.[0] ?? err.message);
       } else {
-        setPending({ question, key, error: err.message || "Could not reach Praxis AI" });
+        setPending({ question, key, error: err.message || "Could not reach the server" });
       }
     } finally {
-      asking.current = false;
+      if (here()) asking.current = false;
     }
   };
 
+  /** Send what is in the box: it empties only when the question goes. */
+  const send = () => {
+    if (asking.current || !text.trim()) return;
+    const words = text;
+    setText("");
+    return ask(words);
+  };
+
   const give = async (a: AiAnswer, value: AiFeedbackValue | null) => {
-    await api.call("POST /api/v1/ai/answers/:id/feedback", { params: { id: a.ai_message_id }, body: { feedback: value } });
-    setFeedback((f) => ({ ...f, [a.ai_message_id]: value }));
-    if (value) toast("Thanks for the feedback");
+    try {
+      await api.call("POST /api/v1/ai/answers/:id/feedback", { params: { id: a.ai_message_id }, body: { feedback: value } });
+      setFeedback((f) => ({ ...f, [a.ai_message_id]: value }));
+      if (value) toast("Thanks for the feedback");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Could not reach the server");
+    }
   };
 
   const empty = !id && answers.length === 0 && !pending;
@@ -191,7 +251,7 @@ function Conversation({ id, onOpened, onGone }: { id: string | null; onOpened: (
 
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-4 max-md:p-3">
+      <div role="log" aria-label="Conversation" className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-4 max-md:p-3">
         {empty ? (
           <div className="m-auto flex w-full max-w-120 flex-col gap-3">
             <EmptyState bare illustration="FirstRun" title={offered.length ? "Try Asking" : "Ask a Question"} />
@@ -204,12 +264,13 @@ function Conversation({ id, onOpened, onGone }: { id: string | null; onOpened: (
           </div>
         ) : (
           <>
-            {turns.page?.has_next && (
+            {id && turns.rows.length > 0 && turns.page?.has_next && (
               <Button size="sm" variant="ghost" className="self-center" busy={turns.loading} onClick={turns.more}>
                 Show Earlier
               </Button>
             )}
             {id && turns.loading && answers.length === 0 && <LoadingRows count={3} />}
+            {id && turns.error && !gone && answers.length === 0 && <ErrorState error={turns.error} onRetry={turns.reload} />}
             {answers.map((a) => (
               <div key={a.ai_message_id} className="flex flex-col gap-3.5">
                 <Question words={a.question} />
@@ -244,18 +305,21 @@ function Conversation({ id, onOpened, onGone }: { id: string | null; onOpened: (
         )}
         <div ref={end} />
       </div>
-      <Form onSubmit={() => ask(text)} className="flex flex-none items-center gap-1.5 border-t border-border p-3 max-md:p-2">
-        <InlineInput
-          className="h-control min-w-0 flex-1 rounded-full border border-input bg-background px-4 text-sm outline-none focus:border-ring phone:text-base"
-          placeholder="Ask a question"
-          aria-label="Ask a Question"
-          maxLength={500}
-          value={text}
-          onChange={setText}
-        />
-        <VoiceField compact label="Question" transcribe={transcribe} onTranscript={(words) => setText((t) => (t.trim() ? `${t.trim()} ${words}` : words))} />
-        <IconButton type="submit" icon="send" label="Send" className="on-primary rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" />
-      </Form>
+      {/* The microphone sits outside the form, so a question being sent never holds its Stop. */}
+      <div className="flex flex-none items-center gap-1.5 border-t border-border p-3 max-md:p-2">
+        <Form id={formId} onSubmit={send} className="min-w-0 flex-1">
+          <InlineInput
+            className="h-control w-full min-w-0 rounded-full border border-input bg-background px-4 text-sm outline-none focus:border-ring phone:text-base"
+            placeholder="Ask a question"
+            aria-label="Ask a Question"
+            maxLength={QUESTION_MAX}
+            value={text}
+            onChange={setText}
+          />
+        </Form>
+        <VoiceField compact label="Question" transcribe={transcribe} onTranscript={(words) => setText((t) => (t.trim() ? `${t.trim()} ${words}` : words).slice(0, QUESTION_MAX))} />
+        <IconButton type="submit" form={formId} icon="send" label="Send" className="on-primary rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" />
+      </div>
     </>
   );
 }
@@ -275,6 +339,7 @@ function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: Ai
   const more = a.citations_total - cites.length;
   /* The read the table was drawn from, when it had more rows than the page it returned. */
   const paged = a.table?.rows.length ? a.reads.find((r) => r.rows === a.table!.rows.length && r.total != null && r.total > r.rows) : undefined;
+  const from = paged?.page ? (paged.page - 1) * PAGE_SIZE + 1 : null;
   return (
     <article aria-label="Answer" className="flex max-w-11/12 flex-col gap-2.5 bubble-them border border-border bg-card p-3 max-md:max-w-full">
       <p data-copy="content" className="text-sm whitespace-pre-line wrap-any">
@@ -285,7 +350,7 @@ function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: Ai
         <div className="flex flex-wrap items-center gap-2">
           {paged && (
             <span className="text-xs text-subtle-foreground">
-              Showing {paged.rows} of {paged.total}
+              {from && from > 1 ? `Showing ${from} to ${from + paged.rows - 1} of ${paged.total}` : `Showing ${paged.rows} of ${paged.total}`}
             </span>
           )}
           {onNext && (
@@ -323,8 +388,10 @@ function Answer({ a, feedback, onFeedback, onNext }: { a: AiAnswer; feedback: Ai
         </div>
       )}
       <div className="flex items-center gap-1">
-        <IconButton size="sm" icon="thumb" label="Helpful" aria-pressed={feedback === "up"} className={cn(feedback === "up" && "bg-muted text-foreground")} onClick={() => onFeedback(feedback === "up" ? null : "up")} />
-        <IconButton size="sm" icon="thumbdown" label="Not Helpful" aria-pressed={feedback === "down"} className={cn(feedback === "down" && "bg-muted text-foreground")} onClick={() => onFeedback(feedback === "down" ? null : "down")} />
+        <ActionGroup>
+          <IconButton size="sm" icon="thumb" label="Helpful" aria-pressed={feedback === "up"} className={cn(feedback === "up" && "bg-muted text-foreground")} onClick={() => onFeedback(feedback === "up" ? null : "up")} />
+          <IconButton size="sm" icon="thumbdown" label="Not Helpful" aria-pressed={feedback === "down"} className={cn(feedback === "down" && "bg-muted text-foreground")} onClick={() => onFeedback(feedback === "down" ? null : "down")} />
+        </ActionGroup>
       </div>
     </article>
   );
@@ -360,7 +427,7 @@ function History() {
       invalidate("/api/v1/ai");
       toast(done);
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Could not reach the server");
+      toast.error(e instanceof ApiError ? e.message : "Could not reach the server");
     }
   };
   const clear = () => removing({ title: "Clear History", body: "Every conversation is removed.", destructive: true }, () => api.call("DELETE /api/v1/ai/history"), "History cleared");
@@ -398,7 +465,7 @@ function History() {
         rowKey={(c) => c.ai_conversation_id}
         noun="conversation"
         onRowClick={(c) => navigate(hrefFor("praxis_ai", "ask", { id: c.ai_conversation_id }))}
-        empty={{ title: "No Questions Yet", text: "Ask Praxis AI and it is kept here." }}
+        empty={{ title: "No Questions Yet", text: "Ask one on the Ask tab." }}
         columns={[
           { key: "title", label: "Title", sortable: true, render: (c) => c.title },
           { key: "last_asked_at", label: "Last Asked", sortable: true, render: (c) => (c.last_asked_at ? formatDateTime(c.last_asked_at) : null) },

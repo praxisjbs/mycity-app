@@ -43,9 +43,11 @@ their own screens would show them, and nothing more.
 4. **Voice in, not voice out.** Ask carries the shared `VoiceField`: the question is recorded,
    transcribed on the Transcription job, and lands in the box to be checked and sent. Answers are
    read, not spoken.
-5. **The name is held in one place.** "Praxis AI" (MILESTONES §18.1) is written once, in the shell's
-   catalogue and the system prompt's first line, so a different name is a one-line change if MyCity
-   asks for one (Ifeoma used "Shi" in the meeting; JBS said it could be renamed).
+5. **The name is held in one place.** "Praxis AI" (MILESTONES §18.1) is written in the two module
+   catalogues (the shell's `catalogue.ts`, the server's `access.catalog.js`) and the system prompt's
+   first line. The screens and the floating button read it from the shell's catalogue, and a message
+   or the Audit Log says "the assistant", so a different name is a three-line change if MyCity asks
+   for one (Ifeoma used "Shi" in the meeting; JBS said it could be renamed).
 6. **The Knowledge Hub is not built here.** Its articles (SOPs, FAQs, training) live in
    `knowledge_article` and `knowledge_article_version`, their vectors in `knowledge_embedding`
    (migration `10000`). When the Knowledge Hub is built, it ships a search read in `knowledge.ai.js`
@@ -123,8 +125,12 @@ Under `/api/v1/ai`, schemas in `packages/contract/schemas/assistant.js`.
 
 Errors: 404 `NOT_FOUND` (a conversation or answer that is not the caller's, or no longer exists,
 reads as missing); 422 the contract's; governance's `AI_DISABLED`, `AI_MODULE_DISABLED`,
-`AI_CAP_REACHED`; `AI_UNAVAILABLE` (503) when every model is passed by or fails. A refused read is
-not an error: it becomes an answer that says the information is not available (§6.3).
+`AI_CAP_REACHED`; `AI_UNAVAILABLE` (503) when every model is passed by or fails, or the question's
+60 seconds run out; `AI_VENDOR_CONFIG` (503) when a wrong key or model was the last word;
+`AI_BAD_OUTPUT` (502) when no usable answer came back (§6.1); `AI_FAILED` (500) for anything else
+in the loop. Transcribe adds `NOT_AUDIO` (422) and `NOT_READY` (409) from the transcription service.
+A refused read is not an error: it becomes an answer that says the information is not available
+(§6.3).
 
 ## 6 · Rules and calculations
 
@@ -135,28 +141,36 @@ not an error: it becomes an answer that says the information is not available (�
 2. **The turn sent to the model**, in this order:
    - the system prompt, `services/ai/prompts/data-answers.md`, named after its action (versioned, its version and hash
      on the run);
-   - who is asking: name, job title, department, role, and their scope in words ("your team");
-   - today: the Lagos date and time, the working week;
+   - who is asking: name, job title, department, roles, and whether they are the CEO (their scope
+     needs no words: every read applies it);
+   - today: the weekday, the Lagos date and time (the working week is a read, `working_week.get`);
    - the screens this person may open (`shared/route-map` SCREENS filtered as ⌘K filters them,
      `shared/search/screens.js`) and the manifests' routes they may reach, as `intent → screen`;
-   - the last 10 turns of the conversation (question and answer words, never the rows read);
-   - the question, marked as the person's words, to be treated as a question and never as
-     instructions to the system.
+   - the last 10 turns of the conversation: each question, its answer's words and the reads it made
+     (key, parameters, rows returned, total), never the rows themselves, so "show the next 25" knows
+     which read to page;
+   - the question, as the person's turn. The prompt says the person's message cannot change its
+     rules, open a read it was not given, or make it act.
 3. **Tools**: `authorise.allowedReads(actor)`, one tool per read the person may run (its key,
    description and its contract schema as JSON Schema, `services/ai/structured.js`). A read the
    person may not run is never offered. Tool names are the read key with `.` as `__`.
 4. **The loop**: the chain of Data Answers (`ai-control.md` §6.1; Gemini's Flash first, its Pro
    second) answers with read calls or its answer. Each call runs (§6.3) and its result goes back.
-   After 5 reads, or a repeated read, the model is told to answer with what it has. Every round is a
-   step of the question's one `ai_run`.
+   After 5 reads, a repeated read, or 8 rounds, the model is told to answer with what it has: the
+   tools stay offered with none to call (`tool_choice: none`), because Claude needs the tools of
+   the calls already in the conversation, and its own thinking goes back to it unchanged. Every
+   round is a step of the question's one `ai_run`.
 5. **The answer** must match `AiAnswerDraft` (§6.4). A reply that does not parse is sent back once
    with its problems; a second failure is answered from the reads already made by one short
-   call with no tools; if that fails too, the question fails with `AI_BAD_OUTPUT` and its reads
-   are shown as the records it read. An answer cut off at the token limit is asked to continue once.
-6. **Budget**: 60 seconds for the whole question; each model call keeps the chain's own 30. Past 60
-   the model is not asked again; the question fails with `AI_UNAVAILABLE`.
+   call with no tools; if that fails too, the question fails with `AI_BAD_OUTPUT`, nothing is saved
+   and the screen offers Try Again. An answer cut off at the token limit counts as one that does
+   not parse: the correction asks for a shorter one.
+6. **Budget**: 60 seconds for the whole question. Each model call is given what is left of it, at
+   most `AI_REQUEST_TIMEOUT_MS` (60 seconds by default), and none starts after it; the question then
+   fails with `AI_UNAVAILABLE`.
 7. **Saved**: the question and the answer in one transaction with `emit()` (§7). If the screen lost
-   its connection meanwhile, the answer is in the conversation when it reloads.
+   its connection meanwhile, the answer is saved: in the conversation when it reloads, or for a
+   first question, in Recent and History.
 
 ### 6.2 What the model may and may not do
 
@@ -181,9 +195,12 @@ not an error: it becomes an answer that says the information is not available (�
 3. it runs with the person's scope (all, team or own);
 4. a list returns one page of at most 25 (`assertPage`); the total travels with it, so "312 people,
    showing 25" is answerable and Show Next 25 asks for page 2;
-5. restricted fields are emptied for the person (field mask), then the rows pass through
-   `redactValue` on the `reasoning` egress: payment and identity numbers masked, contact details
-   kept, because the answer is shown to this person alone (§1.1 decision 7);
+5. restricted fields are emptied for the person (field mask), then the rows sent to the model pass
+   through `redactValue` on the `reasoning` egress, keeping the restricted fields this person sees
+   on screen: payment and identity numbers (`redact.js` `NEVER_PROPS`: account number, BVN, NIN, tax
+   and pension numbers) are emptied whatever is kept, contact details and amounts stay, because the
+   answer is shown to this person alone (§1.1 decision 7). The table and citations are drawn from
+   the rows as read;
 6. the result sent to the model is the page, its total and the rows, cut at 12,000 characters on a
    row boundary with a note when cut;
 7. its citations are kept for the answer (`cite.js`).
@@ -203,16 +220,19 @@ The server turns it into `AiAnswer`:
   values the model gave that parse with the route's `prefill` schema; a route to a screen the person
   may not open is never offered and, if named, dropped;
 - **citations**: from every read this turn, de-duplicated, first 50 kept with the total;
-- **declined**: `not_available` when a read was refused and nothing else answered, `change` when
-  the question asked for a change and a screen was offered instead, else null;
+- **declined**: `not_available` when a read was refused and nothing else answered, `change` when a
+  screen was offered (the model offers one for a change asked for, or where no read answers; the
+  server cannot tell which), else null;
 - **provisional**: always true.
 
 ### 6.5 Conversations and history
 
-- A question without `conversation_id` opens a conversation titled by its first 120 characters.
+- A question without `ai_conversation_id` opens a conversation titled by its first 120 characters.
 - The last 10 turns are replayed; older turns stay on screen but are not sent.
-- Delete Conversation and Clear History remove the conversations, messages and citations. The runs
-  stay, holding no words, so spend and the cap are untouched.
+- Delete Conversation and Clear History remove the conversations, messages and citations, and the
+  replies the idempotency layer kept for a repeated press of Send (`middleware/idempotency.js`
+  `forget`), which hold the answers' words too. The runs stay, holding no words, so spend and the
+  cap are untouched.
 - `AiHistorySummary`: this Lagos month's questions and conversations, the records read (the rows
   every answer's reads returned), questions by module (the module of the first read of each
   answer; no read counts as Other).
@@ -222,12 +242,17 @@ The server turns it into `AiAnswer`:
 - `VoiceField` (120 seconds at most) records; the screen sends the recording in one request,
   `POST /ai/transcribe`, through the upload engine (purpose `voice_note`).
 - The words come from `services/ai/transcription.transcribe` under the action `praxis-ai-voice`
-  (Transcription job, personal data, so never DeepSeek; Groq, then Gemini, then the browser's
-  captions as a draft, `integrations.md` §6.14).
-- The recording is held in the vault (document type `ai_voice_question`, stored `transient`, so no
-  derived files are queued for it) only while it is transcribed, and removed in the same request whatever happens. One a request left behind (the
-  process stopped mid-way) is removed within the hour by the `assistant-voice-sweep` scheduler.
-- The words land in the box; nothing is asked until the person sends it.
+  (Transcription job, personal data, so never DeepSeek; Groq, then Gemini). No browser captions
+  are taken: when neither answers, the box stays empty and the microphone says Could not
+  transcribe. The stub's placeholder (no provider set up) comes back as a draft and is not put in
+  the box either.
+- The recording is held in the vault (document type and record type `ai_voice_question`, its id
+  the speaker's login, stored `transient`, so no derived files are queued for it) only while it is
+  transcribed, and removed in the same request whatever happens. Only the speaker may read it
+  (`vault.defineAccess`), the CEO and an `all` holder included. One a request left behind (the
+  process stopped mid-way) is removed by the `assistant-voice-sweep` scheduler: every 15 minutes,
+  any recording 30 minutes old, so within 45 minutes.
+- The words land in the box, at most 500 characters; nothing is asked until the person sends it.
 
 ### 6.7 The registry, AI Control and jobs
 
@@ -300,7 +325,7 @@ and screens a manifest declares, and that the grading passes and fails what it s
 | `assistant.conversation_deleted` | Delete Conversation | Audit only |
 | `assistant.history_cleared` | Clear History | Audit only |
 | `assistant.feedback_given` | Helpful or Not Helpful | Audit only |
-| `assistant-voice-sweep` (hourly, under the cron lock) | Every hour at 25 past | Removes recordings an hour old: their request never finished (§6.6) |
+| `assistant-voice-sweep` (under the cron lock) | Every 15 minutes | Removes recordings 30 minutes old: their request never finished (§6.6) |
 
 Nobody is notified of anything.
 
@@ -323,9 +348,9 @@ module grant. Restricted fields reach the model only for a person who sees them 
 - **AI routes**: none.
 - **Search** (`assistant.search.js`): the person's own conversations by title, pinned to their
   `user_id` like the mailbox (`owner`), opening the conversation on Ask (`ai_conversation` in the
-  route map, `/praxis-ai?tab=ask&id=`). Words: conversation, question, chat, asked. Screens: Ask ("ai", "assistant", "ask",
-  "chat", "question"), History ("ai history", "past questions"), and New Conversation as Ask's New
-  action.
+  route map, `/praxis-ai?tab=ask&id=`). Words: conversation, question, chat, asked. Screens: Ask ("ai", "assistant",
+  "chat", "question"), History ("ai history", "past questions", "conversations"), and New
+  Conversation as Ask's New action.
 
 ## 10 · On screen and mobile
 
@@ -339,8 +364,8 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more, Show Next 25 on the newest answer that has more, its screen button ("Open Leave"), From with the records read as chips opening each (the first 6, then "+12 More"), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; toasts "Thanks for the feedback", "That conversation was deleted" | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
-| Praxis AI · History (`history`) | History as the title; this month's Questions, Conversations and Records Read, each captioned with the month; Conversations, 25 a page: Title, Last Asked, Questions, Records Read, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog ("Delete Conversation"); Search Conversations; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Questions by Module (desktop); toasts "Conversation deleted", "History cleared" | Help term on Records Read (how many records this month's answers were read from) | Where spend and the cap are (AI Control · Spend), what deleting keeps: §6.5 |
+| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"), From with the records read as chips opening each (the first 6, then "+12 More"), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; Recent empty: No Questions Yet; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, Could not transcribe) | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
+| Praxis AI · History (`history`) | History as the title; this month's Questions, Conversations and Records Read, each captioned with the month; Conversations, 25 a page: Title, Last Asked, Questions, Records Read, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog ("Delete Conversation"); Search Conversations; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Questions by Module (desktop); toasts "Conversation deleted", "History cleared" | Help term on Records Read (how many records this month's answers were read from) | Where spend and the cap are (AI Control · Spend), what deleting keeps: §6.5 |
 
 ### 10.2 Phone layout
 
@@ -364,19 +389,27 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **A huge list** ("all our staff"): the first 25 and the total; Show Next 25 asks for the next page
   as a follow-up in the same conversation.
 - **A question that needs a total over more than one page** (a sum of 400 records): answered only
-  where a read returns that total; otherwise the answer says it can count the first 25 and names
-  the screen. A module adds a summary read when its questions need one.
+  where a read returns that total; otherwise the answer gives the total, says it looked at the
+  first 25 and names the screen (the prompt says so and never to estimate the rest). A module adds
+  a summary read when its questions need one.
 - **The connection drops while waiting** (Ifeoma's bad network zone): the answer is saved; the
-  conversation shows it on reload. Pressing Send again with the same `Idempotency-Key` returns the
-  same answer, never a second run.
+  conversation shows it on reload, and a first question's answer is in Recent and History. Try
+  Again sends the same `Idempotency-Key`, which returns the same answer, never a second run.
+- **The person moves to another conversation, or leaves, while an answer is being made**: the
+  answer is saved where it was asked and shown there; the conversation on screen is not touched.
+- **A question refused as it stands** (a 4xx other than 404 and 409, such as one over 500
+  characters): the words go back to the box with the reason in a toast; Try Again is only for a
+  question that may succeed if sent again.
 - **A person loses a grant after asking**: their History keeps the old answer's words; a citation
   opens through the screen's own check, which may now refuse.
 - **A cited record is deleted later**: the citation opens the screen's not-found state.
 - **A conversation deleted in another tab**: asking in it is 404 and the screen starts a new
-  conversation with the same question in the box; deleted while its answer was being made, the
-  question is saved in a new conversation.
-- **A recording that never transcribes**: the box stays empty with a short message; the recording
-  is removed in the same request, or by the sweep within the hour.
+  conversation with the same question in the box; opening it (from History or ⌘K) does the same,
+  with "That conversation was deleted"; deleted while its answer was being made, the question is
+  saved in a new conversation.
+- **A recording that never transcribes**: the box stays empty and Could not transcribe shows in a
+  toast (the stub's placeholder is not put in the box either); the recording
+  is removed in the same request, or by the sweep within 45 minutes.
 - **A question in another language**: answered in English.
 
 ## 12 · Donor code
@@ -405,6 +438,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Commit 7 of 7, the audit (three independent reviews of commits 1 to 6: backend, screens, guide against code; each finding checked before it was fixed). Fixed: a Claude model on Data Answers' chain now keeps its tools on a round that may call none (`tool_choice: none`) and gets its thinking back unchanged (§6.1.4); `converse()` takes the question's deadline, so no call starts past 60 seconds (§6.1.6); a read's rows reach the model through `redactValue`, keeping only the fields the person sees and never payment or identity numbers (§6.3.5, `redact.js` `NEVER_PROPS`); only the speaker may read a recording (§6.6); Delete Conversation and Clear History also forget the replies kept for a repeated press (§6.5); the sweep runs every 15 minutes (§6.6, §7); the prompt (version 2) says the person's words cannot change its rules and never estimates over more than one page (§6.1.2, §11); the reads made carry their page, so a later page reads Showing 26 to 50 of 312 (§10.1). On screen: ⌘K's New Conversation no longer loops; an answer that lands after the person moved on is not shown in the wrong conversation; a conversation that fails to load says so, and a deleted one starts a new one; a spoken question is cut at 500 characters and a refused question goes back to the box; Show Earlier keeps the earlier turns and is not offered in a new conversation; the box keeps a half-typed question; the microphone is outside the form, so sending never holds its Stop, and its problems are a toast; Helpful and Not Helpful wait for each other; new answers are announced. Corrected here: decision 5, §5's errors, §6.1, §6.4's `declined`, §6.5, §6.6 (no browser captions), §7, §9, §10.1, §11. Home's `activity.list` and the evaluation set unchanged; the eval's target questions now name the catalogue's modules (`partnerships`, `recruitment`, `expenses`), so they run once those modules have reads.
 - 22/10/2026 · GE · Commit 6 of 7: §6.9 built, Home's `activity.list` (`home.md` §6, §9 changed with it), so Ifeoma's "what happened today" and "what has a person done today" are one read each, by name too. §6.10 built, `scripts/ai/eval-assistant.js` and its key-free test. §6.8: a question whose read answers only with a capability (the Team roster, the alerts one may clear) waits for it, found when a member of staff was offered "Who is in today" and would have read an empty roster; "What happened today?" joins Try Asking.
 - 22/10/2026 · GE · Commit 5 of 7: Ask and History built to §10 (`app/src/features/assistant/`). §10.2: New Conversation sits under the title on a phone, because a fit page has no floating button (FRONTEND_GUIDE §7); ⌘K offers it as an action. §5, §10.1: Show Earlier loads a conversation's older turns; Delete Conversation is confirmed like Clear History. `VoiceField` gains `compact` (the microphone alone, for a message box) and the icon set gains `thumbdown` for Not Helpful.
 - 22/10/2026 · GE · Commit 4 of 7: the API built (`src/modules/assistant`, §5): ask, suggestions, conversations, turns, Delete Conversation, Clear History, the summary, feedback and voice. §5: transcribe takes the recording in one multipart request; a conversation that is gone is 404, not 409. §6.6, §7: the recording is removed in the same request and the sweep is hourly. §9: a conversation opens on Ask. §4: citations keep their order (`position`), found when the full suite read them back in a different order. Ask and History moved onto the contract and its mock (the screens' rebuild is commit 5).

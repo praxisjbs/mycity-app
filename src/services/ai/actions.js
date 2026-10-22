@@ -63,7 +63,7 @@ const ACTIONS = Object.freeze({
     job: "transcription",
     personal_data: true,
     chosen_by: "GE",
-    chosen_at: "2026-10-22",
+    chosen_at: "2026-10-21",
     built: true,
   }),
   "find-prices": Object.freeze({

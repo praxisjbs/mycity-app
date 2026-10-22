@@ -103,7 +103,13 @@ function build({ draft, reads, routes, screens }) {
   let declined = null;
   if (link) declined = "change";
   else if (reads.some((r) => r.declined) && !ok.length) declined = "not_available";
-  const madeReads = reads.map((r) => ({ key: r.key, params: r.params, rows: r.rows.length, total: r.ok ? r.total : null }));
+  const madeReads = reads.map((r) => ({
+    key: r.key,
+    params: r.params,
+    rows: r.rows.length,
+    total: r.ok ? r.total : null,
+    page: r.ok && r.page ? r.page.number : null,
+  }));
   const more = Boolean(draft.more) && ok.some((r) => r.page && r.page.has_next);
   const shown = {
     content: draft.text,
@@ -111,7 +117,7 @@ function build({ draft, reads, routes, screens }) {
     link,
     citations,
     citations_total: all.length,
-    reads: madeReads.map(({ key, rows, total }) => ({ key, rows, total })),
+    reads: madeReads.map(({ key, rows, total, page }) => ({ key, rows, total, page })),
     declined,
     more,
     rows_read: ok.reduce((n, r) => n + r.rows.length, 0),

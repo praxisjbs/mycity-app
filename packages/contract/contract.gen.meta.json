@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "4d042676105bd19c7857f4159f6cecf61bde2dd1286c477b7c69c8888e90a014",
+  "source_hash": "4ffb7b8b5c7e887c554aa8d560af9926b84723ee4c504220414f2e434ab51727",
   "schemas": 897,
   "endpoints": 455,
   "inputs": {
@@ -12,7 +12,7 @@
     "packages/contract/schemas/announcements.js": "fd6e37d081b609ad75ee98a84357db39b3b07fa995369f55100a0d2d4f727af5",
     "packages/contract/schemas/appearance.js": "19d4a590df5d59d507ad5f6df04600edf7137782027bec0f022a4f566caa3cbe",
     "packages/contract/schemas/assessments.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/assistant.js": "9dc2d80f5532fda52fe25ab14606f5b853e5e8d8ee61ebd0dd8a7c36b04f5cb9",
+    "packages/contract/schemas/assistant.js": "6c778c253102f35fb376964cec42f09cc62cdf83a0bc6bafe425f2475b90f9d2",
     "packages/contract/schemas/attendance.js": "7a4bec3d08320ec7a8926b5ae205a6b3c8cbb4abf59fbb7fcc12574682e70d42",
     "packages/contract/schemas/audit.js": "0da325da2e49796743a8501459005a2cb952af522723ecc181498059f98458aa",
     "packages/contract/schemas/budgets.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -78,7 +78,7 @@
     "src/modules/ai_governance/ai_governance.routes.js": "0f5817fcbf3f38f809b6763b28cb27224b393932fdffb41d5b0a96871aadd720",
     "src/modules/alerts/alerts.routes.js": "fda8e77d03da77555506c0cc0edfaa884ed720c1a794800bb1fd748a60ff74c7",
     "src/modules/announcements/announcements.routes.js": "16d40da16fb015f27cafb6fb5095c5f582da6e019ca4237d7f5cfd88f01b3cce",
-    "src/modules/assistant/assistant.routes.js": "a115c2b7a18e526e80685f1b43053f209ab988e2e8ddc9b81817ff3dc0bdf285",
+    "src/modules/assistant/assistant.routes.js": "a8d635937150bf3f4754e8aa49d10527f4725280e9d8c6c2548e555a6b48ff92",
     "src/modules/attendance/attendance.routes.js": "5e2638c2a1a3735e553d433ecde66d33948a015148c4aac09fff144d3ea1a4f9",
     "src/modules/audit/audit.routes.js": "fac4a29b34b9310e901c2514681d3f6ac22df927c00b44a6b3b2b231a2609025",
     "src/modules/calendar/calendar.routes.js": "0795f184d51a5bd6fe539851e224e5d68581a53d00b9c3c4016323b543544c21",

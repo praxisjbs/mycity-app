@@ -15,6 +15,7 @@ import { cn } from "../lib/cn";
 import { Button, IconButton } from "../actions/Button";
 import { Icon } from "../icons/Icon";
 import { Spinner } from "../display/Skeleton";
+import { toast } from "../feedback/toast";
 
 /** How a recording becomes words: the app's own call, so no vendor reaches the package. */
 export type Transcribe = (audio: Blob) => Promise<string>;
@@ -30,7 +31,7 @@ export interface VoiceFieldProps {
   maxSeconds?: number;
   /** Nothing can be recorded (the form is closed, or the browser refused the microphone). */
   disabled?: boolean;
-  /** The microphone alone, for a message box beside its Send: Record and Stop are icon buttons, the time shows while it records. */
+  /** The microphone alone, for a message box beside its Send: Record and Stop are icon buttons, the time shows while it records, and a problem is a toast. */
   compact?: boolean;
   /** Layout classes only (spacing). */
   className?: string;
@@ -113,6 +114,10 @@ export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, 
       {clock(seconds)}
     </span>
   );
+  // Beside a message box there is no room for a line of its own: the problem is said in a toast.
+  useEffect(() => {
+    if (compact && problem) toast.error(problem);
+  }, [compact, problem]);
   const trouble = problem && (
     <span role="status" className="flex items-center gap-1.5 text-xs text-destructive">
       <Icon name="alert" size="s" />
@@ -131,10 +136,7 @@ export function VoiceField({ label, transcribe, onTranscript, maxSeconds = 120, 
         ) : state === "working" ? (
           <Spinner label="Writing it down" className="size-control justify-center" />
         ) : (
-          <>
-            {trouble}
-            <IconButton icon="mic" label={`Record ${label}`} onClick={start} disabled={disabled} aria-pressed={false} />
-          </>
+          <IconButton icon="mic" label={`Record ${label}`} onClick={start} disabled={disabled} aria-pressed={false} />
         )}
       </div>
     );

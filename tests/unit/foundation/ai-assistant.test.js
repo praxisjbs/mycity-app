@@ -19,6 +19,7 @@ const ledger = require("../../../src/services/ai/ledger");
 const integrations = require("../../../src/shared/integrations/settings");
 const usage = require("../../../src/shared/integrations/usage");
 const { AppError } = require("../../../src/shared/errors");
+const fieldMask = require("../../../src/shared/rbac/field-mask");
 const c = require("@mycity/contract");
 
 const ACTOR = { user_id: "u1", employee_id: "e1", display_name: "Ada Obi", role_ids: ["r1"], is_ceo: false };
@@ -93,6 +94,24 @@ beforeEach(async () => {
 afterEach(() => jest.restoreAllMocks());
 
 describe("one question", () => {
+  test("a read's rows reach the model redacted (§6.3.5): a field the person sees stays, payment and identity numbers never do", async () => {
+    const row = { id: "l1", employee: "Ayo Bello", salary: "250000.00", personal_phone: "08031234567", bvn: "12345678901", nin: "98765432109" };
+    jest.spyOn(authorise, "runRead").mockResolvedValue(page([row]));
+    const sentRows = async (hidden) => {
+      jest.spyOn(fieldMask, "maskedKeysFor").mockResolvedValue(hidden);
+      const vendors = model([reply("", [call("leave__requests", {}, "c1")]), reply(DRAFT())]);
+      const out = await ask(vendors);
+      const tool = vendors.gemini.complete.mock.calls[1][0].messages.find((m) => m.role === "tool");
+      return { rows: JSON.parse(tool.content).rows, out };
+    };
+    const seen = await sentRows([]);
+    expect(seen.rows).toEqual([{ id: "l1", employee: "Ayo Bello", salary: "250000.00", personal_phone: "08031234567", bvn: null, nin: null }]);
+    // The table and citations are drawn from the rows as read, not as the model was sent them.
+    expect(seen.out.reads[0].rows[0].bvn).toBe("12345678901");
+    const hidden = await sentRows(["employee.salary"]);
+    expect(hidden.rows[0]).toMatchObject({ salary: null, personal_phone: "08031234567", bvn: null });
+  });
+
   test("only the person's reads are offered; a call runs with their rights and its page goes back as data", async () => {
     jest.spyOn(authorise, "runRead").mockResolvedValue(page([{ id: "l1", employee: "Ayo Bello", starts_on: "2026-10-27" }]));
     const vendors = model([reply("", [call("leave__requests", { page: 1 }, "c1")]), reply(DRAFT())]);
@@ -235,7 +254,7 @@ describe("what the screen shows", () => {
     });
     expect(shown).toMatchObject({ more: true, rows_read: 2, module_key: "ess", citations_total: 2, declined: null });
     expect(shown.citations[0]).toEqual({ entity_type: "leave_request", entity_id: "l1", label: "Ayo Bello", link: "/x?id=l1", read_key: "leave.requests" });
-    expect(shown.metadata.reads).toEqual([{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 40 }]);
+    expect(shown.metadata.reads).toEqual([{ key: "leave.requests", params: { page: 1 }, rows: 2, total: 40, page: 1 }]);
   });
 
   test("the screen button is an offered route by its intent, with only the prefill its schema takes", () => {

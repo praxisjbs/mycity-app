@@ -34,7 +34,9 @@ describe("the questions", () => {
     expect(CASES.filter((k) => k.id.startsWith("today.")).map((k) => k.reads)).toEqual([["activity.list"], ["activity.list"]]);
   });
 
-  test("a target question waits until its module declares a read", () => {
+  test("a target question names a module the catalogue has, and waits until that module declares a read", () => {
+    const catalog = require("../../../src/shared/access/access.catalog");
+    for (const k of CASES.filter((x) => x.needs)) expect([k.id, k.needs, catalog.isModule(k.needs)]).toEqual([k.id, k.needs, true]);
     const expenses = CASES.find((k) => k.needs === "expenses");
     expect(waiting(expenses, { reads: () => [{ key: "leave.requests", module: "people" }] })).toBe(true);
     expect(waiting(expenses, { reads: () => [{ key: "expenses.list", module: "expenses" }] })).toBe(false);
@@ -58,6 +60,12 @@ describe("the grade", () => {
     expect(grade(k, { reads: [read("employees.list", 0, false)], shown: shown() }).pass).toBe(true);
     expect(grade(k, { reads: [read("employees.list", 0)], shown: shown() }).pass).toBe(true);
     expect(grade(k, { reads: [read("employees.list", 3)], shown: shown() }).problems).toEqual(["employees.list returned rows to someone who may not see them"]);
+  });
+
+  test("a target question, once it runs, must read from its module", () => {
+    const k = { id: "x", needs: "partnerships" };
+    expect(grade(k, { reads: [{ ...read("partners.list"), module: "partnerships" }], shown: shown() }).pass).toBe(true);
+    expect(grade(k, { reads: [{ ...read("employees.list"), module: "people" }], shown: shown() }).problems[0]).toMatch(/read nothing from partnerships/);
   });
 
   test("a change is a screen offered with declined change, never a claim", () => {

@@ -152,7 +152,9 @@ function toolCallOf(call, i) {
  * @param {string[]} [keep]
  */
 function chatMessages(messages, keep = []) {
-  return (messages || []).map((m) => {
+  return (messages || []).map((full) => {
+    // A Claude turn's own blocks (its thinking) go back to Claude only (vendors/anthropic.js).
+    const { anthropic_content: _claude, ...m } = full;
     if (!Array.isArray(m.tool_calls)) return m;
     return {
       ...m,

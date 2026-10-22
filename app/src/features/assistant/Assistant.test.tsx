@@ -16,7 +16,8 @@ const m = vi.hoisted(() => ({
   turns: {} as Record<string, unknown[]>,
   navigate: vi.fn(),
   setParams: vi.fn(),
-  action: null as null | { label: string },
+  action: null as null | { label: string; onSelect: () => void },
+  turnsError: null as unknown,
 }));
 vi.mock("@/api/hooks", () => ({
   invalidate: m.invalidate,
@@ -28,7 +29,7 @@ vi.mock("@/api/hooks", () => ({
   },
   useInfinite: (_key: string, opts: { params: { id: string }; enabled?: boolean }) => {
     const rows = opts.enabled === false ? [] : (m.turns[opts.params.id] ?? []);
-    return { rows, page: { number: 1, size: 25, total: rows.length, pages: 1, has_next: false }, loading: false, error: null, more: () => undefined, reload: async () => undefined };
+    return { rows, page: { number: 1, size: 25, total: rows.length, pages: 1, has_next: false }, loading: false, error: opts.enabled === false ? null : m.turnsError, more: () => undefined, reload: async () => undefined };
   },
 }));
 vi.mock("@/api/client", async () => ({ api: { call: m.call }, ApiError: (await import("@mycity/ui")).ApiError }));
@@ -36,7 +37,7 @@ vi.mock("@/api/upload", () => ({ upload: vi.fn() }));
 vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate }), useSearchParams: () => [new URLSearchParams(), m.setParams] }));
 vi.mock("@/shell/layout-context", () => ({ useFitPage: () => undefined }));
 vi.mock("@/shell/screen-action", () => ({
-  useScreenAction: (a: { label: string } | null) => {
+  useScreenAction: (a: { label: string; onSelect: () => void } | null) => {
     m.action = a;
   },
 }));
@@ -63,6 +64,9 @@ afterEach(() => {
   m.data = {};
   m.rows = {};
   m.turns = {};
+  m.turnsError = null;
+  m.call.mockReset();
+  m.call.mockImplementation(async () => ({}));
 });
 
 const CONV = "00000000-0000-4000-8000-0000000000c1";
@@ -76,7 +80,7 @@ const answer = (over: Partial<AiAnswer> = {}): AiAnswer => ({
   link: { label: "Open Leave", path: "/people?tab=leave" },
   citations: Array.from({ length: 8 }, (_, i) => ({ entity_type: "employee", entity_id: `00000000-0000-4000-8000-00000000000${i}`, label: `Person ${i + 1}`, link: `/people?tab=employees&id=${i}`, read_key: "employees.list" })),
   citations_total: 8,
-  reads: [{ key: "leave.requests", rows: 2, total: 2 }],
+  reads: [{ key: "leave.requests", rows: 2, total: 2, page: 1 }],
   declined: null,
   more: false,
   feedback: null,
@@ -136,7 +140,7 @@ describe("Ask", () => {
   });
 
   it("an open conversation shows its turns; Show Next 25 asks for the next page in it", async () => {
-    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ key: "employees.list", rows: 2, total: 312 }] })];
+    m.turns[CONV] = [answer({ more: true, citations: [], citations_total: 0, reads: [{ key: "employees.list", rows: 2, total: 312, page: 1 }] })];
     m.call.mockImplementation(async () => answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", question: "Show the next 25.", content: "Here are the next people." }));
     ui("ask", CONV);
     expect(screen.getByText("Showing 2 of 312")).toBeTruthy();
@@ -165,8 +169,57 @@ describe("Ask", () => {
     const box = screen.getByRole("textbox", { name: "Ask a Question" });
     await userEvent.type(box, "And next week?");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(m.setParams).toHaveBeenCalledWith({ id: null }));
+    await waitFor(() => expect(m.navigate).toHaveBeenCalledWith("/praxis-ai?tab=ask"));
     expect((box as HTMLInputElement).value).toBe("And next week?");
+  });
+
+  it("⌘K's New Conversation opens a clean address, never the one it arrived on", () => {
+    ui("ask", CONV);
+    m.action!.onSelect();
+    expect(m.navigate).toHaveBeenCalledWith("/praxis-ai?tab=ask");
+    expect(m.setParams).not.toHaveBeenCalled();
+  });
+
+  it("an answer that lands after the person moved to another conversation is not shown there", async () => {
+    let land: (a: AiAnswer) => void = () => undefined;
+    m.turns[CONV] = [answer()];
+    m.call.mockImplementation(() => new Promise((r) => (land = r as (a: AiAnswer) => void)));
+    const view = ui("ask", CONV);
+    await userEvent.type(screen.getByRole("textbox", { name: "Ask a Question" }), "Late answer?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    const OTHER = "00000000-0000-4000-8000-0000000000c2";
+    view.rerender(
+      <ModalProvider>
+        <Assistant tab="ask" id={OTHER} />
+      </ModalProvider>,
+    );
+    land(answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a9", content: "This belongs to the first one." }));
+    await waitFor(() => expect(m.refresh).toHaveBeenCalled());
+    expect(screen.queryByText("This belongs to the first one.")).toBeNull();
+    expect(m.setParams).not.toHaveBeenCalled();
+  });
+
+  it("a question refused as it stands goes back to the box to change, not to Try Again", async () => {
+    m.data["GET /api/v1/ai/suggestions"] = { questions: [] };
+    m.call.mockRejectedValueOnce(new ApiError(422, { error: { code: "VALIDATION", message: "Check the question", fields: { question: ["Too long"] } } }));
+    ui("ask");
+    const box = screen.getByRole("textbox", { name: "Ask a Question" });
+    await userEvent.type(box, "Who is late?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect((box as HTMLInputElement).value).toBe("Who is late?"));
+    expect(screen.queryByRole("button", { name: "Try Again" })).toBeNull();
+  });
+
+  it("a conversation that is gone when opened starts a new one", async () => {
+    m.turnsError = new ApiError(404, { error: { code: "NOT_FOUND", message: "Not found" } });
+    ui("ask", CONV);
+    await waitFor(() => expect(m.navigate).toHaveBeenCalledWith("/praxis-ai?tab=ask"));
+  });
+
+  it("the second page of a list says which rows it shows", () => {
+    m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [] }, reads: [{ key: "employees.list", rows: 25, total: 312, page: 2 }], citations: [], citations_total: 0 })];
+    ui("ask", CONV);
+    expect(screen.getByText("Showing 26 to 50 of 312")).toBeTruthy();
   });
 });
 

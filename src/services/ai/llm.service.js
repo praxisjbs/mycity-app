@@ -137,19 +137,24 @@ function systemText(body, schema) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** A call given less time than this is not started: the question's time has run out (converse). */
+const MIN_CALL_MS = 2_000;
+
 /**
  * One completion on one provider, from the same messages (OpenAI's shape, tool calls and results
  * included): Anthropic takes the system part on its own, DeepSeek has no schema mode. Tools go to
  * every provider; each vendor file sends them in its own API's form.
  */
-function ask(vendor, provider, { apiKey, model, messages, output, tools = null, temperature, maxTokens }) {
-  const timeoutMs = config.AI_REQUEST_TIMEOUT_MS;
+function ask(vendor, provider, { apiKey, model, messages, output, tools = null, toolChoice = "auto", temperature, maxTokens, timeoutMs = config.AI_REQUEST_TIMEOUT_MS }) {
   if (provider === "anthropic") {
+    // Claude keeps the conversation's tools on a round that may call none: a history holding tool
+    // calls needs them defined, and its thinking is bound to the same tool set.
     const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
-    return vendor.complete({ apiKey, model, system, messages: messages.filter((m) => m.role !== "system"), tools, maxTokens, timeoutMs });
+    return vendor.complete({ apiKey, model, system, messages: messages.filter((m) => m.role !== "system"), tools, toolChoice, maxTokens, timeoutMs });
   }
-  if (provider === "deepseek") return vendor.complete({ apiKey, model, messages, tools, temperature, maxTokens, timeoutMs });
-  return vendor.complete({ apiKey, model, messages, json: Boolean(output), schema: output, tools, temperature, maxTokens, timeoutMs });
+  const offered = toolChoice === "none" ? null : tools;
+  if (provider === "deepseek") return vendor.complete({ apiKey, model, messages, tools: offered, temperature, maxTokens, timeoutMs });
+  return vendor.complete({ apiKey, model, messages, json: Boolean(output), schema: output, tools: offered, temperature, maxTokens, timeoutMs });
 }
 
 /**
@@ -405,7 +410,8 @@ async function complete(req) {
  * sends all of it each round; every vendor file takes that shape and answers in it.
  *
  *   const talk = await ai.converse({ purpose: "data-answers", module: "praxis_ai", actor, egress: "reasoning" });
- *   const r = await talk.round({ messages, tools });       // { text, toolCalls, finish_reason, provider, model }
+ *   const r = await talk.round({ messages, tools, deadline });  // { text, toolCalls, turn, finish_reason, provider, model }
+ *   messages.push(r.turn);                                     // the model's turn, as the next round sends it
  *   ...
  *   await talk.finish();                                    // or: throw await talk.fail(code, message, status)
  *
@@ -507,24 +513,45 @@ async function converse(req) {
 
   /**
    * One round: the model that answered last, else the next one Ready.
-   * @param {{messages: Array<object>, tools?: Array<object>|null, output?: import("zod").ZodTypeAny|null, kind?: "completion"|"retry"}} r
-   *   output  ask for one JSON object of this shape (no tools in the same round)
+   * @param {{messages: Array<object>, tools?: Array<object>|null, toolChoice?: "auto"|"none", output?: import("zod").ZodTypeAny|null,
+   *          kind?: "completion"|"retry", deadline?: number|null}} r
+   *   toolChoice  "none": the model may call no tool this round (Claude keeps them defined; the
+   *               others are sent none)
+   *   output      ask for one JSON object of this shape (no tools in the same round)
+   *   deadline    the time (ms since the epoch) the caller stops waiting: each call is given what
+   *               is left of it, and none starts after it
    */
-  const round = async ({ messages, tools = null, output = null, kind = "completion" }) => {
+  const round = async ({ messages, tools = null, toolChoice = "auto", output = null, kind = "completion", deadline = null }) => {
     if (closed) throw new Error("ai.converse: this conversation's run is already closed");
     const msgs = safe(messages);
     let last = null;
-    for (let i = at; i < links.length; i += 1) {
+    let late = false;
+    for (let i = at; i < links.length && !late; i += 1) {
       const link = links[i];
       if (i > at && link.provider !== "stub" && (await skips.until(link.provider))) continue;
       const ctx = await contextOf(link);
       const tries = links.length === 1 ? 2 : 1;
       for (let attempt = 1; attempt <= tries; attempt += 1) {
+        const left = deadline ? deadline - Date.now() : null;
+        if (left !== null && left < MIN_CALL_MS) {
+          late = true;
+          break;
+        }
         step += 1;
         const started = Date.now();
         const counted = link.provider !== "stub";
         try {
-          const res = await ask(ctx.vendor, link.provider, { apiKey: ctx.apiKey, model: link.model, messages: msgs, output, tools, temperature, maxTokens });
+          const res = await ask(ctx.vendor, link.provider, {
+            apiKey: ctx.apiKey,
+            model: link.model,
+            messages: msgs,
+            output,
+            tools,
+            toolChoice,
+            temperature,
+            maxTokens,
+            timeoutMs: left === null ? config.AI_REQUEST_TIMEOUT_MS : Math.min(config.AI_REQUEST_TIMEOUT_MS, left),
+          });
           const c = await ledger.recordStep(db, runId, {
             step_no: step,
             kind,
@@ -540,9 +567,19 @@ async function converse(req) {
           if (counted) usage.record(link.provider, "call", { ok: true });
           at = i;
           answered = link;
+          const text = res.text || "";
+          const toolCalls = Array.isArray(res.toolCalls) ? res.toolCalls : [];
           return {
-            text: res.text || "",
-            toolCalls: Array.isArray(res.toolCalls) ? res.toolCalls : [],
+            text,
+            toolCalls,
+            // The model's turn as the next round sends it back: Claude's own blocks (its thinking)
+            // ride with it unchanged, and only Claude is sent them (vendors/http.js chatMessages).
+            turn: {
+              role: "assistant",
+              content: text || null,
+              ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
+              ...(Array.isArray(res.content) ? { anthropic_content: res.content } : {}),
+            },
             finish_reason: res.finish_reason || null,
             provider: link.provider,
             model: res.model || link.model,
@@ -577,6 +614,10 @@ async function converse(req) {
       }
     }
     at = links.length;
+    if (late) {
+      await close({ status: "failed", error_code: "AI_UNAVAILABLE", error: "the question's time ran out" });
+      throw new AppError("AI_UNAVAILABLE", "The AI service is not answering. Try again in a few minutes.", 503);
+    }
     if (last && last.kind === "config") {
       await close({ status: "failed", error_code: "AI_VENDOR_CONFIG", error: last.message });
       throw new AppError("AI_VENDOR_CONFIG", "The AI service is not set up correctly. An administrator has been told.", 503);

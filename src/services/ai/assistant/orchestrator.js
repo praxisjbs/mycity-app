@@ -35,6 +35,8 @@ const { SCREENS, tabVisible } = require("../../../shared/search/screens");
 const search = require("../../../shared/search/search.service");
 const c = require("@mycity/contract");
 const ai = require("../llm.service");
+const { redactValue } = require("../redact");
+const fieldMask = require("../../../shared/rbac/field-mask");
 const { jsonSchemaOf, parseStructured } = require("../structured");
 
 const MAX_READS = 5;
@@ -161,13 +163,17 @@ function historyTurns(history) {
   return out;
 }
 
-/** A read's page as the model receives it: the rows that fit, the page and the total. */
-function resultContent(n, made) {
+/**
+ * A read's page as the model receives it: the rows that fit, the page and the total. The rows pass
+ * through redactValue on the reasoning egress first (§6.3.5): the fields this person sees are kept
+ * (`keep`), payment and identity numbers in them are masked.
+ */
+function resultContent(n, made, keep = []) {
   const head = { read: n, key: made.key, total: made.total, page: made.page ? made.page.number : null, has_next: Boolean(made.page && made.page.has_next) };
   const rows = [];
   let size = JSON.stringify({ ...head, rows: [] }).length;
   let cut = false;
-  for (const row of made.rows) {
+  for (const row of redactValue(made.rows, { egress: "reasoning", keep })) {
     const s = JSON.stringify(row).length + 1;
     if (size + s > RESULT_MAX_CHARS) {
       cut = true;
@@ -193,11 +199,15 @@ function resultContent(n, made) {
  */
 async function answer({ db, actor, question, history = [], now = new Date(), vendors, deadlineMs = DEADLINE_MS }) {
   const started = Date.now();
+  // No model call starts past this, and each is given only what is left of it (§6.1.6).
+  const deadline = started + deadlineMs;
   const talk = await ai.converse({ purpose: "data-answers", module: "praxis_ai", actor, egress: "reasoning", db, vendors });
   const AiAnswerDraft = c.assistant.AiAnswerDraft;
   const reads = [];
   try {
-    const [ctx, allowed] = await Promise.all([contextOf(db, actor), authorise.allowedReads(actor)]);
+    const [ctx, allowed, hidden] = await Promise.all([contextOf(db, actor), authorise.allowedReads(actor), fieldMask.maskedKeysFor(db, actor)]);
+    /** The restricted fields this person sees on screen, which reach the model for them alone. */
+    const keep = Object.keys(fieldMask.FIELDS).filter((k) => !hidden.includes(k));
     const tools = allowed.map((r) => ({
       type: "function",
       function: { name: toolName(r.key), description: r.description, parameters: jsonSchemaOf(r.params) },
@@ -240,7 +250,7 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
         made.total = res.list ? res.page.total : made.rows.length;
         made.citations = res.citations;
         reads.push(made);
-        return resultContent(n, made);
+        return resultContent(n, made, keep);
       } catch (err) {
         const code = err && err.code;
         if (code === "AI_READ_FORBIDDEN" || code === "AI_READ_UNKNOWN") {
@@ -266,13 +276,17 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
       if (round > MAX_ROUNDS || attempts >= MAX_READS) forced = true;
       const r = await talk.round({
         messages,
-        tools: forced ? null : tools,
+        // The tools stay offered on a forced round, with none to call: Claude needs them defined
+        // for the calls already in the conversation (llm.service ask()).
+        tools: tools.length ? tools : null,
+        toolChoice: forced ? "none" : "auto",
         output: forced ? AiAnswerDraft : null,
         kind: corrected && forced ? "retry" : "completion",
+        deadline,
       });
 
       if (!forced && r.toolCalls.length) {
-        messages.push({ role: "assistant", content: r.text || null, tool_calls: r.toolCalls });
+        messages.push(r.turn);
         for (const call of r.toolCalls) messages.push({ role: "tool", tool_call_id: call.id, content: await handle(call) });
         if (forced || attempts >= MAX_READS) {
           forced = true;
@@ -289,14 +303,14 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
       if (!corrected) {
         corrected = true;
         forced = true;
-        messages.push({ role: "assistant", content: r.text || "" });
+        messages.push(r.turn);
         messages.push({
           role: "user",
           content: `That reply could not be used:\n- ${parsed.issues.join("\n- ")}\nReply again with only the JSON object${r.finish_reason === "length" ? ", and shorter" : ""}.`,
         });
         continue;
       }
-      draft = await rescue(talk, question, reads);
+      draft = await rescue(talk, question, reads, deadline);
     }
     await talk.finish();
     return { draft, reads, run_id: talk.run_id, stub: talk.stub, routes: ctx.routes, screens: ctx.screens };
@@ -305,7 +319,7 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
       await talk.fail(err.code, err.message, err.status);
       throw err;
     }
-    await talk.fail("AI_FAILED", "Praxis AI could not answer. Try again.", 500, err && err.message);
+    await talk.fail("AI_FAILED", "The assistant could not answer. Try again.", 500, err && err.message);
     throw err;
   }
 }
@@ -314,12 +328,13 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
  * The last way to an answer: the reads already made, in plain words, with no tools and no JSON.
  * Throws AI_BAD_OUTPUT when even that gives nothing.
  */
-async function rescue(talk, question, reads) {
+async function rescue(talk, question, reads, deadline = null) {
   const data = reads
     .filter((r) => r.ok)
     .map((r) => ({ read: r.key, total: r.total, rows: r.rows }));
   const r = await talk.round({
     kind: "retry",
+    deadline,
     messages: [
       {
         role: "system",

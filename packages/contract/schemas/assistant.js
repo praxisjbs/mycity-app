@@ -62,12 +62,16 @@ const AiAnswerLink = z
   })
   .strict();
 
-/** A read an answer made: which, how many rows it returned and how many there are in all. */
+/**
+ * A read an answer made: which, how many rows it returned, how many there are in all, and which
+ * page of the list it read (null for a read of one record, or one that returned nothing).
+ */
 const AiReadMade = z
   .object({
     key: z.string(),
     rows: z.number().int().min(0).max(25),
     total: z.number().int().min(0).nullable(),
+    page: z.number().int().min(1).nullable(),
   })
   .strict();
 

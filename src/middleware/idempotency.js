@@ -185,4 +185,21 @@ async function idempotency(req, res, next) {
   return res.status(row.status_code || 200).json(row.response_body);
 }
 
-module.exports = { idempotency, hashRequest, KEY_PATTERN };
+/**
+ * Forget the replies a person's requests on one route left here, where a reply holds words they
+ * have since removed (Praxis AI's answers, after Delete Conversation or Clear History): a reply
+ * kept for replay must not outlive the record it copies. `field` and `value` narrow it to the
+ * replies naming one record. A request still running keeps nothing: its outcome finds no row.
+ * @param {{query: Function}} db  the caller's transaction
+ * @param {{userId: string, method: string, path: string, field?: string|null, value?: string|null}} which
+ */
+async function forget(db, { userId, method, path, field = null, value = null }) {
+  await db.query(
+    `DELETE FROM idempotency_key
+      WHERE user_id = $1 AND method = $2 AND path = $3
+        AND ($4::text IS NULL OR response_body ->> $4 = $5)`,
+    [userId, method, path, field, value],
+  );
+}
+
+module.exports = { idempotency, hashRequest, forget, KEY_PATTERN };

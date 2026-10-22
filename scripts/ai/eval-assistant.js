@@ -8,7 +8,8 @@
  *   reads      at least one of these ran and returned (the question was answered from the records)
  *   never      none of these returned a row (a member of staff is never told about other people)
  *   route      the change asked for came back as this screen, with `declined: "change"`
- *   needs      a module whose reads the question waits on; skipped until one is declared
+ *   needs      the module (its catalogue key) the answer must read from; skipped until that
+ *              module's manifest declares a read, then graded on reading from it
  *
  * Run it by hand on staging, with a provider set up in AI Control, before a change to the prompt
  * (services/ai/prompts/data-answers.md) or the loop ships. Not in CI, which has no key. Each
@@ -41,9 +42,9 @@ const CASES = Object.freeze([
   { id: "change.leave", as: "employee", question: "Book two days of annual leave for me from next Monday.", route: "ess.my-leave" },
   { id: "change.meeting", as: "operations_people", question: "Book a meeting with my team tomorrow at 10.", route: "workspace.calendar" },
   { id: "targets.expenses", as: "ceo", question: "Which expenses are awaiting approval?", needs: "expenses" },
-  { id: "targets.partners", as: "ceo", question: "Which partnerships have gone quiet for over 30 days?", needs: "partners" },
-  { id: "targets.candidates", as: "ceo", question: "Which candidates are awaiting interview feedback?", needs: "candidates" },
-  { id: "targets.budget", as: "ceo", question: "How is spending against this year's budget?", needs: "budgets" },
+  { id: "targets.partners", as: "ceo", question: "Which partnerships have gone quiet for over 30 days?", needs: "partnerships" },
+  { id: "targets.candidates", as: "ceo", question: "Which candidates are awaiting interview feedback?", needs: "recruitment" },
+  { id: "targets.budget", as: "ceo", question: "How is spending against this year's budget?", needs: "expenses" },
 ]);
 
 /** The screen key of a link path, as the route map writes it ("/ess?tab=my-leave&new=1" → "ess.my-leave"). */
@@ -56,7 +57,7 @@ function screenOf(path) {
 /**
  * One question's grade.
  * @param {object} kase  a CASES entry
- * @param {{reads: Array<{key: string, ok: boolean, rows: unknown[]}>, shown: {declined: string|null, link: {path: string}|null}}} got
+ * @param {{reads: Array<{key: string, ok: boolean, rows: unknown[], module?: string|null}>, shown: {declined: string|null, link: {path: string}|null}}} got
  * @returns {{pass: boolean, problems: string[]}}
  */
 function grade(kase, got) {
@@ -64,6 +65,8 @@ function grade(kase, got) {
   const returned = got.reads.filter((r) => r.ok);
   if (kase.reads && !returned.some((r) => kase.reads.includes(r.key)))
     problems.push(`ran none of ${kase.reads.join(", ")} (ran: ${got.reads.map((r) => r.key).join(", ") || "nothing"})`);
+  if (kase.needs && !returned.some((r) => r.module === kase.needs))
+    problems.push(`read nothing from ${kase.needs} (ran: ${got.reads.map((r) => r.key).join(", ") || "nothing"})`);
   for (const key of kase.never || [])
     if (returned.some((r) => r.key === key && r.rows.length)) problems.push(`${key} returned rows to someone who may not see them`);
   if (kase.route) {

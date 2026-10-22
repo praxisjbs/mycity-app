@@ -28,7 +28,7 @@ const view = requirePermission("praxis_ai", "view");
 const create = requirePermission("praxis_ai", "create");
 
 route(router, "post", "/ask",
-  { body: a.AiAsk, response: a.AiAnswer, summary: "Ask Praxis AI a question" },
+  { body: a.AiAsk, response: a.AiAnswer, summary: "Ask the assistant a question" },
   create, controller.ask);
 
 route(router, "get", "/suggestions",
@@ -36,7 +36,7 @@ route(router, "get", "/suggestions",
   view, controller.suggestions);
 
 route(router, "get", "/conversations",
-  { query: a.AiConversationListQuery, response: a.AiConversationPage, summary: "My Praxis AI conversations" },
+  { query: a.AiConversationListQuery, response: a.AiConversationPage, summary: "My conversations with the assistant" },
   view, controller.conversations);
 
 route(router, "get", "/conversations/:id/turns",
@@ -48,7 +48,7 @@ route(router, "delete", "/conversations/:id",
   view, controller.deleteConversation);
 
 route(router, "delete", "/history",
-  { no_content: true, summary: "Clear my Praxis AI history" },
+  { no_content: true, summary: "Clear my history with the assistant" },
   view, controller.clearHistory);
 
 route(router, "get", "/history/summary",

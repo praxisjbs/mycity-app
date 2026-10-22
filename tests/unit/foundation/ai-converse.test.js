@@ -86,6 +86,36 @@ describe("every vendor file sends tools and answers in one shape", () => {
     });
   });
 
+  test("Anthropic: Claude's own blocks, its thinking included, go back exactly as they came; a round with no tool to call keeps the tools, with tool_choice none", async () => {
+    const said = [
+      { type: "thinking", thinking: "", signature: "sig-1" },
+      { type: "tool_use", id: "toolu_9", name: "leave__requests", input: { page: 1 } },
+    ];
+    const { sent, fetchImpl } = capture({ content: [{ type: "text", text: "{}" }], stop_reason: "end_turn", usage: {} });
+    await anthropic.complete({
+      apiKey: "k",
+      model: "claude-sonnet-5-5",
+      messages: [
+        { role: "user", content: "Whose leave waits on me?" },
+        { role: "assistant", content: null, tool_calls: [{ id: "toolu_9", type: "function", function: { name: "leave__requests", arguments: "{}" } }], anthropic_content: said },
+        { role: "tool", tool_call_id: "toolu_9", content: "{}" },
+      ],
+      tools: [TOOL],
+      toolChoice: "none",
+      fetchImpl,
+    });
+    const body = sent[0].body;
+    expect(body.messages[1]).toEqual({ role: "assistant", content: said });
+    expect(body.tools).toHaveLength(1);
+    expect(body.tool_choice).toEqual({ type: "none" });
+  });
+
+  test("Claude's blocks reach no other vendor", () => {
+    const out = http.chatMessages([{ role: "assistant", content: null, tool_calls: CONVERSATION[2].tool_calls, anthropic_content: [{ type: "thinking" }] }], ["extra_content"]);
+    expect(out[0]).not.toHaveProperty("anthropic_content");
+    expect(out[0].tool_calls[0]).toMatchObject({ id: "fc:1", extra_content: CONVERSATION[2].tool_calls[0].extra_content });
+  });
+
   test("Anthropic: a cut-off answer reads as length, a plain one as stop", async () => {
     const reply = (stop_reason) => capture({ content: [{ type: "text", text: "Two." }], stop_reason, usage: {} }).fetchImpl;
     const ask = (stop) => anthropic.complete({ apiKey: "k", model: "claude-haiku-5-5", messages: [{ role: "user", content: "Hi" }], fetchImpl: reply(stop) });
@@ -192,6 +222,30 @@ describe("converse(): one run for a question, a step per round, the chain walked
     expect(finished).toEqual([{ status: "ok", vendor: "gemini", model: "gemini-3.8-flash" }]);
     expect(t.cost()).toBe("3.00");
     expect(ledger.startRun).toHaveBeenCalledTimes(1);
+  });
+
+  test("a round that may call no tool: Claude keeps the tools with tool_choice none, the others are sent none; Claude's turn carries its blocks", async () => {
+    const g = jest.fn().mockResolvedValue(answer('{"text":"Ada Obi."}'));
+    const a = jest.fn().mockResolvedValue({ ...answer("Reading."), content: [{ type: "thinking", thinking: "", signature: "s" }, { type: "text", text: "Reading." }] });
+    const gt = await talk({ gemini: { complete: g }, anthropic: { complete: a }, stub: { complete: jest.fn() } });
+    await gt.round({ messages: CONVERSATION, tools: [TOOL], toolChoice: "none" });
+    expect(g.mock.calls[0][0].tools).toBeNull();
+    jest.spyOn(jobs, "resolve").mockResolvedValue(chainOf([{ provider: "anthropic", model: "claude-sonnet-5-5" }]));
+    const at = await talk({ gemini: { complete: g }, anthropic: { complete: a }, stub: { complete: jest.fn() } });
+    const r = await at.round({ messages: CONVERSATION, tools: [TOOL], toolChoice: "none" });
+    expect(a.mock.calls[0][0]).toMatchObject({ tools: [TOOL], toolChoice: "none" });
+    expect(r.turn).toEqual({ role: "assistant", content: "Reading.", anthropic_content: [{ type: "thinking", thinking: "", signature: "s" }, { type: "text", text: "Reading." }] });
+  });
+
+  test("the question's deadline: each call is given what is left of it, and none starts after it", async () => {
+    const g = jest.fn().mockResolvedValue(answer("Done."));
+    const t = await talk({ gemini: { complete: g }, anthropic: { complete: jest.fn() }, stub: { complete: jest.fn() } });
+    await t.round({ messages: CONVERSATION.slice(0, 2), deadline: Date.now() + 10_000 });
+    expect(g.mock.calls[0][0].timeoutMs).toBeLessThanOrEqual(10_000);
+    expect(g.mock.calls[0][0].timeoutMs).toBeGreaterThan(5_000);
+    await expect(t.round({ messages: CONVERSATION.slice(0, 2), deadline: Date.now() + 500 })).rejects.toMatchObject({ code: "AI_UNAVAILABLE" });
+    expect(g).toHaveBeenCalledTimes(1);
+    expect(finished).toEqual([expect.objectContaining({ status: "failed", error: "the question's time ran out" })]);
   });
 
   test("the first choice fails mid-question: the fallback gets the same conversation and keeps the rest of it", async () => {

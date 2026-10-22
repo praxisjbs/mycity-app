@@ -7,8 +7,16 @@
  * Request shaping: Sonnet 5.5 and Haiku 5.5 refuse a temperature other than the default, so none
  * is sent; thinking is left to the model's default. The conversation arrives in OpenAI's shape,
  * as every vendor file takes it, and is turned into Anthropic's content blocks here; the answer
- * goes back the same way, its stop reason in OpenAI's words (docs/guides/ai-control.md decision 34). Errors: 400, 401, 403, 404 are "config"; 429
- * is "rate_limited" with `retry-after`; 529 (overloaded) and 5xx are "transient".
+ * goes back the same way, its stop reason in OpenAI's words (docs/guides/ai-control.md decision 34).
+ *
+ * Tool rounds: the models think by default, and a turn's thinking must go back exactly as it came
+ * within the conversation, so each answer also returns its raw `content` blocks; the caller keeps
+ * them on the assistant turn (`anthropic_content`) and they are sent back unchanged. A round that
+ * may call no tool keeps the tools defined with `tool_choice: none`: a history that holds tool
+ * calls needs its tools, and the thinking is bound to the same tool set.
+ *
+ * Errors: 400, 401, 403, 404 are "config"; 429 is "rate_limited" with `retry-after`; 529
+ * (overloaded) and 5xx are "transient".
  */
 const { VendorError, request } = require("./http");
 
@@ -67,8 +75,9 @@ function inputOf(args) {
 /**
  * The conversation, kept in OpenAI's shape, as Anthropic's Messages API takes it: an assistant's
  * tool calls become `tool_use` blocks, each tool's result a `tool_result` block in the user turn
- * that follows, and turns of the same role are joined, since the API wants them to alternate.
- * @param {Array<{role: string, content?: string|null, tool_calls?: Array, tool_call_id?: string}>} messages  no system turn
+ * that follows, and turns of the same role are joined, since the API wants them to alternate. A
+ * turn Claude gave keeps its own blocks, thinking included, exactly as they came.
+ * @param {Array<{role: string, content?: string|null, tool_calls?: Array, tool_call_id?: string, anthropic_content?: Array}>} messages  no system turn
  */
 function toAnthropic(messages) {
   const out = [];
@@ -81,6 +90,8 @@ function toAnthropic(messages) {
   for (const m of messages || []) {
     if (m.role === "tool") {
       push("user", [{ type: "tool_result", tool_use_id: safeId(m.tool_call_id, 0), content: String(m.content ?? "") }]);
+    } else if (m.role === "assistant" && Array.isArray(m.anthropic_content) && m.anthropic_content.length) {
+      push("assistant", m.anthropic_content);
     } else if (m.role === "assistant") {
       const blocks = [];
       if (typeof m.content === "string" && m.content.trim()) blocks.push({ type: "text", text: m.content });
@@ -99,12 +110,14 @@ function toAnthropic(messages) {
 /**
  * One answer, with tools when they are given.
  * @param {{apiKey: string, model: string, system?: string, messages: Array<object>, tools?: Array<object>|null,
- *          maxTokens?: number, effort?: string, timeoutMs?: number, fetchImpl?: typeof fetch}} req
- *   messages  in OpenAI's shape (vendors/http.js toolCallOf), without the system turn
- *   tools     OpenAI-style function tools, sent as Anthropic's `name`, `description`, `input_schema`
- * @returns {Promise<{text: string, toolCalls: Array, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}>}
+ *          toolChoice?: "auto"|"none", maxTokens?: number, effort?: string, timeoutMs?: number, fetchImpl?: typeof fetch}} req
+ *   messages    in OpenAI's shape (vendors/http.js toolCallOf), without the system turn
+ *   tools       OpenAI-style function tools, sent as Anthropic's `name`, `description`, `input_schema`
+ *   toolChoice  "none": the tools stay defined and none may be called
+ * @returns {Promise<{text: string, toolCalls: Array, content: Array, usage: {input_tokens: number, output_tokens: number}, model: string, finish_reason: string|null}>}
+ *   content  the answer's own blocks, to send back unchanged on the next round
  */
-async function complete({ apiKey, model, system, messages, tools = null, maxTokens = 1024, effort, timeoutMs = 60_000, fetchImpl }) {
+async function complete({ apiKey, model, system, messages, tools = null, toolChoice = "auto", maxTokens = 1024, effort, timeoutMs = 60_000, fetchImpl }) {
   if (!apiKey) throw new VendorError("anthropic: no API key", "config");
   if (!ALLOWED.test(String(model || ""))) throw new VendorError(`anthropic: ${model} is not a Sonnet or Haiku model`, "config");
   const body = { model, max_tokens: maxTokens, messages: toAnthropic(messages) };
@@ -116,6 +129,7 @@ async function complete({ apiKey, model, system, messages, tools = null, maxToke
       description: t.function.description || "",
       input_schema: t.function.parameters || { type: "object", properties: {} },
     }));
+    if (toolChoice === "none") body.tool_choice = { type: "none" };
   }
   const { data } = await request("anthropic", `${BASE_URL}/messages`, {
     method: "POST",
@@ -135,6 +149,7 @@ async function complete({ apiKey, model, system, messages, tools = null, maxToke
   return {
     text,
     toolCalls,
+    content: blocks,
     usage: {
       input_tokens: Number(data.usage && data.usage.input_tokens) || 0,
       output_tokens: Number(data.usage && data.usage.output_tokens) || 0,

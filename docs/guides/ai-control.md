@@ -413,6 +413,7 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 ## 14 · Change log
 
 - 22/10/2026 · GE · Data Answers built (Praxis AI's engine, `praxis-ai.md` §6.1): its Not Built Yet pill goes.
+- 22/10/2026 · GE · Decision 35 built with Praxis AI's API (`praxis-ai.md` §6.6): Voice Question transcribes a spoken question and the recording is removed in the same request; its action is marked built. Praxis AI's audit: a Claude model on Data Answers' chain keeps its tools on a round that may call none (`tool_choice: none`) and gets its own thinking blocks back unchanged, so a Claude fallback no longer fails mid-question; `converse()` takes the question's deadline, so no call starts past 60 seconds.
 - 22/10/2026 · GE · Decision 34 built: every vendor file takes tools in one conversation shape, Groq and OpenAI answer text, `llm.service.converse()` keeps one run per question and hands a failing model's conversation to the next link; Voice Question registered (decision 35), not built yet.
 - 22/10/2026 · GE · Decision 34 rewritten: no Cannot Use Tools state. Every provider's vendor file takes tools, so any text model IT chooses answers on Data Answers' chain, first or fallback; Groq's and OpenAI's text models, which Edit Chain accepted but no call used, answer too. §6.1 and §10.1 lose the state.
 - 21/10/2026 · GE · Decisions 33 to 35 with Praxis AI's guide (`praxis-ai.md`): up to 5 reads a question for Data Answers, the Cannot Use Tools state, Voice Question registered; §2, §6.1, §6.5 and §10.1 follow. To be built with Praxis AI.
