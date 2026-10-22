@@ -9,6 +9,7 @@ import { ON_UPLOAD } from "../uploads";
 type Kept = { owner: string; conversation: AiConversation; turns: AiAnswer[] };
 const KEPT: Kept[] = [];
 
+const nameOf = (key: string) => byKey(key)?.display_name ?? "";
 const partnerCite = (p: (typeof PARTNERS)[number]): AiCitation => ({ entity_type: "partner", entity_id: p.partner_id, label: p.name, link: `/partnerships?tab=pipeline&id=${p.partner_id}`, read_key: "partners.list" });
 const personCite = (key: string): AiCitation | null => {
   const p = byKey(key);
@@ -34,6 +35,21 @@ function answerFor(question: string, view: string): Draft {
       reads: [{ key: "partners.list", rows: quiet.length, total: quiet.length }],
     });
   }
+  if (l.includes("happened") || l.includes("done today"))
+    return said("Four things happened today: a leave approval, a new joiner, a recognition and a celebration.", {
+      table: {
+        columns: ["When", "What", "By", "About"],
+        rows: [
+          ["11:20", "Recognition posted", nameOf("ngozi"), nameOf("adedotun")],
+          ["10:05", "Employee added", nameOf("cynthia"), nameOf("samuel")],
+          ["09:12", "Leave approved", nameOf("cynthia"), nameOf("tobi")],
+          ["00:01", "Celebration posted", "", nameOf("hauwa")],
+        ],
+        numeric: [],
+      },
+      reads: [{ key: "activity.list", rows: 4, total: 4 }],
+      link: { label: "Open Home", path: "/home?tab=overview" },
+    });
   if (l.includes("late"))
     return said("Seven late arrivals this month, from four people. One person has reached the query threshold.", {
       table: { columns: ["Employee", "Late Arrivals"], rows: [["Bashir Lawal", "3"], ["Tobi Ojo", "2"], ["Emeka Obi", "1"], ["Cynthia Osakunih", "1"]], numeric: [1] },
@@ -69,8 +85,8 @@ const kept = (user: string, id: string) => KEPT.find((k) => k.owner === user && 
 
 route("GET /api/v1/ai/suggestions", (req) => {
   const view = SIGN_INS[req.user!]?.view ?? "staff";
-  const all = ["Who is in today, and who is late?", "What is waiting on my approval?", "Which leave requests are waiting?", "Who came in late this week?", "How many leave days do I have left?", "Which of my tasks are overdue?"];
-  return ok({ questions: view === "staff" ? ["How many leave days do I have left?", "Which of my tasks are overdue?", "Was I late at all this month?", "When is the next public holiday?"] : all });
+  const all = ["Who is in today, and who is late?", "What happened today?", "What is waiting on my approval?", "Which leave requests are waiting?", "Who came in late this week?", "How many leave days do I have left?"];
+  return ok({ questions: view === "staff" ? ["What happened today?", "How many leave days do I have left?", "Which of my tasks are overdue?", "Was I late at all this month?", "When is the next public holiday?"] : all });
 });
 
 route("POST /api/v1/ai/ask", async (req) => {

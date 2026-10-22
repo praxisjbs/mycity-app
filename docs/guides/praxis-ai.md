@@ -248,7 +248,10 @@ The server turns it into `AiAnswer`:
 
 `GET /ai/suggestions` returns up to 6 example questions, each belonging to a read
 (`assistant.suggestions.js`, one line per read key), filtered by the reads the person may run, so a
-member of staff is never offered a question about people they cannot see.
+member of staff is never offered a question about people they cannot see. A read every login may
+run that answers only for holders of a capability names it (`team.today` needs `home.team`,
+`alerts.mine` needs `alerts.clear`), and its question waits for the capability too; the CEO holds
+every one. "What happened today?" (`activity.list`) is offered to everyone.
 
 ### 6.9 Reads this build adds
 
@@ -256,20 +259,38 @@ Praxis AI answers what the manifests offer; it does not add reads to other modul
 Where a target question needs a read that does not exist, the read is added in its module (with
 that module's guide changed):
 
-- **Home**: `activity.list`, Activity Today filtered by person and day, with Home's own rules for
-  who sees which event (`home.md` §6), for "what has Aisha done today?".
+- **Home** (built): `activity.list` (`HomeActivityQuery`), Activity Today for any one Lagos day,
+  today unless `date` is given, through the Overview's own query, allow-list and scopes (`home.md`
+  §6, §9). `employee_id`, or part of a name in `q`, keeps one person's: what they did and what is
+  about them. "What happened today?" and "what has Aisha done today?" are one read each.
 
 The six target questions of MILESTONES §15 answer as their modules land: overdue tasks (M2,
 `tasks.list` today), expenses awaiting approval (M8), due for confirmation (people), inactive
-partnerships (M7), candidates awaiting feedback (M4), budget against actual (M8).
+partnerships (M7), candidates awaiting feedback (M4), budget against actual (M8). Due for
+confirmation reads `employees.list`, whose rows carry `confirmation_due_on`: MyCity's staff fit on
+one page, and People adds a date filter if the staff grows past the 125 people five reads can hold.
 
 ### 6.10 Checking answers
 
-`scripts/ai/eval-assistant.js` asks a set of questions on staging with a real key and grades each
-answer: the reads it should run, the reads it must not (a member of staff asking about payroll),
-a change asked for (a route, never a claim), the six target questions as they become answerable,
-and Ifeoma's ("what has a person done today", "what happened today"). Run by hand before a change to
-the prompt or the loop ships; not in CI, which has no key.
+`scripts/ai/eval-assistant.js` asks its questions (`CASES`) on staging with a real key, each as the
+person of the role it names (the CEO's login, or the first active login holding the role code),
+through the same engine Ask uses, and grades each answer:
+
+| Grade | Passes when |
+|---|---|
+| `reads` | one of these reads ran and returned (the answer came from the records) |
+| `never` | none of these returned rows (a member of staff asking about others' pay or lateness) |
+| `route` | the change asked for came back as this screen, with `declined: change`, never a claim |
+| `needs` | a target question whose module declares no read yet is skipped, not failed |
+
+The set holds Ifeoma's two ("what happened today", "what has a person done today"), the target
+questions as they become answerable, the privacy cases and three changes (a task, leave, a meeting).
+It saves nothing to History and writes nothing; each question is one Data Answers run in AI Control
+· Spend. `--only=<id prefix>`, `--list` (asks nothing), `--json`. Exit 0 when all pass, 1 when one
+fails, 2 when it cannot run (nobody holds a role, AI is off, only the stub answers). Refused on
+production. Run by hand before a change to the prompt or the loop ships; not in CI, which has no
+key. `tests/unit/foundation/ai-eval.test.js` checks without a key that every question names reads
+and screens a manifest declares, and that the grading passes and fails what it should.
 
 ## 7 · Events, jobs and notifications
 
@@ -384,6 +405,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Commit 6 of 7: §6.9 built, Home's `activity.list` (`home.md` §6, §9 changed with it), so Ifeoma's "what happened today" and "what has a person done today" are one read each, by name too. §6.10 built, `scripts/ai/eval-assistant.js` and its key-free test. §6.8: a question whose read answers only with a capability (the Team roster, the alerts one may clear) waits for it, found when a member of staff was offered "Who is in today" and would have read an empty roster; "What happened today?" joins Try Asking.
 - 22/10/2026 · GE · Commit 5 of 7: Ask and History built to §10 (`app/src/features/assistant/`). §10.2: New Conversation sits under the title on a phone, because a fit page has no floating button (FRONTEND_GUIDE §7); ⌘K offers it as an action. §5, §10.1: Show Earlier loads a conversation's older turns; Delete Conversation is confirmed like Clear History. `VoiceField` gains `compact` (the microphone alone, for a message box) and the icon set gains `thumbdown` for Not Helpful.
 - 22/10/2026 · GE · Commit 4 of 7: the API built (`src/modules/assistant`, §5): ask, suggestions, conversations, turns, Delete Conversation, Clear History, the summary, feedback and voice. §5: transcribe takes the recording in one multipart request; a conversation that is gone is 404, not 409. §6.6, §7: the recording is removed in the same request and the sweep is hourly. §9: a conversation opens on Ask. §4: citations keep their order (`position`), found when the full suite read them back in a different order. Ask and History moved onto the contract and its mock (the screens' rebuild is commit 5).
 - 22/10/2026 · GE · Commit 3 of 7: §6.1 to §6.4 built as the engine (`services/ai/assistant/{orchestrator, answer}.js`); the prompt is `prompts/data-answers.md`, named after its action as the AI-actions gate requires.

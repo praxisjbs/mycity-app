@@ -103,6 +103,8 @@ mycity-app/
 │   │                         restore-drill.js (weekly), installed on the server as mycity-backup,
 │   │                         mycity-restore-drill
 │   ├── import/               command-line import
+│   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging
+│   │                         with a real key before a change to its prompt or loop ships (not in CI)
 │   ├── ops/                  health-brief.js: the Status brief made on the server (npm run health:brief),
 │   │                         and with --watch the health watch that mails it when something is down
 │   └── deploy/               deploy-gate, check-gate, release-manifest, verify-staging, rollback

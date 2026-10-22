@@ -1,7 +1,7 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "5dd9e748fa5b7e537400211771452e9c3dbf7359f8041c9b892e0d9e114ba942",
-  "schemas": 896,
+  "source_hash": "4d042676105bd19c7857f4159f6cecf61bde2dd1286c477b7c69c8888e90a014",
+  "schemas": 897,
   "endpoints": 455,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
@@ -20,7 +20,7 @@
     "packages/contract/schemas/candidates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/common.js": "e3f9d6edaef133d3ce44855767aa8dd411e66242ab2747113707a379e2f7095b",
     "packages/contract/schemas/community.js": "97a91f36f33f43cd795ae1d6ed8f2a95d5b7eb8aa9dd0a7743ff35a6c696c696",
-    "packages/contract/schemas/dashboard.js": "7d30bbc1d29021fe3cf59b80c07454368e5dc6403fe746a5c12b78c1a20437fa",
+    "packages/contract/schemas/dashboard.js": "576712eadd06a2637234fe4c17a9120cbcb9dbcf850f95a5a007b084809a85dc",
     "packages/contract/schemas/deductions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/devices.js": "b91698248b9bbba88812399e504aee8069de9f5292975627fc20994ca10ec4dd",
     "packages/contract/schemas/disbursements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

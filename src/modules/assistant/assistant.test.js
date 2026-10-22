@@ -53,9 +53,16 @@ describe("Try Asking", () => {
       "When is the next public holiday?",
     ]);
     const all = suggestions.QUESTIONS.map(([key]) => ({ key }));
-    expect(suggestions.forReads(all)).toHaveLength(6);
-    expect(suggestions.forReads(all)[0]).toBe("Who is in today, and who is late?");
+    expect(suggestions.forReads(all, { capabilities: ["home.team"] })).toHaveLength(6);
+    expect(suggestions.forReads(all, { capabilities: ["home.team"] })[0]).toBe("Who is in today, and who is late?");
     expect(suggestions.forReads([{ key: "payroll.runs" }])).toEqual([]);
+  });
+
+  test("a read that answers only with a capability offers its question only to its holders, and the CEO", () => {
+    const reads = [{ key: "team.today" }, { key: "activity.list" }, { key: "alerts.mine" }];
+    expect(suggestions.forReads(reads)).toEqual(["What happened today?"]);
+    expect(suggestions.forReads(reads, { capabilities: ["alerts.clear"] })).toEqual(["What happened today?", "Which alerts are open right now?"]);
+    expect(suggestions.forReads(reads, { is_ceo: true })).toEqual(["Who is in today, and who is late?", "What happened today?", "Which alerts are open right now?"]);
   });
 
   test("every question belongs to a read some module declares", () => {

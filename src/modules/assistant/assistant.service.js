@@ -15,6 +15,7 @@ const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const authorise = require("../../shared/ai/authorise");
+const grantsCache = require("../../shared/rbac/grants-cache");
 const vault = require("../../shared/documents/vault");
 const orchestrator = require("../../services/ai/assistant/orchestrator");
 const answer = require("../../services/ai/assistant/answer");
@@ -118,7 +119,8 @@ async function ask(body, actor) {
 
 /** GET /ai/suggestions. */
 async function suggestionsFor(actor) {
-  return { questions: suggestions.forReads(await authorise.allowedReads(actor)) };
+  const [reads, capabilities] = await Promise.all([authorise.allowedReads(actor), grantsCache.getCapabilities(pool, actor.user_id)]);
+  return { questions: suggestions.forReads(reads, { capabilities, is_ceo: actor.is_ceo === true }) };
 }
 
 /** POST /ai/answers/:id/feedback: Helpful, Not Helpful, or neither again. */

@@ -40,6 +40,7 @@ const transcription = require("../../src/services/ai/transcription");
 const authorise = require("../../src/shared/ai/authorise");
 const vault = require("../../src/shared/documents/vault");
 const suggestions = require("../../src/modules/assistant/assistant.suggestions");
+const grantsCache = require("../../src/shared/rbac/grants-cache");
 const assistant = require("../../src/modules/assistant/assistant.service");
 require("../../src/modules/assistant/assistant.events");
 
@@ -248,11 +249,18 @@ describeDb("Praxis AI against the real migrations", () => {
     expect(res.body.by_module).toEqual(expect.arrayContaining([{ module_key: "people", label: "People", questions: 1 }, { module_key: null, label: "Other", questions: 2 }]));
   });
 
-  test("Try Asking offers only what the person's reads can answer", async () => {
-    for (const who of ["staff", "ops"]) {
+  test("Try Asking offers only what the person's reads can answer, and a capability's question only to its holders", async () => {
+    const staff = (await as("staff").get("/ai/suggestions")).body.questions;
+    expect(staff).toContain("What happened today?");
+    // team.today is every login's read but answers only with home.team; leave requests are People's.
+    expect(staff).not.toContain("Who is in today, and who is late?");
+    expect(staff).not.toContain("Which leave requests are waiting?");
+    expect((await as("ceo").get("/ai/suggestions")).body.questions[0]).toBe("Who is in today, and who is late?");
+    for (const who of ["staff", "ops", "ceo"]) {
       const res = await as(who).get("/ai/suggestions");
       expect(res.status).toBe(200);
-      expect(res.body.questions).toEqual(suggestions.forReads(await authorise.allowedReads(userOf(who))));
+      const capabilities = await grantsCache.getCapabilities(pool, people[who].user_id);
+      expect(res.body.questions).toEqual(suggestions.forReads(await authorise.allowedReads(userOf(who)), { capabilities, is_ceo: who === "ceo" }));
     }
   });
 

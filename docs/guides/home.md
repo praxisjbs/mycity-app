@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -369,7 +369,8 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   row is only ever an allowed key under the module that declares it. Never a mail, a message, a
   sign-in or an audit before-and-after value: each row is the key, the module, when, who did it,
   who it is about and where it opens (the reader's own view when it is about them). At most 25,
-  newest first.
+  newest first. Praxis AI's `activity.list` (§9) reads the same events through the same query and
+  rules, for any one day and, when asked, one person: what they did and what is about them.
 - **Your Week** is this week's working days of the reader's own schedule, Monday first (the days
   their work schedule, else the company hours, works; a public holiday among them named and given no
   hours): each day's own hours (Saturday 09:00 to 15:00 under the suggested hours),
@@ -633,7 +634,11 @@ never reaches Home.
     page without `alerts.clear`.
   - `dashboard.ai.js` · `team.today` (`HomeTeamQuery`): today's roster in the asker's `home` scope,
     as their Team tab lists it, each row cited as the employee; an empty page without `home.team`.
-    `cards.mine` (`EmptyBody`): the asker's own cards and their figures.
+    `cards.mine` (`EmptyBody`): the asker's own cards and their figures. `activity.list`
+    (`HomeActivityQuery`): a day's Activity Today (today in Lagos unless `date` is given) by its
+    allow-list and the asker's scope on each module, newest first; `employee_id`, or part of a name
+    in `q`, keeps one person's (they did it, or it is about them); each event cited as its record.
+    It answers "what happened today?" and "what has Aisha done today?" (praxis-ai.md §6.9).
   - `reports.ai.js` · `reports.mine` (`HomeReportQuery`): the reports the asker owns or receives;
     `runs.mine` (`HomeReportRunQuery`): the files the asker received, newest first; both empty
     without `home.reports`.
@@ -645,7 +650,7 @@ never reaches Home.
   `home.team`; "choose the cards on my Home" →
   `home.overview`; "see who has clocked in today, by status" and "see the requests waiting on my
   approval" → `home.overview` with `kpi` (`attendance_today`, `approvals_awaiting_you`), which opens
-  that card's records as ⌘K's `?id=` does.
+  that card's records as ⌘K's `?id=` does; "see what happened today" → `home.overview`.
 - **Search**: route-map types `home_alert` and `home_alert_rule` (Alerts), `home_report` and
   `home_report_run` (Reports), `home_kpi` (Overview, opening the card's records). Providers:
   `alerts.search.js` (open alerts the reader may see, by title or trigger; rules by name or key
@@ -826,6 +831,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · For Praxis AI (praxis-ai.md §6.9): `activity.list`, Activity Today as an assistant read for any day and one person, by id or by name, on the same query as the Overview's (`dashboard.activity.js` `eventsOn`); `HomeActivityQuery`; the route "see what happened today". §6 Overview and §9 follow. Nothing on the Overview changes. TB to review.
 - 21/10/2026 · TB · Daily Attendance's day and statuses, from the M1 handover (a report filtered to Absent came back empty, because nobody is Absent until the day-close has closed the day): New Report's Day (Today So Far or Last Working Day) and Statuses (any of them, ticked; Absent only on the Last Working Day, Not In only Today), the roster reading `statuses` together, the file naming its day and date, and `1152` turning a saved report's one status into a list (§6 Reports, §10.1, §11).
 
 - 21/10/2026 · TB · Built with attendance's PR 3: the `late_arrivals` and `missing_clock_out` metrics left the list and their rules are switched off (`1445`); attendance's alerts are the policy's breaches, on the five rules the system keeps (metric `attendance_policy`, People Approvers, no Over By), raised after commit by `attendance.raise_breach_alert`; Alert Rules opens with the Attendance Policy card (`GET /home/alert-rules/policy`), and a policy alert offers Set in Attendance Policy in place of Edit Rule. Alert Sources counts them as Attendance Policy. The staging seed keeps two rules.

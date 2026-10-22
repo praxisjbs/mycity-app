@@ -19,8 +19,11 @@
  * The server sends the key, the module, when, who did it, who it is about and where it
  * opens (shared/route-map.js); the screen words each key. At most 25, newest first: the
  * first page of the same paged query, never a longer list.
+ *
+ * The assistant's `activity.list` (dashboard.ai.js) reads the same events by the same rules,
+ * for any one Lagos day and, when asked, one person: what they did and what is about them.
  */
-const { pageQuery, TOTAL_COL } = require("../../shared/http/paged");
+const { envelope, pageOf, pageQuery, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const rbac = require("../../middleware/rbac");
 const routeMap = require("../../shared/route-map");
@@ -76,6 +79,55 @@ async function scopesOf(user) {
 }
 
 /**
+ * One Lagos day's events the reader may see, newest first, a page of 25; null when the reader
+ * may open none of the modules they come from. With `employeeId`, or `q` (part of a name), only
+ * what that person did (the event's actor) or what is about them (its subject).
+ * @param {{query: Function}} client
+ * @param {{user_id: string, employee_id: string|null, role_ids: string[], is_ceo?: boolean}} user  req.user
+ * @param {{date: string, employeeId?: string|null, q?: string|null}} on
+ * @param {{page?: number}} query
+ */
+async function eventsOn(client, user, { date, employeeId = null, q = null }, query) {
+  const params = [lagos.startOfDay(date), lagos.endOfDayExclusive(date)];
+  const visible = visibleWhere(await scopesOf(user), params);
+  if (!visible) return null;
+  let person = "";
+  if (employeeId) {
+    params.push(employeeId);
+    person += ` AND (ae.employee_id = $${params.length}::uuid OR se.employee_id = $${params.length}::uuid)`;
+  }
+  if (q) {
+    params.push(q);
+    const like = `LIKE '%' || search_fold($${params.length}) || '%'`;
+    person += ` AND (search_fold(${nameOf("ae")}) ${like} OR search_fold(${nameOf("se")}) ${like})`;
+  }
+  return pageQuery(
+    client,
+    `SELECT l.event_id, l.event_key, l.module_key, l.occurred_at, l.entity_type, l.entity_id,
+            ae.employee_id AS actor_employee_id, ${nameOf("ae")} AS actor_name,
+            se.employee_id AS subject_employee_id, ${nameOf("se")} AS subject,
+            ${TOTAL_COL}
+       FROM event_log l
+       LEFT JOIN app_user au ON au.user_id = l.actor_user_id
+       LEFT JOIN employee ae ON ae.employee_id = au.employee_id
+       LEFT JOIN employee se ON se.employee_id::text = ${SUBJECT}
+      WHERE l.occurred_at >= $1::timestamptz AND l.occurred_at < $2::timestamptz
+        AND ${visible}${person}
+      ORDER BY l.occurred_at DESC, l.event_id`,
+    params,
+    query,
+  );
+}
+
+/** Where an event opens for this reader: their own view when it is about them. */
+function linkOf(r, user) {
+  const link = routeMap.linkFor(r.entity_type, r.entity_id, {
+    self: Boolean(user.employee_id) && r.subject_employee_id === user.employee_id,
+  });
+  return link ? link.path : null;
+}
+
+/**
  * Today's activity for the reader, newest first, at most 25 (HomeActivityItem); null when
  * the reader may open none of the modules it comes from.
  * @param {{query: Function}} client
@@ -84,38 +136,48 @@ async function scopesOf(user) {
  * @returns {Promise<object[]|null>}
  */
 async function today(client, user, { today: date }) {
-  const params = [lagos.startOfDay(date), lagos.endOfDayExclusive(date)];
-  const visible = visibleWhere(await scopesOf(user), params);
-  if (!visible) return null;
-  const page = await pageQuery(
-    client,
-    `SELECT l.event_id, l.event_key, l.module_key, l.occurred_at, l.entity_type, l.entity_id,
-            ${nameOf("ae")} AS actor_name, se.employee_id AS subject_employee_id, ${nameOf("se")} AS subject,
-            ${TOTAL_COL}
-       FROM event_log l
-       LEFT JOIN app_user au ON au.user_id = l.actor_user_id
-       LEFT JOIN employee ae ON ae.employee_id = au.employee_id
-       LEFT JOIN employee se ON se.employee_id::text = ${SUBJECT}
-      WHERE l.occurred_at >= $1::timestamptz AND l.occurred_at < $2::timestamptz
-        AND ${visible}
-      ORDER BY l.occurred_at DESC, l.event_id`,
-    params,
-    { page: 1 },
-  );
-  return page.data.map((r) => {
-    const link = routeMap.linkFor(r.entity_type, r.entity_id, {
-      self: Boolean(user.employee_id) && r.subject_employee_id === user.employee_id,
-    });
-    return {
-      event_id: r.event_id,
+  const page = await eventsOn(client, user, { date }, { page: 1 });
+  if (!page) return null;
+  return page.data.map((r) => ({
+    event_id: r.event_id,
+    event_key: r.event_key,
+    module_key: r.module_key,
+    occurred_at: new Date(r.occurred_at).toISOString(),
+    actor_name: r.actor_name,
+    subject: r.subject,
+    link: linkOf(r, user),
+  }));
+}
+
+/**
+ * The assistant's `activity.list`: a day's events (today in Lagos unless `date` is given) by
+ * the same allow-list and scopes as Activity Today, optionally one person's (`employee_id`, or
+ * `q` matching the name of who did it or who it is about), 25 a page. Each
+ * row names the record it is about, so the answer can cite it; an empty page for a reader who
+ * may open none of the modules.
+ * @param {{query: Function}} client
+ * @param {object} actor  req.user, as the assistant's read passes it
+ * @param {{date?: string, employee_id?: string, page?: number}} query  HomeActivityQuery
+ */
+async function forAssistant(client, actor, query, { now = new Date() } = {}) {
+  const date = query.date || lagos.today(now);
+  const page = await eventsOn(client, actor, { date, employeeId: query.employee_id || null, q: query.q || null }, query);
+  if (!page) return envelope([], pageOf(query).number, 0);
+  return {
+    ...page,
+    data: page.data.map((r) => ({
       event_key: r.event_key,
       module_key: r.module_key,
       occurred_at: new Date(r.occurred_at).toISOString(),
       actor_name: r.actor_name,
+      actor_employee_id: r.actor_employee_id,
       subject: r.subject,
-      link: link ? link.path : null,
-    };
-  });
+      subject_employee_id: r.subject_employee_id,
+      entity_type: r.entity_type,
+      entity_id: r.entity_id,
+      link: linkOf(r, actor),
+    })),
+  };
 }
 
-module.exports = { ALLOWED, MODULES, visibleWhere, today };
+module.exports = { ALLOWED, MODULES, visibleWhere, today, forAssistant };
