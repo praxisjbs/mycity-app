@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 1 | 1 | 8 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 1 | 0 | 9 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 6 | 0 | 3 | 0 | 0 |
-| **Total** | **99** | **43** | **1** | **55** | **0** | **0** |
+| **Total** | **99** | **43** | **0** | **56** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy

@@ -677,7 +677,7 @@ routes file; the module that owns each route is named.
 | `POST /performance/tidy` | `TidyRequest` → `TidyResult` | view · the writer of the text | | `kind` `check_in` or `review`, the item, the text; one `review-cleanup` run |
 | `GET /performance/pips` | `PipListQuery` → `PipPage` | view · scope | yes, 25 | |
 | `POST /performance/pips` · `PATCH /performance/pips/:id` · `POST /performance/pips/:id/close` | `PipCreate`, `PipEdit`, `PipClose` → `Pip` | create · edit, `performance.manage` | | from a closed review rated Below |
-| `GET /api/v1/ess/performance` | → `MyPerformance` | `ess` · own | | the quarter, the scorecard (score to date, rating, agreement, reviewer), the open check-in, commitments this month (null until PR 4), an open PIP; the reviews are `GET /ess/performance/reviews` |
+| `GET /api/v1/ess/performance` | → `MyPerformance` | `ess` · own | | the quarter, the scorecard (score to date, rating, agreement, reviewer), the open check-in, this month's commitments (due and delivered on time, as `targets.commitments` `monthFigures` counts them, and the set's status), an open PIP; the reviews are `GET /ess/performance/reviews` |
 | `GET /api/v1/ess/performance/check-in` · `PUT` | → `ReviewCheckIn` · `ReviewCheckInSave` → `ReviewCheckIn` | `ess` · own | | the open month; 404 `NO_OPEN_CHECK_IN` when none (`reviews.js`: attendance already has a `CheckIn`) |
 | `POST /api/v1/ess/performance/check-in/submit` | `EmptyBody` → `ReviewCheckIn` | `ess` · own | | |
 | `POST /api/v1/ess/performance/check-in/dictation` | multipart `file` + `DictationRequest` → `Dictation` | `ess` · own | | the transcript lands in the item's `action_transcript` |
@@ -1355,6 +1355,9 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · PR 3 merged with PR 4: the automatic commitments line (§6.10) and My Performance's
+  Commitments On Time read `targets.commitments` `monthFigures`, PR 4's own count, so the line, the
+  Commitments view and ESS agree; My Commitments sits on ESS · My Performance with the rest (§10).
 - 22/10/2026 · TB · PR 3 Reviews built: monthly rounds (job `review-cycles`, Open Round, Close Round),
   the check-in with evidence, automatic lines (`targets.progress.js`), self first (409 `CHECK_IN_FIRST`),
   the reviewer's scores and corrective actions as tasks, Ask For Input and Give Input, the
