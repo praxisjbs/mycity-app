@@ -138,7 +138,9 @@ describeDb("attendance against the real migrations", () => {
    * every date here, so the newest version is the one in force. Homes keep the 100 m an older
    * version may hold (the 150 m minimum binds new drafts only).
    */
-  let rulesNow = { home_radius_m: 100 };
+  // Every test here but the switch's own runs with the policy's Home Location on (§1.3): they were
+  // written when homes were always used. `the Home Location switch` below turns it off and on.
+  let rulesNow = { home_radius_m: 100, home_location: { on: true } };
   const setRules = (changes) => {
     rulesNow = { ...rulesNow, ...changes };
     return attendanceVersion(pool, rulesNow, "2026-01-01");
@@ -433,7 +435,7 @@ describeDb("attendance against the real migrations", () => {
       const r = await punchAt("outsider", nextMorning(), { ...north(5000) });
       expect(r).toMatchObject({ validation_state: "review", reasons: ["location_unverified"], worksite_name: null, distance_m: null });
       expect(r.message).toBe("Clocked in at 08:00. People will review it: you have no office assigned yet.");
-      expect(r.today.location).toEqual({ kind: "none", name: null, radius_m: null, home_state: null });
+      expect(r.today.location).toEqual({ kind: "none", name: null, radius_m: null, home_state: null, checked: true });
       const ev = await q(
         "SELECT validation -> 'geofence' AS g, latitude::float8 AS lat FROM attendance_event WHERE attendance_event_id = $1",
         [r.attendance_event_id],
@@ -447,7 +449,7 @@ describeDb("attendance against the real migrations", () => {
       const remote = await punchAt("remote", nextMorning(), { ...north(9000) });
       expect(remote).toMatchObject({ validation_state: "review", reasons: ["location_unverified"], worksite_name: null });
       expect(remote.message).toBe("Clocked in at 08:00. People will review it: you have no approved home location yet.");
-      expect(remote.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none" });
+      expect(remote.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none", checked: true });
     });
 
     test("block: outside is rejected and counts for nothing, but opens its exception for People; inside and the boundary are accepted", async () => {
@@ -957,7 +959,7 @@ describeDb("attendance against the real migrations", () => {
         { status: "pending", address: ADDRESS },
       ]);
       const now = await as("remote").get("/attendance/me/today");
-      expect(now.body.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "pending" });
+      expect(now.body.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "pending", checked: true });
 
       // Waiting is not approved: the punch is still reviewed for want of a home, never rejected.
       await setPolicy("block", "off");
@@ -1016,7 +1018,7 @@ describeDb("attendance against the real migrations", () => {
       const mine = await as("remote").get("/attendance/me/home");
       expect(mine.body).toMatchObject({ approved: { attendance_home_id: first, status: "approved" }, pending: null, rejected: null });
       const now = await as("remote").get("/attendance/me/today");
-      expect(now.body.location).toEqual({ kind: "home", name: "Home", radius_m: 100, home_state: "approved" });
+      expect(now.body.location).toEqual({ kind: "home", name: "Home", radius_m: 100, home_state: "approved", checked: true });
     });
 
     test("a remote punch is judged against the approved home: inside, the boundary, outside under warn and block", async () => {
@@ -1600,7 +1602,7 @@ describeDb("attendance against the real migrations", () => {
       const noHome = await punchAt("staff", `${thursday}T07:00:00Z`, homeAt(0));
       expect(noHome).toMatchObject({ validation_state: "review", reasons: ["location_unverified"] });
       expect(noHome.message).toBe("Clocked in at 08:00. People will review it: you have no approved home location yet.");
-      expect(noHome.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none" });
+      expect(noHome.today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: "none", checked: true });
 
       const homeSent = await as("staff").post("/attendance/me/home", {
         home_address: picked("3 Example Close, Yaba"), home_latitude: homeAt(0).latitude, home_longitude: homeAt(0).longitude, accuracy_m: 12,
@@ -1834,6 +1836,146 @@ describeDb("attendance against the real migrations", () => {
       const label = await q("SELECT label FROM reference_value WHERE domain = 'attendance_exception' AND code = 'location_unverified'");
       expect(label.rows[0].label).toBe("Location Unclear");
       await setPolicy("warn", "off");
+    });
+  });
+
+  /* ---------------------------------------------------------------- *
+   * The Home Location switch (§1.3). Last: its own versions start after the suite's.
+   * ---------------------------------------------------------------- */
+
+  describe("the Home Location switch", () => {
+    const reminders = require("../../src/modules/notifications/notifications.reminders");
+    const femi = () => people.remote.employee.employee_id;
+    const bisi = () => people.outsider.employee.employee_id;
+    /** June 2026 weekdays, in the past and untouched by the cases above: 08:00 Lagos is 07:00Z. */
+    const JUNE = (day) => `2026-06-${String(day).padStart(2, "0")}`;
+    const homesOf = async (id) =>
+      (await q("SELECT attendance_home_id, status, address FROM attendance_home WHERE employee_id = $1 ORDER BY requested_at, attendance_home_id", [id])).rows;
+    const approvedOf = async (id) => (await homesOf(id)).find((h) => h.status === "approved");
+    /** A point `metres` north of Femi's approved home at 6.600000, 3.500000. */
+    const fromHome = (metres) => ({ latitude: 6.6 + metres / 111_195, longitude: 3.5 });
+    const pushed = async (id) =>
+      (await q("SELECT n.title, n.body FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1 AND n.event_key = 'attendance.home_needed' ORDER BY n.created_at", [id])).rows;
+    /** 10:00 on a Wednesday in Lagos, inside the working day the reminder keeps to. */
+    const WORKING = new Date("2026-10-21T09:00:00Z");
+
+    test("off: nothing about a home is shown, sent, listed, decided or found, and the homes stay as they were", async () => {
+      const kept = await homesOf(femi());
+      const approved = await approvedOf(femi());
+      expect(approved).toBeTruthy();
+      await setRules({ home_location: { on: false } });
+
+      expect((await as("remote").get("/attendance/me/home")).body).toEqual({ needed: false, approved: null, pending: null, rejected: null, max_accuracy_m: 100 });
+      const asked = await as("remote").post("/attendance/me/home", { home_address: picked("9 Another Close, Testbed Estate"), home_latitude: 6.6, home_longitude: 3.5, accuracy_m: 12 });
+      expect(asked.status).toBe(409);
+      expect(asked.body.error.code).toBe("HOME_LOCATION_OFF");
+      for (const res of [
+        await as("ops").get("/attendance/homes"),
+        await as("ops").get(`/attendance/homes/${approved.attendance_home_id}`),
+        await as("ops").post(`/attendance/homes/${approved.attendance_home_id}/decision`, { decision: "approve" }),
+      ]) {
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("HOME_LOCATION_OFF");
+      }
+      // A manager has no scope to decide: that answer comes first, as ever.
+      expect((await as("manager").post(`/attendance/homes/${approved.attendance_home_id}/decision`, { decision: "approve" })).status).toBe(403);
+
+      const now = await as("remote").get("/attendance/me/today");
+      expect(now.body.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: null, checked: false });
+      expect(now.body.policy.home_location).toBe(false);
+      expect((await as("ops").get(`/attendance/schedules/${femi()}`)).body.home_state).toBeNull();
+      const found = await as("ops").get("/search?q=femi");
+      expect((found.body.groups || []).map((g) => g.type)).not.toContain("attendance_home");
+      expect(await homesOf(femi())).toEqual(kept);
+    });
+
+    test("off: a day from home is not checked and keeps no reading under Refuse; the time check still runs", async () => {
+      await setRules({ office_geofence_mode: "block", home_geofence_mode: "block", site_geofence_mode: "block", home_location: { on: false } });
+      const far = await punchAt("remote", `${JUNE(3)}T07:00:00Z`, fromHome(5000));
+      expect(far).toMatchObject({ validation_state: "accepted", reasons: [], distance_m: null, worksite_name: null });
+      expect(far.message).toBe("Clocked in at 08:00.");
+      const stored = await q(
+        "SELECT latitude, longitude, accuracy_m, worksite_id, validation->'geofence' AS g FROM attendance_event WHERE attendance_event_id = $1",
+        [far.attendance_event_id],
+      );
+      expect(stored.rows[0]).toMatchObject({ latitude: null, longitude: null, accuracy_m: null, worksite_id: null });
+      expect(stored.rows[0].g).toMatchObject({ verdict: "not_applied", reason: "home_location_off", place: null, home_id: null, distance_m: null });
+      expect((await q("SELECT count(*)::int AS n FROM attendance_exception WHERE attendance_event_id = $1", [far.attendance_event_id])).rows[0].n).toBe(0);
+
+      // The device's clock ahead is still caught.
+      const at = `${JUNE(4)}T07:00:00Z`;
+      const ahead = await punchAt("remote", at, { ...fromHome(0), device_at: new Date(Date.parse(at) + 3 * 60_000).toISOString() });
+      expect(ahead).toMatchObject({ validation_state: "review", reasons: ["suspicious_timestamp"] });
+
+      const reg = await as("ops").get(`/attendance/register?date=${JUNE(3)}&q=Femi`);
+      expect(reg.body.data[0]).toMatchObject({ expected_location: "Remote", location_verdict: "not_applied" });
+      expect((await as("ops").get(`/attendance/register/${femi()}?date=${JUNE(3)}`)).body.expected_location).toBeNull();
+    });
+
+    test("on again: the approved home is the fence again, and the register names it", async () => {
+      await setRules({ home_location: { on: true } });
+      const mine = await as("remote").get("/attendance/me/home");
+      expect(mine.body).toMatchObject({ needed: true, approved: { status: "approved" } });
+      const now = await as("remote").get("/attendance/me/today");
+      expect(now.body.location).toMatchObject({ kind: "home", home_state: "approved", checked: true });
+      expect(now.body.policy.home_location).toBe(true);
+      const far = await punchAt("remote", `${JUNE(5)}T07:00:00Z`, fromHome(5000));
+      expect(far).toMatchObject({ validation_state: "rejected", reasons: ["outside_home"] });
+      expect((await as("ops").get(`/attendance/register?date=${JUNE(3)}&q=Femi`)).body.data[0]).toMatchObject({ expected_location: "Home" });
+      expect((await as("ops").get("/attendance/homes")).status).toBe(200);
+      await setPolicy("warn", "off");
+    });
+
+    test("switched on, whoever needs a home and has none is asked once a stretch, in the working day", async () => {
+      await q("UPDATE employee SET work_pattern = 'remote' WHERE employee_id = $1", [bisi()]);
+      try {
+        // Off: nobody is asked.
+        await setRules({ home_location: { on: false } });
+        await reminders.tick({ db: pool, now: WORKING });
+        await drain();
+        expect(await pushed(bisi())).toEqual([]);
+
+        // On: Bisi, remote with no home, is asked; Femi and Musa, each with an approved home, are not.
+        await setRules({ home_location: { on: true } });
+        await reminders.tick({ db: pool, now: WORKING });
+        await drain();
+        expect(await pushed(bisi())).toEqual([{ title: "Set your home location", body: "Send it from My Attendance before your next clock-in." }]);
+        expect(await pushed(femi())).toEqual([]);
+        expect(await pushed(people.staff.employee.employee_id)).toEqual([]);
+        const link = await q(
+          "SELECT n.entity_type, n.entity_id FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1 AND n.event_key = 'attendance.home_needed'",
+          [bisi()],
+        );
+        expect(link.rows[0]).toEqual({ entity_type: "attendance_home_needed", entity_id: bisi() });
+
+        // Once a stretch: another tick, or another version the same first day, asks nobody again.
+        await reminders.tick({ db: pool, now: new Date(WORKING.getTime() + 3600_000) });
+        await setRules({ grace_minutes: 7 });
+        await reminders.tick({ db: pool, now: new Date(WORKING.getTime() + 7200_000) });
+        await drain();
+        expect(await pushed(bisi())).toHaveLength(1);
+
+        // Off and on again from later first days: a new stretch, so Bisi, still without a home, is asked again.
+        await attendanceVersion(pool, { ...rulesNow, home_location: { on: false } }, "2026-09-01");
+        await attendanceVersion(pool, { ...rulesNow, home_location: { on: true } }, "2026-09-02");
+        await reminders.tick({ db: pool, now: new Date(WORKING.getTime() + 10_800_000) });
+        await drain();
+        expect(await pushed(bisi())).toHaveLength(2);
+        // At night it waits for the working day, and a home sent meanwhile means it never comes.
+        await attendanceVersion(pool, { ...rulesNow, home_location: { on: false } }, "2026-09-03");
+        await attendanceVersion(pool, { ...rulesNow, home_location: { on: true } }, "2026-09-04");
+        const night = new Date("2026-10-21T21:00:00Z");
+        await reminders.tick({ db: pool, now: night });
+        const waiting = await as("outsider").post("/attendance/me/home", {
+          home_address: picked("5 Waiting Close, Testbed Estate"), home_latitude: 6.61, home_longitude: 3.51, accuracy_m: 12,
+        });
+        expect(waiting.status).toBe(201);
+        await reminders.tick({ db: pool, now: new Date("2026-10-22T08:00:00Z") });
+        await drain();
+        expect(await pushed(bisi())).toHaveLength(2);
+      } finally {
+        await q("UPDATE employee SET work_pattern = 'on_site' WHERE employee_id = $1", [bisi()]);
+      }
     });
   });
 });

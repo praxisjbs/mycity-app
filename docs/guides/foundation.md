@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -486,6 +486,9 @@ As built (17/10/2026):
   (`shared/search/screens.js` mirrors `app/src/shell/access.ts`; a Home tab the shell shows locked,
   ⌘K hides) and they hold the grant it needs. A
   record group runs only for a reader with `view` on its module, within their scope.
+- A record group also stands down while its feature is switched off: a provider's `available(client)`
+  (`shared/search/provider.js`) is asked before its query, and false leaves the group out for
+  everyone (Home Locations while the Attendance policy's Home Location is off, `attendance.md` §1.3).
 - A type word at either end of the line ("login halima", "staff ada") narrows the records to that
   type; the screens and actions are still matched on the whole line.
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
@@ -893,6 +896,7 @@ screen.
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · Search (§6.7): a record provider may name `available(client)`, asked before its query; false leaves its group out for everyone. Home Locations uses it while the Attendance policy's Home Location is off (`attendance.md` §1.3).
 - 21/10/2026 · TB · Settings · Appearance (#75) built (§6.15, §2, §5, §7, §10): the hub's dark palette from four colours derived by the contract's maths with every pair at AA, presets with the samples file, a live preview, contrast, two fonts from a vetted list, the theme and density everyone starts on; `/auth/me` carries it, `app/public/boot.js` paints it before first paint; each person's Text Size from the account menu, More and ⌘K.
 
 - 21/10/2026 · TB · From the 21/10 System Health brief. Documents & Numbering (#76, fault #3): a scheme's three rules are the contract's, so the form marks them as it is filled, and Each Year or Each Month ticks Period (§10, §11; "Add digits or a period" is now "Add digits or period", four words). Request Leave, shared by My Leave and People · Leave (faults #1 and #2): the types show what is left of the First Day's year and New Year is marked as typed (`ess.md` §6, §10). The API records a refused form under the rule that refused it, at the route as declared (`system-health.md` §6).

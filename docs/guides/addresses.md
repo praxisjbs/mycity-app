@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | every screen in §2 (#69, #28, #25, #87, #9, #8, #24, #38, #51, #53) and the M0 item "Addresses picked, never typed" |
 | Status | Agreed |
-| Last changed | 20/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: TB's brief and four answers of 20/10/2026 (§1.1); FRONTEND_FOUNDATION F21 (maps) and F27
 (this rule); `foundation.md` §6.13 (the address search as first built); `integrations.md` (the
@@ -64,7 +64,7 @@ Every place an address is entered today. The level (§6.3) is what a pick may be
 | People · Worksites (`worksites`, #28) | Staff app | `people` create, edit | **Address** (address, optional) beside the fence's centre and radius; a pick fills the centre, and a centre typed or tapped first fills an empty address from the pin | Pick, pin, or let the centre name it |
 | Add Work Site, the temporary site sheet (Home · Overview #1, ESS · Work Location Requests #87; Add Temporary Site on People · Worksites #28) | Staff app, both shells | Anyone; People for Add Temporary Site | **Addresses**, one to eight (address); each pick is the address's fence centre, with its own radius and small map | Pick, pin, add details; Add Address, Remove |
 | People · Attendance, Field Assignments, and ESS · Work Location Requests, New Request | Staff app | Until attendance's PR 4 | A field site's and a client visit's or temporary home's address; both forms went in PR 4, their saved addresses kept | None now |
-| ESS · My Attendance, Home Location (`my-attendance`, #9) | Staff app, both shells | The person | **Address** of the home they ask to clock in from (address, required). The fence stays on the reading taken at home | Pick, pin, add details, or use the current location in an outage |
+| ESS · My Attendance, Home Location (`my-attendance`, #9) | Staff app, both shells | The person, while the Attendance policy's Home Location is on (`attendance.md` §1.3) | **Address** of the home they ask to clock in from (address, required). The fence stays on the reading taken at home | Pick, pin, add details, or use the current location in an outage |
 | ESS · My Profile, Edit Profile (`my-profile`, #8) | Staff app, both shells | The person | **Home Address** (address, optional) | Pick, pin, add details |
 | People · Employees (`employees`, #24) | Staff app | `people` view; the address under the `employee.personal` mask | The home address on the record, read only. The add and edit forms do not ask for it; the person sets it on My Profile | Read it |
 | Recruitment · Vacancies (`vacancies`, #38, M4, on the mock) | Staff app | `recruitment` create | **Location** of a vacancy (level area: a district or a city) | Pick an area |
@@ -339,6 +339,7 @@ None.
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · My Attendance's Home Location address is asked for only while the Attendance policy's Home Location is on (`attendance.md` §1.3); the residential Home Address on My Profile and the employee record is unchanged.
 - 20/10/2026 · TB · Written from TB's brief and four answers (§1.1): every address across the ERP
   picked, never typed, on hub and go, live and staging, with the inventory (§2), the signed place
   (§6.2), the instant search (§6.4), the outage path (§6.5) and gate 22.

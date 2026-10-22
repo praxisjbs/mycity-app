@@ -140,7 +140,9 @@ describeDb("temporary sites and check-ins against the real migrations", () => {
       { idempotencyKey: idem, now: new Date(iso) },
     );
 
-  const setRules = (changes) => attendanceVersion(pool, { home_radius_m: 150, ...changes }, "2026-01-01");
+  // The policy's Home Location on (attendance.md §1.3), as these cases were written; the Temporary
+  // Home case also switches it off.
+  const setRules = (changes) => attendanceVersion(pool, { home_radius_m: 150, home_location: { on: true }, ...changes }, "2026-01-01");
   const setPolicy = (mode) =>
     setRules({ office_geofence_mode: mode, home_geofence_mode: mode, site_geofence_mode: mode, device_mode: "off" });
 
@@ -485,6 +487,22 @@ describeDb("temporary sites and check-ins against the real migrations", () => {
     expect((await roster.page(pool, { date: day(8), q: "Femi" }, ALL, {})).data[0]).toMatchObject({ status: "remote", worksite: null });
     const reg = await as("ops").get(`/attendance/register?date=${day(8)}&q=femi`);
     expect(reg.body.data[0].expected_location).toBe("Temporary Home");
+
+    // Home Location off (§1.3, H6): no new Temporary Home, and the approved one's days read as a day
+    // from home, unchecked: no reading kept, no Check In. Its refused clock-in freed the day's slot.
+    await setRules({ office_geofence_mode: "block", home_geofence_mode: "block", site_geofence_mode: "block", device_mode: "off", home_location: { on: false } });
+    const refused = await as("ops").post("/attendance/temporary-sites", body({
+      purpose: "temporary_home", name: "Abeokuta stay", starts_on: day(11), ends_on: day(12), employee_ids: [id("remote")],
+      locations: [{ address: pick("4 Hidden Close, Abeokuta", HOME), radius_m: 200 }],
+    }));
+    expect(refused.status).toBe(422);
+    expect(refused.body.error).toMatchObject({ code: "HOME_LOCATION_OFF", fields: { purpose: ["Not available"] } });
+    const unchecked = await punchAt("remote", `${day(9)}T08:00:00Z`, at(HOME, 900));
+    expect(unchecked).toMatchObject({ validation_state: "accepted", reasons: [], distance_m: null, worksite_name: null });
+    const kept = await q("SELECT latitude, accuracy_m, validation->'geofence'->>'reason' AS reason FROM attendance_event WHERE attendance_event_id = $1", [unchecked.attendance_event_id]);
+    expect(kept.rows[0]).toEqual({ latitude: null, accuracy_m: null, reason: "home_location_off" });
+    await expect(checkInAt("remote", `${day(9)}T10:00:00Z`, at(HOME, 0))).rejects.toMatchObject({ code: "NO_TEMPORARY_SITE" });
+    await setPolicy("block");
   });
 
   test("a site abroad: the work date and the wall clock are read in its zone", async () => {

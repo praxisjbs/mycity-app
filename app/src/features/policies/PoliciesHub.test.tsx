@@ -88,10 +88,15 @@ describe("Knowledge Hub · Policies", () => {
     expect(screen.getByRole("button", { name: "Publish Policy" })).toBeTruthy();
   }, 30000);
 
-  it("refuses a home radius under 150 m on the field", async () => {
+  it("Home Location starts off with its checks hidden; switched on, a home radius under 150 m is refused on the field", async () => {
     await signedInAs("cynthia@mycityapp.io");
     fireEvent.click(await screen.findByText("Attendance Policy", {}, { timeout: 5000 }));
     const checks = await waitFor(() => cardOf("Location Checks"), { timeout: 5000 });
+    expect(within(checks).queryByRole("textbox", { name: /Home Radius/ })).toBeNull();
+    expect(within(checks).queryByText("Home Check")).toBeNull();
+    fireEvent.click(within(checks).getByRole("checkbox", { name: "On" }));
+    expect(await within(checks).findByText("Changed")).toBeTruthy();
+    expect(within(checks).getByText("Home Check")).toBeTruthy();
     fireEvent.change(within(checks).getByRole("textbox", { name: /Home Radius/ }), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
     expect(await within(checks).findByText("At least 150", {}, { timeout: 5000 })).toBeTruthy();

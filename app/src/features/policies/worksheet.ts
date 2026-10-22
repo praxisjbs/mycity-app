@@ -45,6 +45,7 @@ export function worksheetValues(r: AttendanceRules): WorksheetValues {
     v[`${k}_amount`] = moneyText(r[k].amount);
   }
   v.absence_deduction_on = r.absence_deduction.on;
+  v.home_location_on = r.home_location.on;
   const o = r.overtime;
   v.overtime_on = o.on;
   v.overtime_after_minutes = asText(o.after_minutes);
@@ -102,6 +103,7 @@ export function worksheetRules(base: AttendanceRules, v: WorksheetValues): Atten
     early_deduction: deduction("early_deduction"),
     absence_rule: count("absence_rule"),
     absence_deduction: { on: v.absence_deduction_on === true },
+    home_location: { on: v.home_location_on === true },
     forgotten_rule: count("forgotten_rule"),
     location_rule: count("location_rule"),
     overtime: {

@@ -17,7 +17,8 @@ import { claimSignIn, claimStart, closeDue, noteShown, promptDue, REMIND_CHOICES
  * It reads the location only after the person presses Clock In, through the feature's one reader
  * (./location: up to ten seconds, the best fix, always ending), and only when there is a place to
  * match it to: a worksite, or for remote staff their approved home (asked too while they have none,
- * so People see where they were). A reading that cannot prove the place names the fix for this
+ * so People see where they were). While the policy's Home Location is off a day from home reads none
+ * (`location.checked` false, §1.3). A reading that cannot prove the place names the fix for this
  * device (Precise Location Off, Use Your Phone, Location Blocked, Secure Address Needed) and offers
  * Clock In Anyway. Every punch carries one Idempotency-Key, kept for a retry of the same press, so a
  * lost answer never makes a second punch. What the panel shows after a punch is
@@ -259,9 +260,11 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
 
   /**
    * The press: the location is read now, after saying why, and the server matches it (or keeps it
-   * for People). Blocked, the browser will not ask, so the panel says how to allow it instead.
+   * for People). Blocked, the browser will not ask, so the panel says how to allow it instead. A day
+   * from home while the policy's Home Location is off reads no location at all (§1.3).
    */
   const start = async () => {
+    if (!t.location.checked) return punch();
     if (!secure()) return setStage({ kind: "no_location", error: "insecure" });
     if (!supported()) return setStage({ kind: "no_location", error: "unsupported" });
     const allowed = await permission();
@@ -308,7 +311,7 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
             : t.location.kind === "field" || t.location.kind === "client_visit"
               ? `${t.location.name}${t.location.radius_m ? ` · ${t.location.radius_m} m` : ""}`
             : t.location.kind === "remote"
-              ? t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
+              ? !t.location.checked ? "Not Checked" : t.location.home_state === "pending" ? "Home Awaiting Approval" : "No Approved Home"
               : "No Office Assigned";
   const punchName = eventType === "clock_out" ? "clock-out" : "clock-in";
   const MATCHED: Partial<Record<typeof t.location.kind, string>> = { home: "your approved home", temporary_home: "your temporary home", client_visit: "the client's site", temporary_site: "the site's nearest address" };
@@ -419,7 +422,7 @@ function ClockPanel({ close, prompt }: { close: () => void; prompt?: PromptKind 
         <div className="mt-2">{statePill}</div>
       </div>
       {step && <div className="mb-3">{step}</div>}
-      {t.location.kind === "remote" && idle && (
+      {t.location.kind === "remote" && t.location.checked && idle && (
         <Banner tone="warn" icon="home" action={t.location.home_state === "none" ? <Button size="sm" onClick={toHome}>Set Home</Button> : undefined}>
           {t.location.home_state === "pending" ? "Your home location is waiting for approval." : "No approved home location yet."}
         </Banner>

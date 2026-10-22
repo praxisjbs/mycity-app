@@ -70,7 +70,11 @@ export function ReadingStep({ reading, idle }: { reading: Reading; idle: { title
   return <Result tone="info" label="Location Check" title={idle.title} text={idle.text} icon="home" />;
 }
 
-/** The card, for whoever needs a home (`needed`). `?home=set` (the clock panel's Set Home) opens the sheet once. */
+/**
+ * The card, for whoever needs a home (`needed`: never while the policy's Home Location is off, §1.3).
+ * A link carrying `?home=` (the clock panel's Set Home, the push to set one, a decision's notice)
+ * opens the sheet once, while no home is approved or waiting.
+ */
 export function HomeLocationCard({ openOnLoad }: { openOnLoad: boolean }) {
   const modal = useModal();
   const { data: h } = useApi("GET /api/v1/attendance/me/home");
@@ -80,7 +84,7 @@ export function HomeLocationCard({ openOnLoad }: { openOnLoad: boolean }) {
   );
   const opened = useRef(false);
   useEffect(() => {
-    if (openOnLoad && h?.needed && !opened.current) {
+    if (openOnLoad && h?.needed && !h.approved && !h.pending && !opened.current) {
       opened.current = true;
       openSheet(h);
     }

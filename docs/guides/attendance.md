@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #9 My Attendance, #87 Work Location Requests, #88 My Devices, #25 Attendance, #27 Devices, #28 Worksites, the Work Schedule tab of the employee record (#24 Employees), Home · Overview's Add Work Site (#1), and the Attendance policy's worksheet on Knowledge Hub · Policies (#62, `policies.md`). #89 Policy Updates moved to `policies.md`; #73 Settings · Attendance Policy is dropped (TB, 20/10/2026) |
 | Status | Agreed |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1);
 MILESTONES §6.2 and A22, A26; REUSE_MAP §2.2 (the policy model and the donor files); the 12 and 13
@@ -24,8 +24,8 @@ BACKEND_STRUCTURE §15 (the device's own time beside the server's). `demo.html` 
 ## 1 · What it is for
 
 Attendance lets an employee clock in and out from the place they are expected to work (their
-worksite, for remote staff the home People approved, and for hybrid staff one or the other by their
-work schedule), on a device they registered, on the days and hours of their own work schedule, and
+worksite; for remote staff, while the policy's Home Location is on (§1.3), the home People approved;
+and for hybrid staff one or the other by their work schedule), on a device they registered, on the days and hours of their own work schedule, and
 gives People and line managers a register of who is in, late, absent or on leave, with the evidence
 behind every punch. Anyone who will work somewhere else for some days (a client's office, a
 training, an event, a coworking space, an assignment out of station) adds a temporary site from
@@ -38,8 +38,9 @@ add pending deductions; overtime is counted and approved as the policy says.
 The rules a punch and a day are judged by are the **Attendance policy**, a rules policy People set
 on Knowledge Hub · Policies (`policies.md`): the hours and each person's schedule, the grace period,
 how lateness, early departure, absence and forgotten clock-outs are counted and what each leads to
-(an alert, a query, a deduction), overtime and how it is approved, how strictly the location is
-checked at the office, at home and at a temporary site, and the device check. Each is a switch, a
+(an alert, a query, a deduction), overtime and how it is approved, whether homes are used at all
+(Home Location, §1.3), how strictly the location is checked at the office, at home and at a
+temporary site, and the device check. Each is a switch, a
 figure or a choice with a suggested value; the system enforces what People set. A change is a
 draft until People publish it as a numbered version from a first day; everyone reads it on ESS ·
 Policy Updates in plain sentences with what changed, and acknowledges it.
@@ -80,24 +81,47 @@ takes its migrations from its own part of the M1 block, so the four never collid
 
 Until a PR lands, the behaviour its sections replace is what runs; the sections say what stood before.
 
+### 1.3 The Home Location switch (TB, 22/10/2026, binding)
+
+At the Milestone 1 handover (21/10/2026) Edidiong asked that home location be something MyCity can
+turn off, and Cynthia asked to keep the home checks. Home location is now a switch of the Attendance
+policy. TB's ten answers of 22/10/2026:
+
+| # | Question | Answer |
+|---|---|---|
+| H1 | Where the switch lives | The Attendance policy: **Home Location** (`home_location`), a switch on the worksheet's Location Checks card, with Home Check and Home Radius beneath it while it is on (§6.15). A change is a version from a first day, approved, signed and acknowledged like every rule |
+| H2 | Its state when it ships | **Off.** Every version published before it reads it off, as a rule a version predates always does (§6.15); the type's default and its suggestion for a first draft are off too |
+| H3 | Who decides a change | As the policy's own Needs Approval says, like every other rule (`policies.md` P6) |
+| H4 | Who it covers | Everyone: one switch for the company, remote staff and hybrid staff's Remote days alike |
+| H5 | A remote day while it is off | No location at all: the panel asks for none and the server keeps none (§6.5). The punch is accepted for its place (Not Checked); the device and time checks still run |
+| H6 | Temporary Home while it is off | Hidden: Add Work Site does not offer it and the API refuses it. One already approved reads as a remote day, unchecked, its hours and time zone kept, with no Check In on its days (§6.11, §6.12). Every other purpose is untouched |
+| H7 | Homes already registered | Kept, unread and shown nowhere while it is off. Switched on again, an approved home is the fence again and a waiting one waits again |
+| H8 | When it is switched on | Everyone whose week has a Remote day with neither an approved nor a waiting home gets one push, **Set your home location**, in the working day, once for each stretch it stays on; someone who starts working from home while it is on gets it then (§6.10). Their clock-ins still go to review until People approve a home, as before |
+| H9 | Open Outside Home and no home exceptions | Left for People: a day is judged once (§6.4) |
+| H10 | The residential address | Untouched: the Home Address on the employee record, My Profile and Download My Data is HR's record of where someone lives, not the clock's |
+
+While it is off, staff read one sentence under Working From Home: "Working from home, your location
+is not checked." (assumed with H5, TB to confirm). It ships off although the handover agreed to keep
+home checks: MyCity are told (§13).
+
 ## 2 · Screens affected
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Clock In / Clock Out panel (`clock`) | Desktop top bar, the phone's floating button, and by itself over a blurred screen: on the first screen of the day's first sign-in, at the shift's start and at its end (§6.14) | Every employee, own record | Today's date and time at the workplace, the shift (from their work schedule), the clock location and radius (on a temporary site's day, its addresses), the state (Clocked Out, Clocked In since, Review Required), this device's state, the result of a punch, the fix for a rough reading (§6.5), a day ended by a System Clock-Out | Clock in or out, allow location, retry location, register this device, add a note to a punch under review; on a temporary site's day, Check In at each stop (PR 4); at the shift's end, Clock Out or Remind Me |
-| ESS · My Attendance (`my-attendance`) | Employee Self-Service | Every employee, own record | Today, the month's figures, the days of the month, each day's punches and check-ins (a clock-out the system made reads System Clock-Out), open exceptions; pending deductions and overtime for the month with their amounts (PR 3); for remote staff, their home location (approved, waiting or not set); their temporary sites, today's and those to come | Pick a month, open a figure's days, switch the days between a table and a chart, open a day, explain an exception or give the real time of a system clock-out, export the month, open a temporary site; remote staff set their home location from home, for People to approve |
+| Clock In / Clock Out panel (`clock`) | Desktop top bar, the phone's floating button, and by itself over a blurred screen: on the first screen of the day's first sign-in, at the shift's start and at its end (§6.14) | Every employee, own record | Today's date and time at the workplace, the shift (from their work schedule), the clock location and radius (on a temporary site's day, its addresses), the state (Clocked Out, Clocked In since, Review Required), this device's state, the result of a punch, the fix for a rough reading (§6.5), a day ended by a System Clock-Out; while Home Location is off, a remote day reads Not Checked, with no location step and no home banner (§1.3) | Clock in or out, allow location, retry location, register this device, add a note to a punch under review; on a temporary site's day, Check In at each stop (PR 4); at the shift's end, Clock Out or Remind Me |
+| ESS · My Attendance (`my-attendance`) | Employee Self-Service | Every employee, own record | Today, the month's figures, the days of the month, each day's punches and check-ins (a clock-out the system made reads System Clock-Out), open exceptions; pending deductions and overtime for the month with their amounts (PR 3); while Home Location is on (§1.3), for remote staff, their home location (approved, waiting or not set); their temporary sites, today's and those to come | Pick a month, open a figure's days, switch the days between a table and a chart, open a day, explain an exception or give the real time of a system clock-out, export the month, open a temporary site; while Home Location is on, remote staff set their home location from home, for People to approve |
 | ESS · My Devices (`my-devices`) | Employee Self-Service | Every employee, own devices | The devices they clock in from, each with its status, up to three registered | Register this device, remove one of theirs |
-| People · Attendance (`attendance`) | People | `people` view: Operations & People and Management everyone, line managers and heads their team | The day's figures, the register, a day's evidence (each punch's source: Clock, Added by People, System), exceptions, remote staff's home locations; Deductions and Overtime (PR 3): the pending items with their days, minutes and amounts | Pick a day, filter, open a person's day, decide an exception (scope all, `people` approve), approve or reject a home location (scope all, `people` approve), waive deductions one by one or in a batch (scope all, `people` approve), confirm or cut overtime (the line manager for their team, People for anyone, as the policy says), export the register. A day's evidence shows its check-ins in time order between the clock-in and the clock-out (PR 4). The Requests and Field views and New Assignment left this screen in PR 4 for People · Worksites, Temporary |
+| People · Attendance (`attendance`) | People | `people` view: Operations & People and Management everyone, line managers and heads their team | The day's figures, the register, a day's evidence (each punch's source: Clock, Added by People, System), exceptions, remote staff's home locations (the Homes view, while Home Location is on, §1.3); Deductions and Overtime (PR 3): the pending items with their days, minutes and amounts | Pick a day, filter, open a person's day, decide an exception (scope all, `people` approve), approve or reject a home location (scope all, `people` approve, while Home Location is on), waive deductions one by one or in a batch (scope all, `people` approve), confirm or cut overtime (the line manager for their team, People for anyone, as the policy says), export the register. A day's evidence shows its check-ins in time order between the clock-in and the clock-out (PR 4). The Requests and Field views and New Assignment left this screen in PR 4 for People · Worksites, Temporary |
 | People · Devices (`devices`) | People | `people` view, within scope | Every device used to clock in, its owner and status | Remove a device (`people` edit) |
 | People · Worksites (`worksites`) | People | `people` view | A switch, **Permanent** or **Temporary** (PR 4). Permanent shows the offices alone, with their centre, radius and who is assigned. Temporary shows the temporary sites in the reader's scope with number, purpose, name, dates, people and state, those waiting for approval first; and, beside them while one still waits or is in force, the work location requests and field assignments made before PR 4 (Requests, Field) | Add, change, retire and restore a permanent site (`people` create, edit); assign employees; add a temporary site (`people` approve, scope all: in force at once), approve or reject one submitted from Home (the stage's approvers, never someone on it), cancel one or take someone off it; on a request made before PR 4, Record Decision while it waits; on a field assignment made before PR 4, Cancel Assignment and Take Off while it is in force |
-| Home · Overview (`overview`, home.md) | Home | Every employee | An Add Work Site button beside New, and an entry in New (PR 4) | Open the temporary site sheet: Purpose, Name, Addresses, First Day, Last Day, People, Description, Submit for Approval |
-| People · Employees, the record's Work Schedule tab | People | `people` view, within scope | After Job (PR 3; it replaces the Attendance tab): Work Setup (work pattern, office and radius, home location's state) and the work schedule in force and one waiting to start: each weekday Working or Off, its hours and Office or Remote, from a date; Company Hours when none is set | Set Schedule (`people` edit, within scope, never their own) |
+| Home · Overview (`overview`, home.md) | Home | Every employee | An Add Work Site button beside New, and an entry in New (PR 4) | Open the temporary site sheet: Purpose (Temporary Home among them only while Home Location is on, §1.3), Name, Addresses, First Day, Last Day, People, Description, Submit for Approval |
+| People · Employees, the record's Work Schedule tab | People | `people` view, within scope | After Job (PR 3; it replaces the Attendance tab): Work Setup (work pattern, office and radius, home location's state while Home Location is on) and the work schedule in force and one waiting to start: each weekday Working or Off, its hours and Office or Remote, from a date; Company Hours when none is set | Set Schedule (`people` edit, within scope, never their own) |
 | ESS · My Profile (`my-profile`, ess.md) | Employee Self-Service | Every employee, own record | Their work schedule: each day Working or Off with its hours and Office or Remote (read from this module) | Nothing here: People set it |
 | ESS · Work Location Requests (`work-location-requests`) | Employee Self-Service | Every employee, own | The temporary sites they submitted or are on, with number, purpose, name, dates and state, each opening with its addresses, people, description and approval trail (PR 4); under them, while any is still listed, their own requests made before PR 4 (temporary home, remote day, client visit) with their approval trail | Add Work Site (the same sheet as Home's), Withdraw Submission while it waits; on a request made before PR 4, withdraw or cancel it as before. New Request left in PR 4 |
 | Knowledge Hub · Policies (`policies`, policies.md) | Knowledge Hub | `policies.manage` | The Attendance policy's worksheet (§6.15, §10) | Change the rules, publish a version |
 | ESS · Policy Updates (`policy-updates`, policies.md) | Employee Self-Service | Every employee | The Attendance policy's sentences with every other policy that applies to them | Acknowledge |
 | Home · Alerts (`alerts`, home.md) | Home | As Home · Alerts | Attendance alerts raised by the policy's rules (PR 3); their rules listed read only, Set in Attendance Policy | Clear an alert |
-| Notifications (bell) | Global header | The person and People within scope | A reminder to clock in when the shift starts, reminders to clock out after it ends and a system clock-out, review needed, a missing clock-out, a decision on an exception, a device registered or removed, a home location waiting or decided, a temporary site waiting on you, approved or rejected, one you are put on, taken off or that is cancelled, your work schedule set, deductions added or waived and overtime to confirm (PR 3), an attendance rule breached | Open the record |
+| Notifications (bell) | Global header | The person and People within scope | A reminder to clock in when the shift starts, reminders to clock out after it ends and a system clock-out, review needed, a missing clock-out, a decision on an exception, a device registered or removed, a home location waiting or decided, Set your home location once Home Location is switched on (§1.3, H8), a temporary site waiting on you, approved or rejected, one you are put on, taken off or that is cancelled, your work schedule set, deductions added or waived and overtime to confirm (PR 3), an attendance rule breached | Open the record |
 
 ## 3 · How the screens relate
 
@@ -115,10 +139,12 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
    Profile shows it.
 3. **The employee registers their device and, working from home, their home.** The browser they
    clock in from (ESS · My Devices, Register This Device) is the device identity sign-in already
-   keeps (`known_device`), confirmed by a fresh sign-in, at most three at a time. Anyone whose
-   week has a Remote day sets their home from home (ESS · My Attendance, Set Home Location): one
-   reading and their address, picked; People approve or reject it (People · Attendance, Homes),
-   never their own. The approved home is their fence on remote days (§6.5, §6.10).
+   keeps (`known_device`), confirmed by a fresh sign-in, at most three at a time. While the
+   policy's Home Location is on (§1.3), anyone whose week has a Remote day sets their home from home
+   (ESS · My Attendance, Set Home Location): one reading and their address, picked; People approve
+   or reject it (People · Attendance, Homes), never their own. The approved home is their fence on
+   remote days (§6.5, §6.10). When it is switched on, those who still need one are pushed once to
+   set it (H8); while it is off nobody is asked and a remote day is not checked (H5).
 4. **Working somewhere else** (PR 4, §6.11). Anyone presses Add Work Site on Home: a purpose from the
    list, a name, one or more picked addresses, the first and last day, the people (themselves,
    colleagues or both) and a description. It is numbered (`TS-0001`) and opens the
@@ -131,7 +157,8 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
 5. **The employee clocks in** (the clock panel). The panel names the place the day expects (the
    office, the home, a temporary site's addresses) and asks the browser for a reading only when Allow
    Location is pressed (straight away when already allowed, and never when the browser has blocked
-   it: the panel then says how to allow it). It reads for up to ten seconds and keeps the best fix; a
+   it: the panel then says how to allow it). On a remote day while Home Location is off it asks
+   for no reading at all (H5). It reads for up to ten seconds and keeps the best fix; a
    reading too rough to prove the place offers the fix for that device and Clock In Anyway (§6.5). It sends `POST /attendance/punches` with an `Idempotency-Key`, and shows the
    server's answer. On a temporary site's day, Check In at each later stop sends
    `POST /attendance/check-ins` (§6.12).
@@ -185,7 +212,7 @@ Until a PR lands, the behaviour its sections replace is what runs; the sections 
 | `attendance_exception` (1000, 1300, 1310, 1360) | `attendance_day_id`, `attendance_event_id`, `exception_type` (`outside_worksite`, `outside_home`, `location_unverified`, `unknown_device`, `suspicious_timestamp`, `missing_clock_out`, `automatic_clock_out`: opened only when the person explains one, §6.14), `severity`, `status` (`open`, `resolved`), `outcome` (`accepted`, `rejected`, `corrected`), `evidence`, `employee_note`, `reviewed_by`, `reviewed_at`, `resolution` | One per event and type, one day-level `missing_clock_out` per day (partial unique indexes), so a retried job adds none |
 | `attendance_device` (1300) | `employee_id`, `known_device_id` (unique), `label`, `status` (`observed`, `registered`, `removed`), `first_seen_at`, `last_punch_at`, `registered_at`, `removed_at`, `removed_by`, `removal_reason` | Owned by `devices`. A device first seen on a punch is `observed`; the employee registers it; a removed one may be registered again. The device cookie and its hash never leave identity |
 | `worksite` (0040) | `code`, `name`, `address` (jsonb `{ text }`), `latitude`, `longitude`, `radius_m`, `timezone`, `active` | Written by `worksites` from this delivery; the employee's assignment is `employee.worksite_id` |
-| `attendance_home` (1310) | `employee_id`, `address`, `latitude`, `longitude`, `accuracy_m`, `status` (`pending`, `approved`, `rejected`, `superseded`), `requested_by`, `requested_at`, `decided_by`, `decided_at`, `decision_reason` | A remote employee's home location. At most one `pending` and one `approved` per person (partial unique indexes); approving supersedes the old approved one, a new request supersedes the one still waiting. Personal data: on the wire as `home_address`, `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the person and to `people` scope all |
+| `attendance_home` (1310) | `employee_id`, `address`, `latitude`, `longitude`, `accuracy_m`, `status` (`pending`, `approved`, `rejected`, `superseded`), `requested_by`, `requested_at`, `decided_by`, `decided_at`, `decision_reason` | A remote employee's home location. At most one `pending` and one `approved` per person (partial unique indexes); approving supersedes the old approved one, a new request supersedes the one still waiting. Personal data: on the wire as `home_address`, `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the person and to `people` scope all. While the policy's Home Location is off (§1.3) its rows are kept as they are and read by nothing |
 
 | `attendance_location_request` (1320, 1350) | `number`, `employee_id`, `request_type` (`temporary_home`, `remote_day`, `client_visit`), `starts_on`, `ends_on`, `address`, `latitude`, `longitude`, `accuracy_m`, `site_latitude`, `site_longitude`, `site_radius_m`, `reason`, `status` (`submitted`, `approved`, `rejected`, `cancelled`), `workflow_instance_id`, `requested_by`, `decided_at`, `cancelled_at`, `cancel_reason` | A request to work somewhere else for some days, decided in its approval. `latitude`, `longitude` are a temporary home's reading only (both or neither); on the wire `home_latitude`, `home_longitude`, masked under `employee.personal` and given only to the person and to `people` scope all. `site_latitude`, `site_longitude`, `site_radius_m` (100 to 500) are a client visit's site only, all three or none: a client's venue, not personal data. A client visit sent before `1350` has none |
 | `attendance_schedule` (1340) | `employee_id`, `office_days` (ISO weekdays, 1 Monday to 7 Sunday), `effective_from`, `reason`, `set_by`, `set_at` | **Frozen from PR 3**: its rows were copied into `attendance_work_schedule` (`1420`). Read by nothing; a later release drops it (MIGRATIONS §8) |
@@ -256,8 +283,8 @@ event a day) and needs none of its own.
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /api/v1/attendance/me/today` | → `AttendanceToday` | self, own | no | The authoritative state, the shift, the clock location (name and radius, no coordinates), the policy's modes (the location mode of today's place) and accuracy limit, this device; `clock_out_automatic` when the day's clock-out was the system's, and `sign_in_prompt` when this session is the first of a working day and the person is not clocked in (§6.14). From PR 4, `temporary_site`: the day's site with its number, name, purpose and addresses with their radius (a Temporary Home's line to its own people only), no coordinates; and `check_ins`: the day's check-ins in time order (at most 20), each with its address and verdict, so the panel shows each stop's result after a reload |
-| `POST /api/v1/attendance/punches` | `PunchCreate` → `PunchResult` | self, own | no | `Idempotency-Key` required (428 without). The person is the session's; the body names nobody. 409 for a refused transition, 422 on leave or not employed |
+| `GET /api/v1/attendance/me/today` | → `AttendanceToday` | self, own | no | The authoritative state, the shift, the clock location (name and radius, no coordinates; `checked` false on a remote day while Home Location is off, so the panel reads no location, §1.3), the policy's modes (the location mode of today's place), accuracy limit and Home Location (`home_location`, which every screen showing a home reads), this device; `clock_out_automatic` when the day's clock-out was the system's, and `sign_in_prompt` when this session is the first of a working day and the person is not clocked in (§6.14). From PR 4, `temporary_site`: the day's site with its number, name, purpose and addresses with their radius (a Temporary Home's line to its own people only), no coordinates; and `check_ins`: the day's check-ins in time order (at most 20), each with its address and verdict, so the panel shows each stop's result after a reload |
+| `POST /api/v1/attendance/punches` | `PunchCreate` → `PunchResult` | self, own | no | `Idempotency-Key` required (428 without). The person is the session's; the body names nobody. 409 for a refused transition, 422 on leave or not employed. On a remote day while Home Location is off, any coordinates sent are dropped, never stored (§6.5) |
 | `GET /api/v1/attendance/me` | `MyDayListQuery` (`month`, `status`) → `AttendanceDayPage` | self, own | yes, 25 | Days of the month, newest first; `status` keeps one figure's days (`present` takes late days too, as Days Present counts them) |
 | `GET /api/v1/attendance/me/summary` | `MySummaryQuery` → `MyAttendanceSummary` | self, own | no | The month's figures |
 | `GET /api/v1/attendance/me/events` | `MyEventListQuery` (`date`) → `AttendanceEventPage` | self, own | yes, 25 | One day's punches, own coordinates not returned |
@@ -276,10 +303,10 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/records/:id` | → `AttendanceRecordRef` | `people` view · scope | no | A day's id or an exception's, to the person and day a link opens (⌘K, the bell) |
 | `GET /api/v1/attendance/me/records/:id` | → `AttendanceRecordRef` | self, own | no | The same for the person's own |
 | `POST /api/v1/attendance/export` | `RegisterExportRequest` (`from`, `to`, at most 31 days) → `ExportFile` (202) | `people` export · scope | no | The register's workbook, made after commit and downloaded on the device that asked |
-| `GET /api/v1/attendance/me/home` | → `MyHome` | self, own | no | The approved home, the one waiting and the last one rejected, with their own coordinates |
-| `POST /api/v1/attendance/me/home` | `HomeRequestCreate` (`home_address`, a `PlaceInput`: picked, pinned or the device's location in an outage; `home_latitude`, `home_longitude`, `accuracy_m`) → `MyHome` | self, own | no | Anyone whose week, in force or waiting to start, has a Remote day, a remote employee with no schedule included (§6.10; 422 `HOME_NOT_NEEDED` otherwise); the reading within `max_accuracy_m` (422 `HOME_READING_WEAK`); supersedes a request still waiting |
-| `GET /api/v1/attendance/homes` | `HomeListQuery` (`status`, `employee_id`, `q`, `sort`) → `HomeRequestPage` | `people` view · scope | yes, 25 | Waiting first; address and coordinates only for scope all, masked under `employee.personal` |
-| `GET /api/v1/attendance/homes/:id` | → `HomeRequest` | `people` view · scope | no | The home a link opens (`attendance_home`, `?home=` on People · Attendance); the same visibility as the list |
+| `GET /api/v1/attendance/me/home` | → `MyHome` | self, own | no | The approved home, the one waiting and the last one rejected, with their own coordinates. While Home Location is off: `needed` false and no homes (H7) |
+| `POST /api/v1/attendance/me/home` | `HomeRequestCreate` (`home_address`, a `PlaceInput`: picked, pinned or the device's location in an outage; `home_latitude`, `home_longitude`, `accuracy_m`) → `MyHome` | self, own | no | While Home Location is on (409 `HOME_LOCATION_OFF` otherwise); anyone whose week, in force or waiting to start, has a Remote day, a remote employee with no schedule included (§6.10; 422 `HOME_NOT_NEEDED` otherwise); the reading within `max_accuracy_m` (422 `HOME_READING_WEAK`); supersedes a request still waiting |
+| `GET /api/v1/attendance/homes` | `HomeListQuery` (`status`, `employee_id`, `q`, `sort`) → `HomeRequestPage` | `people` view · scope | yes, 25 | Waiting first; address and coordinates only for scope all, masked under `employee.personal`. 409 `HOME_LOCATION_OFF` while Home Location is off |
+| `GET /api/v1/attendance/homes/:id` | → `HomeRequest` | `people` view · scope | no | The home a link opens (`attendance_home`, `?home=` on People · Attendance); the same visibility as the list, and the same 409 while Home Location is off |
 | `GET /api/v1/attendance/me/requests` | `MyLocationRequestListQuery` (`status`, `sort`) → `LocationRequestPage` | self, own | yes, 25 | The person's own requests, newest first |
 | `POST /api/v1/attendance/me/requests` | Removed in PR 4 with `LocationRequestCreate` | | | A temporary site replaces it (`POST /attendance/me/temporary-sites`) |
 | `GET /api/v1/attendance/me/requests/:id` | → `LocationRequest` | self, own | no | Another person's is a 404 |
@@ -295,7 +322,7 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/me/field-assignments/:id` | → `FieldAssignment` | self, own | no | One they are or were on; anyone else's is a 404 |
 | The policy's routes | `policies.md` §5 | | | Removed from this module in PR 1 (`/attendance/policy...`, `/attendance/me/policy...`): the Attendance policy is read and changed through `/policies`, and the clock reads it through `policies.rulesFor` (§6.1) |
 | `POST /api/v1/workflow/instances/:id/approve`, `/reject` | the approval's own routes (foundation.md §5) | the stage's approvers | no | How a request and a temporary site are decided; never by a route of this module. The engine refuses anyone on the site (`excluded_employee_ids`, 403 `PERMISSION_DENIED`) |
-| `POST /api/v1/attendance/homes/:id/decision` | `HomeDecision` (`decision`, `reason`) → `HomeRequest` | `people` approve · all | no | Never your own (403 `OWN_RECORD`); a rejection needs a reason of 10 or more characters; 409 once decided |
+| `POST /api/v1/attendance/homes/:id/decision` | `HomeDecision` (`decision`, `reason`) → `HomeRequest` | `people` approve · all | no | Never your own (403 `OWN_RECORD`); a rejection needs a reason of 10 or more characters; 409 once decided; 409 `HOME_LOCATION_OFF` while Home Location is off |
 | `GET /api/v1/devices/mine` | `PageQuery` → `MyDevicePage` | self, own | yes, 25 | |
 | `POST /api/v1/devices/mine` | `DeviceRegister` → `MyDevice` | self, own | no | This session's device; fresh sign-in (403 `REAUTH_REQUIRED`); 409 past three |
 | `POST /api/v1/devices/mine/:id/remove` | `EmptyBody` → `MyDevice` | self, own | no | |
@@ -308,7 +335,7 @@ event a day) and needs none of its own.
 | `PATCH /api/v1/worksites/:id` | `WorksiteUpdate` → `Worksite` | `people` edit | no | `active: false` retires, `true` restores |
 | `GET /api/v1/worksites/:id/employees` | `PageQuery` → `WorksiteEmployeePage` | `people` view · scope | yes, 25 | |
 | `POST /api/v1/worksites/:id/employees` | `WorksiteAssign` → `WorksiteEmployee` | `people` edit · scope | no | Through `organisation.service.updateEmployee`; assigning someone to another worksite moves them |
-| `GET /api/v1/attendance/schedules/:employee_id` (PR 3) | `ScheduleParams` → `WorkSchedule` | `people` view · scope | no | For anyone: the person's pattern, office, home state, the week in force today day by day (Working or Off, its hours, Office or Remote, and whether the hours are the company's), the schedule in force (`current`, null for the company hours) and the one waiting to start (`next`); `can_edit` for the reader. 404 outside scope |
+| `GET /api/v1/attendance/schedules/:employee_id` (PR 3) | `ScheduleParams` → `WorkSchedule` | `people` view · scope | no | For anyone: the person's pattern, office, home state (null while Home Location is off), the week in force today day by day (Working or Off, its hours, Office or Remote, and whether the hours are the company's), the schedule in force (`current`, null for the company hours) and the one waiting to start (`next`); `can_edit` for the reader. 404 outside scope |
 | `POST /api/v1/attendance/schedules/:employee_id` (PR 3) | `ScheduleParams`, `WorkScheduleSet` (`days`, the seven weekdays; `effective_from`; `reason`) → `WorkSchedule` | `people` edit · scope | no | Anyone's, whatever their work pattern; never your own (403 `OWN_RECORD`); the checks of §6.13 (422 `SCHEDULE_IN_THE_PAST`, `SCHEDULE_TOO_FAR`, `SCHEDULE_HOURS_NEEDED`) |
 | `GET /api/v1/attendance/me/schedule` (PR 3) | → `WorkSchedule` | self, own | no | My Profile's week; `can_edit` is false |
 | `GET /api/v1/attendance/pay-items` (PR 3) | `PayItemListQuery` (`group` deductions or overtime, `kind`, `status`, `month`, `employee_id`, `q`, `sort`) → `PayItemPage` | `people` view · scope | yes, 25 | Pending first, then the newest day. Amounts (`pay_amount`) masked as the salary is; `can_decide` says whether the reader may waive it or confirm and cut it |
@@ -318,13 +345,13 @@ event a day) and needs none of its own.
 | `GET /api/v1/attendance/me/pay-items` (PR 3) | `MyPayItemListQuery` (`month`, `group`, `kind`) → `PayItemPage` | self, own | yes, 25 | The person's own, newest day first, with their amounts (never masked for themselves) |
 | `GET /api/v1/attendance/temporary-sites` (PR 4) | `TemporarySiteListQuery` (`status`, `state`, `purpose`, `employee_id`, `q`, `sort`) → `TemporarySitePage` | `people` view · scope | yes, 25 | Every site with someone in the reader's scope on it (or once on it). Waiting first, then in progress, upcoming and the rest; `can_decide` on each (the approval's stage waits on the reader and they are not on it), `can_change` (People with `people` approve, scope all, not on it, until its last day). `q` finds the number, name or anyone on it, never an address |
 | `GET /api/v1/attendance/temporary-sites/:id` (PR 4) | → `TemporarySite` | `people` view · scope | no | `?site=` on People · Worksites; 404 outside scope |
-| `POST /api/v1/attendance/temporary-sites` (PR 4) | `TemporarySiteCreate` (`purpose`, `name`, `description`, `starts_on`, `ends_on`, `locations` of `PlaceInput`, an optional `name` and `radius_m`, `employee_ids`) → `TemporarySite` | `people` approve · all | no | People's own: in force at once (status `approved`), whoever adds it its approver; never with themselves on it (403 `OWN_RECORD`: they use Add Work Site). The checks of §6.11 |
-| `POST /api/v1/attendance/me/temporary-sites` (PR 4) | `TemporarySiteCreate` → `TemporarySite` | self (anyone) | no | Add Work Site: numbered, `submitted`, and the `attendance.temporary_site` approval opened in the same transaction; for themselves, colleagues or both. The checks of §6.11: 422 `SITE_IN_THE_PAST`, `SITE_TOO_FAR`, `SITE_TOO_LONG`, `NOT_EMPLOYED`; 409 `SITE_OVERLAPS` naming the person and the other site |
+| `POST /api/v1/attendance/temporary-sites` (PR 4) | `TemporarySiteCreate` (`purpose`, `name`, `description`, `starts_on`, `ends_on`, `locations` of `PlaceInput`, an optional `name` and `radius_m`, `employee_ids`) → `TemporarySite` | `people` approve · all | no | People's own: in force at once (status `approved`), whoever adds it its approver; never with themselves on it (403 `OWN_RECORD`: they use Add Work Site). The checks of §6.11; a Temporary Home while Home Location is off is 422 `HOME_LOCATION_OFF` on `purpose` (H6) |
+| `POST /api/v1/attendance/me/temporary-sites` (PR 4) | `TemporarySiteCreate` → `TemporarySite` | self (anyone) | no | Add Work Site: numbered, `submitted`, and the `attendance.temporary_site` approval opened in the same transaction; for themselves, colleagues or both. The checks of §6.11: 422 `SITE_IN_THE_PAST`, `SITE_TOO_FAR`, `SITE_TOO_LONG`, `NOT_EMPLOYED`, `HOME_LOCATION_OFF` (a Temporary Home while Home Location is off, H6); 409 `SITE_OVERLAPS` naming the person and the other site |
 | `GET /api/v1/attendance/me/temporary-sites` (PR 4) | `MyTemporarySiteListQuery` (`state`) → `TemporarySitePage` | self, own | yes, 25 | Those they submitted or are or were on: waiting, in progress and upcoming first |
 | `GET /api/v1/attendance/me/temporary-sites/:id` (PR 4) | → `TemporarySite` | self, own | no | One they submitted or are or were on; anyone else's is a 404. `?site=` on ESS · Work Location Requests (a notice, ⌘K, My Attendance); `can_withdraw` for its submitter while it waits |
 | `POST /api/v1/attendance/me/temporary-sites/:id/withdraw` (PR 4) | `TemporarySiteCancel` (`reason`, 10 to 500) → `TemporarySite` | self, the submitter | no | While it waits (409 `SITE_NOT_WAITING` after); the approval is withdrawn with it. Anyone else's is a 404 |
 | `POST /api/v1/attendance/temporary-sites/:id/cancel`, `/remove` (PR 4) | `TemporarySiteCancel`, `TemporarySiteMemberRemove` (`employee_id`, `reason`) → `TemporarySite` | `people` approve · all | no | Until its last day (409 `SITE_ENDED`); never on a site the reader is on (403 `OWN_RECORD`). Cancel: an approved site (409 `SITE_NOT_APPROVED`: a waiting one is rejected instead). Remove: a waiting or approved site, someone still on it (409 `NOT_ON_SITE`), never the last (409 `SITE_LAST_PERSON`: cancel it instead) |
-| `POST /api/v1/attendance/check-ins` (PR 4) | `CheckInCreate` (`latitude`, `longitude`, `accuracy_m`, `location_error`, `device_at`) → `CheckInResult` | self, own | no | `Idempotency-Key` required (428 without), stored on the check-in, unique per person. Only on a temporary site's day (422 `NO_TEMPORARY_SITE`) while clocked in (409 `NOT_CLOCKED_IN`); the 21st of a day is 422 `CHECK_IN_LIMIT`; never refused for where it was made (§6.12) |
+| `POST /api/v1/attendance/check-ins` (PR 4) | `CheckInCreate` (`latitude`, `longitude`, `accuracy_m`, `location_error`, `device_at`) → `CheckInResult` | self, own | no | `Idempotency-Key` required (428 without), stored on the check-in, unique per person. Only on a temporary site's day (422 `NO_TEMPORARY_SITE`; a Temporary Home's day while Home Location is off is none, H6) while clocked in (409 `NOT_CLOCKED_IN`); the 21st of a day is 422 `CHECK_IN_LIMIT`; never refused for where it was made (§6.12) |
 
 From PR 4 the work location request and field assignment routes above take no new entry (their
 create routes are removed with their sheets, `LocationRequestCreate` and `FieldAssignmentCreate`
@@ -374,7 +401,9 @@ punch's point is never sent to the provider.
   site (`site_geofence_mode`: a temporary site's addresses; before PR 4, a field assignment's sites and
   a client visit's site). Shown as **Off** (record only), **Flag** (`warn`: accepted for review with
   an exception) and **Refuse** (`block`). A new version offers Flag and Refuse only for a home and a
-  temporary site (Cynthia: the home is mandatory); older versions keep what they set.
+  temporary site (Cynthia: the home is mandatory); older versions keep what they set. Since
+  22/10/2026 homes as a whole are the policy's Home Location switch (§1.3): a home's mode applies
+  only while it is on, and while it is off a home day is not checked at all (§6.5).
 - Grace is the policy's `grace_minutes`. The day's start and end are the person's work schedule for
   that weekday, else the policy's company hours, else the working week of Settings · Organisation
   (A22) while no version sets `hours`; public holidays stay in Settings · Organisation
@@ -471,7 +500,15 @@ punch's point is never sent to the provider.
   PR 4, a field assignment, then an approved work location request), their approved home on a remote
   day of their schedule or every day for a `remote` work pattern (§6.10, the policy's
   `home_radius_m`), else their permanent site (`employee.worksite_id`), if active.
-- Someone working from home with no approved home has no fence to meet: the location is
+- **Home Location off** (§1.3, H5): a remote day of the schedule (every working day for a `remote`
+  work pattern with none), an approved Temporary Home and a work location request for a temporary
+  home or a remote day made before PR 4 are not checked. `contextFor` answers `unchecked`; the panel
+  asks for no reading (`AttendanceToday.location.checked` false); the server drops any coordinates
+  sent, so none is stored on the event; and `decideGeofence` answers `not_applied` with reason
+  `home_location_off`, accepted under every mode (Not Checked). The device and time checks still
+  run. The evidence names no place and no home. A permanent site, a field assignment and every other
+  temporary site are checked as ever.
+- While Home Location is on, someone working from home with no approved home has no fence to meet: the location is
   `unverified` (`no_home`), so the punch goes to review under Flag and Refuse and is never refused for
   it. Someone expected at an office whose site is not set or not active is the same (`no_worksite`,
   owner decision, 19/10/2026). Retry Location is not offered for either: a new reading changes
@@ -511,8 +548,8 @@ punch's point is never sent to the provider.
   temporary site sheet reads a location only through `AddressField`'s own device-location fallback
   (F27), which stays as it is. A page without `crypto.randomUUID` (an insecure one) still gets each
   punch's Idempotency-Key (`newKey`).
-- The radius of a home and of a temporary site's address is at least 150 m on a new version (T9); a
-  permanent site keeps its own radius (25 to 1,000 m).
+- The radius of a home (while Home Location is on) and of a temporary site's address is at least
+  150 m on a new version (T9); a permanent site keeps its own radius (25 to 1,000 m).
 - A punch against a home keeps `worksite_id` empty (the roster, §6.9, and Home read it as remote);
   its evidence names the place `home` and the home record it was judged against. A punch at a
   temporary site names the site and the address it was matched to (PR 4): place `temporary_site`
@@ -644,6 +681,25 @@ Home and those screens never disagree.
 
 ### 6.10 Home locations (`attendance.home.js`)
 
+- **The switch** (§1.3). Everything below applies while the Attendance policy's Home Location is on,
+  as the version in force today says (`onDate`, through `policies.rulesFor`). While it is off:
+  `MyHome.needed` is false, so My Attendance shows no Home Location card, and `GET /me/home` gives
+  no homes; sending one, People's list, one home and a decision answer 409 `HOME_LOCATION_OFF`; the
+  Work Schedule's `home_state` is null; ⌘K finds no home; the register names a remote day Remote,
+  never Home; and no home notice is sent. The rows stay as they are (H7): switched on again, the
+  approved home is the fence again and a waiting one waits again.
+- **Switched on** (H8): the reminder `attendance_home_needed` (the reminder engine, notifications.md
+  §7.1) finds, every 5 minutes while Home Location is on, everyone active and started with a login
+  whose week, in force or waiting to start, has a Remote day and who has neither an approved nor a
+  waiting home, and adds one occurrence for each person and stretch the switch has stayed on (named
+  by the stretch's first day: the first day of the unbroken run of versions with it on, up to the
+  one in force, `policies.heldSince`; a second version published the same day names the same
+  stretch). It fires in the working day (08:00 to 18:00 Lagos), after
+  checking again in its own transaction that the switch is still on in the same stretch and that
+  the person still needs a home and has none approved or waiting; `attendance.home_needed` then
+  tells the person, **Set your home location**, and the notice opens My Attendance with the sheet
+  open. One push a person for each stretch: switched off and on again, it comes again; someone who
+  starts working from home while it is on is found then.
 - Anyone whose week, in force or waiting to start, has a Remote day sets one (§6.13), a remote
   employee with no schedule included (their pattern makes every working day Remote): 422
   `HOME_NOT_NEEDED` otherwise; `MyHome.needed` says which, and My Attendance shows the Home Location
@@ -681,7 +737,9 @@ Owner decisions of 20/10/2026 (T11, T14), replacing work location requests and f
   place, Lagos when unknown) and **one to 25 people**. An address must carry a point: one typed
   before F27 is refused ("Pick an address"). A Temporary Home has exactly one address and is
   personal data, masked as a home is; its fence is that address's point and radius, judged with
-  `home_geofence_mode`.
+  `home_geofence_mode`. It is offered only while Home Location is on (H6): while it is off, Add Work
+  Site leaves it out of the purposes and both create routes refuse it (422 `HOME_LOCATION_OFF` on
+  `purpose`).
 - **Its hours** (owner decision of 21/10/2026), the sheet's first choice: **Usual Shift** (`usual`)
   or **Site Hours** (`site`) with a **start** and an **end** (`HH:MM`, the end after the start on
   the same day: a training from 11:00 to 15:00). Usual Shift keeps each person's own shift on the
@@ -735,7 +793,9 @@ Owner decisions of 20/10/2026 (T11, T14), replacing work location requests and f
   Refuse), named with the nearest; a reading too rough is `location_unverified` (§6.5). A Temporary
   Home is judged as a home (`outside_home`, `home_geofence_mode`). The wall clock and the work date
   are read in the site's zone (§6.4). A site still waiting changes nothing. Approved leave still
-  refuses a punch (§11, `ON_LEAVE`).
+  refuses a punch (§11, `ON_LEAVE`). While Home Location is off, an approved Temporary Home is
+  passed over here: its days read as a remote day, unchecked (§6.5), its hours and zone kept, and
+  the panel shows no site and offers no Check In (H6).
 - **Approved after its first day**: punches already made keep their judgement. The
   `attendance.resolve_covered_exceptions` handler on `temporary_site.approved` resolves each open
   location exception (`outside_worksite`, `outside_home`, `location_unverified`) of a person still on
@@ -801,7 +861,8 @@ Owner decisions of 20/10/2026 (T11, T14), replacing work location requests and f
   before sites were asked for (`1350`), the
   approval is the check: the punch is accepted under every geofence mode with its reading kept as
   evidence (verdict `not_applied`, reason `approved_request`). The device and time checks still
-  apply. The evidence names the place (`temporary_home`, `remote_day`, `client_visit`) and the
+  apply. While Home Location is off, a temporary home or a remote day still in force reads as a
+  remote day, unchecked, with no reading kept (§6.5, H6); a client visit is checked as before. The evidence names the place (`temporary_home`, `remote_day`, `client_visit`) and the
   request; `worksite_id` stays empty; the register and the punch read Temporary Home, Remote Day or
   Client Visit. Two approved requests never cover one day (the overlap rule).
 - **Decided late**: approving a request after one of its days has a punch does not re-judge that
@@ -820,7 +881,8 @@ Owner decisions of 20/10/2026 (T11, T14), replacing work location requests and f
   location reader (`location.ts`, §6.5), as a punch does: the panel stays answerable while it reads,
   and whatever it found (a fix, a rough one, or why there was none) is sent.
 - **Refused** only when it is not a check-in at all: 428 with no key; 422 `NO_TEMPORARY_SITE` on a day
-  with no approved site the person is still on; 409 `NOT_CLOCKED_IN` with no shift open (today's, or
+  with no approved site the person is still on, or whose site is a Temporary Home while Home Location
+  is off (H6); 409 `NOT_CLOCKED_IN` with no shift open (today's, or
   yesterday's still open, whose site it then checks against); 422 `CHECK_IN_LIMIT` for the 21st of a
   day. A check-in is never refused for where it was made.
 - **Matched** to the nearest address of that day's site and recorded (`attendance_check_in`) with
@@ -918,7 +980,8 @@ the hybrid office days of 19/10/2026 (`attendance_schedule`, `1340`).
 - **On the clock and the day**: the schedule in force on a date gives the shift (§6.4), whether the
   day is worked (no lateness, absence, prompts or reminders on an Off day), and the place: an Office
   day is matched to the permanent site, a Remote day to the approved home (`outside_home` beyond it;
-  no approved home is `unverified`, `no_home`). A punch on a day that is not worked is matched by the
+  no approved home is `unverified`, `no_home`) while Home Location is on, and not checked at all
+  while it is off (§6.5, H5). A punch on a day that is not worked is matched by the
   work pattern. A temporary site on the day comes first (§6.5, PR 4).
 - **Pay**: the working days of a month by the person's schedule, less public holidays, divide their
   monthly gross into a daily rate; that day's hours divide it into an hourly rate (§6.17).
@@ -1044,8 +1107,9 @@ version, and to a rule a version predates (a new rule reads as off on an older v
 | Location Flags | `location_rule`: `on`, `count`, `period`, `alert`, `query` | A switch; N punches or check-ins outside a fence (1 to 31) in a period | 3 in a month; Alert on | Off | Built (§6.16) |
 | Overtime | `overtime`: `on`, `after_minutes`, `approval`, `method`, `multiplier`, `amount`, `rest_day_multiplier`, `monthly_cap_hours` | A switch; counts after 0 to 120 minutes; approved by Line Manager After, Pre-Approved or Automatic; paid at a multiple of the hourly rate (1.0 to 3.0) or a fixed amount per hour (₦1 to ₦1,000,000); Sundays and holidays at a multiple (1.0 to 3.0); a monthly cap (1 to 100 hours) | 30 minutes; Line Manager After; 1.5 times; 2.0 times on rest days; 20 hours | Off | Built (§6.17) |
 | Location Checks | `office_geofence_mode` | Off, Flag, Refuse | Flag | Flag | Built |
-| Location Checks | `home_geofence_mode` (Home Check), `site_geofence_mode` (Temporary Site Check) | Flag, Refuse (Off only on an older version) | Flag | Flag | Built; Off removed from new versions in PR 1; from PR 4 the site's applies to a temporary site's addresses and its check-ins |
-| Location Checks | `home_radius_m` | 150 to 500 m (a new version) | 150 | 150 | Built; the minimum in PR 1 (T9) |
+| Location Checks | `home_location`: `on` (Home Location) | A switch; while it is on, Home Check and Home Radius beneath it | Off | Off | Built 22/10/2026 (§1.3): off, no home is asked for, sent, approved or checked, and a remote day is not checked |
+| Location Checks | `home_geofence_mode` (Home Check), `site_geofence_mode` (Temporary Site Check) | Flag, Refuse (Off only on an older version) | Flag | Flag | Built; Off removed from new versions in PR 1; from PR 4 the site's applies to a temporary site's addresses and its check-ins; the home's applies, and is checked in a draft, only while Home Location is on |
+| Location Checks | `home_radius_m` | 150 to 500 m (a new version) | 150 | 150 | Built; the minimum in PR 1 (T9); used, and checked in a draft, only while Home Location is on |
 | Location Checks | `max_accuracy_m` | 50 to 250 m | 100 | 100 | Built; its meaning in PR 2 (§6.5) |
 | Devices | `device_mode` | Off, Flag, Refuse | Flag | Off | Built |
 | Clock Prompts | `clock_out_reminder_minutes` | 15 to 60 minutes | 30 | 30 | Built (§6.14) |
@@ -1054,8 +1118,9 @@ version, and to a rule a version predates (a new rule reads as off on an older v
 - **The contract** (`packages/contract/schemas/attendance.js`): `AttendanceRules` reads a version
   (every key optional, each filled with its default); `AttendanceRulesDraft` checks a draft (every key
   present; a switch that is on needs its figures: a count or hours, an amount for a fixed method;
-  hours end after they start, at least one working day; a home and a temporary site Flag or Refuse;
-  the home radius at least 150; from PR 3, a fixed deduction's amount and overtime's amount per hour
+  hours end after they start, at least one working day; a temporary site Flag or Refuse; while Home
+  Location is on, a home Flag or Refuse and its radius at least 150 (off, both are kept as they were
+  and checked once it is switched on, when the worksheet shows them); Home Location given (22/10/2026); from PR 3, a fixed deduction's amount and overtime's amount per hour
   from ₦1.00 to ₦1,000,000.00, each refused on its own field). PR 1 writes both in full, so PRs 3
   and 4 add behaviour, not keys.
   `latest_clock_out_minutes` is not carried into the rules: the system clock-out replaces it.
@@ -1066,11 +1131,13 @@ version, and to a rule a version predates (a new rule reads as off on an older v
   that makes it do something, so no switch is shown that does nothing. The cards, in order:
   Working Hours (a row per weekday: Working, Starts, Ends), Lateness, Late Arrivals, Early
   Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices,
-  Clock Prompts.
+  Clock Prompts. Location Checks reads Office Check, Home Location (with Home Check and Home Radius
+  beneath it while it is on), Temporary Site Check and GPS Accuracy.
 - **The sentences** staff read, one per rule, values filled in, under the same sections; a rule that
   is off says so ("Late arrivals do not lead to a deduction."). Fixed sentences also say: "Where your
   own work schedule differs, your schedule applies." and "Working somewhere else? Add it from Home,
-  or ask People." (T7, T14).
+  or ask People." (T7, T14). With Home Location off, Working From Home reads only "Working from
+  home, your location is not checked." (§1.3), and Your Location counts only the checks in use.
 - **At a Temporary Site** (PR 4, the section once At a Field Site): Flag reads "At a temporary site,
   a clock-in or check-in outside its addresses is accepted and sent for review."; Refuse reads "At a
   temporary site, a clock-in outside its addresses is refused, and People see it." and "A check-in
@@ -1204,6 +1271,7 @@ Owner decisions of 20/10/2026 (T4, T6). The items are settled in the same transa
 | `worksite.created`, `worksite.updated` | People · Worksites | Audit |
 | `attendance.home_requested` | A remote employee sets their home location | Audit; notifies `people` approve holders with scope over the person |
 | `attendance.home_decided` | People approve or reject a home location | Audit; notifies the person; realtime refresh |
+| `attendance.home_needed` | The reminder `attendance_home_needed` fires: Home Location is on and the person needs a home and has none approved or waiting (§6.10, H8) | Notifies the person ("Set your home location"; push as their Attendance and Leave preference allows); the notice opens My Attendance with Set Home Location open (`attendance_home_needed`, `?home=`) |
 | `location_request.submitted` | An employee sends a work location request | Audit; the approval (`attendance.location_request`) notifies the first stage's approvers |
 | `location_request.approved`, `location_request.rejected` | Its approval ends (copied on by `attendance.apply_request_decision`) | Audit; the approval already told the person; realtime refresh |
 | `location_request.cancelled` | The person withdraws or cancels it | Audit; realtime refresh |
@@ -1240,9 +1308,9 @@ and on ESS · Work Location Requests (`?site=`) for everyone else on it (notific
 
 | Role | Sees | Can do |
 |---|---|---|
-| Employee | Own clock, days, punches, check-ins, exceptions, devices, home location, temporary sites, work location requests and field assignments made before PR 4, work schedule and week, and their own deductions and overtime with their amounts; every published version of the attendance policy | Clock in and out, check in at each stop on a temporary site's day, explain an exception, give the real time of a System Clock-Out, export the month, register and remove own devices; anyone whose week has a Remote day sets their home location; withdraw or cancel a work location request made before PR 4; acknowledge the newest policy version |
+| Employee | Own clock, days, punches, check-ins, exceptions, devices, home location, temporary sites, work location requests and field assignments made before PR 4, work schedule and week, and their own deductions and overtime with their amounts; every published version of the attendance policy | Clock in and out, check in at each stop on a temporary site's day, explain an exception, give the real time of a System Clock-Out, export the month, register and remove own devices; while Home Location is on, anyone whose week has a Remote day sets their home location; withdraw or cancel a work location request made before PR 4; acknowledge the newest policy version |
 | Line Manager, Head of Department (`people` team) | The register, days, check-ins, devices, exceptions and home statuses of their reporting tree, its temporary sites (no Temporary Home's line or point), its work location requests (no temporary home's point), its work schedules, and its deductions and overtime (amounts only with the salary grant); no coordinates or home addresses | Decide the first stage of a direct report's work location request still waiting from before PR 4; cancel a field assignment made before PR 4 for people in their reporting tree, or take someone off it (`people` approve); confirm or cut a report's overtime under Line Manager After and approve it beforehand under Pre-Approved (`people` approve); set a report's work schedule where their role holds `people` edit; otherwise read only; export (heads). From PR 4 they no longer set field assignments: anyone adds a temporary site from Home |
-| Operations & People, Management (`people` all) | Everyone, with the punch coordinates, home locations, temporary sites (a Temporary Home's line and point masked under `employee.personal` where the role masks personal details), work location requests, deductions and overtime | Decide exceptions, a check-in's included, and home locations (approve); approve or reject a temporary site, the stage's approvers (Operations & People by default), never one they are on; add a temporary site directly, never with themselves on it, cancel one or take someone off (approve, scope all); decide a waiting work location request's Operations & People stage; cancel and change field assignments made before PR 4 (approve); waive deductions and confirm, cut or approve overtime (approve); remove devices and set anyone's work schedule (edit), manage worksites (create, edit), export |
+| Operations & People, Management (`people` all) | Everyone, with the punch coordinates, home locations, temporary sites (a Temporary Home's line and point masked under `employee.personal` where the role masks personal details), work location requests, deductions and overtime | Decide exceptions, a check-in's included, and home locations while Home Location is on (approve); approve or reject a temporary site, the stage's approvers (Operations & People by default), never one they are on; add a temporary site directly, never with themselves on it, cancel one or take someone off (approve, scope all); decide a waiting work location request's Operations & People stage; cancel and change field assignments made before PR 4 (approve); waive deductions and confirm, cut or approve overtime (approve); remove devices and set anyone's work schedule (edit), manage worksites (create, edit), export |
 | CEO | Everything, as the access rules give the CEO | The same as `people` all, never on their own exception; may decide any approval's stage, a temporary site they are on included (A11) |
 | Anyone (from PR 4) | Their own temporary sites: those they submitted or are or were on | Add Work Site for themselves and colleagues; withdraw one they submitted while it waits; check in on its days |
 | People with the salary grant | Deduction and overtime amounts (`pay_amount`, masked under `employee.salary` for everyone else) | As their grant allows |
@@ -1268,8 +1336,9 @@ never leave identity, and no log line carries them.
   service and scope as the screen; no coordinates, no device identifier, no evidence blob.
 - **AI routes**: clock in or see my attendance → ESS · My Attendance; review attendance → People ·
   Attendance; register a device → ESS · My Devices; add a worksite → People · Worksites; set my
-  home location → ESS · My Attendance; approve home locations → People · Attendance; approve work
-  location requests → People · Worksites;
+  home location → ESS · My Attendance; approve home locations → People · Attendance (these two only
+  while Home Location is on: the assistant, M10, asks `attendance.home.onDate` before offering them,
+  §1.3); approve work location requests → People · Worksites;
   read or acknowledge the attendance policy → ESS · Policy Updates; change the attendance policy →
   Knowledge Hub · Policies (`?policy=attendance`); work somewhere else → ESS · Work Location Requests,
   where Add Work Site is (PR 4; a manifest names no action, A23); approve a temporary site → People · Worksites
@@ -1283,7 +1352,8 @@ never leave identity, and no log line carries them.
   schedule. Nothing in PR 3 or PR 4 calls a model, so no AI job is chosen.
 - **Search**: `attendance.search.js` finds attendance days and exceptions by the person's name;
   `devices.search.js` devices by label or owner; `worksites.search.js` worksites by name or code;
-  `attendance.search.js` also finds home locations by the person's name (never by the address), and
+  `attendance.search.js` also finds home locations by the person's name (never by the address) while
+  Home Location is on (the provider's `available`, `shared/search/provider.js`), and
   work location requests by their number or the person's name (never by the address), and field
   assignments by their number, name, client or anyone on them (never by a site's address).
   Each within the reader's `people` scope. A request opens on People · Worksites, Temporary, by
@@ -1300,7 +1370,8 @@ never leave identity, and no log line carries them.
   person's own on My Attendance. A reminder to clock out opens My Attendance with the clock panel,
   as a reminder to clock in does. A clock-in reminder is not a record to look up
   (`attendance_clock_reminder`, `search:none` in the route map): its notice opens My Attendance with
-  the clock panel (`?clock=`). The Attendance policy is found as a policy (`policies.md` §9); the route map's
+  the clock panel (`?clock=`). Nor is the push to set a home (`attendance_home_needed`, `search:none`,
+  §6.10): it opens My Attendance with Set Home Location (`?home=`). The Attendance policy is found as a policy (`policies.md` §9); the route map's
   `attendance_policy` entry goes in PR 1. From PR 4, temporary sites by their number, name, purpose
   or anyone on them (never by an address), within the reader's `people` scope, opening People ·
   Worksites `?site=` or, for the person's own, ESS · Work Location Requests `?site=` (read through
@@ -1322,30 +1393,30 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Clock In / Clock Out panel | For someone working from home that day (a Remote day of their week) with no approved home, a banner (No Approved Home) with Set Home; for someone expected at an office with none assigned, a banner (No Office Assigned); the date and the workplace's current time, the state pill (Clocked Out, Clocked In with its time, Review Required), Shift, Work Arrangement, Clock Location with its radius (on a field assignment's day, its site), This Device with its status; the step before the browser asks (Location Check, one line naming the worksite); Clock In or Clock Out, Allow Location, Retry Location, Register Device, Not Now; the result after a punch with its reasons; Add Note when it is under review; opened by itself over a blurred screen, Start Your Day at the day's first sign-in and at the start and Finish Your Day at the end, with Remind Me (In 15 Minutes, In 30 Minutes, In 1 Hour) beside Clock Out; Shift is the person's own (from their work schedule); after a system clock-out, System Clock-Out with the day's times | Clock Location: the punch is matched to this place; This Device: why an unregistered device is flagged under the current policy | "location is read only and not continuously tracked", how block and warn decide, idempotency, when the system clocks you out: §6 here |
-| ESS · My Attendance | When their week, in force or waiting to start, has a Remote day (`MyHome.needed`), a Home Location card: the status (Approved, Waiting, Not Set, Rejected with People's reason), the address, Set Home Location or Update Home (a sheet: Use This Location with the reading's accuracy, Address, Send for Approval); Today's card, Temporary Sites when the person has any waiting, in progress or to come (number and name, purpose, dates, state; one opens on ESS · Work Location Requests), and beside them Field Assignments made before PR 4 while one is in progress or to come (number and name, dates, the site; one opens with the client, its sites with their address and radius, and who else is on it), the month picker beside Export Month (arrows a month at a time; the month's name opens a year and its months, back two years), Days Present, Late Days (with the share of days present), Absent, Hours Worked, each of the first three opening its days paged at 25, the days with clock in, clock out, hours, status and Review or as a chart of hours (late days stand out), a day's punches, open exceptions with Explain; a clock-out the system made reads System Clock-Out in My Days and the day's punches, and the day offers Give Real Time (a sheet: Real Time, Your Note, Send Time); Export Month | Hours Worked: from the first clock-in to the last clock-out; a System Clock-Out counts to the shift's end | "a correction never overwrites a punch", when the system clocks you out: §6.8, §6.14 |
+| Clock In / Clock Out panel | While Home Location is on, for someone working from home that day (a Remote day of their week) with no approved home, a banner (No Approved Home) with Set Home; while it is off, a remote day's Clock Location reads Not Checked, with no banner and no location step (Clock In goes straight to the punch); for someone expected at an office with none assigned, a banner (No Office Assigned); the date and the workplace's current time, the state pill (Clocked Out, Clocked In with its time, Review Required), Shift, Work Arrangement, Clock Location with its radius (on a field assignment's day, its site), This Device with its status; the step before the browser asks (Location Check, one line naming the worksite); Clock In or Clock Out, Allow Location, Retry Location, Register Device, Not Now; the result after a punch with its reasons; Add Note when it is under review; opened by itself over a blurred screen, Start Your Day at the day's first sign-in and at the start and Finish Your Day at the end, with Remind Me (In 15 Minutes, In 30 Minutes, In 1 Hour) beside Clock Out; Shift is the person's own (from their work schedule); after a system clock-out, System Clock-Out with the day's times | Clock Location: the punch is matched to this place; This Device: why an unregistered device is flagged under the current policy | "location is read only and not continuously tracked", how block and warn decide, idempotency, when the system clocks you out: §6 here |
+| ESS · My Attendance | While Home Location is on and their week, in force or waiting to start, has a Remote day (`MyHome.needed`), a Home Location card: the status (Approved, Waiting, Not Set, Rejected with People's reason), the address, Set Home Location or Update Home (a sheet: Use This Location with the reading's accuracy, Address, Send for Approval; a link with `?home=`, from the panel's Set Home or the push to set one, opens it while no home is approved or waiting); Today's card, Temporary Sites when the person has any waiting, in progress or to come (number and name, purpose, dates, state; one opens on ESS · Work Location Requests), and beside them Field Assignments made before PR 4 while one is in progress or to come (number and name, dates, the site; one opens with the client, its sites with their address and radius, and who else is on it), the month picker beside Export Month (arrows a month at a time; the month's name opens a year and its months, back two years), Days Present, Late Days (with the share of days present), Absent, Hours Worked, each of the first three opening its days paged at 25, the days with clock in, clock out, hours, status and Review or as a chart of hours (late days stand out), a day's punches, open exceptions with Explain; a clock-out the system made reads System Clock-Out in My Days and the day's punches, and the day offers Give Real Time (a sheet: Real Time, Your Note, Send Time); Export Month | Hours Worked: from the first clock-in to the last clock-out; a System Clock-Out counts to the shift's end | "a correction never overwrites a punch", when the system clocks you out: §6.8, §6.14 |
 | ESS · Work Location Requests | Add Work Site; My Temporary Sites with number, purpose and name, dates and state (Awaiting Approval, Upcoming, In Progress, Done, Rejected, Withdrawn, Cancelled); a site opens with its details (purpose, first and last day, days, hours, its addresses with their radius on a map, the people on it, the description, who added it), its approval trail, and Withdraw Submission while it waits; the Add Work Site sheet, as Home's; under them, while any is listed, My Requests made before PR 4 with number, type, dates and status, each opening with its details, its approval trail and Withdraw Request or Cancel Request | Description: People approve from this; name an out-of-station letter if you have one. Radius: a punch within it counts here | How the approval routes and what the clock does on an approved day: §6.11 |
 | ESS · My Devices | The devices with status, first seen, last punch and This Device; Register This Device, Remove | Status header: what New, Registered and Removed mean | "How device checks work", the three-device reason: §6.6 |
-| People · Attendance | The date, Expected, Present, Late, Absent, On Leave, Not In, Open Exceptions; Register, Exceptions and Homes (status chips; person, address, accuracy, requested, distance from the approved home, status; a home opens with Approve and Reject); the register (person, arrangement, clock in, clock out, location, device, status, review); a day's evidence, each punch's Source (Clock, Added by People, System Clock-Out), and from PR 4 its route: the clock-in, each Check-In with its address and verdict, then the clock-out, in time order; Decide, a System Clock-Out offering Accept and Correct Time (starting from the time the person gave, with their note), a check-in's flag offering Accept and Reject; Export. Requests and Field (with New Assignment) left in PR 4 for People · Worksites, Temporary | Open Exceptions: what waits on People; Outcome on the decision form: accept, reject or add the clock-out, or for a System Clock-Out keep or correct its time; From Approved Home: how far a new home is from the one in force | The page explainer, "what a manager can and cannot do", reconciliation mechanics: §3, §6.8, §8 |
+| People · Attendance | The date, Expected, Present, Late, Absent, On Leave, Not In, Open Exceptions; Register, Exceptions and, while Home Location is on, Homes (status chips; person, address, accuracy, requested, distance from the approved home, status; a home opens with Approve and Reject); the register (person, arrangement, clock in, clock out, location, device, status, review); a day's evidence, each punch's Source (Clock, Added by People, System Clock-Out), and from PR 4 its route: the clock-in, each Check-In with its address and verdict, then the clock-out, in time order; Decide, a System Clock-Out offering Accept and Correct Time (starting from the time the person gave, with their note), a check-in's flag offering Accept and Reject; Export. Requests and Field (with New Assignment) left in PR 4 for People · Worksites, Temporary | Open Exceptions: what waits on People; Outcome on the decision form: accept, reject or add the clock-out, or for a System Clock-Out keep or correct its time; From Approved Home: how far a new home is from the one in force | The page explainer, "what a manager can and cannot do", reconciliation mechanics: §3, §6.8, §8 |
 | People · Devices | Device list with employee, device, status, first seen, last punch; Remove Device | Status header: as on My Devices | "devices register on every punch": §6.6 |
 | People · Worksites | Worksites with code, address, radius, assigned and status; Add Worksite and Edit Worksite (Name, Address with suggestions as it is typed, the one picked filling Latitude and Longitude, Radius, Metres, then a map of the centre and its fence once both coordinates are real; tapping the map moves the centre; coordinates given with no address fill it); a worksite's details with the same map, Edit, Retire or Restore, its employees with Assign Employee; under the address while typing, a spinner, "No address matches" or "Could not search addresses" | Radius: punches inside count as on site | "How the geofence behaves": §6.5; where the suggestions come from: foundation.md §6.13 |
 | Clock In / Clock Out panel, from PRs 2 to 4 | A rough reading names its fix as a banner: Precise Location Off with how to turn it on (iPhone, Android), Use Your Phone (a computer), Location Blocked with how to allow it, Secure Address Needed; Clock In Anyway; the location step always ends, so Not Now works while it reads (PR 2). Finish Your Day with Clock Out and Remind Me; a day ended by the system reads System Clock-Out (PR 3). On a temporary site's day, the site's name and addresses, and Check In after clocking in, with Check-Ins under it: each stop's time, address and Inside or Flagged (Recorded when the policy checks nothing) (PR 4) | Location Unclear: the reading could not prove where you were | How the fence and the reading are judged, when the system clocks you out: §6.5, §6.14 |
 | ESS · My Attendance, from PRs 3 and 4 | Deductions and Overtime cards for the month: each day, its kind, its minutes, its amount (or No Salary Set) and status (Pending, Waived, Confirmed, Cut, In Payroll), a waived or cut one with its reason; Give Real Time on a System Clock-Out; a day's route of check-ins (PR 4) | Amount: worked out from your monthly gross | The formulas, the cap, who confirms: §6.17 |
 | People · Attendance, from PR 3 | Deductions and Overtime in the view switch: person, day, kind, minutes, amount (Restricted without the salary grant, or No Salary Set), status, the status chips (Pending, Waived or Confirmed, Cut, All); Waive Selected (a sheet: Reason, Waive Deductions; up to 25 ticked), Confirm and Cut on a pending overtime item (Minutes for fewer, Reason to cut); Approve Overtime on a person's day (a sheet: Minutes, Reason, Approve Overtime) | Deductions (the list's title): Waive Selected restores the pay, the day still counts | The rules engine and the methods: §6.16, §6.17 |
 | People · Worksites, from PR 4 | Permanent or Temporary, a switch; Permanent is the worksites alone, as above. Temporary: the status chips (All, Awaiting Approval, In Progress, Upcoming, Done, Rejected, Cancelled) over the sites in the reader's scope: number and name, purpose, dates, people, state, Awaiting Approval first; Add Temporary Site (`people` approve, scope all), the same sheet as Home's with People from the employee list and Save Site; a site opens with its details (number, purpose, first and last day, days, hours, added by, approved), its addresses on a map with their radius, its description, its people (Take Off on a person, with a reason), its approval trail, and Approve or Reject (a reason) when it waits on the reader, Cancel Site (a reason) while it is in force; while any made before PR 4 still waits or is in force, Requests and Field beside the sites: a request opens with its details, its approval route and Record Decision when it waits on the reader; an assignment opens with its details, sites and people, Take Off and Cancel Assignment | Description: why it is needed. Radius: a punch within it counts here | The approval route, who on a site may not decide it: §6.11 |
-| Home · Overview, Add Work Site (PR 4) | The sheet: Hours first (Usual Shift or Site Hours; Site Hours adds Starts At and Ends At), Purpose (search the list), Name, Addresses (picked; Add Address, up to eight, each with its Label, its Radius and a small map; Remove on all but the first), First Day, Last Day, People (you and colleagues, you first), Description, Submit for Approval; toast "TS-0001 sent for approval"; a site that overlaps another names it on First Day | Description: People approve from this; name an out-of-station letter if you have one. Radius: a punch within it counts here | Who approves and what happens on the day: §6.11 |
-| People · Employees, the Work Schedule tab | After Job, in place of the Attendance tab: a Work Setup card (Work Pattern, Office with its radius or No Office Assigned, Home Location: Approved, Waiting or Not Set for someone whose week has a Remote day); a Work Schedule card: the week as seven rows, each Working or Off with its hours (Company Hours when they are the company's) and an Office or Remote pill, From (the schedule's first day, or Company Hours when none is set) and Next (a schedule waiting to start, from its first day); Set Schedule when `can_edit` (a sheet: a row per weekday with Working, Starts, Ends and Office or Remote, then From, Reason, Save Schedule) | Work Schedule: lateness and absence follow these days and hours; Days (the sheet's header): leave Starts and Ends empty for the company hours of that day | How a day is judged: §6.4, §6.13 |
-| Knowledge Hub · Policies, the Attendance worksheet | One card per section (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts), each rule a row with its control and Changed; a switch that is on shows its figures; every rule since PR 3 | Each rule's label: what it decides ("Flag: accepted, sent to People to review") | Versions, approval and acknowledgement: policies.md §6 |
+| Home · Overview, Add Work Site (PR 4) | The sheet: Hours first (Usual Shift or Site Hours; Site Hours adds Starts At and Ends At), Purpose (search the list; Temporary Home only while Home Location is on), Name, Addresses (picked; Add Address, up to eight, each with its Label, its Radius and a small map; Remove on all but the first), First Day, Last Day, People (you and colleagues, you first), Description, Submit for Approval; toast "TS-0001 sent for approval"; a site that overlaps another names it on First Day | Description: People approve from this; name an out-of-station letter if you have one. Radius: a punch within it counts here | Who approves and what happens on the day: §6.11 |
+| People · Employees, the Work Schedule tab | After Job, in place of the Attendance tab: a Work Setup card (Work Pattern, Office with its radius or No Office Assigned, Home Location: Approved, Waiting or Not Set for someone whose week has a Remote day, while Home Location is on); a Work Schedule card: the week as seven rows, each Working or Off with its hours (Company Hours when they are the company's) and an Office or Remote pill, From (the schedule's first day, or Company Hours when none is set) and Next (a schedule waiting to start, from its first day); Set Schedule when `can_edit` (a sheet: a row per weekday with Working, Starts, Ends and Office or Remote, then From, Reason, Save Schedule) | Work Schedule: lateness and absence follow these days and hours; Days (the sheet's header): leave Starts and Ends empty for the company hours of that day | How a day is judged: §6.4, §6.13 |
+| Knowledge Hub · Policies, the Attendance worksheet | One card per section (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts), each rule a row with its control and Changed; a switch that is on shows its figures; every rule since PR 3; Location Checks' Home Location a switch, with Home Check and Home Radius beneath it while it is on | Each rule's label: what it decides ("Flag: accepted, sent to People to review") | Versions, approval and acknowledgement: policies.md §6 |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
 | Clock In / Clock Out panel | A bottom sheet: the state, the time, the shift and location, then the result (no toast over it); opened by itself, it does not drag away | Nothing | Clock In or Clock Out, full width at the foot; Remind Me above it at the shift's end, its choices an action sheet | The floating button's Clock In or Out (F18); the top bar's clock on desktop; it opens by itself on the first screen of the day's first sign-in, at the shift's start and at its end (§6.14), and from the reminder's notice |
-| ESS · My Attendance | When their week has a Remote day, the Home Location card first, then Today's card, Temporary Sites as cards when there are any (then Field Assignments made before PR 4), the four figures two to a row, then days as cards | Subtitle | Export Month in the header; Set Home Location full width in its card, its sheet's Send for Approval at the foot | Bottom bar Self-Service; ESS tabs scroll sideways |
+| ESS · My Attendance | While Home Location is on and their week has a Remote day, the Home Location card first, then Today's card, Temporary Sites as cards when there are any (then Field Assignments made before PR 4), the four figures two to a row, then days as cards | Subtitle | Export Month in the header; Set Home Location full width in its card, its sheet's Send for Approval at the foot | Bottom bar Self-Service; ESS tabs scroll sideways |
 | ESS · Work Location Requests | Site cards with number and name, purpose, dates and state; then, while any is listed, request cards made before PR 4 | Subtitle; a site's people and description (in its sheet) | Add Work Site, full width at the foot and in the floating button's fan; the sheet's Submit for Approval at its foot; Withdraw Submission in the site's sheet | ESS tabs |
 | ESS · My Devices | Device cards with their status | Subtitle | Register This Device, full width | ESS tabs |
-| People · Attendance | The figures two to a row (a figure filters the register), the view switch (Register, Exceptions, Homes), the status chips scrolling sideways, then register cards with status, clock in and clock out; Homes as cards with the person, status and distance | Subtitle; the arrangement, location, device and review columns (in the day's sheet) | A card opens the day's evidence in a sheet, its check-ins in time order between the punches (PR 4) | More, then People |
+| People · Attendance | The figures two to a row (a figure filters the register), the view switch (Register, Exceptions, and Homes while Home Location is on), the status chips scrolling sideways, then register cards with status, clock in and clock out; Homes as cards with the person, status and distance | Subtitle; the arrangement, location, device and review columns (in the day's sheet) | A card opens the day's evidence in a sheet, its check-ins in time order between the punches (PR 4) | More, then People |
 | People · Devices | Device cards with status | Subtitle | A card opens it; Remove Device in its sheet | People tabs |
 | People · Worksites | Worksite cards; the Add Worksite sheet with the address first after the name, its suggestions as 44 px rows under it inside the sheet's scroll, and the small map under Radius; a worksite's sheet shows its map under the details | Subtitle | Add Worksite, full width; picking a suggestion fills Latitude and Longitude, so a phone types neither; a tap on the map moves the centre (the map never drags, so the sheet keeps its scroll) | People tabs |
 | Clock In / Clock Out panel, from PRs 2 to 4 | The banner for a rough reading above Clock In Anyway; Check In full width on a temporary site's day | Nothing | Clock In or Clock Out; Check In | As above |
@@ -1502,6 +1573,21 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
   hour still not clocked in: the push then.
 - Signing in through a link to another screen, first thing in the day: the sign-in prompt opens
   over that screen; closing it leaves the screen as it was.
+- Home Location switched off by a version from today (§1.3): punches before it keep their judgement,
+  and a day whose clock-in was checked against the home stays judged so (§6.4); the next remote
+  punch is not checked.
+- Home Location off with a home waiting: it waits, unseen; switched on again, People see it in Homes
+  and decide it. An open Outside Home or no home exception stays on Exceptions for People (H9).
+- Home Location switched on: whoever needs a home and has none approved or waiting gets one push in
+  the working day; someone who sets one first is not pushed; switched off and on again, those still
+  without one are pushed again (H8). Their clock-ins go to review (no home) until People approve.
+- Moving house while Home Location is off: nothing to do; once it is on again, the old approved home
+  is the fence until the person sends the new one and People approve it.
+- A Temporary Home approved, then Home Location switched off: its remaining days read as remote,
+  unchecked, its hours and zone kept; Check In is refused (`NO_TEMPORARY_SITE`); switched on again,
+  its remaining days are fenced again (H6).
+- A link to a home (an older notice, a search remembered) while Home Location is off: People ·
+  Attendance opens without the Homes view and shows nothing about the home.
 
 ## 12 · Donor code
 
@@ -1531,6 +1617,12 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 - **Payroll** (M6, LA) takes pending items into a run (`in_run`) and owns what a payslip shows;
   PR 3 prices them from `employee.gross_monthly` so the person sees them as they happen.
 - **Cynthia is told** the home fence is 150 m, not the 100 m of her email, and why (TB, 20/10/2026).
+- **Home Location ships off** (TB, 22/10/2026, §1.3 H2), although the 21/10 handover agreed to keep
+  home checks for remote staff (Cynthia). MyCity are told; People switch it on by publishing a
+  version of the Attendance policy whenever they want it. TB to confirm the Working From Home
+  sentence read while it is off.
+- **The assistant** (M10) offers the two home routes (§9) only while Home Location is on; no AI
+  route is conditional yet, since nothing reads the routes before M10.
 - Still open: overnight shifts (a schedule's end after midnight; today a shift ends the day it
   starts); offline punching for field staff (not in scope, BACKEND_STRUCTURE §15); whether excusing a
   late day (not only waiving its deduction) should take it out of the count (today it never does).
@@ -1539,6 +1631,7 @@ What each screen shows open, what sits behind help, and how it is laid out on a 
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · The Home Location switch (§1.3, TB's ten answers after the Milestone 1 handover): `home_location` joins the Attendance policy (Location Checks, Home Check and Home Radius beneath it), off by default and on every version before it. Off, no home is asked for, sent, listed, approved, searched or notified (409 `HOME_LOCATION_OFF` on the home routes), a remote day, an approved Temporary Home and an older temporary home or remote day request are not checked (no reading asked or kept, `not_applied`, `home_location_off`), Temporary Home leaves Add Work Site, its days offer no Check In, the register names a remote day Remote, and Working From Home reads one sentence. Homes stay as they were. Switched on, the reminder `attendance_home_needed` pushes Set your home location once a stretch to whoever needs one (`policies.heldSince` gives the stretch's first day, which names it). `AttendanceToday` gains `policy.home_location` and `location.checked`. The rule is a switch named like a place, so it is marked `address:none` in the contract for gate 22 (`addresses.md`). A draft checks a home's Home Check and Home Radius only while Home Location is on, when the worksheet shows them, so an older version's Off or 100 m never blocks a draft on a hidden field. §1 to §11 and §13 updated.
 - 21/10/2026 · TB · The shared roster's `page()` takes `statuses`, any of several (Home's Daily Attendance report: Late and Absent together, `home.md` §6 Reports); nothing it reads or decides changed.
 - 21/10/2026 · TB · Every attendance date field keeps what is typed and refuses a day outside its range as it is typed (the shared `DateField`, fault #2 of the 21/10 brief: a typed 28/10/2026 had become 2020-10-28, so a temporary site, a schedule or overtime from a typed date was refused as Already Past after Save). People · Attendance's Export takes the Period's own message ("Pick 21/10/2026 or earlier") through `DateRangeField`'s `onProblem`.
 - 21/10/2026 · TB · My Days as a chart (`EssAttendance.tsx`, `ess.md`) labels each day 13/10, not 13/10/; the shared bar chart leaves off the days that would touch.

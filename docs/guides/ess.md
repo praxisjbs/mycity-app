@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -380,6 +380,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · My Attendance (#9): the Home Location card shows only while the Attendance policy's Home Location is on (`attendance.md` §1.3); a link carrying `?home=`, from the clock panel's Set Home or the push to set a home, opens Set Home Location while the person has no home approved or waiting. My Profile's Home Address is untouched (H10).
 - 21/10/2026 · TB · My Leave (#12), from the 21/10 System Health brief (faults #1 and #2): Request Leave's types show what is left of the First Day's year ("Annual · 12 days left"), crossing New Year is the contract's check and marks the Last Day as it is typed, and a typed day before today is refused at once by the shared date field, which had turned a typed 28/10/2026 into 2020-10-28 (refused as Already Past). §6, §10.
 - 21/10/2026 · TB · My Attendance (#9): My Days as a chart labels each day 13/10 (it read 13/10/, with a stray slash), and the shared bar chart leaves off the days that would touch, every few days at an even step, the first and the last always.
 - 21/10/2026 · TB · With attendance's PR 2 (`attendance.md` §6.5): Download My Data names a punch whose location could not be proved Unclear, as every screen now does (Location Unclear); My Attendance (#9) reads Location Unclear with its help and a punch's location with its reason, and the clock panel reads the location through the feature's one reader (`app/src/features/attendance/location.ts`).
