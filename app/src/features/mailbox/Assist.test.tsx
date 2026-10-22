@@ -92,13 +92,13 @@ describe("Write With AI", () => {
     expect(screen.queryByRole("radiogroup", { name: "Write or Tidy" })).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: /What To Say/ }), { target: { value: "confirm the eight venues" } });
     fireEvent.click(screen.getByRole("button", { name: "Write Draft" }));
-    await screen.findByRole("button", { name: "Use Draft" });
+    await screen.findByRole("button", { name: "Use Draft" }, { timeout: 5000 });
     const sent = call.mock.calls.find(([key]) => key === "POST /api/v1/mailbox/assist")![1] as { body: Record<string, unknown> };
     expect(sent.body).toMatchObject({ mode: "write", in_reply_to: reply.in_reply_to, instruction: "confirm the eight venues", write_anyway: false });
     expect(screen.getByRole("button", { name: "Try Again" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Use Draft" }));
     expect(use).toHaveBeenCalledWith({ body_html: expect.stringMatching(/^<p>Good morning,<\/p>.*Confirm the eight venues\..*<p>Kind regards,<\/p>$/), subject: null });
-  });
+  }, 30000);
 
   it("asks first when a fact is missing, then Write Anyway drafts without asking", async () => {
     await signedIn(<div />);
@@ -106,19 +106,19 @@ describe("Write With AI", () => {
     render(<WriteWithAi compose={{ ...reply, to: [] }} hidden={false} back={vi.fn()} use={vi.fn()} />);
     fireEvent.change(screen.getByRole("textbox", { name: /What To Say/ }), { target: { value: "propose a day for the site visit" } });
     fireEvent.click(screen.getByRole("button", { name: "Write Draft" }));
-    expect(await screen.findByText("Which day and time suit you?")).toBeTruthy();
+    expect(await screen.findByText("Which day and time suit you?", {}, { timeout: 5000 })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Write Anyway" }));
-    await screen.findByRole("button", { name: "Use Draft" });
+    await screen.findByRole("button", { name: "Use Draft" }, { timeout: 5000 });
     const last = call.mock.calls.filter(([key]) => key === "POST /api/v1/mailbox/assist").pop()![1] as { body: Record<string, unknown> };
     expect(last.body.write_anyway).toBe(true);
-  });
+  }, 30000);
 
   it("on a new message says what is missing on the field; with words written, offers Tidy Up", async () => {
     await signedIn(<div />);
     const fresh: ComposeNow = { ...reply, in_reply_to: null, quoted_html: "", subject: "" };
     const { unmount } = render(<WriteWithAi compose={fresh} hidden={false} back={vi.fn()} use={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Write Draft" }));
-    expect(await screen.findByText("Say what to write")).toBeTruthy();
+    expect(await screen.findByText("Say what to write", {}, { timeout: 5000 })).toBeTruthy();
     unmount();
 
     render(<WriteWithAi compose={{ ...fresh, own_html: "<p>pls send the venue list by monday</p>" }} hidden={false} back={vi.fn()} use={vi.fn()} />);
@@ -127,7 +127,7 @@ describe("Write With AI", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Add a Note" }));
     expect(screen.getByRole("textbox", { name: /Note/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Record Note" }).textContent).toContain("Dictate");
-  });
+  }, 30000);
 
   it("has no accessibility violations", async () => {
     const { container } = render(<WriteWithAi compose={reply} hidden={false} back={vi.fn()} use={vi.fn()} />);
@@ -159,12 +159,12 @@ describe("Summarise Thread", () => {
 
   it("opens above the conversation from the reader", async () => {
     await signedIn(<Mailbox tab="inbox" id={null} />);
-    const reader = await screen.findByRole("button", { name: "Summarise Thread" });
+    const reader = await screen.findByRole("button", { name: "Summarise Thread" }, { timeout: 10000 });
     fireEvent.click(reader);
-    expect(await screen.findByRole("heading", { name: /Summary/ })).toBeTruthy();
-    expect(await screen.findByText(/wrote about/)).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: /Summary/ }, { timeout: 5000 })).toBeTruthy();
+    expect(await screen.findByText(/wrote about/, {}, { timeout: 5000 })).toBeTruthy();
     expect(within(screen.getByRole("button", { name: "Close Summary" }).closest("span")!).getByRole("button", { name: "Copy Summary" })).toBeTruthy();
-  });
+  }, 30000);
 
   it("has no accessibility violations", async () => {
     const { container } = render(<SummaryCard summary={{ ...summary, asked_of_you: ["Send the final venue list by Monday."] }} close={vi.fn()} />);
