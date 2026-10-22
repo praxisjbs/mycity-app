@@ -256,6 +256,7 @@ async function onTime(db, period, months, departmentId, scope, now, kind) {
               THEN c.head_check_in_due_on ELSE c.check_in_due_on END`
       : "c.close_due_on";
   const doneAt = kind === "check_in" ? "rv.check_in_submitted_at" : "rv.closed_at";
+  // A withdrawn review (a leaver's, §11) was never due, so it leaves both counts.
   const { rows } = await db.query(
     `WITH quarter_month AS (
        SELECT g.m::date AS month FROM generate_series($2::date, $3::date, interval '1 month') AS g(m)
@@ -265,7 +266,6 @@ async function onTime(db, period, months, departmentId, scope, now, kind) {
          JOIN performance_cycle c ON c.performance_cycle_id = rv.performance_cycle_id
          JOIN scorecard s ON s.scorecard_id = rv.scorecard_id
         WHERE c.performance_period_id = $1 AND rv.review_kind = 'monthly'
-          -- A withdrawn review (a leaver's, §11) was never due.
           AND rv.status <> 'withdrawn'
           AND ($4::uuid IS NULL OR s.department_id = $4) ${s.and}
      ), marked AS (
