@@ -363,17 +363,17 @@ async function factsOf(db, employeeId, month) {
  * @param {{employee_id: string, month: string}} params  month as YYYY-MM
  */
 async function submit(actor, scope, { employee_id: employeeId, month: key }) {
-  if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee can send commitments", 403);
+  if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee sends commitments", 403);
   if (employeeId !== actor.employee_id && !audience.inScope(scope, employeeId))
-    throw new AppError("FORBIDDEN", "You can send commitments for yourself and your team", 403);
+    throw new AppError("FORBIDDEN", "You can send for yourself and your team", 403);
   const month = monthStart(key);
   return tx(async (client) => {
     const set = await lockSet(client, employeeId, month);
     if (set.status === "submitted")
-      throw new AppError("COMMITMENTS_WAITING", "This month's commitments are already waiting for approval", 409);
+      throw new AppError("COMMITMENTS_WAITING", "This month is already waiting for approval", 409);
     const ids = await tasks.linkCommitments(client, actor, { employeeId, month, setId: set.commitment_set_id });
     if (!ids.length)
-      throw new AppError("COMMITMENTS_EMPTY", "Mark at least one task as a commitment for that month first", 422);
+      throw new AppError("COMMITMENTS_EMPTY", "Mark a commitment for that month first", 422);
     await client.query(
       "UPDATE commitment_set SET status = 'submitted', submitted_at = now() WHERE commitment_set_id = $1",
       [set.commitment_set_id],
@@ -472,7 +472,7 @@ async function rescope(actor, scope, id, { reason }) {
     if (r.rescoped_at) throw new AppError("COMMITMENT_RESCOPED", "This commitment is already rescoped", 409);
     if (["on_time", "late"].includes(r.state))
       throw new AppError("COMMITMENT_DONE", "This commitment is done", 409);
-    if (r.rescope_pending) throw new AppError("WORKFLOW_ALREADY_OPEN", "A rescope is already waiting for approval", 409);
+    if (r.rescope_pending) throw new AppError("WORKFLOW_ALREADY_OPEN", "A rescope is already waiting", 409);
     await tasks.askRescope(client, actor, id, reason);
     await emit(client, {
       key: EVENTS.COMMITMENT_RESCOPE_REQUESTED,
@@ -498,7 +498,7 @@ async function recovery(actor, scope, id, { primary_assignee_id: ownerId, due_on
   return tx(async (client) => {
     const r = await commitmentFor(client, scope, id);
     if (r.state !== "missed")
-      throw new AppError("COMMITMENT_NOT_MISSED", "Only a missed commitment needs a recovery", 409);
+      throw new AppError("COMMITMENT_NOT_MISSED", "Only a missed commitment needs recovery", 409);
     if (r.recovery) throw new AppError("RECOVERY_SET", "This commitment already has a recovery", 409);
     const task = await tasks.create(
       actor,

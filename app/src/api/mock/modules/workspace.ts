@@ -199,7 +199,7 @@ route("PATCH /api/v1/tasks/:id", (req) => {
   if (["title", "due_on", "cadence", "primary_assignee_id"].some((k) => k in b) && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that");
   const approved = Boolean(t.is_commitment && t.original_due_at);
   const marks = ["is_commitment", "acceptance_criteria", "commitment_month"].some((k) => k in b && b[k] !== (t as unknown as Record<string, unknown>)[k]);
-  if (approved && marks) return fail(409, "COMMITMENT_APPROVED", "This commitment is approved. Rescope it instead.");
+  if (approved && marks) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
   if (!approved && marks) {
     const will = { is_commitment: "is_commitment" in b ? Boolean(b.is_commitment) : t.is_commitment, acceptance_criteria: (b.acceptance_criteria as string) ?? t.acceptance_criteria, commitment_month: (b.commitment_month as string) ?? t.commitment_month, due_on: "due_on" in b ? (b.due_on as string) : t.due_at?.slice(0, 10) };
     const problem = commitmentProblem(will);
@@ -247,7 +247,7 @@ route("POST /api/v1/tasks/:id/cancel", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
   if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can cancel it");
-  if (t.is_commitment && t.original_due_at) return fail(409, "COMMITMENT_APPROVED", "This commitment is approved. Rescope it instead.");
+  if (t.is_commitment && t.original_due_at) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
   log(req.user!, t, "cancelled", t.status, "cancelled");
   Object.assign(t, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: (req.body as { cancel_reason: string }).cancel_reason });
   return ok(fresh(t));
@@ -478,9 +478,9 @@ const keyOf = (t: Task) => byId(t.assignee?.employee_id)?.user_key ?? "";
 /** Send a month: its unapproved commitments go into the set, which waits on the manager, or is approved as sent by them. */
 function send(user: string, key: string, month: string) {
   const s = setFor(key, month);
-  if (s.status === "submitted") return fail(409, "COMMITMENTS_WAITING", "This month's commitments are already waiting for approval");
+  if (s.status === "submitted") return fail(409, "COMMITMENTS_WAITING", "This month is already waiting for approval");
   const mine = TASKS.filter((t) => keyOf(t) === key && t.is_commitment && t.commitment_month === month && !t.original_due_at && !t.rescoped_at && t.status !== "cancelled");
-  if (!mine.length) return fail(422, "COMMITMENTS_EMPTY", "Mark at least one task as a commitment for that month first");
+  if (!mine.length) return fail(422, "COMMITMENTS_EMPTY", "Mark a commitment for that month first");
   for (const t of mine) t.commitment_set_id = s.commitment_set_id;
   Object.assign(s, { status: "submitted", submitted_at: new Date().toISOString(), workflow_instance_id: uuid(), returned_reason: null });
   if (byKey(key)?.manager === user) settleSet(s, true);
@@ -565,7 +565,7 @@ route("GET /api/v1/performance/commitments/sets", (req) => {
 });
 route("POST /api/v1/performance/commitments/sets/:employee_id/:month/submit", (req) => {
   const who = byId(req.params.employee_id);
-  if (!who || !canSetFor(req.user!, who.employee_id)) return fail(403, "FORBIDDEN", "You can send commitments for yourself and your team");
+  if (!who || !canSetFor(req.user!, who.employee_id)) return fail(403, "FORBIDDEN", "You can send for yourself and your team");
   return send(req.user!, who.user_key, monthOf(req.params.month));
 });
 route("POST /api/v1/performance/commitments/report", (req) => exportFile(req.user!, `commitments-${String(req.body.month ?? "")}`));
@@ -574,7 +574,7 @@ route("POST /api/v1/performance/commitments/:id/rescope", (req) => {
   if (!t || !t.is_commitment) return notFound();
   if (!t.original_due_at) return fail(409, "COMMITMENT_NOT_APPROVED", "Only an approved commitment is rescoped");
   if (t.status === "done") return fail(409, "COMMITMENT_DONE", "This commitment is done");
-  if (RESCOPES.has(t.task_id)) return fail(409, "WORKFLOW_ALREADY_OPEN", "A rescope is already waiting for approval");
+  if (RESCOPES.has(t.task_id)) return fail(409, "WORKFLOW_ALREADY_OPEN", "A rescope is already waiting");
   t.rescope_reason = String(req.body.reason ?? "");
   if (byKey(keyOf(t))?.manager === req.user) t.rescoped_at = new Date().toISOString();
   else RESCOPES.set(t.task_id, uuid());
@@ -583,7 +583,7 @@ route("POST /api/v1/performance/commitments/:id/rescope", (req) => {
 route("POST /api/v1/performance/commitments/:id/recovery", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t || !t.is_commitment) return notFound();
-  if (stateOf(t) !== "missed") return fail(409, "COMMITMENT_NOT_MISSED", "Only a missed commitment needs a recovery");
+  if (stateOf(t) !== "missed") return fail(409, "COMMITMENT_NOT_MISSED", "Only a missed commitment needs recovery");
   if (recoveryOf(t.task_id)) return fail(409, "RECOVERY_SET", "This commitment already has a recovery");
   const owner = byId(String(req.body.primary_assignee_id ?? ""));
   if (!owner || !canSetFor(req.user!, owner.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });

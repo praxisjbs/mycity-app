@@ -266,7 +266,7 @@ function checkCommitment(t, dueAt) {
 }
 
 const approvedCommitment = () =>
-  new AppError("COMMITMENT_APPROVED", "This commitment is approved. Rescope it instead.", 409);
+  new AppError("COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed", 409);
 
 async function checkAssignee(db, scope, employeeId) {
   audience.assertMaySetFor(scope, employeeId);
