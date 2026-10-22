@@ -504,4 +504,14 @@ describeDb("my workspace against the real migrations", () => {
     const wrong = await as("staff").post(`/tasks/${a.body.task_id}/move`, { status: "in_progress", before_task_id: b.body.task_id });
     expect(wrong.status).toBe(409);
   });
+
+  test("swept after the day's due time, the next one is for the rule's following day, never late at birth", async () => {
+    const thursdayEvening = new Date("2026-10-22T18:30:00Z"); // a Thursday, 19:30 in Lagos, after the day's close
+    const r = await as("staff").post("/tasks", { title: "Send the Thursday digest", due_on: "2026-10-19", recurrence: { freq: "weekly", days: [1, 4] } });
+    expect(r.status).toBe(201);
+    await tasks.sweep(thursdayEvening);
+    const next = await q("SELECT due_at FROM task WHERE parent_task_id = $1", [r.body.task_id]);
+    expect(next.rows.map((row) => lagos.dateOf(new Date(row.due_at)))).toEqual(["2026-10-26"]);
+    expect((await tasks.sweep(thursdayEvening)).repeated).toBe(0);
+  });
 });

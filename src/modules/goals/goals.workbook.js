@@ -36,12 +36,18 @@ function score(v) {
 
 const norm = (v) => (text(v) || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-/** The columns of a header row: the index of the first header that starts with one of the names. */
+/**
+ * The columns of a header row: for each name in turn, the header equal to it, else the first that
+ * starts with it ("Accountable owner" for "Accountable"). Equal wins, so "KPI" is the KPI's name
+ * column and not "KPI ID" before it.
+ */
 function columnsOf(header) {
   const heads = (header || []).map(norm);
   return (...names) => {
     for (const n of names.map(norm)) {
-      const i = heads.findIndex((h) => h === n || h.startsWith(`${n} `));
+      const exact = heads.indexOf(n);
+      if (exact >= 0) return exact;
+      const i = heads.findIndex((h) => h.startsWith(`${n} `));
       if (i >= 0) return i;
     }
     return -1;

@@ -275,7 +275,7 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
 | `task.watchers_changed` | someone watches or stops | the person added by someone else is told |
 | `task.pinged` | Send Nudge | notification to whoever it names, never the sender |
 | `task.reminder_due` | a reminder set on the task comes due (reminder engine, `task_reminder`) | notification to the assignee |
-| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day (counted from today when its day has passed, so a task days overdue repeats once, and never onto a day whose close has already gone by, so a sweep after hours makes no copy already late); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task) |
+| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day (counted from today when its day has passed, so a task days overdue repeats once, and never late at birth: a day whose due time has already gone gives the rule's next day); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task) |
 | `calendar_event.created`, `.changed`, `.cancelled` | save, change, call off | notification to the attendees (an ICS file by email is §13) |
 | `calendar_event.answered` | an attendee accepts or declines | notification to the owner |
 | `calendar_event.reminder_due` | an event's reminder comes due (reminder engine, `calendar_event_reminder`) | notification to the owner and the attendees who have not declined |
@@ -382,9 +382,9 @@ is listed here as tier 1 or tier 2.**
 
 ## 14 · Change log
 
-- 22/10/2026 · GE · §7: a repeating task caught up after the day's close repeats onto its next day still ahead, not onto today's already-late slot (the sweep after hours made two copies; found when the suite ran at 18:00).
-
 - 22/10/2026 · GE · Calendar's toolbar: Today stands on its own before the arrows, which are named by the view (Previous Month, Next Week, Next Day), so the forward arrow no longer reads as "tomorrow" (team feedback, 22/10/2026).
+
+- 22/10/2026 · TB · §7: a repeating task swept after its next day's due time comes round on the rule's following day; it was made late at birth and repeated again on the next sweep (found when the integration suite ran on a Thursday evening).
 
 - 22/10/2026 · GE · §9: Praxis AI's "create a task" and "book a meeting" open New Task and New Event filled with what the person said (`TaskPrefill`, `CalendarEventPrefill`, `praxis-ai.md` §6.4); the forms read their own fields from the address, so the deep link no longer passes the title itself.
 

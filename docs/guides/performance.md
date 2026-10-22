@@ -1074,7 +1074,8 @@ Worked out whenever a check-in opens or is read, and again at the review's submi
   monthly scores); "Scored from" sets Scored From; `[TBC]` sets TBC; the department from the sheet's title
   (now equal to the department names, P4); accountable owners matched to employees by name, a function
   named as owner resolving to its head; the change map's former IDs saved as `okr_code_alias`.
-- **`okr_kpis`**: each function sheet's Operational KPIs table.
+- **`okr_kpis`**: each function sheet's Operational KPIs table. The KPI column names the KPI and KPI ID
+  gives its code: a header equal to the name a column is looked up by wins over one that starts with it.
 - **`scorecards`**: each `00nnn Name` sheet: the person matched on the staff list by name (their staff IDs
   differ from the system's), reviewer by name; each line with section, weight, target text, linked codes
   resolved through codes and aliases, due or frequency; months entered. Unmatched people (Abubakar
@@ -1387,6 +1388,13 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 - **M3 hand-off**: the caution letter and the conduct mark from upheld sanctions. GE, at M3's start.
 
 ## 14 · Change log
+
+- 22/10/2026 · TB · Fix after PR 5, found while walking staging's data for the training guide: `okr_kpis`
+  named every KPI after its code, because the column finder took the first header starting with "KPI"
+  ("KPI ID") for the KPI column (§6.19). Importing the workbook's KPIs again corrects the names (45
+  updates). A key result's panel reads "Was not set" for a target a change set first, not "Was null".
+  Reviews opened on the quarter's oldest round: the API lists rounds newest first and the screen took
+  the last row; it now opens on the newest (§10).
 
 - 22/10/2026 · TB · PR 5 built: Performance Analytics (`GET /performance/analytics`, its people table
   and Export), every figure in SQL within the reader's scope (§6.21); the Analytics tab on both shells;
