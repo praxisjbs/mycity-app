@@ -108,7 +108,7 @@ by PR), so the parallel three do not edit the same file; the shared exceptions a
 | 1 · Foundation | `m2/perf-foundation` | The org's names and seats; department heads; the whole schema, contract and scoring library; business days; the second-level approver; the four approval flows; capabilities; quarters and their rules (the first API); screens registered and laid out; the mock | §4, §6.1, §6.2, §6.8, §6.9 (the maths), §6.13, §6.20 | 2100 to 2199 | none | Built 22/10/2026 |
 | 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards with the contribution check, the quarter plan and its approval, agreement, target changes and the lock, the three importers; Goals, Scorecards and KPIs screens; Home's goals adapter kept true | §3.1, §3.2, §3.5, §3.6, §6.3 to §6.7, §6.19 | 2200 to 2299 | PR 1 | Built 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, self-first, the reviewer, dotted input, second level, HR close, conduct cap, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews tab and ESS · My Performance; Home's reviews adapter kept true | §3.3, §6.10, §6.12, §6.14 to §6.17 | 2300 to 2399 | PR 2 | Not started |
-| 4 · Workspace | `m2/perf-workspace` | Commitments and their approval, the Commitments view and month-end report, Counts Towards, initiatives on the board, the weekly summary with Tidy, performance dates on the calendar, My Commitments on ESS | §3.4, §6.11, §6.18 | 2400 to 2499 | PR 2 | In progress |
+| 4 · Workspace | `m2/perf-workspace` | Commitments and their approval, the Commitments view and month-end report, Counts Towards, initiatives on the board, the weekly summary with Tidy, performance dates on the calendar, My Commitments on ESS | §3.4, §6.11, §6.18 | 2400 to 2499 | PR 2 | Built 22/10/2026 |
 | 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard and the Team roster's score; the M2 demo walk | §3.7, §6.21 | 2500 to 2599 | PR 2 | Not started |
 
 Until a PR lands, the screens its sections build stay as they are (Coming Soon on production, the
@@ -175,17 +175,17 @@ line. Nothing is ticked until it is merged.
 
 **PR 4 · Workspace**
 
-- [ ] Commitments on tasks (§6.11): Commitment, Acceptance Criteria and the month on the task form; Send Commitments (`commitment_set`, `performance.commitments`); approval locks the original date; a moved date keeps the original; Rescope by approval; states worked out; a recovery task for each missed one
-- [ ] Commitments view on Performance · Scorecards (P10): month, filters, Waiting On You, Approve Month; a row opens its task and Back returns to the same filtered list
-- [ ] Month-end delivery report (§6.11): per function, by the 3rd business day, as an export through `shared/documents/exports`
-- [ ] Counts Towards (§6.18): the task form's picker of the assignee's scorecard lines and the key results they own; `linkFor("target", …)`; lines measured in tasks recount on `task.completed` and `task.reopened`
-- [ ] Weekly summary (§6.18): My Week and Team This Week on Today, Support Needed, Tidy With AI (action `week-summary`, Default, `chosen_by` TB, `chosen_at` 2026-10-22, `personal_data` true)
-- [ ] Performance dates on the calendar (§6.18): check-in due, reviews to write, key result finish dates for their owner, PIP review dates
-- [ ] My Commitments on ESS · My Performance (`app/src/features/performance/my/MyCommitments.tsx`, §12)
-- [ ] `docs/guides/workspace.md` brought up to what shipped (§2 to §10, §14)
-- [ ] ⌘K action New Commitment; commitments found as tasks
-- [ ] Staging seed `seeds/staging/47_performance_commitments.js`: October and November commitments in every state
-- [ ] Docs and progress: Workspace notes and the Commitments half of #30; this guide's §14
+- [x] 22/10/2026 · Commitments on tasks (§6.11): Mark as Commitment, Acceptance Criteria and Month on the task form; Send Commitments (`commitment_set`, `performance.commitments`; a month sent by its own reviewer is approved as sent); approval fixes the original date, and the mark, month and criteria with it; a moved date keeps the original; Rescope by approval; states worked out on every read; a missed one gets its recovery task through Set Recovery, its owner and date chosen by a person (the CEO KPI is a recovery decision), not made by itself
+- [x] 22/10/2026 · Commitments view on Performance · Scorecards (P10): the month, Department and State filters and Search People, all kept in the address; the figures; Waiting On You with Approve Month and Request Changes; a row opens its task and Back returns to the same filtered list
+- [x] 22/10/2026 · Month-end delivery report (§6.11): Export Report on the Commitments view, a summary sheet and one sheet per function in the reader's scope, made by the worker through `shared/documents/exports`. It is made when asked: the 3rd business day is the CEO's deadline, not a schedule
+- [x] 22/10/2026 · Counts Towards (§6.18): the task form's picker of the assignee's scorecard lines and the key results they own (`GET /tasks/counts-towards`, 25 a page); `linkFor("target", …)`; lines measured in tasks are counted on every read (`tasks.service.doneTowards`), so there is nothing stored to recount: `task.completed` and `task.reopened` carry the line and the month for whoever listens
+- [x] 22/10/2026 · Weekly summary (§6.18): My Week and Team This Week on Today, Support Needed, Tidy With AI (action `week-summary`, Default, `chosen_by` TB, `chosen_at` 2026-10-22, `personal_data` true), which changes nothing until Use Summary
+- [x] 22/10/2026 · Performance dates on the calendar (§6.18): check-in due, reviews to write, key result finish dates for their owner, PIP review dates. The first two show once PR 3 opens rounds
+- [x] 22/10/2026 · My Commitments on ESS · My Performance (`app/src/features/performance/my/MyCommitments.tsx`, §12), placed on the page as its icon card and its desktop card (two lines in `app/src/features/ess/Performance.tsx`, PR 3's file, named in the PR)
+- [x] 22/10/2026 · `docs/guides/workspace.md` brought up to what shipped (§2 to §10, §14)
+- [x] 22/10/2026 · ⌘K action New Commitment; commitments found as tasks; a commitment set `search:none` with its reason
+- [x] 22/10/2026 · Staging seed `seeds/staging/47_performance_commitments.js`: October and November commitments in every state the day allows (Not Sent, Awaiting Approval, Returned, Due, On Time, Late, Rescoped, a rescope waiting; Missed and a Recovery once October has closed), with its own integration test
+- [x] 22/10/2026 · Docs and progress: Workspace notes and the Commitments half of #30; this guide's §14
 
 **PR 5 · Analytics**
 
@@ -1333,6 +1333,16 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 - **M3 hand-off**: the caution letter and the conduct mark from upheld sanctions. GE, at M3's start.
 
 ## 14 · Change log
+
+- 22/10/2026 · TB · PR 4 built: commitments on tasks with their month's approval, original dates,
+  rescope and recovery; the Commitments view with its figures, Waiting On You and Export Report; Counts
+  Towards; My Week and Team This Week with Tidy With AI; performance dates on the calendar; My
+  Commitments on ESS; New Commitment on ⌘K; the staging seed. What differs from §1.2: lines measured in
+  tasks are counted on read, so nothing recounts; a recovery task is set by a person (Set Recovery),
+  not made by itself; the month-end report is made when asked; the Commitments view's person filter is
+  its search (Search People); a month sent by its own reviewer is approved as sent; Awaiting Approval
+  counts sent months, a Not Sent commitment shows only in the list. My Commitments is placed on the ESS
+  page in PR 3's file (two lines).
 
 - 22/10/2026 · TB · PR 4 begun, this guide first (CLAUDE.md step 2): §3.4, §6.11 and §6.18 say how
   commitments are sent, approved, rescoped and recovered, how Counts Towards picks, how lines measured
