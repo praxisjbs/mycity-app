@@ -240,6 +240,39 @@ const CAPABILITY_CATALOG = [
     label: "Configure Signature",
     description: "Set the company's signature links and what shows on everyone's email signature.",
   },
+  // M2 Performance (docs/guides/performance.md §8), seeded in 2190.
+  {
+    code: "goals.organisation",
+    module: "performance",
+    label: "Set Organisational Goals",
+    description: "Record and edit the organisational goals and their quarterly targets.",
+  },
+  {
+    code: "goals.company",
+    module: "performance",
+    label: "Set Company OKRs",
+    description: "Set the company objectives and key results, and send the company plan.",
+  },
+  {
+    code: "goals.function",
+    module: "performance",
+    label: "Set Function OKRs",
+    description:
+      "Set a function's objectives, key results and KPIs, report its month and send its plan, as its head or acting head.",
+  },
+  {
+    code: "goals.confirm",
+    module: "performance",
+    label: "Confirm Scores",
+    description: "Confirm the month's key result scores the heads propose.",
+  },
+  {
+    code: "performance.manage",
+    module: "performance",
+    label: "Run Performance",
+    description:
+      "Run the cycle: quarters and their rules, rounds, reviewer changes, conduct, improvement plans, probation outcomes and imports.",
+  },
 ];
 
 const CAPABILITIES = CAPABILITY_CATALOG.map((c) => c.code);

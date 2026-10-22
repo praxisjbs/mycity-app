@@ -62,6 +62,7 @@ export const VISIBLE_RULES = [
   "location_rule",
   "overtime",
   "office_geofence_mode",
+  "home_location",
   "home_geofence_mode",
   "site_geofence_mode",
   "home_radius_m",
@@ -106,6 +107,7 @@ export const RULE_LABEL: Record<VisibleRule, string> = {
   location_rule: "Location Flags",
   overtime: "Overtime",
   office_geofence_mode: "Office Check",
+  home_location: "Home Location",
   home_geofence_mode: "Home Check",
   site_geofence_mode: "Temporary Site Check",
   home_radius_m: "Home Radius",
@@ -130,6 +132,7 @@ export const RULE_HELP: Record<VisibleRule, string> = {
   location_rule: "Clock-ins outside a place of work that still stand, counted over a period.",
   overtime: "Minutes worked past the end, and every minute on a day not worked, paid as approved.",
   office_geofence_mode: "A clock-in outside the office's radius. Flag: accepted and sent to People to review. Refuse: not accepted.",
+  home_location: "Staff who work from home set a home for People to approve. Off: no home is asked for and a clock-in from home is not checked.",
   home_geofence_mode: "A clock-in away from an approved home. Flag: accepted and sent to People to review. Refuse: not accepted.",
   site_geofence_mode: "A clock-in outside a temporary site's addresses. Flag: accepted and sent to People to review. Refuse: not accepted. A check-in outside them is flagged under either.",
   home_radius_m: "How far from an approved home a clock-in still counts as at home. At least 150 m.",
@@ -169,7 +172,8 @@ export const WORKSHEET: ReadonlyArray<{ title: string; rules: readonly VisibleRu
   { title: "Forgotten Clock-Outs", rules: ["forgotten_rule"] },
   { title: "Location Flags", rules: ["location_rule"] },
   { title: "Overtime", rules: ["overtime"] },
-  { title: "Location Checks", rules: ["office_geofence_mode", "home_geofence_mode", "site_geofence_mode", "home_radius_m", "max_accuracy_m"] },
+  // Home Check and Home Radius are drawn under Home Location, while it is on (attendance.md §1.3).
+  { title: "Location Checks", rules: ["office_geofence_mode", "home_location", "site_geofence_mode", "max_accuracy_m"] },
   { title: "Devices", rules: ["device_mode"] },
   { title: "Clock Prompts", rules: ["clock_out_reminder_minutes", "system_clock_out_after_minutes"] },
 ];

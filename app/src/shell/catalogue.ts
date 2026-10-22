@@ -42,7 +42,7 @@ export const MODULES: ModuleDef[] = [
     key: "people", label: "People", short: "People", icon: "users", area: "People",
     tabs: [t("Employees", "employees"), t("Organogram", "organogram"), t("Attendance", "attendance"), t("Leave", "leave"), t("Devices", "devices"), t("Worksites", "worksites")],
   },
-  { key: "performance", label: "Performance", short: "Performance", icon: "target", area: "People", tabs: [t("Goals", "goals"), t("Targets", "targets"), t("KPIs", "kpis"), t("Reviews", "reviews"), t("Analytics", "analytics")] },
+  { key: "performance", label: "Performance", short: "Performance", icon: "target", area: "People", tabs: [t("Goals", "goals"), t("Scorecards", "targets"), t("KPIs", "kpis"), t("Reviews", "reviews"), t("Analytics", "analytics")] },
   { key: "queries", label: "Queries & Sanctions", short: "Queries", icon: "flag", area: "People", tabs: [t("Queries", "queries"), t("Rules", "rules"), t("Sanctions", "sanctions"), t("Letter Templates", "letter-templates")] },
   {
     key: "recruitment", label: "Recruitment", short: "Recruitment", icon: "brief", area: "People",

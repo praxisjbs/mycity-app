@@ -1,5 +1,5 @@
 {
-  "note": "Which roles a post is given when the staff roster creates its login, by job title as seeds/staff/staff-list.xlsx spells it. No names: a person is matched by their post, so a new holder of the post is given the same roles. Roles are applied only when the login is created, so a role taken away on screen is not added back by the next deploy (docs/guides/foundation.md §6.1, §11). TB, 16/10/2026. A post the sheet does not hold may say who it reports to (line_manager, in the words of the sheet's Line Manager column); the loader gives that line only while the person has none, so a manager set on screen stays. TB, 19/10/2026.",
+  "note": "Which roles a post is given when the staff roster creates its login, by job title as seeds/staff/staff-list.xlsx spells it. No names: a person is matched by their post, so a new holder of the post is given the same roles. Roles are applied only when the login is created, so a role taken away on screen is not added back by the next deploy (docs/guides/foundation.md §6.1, §11). TB, 16/10/2026. A post the sheet does not hold may say who it reports to (line_manager, in the words of the sheet's Line Manager column); the loader gives that line only while the person has none, so a manager set on screen stays. TB, 19/10/2026. Posts renamed to the Org Chart's titles (Backend Operations Manager; Head, PR, Marketing & Brand Strategy), TB, 22/10/2026.",
   "default": {
     "roles": ["employee"]
   },
@@ -19,10 +19,10 @@
       "work_email": "cynthia@mycityapp.io",
       "work_email_note": "The sheet has no email for this post. TB gave it on 16/10/2026."
     },
-    "Head PR, Marketing & Brand Strategy": {
+    "Head, PR, Marketing & Brand Strategy": {
       "roles": ["head_of_department"]
     },
-    "Back-end Manager": {
+    "Backend Operations Manager": {
       "roles": ["manager"]
     },
     "Implementation Partner": {

@@ -8,6 +8,7 @@ import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
 import { byKey } from "@/api/mock/data/people";
+import { setMockHomeLocation } from "@/api/mock/modules/policies";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { useClock } from "./ClockButton";
@@ -20,7 +21,8 @@ import { PeopleAttendance } from "./PeopleAttendance";
  * Location takes one reading good enough and the address; People approve or reject what waits.
  * Chidera, who has not clocked in today on the mock, is made remote for this file only, so each
  * test starts from the same day whatever the date (the Remote demonstration account's day comes
- * from the mock's history).
+ * from the mock's history). The policy's Home Location (attendance.md §1.3), off on the mock as in
+ * production, is switched on for these cases; the last case runs with it off.
  */
 
 type Position = { coords: { latitude: number; longitude: number; accuracy: number } };
@@ -51,8 +53,10 @@ beforeEach(() => {
   Object.defineProperty(navigator, "userAgent", { configurable: true, value: PHONE });
   Object.defineProperty(navigator, "permissions", { configurable: true, value: { query: async () => ({ state: "prompt" }) } });
   byKey("chidera")!.work_pattern = "remote";
+  setMockHomeLocation(true);
 });
 afterEach(() => {
+  setMockHomeLocation(false);
   cleanup();
   vi.restoreAllMocks();
   vi.useRealTimers();
@@ -163,7 +167,8 @@ describe("remote staff's homes", () => {
 
   it("People see homes waiting first and decide one; a rejection needs its reason", async () => {
     await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
-    fireEvent.click(screen.getByRole("radio", { name: "Homes" }));
+    // Homes shows once today's policy says Home Location is on.
+    fireEvent.click(await screen.findByRole("radio", { name: "Homes" }, { timeout: 5000 }));
     const row = await screen.findByText("Seyi Balogun");
     expect(screen.getByText("3 Fixture Road, Ikoyi")).toBeTruthy();
     fireEvent.click(row);
@@ -181,5 +186,39 @@ describe("remote staff's homes", () => {
     await waitFor(() => expect(screen.queryByText("Seyi Balogun")).toBeNull());
     const approved = await api.call("GET /api/v1/attendance/homes", { query: { status: "approved", q: "seyi" } });
     expect(approved.data.map((h) => [h.employee.display_name, h.home_address, h.decided_by_name])).toEqual([["Seyi Balogun", "3 Fixture Road, Ikoyi", "Cynthia Osakunih"]]);
+  }, 20000);
+});
+
+describe("with the policy's Home Location off", () => {
+  beforeEach(() => setMockHomeLocation(false));
+
+  it("no card and no home banner; Clock In reads no location and the punch is not checked", async () => {
+    await signedInAs("chidera@mycityapp.io", <HomeLocationCard openOnLoad />);
+    act(() => clock!.open());
+    await screen.findByText("Not Checked");
+    expect(screen.queryByText("No approved home location yet.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Set Home" })).toBeNull();
+    expect(screen.queryByText("Home Location")).toBeNull();
+
+    // The mock keeps the first case's clock-in: whichever the panel offers, it sends no reading. The
+    // device check still runs, so an unregistered device may still send the punch to review.
+    const out = clock!.today!.state === "clocked_in";
+    press(out ? "Clock Out" : "Clock In");
+    await waitFor(() => expect(clock!.today!.state).toBe(out ? "clocked_out" : "clocked_in"), { timeout: 5000 });
+    expect(watchPosition).not.toHaveBeenCalled();
+    expect(screen.queryByText("Share Your Location")).toBeNull();
+    const today = await api.call("GET /api/v1/attendance/me/today", {});
+    expect(today.location).toEqual({ kind: "remote", name: null, radius_m: null, home_state: null, checked: false });
+    expect(today.policy.home_location).toBe(false);
+    const events = await api.call("GET /api/v1/attendance/me/events", { query: { date: today.date } });
+    const punched = events.data.find((e) => e.event_type === (out ? "clock_out" : "clock_in"));
+    expect(punched).toMatchObject({ geofence: "not_applied", location_reason: "home_location_off", distance_m: null });
+  }, 20000);
+
+  it("People see no Homes view, and the home routes refuse", async () => {
+    await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
+    await screen.findByRole("radio", { name: "Register" });
+    expect(screen.queryByRole("radio", { name: "Homes" })).toBeNull();
+    await expect(api.call("GET /api/v1/attendance/homes", { query: {} })).rejects.toMatchObject({ code: "HOME_LOCATION_OFF" });
   }, 20000);
 });

@@ -15,7 +15,7 @@
  */
 const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
-const { photoUrlSql } = require("../../shared/db/person");
+const { photoUrlSql, personJson } = require("../../shared/db/person");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -349,7 +349,8 @@ function findDepartmentByName(db, name) {
 function findDepartmentById(db, departmentId) {
   return one(
     db,
-    `SELECT department_id, code::text AS code, name, parent_department_id, description, active
+    `SELECT department_id, code::text AS code, name, parent_department_id, description, active,
+            head_employee_id, head_seat_id
        FROM department WHERE department_id = $1`,
     [departmentId],
   );
@@ -359,28 +360,92 @@ async function codeTaken(db, code) {
   return Boolean(await one(db, "SELECT 1 AS x FROM department WHERE code = $1", [code]));
 }
 
-function insertDepartment(db, { code, name, parent_department_id: parent = null, description = null }) {
+function insertDepartment(
+  db,
+  { code, name, parent_department_id: parent = null, description = null, head_employee_id: headId = null, head_seat_id: seatId = null },
+) {
   return one(
     db,
-    `INSERT INTO department (code, name, parent_department_id, description)
-     VALUES ($1, $2, $3, $4)
-     RETURNING department_id, code::text AS code, name, parent_department_id, description, active, created_at`,
-    [code, name, parent, description],
+    `INSERT INTO department (code, name, parent_department_id, description, head_employee_id, head_seat_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING department_id, code::text AS code, name, parent_department_id, description, active,
+               head_employee_id, head_seat_id, created_at`,
+    [code, name, parent, description, headId, seatId],
   );
 }
+
+/**
+ * A department as the contract gives it: its headcount, and its head as a ManagerRef (a person,
+ * the person in a filled head seat, or the vacant seat). `acting_head` is added by the service.
+ */
+const DEPARTMENT_ROW = `
+  d.department_id, d.code::text AS code, d.name, d.parent_department_id, d.active,
+  (SELECT count(*)::int FROM employee e WHERE e.department_id = d.department_id AND e.status = 'active') AS headcount,
+  d.head_employee_id, d.head_seat_id,
+  CASE
+    WHEN he.employee_id IS NOT NULL THEN json_build_object(
+      'employee_id', he.employee_id, 'org_seat_id', NULL,
+      'display_name', btrim(he.first_name || ' ' || he.last_name), 'job_title', he.job_title, 'vacant', false)
+    WHEN hf.employee_id IS NOT NULL THEN json_build_object(
+      'employee_id', hf.employee_id, 'org_seat_id', NULL,
+      'display_name', btrim(hf.first_name || ' ' || hf.last_name), 'job_title', hs.title, 'vacant', false)
+    WHEN hs.org_seat_id IS NOT NULL THEN json_build_object(
+      'employee_id', NULL, 'org_seat_id', hs.org_seat_id,
+      'display_name', hs.title, 'job_title', hs.title, 'vacant', true)
+  END AS head`;
+const DEPARTMENT_JOINS = `
+  LEFT JOIN employee he ON he.employee_id = d.head_employee_id
+  LEFT JOIN org_seat hs ON hs.org_seat_id = d.head_seat_id
+  LEFT JOIN employee hf ON hf.employee_id = hs.filled_by_employee_id AND hs.status = 'filled'`;
 
 /** One department in the shape the contract gives a list row, headcount included. */
 function departmentRow(db, departmentId) {
   return one(
     db,
-    `SELECT d.department_id, d.code::text AS code, d.name, d.parent_department_id, d.active,
-            count(e.employee_id) FILTER (WHERE e.status = 'active')::int AS headcount
-       FROM department d
-       LEFT JOIN employee e ON e.department_id = d.department_id
-      WHERE d.department_id = $1
-      GROUP BY d.department_id, d.code, d.name, d.parent_department_id, d.active`,
+    `SELECT ${DEPARTMENT_ROW} FROM department d ${DEPARTMENT_JOINS} WHERE d.department_id = $1`,
     [departmentId],
   );
+}
+
+/**
+ * Who acts as a department's head (docs/guides/performance.md §6.20): its head; the person in
+ * its head seat; or, while the seat is vacant, the first person above it, through any vacant
+ * seats between. Null when it has none.
+ */
+async function headOf(db, departmentId) {
+  const row = await one(
+    db,
+    `WITH RECURSIVE up AS (
+       SELECT s.org_seat_id, s.status, s.filled_by_employee_id, s.line_manager_id, s.line_manager_seat_id, 0 AS hops
+         FROM department d JOIN org_seat s ON s.org_seat_id = d.head_seat_id
+        WHERE d.department_id = $1
+       UNION ALL
+       SELECT n.org_seat_id, n.status, n.filled_by_employee_id, n.line_manager_id, n.line_manager_seat_id, up.hops + 1
+         FROM up JOIN org_seat n ON n.org_seat_id = up.line_manager_seat_id
+        WHERE up.status <> 'filled' AND up.line_manager_id IS NULL AND up.hops < 32
+     )
+     SELECT COALESCE(
+              (SELECT d.head_employee_id FROM department d WHERE d.department_id = $1),
+              (SELECT CASE WHEN up.status = 'filled' THEN up.filled_by_employee_id ELSE up.line_manager_id END
+                 FROM up
+                WHERE (up.status = 'filled' AND up.filled_by_employee_id IS NOT NULL) OR up.line_manager_id IS NOT NULL
+                ORDER BY up.hops LIMIT 1)
+            ) AS employee_id`,
+    [departmentId],
+  );
+  return row ? row.employee_id : null;
+}
+
+/** A person as the contract's PersonRef, or null. */
+function personRef(db, employeeId) {
+  if (!employeeId) return null;
+  return one(
+    db,
+    `SELECT ${personJson("e", "d")} AS person
+       FROM employee e LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE e.employee_id = $1`,
+    [employeeId],
+  ).then((r) => (r ? r.person : null));
 }
 
 const DEPARTMENT_SORTS = { name: "d.name", created_at: "d.created_at" };
@@ -389,13 +454,10 @@ const DEPARTMENT_SORTS = { name: "d.name", created_at: "d.created_at" };
 function departments(db, query) {
   return pageQuery(
     db,
-    `SELECT d.department_id, d.code::text AS code, d.name, d.parent_department_id, d.active,
-            count(e.employee_id) FILTER (WHERE e.status = 'active')::int AS headcount, ${TOTAL_COL}
-       FROM department d
-       LEFT JOIN employee e ON e.department_id = d.department_id
-      WHERE ($1::text IS NULL OR search_fold(d.name) LIKE '%' || search_fold($1) || '%')
+    `SELECT ${DEPARTMENT_ROW}, ${TOTAL_COL}
+       FROM department d ${DEPARTMENT_JOINS}
+      WHERE ($1::text IS NULL OR search_fold(d.name || ' ' || d.code) LIKE '%' || search_fold($1) || '%')
         AND ($2::text IS NULL OR d.active = ($2 = 'true'))
-      GROUP BY d.department_id, d.code, d.name, d.parent_department_id, d.active, d.created_at
       ORDER BY ${orderBy(query, DEPARTMENT_SORTS, "d.department_id")}`,
     [query.q ?? null, query.active ?? null],
     query,
@@ -403,7 +465,7 @@ function departments(db, query) {
 }
 
 function updateDepartment(db, departmentId, patch) {
-  const keys = ["name", "parent_department_id", "description", "active"].filter((k) =>
+  const keys = ["name", "code", "parent_department_id", "description", "active", "head_employee_id", "head_seat_id"].filter((k) =>
     Object.prototype.hasOwnProperty.call(patch, k),
   );
   const sets = keys.map((k, i) => `${k} = $${i + 2}`);
@@ -411,7 +473,8 @@ function updateDepartment(db, departmentId, patch) {
     db,
     `UPDATE department SET ${sets.join(", ")}, updated_at = now()
       WHERE department_id = $1
-      RETURNING department_id, code::text AS code, name, parent_department_id, description, active, created_at`,
+      RETURNING department_id, code::text AS code, name, parent_department_id, description, active,
+                head_employee_id, head_seat_id, created_at`,
     [departmentId, ...keys.map((k) => patch[k])],
   );
 }
@@ -855,6 +918,8 @@ module.exports = {
   findDepartmentByName,
   findDepartmentById,
   departmentRow,
+  headOf,
+  personRef,
   codeTaken,
   insertDepartment,
   departments,

@@ -11,7 +11,7 @@
  *
  * Open means not done, not cancelled and not archived.
  */
-const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { personJson } = require("../../shared/db/person");
 
@@ -22,6 +22,8 @@ const ROWS = `
          t.blocked_reason, t.blocked_at, t.employee_target_id, t.entity_type, t.entity_id,
          t.recurrence, t.sort_order, t.created_at, t.updated_at, t.archived_at,
          t.primary_assignee_id, t.set_by_employee_id, t.created_by,
+         t.is_commitment, t.acceptance_criteria, t.commitment_month, t.original_due_at, t.rescoped_at,
+         t.commitment_set_id,
          ${personJson("ae", "ad")} AS assignee,
          ${personJson("se", "sd")} AS set_by,
          et.title AS target_title,
@@ -43,7 +45,8 @@ const OUT = `v.task_id, v.number, v.title, v.description, v.status, v.priority, 
   v.due_at, v.started_at, v.completed_at, v.cancelled_at, v.cancel_reason, v.blocked_reason,
   v.blocked_at, v.employee_target_id, v.entity_type, v.entity_id, v.recurrence, v.sort_order,
   v.created_at, v.updated_at, v.primary_assignee_id, v.set_by_employee_id, v.created_by,
-  v.assignee, v.set_by, v.target_title, v.comment_count`;
+  v.assignee, v.set_by, v.target_title, v.comment_count, v.is_commitment, v.acceptance_criteria,
+  v.commitment_month, v.original_due_at, v.rescoped_at, v.commitment_set_id`;
 
 /** The SQL for each field TaskListQuery allow-lists. The first is the default order. */
 const SORTS = {
@@ -395,8 +398,23 @@ async function dueBetween(db, from, to, after, batch) {
   return rows;
 }
 
+/** The tasks still open that carry out one record (a key result's initiatives). */
+async function openForRecord(db, entityType, entityId) {
+  // pagination:complete every open task of one record, each cancelled with it
+  const { rows } = await completeQuery(
+    db,
+    `SELECT task_id, status FROM task
+      WHERE entity_type = $1 AND entity_id = $2 AND status NOT IN ('done', 'cancelled')
+      ORDER BY task_id`,
+    [entityType, entityId],
+    { label: "a record's open tasks", ceiling: 500 },
+  );
+  return rows;
+}
+
 module.exports = {
   SORTS,
+  openForRecord,
   list,
   summary,
   get,

@@ -1108,6 +1108,28 @@ async function rulesOfVersion(db, kind, policyVersionId) {
 }
 
 /**
+ * Since when a rule has held (§6.8): the first version of the unbroken run of versions, up to the
+ * one in force on `date`, whose rules all pass `test`; null when the version in force fails it. The
+ * type's defaults are a run of their own from before the first version (no id). The Attendance
+ * policy's Home Location names each stretch it stays on by it (attendance.md §6.10).
+ * @param {{query: Function}} db
+ * @param {string} kind  a rules type ("attendance")
+ * @param {string} date  YYYY-MM-DD
+ * @param {(rules: object) => boolean} test
+ * @returns {Promise<{policy_version_id: string|null, effective_from: string|null}|null>}
+ */
+async function heldSince(db, kind, date, test) {
+  let since = null;
+  for (let at = date; ; ) {
+    const row = await repo.rulesInForce(db, kind, at);
+    if (!test(rulesOf(kind, row ? row.rules : null))) return since;
+    if (!row) return { policy_version_id: null, effective_from: null };
+    since = { policy_version_id: row.policy_version_id, effective_from: day(row.effective_from) };
+    at = lagos.addDays(since.effective_from, -1);
+  }
+}
+
+/**
  * The reminder's `find` (policies.events.js): for each newest version published REMIND_AFTER_DAYS
  * days ago or more that needs acknowledging, one occurrence for each person asked who has neither
  * acknowledged nor been reminded. Fired in the working day; the engine adds each once.
@@ -1181,6 +1203,7 @@ module.exports = {
   requestPdf,
   rulesFor,
   rulesOfVersion,
+  heldSince,
   remindersDue,
   reminderCheck,
   canManage,

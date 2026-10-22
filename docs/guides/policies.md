@@ -10,7 +10,7 @@
 | Capabilities | `policies.manage` (write, publish, withdraw and archive policies, and see who has acknowledged them; Knowledge Hub · Policies) |
 | Screens (PROGRESS.md rows) | #62 Policies, #89 Policy Updates; the acknowledge sheet over any screen; #73 Settings · Attendance Policy is dropped, its worksheet is the Attendance policy here |
 | Status | Built |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources, in their order of authority (CLAUDE.md step 3): TB's decisions of 20/10/2026 (§1.1), which
 bring Knowledge Hub · Policies forward from M10 and retire Settings · Attendance Policy (MILESTONES
@@ -265,6 +265,12 @@ removed with Settings · Attendance Policy; what the clock reads is unchanged (�
   second way a module reads its rules: for something judged by a version recorded on it, whatever is
   in force since (attendance's day, judged by the version on its first clock-in, `attendance.md`
   §6.4). A module never reads `policy_version` itself.
+- `policies.heldSince(client, kind, date, test)` gives the first version of the unbroken run of
+  versions, up to the one in force on that date, whose rules all pass `test` (`policy_version_id`
+  and `effective_from`), or null when the version in force fails it. It is the third way a module
+  reads its rules: since when a switch that is on now has stayed on (the Attendance policy's Home
+  Location, whose push to set a home goes once for each stretch it stays on, `attendance.md` §6.10).
+  The type's defaults count as a run of their own from before the first version (no id).
 - A module records the version it applied (`attendance_event.policy_version_id`,
   `attendance_day.policy_version_id`); a new version never re-judges what an older one judged.
 - A module caches no rules: each call reads the version, so a new version applies from its first day
@@ -383,6 +389,7 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · The Attendance policy gains Home Location (`attendance.md` §1.3): a switch on the worksheet's Location Checks card, off by default and on every version before it, with Home Check and Home Radius beneath it while it is on; Working From Home reads one sentence while it is off. `policies.heldSince` (§6.8) says since when a rule has held, for the push Home Location sends once a stretch.
 - 21/10/2026 · TB · Attendance's PR 3 built: the worksheet shows every rule (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts; `worksheet.ts` keeps one flat value per control), and the sentences staff read cover each (`attendance.policy-type.js`, the mock word for word). A draft compares rules whatever order their keys came in.
 - 20/10/2026 · TB · Attendance's PR 4: the Attendance policy's `site_geofence_mode` reads Temporary Site Check on the worksheet, and its section At a Temporary Site (once At a Field Site) covers a temporary site's addresses and its check-ins and ends with T14's fixed sentence, "Working somewhere else? Add it from Home, or ask People." (attendance.md §6.15). A version's rules and acknowledgements are unchanged; the sentences of every version read the new words.
 - 20/10/2026 · TB · Tidy With AI's job chosen under the AI convention merged from main (#101): Default, carrying personal data, never DeepSeek (§9); the open question on its model is closed.

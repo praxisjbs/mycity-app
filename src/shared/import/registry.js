@@ -7,6 +7,7 @@
  *     key: "employees",
  *     label: "Employees",
  *     permission: ["people", "create"],
+ *     capability: "performance.manage",            // optional: a capability it needs as well
  *     entity: "employee",                          // entity_type of the records it writes
  *     schema: c.organisation.EmployeeImportRow,    // the same field rules as POST /employees
  *     matchKeys: ["staff_number", "work_email"],
@@ -26,6 +27,7 @@
  *                  created when the person ticks it at commit
  *   mask           a field key (shared/rbac/field-mask.js): hidden in previews and error
  *                  files from people masked from it
+ *   max            a text field's longest value; 500 characters unless set
  *   example, hint  shown on the template's Reference sheet
  *
  * Functions the importer supplies (every write goes through the module's SERVICE, so
@@ -43,7 +45,13 @@
  *                                              write then stays unchanged
  *   archive(client, id, ctx)                   revert a create
  *   restore(client, id, before, ctx)           revert an update to its before-snapshot
- *   isReferenced(client, id)                   optional: true refuses reverting that row
+ *   isReferenced(client, id, {batch})          optional: true refuses reverting a row it created
+ *   extract(sheets)                            optional: a whole workbook as the business keeps it
+ *                                              (sheets as readSheets gives them) → { rows, notes },
+ *                                              each row keyed by field. Its rows are imported as one
+ *                                              sheet headed by the field labels; notes are kept on
+ *                                              the batch's stats. It throws an AppError for a
+ *                                              workbook that is not the one it reads
  */
 const catalog = require("../access/access.catalog");
 
@@ -78,6 +86,8 @@ function checkField(key, f, seen) {
     fail(key, `enum field "${f.key}" needs options`);
   if (type === "reference" && !f.ref)
     fail(key, `reference field "${f.key}" needs ref`);
+  if (f.max !== undefined && !(Number.isInteger(f.max) && f.max > 0))
+    fail(key, `field "${f.key}": max is a whole number of characters`);
   if (f.pass !== undefined && ![1, 2].includes(f.pass))
     fail(key, `field "${f.key}": pass is 1 or 2`);
   if (f.pass === 2 && type !== "reference")
@@ -112,6 +122,8 @@ function defineImporter(spec) {
   const [module, action] = spec.permission || [];
   if (!catalog.isModule(module) || !catalog.isAction(action))
     fail(key, "permission is [module, action]");
+  if (spec.capability !== undefined && !catalog.CAPABILITY_CATALOG.some((c) => c.code === spec.capability))
+    fail(key, `capability "${spec.capability}" is not in the catalogue`);
   if (!/^[a-z][a-z0-9_]*$/.test(String(spec.entity || "")))
     fail(key, "entity is the snake_case entity type it writes");
   if (!spec.schema || typeof spec.schema.safeParse !== "function")
@@ -134,6 +146,8 @@ function defineImporter(spec) {
     fail(key, "link() is required for pass-2 references");
   if (refs.some((f) => f.createMissing) && typeof spec.create !== "function")
     fail(key, "create() is required for createMissing fields");
+  if (spec.extract !== undefined && typeof spec.extract !== "function")
+    fail(key, "extract is a function of the workbook's sheets");
   if (IMPORTERS.has(key) && IMPORTERS.get(key) !== spec)
     fail(key, "already registered");
   IMPORTERS.set(key, Object.freeze({ options: {}, ...spec }));
@@ -157,6 +171,7 @@ async function availableTo(client, user) {
   if (user && user.is_ceo === true) return all();
   const grants = require("../rbac/grants-cache");
   const { scopeFromGrants } = require("../../middleware/rbac");
+  let held = null;
   const out = [];
   for (const imp of all()) {
     const [module, action] = imp.permission;
@@ -164,7 +179,12 @@ async function availableTo(client, user) {
       role_ids: (user && user.role_ids) || [],
       module,
     });
-    if (scopeFromGrants(rows, action)) out.push(imp);
+    if (!scopeFromGrants(rows, action)) continue;
+    if (imp.capability) {
+      held = held || (user && user.user_id ? await grants.getCapabilities(client, user.user_id) : []);
+      if (!held.includes(imp.capability)) continue;
+    }
+    out.push(imp);
   }
   return out;
 }

@@ -170,7 +170,7 @@ function versionInForce(db, policyId, date) {
 function rulesInForce(db, kind, date) {
   return one(
     db,
-    `SELECT v.policy_version_id, v.version, v.rules
+    `SELECT v.policy_version_id, v.version, v.rules, v.effective_from
        FROM policy_version v JOIN policy p ON p.policy_id = v.policy_id
       WHERE p.kind = $1 AND v.status = 'published' AND v.effective_from <= $2::date
       ORDER BY v.effective_from DESC, v.version DESC LIMIT 1`,

@@ -33,6 +33,7 @@ const VISIBLE = Object.freeze([
   "location_rule",
   "overtime",
   "office_geofence_mode",
+  "home_location",
   "home_geofence_mode",
   "site_geofence_mode",
   "home_radius_m",
@@ -57,6 +58,7 @@ const RULE_LABEL = Object.freeze({
   location_rule: "Location Flags",
   overtime: "Overtime",
   office_geofence_mode: "Office Check",
+  home_location: "Home Location",
   home_geofence_mode: "Home Check",
   site_geofence_mode: "Temporary Site Check",
   home_radius_m: "Home Radius",
@@ -161,6 +163,8 @@ function ruleValue(rule, r) {
       return deductionValue(r[rule]);
     case "absence_deduction":
       return r.absence_deduction.on ? "A Day's Pay" : "Off";
+    case "home_location":
+      return r.home_location.on ? "On" : "Off";
     case "overtime":
       return overtimeValue(r.overtime);
     default:
@@ -269,7 +273,9 @@ function office(mode) {
   return ["At the office, a clock-in outside your office's radius is refused, and People see it. Clock in again from inside it."];
 }
 
-function home(mode, radius) {
+/** Working from home (§6.15): with Home Location off, no home is used and nothing is checked (§1.3). */
+function home(on, mode, radius) {
+  if (!on) return ["Working from home, your location is not checked."];
   if (mode === "off") return ["Working from home, your location is recorded with each clock-in and clock-out. Nothing is flagged."];
   const away = `Working from home, a clock-in more than ${metres(radius)} from your approved home`;
   return [
@@ -295,7 +301,9 @@ function site(mode) {
 }
 
 function location(r) {
-  const checked = [r.office_geofence_mode, r.home_geofence_mode, r.site_geofence_mode].some((m) => m !== "off");
+  // A home's mode counts only while Home Location is on (§1.3).
+  const modes = [r.office_geofence_mode, ...(r.home_location.on ? [r.home_geofence_mode] : []), r.site_geofence_mode];
+  const checked = modes.some((m) => m !== "off");
   return [
     `Your phone's location must be accurate to within ${metres(r.max_accuracy_m)}. A weaker reading cannot confirm where you are.`,
     ...(checked ? ["When your location cannot be confirmed, your clock-in is sent to People for review."] : []),
@@ -355,8 +363,8 @@ const SECTIONS = Object.freeze([
   {
     key: "home",
     title: "Working From Home",
-    rules: ["home_geofence_mode", "home_radius_m"],
-    text: (r) => home(r.home_geofence_mode, r.home_radius_m),
+    rules: ["home_location", "home_geofence_mode", "home_radius_m"],
+    text: (r) => home(r.home_location.on, r.home_geofence_mode, r.home_radius_m),
   },
   { key: "site", title: "At a Temporary Site", rules: ["site_geofence_mode"], text: (r) => site(r.site_geofence_mode) },
   { key: "location", title: "Your Location", rules: ["max_accuracy_m"], text: (r) => location(r) },
@@ -396,8 +404,8 @@ const SUGGESTED_HOURS = Object.freeze(
 
 /**
  * The rules a first draft starts from (§6.15's Suggested column): the defaults with the suggested
- * hours, grace and figures. Every consequence rule, deduction and overtime stays off (T5): People
- * switch each on, and its figures are already filled in.
+ * hours, grace and figures. Every consequence rule, deduction and overtime stays off (T5), and so
+ * does Home Location (§1.3, H2): People switch each on, and its figures are already filled in.
  */
 function suggestions() {
   const r = c.attendance.AttendanceRules.parse({});

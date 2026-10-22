@@ -22,6 +22,12 @@
  * `policy.approval` (docs/guides/policies.md §6.4, seeded in 1396): a policy version, the CEO.
  * Attendance's PR 4 adds `attendance.temporary_site` (docs/guides/attendance.md §6.11, seeded in
  * 1470): a temporary site, Operations & People; everyone on the site is excluded from deciding it.
+ * M2 Performance adds four (docs/guides/performance.md §6.4, §6.7, §6.11, §6.12; seeded in 2190):
+ * `performance.plan` (a quarter plan: the head's line manager unless the head reports to the CEO,
+ * Operations & People unless they sent it, then the CEO; the company plan goes to the CEO alone),
+ * `performance.target_change` (the CEO), `performance.commitments` (the person's reviewer, or the
+ * CEO for a function head) and `performance.review` (the reviewer's own manager, skipped when the
+ * reviewer is the CEO, then Operations & People; the reviewee is excluded from deciding it).
  *
  * Table (migration 0070; BACKEND_STRUCTURE §11.1):
  *   workflow_definition  workflow_definition_id, key, version, module_key, name, description,
@@ -128,6 +134,94 @@ const DEFAULTS = Object.freeze({
     description: "The CEO approves and signs a policy version before it can start.",
     context: {},
     stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
+  },
+  // M2, seeded in 2190 (docs/guides/performance.md §6.4).
+  "performance.plan": {
+    key: "performance.plan",
+    module: "performance",
+    name: "Quarter Plan",
+    description:
+      "The head's line manager, Operations & People, then the CEO. The company plan goes to the CEO.",
+    context: { head_reports_to_ceo: "boolean", by_operations_people: "boolean", is_company: "boolean" },
+    stages: [
+      {
+        key: "line_manager",
+        name: "Line Manager",
+        approver: { type: "manager_of_subject" },
+        condition: [
+          { field: "head_reports_to_ceo", op: "=", value: false },
+          { field: "is_company", op: "=", value: false },
+        ],
+        sla_hours: 72,
+      },
+      {
+        key: "operations_people",
+        name: "Operations & People",
+        approver: { type: "role", value: "operations_people" },
+        condition: [
+          { field: "by_operations_people", op: "=", value: false },
+          { field: "is_company", op: "=", value: false },
+        ],
+        sla_hours: 72,
+      },
+      { key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 },
+    ],
+  },
+  // M2, seeded in 2190 (docs/guides/performance.md §6.7).
+  "performance.target_change": {
+    key: "performance.target_change",
+    module: "performance",
+    name: "Target Change",
+    description: "The CEO approves a change to a binding target.",
+    context: {},
+    stages: [{ key: "ceo", name: "CEO", approver: { type: "ceo" }, sla_hours: 72 }],
+  },
+  // M2, seeded in 2190 (docs/guides/performance.md §6.11).
+  "performance.commitments": {
+    key: "performance.commitments",
+    module: "performance",
+    name: "Monthly Commitments",
+    description: "The person's reviewer approves the month's commitments; the CEO approves a head's.",
+    context: { is_function_head: "boolean", reviewer_employee_id: "uuid" },
+    stages: [
+      {
+        key: "reviewer",
+        name: "Reviewer",
+        approver: { type: "employee_in_context", value: "reviewer_employee_id" },
+        condition: { field: "is_function_head", op: "=", value: false },
+        sla_hours: 48,
+      },
+      {
+        key: "ceo",
+        name: "CEO",
+        approver: { type: "ceo" },
+        condition: { field: "is_function_head", op: "=", value: true },
+        sla_hours: 48,
+      },
+    ],
+  },
+  // M2, seeded in 2190 (docs/guides/performance.md §6.12).
+  "performance.review": {
+    key: "performance.review",
+    module: "performance",
+    name: "Monthly Review",
+    description: "The reviewer's own manager, then Operations & People close it.",
+    context: { second_level_employee_id: "uuid", reviewer_is_ceo: "boolean" },
+    stages: [
+      {
+        key: "second_level",
+        name: "Second Level",
+        approver: { type: "employee_in_context", value: "second_level_employee_id" },
+        condition: { field: "reviewer_is_ceo", op: "=", value: false },
+        sla_hours: 48,
+      },
+      {
+        key: "operations_people",
+        name: "Operations & People",
+        approver: { type: "role", value: "operations_people" },
+        sla_hours: 48,
+      },
+    ],
   },
 });
 

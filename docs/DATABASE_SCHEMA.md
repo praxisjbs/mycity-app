@@ -301,19 +301,32 @@ performance cycles, reviews and review items · `2010` a task's number, setter (
 cadence, KPI (`employee_target_id`), record pointer (`entity_type`, `entity_id`), the cancelled
 status, blockers and `task_activity`; calendar visibility, record pointer, called-off events and
 `calendar_event_attendee`; the indexes Home asked for (docs/guides/workspace.md §4) · `2090` the
-`task` numbering scheme and the cancelled status · `2099` seed.
+`task` numbering scheme and the cancelled status · `2099` seed · `2100` the Performance foundation
+(`docs/guides/performance.md` §4, PR 1, 22/10/2026): department heads (`head_employee_id`,
+`head_seat_id`); quarters with their rules (`performance_period`); organisational goals' MyCity columns
+and their quarterly targets; function and company plans, objectives, key results, their links, monthly
+reports and former codes; KPIs' function columns and monthly actuals (`kpi_month`); scorecards, whose
+lines are `employee_target` (section, measure, source, key result, share), Team result links and
+target changes; monthly rounds on `performance_cycle` with their deadlines; one review per scorecard per
+round on `performance_review` (probation reviews without a round), its items' check-in, evidence, action
+and scores; improvement plans and their lines; commitments on `task` and `commitment_set`; weekly
+summaries · `2190` seed: the five Performance capabilities and their holders, the four flows, the code
+lists · `2200` the statuses an organisational goal (`active`, `closed`; active by default) and a
+scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance PR 2) · `2290` seed: the
+`goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired).
 
 **Owes:**
-- Goals cascade as A16 sets it (organisational, annual, monthly, departmental, individual KPI),
-  with code, strategic theme, success measure, baseline and the CEO's final approval.
-- Reviews: the second-level and HR stages and their workflow; dictation transcript, cleaned text
-  and `ai_run_id` (A18).
+- PRs 3 to 5 of `docs/guides/performance.md` use 2300 to 2599 only for a gap. The numbers 2020, 2030 and
+  2091 were used on a withdrawn branch and are not reused.
+- Status CHECKs on `performance_cycle` and `performance_review` (Home's staging rows still hold the old
+  values): PR 3, once its staging seed has replaced those rows.
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,
   `ends_at`, `all_day`) through `calendar.source.js`; `organisational_goal` (`organisational_goal_id`,
-  `level`, `title`, `status`, `starts_on`, `ends_on`) and `employee_target` (`employee_target_id`,
-  `employee_id`, `title`, `due_on`) through `goals.source.js`; `performance_review`
+  `level`, `title`, `status`, `starts_on`, `ends_on`), `employee_target` (`employee_target_id`,
+  `employee_id`, `title`, `due_on`, `scorecard_id`) and `scorecard` (`scorecard_id`, `status`) through
+  `goals.source.js`; `performance_review`
   (`performance_review_id`, `performance_cycle_id`, `employee_id`, `reviewer_employee_id`,
   `review_type`, `submitted_at`) with `performance_cycle` (`performance_cycle_id`, `name`,
   `closes_at`) through `reviews.source.js`. The PR that changes any of these updates the adapter in
@@ -321,9 +334,9 @@ status, blockers and `task_activity`; calendar visibility, record pointer, calle
   Indexes asked by Home: `task (due_at) WHERE archived_at IS NULL AND completed_at IS NULL`,
   `calendar_event (owner_employee_id, starts_at)`, `organisational_goal (level, starts_on, ends_on)`,
   `employee_target (employee_id, due_on)`.
-  **Staging holds Home's demonstration rows** in `task`, `calendar_event`, `organisational_goal`,
-  `employee_target`, `performance_cycle` and `performance_review` (`seeds/staging/60_home.js`,
-  decision O11). Their ids are written out in `HOME_STAGING_ROWS`
+  **Staging holds Home's demonstration rows** in `performance_cycle` and `performance_review`
+  (`seeds/staging/60_home.js`, decision O11); `task` and `calendar_event` were taken away by
+  `40_workspace.js`, `organisational_goal` and `employee_target` by `45_performance_plan.js`. Their ids are written out in `HOME_STAGING_ROWS`
   (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
   takes them away once, in the three steps that file starts with: that seed calls
   `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes

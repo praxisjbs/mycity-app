@@ -15,6 +15,11 @@
  * The address and the point are personal data: the person reads their own, People with
  * scope all read them (masked by the controller under employee.personal), team scope reads
  * the status and the distance only. Events carry ids and statuses, never either.
+ *
+ * All of it waits on the Attendance policy's Home Location (§1.3, onDate): while it is off nobody
+ * sets a home, People list and decide none, and the rows stay as they are. Switched on, the
+ * reminder attendance_home_needed asks whoever needs a home and has none, once a stretch
+ * (homesDue, homeNeeded).
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -26,6 +31,7 @@ const lagos = require("../../shared/time/lagos");
 const calendar = require("./attendance.calendar");
 const repo = require("./attendance.repo");
 const places = require("../../shared/places/places");
+const policies = require("../policies/policies.service");
 const schedules = require("./attendance.schedule");
 const { EVENTS } = require("./attendance.events");
 
@@ -39,7 +45,19 @@ async function tx(fn) {
 }
 
 const notFound = () => new AppError("NOT_FOUND", "That home location does not exist", 404);
+const switchedOff = () => new AppError("HOME_LOCATION_OFF", "Home locations are off in the Attendance policy.", 409);
 const iso = (t) => (t ? new Date(t).toISOString() : null);
+
+/** Whether the Attendance policy in force on `date` uses homes at all: its Home Location (§1.3). */
+async function onDate(db, date = lagos.today()) {
+  const policy = await calendar.policyFor(db, null, date);
+  return policy.home_location.on === true;
+}
+
+/** People's reads and decisions wait on the switch, as the person's own do (§6.10). */
+async function assertOn(db) {
+  if (!(await onDate(db))) throw switchedOff();
+}
 
 /** A home row as the person reads it: their own address and point. */
 function asLocation(row, radiusM) {
@@ -65,10 +83,12 @@ async function personOf(db, employeeId) {
   return person;
 }
 
-/** GET /attendance/me/home. */
+/** GET /attendance/me/home. While Home Location is off nothing about a home is shown (H7). */
 async function mine(user) {
   const person = await personOf(pool, user.employee_id);
   const policy = await calendar.policyFor(pool, user.employee_id, lagos.today());
+  if (!policy.home_location.on)
+    return { needed: false, approved: null, pending: null, rejected: null, max_accuracy_m: policy.max_accuracy_m };
   const homes = await repo.homesOf(pool, user.employee_id);
   return {
     needed: await schedules.needsHome(pool, person),
@@ -90,9 +110,10 @@ async function request(user, body) {
   await tx(async (client) => {
     await repo.lockEmployee(client, employeeId);
     const person = await personOf(client, employeeId);
+    const policy = await calendar.policyFor(client, employeeId, lagos.today());
+    if (!policy.home_location.on) throw switchedOff();
     if (!(await schedules.needsHome(client, person)))
       throw new AppError("HOME_NOT_NEEDED", "Only staff who work from home set a home location.", 422);
-    const policy = await calendar.policyFor(client, employeeId, lagos.today());
     if (Number(body.accuracy_m) > Number(policy.max_accuracy_m))
       throw new AppError("HOME_READING_WEAK", "The location reading was not accurate enough.", 422, {
         accuracy_m: ["Reading too weak"],
@@ -154,12 +175,13 @@ function present(row, radiusM) {
 async function radii(employeeIds) {
   const today = lagos.today();
   const ids = [...new Set(employeeIds)];
-  const policies = await Promise.all(ids.map((id) => calendar.policyFor(pool, id, today)));
-  return new Map(ids.map((id, i) => [id, policies[i].home_radius_m]));
+  const inForce = await Promise.all(ids.map((id) => calendar.policyFor(pool, id, today)));
+  return new Map(ids.map((id, i) => [id, inForce[i].home_radius_m]));
 }
 
 /** GET /attendance/homes: within the caller's scope, the place only for scope all. */
 async function list(query, scope) {
+  await assertOn(pool);
   const page = await repo.listHomes(pool, query, scope, { place: scope.scope === "all" });
   const r = await radii(page.data.map((row) => row.employee.employee_id));
   return { ...page, data: page.data.map((row) => present(row, r.get(row.employee.employee_id))) };
@@ -167,6 +189,7 @@ async function list(query, scope) {
 
 /** One home location as People read it, within the caller's scope. */
 async function get(id, scope) {
+  await assertOn(pool);
   const home = await repo.getHome(pool, id);
   if (!home) throw notFound();
   assertInScope(scope, home.employee_id);
@@ -184,6 +207,7 @@ async function get(id, scope) {
 async function decide(actor, scope, id, body) {
   if (scope.scope !== "all")
     throw new AppError("FORBIDDEN", "Only People with access to everyone decide home locations", 403);
+  await assertOn(pool);
   const home = await repo.getHome(pool, id);
   if (!home) throw notFound();
   if (home.employee_id === actor.employee_id)
@@ -221,4 +245,52 @@ async function decide(actor, scope, id, body) {
   return get(id, scope);
 }
 
-module.exports = { mine, request, list, get, decide, present };
+/* ------------------------------------------------------------------ *
+ * The push once Home Location is switched on (§6.10, H8)
+ * ------------------------------------------------------------------ */
+
+const isOn = (rules) => rules.home_location.on === true;
+/**
+ * A stretch is named by its first day (none: the defaults), so a second version published the same
+ * day (another rule fixed) names the same stretch and nobody is asked twice.
+ */
+const stretchOf = (since) => since.effective_from || "defaults";
+
+/**
+ * The reminder's `find` (attendance.events.js): while Home Location is on, one occurrence for each
+ * person whose week has a Remote day and who has no home approved or waiting, named by the stretch,
+ * so each stretch it stays on asks them once. Fired in the working day.
+ */
+async function homesDue(db, { now }) {
+  const today = lagos.today(now);
+  const since = await policies.heldSince(db, "attendance", today, isOn);
+  if (!since) return [];
+  const out = [];
+  for (const { employee_id: id } of await repo.withoutHome(db, today)) {
+    const person = await repo.person(db, id);
+    if (person && (await schedules.needsHome(db, person, today)))
+      out.push({ entity_type: "employee", entity_id: id, occurrence: stretchOf(since), due_at: now, work_hours: true });
+  }
+  return out;
+}
+
+/**
+ * The reminder's `check`, in the firing's transaction: Home Location is still on in the same
+ * stretch, and the person is still at work, still works from home on some days and still has no
+ * home approved or waiting.
+ */
+async function homeNeeded(client, row, { now }) {
+  const today = lagos.today(now);
+  const since = await policies.heldSince(client, "attendance", today, isOn);
+  if (!since || stretchOf(since) !== row.occurrence) return null;
+  const person = await repo.person(client, row.entity_id);
+  if (!person || person.status !== "active") return null;
+  const homes = await repo.homesOf(client, row.entity_id);
+  if (homes.approved || homes.pending || !(await schedules.needsHome(client, person, today))) return null;
+  return {
+    entity: { type: "attendance_home_needed", id: row.entity_id },
+    payload: { employee_id: row.entity_id, subject_employee_id: row.entity_id },
+  };
+}
+
+module.exports = { onDate, mine, request, list, get, decide, present, homesDue, homeNeeded };

@@ -96,6 +96,7 @@ function approverView(a, names) {
   else if (type === "user") label = names.users.get(value) || "A Login";
   else if (type === "employee") label = names.employees.get(value) || "Line Manager";
   else if (type === "manager_of_subject") label = "Line Manager";
+  else if (type === "employee_in_context") label = "Named Person";
   else if (type === "ceo") label = "CEO";
   else label = "Not Set";
   return { type, value, label };

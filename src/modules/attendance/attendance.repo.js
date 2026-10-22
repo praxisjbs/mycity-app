@@ -561,9 +561,10 @@ function explainException(client, id, note) {
  * Everyone on the date `$1`: the employees at work then (and anyone with a day that
  * date), their day if they have one, and what having none means, each by their own day (EXPECTED_ON:
  * their schedule, else the company hours `hours`, a jsonb parameter, else the working week). `$1` is
- * the date.
+ * the date. `homes` (a boolean parameter) is the policy's Home Location on that date: off, a day
+ * from home is expected at Remote, never at a Home (§1.3).
  */
-const REGISTER = (hours) => `
+const REGISTER = (hours, homes = "true") => `
   SELECT e.employee_id, ${PERSON()} AS employee, e.work_pattern, e.department_id,
          $1::date AS date,
          CASE WHEN ad.status IS NOT NULL THEN ad.status
@@ -579,7 +580,7 @@ const REGISTER = (hours) => `
          CASE WHEN fa.sites IS NOT NULL THEN fa.sites
               WHEN lr.request_type IS NOT NULL THEN ${REQUEST_PLACE("lr.request_type")}
               WHEN ${PLACE_REMOTE("e.employee_id", "e.work_pattern", "$1::date")}
-              THEN CASE WHEN EXISTS (SELECT 1 FROM attendance_home ah
+              THEN CASE WHEN ${homes} AND EXISTS (SELECT 1 FROM attendance_home ah
                                       WHERE ah.employee_id = e.employee_id AND ah.status = 'approved')
                         THEN 'Home' ELSE 'Remote' END
               WHEN w.active THEN w.name END) AS expected_location,
@@ -637,13 +638,13 @@ const REGISTER_SORTS = {
 /** The company hours for the register's date, as the jsonb parameter REGISTER reads (null: the working week). */
 const hoursParam = (hours) => (Array.isArray(hours) ? JSON.stringify(hours) : null);
 
-function register(db, date, query, scope, { hours = null } = {}) {
-  const params = [date, query.status || null, query.department_id || null, query.q || null, hoursParam(hours)];
+function register(db, date, query, scope, { hours = null, homes = true } = {}) {
+  const params = [date, query.status || null, query.department_id || null, query.q || null, hoursParam(hours), Boolean(homes)];
   const s = scopeClause(scope, { column: "v.employee_id" }, params);
   return pageQuery(
     db,
     `SELECT ${REGISTER_OUT}, ${TOTAL_COL}
-       FROM (${REGISTER("$5::jsonb")}) v
+       FROM (${REGISTER("$5::jsonb", "$6::boolean")}) v
       WHERE ($2::text IS NULL OR v.status = $2)
         AND ($3::uuid IS NULL OR v.department_id = $3)
         AND ($4::text IS NULL OR v.haystack LIKE '%' || search_fold($4) || '%')
@@ -673,12 +674,12 @@ function registerSummary(db, date, scope, { hours = null } = {}) {
 }
 
 /** One person on the register for a date, with the day's extras. */
-const registerRow = (db, date, employeeId, { hours = null } = {}) =>
+const registerRow = (db, date, employeeId, { hours = null, homes = true } = {}) =>
   one(
     db,
     `SELECT ${REGISTER_OUT}, v.early_minutes, v.overtime_minutes, v.closed_at, v.expected_radius_m, v.employee_id
-       FROM (${REGISTER("$3::jsonb")}) v WHERE v.employee_id = $2`,
-    [date, employeeId, hoursParam(hours)],
+       FROM (${REGISTER("$3::jsonb", "$4::boolean")}) v WHERE v.employee_id = $2`,
+    [date, employeeId, hoursParam(hours), Boolean(homes)],
   );
 
 /**
@@ -1037,6 +1038,32 @@ function listHomes(db, query, scope, { place }) {
 /** One home location as People read it (the caller checked the scope). */
 function homeRow(db, id, { place }) {
   return one(db, `${HOME_ROWS()} WHERE h.attendance_home_id = $2`, [Boolean(place), id]);
+}
+
+/**
+ * The people at work on a date (active, started, not left), with a login to tell, who have neither
+ * an approved nor a waiting home and may work from home: a remote pattern, or a work schedule with a
+ * Remote day. The push to set a home (§6.10, H8) checks each one's own week (schedules.needsHome).
+ */
+async function withoutHome(db, date) {
+  // pagination:complete the push asks everyone who needs a home, not a page of them
+  const { rows } = await completeQuery(
+    db,
+    `SELECT e.employee_id
+       FROM employee e
+      WHERE e.status = 'active' AND (e.start_date IS NULL OR e.start_date <= $1::date)
+        AND (e.left_on IS NULL OR e.left_on > $1::date)
+        AND EXISTS (SELECT 1 FROM app_user u WHERE u.employee_id = e.employee_id AND u.status = 'active')
+        AND NOT EXISTS (SELECT 1 FROM attendance_home h
+                         WHERE h.employee_id = e.employee_id AND h.status IN ('approved', 'pending'))
+        AND (e.work_pattern = 'remote'
+             OR EXISTS (SELECT 1 FROM attendance_work_schedule s
+                         WHERE s.employee_id = e.employee_id AND s.days @> '[{"place": "remote"}]'::jsonb))
+      ORDER BY e.employee_id`,
+    [date],
+    { label: "people with no home" },
+  );
+  return rows;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1816,6 +1843,7 @@ module.exports = {
   rejectHome,
   listHomes,
   homeRow,
+  withoutHome,
   approvedRequestOn,
   getRequest,
   settleRequest,

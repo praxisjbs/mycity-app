@@ -122,6 +122,22 @@ describe("working week", () => {
     expect(ww.isWorkingDay("2026-10-03", six)).toBe(true);
   });
 
+  test("business days are Monday to Friday, not holidays, even in a six-day working week (performance.md G2)", () => {
+    const six = ww.makeCalendar({ days: [1, 2, 3, 4, 5, 6], holidays: ["2027-01-01", "2026-12-25", "2026-12-28"] });
+    expect(ww.isBusinessDay("2026-11-07", six)).toBe(false); // a worked Saturday is not a business day
+    expect(ww.isBusinessDay("2027-01-01", six)).toBe(false);
+    // MyCity's own reporting deadlines: the 3rd business day of each month.
+    expect(ww.nthBusinessDay("2026-11", 3, six)).toBe("2026-11-04");
+    expect(ww.nthBusinessDay("2026-12", 3, six)).toBe("2026-12-03");
+    expect(ww.nthBusinessDay("2027-01", 3, six)).toBe("2027-01-06");
+    expect(ww.nthBusinessDay("2026-11", 2, six)).toBe("2026-11-03");
+    expect(ww.addBusinessDays("2026-11-04", 2, six)).toBe("2026-11-06");
+    expect(ww.addBusinessDays("2026-11-06", 1, six)).toBe("2026-11-09"); // Friday to Monday
+    expect(ww.addBusinessDays("2026-11-09", -1, six)).toBe("2026-11-06");
+    expect(ww.countBusinessDays("2026-12-21", "2026-12-31", six)).toBe(7); // less Christmas and the 28th
+    expect(() => ww.nthBusinessDay("2026-11-01", 1, six)).toThrow(/YYYY-MM/);
+  });
+
   test("loadCalendar reads the settings, and defaults to Monday to Friday on an empty table", async () => {
     ww.invalidateCalendar();
     const client = { query: jest.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }) };

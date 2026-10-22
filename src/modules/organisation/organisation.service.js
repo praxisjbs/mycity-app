@@ -60,13 +60,16 @@ async function createDepartment(client, input, actor) {
     throw new AppError("DEPARTMENT_EXISTS", "There is already a department with this name.", 409, {
       name: ["Already in use"],
     });
+  await assertHead(client, input);
   const inserted = await repo.insertDepartment(client, {
-    code: await departmentCode(client, name),
+    code: input.code ? await freeDepartmentCode(client, input.code) : await departmentCode(client, name),
     name,
     parent_department_id: input.parent_department_id ?? null,
     description: input.description ?? null,
+    head_employee_id: input.head_employee_id ?? null,
+    head_seat_id: input.head_seat_id ?? null,
   });
-  const department = await repo.departmentRow(client, inserted.department_id);
+  const department = await withActingHead(client, await repo.departmentRow(client, inserted.department_id));
   await emit(client, {
     key: EVENTS.DEPARTMENT_CREATED,
     entity: { type: "department", id: department.department_id },
@@ -83,7 +86,18 @@ async function updateDepartment(client, departmentId, patch, actor) {
     throw new AppError("DEPARTMENT_PARENT", "A department cannot sit inside itself.", 422, {
       parent_department_id: ["Not itself"],
     });
-  const after = await repo.updateDepartment(client, departmentId, patch);
+  const change = { ...patch };
+  // A head is a person or a vacant seat: naming one clears the other.
+  if (change.head_employee_id) change.head_seat_id = null;
+  if (change.head_seat_id) change.head_employee_id = null;
+  await assertHead(client, change);
+  if (change.code !== undefined) {
+    const code = change.code.toUpperCase();
+    if (code !== before.code && (await repo.codeTaken(client, code)))
+      throw new AppError("DEPARTMENT_CODE", "Another department has this code.", 409, { code: ["Already in use"] });
+    change.code = code;
+  }
+  const after = await repo.updateDepartment(client, departmentId, change);
   await emit(client, {
     key: EVENTS.DEPARTMENT_UPDATED,
     entity: { type: "department", id: departmentId },
@@ -91,7 +105,39 @@ async function updateDepartment(client, departmentId, patch, actor) {
     before,
     after,
   });
-  return repo.departmentRow(client, departmentId);
+  return withActingHead(client, await repo.departmentRow(client, departmentId));
+}
+
+/** The head named must exist: an employee, or a seat. */
+async function assertHead(client, input) {
+  if (input.head_employee_id && !(await repo.findEmployeeById(client, input.head_employee_id)))
+    throw new AppError("VALIDATION_FAILED", "Pick someone who works here.", 422, { head_employee_id: ["Not found"] });
+  if (input.head_seat_id && !(await repo.findSeatById(client, input.head_seat_id)))
+    throw new AppError("VALIDATION_FAILED", "Pick a seat on the chart.", 422, { head_seat_id: ["Not found"] });
+}
+
+/** A code a person chose, upper-cased, refused when another department has it. */
+async function freeDepartmentCode(client, code) {
+  const wanted = String(code).toUpperCase();
+  if (await repo.codeTaken(client, wanted))
+    throw new AppError("DEPARTMENT_CODE", "Another department has this code.", 409, { code: ["Already in use"] });
+  return wanted;
+}
+
+/**
+ * Who acts as a department's head (docs/guides/performance.md §6.13, §6.20): its head, the
+ * person in its head seat, or the first person above a vacant head seat. Null when none.
+ * @param {{query: Function}} db
+ * @param {string} departmentId
+ * @returns {Promise<string|null>} an employee id
+ */
+const headOf = (db, departmentId) => repo.headOf(db, departmentId);
+
+/** A department row with the person who acts as its head. */
+async function withActingHead(db, row) {
+  if (!row) return row;
+  const acting = await repo.headOf(db, row.department_id);
+  return { ...row, acting_head: await repo.personRef(db, acting) };
 }
 
 /** The department with this name, or a new one. Used by create-admin and the importer. */
@@ -418,7 +464,12 @@ async function findOrCreateSeat(client, { title, department_id: departmentId }, 
  * ------------------------------------------------------------------ */
 
 const list = (client, query, scope) => repo.list(client, query, scope);
-const departments = (client, query) => repo.departments(client, query);
+async function departments(client, query) {
+  const page = await repo.departments(client, query);
+  const data = [];
+  for (const row of page.data) data.push(await withActingHead(client, row));
+  return { ...page, data };
+}
 const seats = (client, query) => repo.seats(client, query);
 const historyOf = (client, employeeId, query) => repo.historyOf(client, employeeId, query);
 
@@ -792,6 +843,7 @@ module.exports = {
   findDepartmentByName,
   findOrCreateDepartment,
   createDepartment,
+  headOf,
   updateDepartment,
   departments,
   findEmployeeByWorkEmail,

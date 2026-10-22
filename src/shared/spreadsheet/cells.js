@@ -32,6 +32,7 @@ function cellRawValue(v) {
     if (v.richText) return v.richText.map((t) => t.text).join("");
     if (v.text !== null && v.text !== undefined) return v.text; // hyperlink / rich text
     if (v.result !== undefined) return v.result; // formula's cached result
+    if (v.formula !== undefined || v.sharedFormula !== undefined) return null; // a formula saved without its result: blank
     if (v.error) return ""; // #REF! etc.: an error is not a value
     if (v.hyperlink !== undefined) return v.hyperlink; // link object with no text
   }

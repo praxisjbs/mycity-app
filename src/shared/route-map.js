@@ -224,6 +224,10 @@ const ENTITY_ROUTES = Object.freeze({
     param: "home",
     self: screen("ess", "my-attendance"),
   },
+  // The push to set a home once the Attendance policy's Home Location is switched on (§6.10): the
+  // person's notice opens My Attendance with Set Home Location (`?home=`).
+  // search:none a notice to the person, not a record anyone looks up
+  attendance_home_needed: { ...screen("ess", "my-attendance"), param: "home" },
   // A work location request made before attendance's PR 4: People · Worksites opens it in
   // Temporary, Requests (`?request=`); the person's own opens on Work Location Requests.
   attendance_location_request: {
@@ -271,23 +275,42 @@ const ENTITY_ROUTES = Object.freeze({
   device: { ...screen("people", "devices"), self: screen("ess", "my-devices") },
   worksite: screen("people", "worksites"),
 
-  // Performance
-  // search:none not built yet (src/modules/goals)
+  // Performance (docs/guides/performance.md §9)
+  // search:none the same record as organisational_goal, found under that type; Home and older tasks link it as goal
   goal: {
     ...screen("performance", "goals"),
     self: screen("ess", "my-performance"),
   },
-  // search:none not built yet (src/modules/targets)
+  organisational_goal: screen("performance", "goals"),
+  objective: screen("performance", "goals"),
+  key_result: screen("performance", "goals"),
+  scorecard: {
+    ...screen("performance", "targets"),
+    self: screen("ess", "my-performance"),
+  },
+  // search:none a line is found through its scorecard, which search reaches
   target: {
     ...screen("performance", "targets"),
     self: screen("ess", "my-performance"),
   },
-  kpi: screen("performance", "kpis"), // search:none not built yet (src/modules/kpis)
+  kpi: screen("performance", "kpis"),
   // search:none not built yet (src/modules/reviews)
   review: {
     ...screen("performance", "reviews"),
     self: screen("ess", "my-performance"),
   },
+  // search:none the same record as review, found under that type; a task's pointer names it this way
+  performance_review: {
+    ...screen("performance", "reviews"),
+    self: screen("ess", "my-performance"),
+  },
+  // search:none sensitive: an improvement plan is reached from its review, never from search
+  improvement_plan: {
+    ...screen("performance", "reviews"),
+    self: screen("ess", "my-performance"),
+  },
+  // search:none a quarter is picked on Performance · Goals, never searched for
+  performance_period: screen("performance", "goals"),
 
   // Queries & Sanctions
   query: { ...screen("queries", "queries"), self: screen("ess", "my-queries") }, // search:none not built yet (src/modules/queries)

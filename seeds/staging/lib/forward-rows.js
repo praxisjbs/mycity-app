@@ -141,24 +141,7 @@ const BUDGETS = [
 
 /* Tasks and the calendar are M2's own staging seed now (40_workspace.js). */
 
-/** The organisation's goals this year (M2). */
-const GOALS = [
-  { key: "active-residents", title: "Reach 2 million active residents", owner: "ceo" },
-  { key: "partnership-revenue", title: "Partnership revenue of ₦180M", owner: "ceo" },
-  { key: "twelve-cities", title: "Operate in 12 Nigerian cities", owner: "ceo" },
-  { key: "operations-platform", title: "Ship the operations platform", owner: "management:2" },
-  { key: "forty-person-team", title: "Build a 40 person team", owner: "ceo" },
-];
-
-/** People's targets due this quarter (M2): `due` days from today, never past the quarter's end. */
-const TARGETS = [
-  { key: "enugu-content", title: "Publish 24 pieces for the Enugu launch", who: "head_team:1", goal: "active-residents", weight: 60, due: 60 },
-  { key: "pitch-deck", title: "Design the partner pitch deck", who: "head_team:1", goal: "partnership-revenue", weight: 40, due: 20 },
-  { key: "social-growth", title: "Grow social followers by 15%", who: "head_team:2", goal: "active-residents", weight: 100, due: 60 },
-  { key: "enugu-places", title: "List 300 new places in Enugu", who: "manager_team:1", goal: "twelve-cities", weight: 100, due: 45 },
-  { key: "new-prospects", title: "8 new prospects, 3 proposals sent", who: "head", goal: "partnership-revenue", weight: 100, due: 60 },
-  { key: "approval-turnaround", title: "Reduce approval turnaround to 2 days", who: "operations", goal: "forty-person-team", weight: 100, due: 60 },
-];
+/* Organisational goals and people's targets are Performance's own staging seed now (45_performance_plan.js). */
 
 /** Reviews of this quarter's check-in (M2), none filed: each person's own and their manager's. */
 const REVIEWED = ["head_team:1", "head_team:2", "head_team:3", "manager_team:1", "manager_team:2"];
@@ -236,34 +219,6 @@ const ROWS = Object.freeze([
     });
     return [review("self", slot), review("manager", manager)];
   }),
-  ...GOALS.map((g) => ({
-    table: "organisational_goal",
-    key: g.key,
-    needs: [g.owner],
-    values: (x, [owner]) => ({
-      level: "organisation",
-      title: g.title,
-      status: "active",
-      starts_on: `${x.year}-01-01`,
-      ends_on: `${x.year}-12-31`,
-      weight: 20,
-      owner_employee_id: owner.employee_id,
-    }),
-  })),
-  ...TARGETS.map((t) => ({
-    table: "employee_target",
-    key: t.key,
-    needs: [t.who],
-    parents: [["organisational_goal", t.goal]],
-    values: (x, [person]) => ({
-      organisational_goal_id: idOf("organisational_goal", t.goal),
-      employee_id: person.employee_id,
-      title: t.title,
-      weight: t.weight,
-      status: "active",
-      due_on: x.inQuarter(x.daysFrom(t.due)),
-    }),
-  })),
   ...BUDGETS.flatMap((b, i) => [
     {
       table: "budget",

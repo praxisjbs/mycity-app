@@ -12,7 +12,7 @@ const editor = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.view ?
 
 const ROLE_NAMES: Record<string, string> = { operations_people: "Operations & People", management: "Management", manager: "Line Manager", head_of_department: "Head of Department" };
 const label = (a: { type: string; value?: string | null }) =>
-  a.type === "role" ? (ROLE_NAMES[a.value ?? ""] ?? a.value ?? "A Role") : a.type === "manager_of_subject" ? "Line Manager" : a.type === "ceo" ? "CEO" : a.type === "user" ? "A Login" : "Not Set";
+  a.type === "role" ? (ROLE_NAMES[a.value ?? ""] ?? a.value ?? "A Role") : a.type === "manager_of_subject" ? "Line Manager" : a.type === "employee_in_context" ? "Named Person" : a.type === "ceo" ? "CEO" : a.type === "user" ? "A Login" : "Not Set";
 
 const FLOWS: ApprovalFlow[] = [
   {

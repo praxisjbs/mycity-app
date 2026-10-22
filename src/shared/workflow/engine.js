@@ -135,6 +135,7 @@ async function decide(client, instance, stageKey, actor, decision, reason) {
 async function moveTo(client, instance, stage) {
   const snapshot = await approvers.resolve(client, stage.approvers, {
     subject_employee_id: instance.subject_employee_id,
+    context: instance.context,
   });
   const { rows } = await client.query(
     `UPDATE workflow_instance

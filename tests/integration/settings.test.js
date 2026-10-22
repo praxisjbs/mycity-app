@@ -172,9 +172,14 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "goals.company",
+        "goals.confirm",
+        "goals.function",
+        "goals.organisation",
         "home.reports",
         "home.team",
         "mailbox.signature",
+        "performance.manage",
         "policies.manage",
       ]);
 
@@ -232,7 +237,16 @@ describeDb("access, settings and audit against the real migrations", () => {
         (await as("ops").get(`/settings/roles/${roles.find((r) => r.code === code).role_id}`)).body;
       const ops = await detail("operations_people");
       expect(ops.visible_fields).toHaveLength(4);
-      expect(ops.capabilities).toEqual(["alerts.clear", "alerts.manage", "announcements.post", "home.reports", "home.team", "policies.manage"]);
+      expect(ops.capabilities).toEqual([
+        "alerts.clear",
+        "alerts.manage",
+        "announcements.post",
+        "goals.function",
+        "home.reports",
+        "home.team",
+        "performance.manage",
+        "policies.manage",
+      ]);
       const staff = await detail("employee");
       expect(staff.visible_fields).toEqual([]);
       expect(staff.capabilities).toEqual([]);
@@ -248,8 +262,10 @@ describeDb("access, settings and audit against the real migrations", () => {
         "alerts.clear",
         "alerts.manage",
         "announcements.post",
+        "goals.function",
         "home.reports",
         "home.team",
+        "performance.manage",
         "policies.manage",
       ]);
       expect(await grantsCache.getCapabilities(pool, people.staff.user.user_id)).toEqual([]);

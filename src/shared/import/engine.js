@@ -96,8 +96,8 @@ function coerce(field, raw) {
     case "reference":
       if (raw instanceof Date)
         return { value: null, error: "should be text, not a date" };
-      return text.length > 500
-        ? { value: null, error: "is longer than 500 characters" }
+      return text.length > (field.max || 500)
+        ? { value: null, error: `is longer than ${field.max || 500} characters` }
         : { value: text, error: null };
     case "int": {
       const n = Number(text.replace(/,/g, ""));
@@ -290,6 +290,24 @@ async function assertMay(client, user, imp) {
     throw new AppError("PERMISSION_DENIED", "You cannot run this import", 403);
 }
 
+/** The one sheet an `extract` importer's rows make. */
+const EXTRACTED = "Rows";
+
+/**
+ * A workbook's sheets as the importer reads them. An importer with `extract(sheets)` takes a
+ * whole workbook as the business keeps it (a planning workbook, not one table) and answers
+ * `{ rows, notes }`, each row keyed by field: its rows become one sheet whose header is the
+ * importer's field labels, so mapping, preview, errors, commit and revert work as for any sheet.
+ * @returns {{sheets: Array<{name: string, rows: Array<Array<*>>}>, notes: string[]}}
+ */
+function sheetsFor(imp, sheets) {
+  if (typeof imp.extract !== "function") return { sheets, notes: [] };
+  const { rows = [], notes = [] } = imp.extract(sheets) || {};
+  const header = imp.fields.map((f) => f.label);
+  const grid = rows.map((r) => imp.fields.map((f) => (r[f.key] === undefined ? null : r[f.key])));
+  return { sheets: [{ name: EXTRACTED, rows: [header, ...grid] }], notes };
+}
+
 async function sourceGrid(client, batch) {
   const doc = await vault.get(client, batch.document_id);
   if (!doc)
@@ -300,7 +318,7 @@ async function sourceGrid(client, batch) {
     buffer: await storage.get(doc.storage_key),
     filename: doc.original_name,
   });
-  return book.sheets;
+  return sheetsFor(importerOf(batch.importer_key), book.sheets).sheets;
 }
 
 function sheetOf(sheets, name) {
@@ -338,6 +356,7 @@ async function createBatch(client, { importer_key: key, file, actor, options = {
     buffer: file && file.buffer,
     filename: file && file.originalname,
   });
+  const { sheets, notes } = sheetsFor(imp, book.sheets);
   const doc = await vault.store(client, {
     file,
     purpose: "import_sheet",
@@ -348,9 +367,9 @@ async function createBatch(client, { importer_key: key, file, actor, options = {
     actor,
   });
 
-  let sheet = book.sheets[0];
+  let sheet = sheets[0];
   let headerRow = null;
-  for (const s of book.sheets) {
+  for (const s of sheets) {
     const h = mapping.detectHeaderRow(s.rows, imp.fields);
     if (h !== null) {
       sheet = s;
@@ -400,6 +419,7 @@ async function createBatch(client, { importer_key: key, file, actor, options = {
         sheets: book.sheets.map((s) => s.name),
         header_signature: signature,
         profile_applied: Boolean(profile),
+        ...(notes.length ? { notes } : {}),
       }),
       actor ? actor.user_id : null,
       JSON.stringify(options || {}),

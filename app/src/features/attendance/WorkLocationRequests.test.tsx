@@ -7,6 +7,7 @@ import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/tes
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
+import { setMockHomeLocation } from "@/api/mock/modules/policies";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import { useClock } from "./ClockButton";
@@ -159,6 +160,26 @@ describe("temporary sites", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const after = await api.call("GET /api/v1/attendance/me/temporary-sites", { query: {} });
     expect(after.data.find((x) => x.number === "TS-0006")).toMatchObject({ status: "withdrawn", state: "withdrawn", cancel_reason: "The partner moved the training online", can_withdraw: false });
+  }, 30000);
+
+  it("Temporary Home is a purpose only while the policy's Home Location is on (attendance.md §1.3)", async () => {
+    const offered = async () => {
+      fireEvent.click((await screen.findAllByRole("button", { name: "Add Work Site" }))[0]);
+      const dialog = await screen.findByRole("dialog", { name: "Add Work Site" });
+      fireEvent.click(within(dialog).getByRole("combobox", { name: "Purpose" }));
+      fireEvent.change(await screen.findByRole("searchbox", { name: "Search Purpose" }), { target: { value: "home" } });
+      return screen.queryAllByRole("option", { name: "Temporary Home" }).length;
+    };
+    await signedInAs("chidera@mycityapp.io", <WorkLocationRequestsPage />);
+    expect(await offered()).toBe(0);
+    cleanup();
+    setMockHomeLocation(true);
+    try {
+      await signedInAs("chidera@mycityapp.io", <WorkLocationRequestsPage />);
+      expect(await offered()).toBe(1);
+    } finally {
+      setMockHomeLocation(false);
+    }
   }, 30000);
 
   it("Site Hours ask for a start and an end, and the site keeps them; the Usual Shift asks for neither", async () => {

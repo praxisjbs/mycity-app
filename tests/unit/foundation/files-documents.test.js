@@ -28,7 +28,7 @@ const { parseDmarc } = require("../../../src/services/mail/deliverability/dmarc"
 const { toRow, regression } = require("../../../src/services/mail/deliverability/evaluate");
 const mail = require("../../../src/services/mail/system-mail.service");
 const { parseCsv, parseCsvGrid, buildCsv } = require("../../../src/shared/spreadsheet/csv");
-const { escapeFormula, sheetName, serialDate, exportFilename } = require("../../../src/shared/spreadsheet/cells");
+const { escapeFormula, sheetName, serialDate, exportFilename, cellRawValue } = require("../../../src/shared/spreadsheet/cells");
 const { workbookContext } = require("../../../src/shared/spreadsheet/context");
 const dates = require("../../../src/shared/spreadsheet/day-first-cells");
 const { buildWorkbook } = require("../../../src/shared/spreadsheet/build");
@@ -484,6 +484,13 @@ describe("spreadsheets", () => {
     expect(out).toBe("\uFEFFA,B,Day,Ok\r\n'=SUM(A1),\"x,y\",03/11/2026,Yes\r\n");
   });
 
+  test("cells: a formula reads as its saved result, or blank when the file kept none", () => {
+    expect(cellRawValue({ formula: "SUM(A1:A2)", result: 7 })).toBe(7);
+    expect(cellRawValue({ formula: "IF(B2=\"\",\"\",B2)" })).toBeNull();
+    expect(cellRawValue({ sharedFormula: "N6" })).toBeNull();
+    expect(cellRawValue({ richText: [{ text: "On " }, { text: "track" }] })).toBe("On track");
+  });
+
   test("cells: formula injection escaped, sheet names Excel accepts, Lagos dates, filenames", () => {
     expect(escapeFormula("+2348031234567")).toBe("'+2348031234567");
     expect(escapeFormula("@cmd")).toBe("'@cmd");
@@ -651,5 +658,8 @@ describe("import mapping and rows", () => {
     expect(() => registry.defineImporter({ ...base, matchKeys: ["zz"] })).toThrow(/matchKeys/);
     expect(() => registry.defineImporter({ ...base, fields: [{ key: "a", label: "A", type: "reference", ref: "x", pass: 2 }], resolve() {} })).toThrow(/link/);
     expect(() => registry.defineImporter({ ...base, write: undefined })).toThrow(/write/);
+    expect(() => registry.defineImporter({ ...base, extract: "sheets" })).toThrow(/extract/);
+    expect(() => registry.defineImporter({ ...base, capability: "importing.everything" })).toThrow(/capability/);
+    expect(() => registry.defineImporter({ ...base, fields: [{ key: "a", label: "A", max: 0 }], matchKeys: ["a"] })).toThrow(/max/);
   });
 });

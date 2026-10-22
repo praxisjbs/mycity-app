@@ -121,13 +121,14 @@ async function checkIn(user, body, { idempotencyKey, now = new Date() } = {}) {
     const session = await openShift(client, employeeId, date);
     const workDate = session.date || date;
     const site = await sitesRepo.siteOn(client, employeeId, workDate);
-    if (!site)
+    // A Temporary Home while Home Location is off is a day from home, unchecked: no stops (§6.12, H6).
+    const ctx = site ? await calendar.contextFor(client, person, workDate) : null;
+    if (!site || ctx.unchecked)
       throw new AppError("NO_TEMPORARY_SITE", "Check In is for a temporary site's day.", 422);
     if (!session.date) throw new AppError("NOT_CLOCKED_IN", "Clock in before you check in.", 409);
     if ((await sitesRepo.countOn(client, employeeId, workDate)) >= DAILY_LIMIT)
       throw new AppError("CHECK_IN_LIMIT", `At most ${DAILY_LIMIT} check-ins a day.`, 422);
 
-    const ctx = await calendar.contextFor(client, person, workDate);
     const point = body.latitude === null ? null : { latitude: body.latitude, longitude: body.longitude };
     const judged = decideGeofence({
       mode: ctx.policy.geofence_mode,

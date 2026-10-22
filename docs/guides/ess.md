@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 21/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -41,7 +41,7 @@ modules (People, Performance, Queries & Sanctions, Payroll), never here.
 | ESS · Work Location Requests (`work-location-requests`) | Staff app | Every employee | Owned by LA: the temporary sites they submitted or are on (attendance guide §6.11), and their work location requests made before its PR 4 | Add Work Site (the same sheet as Home's), Withdraw Submission while it waits; withdraw or cancel an old request |
 | ESS · My Devices (`my-devices`) | Staff app | Every employee | Owned by LA: devices used to clock in, up to 3 | Register this device |
 | ESS · Policy Updates (`policy-updates`) | Staff app | Every employee | Owned by TB (policies.md): every policy that applies to them, those to acknowledge first, as clean text or sentences with what changed; approvers, the versions waiting on them | Acknowledge, Later, Download PDF; an approver approves and signs |
-| ESS · My Performance (`my-performance`) | Staff app | Every employee | KPIs this month, the goal chain above them, reviews | Read; open a review; self rating opens with the review cycle (M2) |
+| ESS · My Performance (`my-performance`) | Staff app | Every employee | KPIs this month, the goal chain above them, reviews (interim, on the mock); Performance PRs 3 and 4 make it the scorecard, the check-in, commitments and the reviews (`docs/guides/performance.md` §10) | Read; open a review; self rating opens with the review cycle (M2) |
 | ESS · My Payslips (`my-payslips`) | Staff app | Every employee | Payslips by year, gross, net, deductions, next payday, a preview | Change year, preview a month, download a PDF, email a copy, open the deductions breakdown |
 | ESS · My Leave (`my-leave`) | Staff app | Every employee | Entitlement, taken, upcoming, remaining, requests | Request leave, cancel a request while it waits or before it starts, open a request or a figure's list, open the leave calendar |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee | Three cards: Open Queries, Archived, Sanctions | Open each list; respond to an open query |
@@ -380,6 +380,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · My Attendance (#9): the Home Location card shows only while the Attendance policy's Home Location is on (`attendance.md` §1.3); a link carrying `?home=`, from the clock panel's Set Home or the push to set a home, opens Set Home Location while the person has no home approved or waiting. My Profile's Home Address is untouched (H10).
 - 21/10/2026 · TB · My Leave (#12), from the 21/10 System Health brief (faults #1 and #2): Request Leave's types show what is left of the First Day's year ("Annual · 12 days left"), crossing New Year is the contract's check and marks the Last Day as it is typed, and a typed day before today is refused at once by the shared date field, which had turned a typed 28/10/2026 into 2020-10-28 (refused as Already Past). §6, §10.
 - 21/10/2026 · TB · My Attendance (#9): My Days as a chart labels each day 13/10 (it read 13/10/, with a stray slash), and the shared bar chart leaves off the days that would touch, every few days at an even step, the first and the last always.
 - 21/10/2026 · TB · With attendance's PR 2 (`attendance.md` §6.5): Download My Data names a punch whose location could not be proved Unclear, as every screen now does (Location Unclear); My Attendance (#9) reads Location Unclear with its help and a punch's location with its reason, and the clock panel reads the location through the feature's one reader (`app/src/features/attendance/location.ts`).
@@ -433,3 +434,4 @@ Deductions figure and every form open the shared modal.
 - 20/10/2026 · TB · My Profile's Home Address is picked, never typed (F27, `docs/guides/addresses.md`): Edit Profile opens it from `home_address_place` with Change and a Details line, sends it only when a new place was picked or its details changed, and the organisation service keeps it through `shared/places` (owner `employee.home_address`). Left out, it stays as it is, as every field here. §5 and §10.1 updated.
 - 20/10/2026 · TB · Policy Updates (#89) now serves every company policy and is described in `docs/guides/policies.md` (TB's decisions of 20/10/2026); the attendance guide no longer owns it. My Profile's week becomes the person's work schedule from the record's Work Schedule tab (attendance guide §6.13, its PR 3). The broken link to `attendance-guide.md` points at `docs/guides/attendance.md`.
 - 20/10/2026 · TB · Attendance's PR 4 built (attendance guide §6.11, §6.12, §10): Work Location Requests (#87) lists the person's temporary sites with Add Work Site and Withdraw Submission, a site opening by `?site=`, and their old requests under them; New Request is gone. My Attendance (#9) shows their temporary sites in place of Field Assignments (an old assignment still in force stays) and each day's route of check-ins. §2 and §10.2 rows updated.
+- 22/10/2026 · TB · Performance PR 1: ESS · My Performance is composed of its parts in `app/src/features/performance/my/` (My Scorecard, My Reviews; My Commitments empty until Performance PR 4) with behaviour unchanged; `ess.js` gains `MyPerformance`, `MyReview`, `MyReviewPage` and `MyReviewListQuery` for Performance PR 3, and `src/modules/ess/ess.performance.js` is laid out empty for it (`docs/guides/performance.md` §5, §12).

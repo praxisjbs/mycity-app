@@ -10,6 +10,9 @@
  *                                              for someone who reports to a vacant seat, the first
  *                                              person above the seat (employee_effective_manager)
  *   { type: "ceo" }                            the CEO (app_user.is_ceo)
+ *   { type: "employee_in_context",             the employee the request names in that context field
+ *     value: "<uuid field>" }                  (a review's second level); conditions.js skips the
+ *                                              stage when the field is empty
  *
  * When a stage starts, resolve() turns that into a snapshot stored on the instance
  * (workflow_instance.stage_approvers), so "who can act" and "my approvals" are one
@@ -18,7 +21,7 @@
  *
  *   { type: "role", value: "hr_manager" }
  *   { type: "user", value: "<user id>" }
- *   { type: "employee", value: "<employee id>", via: "manager_of_subject" }
+ *   { type: "employee", value: "<employee id>", via: "manager_of_subject" | "employee_in_context" }
  *   { type: "ceo" }      also what manager_of_subject becomes when the subject has no
  *                        line manager, nor anybody above their empty seat (the top of
  *                        the tree goes to the CEO)
@@ -60,13 +63,14 @@ async function lineManagerOf(client, employeeId) {
  * Snapshot a stage's approvers for one request.
  * @param {{query: Function}} client
  * @param {Array<{type: string, value?: string}>} approvers  normalised stage approvers
- * @param {{subject_employee_id?: string|null}} subject
+ * @param {{subject_employee_id?: string|null, context?: object}} subject  the instance's context
+ *        names the employees an employee_in_context approver reads
  * @returns {Promise<Array<{type: string, value?: string, via?: string}>>}
  */
 async function resolve(
   client,
   approvers,
-  { subject_employee_id: subjectId = null } = {},
+  { subject_employee_id: subjectId = null, context = {} } = {},
 ) {
   const out = [];
   for (const a of approvers) {
@@ -80,10 +84,16 @@ async function resolve(
           ? { type: "employee", value: manager, via: "manager_of_subject" }
           : { type: "ceo", via: "no_line_manager" },
       );
+    } else if (a.type === "employee_in_context") {
+      const named = (context || {})[a.value];
+      if (named) out.push({ type: "employee", value: named, via: "employee_in_context" });
     } else {
       throw new Error(`workflow: unknown approver type "${a.type}"`);
     }
   }
+  // A stage whose named people are all absent is skipped before it starts; if one starts anyway,
+  // it goes to the CEO, as for anyone with nobody above them.
+  if (out.length === 0) out.push({ type: "ceo", via: "nobody_named" });
   // One entry per distinct approver, in stage order.
   const seen = new Set();
   return out.filter((a) => {

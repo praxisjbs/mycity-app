@@ -580,6 +580,19 @@ Two modules, not one:
 **Performance Management System** — goals, KPIs, review cycle. Separate, because Cynthia asked for
 it separate and because a review cycle and a task board have different audiences and lifespans.
 
+**Amended 22/10/2026 (TB).** The Performance Management System follows MyCity's own Q4 workbooks
+(OKRs V2 and Individual Scorecards), which are its source of truth; its engineering shape, TB's 22
+decisions and the five-PR build plan are in `docs/guides/performance.md`. A16's levels map onto those
+workbooks: organisational goals (the CEO) → company objectives and key results (the annual goal) →
+function objectives, key results and operational KPIs (departmental) → individual scorecards, whose
+lines are the individual KPIs (Results 60%, KPIs 25%, Accountability 15%) → monthly commitments (the
+monthly target) → weekly and daily tasks (A24). Plans are quarterly and scored monthly, December being
+the quarter's final. A function's quarter plan is approved by the head's line manager (the Program
+Manager in MyCity's chart, who holds the stage §7.1 calls the COO's), then Operations & People, then
+the CEO, whose approval alone makes it binding. The review (A17) runs self, reviewer (the effective line
+manager), second level (the reviewer's line manager), then HR. Departments are named as the OKR
+functions, one nomenclature everywhere. Where §7.1 and §7.2 read otherwise, the guide wins.
+
 ### 7.1 The goal cascade (A16) — net-new
 
 ```
@@ -1295,6 +1308,12 @@ ratifying it also updates the summary counts, the `SCREENS` constant in
 
 **Ratified 20/10/2026 (TB).** Policies are centralised. **Knowledge Hub · Policies** (`policies`) is brought forward from M10 to M1, built with the attendance work, as the one place every company policy lives: a written document, or a rules policy whose switches and figures the system enforces, the Attendance policy first. **Settings · Attendance Policy** (`attendance-policy`) is dropped: its worksheet is the Attendance policy on Knowledge Hub · Policies, taking Settings to 13 tabs, the admin surface to 88 and the inventory to 94. **Employee Self-Service · Policy Updates** keeps its slug and now carries every policy that applies to the person, with their acknowledgement. Its row in `docs/PROGRESS.md` (#73) is marked Dropped, not deleted. Applied to the table below, `src/shared/route-map.js`, `src/shared/search/screens.js`, the app's catalogue and `docs/PROGRESS.md` (rows #62, #73, #89). Its engineering shape is in `docs/guides/policies.md`, and the Attendance policy's rules in `docs/guides/attendance.md` §6.15. Policies use the `knowledge` permission key with a new capability, `policies.manage`, so only Operations & People (and those given it) write them; everyone else reads the policies that apply to them on ESS.
 
+**Amended 22/10/2026 (TB).** Performance · Targets is labelled **Scorecards**, MyCity's own word for
+it; the tab's slug stays `targets` (§18.1), and the tab carries Scorecards and the monthly
+Commitments view (`docs/guides/performance.md` P11). The inventory's count is unchanged. Performance
+PR 1 applies the label to the table below, the app's catalogue, `src/shared/search/screens.js` and
+`docs/PROGRESS.md` (row #30).
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1308,7 +1327,7 @@ staff never navigates to it to do their job.
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
 | People | **People** | 6 | Employees · Organogram · Attendance · Leave · Devices · Worksites | M1 |
-| People | **Performance** | 5 | Goals · Targets · KPIs · Reviews · Analytics | M2 |
+| People | **Performance** | 5 | Goals · Scorecards · KPIs · Reviews · Analytics | M2 |
 | People | **Queries & Sanctions** | 4 | Queries · Rules · Sanctions · Letter Templates | M3 |
 | People | **Recruitment** | 7 | Vacancies · Candidates · Assessments · Interviews · Offers · Onboarding · Talent Pool | M4, M5 |
 | People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |

@@ -66,6 +66,12 @@ const TASKS: Task[] = ROWS.map((r, i) => ({
   link: r[6] ? { module: "partnerships", tab: "partners", id: sid(`partner:${r[6]}`), path: `/partnerships?tab=partners&id=${sid(`partner:${r[6]}`)}` } : null,
   recurrence: null,
   comment_count: 0,
+  is_commitment: false,
+  acceptance_criteria: null,
+  commitment_month: null,
+  original_due_at: null,
+  rescoped_at: null,
+  commitment_set_id: null,
   created_at: at(10, "09:00"),
   updated_at: at(1, "09:00"),
 }));

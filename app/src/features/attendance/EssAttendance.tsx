@@ -128,7 +128,7 @@ export function MyAttendancePage() {
           </>
         }
       />
-      <HomeLocationCard openOnLoad={params.get("home") === "set"} />
+      <HomeLocationCard openOnLoad={params.has("home")} />
       {todayCard}
       <MyTemporarySites openSite={openSite} />
       <MyFieldAssignments open={openAssignment} />

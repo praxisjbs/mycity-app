@@ -1,10 +1,11 @@
 "use strict";
 /**
- * My Workspace: the Today view and Analytics (docs/guides/workspace.md §2, §6).
- * Tasks and the calendar have their own files; these are the views built over them.
+ * My Workspace: the Today view, Analytics and the week (docs/guides/workspace.md §2, §6;
+ * docs/guides/performance.md §6.18). Tasks and the calendar have their own files; these are
+ * the views built over them.
  */
 const { z } = require("zod");
-const { uuid, isoDate, isoDateTime, PAGE_SIZE } = require("./common");
+const { uuid, isoDate, isoDateTime, PAGE_SIZE, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
 const { Task, TaskPriority, TaskStatus, TaskActivityKind, TaskScope } = require("./tasks");
 const { CalendarItem } = require("./calendar");
@@ -74,8 +75,85 @@ const WorkspaceAnalytics = z
   })
   .strict();
 
+/* ------------------------------------------------------------------ *
+ * The week (docs/guides/performance.md §6.18, PR 4)
+ * ------------------------------------------------------------------ */
+
+/** A Monday: the first day of a working week. */
+const WeekStart = isoDate.refine((v) => new Date(`${v}T00:00:00Z`).getUTCDay() === 1, "must be a Monday");
+
+/** GET /workspace/week: the reader's week, or someone's in their scope. */
+const WeekQuery = z
+  .object({
+    week_starts_on: WeekStart.optional(),
+    employee_id: uuid.optional(),
+  })
+  .strict();
+
+/** Done this week, planned next week and blocked; Support Needed and an accepted summary. */
+const WeekView = z
+  .object({
+    employee: PersonRef,
+    week_starts_on: WeekStart,
+    done: firstPage(Task),
+    planned: firstPage(Task),
+    blocked: firstPage(Task),
+    support_needed: z.string().nullable(),
+    summary_text: z.string().nullable(),
+    updated_at: isoDateTime.nullable(),
+  })
+  .strict();
+
+/** PUT /workspace/week: Support Needed, and a tidied summary the person accepted. */
+const WeekSave = z
+  .object({
+    week_starts_on: WeekStart,
+    support_needed: z.string().trim().max(1000).nullable().optional(),
+    summary_text: z.string().trim().max(4000).nullable().optional(),
+    ai_run_id: uuid.nullable().optional(),
+  })
+  .strict();
+
+/** One person's week on Team This Week. */
+const TeamWeek = z
+  .object({
+    employee: PersonRef,
+    done: z.number().int().min(0),
+    planned: z.number().int().min(0),
+    blocked: z.number().int().min(0),
+    support_needed: z.string().nullable(),
+  })
+  .strict();
+
+const TeamWeekPage = Paged(TeamWeek);
+
+/** GET /workspace/team-weeks */
+const TeamWeekQuery = listQuery({ week_starts_on: WeekStart.optional() }, ["employee"]);
+
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
+  WeekQuery: { table: null, reason: "whose week, and which" },
+  WeekView: {
+    table: "weekly_summary",
+    virtual: {
+      employee: "the person in weekly_summary.employee_id",
+      done: "their tasks completed that week",
+      planned: "their open tasks due the next week",
+      blocked: "their blocked tasks",
+    },
+  },
+  WeekSave: { table: "weekly_summary" },
+  TeamWeek: {
+    table: "weekly_summary",
+    virtual: {
+      employee: "the person in weekly_summary.employee_id",
+      done: "their tasks completed that week, counted",
+      planned: "their open tasks due the next week, counted",
+      blocked: "their blocked tasks, counted",
+    },
+  },
+  TeamWeekPage: { table: null, reason: "a page of the team's weeks" },
+  TeamWeekQuery: { table: null, reason: "list controls and the week" },
   TodayActivity: {
     table: "task_activity",
     virtual: {
@@ -101,4 +179,11 @@ module.exports = {
   PersonLoad,
   PriorityLoad,
   WorkspaceAnalytics,
+  WeekStart,
+  WeekQuery,
+  WeekView,
+  WeekSave,
+  TeamWeek,
+  TeamWeekPage,
+  TeamWeekQuery,
 };

@@ -183,8 +183,10 @@ async function scheduleOf(user, person, { editable = true } = {}) {
   const today = lagos.today();
   const { current, next } = await versionsOf(pool, person, today);
   const site = await worksites.fenceFor(pool, person.worksite_id);
+  // The home is told only while the policy's Home Location is on (§1.3).
+  const homesOn = (await calendar.policyFor(pool, person.employee_id, today)).home_location.on === true;
   let homeState = null;
-  if (await needsHome(pool, person, today)) {
+  if (homesOn && (await needsHome(pool, person, today))) {
     const homes = await repo.homesOf(pool, person.employee_id);
     homeState = homes.approved ? "approved" : homes.pending ? "pending" : "none";
   }

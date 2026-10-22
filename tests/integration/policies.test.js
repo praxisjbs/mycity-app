@@ -198,10 +198,12 @@ describeDb("policies against the real migrations", () => {
 
   test("the Attendance draft holds every rule, and refuses what a new version may not set", async () => {
     expect((await as("staff").put(`/policies/${attendanceId}/draft`, attendanceDraft())).status).toBe(403);
-    const narrow = await as("ops").put(`/policies/${attendanceId}/draft`, attendanceDraft({ home_radius_m: 100 }));
+    // A home's check and radius are checked while Home Location is on, when the worksheet shows them (attendance.md §1.3).
+    const homes = { home_location: { on: true } };
+    const narrow = await as("ops").put(`/policies/${attendanceId}/draft`, attendanceDraft({ ...homes, home_radius_m: 100 }));
     expect(narrow.status).toBe(422);
     expect(Object.keys(narrow.body.error.fields)).toContain("rules.home_radius_m");
-    const homeOff = await as("ops").put(`/policies/${attendanceId}/draft`, attendanceDraft({ home_geofence_mode: "off" }));
+    const homeOff = await as("ops").put(`/policies/${attendanceId}/draft`, attendanceDraft({ ...homes, home_geofence_mode: "off" }));
     expect(homeOff.status).toBe(422);
     const text = await as("ops").put(`/policies/${attendanceId}/draft`, { ...attendanceDraft(), body_html: "<p>Words</p>" });
     expect(text.body.error.code).toBe("NO_TEXT_ON_RULES");
@@ -213,6 +215,13 @@ describeDb("policies against the real migrations", () => {
 
     await as("ops").put(`/policies/${attendanceId}/draft`, attendanceDraft({ office_geofence_mode: "block", grace_minutes: 10 }));
     expect((await q("SELECT count(*)::int AS n FROM policy_version WHERE status = 'draft'")).rows[0].n).toBe(1);
+    // Off, an older version's Off and 100 m are kept, hidden, and the draft still saves.
+    const kept = await as("ops").put(
+      `/policies/${attendanceId}/draft`,
+      attendanceDraft({ office_geofence_mode: "block", home_geofence_mode: "off", home_radius_m: 100 }),
+    );
+    expect(kept.status).toBe(200);
+    expect(kept.body.draft.rules).toMatchObject({ home_location: { on: false }, home_geofence_mode: "off", home_radius_m: 100 });
     await as("ops").put(`/policies/${attendanceId}/draft`, attendanceDraft({ office_geofence_mode: "block" }));
   });
 

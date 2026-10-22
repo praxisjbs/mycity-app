@@ -20,6 +20,9 @@
  *                                   (approve, within scope) are told
  *   attendance.home_decided         People approved or rejected it: the person is told, and
  *                                   their clock reloads
+ *   attendance.home_needed          the policy's Home Location is on and someone who works
+ *                                   from home has no home: they are asked to set one, once a
+ *                                   stretch (the reminder attendance_home_needed, guide §6.10)
  *   location_request.submitted      a work location request was sent; its approval
  *                                   (attendance.location_request) tells the first stage
  *   location_request.approved,      its approval ended; copied onto the request after commit
@@ -73,6 +76,7 @@ const places = require("../../shared/places/owners");
 const outbox = require("../../shared/events/outbox");
 const workflow = require("../../shared/workflow/engine");
 const { defineNotification, permissionHolders } = require("../../shared/notifications/fanout");
+const reminders = require("../notifications/notifications.reminders");
 const { defineDocumentType } = require("../../shared/documents/types");
 const { formatDate } = require("../../shared/time/day-first");
 
@@ -86,6 +90,7 @@ const EVENTS = defineEvents("people", {
   "attendance.export_requested": { summary: "An attendance export was requested" },
   "attendance.home_requested": { summary: "A remote employee asked for a home location" },
   "attendance.home_decided": { summary: "People decided a home location" },
+  "attendance.home_needed": { summary: "An employee was asked to set their home location" },
   "location_request.submitted": { summary: "A work location request was sent" },
   "location_request.approved": { summary: "A work location request was approved" },
   "location_request.rejected": { summary: "A work location request was rejected" },
@@ -171,6 +176,25 @@ defineNotification(EVENTS.ATTENDANCE_HOME_DECIDED, {
     e.payload.status === "approved"
       ? "Your clock-ins are now checked against it."
       : "Send it again from My Attendance.",
+});
+
+defineNotification(EVENTS.ATTENDANCE_HOME_NEEDED, {
+  to: [{ subject: true }],
+  title: "Set your home location",
+  body: "Send it from My Attendance before your next clock-in.",
+});
+
+/*
+ * Once the policy's Home Location is switched on (guide §6.10, H8), the one reminder engine
+ * (docs/guides/notifications.md §7.1) asks whoever works from home and has no home, once for each
+ * stretch it stays on, in the working day. attendance.home requires this file for its event keys,
+ * so it is required when the engine calls it.
+ */
+reminders.defineReminder("attendance_home_needed", {
+  event: EVENTS.ATTENDANCE_HOME_NEEDED,
+  module: "people",
+  find: (db, ctx) => require("./attendance.home").homesDue(db, ctx),
+  check: (client, row, ctx) => require("./attendance.home").homeNeeded(client, row, ctx),
 });
 
 /** "FA-0001 · Venue Setup" */

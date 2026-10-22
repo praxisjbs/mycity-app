@@ -54,9 +54,9 @@ export const COMING: Record<string, string[]> = {
   "people/organogram": ["The reporting tree for the whole company", "Move a person or team by dragging", "Vacant positions shown where they sit"],
 
   /* Performance */
-  "performance/goals": ["Company goals, broken down to each department", "Progress rolled up from the KPIs beneath", "Who owns each goal"],
-  "performance/targets": ["Monthly targets set by managers", "Reviewed by the COO and Operations, approved by the CEO", "Binding once approved"],
-  "performance/kpis": ["Each person's KPIs for the month, weighted to 100%", "Set by department managers", "Progress updated as work is done"],
+  "performance/goals": ["The year's goals, and each function's objectives and key results", "Heads report the month; the CEO confirms the scores", "Every key result traces up to its goal"],
+  "performance/targets": ["Each person's quarter scorecard: results, KPIs and accountability", "Drafted by the manager, approved with the plan", "Agreed by the person and their reviewer"],
+  "performance/kpis": ["Each function's standing KPIs and their targets", "Met, Not Met or N/A every month", "The scorecard lines each KPI feeds"],
   "performance/reviews": ["Self rating, then the manager, then a second approval", "Comments kept with each rating", "Review cycles by month or quarter"],
   "performance/analytics": ["Performance by department and by person", "Who is improving and who needs support", "Trends across review cycles"],
 

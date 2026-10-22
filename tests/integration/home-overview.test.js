@@ -319,7 +319,7 @@ describeDb("Home · Overview against the real migrations", () => {
       await leaveRow("staff", "2026-09-01", "2026-09-03", 3, "approved");
       await leaveRow("staff", "2026-11-02", "2026-11-02", 1, "submitted");
 
-      // Goals this quarter (M2): one live, one ended last quarter, one a department's, one a draft.
+      // Goals this quarter (M2): one live, one ended last quarter, one a department's, one closed last year.
       const goal = (title, level, status, from, to) =>
         q(
           `INSERT INTO organisational_goal (level, title, status, starts_on, ends_on, owner_employee_id)
@@ -329,7 +329,7 @@ describeDb("Home · Overview against the real migrations", () => {
       await goal("Reach Three New States", "organisation", "active", "2026-10-01", "2026-12-31");
       await goal("Launch the Festival", "organisation", "active", "2026-07-01", "2026-09-30");
       await goal("Hire Two Producers", "department", "active", "2026-10-01", "2026-12-31");
-      await goal("Draft Goal", "organisation", "draft", "2026-10-01", "2026-12-31");
+      await goal("Closed Last Year", "organisation", "closed", "2025-10-01", "2025-12-31");
 
       // Musa's targets: one due this quarter, one last quarter.
       const target = (title, due) =>

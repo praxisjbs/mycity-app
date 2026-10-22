@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #4 Today, #5 Tasks, #6 Calendar, #7 Analytics |
 | Status | Draft |
-| Last changed | 19/10/2026 |
+| Last changed | 22/10/2026 |
 
 Sources: MILESTONES §7 (A24) and §7 Definition of done; REUSE_MAP §3.1; the meeting of
 10 October 2026 (Cynthia Osakunih, Tom-Blake Asaah: "task and activity tracking is a primary
@@ -247,9 +247,16 @@ is listed here as tier 1 or tier 2.**
 - An ICS invitation by email beside the in-app notice (`services/calendar/ics`). AJ, after the demo.
 - Reordering within a column on the board: the API takes `before_task_id`; `Kanban` moves between
   columns only today. AJ, after the demo.
+- Performance PR 4 (`docs/guides/performance.md` §1.2, §6.11, §6.18; agreed by TB 22/10/2026) changes
+  this module: commitments on tasks with their monthly approval and fixed original date, Counts Towards a
+  scorecard line or key result (`linkFor("target", …)` in place of `linkFor("kpi", …)`), key results'
+  initiatives and review actions as tasks, My Week and Team This Week on Today (the weekly tracker
+  retires), and performance dates on the calendar. This guide is brought up to it in that PR.
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · `tasks.service.create` takes the caller's transaction (`{ client }`), so Performance's OKR workbook import sets a key result's dated initiatives as tasks for its owner inside the import (`entity_type` `key_result`); nothing on screen changes.
+- 22/10/2026 · TB · §13: Performance PR 4's changes to this module, agreed in `performance.md`, noted; the module is unchanged until that PR.
 - 21/10/2026 · AJ · An event's Location stays free text, marked `address:none` for gate 22 (F27): a meeting's room or call link, not a street address.
 - 21/10/2026 · AJ · Performance left out of M2's PR (the lead, 21/10/2026: TB builds it from MyCity's sheets): the task form's Counts Towards field is gone until a KPIs API exists; `task.completed` and `task.reopened` still carry the KPI for it. The staging seed is `40_workspace.js` (tasks and calendar only).
 - 20/10/2026 · AJ · Staging: `seeds/staging/40_workspace.js` sets tasks (by the CEO, the head of department and the line manager for their people, and people's own, A24) and this week's meetings through the tasks and calendar services, after taking Home's forward rows out of those tables.

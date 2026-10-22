@@ -116,6 +116,8 @@ module.exports = defineManifest({
     { intent: "clock in or out", screen: "ess.my-attendance" },
     { intent: "see my attendance", screen: "ess.my-attendance" },
     { intent: "review attendance", screen: "people.attendance" },
+    // These two only while the policy's Home Location is on (§1.3): the assistant (M10) asks
+    // attendance.home onDate before offering them; nothing reads the routes before then.
     { intent: "set my home location", screen: "ess.my-attendance" },
     { intent: "approve home locations", screen: "people.attendance" },
     // Add Work Site is that screen's own action; a manifest carries no action of its own (A23).

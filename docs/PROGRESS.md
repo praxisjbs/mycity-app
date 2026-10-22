@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 6 | 0 | 4 | 0 | 0 |
+| M2 Productivity & Performance | 10 | 3 | 1 | 6 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **99** | **46** | **0** | **53** | **0** | **0** |
+| **Total** | **99** | **43** | **1** | **55** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -641,13 +641,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 
 **Notes**
 
+- 22/10/2026 · TB · Overview (#1): Add Work Site offers Temporary Home only while the Attendance policy's Home Location is on (`docs/guides/attendance.md` §1.3, H6).
 - 21/10/2026 · TB · Reports (#3), from the Milestone 1 handover (a Daily Attendance report filtered to Absent came back empty: nobody is Absent until the 01:30 day-close has closed the day, so a same-day report could never list them): Daily Attendance takes a Day (Today So Far, or Last Working Day, the closed day before) and Statuses, any of them ticked (Absent only on the Last Working Day, Not In only Today; the contract's `ROSTER_STATUSES_ON`), the roster reads `statuses` together, and the file names its day and date. `1152` turns a saved report's one status into a list. Tests: `reports.test.js`, `home-contract.test.js`, `home-reports.test.js` (an absentee on the last working day is in the file), `Reports.test.tsx`. Left: nothing.
 - 21/10/2026 · TB · Overview (#1): Add Work Site's sheet opens on Hours (Usual Shift or Site Hours); on a day of a site with its own hours the Staff day strip's Shift Today shows the site's hours (`docs/guides/home.md` §3 step 10, §6). Left: nothing.
 - 21/10/2026 · TB · Attendance's PR 3 (rules and schedules, `docs/guides/attendance.md` §1.2): Alerts (#2) shows attendance's alerts as the Attendance policy's breaches on the five rules the system keeps (People Approvers, no Over By, Query Due while M3's query is not in), Alert Rules opens with the read-only Attendance Policy card and Set in Attendance Policy, and Home's own Late Arrivals and Missing Clock-Outs rules are switched off with their open alerts dismissed (`1445`; the staging seed keeps two rules). Overview (#1): the day strip and Your Week read the person's own shift (their work schedule, else the company hours). Team (#86): the roster counts only people with a login as expected. Left: nothing on Home for PR 3.
@@ -749,6 +750,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 22/10/2026 · TB · My Workspace (#4 to #7): Performance PR 4 (`docs/guides/performance.md` §1.2) will add commitments (a task marked Commitment, approved monthly, its original date fixed), Counts Towards a scorecard line or key result, key results' initiatives as tasks, My Week and Team This Week on Today in place of the weekly tracker, and performance dates on the calendar; `workspace.md` is brought up to it in that PR. Nothing changed yet.
 - 21/10/2026 · AJ · My Workspace (#4 to #7), the CI run after the second merge with `main` (7 failures in 4 suites, all from Workspace meeting `main`'s tests): Settings · Documents & Numbering lists 23 schemes, 3 resetting (Project and Task added; `settings.test.js`); `task-recurrence` is on the worker's scheduler list (`worker.test.js`); New Event no longer answers "invite", which is Invite User's (`search.test.js`); the Workspace seed takes the run's date as Home's does, sets Operations and the head's first report an overdue task and puts this week's meetings on its Monday, so Home's seed tests read them on their fixed day (`home-staging-seed.test.js`). Settings and search pass here on PGlite; worker and Home's seed suites take longer than this harness allows, checked by what they read; CI decides.
 - 21/10/2026 · AJ · My Workspace (#4 to #7) after the merge with `main`: a task due on a day off failed to save (the working week now keeps no hours for a day off, and `shared/time/working-week.js` loadCalendar hands that back as the text "null"; GE to look at the loader), so a day with no closing time now closes at 17:00 (`tasks.recurrence.js`, with a unit test). An event's Location is marked `address:none` for gate 22 (a room or call link, not an address). Checks, backend and frontend groups pass (typecheck, lint, 359 app tests, build, no mock); the workspace, home-schema and home-team integration suites pass on PGlite, bar the known Postgres 17 error code in home-schema; the staging seed lands and re-runs clean. Not run here: Home's overview and staging-seed suites and the browser screen gates (CI).
 - 21/10/2026 · AJ · My Workspace (#4 to #7) after Performance left M2's PR: the task form's Counts Towards field is gone until a KPIs API exists; the staging seed is `seeds/staging/40_workspace.js` (tasks by the CEO, the head and the line manager for their people and people's own, this week's meetings, through the services), which runs before Home's and takes Home's forward rows out of `task` and `calendar_event`; Home keeps its forward goals, targets and review cycle. Merged with `main` (21/10/2026).
@@ -761,13 +763,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 89 | Policy Updates | `policy-updates` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 90 | My Security | `my-security` | M1 | AJ | ☑ | ☑ | ☑ | Built | 19/10/2026 |
@@ -775,6 +777,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 22/10/2026 · TB · My Attendance (#9) and Work Location Requests (#87), the Attendance policy's Home Location switch (`docs/guides/attendance.md` §1.3, TB's ten answers after the Milestone 1 handover; off by default and on every version before it): while it is off there is no Home Location card, the clock panel asks for no location on a day from home (Clock Location reads Not Checked, no Set Home banner) and the punch keeps none, and Add Work Site leaves Temporary Home out of the purposes. Switched on, everyone who needs a home and has none is pushed once, Set your home location, which opens the sheet (`?home=`). My Profile's Home Address is unchanged. Left: MyCity told it ships off; TB to confirm the Working From Home sentence.
 - 21/10/2026 · TB · My Leave (#12), faults #1 and #2 of the 21/10 System Health brief (the server refused LEAVE_SPANS_YEARS and LEAVE_IN_THE_PAST after Send Request): Request Leave's types read what is left of the First Day's year ("Annual · 12 days left", from `GET /ess/leave/balances?year=`), a Last Day in another year reads "Ends in another year" as it is typed (`schemas/leave.js`, for Record Leave too), and a typed day before today "Pick 21/10/2026 or later" at once (the shared `DateField`, M0 note). Tests: `app/src/features/people/Leave.test.tsx`, `leave.test.js`, `tests/integration/leave.test.js`. Left: nothing.
 - 21/10/2026 · TB · My Attendance (#9): My Days as a chart labels each day 13/10 (it read 13/10/, with a
   stray slash), and the shared bar chart leaves off the days that would touch, every few days at an even step,
@@ -909,15 +912,16 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
-| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 
 **Notes**
 
+- 22/10/2026 · TB · Attendance (#25), Employees (#24) and Worksites (#28), the Attendance policy's Home Location switch (`docs/guides/attendance.md` §1.3): while it is off the Homes view is gone (the home routes answer 409 `HOME_LOCATION_OFF`, ⌘K finds no home), the register names a day from home Remote, the Work Schedule tab shows no Home Location row, a remote punch is Not Checked with no reading kept, an approved Temporary Home reads as a day from home with no Check In, and a new Temporary Home is refused. Homes and open exceptions stay as they were. Left: the assistant (M10) offers its two home routes only while it is on.
 - 21/10/2026 · TB · Leave (#26): Record Leave marks a Last Day in another year as it is typed (the contract's New Year check, with My Leave's, #12). Attendance (#25): Export's Period says what is wrong with a typed day after today ("Pick 21/10/2026 or earlier") through `DateRangeField`'s `onProblem`, and every attendance date field keeps a four-digit year as typed (M0 note). Left: nothing.
 - 21/10/2026 · TB · Attendance's PR 2 built (clock fixes, `docs/guides/attendance.md` §1.2): Attendance (#25) lists every refused punch's exception (outside the fence or an unknown device under Refuse, its detail Refused), decided as §6.8 says (accept keeps the refusal, reject marks it wrong; neither makes it count); Location Unclear in place of Location Unverified, with its reason (no reading, rough reading, at the edge, no home, no office). A punch People reject frees its slot: the person clocks in or out again, and a clock-out rejected on a day already closed opens its missing clock-out for Add Clock-Out, which recalculates the day. Backend: the reading judged with its accuracy (`attendance.geofence.js` `judgeReading`), `1380` (`attendance_event.slot`, the unique index a slot at a time; applied on a fresh database before `1405`, `1450` and `1460`, and on one already holding them), `1397` (the label), leave read on the work date and re-projected onto a closed day when granted later (`attendance.day_reprojected`), a stored key reused for the other punch after 48 hours is 422, `shared/geo`'s second geofence removed. This closes PR 3's "Left: PR 2". Left: the M3 query subscriber and payroll's `in_run` (M6), as before.
 - 21/10/2026 · TB · Attendance (#25) and Worksites (#28), a temporary site's hours (owner decision, 21/10/2026; `docs/guides/attendance.md` §6.11): Add Work Site and Add Temporary Site open on Hours, Usual Shift or Site Hours with Starts At and Ends At, and a site shows its hours. Site Hours make every day of the site worked for its people, weekends and holidays included, on the site's own clock: the clock-in reminder and the start prompt at its start, lateness from it with the policy's grace, the closing prompt, overtime and the system clock-out from its end, and a day with no clock-in closed absent; the register and the roster count those days as worked. Migration `1475`. Left: nothing.
@@ -991,14 +995,29 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 29 | Goals | `goals` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
-| 30 | Targets | `targets` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
-| 31 | KPIs | `kpis` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
+| 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☐ | ☐ | In progress | 22/10/2026 |
+| 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 32 | Reviews | `reviews` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 | 33 | Analytics | `analytics` | M2 | TB | ☐ | ☐ | ☐ | Not started | |
 
+**Build plan** (`docs/guides/performance.md` §1.2, where each PR's checklist is ticked; PR 1 and PR 2 in
+order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
+
+| PR | Branch | Builds | Depends on | Status | Updated |
+|---|---|---|---|---|---|
+| 1 · Foundation | `m2/perf-foundation` | Department names and seats, department heads, the whole schema, contract and scoring library, business days, the second-level approver, the four flows, capabilities, quarters and rules, screens laid out, the mock | none | Built | 22/10/2026 |
+| 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards and the contribution check, the quarter plan and its approval, agreement, target changes, the three importers; Goals, Scorecards, KPIs | PR 1 | Built | 22/10/2026 |
+| 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, the review chain, conduct, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews, ESS · My Performance | PR 2 | Not started | |
+| 4 · Workspace | `m2/perf-workspace` | Commitments and their view, the month-end report, Counts Towards, initiatives, the weekly summary, performance dates on the calendar, My Commitments | PR 2 | Not started | |
+| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard, the Team roster's score; the demo walk | PR 2 | Not started | |
+
 **Notes**
 
+- 22/10/2026 · TB · Performance PR 2 review fixes: plan approval binds scorecards and schedules agreement reminders; approved target changes apply to lines and re-propose key results; TBC targets unscored until locked; confirmed scores reach Scored From company key results; role reviewers agree; plan detail and lists honour scope; import reverts refused once used; Report Month per function with recovery fields when the score needs them; Edit Lines keeps every field; Goals and KPIs figures counted on the server; Change Target, Edit KPI and Record Actual follow the API. Left: PRs 3, 4 and 5.
+- 22/10/2026 · TB · Performance PR 2 (Plan) built: organisational goals (the CEO; quarterly targets), the OKR tree for the company and each function (codes G1, links to company key results, Scored From, owner and co-owner, TBC, the trace), Report Month for a function's key results and KPIs in one save with Recovery below 0.4 and Confirm Score for the CEO, KPIs with monthly Met, Not Met or N/A, scorecards (Accountability lines prefilled, Copy Last Quarter or a colleague's, reviewer override with a reason, dotted line), the contribution check, the quarter plan and `performance.plan` (binding on the CEO's approval with its scorecards), one-tap agreement with its daily reminder, target changes to the CEO and the `targets-lock` job; importers `okr_workbook`, `okr_kpis` and `scorecards` reading MyCity's workbooks as they are (the import engine's new `extract` hook); staging loads MyCity's Q4 2026 plan through them and Home's forward goal and target rows are gone; Home's goals adapter lists a person's lines once their scorecard binds. Goals (#29) and KPIs (#31) built on both shells; Scorecards (#30) has its Scorecards view and a scorecard, the Commitments view is PR 4. Left: PRs 3, 4 and 5 in parallel.
+- 22/10/2026 · TB · Performance PR 1 (Foundation) built: MyCity's five departments, the chart's titles and seven vacant seats kept true by the staff loader (`seeds/staff/nomenclature.json`, renamed in place on staging and production); department heads; migration 2100 (every table of the guide's §4) and seed 2190 (capabilities, the four flows, code lists); the whole contract (`goals`, `kpis`, `targets`, `reviews`, `scoring`, and additions to `ess`, `tasks`, `calendar`, `workspace`, `organisation`) and the scoring library with the workbooks' tests; business days; the named-person approver on Settings · Approvals; the quarters API; the record types and ⌘K over key results, objectives and goals; Performance · Targets labelled Scorecards (#30); the screens split one file per tab and ESS · My Performance composed of its parts, behaviour unchanged; the mock in the contract's shapes. No screen ticked. Left: PR 2, then PRs 3 to 5.
+- 22/10/2026 · TB · Performance (#29 to #33, #10): the engineering guide `docs/guides/performance.md` written and agreed, from MyCity's two Q4 workbooks (OKRs V2, Individual Scorecards), the handbook, the October org chart, the weekly tracker, the monthly report template, the caution letter and the meetings of 2, 10 and 12 October, with TB's 22 decisions: their sheets are the source of truth; quarter plans scored monthly; one nomenclature, five departments named as the OKR functions (General Management, Technology & Back-office Ops, Branding & Marketing, Partnership & Growth, People & Culture), checked against the org chart; the chart's job titles and vacant seats, David under Chinyere, the Strategy seat vacant (Abubakar has left); both scoring rule sets kept, configurable; one plan per function (the head's line manager, Operations & People, the CEO); one-tap agreement; target changes to the CEO; commitments as Workspace tasks with a view under Performance; Targets relabelled Scorecards; self, reviewer, second level, HR; the line manager reviews, a dotted line gives input, another reviewer may be named; one monthly check-in with automatic lines and a factual proposed score; the weekly tracker retired; AI on Default when pressed, Transcription for speech, no DeepSeek; both workbooks imported; corrective actions, PIPs and probation reviews; five PRs. Nothing built; no screen moved. Left: PR 1, then PR 2, then PRs 3 to 5. Open: the 2026 Organisational Goals sheet and the paper review form (never received), whether Emmanuel Aneke has left, and the delivery dates against the 23/10 demo.
 - 21/10/2026 · AJ · Performance (#29 to #33, #10) left out of M2's PR, as the lead asked (21/10/2026): it is new, the donors do not have it, and TB builds it from MyCity's sheets on the Google Drive. The API, migrations 2020 and 2030, seed 2091, contracts and screens built on 19 and 20/10 are removed from the branch (they stay in its history, commit d820732); the screens are back on the mock. Rows back to Not started, owner TB.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/performance/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/performance.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
@@ -1079,7 +1098,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 62 | Policies | `policies` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 63 | SOPs | `sops` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
@@ -1087,6 +1106,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 22/10/2026 · TB · Policies (#62): the Attendance worksheet's Location Checks gains Home Location, a switch with Home Check and Home Radius beneath it while it is on (`docs/guides/attendance.md` §1.3); off by default, it changes through a version like every rule, and while it is off Working From Home reads "Working from home, your location is not checked." `policies.heldSince` names the stretch it stays on, for the push to set a home.
 - 21/10/2026 · TB · Policies (#62): the Attendance worksheet shows every rule (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts; `app/src/features/policies/worksheet.ts`), each a switch with its figures, with the server's suggestions for a first draft; a rule compares as changed whatever order its keys came in. Closes PR 1's "Left: the worksheet's PR 3 sections". Left: Tidy With AI against a real model.
 - 20/10/2026 · TB · Policies (#62), attendance's PR 4: the Attendance policy's `site_geofence_mode` reads Temporary Site Check on the worksheet, with new help, and its section At a Temporary Site covers a site's addresses and its check-ins and ends with "Working somewhere else? Add it from Home, or ask People." (`docs/guides/policies.md` §14). Left: nothing.
 - 20/10/2026 · TB · Policies (#62) built (PR 1): the `policies` module, contract and migrations `1400`, `1405` (the Attendance policy's versions moved over with their ids), seed `1396`; the screen in `app/src/features/policies/` (the list, a policy's draft with the editor or the Attendance worksheet, Publish or Submit with a signature, Withdraw, Recall, Archive, versions and acknowledgements, Download PDF), the mock, and `RichText` in `packages/ui`. Tests: unit, `tests/integration/policies.test.js` on the real migrations, the screen on the mock. Tidy With AI runs on the Default job, carrying personal data (never DeepSeek), TB 20/10/2026. Left: the worksheet's PR 3 sections; Tidy With AI against a real model.

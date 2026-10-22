@@ -17,10 +17,11 @@ import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
  * People · Attendance (#25, docs/guides/attendance.md §10): one day's register for everyone in the
  * reader's `people` scope, with its figures, each person's day and the evidence of every punch
  * (and on a temporary site's day each check-in between them), the exceptions waiting on People and
- * remote staff's home locations, and the pending deductions and overtime (waived, confirmed and cut
- * here, §6.17). A manager sees their team; the coordinates, the home addresses and the home
- * decisions are for People with scope all, which the API enforces. Temporary sites, and the
- * requests and field assignments made before them, are on People · Worksites, Temporary.
+ * remote staff's home locations (while the policy's Home Location is on, §1.3), and the pending
+ * deductions and overtime (waived, confirmed and cut here, §6.17). A manager sees their team; the
+ * coordinates, the home addresses and the home decisions are for People with scope all, which the
+ * API enforces. Temporary sites, and the requests and field assignments made before them, are on
+ * People · Worksites, Temporary.
  */
 
 type View = "register" | "exceptions" | "homes" | "deductions" | "overtime";
@@ -44,10 +45,20 @@ export function PeopleAttendance() {
   const [status, setStatus] = useState<RegisterStatus | "all">("all");
   const summary = useApi("GET /api/v1/attendance/summary", { query: { date } });
   const s = summary.data;
+  // Homes only while the policy's Home Location is on (attendance.md §1.3), as today's clock reads it.
+  const homesOn = useApi("GET /api/v1/attendance/me/today").data?.policy.home_location === true;
+  const shown: View = view === "homes" && !homesOn ? "register" : view;
+  const views: Array<[View, string]> = [
+    ["register", "Register"],
+    ["exceptions", "Exceptions"],
+    ...(homesOn ? ([["homes", "Homes"]] as Array<[View, string]>) : []),
+    ["deductions", "Deductions"],
+    ["overtime", "Overtime"],
+  ];
   const openDay = (employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> });
   useRecordLink(id, openDay);
   const openHome = useCallback((h: HomeRequest) => modal.open({ title: h.employee.display_name, body: (close) => <HomeView h={h} close={close} /> }), [modal]);
-  useHomeLink(homeId, openHome, () => setView("homes"));
+  useHomeLink(homesOn ? homeId : null, openHome, () => setView("homes"));
   // Deductions ticked on the Deductions view put Waive Selected in the phone's floating button.
   const waiveRef = useRef<(() => void) | null>(null);
   const [canWaive, setCanWaive] = useState(false);
@@ -89,19 +100,14 @@ export function PeopleAttendance() {
         />
       </Grid>
       <div className="my-3">
-        <SegmentedControl
-          label="View"
-          value={view}
-          onChange={setView}
-          options={[["register", "Register"], ["exceptions", "Exceptions"], ["homes", "Homes"], ["deductions", "Deductions"], ["overtime", "Overtime"]]}
-        />
+        <SegmentedControl label="View" value={shown} onChange={setView} options={views} />
       </div>
-      {view === "register" ? (
+      {shown === "register" ? (
         <Register date={date} status={status} setStatus={setStatus} openDay={openDay} />
-      ) : view === "exceptions" ? (
+      ) : shown === "exceptions" ? (
         <Exceptions date={date} />
-      ) : view === "deductions" || view === "overtime" ? (
-        <PayItemsView key={view} group={view} waiveRef={waiveRef} onCanWaive={setCanWaive} />
+      ) : shown === "deductions" || shown === "overtime" ? (
+        <PayItemsView key={shown} group={shown} waiveRef={waiveRef} onCanWaive={setCanWaive} />
       ) : (
         <Homes openHome={openHome} />
       )}
