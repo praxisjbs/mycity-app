@@ -28,6 +28,7 @@ const EVENTS = defineEvents("performance", {
   "plan.reopened": { summary: "A quarter plan went back to draft when the import of its objectives was reverted" },
   "target_change.requested": { summary: "A change to a binding target was asked for" },
   "target_change.decided": { summary: "A target change was approved or refused" },
+  "analytics.export_requested": { summary: "Performance Analytics' people table was asked for as a workbook" },
 });
 
 defineNotification(EVENTS.PLAN_BINDING, {
@@ -53,6 +54,7 @@ defineNotification(EVENTS.TARGET_CHANGE_DECIDED, {
 
 module.exports = { EVENTS };
 
-// The plan's and the target change's outcomes, registered with the worker's outbox here because the
-// worker loads each module's events file (src/worker.js).
+// The plan's and the target change's outcomes, and the Analytics export, registered with the worker's
+// outbox here because the worker loads each module's events file (src/worker.js).
 require("./goals.approval");
+require("./goals.analytics");

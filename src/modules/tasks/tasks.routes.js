@@ -3,6 +3,7 @@
  * /api/v1/tasks: My Workspace · Tasks (docs/guides/workspace.md §5).
  *
  *   GET   /, /summary, /:id                 `workspace` view: the board, its figures, a task
+ *   GET   /counts-towards                   `workspace` view: the assignee's lines and key results
  *   POST  /                                 `workspace` create: for oneself, or someone in scope (A24)
  *   PATCH /:id                              `workspace` edit: the setter's fields, or the assignee's notes
  *   POST  /:id/move                         `workspace` edit: a drag between and within columns
@@ -36,6 +37,10 @@ route(router, "get", "/",
 route(router, "get", "/summary",
   { query: t.TaskSummaryQuery, response: t.TaskSummary, summary: "The figures above the board" },
   requirePermission("workspace", "view"), controller.summary);
+
+route(router, "get", "/counts-towards",
+  { query: t.CountsTowardsQuery, response: t.CountsTowardsPage, summary: "The scorecard lines and key results a task may count towards" },
+  requirePermission("workspace", "view"), controller.countsTowards);
 
 route(router, "get", "/:id",
   { ...one, response: t.TaskDetail, summary: "One task, and what the caller may do to it" },

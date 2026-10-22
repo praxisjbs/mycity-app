@@ -4,7 +4,8 @@
  * (docs/guides/workspace.md §3 step 5, §6).
  *
  * The month is the reader's own: their events and invitations, events shared with
- * everyone, their open tasks' deadlines and their approved leave. Only the owner
+ * everyone, their open tasks' deadlines, their approved leave and their performance dates
+ * (docs/guides/performance.md §6.18). Only the owner
  * changes or calls off an event; an attendee answers it.
  */
 const { pool } = require("../../config/db");
@@ -42,7 +43,8 @@ function toItem(row) {
     event_type: row.event_type,
     location: row.location,
     my_response: row.my_response,
-    link: linkFor(row.link_type, row.item_id),
+    performance_kind: row.performance_kind || null,
+    link: linkFor(row.link_type, row.item_id, { self: Boolean(row.link_self) }),
   };
 }
 

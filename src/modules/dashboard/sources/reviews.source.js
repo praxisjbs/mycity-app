@@ -4,24 +4,25 @@
  * Due card (whose review it is, in the reader's scope) and the My Reviews Due card (the
  * reviews the reader must write).
  *
- * OWNED BY the `reviews` module, M2 Productivity & Performance, AJ (migration 2000).
+ * OWNED BY the `reviews` module, M2 Productivity & Performance, AJ (migrations 2000, 2100,
+ * 2300; docs/guides/performance.md §6.12).
  *
- * Home reads these tables before the module that owns them is built, so this file is the
- * one place Home names them. The M2 pull request that builds `reviews` MUST, in the same PR,
- * move or replace these queries with its own reads, keep `tables` true to every column they
- * name, and clear `owes` as it pays each item (docs/guides/home.md §4.1,
- * docs/DATABASE_SCHEMA.md M2 Owes). A unit test holds `tables` to the migrated schema and
- * the queries to `tables`.
+ * Home reads these tables through this one file. A pull request that changes what the reviews
+ * module writes MUST, in the same PR, keep these queries and `tables` true to every column they
+ * name (docs/guides/home.md §4.1). A unit test holds `tables` to the migrated schema and the
+ * queries to `tables`.
  *
- * Due: not yet submitted, in a cycle that closes before the end of the thirtieth day from
- * today (Lagos), so a review whose cycle has already closed is still due.
+ * A monthly review is due until its reviewer submits it: while the employee checks in, while it
+ * is with the reviewer, and when the chain returns it to them. It counts once its round closes
+ * before the end of the thirtieth day from today (Lagos), so a review whose round has passed its
+ * close date is still due. My Reviews Due are those with the reader to score now.
  */
 const { pageQuery, orderBy, TOTAL_COL } = require("../../../shared/http/paged");
 const { scopeClause } = require("../../../shared/rbac/scope");
 const lagos = require("../../../shared/time/lagos");
 const { PERSON } = require("../kpi-catalog/shared");
 
-/** The forward tables and the columns these queries read. */
+/** The tables and the columns these queries read. */
 const TABLES = Object.freeze({
   performance_review: [
     "performance_review_id",
@@ -29,24 +30,24 @@ const TABLES = Object.freeze({
     "employee_id",
     "reviewer_employee_id",
     "review_type",
-    "submitted_at",
+    "status",
   ],
   performance_cycle: ["performance_cycle_id", "name", "closes_at"],
 });
 
-/** What M2 still owes these queries. */
-const OWES = Object.freeze([
-  "The second level and HR stages of a review and their workflow (DATABASE_SCHEMA M2).",
-  "A cycle's statuses: until they are agreed, an unfiled review of a cycle that closed long ago still counts as due.",
-]);
+/** What M2 still owes these queries: nothing since Performance PR 3 built the stages and their statuses. */
+const OWES = Object.freeze([]);
 
-/** Days ahead a cycle's close makes its reviews due. */
+/** Days ahead a round's close makes its reviews due. */
 const DUE_WITHIN_DAYS = 30;
 
-/** Not submitted, its cycle closing before `$1`. */
-const DUE = "pr.submitted_at IS NULL AND pc.closes_at < $1::timestamptz";
+/** Not yet through its reviewer, its round closing before `$1`. */
+const DUE = "pr.status IN ('check_in', 'with_reviewer', 'returned') AND pc.closes_at < $1::timestamptz";
 
-/** The instant a review's cycle must close before for it to be due, from a Lagos date. */
+/** With the reviewer to score now. */
+const TO_WRITE = "pr.status IN ('with_reviewer', 'returned') AND pc.closes_at < $1::timestamptz";
+
+/** The instant a review's round must close before for it to be due, from a Lagos date. */
 const cutoff = (today) => lagos.endOfDayExclusive(lagos.addDays(today, DUE_WITHIN_DAYS));
 
 const FROM = `FROM performance_review pr
@@ -94,27 +95,27 @@ function duePage(client, { today }, scope, query) {
 }
 
 /**
- * How many due reviews a person must write.
+ * How many due reviews a person must write now.
  * @param {{query: Function}} client
  * @param {{today: string, employee_id: string}} who
  * @returns {Promise<number>}
  */
 async function reviewerDueCount(client, { today, employee_id: employeeId }) {
   const { rows } = await client.query(
-    `SELECT count(*)::int AS n ${FROM} WHERE ${DUE} AND pr.reviewer_employee_id = $2`,
+    `SELECT count(*)::int AS n ${FROM} WHERE ${TO_WRITE} AND pr.reviewer_employee_id = $2`,
     [cutoff(today), employeeId],
   );
   return rows[0].n;
 }
 
-/** One page of the due reviews a person must write, soonest closing first. */
+/** One page of the due reviews a person must write now, soonest closing first. */
 function reviewerDuePage(client, { today, employee_id: employeeId }, query) {
   return pageQuery(
     client,
     `SELECT ${ROW}, ${TOTAL_COL}
        ${FROM}
        ${JOINS}
-      WHERE ${DUE} AND pr.reviewer_employee_id = $2
+      WHERE ${TO_WRITE} AND pr.reviewer_employee_id = $2
         AND ($3::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($3) || '%')
       ORDER BY ${orderBy(query, SORTS, "pr.performance_review_id")}`,
     [cutoff(today), employeeId, query.q || null],

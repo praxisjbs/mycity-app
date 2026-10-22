@@ -316,30 +316,43 @@ and scores; improvement plans and their lines; commitments on `task` and `commit
 summaries · `2190` seed: the five Performance capabilities and their holders, the four flows, the code
 lists · `2200` the statuses an organisational goal (`active`, `closed`; active by default) and a
 scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance PR 2) · `2290` seed: the
-`goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired).
+`goal_status` code list to match (`active`, `closed`; Draft, Pending Approval and Completed retired) ·
+`2300` the statuses a round (`open`, `closed`) and a review (`check_in`, `with_reviewer`, `second_level`,
+`with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
+the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action
+(`corrective_title`, `corrective_owner_id`, `corrective_due_on`, `corrective_task_id`) (Performance PR 3). ·
+`2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
+missed commitment's Recovery task (Performance PR 4).
 
 **Owes:**
-- PRs 3 to 5 of `docs/guides/performance.md` use 2300 to 2599 only for a gap. The numbers 2020, 2030 and
+- PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and
   2091 were used on a withdrawn branch and are not reused.
-- Status CHECKs on `performance_cycle` and `performance_review` (Home's staging rows still hold the old
-  values): PR 3, once its staging seed has replaced those rows.
 - **Read by Home** (home.md §4.1): `task` (`task_id`, `title`, `status`, `priority`, `due_at`,
   `completed_at`, `archived_at`, `primary_assignee_id`) through `src/modules/dashboard/sources/tasks.source.js`;
   `calendar_event` (`calendar_event_id`, `title`, `event_type`, `owner_employee_id`, `starts_at`,
   `ends_at`, `all_day`) through `calendar.source.js`; `organisational_goal` (`organisational_goal_id`,
   `level`, `title`, `status`, `starts_on`, `ends_on`), `employee_target` (`employee_target_id`,
-  `employee_id`, `title`, `due_on`, `scorecard_id`) and `scorecard` (`scorecard_id`, `status`) through
-  `goals.source.js`; `performance_review`
+  `employee_id`, `title`, `due_on`, `scorecard_id`, `section`, `position`, `weight`), `scorecard`
+  (`scorecard_id`, `status`, `performance_period_id`, `employee_id`, `score_to_date`), `performance_period`
+  (`performance_period_id`, `starts_on`, `ends_on`, `rules`), `okr_objective` (`okr_objective_id`,
+  `performance_period_id`, `department_id`, `organisational_goal_id`), `okr_key_result` (`okr_key_result_id`,
+  `okr_objective_id`, `code`, `statement`, `accountable_employee_id`), `okr_key_result_month`
+  (`okr_key_result_month_id`, `okr_key_result_id`, `month`, `status`, `proposed_score`, `confirmed_score`) and,
+  for a line's score, `performance_review` (`performance_review_id`, `performance_cycle_id`, `review_kind`,
+  `status`), `performance_review_item` (`performance_review_id`, `employee_target_id`, `score`) and
+  `performance_cycle` (`performance_cycle_id`, `month`) through `goals.source.js`, which owes nothing since
+  Performance PR 5 (goal progress, the Org KPI, Goals On Track, My Scorecard and the Team roster's score live,
+  22/10/2026); `performance_review`
   (`performance_review_id`, `performance_cycle_id`, `employee_id`, `reviewer_employee_id`,
-  `review_type`, `submitted_at`) with `performance_cycle` (`performance_cycle_id`, `name`,
+  `review_type`, `status`) with `performance_cycle` (`performance_cycle_id`, `name`,
   `closes_at`) through `reviews.source.js`. The PR that changes any of these updates the adapter in
-  the same PR, and the one that defines a goal's progress makes Goals On Track and My Targets live.
+  the same PR (Performance PR 5 defined a goal's progress and made Goals On Track and My Scorecard live).
   Indexes asked by Home: `task (due_at) WHERE archived_at IS NULL AND completed_at IS NULL`,
   `calendar_event (owner_employee_id, starts_at)`, `organisational_goal (level, starts_on, ends_on)`,
   `employee_target (employee_id, due_on)`.
-  **Staging holds Home's demonstration rows** in `performance_cycle` and `performance_review`
-  (`seeds/staging/60_home.js`, decision O11); `task` and `calendar_event` were taken away by
-  `40_workspace.js`, `organisational_goal` and `employee_target` by `45_performance_plan.js`. Their ids are written out in `HOME_STAGING_ROWS`
+  **Home's demonstration rows are gone from staging**: `task` and `calendar_event` were taken away by
+  `40_workspace.js`, `organisational_goal` and `employee_target` by `45_performance_plan.js`, and
+  `performance_cycle` and `performance_review` by `46_performance_reviews.js` (Performance PR 3). Their ids are written out in `HOME_STAGING_ROWS`
   (`seeds/staging/lib/home-staging-rows.js`), and the PR that adds this milestone's own staging seed
   takes them away once, in the three steps that file starts with: that seed calls
   `removeHomeStagingRows(client, [these tables])` in its transaction before it writes, which deletes
@@ -517,7 +530,11 @@ job's claim), `ai_model.price_not_listed_at` (asked again after 7 days), and the
 `ai_model` rows decision 29 leaves off (`-latest` aliases, Gemma, repeated snapshots no chain uses)
 deleted · `10220` the voice notes kept under the purpose `transcription` before the action registry
 moved onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` so the DOWN puts
-it back (`docs/guides/ai-control.md` §4, §6.5) · `10290` seed: the `ai_control` grants.
+it back (`docs/guides/ai-control.md` §4, §6.5) · `10290` seed: the `ai_control` grants · `10300`
+the mailbox's mail AI, brought forward (`docs/guides/mailbox.md` §1.1, §4): `mail_thread_summary`
+(Summarise Thread's answer, one row per conversation, kept until its newest message changes: the
+gist, up to five key points and things asked of the owner, the message count and newest message it
+covered, its AI run).
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

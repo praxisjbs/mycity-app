@@ -7,7 +7,8 @@ import { useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, EmployeePicker } from "@/features/shared/pickers";
-import { Button, CheckboxField, DateField, Field, FormFooter, formatDateTime, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
+import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { LABEL, LATE_OPTIONS, refresh, say, type BoardStatus, type LateReason } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
@@ -18,10 +19,21 @@ const failed = (f: { setServerErrors: (e: Record<string, string[]>) => void }) =
 
 /* ───────────── New and Edit Task ───────────── */
 
-export function TaskForm({ close, title = "", task }: { close: () => void; title?: string; task?: TaskDetail }) {
+/** What a task counts towards, as the picker holds it. */
+const choiceOf = (t?: TaskDetail): CountsChoice[] =>
+  t?.counts_towards
+    ? [{ kind: t.counts_towards.kind, employee_target_id: t.counts_towards.employee_target_id, okr_key_result_id: t.counts_towards.okr_key_result_id, title: t.counts_towards.title, sub: null }]
+    : [];
+
+export function TaskForm({ close, title = "", task, commitment = false }: { close: () => void; title?: string; task?: TaskDetail; commitment?: boolean }) {
   const me = useMe();
+  const months = commitmentMonths();
   const [who, setWho] = useState<PersonRef[]>(task?.assignee && task.assignee.employee_id !== me.employee_id ? [task.assignee] : []);
+  const [counts, setCounts] = useState<CountsChoice[]>(choiceOf(task));
   const canAssign = !task || task.can_reassign;
+  // An approved commitment keeps its person, mark, month and criteria; its date may still move.
+  const fixed = Boolean(task?.is_commitment && task.original_due_at);
+  const mayMark = !fixed && (!task || task.status !== "done");
   const f = useContractForm(
     {
       title: task?.title ?? title,
@@ -29,22 +41,49 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
       due_on: task?.due_at ? task.due_at.slice(0, 10) : "",
       priority: (task?.priority ?? "normal") as string,
       description: task?.description ?? "",
+      is_commitment: task?.is_commitment ?? commitment,
+      acceptance_criteria: task?.acceptance_criteria ?? "",
+      commitment_month: task?.commitment_month ?? months[0][0],
     },
     tasks.TaskCreate,
   );
   const createTask = useMutation("POST /api/v1/tasks");
   const editTask = useMutation("PATCH /api/v1/tasks/:id");
+  const isCommitment = Boolean(f.values.is_commitment);
+  /** Counts Towards as the body names it: a line, or a key result as the task's record. */
+  const pointer = () => {
+    const c = counts[0];
+    if (c?.kind === "line") return { employee_target_id: c.employee_target_id, ...(task?.entity_type === "key_result" ? { entity_type: null, entity_id: null } : {}) };
+    if (c?.kind === "key_result") return { employee_target_id: null, entity_type: "key_result" as const, entity_id: c.okr_key_result_id };
+    return { employee_target_id: null, ...(task?.entity_type === "key_result" ? { entity_type: null, entity_id: null } : {}) };
+  };
+  const commitmentBody = () =>
+    mayMark
+      ? isCommitment
+        ? { is_commitment: true, acceptance_criteria: f.values.acceptance_criteria || null, commitment_month: f.values.commitment_month || null }
+        : task?.is_commitment
+          ? { is_commitment: false }
+          : {}
+      : {};
   const submit = async () => {
     if (!f.check()) return;
     const v = f.values;
     try {
       if (task) {
-        const body = task.can_reassign
-          ? { title: v.title, priority: v.priority, cadence: v.cadence || null, due_on: v.due_on || null, description: v.description || null, ...(who[0] ? { primary_assignee_id: who[0].employee_id } : {}) }
-          : { priority: v.priority, description: v.description || null };
+        const managed = task.can_reassign
+          ? {
+              title: v.title,
+              cadence: v.cadence || null,
+              due_on: v.due_on || null,
+              ...(who[0] && !fixed ? { primary_assignee_id: who[0].employee_id } : {}),
+              ...pointer(),
+            }
+          : {};
+        const body = { priority: v.priority, description: v.description || null, ...managed, ...commitmentBody() };
         await editTask.run({ params: { id: task.task_id }, body: body as never });
         toast("Task saved");
       } else {
+        const c = counts[0];
         const t = await createTask.run({
           body: {
             title: v.title,
@@ -53,6 +92,9 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
             ...(v.due_on && { due_on: v.due_on }),
             ...(v.description && { description: v.description }),
             ...(who[0] && { primary_assignee_id: who[0].employee_id }),
+            ...(c?.kind === "line" && c.employee_target_id && { employee_target_id: c.employee_target_id }),
+            ...(c?.kind === "key_result" && c.okr_key_result_id && { entity_type: "key_result" as const, entity_id: c.okr_key_result_id }),
+            ...(isCommitment && { is_commitment: true, acceptance_criteria: v.acceptance_criteria, commitment_month: v.commitment_month }),
           },
         });
         toast(who[0] ? `${t.number} set for ${who[0].display_name}` : `${t.number} created`);
@@ -60,13 +102,16 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
       refresh();
       close();
     } catch (e) {
-      failed(f)(e);
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
     }
   };
+  const assigneeId = who[0]?.employee_id ?? task?.assignee?.employee_id ?? null;
+  const month = isCommitment && f.values.commitment_month ? String(f.values.commitment_month) : `${(f.values.due_on || todayIso()).slice(0, 7)}-01`;
   return (
     <>
       {canAssign && <Field label="Task" {...f.field("title")}><TextField {...f.field("title")} placeholder="Visit the venue" /></Field>}
-      {me.manages_people && canAssign && (
+      {me.manages_people && canAssign && !fixed && (
         <Field label="Assign To" optional>
           <EmployeePicker value={who} onChange={setWho} placeholder="Your team" />
         </Field>
@@ -76,8 +121,34 @@ export function TaskForm({ close, title = "", task }: { close: () => void; title
           <SelectField options={[["", "None"], ["daily", "Daily"], ["weekly", "Weekly"]]} {...f.field("cadence")} />
         </Field>
       )}
-      {canAssign && <Field label="Due" optional {...f.field("due_on")}><DateField {...f.field("due_on")} min={todayIso()} /></Field>}
+      {canAssign && (
+        <Field label="Due" optional={!isCommitment} {...f.field("due_on")}>
+          <DateField {...f.field("due_on")} min={task ? undefined : todayIso()} />
+        </Field>
+      )}
       <Field label="Priority"><SelectField options={[["urgent", "Urgent"], ["high", "High"], ["normal", "Normal"], ["low", "Low"]]} {...f.field("priority")} /></Field>
+      {canAssign && (
+        <Field label="Counts Towards" optional help={COUNTS_HELP}>
+          <CountsTowardsField assigneeId={assigneeId} month={month} value={counts} onChange={setCounts} />
+        </Field>
+      )}
+      {mayMark && (
+        <Field label="Commitment" help={COMMITMENT_HELP} optional>
+          <CheckboxField label="Mark as Commitment" value={isCommitment} onChange={(on) => f.field("is_commitment").onChange(on)} />
+        </Field>
+      )}
+      {mayMark && isCommitment && (
+        <>
+          <Field label="Acceptance Criteria" {...f.field("acceptance_criteria")}><TextAreaField {...f.field("acceptance_criteria")} /></Field>
+          <Field label="Month" {...f.field("commitment_month")}>
+            <ChoiceField
+              value={String(f.values.commitment_month)}
+              onChange={(m) => f.field("commitment_month").onChange(m)}
+              options={task?.commitment_month && !months.some(([m]) => m === task.commitment_month) ? [[task.commitment_month, formatMonth(task.commitment_month)], ...months] : months}
+            />
+          </Field>
+        </>
+      )}
       <Field label="Notes" optional><TextAreaField {...f.field("description")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

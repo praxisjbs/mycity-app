@@ -8,12 +8,14 @@ import tasks from "@mycity/contract/schemas/tasks.js";
 import type { TaskDependency, TaskDetail } from "@mycity/contract/contract.gen.ts";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
+import { Link } from "@/lib/router";
 import {
   Button,
   ErrorState,
   Field,
   formatDate,
   formatDateTime,
+  HelpTerm,
   IconButton,
   KeyValue,
   LoadingRows,
@@ -30,6 +32,7 @@ import {
   Who,
 } from "@mycity/ui";
 import { CADENCE, LABEL, LATE, PRIORITY, STATUS_TONE, refresh, say, type Status } from "./shared";
+import { CommitmentActions, commitmentItems, COUNTS_HELP } from "./Commitment";
 import { BlockForm, CancelForm, LateReasonForm, OverrideForm, PingForm, RemindersForm, RepeatForm, repeatText, StepForm, TaskForm, UnblockForm, WaitingForm, WatcherForm } from "./TaskForms";
 
 type View = "details" | "steps" | "comments" | "history";
@@ -112,6 +115,7 @@ export function TaskPanel({ id, close, onOpenTask }: { id: string; close: () => 
           <Button onClick={() => form("Mark Blocked", (done) => <BlockForm id={t.task_id} close={done} onDone={changed} />)}>Mark Blocked</Button>
         )}
         {t.blocked_reason && <Button onClick={() => form("Clear Blocker", (done) => <UnblockForm task={t} close={done} onDone={changed} />)}>Clear Blocker</Button>}
+        {t.is_commitment && <CommitmentActions t={t} onChanged={changed} />}
         {open && <Menu label="More Actions" items={more} trigger={(p) => <IconButton {...p} icon="dots" label="More Actions" />} />}
       </div>
     </>
@@ -123,7 +127,7 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
   const watch = useMutation("POST /api/v1/tasks/:id/watchers");
   const unwatch = useMutation("DELETE /api/v1/tasks/:id/watchers/:child_id");
   const unlink = useMutation("DELETE /api/v1/tasks/:id/waiting-on/:child_id");
-  const items: Array<[string, ReactNode]> = [
+  const items: Array<[ReactNode, ReactNode]> = [
     ["Number", t.number],
     ["Assignee", t.assignee?.display_name ?? "Nobody"],
     ["Set By", t.set_by?.display_name ?? "Nobody"],
@@ -133,9 +137,19 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
   ];
   if (t.cadence) items.push(["Cadence", CADENCE[t.cadence]]);
   if (t.recurrence) items.push(["Repeats", repeatText(t.recurrence)]);
-  if (t.counts_towards) items.push(["Counts Towards", t.counts_towards.title]);
+  if (t.counts_towards)
+    items.push([
+      <HelpTerm key="ct" help={COUNTS_HELP}>Counts Towards</HelpTerm>,
+      <span key="cv" data-copy="content">
+        {t.counts_towards.title}
+        {t.counts_towards.link && (
+          <Link className="ml-2 text-xs font-semibold text-primary underline" to={t.counts_towards.link.path}>Open</Link>
+        )}
+      </span>,
+    ]);
   if (t.late_reason) items.push(["Why Late", LATE[t.late_reason]]);
   if (t.cancel_reason) items.push(["Cancelled", t.cancel_reason]);
+  items.push(...commitmentItems(t));
   const run = async (work: () => Promise<unknown>, done: string) => {
     try {
       await work();
@@ -174,10 +188,10 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
       )}
       <KeyValue items={items} />
       {t.description && <p className="mt-3 text-xs text-muted-foreground" data-copy="content">{t.description}</p>}
-      {t.link && (
-        <a className="mt-3 inline-block text-xs font-semibold text-primary underline" href={t.link.path}>
+      {t.link && !(t.counts_towards && t.counts_towards.kind === "key_result") && (
+        <Link className="mt-3 inline-block text-xs font-semibold text-primary underline" to={t.link.path}>
           Open Record
-        </a>
+        </Link>
       )}
       <Section
         title="Waiting On"

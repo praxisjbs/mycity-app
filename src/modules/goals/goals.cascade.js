@@ -8,7 +8,8 @@
  *   roll-up   an objective's score is the mean of its key results' scores for the month; a
  *             function's the mean of its objectives'; the company's the mean of the company
  *             objectives'. Blank when nothing is scored. A key result's score is its confirmed
- *             score, else its proposed one.
+ *             score, else its proposed one. objectiveScores() is the same roll-up in SQL, for
+ *             Analytics and Home (goals.analytics.js, dashboard/sources/goals.source.js).
  */
 const { scoring } = require("@mycity/contract");
 
@@ -36,4 +37,22 @@ const monthScore = (m) => (m ? scoring.num(m.confirmed_score ?? m.proposed_score
 /** An objective's score: the mean of its key results' latest scores. */
 const objectiveScore = (keyResults) => scoring.meanScore(keyResults.map((kr) => monthScore(kr.latest)));
 
-module.exports = { nextObjectiveCode, nextKeyResultCode, monthScore, objectiveScore };
+/**
+ * The quarter's objectives with the score Goals shows for each, in SQL: each key result at its
+ * latest month, confirmed else proposed, and the objective the mean of them to two places, as
+ * objectiveScore() works it out. The body of a CTE the caller names objective_score
+ * (`WITH objective_score AS (${objectiveScores("$1")})`): okr_objective_id, department_id,
+ * organisational_goal_id, score, over the quarters `periods` names: a placeholder ("$1") or a
+ * subquery of their ids.
+ */
+const objectiveScores = (periods) => `
+    SELECT o.okr_objective_id, o.department_id, o.organisational_goal_id,
+           round(avg(COALESCE(km.confirmed_score, km.proposed_score)), 2) AS score
+      FROM okr_objective o
+      JOIN okr_key_result k ON k.okr_objective_id = o.okr_objective_id
+      LEFT JOIN okr_key_result_month km ON km.okr_key_result_id = k.okr_key_result_id
+       AND km.month = (SELECT max(kx.month) FROM okr_key_result_month kx WHERE kx.okr_key_result_id = k.okr_key_result_id)
+     WHERE o.performance_period_id IN (${periods})
+     GROUP BY o.okr_objective_id, o.department_id, o.organisational_goal_id`;
+
+module.exports = { nextObjectiveCode, nextKeyResultCode, monthScore, objectiveScore, objectiveScores };

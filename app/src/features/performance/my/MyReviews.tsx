@@ -1,55 +1,39 @@
 /**
- * ESS · My Performance · My Reviews: the person's reviews; a closed one shows its final scores.
- * Interim, on the in-browser mock. Performance PR 3 replaces it with GET /ess/performance/reviews
- * and the review PDF (docs/guides/performance.md §10).
+ * ESS · My Performance · My Reviews: the person's monthly and probation reviews, newest first
+ * (GET /api/v1/ess/performance/reviews). A review opens the review itself: the person's own
+ * check-in throughout, and the reviewer's scores and Download PDF once it is closed (A17;
+ * docs/guides/performance.md §10).
  */
-import type { MyPerformance } from "@/api/types/ess";
-import { Card, CardHeader, DataView, KeyValue, Pill, TapList, useModal } from "@mycity/ui";
+import type { MyReview } from "@mycity/contract/contract.gen.ts";
+import { usePaged } from "@/api/hooks";
+import { PagedTable } from "@/features/shared/sections";
+import { formatMonth, StatusPill, useModal } from "@mycity/ui";
+import { ReviewSheet } from "../ReviewPage";
+import { rating, reviewStatus, score } from "../shared";
 
-type Review = MyPerformance["reviews"][number];
-
-/** Opens one review in a modal. */
+/** Opens one of the person's reviews full screen. */
 export function useReviewOpener() {
   const modal = useModal();
-  return (r: Review) =>
-    modal.open({
-      title: `Review, ${r.cycle}`,
-      body: (
-        <>
-          <Card>
-            <CardHeader title={r.cycle} />
-            <KeyValue items={[["Your rating", r.self ?? "Not yet"], ["Manager", r.manager ?? "Not yet"], ["Second level", r.second ?? "Not yet"], ["Status", <Pill tone={r.status.tone}>{r.status.text}</Pill>]]} />
-          </Card>
-          {r.manager_comment && (
-            <Card className="mt-3">
-              <CardHeader title="Manager Comment" />
-              <p className="text-2xs text-subtle-foreground">{r.manager_comment}</p>
-            </Card>
-          )}
-        </>
-      ),
-    });
+  return (r: MyReview) => modal.open({ title: r.round_name ?? "Probation Review", wide: true, full: true, body: (close) => <ReviewSheet id={r.performance_review_id} close={close} /> });
 }
 
-/** The reviews as a phone list. */
-export function MyReviewsList({ p, onOpen }: { p: MyPerformance; onOpen: (r: Review) => void }) {
-  return <TapList items={p.reviews.map((r) => ({ key: r.review_id, title: r.cycle, sub: `Self ${r.self ?? "not yet"} · Manager ${r.manager ?? "not yet"}`, right: <Pill tone={r.status.tone}>{r.status.text}</Pill>, onClick: () => onOpen(r) }))} />;
-}
-
-/** The reviews as a desktop table. */
-export function MyReviewsTable({ p, onOpen }: { p: MyPerformance; onOpen: (r: Review) => void }) {
+/** The person's reviews, one page of 25 at a time. */
+export function MyReviewsList() {
+  const list = usePaged("GET /api/v1/ess/performance/reviews");
+  const open = useReviewOpener();
   return (
-    <DataView
+    <PagedTable
       title="My Reviews"
-      rows={p.reviews}
-      rowKey={(r) => r.review_id}
-      onRowClick={onOpen}
+      list={list}
+      rowKey={(r) => r.performance_review_id}
+      noun="review"
+      onRowClick={open}
+      empty={{ title: "No Reviews Yet" }}
       columns={[
-        { key: "c", label: "Cycle", render: (r) => r.cycle },
-        { key: "s", label: "Self Rating", render: (r) => r.self ?? "Not yet" },
-        { key: "m", label: "Manager", render: (r) => r.manager ?? "Not yet" },
-        { key: "x", label: "Second Level", render: (r) => r.second ?? "Not yet" },
-        { key: "t", label: "Status", render: (r) => <Pill tone={r.status.tone}>{r.status.text}</Pill> },
+        { key: "month", label: "Month", render: (r) => r.round_name ?? (r.month ? formatMonth(r.month) : "Probation") },
+        { key: "score", label: "Score", align: "n", render: (r) => score(r.score_month) },
+        { key: "rating", label: "Rating", render: (r) => <StatusPill s={rating(r.rating)} />, desktop: true },
+        { key: "status", label: "Status", render: (r) => <StatusPill s={reviewStatus(r.status)} /> },
       ]}
     />
   );

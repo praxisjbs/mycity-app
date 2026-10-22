@@ -50,6 +50,9 @@ const EVENTS = defineEvents("mailbox", {
   "mail_account.server_moved": {
     summary: "Every mailbox moved to the staff mail server set on Settings, Integrations",
   },
+  "mail_thread.summarised": {
+    summary: "Summarise Thread kept a fresh summary of a conversation",
+  },
 });
 
 defineDocumentType("mail_attachment", {
@@ -62,6 +65,14 @@ defineDocumentType("mail_signature_image", {
   label: "Signature picture",
   module: "mailbox",
   sensitivity: "normal",
+});
+
+/** Dictate's recording (mailbox.md §3 step 13): kept only while it is transcribed, never played. */
+defineDocumentType("mail_dictation", {
+  label: "Mail dictation",
+  module: "mailbox",
+  sensitivity: "personal",
+  transient: true,
 });
 
 /** A file on mail, or one waiting in the composer: the mailbox's owner reads it, nobody else. */

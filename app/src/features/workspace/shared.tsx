@@ -51,6 +51,7 @@ export function CardPills({ t }: { t: Task }) {
   return (
     <>
       <Pill tone={due.tone}>{due.text}</Pill>
+      {t.is_commitment && <Pill tone="info">Commitment</Pill>}
       {t.priority === "urgent" && <Pill tone="err">Urgent</Pill>}
       {t.priority === "high" && <Pill tone="warn">High</Pill>}
       {t.blocked_reason && <Pill tone="err">Blocked</Pill>}

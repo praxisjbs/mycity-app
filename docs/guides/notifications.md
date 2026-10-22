@@ -285,7 +285,7 @@ it on again reminds what is still waiting at the next tick.
 | `reminders` (scheduler, every 5 minutes) | Always | Each declared reminder's `find` adds what has come due (Approvals Waiting, Probation Ending); every due occurrence is checked and fired in its own transaction (§7.1); from the digest time on, each person's digest for the day is queued once (`digest-<user>-<day>`) |
 | `reminders` (job, `digest`) | Per person and Lagos day | Emails the digest (`templates/email/digest.html`) when something arrived unread in the last 24 hours; paced like all system mail. Queued only for people who have signed in; while system mail is paused the day's digest is dropped (`mail_paused`), and an address refused for good ends it (`refused`) |
 | `workflow.reminded` | An approval has waited its interval | The stage's approvers: "Reminder: <approval>" (important) |
-| `employee.probation_ending` | The probation reminder's day | People · Approve holders over the person |
+| `employee.probation_ending` | The probation reminder's day | People · Approve holders over the person; Performance opens the person's probation review on it (`docs/guides/performance.md` §6.16) |
 | `notification_rule.changed` | Save or Reset to Default on a notice | Audit (the notice, what it is now, who changed it) |
 | `notification_reminder.changed` | Save on Reminders | Audit; moves the next reminder of waiting approvals when the interval changed |
 | `notification_setting.changed` | Quiet hours or the digest switched by a person | Audit |
@@ -459,6 +459,8 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
 ## 14 · Change log
 
 - 22/10/2026 · GE · §7.1: `pendingFor` reads a record's pending occurrences of a reminder, so a screen can list them; My Workspace's task reminders are its first user (`task_reminder`).
+
+- 22/10/2026 · TB · Performance PR 3: `notifications.reminders.js` exports `PEOPLE_EVENTS`, so the reviews module subscribes to `employee.probation_ending` by its constant and opens a probation review (`docs/guides/performance.md` §6.16, §7). Its own reminders (`check_in_due`, `review_due`, `review_close_due`, `pip_review_due`, `kr_report_due`) are declared with `reminders.defineReminder` as §7.1 sets out.
 
 - 21/10/2026 · TB · With Pause Mail (`docs/guides/integrations.md` §6.15): while system mail is paused a notice due by email is pushed instead (`instead_of_email` on `notification-push`, past the person's push switch for the category) and never emailed later, and the day's digest is dropped. The daily digest goes only to people who have signed in at least once. A notice's email refused for good is done, not retried (§6, §7, §11).
 

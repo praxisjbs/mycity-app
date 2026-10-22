@@ -290,6 +290,13 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
   (Default, personal data, TB, `policies.md` §9), Data Answers (Default, personal data, TB,
   decision 27), Find Prices (Deep Reasoning, none, TB). Settings · Integrations' connection test
   (`integration-test`) is registered as direct: it calls the model under test and has no chain.
+- Registered since: Review Dictation (Transcription) and Tidy Review (Default), personal data, TB,
+  22/10/2026 (`performance.md` §6.17); Week Summary (Default, personal data, TB, 22/10/2026,
+  `performance.md` §6.18); the mailbox's Write Email, Tidy Email and Thread Summary (Default) and
+  Mail Dictation (Transcription), all personal data, TB, 22/10/2026 (`mailbox.md` §1.1, §9).
+- `redact.js` `shield()` swaps what the external redaction would mask for tokens (`KEPT001`) and
+  hands back a `restore()` that puts the real values into the answer, for a feature whose answer
+  must carry them (a mail draft) without the model ever seeing them (`mailbox.md` §6).
 - `scripts/check/ai-actions.js` fails a build when an AI call names an action that is not
   registered, names it with anything but a literal, or a registry entry lacks its job, its
   personal-data answer, who chose it and when, or (Top Tier) its reason.
@@ -391,12 +398,13 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
 
 1. **The per-module switch** (`ai_setting.disabled_modules`, M0) has no screen yet; M10 decides
    whether it goes on AI Control.
-2. **Actions registered later**: dictation, review cleanup, JD draft, CV screening, proposal
-   draft, MOU draft and image reading are registered by the build that makes each one, asking the
-   person which job (CLAUDE.md, §6.5).
+2. **Actions registered later**: JD draft, CV screening, proposal draft, MOU draft and image
+   reading are registered by the build that makes each one, asking the person which job
+   (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5).
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · §6.5 and §13: the mailbox's Write Email (`mail-draft`), Tidy Email (`mail-tidy`) and Thread Summary (`mail-summary`) on Default and Mail Dictation (`mail-dictation`) on Transcription, personal data, chosen by TB (`mailbox.md` §1.1); `redact.js` gains `shield()`, which Tidy Policy now uses too.
 - 21/10/2026 · TB · Spend fixed after staging showed Spend by Day's labels run together and a bare `transcription` row in By Action: each day reads 14/10 on the shared bar chart, which keeps its labels 11 px and leaves off those that would touch (§10.1); migration 10220 moves the voice notes kept under `transcription` before the registry onto `voice-note-transcription`, the old key kept in `ai_run.original_purpose` (§4, §6.5).
 - 20/10/2026 · TB · Decisions 29 to 32 after the first Find Prices on staging returned nothing for 129 models (the answer was capped at 60 and cut short): fewer models kept, Find Prices in requests of 20 over every unpriced model with Not Listed marks, the New Prices sheet with Accept All and Find More, the Models tab opening on the models in a chain and on the key.
 - 21/10/2026 · TB · Find Prices runs as the `ai-find-prices` job, claimed once, since a run outlasts an outbox handler; a run is lost after 15 minutes without progress; a failed run's reason stays on the tab; Not Listed counts only a model still without a price and on the key; a job that comes too late ends its run as LOST; one running run is a database rule.

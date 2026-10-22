@@ -606,6 +606,7 @@ describe("schedules and heartbeat", () => {
       "media-reconcile",
       "places-name",
       "reminders",
+      "review-cycles",
       "scheduled-reports",
       "system-health",
       "system-health-digest",

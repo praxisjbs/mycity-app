@@ -125,7 +125,7 @@ async function lines(db, scorecardId) {
   return rows;
 }
 
-/** Each line's monthly scores so far, from the reviews' items (written from PR 3 on). */
+/** Each line's monthly scores so far: the final scores of its closed reviews (A17: none before). */
 async function lineMonths(db, scorecardId) {
   // pagination:complete one row per line per month of a quarter
   const { rows } = await completeQuery(
@@ -134,7 +134,7 @@ async function lineMonths(db, scorecardId) {
        FROM performance_review_item i
        JOIN performance_review r ON r.performance_review_id = i.performance_review_id
        JOIN performance_cycle c ON c.performance_cycle_id = r.performance_cycle_id
-      WHERE r.scorecard_id = $1 AND i.employee_target_id IS NOT NULL AND c.month IS NOT NULL
+      WHERE r.scorecard_id = $1 AND r.status = 'closed' AND i.employee_target_id IS NOT NULL AND c.month IS NOT NULL
       ORDER BY c.month, i.employee_target_id`,
     [scorecardId],
     { label: "a scorecard's months", ceiling: 1000 },

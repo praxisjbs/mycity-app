@@ -48,6 +48,7 @@ const ALLOW = Object.freeze({
   import_sheet: [TYPES.xlsx, TYPES.csv],
   signature: [TYPES.png],
   brand: [TYPES.png, TYPES.webp],
+  performance_evidence: [TYPES.pdf, ...IMAGES, TYPES.docx, TYPES.xlsx, TYPES.pptx, TYPES.csv],
 });
 
 const NEVER = new Set(["markup", "archive", "unknown"]);

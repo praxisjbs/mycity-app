@@ -11,6 +11,7 @@
 const { AppError } = require("../../shared/errors");
 const md = require("../../shared/documents/markdown");
 const ai = require("../../services/ai/llm.service");
+const redact = require("../../services/ai/redact");
 
 /**
  * A list marker or clause number at the start of a line ("- ", "1. ", "2) ", "3.1 "): layout, so a
@@ -30,15 +31,13 @@ function wordsOf(markdown) {
 /** Contact details a policy names on purpose (an email, a phone number, a link): kept out of the model. */
 const KEPT_OUT = /(https?:\/\/[^\s)\]]+|[\w.+-]+@[\w-]+\.[\w.-]+|\+?\d[\d\s().-]{7,}\d)/g;
 
-/** The text with each contact detail swapped for a placeholder word, and the way back. */
+/**
+ * The text with each contact detail and link swapped for a placeholder word, and the way back:
+ * the AI layer's shield, with the links and digit runs a policy keeps word for word as well.
+ */
 function shield(text) {
-  const kept = [];
-  const out = String(text).replace(KEPT_OUT, (m) => {
-    kept.push(m);
-    return `KEPT${String(kept.length).padStart(3, "0")}`;
-  });
-  const restore = (t) => String(t).replace(/KEPT(\d{3})/g, (m, n) => kept[Number(n) - 1] || m);
-  return { out, restore };
+  const s = redact.shield(String(text), { also: [KEPT_OUT] });
+  return { out: s.value, restore: s.restore };
 }
 
 /** Whether `after` says exactly the words of `before`. */

@@ -27,8 +27,8 @@
  * fails is logged and left null, never drawn as an empty one, as a card is (kpi-catalog
  * guards.js).
  *
- * What M2 has not yet defined is null, never a guess: a goal's progress and every KPI
- * score (goals.source.js says why).
+ * A goal's progress, a line's score and the Org KPI are Performance's (docs/guides/performance.md
+ * §6.21), read through goals.source.js; each is null while nothing behind it is scored.
  *
  * The server sends figures; every title and caption is written on the screen.
  */
@@ -168,36 +168,40 @@ async function attendance(client, { today, scopes }) {
  * Goals, the Org KPI and the pipeline
  * ------------------------------------------------------------------ */
 
-/** The organisation's goals live this quarter, soonest ending first, at most a page. Progress waits for M2. */
+/**
+ * The organisation's goals live this quarter, soonest ending first, at most a page, each with its
+ * progress: the mean score of the company objectives serving it, as a percentage (goals.source.js).
+ */
 async function quarterGoals(client, { today }) {
   const page = await goals.organisationGoals(client, quarterOf(today), {
     page: 1,
   });
   return page.data.map((g) => ({
     title: g.title,
-    progress: null,
+    progress: g.progress ?? null,
     due_on: g.ends_on,
     link: pathOf("goal", g.organisational_goal_id),
   }));
 }
 
 /**
- * The Org KPI donut: the organisation's score and each active department beside it. The
- * scores are M2's (departmental KPIs weighted together) and are null until then; the
- * departments are the organisation's own, the first page of them by name.
+ * The Org KPI donut: the company's score this quarter and each active department's function score
+ * beside it, as percentages (goals.source.js orgScores: the score Goals shows), null for one with
+ * nothing scored; the departments are the organisation's own, the first page of them by name.
  */
-async function orgKpi(client) {
-  const page = await organisation.departments(client, {
-    page: 1,
-    active: "true",
-  });
+async function orgKpi(client, { today }) {
+  const [page, scores] = await Promise.all([
+    organisation.departments(client, { page: 1, active: "true" }),
+    goals.orgScores(client, { today }),
+  ]);
+  const percentOf = new Map(scores.map((r) => [r.department_id, r.percent]));
   return {
     kind: "org_kpi",
-    percent: null,
+    percent: percentOf.get(null) ?? null,
     departments: page.data.map((d) => ({
       department_id: d.department_id,
       department: d.name,
-      percent: null,
+      percent: percentOf.get(d.department_id) ?? null,
     })),
   };
 }
@@ -275,7 +279,7 @@ async function dayStrip(client, { user, today }) {
   };
 }
 
-/** The reader's own targets due this quarter, soonest first, at most a page. Progress waits for M2. */
+/** The reader's own targets due this quarter, soonest first, at most a page, each with its score from closed reviews as a percentage. */
 async function myGoals(client, { user, today }) {
   const page = await goals.targetsOf(
     client,
@@ -284,7 +288,7 @@ async function myGoals(client, { user, today }) {
   );
   return page.data.map((t) => ({
     title: t.title,
-    progress: null,
+    progress: t.progress ?? null,
     due_on: t.due_on,
     link: pathOf("target", t.employee_target_id, { self: true }),
   }));
@@ -460,7 +464,7 @@ async function sectionsFor(client, reader) {
         () => quarterGoals(client, reader),
       ),
       when(v.donut === "org_kpi" && may("performance"), "org_kpi", () =>
-        orgKpi(client),
+        orgKpi(client, reader),
       ),
       when(
         v.chart === "signed_value" && may("partnerships"),

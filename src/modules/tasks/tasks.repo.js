@@ -10,10 +10,32 @@
  * and what they share as a co-assignee (docs/guides/workspace.md §6).
  *
  * Open means not done, not cancelled and not archived.
+ *
+ * A commitment's state (docs/guides/performance.md §6.11) is worked out here, in SQL, on every
+ * read: COMMITMENT_STATE is the one expression, which the commitments list shares.
  */
 const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { personJson } = require("../../shared/db/person");
+
+/**
+ * A commitment's state from its own columns, Africa/Lagos: rescoped; awaiting approval (no
+ * original date yet); delivered on time (done before the end of its original date's day); late;
+ * missed (open when its month has ended); due. Null for a task that is not a commitment, or is
+ * cancelled. `t` names the task row.
+ * @param {string} t
+ */
+const COMMITMENT_STATE = (t) => `CASE
+    WHEN NOT ${t}.is_commitment OR ${t}.status = 'cancelled' THEN NULL
+    WHEN ${t}.rescoped_at IS NOT NULL THEN 'rescoped'
+    WHEN ${t}.original_due_at IS NULL THEN 'awaiting_approval'
+    WHEN ${t}.status = 'done'
+         AND ${t}.completed_at < ((((${t}.original_due_at AT TIME ZONE 'Africa/Lagos')::date + 1)::timestamp) AT TIME ZONE 'Africa/Lagos')
+      THEN 'on_time'
+    WHEN ${t}.status = 'done' THEN 'late'
+    WHEN now() >= ((((${t}.commitment_month + interval '1 month')::date)::timestamp) AT TIME ZONE 'Africa/Lagos') THEN 'missed'
+    ELSE 'due'
+  END`;
 
 /** Every task with what the board and the panel show. */
 const ROWS = `
@@ -23,10 +45,12 @@ const ROWS = `
          t.recurrence, t.sort_order, t.created_at, t.updated_at, t.archived_at,
          t.primary_assignee_id, t.set_by_employee_id, t.created_by,
          t.is_commitment, t.acceptance_criteria, t.commitment_month, t.original_due_at, t.rescoped_at,
-         t.commitment_set_id, t.late_reason,
+         t.rescope_reason, t.commitment_set_id, cs.status AS set_status, t.late_reason,
+         ${COMMITMENT_STATE("t")} AS commitment_state,
          ${personJson("ae", "ad")} AS assignee,
          ${personJson("se", "sd")} AS set_by,
          et.title AS target_title,
+         kr.code AS kr_code, kr.statement AS kr_statement,
          (SELECT count(*)::int FROM task_comment c
            WHERE c.task_id = t.task_id AND c.deleted_at IS NULL) AS comment_count,
          (SELECT count(*)::int FROM task_step st WHERE st.task_id = t.task_id) AS steps_total,
@@ -41,7 +65,9 @@ const ROWS = `
     LEFT JOIN department ad ON ad.department_id = ae.department_id
     LEFT JOIN employee se ON se.employee_id = t.set_by_employee_id
     LEFT JOIN department sd ON sd.department_id = se.department_id
-    LEFT JOIN employee_target et ON et.employee_target_id = t.employee_target_id`;
+    LEFT JOIN employee_target et ON et.employee_target_id = t.employee_target_id
+    LEFT JOIN okr_key_result kr ON t.entity_type = 'key_result' AND kr.okr_key_result_id = t.entity_id
+    LEFT JOIN commitment_set cs ON cs.commitment_set_id = t.commitment_set_id`;
 
 const OPEN = `v.status NOT IN ('done', 'cancelled') AND v.archived_at IS NULL`;
 
@@ -50,8 +76,9 @@ const OUT = `v.task_id, v.number, v.title, v.description, v.status, v.priority, 
   v.due_at, v.started_at, v.completed_at, v.cancelled_at, v.cancel_reason, v.blocked_reason,
   v.blocked_at, v.employee_target_id, v.entity_type, v.entity_id, v.recurrence, v.sort_order,
   v.created_at, v.updated_at, v.primary_assignee_id, v.set_by_employee_id, v.created_by,
-  v.assignee, v.set_by, v.target_title, v.comment_count, v.is_commitment, v.acceptance_criteria,
-  v.commitment_month, v.original_due_at, v.rescoped_at, v.commitment_set_id, v.late_reason,
+  v.assignee, v.set_by, v.target_title, v.kr_code, v.kr_statement, v.comment_count, v.is_commitment,
+  v.acceptance_criteria, v.commitment_month, v.original_due_at, v.rescoped_at, v.rescope_reason,
+  v.commitment_set_id, v.set_status, v.commitment_state, v.late_reason,
   v.steps_total, v.steps_done, v.waiting`;
 
 /** The SQL for each field TaskListQuery allow-lists. The first is the default order. */
@@ -99,6 +126,8 @@ function list(db, query, scope, at) {
     at.today.to,
     at.week.from,
     at.week.to,
+    query.is_commitment === undefined ? null : query.is_commitment === "true",
+    query.commitment_month || null,
   ];
   const who = audience(query.scope, scope, params);
   return pageQuery(
@@ -116,6 +145,8 @@ function list(db, query, scope, at) {
              OR ($7 = 'overdue' AND ${OPEN} AND v.due_at < $8)
              OR ($7 = 'today' AND v.due_at >= $9 AND v.due_at < $10)
              OR ($7 = 'week' AND v.due_at >= $11 AND v.due_at < $12))
+        AND ($13::boolean IS NULL OR v.is_commitment = $13)
+        AND ($14::date IS NULL OR v.commitment_month = $14)
         ${who}
       ORDER BY ${orderBy(query, SORTS, "v.task_id")}`,
     params,
@@ -188,6 +219,13 @@ const WRITABLE = [
   "recurrence",
   "sort_order",
   "late_reason",
+  "is_commitment",
+  "acceptance_criteria",
+  "commitment_month",
+  "original_due_at",
+  "commitment_set_id",
+  "rescoped_at",
+  "rescope_reason",
 ];
 
 /** Insert a task; returns its id. */
@@ -356,14 +394,114 @@ function comments(db, taskId, query) {
  * What other modules ask of tasks
  * ------------------------------------------------------------------ */
 
-/** An active KPI of the person, with its month, or null. */
+/** A scorecard line, with whose scorecard it is on and where that scorecard stands, or null. */
 async function targetOf(db, targetId) {
   const { rows } = await db.query(
-    `SELECT employee_target_id, employee_id, title, status FROM employee_target
-      WHERE employee_target_id = $1`,
+    `SELECT et.employee_target_id, COALESCE(s.employee_id, et.employee_id) AS employee_id, et.title,
+            s.status AS scorecard_status
+       FROM employee_target et LEFT JOIN scorecard s ON s.scorecard_id = et.scorecard_id
+      WHERE et.employee_target_id = $1`,
     [targetId],
   );
   return rows[0] || null;
+}
+
+/** A key result a task may point at, or null. */
+async function keyResultOf(db, id) {
+  const { rows } = await db.query(
+    "SELECT okr_key_result_id, code, statement FROM okr_key_result WHERE okr_key_result_id = $1",
+    [id],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Counts Towards (docs/guides/performance.md §6.18): the lines of the assignee's binding or agreed
+ * scorecard in the quarter holding `month`, then the key results they are accountable or
+ * co-accountable for in a binding plan of that quarter. One page.
+ * @param {{query: Function}} db
+ * @param {{assigneeId: string, month: string}} who   month: the first day of a month
+ * @param {object} query  CountsTowardsQuery
+ */
+function countsTowards(db, { assigneeId, month }, query) {
+  return pageQuery(
+    db,
+    `SELECT v.kind, v.employee_target_id, v.okr_key_result_id, v.title, v.sub, ${TOTAL_COL}
+       FROM (
+         SELECT 'line' AS kind, et.employee_target_id, NULL::uuid AS okr_key_result_id, et.title,
+                p.name || ' · ' || initcap(et.section) AS sub, 0 AS grp,
+                CASE et.section WHEN 'results' THEN 0 WHEN 'kpis' THEN 1 ELSE 2 END AS sec, et.position AS pos
+           FROM employee_target et
+           JOIN scorecard s ON s.scorecard_id = et.scorecard_id
+           JOIN performance_period p ON p.performance_period_id = s.performance_period_id
+          WHERE s.employee_id = $1 AND s.status IN ('binding', 'agreed')
+            AND $2::date BETWEEN p.starts_on AND p.ends_on
+         UNION ALL
+         SELECT 'key_result', NULL::uuid, kr.okr_key_result_id, kr.code || ' ' || kr.statement,
+                p.name, 1, 0, kr.position
+           FROM okr_key_result kr
+           JOIN okr_objective o ON o.okr_objective_id = kr.okr_objective_id
+           JOIN performance_period p ON p.performance_period_id = o.performance_period_id
+           JOIN performance_plan pl ON pl.performance_plan_id = o.performance_plan_id
+          WHERE (kr.accountable_employee_id = $1 OR kr.co_accountable_employee_id = $1)
+            AND pl.status = 'binding' AND $2::date BETWEEN p.starts_on AND p.ends_on
+       ) v
+      WHERE ($3::text IS NULL OR search_fold(v.title) LIKE '%' || search_fold($3) || '%')
+      ORDER BY v.grp, v.sec, v.pos, v.title, COALESCE(v.employee_target_id, v.okr_key_result_id)`,
+    [assigneeId, month, query.q || null],
+    query,
+  );
+}
+
+/**
+ * How many tasks pointing at a line were done in a window (a line measured in tasks, §6.18):
+ * the one count, read where the line's month is worked out.
+ */
+async function doneTowards(db, lineId, from, to) {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS n FROM task
+      WHERE employee_target_id = $1 AND status = 'done' AND archived_at IS NULL
+        AND completed_at >= $2 AND completed_at < $3`,
+    [lineId, from, to],
+  );
+  return rows[0].n;
+}
+
+/** The Recovery task set for a commitment (§6.11), or null. */
+async function recoveryOf(db, taskId) {
+  const { rows } = await db.query(
+    `SELECT t.task_id, t.number::text AS number, ${personJson("e", "d")} AS assignee, t.due_at
+       FROM task t
+       LEFT JOIN employee e ON e.employee_id = t.primary_assignee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE t.entity_type = 'task' AND t.entity_id = $1 AND t.status <> 'cancelled'
+      ORDER BY t.created_at, t.task_id
+      LIMIT 1`,
+    [taskId],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * One person's week (§6.18), each list its first page: `done` completed in the window, `planned`
+ * open and due in the window, `blocked` open and marked blocked.
+ * @param {{query: Function}} db
+ * @param {{employeeId: string, kind: "done"|"planned"|"blocked", from: Date, to: Date}} w
+ */
+function weekList(db, { employeeId, kind, from, to }) {
+  const order = { done: "v.completed_at DESC", planned: "v.due_at", blocked: "v.blocked_at DESC" }[kind];
+  return pageQuery(
+    db,
+    `SELECT ${OUT}, ${TOTAL_COL}
+       FROM (${ROWS}) v
+      WHERE v.primary_assignee_id = $1 AND v.archived_at IS NULL
+        AND (($2 = 'done' AND v.status = 'done' AND v.completed_at >= $3 AND v.completed_at < $4)
+          OR ($2 = 'planned' AND ${OPEN} AND v.due_at >= $3 AND v.due_at < $4)
+          OR ($2 = 'blocked' AND ${OPEN} AND v.blocked_reason IS NOT NULL))
+      ORDER BY ${order}, v.task_id`,
+    [employeeId, kind, from, to],
+    { page: 1 },
+  );
 }
 
 /** Is the employee on the staff now (not suspended, not left)? */
@@ -404,6 +542,32 @@ async function dueBetween(db, from, to, after, batch) {
     [from, to, after ? after.due_at : null, after ? after.task_id : null, batch],
   );
   return rows;
+}
+
+/**
+ * Put a person's commitments for a month that are not yet approved into their set (§6.11):
+ * every one not rescoped, cancelled or archived. Returns the ids put in.
+ */
+async function linkCommitments(client, { employeeId, month, setId }) {
+  const { rows } = await client.query(
+    `UPDATE task SET commitment_set_id = $3
+      WHERE primary_assignee_id = $1 AND is_commitment AND commitment_month = $2
+        AND original_due_at IS NULL AND rescoped_at IS NULL AND status <> 'cancelled' AND archived_at IS NULL
+      RETURNING task_id`,
+    [employeeId, month, setId],
+  );
+  return rows.map((r) => r.task_id);
+}
+
+/** A set approved: each commitment in it not yet approved takes its due date as its original. Returns the ids. */
+async function fixOriginalDates(client, setId) {
+  const { rows } = await client.query(
+    `UPDATE task SET original_due_at = due_at
+      WHERE commitment_set_id = $1 AND is_commitment AND original_due_at IS NULL AND status <> 'cancelled'
+      RETURNING task_id`,
+    [setId],
+  );
+  return rows.map((r) => r.task_id);
 }
 
 /** The tasks still open that carry out one record (a key result's initiatives). */
@@ -718,7 +882,15 @@ module.exports = {
   insertBlockage,
   resolveBlockage,
   SORTS,
+  COMMITMENT_STATE,
   openForRecord,
+  keyResultOf,
+  countsTowards,
+  doneTowards,
+  recoveryOf,
+  weekList,
+  linkCommitments,
+  fixOriginalDates,
   list,
   summary,
   get,

@@ -3,11 +3,13 @@
  * Home · Overview and Team over HTTP (dashboard.routes.js). Reads the request, calls the
  * service, sends the answer. The records behind a card and the Team tab's lists leave
  * through the field mask: they list people, and a field the reader may not see is null on
- * the way out. The Team tab reads in the scope the `home` grant gave the route. The Overview
+ * the way out. The Team tab reads in the scope the `home` grant gave the route; a roster
+ * person's score shows only where the reader's `performance` view reaches them. The Overview
  * Export is a run of the reports engine, answered 202 while its file is made, and read again by
  * the screen waiting to download it.
  */
 const { pool } = require("../../config/db");
+const { scopeFor } = require("../../middleware/rbac");
 const { withActor } = require("../../shared/events/emit");
 const { sendPaged } = require("../../shared/http/paged");
 const { ok, noContent, accepted } = require("../../shared/http/respond");
@@ -38,7 +40,14 @@ module.exports = {
 
   teamSummary: async (req, res) => ok(res, await team.summary(req.user, scopeOf(req))),
   team: async (req, res) =>
-    sendPaged(res, await maskForUser(pool, req.user, await team.roster(scopeOf(req), req.validated.query))),
+    sendPaged(
+      res,
+      await maskForUser(
+        pool,
+        req.user,
+        await team.roster(scopeOf(req), req.validated.query, { performance: await scopeFor(req.user, "performance", "view") }),
+      ),
+    ),
   teamAttendance: async (req, res) =>
     sendPaged(res, await maskForUser(pool, req.user, await team.month(scopeOf(req), req.validated.query))),
 

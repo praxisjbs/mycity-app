@@ -440,5 +440,6 @@ module.exports = {
   WORK,
   APPROVAL,
   PROBATION,
+  PEOPLE_EVENTS,
   SPECS,
 };

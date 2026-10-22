@@ -23,3 +23,23 @@ describe("Since You Were Away", () => {
     expect(sinceOf("2026-10-21", cal).toISOString()).toBe("2026-10-19T23:00:00.000Z");
   });
 });
+
+describe("the week (docs/guides/performance.md §6.18)", () => {
+  const { thisMonday } = require("./workspace.week");
+  const { routesOf } = require("../../http/route");
+
+  test("runs Monday to Sunday in Lagos", () => {
+    expect(thisMonday(new Date("2026-10-22T09:00:00Z"))).toBe("2026-10-19");
+    expect(thisMonday(new Date("2026-10-25T22:30:00Z"))).toBe("2026-10-19");
+    expect(thisMonday(new Date("2026-10-25T23:30:00Z"))).toBe("2026-10-26");
+  });
+
+  test("its routes carry the workspace permission; Team This Week pages with no page size", () => {
+    const routes = routesOf(require("./workspace.routes").router);
+    for (const r of routes) expect(r.permission && r.permission.key).toBe("workspace");
+    const team = routes.find((r) => r.path === "/team-weeks");
+    const keys = Object.keys(team.contract.query.shape);
+    expect(keys).toEqual(expect.arrayContaining(["page", "q", "week_starts_on"]));
+    for (const k of ["limit", "offset", "per_page", "page_size"]) expect(keys).not.toContain(k);
+  });
+});

@@ -8,7 +8,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { ColleaguePicker } from "@/features/shared/pickers";
-import { useSearchParams } from "@/lib/router";
+import { useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
@@ -75,7 +75,15 @@ const REMIND: Array<[string, string]> = [["", "None"], ["0", "At Start"], ["15",
 const remindText = (m: number) => (REMIND.find(([v]) => v === String(m))?.[1] ?? `${m} minutes before`);
 
 const KIND: Record<string, string> = { meeting: "Meeting", deadline: "Deadline", campaign: "Campaign", event: "Event", interview: "Interview" };
-const kindOf = (i: CalendarItem) => (i.item_kind === "task" ? "Deadline" : i.item_kind === "leave" ? "Leave" : i.item_kind === "performance" ? "Review" : KIND[i.event_type ?? ""] ?? "Event");
+/** What a performance date is, as Coming Up names it (performance.md §10). */
+const PERFORMANCE_DATES: Record<NonNullable<CalendarItem["performance_kind"]>, string> = {
+  check_in_due: "Check-In Due",
+  review_due: "Review Due",
+  key_result_due: "Key Result Due",
+  pip_review: "PIP Review",
+};
+const kindOf = (i: CalendarItem) =>
+  i.performance_kind ? PERFORMANCE_DATES[i.performance_kind] : i.item_kind === "task" ? "Deadline" : i.item_kind === "leave" ? "Leave" : KIND[i.event_type ?? ""] ?? "Event";
 
 /** One line of a day: the time, the title and place, and what it is. */
 function Line({ i, onOpen }: { i: CalendarItem; onOpen: (i: CalendarItem) => void }) {
@@ -86,7 +94,7 @@ function Line({ i, onOpen }: { i: CalendarItem; onOpen: (i: CalendarItem) => voi
         <span className="block text-xs font-semibold" data-copy="content">{i.title}</span>
         {i.location && <span className="block text-2xs text-subtle-foreground">{i.location}</span>}
       </span>
-      <Pill tone={i.item_kind === "task" ? "warn" : i.item_kind === "leave" ? "info" : "neutral"}>{kindOf(i)}</Pill>
+      <Pill tone={i.item_kind === "task" || i.item_kind === "performance" ? "warn" : i.item_kind === "leave" ? "info" : "neutral"}>{kindOf(i)}</Pill>
     </button>
   );
 }
@@ -103,6 +111,7 @@ export function CalendarTab() {
   const now = useMonth(today.slice(0, 7));
   const modal = useModal();
   const panel = useTaskPanel();
+  const { navigate } = useRouter();
   const add = () => modal.open({ title: "New Event", body: (close) => <EventForm close={close} day={view === "month" ? undefined : anchor} /> });
   useScreenAction({ label: "New Event", onSelect: add });
   /* A link to one event (the bell, ⌘K): /workspace?tab=calendar&id=… opens it. */
@@ -119,7 +128,7 @@ export function CalendarTab() {
   const openItem = (i: CalendarItem) => {
     if (i.item_kind === "task") panel.open(i.item_id, i.title);
     else if (i.item_kind === "event") modal.open({ title: i.title, body: (close) => <EventPanel id={i.item_id} close={close} /> });
-    else if (i.link) window.location.assign(i.link.path);
+    else if (i.link) navigate(i.link.path);
   };
   const step = (n: number) =>
     setAnchor((d) => (view === "day" ? addDays(d, n) : view === "week" ? addDays(d, 7 * n) : `${addMonths(d.slice(0, 7), n)}-01`));
@@ -153,7 +162,7 @@ export function CalendarTab() {
           <Calendar
             year={Number(month.slice(0, 4))}
             month={Number(month.slice(5, 7)) - 1}
-            events={here.rows.map((e) => ({ date: lagosDay(e.starts_at), label: e.title, highlight: e.item_kind === "task", onSelect: () => openItem(e) }))}
+            events={here.rows.map((e) => ({ date: lagosDay(e.starts_at), label: e.title, highlight: e.item_kind === "task" || e.item_kind === "performance", onSelect: () => openItem(e) }))}
           />
         ) : view === "week" ? (
           <Card>

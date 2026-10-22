@@ -179,11 +179,11 @@ describeDb("the KPI catalogue against the real migrations", () => {
       });
       expect(await pick("ceo", "ceo")).toEqual({
         source: "view",
-        ids: ["approvals_awaiting_you", "partnerships_signed_value", "alerts_high_open", "attendance_today"],
+        ids: ["goals_on_track", "approvals_awaiting_you", "partnerships_signed_value", "alerts_high_open"],
       });
       expect(await pick("staff", "staff")).toEqual({
         source: "view",
-        ids: ["my_tasks_overdue", "my_reviews_due", "my_attendance_30d", "my_leave_left"],
+        ids: ["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"],
       });
     });
   });
@@ -319,11 +319,12 @@ describeDb("the KPI catalogue against the real migrations", () => {
         ).performance_cycle_id;
       const soon = await cycle("2026 Second Half", 10);
       const later = await cycle("2027 First Half", 60);
+      // With the reviewer until submitted; a submitted one has gone on to its second level.
       const review = (cycleId, of, by, type, submitted = null) =>
         q(
-          `INSERT INTO performance_review (performance_cycle_id, employee_id, reviewer_employee_id, review_type, submitted_at)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [cycleId, people[of], people[by], type, submitted],
+          `INSERT INTO performance_review (performance_cycle_id, employee_id, reviewer_employee_id, review_type, submitted_at, status)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [cycleId, people[of], people[by], type, submitted, submitted ? "second_level" : "with_reviewer"],
         );
       await review(soon, "staff", "mgr", "manager");
       await review(soon, "staff", "staff", "self");

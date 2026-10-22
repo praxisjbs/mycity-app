@@ -8,10 +8,11 @@ import { useApi, useInfinite, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
-import { useScreenAction } from "@/shell/screen-action";
+import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { Button, CheckboxField, DataView, EmptyState, formatDate, Kanban, PageHeader, Pill, SearchInput, SegmentedControl, Toolbar, useModal, Who } from "@mycity/ui";
 import { CardPills, COLS, duePill, LABEL, PRIORITY, STATUS_TONE, type BoardStatus } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
+import { SendCommitmentsForm } from "./Commitment";
 import { TaskForm, useMoveTask } from "./TaskForms";
 
 type Scope = "mine" | "team";
@@ -21,7 +22,7 @@ function useColumn(status: BoardStatus, scope: Scope, q: string) {
   return useInfinite("GET /api/v1/tasks", { filters: { status, scope }, q });
 }
 
-export function Tasks() {
+export function Tasks({ openId = null }: { openId?: string | null }) {
   const me = useMe();
   const modal = useModal();
   const [scope, setScope] = useState<Scope>("mine");
@@ -39,9 +40,9 @@ export function Tasks() {
   const gone = usePaged("GET /api/v1/tasks", { filters: { status: "cancelled", scope }, enabled: cancelled });
   const panel = useTaskPanel();
   const move = useMoveTask(modal.open);
-  /* A link to one task (the bell, ⌘K, a record's Open Task): /workspace?tab=tasks&id=… opens its panel. */
-  const [params, setParams] = useSearchParams();
-  const linked = params.get("id");
+  /* A task opened from a link (?id=): the bell, ⌘K, the Commitments view, a calendar date. */
+  const [, setParams] = useSearchParams();
+  const linked = openId;
   const { open: openPanel } = panel;
   useEffect(() => {
     if (!linked) return;
@@ -49,7 +50,10 @@ export function Tasks() {
     setParams({ id: null }, { replace: true });
   }, [linked, openPanel, setParams]);
   const add = () => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> });
+  const addCommitment = () => modal.open({ title: "New Commitment", body: (close) => <TaskForm close={close} commitment /> });
+  const sendMonth = () => modal.open({ title: "Send Commitments", wide: true, body: (close) => <SendCommitmentsForm close={close} /> });
   useScreenAction({ label: "New Task", onSelect: add });
+  useUrlAction("commitment", addCommitment);
   const all = Object.values(cols).flatMap((c) => c.rows);
   const s = summary.data;
   return (
@@ -60,6 +64,7 @@ export function Tasks() {
           <>
             <SegmentedControl label="Tasks Layout" value={layout} onChange={setLayout} options={[["board", "Board"], ["list", "List"]]} />
             {me.manages_people && <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            <Button icon="send" onClick={sendMonth}>Send Commitments</Button>
             <Button variant="primary" icon="plus" onClick={add}>New Task</Button>
           </>
         }

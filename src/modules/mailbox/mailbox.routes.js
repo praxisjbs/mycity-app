@@ -197,6 +197,57 @@ route(
   controller.cancel,
 );
 
+/* Write With AI, Dictate and Summarise Thread (mailbox.md §3 steps 12 to 14): the owner's own mail. */
+route(
+  router,
+  "post",
+  "/assist",
+  {
+    body: mb.MailAssistRequest,
+    response: mb.MailAssist,
+    summary: "Draft or tidy the message being written with AI",
+  },
+  create(),
+  controller.assist,
+);
+route(
+  router,
+  "post",
+  "/dictation",
+  {
+    body: c.documents.DocumentUpload,
+    response: c.documents.DocumentRef,
+    summary: "A recording to write down, held until it is transcribed",
+  },
+  create(),
+  upload.single("file", { purpose: "voice_note" }),
+  controller.storeDictation,
+);
+route(
+  router,
+  "post",
+  "/dictation/:id/transcript",
+  {
+    body: c.common.EmptyBody,
+    response: mb.MailDictation,
+    summary: "Write down a recording, then remove it",
+  },
+  create(),
+  controller.transcript,
+);
+route(
+  router,
+  "post",
+  "/threads/:id/summary",
+  {
+    body: c.common.EmptyBody,
+    response: mb.ThreadSummary,
+    summary: "Summarise a conversation with AI",
+  },
+  view(),
+  controller.summary,
+);
+
 route(
   router,
   "get",

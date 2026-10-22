@@ -157,6 +157,13 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["task", "add task", "create task", "to do", "todo", "set a task", "assign work"],
   }),
+  // A commitment is a task marked as one (docs/guides/performance.md §6.11): New Task with it ticked.
+  a("new_commitment", "New Commitment", {
+    screen: "workspace.tasks",
+    params: { action: "commitment" },
+    need: ["workspace", "create"],
+    words: ["commitment", "commitments", "monthly commitment", "set my commitments", "priority for the month"],
+  }),
   // Performance (docs/guides/performance.md §9).
   a("new_goal", "New Goal", {
     screen: "performance.goals",
@@ -176,6 +183,19 @@ const ACTIONS = Object.freeze([
     params: { action: "new" },
     need: ["performance", "create"],
     words: ["scorecard", "targets", "draft a scorecard", "set targets"],
+  }),
+  a("open_round", "Open Round", {
+    screen: "performance.reviews",
+    params: { action: "new" },
+    need: ["performance", "create"],
+    capability: "performance.manage",
+    words: ["review round", "monthly round", "open the month", "start reviews", "review cycle"],
+  }),
+  a("start_check_in", "Start Check-In", {
+    screen: "ess.my-performance",
+    params: { check_in: "1" },
+    need: ["ess", "view"],
+    words: ["check in", "check-in", "monthly update", "self review", "self rating", "do my check-in", "review"],
   }),
   a("new_kpi", "New KPI", {
     screen: "performance.kpis",

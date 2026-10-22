@@ -66,6 +66,8 @@ const CalendarEvent = z
  * `item_id` is the event, task, leave request, review, key result or PIP.
  */
 const CalendarItemKind = z.enum(["event", "task", "leave", "performance"]);
+/** Which performance date an item of kind `performance` is. */
+const PerformanceDateKind = z.enum(["check_in_due", "review_due", "key_result_due", "pip_review"]);
 const CalendarItem = z
   .object({
     item_kind: CalendarItemKind,
@@ -77,6 +79,7 @@ const CalendarItem = z
     event_type: CalendarEventType.nullable(),
     location: z.string().nullable(),
     my_response: AttendeeResponse.nullable(),
+    performance_kind: PerformanceDateKind.nullable(),
     link: Link.nullable(),
   })
   .strict();
@@ -155,7 +158,7 @@ const TABLES = {
   },
   CalendarItem: {
     table: null,
-    reason: "one entry of a month, from calendar_event, task (its deadline) or leave_request",
+    reason: "one entry of a month, from calendar_event, task (its deadline), leave_request, or a performance date (review, okr_key_result, improvement_plan)",
   },
   CalendarItemPage: { table: null, reason: "a page of a month's entries" },
   CalendarListQuery: { table: null, reason: "the month and list controls" },
@@ -183,6 +186,7 @@ module.exports = {
   AttendeeResponse,
   CalendarEntityType,
   ReminderMinutes,
+  PerformanceDateKind,
   CalendarItemKind,
   Attendee,
   CalendarEvent,

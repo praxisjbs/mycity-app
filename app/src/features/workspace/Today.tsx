@@ -1,12 +1,14 @@
 /** My Workspace · Today (docs/guides/workspace.md §10.1): the reader's day on one screen. */
 import type { Task } from "@mycity/contract/contract.gen.ts";
 import { useApi } from "@/api/hooks";
+import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useScreenAction } from "@/shell/screen-action";
 import { Avatar, Button, Card, CardHeader, ErrorState, formatDate, formatDateTime, formatTime, Grid, LoadingRows, PageHeader, Pill, Timeline, useModal } from "@mycity/ui";
 import { CardPills } from "./shared";
 import { happened, useTaskPanel } from "./TaskPanel";
 import { TaskForm } from "./TaskForms";
+import { MyWeekCard, TeamWeekCard } from "./Week";
 
 /** A task on Today: its title, its pills and who set it. */
 function TaskCard({ t, onClick }: { t: Task; onClick: () => void }) {
@@ -25,6 +27,7 @@ function TaskCard({ t, onClick }: { t: Task; onClick: () => void }) {
 const answer = (r: string | null) => (r === "declined" ? { tone: "neutral" as const, text: "Declined" } : r === "pending" ? { tone: "neutral" as const, text: "Tentative" } : { tone: "info" as const, text: "Confirmed" });
 
 export function Today() {
+  const me = useMe();
   const { data, error, reload } = useApi("GET /api/v1/workspace/today");
   const clock = useApi("GET /api/v1/attendance/me/today");
   const panel = useTaskPanel();
@@ -88,6 +91,14 @@ export function Today() {
           {!data.since.data.length && <p className="text-2xs text-subtle-foreground">Nothing new.</p>}
         </Card>
       </Grid>
+      {me.manages_people ? (
+        <Grid cols={2}>
+          <MyWeekCard />
+          <TeamWeekCard />
+        </Grid>
+      ) : (
+        <MyWeekCard />
+      )}
       {panel.panel}
     </>
   );

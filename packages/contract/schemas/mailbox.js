@@ -2,7 +2,8 @@
 /**
  * Mailbox (M1, docs/guides/mailbox.md §5): each person's own company mailbox over IMAP
  * and SMTP. The connection, the six canonical folders, threads and their messages,
- * drafts and the send queue. Nobody reaches another person's mail.
+ * drafts and the send queue, signatures, and the AI the owner presses on their own mail
+ * (Write With AI, Dictate, Summarise Thread). Nobody reaches another person's mail.
  *
  * Addresses are plain strings on the wire. A message's sender carries its display name.
  */
@@ -282,6 +283,106 @@ const SignatureConfig = z
   })
   .strict();
 
+/* ------------------------------------------------------------------ *
+ * Write With AI, Tidy Up, Dictate and Summarise Thread (mailbox.md §1.1, §3 steps 12 to 14,
+ * §6): run only when the owner presses them, on their own mail; the AI keeps nothing but a
+ * conversation's summary
+ * ------------------------------------------------------------------ */
+
+/** Write a draft from the conversation and What To Say, or tidy the person's own words. */
+const ASSIST_MODES = ["write", "tidy"];
+const AssistMode = z.enum(ASSIST_MODES);
+
+/** A draft, or the questions the AI needs answered before it can write one (decision 4). */
+const ASSIST_KINDS = ["draft", "questions"];
+const AssistKind = z.enum(ASSIST_KINDS);
+
+/** POST /mailbox/assist: what the composer holds and what the person asked for. */
+const MailAssistRequest = z
+  .object({
+    mode: AssistMode,
+    /** The message a reply answers: its conversation is what the AI reads. */
+    in_reply_to: uuid.nullable().default(null),
+    to_addresses: recipients.default([]),
+    cc_addresses: recipients.default([]),
+    subject: z.string().max(500).default(""),
+    /** The files attached in the composer, by name: the only attachments a draft may mention. */
+    attachment_names: z.array(z.string().trim().min(1).max(255)).max(20).default([]),
+    /** The person's own words, above any quoted mail. */
+    body_html: z.string().max(1_000_000).default(""),
+    /** The mail quoted under them: a forward's message, or a reply's once its conversation is gone. */
+    quoted_html: z.string().max(1_000_000).default(""),
+    /** What To Say. */
+    instruction: z.string().trim().max(2000).default(""),
+    note: z.string().trim().max(4000).default(""),
+    /** The AI's questions from the last press, with the person's answers. */
+    answers: z
+      .array(z.object({ question: z.string().trim().min(1).max(200), answer: z.string().trim().max(1000) }).strict())
+      .max(3)
+      .default([]),
+    /** Write Anyway: draft without asking, around what is not known. */
+    write_anyway: z.boolean().default(false),
+  })
+  .strict();
+
+/** What came back: a draft for the composer, or questions. Nothing changes until Use Draft. */
+const MailAssist = z
+  .object({
+    /** False when AI is off, capped, not answering or not set up: nothing was written. */
+    available: z.boolean(),
+    kind: AssistKind.nullable(),
+    /** A suggested subject, only for a message whose subject is empty. */
+    subject: z.string().nullable(),
+    /** The draft as the composer's HTML. */
+    body_html: z.string().nullable(),
+    questions: z.array(z.string()).max(3),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** The model's answer for Write and Tidy Up, checked for placeholders before anyone sees it (§6). */
+const MailAssistOutput = z
+  .object({
+    kind: AssistKind,
+    subject: z.string().trim().max(150).nullable(),
+    body_markdown: z.string().max(12_000).nullable(),
+    questions: z.array(z.string().trim().min(3).max(200)).max(3),
+  })
+  .strict();
+
+/** The model's answer for Summarise Thread: nothing invented, at most five of each. */
+const MailSummaryOutput = z
+  .object({
+    gist: z.string().trim().min(1).max(400),
+    key_points: z.array(z.string().trim().min(1).max(300)).max(5),
+    asked_of_you: z.array(z.string().trim().min(1).max(300)).max(5),
+  })
+  .strict();
+
+/** POST /mailbox/threads/:id/summary: the kept summary, or a fresh one. */
+const ThreadSummary = z
+  .object({
+    available: z.boolean(),
+    mail_thread_id: uuid,
+    gist: z.string().nullable(),
+    key_points: z.array(z.string()),
+    asked_of_you: z.array(z.string()),
+    /** How many of the conversation's messages it covers. */
+    message_count: z.number().int().min(0),
+    summarised_at: isoDateTime.nullable(),
+    ai_run_id: uuid.nullable(),
+  })
+  .strict();
+
+/** POST /mailbox/dictation/:id/transcript: the words; the recording is removed. */
+const MailDictation = z
+  .object({
+    text: z.string(),
+    /** Only the stub answered (no provider set up): a marked placeholder, as on a laptop. */
+    draft: z.boolean(),
+  })
+  .strict();
+
 /** PUT /mailbox/signature/config: all of it at once, as the wizard's last step saves it. */
 const SignatureConfigSave = z
   .object({
@@ -391,6 +492,15 @@ const TABLES = {
   SignaturePreview: { table: null, reason: "the signature a message with those recipients would carry" },
   SignatureConfig: { table: "mail_signature_config" },
   SignatureConfigSave: { table: "mail_signature_config" },
+  MailAssistRequest: { table: null, reason: "what the composer holds and what the person asked the AI for; nothing is kept" },
+  MailAssist: { table: null, reason: "a draft or questions from the AI, shown before anything changes; nothing is kept" },
+  MailAssistOutput: { table: null, reason: "the model's answer, checked for placeholders before anyone sees it" },
+  MailSummaryOutput: { table: "mail_thread_summary" },
+  ThreadSummary: {
+    table: "mail_thread_summary",
+    virtual: { available: "false when AI is off, capped, not answering or not set up; nothing is kept then" },
+  },
+  MailDictation: { table: null, reason: "a transcript; the recording is removed once it is read" },
 };
 
 module.exports = {
@@ -428,4 +538,14 @@ module.exports = {
   SignaturePreview,
   SignatureConfig,
   SignatureConfigSave,
+  ASSIST_MODES,
+  ASSIST_KINDS,
+  AssistMode,
+  AssistKind,
+  MailAssistRequest,
+  MailAssist,
+  MailAssistOutput,
+  MailSummaryOutput,
+  ThreadSummary,
+  MailDictation,
 };

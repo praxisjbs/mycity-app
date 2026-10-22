@@ -19,8 +19,15 @@
  *              due-today and due-tomorrow reminders.
  *
  * Every change writes a task_activity row and emits one event, in the same transaction.
- * A task that counts towards a KPI tells the performance module through TASK_COMPLETED
- * and TASK_REOPENED, which recounts the KPI after commit.
+ * A task may count towards a scorecard line or a key result of its assignee (Counts Towards,
+ * docs/guides/performance.md §6.18); TASK_COMPLETED and TASK_REOPENED carry the line and the
+ * month, and a line measured in tasks is counted where it is read (doneTowards).
+ *
+ * A commitment (performance.md §6.11) is a task marked as one, with its criteria and its month.
+ * The assignee may mark it as well as whoever manages it; once its month's set is approved its
+ * mark, month and criteria are fixed and it is rescoped rather than cancelled. The targets
+ * module sends, approves and rescopes it, through the helpers at the foot of this file, in its
+ * own transaction.
  */
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
@@ -30,6 +37,8 @@ const numbering = require("../../shared/numbering/numbering");
 const { linkFor } = require("../../shared/route-map");
 const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
+const workflow = require("../../shared/workflow/engine");
+const approvers = require("../../shared/workflow/approvers");
 const repo = require("./tasks.repo");
 const audience = require("./tasks.audience");
 const recurrence = require("./tasks.recurrence");
@@ -78,13 +87,7 @@ function toTask(row, now = new Date()) {
     blocked_reason: row.blocked_reason,
     blocked_at: iso(row.blocked_at),
     late_reason: row.late_reason ?? null,
-    counts_towards: row.employee_target_id
-      ? {
-          employee_target_id: row.employee_target_id,
-          title: row.target_title || "",
-          link: linkFor("kpi", row.employee_target_id),
-        }
-      : null,
+    counts_towards: countsTowardsOf(row),
     entity_type: row.entity_type,
     entity_id: row.entity_id,
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
@@ -98,10 +101,33 @@ function toTask(row, now = new Date()) {
     commitment_month: row.commitment_month ?? null,
     original_due_at: iso(row.original_due_at),
     rescoped_at: iso(row.rescoped_at),
+    rescope_reason: row.rescope_reason ?? null,
     commitment_set_id: row.commitment_set_id ?? null,
+    commitment_state: row.commitment_state ?? null,
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
   };
+}
+
+/** The scorecard line or key result a task counts towards, as the contract names it. */
+function countsTowardsOf(row) {
+  if (row.employee_target_id)
+    return {
+      kind: "line",
+      employee_target_id: row.employee_target_id,
+      okr_key_result_id: null,
+      title: row.target_title || "",
+      link: linkFor("target", row.employee_target_id),
+    };
+  if (row.entity_type === "key_result" && row.kr_code)
+    return {
+      kind: "key_result",
+      employee_target_id: null,
+      okr_key_result_id: row.entity_id,
+      title: `${row.kr_code} ${row.kr_statement || ""}`.trim(),
+      link: linkFor("key_result", row.entity_id),
+    };
+  return null;
 }
 
 /** The facts every task event carries, for the audit line and the notifications. */
@@ -209,18 +235,35 @@ function toBlockage(row) {
 /** May the caller plan the task: its steps, what it waits on, its reminders? */
 const mayPlan = (scope, row) => audience.mayManage(scope, row) || row.primary_assignee_id === scope.employee_id;
 
-/** The panel: the task, what hangs off it, and what the caller may do to it. */
-async function getFor(id, scope) {
+/** May the caller act on this person's commitment: they are its person, or the person is in their scope. */
+const actsFor = (scope, row) => row.primary_assignee_id === scope.employee_id || audience.inScope(scope, row.primary_assignee_id);
+
+/**
+ * The panel: the task, what hangs off it (steps, links, watchers, the open hold, reminders) and what
+ * the caller may do to it. A commitment also carries where its set stands, a rescope waiting on
+ * approval (and whether the caller decides it), and its recovery.
+ * @param {string} id
+ * @param {object} scope  scopeOf(req)
+ * @param {object} [actor] withActor(req): who decides a rescope
+ */
+async function getFor(id, scope, actor = null) {
   const row = await visible(pool, id, scope);
   const manage = audience.mayManage(scope, row);
-  const [stepRows, waits, held, watching, hold, pending] = await Promise.all([
+  const approved = Boolean(row.is_commitment && row.original_due_at);
+  const [stepRows, waits, held, watching, hold, pending, open] = await Promise.all([
     repo.steps(pool, id),
     repo.waitingOn(pool, id),
     repo.holdingUp(pool, id),
     repo.watchers(pool, id),
     repo.openBlockage(pool, id),
     reminders.pendingFor(pool, { key: REMINDER_KEY, entity: { type: "task", id } }),
+    approved ? workflow.findOpenInstance(pool, { type: "task", id }) : null,
   ]);
+  const rescope =
+    open && open.definition_key === "performance.commitments"
+      ? { workflow_instance_id: open.workflow_instance_id, can_decide: Boolean(actor) && (await approvers.canAct(pool, open.stage_approvers, actor, open)) }
+      : null;
+  const recovery = row.commitment_state === "missed" || row.commitment_state === "late" ? await repo.recoveryOf(pool, id) : null;
   return {
     ...toTask(row),
     steps: stepRows.map(toStep),
@@ -239,9 +282,33 @@ async function getFor(id, scope) {
       .sort((a, b) => a.slot - b.slot),
     can_edit: true,
     can_reassign: manage,
-    can_cancel: manage && row.status !== "cancelled",
+    can_cancel: manage && row.status !== "cancelled" && !approved,
     can_plan: mayPlan(scope, row) && row.status !== "cancelled",
+    set_status: row.set_status || null,
+    rescope,
+    recovery: recovery ? { ...recovery, due_at: iso(recovery.due_at) } : null,
+    can_rescope: approved && !rescope && !row.rescoped_at && !["done", "cancelled"].includes(row.status) && actsFor(scope, row),
+    can_set_recovery: row.commitment_state === "missed" && !recovery && actsFor(scope, row),
   };
+}
+
+/** Counts Towards: the lines and key results the assignee (the caller unless named) may pick. */
+async function countsTowards(query, scope) {
+  const assigneeId = query.assignee_id || scope.employee_id;
+  if (!assigneeId) throw new AppError("FORBIDDEN", "Only an employee can hold tasks", 403);
+  if (!audience.maySetFor(scope, assigneeId)) throw invalid("assignee_id", "Not in your team");
+  const month = query.month || `${lagos.today().slice(0, 7)}-01`;
+  return repo.countsTowards(pool, { assigneeId, month }, query);
+}
+
+/**
+ * How many tasks pointing at a line were done in a month (Africa/Lagos): a line measured in tasks
+ * (performance.md §6.10, §6.18). `month` is its first day.
+ */
+async function doneTowards(db, lineId, month) {
+  const from = lagos.instant(month);
+  const to = lagos.instant(lagos.addMonths(month, 1));
+  return repo.doneTowards(db, lineId, from, to);
 }
 
 async function blockageHistory(id, query, scope) {
@@ -264,15 +331,37 @@ async function activity(id, query, scope) {
  * Checks shared by create and edit
  * ------------------------------------------------------------------ */
 
-/** The KPI must be the assignee's own and not closed. */
+/** A line must be on the assignee's own scorecard, and that scorecard binding (§6.18). */
 async function checkTarget(db, targetId, assigneeId) {
   if (!targetId) return;
   const t = await repo.targetOf(db, targetId);
   if (!t || t.employee_id !== assigneeId)
-    throw invalid("employee_target_id", "Not one of their KPIs");
-  if (["cancelled", "returned"].includes(t.status))
-    throw invalid("employee_target_id", "That KPI is closed");
+    throw invalid("employee_target_id", "Not one of their lines");
+  if (!["binding", "agreed"].includes(t.scorecard_status))
+    throw invalid("employee_target_id", "Scorecard not binding yet");
 }
+
+/** A key result a task points at must exist. */
+async function checkRecord(db, entityType, entityId) {
+  if (entityType === "key_result" && entityId && !(await repo.keyResultOf(db, entityId)))
+    throw invalid("entity_id", "Not a key result");
+}
+
+/**
+ * A commitment needs its criteria, its month and a due date in that month (§6.11). `t` is the
+ * task as it will stand; `dueAt` its due instant.
+ */
+function checkCommitment(t, dueAt) {
+  if (!t.is_commitment) return;
+  if (!t.acceptance_criteria) throw invalid("acceptance_criteria", "Give the criteria");
+  if (!t.commitment_month) throw invalid("commitment_month", "Pick the month");
+  if (!dueAt) throw invalid("due_on", "Pick a due date");
+  const month = String(t.commitment_month instanceof Date ? lagos.dateOf(t.commitment_month) : t.commitment_month).slice(0, 7);
+  if (lagos.dateOf(new Date(dueAt)).slice(0, 7) !== month) throw invalid("due_on", "Not in that month");
+}
+
+const approvedCommitment = () =>
+  new AppError("COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed", 409);
 
 async function checkAssignee(db, scope, employeeId) {
   audience.assertMaySetFor(scope, employeeId);
@@ -299,8 +388,11 @@ async function create(actor, scope, body, { client: within = null } = {}) {
   return run(async (client) => {
     await checkAssignee(client, scope, assigneeId);
     await checkTarget(client, body.employee_target_id, assigneeId);
+    await checkRecord(client, body.entity_type, body.entity_id);
     const cal = await workingWeek.loadCalendar(client);
     const dueAt = recurrence.dueFor(body, lagos.today(), cal);
+    const commitment = body.is_commitment === true;
+    checkCommitment({ is_commitment: commitment, acceptance_criteria: body.acceptance_criteria, commitment_month: body.commitment_month }, dueAt);
     if (body.recurrence && !dueAt) throw invalid("recurrence", "Give it a due date to repeat from");
     const { number } = await numbering.allocate(client, "task");
     const id = await repo.insert(client, {
@@ -319,6 +411,9 @@ async function create(actor, scope, body, { client: within = null } = {}) {
       entity_id: body.entity_id || null,
       recurrence: body.recurrence || null,
       sort_order: await repo.nextOrder(client, assigneeId, "todo"),
+      is_commitment: commitment,
+      acceptance_criteria: commitment ? body.acceptance_criteria : null,
+      commitment_month: commitment ? body.commitment_month : null,
     });
     await repo.addActivity(client, { task_id: id, actor_user_id: actor.user_id, kind: "created", to_status: "todo" });
     const row = await repo.get(client, id);
@@ -350,11 +445,23 @@ async function edit(actor, scope, id, body) {
       });
     }
     const assigneeId = body.primary_assignee_id || before.primary_assignee_id;
-    if (body.primary_assignee_id && body.primary_assignee_id !== before.primary_assignee_id)
-      await checkAssignee(client, scope, body.primary_assignee_id);
+    const reassigned = Boolean(body.primary_assignee_id && body.primary_assignee_id !== before.primary_assignee_id);
+    const approved = Boolean(before.is_commitment && before.original_due_at);
+    // An approved commitment keeps its person, mark, month and criteria (§6.11).
+    if (approved) {
+      const day = (v) => (v ? String(v instanceof Date ? lagos.dateOf(v) : v).slice(0, 10) : null);
+      const moved =
+        reassigned ||
+        ("is_commitment" in body && body.is_commitment !== true) ||
+        ("acceptance_criteria" in body && (body.acceptance_criteria || null) !== before.acceptance_criteria) ||
+        ("commitment_month" in body && day(body.commitment_month) !== day(before.commitment_month));
+      if (moved) throw approvedCommitment();
+    }
+    if (reassigned) await checkAssignee(client, scope, body.primary_assignee_id);
     const targetId = "employee_target_id" in body ? body.employee_target_id : before.employee_target_id;
     if ("employee_target_id" in body || body.primary_assignee_id)
       await checkTarget(client, targetId, assigneeId);
+    if ("entity_type" in body) await checkRecord(client, body.entity_type, body.entity_id);
 
     const changes = {};
     for (const k of ["title", "priority", "cadence", "employee_target_id", "entity_type", "entity_id", "recurrence", "late_reason"])
@@ -368,9 +475,26 @@ async function edit(actor, scope, id, body) {
     const repeats = "recurrence" in body ? body.recurrence : before.recurrence;
     const dueAfter = "due_at" in changes ? changes.due_at : before.due_at;
     if (repeats && !dueAfter) throw invalid("recurrence", "Give it a due date to repeat from");
-    if (body.primary_assignee_id && body.primary_assignee_id !== before.primary_assignee_id) {
+    if (reassigned) {
       changes.primary_assignee_id = body.primary_assignee_id;
       changes.sort_order = await repo.nextOrder(client, body.primary_assignee_id, before.status);
+      // A draft commitment leaves its old person's set with them.
+      if (before.commitment_set_id) changes.commitment_set_id = null;
+    }
+    if (!approved && ["is_commitment", "acceptance_criteria", "commitment_month"].some((k) => k in body)) {
+      const mark = "is_commitment" in body ? body.is_commitment === true : Boolean(before.is_commitment);
+      changes.is_commitment = mark;
+      changes.acceptance_criteria = mark
+        ? ("acceptance_criteria" in body ? body.acceptance_criteria || null : before.acceptance_criteria)
+        : null;
+      changes.commitment_month = mark ? ("commitment_month" in body ? body.commitment_month : before.commitment_month) : null;
+      if (!mark) changes.commitment_set_id = null;
+    }
+    if (!approved) {
+      const will = { ...before, ...changes };
+      checkCommitment(will, "due_at" in changes ? changes.due_at : before.due_at);
+    } else if ("due_at" in changes && !changes.due_at) {
+      throw invalid("due_on", "Pick a due date");
     }
     await repo.update(client, id, changes);
     await repo.addActivity(client, {
@@ -452,7 +576,11 @@ async function move(actor, scope, id, { status, before_task_id: beforeId, late_r
         actor,
         before: { status: before.status },
         after: { status },
-        payload: payloadOf(after, { from_status: before.status }),
+        // The month a counting line's figure changes in (§6.18): the completion's, or the one it left.
+        payload: payloadOf(after, {
+          from_status: before.status,
+          month: `${lagos.dateOf(new Date(status === "done" ? now : before.completed_at || now)).slice(0, 7)}-01`,
+        }),
       });
     }
     return toTask(after);
@@ -530,6 +658,7 @@ async function cancel(actor, scope, id, { cancel_reason: reason }) {
     if (!audience.mayManage(scope, before))
       throw new AppError("FORBIDDEN", "Only the person who set this task can cancel it", 403);
     if (before.status === "cancelled") return toTask(before);
+    if (before.is_commitment && before.original_due_at) throw approvedCommitment();
     await repo.update(client, id, { status: "cancelled", cancelled_at: new Date(), cancel_reason: reason });
     await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id } });
     await repo.addActivity(client, {
@@ -673,7 +802,7 @@ async function removeStep(actor, scope, id, stepId) {
     await repo.deleteStep(client, stepId);
     await noted(client, actor, row, { kind: "step_removed", detail: before.title, key: EVENTS.TASK_STEP_CHANGED });
   });
-  return getFor(id, scope);
+  return getFor(id, scope, actor);
 }
 
 /** This task waits on another the caller can see. No loops, and no more than PLAN_MAX either way. */
@@ -698,7 +827,7 @@ async function addWaiting(actor, scope, id, { depends_on_task_id: otherId }) {
         key: EVENTS.TASK_WAITING_CHANGED,
       });
   });
-  return getFor(id, scope);
+  return getFor(id, scope, actor);
 }
 
 async function removeWaiting(actor, scope, id, dependencyId) {
@@ -709,7 +838,7 @@ async function removeWaiting(actor, scope, id, dependencyId) {
     await repo.deleteDependency(client, dependencyId);
     await noted(client, actor, row, { kind: "waiting_removed", detail: edge.other_number, key: EVENTS.TASK_WAITING_CHANGED });
   });
-  return getFor(id, scope);
+  return getFor(id, scope, actor);
 }
 
 /** Go ahead without the other task: a person's word, kept on the link. */
@@ -726,7 +855,7 @@ async function overrideWaiting(actor, scope, id, dependencyId, { override_reason
       key: EVENTS.TASK_WAITING_CHANGED,
     });
   });
-  return getFor(id, scope);
+  return getFor(id, scope, actor);
 }
 
 /**
@@ -753,7 +882,7 @@ async function watch(actor, scope, id, { employee_id: who }) {
         extra: { watcher_employee_id: employeeId },
       });
   });
-  return getFor(id, scope);
+  return getFor(id, scope, actor);
 }
 
 /** Stop watching: oneself always; someone else, for the assignee or the setter. */
@@ -770,7 +899,7 @@ async function unwatch(actor, scope, id, employeeId) {
         extra: { watcher_employee_id: employeeId },
       });
   });
-  return getFor(id, scope);
+  return getFor(id, scope, actor);
 }
 
 /** A nudge with a line of text, to the assignee, the watchers or both. Never to the sender. */
@@ -827,7 +956,7 @@ async function setReminders(actor, scope, id, { reminders: wanted }) {
       key: EVENTS.TASK_EDITED,
     });
   });
-  return getFor(id, scope);
+  return getFor(id, scope, actor);
 }
 
 /** The due time moved: lead-time reminders move with it; fixed ones stay where they were. */
@@ -961,7 +1090,48 @@ async function sweep(now = new Date()) {
   return { repeated, reminded };
 }
 
+/* ------------------------------------------------------------------ *
+ * Commitments: what the targets module asks of a task, in its transaction (§6.11)
+ * ------------------------------------------------------------------ */
+
+/** Put a person's unapproved commitments for a month into their set; the ids put in. */
+async function linkCommitments(client, actor, { employeeId, month, setId }) {
+  const ids = await repo.linkCommitments(client, { employeeId, month, setId });
+  for (const id of ids)
+    await repo.addActivity(client, { task_id: id, actor_user_id: actor ? actor.user_id : null, kind: "edited", detail: "commitment sent" });
+  return ids;
+}
+
+/** A set approved: its commitments' original dates are fixed. The ids fixed. */
+async function fixOriginalDates(client, actor, setId) {
+  const ids = await repo.fixOriginalDates(client, setId);
+  for (const id of ids)
+    await repo.addActivity(client, { task_id: id, actor_user_id: actor ? actor.user_id : null, kind: "edited", detail: "commitment approved" });
+  return ids;
+}
+
+/** A rescope asked: its reason is kept on the task until it is decided. */
+async function askRescope(client, actor, id, reason) {
+  await repo.update(client, id, { rescope_reason: reason });
+  await repo.addActivity(client, { task_id: id, actor_user_id: actor.user_id, kind: "edited", detail: `rescope asked: ${reason}` });
+}
+
+/** A rescope decided: approved, the commitment is rescoped; refused, its reason goes. */
+async function settleRescope(client, actor, id, approved) {
+  await repo.update(client, id, approved ? { rescoped_at: new Date() } : { rescope_reason: null });
+  await repo.addActivity(client, {
+    task_id: id,
+    actor_user_id: actor ? actor.user_id : null,
+    kind: "edited",
+    detail: approved ? "commitment rescoped" : "rescope refused",
+  });
+}
+
 module.exports = {
+  linkCommitments,
+  fixOriginalDates,
+  askRescope,
+  settleRescope,
   cancelForRecord,
   toTask,
   toRef,
@@ -970,6 +1140,8 @@ module.exports = {
   summary,
   getFor,
   blockageHistory,
+  countsTowards,
+  doneTowards,
   comments,
   activity,
   addStep,

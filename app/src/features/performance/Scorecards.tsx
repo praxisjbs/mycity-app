@@ -2,7 +2,9 @@
  * Performance · Scorecards (the `targets` tab; docs/guides/performance.md §2, §3.3, §6.5, §6.6,
  * §10): each person's quarter scorecard. The list with its figures and filters; New Scorecard for
  * a manager; a scorecard's sections and lines with Edit Lines, Change Reviewer, Agree Scorecard and
- * Disagree With Reason. PR 4 adds the Commitments view beside it (Commitments.tsx).
+ * Disagree With Reason, and Send Scorecard for one drafted after its plan bound (PR 3). The
+ * Scorecards and Commitments switch opens the Commitments view beside it (Commitments.tsx;
+ * `?view=commitments`, or `?set=` from an approval's link).
  */
 import { useState } from "react";
 import targetsContract from "@mycity/contract/schemas/targets.js";
@@ -14,6 +16,7 @@ import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { PagedTable } from "@/features/shared/sections";
+import { useSearchParams } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -30,6 +33,7 @@ import {
   HelpTerm,
   KeyValue,
   PageHeader,
+  SegmentedControl,
   SelectField,
   StatusPill,
   TextField,
@@ -38,13 +42,33 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
+import { Commitments } from "./Commitments";
 import { cardStatus, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
 const AUTO = new Set(["key_result", "team_result", "function_kpi", "commitments", "update_on_time", "team_reviews", "tasks"]);
 
+/** The Scorecards and Commitments switch; the view lives in the address. */
+function ViewSwitch({ view }: { view: "scorecards" | "commitments" }) {
+  const [, setParams] = useSearchParams();
+  return (
+    <SegmentedControl
+      value={view}
+      onChange={(v) => setParams({ view: v === "commitments" ? "commitments" : null, set: null }, { replace: true })}
+      options={[["scorecards", "Scorecards"], ["commitments", "Commitments"]]}
+    />
+  );
+}
+
 export function Scorecards() {
+  const [params] = useSearchParams();
+  const commitments = params.get("view") === "commitments" || Boolean(params.get("set"));
+  if (commitments) return <Commitments switcher={<ViewSwitch view="commitments" />} />;
+  return <ScorecardsView />;
+}
+
+function ScorecardsView() {
   const me = useMe();
   const modal = useModal();
   const quarter = useQuarter();
@@ -74,7 +98,12 @@ export function Scorecards() {
       <PageHeader
         title="Scorecards"
         sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined}
-        actions={mayDraft && period ? <Button variant="primary" icon="plus" onClick={newCard}>New Scorecard</Button> : undefined}
+        actions={
+          <>
+            <ViewSwitch view="scorecards" />
+            {mayDraft && period && <Button variant="primary" icon="plus" onClick={newCard}>New Scorecard</Button>}
+          </>
+        }
       />
       <Toolbar>
         <FilterSelect label="Quarter" value={quarter.periodId} onChange={quarter.setPeriodId} options={quarter.options} />
@@ -158,6 +187,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   const read = useApi("GET /api/v1/performance/scorecards/:id", { params: { id } });
   const period = useApi("GET /api/v1/performance/periods/:id", { params: { id: read.data?.performance_period_id ?? "" }, enabled: Boolean(read.data) });
   const agree = useMutation("POST /api/v1/performance/scorecards/:id/agree");
+  const send = useMutation("POST /api/v1/performance/scorecards/:id/submit");
   const c = read.data;
   if (!c) return null;
   const months = period.data?.months ?? [];
@@ -171,6 +201,16 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
       await agree.run({ params: { id }, body: {} });
       reload();
       toast("Scorecard agreed");
+    } catch (e) {
+      say(e);
+    }
+  };
+  // A scorecard drafted after its plan bound goes through the plan's flow on its own (§6.4).
+  const sendCard = async () => {
+    try {
+      await send.run({ params: { id }, body: {} });
+      reload();
+      toast("Scorecard sent for approval");
     } catch (e) {
       say(e);
     }
@@ -196,6 +236,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
           ["Rating", rating(c.rating).text],
           ["Weights", c.weight_problems.length ? "Check" : "100%"],
           ["Agreed", agreedText],
+          ...(c.amendment_instance_id ? ([["Approval", "Awaiting Approval"]] as Array<[string, string]>) : []),
           ...(c.disagree_reason && c.disagreed_at ? ([["Disagreed", c.disagree_reason]] as Array<[string, string]>) : []),
         ]}
       />
@@ -227,6 +268,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
         )}
         {c.can_agree && mine && <Button onClick={() => modal.open({ title: "Disagree With Reason", body: (done) => <DisagreeForm id={id} close={() => (done(), reload())} /> })}>Disagree With Reason</Button>}
         {c.can_agree && <Button variant="primary" onClick={agreeCard}>Agree Scorecard</Button>}
+        {c.can_send && <Button variant="primary" onClick={sendCard}>Send Scorecard</Button>}
       </FormFooter>
     </>
   );
