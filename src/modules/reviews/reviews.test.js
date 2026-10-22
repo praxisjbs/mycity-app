@@ -19,6 +19,65 @@ const rules = scoring.DEFAULT_RULES;
 const ROLES = { employee: false, reviewer: false, dotted: false, second_level: false, hr: false, ceo: false, in_scope: false, full: false, named: false };
 const as = (who) => ({ ...ROLES, ...who, named: true, full: Boolean(who.second_level || who.hr || who.ceo) && !who.employee });
 
+describe("a late check-in, Score Without Check-In and Withdrawn (§11)", () => {
+  const late = { status: "check_in", check_in_submitted_at: null };
+  const scored = { status: "with_reviewer", check_in_submitted_at: null, no_check_in_at: "2026-11-05T09:00:00Z" };
+  const reviewer = as({ reviewer: true });
+
+  test("once the due date has passed the reviewer opens the review, but nothing of the drafts", () => {
+    expect(() => sequence.assertMayRead(late, reviewer, { late: true })).not.toThrow();
+    expect(sequence.partsFor(late, reviewer)).toMatchObject({ check_in: false, self: false, scores: false });
+    const item = { actual_value: "9", evidence_note: "log", self_score: "1", self_reason: "y", proposed_score: "0.9", score: null };
+    expect(sequence.itemFor(item, sequence.partsFor(late, reviewer))).toMatchObject({ actual_value: null, self_score: null, self_reason: null, proposed_score: null });
+    expect(sequence.allowed(late, reviewer, { late: true })).toMatchObject({ score_without_check_in: true, score: false });
+    expect(sequence.allowed(late, reviewer).score_without_check_in).toBe(false);
+    expect(sequence.allowed(late, as({ employee: true }), { late: true }).score_without_check_in).toBe(false);
+  });
+
+  test("scored without it, the drafts stay the employee's; the reviewer scores", () => {
+    expect(sequence.partsFor(scored, reviewer)).toMatchObject({ check_in: false, self: false, scores: true });
+    expect(sequence.partsFor(scored, as({ employee: true }))).toMatchObject({ check_in: true, self: true });
+    expect(sequence.allowed(scored, reviewer)).toMatchObject({ score: true, submit: true, score_without_check_in: false });
+  });
+
+  test("Operations & People withdraw an open review; a withdrawn one offers nothing", () => {
+    const hr = as({ hr: true });
+    expect(sequence.allowed(scored, hr).withdraw).toBe(true);
+    expect(sequence.allowed({ status: "closed" }, hr).withdraw).toBe(false);
+    expect(sequence.allowed(scored, reviewer).withdraw).toBe(false);
+    const withdrawn = { status: "withdrawn", check_in_submitted_at: null };
+    expect(Object.values(sequence.allowed(withdrawn, hr, { decide: true })).some(Boolean)).toBe(false);
+  });
+
+  test("a withdrawn review's chain ends at HR's stage: what happened is done, the rest skipped", () => {
+    const base = { employee: { display_name: "Ada" }, reviewer: { display_name: "Tolu" }, review_type: "manager", second_level: null };
+    const steps = service.chainOf({ ...base, status: "withdrawn", check_in_submitted_at: null, submitted_at: "2026-11-06T10:00:00Z", withdrawn_at: "2026-11-07T10:00:00Z" }, []);
+    expect(steps.map((x) => [x.key, x.state])).toEqual([["check_in", "skipped"], ["reviewer", "done"], ["second_level", "skipped"], ["hr", "done"]]);
+    expect(steps[3]).toMatchObject({ person: "Operations & People", at: "2026-11-07T10:00:00.000Z" });
+  });
+
+  test("the PDF prints the reason, and no check-in for the employee's own lines", () => {
+    const pdf = require("./reviews.pdf");
+    const review = {
+      employee: { display_name: "Ada", job_title: null, department: null },
+      reviewer: { display_name: "Tolu" },
+      round_name: "October 2026",
+      score_month: "0.5",
+      score_to_date: "0.5",
+      rating: "partly_meets",
+      no_check_in_at: "2026-11-05T09:00:00Z",
+      no_check_in_reason: "No check-in by 3 November",
+    };
+    const own = { section: "results", line: { title: "Stories", target_value: "10" }, actual_value: "9", evidence_kind: "note", evidence_note: "log", self_score: "1", self_reason: "y", action_text: "a", proposed_score: null, score: "0.5", override_reason: "Seen at work", auto: false };
+    const auto = { section: "accountability", line: { title: "Monthly update on time" }, actual_text: "Late", proposed_score: "0", score: "0", auto: true };
+    const v = pdf.variables(review, [own, auto], { done: [], ongoing: [], next_month: [] }, []);
+    expect(v.no_check_in_reason).toBe("No check-in by 3 November");
+    expect(v.lines[0]).toMatchObject({ actual: "No check-in", evidence: "No check-in", self: "No check-in", action: null, note: "Reviewer: Seen at work" });
+    expect(v.lines[1]).toMatchObject({ actual: "Late", evidence: "System record", final: "0.00" });
+    expect(c.reviews.ReviewSummaryVars.safeParse(v).success).toBe(true);
+  });
+});
+
 describe("self first, and who sees which part (A17, §6.12, §8)", () => {
   const open = { status: "check_in", check_in_submitted_at: null };
   const sent = { status: "with_reviewer", check_in_submitted_at: "2026-11-03T10:00:00Z" };
@@ -194,6 +253,7 @@ describe("the routes", () => {
       ["POST", "/rounds/:id/close"],
       ["POST", "/reviews/:id/conduct"],
       ["POST", "/reviews/:id/probation-outcome"],
+      ["POST", "/reviews/:id/withdraw"],
       ["POST", "/pips"],
       ["PATCH", "/pips/:id"],
       ["POST", "/pips/:id/close"],

@@ -321,6 +321,9 @@ scorecard line (`draft`, `active`, `closed`, `cancelled`) may hold (Performance 
 `with_hr`, `closed`, `returned`) may hold, `NOT VALID` so earlier rows stand, with `open` and `check_in`
 the defaults; a review's second level (`second_level_employee_id`) and each item's corrective action
 (`corrective_title`, `corrective_owner_id`, `corrective_due_on`, `corrective_task_id`) (Performance PR 3). ·
+`2310` a review scored without its check-in (`no_check_in_at`, `no_check_in_reason`) and closed as
+Withdrawn (`withdrawn_at`, `withdrawn_reason`; the status `withdrawn`, `NOT VALID`) (after PR #130,
+`docs/guides/performance.md` §11) ·
 `2400` a rescope's reason on `task` (`rescope_reason`) and `task` as a record a task points at, for a
 missed commitment's Recovery task (Performance PR 4).
 

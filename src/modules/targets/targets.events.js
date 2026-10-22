@@ -35,6 +35,7 @@ const EVENTS = defineEvents("performance", {
   "scorecard.line_target_changed": { summary: "A scorecard line's target changed on an approved target change" },
   "scorecard.sent": { summary: "A scorecard drafted after its plan bound was sent for approval on its own" },
   "scorecard.amendment_decided": { summary: "A scorecard sent on its own was approved or returned" },
+  "scorecard.closed": { summary: "A leaver's scorecard closed: no round reviews it again" },
   "commitments.submitted": { summary: "A person's commitments for a month were sent for approval" },
   "commitments.approved": { summary: "A person's commitments for a month were approved" },
   "commitments.returned": { summary: "A person's commitments for a month were returned with a reason" },

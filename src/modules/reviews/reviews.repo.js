@@ -31,7 +31,8 @@ const ROW = `pr.performance_review_id, pr.performance_cycle_id, c.name AS round_
   trim_scale(pr.score_month)::text AS score_month, trim_scale(pr.score_to_date)::text AS score_to_date, pr.rating,
   (${DUE}) AS due_on, pr.dotted_employee_id, ${PERSON("dm", "dd")} AS dotted, pr.dotted_input, pr.dotted_input_at,
   pr.second_level_employee_id, ${PERSON("sl", "sld")} AS second_level, pr.conduct_breach, pr.conduct_note,
-  pr.probation_outcome, pr.returned_reason, pr.document_id, pr.workflow_instance_id, pr.created_at,
+  pr.probation_outcome, pr.returned_reason, pr.no_check_in_at, pr.no_check_in_reason, pr.withdrawn_at, pr.withdrawn_reason,
+  pr.document_id, pr.workflow_instance_id, pr.created_at,
   s.department_id AS scorecard_department_id, e.department_id AS employee_department_id,
   COALESCE(s.performance_period_id, c.performance_period_id) AS performance_period_id,
   s.reviewer_role_code::text AS reviewer_role_code, c.check_in_due_on, c.head_check_in_due_on, c.review_due_on,
@@ -139,17 +140,32 @@ const lock = (client, id) => client.query("SELECT 1 FROM performance_review WHER
 const ofScorecardInRound = (db, cycleId, scorecardId) =>
   one(db, `SELECT ${ROW}, false AS waiting_on_me ${FROM} WHERE pr.performance_cycle_id = $1 AND pr.scorecard_id = $2`, [cycleId, scorecardId]);
 
-/** The caller's latest review that is not closed: the check-in My Performance opens. */
+/** The caller's latest review that has not ended (closed or withdrawn): the check-in My Performance opens. */
 const openOfEmployee = (db, employeeId) =>
   one(
     db,
     `SELECT ${ROW}, false AS waiting_on_me ${FROM}
-      WHERE pr.employee_id = $1 AND pr.status <> 'closed' AND pr.review_kind IN ('monthly', 'probation')
+      WHERE pr.employee_id = $1 AND pr.status NOT IN ('closed', 'withdrawn') AND pr.review_kind IN ('monthly', 'probation')
         AND (pr.scorecard_id IS NOT NULL OR pr.review_kind = 'probation')
       ORDER BY (pr.status = 'check_in') DESC, c.month DESC NULLS LAST, pr.created_at DESC, pr.performance_review_id
       LIMIT 1`,
     [employeeId],
   );
+
+/** A person's reviews that have not ended, oldest first: what a leaver's leaving withdraws (§11). */
+async function openIdsOf(db, employeeId) {
+  // pagination:complete a person's open reviews: a month's and a probation review at most, each withdrawn
+  const { rows } = await completeQuery(
+    db,
+    `SELECT pr.performance_review_id FROM performance_review pr
+      WHERE pr.employee_id = $1 AND pr.status NOT IN ('closed', 'withdrawn')
+        AND (pr.scorecard_id IS NOT NULL OR pr.review_kind = 'probation')
+      ORDER BY pr.created_at, pr.performance_review_id`,
+    [employeeId],
+    { label: "a leaver's open reviews", ceiling: 50 },
+  );
+  return rows.map((r) => r.performance_review_id);
+}
 
 /** The caller's own reviews, newest first (GET /ess/performance/reviews). */
 function ofEmployee(db, employeeId, query) {
@@ -167,7 +183,8 @@ const REVIEW_WRITABLE = [
   "performance_cycle_id", "scorecard_id", "employee_id", "reviewer_employee_id", "review_type", "review_kind",
   "status", "check_in_submitted_at", "submitted_at", "closed_at", "returned_reason", "workflow_instance_id",
   "dotted_employee_id", "dotted_input", "dotted_input_at", "second_level_employee_id", "score_month", "score_to_date",
-  "rating", "conduct_breach", "conduct_note", "probation_outcome", "document_id",
+  "rating", "conduct_breach", "conduct_note", "probation_outcome", "document_id", "no_check_in_at", "no_check_in_reason",
+  "withdrawn_at", "withdrawn_reason",
 ];
 
 async function insert(client, row) {
@@ -617,6 +634,7 @@ module.exports = {
   lock,
   ofScorecardInRound,
   openOfEmployee,
+  openIdsOf,
   ofEmployee,
   insert,
   update,

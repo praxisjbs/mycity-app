@@ -73,7 +73,8 @@ const RoundCreate = z
  * Reviews
  * ------------------------------------------------------------------ */
 
-const ReviewStatus = z.enum(["check_in", "with_reviewer", "second_level", "with_hr", "closed", "returned"]);
+/** `withdrawn`: closed at HR's stage without a score, for a leaver or by Operations & People (§11). */
+const ReviewStatus = z.enum(["check_in", "with_reviewer", "second_level", "with_hr", "closed", "returned", "withdrawn"]);
 const ReviewKind = z.enum(["monthly", "probation"]);
 /** manager: the effective line manager; designated: a person or role named on the scorecard. */
 const ReviewType = z.enum(["self", "manager", "designated"]);
@@ -242,6 +243,8 @@ const ReviewAllowed = z
     decide_probation: z.boolean(),
     decide: z.boolean(),
     start_pip: z.boolean(),
+    score_without_check_in: z.boolean(),
+    withdraw: z.boolean(),
   })
   .strict();
 
@@ -255,6 +258,10 @@ const ReviewDetail = Review.extend({
   conduct_note: z.string().nullable(),
   probation_outcome: ProbationOutcomeCode.nullable(),
   returned_reason: z.string().nullable(),
+  no_check_in_at: isoDateTime.nullable(),
+  no_check_in_reason: z.string().nullable(),
+  withdrawn_at: isoDateTime.nullable(),
+  withdrawn_reason: z.string().nullable(),
   document_id: uuid.nullable(),
   workflow_instance_id: uuid.nullable(),
   items: z.array(ReviewItem),
@@ -306,6 +313,15 @@ const ReviewInput = z.object({ dotted_input: text(4000) }).strict();
 
 /** POST /performance/reviews/:id/return: the reviewer sends a check-in back, with a reason. */
 const ReturnCheckIn = z.object({ returned_reason: text(1000) }).strict();
+
+/**
+ * POST /performance/reviews/:id/score-without-check-in: once the check-in's due date has passed,
+ * the reviewer scores without it, saying why (§11). Monthly Update On Time then scores 0.
+ */
+const ScoreWithoutCheckIn = z.object({ no_check_in_reason: text(1000) }).strict();
+
+/** POST /performance/reviews/:id/withdraw: Operations & People close an open review as Withdrawn, with a reason (§11). */
+const ReviewWithdraw = z.object({ withdrawn_reason: text(1000) }).strict();
 
 /** POST /performance/reviews/:id/conduct: caps the rating at Partly Meets (§6.15). */
 const ConductMark = z
@@ -538,6 +554,7 @@ const ReviewSummaryVars = z
     rating: z.string(),
     conduct_note: z.string().nullable(),
     outcome: z.string().nullable(),
+    no_check_in_reason: z.string().nullable(),
     lines: z.array(ReviewSummaryLine),
     done: z.array(z.string()),
     ongoing: z.array(z.string()),
@@ -623,6 +640,8 @@ const TABLES = {
   ReviewScoresSave: { table: null, reason: "the reviewer's scores and corrective actions" },
   ReviewInput: { table: "performance_review" },
   ReturnCheckIn: { table: "performance_review" },
+  ScoreWithoutCheckIn: { table: "performance_review" },
+  ReviewWithdraw: { table: "performance_review" },
   ConductMark: { table: "performance_review" },
   ProbationOutcome: {
     table: "performance_review",
@@ -704,6 +723,8 @@ module.exports = {
   ReviewScoresSave,
   ReviewInput,
   ReturnCheckIn,
+  ScoreWithoutCheckIn,
+  ReviewWithdraw,
   ConductMark,
   ProbationOutcome,
   ReviewCheckInItemSave,

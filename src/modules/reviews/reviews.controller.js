@@ -25,6 +25,9 @@ module.exports = {
   saveScores: async (req, res) => ok(res, await service.saveScores(withActor(req), scopeOf(req), id(req), req.validated.body)),
   submit: async (req, res) => ok(res, await service.submit(withActor(req), scopeOf(req), id(req))),
   returnCheckIn: async (req, res) => ok(res, await service.returnCheckIn(withActor(req), scopeOf(req), id(req), req.validated.body)),
+  scoreWithoutCheckIn: async (req, res) =>
+    ok(res, await service.scoreWithoutCheckIn(withActor(req), scopeOf(req), id(req), req.validated.body)),
+  withdraw: async (req, res) => ok(res, await service.withdraw(withActor(req), scopeOf(req), id(req), req.validated.body)),
   askInput: async (req, res) => ok(res, await service.askInput(withActor(req), scopeOf(req), id(req))),
   giveInput: async (req, res) => ok(res, await service.giveInput(withActor(req), scopeOf(req), id(req), req.validated.body)),
   markConduct: async (req, res) => ok(res, await service.markConduct(withActor(req), scopeOf(req), id(req), req.validated.body)),

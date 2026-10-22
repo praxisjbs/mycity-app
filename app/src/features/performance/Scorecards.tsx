@@ -2,11 +2,15 @@
  * Performance · Scorecards (the `targets` tab; docs/guides/performance.md §2, §3.3, §6.5, §6.6,
  * §10): each person's quarter scorecard. The list with its figures and filters; New Scorecard for
  * a manager; a scorecard's sections and lines with Edit Lines, Change Reviewer, Agree Scorecard and
- * Disagree With Reason, and Send Scorecard for one drafted after its plan bound (PR 3). The
+ * Disagree With Reason, and Send Scorecard for one drafted after its plan bound (PR 3). Such a
+ * scorecard's approvers decide it on its sheet (Request Changes, Approve Scorecard), reached from
+ * Goals › Waiting On You (./Approvals) and from its link (`?id=`, opened once over the list). A line
+ * opens its own sheet with Change Target for the scorecard's reviewer or the function's head. The
  * Scorecards and Commitments switch opens the Commitments view beside it (Commitments.tsx;
  * `?view=commitments`, or `?set=` from an approval's link).
  */
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import goalsContract from "@mycity/contract/schemas/goals.js";
 import targetsContract from "@mycity/contract/schemas/targets.js";
 import type { KeyResult, ScorecardDetail, ScorecardLine } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
@@ -16,6 +20,7 @@ import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { PagedTable } from "@/features/shared/sections";
+import { ReasonForm } from "@/features/workspace/Commitment";
 import { useSearchParams } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
@@ -24,11 +29,13 @@ import {
   Button,
   Card,
   CardHeader,
+  Chain,
   DataView,
   DateField,
   Field,
   FilterSelect,
   formatDate,
+  formatMonth,
   FormFooter,
   HelpTerm,
   KeyValue,
@@ -68,6 +75,34 @@ export function Scorecards() {
   return <ScorecardsView />;
 }
 
+/** Opens one scorecard's sheet: from the list, from its link, and from Goals › Waiting On You. */
+export function useScorecardSheet() {
+  const modal = useModal();
+  return (id: string) => modal.open({ title: "Scorecard", wide: true, body: (close) => <ScorecardSheet id={id} close={close} /> });
+}
+
+/**
+ * A link to a scorecard (the bell, ⌘K, the assistant, the route map's `scorecard`, and `target` for a
+ * line, whose scorecard the API answers) opens its sheet over the list once, then leaves the
+ * address, so a reload does not open it again.
+ */
+function useScorecardLink(open: (id: string) => void) {
+  const [params, setParams] = useSearchParams();
+  const id = params.get("id");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!id) {
+      opened.current = null;
+      return;
+    }
+    if (opened.current === id) return;
+    opened.current = id;
+    setParams({ id: null }, { replace: true });
+    open(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+}
+
 function ScorecardsView() {
   const me = useMe();
   const modal = useModal();
@@ -90,7 +125,8 @@ function ScorecardsView() {
 
   const mayDraft = (me.manages_people || hasCapability(me, "performance.manage")) && Boolean(me.grants.performance?.includes("create"));
   const newCard = () => modal.open({ title: "New Scorecard", body: (close) => <NewScorecardForm close={close} periodId={quarter.periodId} onOpen={openCard} /> });
-  const openCard = (id: string) => modal.open({ title: "Scorecard", wide: true, body: (close) => <ScorecardSheet id={id} close={close} /> });
+  const openCard = useScorecardSheet();
+  useScorecardLink(openCard);
   useScreenAction(mayDraft && period ? { label: "New Scorecard", onSelect: newCard } : null);
 
   return (
@@ -180,25 +216,56 @@ function NewScorecardForm({ close, periodId, onOpen }: { close: () => void; peri
   );
 }
 
-/** One scorecard: who, the figures, its three sections and their lines; what the reader may do. */
+/** What a decision on a mid-quarter scorecard moves: the waiting lists, the bell and Need You, the scorecards. */
+function refreshApprovals() {
+  for (const prefix of ["/api/v1/workflow", "/api/v1/performance/approvals", "/api/v1/performance/scorecards", "/api/v1/performance/plans"]) invalidate(prefix);
+}
+
+/**
+ * One scorecard: who, the figures, its three sections and their lines; what the reader may do. A
+ * mid-quarter scorecard sent on its own shows its approval's chain, and its approver decides it here.
+ */
 function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   const me = useMe();
   const modal = useModal();
   const read = useApi("GET /api/v1/performance/scorecards/:id", { params: { id } });
   const period = useApi("GET /api/v1/performance/periods/:id", { params: { id: read.data?.performance_period_id ?? "" }, enabled: Boolean(read.data) });
+  const amendmentId = read.data?.amendment_instance_id ?? null;
+  const amendment = useApi("GET /api/v1/workflow/instances/:id", { params: { id: amendmentId ?? "" }, enabled: Boolean(amendmentId) });
   const agree = useMutation("POST /api/v1/performance/scorecards/:id/agree");
   const send = useMutation("POST /api/v1/performance/scorecards/:id/submit");
+  const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
   const c = read.data;
   if (!c) return null;
   const months = period.data?.months ?? [];
   const mine = c.employee.employee_id === me.employee_id;
+  const w = amendmentId ? amendment.data : undefined;
+  const steps = (w?.route ?? []).filter((x) => x.state !== "skipped").map((x) => ({ label: x.name, state: x.state === "done" || x.state === "now" ? x.state : undefined }));
   const reload = () => {
     read.reload();
     invalidate("/api/v1/performance/scorecards");
   };
+  // The scorecard's approver decides it: Approve Scorecard sends it on, or binds it at the last stage.
+  const approveCard = async () => {
+    if (!amendmentId) return;
+    try {
+      const next = await approve.run({ params: { id: amendmentId }, body: {} });
+      refreshApprovals();
+      close();
+      toast(next.state === "pending" && next.stage_name ? `Sent on to ${next.stage_name}` : "Scorecard approved");
+    } catch (e) {
+      say(e);
+    }
+  };
+  // One sheet is open at a time: Request Changes takes this one's place, and a line's sheet comes back to it.
+  const sendBack = () =>
+    amendmentId &&
+    modal.open({ title: "Request Changes", body: (done) => <ReasonForm instanceId={amendmentId} close={() => (done(), refreshApprovals())} done="Scorecard sent back" /> });
+  const reopen = () => modal.open({ title: "Scorecard", wide: true, body: (done) => <ScorecardSheet id={c.scorecard_id} close={done} /> });
+  const openLine = (line: ScorecardLine) => modal.open({ title: "Scorecard Line", body: () => <LineSheet line={line} back={reopen} /> });
   const agreeCard = async () => {
     try {
-      await agree.run({ params: { id }, body: {} });
+      await agree.run({ params: { id: c.scorecard_id }, body: {} });
       reload();
       toast("Scorecard agreed");
     } catch (e) {
@@ -208,7 +275,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   // A scorecard drafted after its plan bound goes through the plan's flow on its own (§6.4).
   const sendCard = async () => {
     try {
-      await send.run({ params: { id }, body: {} });
+      await send.run({ params: { id: c.scorecard_id }, body: {} });
       reload();
       toast("Scorecard sent for approval");
     } catch (e) {
@@ -236,15 +303,16 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
           ["Rating", rating(c.rating).text],
           ["Weights", c.weight_problems.length ? "Check" : "100%"],
           ["Agreed", agreedText],
-          ...(c.amendment_instance_id ? ([["Approval", "Awaiting Approval"]] as Array<[string, string]>) : []),
+          ...(c.amendment_instance_id ? ([["Approval", w?.stage_name ? `With ${w.stage_name}` : "Awaiting Approval"]] as Array<[string, string]>) : []),
           ...(c.disagree_reason && c.disagreed_at ? ([["Disagreed", c.disagree_reason]] as Array<[string, string]>) : []),
         ]}
       />
-      {c.weight_problems.map((w) => (
-        <Banner key={w.section} tone="warn" className="mt-2">{`${SECTION_NAMES[w.section]} lines total ${w.total}, not ${w.expected}.`}</Banner>
+      {steps.length > 0 && <Chain className="mt-3" steps={steps} label="Scorecard approval" />}
+      {c.weight_problems.map((p) => (
+        <Banner key={p.section} tone="warn" className="mt-2">{`${SECTION_NAMES[p.section]} lines total ${p.total}, not ${p.expected}.`}</Banner>
       ))}
       {(["results", "kpis", "accountability"] as const).map((section) => (
-        <SectionLines key={section} section={section} card={c} months={months} />
+        <SectionLines key={section} section={section} card={c} months={months} onOpen={openLine} />
       ))}
       {c.contributions.length > 0 && (
         <DataView
@@ -264,17 +332,27 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
         <Button onClick={close}>Close</Button>
         {c.can_edit && <Button onClick={() => modal.open({ title: "Edit Lines", wide: true, body: (done) => <LinesForm card={c} close={() => (done(), reload())} /> })}>Edit Lines</Button>}
         {hasCapability(me, "performance.manage") && c.status !== "closed" && (
-          <Button onClick={() => modal.open({ title: "Change Reviewer", body: (done) => <ReviewerForm id={id} close={() => (done(), reload())} /> })}>Change Reviewer</Button>
+          <Button onClick={() => modal.open({ title: "Change Reviewer", body: (done) => <ReviewerForm id={c.scorecard_id} close={() => (done(), reload())} /> })}>Change Reviewer</Button>
         )}
-        {c.can_agree && mine && <Button onClick={() => modal.open({ title: "Disagree With Reason", body: (done) => <DisagreeForm id={id} close={() => (done(), reload())} /> })}>Disagree With Reason</Button>}
+        {c.can_agree && mine && <Button onClick={() => modal.open({ title: "Disagree With Reason", body: (done) => <DisagreeForm id={c.scorecard_id} close={() => (done(), reload())} /> })}>Disagree With Reason</Button>}
         {c.can_agree && <Button variant="primary" onClick={agreeCard}>Agree Scorecard</Button>}
         {c.can_send && <Button variant="primary" onClick={sendCard}>Send Scorecard</Button>}
+        {w?.can_decide && <Button onClick={sendBack}>Request Changes</Button>}
+        {w?.can_decide && (
+          <Button variant="primary" onClick={approveCard}>
+            Approve Scorecard
+          </Button>
+        )}
       </FormFooter>
     </>
   );
 }
 
-function SectionLines({ section, card, months }: { section: ScorecardLine["section"]; card: ScorecardDetail; months: string[] }) {
+/** A line's target as the scorecard shows it: its words, or its figure and unit. */
+const lineTarget = (l: Pick<ScorecardLine, "target_text" | "target_value" | "unit">) =>
+  `${l.target_text ?? l.target_value ?? "–"}${l.unit && l.target_value && !l.target_text ? (l.unit === "%" ? "%" : ` ${l.unit}`) : ""}`;
+
+function SectionLines({ section, card, months, onOpen }: { section: ScorecardLine["section"]; card: ScorecardDetail; months: string[]; onOpen: (l: ScorecardLine) => void }) {
   const lines = card.lines.filter((l) => l.section === section);
   const weight = card[`${section}_weight`];
   return (
@@ -284,6 +362,7 @@ function SectionLines({ section, card, months }: { section: ScorecardLine["secti
       rows={lines}
       rowKey={(l) => l.employee_target_id}
       empty={{ title: "No Lines" }}
+      onRowClick={onOpen}
       columns={[
         {
           key: "title",
@@ -292,10 +371,11 @@ function SectionLines({ section, card, months }: { section: ScorecardLine["secti
             <span className="flex flex-wrap items-center gap-1.5">
               {l.title}
               {AUTO.has(l.source) && <StatusPill s={{ tone: "info", text: "Auto" }} />}
+              {l.pending_change && <StatusPill s={{ tone: "warn", text: "Change Waiting" }} />}
             </span>
           ),
         },
-        { key: "target", label: "Target", render: (l) => `${l.target_text ?? l.target_value ?? "–"}${l.unit && l.target_value ? (l.unit === "%" ? "%" : ` ${l.unit}`) : ""}` },
+        { key: "target", label: "Target", render: lineTarget },
         {
           key: "linked",
           label: <HelpTerm help="The key result or KPI this line feeds. Its figures come from there.">Linked To</HelpTerm>,
@@ -308,6 +388,93 @@ function SectionLines({ section, card, months }: { section: ScorecardLine["secti
         { key: "score", label: "Score", align: "n", render: (l) => score(l.score) },
       ]}
     />
+  );
+}
+
+/**
+ * One line: what it aims for, what feeds it, its score; Change Target for the scorecard's reviewer or
+ * the function's head while no change waits (§3.5, §6.7).
+ */
+// search:none Change Target on a line is reached through its scorecard, which search finds
+function LineSheet({ line, back }: { line: ScorecardLine; back: () => void }) {
+  const modal = useModal();
+  const waiting = line.pending_change;
+  const items: Array<[string, ReactNode]> = [
+    ["Line", line.title],
+    ["Section", SECTION_NAMES[line.section]],
+    ["Target", lineTarget(line)],
+    ...(waiting
+      ? ([["Change Waiting", `${lineTarget({ target_text: waiting.to_text, target_value: waiting.to_value, unit: line.unit })} from ${formatMonth(waiting.from_month)}`]] as Array<[string, ReactNode]>)
+      : []),
+    ["Linked To", line.key_result?.code ?? line.kpi?.code ?? (line.team_key_results.map((k) => k.code).join(", ") || "–")],
+    ["Due", line.milestone_due_on ?? line.due_on ? formatDate((line.milestone_due_on ?? line.due_on)!) : "–"],
+    ["Weight", `${line.weight}%`],
+    ["Score", score(line.score)],
+  ];
+  const change = () => modal.open({ title: "Change Target", body: () => <LineChangeForm line={line} done={back} /> });
+  return (
+    <>
+      <KeyValue items={items} />
+      <FormFooter>
+        <Button onClick={back}>Close</Button>
+        {line.can_change_target && <Button variant="primary" onClick={change}>Change Target</Button>}
+      </FormFooter>
+    </>
+  );
+}
+
+/** The first of this month, where a change applies from unless the person picks another. */
+const thisMonth = () => {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+};
+
+/**
+ * Change Target on a binding line: the new figure, or words where the line's target is in words
+ * (their number kept beside them), the month it applies from and the reason; to the CEO.
+ */
+function LineChangeForm({ line, done }: { line: ScorecardLine; done: () => void }) {
+  const words = line.target_text !== null || line.measure === "milestone";
+  const f = useContractForm({ employee_target_id: line.employee_target_id, to_value: "", to_text: "", from_month: thisMonth(), reason: "" }, goalsContract.TargetChangeCreate);
+  const save = useMutation("POST /api/v1/performance/target-changes");
+  const submit = async () => {
+    if (!f.check()) return;
+    const typed = String((words ? f.values.to_text : f.values.to_value) ?? "").trim();
+    const figure = words ? numberIn(typed) : typed;
+    try {
+      await save.run({
+        body: {
+          employee_target_id: line.employee_target_id,
+          from_month: f.values.from_month,
+          reason: f.values.reason,
+          ...(words ? { to_text: typed } : {}),
+          ...(figure ? { to_value: figure } : {}),
+        },
+      });
+      invalidate("/api/v1/performance/approvals");
+      invalidate("/api/v1/performance/scorecards");
+      done();
+      toast("Sent to the CEO");
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
+    }
+  };
+  // The contract names a missing target on to_value: it marks whichever field this line asks for.
+  const target = words ? f.status("to_text") : f.status("to_value");
+  const mark = target.state ? target : f.status("to_value");
+  return (
+    <>
+      <Field label="New Target" {...mark}>
+        {words ? <TextField {...f.field("to_text")} /> : <TextField {...f.field("to_value")} inputMode="decimal" />}
+      </Field>
+      <Field label="From Month" {...f.status("from_month")}><DateField {...f.field("from_month")} /></Field>
+      <Field label="Reason" {...f.status("reason")}><TextField {...f.field("reason")} /></Field>
+      <FormFooter>
+        <Button onClick={done}>Cancel</Button>
+        <Button variant="primary" onClick={submit}>Send Change</Button>
+      </FormFooter>
+    </>
   );
 }
 

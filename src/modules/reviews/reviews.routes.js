@@ -11,6 +11,8 @@
  *   PUT   /reviews/:id/scores            the reviewer, after the check-in (409 CHECK_IN_FIRST)
  *   POST  /reviews/:id/submit            the reviewer: opens performance.review
  *   POST  /reviews/:id/return            the reviewer: the check-in back to the employee
+ *   POST  /reviews/:id/score-without-check-in   the reviewer, once the check-in is late (§11)
+ *   POST  /reviews/:id/withdraw          edit, performance.manage: closes it as Withdrawn (§11)
  *   POST  /reviews/:id/ask-input · input the reviewer asks; the dotted manager gives
  *   POST  /reviews/:id/conduct           edit, performance.manage: caps the rating
  *   POST  /reviews/:id/probation-outcome approve, performance.manage: at HR's stage
@@ -63,6 +65,14 @@ route(router, "post", "/reviews/:id/submit",
 route(router, "post", "/reviews/:id/return",
   { params: c.common.IdParams, body: r.ReturnCheckIn, response: r.Review, summary: "Return a check-in to the employee" },
   view, controller.returnCheckIn);
+
+route(router, "post", "/reviews/:id/score-without-check-in",
+  { params: c.common.IdParams, body: r.ScoreWithoutCheckIn, response: r.ReviewDetail, summary: "Score a review without its late check-in" },
+  view, controller.scoreWithoutCheckIn);
+
+route(router, "post", "/reviews/:id/withdraw",
+  { params: c.common.IdParams, body: r.ReviewWithdraw, response: r.ReviewDetail, summary: "Withdraw an open review" },
+  requirePermission("performance", "edit"), requireCapability("performance.manage"), controller.withdraw);
 
 route(router, "post", "/reviews/:id/ask-input",
   { params: c.common.IdParams, body: c.common.EmptyBody, response: r.ReviewDetail, summary: "Ask the dotted-line manager for input" },
