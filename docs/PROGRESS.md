@@ -1010,7 +1010,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards and the contribution check, the quarter plan and its approval, agreement, target changes, the three importers; Goals, Scorecards, KPIs | PR 1 | Built | 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, the review chain, conduct, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews, ESS · My Performance | PR 2 | Not started | |
 | 4 · Workspace | `m2/perf-workspace` | Commitments and their view, the month-end report, Counts Towards, initiatives, the weekly summary, performance dates on the calendar, My Commitments | PR 2 | Not started | |
-| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard, the Team roster's score; the demo walk | PR 2 | Not started | |
+| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard, the Team roster's score; the demo walk | PR 2 | In progress | 22/10/2026 |
 
 **Notes**
 

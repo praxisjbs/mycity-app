@@ -109,7 +109,7 @@ by PR), so the parallel three do not edit the same file; the shared exceptions a
 | 2 · Plan | `m2/perf-plan` | Organisational goals, the OKR tree, KPIs, scorecards with the contribution check, the quarter plan and its approval, agreement, target changes and the lock, the three importers; Goals, Scorecards and KPIs screens; Home's goals adapter kept true | §3.1, §3.2, §3.5, §3.6, §6.3 to §6.7, §6.19 | 2200 to 2299 | PR 1 | Built 22/10/2026 |
 | 3 · Reviews | `m2/perf-reviews` | Monthly rounds, the check-in, automatic lines, self-first, the reviewer, dotted input, second level, HR close, conduct cap, PDF, corrective actions, PIPs, probation reviews, dictation and Tidy; Reviews tab and ESS · My Performance; Home's reviews adapter kept true | §3.3, §6.10, §6.12, §6.14 to §6.17 | 2300 to 2399 | PR 2 | Not started |
 | 4 · Workspace | `m2/perf-workspace` | Commitments and their approval, the Commitments view and month-end report, Counts Towards, initiatives on the board, the weekly summary with Tidy, performance dates on the calendar, My Commitments on ESS | §3.4, §6.11, §6.18 | 2400 to 2499 | PR 2 | Not started |
-| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard and the Team roster's score; the M2 demo walk | §3.7, §6.21 | 2500 to 2599 | PR 2 | Not started |
+| 5 · Analytics | `m2/perf-analytics` | Performance Analytics; Home's goal progress, Org KPI, Goals On Track, My Scorecard and the Team roster's score; the M2 demo walk | §3.7, §6.21 | 2500 to 2599 | PR 2 | In progress |
 
 Until a PR lands, the screens its sections build stay as they are (Coming Soon on production, the
 mock on a laptop).
