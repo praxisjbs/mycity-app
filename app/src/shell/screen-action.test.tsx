@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, renderHook } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, render, renderHook } from "@testing-library/react";
+import { useState, type ReactNode } from "react";
 import { RouterProvider } from "@/lib/router";
-import { ScreenActionProvider, useRegisteredAction, useRegisteredSecond, useScreenAction, useUrlAction } from "./screen-action";
+import { ScreenActionProvider, useAddressPrefill, useNewLink, useRegisteredAction, useRegisteredSecond, useScreenAction, useUrlAction } from "./screen-action";
+import leave from "@mycity/contract/schemas/leave.js";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <RouterProvider>
@@ -90,5 +91,53 @@ describe("opening a screen on an action (search's links)", () => {
     const invite = vi.fn();
     renderHook(() => useScreenAction({ label: "Invite User", onSelect: invite }), { wrapper });
     expect(invite).not.toHaveBeenCalled();
+  });
+});
+
+describe("a form filled from the address (Praxis AI's screen button)", () => {
+  const TYPE = "4f5c2b9e-8c1d-4a7e-9b3f-2d6e1a0c5b7d";
+
+  it("reads the fields its schema takes, once, and takes them out of the address", () => {
+    at(`/ess?tab=my-leave&starts_on=2026-10-26&ends_on=2026-13-40&leave_type_id=${TYPE}&gross_monthly=900000.00`);
+    const { result, rerender } = renderHook(() => useAddressPrefill(leave.LeaveRequestPrefill), { wrapper });
+    // A day that is no day is left for the person; a field the schema does not have stays in the address.
+    expect(result.current).toEqual({ starts_on: "2026-10-26", leave_type_id: TYPE });
+    expect(window.location.search).toBe("?tab=my-leave&gross_monthly=900000.00");
+    rerender();
+    expect(result.current).toEqual({ starts_on: "2026-10-26", leave_type_id: TYPE });
+  });
+
+  it("an edit form reads and removes nothing", () => {
+    at("/ess?tab=my-leave&starts_on=2026-10-26");
+    const { result } = renderHook(() => useAddressPrefill(leave.LeaveRequestPrefill, false), { wrapper });
+    expect(result.current).toEqual({});
+    expect(window.location.search).toBe("?tab=my-leave&starts_on=2026-10-26");
+  });
+
+  it.each([
+    ["the assistant's ?new=1", "new=1"],
+    ["⌘K's ?action=new", "action=new"],
+  ])("opened by %s, the form the action opens is filled and the address is left clean", (_how, ask) => {
+    at(`/ess?tab=my-leave&${ask}&starts_on=2026-10-26&reason=Family`);
+    let filled = {};
+    let opened = 0;
+    function Filled() {
+      filled = useAddressPrefill(leave.LeaveRequestPrefill);
+      return null;
+    }
+    function Screen() {
+      const [open, setOpen] = useState(false);
+      const request = () => {
+        opened += 1;
+        setOpen(true);
+      };
+      useScreenAction({ label: "Request Leave", onSelect: request });
+      useNewLink(request);
+      return open ? <Filled /> : null;
+    }
+    render(<Screen />, { wrapper });
+    expect(opened).toBe(1);
+    expect(filled).toEqual({ starts_on: "2026-10-26", reason: "Family" });
+    expect(window.location.search).toBe("?tab=my-leave");
   });
 });

@@ -41,7 +41,6 @@ const authorise = require("../../src/shared/ai/authorise");
 const vault = require("../../src/shared/documents/vault");
 const suggestions = require("../../src/modules/assistant/assistant.suggestions");
 const grantsCache = require("../../src/shared/rbac/grants-cache");
-const assistant = require("../../src/modules/assistant/assistant.service");
 const { VOICE_QUESTION } = require("../../src/modules/assistant/assistant.events");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
@@ -208,15 +207,14 @@ describeDb("Praxis AI against the real migrations", () => {
 
   test("asked for a change, the answer offers the owning screen with its prefill checked, and nothing is written", async () => {
     const before = (await one("SELECT count(*)::int AS n FROM employee")).n;
-    script(say({ text: "Add her on Employees.", route: "add an employee", prefill: { first_name: "Kemi", salary: "1000000.00" } }));
+    script(say({ text: "Add her on Employees.", route: "add an employee", prefill: { first_name: "Kemi", last_name: "Bello", gross_monthly: "1000000.00", account_number: "0123456789", action: "delete" } }));
     const res = await as("ops").post("/ai/ask").send({ question: "Add Kemi Bello as a new employee" });
     expect(res.status).toBe(200);
     expect(res.body.declined).toBe("change");
     expect(res.body.link.label).toBe("Open Employees");
-    expect(res.body.link.path).toMatch(/^\/people\?tab=employees/);
-    expect(res.body.link.path).toContain("new=1");
-    expect(res.body.link.path).toContain("first_name=Kemi");
-    expect(res.body.link.path).not.toContain("salary");
+    // Add Employee opens filled with the names; pay and bank never reach the address.
+    const address = new URL(res.body.link.path, "http://x").searchParams;
+    expect(Object.fromEntries(address)).toEqual({ tab: "employees", new: "1", first_name: "Kemi", last_name: "Bello" });
     expect((await one("SELECT count(*)::int AS n FROM employee")).n).toBe(before);
   });
 

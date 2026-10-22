@@ -71,6 +71,6 @@ module.exports = defineManifest({
   routes: [
     { intent: "upload one of my documents", screen: "ess.my-documents" },
     { intent: "change my phone, address, next of kin or bank details", screen: "ess.my-profile" },
-    { intent: "request leave", screen: "ess.my-leave", prefill: c.leave.LeaveRequestCreate },
+    { intent: "request leave", screen: "ess.my-leave", params: { new: "1" }, prefill: c.leave.LeaveRequestPrefill },
   ],
 });

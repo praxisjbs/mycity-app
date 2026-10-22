@@ -7,7 +7,7 @@ import { Button, Calendar, Card, CardHeader, DataView, DesktopOnly, formatDate, 
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { PhoneCards } from "@/features/shared/PhoneCards";
 import { dayCount, LeaveForm, statusPill } from "@/features/people/Leave";
-import { useScreenAction } from "@/shell/screen-action";
+import { useNewLink, useScreenAction } from "@/shell/screen-action";
 
 /**
  * ESS · My Leave (#12, `my-leave`): the caller's own requests and what is left of
@@ -36,6 +36,8 @@ export function MyLeavePage() {
   const next = [...list.rows].reverse().find((r) => r.status === "approved" && r.starts_on > today) ?? null;
   const request = () => modal.open({ title: "Request Leave", body: (close) => <LeaveForm close={close} /> });
   useScreenAction({ label: "Request Leave", onSelect: request });
+  // The assistant's Request Leave button: ?new=1 and the form's values (docs/guides/praxis-ai.md §6.4).
+  useNewLink(request);
 
   const open = (r: LeaveRequest) =>
     modal.open({

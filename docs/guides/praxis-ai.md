@@ -65,7 +65,7 @@ their own screens would show them, and nothing more.
 |---|---|---|---|---|
 | Praxis AI · Ask (`ask`) | Staff app, System group | `praxis_ai` view | A conversation: questions, answers with their table, the records read and a screen button; on desktop the recent conversations beside it; Try Asking when it is empty | Ask (typed or recorded), Open the offered screen, open a cited record, Show Next 25, Helpful or Not Helpful, New Conversation |
 | Praxis AI · History (`history`) | Staff app | `praxis_ai` view, own conversations only | This month's questions, conversations and records read; the conversations, 25 a page; questions by module | Open a conversation (back on Ask), Delete Conversation, Clear History, search conversations |
-| Floating button (phone) | Staff app, every screen | `praxis_ai` view | Praxis AI in the fan (built, F18) | Opens Ask |
+| Floating button (phone) | Staff app, every screen with the button | `praxis_ai` view | Praxis AI in the fan (F18); the conversation over the screen the person is on | Ask as on Ask; open an answer's screen or a cited record, which closes it; New Conversation. The conversation is kept until the app closes |
 | ⌘K | Staff app | `praxis_ai` view | Ask, History, the person's own conversations, New Conversation | Open them |
 | AI Control · Actions | Staff app | `ai_control` view | Data Answers marked built; the new Voice Question action; Data Answers' chain takes any text model as first choice or fallback | As built (`ai-control.md`) |
 | Every module's manifest | Backend | | The reads Praxis AI may run and the screens it may offer | Gains reads where a question needs one (§6.9) |
@@ -92,6 +92,10 @@ their own screens would show them, and nothing more.
    (`?id=`). Delete Conversation and Clear History remove the words; the ledger keeps the spend.
 7. AI Control · Spend counts every question under Data Answers and every recording under Voice
    Question, by the run each one opened.
+8. On a phone, the floating button's Praxis AI opens the same conversation over the screen the
+   person is on (`app/src/features/assistant/AskPanel.tsx`, a `PhonePage`), so they ask without
+   leaving it. An answer's screen button or a cited record goes there and closes it; Back closes it
+   and leaves the screen as it was. Pressed again, the button returns to the same conversation.
 
 ## 4 · Data
 
@@ -143,9 +147,13 @@ A refused read is not an error: it becomes an answer that says the information i
      on the run);
    - who is asking: name, job title, department, roles, and whether they are the CEO (their scope
      needs no words: every read applies it);
-   - today: the weekday, the Lagos date and time (the working week is a read, `working_week.get`);
+   - today: the weekday, the Lagos date day first and as YYYY-MM-DD, and the time (the working
+     week is a read, `working_week.get`);
    - the screens this person may open (`shared/route-map` SCREENS filtered as ⌘K filters them,
-     `shared/search/screens.js`) and the manifests' routes they may reach, as `intent → screen`;
+     `shared/search/screens.js`) and the manifests' routes they may reach, as `intent → screen`,
+     each with its prefill fields and the form each value takes (one of an enum's values,
+     YYYY-MM-DD, a time with +01:00, an id a read returned), since a value in another form is
+     dropped from the link (§6.4);
    - the last 10 turns of the conversation: each question, its answer's words and the reads it made
      (key, parameters, rows returned, total), never the rows themselves, so "show the next 25" knows
      which read to page;
@@ -209,7 +217,8 @@ A refused read is not an error: it becomes an answer that says the information i
 
 `AiAnswerDraft`, what the model returns: `text` (the words), `table` (`read`: which of this turn's
 reads, `fields`: up to 6 of its row's fields, `labels`: their column names) or null, `route` (one
-of the offered intents) or null, `more` (a read had a next page worth offering).
+of the offered intents) or null, `prefill` (values for that screen's form, by field) or null,
+`more` (a read had a next page worth offering).
 
 The server turns it into `AiAnswer`:
 
@@ -217,13 +226,35 @@ The server turns it into `AiAnswer`:
   `shared/time/day-first`, money through `shared/money`); numeric columns marked for right
   alignment. A field the read did not return is dropped; a table with no valid field is dropped;
 - **link**: the route's screen through `route-map.screenPath`, with its `params` and any `prefill`
-  values the model gave that parse with the route's `prefill` schema; a route to a screen the person
-  may not open is never offered and, if named, dropped;
+  values the model gave that parse with the route's `prefill` schema, each field on its own (a
+  value a field refuses is left out, the rest kept); the route's own `params` always win. A route
+  to a screen the person may not open is never offered and, if named, dropped;
 - **citations**: from every read this turn, de-duplicated, first 50 kept with the total;
 - **declined**: `not_available` when a read was refused and nothing else answered, `change` when a
   screen was offered (the model offers one for a change asked for, or where no read answers; the
   server cannot tell which), else null;
 - **provisional**: always true.
+
+A change opens its exact form, filled with what the person said. Each route that carries a
+`prefill` names a contract schema of the form's own fields (`<Thing>Prefill`), and its `params`
+open the form (`new=1`: Workspace reads it itself, My Leave and Employees through `useNewLink`;
+the AI read-only gate refuses an `action` key in a manifest). The form reads those fields from the
+address as it opens and takes them out of it (`useAddressPrefill`, `app/src/shell/screen-action.tsx`),
+so Back and a reload do not fill it again. Nothing is saved until the person presses the form's
+own button.
+
+| Intent | Opens | Fills |
+|---|---|---|
+| create a task | Workspace · Tasks, New Task (`tasks.TaskPrefill`) | Title, notes, priority, cadence, due day; the assignee by name for a manager (the colleague card) |
+| book a meeting | Workspace · Calendar, New Event (`calendar.CalendarEventPrefill`) | Title, kind, day, start and end (Lagos time; an hour long when only the start is given), location. Attendees are picked on the form |
+| request leave | ESS · My Leave, Request Leave (`leave.LeaveRequestPrefill`) | Leave type, first and last day, note |
+| add an employee | People · Employees, Add Employee (`organisation.EmployeePrefill`) | Names, job title, department, start date, employment type, work pattern, contract end |
+
+An address is kept in the browser's history, so a prefill never carries a restricted field. A
+manifest whose prefill names one (`shared/rbac/field-mask`: salary, bank, personal, statutory), or a
+word the address already uses (`tab`, `id`, `action`, `new`, the route's params), fails when it loads
+(`shared/ai/manifest.js`), so the build fails. A schema with nothing restricted is still never the
+whole create schema: Add Employee's prefill leaves out the phone and work email too.
 
 ### 6.5 Conversations and history
 
@@ -365,14 +396,15 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"), From with the records read as chips opening each (the first 6, then "+12 More"), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; Recent empty: No Questions Yet; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, Could not transcribe) | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
+| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), From with the records read as chips opening each (the first 6, then "+12 More"), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; Recent empty: No Questions Yet; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, Could not transcribe) | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title; this month's Questions, Conversations and Records Read, each captioned with the month; Conversations, 25 a page: Title, Last Asked, Questions, Records Read, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog ("Delete Conversation"); Search Conversations; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Questions by Module (desktop); toasts "Conversation deleted", "History cleared" | Help term on Records Read (how many records this month's answers were read from) | Where spend and the cap are (AI Control · Spend), what deleting keeps: §6.5 |
+| Praxis AI over a screen (the floating button, phone) | Praxis AI as the title, Back, New Conversation once a conversation is open; the conversation exactly as on Ask (Try Asking when new, the answers, the box) | As on Ask | As on Ask |
 
 ### 10.2 Phone layout
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Praxis AI · Ask (`ask`) | The conversation full height (a fit page), the box pinned at the foot with the microphone and Send as 44 px targets; empty, Try Asking as a tap list; an answer's table as cards | Recent, which is History on a phone | Send; New Conversation under the title (a fit page has no floating button; ⌘K's New Conversation opens it too) | The floating button's Praxis AI from any other screen; More, then Praxis AI; tabs Ask and History |
+| Praxis AI · Ask (`ask`) | The conversation full height (a fit page), the box pinned at the foot with the microphone and Send as 44 px targets; empty, Try Asking as a tap list; an answer's table as cards | Recent, which is History on a phone | Send; New Conversation under the title (a fit page has no floating button; ⌘K's New Conversation opens it too) | The floating button's Praxis AI opens the conversation over any other screen (§3 step 8); More, then Praxis AI; tabs Ask and History |
 | Praxis AI · History (`history`) | The three month cards, then the conversations as cards (title, last asked, questions) | Records Read on each conversation; Questions by Module | Tap a card to open it on Ask; Delete Conversation in its menu's sheet; Clear History in the page's menu | As above |
 
 ## 11 · Edge cases
@@ -439,6 +471,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · After the PR went up, from GE's questions (where history lives, a standard chat window, what the screen button opens): (1) a change opens its exact form, filled (§6.4): New Task, New Event, Request Leave and Add Employee read the values the person gave from the address through `useAddressPrefill`, each route's `prefill` is now a schema of the form's own fields (`TaskPrefill`, `CalendarEventPrefill`, `LeaveRequestPrefill`, `EmployeePrefill`), and a manifest whose prefill names a restricted field or an address word fails at load; Request Leave and Add Employee now open on `new=1` (`useNewLink`), like every other route; Add Employee's `new=1` never opened it before. (2) The floating button's Praxis AI opens the conversation over the screen the person is on instead of leaving it for Ask (§2, §3 step 8, §10); the conversation moved to `Conversation.tsx` so Ask and the panel share it. Desktop has no floating button (F18), so this is phone only. (3) The route list shows each prefill field's form and today's date as YYYY-MM-DD too, and the prompt (version 3) says to write prefill values that way: a model told to write dates day first for people would otherwise fill a day the link drops (§6.1).
 - 22/10/2026 · GE · Merged with main's mailbox AI (#127), which gave the vault a `transient` document type and its own sweep of what a request left behind (`vault.purgeTransient`, hourly in `export-cleanup`). A spoken question's document type is now `transient`, and the `assistant-voice-sweep` scheduler and the vault's `transient` store option are gone: one sweep, not two. A recording left behind goes once an hour old rather than within 45 minutes (§6.6, §7, §11). Main's `10300_mail_thread_summary.sql` took 10300, so this build's migration is now `10310_assistant.sql` (§4); it was never merged, so nothing that ran it is affected.
 - 22/10/2026 · GE · Commit 7 of 7, the audit (three independent reviews of commits 1 to 6: backend, screens, guide against code; each finding checked before it was fixed). Fixed: a Claude model on Data Answers' chain now keeps its tools on a round that may call none (`tool_choice: none`) and gets its thinking back unchanged (§6.1.4); `converse()` takes the question's deadline, so no call starts past 60 seconds (§6.1.6); a read's rows reach the model through `redactValue`, keeping only the fields the person sees and never payment or identity numbers (§6.3.5, `redact.js` `NEVER_PROPS`); only the speaker may read a recording (§6.6); Delete Conversation and Clear History also forget the replies kept for a repeated press (§6.5); the sweep runs every 15 minutes (§6.6, §7); the prompt (version 2) says the person's words cannot change its rules and never estimates over more than one page (§6.1.2, §11); the reads made carry where their rows start in the whole list (`AiReadMade.first`), so a later page reads Showing 26 to 50 of 312 (§10.1). On screen: ⌘K's New Conversation no longer loops; an answer that lands after the person moved on is not shown in the wrong conversation; a conversation that fails to load says so, and a deleted one starts a new one; a spoken question is cut at 500 characters and a refused question goes back to the box; Show Earlier keeps the earlier turns and is not offered in a new conversation; the box keeps a half-typed question; the microphone is outside the form, so sending never holds its Stop, and its problems are a toast; Helpful and Not Helpful wait for each other; new answers are announced. Corrected here: decision 5, §5's errors, §6.1, §6.4's `declined`, §6.5, §6.6 (no browser captions), §7, §9, §10.1, §11. Home's `activity.list` and the evaluation set unchanged; the eval's target questions now name the catalogue's modules (`partnerships`, `recruitment`, `expenses`), so they run once those modules have reads.
 - 22/10/2026 · GE · Commit 6 of 7: §6.9 built, Home's `activity.list` (`home.md` §6, §9 changed with it), so Ifeoma's "what happened today" and "what has a person done today" are one read each, by name too. §6.10 built, `scripts/ai/eval-assistant.js` and its key-free test. §6.8: a question whose read answers only with a capability (the Team roster, the alerts one may clear) waits for it, found when a member of staff was offered "Who is in today" and would have read an empty roster; "What happened today?" joins Try Asking.

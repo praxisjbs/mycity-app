@@ -71,11 +71,21 @@ function argsOf(call) {
   }
 }
 
-/** The fields a prefill schema takes, for the route list the model reads. */
+const ISO_DAY = "^\\d{4}-\\d{2}-\\d{2}$";
+
+/**
+ * The fields a prefill schema takes, each with the form its value is written in, for the route list
+ * the model reads: a value in any other form (a day written day first) is dropped from the link.
+ */
 function prefillFields(schema) {
-  let s = schema;
-  while (s && s._def && !s.shape && (s._def.schema || s._def.innerType)) s = s._def.schema || s._def.innerType;
-  return s && s.shape ? Object.keys(s.shape) : [];
+  const props = (jsonSchemaOf(schema) || {}).properties || {};
+  return Object.entries(props).map(([k, p]) => {
+    if (p.enum) return `${k} (one of ${p.enum.join(", ")})`;
+    if (p.format === "date-time") return `${k} (YYYY-MM-DDTHH:MM:SS+01:00)`;
+    if (p.format === "uuid") return `${k} (an id a read returned)`;
+    if (p.pattern === ISO_DAY) return `${k} (YYYY-MM-DD)`;
+    return k;
+  });
 }
 
 /**
@@ -131,7 +141,7 @@ function systemTurn(prompt, ctx, now) {
   const lines = [
     prompt.body,
     "",
-    `Today: ${WEEKDAYS[lagos.weekday(today) - 1]} ${formatDate(today)}, ${lagos.timeOf(now)} in Lagos.`,
+    `Today: ${WEEKDAYS[lagos.weekday(today) - 1]} ${formatDate(today)} (${today}), ${lagos.timeOf(now)} in Lagos.`,
     `Asking: ${who}.`,
     "",
     "Screens this person can open:",

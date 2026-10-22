@@ -130,6 +130,19 @@ const LeaveRequestCreate = z
   .refine(endsAfterStart, ENDS_BEFORE)
   .refine(oneYear, OTHER_YEAR);
 
+/**
+ * What a screen button may fill on Request Leave through the address (docs/guides/praxis-ai.md
+ * §6.4): the form's fields, each optional and checked on its own. The person still presses Send.
+ */
+const LeaveRequestPrefill = z
+  .object({
+    leave_type_id: uuid.optional(),
+    starts_on: isoDate.optional(),
+    ends_on: isoDate.optional(),
+    reason: optionalText(500),
+  })
+  .strict();
+
 /** POST /leave/requests: People record leave on someone's behalf. It is approved at once. */
 const LeaveRecordCreate = z
   .object({ employee_id: uuid, ...span })
@@ -251,6 +264,7 @@ const TABLES = {
   },
   LeavePage: { table: null, reason: "a page of leave requests" },
   LeaveRequestCreate: { table: "leave_request" },
+  LeaveRequestPrefill: { table: "leave_request" },
   LeaveRecordCreate: { table: "leave_request" },
   LeaveCancel: {
     table: null,
@@ -288,6 +302,7 @@ module.exports = {
   LeaveRequest,
   LeavePage,
   LeaveRequestCreate,
+  LeaveRequestPrefill,
   LeaveRecordCreate,
   LeaveCancel,
   LeaveListQuery,

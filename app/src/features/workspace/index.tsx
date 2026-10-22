@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import calendar from "@mycity/contract/schemas/calendar.js";
 import tasks from "@mycity/contract/schemas/tasks.js";
 import type { CalendarItem, Task, TaskDetail } from "@mycity/contract/contract.gen.ts";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
@@ -9,7 +10,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { Link, useRouter, useSearchParams } from "@/lib/router";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { useScreenAction, useUrlAction } from "@/shell/screen-action";
+import { useAddressPrefill, useScreenAction, useUrlAction } from "@/shell/screen-action";
 import {
   COMMITMENT_HELP,
   CommitmentActions,
@@ -73,14 +74,16 @@ import {
 export default function Workspace({ tab, id }: ModuleScreenProps) {
   const [params, setParams] = useSearchParams();
   const modal = useModal();
-  /* Deep link from Home's New button or the assistant: /workspace?tab=tasks&new=1&title=… (&commitment=1) */
+  /*
+   * Deep link from Home's New button or the assistant: /workspace?tab=tasks&new=1&title=… (&commitment=1).
+   * The form reads its own fields from the address (TaskPrefill, CalendarEventPrefill).
+   */
   useEffect(() => {
     if (params.get("new") !== "1") return;
-    const title = params.get("title") ?? "";
     const commitment = params.get("commitment") === "1";
-    setParams({ new: null, title: null, commitment: null }, { replace: true });
-    if (tab === "calendar") modal.open({ title: "New Event", body: (close) => <EventForm close={close} title={title} /> });
-    else modal.open({ title: commitment ? "New Commitment" : "New Task", body: (close) => <TaskForm close={close} title={title} commitment={commitment} /> });
+    setParams({ new: null, commitment: null }, { replace: true });
+    if (tab === "calendar") modal.open({ title: "New Event", body: (close) => <EventForm close={close} /> });
+    else modal.open({ title: commitment ? "New Commitment" : "New Task", body: (close) => <TaskForm close={close} commitment={commitment} /> });
   }, [params, setParams, modal, tab]);
   if (tab === "tasks") return <Tasks openId={id} />;
   if (tab === "calendar") return <CalendarTab />;
@@ -332,10 +335,24 @@ const choiceOf = (t?: TaskDetail): CountsChoice[] =>
     ? [{ kind: t.counts_towards.kind, employee_target_id: t.counts_towards.employee_target_id, okr_key_result_id: t.counts_towards.okr_key_result_id, title: t.counts_towards.title, sub: null }]
     : [];
 
-export function TaskForm({ close, title = "", task, commitment = false }: { close: () => void; title?: string; task?: TaskDetail; commitment?: boolean }) {
+export function TaskForm({ close, task, commitment = false }: { close: () => void; task?: TaskDetail; commitment?: boolean }) {
   const me = useMe();
   const months = commitmentMonths();
+  const filled = useAddressPrefill(tasks.TaskPrefill, !task);
   const [who, setWho] = useState<PersonRef[]>(task?.assignee && task.assignee.employee_id !== me.employee_id ? [task.assignee] : []);
+  // An assignee named in the address shows by name: a manager's picker holds the person, not an id.
+  const assignee = me.manages_people && filled.primary_assignee_id !== me.employee_id ? filled.primary_assignee_id : undefined;
+  useEffect(() => {
+    if (!assignee) return;
+    let live = true;
+    api.call("GET /api/v1/community/people/:id/card", { params: { id: assignee } }).then(
+      (card) => live && setWho((now) => (now.length ? now : [card.person])),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [assignee]);
   const [counts, setCounts] = useState<CountsChoice[]>(choiceOf(task));
   const canAssign = !task || task.can_reassign;
   // An approved commitment keeps its person, mark, month and criteria; its date may still move.
@@ -343,11 +360,11 @@ export function TaskForm({ close, title = "", task, commitment = false }: { clos
   const mayMark = !fixed && (!task || task.status !== "done");
   const f = useContractForm(
     {
-      title: task?.title ?? title,
-      cadence: task?.cadence ?? "",
-      due_on: task?.due_at ? task.due_at.slice(0, 10) : "",
-      priority: (task?.priority ?? "normal") as string,
-      description: task?.description ?? "",
+      title: task?.title ?? filled.title ?? "",
+      cadence: task?.cadence ?? filled.cadence ?? "",
+      due_on: task?.due_at ? task.due_at.slice(0, 10) : (filled.due_on ?? ""),
+      priority: (task?.priority ?? filled.priority ?? "normal") as string,
+      description: task?.description ?? filled.description ?? "",
       is_commitment: task?.is_commitment ?? commitment,
       acceptance_criteria: task?.acceptance_criteria ?? "",
       commitment_month: task?.commitment_month ?? months[0][0],
@@ -794,10 +811,27 @@ function EventPanel({ id, close }: { id: string; close: () => void }) {
 
 /** Lagos wall clock on a day → the instant on the wire. */
 const lagosInstant = (day: string, hm: string) => new Date(`${day}T${hm}:00+01:00`).toISOString();
+/** An instant → its Lagos day and wall clock (Lagos keeps UTC+1 all year). */
+const lagosParts = (iso: string, plusMinutes = 0) => {
+  const t = new Date(Date.parse(iso) + (60 + plusMinutes) * 60_000).toISOString();
+  return { day: t.slice(0, 10), time: t.slice(11, 16) };
+};
 
-function EventForm({ close, title = "" }: { close: () => void; title?: string }) {
+function EventForm({ close }: { close: () => void }) {
   const [who, setWho] = useState<PersonRef[]>([]);
-  const f = useContractForm({ title, day: "", start: "10:00", end: "11:00", event_type: "meeting", location: "", visibility: "attendees" }, {
+  const filled = useAddressPrefill(calendar.CalendarEventPrefill);
+  const starts = filled.starts_at ? lagosParts(filled.starts_at) : null;
+  // A start with no end is an hour long.
+  const ends = filled.ends_at ? lagosParts(filled.ends_at) : filled.starts_at ? lagosParts(filled.starts_at, 60) : null;
+  const f = useContractForm({
+    title: filled.title ?? "",
+    day: starts?.day ?? "",
+    start: starts?.time ?? "10:00",
+    end: ends?.time ?? "11:00",
+    event_type: filled.event_type ?? "meeting",
+    location: filled.location ?? "",
+    visibility: "attendees",
+  }, {
     title: (v: string) => (!v.trim() ? "Name the event" : null),
     day: (v: string) => (!v ? "Pick a date" : null),
     end: (v: string, all: Record<string, unknown>) => (v && all.start && v <= String(all.start) ? "Ends before it starts" : null),

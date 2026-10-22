@@ -56,15 +56,17 @@ function tableOf(spec, reads) {
   };
 }
 
-/** The values of a prefill its route's schema takes, each checked on its own. */
+/** The values of a prefill its route's schema takes, each checked on its own; never one of the route's params. */
 function prefillOf(route, values) {
-  if (!route.prefill || !values) return {};
+  if (!route.prefill || !values || typeof values !== "object") return {};
   let s = route.prefill;
   while (s && s._def && !s.shape && (s._def.schema || s._def.innerType)) s = s._def.schema || s._def.innerType;
   const shape = (s && s.shape) || {};
   const out = {};
   for (const [k, v] of Object.entries(values)) {
-    if (!shape[k] || !shape[k].safeParse(v).success) continue;
+    if (!Object.prototype.hasOwnProperty.call(shape, k) || (route.params && k in route.params)) continue;
+    if (typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean") continue;
+    if (!shape[k].safeParse(v).success) continue;
     out[k] = String(v);
   }
   return out;
@@ -78,7 +80,7 @@ function linkOf(intent, values, routes, screens) {
   if (!route) return null;
   const screen = screens.find((s) => s.module === route.module && s.tab === route.tab);
   const name = screen ? screen.label : route.tab;
-  const params = { ...(route.params || {}), ...prefillOf(route, values) };
+  const params = { ...prefillOf(route, values), ...(route.params || {}) };
   return {
     label: name.split(/\s+/).length <= 2 ? `Open ${name}` : name,
     path: routeMap.screenPath(route.module, route.tab, { params }),

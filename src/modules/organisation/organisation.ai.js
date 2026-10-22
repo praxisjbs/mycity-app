@@ -41,7 +41,7 @@ module.exports = defineManifest({
     },
   ],
   routes: [
-    { intent: "add an employee", screen: "people.employees", params: { new: "1" }, prefill: c.organisation.EmployeeCreate },
+    { intent: "add an employee", screen: "people.employees", params: { new: "1" }, prefill: c.organisation.EmployeePrefill },
     { intent: "import a staff sheet", screen: "people.employees", params: { import: "1" } },
     { intent: "show the org chart", screen: "ess.org-chart" },
     { intent: "change who someone reports to", screen: "people.organogram" },

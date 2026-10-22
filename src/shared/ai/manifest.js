@@ -29,7 +29,9 @@
  *    authorise.js refuses a list that returns more than one page of 25;
  *  - keys are `<thing>.<verb>` and unique; descriptions are short, plain and have no
  *    em dash (the model reads them and so may a person);
- *  - a route names a real screen (shared/route-map SCREENS) as "<module>.<tab>".
+ *  - a route names a real screen (shared/route-map SCREENS) as "<module>.<tab>";
+ *  - a route's prefill is the form's own fields (packages/contract `<Thing>Prefill`), never a
+ *    restricted field nor one of the address's own words (tab, id, action, new, its params).
  *
  * `run(client, params, actor)` receives the caller's own scope as `actor.scope`
  * ({ scope, scope_ids, employee_id }), so a read returns exactly what the same person
@@ -140,6 +142,34 @@ function checkRead(where, r, seen) {
   });
 }
 
+/** Words the screen's address already uses: a prefill field may not take one over. */
+const ADDRESS_WORDS = new Set(["tab", "id", "action", "new"]);
+
+/**
+ * A prefill lands in the address bar, and so in the browser's history: an object schema, no field
+ * named like the address's own words or the route's params, and none the field mask restricts
+ * (salary, bank, personal, statutory).
+ */
+function checkPrefill(where, r) {
+  const shape = shapeOf(r.prefill);
+  if (!shape)
+    throw new Error(
+      `${where}: route "${r.intent}" prefill is an object schema`,
+    );
+  const { FIELDS, maskedPropsFor } = require("../rbac/field-mask");
+  const restricted = maskedPropsFor(Object.keys(FIELDS));
+  for (const k of Object.keys(shape)) {
+    if (ADDRESS_WORDS.has(k) || (r.params && k in r.params))
+      throw new Error(
+        `${where}: route "${r.intent}" prefill field "${k}" is a word the address already uses`,
+      );
+    if (restricted.has(k))
+      throw new Error(
+        `${where}: route "${r.intent}" prefill field "${k}" is restricted (shared/rbac/field-mask); an address is kept in the browser's history`,
+      );
+  }
+}
+
 function checkRoute(where, r, seen) {
   if (!r || typeof r !== "object")
     throw new Error(`${where}: each route is an object`);
@@ -184,6 +214,7 @@ function checkRoute(where, r, seen) {
       `${where}: route "${r.intent}" prefill is a schema exported from packages/contract`,
     );
   }
+  if (r.prefill !== undefined) checkPrefill(where, r);
   return Object.freeze({
     ...r,
     module,

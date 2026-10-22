@@ -37,7 +37,7 @@ const READS = [
   { key: "leave.requests", description: "Leave requests waiting on someone", params: c.common.PageQuery, permission: ["ess", "view"], module: "ess", list: true },
   { key: "tasks.list", description: "Tasks, filtered by who they are for", params: c.common.PageQuery, permission: ["workspace", "view"], module: "workspace", list: true },
 ];
-const ROUTES = [{ intent: "book a meeting", screen: "workspace.calendar", module: "workspace", tab: "calendar", params: { new: "1" }, prefill: c.calendar.CalendarEventCreate, owner: "calendar" }];
+const ROUTES = [{ intent: "book a meeting", screen: "workspace.calendar", module: "workspace", tab: "calendar", params: { new: "1" }, prefill: c.calendar.CalendarEventPrefill, owner: "calendar" }];
 
 const call = (name, args = {}, id = `c-${Math.random().toString(36).slice(2, 7)}`) => ({ id, type: "function", function: { name, arguments: JSON.stringify(args) } });
 const reply = (text, toolCalls = [], finish = toolCalls.length ? "tool_calls" : "stop") => ({ text, toolCalls, usage: { input_tokens: 5, output_tokens: 5 }, finish_reason: finish });
@@ -119,8 +119,11 @@ describe("one question", () => {
     const first = vendors.gemini.complete.mock.calls[0][0];
     expect(first.tools.map((t) => t.function.name)).toEqual(["leave__requests", "tasks__list"]);
     expect(first.messages[0].content).toContain("Asking: Ada Obi, Operations Lead, in HR & Operations, (Operations & People).");
-    expect(first.messages[0].content).toContain("Today: Thursday 22/10/2026, 10:30 in Lagos.");
-    expect(first.messages[0].content).toContain('- "book a meeting": ');
+    expect(first.messages[0].content).toContain("Today: Thursday 22/10/2026 (2026-10-22), 10:30 in Lagos.");
+    // Each prefill field with the form its value takes, so a day is not written day first and dropped.
+    expect(first.messages[0].content).toContain(
+      '- "book a meeting": Calendar; prefill fields: title, event_type (one of meeting, deadline, campaign, event), starts_at (YYYY-MM-DDTHH:MM:SS+01:00), ends_at (YYYY-MM-DDTHH:MM:SS+01:00), location',
+    );
     expect(authorise.runRead).toHaveBeenCalledWith(db, ACTOR, "leave.requests", { page: 1 });
     const second = vendors.gemini.complete.mock.calls[1][0].messages;
     expect(second.find((m) => m.role === "tool")).toMatchObject({ tool_call_id: "c1" });
@@ -269,6 +272,15 @@ describe("what the screen shows", () => {
     expect(shown.link.path).toContain("title=Budget");
     expect(shown.link.path).not.toContain("nonsense");
     expect(shown.declined).toBe("change");
+    // The route's own params win, a value the field refuses is dropped, and a list is never a value.
+    const sneaky = answer.build({
+      draft: { text: "x", table: null, route: "book a meeting", prefill: { new: "0", starts_at: "2026-10-23T10:00:00+01:00", event_type: "interview", location: ["a"] }, more: false },
+      reads: [],
+      routes: ROUTES,
+      screens: SCREENS,
+    });
+    const q = new URL(sneaky.link.path, "http://x").searchParams;
+    expect(Object.fromEntries(q)).toEqual({ tab: "calendar", new: "1", starts_at: "2026-10-23T10:00:00+01:00" });
     const none = answer.build({ draft: { text: "No.", table: null, route: "delete everyone", prefill: null, more: false }, reads: [], routes: ROUTES, screens: SCREENS });
     expect(none.link).toBeNull();
   });

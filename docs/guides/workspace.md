@@ -232,9 +232,14 @@ set and a rescope are decided by the person the flow names (performance.md §6.1
 - **AI reads** (`tasks.ai.js`): `tasks.list` (TaskListQuery: "what is overdue on my team"),
   `calendar.ai.js`: `calendar.month` ("what's on Thursday"). Both `workspace` view, scoped, paged at
   25. The `workspace` module itself (Today, Analytics) is `ai:none`: it is a view over these two.
-- **AI routes**: "create a task" → `workspace.tasks` with `new=1` and the title prefilled; "set my
-  commitments" → `workspace.tasks` with `new=1&commitment=1`; "book a meeting" → `workspace.calendar`
-  with `new=1`.
+- **AI routes**: "create a task" → `workspace.tasks` with `new=1`, New Task filled from the address
+  (`tasks.TaskPrefill`: title, notes, priority, cadence, due day, and for a manager the assignee,
+  shown by name through the colleague card); "set my commitments" → `workspace.tasks` with
+  `new=1&commitment=1`; "book a meeting" → `workspace.calendar` with `new=1`, New Event filled
+  (`calendar.CalendarEventPrefill`: title, kind, day, start and end in Lagos time, an hour long
+  when only the start is given, location). The form takes the values out of the address as it
+  opens (`useAddressPrefill`, `docs/guides/praxis-ai.md` §6.4); Home's New button sends `title` the
+  same way.
 - **Feature AI**: Tidy With AI on the week, action `week-summary` (Default, personal data, TB,
   22/10/2026; prompt `services/ai/prompts/week-summary.md`), only when pressed (performance.md §6.18).
 - **Search** (`tasks.search.js`): type `task`, words task, todo, to do, commitment, commitments; number
@@ -306,6 +311,7 @@ is listed here as tier 1 or tier 2.**
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · §9: Praxis AI's "create a task" and "book a meeting" open New Task and New Event filled with what the person said (`TaskPrefill`, `CalendarEventPrefill`, `praxis-ai.md` §6.4); the forms read their own fields from the address, so the deep link no longer passes the title itself.
 - 22/10/2026 · TB · Performance PR 4 (`docs/guides/performance.md` §6.11, §6.18): §1 to §11 now cover
   commitments on tasks (marked by the person or their manager, sent as a month, approved with their
   original dates fixed, rescoped or recovered from the panel), Counts Towards a scorecard line or a key

@@ -19,13 +19,21 @@ const personCite = (key: string): AiCitation | null => {
 type Draft = Pick<AiAnswer, "content" | "table" | "link" | "citations" | "reads" | "declined" | "more">;
 const said = (content: string, over: Partial<Draft> = {}): Draft => ({ content, table: null, link: null, citations: [], reads: [], declined: null, more: false, ...over });
 
+/** A day from today as YYYY-MM-DD, for the filled forms the change answers open. */
+const dayFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+/** The screen a change opens, filled with what the question gave, as the server's route links are. */
+function changeLink(l: string): Draft["link"] {
+  if (l.includes("task")) return { label: "Open Tasks", path: `/workspace?tab=tasks&new=1&title=Send+the+weekly+report&priority=high&due_on=${dayFromNow(2)}` };
+  if (l.includes("meeting")) return { label: "Open Calendar", path: `/workspace?tab=calendar&new=1&title=Team+meeting&starts_at=${dayFromNow(1)}T09:00:00.000Z` };
+  if (l.includes("leave")) return { label: "Open My Leave", path: `/ess?tab=my-leave&new=1&starts_on=${dayFromNow(7)}&ends_on=${dayFromNow(8)}` };
+  return null;
+}
+
 function answerFor(question: string, view: string): Draft {
   const l = question.toLowerCase();
   if (/\b(create|add|delete|approve|send|update|raise|book)\b/.test(l))
-    return said("I do not create or change records. Make the change on its screen.", {
-      declined: "change",
-      link: l.includes("task") ? { label: "Open Tasks", path: "/workspace?tab=tasks&new=1" } : l.includes("meeting") ? { label: "Open Calendar", path: "/workspace?tab=calendar&new=1" } : null,
-    });
+    return said("I do not create or change records. Make the change on its screen.", { declined: "change", link: changeLink(l) });
   if (l.includes("partner") || l.includes("inactive") || l.includes("quiet")) {
     if (view === "staff") return said("Partnership records are not available to you.", { declined: "not_available", reads: [{ key: "partners.list", rows: 0, total: null, first: null }] });
     const quiet = PARTNERS.filter((p) => p.quiet_days > 30).sort((x, y) => y.quiet_days - x.quiet_days);
