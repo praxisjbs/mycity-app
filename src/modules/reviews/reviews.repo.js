@@ -380,20 +380,31 @@ async function runningPeriods(db) {
   return rows;
 }
 
-/** A quarter's scorecards that bind (binding or agreed): each gets a review in a round. */
-async function bindingScorecards(db, periodId) {
+/**
+ * A quarter's scorecards that bind (binding or agreed) and had bound before a month ended: each
+ * gets a review in that month's round. A scorecard binds with its plan, or on its own amendment's
+ * approval (§11); an imported one when it was made. Months before it bound are not reviewed.
+ */
+async function bindingScorecards(db, periodId, monthEndsBefore) {
   // pagination:complete a round opens one review for every binding scorecard of its quarter at once
   const { rows } = await completeQuery(
     db,
     `SELECT s.scorecard_id, s.employee_id, s.department_id, s.reviewer_employee_id, s.reviewer_role_code::text AS reviewer_role_code,
             s.reviewer_reason, s.dotted_employee_id, m.manager_id AS effective_manager_id,
-            COALESCE((SELECT u.is_ceo FROM app_user u WHERE u.employee_id = s.employee_id LIMIT 1), false) AS is_ceo
+            COALESCE((SELECT bool_or(u.is_ceo) FROM app_user u WHERE u.employee_id = s.employee_id), false) AS is_ceo
        FROM scorecard s
        JOIN employee e ON e.employee_id = s.employee_id
        LEFT JOIN employee_effective_manager m ON m.employee_id = s.employee_id
+       LEFT JOIN performance_plan pl ON pl.performance_period_id = s.performance_period_id
+            AND pl.department_id IS NOT DISTINCT FROM s.department_id
       WHERE s.performance_period_id = $1 AND s.status IN ('binding', 'agreed') AND e.status = 'active'
+        AND COALESCE(
+              (SELECT max(wi.completed_at) FROM workflow_instance wi
+                WHERE wi.entity_type = 'scorecard' AND wi.entity_id = s.scorecard_id::text
+                  AND wi.definition_key = 'performance.plan' AND wi.state IN ('approved', 'timeout_approved')),
+              pl.binding_at, s.created_at) < $2::timestamptz
       ORDER BY e.first_name, e.last_name, s.scorecard_id`,
-    [periodId],
+    [periodId, monthEndsBefore],
     { label: "a quarter's binding scorecards", ceiling: 2000 },
   );
   return rows;

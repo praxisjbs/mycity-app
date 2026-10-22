@@ -143,9 +143,7 @@ const BUDGETS = [
 
 /* Organisational goals and people's targets are Performance's own staging seed now (45_performance_plan.js). */
 
-/** Reviews of this quarter's check-in (M2), none filed: each person's own and their manager's. */
-const REVIEWED = ["head_team:1", "head_team:2", "head_team:3", "manager_team:1", "manager_team:2"];
-const REVIEWER = { head_team: "head", manager_team: "manager" };
+/* Review rounds and reviews are Performance's own staging seed now (46_performance_reviews.js). */
 
 /**
  * Vacancies (M4) for the organogram's open seats, the first two by title. A vacancy's number
@@ -190,35 +188,6 @@ const ROWS = Object.freeze([
       };
     },
   })),
-  {
-    table: "performance_cycle",
-    key: "quarter-check-in",
-    needs: [],
-    values: (x) => ({
-      name: `${x.quarterName} Check-In`,
-      starts_on: x.quarter.from,
-      ends_on: x.quarter.to,
-      status: "open",
-      closes_at: x.at(x.daysFrom(14), "17:00"),
-    }),
-  },
-  ...REVIEWED.flatMap((slot) => {
-    const manager = REVIEWER[slot.split(":")[0]];
-    const review = (type, reviewer) => ({
-      table: "performance_review",
-      key: `${type}:${slot}`,
-      needs: [slot, reviewer],
-      parents: [["performance_cycle", "quarter-check-in"]],
-      values: (x, [person, by]) => ({
-        performance_cycle_id: idOf("performance_cycle", "quarter-check-in"),
-        employee_id: person.employee_id,
-        reviewer_employee_id: by.employee_id,
-        review_type: type,
-        status: "draft",
-      }),
-    });
-    return [review("self", slot), review("manager", manager)];
-  }),
   ...BUDGETS.flatMap((b, i) => [
     {
       table: "budget",

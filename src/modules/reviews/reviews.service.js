@@ -137,9 +137,10 @@ async function tasksOf(db, r) {
   const { first, from, to } = progress.monthOf(monthOfReview(r));
   const next = lagos.monthBounds(lagos.addMonths(first, 1)).last;
   const m = { from, to, next_to: lagos.endOfDayExclusive(next) };
-  const [done, ongoing, nextMonth] = await Promise.all(
-    ["done", "ongoing", "next_month"].map((b) => repo.taskBucket(db, r.employee_id, b, m)),
-  );
+  // One after another: `db` may be the closing transaction's client.
+  const done = await repo.taskBucket(db, r.employee_id, "done", m);
+  const ongoing = await repo.taskBucket(db, r.employee_id, "ongoing", m);
+  const nextMonth = await repo.taskBucket(db, r.employee_id, "next_month", m);
   return {
     tasks: [...done.data, ...ongoing.data, ...nextMonth.data].map(taskView),
     task_counts: { done: done.page.total, ongoing: ongoing.page.total, next_month: nextMonth.page.total },
@@ -583,7 +584,9 @@ async function submit(actor, scope, id) {
     const items = await repo.items(client, id);
     const problems = {};
     for (const [n, i] of items.entries()) {
-      if (i.assessable && i.score === null) problems[`items.${n}.score`] = ["Give a score"];
+      // An automatic line with no eligible cases this month is blank, never scored (§6.9).
+      const blank = i.auto && i.proposed_score === null;
+      if (i.assessable && !blank && i.score === null) problems[`items.${n}.score`] = ["Give a score"];
       if (!i.assessable && i.score !== null && !i.override_reason) problems[`items.${n}.override_reason`] = ["Give a reason"];
     }
     if (Object.keys(problems).length) throw new AppError("SCORES_MISSING", "Score every line first", 422, problems);
@@ -652,7 +655,10 @@ async function submit(actor, scope, id) {
   return get(actor, scope, id);
 }
 
-/** POST /performance/reviews/:id/return: the check-in goes back to the employee, with the reason. */
+/**
+ * POST /performance/reviews/:id/return: the check-in goes back to the employee, with the reason.
+ * Answers with the review's row: the reviewer sees nothing of it again until it is resubmitted.
+ */
 async function returnCheckIn(actor, scope, id, body) {
   await tx(async (client) => {
     const { r } = await forReviewer(client, id, actor, scope);
@@ -665,7 +671,7 @@ async function returnCheckIn(actor, scope, id, body) {
       payload: { performance_review_id: id, employee_id: r.employee_id, reviewer_employee_id: r.reviewer_employee_id, employee_name: r.employee.display_name, to: "employee", reason: body.returned_reason },
     });
   });
-  return get(actor, scope, id);
+  return reviewView(await repo.get(pool, id));
 }
 
 /** The dotted manager asked for input, in the caller's transaction. */

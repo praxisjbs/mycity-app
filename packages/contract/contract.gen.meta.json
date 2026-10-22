@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "19ef75803953950417cbfa2f0a2dd69769629f452cc63f779fed4be9ba287877",
+  "source_hash": "333f5096f1ae0df12edfa73208c337ea97a5807b3b4efc72a17757f7d628e057",
   "schemas": 1063,
   "endpoints": 512,
   "inputs": {
@@ -99,7 +99,7 @@
     "src/modules/organisation/organisation.routes.js": "0e36c55aad472f3007c6ce36a0e4e3c0d4da9e0a19b43e36a62887032d208a90",
     "src/modules/policies/policies.routes.js": "fc507d3124b59274a3e08503c3486274689960ead168914538b114bb87640916",
     "src/modules/reports/reports.routes.js": "7c9e4d8214908d9baf4ed5f1448d190cea08b6b952cf355e0b900f2fbb8a3ebe",
-    "src/modules/reviews/reviews.routes.js": "5133e2bd3974010ade074ef5bd543eb24d770d98648a5dbedf1c5e020225919d",
+    "src/modules/reviews/reviews.routes.js": "b3edae0ecf98e71a47c85d0a0edca536092f050a66a715698dbdd096cd303d51",
     "src/modules/search/search.routes.js": "0e82222d55484d42635f18d0da8068d4665bb070e4407a57b498ef829a7e44bd",
     "src/modules/security/security.routes.js": "2148273cc406a5725539fcfb75ff74008a69e3bb40a0c939e1eaeb33c74f0f4f",
     "src/modules/settings/settings.routes.js": "24e880ee10c223bc347fa980803a2e1bb28bf02d373c73451a26cbcb2029e802",

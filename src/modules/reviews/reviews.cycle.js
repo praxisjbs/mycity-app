@@ -7,7 +7,8 @@
  * one review per scorecard that binds at that moment, each with an item per line, and the deadlines
  * of the quarter's rules: the check-in by the month after's 2nd business day (3rd for a function's
  * head), the reviewer by the 5th, the second level by the 7th, Operations & People by the 10th. A
- * scorecard that binds after its month's round opened is not reviewed for that month (§11).
+ * scorecard reviewed in a month had bound by its end; one that binds later starts with the next
+ * month, and one that binds after its month's round opened waits for the next round (§11).
  *
  * Opening is idempotent: a round is made once per quarter and month, a review once per scorecard in
  * it. Each person is told their check-in is due, and reminded 2 business days before and on the day.
@@ -170,7 +171,7 @@ async function openRound(client, actor, period, month) {
   const heads = new Set(
     (await client.query("SELECT head_employee_id FROM department WHERE head_employee_id IS NOT NULL")).rows.map((r) => r.head_employee_id),
   );
-  const cards = await repo.bindingScorecards(client, period.performance_period_id);
+  const cards = await repo.bindingScorecards(client, period.performance_period_id, lagos.endOfDayExclusive(last));
   const opened = [];
   for (const card of cards) {
     const who = await reviewerFor(client, card);

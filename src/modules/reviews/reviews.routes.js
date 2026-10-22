@@ -61,7 +61,7 @@ route(router, "post", "/reviews/:id/submit",
   view, controller.submit);
 
 route(router, "post", "/reviews/:id/return",
-  { params: c.common.IdParams, body: r.ReturnCheckIn, response: r.ReviewDetail, summary: "Return a check-in to the employee" },
+  { params: c.common.IdParams, body: r.ReturnCheckIn, response: r.Review, summary: "Return a check-in to the employee" },
   view, controller.returnCheckIn);
 
 route(router, "post", "/reviews/:id/ask-input",
