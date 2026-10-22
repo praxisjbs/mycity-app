@@ -54,7 +54,7 @@ const ACTIONS = Object.freeze({
       ["gemini", "flash"],
       ["gemini", "pro"],
     ]),
-    built: false,
+    built: true,
   }),
   // A question spoken on Praxis AI · Ask (docs/guides/praxis-ai.md §6.6).
   "praxis-ai-voice": Object.freeze({

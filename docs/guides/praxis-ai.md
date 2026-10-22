@@ -133,7 +133,7 @@ not an error: it becomes an answer that says the information is not available (�
 1. **Governance first**: AI on, `praxis_ai` not in `ai_setting.disabled_modules`, the overall cap not
    reached (`services/ai/governance.js`). A refusal is recorded and shown; nothing is spent.
 2. **The turn sent to the model**, in this order:
-   - the system prompt, `services/ai/prompts/assistant-system.md` (versioned, its version and hash
+   - the system prompt, `services/ai/prompts/data-answers.md`, named after its action (versioned, its version and hash
      on the run);
    - who is asking: name, job title, department, role, and their scope in words ("your team");
    - today: the Lagos date and time, the working week;
@@ -381,6 +381,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 22/10/2026 · GE · Commit 3 of 7: §6.1 to §6.4 built as the engine (`services/ai/assistant/{orchestrator, answer}.js`); the prompt is `prompts/data-answers.md`, named after its action as the AI-actions gate requires.
 - 22/10/2026 · GE · Commit 2 of 7: §6.7 built: tools on every text model's vendor file, `converse()`, Voice Question registered (built with the API, commit 4).
 - 22/10/2026 · GE · Commit 1 of 7: the contract (`assistant.js`) and migration `10300_assistant.sql` built. §4: `ai_message` gains `rows_read` and `module_key` as columns (History reports on them), the role CHECK keeps the three roles `10099` seeds, and the 10000 tables gain their indexes and update triggers; numbered 10300, after AI Control's 10200 to 10220, so no server applies it out of order. §5: `ai_conversation_id`, the column's name.
 - 22/10/2026 · GE · §6.7: no Cannot Use Tools state. Every provider's vendor file takes tools, so any text model on Data Answers' chain answers, first choice or fallback, as AI Control promises (`ai-control.md` decision 34 rewritten).

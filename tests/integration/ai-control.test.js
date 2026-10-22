@@ -224,7 +224,7 @@ describeDb("AI Control against the real migrations", () => {
       const res = await as("admin").get("/ai-control/actions");
       expect(res.body.data.map((a) => a.key)).toEqual(["voice-note-transcription", "policy-tidy", "data-answers", "praxis-ai-voice", "find-prices"]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
-      expect(by["data-answers"]).toMatchObject({ job: "default", built: false, own_chain: true, personal_data: true, chosen_by: "TB" });
+      expect(by["data-answers"]).toMatchObject({ job: "default", built: true, own_chain: true, personal_data: true, chosen_by: "TB" });
       expect(by["data-answers"].chain.links.map((l) => l.model)).toEqual(["gemini-3.8-flash", "gemini-2.5-pro"]);
       expect(by["policy-tidy"]).toMatchObject({ own_chain: false, chain: expect.objectContaining({ scope: "job", key: "default" }) });
       expect(by["find-prices"]).toMatchObject({ job: "deep_reasoning", personal_data: false });

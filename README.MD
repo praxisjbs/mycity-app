@@ -227,14 +227,16 @@ src/
 │   │                  server's refusal means) · tls-check (a server's TLS and certificate) ·
 │   │                  deliverability/{check, route-check, dns-check, dmarc, ptr, rbl, evaluate}
 │   ├── secrets/       encryption.service
-│   ├── ai/            llm.service (complete, and search for Find Prices) · governance (the switch,
+│   ├── ai/            llm.service (complete; converse, the assistant's rounds with tools; search for
+│   │                  Find Prices) · governance (the switch,
 │   │                  the caps, the spend) · ledger · redact · structured · transcription (Groq, then
 │   │                  Gemini, then the browser's captions) · catalogue (a provider's model list,
 │   │                  sorted into what the ERP uses) · actions (every AI feature, registered under
 │   │                  its job) · jobs (each action's chain and each model's state, AI Control) ·
 │   │                  prices (what a step is charged at, in naira) · skips (a provider skipped until
 │   │                  its quota resets) · vendors/{http, gemini, groq, openai, anthropic, deepseek,
-│   │                  stub} · prompts/*.md · assistant/* (M10)
+│   │                  stub} · prompts/*.md · assistant/{orchestrator (one question: the reads
+│   │                  as tools, the loop, the answer), answer (what the screen shows)} (M10)
 │   ├── push/          web-push · vapid (the environment's key pair) · payload (brought forward from M6)
 │   ├── calendar/      ics
 │   ├── maps/          geoapify.service (the address search, a pinned point's nearest address and the
@@ -516,7 +518,7 @@ Four permission layers: module, action, record scope, field. No entity layer (A2
 | Module | Files beyond the template |
 |---|---|
 | `knowledge` | `.versions`, `.embeddings` (policies, SOPs, FAQs, training) |
-| `assistant` | `.history` (Ask, History). Engine in `services/ai/assistant/{orchestrator, retrieval, embeddings, answer, conversation.repo}.js` |
+| `assistant` | `.history` (Ask, History). Engine in `services/ai/assistant/{orchestrator, answer}.js`, the prompt `services/ai/prompts/data-answers.md`; the Knowledge Hub is searched through its own read (`docs/guides/praxis-ai.md`) |
 | `ai_governance` | AI Control (brought forward): `/api/v1/ai-control`, each job's and action's chain, Make First, model prices and Find Prices, the monthly caps per provider and on all AI (`docs/guides/ai-control.md`) |
 
 The assistant **reads only** (A23). It answers from the manifests every module has carried since M1.
