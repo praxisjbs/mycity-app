@@ -23,6 +23,12 @@ const outbox = require("../../src/shared/events/outbox");
 const lagos = require("../../src/shared/time/lagos");
 const tasks = require("../../src/modules/tasks/tasks.service");
 
+// The reminder engine's tick also queues the daily digests; no queue runs here.
+jest.mock("../../src/jobs/queues", () => ({
+  ...jest.requireActual("../../src/jobs/queues"),
+  enqueue: jest.fn(async () => ({ id: "1" })),
+}));
+
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
 const q = (sql, params) => pool.query(sql, params);
@@ -59,6 +65,9 @@ describeDb("my workspace against the real migrations", () => {
       request(app).post(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
     patch: (path, body = {}) =>
       request(app).patch(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
+    put: (path, body = {}) =>
+      request(app).put(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`).send(body),
+    del: (path) => request(app).delete(`/api/v1${path}`).set("Authorization", `Bearer ${tokens[who]}`),
   });
   const emp = (who) => people[who].employee.employee_id;
 
@@ -273,5 +282,226 @@ describeDb("my workspace against the real migrations", () => {
     expect(next.rows).toHaveLength(1);
     const again = await tasks.sweep(new Date());
     expect(again.repeated).toBe(0);
+  });
+  test("steps: the assignee plans them, anyone who sees the task ticks them, the card counts them", async () => {
+    const t = await as("manager").post("/tasks", { title: "Prepare the Ikeja launch kit", primary_assignee_id: emp("staff") });
+    const one = await as("staff").post(`/tasks/${t.body.task_id}/steps`, { title: "Order banners", due_on: later(1) });
+    expect(one.status).toBe(201);
+    const two = await as("manager").post(`/tasks/${t.body.task_id}/steps`, { title: "Book the van" });
+    expect(two.status).toBe(201);
+    expect(two.body.sort_order).toBeGreaterThan(one.body.sort_order);
+    const tick = await as("manager").patch(`/tasks/${t.body.task_id}/steps/${one.body.task_step_id}`, { done: true });
+    expect(tick.status).toBe(200);
+    expect(tick.body.done_by.employee_id).toBe(emp("manager"));
+    expect((await as("outsider").patch(`/tasks/${t.body.task_id}/steps/${one.body.task_step_id}`, { done: false })).status).toBe(404);
+    const card = await as("staff").get(`/tasks/${t.body.task_id}`);
+    expect(card.body.steps_total).toBe(2);
+    expect(card.body.steps_done).toBe(1);
+    expect(card.body.steps.map((x) => x.title)).toEqual(["Order banners", "Book the van"]);
+    const gone = await as("staff").del(`/tasks/${t.body.task_id}/steps/${two.body.task_step_id}`);
+    expect(gone.status).toBe(200);
+    expect(gone.body.steps).toHaveLength(1);
+    const history = await as("staff").get(`/tasks/${t.body.task_id}/activity`);
+    expect(history.body.data.map((a) => a.kind)).toEqual(expect.arrayContaining(["step_added", "step_done", "step_removed"]));
+  });
+
+  test("waiting on: a task does not start before what it waits on is done, no loops, and an override lets it go", async () => {
+    const first = await as("staff").post("/tasks", { title: "Get venue sign-off" });
+    const then = await as("staff").post("/tasks", { title: "Print the venue map" });
+    const link = await as("staff").post(`/tasks/${then.body.task_id}/waiting-on`, { depends_on_task_id: first.body.task_id });
+    expect(link.status).toBe(200);
+    expect(link.body.waiting).toBe(true);
+    expect(link.body.waiting_on[0].task.number).toBe(first.body.number);
+    expect(link.body.waiting_on[0].satisfied).toBe(false);
+
+    const loop = await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: then.body.task_id });
+    expect(loop.status).toBe(422);
+    expect(loop.body.error.fields.depends_on_task_id).toBeDefined();
+
+    const early = await as("staff").post(`/tasks/${then.body.task_id}/move`, { status: "in_progress" });
+    expect(early.status).toBe(409);
+    expect(early.body.error.code).toBe("TASK_WAITING");
+
+    const held = await as("staff").get(`/tasks/${first.body.task_id}`);
+    expect(held.body.holding_up[0].task.task_id).toBe(then.body.task_id);
+
+    const go = await as("staff").post(`/tasks/${then.body.task_id}/waiting-on/${link.body.waiting_on[0].task_dependency_id}/override`, { override_reason: "Sign-off promised by phone" });
+    expect(go.body.waiting).toBe(false);
+    expect(go.body.waiting_on[0].override_reason).toBe("Sign-off promised by phone");
+    expect((await as("staff").post(`/tasks/${then.body.task_id}/move`, { status: "in_progress" })).status).toBe(200);
+
+    const outsiderTask = await as("outsider").post("/tasks", { title: "Close the books" });
+    const hidden = await as("staff").post(`/tasks/${first.body.task_id}/waiting-on`, { depends_on_task_id: outsiderTask.body.task_id });
+    expect(hidden.status).toBe(422);
+  });
+
+  test("watchers hear about it, and a ping reaches whoever it names", async () => {
+    const t = await as("manager").post("/tasks", { title: "Confirm caterer for the launch", primary_assignee_id: emp("staff") });
+    const added = await as("manager").post(`/tasks/${t.body.task_id}/watchers`, { employee_id: emp("peer") });
+    expect(added.status).toBe(200);
+    expect(added.body.watchers.map((p) => p.employee_id)).toContain(emp("peer"));
+    const notMine = await as("staff").post(`/tasks/${t.body.task_id}/watchers`, {});
+    expect(notMine.body.watching).toBe(true);
+    expect((await as("outsider").post(`/tasks/${t.body.task_id}/watchers`, {})).status).toBe(404);
+
+    const pinged = await as("manager").post(`/tasks/${t.body.task_id}/ping`, { message: "Need this by noon", to: "everyone" });
+    expect(pinged.status).toBe(200);
+    await drain();
+    const peerBell = await q(
+      `SELECT n.title FROM notification n JOIN app_user u ON u.user_id = n.user_id
+        WHERE u.employee_id = $1 ORDER BY n.created_at DESC`,
+      [emp("peer")],
+    );
+    expect(peerBell.rows.map((r) => r.title)).toEqual(expect.arrayContaining([expect.stringMatching(/nudged you/)]));
+
+    const left = await as("staff").del(`/tasks/${t.body.task_id}/watchers/${emp("staff")}`);
+    expect(left.body.watching).toBe(false);
+    expect((await as("staff").del(`/tasks/${t.body.task_id}/watchers/${emp("peer")}`)).status).toBe(200);
+  });
+
+  test("a hold has a note and an expected day; clearing it moves the due time on and keeps the history", async () => {
+    const t = await as("staff").post("/tasks", { title: "Collect the permit", due_on: later(3) });
+    const block = await as("staff").post(`/tasks/${t.body.task_id}/block`, { blocked_reason: "Council office closed", estimated_resolve_on: later(2) });
+    expect(block.status).toBe(200);
+    expect((await as("staff").post(`/tasks/${t.body.task_id}/block`, { blocked_reason: "Again" })).status).toBe(409);
+    const panel = await as("staff").get(`/tasks/${t.body.task_id}`);
+    expect(panel.body.blockage.note).toBe("Council office closed");
+    expect(panel.body.blockage.estimated_resolve_on).toBe(later(2));
+
+    const team = await as("manager").get("/workspace/analytics?scope=team");
+    expect(team.body.blocked.data.map((b) => b.task.task_id)).toContain(t.body.task_id);
+
+    const cleared = await as("staff").post(`/tasks/${t.body.task_id}/unblock`, { resolve_note: "Opened again" });
+    expect(cleared.status).toBe(200);
+    expect(Date.parse(cleared.body.due_at)).toBeGreaterThan(Date.parse(t.body.due_at));
+    const holds = await as("staff").get(`/tasks/${t.body.task_id}/blockages`);
+    expect(holds.body.data).toHaveLength(1);
+    expect(holds.body.data[0].due_shift_days).toBe(1);
+    expect(holds.body.data[0].resolve_note).toBe("Opened again");
+
+    await as("staff").post(`/tasks/${t.body.task_id}/block`, { blocked_reason: "Waiting on the stamp" });
+    const kept = await as("staff").post(`/tasks/${t.body.task_id}/unblock`, { push_due: false });
+    expect(kept.body.due_at).toBe(cleared.body.due_at);
+    expect((await as("staff").get(`/tasks/${t.body.task_id}/blockages`)).body.page.total).toBe(2);
+  });
+
+  test("reminders: up to three, they follow the due time, and Done cancels them", async () => {
+    const t = await as("staff").post("/tasks", { title: "Send the press note", due_on: later(4) });
+    const set = await as("staff").put(`/tasks/${t.body.task_id}/reminders`, {
+      reminders: [{ minutes_before: 60 }, { minutes_before: 1440 }],
+    });
+    expect(set.status).toBe(200);
+    expect(set.body.reminders.map((r) => r.minutes_before)).toEqual([60, 1440]);
+    expect(Date.parse(set.body.reminders[0].remind_at)).toBe(Date.parse(t.body.due_at) - 60 * 60000);
+
+    const moved = await as("staff").patch(`/tasks/${t.body.task_id}`, { due_on: later(5) });
+    const after = await as("staff").get(`/tasks/${t.body.task_id}`);
+    expect(Date.parse(after.body.reminders[0].remind_at)).toBe(Date.parse(moved.body.due_at) - 60 * 60000);
+
+    const tooMany = await as("staff").put(`/tasks/${t.body.task_id}/reminders`, { reminders: [{ minutes_before: 1 }, { minutes_before: 2 }, { minutes_before: 3 }, { minutes_before: 4 }] });
+    expect(tooMany.status).toBe(422);
+    const noDue = await as("staff").post("/tasks", { title: "Undated thought" });
+    expect((await as("staff").put(`/tasks/${noDue.body.task_id}/reminders`, { reminders: [{ minutes_before: 30 }] })).status).toBe(422);
+
+    await as("staff").post(`/tasks/${t.body.task_id}/move`, { status: "done" });
+    expect((await as("staff").get(`/tasks/${t.body.task_id}`)).body.reminders).toHaveLength(0);
+  });
+
+  test("a late task carries its reason, and Analytics counts the overdue by reason and by age", async () => {
+    const late = await as("staff").post("/tasks", { title: "Return the projector", due_on: later(-6) });
+    const why = await as("staff").patch(`/tasks/${late.body.task_id}`, { late_reason: "waiting_on_others" });
+    expect(why.status).toBe(200);
+    expect(why.body.late_reason).toBe("waiting_on_others");
+    const mine = await as("staff").get("/workspace/analytics");
+    expect(mine.body.overdue_by_reason).toEqual(expect.arrayContaining([{ reason: "waiting_on_others", count: 1 }]));
+    expect(mine.body.overdue_aging.reduce((n, b) => n + b.count, 0)).toBe(mine.body.overdue);
+    expect(mine.body.open).toBeGreaterThan(0);
+
+    const done = await as("staff").post(`/tasks/${late.body.task_id}/move`, { status: "done", late_reason: "underestimated" });
+    expect(done.body.late_reason).toBe("underestimated");
+    const summary = await as("staff").get("/tasks/summary");
+    expect(summary.body.done_30d).toBeGreaterThanOrEqual(1);
+  });
+  test("a repeat needs a due date to count from; set one and it repeats", async () => {
+    const bare = await as("staff").post("/tasks", { title: "Water the plants", recurrence: { freq: "daily" } });
+    expect(bare.status).toBe(422);
+    expect(bare.body.error.fields.recurrence).toBeDefined();
+    const t = await as("staff").post("/tasks", { title: "Water the plants", due_on: later(1) });
+    const set = await as("staff").patch(`/tasks/${t.body.task_id}`, { recurrence: { freq: "weekly", days: [1, 3, 5] } });
+    expect(set.status).toBe(200);
+    expect(set.body.recurrence).toEqual({ freq: "weekly", days: [1, 3, 5] });
+    expect((await as("staff").patch(`/tasks/${t.body.task_id}`, { due_on: null })).status).toBe(422);
+    expect((await as("staff").patch(`/tasks/${t.body.task_id}`, { recurrence: { freq: "hourly" } })).status).toBe(422);
+  });
+
+  test("an event's reminders follow its start, go when it is called off, and fire to the people still going", async () => {
+    const reminders = require("../../src/modules/notifications/notifications.reminders");
+    const start = new Date(Date.now() + 3 * 86_400_000);
+    start.setUTCMinutes(0, 0, 0);
+    const end = new Date(start.getTime() + 3_600_000);
+    const made = await as("manager").post("/calendar", {
+      title: "Venue Walkthrough",
+      starts_at: start.toISOString(),
+      ends_at: end.toISOString(),
+      attendee_ids: [emp("staff"), emp("peer")],
+      reminder_minutes: [60, 15],
+    });
+    expect(made.status).toBe(201);
+    expect(made.body.reminder_minutes).toEqual([15, 60]);
+    const due = await q("SELECT due_at FROM reminder WHERE entity_id = $1 AND state = 'pending' ORDER BY due_at", [made.body.calendar_event_id]);
+    expect(due.rows.map((r) => r.due_at.getTime())).toEqual([start.getTime() - 3_600_000, start.getTime() - 900_000]);
+
+    const later2 = new Date(start.getTime() + 86_400_000);
+    const moved = await as("manager").patch(`/calendar/${made.body.calendar_event_id}`, {
+      starts_at: later2.toISOString(),
+      ends_at: new Date(later2.getTime() + 3_600_000).toISOString(),
+    });
+    expect(moved.body.reminder_minutes).toEqual([15, 60]);
+    const due2 = await q("SELECT min(due_at) AS first FROM reminder WHERE entity_id = $1 AND state = 'pending'", [made.body.calendar_event_id]);
+    expect(due2.rows[0].first.getTime()).toBe(later2.getTime() - 3_600_000);
+
+    await as("peer").post(`/calendar/${made.body.calendar_event_id}/respond`, { response: "declined" });
+    const fired = await reminders.tick({ now: new Date(later2.getTime() - 3_590_000) });
+    expect(fired).toBeTruthy();
+    await drain();
+    const told = await q(
+      `SELECT u.employee_id FROM notification n JOIN app_user u ON u.user_id = n.user_id
+        WHERE n.title = 'Starting soon: Venue Walkthrough'`,
+    );
+    const who = told.rows.map((r) => r.employee_id);
+    expect(who).toEqual(expect.arrayContaining([emp("manager"), emp("staff")]));
+    expect(who).not.toContain(emp("peer"));
+
+    await as("manager").post(`/calendar/${made.body.calendar_event_id}/cancel`, {});
+    const left = await q("SELECT count(*)::int AS n FROM reminder WHERE entity_id = $1 AND state = 'pending'", [made.body.calendar_event_id]);
+    expect(left.rows[0].n).toBe(0);
+  });
+
+  test("a task reminder fires to the assignee through the reminder engine", async () => {
+    const reminders = require("../../src/modules/notifications/notifications.reminders");
+    const t = await as("manager").post("/tasks", { title: "Send the venue deposit", primary_assignee_id: emp("staff"), due_on: later(2) });
+    await as("manager").put(`/tasks/${t.body.task_id}/reminders`, { reminders: [{ minutes_before: 60 }] });
+    await reminders.tick({ now: new Date(Date.parse(t.body.due_at) - 3_500_000) });
+    await drain();
+    const told = await q(
+      `SELECT n.title FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1`,
+      [emp("staff")],
+    );
+    expect(told.rows.map((r) => r.title)).toContain("Reminder: Send the venue deposit");
+  });
+
+  test("a card moves above another in its column, and to the foot without one", async () => {
+    const a = await as("staff").post("/tasks", { title: "Order A" });
+    const b = await as("staff").post("/tasks", { title: "Order B" });
+    const c = await as("staff").post("/tasks", { title: "Order C" });
+    const up = await as("staff").post(`/tasks/${c.body.task_id}/move`, { status: "todo", before_task_id: a.body.task_id });
+    expect(up.status).toBe(200);
+    const order = async () =>
+      (await as("staff").get("/tasks?status=todo&q=Order")).body.data.map((t) => t.title);
+    expect(await order()).toEqual(["Order C", "Order A", "Order B"]);
+    await as("staff").post(`/tasks/${c.body.task_id}/move`, { status: "todo", before_task_id: null });
+    expect(await order()).toEqual(["Order A", "Order B", "Order C"]);
+    const wrong = await as("staff").post(`/tasks/${a.body.task_id}/move`, { status: "in_progress", before_task_id: b.body.task_id });
+    expect(wrong.status).toBe(409);
   });
 });

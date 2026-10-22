@@ -8,7 +8,13 @@
  *   edit()     the setter changes what they decided; the assignee their notes and priority.
  *   move()     a drag: a column and the card it now sits above. Entering In Progress the
  *              first time starts it; Done completes it; leaving Done reopens it.
- *   block(), unblock(), cancel(), comment()
+ *   block(), unblock()   a hold with its note and expected day; clearing it moves the due
+ *              time on by the days it lasted, unless told not to.
+ *   cancel(), comment()
+ *   addStep(), editStep(), removeStep()          the task's steps
+ *   addWaiting(), removeWaiting(), overrideWaiting()   the tasks it waits on: a task waiting
+ *              on one not yet done does not leave To Do until that is done or overridden
+ *   watch(), unwatch(), ping(), setReminders()
  *   sweep()    the recurrence job: the next occurrence of each repeating task, and the
  *              due-today and due-tomorrow reminders.
  *
@@ -27,7 +33,8 @@ const workingWeek = require("../../shared/time/working-week");
 const repo = require("./tasks.repo");
 const audience = require("./tasks.audience");
 const recurrence = require("./tasks.recurrence");
-const { EVENTS } = require("./tasks.events");
+const reminders = require("../notifications/notifications.reminders");
+const { EVENTS, REMINDER_KEY } = require("./tasks.events");
 
 const iso = (v) => (v instanceof Date ? v.toISOString() : v || null);
 
@@ -70,6 +77,7 @@ function toTask(row, now = new Date()) {
     cancel_reason: row.cancel_reason,
     blocked_reason: row.blocked_reason,
     blocked_at: iso(row.blocked_at),
+    late_reason: row.late_reason ?? null,
     counts_towards: row.employee_target_id
       ? {
           employee_target_id: row.employee_target_id,
@@ -82,6 +90,9 @@ function toTask(row, now = new Date()) {
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
     recurrence: row.recurrence || null,
     comment_count: row.comment_count || 0,
+    steps_total: row.steps_total || 0,
+    steps_done: row.steps_done || 0,
+    waiting: Boolean(row.waiting),
     is_commitment: Boolean(row.is_commitment),
     acceptance_criteria: row.acceptance_criteria ?? null,
     commitment_month: row.commitment_month ?? null,
@@ -120,6 +131,7 @@ function windows(now = new Date()) {
     now,
     today: { from: lagos.instant(today), to: lagos.instant(lagos.addDays(today, 1)) },
     week: { from: lagos.instant(monday), to: lagos.instant(lagos.addDays(monday, 7)) },
+    last30: { from: lagos.instant(lagos.addDays(today, -29)), to: lagos.instant(lagos.addDays(today, 1)) },
   };
 }
 
@@ -144,11 +156,98 @@ async function visible(db, id, scope) {
   return row;
 }
 
-/** The panel: the task and what the caller may do to it. */
+/** Another task as a panel line: its words only when the reader may open it. */
+function toRef(row, scope) {
+  const seen = audience.maySee(scope, row, false);
+  return {
+    task_id: row.task_id,
+    number: row.number || "",
+    title: seen ? row.title : "A task you cannot open",
+    status: row.status,
+    assignee: seen ? row.assignee : null,
+    visible: seen,
+  };
+}
+
+const toEdge = (row, scope) => ({
+  task_dependency_id: row.task_dependency_id,
+  task: toRef(row, scope),
+  satisfied: row.status === "done" || Boolean(row.overridden_at),
+  overridden_at: iso(row.overridden_at),
+  override_reason: row.override_reason,
+});
+
+function toStep(row) {
+  return {
+    task_step_id: row.task_step_id,
+    task_id: row.task_id,
+    title: row.title,
+    due_on: row.due_on || null,
+    done_at: iso(row.done_at),
+    done_by: row.done_by,
+    sort_order: row.sort_order,
+    created_at: iso(row.created_at),
+  };
+}
+
+function toBlockage(row) {
+  if (!row) return null;
+  return {
+    task_blockage_id: row.task_blockage_id,
+    note: row.note,
+    estimated_resolve_on: row.estimated_resolve_on || null,
+    raised_by: row.raised_by,
+    raised_at: iso(row.raised_at),
+    resolved_at: iso(row.resolved_at),
+    resolved_by: row.resolved_by,
+    resolve_note: row.resolve_note,
+    due_shift_days: row.due_shift_days ?? null,
+    blocked_days: Number(row.blocked_days) || 0,
+  };
+}
+
+/** May the caller plan the task: its steps, what it waits on, its reminders? */
+const mayPlan = (scope, row) => audience.mayManage(scope, row) || row.primary_assignee_id === scope.employee_id;
+
+/** The panel: the task, what hangs off it, and what the caller may do to it. */
 async function getFor(id, scope) {
   const row = await visible(pool, id, scope);
   const manage = audience.mayManage(scope, row);
-  return { ...toTask(row), can_edit: true, can_reassign: manage, can_cancel: manage && row.status !== "cancelled" };
+  const [stepRows, waits, held, watching, hold, pending] = await Promise.all([
+    repo.steps(pool, id),
+    repo.waitingOn(pool, id),
+    repo.holdingUp(pool, id),
+    repo.watchers(pool, id),
+    repo.openBlockage(pool, id),
+    reminders.pendingFor(pool, { key: REMINDER_KEY, entity: { type: "task", id } }),
+  ]);
+  return {
+    ...toTask(row),
+    steps: stepRows.map(toStep),
+    waiting_on: waits.map((r) => toEdge(r, scope)),
+    holding_up: held.map((r) => toEdge(r, scope)),
+    watchers: watching,
+    watching: watching.some((p) => p.employee_id === scope.employee_id),
+    blockage: toBlockage(hold),
+    reminders: pending
+      .map((r) => ({
+        slot: Number(r.occurrence) || 1,
+        remind_at: iso(r.due_at),
+        minutes_before: r.payload && Number.isInteger(r.payload.minutes_before) ? r.payload.minutes_before : null,
+      }))
+      .filter((r) => r.slot >= 1 && r.slot <= 3)
+      .sort((a, b) => a.slot - b.slot),
+    can_edit: true,
+    can_reassign: manage,
+    can_cancel: manage && row.status !== "cancelled",
+    can_plan: mayPlan(scope, row) && row.status !== "cancelled",
+  };
+}
+
+async function blockageHistory(id, query, scope) {
+  await visible(pool, id, scope);
+  const page = await repo.blockages(pool, id, query);
+  return { ...page, data: page.data.map(toBlockage) };
 }
 
 async function comments(id, query, scope) {
@@ -202,6 +301,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
     await checkTarget(client, body.employee_target_id, assigneeId);
     const cal = await workingWeek.loadCalendar(client);
     const dueAt = recurrence.dueFor(body, lagos.today(), cal);
+    if (body.recurrence && !dueAt) throw invalid("recurrence", "Give it a due date to repeat from");
     const { number } = await numbering.allocate(client, "task");
     const id = await repo.insert(client, {
       number,
@@ -257,13 +357,17 @@ async function edit(actor, scope, id, body) {
       await checkTarget(client, targetId, assigneeId);
 
     const changes = {};
-    for (const k of ["title", "priority", "cadence", "employee_target_id", "entity_type", "entity_id", "recurrence"])
+    for (const k of ["title", "priority", "cadence", "employee_target_id", "entity_type", "entity_id", "recurrence", "late_reason"])
       if (k in body) changes[k] = body[k];
     if ("description" in body) changes.description = body.description || null;
     if ("due_on" in body) {
       const cal = await workingWeek.loadCalendar(client);
       changes.due_at = body.due_on ? recurrence.dueInstant(body.due_on, cal) : null;
     }
+    // A series counts from its due day: a repeating task keeps one (the rule a repeat is anchored by).
+    const repeats = "recurrence" in body ? body.recurrence : before.recurrence;
+    const dueAfter = "due_at" in changes ? changes.due_at : before.due_at;
+    if (repeats && !dueAfter) throw invalid("recurrence", "Give it a due date to repeat from");
     if (body.primary_assignee_id && body.primary_assignee_id !== before.primary_assignee_id) {
       changes.primary_assignee_id = body.primary_assignee_id;
       changes.sort_order = await repo.nextOrder(client, body.primary_assignee_id, before.status);
@@ -276,6 +380,7 @@ async function edit(actor, scope, id, body) {
       detail: Object.keys(body).join(", "),
     });
     const after = await repo.get(client, id);
+    if ("due_on" in body) await followDue(client, id, after.due_at);
     await emit(client, {
       key: EVENTS.TASK_EDITED,
       entity: { type: "task", id },
@@ -289,12 +394,20 @@ async function edit(actor, scope, id, body) {
 }
 
 /** Drag a card: a column, and the card it now sits above (null: the foot). */
-async function move(actor, scope, id, { status, before_task_id: beforeId }) {
+async function move(actor, scope, id, { status, before_task_id: beforeId, late_reason: lateReason }) {
   if (beforeId === id) throw invalid("before_task_id", "Pick another card");
   return tx(async (client) => {
     if (!(await repo.lock(client, id))) throw notFound();
     const before = await visible(client, id, scope);
     if (before.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
+    if (before.status === "todo" && status !== "todo") {
+      const pending = await repo.firstUnsatisfied(client, id);
+      if (pending) {
+        throw new AppError("TASK_WAITING", `Waiting on ${pending.number}: ${pending.title}`, 409, {
+          status: [`Waiting on ${pending.number}`],
+        });
+      }
+    }
     let slot = await repo.slotIn(client, {
       assigneeId: before.primary_assignee_id,
       status,
@@ -315,9 +428,12 @@ async function move(actor, scope, id, { status, before_task_id: beforeId }) {
       if (status === "done" && before.blocked_reason) {
         changes.blocked_reason = null;
         changes.blocked_at = null;
+        await repo.resolveBlockage(client, id, { by: actor.user_id, note: "Done", shiftDays: null });
       }
+      if (status === "done" && lateReason) changes.late_reason = lateReason;
     }
     await repo.update(client, id, changes);
+    if (status === "done" && before.status !== "done") await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id } });
     const after = await repo.get(client, id);
     if (status !== before.status) {
       await repo.addActivity(client, {
@@ -343,13 +459,21 @@ async function move(actor, scope, id, { status, before_task_id: beforeId }) {
   });
 }
 
-async function block(actor, scope, id, { blocked_reason: reason }) {
+async function block(actor, scope, id, { blocked_reason: reason, estimated_resolve_on: estimate }) {
   return tx(async (client) => {
     if (!(await repo.lock(client, id))) throw notFound();
     const before = await visible(client, id, scope);
     if (["done", "cancelled"].includes(before.status))
       throw new AppError("TASK_CLOSED", "This task is closed", 409);
-    await repo.update(client, id, { blocked_reason: reason, blocked_at: new Date() });
+    if (before.blocked_reason)
+      throw new AppError("TASK_BLOCKED", "This task is already blocked; clear that first", 409);
+    const hold = await repo.insertBlockage(client, {
+      task_id: id,
+      note: reason,
+      estimated_resolve_on: estimate || null,
+      raised_by: actor.user_id,
+    });
+    await repo.update(client, id, { blocked_reason: reason, blocked_at: hold.raised_at });
     await repo.addActivity(client, { task_id: id, actor_user_id: actor.user_id, kind: "blocked", detail: reason });
     const after = await repo.get(client, id);
     await emit(client, {
@@ -363,13 +487,29 @@ async function block(actor, scope, id, { blocked_reason: reason }) {
   });
 }
 
-async function unblock(actor, scope, id) {
+/** Days a hold lasted, rounded up: a hold of an afternoon moves the due time a day. */
+const heldDays = (since, now) => Math.max(1, Math.ceil((now.getTime() - new Date(since).getTime()) / 86_400_000));
+
+async function unblock(actor, scope, id, body = {}) {
+  const pushDue = body.push_due !== false;
   return tx(async (client) => {
     if (!(await repo.lock(client, id))) throw notFound();
     const before = await visible(client, id, scope);
     if (!before.blocked_reason) return toTask(before);
-    await repo.update(client, id, { blocked_reason: null, blocked_at: null });
-    await repo.addActivity(client, { task_id: id, actor_user_id: actor.user_id, kind: "unblocked" });
+    const now = new Date();
+    const open = !["done", "cancelled"].includes(before.status);
+    const shift = pushDue && open && before.due_at && before.blocked_at ? heldDays(before.blocked_at, now) : null;
+    await repo.resolveBlockage(client, id, { by: actor.user_id, note: body.resolve_note || null, shiftDays: shift });
+    const changes = { blocked_reason: null, blocked_at: null };
+    if (shift) changes.due_at = new Date(new Date(before.due_at).getTime() + shift * 86_400_000);
+    await repo.update(client, id, changes);
+    await repo.addActivity(client, {
+      task_id: id,
+      actor_user_id: actor.user_id,
+      kind: "unblocked",
+      detail: [body.resolve_note, shift ? `due moved ${shift} day${shift === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ") || null,
+    });
+    if (shift) await followDue(client, id, changes.due_at);
     const after = await repo.get(client, id);
     await emit(client, {
       key: EVENTS.TASK_UNBLOCKED,
@@ -391,6 +531,7 @@ async function cancel(actor, scope, id, { cancel_reason: reason }) {
       throw new AppError("FORBIDDEN", "Only the person who set this task can cancel it", 403);
     if (before.status === "cancelled") return toTask(before);
     await repo.update(client, id, { status: "cancelled", cancelled_at: new Date(), cancel_reason: reason });
+    await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id } });
     await repo.addActivity(client, {
       task_id: id,
       actor_user_id: actor.user_id,
@@ -452,6 +593,272 @@ async function comment(actor, scope, id, { body }) {
     });
     return repo.comment(client, commentId);
   });
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Steps, waiting on, watchers, pings and reminders
+ * ------------------------------------------------------------------ */
+
+const conflict = (code, message) => new AppError(code, message, 409);
+
+/** Lock and load a task the caller may plan, or refuse. */
+async function planned(client, id, scope) {
+  if (!(await repo.lock(client, id))) throw notFound();
+  const row = await visible(client, id, scope);
+  if (row.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
+  if (!mayPlan(scope, row))
+    throw new AppError("FORBIDDEN", "Only its assignee or the person who set it can change that", 403);
+  return row;
+}
+
+/** One write to a task's plan: the history line and the event, in the caller's transaction. */
+async function noted(client, actor, row, { kind, detail, key, extra = {} }) {
+  await repo.addActivity(client, { task_id: row.task_id, actor_user_id: actor.user_id, kind, detail: detail || null });
+  await emit(client, {
+    key,
+    entity: { type: "task", id: row.task_id },
+    actor,
+    payload: payloadOf(row, { change: kind, detail: detail || null, ...extra }),
+  });
+}
+
+async function addStep(actor, scope, id, body) {
+  return tx(async (client) => {
+    const row = await planned(client, id, scope);
+    const { n, last } = await repo.stepCount(client, id);
+    if (n >= repo.PLAN_MAX) throw conflict("TOO_MANY_STEPS", `A task holds at most ${repo.PLAN_MAX} steps`);
+    const stepId = await repo.insertStep(client, {
+      task_id: id,
+      title: body.title,
+      due_on: body.due_on || null,
+      sort_order: last + 1,
+      created_by: actor.user_id,
+    });
+    await noted(client, actor, row, { kind: "step_added", detail: body.title, key: EVENTS.TASK_STEP_CHANGED });
+    return toStep(await repo.step(client, id, stepId));
+  });
+}
+
+/** Rename, re-date, tick or untick a step. Ticking is open to anyone who can see the task. */
+async function editStep(actor, scope, id, stepId, body) {
+  return tx(async (client) => {
+    if (!(await repo.lock(client, id))) throw notFound();
+    const row = await visible(client, id, scope);
+    if (row.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
+    const before = await repo.step(client, id, stepId);
+    if (!before) throw new AppError("NOT_FOUND", "That step does not exist", 404);
+    if (("title" in body || "due_on" in body) && !mayPlan(scope, row))
+      throw new AppError("FORBIDDEN", "Only its assignee or the person who set it can change that", 403);
+    const changes = {};
+    if ("title" in body) changes.title = body.title;
+    if ("due_on" in body) changes.due_on = body.due_on;
+    let kind = "edited";
+    if ("done" in body && body.done !== Boolean(before.done_at)) {
+      changes.done_at = body.done ? new Date() : null;
+      changes.done_by = body.done ? actor.user_id : null;
+      kind = body.done ? "step_done" : "step_reopened";
+    }
+    await repo.updateStep(client, stepId, changes);
+    await noted(client, actor, row, { kind, detail: changes.title || before.title, key: EVENTS.TASK_STEP_CHANGED });
+    return toStep(await repo.step(client, id, stepId));
+  });
+}
+
+async function removeStep(actor, scope, id, stepId) {
+  await tx(async (client) => {
+    const row = await planned(client, id, scope);
+    const before = await repo.step(client, id, stepId);
+    if (!before) throw new AppError("NOT_FOUND", "That step does not exist", 404);
+    await repo.deleteStep(client, stepId);
+    await noted(client, actor, row, { kind: "step_removed", detail: before.title, key: EVENTS.TASK_STEP_CHANGED });
+  });
+  return getFor(id, scope);
+}
+
+/** This task waits on another the caller can see. No loops, and no more than PLAN_MAX either way. */
+async function addWaiting(actor, scope, id, { depends_on_task_id: otherId }) {
+  if (otherId === id) throw invalid("depends_on_task_id", "Pick another task");
+  await tx(async (client) => {
+    const row = await planned(client, id, scope);
+    const other = await repo.get(client, otherId);
+    if (!other || !audience.maySee(scope, other, await repo.sharedWith(client, otherId, scope.employee_id)))
+      throw invalid("depends_on_task_id", "Not a task you can see");
+    if (other.status === "cancelled") throw invalid("depends_on_task_id", "That task was cancelled");
+    const counts = await repo.edgeCounts(client, id, otherId);
+    if (counts.waits >= repo.PLAN_MAX || counts.held >= repo.PLAN_MAX)
+      throw conflict("TOO_MANY_LINKS", `A task waits on, or holds up, at most ${repo.PLAN_MAX} others`);
+    if (await repo.wouldCycle(client, id, otherId))
+      throw invalid("depends_on_task_id", `${other.number} already waits on this task`);
+    const made = await repo.insertDependency(client, { task_id: id, depends_on_task_id: otherId, created_by: actor.user_id });
+    if (made)
+      await noted(client, actor, row, {
+        kind: "waiting_added",
+        detail: `${other.number} ${other.title}`,
+        key: EVENTS.TASK_WAITING_CHANGED,
+      });
+  });
+  return getFor(id, scope);
+}
+
+async function removeWaiting(actor, scope, id, dependencyId) {
+  await tx(async (client) => {
+    const row = await planned(client, id, scope);
+    const edge = await repo.dependency(client, id, dependencyId);
+    if (!edge) throw new AppError("NOT_FOUND", "That link does not exist", 404);
+    await repo.deleteDependency(client, dependencyId);
+    await noted(client, actor, row, { kind: "waiting_removed", detail: edge.other_number, key: EVENTS.TASK_WAITING_CHANGED });
+  });
+  return getFor(id, scope);
+}
+
+/** Go ahead without the other task: a person's word, kept on the link. */
+async function overrideWaiting(actor, scope, id, dependencyId, { override_reason: reason }) {
+  await tx(async (client) => {
+    const row = await planned(client, id, scope);
+    const edge = await repo.dependency(client, id, dependencyId);
+    if (!edge) throw new AppError("NOT_FOUND", "That link does not exist", 404);
+    if (edge.overridden_at) return;
+    await repo.overrideDependency(client, dependencyId, { by: actor.user_id, reason });
+    await noted(client, actor, row, {
+      kind: "waiting_overridden",
+      detail: [edge.other_number, reason].filter(Boolean).join(": "),
+      key: EVENTS.TASK_WAITING_CHANGED,
+    });
+  });
+  return getFor(id, scope);
+}
+
+/**
+ * Watch a task. Anyone who can see it watches it themselves; naming someone else is for its
+ * assignee or the person who set it, and that person must be on the staff.
+ */
+async function watch(actor, scope, id, { employee_id: who }) {
+  const employeeId = who || actor.employee_id;
+  if (!employeeId) throw new AppError("FORBIDDEN", "Only an employee can watch a task", 403);
+  await tx(async (client) => {
+    if (!(await repo.lock(client, id))) throw notFound();
+    const row = await visible(client, id, scope);
+    if (employeeId !== actor.employee_id) {
+      if (!mayPlan(scope, row))
+        throw new AppError("FORBIDDEN", "Only its assignee or the person who set it can add watchers", 403);
+      if (!(await repo.employeeActive(client, employeeId))) throw invalid("employee_id", "Not on the staff");
+    }
+    if ((await repo.watcherIds(client, id)).length >= repo.PLAN_MAX)
+      throw conflict("TOO_MANY_WATCHERS", `A task has at most ${repo.PLAN_MAX} watchers`);
+    if (await repo.addWatcher(client, { task_id: id, employee_id: employeeId, created_by: actor.user_id }))
+      await noted(client, actor, row, {
+        kind: "watcher_added",
+        key: EVENTS.TASK_WATCHERS_CHANGED,
+        extra: { watcher_employee_id: employeeId },
+      });
+  });
+  return getFor(id, scope);
+}
+
+/** Stop watching: oneself always; someone else, for the assignee or the setter. */
+async function unwatch(actor, scope, id, employeeId) {
+  await tx(async (client) => {
+    if (!(await repo.lock(client, id))) throw notFound();
+    const row = await visible(client, id, scope);
+    if (employeeId !== actor.employee_id && !mayPlan(scope, row))
+      throw new AppError("FORBIDDEN", "Only its assignee or the person who set it can remove watchers", 403);
+    if (await repo.removeWatcher(client, id, employeeId))
+      await noted(client, actor, row, {
+        kind: "watcher_removed",
+        key: EVENTS.TASK_WATCHERS_CHANGED,
+        extra: { watcher_employee_id: employeeId },
+      });
+  });
+  return getFor(id, scope);
+}
+
+/** A nudge with a line of text, to the assignee, the watchers or both. Never to the sender. */
+async function ping(actor, scope, id, { message, to }) {
+  return tx(async (client) => {
+    const row = await visible(client, id, scope);
+    if (row.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
+    const watchers = to === "assignee" ? [] : await repo.watcherIds(client, id);
+    const people = [...(to === "watchers" ? [] : [row.primary_assignee_id]), ...watchers]
+      .filter((p) => p && p !== actor.employee_id);
+    if (!people.length) throw invalid("to", "Nobody else to tell");
+    await noted(client, actor, row, {
+      kind: "pinged",
+      detail: message.slice(0, 140),
+      key: EVENTS.TASK_PINGED,
+      extra: { ping_employee_ids: [...new Set(people)], message: message.slice(0, 280), sender_name: actor.display_name || null },
+    });
+    return toTask(row);
+  });
+}
+
+/** When a reminder fires: minutes before the due time, or the time itself. */
+function reminderAt(r, dueAt) {
+  if (r.remind_at) return new Date(r.remind_at);
+  if (!dueAt) return null;
+  return new Date(new Date(dueAt).getTime() - r.minutes_before * 60_000);
+}
+
+/** Replace a task's reminders to its assignee (up to three). A lead time needs a due time. */
+async function setReminders(actor, scope, id, { reminders: wanted }) {
+  await tx(async (client) => {
+    const row = await planned(client, id, scope);
+    if (["done", "cancelled"].includes(row.status)) throw new AppError("TASK_CLOSED", "This task is closed", 409);
+    const now = new Date();
+    const times = wanted.map((r, i) => {
+      const at = reminderAt(r, row.due_at);
+      if (!at) throw invalid(`reminders.${i}.minutes_before`, "Give the task a due date");
+      if (at <= now) throw invalid(`reminders.${i}`, "That time has passed");
+      return { at, minutes: r.minutes_before ?? null };
+    });
+    await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id } });
+    for (const [i, t] of times.entries()) {
+      await reminders.schedule(client, {
+        key: REMINDER_KEY,
+        entity: { type: "task", id },
+        occurrence: String(i + 1),
+        at: t.at,
+        payload: { minutes_before: t.minutes },
+      });
+    }
+    await noted(client, actor, row, {
+      kind: "reminders_set",
+      detail: times.length ? `${times.length} reminder${times.length === 1 ? "" : "s"}` : "none",
+      key: EVENTS.TASK_EDITED,
+    });
+  });
+  return getFor(id, scope);
+}
+
+/** The due time moved: lead-time reminders move with it; fixed ones stay where they were. */
+async function followDue(client, id, dueAt) {
+  const pending = await reminders.pendingFor(client, { key: REMINDER_KEY, entity: { type: "task", id } });
+  for (const r of pending) {
+    const minutes = r.payload && Number.isInteger(r.payload.minutes_before) ? r.payload.minutes_before : null;
+    if (minutes === null) continue;
+    const at = dueAt ? new Date(new Date(dueAt).getTime() - minutes * 60_000) : null;
+    if (!at || at <= new Date()) {
+      await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id }, occurrence: r.occurrence });
+    } else {
+      await reminders.schedule(client, {
+        key: REMINDER_KEY,
+        entity: { type: "task", id },
+        occurrence: r.occurrence,
+        at,
+        payload: { minutes_before: minutes },
+      });
+    }
+  }
+}
+
+/** The reminder engine's check before a task reminder fires: an open task only. */
+async function reminderCheck(client, row) {
+  const t = await repo.get(client, row.entity_id);
+  if (!t || ["done", "cancelled"].includes(t.status) || t.archived_at) return null;
+  return {
+    entity: { type: "task", id: t.task_id },
+    payload: { ...payloadOf(t), due_at: iso(t.due_at) },
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -557,12 +964,25 @@ async function sweep(now = new Date()) {
 module.exports = {
   cancelForRecord,
   toTask,
+  toRef,
   windows,
   list,
   summary,
   getFor,
+  blockageHistory,
   comments,
   activity,
+  addStep,
+  editStep,
+  removeStep,
+  addWaiting,
+  removeWaiting,
+  overrideWaiting,
+  watch,
+  unwatch,
+  ping,
+  setReminders,
+  reminderCheck,
   create,
   edit,
   move,

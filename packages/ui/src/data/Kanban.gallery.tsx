@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { GalleryEntry } from "../testing/gallery";
 import { Money } from "../display/Money";
 import { Pill } from "../display/Pill";
+import { EmptyState } from "../display/EmptyState";
 import { Kanban, type KanbanColumn } from "./Kanban";
 
 const START: KanbanColumn[] = [
@@ -25,6 +26,7 @@ const Moving = () => {
     <Kanban
       columns={columns}
       onOpen={() => undefined}
+      reorder
       onMove={(card, from, to) =>
         setColumns((cols) => {
           const moved = cols.find((c) => c.key === from)?.cards.find((c) => c.key === card);
@@ -44,5 +46,9 @@ export default {
     Moving,
     "Read Only": () => <Kanban columns={START} />,
     "Empty Board": () => <Kanban columns={START.map((c) => ({ ...c, cards: [], count: 0 }))} onMove={() => undefined} />,
+    "Empty With State": () => (
+      <Kanban columns={START.map((c) => ({ ...c, cards: [], count: 0 }))} empty={<EmptyState title="No Deals Yet" text="Add the first partner to start" />} />
+    ),
+    "More To Load": () => <Kanban columns={START.map((c, i) => (i === 0 ? { ...c, count: 9, onMore: () => new Promise((r) => setTimeout(r, 800)) } : c))} onMove={() => undefined} />,
   },
 } satisfies GalleryEntry;

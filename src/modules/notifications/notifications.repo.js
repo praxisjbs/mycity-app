@@ -749,6 +749,20 @@ async function cancelReminders(db, { key, entityType, entityId, occurrence = nul
   return rowCount;
 }
 
+/** A record's pending occurrences of one reminder, by occurrence. A record holds a handful at most. */
+async function pendingReminders(db, { key, entityType, entityId }) {
+  // pagination:complete one record's pending occurrences of one reminder
+  const { rows } = await completeQuery(
+    db,
+    `SELECT ${REMINDER_COLUMNS} FROM reminder
+      WHERE reminder_key = $1 AND entity_type = $2 AND entity_id = $3 AND state = 'pending'
+      ORDER BY occurrence, reminder_id`,
+    [key, entityType, String(entityId)],
+    { label: "a record's pending reminders", ceiling: 25 },
+  );
+  return rows;
+}
+
 /** Occurrences due now, oldest first. */
 async function dueReminders(db, now, keys) {
   const { rows } = await db.query(
@@ -988,6 +1002,7 @@ module.exports = {
   scheduleReminder,
   cancelReminders,
   dueReminders,
+  pendingReminders,
   reminderForFiring,
   moveReminder,
   reminderFired,

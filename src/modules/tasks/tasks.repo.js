@@ -23,12 +23,17 @@ const ROWS = `
          t.recurrence, t.sort_order, t.created_at, t.updated_at, t.archived_at,
          t.primary_assignee_id, t.set_by_employee_id, t.created_by,
          t.is_commitment, t.acceptance_criteria, t.commitment_month, t.original_due_at, t.rescoped_at,
-         t.commitment_set_id,
+         t.commitment_set_id, t.late_reason,
          ${personJson("ae", "ad")} AS assignee,
          ${personJson("se", "sd")} AS set_by,
          et.title AS target_title,
          (SELECT count(*)::int FROM task_comment c
            WHERE c.task_id = t.task_id AND c.deleted_at IS NULL) AS comment_count,
+         (SELECT count(*)::int FROM task_step st WHERE st.task_id = t.task_id) AS steps_total,
+         (SELECT count(*)::int FROM task_step st
+           WHERE st.task_id = t.task_id AND st.done_at IS NOT NULL) AS steps_done,
+         EXISTS (SELECT 1 FROM task_dependency dp JOIN task pre ON pre.task_id = dp.depends_on_task_id
+                  WHERE dp.task_id = t.task_id AND dp.overridden_at IS NULL AND pre.status <> 'done') AS waiting,
          search_fold(t.title || ' ' || COALESCE(t.number::text, '') || ' ' ||
                      COALESCE(ae.first_name || ' ' || ae.last_name, '')) AS haystack
     FROM task t
@@ -46,7 +51,8 @@ const OUT = `v.task_id, v.number, v.title, v.description, v.status, v.priority, 
   v.blocked_at, v.employee_target_id, v.entity_type, v.entity_id, v.recurrence, v.sort_order,
   v.created_at, v.updated_at, v.primary_assignee_id, v.set_by_employee_id, v.created_by,
   v.assignee, v.set_by, v.target_title, v.comment_count, v.is_commitment, v.acceptance_criteria,
-  v.commitment_month, v.original_due_at, v.rescoped_at, v.commitment_set_id`;
+  v.commitment_month, v.original_due_at, v.rescoped_at, v.commitment_set_id, v.late_reason,
+  v.steps_total, v.steps_done, v.waiting`;
 
 /** The SQL for each field TaskListQuery allow-lists. The first is the default order. */
 const SORTS = {
@@ -117,15 +123,16 @@ function list(db, query, scope, at) {
   );
 }
 
-/** The four figures above the board, for `mine` or `team`. */
+/** The four figures above the board, for `mine` or `team`, and what was done in the last 30 days. */
 async function summary(db, listScope, scope, at) {
-  const params = [at.now, at.week.from, at.week.to];
+  const params = [at.now, at.week.from, at.week.to, at.last30.from];
   const who = audience(listScope, scope, params);
   const { rows } = await db.query(
     `SELECT count(*) FILTER (WHERE ${OPEN})::int AS open,
             count(*) FILTER (WHERE ${OPEN} AND v.due_at >= $2 AND v.due_at < $3)::int AS due_this_week,
             count(*) FILTER (WHERE ${OPEN} AND v.due_at < $1)::int AS overdue,
-            count(*) FILTER (WHERE v.status = 'done' AND v.completed_at >= $2 AND v.completed_at < $3)::int AS done_this_week
+            count(*) FILTER (WHERE v.status = 'done' AND v.completed_at >= $2 AND v.completed_at < $3)::int AS done_this_week,
+            count(*) FILTER (WHERE v.status = 'done' AND v.completed_at >= $4::timestamptz)::int AS done_30d
        FROM (${ROWS}) v
       WHERE v.archived_at IS NULL ${who}`,
     params,
@@ -180,6 +187,7 @@ const WRITABLE = [
   "entity_id",
   "recurrence",
   "sort_order",
+  "late_reason",
 ];
 
 /** Insert a task; returns its id. */
@@ -412,7 +420,303 @@ async function openForRecord(db, entityType, entityId) {
   return rows;
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Steps, waiting on, watchers and holds (docs/guides/workspace.md §6)
+ * ------------------------------------------------------------------ */
+
+/** Most steps, prerequisites and watchers a task holds; the panel shows them whole. */
+const PLAN_MAX = 25;
+
+const STEPS = `
+  SELECT s.task_step_id, s.task_id, s.title, to_char(s.due_on, 'YYYY-MM-DD') AS due_on, s.done_at,
+         ${personJson("e", "d")} AS done_by, s.sort_order, s.created_at
+    FROM task_step s
+    LEFT JOIN app_user u ON u.user_id = s.done_by
+    LEFT JOIN employee e ON e.employee_id = u.employee_id
+    LEFT JOIN department d ON d.department_id = e.department_id`;
+
+/** A task's steps in their order. */
+async function steps(db, taskId) {
+  // pagination:complete a task's own steps, at most PLAN_MAX (the service refuses more)
+  const { rows } = await completeQuery(
+    db,
+    `${STEPS} WHERE s.task_id = $1 ORDER BY s.sort_order, s.created_at, s.task_step_id`,
+    [taskId],
+    { label: "a task's steps", ceiling: PLAN_MAX },
+  );
+  return rows;
+}
+
+async function step(db, taskId, stepId) {
+  const { rows } = await db.query(`${STEPS} WHERE s.task_id = $1 AND s.task_step_id = $2`, [taskId, stepId]);
+  return rows[0] || null;
+}
+
+async function stepCount(db, taskId) {
+  const { rows } = await db.query("SELECT count(*)::int AS n, COALESCE(max(sort_order), 0) AS last FROM task_step WHERE task_id = $1", [taskId]);
+  return { n: rows[0].n, last: Number(rows[0].last) };
+}
+
+async function insertStep(client, row) {
+  const { rows } = await client.query(
+    `INSERT INTO task_step (task_id, title, due_on, sort_order, created_by)
+     VALUES ($1, $2, $3, $4, $5) RETURNING task_step_id`,
+    [row.task_id, row.title, row.due_on || null, row.sort_order, row.created_by],
+  );
+  return rows[0].task_step_id;
+}
+
+/** Change a step: title, due_on, done_at and done_by as given. */
+async function updateStep(client, stepId, changes) {
+  const keys = ["title", "due_on", "done_at", "done_by"].filter((k) => changes[k] !== undefined);
+  if (!keys.length) return;
+  await client.query(
+    `UPDATE task_step SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(", ")} WHERE task_step_id = $1`,
+    [stepId, ...keys.map((k) => changes[k])],
+  );
+}
+
+async function deleteStep(client, stepId) {
+  await client.query("DELETE FROM task_step WHERE task_step_id = $1", [stepId]);
+}
+
+/** The other end of an edge, with what the reader needs to decide whether they may open it. */
+const EDGES = (side, other) => `
+  SELECT dp.task_dependency_id, dp.overridden_at, dp.override_reason,
+         o.task_id, o.number::text AS number, o.title, o.status,
+         o.primary_assignee_id, o.set_by_employee_id,
+         ${personJson("oe", "od")} AS assignee
+    FROM task_dependency dp
+    JOIN task o ON o.task_id = dp.${other}
+    LEFT JOIN employee oe ON oe.employee_id = o.primary_assignee_id
+    LEFT JOIN department od ON od.department_id = oe.department_id
+   WHERE dp.${side} = $1`;
+
+/** What a task waits on. */
+async function waitingOn(db, taskId) {
+  // pagination:complete one task's prerequisites, at most PLAN_MAX (the service refuses more)
+  const { rows } = await completeQuery(
+    db,
+    `${EDGES("task_id", "depends_on_task_id")} ORDER BY dp.created_at, dp.task_dependency_id`,
+    [taskId],
+    { label: "a task's prerequisites", ceiling: PLAN_MAX },
+  );
+  return rows;
+}
+
+/** What waits on a task. */
+async function holdingUp(db, taskId) {
+  // pagination:complete the tasks waiting on one task, at most PLAN_MAX (the service refuses more)
+  const { rows } = await completeQuery(
+    db,
+    `${EDGES("depends_on_task_id", "task_id")} ORDER BY dp.created_at, dp.task_dependency_id`,
+    [taskId],
+    { label: "the tasks waiting on a task", ceiling: PLAN_MAX },
+  );
+  return rows;
+}
+
+async function edgeCounts(db, taskId, dependsOnId) {
+  const { rows } = await db.query(
+    `SELECT (SELECT count(*)::int FROM task_dependency WHERE task_id = $1) AS waits,
+            (SELECT count(*)::int FROM task_dependency WHERE depends_on_task_id = $2) AS held`,
+    [taskId, dependsOnId],
+  );
+  return rows[0];
+}
+
+/** Would "taskId waits on dependsOnId" close a loop? Walks what dependsOnId waits on, 50 deep at most. */
+async function wouldCycle(db, taskId, dependsOnId) {
+  const { rows } = await db.query(
+    `WITH RECURSIVE walk AS (
+       SELECT $2::uuid AS id, 0 AS depth
+       UNION
+       SELECT dp.depends_on_task_id, w.depth + 1
+         FROM task_dependency dp JOIN walk w ON dp.task_id = w.id
+        WHERE w.depth < 50
+     )
+     SELECT 1 FROM walk WHERE id = $1 LIMIT 1`,
+    [taskId, dependsOnId],
+  );
+  return rows.length > 0;
+}
+
+async function insertDependency(client, { task_id, depends_on_task_id, created_by }) {
+  const { rows } = await client.query(
+    `INSERT INTO task_dependency (task_id, depends_on_task_id, created_by) VALUES ($1, $2, $3)
+     ON CONFLICT (task_id, depends_on_task_id) DO NOTHING RETURNING task_dependency_id`,
+    [task_id, depends_on_task_id, created_by],
+  );
+  return rows[0] ? rows[0].task_dependency_id : null;
+}
+
+async function dependency(db, taskId, dependencyId) {
+  const { rows } = await db.query(
+    `SELECT dp.*, o.number::text AS other_number, o.status AS other_status
+       FROM task_dependency dp JOIN task o ON o.task_id = dp.depends_on_task_id
+      WHERE dp.task_id = $1 AND dp.task_dependency_id = $2`,
+    [taskId, dependencyId],
+  );
+  return rows[0] || null;
+}
+
+async function deleteDependency(client, dependencyId) {
+  await client.query("DELETE FROM task_dependency WHERE task_dependency_id = $1", [dependencyId]);
+}
+
+async function overrideDependency(client, dependencyId, { by, reason }) {
+  await client.query(
+    `UPDATE task_dependency SET overridden_at = now(), overridden_by = $2, override_reason = $3
+      WHERE task_dependency_id = $1`,
+    [dependencyId, by, reason || null],
+  );
+}
+
+/** The first prerequisite still holding a task up, or null. */
+async function firstUnsatisfied(db, taskId) {
+  const { rows } = await db.query(
+    `SELECT o.number::text AS number, o.title FROM task_dependency dp
+       JOIN task o ON o.task_id = dp.depends_on_task_id
+      WHERE dp.task_id = $1 AND dp.overridden_at IS NULL AND o.status <> 'done'
+      ORDER BY dp.created_at, dp.task_dependency_id LIMIT 1`,
+    [taskId],
+  );
+  return rows[0] || null;
+}
+
+/** The open tasks that wait on this one, with their assignees: told when it is done. */
+async function waitingAssignees(db, taskId) {
+  // pagination:complete the tasks waiting on one task, at most PLAN_MAX
+  const { rows } = await completeQuery(
+    db,
+    `SELECT t.primary_assignee_id FROM task_dependency dp JOIN task t ON t.task_id = dp.task_id
+      WHERE dp.depends_on_task_id = $1 AND t.status NOT IN ('done', 'cancelled')
+      ORDER BY dp.task_dependency_id`,
+    [taskId],
+    { label: "the tasks waiting on a task", ceiling: PLAN_MAX },
+  );
+  return rows.map((r) => r.primary_assignee_id);
+}
+
+/** A task's watchers as people. */
+async function watchers(db, taskId) {
+  // pagination:complete one task's watchers, at most PLAN_MAX (the service refuses more)
+  const { rows } = await completeQuery(
+    db,
+    `SELECT ${personJson("e", "d")} AS person
+       FROM task_watcher w
+       JOIN employee e ON e.employee_id = w.employee_id
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE w.task_id = $1
+      ORDER BY w.created_at, w.task_watcher_id`,
+    [taskId],
+    { label: "a task's watchers", ceiling: PLAN_MAX },
+  );
+  return rows.map((r) => r.person);
+}
+
+async function watcherIds(db, taskId) {
+  // pagination:complete one task's watchers, at most PLAN_MAX
+  const { rows } = await completeQuery(
+    db,
+    "SELECT employee_id FROM task_watcher WHERE task_id = $1 ORDER BY task_watcher_id",
+    [taskId],
+    { label: "a task's watchers", ceiling: PLAN_MAX },
+  );
+  return rows.map((r) => r.employee_id);
+}
+
+async function addWatcher(client, { task_id, employee_id, created_by }) {
+  const { rows } = await client.query(
+    `INSERT INTO task_watcher (task_id, employee_id, created_by) VALUES ($1, $2, $3)
+     ON CONFLICT (task_id, employee_id) DO NOTHING RETURNING task_watcher_id`,
+    [task_id, employee_id, created_by],
+  );
+  return rows.length > 0;
+}
+
+async function removeWatcher(client, taskId, employeeId) {
+  const { rowCount } = await client.query("DELETE FROM task_watcher WHERE task_id = $1 AND employee_id = $2", [taskId, employeeId]);
+  return rowCount > 0;
+}
+
+const HOLDS = `
+  SELECT b.task_blockage_id, b.note, to_char(b.estimated_resolve_on, 'YYYY-MM-DD') AS estimated_resolve_on,
+         ${personJson("re", "rd")} AS raised_by, b.raised_at, b.resolved_at,
+         ${personJson("xe", "xd")} AS resolved_by, b.resolve_note, b.due_shift_days,
+         round((extract(epoch FROM COALESCE(b.resolved_at, now()) - b.raised_at) / 86400.0)::numeric, 1)::float AS blocked_days
+    FROM task_blockage b
+    LEFT JOIN app_user ru ON ru.user_id = b.raised_by
+    LEFT JOIN employee re ON re.employee_id = ru.employee_id
+    LEFT JOIN department rd ON rd.department_id = re.department_id
+    LEFT JOIN app_user xu ON xu.user_id = b.resolved_by
+    LEFT JOIN employee xe ON xe.employee_id = xu.employee_id
+    LEFT JOIN department xd ON xd.department_id = xe.department_id`;
+
+/** The task's open hold, or null. */
+async function openBlockage(db, taskId) {
+  const { rows } = await db.query(`${HOLDS} WHERE b.task_id = $1 AND b.resolved_at IS NULL`, [taskId]);
+  return rows[0] || null;
+}
+
+/** One page of a task's holds, newest first by default. */
+function blockages(db, taskId, query) {
+  return pageQuery(
+    db,
+    `SELECT v.*, ${TOTAL_COL} FROM (${HOLDS} WHERE b.task_id = $1) v
+      ORDER BY ${orderBy(query, { raised_at: "v.raised_at" }, "v.task_blockage_id")}`,
+    [taskId],
+    { ...query, sort: query.sort || { field: "raised_at", dir: "desc" } },
+  );
+}
+
+async function insertBlockage(client, { task_id, note, estimated_resolve_on, raised_by }) {
+  const { rows } = await client.query(
+    `INSERT INTO task_blockage (task_id, note, estimated_resolve_on, raised_by) VALUES ($1, $2, $3, $4)
+     RETURNING task_blockage_id, raised_at`,
+    [task_id, note, estimated_resolve_on || null, raised_by],
+  );
+  return rows[0];
+}
+
+/** Close the open hold; returns it as it was (raised_at), or null when none was open. */
+async function resolveBlockage(client, taskId, { by, note, shiftDays }) {
+  const { rows } = await client.query(
+    `UPDATE task_blockage SET resolved_at = now(), resolved_by = $2, resolve_note = $3, due_shift_days = $4
+      WHERE task_id = $1 AND resolved_at IS NULL
+      RETURNING task_blockage_id, raised_at`,
+    [taskId, by, note || null, shiftDays],
+  );
+  return rows[0] || null;
+}
+
 module.exports = {
+  PLAN_MAX,
+  steps,
+  step,
+  stepCount,
+  insertStep,
+  updateStep,
+  deleteStep,
+  waitingOn,
+  holdingUp,
+  edgeCounts,
+  wouldCycle,
+  insertDependency,
+  dependency,
+  deleteDependency,
+  overrideDependency,
+  firstUnsatisfied,
+  waitingAssignees,
+  watchers,
+  watcherIds,
+  addWatcher,
+  removeWatcher,
+  openBlockage,
+  blockages,
+  insertBlockage,
+  resolveBlockage,
   SORTS,
   openForRecord,
   list,
