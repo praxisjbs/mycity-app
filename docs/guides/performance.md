@@ -565,7 +565,7 @@ own blocks (§1.2). Numbers 2020, 2030 and 2091 were used on the withdrawn branc
 | `performance_review_item` (2000, altered) | `criterion` (a probation review's `objectives`, `quality`, `timeliness`, `attendance`, `conduct`, where there is no line), `actual_value`, `actual_text`, `achieved_on`, `evidence_kind` (`record`, `document`, `link`, `note`), `evidence_entity_type`, `evidence_entity_id`, `evidence_document_id`, `evidence_url`, `evidence_note`, `action_text`, `action_transcript`, `action_document_id`, `action_ai_run_id`, `proposed_score`, `self_score`, `self_reason`, `override_reason`, `assessable`, `auto` | One per line per review. `score` (existing) is the final score; `comment` (existing) the reviewer's comment |
 | `improvement_plan` (new) | `improvement_plan_id`, `employee_id`, `performance_review_id`, `starts_on`, `ends_on`, `review_on`, `summary`, `status` (`open`, `passed`, `extended`, `not_met`), `outcome_note`, `created_by`, `decided_by`, `decided_at` | A PIP. Its actions are tasks pointing at it |
 | `improvement_plan_line` (new) | `improvement_plan_id`, `employee_target_id`, `text`, `target_text` | What must improve |
-| `task` (2000, 2010, altered) | `is_commitment`, `acceptance_criteria`, `commitment_month`, `original_due_at`, `commitment_set_id`, `rescoped_at` | `entity_type` CHECK gains `key_result`, `scorecard`, `performance_review`, `improvement_plan`, and `task` (2400, PR 4: a Recovery task points at the missed commitment it recovers). `original_due_at` is fixed when the commitment set is approved; a rescope's approval sets `rescoped_at` |
+| `task` (2000, 2010, altered) | `is_commitment`, `acceptance_criteria`, `commitment_month`, `original_due_at`, `commitment_set_id`, `rescoped_at`, `rescope_reason` (2400) | `entity_type` CHECK gains `key_result`, `scorecard`, `performance_review`, `improvement_plan`, and `task` (2400, PR 4: a Recovery task points at the missed commitment it recovers). `original_due_at` is fixed when the commitment set is approved; a rescope keeps its reason in `rescope_reason` (cleared when refused) and its approval sets `rescoped_at` |
 | `commitment_set` (new) | `commitment_set_id`, `employee_id`, `month`, `status` (`draft`, `submitted`, `approved`, `returned`), `workflow_instance_id`, `approved_at` | One person's commitments for a month, approved as one. UNIQUE (employee, month) |
 | `weekly_summary` (new) | `weekly_summary_id`, `employee_id`, `week_starts_on`, `support_needed`, `summary_text`, `ai_run_id` | The one line a person writes each week, and a tidied summary they accepted. UNIQUE (employee, week) |
 
@@ -644,7 +644,7 @@ routes file; the module that owns each route is named.
 | `POST /performance/scorecards/:id/disagree` | `DisagreeBody` (`disagree_reason`) → `ScorecardDetail` | as above | | |
 | `GET /performance/contributions` | `ContributionQuery` → `ContributionPage` | view | yes, 25 | `plan_id` or `key_result_id`: each split key result with its shares, sum, target, OK or Rebalance |
 | `GET /performance/commitments` (PR 4) | `CommitmentListQuery` → `CommitmentPage` | view · own, team, all | yes, 25 | `month`, `department_id`, `employee_id`, `state` (`awaiting_approval`, `due`, `on_time`, `late`, `missed`, `rescoped`), `waiting_on_me`, `q`; rows are tasks |
-| `POST /performance/commitments/sets/:employee_id/:month/submit` (PR 4) | `EmptyBody` → `CommitmentSet` | `workspace` edit · scope (the person or their manager) | | `month` is `YYYY-MM`; opens `performance.commitments` |
+| `POST /performance/commitments/sets/:employee_id/:month/submit` (PR 4) | `EmptyBody` → `CommitmentSetRow` | `workspace` edit · scope (the person or their manager) | | `month` is `YYYY-MM`; opens `performance.commitments` |
 | `POST /performance/commitments/report` (PR 4) | `CommitmentReportRequest` → `ExportFile` | export · scope | | the month-end delivery report (202, `shared/documents/exports`) |
 | `GET /performance/commitments/summary` (PR 4) | `CommitmentSummaryQuery` → `CommitmentSummary` | view · own, team, all | | the Commitments view's figures for a month: commitments, on time, late or missed, awaiting approval |
 | `GET /performance/commitments/sets` (PR 4) | `CommitmentSetListQuery` → `CommitmentSetPage` | view · own, team, all, plus sets waiting on the reader | yes, 25 | `month`, `employee_id`, `status`, `waiting_on_me`; each set with its person and its approval; Waiting On You |
@@ -1194,7 +1194,7 @@ the CEO. They never go to search, Home, Analytics (scores only) or the AI (§9).
   October"). `reviews.ai.js`: `reviews.list` (stages and scores only; never
   actions, evidence, transcripts, comments, input, conduct or PIPs).
 - **AI routes**: "do my check-in" → `ess.my-performance` with `check_in=1`; "set my commitments" →
-  `workspace.tasks` with `action=commitment` (New Task with Commitment ticked); "open Ada's scorecard" → `performance.targets` with the
+  `workspace.tasks` with `new=1&commitment=1` (New Task with Commitment ticked); "open Ada's scorecard" → `performance.targets` with the
   scorecard; "report the month" → `performance.goals` with `report=1`.
 - **Feature AI** (§6.17, §6.18): `review-dictation` (Transcription), `review-cleanup` (Default),
   `week-summary` (Default), each registered in `src/services/ai/actions.js` with `chosen_by` TB,

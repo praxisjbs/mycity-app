@@ -91,7 +91,7 @@ board itself (My Week), so MyCity's weekly tracker retires.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `task` (2000, 2010, 2100, 2400) | `task_id`, `number`, `title`, `status`, `priority`, `primary_assignee_id`, `set_by_employee_id`, `created_by`, `cadence`, `due_at`, `started_at`, `completed_at`, `cancelled_at`, `cancel_reason`, `employee_target_id`, `entity_type`, `entity_id`, `blocked_reason`, `blocked_at`, `sort_order`, `recurrence`, `archived_at`; a commitment's `is_commitment`, `acceptance_criteria`, `commitment_month`, `original_due_at`, `commitment_set_id`, `rescoped_at` (2100) | `status` CHECK `todo`, `in_progress`, `in_review`, `done`, `cancelled`; `priority` CHECK `low`, `normal`, `high`, `urgent`; `cadence` CHECK `daily`, `weekly` or NULL (a task with no horizon). `number` is filled by numbering for every task saved through the service; rows written before 2010 have none. The next occurrence of a repeating task points back at it through `parent_task_id`. Read by Home (`task_id`, `title`, `status`, `priority`, `due_at`, `completed_at`, `archived_at`, `primary_assignee_id`) |
+| `task` (2000, 2010, 2100, 2400) | `task_id`, `number`, `title`, `status`, `priority`, `primary_assignee_id`, `set_by_employee_id`, `created_by`, `cadence`, `due_at`, `started_at`, `completed_at`, `cancelled_at`, `cancel_reason`, `employee_target_id`, `entity_type`, `entity_id`, `blocked_reason`, `blocked_at`, `sort_order`, `recurrence`, `archived_at`; a commitment's `is_commitment`, `acceptance_criteria`, `commitment_month`, `original_due_at`, `commitment_set_id`, `rescoped_at` (2100) and `rescope_reason` (2400) | `status` CHECK `todo`, `in_progress`, `in_review`, `done`, `cancelled`; `priority` CHECK `low`, `normal`, `high`, `urgent`; `cadence` CHECK `daily`, `weekly` or NULL (a task with no horizon). `number` is filled by numbering for every task saved through the service; rows written before 2010 have none. The next occurrence of a repeating task points back at it through `parent_task_id`. Read by Home (`task_id`, `title`, `status`, `priority`, `due_at`, `completed_at`, `archived_at`, `primary_assignee_id`) |
 | `task_assignee` (2000) | `task_id`, `employee_id`, `assignment_role` | the people beside the primary assignee (`assignment_role` `collaborator` or `reviewer`); the primary assignee is always on `task` |
 | `task_comment` (2000) | `task_id`, `author_user_id`, `body`, `deleted_at` | paged at 25, newest last |
 | `task_activity` (2010) | `task_id`, `actor_user_id`, `kind`, `from_status`, `to_status`, `detail` | history the panel and Since You Were Away read; never updated (trigger), removed only with its task |
@@ -103,7 +103,7 @@ board itself (My Week), so MyCity's weekly tracker retires.
 
 Schema migration file(s): `migrations/2010_workspace.sql`; Performance's `2100_performance_foundation.sql`
 (the commitment columns, `commitment_set`, `weekly_summary`) and `2400_performance_commitments.sql`
-(`entity_type` `task`, a Recovery task's pointer). Reference-data file(s):
+(`entity_type` `task`, a Recovery task's pointer; `rescope_reason`). Reference-data file(s):
 `seeds/reference/2090_seed_workspace.sql` (the `task` numbering scheme, the status, priority and
 event type codes, `cancelled`).
 
@@ -233,7 +233,7 @@ set and a rescope are decided by the person the flow names (performance.md §6.1
   `calendar.ai.js`: `calendar.month` ("what's on Thursday"). Both `workspace` view, scoped, paged at
   25. The `workspace` module itself (Today, Analytics) is `ai:none`: it is a view over these two.
 - **AI routes**: "create a task" → `workspace.tasks` with `new=1` and the title prefilled; "set my
-  commitments" → `workspace.tasks` with `action=commitment`; "book a meeting" → `workspace.calendar`
+  commitments" → `workspace.tasks` with `new=1&commitment=1`; "book a meeting" → `workspace.calendar`
   with `new=1`.
 - **Feature AI**: Tidy With AI on the week, action `week-summary` (Default, personal data, TB,
   22/10/2026; prompt `services/ai/prompts/week-summary.md`), only when pressed (performance.md §6.18).
