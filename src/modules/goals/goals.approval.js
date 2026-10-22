@@ -3,7 +3,8 @@
  * What an approval's outcome does to a plan or a target (docs/guides/performance.md §6.4, §6.7).
  *
  *   performance.plan approved           the plan binds: its codes freeze, its function's scorecards
- *                                       bind and their people and reviewers are asked to agree
+ *                                       bind and their people and reviewers are asked to agree; an
+ *                                       amendment holding one mid-quarter scorecard binds it alone
  *   performance.plan rejected           the plan returns to its head with the reason (Request
  *                                       Changes on a plan is a refusal with a reason)
  *   performance.target_change approved  the new target applies from its month; earlier months keep
@@ -116,8 +117,15 @@ async function settleChange(changeId, { state }) {
   });
 }
 
+// A plan, or a mid-quarter scorecard sent on its own as an amendment of its plan (§11).
 workflow.onCompleted(PLAN_FLOW, "goals.settle_plan", (event) =>
-  settlePlan(event.entity.id, { state: event.payload.state, reason: event.payload.reason || null }),
+  event.entity.type === "scorecard"
+    ? require("../targets/targets.service").settleAmendment(event.entity.id, {
+        state: event.payload.state,
+        reason: event.payload.reason || null,
+        opened_by: event.payload.opened_by || null,
+      })
+    : settlePlan(event.entity.id, { state: event.payload.state, reason: event.payload.reason || null }),
 );
 
 workflow.onCompleted(CHANGE_FLOW, "goals.settle_target_change", (event) =>

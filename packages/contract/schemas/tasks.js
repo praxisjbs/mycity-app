@@ -32,6 +32,7 @@ const {
   Paged,
 } = require("./common");
 const { PersonRef } = require("./organisation");
+const { MonthStart } = require("./kpis");
 
 const TaskStatus = z.enum(["todo", "in_progress", "in_review", "done", "cancelled"]);
 /** The four columns a card can be dragged between. */
@@ -39,8 +40,11 @@ const BoardStatus = z.enum(["todo", "in_progress", "in_review", "done"]);
 const TaskPriority = z.enum(["low", "normal", "high", "urgent"]);
 /** A24: the horizon a manager sets work on. Null for a task with no horizon. */
 const TaskCadence = z.enum(["daily", "weekly"]);
-/** Records a task may point at in M2; each is a key of shared/route-map ENTITY_ROUTES. */
-const TaskEntityType = z.enum(["partner", "vacancy", "goal", "key_result", "scorecard", "performance_review", "improvement_plan"]);
+/**
+ * Records a task may point at in M2; each is a key of shared/route-map ENTITY_ROUTES. `task`: a
+ * Recovery task points at the missed commitment it recovers (migration 2400).
+ */
+const TaskEntityType = z.enum(["partner", "vacancy", "goal", "key_result", "scorecard", "performance_review", "improvement_plan", "task"]);
 /** `mine`: tasks the caller is assigned, set or shares. `team`: everyone in their workspace scope. */
 const TaskScope = z.enum(["mine", "team"]);
 
@@ -75,14 +79,72 @@ const Link = z
   })
   .strict();
 
-/** The KPI a task counts towards, as the card and panel name it. */
+/* ------------------------------------------------------------------ *
+ * Commitments (docs/guides/performance.md §6.11)
+ * ------------------------------------------------------------------ */
+
+/**
+ * A commitment's state, worked out on every read: approved or not, done by its original date or
+ * after, missed at its month's end, or rescoped.
+ */
+const CommitmentState = z.enum(["awaiting_approval", "due", "on_time", "late", "missed", "rescoped"]);
+/** Where a person's month of commitments stands. */
+const CommitmentSetStatus = z.enum(["draft", "submitted", "approved", "returned"]);
+
+/** The Recovery task set for a missed commitment: its owner and date. */
+const CommitmentRecoveryRef = z
+  .object({
+    task_id: uuid,
+    number: z.string(),
+    assignee: PersonRef.nullable(),
+    due_at: isoDateTime.nullable(),
+  })
+  .strict();
+
+/** A rescope waiting for approval (its reason is the task's `rescope_reason`), and whether the reader decides it. */
+const PendingRescope = z
+  .object({
+    workflow_instance_id: uuid,
+    can_decide: z.boolean(),
+  })
+  .strict();
+
+/* ------------------------------------------------------------------ *
+ * Counts Towards (docs/guides/performance.md §6.18)
+ * ------------------------------------------------------------------ */
+
+const CountsTowardsKind = z.enum(["line", "key_result"]);
+
+/** The scorecard line or key result a task counts towards, as the card and panel name it. */
 const CountsTowards = z
   .object({
-    employee_target_id: uuid,
+    kind: CountsTowardsKind,
+    employee_target_id: uuid.nullable(),
+    okr_key_result_id: uuid.nullable(),
     title: z.string(),
     link: Link.nullable(),
   })
   .strict();
+
+/** One choice on the task form's Counts Towards: a line of the assignee's scorecard, or a key result they own. */
+const CountsTowardsOption = z
+  .object({
+    kind: CountsTowardsKind,
+    employee_target_id: uuid.nullable(),
+    okr_key_result_id: uuid.nullable(),
+    title: z.string(),
+    sub: z.string().nullable(),
+  })
+  .strict();
+const CountsTowardsPage = Paged(CountsTowardsOption);
+
+/** GET /tasks/counts-towards: the assignee's own (the caller unless given), for the quarter holding `month`. */
+const CountsTowardsQuery = listQuery(
+  {
+    assignee_id: uuid.optional(),
+    month: MonthStart.optional(),
+  },
+);
 
 /** One task, as the board, Today and the panel show it. */
 const Task = z
@@ -115,17 +177,28 @@ const Task = z
     commitment_month: isoDate.nullable(),
     original_due_at: isoDateTime.nullable(),
     rescoped_at: isoDateTime.nullable(),
+    rescope_reason: z.string().nullable(),
     commitment_set_id: uuid.nullable(),
+    commitment_state: CommitmentState.nullable(),
     created_at: isoDateTime,
     updated_at: isoDateTime,
   })
   .strict();
 
-/** GET /tasks/:id: the task and what the caller may do to it. */
+/**
+ * GET /tasks/:id: the task and what the caller may do to it. A commitment also says where its
+ * month's set stands, a rescope waiting on approval, its Recovery task, and whether the caller may
+ * ask a rescope or set its recovery.
+ */
 const TaskDetail = Task.extend({
   can_edit: z.boolean(),
   can_reassign: z.boolean(),
   can_cancel: z.boolean(),
+  set_status: CommitmentSetStatus.nullable(),
+  rescope: PendingRescope.nullable(),
+  recovery: CommitmentRecoveryRef.nullable(),
+  can_rescope: z.boolean(),
+  can_set_recovery: z.boolean(),
 }).strict();
 
 const TaskPage = Paged(Task);
@@ -140,6 +213,8 @@ const TaskListQuery = listQuery(
     priority: TaskPriority.optional(),
     due: z.enum(["overdue", "today", "week"]).optional(),
     employee_target_id: uuid.optional(),
+    is_commitment: z.enum(["true", "false"]).optional(),
+    commitment_month: MonthStart.optional(),
   },
   ["sort_order", "due_at", "priority", "created_at"],
 );
@@ -161,6 +236,20 @@ const pointerPair = (v) =>
   (v.entity_id === undefined || v.entity_id === null);
 const POINTER = { message: "Pick the record", path: ["entity_id"] };
 
+/**
+ * A commitment needs its criteria, its month and a due date in that month (performance.md §6.11).
+ * Applied where the body says it is one.
+ */
+function commitmentProblems(v, ctx) {
+  if (v.is_commitment !== true) return;
+  const say = (path, message) => ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [path] });
+  if (!v.acceptance_criteria) say("acceptance_criteria", "Give the criteria");
+  if (!v.commitment_month) say("commitment_month", "Pick the month");
+  if (!v.due_on) say("due_on", "Pick a due date");
+  else if (v.commitment_month && String(v.due_on).slice(0, 7) !== String(v.commitment_month).slice(0, 7))
+    say("due_on", "Not in that month");
+}
+
 /** POST /tasks. No assignee: the caller's own task. */
 const TaskCreate = z
   .object({
@@ -174,9 +263,13 @@ const TaskCreate = z
     entity_type: blank(TaskEntityType),
     entity_id: blank(uuid),
     recurrence: Recurrence.optional(),
+    is_commitment: z.boolean().default(false),
+    acceptance_criteria: optionalText(1000),
+    commitment_month: blank(MonthStart),
   })
   .strict()
-  .refine(pointerPair, POINTER);
+  .refine(pointerPair, POINTER)
+  .superRefine(commitmentProblems);
 
 /**
  * PATCH /tasks/:id. The assignee may change the notes and priority of their own task;
@@ -195,10 +288,17 @@ const TaskEdit = z
     entity_type: TaskEntityType.nullable().optional(),
     entity_id: uuid.nullable().optional(),
     recurrence: Recurrence.nullable().optional(),
+    is_commitment: z.boolean().optional(),
+    acceptance_criteria: z.string().trim().max(1000).nullable().optional(),
+    commitment_month: MonthStart.nullable().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field")
-  .refine((v) => !("entity_type" in v || "entity_id" in v) || pointerPair(v), POINTER);
+  .refine((v) => !("entity_type" in v || "entity_id" in v) || pointerPair(v), POINTER)
+  .superRefine((v, ctx) => {
+    // The service checks the rest against the task as it stands: a body that marks it says it all.
+    if (v.is_commitment === true && "due_on" in v && "commitment_month" in v) commitmentProblems(v, ctx);
+  });
 
 /** POST /tasks/:id/move: drag to a column, before a card (null: the foot of the column). */
 const TaskMove = z
@@ -266,9 +366,10 @@ const TABLES = {
       assignee: "the person in task.primary_assignee_id",
       set_by: "the person in task.set_by_employee_id",
       overdue: "worked out: open and task.due_at before now",
-      counts_towards: "task.employee_target_id with the target's title and link",
+      counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
       link: "linkFor(task.entity_type, task.entity_id), never stored",
       comment_count: "count of task_comment not deleted",
+      commitment_state: "worked out from the commitment's dates, completion and month (performance.md §6.11)",
     },
   },
   TaskDetail: {
@@ -277,12 +378,18 @@ const TABLES = {
       assignee: "the person in task.primary_assignee_id",
       set_by: "the person in task.set_by_employee_id",
       overdue: "worked out: open and task.due_at before now",
-      counts_towards: "task.employee_target_id with the target's title and link",
+      counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
       link: "linkFor(task.entity_type, task.entity_id), never stored",
       comment_count: "count of task_comment not deleted",
+      commitment_state: "worked out from the commitment's dates, completion and month (performance.md §6.11)",
       can_edit: "the caller is the setter, or has the setter's scope over the assignee",
       can_reassign: "as can_edit",
       can_cancel: "as can_edit",
+      set_status: "commitment_set.status of the commitment's set",
+      rescope: "the pending performance.commitments instance over the task",
+      recovery: "the task whose entity_type is task and entity_id this commitment",
+      can_rescope: "an approved commitment not done, not rescoped, the caller its person or in scope",
+      can_set_recovery: "a missed commitment with no recovery, the caller its person or in scope",
     },
   },
   TaskPage: { table: null, reason: "a page of tasks" },
@@ -320,7 +427,12 @@ const TABLES = {
   TaskActivityPage: { table: null, reason: "a page of a task's history" },
   TaskActivityListQuery: { table: null, reason: "list controls for a task's history" },
   Link: { table: null, reason: "a screen path from shared/route-map" },
-  CountsTowards: { table: null, reason: "the KPI a task counts towards, from employee_target" },
+  CountsTowards: { table: null, reason: "the line or key result a task counts towards, from employee_target or okr_key_result" },
+  CountsTowardsOption: { table: null, reason: "a line or a key result the assignee may pick" },
+  CountsTowardsPage: { table: null, reason: "a page of Counts Towards choices" },
+  CountsTowardsQuery: { table: null, reason: "whose lines and key results, for which month" },
+  CommitmentRecoveryRef: { table: null, reason: "the Recovery task of a missed commitment" },
+  PendingRescope: { table: null, reason: "a rescope's waiting workflow_instance" },
 };
 
 module.exports = {
@@ -333,7 +445,15 @@ module.exports = {
   TaskScope,
   Recurrence,
   Link,
+  CommitmentState,
+  CommitmentSetStatus,
+  CommitmentRecoveryRef,
+  PendingRescope,
+  CountsTowardsKind,
   CountsTowards,
+  CountsTowardsOption,
+  CountsTowardsPage,
+  CountsTowardsQuery,
   Task,
   TaskDetail,
   TaskPage,

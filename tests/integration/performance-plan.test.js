@@ -296,7 +296,7 @@ describeDb("performance plan against the real migrations", () => {
     expect(waiting.payload.waiting_employee_ids.sort()).toEqual([emp("musa"), emp("head")].sort());
   });
 
-  test("a role reviews: its first holder to agree becomes the reviewer; who reads which scorecards; a binding plan takes no new one", async () => {
+  test("a role reviews: its first holder to agree becomes the reviewer; who reads which scorecards; a binding plan takes a new one as a draft", async () => {
     expect((await as("head").patch(`/performance/scorecards/${ids.cardB}`, { reviewer_role_code: "operations_people", reviewer_reason: "Head on leave" })).status).toBe(403);
     const changed = await as("ops").patch(`/performance/scorecards/${ids.cardB}`, { reviewer_role_code: "operations_people", reviewer_reason: "Head on leave" });
     expect(changed.status).toBe(200);
@@ -311,9 +311,10 @@ describeDb("performance plan against the real migrations", () => {
     expect((await as("ada").get(`/performance/plans/${ids.plan}`)).body.scorecards.map((c) => c.scorecard_id)).toEqual([ids.cardA]);
     expect((await as("head").get(`/performance/plans/${ids.plan}`)).body.scorecards).toHaveLength(2);
 
+    // A binding plan takes a mid-quarter scorecard as a draft, sent on its own (PR 3, §11).
     const late = await as("pm").post("/performance/scorecards", { employee_id: emp("head"), performance_period_id: ids.period });
-    expect(late.status).toBe(409);
-    expect(late.body.error.code).toBe("PLAN_NOT_OPEN");
+    expect(late.status).toBe(201);
+    expect(late.body).toMatchObject({ status: "draft", can_edit: true, can_send: false, amendment_instance_id: null });
   });
 
   test("Report Month: one save; Recovery needs an owner and date; a TBC target waits; Scored From takes the month; the CEO confirms", async () => {

@@ -275,7 +275,7 @@ describeDb("performance analytics against the real migrations", () => {
     await review(nov, cards.head, "head", "pm", "check_in", null);
     await review(nov, cards.dev, "dev", "other", "check_in", null);
 
-    // October's commitments: on time, late, missed, rescoped and one never approved; November's done early and one not yet due.
+    // October's commitments: on time, late, missed, rescoped and one never approved; November's done early and one still open.
     await commitment("ada", "2026-10-01", "2026-10-10T16:00:00Z", "2026-10-10T20:00:00Z");
     await commitment("ada", "2026-10-01", "2026-10-15T16:00:00Z", "2026-10-17T10:00:00Z");
     await commitment("ada", "2026-10-01", "2026-10-20T16:00:00Z");
@@ -358,15 +358,15 @@ describeDb("performance analytics against the real migrations", () => {
     // October's close was due on the 13th: Musa's and Femi's (00:30 on the 14th) are late. November's is not due yet.
     expect(a.reviews_closed).toEqual({ due: 4, on_time: 2 });
     expect(a.reviews_closed_by_month.map((m) => [m.due, m.on_time])).toEqual([[4, 2], [0, 0], [0, 0]]);
-    // Approved commitments, rescoped ones out, a commitment not yet due out.
-    expect(a.commitments).toEqual({ due: 5, on_time: 3 });
+    // Approved commitments as the Commitments view counts them: rescoped and unapproved ones out, an open one due.
+    expect(a.commitments).toEqual({ due: 6, on_time: 3 });
     expect(a.commitments_by_function).toEqual([
       {
         department_id: ids.bm,
         department: "Branding & Marketing",
         months: [
           { month: "2026-10-01", due: 3, on_time: 1 },
-          { month: "2026-11-01", due: 1, on_time: 1 },
+          { month: "2026-11-01", due: 2, on_time: 1 },
           { month: "2026-12-01", due: 0, on_time: 0 },
         ],
       },
@@ -382,7 +382,7 @@ describeDb("performance analytics against the real migrations", () => {
     ]);
 
     const head = await analytics.figures({ department_id: ids.bm }, await scopeOf("head"), { now: NOW });
-    expect(head.commitments).toEqual({ due: 4, on_time: 2 });
+    expect(head.commitments).toEqual({ due: 5, on_time: 2 });
     expect(head.check_ins).toEqual({ due: 6, on_time: 3 });
     // Before November's deadlines nothing of November is due.
     const early = await analytics.figures({}, await scopeOf("ops"), { now: new Date("2026-11-20T12:00:00Z") });

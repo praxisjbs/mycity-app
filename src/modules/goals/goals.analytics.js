@@ -44,6 +44,7 @@ const outbox = require("../../shared/events/outbox");
 const { completeQuery, envelope, pageOf, pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { exportFilename } = require("../../shared/spreadsheet/cells");
+const { COMMITMENT_STATE } = require("../tasks/tasks.repo");
 const { objectiveScores } = require("./goals.cascade");
 const { monthsOf } = require("./goals.periods");
 const repo = require("./goals.repo");
@@ -192,31 +193,30 @@ async function ratingSpread(db, period, departmentId, scope) {
 }
 
 /**
- * Commitments delivered on time (§6.11): each function's, month by month, and the quarter's.
- * Approved commitments only (their original date is fixed), rescoped ones left out; a commitment
- * is due once its original date has ended in Lagos or it is done, and on time when it was done by
- * then. A function is the assignee's department.
+ * Commitments delivered on time (§6.11): each function's, month by month, and the quarter's, counted
+ * as the Commitments view and the On-time Commitment Delivery line count them (one state, the tasks
+ * module's): the month's approved commitments not rescoped are due, those done by the end of their
+ * original date in Lagos on time. A function is the assignee's department.
  */
-async function commitments(db, period, months, departmentId, scope, now) {
-  const params = [months[0], months[months.length - 1], departmentId || null, now];
+async function commitments(db, period, months, departmentId, scope) {
+  const params = [months[0], months[months.length - 1], departmentId || null];
   const s = scopeClause(scope, { column: "t.primary_assignee_id" }, params);
   const { rows } = await db.query(
     `WITH quarter_month AS (
        SELECT g.m::date AS month FROM generate_series($1::date, $2::date, interval '1 month') AS g(m)
-     ), committed AS (
-       SELECT e.department_id, t.commitment_month AS month,
-              (t.completed_at IS NOT NULL
-               OR $4::timestamptz >= ${endOfDay("t.original_due_at AT TIME ZONE 'Africa/Lagos'")}) AS is_due,
-              (t.completed_at IS NOT NULL
-               AND t.completed_at < ${endOfDay("t.original_due_at AT TIME ZONE 'Africa/Lagos'")}) AS on_time
+     ), commitment_state AS (
+       SELECT e.department_id, t.commitment_month AS month, ${COMMITMENT_STATE("t")} AS state
          FROM task t
          JOIN employee e ON e.employee_id = t.primary_assignee_id
-        WHERE t.is_commitment AND t.original_due_at IS NOT NULL AND t.rescoped_at IS NULL
-          AND t.commitment_month BETWEEN $1::date AND $2::date
+        WHERE t.is_commitment AND t.commitment_month BETWEEN $1::date AND $2::date
           AND ($3::uuid IS NULL OR e.department_id = $3) ${s.and}
+     ), committed AS (
+       SELECT cs.department_id, cs.month, cs.state = 'on_time' AS on_time
+         FROM commitment_state cs
+        WHERE cs.state IN ('due', 'on_time', 'late', 'missed')
      ), per_month AS (
        SELECT f.department_id, qm.month,
-              count(cm.month) FILTER (WHERE cm.is_due)::int AS due,
+              count(cm.month)::int AS due,
               count(cm.month) FILTER (WHERE cm.on_time)::int AS on_time
          FROM (SELECT DISTINCT department_id FROM committed) f
          CROSS JOIN quarter_month qm
@@ -230,7 +230,7 @@ async function commitments(db, period, months, departmentId, scope, now) {
          LEFT JOIN department d ON d.department_id = pm.department_id
         GROUP BY pm.department_id, d.name
      )
-     SELECT (SELECT count(*) FROM committed WHERE is_due)::int AS due,
+     SELECT (SELECT count(*) FROM committed)::int AS due,
             (SELECT count(*) FROM committed WHERE on_time)::int AS on_time,
             COALESCE((SELECT json_agg(json_build_object('department_id', pf.department_id, 'department', pf.department,
                                                         'months', pf.months)
@@ -360,7 +360,7 @@ async function figures(query, scope, { now = new Date(), db = pool } = {}) {
   const company = await companyScore(db, period);
   const statuses = await keyResultStatuses(db, period, dept);
   const ratings = await ratingSpread(db, period, dept, scope);
-  const committed = await commitments(db, period, months, dept, scope, now);
+  const committed = await commitments(db, period, months, dept, scope);
   const checkIns = await onTime(db, period, months, dept, scope, now, "check_in");
   const closed = await onTime(db, period, months, dept, scope, now, "close");
   const gaps = await selfAgainstFinal(db, period, dept, scope);

@@ -915,6 +915,7 @@ screen.
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · Performance PR 3: upload purpose `performance_evidence` (`documents.js` `UploadPurpose`, 15 MB in `body-limits.js`, PDF, images and Office files in `mime-policy.js`) for a check-in line's evidence file (`docs/guides/performance.md` §6.14). A route whose multipart body is strict accepts the `purpose` field the upload engine sends beside the file, as `EssDocumentUpload` does.
 - 22/10/2026 · TB · Search (§6.7): a record provider may name `available(client)`, asked before its query; false leaves its group out for everyone. Home Locations uses it while the Attendance policy's Home Location is off (`attendance.md` §1.3).
 - 21/10/2026 · TB · Settings · Appearance (#75) built (§6.15, §2, §5, §7, §10): the hub's dark palette from four colours derived by the contract's maths with every pair at AA, presets with the samples file, a live preview, contrast, two fonts from a vetted list, the theme and density everyone starts on; `/auth/me` carries it, `app/public/boot.js` paints it before first paint; each person's Text Size from the account menu, More and ⌘K.
 

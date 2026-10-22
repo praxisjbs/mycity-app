@@ -148,7 +148,10 @@ async function transcribe({
   const links = chain.links.filter((l) => l.state === "ready" && vendors[l.provider]);
   const first = links[0] || chain.links[0];
 
-  const prompt = require("./llm.service").loadPrompt("voice-note-transcription");
+  // An action with a prompt of its own (review-dictation) is transcribed by it; the rest by the voice note's.
+  const llm = require("./llm.service");
+  const own = require("node:fs").existsSync(path.join(llm.PROMPTS_DIR, `${purpose}.md`));
+  const prompt = llm.loadPrompt(own ? purpose : "voice-note-transcription");
   const runId = await ledger.startRun(db, { purpose, module, actor, vendor: first.provider, model: first.model, prompt });
   let stepNo = 0;
   let last = null;

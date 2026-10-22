@@ -1,5 +1,4 @@
-import type { ReviewRow, Status, Step } from "@/api/types/performance";
-import { created, fail, invalid, noContent, notFound, ok, paged, route, sid, isoDaysAhead, type Req } from "../core";
+import { created, fail, invalid, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, managerOf, refKey, teamOf } from "../data/people";
 import type {
   AnalyticsPerson,
@@ -20,37 +19,12 @@ import type {
   TargetChange,
 } from "@mycity/contract/contract.gen.ts";
 import { exportFile } from "./shared";
-import { CONTRIBUTIONS, DEPT, deptId, KPIS as FUNCTION_KPIS, OBJECTIVES, ORG_GOALS, PERIOD, PLANS, ROUNDS, SCORECARDS, TARGET_CHANGES } from "../data/performance";
-
-const S = (tone: Status["tone"], text: string): Status => ({ tone, text });
-const step = (label: string, state: Step["state"] = null): Step => ({ label, state });
-
-const REVIEWS: ReviewRow[] = [
-  ["tolu", "Q3 2026", "4.2", "4.0", "Approved", "closed"],
-  ["bashir", "Q3 2026", "3.6", "3.2", "Approved", "closed"],
-  ["amara", "Q3 2026", "4.5", "4.4", "Approved", "closed"],
-  ["adedotun", "Q3 2026", "4.1", "4.0", "Approved", "closed"],
-  ["seyi", "Q3 2026", "4.0", "4.0", "Approved", "closed"],
-  ["hauwa", "Q3 2026", "4.3", "4.1", "Approved", "closed"],
-  ["grace", "Q4 2026", null, null, null, "opens"],
-  ["emeka", "Q4 2026", null, null, null, "opens"],
-  ["chidera", "Q4 2026", null, null, null, "opens"],
-].map((r, i) => ({ review_id: sid(`review:${i}`), employee: refKey(r[0] as string), cycle: r[1] as string, self_rating: r[2], manager_rating: r[3], second_level: r[4], status: r[5] === "closed" ? S("ok", "Closed") : S("neutral", "Opens on the 20th") }));
-let CYCLE = { cycle: "Q4 2026", opens_on: isoDaysAhead(5), last_cycle: "18 of 25", average_rating: "3.9" };
-
-route("GET /api/v1/performance/reviews/summary", () => ok({ ...CYCLE, chain: [step("Employee self rating", "now"), step("Manager approval"), step("Second level"), step("People")] }));
-route("GET /api/v1/performance/reviews", (req) => paged(REVIEWS, req, { search: (r) => [r.employee.display_name], filters: { cycle: (r, v) => r.cycle === v } }));
-route("POST /api/v1/performance/reviews/cycles", (req) => {
-  const b = req.body as { name?: string; opens_on?: string };
-  if (!b.name || !b.opens_on) return invalid({ ...(b.name ? {} : { name: ["Name the cycle"] }), ...(b.opens_on ? {} : { opens_on: ["Pick the day it opens"] }) });
-  CYCLE = { ...CYCLE, cycle: b.name, opens_on: b.opens_on };
-  return created({ ...CYCLE, chain: [step("Employee self rating", "now"), step("Manager approval"), step("Second level"), step("People")] });
-});
+import { CONTRIBUTIONS, DEPT, deptId, KPIS as FUNCTION_KPIS, OBJECTIVES, ORG_GOALS, PERIOD, PLANS, SCORECARDS, TARGET_CHANGES } from "../data/performance";
 
 /* ------------------------------------------------------------------ *
  * The contract's endpoints (docs/guides/performance.md §5), on the data in ../data/performance.ts.
- * The interim Reviews routes above keep that screen working until PR 3 replaces them; each PR
- * wires the rest of the contract's endpoints here as it lands.
+ * The reviews' endpoints are in ./reviews.ts; Analytics is at the foot of this file. Each PR
+ * wires the rest of the contract's endpoints as it lands.
  * ------------------------------------------------------------------ */
 
 const PERIODS: PerformancePeriod[] = [PERIOD];
@@ -424,7 +398,7 @@ route("POST /api/v1/performance/reports", (req) => {
 });
 
 /* Plans */
-const cardRow = ({ scope_text: _s, reviewer_reason: _r, disagree_reason: _d, results_weight: _a, kpis_weight: _b, accountability_weight: _c, lines: _l, weight_problems: _w, contributions: _x, can_edit: _e, can_agree: _g, ...row }: ScorecardDetail): Scorecard => row;
+const cardRow = ({ scope_text: _s, reviewer_reason: _r, disagree_reason: _d, results_weight: _a, kpis_weight: _b, accountability_weight: _c, lines: _l, weight_problems: _w, contributions: _x, can_edit: _e, can_agree: _g, can_send: _n, amendment_instance_id: _m, ...row }: ScorecardDetail): Scorecard => row;
 const planProblems = (p: Plan) => {
   const objectives = OBJECTIVES.filter((o) => o.performance_plan_id === p.performance_plan_id);
   const out: PlanDetail["problems"] = [];
@@ -606,14 +580,20 @@ const cardFor = (req: Req, c: ScorecardDetail): ScorecardDetail => {
   const reviewer = reviewerOf(c, req);
   const plan = PLANS.find((p) => p.performance_period_id === c.performance_period_id && p.department_id === c.department_id);
   const agreeable = c.status === "binding" || c.status === "agreed";
+  const amendment = AMENDMENTS.get(c.scorecard_id) ?? null;
+  const canEdit = c.status === "draft" && (!plan || open(plan.status) || (plan.status === "binding" && !amendment)) && !mine && (isCeo(req) || reviewer);
   return {
     ...c,
     line_count: c.lines.length,
     weight_problems: weightProblems(c),
-    can_edit: c.status === "draft" && (!plan || open(plan.status)) && !mine && (isCeo(req) || reviewer),
+    can_edit: canEdit,
     can_agree: agreeable && ((mine && !c.employee_agreed_at) || (reviewer && !c.reviewer_agreed_at)),
+    can_send: canEdit && plan?.status === "binding" && !weightProblems(c).length,
+    amendment_instance_id: amendment,
   };
 };
+/** Scorecards sent after their plan bound, waiting on the plan's flow: scorecard → its instance. */
+const AMENDMENTS = new Map<string, string>();
 /** The reader's scorecards: the CEO all; anyone else their own, those they review and their team's. */
 const visibleCard = (req: Req, c: ScorecardDetail) => {
   const me = meOf(req);
@@ -700,6 +680,8 @@ route("POST /api/v1/performance/scorecards", (req) => {
     contributions: [],
     can_edit: true,
     can_agree: false,
+    can_send: false,
+    amendment_instance_id: null,
   };
   SCORECARDS.push(c);
   const plan = planOf(periodId, c.department_id);
@@ -798,9 +780,19 @@ route("POST /api/v1/performance/scorecards/:id/disagree", (req) => {
   return ok(cardFor(req, c));
 });
 
-route("GET /api/v1/performance/rounds", (req) =>
-  paged(ROUNDS, req, { filters: { period_id: (r, v) => r.performance_period_id === v, status: (r, v) => r.status === v }, sort: { month: (a, b) => a.month.localeCompare(b.month) } }),
-);
+/** Send Scorecard: a scorecard drafted after its plan bound goes through the plan's flow on its own (§6.4). */
+route("POST /api/v1/performance/scorecards/:id/submit", (req) => {
+  const c = SCORECARDS.find((x) => x.scorecard_id === req.params.id);
+  if (!c) return notFound();
+  const plan = PLANS.find((p) => p.performance_period_id === c.performance_period_id && p.department_id === c.department_id);
+  if (!plan || plan.status !== "binding") return fail(409, "PLAN_NOT_BINDING", "Send the function's plan instead");
+  const d = cardFor(req, c);
+  if (!d.can_edit) return fail(409, "SCORECARD_LOCKED", "This scorecard is already sent");
+  if (d.weight_problems.length) return fail(422, "WEIGHTS_NOT_100", "The weights do not total 100");
+  AMENDMENTS.set(c.scorecard_id, sid(`perf:wf:amend:${c.scorecard_id}`));
+  c.updated_at = now();
+  return ok(cardFor(req, c));
+});
 
 /* ------------------------------------------------------------------ *
  * Analytics (§6.21, PR 5): the quarter's figures from the data above, and the rounds, reviews and

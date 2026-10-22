@@ -33,6 +33,7 @@ const staffSeed = require("../../seeds/staging/10_staff");
 const home = require("../../seeds/staging/60_home");
 const workspaceSeed = require("../../seeds/staging/40_workspace");
 const performanceSeed = require("../../seeds/staging/45_performance_plan");
+const reviewsSeed = require("../../seeds/staging/46_performance_reviews");
 const forward = require("../../seeds/staging/lib/forward-rows");
 const { removeHomeStagingRows } = require("../../seeds/staging/lib/home-staging-rows");
 const { realStaff } = require("../../seeds/staging/lib/staff");
@@ -105,10 +106,11 @@ describeDb("Home's staging seed against the real migrations", () => {
     workingWeek.invalidateCalendar();
     outbox.markReady();
     await runFile(staffSeed);
-    // Tasks and the calendar come from My Workspace's own seed, goals and targets from
-    // Performance's; both run before Home's.
+    // Tasks and the calendar come from My Workspace's own seed, goals, targets and reviews from
+    // Performance's; all run before Home's.
     await runFile(workspaceSeed, { now: NOW });
     await runFile(performanceSeed, { now: NOW });
+    await runFile(reviewsSeed, { now: NOW });
     staff = await realStaff(pool);
     await runFile(home, { now: NOW });
     first = await counts();
@@ -133,7 +135,7 @@ describeDb("Home's staging seed against the real migrations", () => {
   });
 
   test("every id the manifest lists is there, in the column it names", async () => {
-    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES];
+    const taken = [...workspaceSeed.M2_TABLES, ...performanceSeed.PLAN_TABLES, ...reviewsSeed.REVIEW_TABLES];
     for (const { table, id_column: idColumn, ids } of home.HOME_STAGING_ROWS.filter((e) => !taken.includes(e.table))) {
       const { n } = await one(`SELECT count(*)::int AS n FROM ${table} WHERE ${idColumn} = ANY($1::uuid[])`, [ids]);
       expect([table, n]).toEqual([table, ids.length]);
@@ -301,9 +303,10 @@ describeDb("Home's staging seed against the real migrations", () => {
       const o = await overviewOf(member);
       const cards = cardsOf(o);
       expect(Object.keys(cards)).toEqual(["my_targets_on_track", "my_tasks_overdue", "my_reviews_due", "my_attendance_30d"]);
-      // My Scorecard counts lines scored in closed reviews, which staging has none of until Performance PR 3's seed.
-      for (const card of o.cards.filter((shown) => shown.key !== "my_targets_on_track"))
+      // A member of staff reviews nobody, so My Reviews Due is none; My Scorecard counts what their closed reviews scored.
+      for (const card of o.cards.filter((k) => !["my_reviews_due", "my_targets_on_track"].includes(k.key)))
         expect([card.key, figure(card) > 0]).toEqual([card.key, true]);
+      expect(figure(cards.my_reviews_due)).toBe(0);
       expect(o.day_strip).toMatchObject({ starts_at: "09:00", ends_at: "17:00" });
       expect(o.my_goals.length).toBeGreaterThan(0);
       expect(o.upcoming_leave.balance).not.toBeNull();
@@ -330,25 +333,14 @@ describeDb("Home's staging seed against the real migrations", () => {
       expect(rows.every((v) => v.status === "open")).toBe(true);
     });
 
-    test("someone moved to another manager since the last run: the run passes, and each review is of whoever holds its place now", async () => {
+    test("someone moved to another manager since the last run: the run passes, and none of Home's old reviews comes back", async () => {
       const before = await realStaff(pool);
       const moved = before.reportsOf(before.head)[0];
       await q("UPDATE employee SET line_manager_id = $2 WHERE employee_id = $1", [moved.employee_id, before.ceo.employee_id]);
       await expect(runFile(home, { now: NOW })).resolves.toBeUndefined();
-      const after = await realStaff(pool);
-      const expected = {};
-      for (const row of forward.ROWS.filter((r) => r.table === "performance_review")) {
-        const [person, by] = row.needs.map((slot) => forward.personOf(after, slot));
-        if (person && by)
-          expected[forward.idOf(row.table, row.key)] = [person.employee_id, by.employee_id, row.key.split(":")[0]];
-      }
-      const { rows } = await q(
-        `SELECT performance_review_id AS id, employee_id, reviewer_employee_id, review_type
-           FROM performance_review WHERE performance_review_id = ANY($1::uuid[])`,
-        [listed("performance_review")],
-      );
-      expect(Object.fromEntries(rows.map((r) => [r.id, [r.employee_id, r.reviewer_employee_id, r.review_type]]))).toEqual(expected);
-      expect(rows.some((r) => r.employee_id === moved.employee_id)).toBe(false);
+      // Reviews are Performance's own now (46_performance_reviews.js): Home writes none.
+      const { n } = await one("SELECT count(*)::int AS n FROM performance_review WHERE performance_review_id = ANY($1::uuid[])", [listed("performance_review")]);
+      expect(n).toBe(0);
     });
   });
 
