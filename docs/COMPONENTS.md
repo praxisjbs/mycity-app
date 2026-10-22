@@ -35,7 +35,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Bars](#bars) | `Bars` | Labelled rows, each a bar and its figure: pipeline stages, a department's spend, progress against a target. | stable |
 | Display | [Chain](#chain) | `Chain` | An approval route: the steps already done, the one in hand, and what is still to come. | stable |
 | Display | [CityShowcase](#cityshowcase) | `CityShowcase` | The sign-in screen's picture: photographs of eight cities at dusk taking turns, drifting slowly under a film grain and rising points of light, each with its ticking clock, and the sign-in form in a panel of smoked glass. | beta |
-| Display | [Confetti](#confetti) | `Confetti` | Pieces of paper or stars drifting down behind a celebration card. | stable |
+| Display | [Confetti](#confetti) | `Confetti` | A short burst of paper or stars from a celebration card, drawn on a canvas inside it, that settles and stops. | stable |
 | Display | [CountBadge](#countbadge) | `CountBadge` | A small round number: how many unread, waiting or new things sit behind a tab, a nav item or a tile. | stable |
 | Display | [EmptyState](#emptystate) | `EmptyState` | Nothing to show, said plainly: a drawing, a title, one short line and at most one action. | stable |
 | Display | [EmptyValue](#emptyvalue) | `EmptyValue` | The marker for a value that is not set: the only dash a screen shows, muted. | stable |
@@ -68,6 +68,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Display | [Tile](#tile) | `Tile` | A small bordered tile: a heading, a line, and whatever sits under them. | stable |
 | Display | [Timeline](#timeline) | `Timeline` | What happened to a record, newest or oldest first: a rail of dated events, each with its own dot. | stable |
 | Display | [Waveform](#waveform) | `Waveform` | A voice note's bars, drawn from its measured loudness, which fill as it plays. | stable |
+| Display | [YearsMedal](#yearsmedal) | `YearsMedal` | The years a person has been at MyCity, large, inside a gold laurel. | beta |
 | Navigation | [Chips](#chips) | `Chips` | A row of filter chips above a list, each with an optional count: one chosen (single select) or several switched on (toggle). | stable |
 | Navigation | [SegmentedControl](#segmentedcontrol) | `SegmentedControl` | Two to five views of the same thing side by side in one pill (Mine, My Team; Week, Month), one of them on. | stable |
 | Navigation | [Tabs](#tabs) | `Tabs`, `TabPanel` | The module's tab strip: one row of tabs under the page header, one of them active, with an optional count on each. | stable |
@@ -708,14 +709,14 @@ The sign-in screen's picture: photographs of eight cities at dusk taking turns, 
 
 ### Confetti
 
-Pieces of paper or stars drifting down behind a celebration card.
+A short burst of paper or stars from a celebration card, drawn on a canvas inside it, that settles and stops.
 
 | | |
 |---|---|
-| Use | Behind a birthday or a work anniversary in the Staff Community, and nowhere a person is working. |
-| Avoid | A saved form, a completed task or anything a person does many times a day; a screen that needs reading while it moves. |
-| Phone | The same pieces at the same pace; they stop under reduced motion, like every other animation. |
-| Accessibility | Decorative and hidden from screen readers, and it stops entirely under prefers-reduced-motion (base.css). |
+| Use | Behind a birthday or a work anniversary card in the Staff Community: once the first time a person sees the card, and from Celebrate each time they press it (community.md §3 step 3). |
+| Avoid | A saved form, a completed task or anything a person does many times a day; anything that should keep moving (it bursts and settles). |
+| Phone | The same burst, sized to the card; nothing reaches outside the card. |
+| Accessibility | Decorative and hidden from screen readers; under prefers-reduced-motion it never draws. |
 | Status | stable |
 | Exports | `Confetti` |
 | Import | `import { Confetti } from "@mycity/ui";` |
@@ -727,12 +728,18 @@ Pieces of paper or stars drifting down behind a celebration card.
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `shape` | `"paper" \| "stars"` |  | `paper` (the default) drops rectangles and circles; `stars` drops five-pointed stars. |
-| `className` | `string` |  | Layout classes only (the box it falls inside). |
+| `shape` | `"paper" \| "stars"` |  | `paper` (rectangles, dots and ribbons, the default) for a birthday; `stars` for an anniversary. |
+| `on` | `"card" \| "brand"` |  | What the pieces fly over: `card` (the default) takes the yellow and the chart colours; `brand`, on City Green, the yellows and white. |
+| `burst` | `number` |  | Fires one burst each time it changes to a new number above 0: pass a count of presses. |
+| `from` | `RefObject<HTMLElement \| null>` |  | Where a `burst` comes from (the Celebrate button); without it, the top of the box. |
+| `burstOnView` | `boolean` |  | Bursts once, the first time the box is well in view (60 %). |
+| `viewFrom` | `RefObject<HTMLElement \| null>` |  | Where the view burst comes from (the person's photo, the medal); without it, the top of the box. |
+| `onViewBurst` | `() => void` |  | Called once the box has been well in view, so the screen can remember the card was seen. |
+| `className` | `string` |  | Layout classes only; the canvas fills its positioned parent, behind its content. |
 
 ```tsx
-<Confetti />
-<Confetti shape="stars" />
+<Confetti burst={presses} from={celebrateRef} />
+<Confetti shape="stars" on="brand" burstOnView onViewBurst={remember} viewFrom={medalRef} />
 ```
 
 ### CountBadge
@@ -1845,6 +1852,35 @@ A voice note's bars, drawn from its measured loudness, which fill as it plays.
 
 ```tsx
 <Waveform seconds={42} peaks={note.document.waveform} progress={position / 42} />
+```
+
+### YearsMedal
+
+The years a person has been at MyCity, large, inside a gold laurel.
+
+| | |
+|---|---|
+| Use | The work anniversary card in Staff Community, on its City Green surface (community.md §3 step 3). |
+| Avoid | Any other figure (a count or a total is a KpiTile); a light surface, where the gold leaves do not carry. |
+| Phone | Shrinks from 140 px to 96 px at 760 px and below; the laurel keeps its shape. |
+| Accessibility | One image named "3 years at MyCity" ("Another year at MyCity" without the years); the leaves and figures inside are not read out one by one. |
+| Status | beta |
+| Exports | `YearsMedal` |
+| Import | `import { YearsMedal } from "@mycity/ui";` |
+| File | `packages/ui/src/display/YearsMedal.tsx` |
+| Test | `packages/ui/src/display/YearsMedal.test.tsx` |
+| Gallery | `packages/ui/src/display/YearsMedal.gallery.tsx` (`npm run gallery`, `#/YearsMedal`) |
+
+**YearsMedal** props (`YearsMedalProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `years` | `number \| null` | yes | Whole years at MyCity; null draws a star in the laurel, for a start date nobody knows. |
+| `className` | `string` |  | Layout classes only (its place in a grid); the size is the component's own. |
+
+```tsx
+<YearsMedal years={3} />
+<YearsMedal years={null} />
 ```
 
 ## Navigation

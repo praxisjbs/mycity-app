@@ -441,7 +441,21 @@ function statusOf(row, other) {
   return "sent";
 }
 
-/** Rows from the repo, completed with people, fans and votes, in the contract's shape. */
+/** A wish as the contract's Wish: its author or a moderator of the card's channel may delete it. */
+function wishView(w, user, moderator) {
+  const mine = w.user_id === user.user_id;
+  return {
+    community_wish_id: w.community_wish_id,
+    community_message_id: w.community_message_id,
+    author: w.author,
+    mine,
+    body: w.body,
+    created_at: iso(w.created_at),
+    can_delete: mine || moderator,
+  };
+}
+
+/** Rows from the repo, completed with people, fans, votes and wishes, in the contract's shape. */
 async function present(
   db,
   rows,
@@ -460,10 +474,11 @@ async function present(
   const pollIds = rows
     .filter((r) => r.message_type === "poll")
     .map((r) => r.community_message_id);
-  const [persons, fanMap, voteMap] = await Promise.all([
+  const [persons, fanMap, voteMap, wishMap] = await Promise.all([
     repo.people(db, [...new Set(subjects)]),
     repo.fans(db, celebrationIds),
     repo.votes(db, pollIds, user.user_id),
+    repo.latestWishes(db, celebrationIds),
   ]);
   return rows.map((r) => {
     const mine = r.sender_user_id === user.user_id;
@@ -475,9 +490,14 @@ async function present(
         ? {
             subject: persons.get(m.subject_employee_id),
             years: m.years ?? null,
+            since: m.since ?? null,
             count: r.reactions,
             mine: r.reacted,
             fans: fanMap.get(r.community_message_id) || [],
+            wishes: (wishMap.get(r.community_message_id)?.wishes || []).map((w) =>
+              wishView(w, user, moderator),
+            ),
+            wish_count: wishMap.get(r.community_message_id)?.count ?? 0,
           }
         : null;
     const recognition =
@@ -676,13 +696,15 @@ async function postMessage(channelId, body, user) {
       if (!persons.has(body.subject_employee_id))
         throw new AppError("NOT_FOUND", "There is no such colleague", 404);
       metadata.subject_employee_id = body.subject_employee_id;
-      // A hand-posted anniversary carries its years, as the 08:00 ones do.
-      if (type === "anniversary")
+      // A hand-posted anniversary carries its years and start date, as the 08:00 ones do.
+      if (type === "anniversary") {
         metadata.years = await repo.yearsServed(
           client,
           body.subject_employee_id,
           lagos.today(),
         );
+        metadata.since = await repo.startDate(client, body.subject_employee_id);
+      }
     }
     const message = await repo.insertMessage(client, {
       community_channel_id: channelId,
@@ -853,6 +875,84 @@ async function vote(messageId, optionIndex, user) {
     });
   });
   return messageView(pool, messageId, user);
+}
+
+/* ------------------------------------------------------------------ *
+ * Wishes under a celebration card (§3 step 3): kept under the card, never in the stream
+ * ------------------------------------------------------------------ */
+
+const CARD_TYPES = ["birthday", "anniversary"];
+
+/** A live birthday or anniversary card in a conversation the caller is in, with that membership. */
+async function cardFor(db, messageId, user) {
+  const row = await repo.messageFor(db, messageId, user.user_id);
+  if (!row || row.deleted_at) throw notFound();
+  const ch = await repo.membership(db, row.community_channel_id, user.user_id);
+  if (!ch) throw notFound();
+  if (!CARD_TYPES.includes(row.message_type))
+    throw new AppError("NOT_A_CARD", "Wishes go on a birthday or anniversary card", 422);
+  return { row, ch };
+}
+
+async function listWishes(messageId, user, query) {
+  const { ch } = await cardFor(pool, messageId, user);
+  const moderator = isModerator(ch, await canAnnounce(pool, user));
+  const page = await repo.listWishes(pool, messageId, query);
+  return { ...page, data: page.data.map((w) => wishView(w, user, moderator)) };
+}
+
+/** A wish under the card; the person it is for is told (community.events.js). */
+async function sendWish(messageId, body, user) {
+  await tx(async (client) => {
+    const { row } = await cardFor(client, messageId, user);
+    const wish = await repo.insertWish(client, {
+      community_message_id: messageId,
+      user_id: user.user_id,
+      body: body.body,
+    });
+    await emit(client, {
+      key: EVENTS.CELEBRATION_WISHED,
+      entity: { type: "community_wish", id: wish.community_wish_id },
+      actor: user,
+      after: wish,
+      payload: {
+        community_channel_id: row.community_channel_id,
+        community_message_id: messageId,
+        community_wish_id: wish.community_wish_id,
+        subject_employee_id: (row.metadata || {}).subject_employee_id ?? null,
+        from_name: user.display_name || null,
+        preview: body.body.slice(0, 140),
+      },
+    });
+  });
+  return messageView(pool, messageId, user);
+}
+
+/** By its author, or a moderator of the card's channel; never edited (§6). */
+async function deleteWish(wishId, user) {
+  await tx(async (client) => {
+    const wish = await repo.lockWish(client, wishId);
+    const ch = wish && !wish.deleted_at
+      ? await repo.membership(client, wish.community_channel_id, user.user_id)
+      : null;
+    if (!ch) throw new AppError("NOT_FOUND", "There is no such wish", 404);
+    const moderator = isModerator(ch, await canAnnounce(client, user));
+    if (wish.user_id !== user.user_id && !moderator)
+      throw new AppError("NOT_YOURS", "Only its author or a moderator deletes a wish", 403);
+    const after = await repo.deleteWish(client, wishId);
+    await emit(client, {
+      key: EVENTS.CELEBRATION_WISH_DELETED,
+      entity: { type: "community_wish", id: wishId },
+      actor: user,
+      before: wish,
+      after,
+      payload: {
+        community_channel_id: wish.community_channel_id,
+        community_message_id: wish.community_message_id,
+        community_wish_id: wishId,
+      },
+    });
+  });
 }
 
 /** A message the caller may act on, locked, with their membership and whether they moderate it. */
@@ -1318,7 +1418,7 @@ async function postCelebrations(date = lagos.today()) {
         sender_user_id: null,
         message_type: c.occasion,
         body: wishFor(c.employee_id, c.occasion),
-        metadata: { subject_employee_id: c.employee_id, years: c.years },
+        metadata: { subject_employee_id: c.employee_id, years: c.years, since: c.since },
       });
       await emit(client, {
         key: EVENTS.CELEBRATION_POSTED,
@@ -1377,6 +1477,9 @@ module.exports = {
   recognise,
   react,
   vote,
+  listWishes,
+  sendWish,
+  deleteWish,
   transcript,
   listConversations,
   openDirect,

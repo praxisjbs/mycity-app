@@ -24,4 +24,5 @@ export type {
   MessageType,
   PostPolicy,
   ProfileCard,
+  Wish,
 } from "@mycity/contract/contract.gen.ts";

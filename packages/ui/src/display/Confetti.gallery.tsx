@@ -1,28 +1,27 @@
+import { useRef, useState } from "react";
 import type { GalleryEntry } from "../testing/gallery";
+import { Button } from "../actions/Button";
 import { Confetti } from "./Confetti";
 
-const card = (shape: "paper" | "stars", title: string, warm: boolean) => (
-  <div className={`sheen relative isolate flex h-36 items-center gap-4 overflow-hidden rounded-sheet p-4 text-on-deep ${warm ? "celebrate-warm" : "celebrate-cool"}`}>
-    <Confetti shape={shape} />
-    <span className={`relative flex size-16 flex-none animate-spin-slow items-center justify-center rounded-full p-1 ${warm ? "ring-warm" : "ring-cool"}`}>
-      <span className="flex size-full items-center justify-center rounded-full border-2 border-deep bg-primary text-xl font-bold text-primary-foreground">AO</span>
-    </span>
-    <span className="relative">
-      <b className="block text-lg">{title}</b>
-      <span className="text-xs opacity-85">Adaeze Okonkwo</span>
-    </span>
-  </div>
-);
+/* A card that bursts the first time it is in view, and again from its button. */
+function Card({ shape, on, title }: { shape: "paper" | "stars"; on: "card" | "brand"; title: string }) {
+  const button = useRef<HTMLButtonElement>(null);
+  const [presses, setPresses] = useState(0);
+  return (
+    <div className={on === "brand" ? "relative isolate overflow-hidden rounded-sheet bg-secondary p-6 text-secondary-foreground" : "relative isolate overflow-hidden rounded-sheet border border-border bg-card p-6"}>
+      <Confetti shape={shape} on={on} burstOnView burst={presses} from={button} />
+      <b className="block text-xl">{title}</b>
+      <Button ref={button} variant="primary" icon="party" className="mt-4" onClick={() => setPresses((n) => n + 1)}>
+        Celebrate
+      </Button>
+    </div>
+  );
+}
 
 export default {
   component: "Confetti",
   states: {
-    "A Birthday": () => card("paper", "Happy Birthday", true),
-    "An Anniversary": () => card("stars", "Four Years Today", false),
-    "On Its Own": () => (
-      <div className="relative h-32 overflow-hidden rounded-card bg-deep">
-        <Confetti />
-      </div>
-    ),
+    "A Birthday": () => <Card shape="paper" on="card" title="Happy Birthday, Adaeze" />,
+    "An Anniversary": () => <Card shape="stars" on="brand" title="Three Years at MyCity" />,
   },
 } satisfies GalleryEntry;

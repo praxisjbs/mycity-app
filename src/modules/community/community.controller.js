@@ -86,6 +86,14 @@ module.exports = {
   recognise: async (req, res) =>
     created(res, await service.recognise(req.validated.body, req.user)),
   react: async (req, res) => ok(res, await service.react(p(req).id, req.user)),
+  listWishes: async (req, res) =>
+    sendPaged(res, await service.listWishes(p(req).id, req.user, req.validated.query)),
+  sendWish: async (req, res) =>
+    created(res, await service.sendWish(p(req).id, req.validated.body, req.user)),
+  deleteWish: async (req, res) => {
+    await service.deleteWish(p(req).id, req.user);
+    noContent(res);
+  },
   vote: async (req, res) =>
     ok(
       res,

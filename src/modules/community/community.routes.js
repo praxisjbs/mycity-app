@@ -270,6 +270,38 @@ route(
 );
 route(
   router,
+  "get",
+  "/messages/:id/wishes",
+  {
+    query: cm.WishListQuery,
+    response: cm.WishPage,
+    summary: "A celebration card's wishes",
+  },
+  view(),
+  controller.listWishes,
+);
+route(
+  router,
+  "post",
+  "/messages/:id/wishes",
+  {
+    body: cm.WishCreate,
+    response: cm.Message,
+    summary: "Send wishes on a birthday or work anniversary card",
+  },
+  create(),
+  controller.sendWish,
+);
+route(
+  router,
+  "delete",
+  "/wishes/:id",
+  { no_content: true, summary: "Delete a wish" },
+  view(),
+  controller.deleteWish,
+);
+route(
+  router,
   "post",
   "/messages/:id/vote",
   { body: cm.PollVote, response: cm.Message, summary: "Vote in a poll" },
