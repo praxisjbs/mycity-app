@@ -26,7 +26,7 @@ const FALLBACK_CLOSE = "17:00";
 
 /**
  * The closing time of a day, "HH:MM". A day off has none (the working week stores no hours for
- * it, and the loader then hands back the text "null"), so a task due on one closes at 17:00.
+ * it), so a task due on one closes at 17:00.
  */
 function closeOf(date, cal) {
   const h = cal.hours && cal.hours[lagos.weekday(date)];

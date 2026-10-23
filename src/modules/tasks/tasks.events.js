@@ -5,13 +5,16 @@
  * Every change to a task is one event. The person who did it is never told (fanout);
  * the people a task concerns are its assignee and the person who set it, so a task a
  * manager set tells the assignee when it is set or cancelled, and tells the manager
- * when it is done or blocked. A task someone set for themselves tells nobody. The people
- * sharing a task (member_employee_ids) hear what its assignee, the lead, hears, and when
- * it is done; someone put on a task by an edit is told so.
+ * when it is done, blocked or unblocked. A task someone set for themselves tells nobody.
+ * The people sharing a task (member_employee_ids) hear what its assignee, the lead, hears,
+ * and when it is done; someone put on a task by an edit is told so. A repeating task's next
+ * occurrence arrives quietly: nobody is told.
  *
- * Watchers hear when the task is done, blocked, cancelled or commented on; the assignees of
- * tasks waiting on it hear when it is done; a ping goes to whoever it names; a reminder set on
- * a task comes back to its assignee through the shared reminder engine.
+ * Watchers who may still see the task hear when it is done, blocked, unblocked, cancelled or
+ * commented on. When a task is done, the people on each open task waiting on it hear about
+ * their own task (task.prerequisite_done), never the one done, which they may not see. A ping
+ * goes to whoever it names; a reminder set on a task comes back to its people through the
+ * shared reminder engine.
  *
  * Done and reopened tasks that count towards a KPI are recounted by the performance
  * module, which registers its own outbox handler on TASK_COMPLETED and TASK_REOPENED
@@ -29,6 +32,7 @@ const EVENTS = defineEvents("workspace", {
   "task.reopened": { summary: "A done task was moved back" },
   "task.blocked": { summary: "A task was marked blocked" },
   "task.unblocked": { summary: "A task's blocker was cleared" },
+  "task.prerequisite_done": { summary: "A task another waits on was done" },
   "task.cancelled": { summary: "A task was cancelled" },
   "task.commented": { summary: "Someone commented on a task" },
   "task.due_soon": { summary: "A task is due today or tomorrow" },
@@ -56,9 +60,12 @@ async function loginsOf(client, employeeIds) {
 /** The people sharing the task beside its lead. */
 const membersOf = (e) => e.payload.member_employee_ids || [];
 
-/** Someone else set it: the assignee hears; and the people sharing it, whoever set it. */
+/**
+ * Someone else set it: the assignee hears; and the people sharing it, whoever set it. A repeat
+ * (payload.repeats) tells nobody: its people already have the task.
+ */
 const assigneeWhenSetByOther = (e, client) =>
-  loginsOf(client, [
+  e.payload.repeats ? [] : loginsOf(client, [
     ...(e.payload.set_by_employee_id && e.payload.set_by_employee_id !== e.payload.primary_assignee_id
       ? [e.payload.primary_assignee_id]
       : []),
@@ -78,21 +85,15 @@ const setterWhenOther = (e, client) =>
 const both = (e, client) =>
   loginsOf(client, [e.payload.primary_assignee_id, e.payload.set_by_employee_id, ...membersOf(e)]);
 
-/** The people watching the task. */
+/** The people watching the task who may still see it (the service is required when called, as below). */
 async function watchersOf(e, client) {
   const { rows } = await client.query("SELECT employee_id FROM task_watcher WHERE task_id = $1", [e.payload.task_id]);
-  return loginsOf(client, rows.map((r) => r.employee_id));
+  const seers = await require("./tasks.service").whoMaySee(client, e.payload, rows.map((r) => r.employee_id));
+  return loginsOf(client, seers);
 }
 
-/** The assignees of open tasks that wait on this one: it being done may let them start. */
-async function waitingOnIt(e, client) {
-  const { rows } = await client.query(
-    `SELECT t.primary_assignee_id FROM task_dependency dp JOIN task t ON t.task_id = dp.task_id
-      WHERE dp.depends_on_task_id = $1 AND t.status NOT IN ('done', 'cancelled')`,
-    [e.payload.task_id],
-  );
-  return loginsOf(client, rows.map((r) => r.primary_assignee_id));
-}
+/** Everyone on the task: its lead and the people sharing it. */
+const onIt = (e, client) => loginsOf(client, [e.payload.primary_assignee_id, ...membersOf(e)]);
 
 defineNotification(EVENTS.TASK_CREATED, {
   to: [{ users: assigneeWhenSetByOther }],
@@ -104,9 +105,21 @@ defineNotification(EVENTS.TASK_CREATED, {
 });
 
 defineNotification(EVENTS.TASK_COMPLETED, {
-  to: [{ users: setterWhenOther }, { users: everyoneOnShared }, { users: watchersOf }, { users: waitingOnIt }],
+  to: [{ users: setterWhenOther }, { users: everyoneOnShared }, { users: watchersOf }],
   title: (e) => `${e.payload.assignee_name || "A task"} is done`,
   body: (e) => `${e.payload.number}: ${e.payload.title}`,
+});
+
+defineNotification(EVENTS.TASK_PREREQUISITE_DONE, {
+  to: [{ users: onIt }],
+  title: "A task you wait on is done",
+  body: (e) => `${e.payload.number}: ${e.payload.title}`,
+});
+
+defineNotification(EVENTS.TASK_UNBLOCKED, {
+  to: [{ users: both }, { users: watchersOf }],
+  title: (e) => `Unblocked: ${e.payload.title}`,
+  body: (e) => e.payload.resolve_note || e.payload.number,
 });
 
 defineNotification(EVENTS.TASK_BLOCKED, {
@@ -128,7 +141,7 @@ defineNotification(EVENTS.TASK_COMMENTED, {
 });
 
 defineNotification(EVENTS.TASK_DUE_SOON, {
-  to: [{ users: (e, client) => loginsOf(client, [e.payload.primary_assignee_id, ...membersOf(e)]) }],
+  to: [{ users: onIt }],
   title: (e) => (e.payload.when === "today" ? "Due today" : "Due tomorrow"),
   body: (e) => `${e.payload.number}: ${e.payload.title}`,
   include_actor: true,
@@ -158,7 +171,7 @@ defineNotification(EVENTS.TASK_EDITED, {
 });
 
 defineNotification(EVENTS.TASK_REMINDER_DUE, {
-  to: [{ users: (e, client) => loginsOf(client, [e.payload.primary_assignee_id, ...membersOf(e)]) }],
+  to: [{ users: onIt }],
   title: (e) => `Reminder: ${e.payload.title}`,
   body: (e) => e.payload.number,
   include_actor: true,

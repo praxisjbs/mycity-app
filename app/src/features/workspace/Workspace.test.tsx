@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { formatDate, ModalProvider } from "@mycity/ui";
 import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
-import { invalidate } from "@/api/hooks";
+import { clear, invalidate } from "@/api/hooks";
 import { isoDaysAgo, isoDaysAhead, mockSession, sid } from "@/api/mock/core";
 import { byKey } from "@/api/mock/data/people";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
@@ -44,6 +44,8 @@ function Harness({ children }: { children?: ReactNode }) {
 /** The screen, signed in on the mock: as Cynthia (Operations & People, with a team) unless another account is named. */
 async function signedIn(screenUnderTest: ReactNode, email = "cynthia@mycityapp.io") {
   mockSession.set(null);
+  // Nothing one test's reader read is kept for the next (the data client's own sign-out clearing).
+  clear();
   invalidate("/api/v1");
   render(
     <RouterProvider>

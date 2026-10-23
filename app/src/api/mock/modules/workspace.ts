@@ -433,7 +433,7 @@ route("POST /api/v1/tasks/:id/move", (req) => {
   if (to === "done" && why) t.late_reason = why;
   if (to === "done") REMINDERS.delete(t.task_id);
   // The board reads TASKS in order: the card goes above `before`, or to the foot.
-  const target = before ? TASKS.find((x) => x.task_id === before) : null;
+  const target = before ? find(req.user!, before) : null;
   if (before && (!target || target.status !== to)) return fail(409, "CONFLICT", "That card has moved, reload the board");
   TASKS.splice(TASKS.indexOf(t), 1);
   TASKS.splice(target ? TASKS.indexOf(target) : TASKS.length, 0, t);
@@ -679,7 +679,7 @@ route("GET /api/v1/calendar", (req) => {
   const items = [
     ...[
       ...EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e)).map((e) => asItem(view(req.user!, e))),
-      ...TASKS.filter((t) => t.assignee?.employee_id === me(req.user) && open(t) && t.due_at).map(taskItem),
+      ...TASKS.filter((t) => (t.assignee?.employee_id === me(req.user) || onIt(req.user!, t)) && open(t) && t.due_at).map(taskItem),
       ...performanceItems(),
     ].filter((i) => i.starts_at.startsWith(month)),
     ...leaveItems(req.user!, month),
@@ -699,7 +699,7 @@ route("POST /api/v1/calendar", (req) => {
   const f: Record<string, string[]> = {};
   if (!b.title) f.title = ["Name the event"];
   if (!b.starts_at) f.starts_at = ["Pick a start"];
-  if (b.starts_at && b.ends_at && b.ends_at <= b.starts_at) f.ends_at = ["Ends before it starts"];
+  if (b.starts_at && b.ends_at && Date.parse(b.ends_at) <= Date.parse(b.starts_at)) f.ends_at = ["Ends before it starts"];
   if (Object.keys(f).length) return invalid(f);
   const e: CalendarEvent = {
     calendar_event_id: sid(`ev:${Date.now()}`), title: b.title!, description: null, event_type: b.event_type ?? "meeting", owner: refKey(req.user!),
@@ -715,6 +715,8 @@ route("PATCH /api/v1/calendar/:id", (req) => {
   if (!e || !sees(req.user!, e)) return notFound();
   if (e.owner?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only the person who made this event can change it");
   const { attendee_ids: ids, ...rest } = req.body as Partial<CalendarEvent> & { attendee_ids?: string[] };
+  // The end comes after the start as a time, whatever offset each is written in.
+  if (Date.parse(rest.ends_at ?? e.ends_at) <= Date.parse(rest.starts_at ?? e.starts_at)) return invalid({ ends_at: ["Ends before it starts"] });
   Object.assign(e, rest);
   if (ids) e.attendees = ids.map((id) => e.attendees.find((a) => a.employee.employee_id === id) ?? { employee: ref(byId(id))!, response: "pending" as const });
   return ok(view(req.user!, e));
@@ -740,9 +742,10 @@ route("GET /api/v1/workspace/today", (req) => {
   const id = me(req.user);
   const today = isoDaysAgo(0);
   const own = TASKS.filter((t) => t.assignee?.employee_id === id && open(t)).map(fresh);
-  const dueToday = own.filter((t) => t.due_at?.startsWith(today));
+  // Due Today is open and not yet past its time; once past it a task is Overdue, so Your Day holds each once.
+  const dueToday = own.filter((t) => t.due_at?.startsWith(today) && !t.overdue);
   const overdue = own.filter((t) => t.overdue);
-  const fromOthers = own.filter((t) => t.set_by && t.set_by.employee_id !== id);
+  const fromOthers = own.filter((t) => t.set_by && t.set_by.employee_id !== id).sort((a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"));
   const [from] = weekBounds();
   const diary = EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e) && e.starts_at.startsWith(today)).map((e) => asItem(view(req.user!, e)));
   const since = ACTIVITY.filter((a) => TASKS.some((t) => t.task_id === a.task_id && t.assignee?.employee_id === id) && a.actor?.employee_id !== id).slice(0, 25);
@@ -752,7 +755,7 @@ route("GET /api/v1/workspace/today", (req) => {
     overdue: overdue.length,
     in_review: own.filter((t) => t.status === "in_review").length,
     done_this_week: TASKS.filter((t) => t.assignee?.employee_id === id && t.status === "done" && (t.completed_at ?? "") >= from).length,
-    my_day: { data: [...overdue, ...dueToday.filter((t) => !t.overdue)].slice(0, 25), total: overdue.length + dueToday.length },
+    my_day: { data: [...overdue, ...dueToday].slice(0, 25), total: overdue.length + dueToday.length },
     set_by_manager: { data: fromOthers.slice(0, 25), total: fromOthers.length },
     diary: { data: diary, total: diary.length },
     since: { data: since.map((a) => ({ task_id: a.task_id, task_title: a.task_title, actor: a.actor, kind: a.kind, to_status: a.to_status, created_at: a.created_at })), total: since.length },

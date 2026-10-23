@@ -94,7 +94,8 @@ const CalendarListQuery = listQuery(
   ["starts_at"],
 );
 
-const endsAfterStart = (v) => !v.starts_at || !v.ends_at || v.ends_at > v.starts_at;
+/** By the instant, not the text: 10:00+01:00 and 09:30Z are compared as times. */
+const endsAfterStart = (v) => !v.starts_at || !v.ends_at || Date.parse(v.ends_at) > Date.parse(v.starts_at);
 const ENDS_BEFORE = { message: "Ends before it starts", path: ["ends_at"] };
 
 /** POST /calendar */

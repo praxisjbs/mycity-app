@@ -123,8 +123,11 @@ function audience(listScope, scope, params) {
  * @param {object} query   TaskListQuery
  * @param {{scope: string, scope_ids: string[]|null, employee_id: string}} scope
  * @param {{now: Date, today: {from: Date, to: Date}, week: {from: Date, to: Date}}} at
+ * @param {{open?: boolean, notPast?: boolean, setByOther?: boolean}} only  narrower reads for
+ *   Today, never from a request: open tasks only; not yet past their due time; set by someone
+ *   other than the caller
  */
-function list(db, query, scope, at) {
+function list(db, query, scope, at, only = {}) {
   const params = [
     query.status || null,
     query.assignee_id || null,
@@ -142,6 +145,13 @@ function list(db, query, scope, at) {
     query.commitment_month || null,
   ];
   const who = audience(query.scope, scope, params);
+  const narrower = [];
+  if (only.open) narrower.push(`AND ${OPEN}`);
+  if (only.notPast) narrower.push("AND v.due_at >= $8");
+  if (only.setByOther) {
+    params.push(scope.employee_id || null);
+    narrower.push(`AND v.set_by_employee_id IS NOT NULL AND v.set_by_employee_id IS DISTINCT FROM $${params.length}::uuid`);
+  }
   return pageQuery(
     db,
     `SELECT ${OUT}, ${TOTAL_COL}
@@ -159,7 +169,7 @@ function list(db, query, scope, at) {
              OR ($7 = 'week' AND v.due_at >= $11 AND v.due_at < $12))
         AND ($13::boolean IS NULL OR v.is_commitment = $13)
         AND ($14::date IS NULL OR v.commitment_month = $14)
-        ${who}
+        ${who} ${narrower.join(" ")}
       ORDER BY ${orderBy(query, SORTS, "v.task_id")}`,
     params,
     query,
@@ -652,7 +662,8 @@ async function employeeActive(db, employeeId) {
 
 /**
  * Repeating tasks whose next occurrence is due (done, or past their due day) and not
- * yet made: one batch. Making the next occurrence takes a task out of this set.
+ * yet made: one batch. Making the next occurrence takes a task out of this set. A task whose
+ * lead has left the staff stops repeating.
  */
 async function dueToRepeat(db, now, batch) {
   const { rows } = await db.query(
@@ -660,6 +671,8 @@ async function dueToRepeat(db, now, batch) {
       WHERE t.recurrence IS NOT NULL AND t.archived_at IS NULL AND t.status <> 'cancelled'
         AND (t.status = 'done' OR t.due_at < $1)
         AND NOT EXISTS (SELECT 1 FROM task n WHERE n.parent_task_id = t.task_id AND n.recurrence IS NOT NULL)
+        AND NOT EXISTS (SELECT 1 FROM employee e WHERE e.employee_id = t.primary_assignee_id
+                          AND e.status IN ('left', 'archived'))
       ORDER BY t.task_id
       LIMIT $2 -- pagination:batch one tick of the recurrence job`,
     [now, batch],
@@ -785,11 +798,12 @@ async function deleteStep(client, stepId) {
   await client.query("DELETE FROM task_step WHERE task_step_id = $1", [stepId]);
 }
 
-/** The other end of an edge, with what the reader needs to decide whether they may open it. */
+/** The other end of an edge, with what the reader ($2) needs to decide whether they may open it. */
 const EDGES = (side, other) => `
   SELECT dp.task_dependency_id, dp.overridden_at, dp.override_reason,
          o.task_id, o.number::text AS number, o.title, o.status,
          o.primary_assignee_id, o.set_by_employee_id,
+         EXISTS (SELECT 1 FROM task_assignee ra WHERE ra.task_id = o.task_id AND ra.employee_id = $2::uuid) AS reader_shares,
          ${personJson("oe", "od")} AS assignee
     FROM task_dependency dp
     JOIN task o ON o.task_id = dp.${other}
@@ -797,25 +811,25 @@ const EDGES = (side, other) => `
     LEFT JOIN department od ON od.department_id = oe.department_id
    WHERE dp.${side} = $1`;
 
-/** What a task waits on. */
-async function waitingOn(db, taskId) {
+/** What a task waits on, as `readerId` sees it. */
+async function waitingOn(db, taskId, readerId) {
   // pagination:complete one task's prerequisites, at most PLAN_MAX (the service refuses more)
   const { rows } = await completeQuery(
     db,
     `${EDGES("task_id", "depends_on_task_id")} ORDER BY dp.created_at, dp.task_dependency_id`,
-    [taskId],
+    [taskId, readerId || null],
     { label: "a task's prerequisites", ceiling: PLAN_MAX },
   );
   return rows;
 }
 
-/** What waits on a task. */
-async function holdingUp(db, taskId) {
+/** What waits on a task, as `readerId` sees it. */
+async function holdingUp(db, taskId, readerId) {
   // pagination:complete the tasks waiting on one task, at most PLAN_MAX (the service refuses more)
   const { rows } = await completeQuery(
     db,
     `${EDGES("depends_on_task_id", "task_id")} ORDER BY dp.created_at, dp.task_dependency_id`,
-    [taskId],
+    [taskId, readerId || null],
     { label: "the tasks waiting on a task", ceiling: PLAN_MAX },
   );
   return rows;
@@ -889,18 +903,31 @@ async function firstUnsatisfied(db, taskId) {
   return rows[0] || null;
 }
 
-/** The open tasks that wait on this one, with their assignees: told when it is done. */
-async function waitingAssignees(db, taskId) {
+/** The open tasks that wait on this one: their people are told when it is done. */
+async function waitingTaskIds(db, taskId) {
   // pagination:complete the tasks waiting on one task, at most PLAN_MAX
   const { rows } = await completeQuery(
     db,
-    `SELECT t.primary_assignee_id FROM task_dependency dp JOIN task t ON t.task_id = dp.task_id
-      WHERE dp.depends_on_task_id = $1 AND t.status NOT IN ('done', 'cancelled')
+    `SELECT t.task_id FROM task_dependency dp JOIN task t ON t.task_id = dp.task_id
+      WHERE dp.depends_on_task_id = $1 AND t.status NOT IN ('done', 'cancelled') AND t.archived_at IS NULL
       ORDER BY dp.task_dependency_id`,
     [taskId],
     { label: "the tasks waiting on a task", ceiling: PLAN_MAX },
   );
-  return rows.map((r) => r.primary_assignee_id);
+  return rows.map((r) => r.task_id);
+}
+
+/** The active logins of these employees, as employee id → user id. */
+async function usersOf(db, employeeIds) {
+  // pagination:complete a task's watchers, or one person named as one, at most PLAN_MAX
+  const { rows } = await completeQuery(
+    db,
+    `SELECT employee_id, user_id FROM app_user
+      WHERE employee_id = ANY($1::uuid[]) AND status = 'active' ORDER BY employee_id`,
+    [employeeIds],
+    { label: "the logins of a task's watchers", ceiling: PLAN_MAX },
+  );
+  return new Map(rows.map((r) => [r.employee_id, r.user_id]));
 }
 
 /** A task's watchers as people. */
@@ -1021,7 +1048,8 @@ module.exports = {
   deleteDependency,
   overrideDependency,
   firstUnsatisfied,
-  waitingAssignees,
+  waitingTaskIds,
+  usersOf,
   watchers,
   watcherIds,
   addWatcher,

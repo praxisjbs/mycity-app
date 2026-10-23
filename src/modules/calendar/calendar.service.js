@@ -31,6 +31,12 @@ async function tx(fn) {
 
 const notFound = () => new AppError("NOT_FOUND", "That event does not exist", 404);
 
+/** A stored value and the one sent: times as instants, the rest as text, nothing as empty. */
+function same(stored, sent) {
+  if (stored instanceof Date) return Date.parse(sent) === stored.getTime();
+  return String(stored ?? "") === String(sent ?? "");
+}
+
 /** A month item as the contract's CalendarItem. */
 function toItem(row) {
   return {
@@ -82,22 +88,31 @@ function whenOf(startsAt, allDay) {
   return allDay ? dd : `${dd}, ${lagos.timeOf(d)}`;
 }
 
-/** A person's month, YYYY-MM. */
-async function month(employeeId, query) {
-  const first = `${query.month}-01`;
-  const next = lagos.addMonths(first, 1);
+/** A person's days from `first` to `last` (YYYY-MM-DD, both kept), one page. */
+async function days(employeeId, first, last, query) {
   const page = await repo.month(
     pool,
     {
       employee_id: employeeId,
       from: lagos.instant(first),
-      to: lagos.instant(next),
+      to: lagos.instant(lagos.addDays(last, 1)),
       fromDay: first,
-      toDay: lagos.addDays(next, -1),
+      toDay: last,
     },
     query,
   );
   return { ...page, data: page.data.map(toItem) };
+}
+
+/** A person's month, YYYY-MM. */
+function month(employeeId, query) {
+  const first = `${query.month}-01`;
+  return days(employeeId, first, lagos.addDays(lagos.addMonths(first, 1), -1), query);
+}
+
+/** A person's one day, YYYY-MM-DD: Today's diary. */
+function oneDay(employeeId, date, query) {
+  return days(employeeId, date, date, query);
 }
 
 /* ------------------------------------------------------------------ *
@@ -234,8 +249,15 @@ async function edit(actor, id, body) {
     for (const k of ["title", "description", "event_type", "starts_at", "ends_at", "all_day", "location", "visibility"])
       if (k in body) changes[k] = body[k];
     await repo.update(client, id, changes);
+    const was = await repo.attendeeIds(client, id);
     if (body.attendee_ids)
       await repo.setAttendees(client, id, await checkAttendees(client, body.attendee_ids, actor.employee_id));
+    const now = await repo.attendeeIds(client, id);
+    const added = now.filter((x) => !was.includes(x));
+    const removed = was.filter((x) => !now.includes(x));
+    // What the people already invited would notice; a change to who else comes, or to the
+    // reminders, is not news to them.
+    const noticed = Object.keys(changes).some((k) => !same(before[k], changes[k]));
     // New lead times replace the old; a move keeps the lead times and moves their times with it.
     if (body.reminder_minutes || body.starts_at) {
       const lead = body.reminder_minutes || (await withReminders(client, before)).reminder_minutes;
@@ -248,8 +270,13 @@ async function edit(actor, id, body) {
       actor,
       before: toEvent(before, actor.employee_id),
       after: toEvent(after, actor.employee_id),
-      payload: payloadOf(after, await repo.attendeeIds(client, id)),
+      payload: { ...payloadOf(after, now.filter((x) => !added.includes(x))), noticed },
     });
+    // Someone newly invited hears an invitation; someone taken off hears that.
+    if (added.length)
+      await emit(client, { key: EVENTS.CALENDAR_EVENT_INVITED, entity: { type: "calendar_event", id }, actor, payload: payloadOf(after, added) });
+    if (removed.length)
+      await emit(client, { key: EVENTS.CALENDAR_EVENT_UNINVITED, entity: { type: "calendar_event", id }, actor, payload: payloadOf(after, removed) });
     return toEvent(after, actor.employee_id);
   });
 }
@@ -297,4 +324,4 @@ async function respond(actor, id, { response }) {
   });
 }
 
-module.exports = { toItem, month, getFor, create, edit, cancel, respond, reminderCheck };
+module.exports = { toItem, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck };

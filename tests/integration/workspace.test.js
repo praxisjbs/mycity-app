@@ -126,6 +126,11 @@ describeDb("my workspace against the real migrations", () => {
   });
 
   const ids = {};
+  const bell = async (who) =>
+    (await q(
+      `SELECT n.title FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1`,
+      [emp(who)],
+    )).rows.map((r) => r.title);
 
   test("a manager sets a weekly task for their report, who adds their own beside it (A24)", async () => {
     const set = await as("manager").post("/tasks", {
@@ -358,11 +363,15 @@ describeDb("my workspace against the real migrations", () => {
     expect(hidden.status).toBe(422);
   });
 
-  test("watchers hear about it, and a ping reaches whoever it names", async () => {
+  test("watchers are people who can already see the task; they hear about it, and a ping reaches whoever it names", async () => {
     const t = await as("manager").post("/tasks", { title: "Confirm caterer for the launch", primary_assignee_id: emp("staff") });
-    const added = await as("manager").post(`/tasks/${t.body.task_id}/watchers`, { employee_id: emp("peer") });
+    // Zainab works beside Musa but cannot open his tasks: she is never made a watcher of one.
+    const unseen = await as("manager").post(`/tasks/${t.body.task_id}/watchers`, { employee_id: emp("peer") });
+    expect(unseen.status).toBe(422);
+    expect(unseen.body.error.fields.employee_id).toEqual(["Cannot see this task"]);
+    const added = await as("manager").post(`/tasks/${t.body.task_id}/watchers`, { employee_id: emp("director") });
     expect(added.status).toBe(200);
-    expect(added.body.watchers.map((p) => p.employee_id)).toContain(emp("peer"));
+    expect(added.body.watchers.map((p) => p.employee_id)).toContain(emp("director"));
     const notMine = await as("staff").post(`/tasks/${t.body.task_id}/watchers`, {});
     expect(notMine.body.watching).toBe(true);
     expect((await as("outsider").post(`/tasks/${t.body.task_id}/watchers`, {})).status).toBe(404);
@@ -370,16 +379,12 @@ describeDb("my workspace against the real migrations", () => {
     const pinged = await as("manager").post(`/tasks/${t.body.task_id}/ping`, { message: "Need this by noon", to: "everyone" });
     expect(pinged.status).toBe(200);
     await drain();
-    const peerBell = await q(
-      `SELECT n.title FROM notification n JOIN app_user u ON u.user_id = n.user_id
-        WHERE u.employee_id = $1 ORDER BY n.created_at DESC`,
-      [emp("peer")],
-    );
-    expect(peerBell.rows.map((r) => r.title)).toEqual(expect.arrayContaining([expect.stringMatching(/nudged you/)]));
+    expect(await bell("director")).toEqual(expect.arrayContaining([expect.stringMatching(/nudged you/)]));
+    expect(await bell("peer")).not.toEqual(expect.arrayContaining([expect.stringMatching(/nudged you on/)]));
 
     const left = await as("staff").del(`/tasks/${t.body.task_id}/watchers/${emp("staff")}`);
     expect(left.body.watching).toBe(false);
-    expect((await as("staff").del(`/tasks/${t.body.task_id}/watchers/${emp("peer")}`)).status).toBe(200);
+    expect((await as("staff").del(`/tasks/${t.body.task_id}/watchers/${emp("director")}`)).status).toBe(200);
   });
 
   test("a hold has a note and an expected day; clearing it moves the due time on and keeps the history", async () => {
@@ -539,11 +544,6 @@ describeDb("my workspace against the real migrations", () => {
   });
 
   /* Shared tasks: one lead, the people sharing it beside them (A24 as extended, workspace.md §6). */
-  const bell = async (who) =>
-    (await q(
-      `SELECT n.title FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1`,
-      [emp(who)],
-    )).rows.map((r) => r.title);
   const programmes = async () => (await q("SELECT department_id FROM department WHERE name = 'Programmes'")).rows[0].department_id;
 
   test("shared: a manager shares a task under a lead; the people on it see it, work it and hear of it", async () => {
@@ -678,5 +678,222 @@ describeDb("my workspace against the real migrations", () => {
       [r.body.task_id],
     );
     expect(next.rows.map((x) => x.employee_id)).toEqual([emp("staff")]);
+  });
+
+  /* ------------------------------------------------------------------ *
+   * The 23/10 audit: who manages, who hears, what Today and Analytics count
+   * ------------------------------------------------------------------ */
+
+  const lagosAt = (hm) => lagos.instant(today, hm);
+  const todayOf = (who, scope, now) =>
+    require("../../src/modules/workspace/workspace.today").today(
+      { user_id: people[who].user.user_id, employee_id: emp(who) },
+      { scope, scope_ids: scope === "all" ? null : [emp(who)], employee_id: emp(who) },
+      now,
+    );
+
+  test("the assignee of a task someone else set never manages it, even with an all grant; the setter and managers over them do", async () => {
+    const t = await as("director").post("/tasks", { title: "Draft the Q4 staffing plan", primary_assignee_id: emp("ops") });
+    expect(t.status).toBe(201);
+    expect((await as("ops").patch(`/tasks/${t.body.task_id}`, { title: "Draft a staffing plan" })).status).toBe(403);
+    expect((await as("ops").post(`/tasks/${t.body.task_id}/cancel`, { cancel_reason: "Not needed" })).status).toBe(403);
+    const panel = await as("ops").get(`/tasks/${t.body.task_id}`);
+    expect(panel.body.can_reassign).toBe(false);
+    expect(panel.body.can_cancel).toBe(false);
+    expect((await as("ops").patch(`/tasks/${t.body.task_id}`, { priority: "high" })).status).toBe(200);
+    expect((await as("director").patch(`/tasks/${t.body.task_id}`, { title: "Draft the Q4 plan" })).status).toBe(200);
+
+    // Over someone else's task, an all grant still manages it.
+    const report = await as("manager").post("/tasks", { title: "Count the banners", primary_assignee_id: emp("staff") });
+    expect((await as("ops").patch(`/tasks/${report.body.task_id}`, { title: "Count every banner" })).status).toBe(200);
+  });
+
+  test("Analytics: Mine counts what the reader leads or shares; what they set for others counts under My Team", async () => {
+    const open = async (who, scope) => (await as(who).get(`/workspace/analytics${scope ? "?scope=team" : ""}`)).body.open;
+    const [mineBefore, teamBefore, peerBefore] = [await open("manager"), await open("manager", "team"), await open("peer")];
+    const t = await as("manager").post("/tasks", { title: "Collect stand receipts", primary_assignee_id: emp("staff"), member_ids: [emp("staff"), emp("peer")] });
+    expect(t.status).toBe(201);
+    expect(await open("manager")).toBe(mineBefore);
+    expect(await open("manager", "team")).toBe(teamBefore + 1);
+    expect(await open("peer")).toBe(peerBefore + 1);
+  });
+
+  test("Today: due today is open and not yet past, From Your Manager is the open tasks someone else set, and the diary is today's", async () => {
+    const one = await as("ops").post("/tasks", { title: "Today probe one", primary_assignee_id: emp("outsider"), due_on: today });
+    const two = await as("ops").post("/tasks", { title: "Today probe two", primary_assignee_id: emp("outsider"), due_on: today });
+    const own = await as("outsider").post("/tasks", { title: "Today probe mine", due_on: today });
+    const done = await as("ops").post("/tasks", { title: "Today probe done", primary_assignee_id: emp("outsider"), due_on: today });
+    for (const r of [one, two, own, done]) expect(r.status).toBe(201);
+    expect((await as("outsider").post(`/tasks/${done.body.task_id}/move`, { status: "done" })).status).toBe(200);
+    const ev = await as("outsider").post("/calendar", {
+      title: "Today probe meeting",
+      starts_at: lagosAt("12:00").toISOString(),
+      ends_at: lagosAt("13:00").toISOString(),
+    });
+    expect(ev.status).toBe(201);
+    await as("outsider").post("/calendar", {
+      title: "Tomorrow probe meeting",
+      starts_at: lagos.instant(later(1), "12:00").toISOString(),
+      ends_at: lagos.instant(later(1), "13:00").toISOString(),
+    });
+
+    const morning = await todayOf("outsider", "own", lagosAt("10:00"));
+    const titles = (list) => list.data.map((t) => t.title);
+    expect(titles(morning.my_day)).toEqual(expect.arrayContaining(["Today probe one", "Today probe two", "Today probe mine"]));
+    expect(titles(morning.my_day)).not.toContain("Today probe done");
+    expect(morning.due_today).toBeGreaterThanOrEqual(3);
+    expect(morning.my_day.total).toBe(morning.overdue + morning.due_today);
+    expect(titles(morning.set_by_manager)).toEqual(expect.arrayContaining(["Today probe one", "Today probe two"]));
+    expect(titles(morning.set_by_manager)).not.toContain("Today probe mine");
+    expect(titles(morning.set_by_manager)).not.toContain("Today probe done");
+    expect(morning.set_by_manager.total).toBe(morning.set_by_manager.data.length);
+    expect(morning.diary.data.map((i) => i.title)).toContain("Today probe meeting");
+    expect(morning.diary.data.map((i) => i.title)).not.toContain("Tomorrow probe meeting");
+
+    // Past the day's close a task due today is overdue, and counted once.
+    const evening = await todayOf("outsider", "own", lagosAt("18:00"));
+    expect(evening.due_today).toBe(0);
+    expect(evening.my_day.total).toBe(evening.overdue);
+    expect(titles(evening.my_day)).toEqual(expect.arrayContaining(["Today probe one", "Today probe mine"]));
+  });
+
+  test("done: the people on a task waiting on it hear about their own task, never the title of one they cannot open", async () => {
+    const prereq = await as("ops").post("/tasks", { title: "Close the Finance ledger", primary_assignee_id: emp("outsider") });
+    const waiting = await as("ops").post("/tasks", { title: "Pay the Ikeja vendor", primary_assignee_id: emp("staff") });
+    expect((await as("ops").post(`/tasks/${waiting.body.task_id}/waiting-on`, { depends_on_task_id: prereq.body.task_id })).status).toBe(200);
+    const panel = await as("staff").get(`/tasks/${waiting.body.task_id}`);
+    expect(panel.body.waiting_on[0].task.title).toBe("A task you cannot open");
+
+    expect((await as("outsider").post(`/tasks/${prereq.body.task_id}/move`, { status: "done" })).status).toBe(200);
+    await drain();
+    const told = await q(
+      `SELECT n.title, n.body FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1`,
+      [emp("staff")],
+    );
+    expect(told.rows).toEqual(expect.arrayContaining([{ title: "A task you wait on is done", body: `${waiting.body.number}: Pay the Ikeja vendor` }]));
+    expect(told.rows.some((r) => `${r.title} ${r.body}`.includes("Close the Finance ledger"))).toBe(false);
+
+    // Someone sharing the other task may open it, so its title shows on the line.
+    const sharedPrereq = await as("ops").post("/tasks", { title: "Sign the Finance memo", primary_assignee_id: emp("outsider"), member_ids: [emp("outsider"), emp("staff")] });
+    expect(sharedPrereq.status).toBe(201);
+    const next = await as("ops").post("/tasks", { title: "File the signed memo", primary_assignee_id: emp("staff") });
+    expect((await as("ops").post(`/tasks/${next.body.task_id}/waiting-on`, { depends_on_task_id: sharedPrereq.body.task_id })).status).toBe(200);
+    expect((await as("staff").get(`/tasks/${next.body.task_id}`)).body.waiting_on[0].task.title).toBe("Sign the Finance memo");
+  });
+
+  test("clearing a blocker tells the setter", async () => {
+    const t = await as("manager").post("/tasks", { title: "Collect the gazebo", primary_assignee_id: emp("staff") });
+    await as("staff").post(`/tasks/${t.body.task_id}/block`, { blocked_reason: "Van is out" });
+    expect((await as("staff").post(`/tasks/${t.body.task_id}/unblock`, { resolve_note: "Van is back" })).status).toBe(200);
+    await drain();
+    expect(await bell("manager")).toEqual(expect.arrayContaining(["Unblocked: Collect the gazebo"]));
+  });
+
+  test("a repeat arrives quietly, and a task whose lead has left stops repeating", async () => {
+    const r = await as("manager").post("/tasks", {
+      title: "Sweep the Ajah stand",
+      primary_assignee_id: emp("staff"),
+      due_on: later(-2),
+      recurrence: { freq: "daily" },
+    });
+    expect(r.status).toBe(201);
+    await tasks.sweep(new Date());
+    await drain();
+    const told = await q(
+      `SELECT count(*)::int AS n FROM notification n JOIN app_user u ON u.user_id = n.user_id
+        WHERE u.employee_id = $1 AND n.title LIKE '%set you a task' AND n.body LIKE '%: Sweep the Ajah stand'`,
+      [emp("staff")],
+    );
+    expect(told.rows[0].n).toBe(1);
+
+    let leaver;
+    await tx(async (client) => {
+      leaver = await createAdmin(
+        client,
+        {
+          employee: {
+            first_name: "Tolu",
+            last_name: "Bello",
+            work_email: "leaver@mycity.test",
+            phone: "08031234567",
+            job_title: "Field Officer",
+            department_name: "Programmes",
+            start_date: "2026-01-05",
+            employment_type: "full_time",
+            work_pattern: "on_site",
+          },
+          role_code: "employee",
+          is_ceo: false,
+        },
+        PASSWORD,
+        { allowAdditional: true },
+      );
+    });
+    const gone = await as("ops").post("/tasks", {
+      title: "Restock the Lekki stand",
+      primary_assignee_id: leaver.employee.employee_id,
+      due_on: later(-2),
+      recurrence: { freq: "daily" },
+    });
+    expect(gone.status).toBe(201);
+    await q("UPDATE employee SET status = 'left' WHERE employee_id = $1", [leaver.employee.employee_id]);
+    await tasks.sweep(new Date());
+    expect((await q("SELECT 1 FROM task WHERE parent_task_id = $1", [gone.body.task_id])).rows).toHaveLength(0);
+  });
+
+  test("a card lands above another only on the reader's own board", async () => {
+    const mine = await as("staff").post("/tasks", { title: "Tidy the stand box" });
+    const theirs = await as("ops").post("/tasks", { title: "Audit petty cash", primary_assignee_id: emp("outsider") });
+    const moved = await as("staff").post(`/tasks/${mine.body.task_id}/move`, { status: "todo", before_task_id: theirs.body.task_id });
+    expect(moved.status).toBe(409);
+  });
+
+  test("a task cancelled with its record takes its reminders with it", async () => {
+    const t = await as("staff").post("/tasks", { title: "Chase the KR evidence", due_on: later(6) });
+    await as("staff").put(`/tasks/${t.body.task_id}/reminders`, { reminders: [{ minutes_before: 60 }] });
+    const record = (await q("SELECT gen_random_uuid() AS id")).rows[0].id;
+    await q("UPDATE task SET entity_type = 'key_result', entity_id = $2 WHERE task_id = $1", [t.body.task_id, record]);
+    await tx((client) => tasks.cancelForRecord(client, null, { entity_type: "key_result", entity_id: record, reason: "Key result reverted" }));
+    const after = await as("staff").get(`/tasks/${t.body.task_id}`);
+    expect(after.body.status).toBe("cancelled");
+    expect(after.body.reminders).toHaveLength(0);
+  });
+
+  test("a shared task is on its people's calendars and found from ⌘K", async () => {
+    const t = await as("manager").post("/tasks", { title: "Brief the Ikorodu crew", primary_assignee_id: emp("staff"), member_ids: [emp("staff"), emp("peer")], due_on: later(3) });
+    expect(t.status).toBe(201);
+    const month = (await as("peer").get(`/calendar?month=${later(3).slice(0, 7)}&item_kind=task`)).body.data;
+    expect(month.map((i) => i.item_id)).toContain(t.body.task_id);
+    const found = await as("peer").get("/search?q=Ikorodu");
+    expect(found.status).toBe(200);
+    const items = found.body.groups.flatMap((g) => g.items);
+    expect(items.map((i) => i.id)).toContain(t.body.task_id);
+    // A task they did not set and do not share stays out of their search.
+    const hidden = await as("manager").post("/tasks", { title: "Ikorodu budget review", primary_assignee_id: emp("staff") });
+    expect((await as("peer").get("/search?q=Ikorodu")).body.groups.flatMap((g) => g.items).map((i) => i.id)).not.toContain(hidden.body.task_id);
+  });
+
+  test("an event's new people hear an invitation, people taken off hear that, and only a real change tells the rest", async () => {
+    const starts = lagos.instant(later(2), "10:00").toISOString();
+    const ends = lagos.instant(later(2), "11:00").toISOString();
+    const ev = await as("manager").post("/calendar", { title: "Stand layout walk", starts_at: starts, ends_at: ends, attendee_ids: [emp("staff")] });
+    expect(ev.status).toBe(201);
+    const id = ev.body.calendar_event_id;
+    expect((await as("manager").patch(`/calendar/${id}`, { attendee_ids: [emp("peer")] })).status).toBe(200);
+    await drain();
+    expect(await bell("peer")).toEqual(expect.arrayContaining(["Invitation: Stand layout walk"]));
+    expect(await bell("staff")).toEqual(expect.arrayContaining(["No longer invited: Stand layout walk"]));
+    expect(await bell("peer")).not.toEqual(expect.arrayContaining(["Changed: Stand layout walk"]));
+
+    // Times compare as instants, whatever the text says: 09:30 UTC is after 10:00 Lagos (09:00 UTC),
+    // and 09:30 Lagos (08:30 UTC) is before 09:00 UTC.
+    const after = await as("manager").post("/calendar", { title: "Offset after", starts_at: `${later(2)}T10:00:00+01:00`, ends_at: `${later(2)}T09:30:00Z` });
+    expect(after.status).toBe(201);
+    const before = await as("manager").post("/calendar", { title: "Offset before", starts_at: `${later(2)}T09:00:00Z`, ends_at: `${later(2)}T09:30:00+01:00` });
+    expect(before.status).toBe(422);
+    const moved = await as("manager").patch(`/calendar/${id}`, { starts_at: lagos.instant(later(2), "14:00").toISOString(), ends_at: lagos.instant(later(2), "15:00").toISOString() });
+    expect(moved.status).toBe(200);
+    await drain();
+    expect(await bell("peer")).toEqual(expect.arrayContaining(["Changed: Stand layout walk"]));
   });
 });

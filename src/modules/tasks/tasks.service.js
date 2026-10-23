@@ -43,6 +43,8 @@ const lagos = require("../../shared/time/lagos");
 const workingWeek = require("../../shared/time/working-week");
 const workflow = require("../../shared/workflow/engine");
 const approvers = require("../../shared/workflow/approvers");
+const grantsCache = require("../../shared/rbac/grants-cache");
+const { scopeFor } = require("../../middleware/rbac");
 const repo = require("./tasks.repo");
 const audience = require("./tasks.audience");
 const recurrence = require("./tasks.recurrence");
@@ -171,9 +173,10 @@ function windows(now = new Date()) {
  * Reading
  * ------------------------------------------------------------------ */
 
-async function list(query, scope) {
-  const at = windows();
-  const page = await repo.list(pool, query, scope, at);
+/** One page of tasks; `only` narrows it for Today (repo.list), whose `now` it is read at. */
+async function list(query, scope, only = {}, now = new Date()) {
+  const at = windows(now);
+  const page = await repo.list(pool, query, scope, at, only);
   return { ...page, data: page.data.map((r) => toTask(r, at.now)) };
 }
 
@@ -209,9 +212,9 @@ async function people(query, scope) {
   return repo.people(pool, query, { reach, excludeId: query.department_id ? null : scope.employee_id });
 }
 
-/** Another task as a panel line: its words only when the reader may open it. */
+/** Another task as a panel line: its words only when the reader may open it (`reader_shares`: they share it). */
 function toRef(row, scope) {
-  const seen = audience.maySee(scope, row, false);
+  const seen = audience.maySee(scope, row, row.reader_shares);
   return {
     task_id: row.task_id,
     number: row.number || "",
@@ -220,6 +223,30 @@ function toRef(row, scope) {
     assignee: seen ? row.assignee : null,
     visible: seen,
   };
+}
+
+/**
+ * Which of these employees may see the task by their own workspace grant: its lead, its setter,
+ * the people sharing it, and anyone whose scope covers the lead (A24). A watcher is only someone
+ * who already may, and watchers and nudges reach only them (workspace.md §6).
+ * @param {{task_id: string, primary_assignee_id: string, set_by_employee_id: string|null}} task
+ */
+async function whoMaySee(db, task, employeeIds) {
+  const ids = [...new Set(employeeIds.filter(Boolean))];
+  if (!ids.length) return [];
+  const members = new Set(await repo.memberIds(db, task.task_id));
+  const logins = await repo.usersOf(db, ids);
+  const seen = [];
+  for (const id of ids) {
+    if (id === task.primary_assignee_id || id === task.set_by_employee_id || members.has(id)) {
+      seen.push(id);
+      continue;
+    }
+    const user = logins.has(id) ? await grantsCache.getAuthUser(db, logins.get(id)) : null;
+    const theirs = user && user.status === "active" ? await scopeFor(user, "workspace", "view") : null;
+    if (theirs && audience.maySee(theirs, task, false)) seen.push(id);
+  }
+  return seen;
 }
 
 const toEdge = (row, scope) => ({
@@ -280,8 +307,8 @@ async function getFor(id, scope, actor = null) {
   const approved = Boolean(row.is_commitment && row.original_due_at);
   const [stepRows, waits, held, watching, hold, pending, open] = await Promise.all([
     repo.steps(pool, id),
-    repo.waitingOn(pool, id),
-    repo.holdingUp(pool, id),
+    repo.waitingOn(pool, id, scope.employee_id),
+    repo.holdingUp(pool, id, scope.employee_id),
     repo.watchers(pool, id),
     repo.openBlockage(pool, id),
     reminders.pendingFor(pool, { key: REMINDER_KEY, entity: { type: "task", id } }),
@@ -626,6 +653,10 @@ async function move(actor, scope, id, { status, before_task_id: beforeId, late_r
   return tx(async (client) => {
     if (!(await repo.lock(client, id))) throw notFound();
     const before = await visible(client, id, scope);
+    // The card it lands above is one on the reader's own board; any other is a stale board.
+    if (beforeId) await visible(client, beforeId, scope).catch(() => {
+      throw new AppError("CONFLICT", "That card has moved, reload the board", 409);
+    });
     if (before.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
     if (before.status === "todo" && status !== "todo") {
       const pending = await repo.firstUnsatisfied(client, id);
@@ -685,9 +716,26 @@ async function move(actor, scope, id, { status, before_task_id: beforeId, late_r
           month: `${lagos.dateOf(new Date(status === "done" ? now : before.completed_at || now)).slice(0, 7)}-01`,
         }),
       });
+      if (status === "done") await tellWaiting(client, actor, after);
     }
     return toTask(after);
   });
+}
+
+/**
+ * A task is done: the people on each open task waiting on it hear, about their own task, so the
+ * notice names nothing they may not open.
+ */
+async function tellWaiting(client, actor, done) {
+  for (const waitingId of await repo.waitingTaskIds(client, done.task_id)) {
+    const row = await repo.get(client, waitingId);
+    await emit(client, {
+      key: EVENTS.TASK_PREREQUISITE_DONE,
+      entity: { type: "task", id: waitingId },
+      actor,
+      payload: payloadOf(row, { prerequisite_task_id: done.task_id }),
+    });
+  }
 }
 
 async function block(actor, scope, id, { blocked_reason: reason, estimated_resolve_on: estimate }) {
@@ -747,7 +795,7 @@ async function unblock(actor, scope, id, body = {}) {
       entity: { type: "task", id },
       actor,
       before: { blocked_reason: before.blocked_reason },
-      payload: payloadOf(after),
+      payload: payloadOf(after, { resolve_note: body.resolve_note || null }),
     });
     return toTask(after);
   });
@@ -792,6 +840,7 @@ async function cancel(actor, scope, id, { cancel_reason: reason }) {
 async function cancelForRecord(client, actor, { entity_type: entityType, entity_id: entityId, reason }) {
   for (const t of await repo.openForRecord(client, entityType, entityId)) {
     await repo.update(client, t.task_id, { status: "cancelled", cancelled_at: new Date(), cancel_reason: reason });
+    await reminders.cancel(client, { key: REMINDER_KEY, entity: { type: "task", id: t.task_id } });
     await repo.addActivity(client, {
       task_id: t.task_id,
       actor_user_id: actor ? actor.user_id : null,
@@ -963,7 +1012,7 @@ async function overrideWaiting(actor, scope, id, dependencyId, { override_reason
 
 /**
  * Watch a task. Anyone who can see it watches it themselves; naming someone else is for its
- * assignee or the person who set it, and that person must be on the staff.
+ * assignee or the person who set it, and that person must be on the staff and able to see it.
  */
 async function watch(actor, scope, id, { employee_id: who }) {
   const employeeId = who || actor.employee_id;
@@ -975,6 +1024,7 @@ async function watch(actor, scope, id, { employee_id: who }) {
       if (!mayPlan(scope, row))
         throw new AppError("FORBIDDEN", "Only its assignee or the person who set it can add watchers", 403);
       if (!(await repo.employeeActive(client, employeeId))) throw invalid("employee_id", "Not on the staff");
+      if (!(await whoMaySee(client, row, [employeeId])).length) throw invalid("employee_id", "Cannot see this task");
     }
     if ((await repo.watcherIds(client, id)).length >= repo.PLAN_MAX)
       throw conflict("TOO_MANY_WATCHERS", `A task has at most ${repo.PLAN_MAX} watchers`);
@@ -1010,7 +1060,7 @@ async function ping(actor, scope, id, { message, to }) {
   return tx(async (client) => {
     const row = await visible(client, id, scope);
     if (row.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
-    const watchers = to === "assignee" ? [] : await repo.watcherIds(client, id);
+    const watchers = to === "assignee" ? [] : await whoMaySee(client, row, await repo.watcherIds(client, id));
     const onIt = [row.primary_assignee_id, ...(row.members || []).map((p) => p.employee_id)];
     const told = [...(to === "watchers" ? [] : onIt), ...watchers]
       .filter((p) => p && p !== actor.employee_id);
@@ -1244,6 +1294,7 @@ module.exports = {
   cancelForRecord,
   toTask,
   toRef,
+  whoMaySee,
   windows,
   list,
   summary,

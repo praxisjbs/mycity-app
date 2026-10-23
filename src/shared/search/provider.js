@@ -21,6 +21,11 @@
  * `scope: { column: "m.employee_id", through: "attendance_field_member m WHERE m.field_assignment_id
  * = a.field_assignment_id" }` finds it when any one of them is in the caller's scope, once.
  *
+ * A record that also names people beyond its scope column (a task the caller set, or shares
+ * with its lead) says where with `scope.named: { column, through }`: the caller finds it
+ * whatever their scope, when they are one of them, as the screen lists it. `through` ends in a
+ * WHERE, like the crew's above, and `column` is compared with the caller's employee id.
+ *
  * `capability: "<code>"` is for records only some holders of `view` may find (README §5.2): the
  * search service runs the provider only for a reader holding that capability (the CEO holds every
  * one), as the route behind the screen checks it.
@@ -101,6 +106,8 @@ function recordProvider(spec) {
     );
   if (spec.scope && !spec.scope.column)
     throw new Error(`search provider ${spec.type}: scope is { column }`);
+  if (spec.scope && spec.scope.named && !(spec.scope.named.column && spec.scope.named.through))
+    throw new Error(`search provider ${spec.type}: scope.named is { column, through }`);
   if (spec.owner && !spec.owner.column)
     throw new Error(`search provider ${spec.type}: owner is { column }`);
   if (spec.capability !== undefined && !catalog.isCapability(spec.capability))
@@ -119,7 +126,7 @@ function recordProvider(spec) {
   /**
    * One page of matches.
    * @param {{query: Function}} c
-   * @param {{term: string, page?: number, fuzzy?: boolean, scope: {scope: string, scope_ids: string[]|null}, user?: {user_id: string}}} q
+   * @param {{term: string, page?: number, fuzzy?: boolean, scope: {scope: string, scope_ids: string[]|null, employee_id?: string|null}, user?: {user_id: string}}} q
    */
   async function search(c, { term, page = 1, fuzzy = false, scope, user }) {
     if (spec.owner && !(user && user.user_id)) return { page: null, items: [] };
@@ -154,6 +161,11 @@ function recordProvider(spec) {
     let s = spec.scope ? scopeClause(scope, { column: spec.scope.column }, params) : { and: "" };
     if (spec.scope && spec.scope.through && s.and)
       s = { and: `AND EXISTS (SELECT 1 FROM ${spec.scope.through} ${s.and})` };
+    if (spec.scope && spec.scope.named && s.and && scope.employee_id) {
+      params.push(scope.employee_id);
+      const { through, column } = spec.scope.named;
+      s = { and: `AND (${s.and.slice(4)} OR EXISTS (SELECT 1 FROM ${through} AND ${column} = $${params.length}::uuid))` };
+    }
     let owned = "";
     if (spec.owner) {
       params.push(user.user_id);
