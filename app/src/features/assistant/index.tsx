@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, refresh, useApi, usePaged, type PagedResult } from "@/api/hooks";
 import type { AiConversation, AiQuestion } from "@mycity/contract/contract.gen.ts";
@@ -11,6 +11,7 @@ import type { ModuleScreenProps } from "@/shell/screens";
 import { saveExport } from "@/api/exports";
 import { BarsCard } from "@/features/shared/sections";
 import { Conversation } from "./Conversation";
+import { ChatList, ChatPage } from "./PhoneChat";
 import {
   AreaChart,
   Button,
@@ -49,12 +50,16 @@ const NAME = moduleByKey("praxis_ai")?.label ?? "Assistant";
 /* ───────────────────────── Ask ───────────────────────── */
 
 function Ask({ id }: { id: string | null }) {
-  const mobile = useIsMobile();
+  return useIsMobile() ? <AskPhone id={id} /> : <AskDesktop id={id} />;
+}
+
+/** On desktop: Recent beside the conversation, which fills the page. */
+function AskDesktop({ id }: { id: string | null }) {
   useFitPage(true);
   const { navigate } = useRouter();
   const [, setParams] = useSearchParams();
   const split = useSplitPanes("praxis-ai", 280);
-  const recent = usePaged("GET /api/v1/ai/conversations", { enabled: !mobile });
+  const recent = usePaged("GET /api/v1/ai/conversations");
   const open = useCallback((next: string) => setParams({ id: next }), [setParams]);
   // A new address rather than a change to this one: ⌘K's New Conversation arrives as ?action=new,
   // which a change made from this render's address would put back.
@@ -63,24 +68,64 @@ function Ask({ id }: { id: string | null }) {
   useScreenAction({ label: "New Conversation", onSelect: fresh });
   const reloadRecent = recent.reload;
   const answered = useCallback(() => {
-    if (!mobile) void reloadRecent();
+    void reloadRecent();
     void refresh("/api/v1/ai/history");
-  }, [mobile, reloadRecent]);
+  }, [reloadRecent]);
 
-  const conversation = <Conversation id={id} onOpened={(next) => setParams({ id: next }, { replace: true })} onGone={fresh} onAnswered={answered} />;
   return (
     <>
       <PageHeader title={NAME} actions={id ? <Button icon="plus" onClick={fresh}>New Conversation</Button> : undefined} />
-      {mobile ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card">{conversation}</div>
-      ) : (
-        <SplitPanes split={split} open list={<Recent list={recent} current={id} onOpen={open} />} detail={conversation} />
-      )}
+      <SplitPanes
+        split={split}
+        open
+        list={<Recent list={recent} current={id} onOpen={open} />}
+        detail={<Conversation id={id} onOpened={(next) => setParams({ id: next }, { replace: true })} onGone={fresh} onAnswered={answered} />}
+      />
     </>
   );
 }
 
-/** Beside the conversation on desktop: the person's conversations, newest first. On a phone this is History. */
+/**
+ * On a phone (§10.2): the person's conversations with New Conversation; one, or a new one, opens
+ * full screen over them, as the floating button's chat does.
+ */
+function AskPhone({ id }: { id: string | null }) {
+  const [, setParams] = useSearchParams();
+  const list = usePaged("GET /api/v1/ai/conversations");
+  /* undefined: the list; null: a new conversation; a string: that conversation. */
+  const [chat, setChat] = useState<string | null | undefined>(id ?? undefined);
+  // History's row (or ⌘K's conversation) asks for one by address: open it, and give the address back to the list.
+  useEffect(() => {
+    if (!id) return;
+    setChat(id);
+    setParams({ id: null }, { replace: true });
+  }, [id, setParams]);
+  const fresh = useCallback(() => setChat(null), []);
+  // In the floating button, and ⌘K's New Conversation (?action=new).
+  useScreenAction({ label: "New Conversation", onSelect: fresh });
+  const reload = list.reload;
+  const answered = useCallback(() => {
+    void reload();
+    void refresh("/api/v1/ai/history");
+  }, [reload]);
+
+  return (
+    <>
+      <PageHeader
+        title={NAME}
+        actions={
+          <Button variant="primary" icon="plus" onClick={fresh}>
+            New Conversation
+          </Button>
+        }
+      />
+      <ChatList list={list} onOpen={setChat} />
+      <ChatPage open={chat !== undefined} id={chat ?? null} onClose={() => setChat(undefined)} onOpen={setChat} onNew={fresh} onAnswered={answered} />
+    </>
+  );
+}
+
+/** Beside the conversation on desktop: the person's conversations, newest first. On a phone they are the page (ChatList). */
 function Recent({ list, current, onOpen }: { list: PagedResult<AiConversation>; current: string | null; onOpen: (id: string) => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-3">

@@ -1,13 +1,26 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
+import { ModalProvider } from "@mycity/ui";
 import { RouterProvider } from "@/lib/router";
 
 /* Praxis AI over the screen (docs/guides/praxis-ai.md §10.2), with the conversation stood in for: it is tested on Ask. */
 
-vi.mock("@/api/hooks", () => ({ refresh: vi.fn(async () => undefined) }));
+vi.mock("@/api/hooks", () => ({
+  refresh: vi.fn(async () => undefined),
+  usePaged: () => ({
+    rows: [{ ai_conversation_id: "c2", title: "Who came in late this week?", last_asked_at: "2026-10-21T08:00:00.000Z", questions: 1, rows_read: 7 }],
+    page: { number: 1, size: 25, total: 1, pages: 1, has_next: false },
+    loading: false,
+    error: null,
+    q: "",
+    setQ: () => undefined,
+    setPage: () => undefined,
+    reload: async () => undefined,
+  }),
+}));
 vi.mock("./Conversation", async () => {
   const { useRouter } = await import("@/lib/router");
   return {
@@ -64,7 +77,9 @@ function Screen() {
 const show = () =>
   render(
     <RouterProvider>
-      <Screen />
+      <ModalProvider>
+        <Screen />
+      </ModalProvider>
     </RouterProvider>,
   );
 
@@ -80,6 +95,17 @@ describe("Praxis AI from the floating button", () => {
     await userEvent.click(screen.getByRole("button", { name: "New Conversation" }));
     expect(page.textContent).toContain("A new conversation");
     expect(window.location.search).toBe("?tab=tasks");
+  });
+
+  it("Conversations opens the person's other conversations as a sheet, and one switches to it", async () => {
+    window.history.replaceState(null, "", "/workspace?tab=tasks");
+    show();
+    const page = await screen.findByRole("dialog", { name: "Praxis AI" });
+    await userEvent.click(screen.getByRole("button", { name: "Conversations" }));
+    const sheet = await screen.findByRole("dialog", { name: "Conversations" });
+    expect(within(sheet).getByRole("button", { name: "New Conversation" })).toBeTruthy();
+    await userEvent.click(within(sheet).getByRole("button", { name: /Who came in late this week/ }));
+    expect(page.textContent).toContain("Conversation c2");
   });
 
   it("an answer's screen button goes there and closes it", async () => {

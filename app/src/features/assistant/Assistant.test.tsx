@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AiAnswer, AiHistorySummary, AiQuestion } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider } from "@mycity/ui";
+import { installMatchMedia, setViewport } from "@mycity/ui/testing";
 
 /* Praxis AI's screens (docs/guides/praxis-ai.md §10) against stand-ins for the API: every person and record is invented. */
 
@@ -56,9 +57,22 @@ beforeAll(() => {
     };
   }
   Element.prototype.scrollIntoView = () => undefined;
-  // Desktop: no media query matches the phone's width.
-  window.matchMedia ??= ((query: string) => ({ matches: false, media: query, onchange: null, addListener: () => undefined, removeListener: () => undefined, addEventListener: () => undefined, removeEventListener: () => undefined, dispatchEvent: () => false })) as typeof window.matchMedia;
+  // The phone's full-screen chat and its sheet are drawers: jsdom needs these for them.
+  Element.prototype.setPointerCapture ??= () => undefined;
+  Element.prototype.releasePointerCapture ??= () => undefined;
+  Element.prototype.hasPointerCapture ??= () => false;
+  if (!("mozTransform" in CSSStyleDeclaration.prototype))
+    Object.defineProperty(CSSStyleDeclaration.prototype, "mozTransform", {
+      configurable: true,
+      get(this: CSSStyleDeclaration) {
+        return this.transform || "none";
+      },
+    });
+  installMatchMedia();
 });
+
+// Desktop unless a test says it is a phone.
+beforeEach(() => setViewport(1440));
 
 afterEach(() => {
   cleanup();
@@ -263,6 +277,48 @@ describe("Ask", () => {
     m.turns[CONV] = [answer({ table: { columns: ["Name"], rows: Array.from({ length: 25 }, (_, i) => [`P${i}`]), numeric: [], links: Array.from({ length: 25 }, () => null) }, reads: [{ key: "employees.list", rows: 25, total: 312, first: 26 }], citations: [], citations_total: 0 })];
     ui("ask", CONV);
     expect(screen.getByText("Showing 26 to 50 of 312")).toBeTruthy();
+  });
+});
+
+describe("Ask on a phone", () => {
+  const OTHER = "00000000-0000-4000-8000-0000000000c2";
+  const conversations = [
+    { ai_conversation_id: CONV, title: "Whose leave waits on me?", last_asked_at: "2026-10-22T09:30:00.000Z", questions: 2, rows_read: 4 },
+    { ai_conversation_id: OTHER, title: "Who came in late this week?", last_asked_at: "2026-10-21T08:00:00.000Z", questions: 1, rows_read: 7 },
+  ];
+
+  it("opens on the conversations with New Conversation; one opens full screen, and Conversations switches to another", async () => {
+    setViewport(390);
+    m.rows["GET /api/v1/ai/conversations"] = conversations;
+    m.turns[CONV] = [answer()];
+    m.turns[OTHER] = [answer({ ai_message_id: "00000000-0000-4000-8000-0000000000a2", ai_conversation_id: OTHER, question: "Who came in late this week?", content: "Seven late arrivals." })];
+    m.data["GET /api/v1/ai/suggestions"] = { questions: ["What happened today?"] };
+    ui("ask");
+    // The landing page is the list and New Conversation, nothing else.
+    expect(screen.queryByRole("textbox", { name: "Ask a Question" })).toBeNull();
+    expect(m.action?.label).toBe("New Conversation");
+    await userEvent.click(screen.getByRole("button", { name: /Whose leave waits on me/ }));
+    const chat = await screen.findByRole("dialog", { name: "Praxis AI" });
+    expect(await within(chat).findByText("Two requests wait on you.")).toBeTruthy();
+
+    // Inside the chat, the other conversations are a sheet, as a channel's switcher is.
+    await userEvent.click(within(chat).getByRole("button", { name: "Conversations" }));
+    const sheet = await screen.findByRole("dialog", { name: "Conversations" });
+    await userEvent.click(within(sheet).getByRole("button", { name: /Who came in late this week/ }));
+    expect(await screen.findByText("Seven late arrivals.")).toBeTruthy();
+
+    // New Conversation starts one: Try Asking again.
+    await userEvent.click(screen.getByRole("button", { name: "New Conversation" }));
+    expect(await screen.findByRole("heading", { name: "Try Asking" })).toBeTruthy();
+  });
+
+  it("a conversation asked for by address opens at once, and the address is the list's again", async () => {
+    setViewport(390);
+    m.rows["GET /api/v1/ai/conversations"] = conversations;
+    m.turns[CONV] = [answer()];
+    ui("ask", CONV);
+    expect(await screen.findByText("Two requests wait on you.")).toBeTruthy();
+    expect(m.setParams).toHaveBeenCalledWith({ id: null }, { replace: true });
   });
 });
 
