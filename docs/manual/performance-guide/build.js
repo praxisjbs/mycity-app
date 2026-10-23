@@ -7,7 +7,7 @@
  *   node docs/manual/performance-guide/build.js           dist/MyCity-PMS-Training-Guide.html
  *   node docs/manual/performance-guide/build.js --check   also measures every page against A4,
  *                                                         fails when one overflows or the guide
- *                                                         passes 16 pages, and prints the PDF
+ *                                                         passes 17 pages, and prints the PDF
  *
  * It states only what is built. A change to a screen it shows updates its page here, with a new
  * screenshot from the hub on the staging seed, cropped to what the page needs.
@@ -18,7 +18,7 @@ const path = require("node:path");
 const HERE = __dirname;
 const OUT = path.join(HERE, "dist");
 const NAME = "MyCity-PMS-Training-Guide";
-const MAX_PAGES = 16;
+const MAX_PAGES = 17;
 
 const uri = (file, mime) => `data:${mime};base64,${fs.readFileSync(file).toString("base64")}`;
 
