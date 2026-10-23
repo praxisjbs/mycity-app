@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #4 Today, #5 Tasks, #6 Calendar, #7 Analytics |
 | Status | Draft |
-| Last changed | 22/10/2026 |
+| Last changed | 23/10/2026 |
 
 Sources: MILESTONES §7 (A24) and §7 Definition of done; REUSE_MAP §3.1; the meeting of
 10 October 2026 (Cynthia Osakunih, Tom-Blake Asaah: "task and activity tracking is a primary
@@ -359,6 +359,8 @@ is listed here as tier 1 or tier 2.**
 - **Blocked twice**: a second Mark Blocked while one is open is a 409; clear the first.
 - **A reminder in the past**: refused when set; one a due-date change puts in the past is dropped.
 - **Empty board**: "No Tasks Yet" with New Task.
+- **A reader whose grant is `all`** (Management, Operations & People, the CEO) on My Team: every
+  task, with its four figures; Wait On Task, which always lists My Team, offers every task too.
 
 ## 12 · Donor code
 
@@ -381,6 +383,8 @@ is listed here as tier 1 or tier 2.**
 - An ICS invitation by email beside the in-app notice (`services/calendar/ics`). AJ, after the demo.
 
 ## 14 · Change log
+
+- 23/10/2026 · TB · Fault #1 (staging, 22/10/2026): My Team failed with "could not determine data type of parameter $15" for a reader whose `workspace` grant is `all` (Management, Operations & People, Implementation, the CEO). The tasks repo added the reader's id to the query before knowing it would name it, and scope `all` names nobody, so Postgres could not type it; the figures above the board failed the same way, as did Wait On Task and Send Commitments for someone else. The id is now added only when the query names it (§11). An integration test opens all four as Management.
 
 - 22/10/2026 · TB · `ReasonForm` takes an `action`, the button's words where a refusal reads otherwise (Refuse Change on a target change, performance.md §6.7); Request Changes stays the default.
 

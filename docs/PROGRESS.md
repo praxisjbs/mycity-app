@@ -745,12 +745,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
 | 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
-| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Notes**
 
+- 23/10/2026 · TB · My Workspace · Tasks (#5) fix, fault #1 of the 23/10 staging brief: My Team, its four figures, Wait On Task and Send Commitments for someone else failed for a reader whose `workspace` grant is `all` (Management, Operations & People, Implementation, the CEO) with "could not determine data type of parameter $15". The tasks repo now adds the reader's id only when the query names it (`docs/guides/workspace.md` §11). One new integration test, 22 workspace integration tests pass. No tick moved. Left: nothing.
 - 22/10/2026 · GE · My Workspace · Calendar (#6): Today moved out from between the arrows; the arrows are named by the view and Today's hover label is the date (team feedback). Left: nothing.
 - 22/10/2026 · GE · My Workspace (#4 to #7), merged with main again (Praxis AI): New Task and New Event open filled from the address in the split screen files (`TaskPrefill`, `CalendarEventPrefill`). Left: nothing.
 - 22/10/2026 · TB · My Workspace (#4 to #7) fix: a repeating task swept after its next day's due time is made for the rule's following day, never already late, so the next sweep does not repeat it again. No tick moved. Left: nothing.
