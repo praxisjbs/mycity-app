@@ -410,10 +410,13 @@ is listed here as tier 1 or tier 2.**
   23/10 demo.
 - Late reasons: built with four codes (Waiting on Others, Underestimated, Deprioritised, Other).
   Whether MyCity wants other codes: Cynthia, at the 23/10 demo.
-- An ICS invitation by email beside the in-app notice (`services/calendar/ics`). AJ, after the demo.
+- An ICS invitation by email beside the in-app notice (`services/calendar/ics`): wanted, once MyCity's
+  system mailbox sends 10,000 an hour rather than 50 (`MAIL_SEND_PER_HOUR`; every attendee, update and
+  cancellation is a mail). Not built until then (TB, 23/10/2026). AJ builds it when the limit is raised.
 
 ## 14 · Change log
 
+- 23/10/2026 · AJ · §13: the ICS invitation by email waits on MyCity's sending limit (TB, 23/10/2026).
 - 23/10/2026 · JP · Shared tasks (A24 extended, JBS Praxis 23/10/2026): New Task and Edit Task ask Individual or Shared; a shared task has one lead and up to 25 people picked by name or as a department, who see it under Mine and work it as its assignee does; the lead alone answers for it (scorecard, commitment, board order, analytics). Assign To and My Team show to whoever may set tasks for others (`GET /api/v1/tasks/people`), not only to someone with direct reports, so Management, Operations & People and the implementation team see them. Fault #1 in Analytics: `/workspace/analytics` under `team` failed the same way the board did (#135) for a reader whose grant reaches everyone; `whose()` binds the reader's id only when it names it (§3, §4, §5, §6, §7, §8, §10, §11).
 - 23/10/2026 · TB · Fault #1 (staging, 22/10/2026): My Team failed with "could not determine data type of parameter $15" for a reader whose `workspace` grant is `all` (Management, Operations & People, Implementation, the CEO). The tasks repo added the reader's id to the query before knowing it would name it, and scope `all` names nobody, so Postgres could not type it; the figures above the board failed the same way, as did Wait On Task and Send Commitments for someone else. The id is now added only when the query names it (§11). An integration test opens all four as Management.
 
