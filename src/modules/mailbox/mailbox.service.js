@@ -815,6 +815,7 @@ const PER_HOUR = async () => Number((await serverValues()).per_person_per_hour) 
 async function deliver(q) {
   const a = await repo.accountById(pool, q.mail_account_id);
   const p = q.payload || {};
+  let accepted = false;
   try {
     if (!a || a.status !== "connected")
       throw new AppError("MAIL_AUTH_FAILED", "Reconnect your mailbox", 422);
@@ -868,6 +869,12 @@ async function deliver(q) {
       references,
       attachments: [...files, ...inline],
     });
+    // The server has it. Marked sent before anything else can fail or stop the worker, so the
+    // sweep of rows stuck in sending never hands it out again (mailbox.md §3 step 5).
+    accepted = true;
+    await repo.markSent(pool, q.mail_send_queue_id, null);
+    usage.record("mailbox_server", "send", { ok: true, units: count });
+    await provider.copyToSent(sent.raw);
     await tx(async (client) => {
       const sentFolder = await repo.folderOfKind(
         client,
@@ -945,9 +952,11 @@ async function deliver(q) {
         },
       });
     });
-    usage.record("mailbox_server", "send", { ok: true, units: count });
     return { mail_send_queue_id: q.mail_send_queue_id, sent: true };
   } catch (err) {
+    // Already sent: what failed is the copy or the filing here, which a resend would not mend
+    // and would put in front of the recipients twice.
+    if (accepted) throw err;
     const mapped = mapSmtpError(err);
     // Counted against the server only when it refused or did not answer: a refused password,
     // sender or recipient is the person's or the message's, not the server's.

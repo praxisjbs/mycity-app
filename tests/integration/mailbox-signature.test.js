@@ -72,8 +72,9 @@ function fakeServer() {
     async send(msg) {
       const messageId = `<sent-${s.sent.length + 1}@mycity.test>`;
       s.sent.push({ ...msg, messageId });
-      return { messageId, raw: Buffer.from("raw"), sentPath: "INBOX.Sent" };
+      return { messageId, raw: Buffer.from("raw") };
     },
+    copyToSent: async () => "INBOX.Sent",
   });
   return s;
 }

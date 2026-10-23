@@ -10,7 +10,7 @@
 | Capabilities | `mailbox.signature` (Configure Signature): the company links and what shows on everyone's signature (§8) |
 | Screens (PROGRESS.md rows) | #18 Inbox, #19 Sent, #20 Drafts, #21 Archive, #22 Spam, #23 Trash, #94 Signature; the staff mail server's settings under Settings · Integrations (#77, `docs/guides/integrations.md`); the brand files under Settings · Organisation (#69, `docs/guides/foundation.md`) |
 | Status | Built |
-| Last changed | 22/10/2026 |
+| Last changed | 23/10/2026 |
 
 Sources: MILESTONES §6.5 and D6; REUSE_MAP §2.5; the internal workflow meeting of 12 October 2026.
 The demo (`demo.html`, Mailbox) was updated the same day with the composer described here. Email
@@ -128,7 +128,9 @@ dictation's recording is removed once it is transcribed.
    the person types; a Draft Saved pill at the end of the formatting bar confirms it.
 5. **Send**: `POST /messages` puts the message on `mail_send_queue` (Idempotency-Key required) →
    the `mail-send` job, delayed to the release time, delivers through SMTP (Bcc in the envelope
-   only), appends a copy to the server's Sent folder and files it in Sent here. A deferral is
+   only). The moment the server accepts it the queued row is marked sent, before anything else can
+   fail or stop the worker, so the queue never hands it out again; then a copy is appended to the
+   server's Sent folder and the message is filed in Sent here. A deferral is
    retried three times; a permanent refusal fails at once and notifies the sender. The `mail-sync`
    scheduler also flushes anything due, so a lost delayed job still goes out. Scheduled mail waits on the queue until its
    release time and can be cancelled until then. Schedule offers tomorrow 08:00, next Monday 08:00,
@@ -366,6 +368,15 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
   connect from other addresses and do not count. **30 mailboxes** on the plan. **50 recipients an
   hour** to send; whether that is per mailbox or for the whole account is still open (§13), and
   the send queue paces each user to it either way.
+- **A server that hangs up or goes silent** (TB, 23/10/2026; faults #2 and #3 of 22/10): every
+  IMAP connection carries an error listener (`providers/imap-smtp.provider.js` `imap()`), so the
+  server dropping the line or not answering fails the one call waiting on it, never the worker.
+  It is logged as a warning naming the host and the error's code, never the address; it is not a
+  fault on Settings · Faults. The sync it broke counts against the Staff Mail Server, whose check
+  on Settings · Status carries the outage. A short-lived connection (a sync, a send's copy to Sent,
+  Connect's check, mark read, move, delete) gives up after **2 minutes** with no answer: a command
+  answers in well under a second, and a long fetch with data arriving never trips it. IDLE keeps
+  the library's 5 minutes, since the server's own keepalive comes every 2.
 
 ## 7 · Events, jobs and notifications
 
@@ -479,6 +490,16 @@ interface copy; the copy rules apply to the chrome around them.
   batch until the folder is caught up.
 - **Hard-bounced recipient**: the send fails with `RECIPIENT_REFUSED` and the sender is notified.
 - **Double send** on a bad connection: refused by the Idempotency-Key.
+- **The worker stops after the server accepted a message** (a crash, a deploy): the row is already
+  marked sent (§3 step 5), so the sweep that puts rows stuck in sending back on the queue after 10
+  minutes never sends it again. What was left undone (the copy to Sent, filing it here, removing
+  the draft) is not redone; the next sync files the server's own copy when the copy was made, and
+  the job's failure is a fault on Settings · Faults. Only the worker stopping, or the database
+  failing, in the instant between the server's acceptance and that one update can still send twice.
+- **The mail server goes silent mid-sync** (staging, 22/10/2026, 03:52 to 04:01 UTC: the host
+  answered slowly, then not at all): the connection gives up after 2 minutes, that mailbox's sync
+  fails as `MAIL_SERVER_UNREACHABLE`, and the pass moves on. Until then the pass holds the
+  scheduler's lock, so no other mailbox syncs on schedule and due mail waits for its own job.
 - **Offline**: not supported; the draft is kept.
 - **Dangerous attachment types**: refused by the mime policy; inbound ones are listed but not opened
   inline.
@@ -574,4 +595,5 @@ interface copy; the copy rules apply to the chrome around them.
   (`mail_account.server_moved`) and syncs it as its retest (§3 step 11, §7, §11). The sync scheduler
   ticks every minute to honour a changed interval; `smtp-errors.js` moved to `services/mail/`.
 - 20/10/2026 · TB · Nothing in the mailbox changed. Always Show Images' `sender_address` is an email address, marked `address:none` in the contract so gate 22 (addresses picked, never typed, `docs/guides/addresses.md`) knows it is not a place.
+- 23/10/2026 · TB · Faults #2 and #3 (staging, 22/10/2026): the worker restarted twice because an IMAP connection had no error listener, so the mail server hanging up during sign-in (`Connection not available`) or going silent for 5 minutes (`Socket timeout`) was thrown as an uncaught exception. Every IMAP connection now has one: the failure reaches the call waiting on it, is logged as a warning and is not a fault. Short-lived connections give up after 2 silent minutes, IDLE after 5 (§6, §11). A send is now marked sent the moment the server accepts it, before the copy to Sent (`send()` and `copyToSent()` apart), so a worker that stops afterwards never sends it twice (§3 step 5, §11). Nothing was sent twice on 22/10.
 - 22/10/2026 · TB · Write With AI and Summarise Thread, from TB's brief and eight answers (§1.1; M10's mail AI brought forward): in the composer, a step that drafts a reply, a forward's note or a new message from the conversation, What To Say and a note (each dictated or typed), or tidies the person's words, asking up to three questions first when a fact only the person knows is missing, then Use Draft; in the reader, a Summary card (gist, Key Points, Asked of You) kept until new mail (`mail_thread_summary`, migration 10300). Actions `mail-draft`, `mail-tidy`, `mail-summary` (Default) and `mail-dictation` (Transcription), personal data. Contact details are swapped for tokens before anything leaves and put back in the draft; every answer is checked for placeholders. §1, §1.1, §2 to §14 updated.

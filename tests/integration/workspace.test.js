@@ -100,6 +100,7 @@ describeDb("my workspace against the real migrations", () => {
     await make("staff", "Musa", "Danjuma", "employee", "Field Officer");
     await make("peer", "Zainab", "Lawal", "employee", "Field Officer");
     await make("outsider", "Bisi", "Ade", "employee", "Accounts Officer", "Finance");
+    await make("director", "Ngozi", "Okafor", "management", "Operations Director", "Management");
     await q("UPDATE employee SET line_manager_id = $1 WHERE employee_id = ANY($2::uuid[])", [
       emp("manager"),
       [emp("staff"), emp("peer")],
@@ -168,6 +169,21 @@ describeDb("my workspace against the real migrations", () => {
     const outsiderTask = (await q("SELECT task_id FROM task WHERE title = 'Reconcile September'")).rows[0].task_id;
     expect((await as("manager").get(`/tasks/${outsiderTask}`)).status).toBe(404);
     expect((await as("peer").get(`/tasks/${ids.set}`)).status).toBe(404);
+  });
+
+  test("a reader whose grant is all sees everyone's work on My Team, its figures and the Wait On picker", async () => {
+    const team = await as("director").get("/tasks?scope=team");
+    expect(team.status).toBe(200);
+    expect(team.body.data.map((t) => t.title)).toEqual(
+      expect.arrayContaining(["Visit three Lekki venues", "Write up venue notes", "Reconcile September"]),
+    );
+    const figures = await as("director").get("/tasks/summary?scope=team");
+    expect(figures.status).toBe(200);
+    expect(figures.body.open).toBeGreaterThanOrEqual(3);
+    const cancelled = await as("director").get("/tasks?scope=team&status=cancelled");
+    expect(cancelled.status).toBe(200);
+    // Their own board is still only their own.
+    expect((await as("director").get("/tasks")).body.page.total).toBe(0);
   });
 
   test("the assignee moves a manager's task but cannot change what the manager decided", async () => {

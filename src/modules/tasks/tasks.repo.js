@@ -92,17 +92,22 @@ const SORTS = {
 /**
  * Who may see a row: under `mine` the caller's own, set or shared tasks; under `team`
  * the reader's workspace scope on the assignee, plus their own set and shared ones.
+ * Under `team` with scope `all` that is every task, so nothing is added, not even the
+ * caller's id: a parameter the SQL never names is one Postgres cannot type, and the
+ * whole query fails.
  * @returns {string} an AND clause
  */
 function audience(listScope, scope, params) {
-  params.push(scope.employee_id || null);
-  const me = `$${params.length}::uuid`;
-  const mine = `(v.primary_assignee_id = ${me} OR v.set_by_employee_id = ${me}
+  const mine = () => {
+    params.push(scope.employee_id || null);
+    const me = `$${params.length}::uuid`;
+    return `(v.primary_assignee_id = ${me} OR v.set_by_employee_id = ${me}
      OR EXISTS (SELECT 1 FROM task_assignee ta WHERE ta.task_id = v.task_id AND ta.employee_id = ${me}))`;
-  if (listScope !== "team") return `AND ${mine}`;
+  };
+  if (listScope !== "team") return `AND ${mine()}`;
   const s = scopeClause(scope, { column: "v.primary_assignee_id" }, params);
   if (!s.and) return "";
-  return `AND (${s.and.slice(4)} OR ${mine})`;
+  return `AND (${s.and.slice(4)} OR ${mine()})`;
 }
 
 /**
