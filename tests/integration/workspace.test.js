@@ -413,7 +413,9 @@ describeDb("my workspace against the real migrations", () => {
     await as("staff").post(`/tasks/${t.body.task_id}/block`, { blocked_reason: "Waiting on the stamp" });
     const kept = await as("staff").post(`/tasks/${t.body.task_id}/unblock`, { push_due: false });
     expect(kept.body.due_at).toBe(cleared.body.due_at);
-    expect((await as("staff").get(`/tasks/${t.body.task_id}/blockages`)).body.page.total).toBe(2);
+    const both = await as("staff").get(`/tasks/${t.body.task_id}/blockages`);
+    expect(both.body.page.total).toBe(2);
+    expect(both.body.data.map((h) => h.note)).toEqual(["Waiting on the stamp", "Council office closed"]);
   });
 
   test("reminders: up to three, they follow the due time, and Done cancels them", async () => {

@@ -147,8 +147,8 @@ describe("one question", () => {
   });
 
   test("a prefill's list (New Event's attendees) travels as one comma-separated value; anything else of the kind is dropped", () => {
-    const c = require("@mycity/contract");
-    const route = { prefill: c.calendar.CalendarEventPrefill, params: { new: "1" } };
+    const contract = require("@mycity/contract");
+    const route = { prefill: contract.calendar.CalendarEventPrefill, params: { new: "1" } };
     const A = "00000000-0000-4000-8000-00000000000a";
     const B = "00000000-0000-4000-8000-00000000000b";
     expect(answer.prefillOf(route, { title: "Stand walk", attendee_ids: [A, B] })).toEqual({ title: "Stand walk", attendee_ids: `${A},${B}` });

@@ -125,6 +125,20 @@ describe("createApi", () => {
     await waitFor(() => expect(seen.at(-1)!.query).toEqual({ status: "active", page: 1, q: "ada" }));
   });
 
+  it("usePaged keeps the page moved to before the first search pause, and a stray space", async () => {
+    const { transport, seen } = fake((req) => ({ status: 200, body: page(Number(req.query.page)) }));
+    const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });
+    const { result } = renderHook(() => core.usePaged("GET /api/v1/employees"));
+    act(() => result.current.setPage(2));
+    await waitFor(() => expect(result.current.page?.number).toBe(2));
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(result.current.pageNumber).toBe(2);
+    act(() => result.current.setQ(" "));
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(result.current.pageNumber).toBe(2);
+    expect(seen.at(-1)!.query).toEqual({ page: 2 });
+  });
+
   it("invalidate refetches every mounted read under a path", async () => {
     const { transport, seen } = fake(() => ({ status: 200, body: page(1) }));
     const core = createApi<Endpoints>({ credentials: "omit", transport, cache: true });

@@ -506,7 +506,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
     const dueAt = recurrence.dueFor(body, lagos.today(), cal);
     const commitment = body.is_commitment === true;
     checkCommitment({ is_commitment: commitment, acceptance_criteria: body.acceptance_criteria, commitment_month: body.commitment_month }, dueAt);
-    if (body.recurrence && !dueAt) throw invalid("recurrence", "Give it a due date to repeat from");
+    if (body.recurrence && !dueAt) throw invalid("recurrence", "Needs a due date");
     const { number } = await numbering.allocate(client, "task");
     const id = await repo.insert(client, {
       number,
@@ -612,7 +612,7 @@ async function edit(actor, scope, id, body) {
     // A series counts from its due day: a repeating task keeps one (the rule a repeat is anchored by).
     const repeats = "recurrence" in body ? body.recurrence : before.recurrence;
     const dueAfter = "due_at" in changes ? changes.due_at : before.due_at;
-    if (repeats && !dueAfter) throw invalid("recurrence", "Give it a due date to repeat from");
+    if (repeats && !dueAfter) throw invalid("recurrence", "Needs a due date");
     if (reassigned) {
       changes.primary_assignee_id = body.primary_assignee_id;
       changes.sort_order = await repo.nextOrder(client, body.primary_assignee_id, before.status);

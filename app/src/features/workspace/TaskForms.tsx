@@ -730,8 +730,8 @@ export function RepeatForm({ task, close, onDone }: { task: TaskDetail; close: (
       close();
       toast(recurrence ? "Repeat set" : "Repeat stopped");
     } catch (e) {
-      // A series counts from its due day: without one the API refuses any repeat (§6), said in four words.
-      if (e instanceof ApiError && e.fields.recurrence?.[0]) setRepeatMark(task.due_at ? e.fields.recurrence[0] : "Needs a due date");
+      // A series counts from its due day: without one the API refuses any repeat (§6).
+      if (e instanceof ApiError && e.fields.recurrence?.[0]) setRepeatMark(e.fields.recurrence[0]);
       else say(e);
     }
   };

@@ -1061,12 +1061,14 @@ async function openBlockage(db, taskId) {
 
 /** One page of a task's holds, newest first by default. */
 function blockages(db, taskId, query) {
+  // Newest first unless the reader sorts: the order and the page it reports agree.
+  const q = { ...query, sort: query.sort || { field: "raised_at", dir: "desc" } };
   return pageQuery(
     db,
     `SELECT v.*, ${TOTAL_COL} FROM (${HOLDS} WHERE b.task_id = $1) v
-      ORDER BY ${orderBy(query, { raised_at: "v.raised_at" }, "v.task_blockage_id")}`,
+      ORDER BY ${orderBy(q, { raised_at: "v.raised_at" }, "v.task_blockage_id")}`,
     [taskId],
-    { ...query, sort: query.sort || { field: "raised_at", dir: "desc" } },
+    q,
   );
 }
 

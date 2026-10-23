@@ -541,7 +541,7 @@ route("PATCH /api/v1/tasks/:id", (req) => {
   }
   if (approved && !dueAt) return invalid({ due_on: ["Pick a due date"] });
   const repeats = "recurrence" in b ? b.recurrence : t.recurrence;
-  if (repeats && !dueAt) return invalid({ recurrence: ["Give it a due date to repeat from"] });
+  if (repeats && !dueAt) return invalid({ recurrence: ["Needs a due date"] });
   // A task may stay in a project completed since; joining one needs it open.
   if (typeof b.project_id === "string" && b.project_id !== t.project?.project_id) {
     const joins = projectProblem(b.project_id);
