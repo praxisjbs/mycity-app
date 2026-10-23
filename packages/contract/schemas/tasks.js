@@ -428,9 +428,11 @@ const TaskEdit = z
 /**
  * GET /tasks/people: the active people the caller may put on a task, never themselves. Without
  * `shared`, who they may set a task for (an assignee, a lead); with `shared` "true", those and the
- * colleagues of their own department, whom they may share a task they lead with.
+ * colleagues of their own department, whom they may share a task they lead with. With
+ * `department_id`, that department's people they may set a task for, themselves included when they
+ * work there: who may lead a task shared with the department.
  */
-const TaskPeopleQuery = listQuery({ shared: z.enum(["true", "false"]).optional() });
+const TaskPeopleQuery = listQuery({ shared: z.enum(["true", "false"]).optional(), department_id: uuid.optional() });
 const TaskPersonPage = Paged(PersonRef);
 
 /** POST /tasks/:id/move: drag to a column, before a card (null: the foot of the column). */

@@ -140,12 +140,19 @@ describe("my workspace", () => {
     expect(within(form).queryByText("Assign To")).toBeNull();
     expect(within(form).getByText("Share With")).toBeTruthy();
     expect(within(form).getAllByText("People")).toHaveLength(2);
-    expect(within(form).getByText("Lead")).toBeTruthy();
+    // With People, the lead is You or one of the people picked: You until changed.
+    expect(within(form).getByRole("combobox", { name: /Lead/ }).textContent).toContain("You");
     fireEvent.change(within(form).getByRole("textbox", { name: /Task/ }), { target: { value: "Count the Yaba stock" } });
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await within(form).findByText("Pick people");
+    // With a Department, Lead waits for the department, then must be picked from it.
     fireEvent.click(within(form).getByRole("radio", { name: "Department" }));
     await waitFor(() => expect(within(form).getAllByText("Department")).toHaveLength(2));
+    expect(within(form).queryByText("Lead")).toBeNull();
+    await chooseOption(within(form).getByRole("combobox", { name: /Department/ }), "Operations & People");
+    await within(form).findByText("Lead");
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await within(form).findByText("Pick a lead");
   }, 30000);
 
   it("an empty day on the month asks New Task or New Event, and New Task starts on that day", async () => {

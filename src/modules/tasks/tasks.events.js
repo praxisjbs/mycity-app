@@ -128,7 +128,7 @@ defineNotification(EVENTS.TASK_COMMENTED, {
 });
 
 defineNotification(EVENTS.TASK_DUE_SOON, {
-  to: [{ users: (e, client) => loginsOf(client, [e.payload.primary_assignee_id]) }],
+  to: [{ users: (e, client) => loginsOf(client, [e.payload.primary_assignee_id, ...membersOf(e)]) }],
   title: (e) => (e.payload.when === "today" ? "Due today" : "Due tomorrow"),
   body: (e) => `${e.payload.number}: ${e.payload.title}`,
   include_actor: true,

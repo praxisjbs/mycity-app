@@ -200,10 +200,13 @@ async function reachOf(db, scope, { peers }) {
   };
 }
 
-/** GET /tasks/people: who the caller may set a task for, or with `shared`, share one with. */
+/**
+ * GET /tasks/people: who the caller may set a task for, or with `shared`, share one with; with
+ * `department_id`, who in that department may lead a task shared with it, the caller included.
+ */
 async function people(query, scope) {
   const reach = await reachOf(pool, scope, { peers: query.shared === "true" });
-  return repo.people(pool, query, { reach, excludeId: scope.employee_id });
+  return repo.people(pool, query, { reach, excludeId: query.department_id ? null : scope.employee_id });
 }
 
 /** Another task as a panel line: its words only when the reader may open it. */
@@ -395,15 +398,16 @@ async function checkAssignee(db, scope, employeeId) {
 }
 
 /**
- * A shared task's lead when none is named: the department's head for a department the caller
- * may set the head work in, otherwise the caller.
+ * A shared task's lead (workspace.md §6): shared with a department, someone in it; named along
+ * with the people, the caller or one of them. Whether the caller may set them work is checkAssignee's.
  */
-async function defaultLead(db, scope, departmentId) {
-  if (!departmentId) return scope.employee_id;
-  const d = await repo.department(db, departmentId);
-  if (!d) throw invalid("department_id", "Not a department");
-  const head = d.head_employee_id;
-  return head && audience.maySetFor(scope, head) && (await repo.employeeActive(db, head)) ? head : scope.employee_id;
+async function checkLead(db, scope, leadId, body) {
+  if (body.department_id) {
+    const [p] = await repo.peopleFacts(db, [leadId]);
+    if (!p || p.department_id !== body.department_id) throw invalid("primary_assignee_id", "Not in that department");
+  } else if (body.primary_assignee_id && body.member_ids && leadId !== scope.employee_id && !body.member_ids.includes(leadId)) {
+    throw invalid("primary_assignee_id", "Pick from the people");
+  }
 }
 
 /**
@@ -453,9 +457,12 @@ async function create(actor, scope, body, { client: within = null } = {}) {
   // An importer sets tasks inside its own transaction (a key result's initiatives).
   const run = within ? (fn) => atomically(within, () => fn(within)) : tx;
   return run(async (client) => {
-    const assigneeId = body.primary_assignee_id || (shared ? await defaultLead(client, scope, body.department_id) : actor.employee_id);
+    // A department is shared under a lead picked from it; with no lead named, the task is the caller's.
+    if (body.department_id && !body.primary_assignee_id) throw invalid("primary_assignee_id", "Pick a lead");
+    const assigneeId = body.primary_assignee_id || actor.employee_id;
     await checkAssignee(client, scope, assigneeId);
     const members = shared ? await shareWith(client, scope, assigneeId, body) : [];
+    if (shared) await checkLead(client, scope, assigneeId, body);
     await checkTarget(client, body.employee_target_id, assigneeId);
     await checkRecord(client, body.entity_type, body.entity_id);
     const cal = await workingWeek.loadCalendar(client);
@@ -543,7 +550,10 @@ async function edit(actor, scope, id, body) {
     const resharing = "member_ids" in body || "department_id" in body;
     const membersBefore = (before.members || []).map((p) => p.employee_id);
     let members = null;
-    if (resharing) members = await shareWith(client, scope, assigneeId, body);
+    if (resharing) {
+      members = await shareWith(client, scope, assigneeId, body);
+      await checkLead(client, scope, assigneeId, body);
+    }
     else if (reassigned && membersBefore.includes(assigneeId)) members = membersBefore.filter((m) => m !== assigneeId);
     const targetId = "employee_target_id" in body ? body.employee_target_id : before.employee_target_id;
     if ("employee_target_id" in body || body.primary_assignee_id)

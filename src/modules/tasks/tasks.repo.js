@@ -216,11 +216,11 @@ function reachClause(reach, params) {
 }
 
 /**
- * One page of the active people the caller may put on a task, never themselves, by name
- * (GET /tasks/people).
+ * One page of the active people the caller may put on a task, by name (GET /tasks/people):
+ * never `excludeId`, and only `query.department_id`'s people when it is given.
  */
 function people(db, query, { reach, excludeId }) {
-  const params = [excludeId || null, query.q || null];
+  const params = [excludeId || null, query.q || null, query.department_id || null];
   const who = reachClause(reach, params);
   return pageQuery(
     db,
@@ -231,6 +231,7 @@ function people(db, query, { reach, excludeId }) {
       WHERE e.status = 'active'
         AND ($1::uuid IS NULL OR e.employee_id <> $1)
         AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
+        AND ($3::uuid IS NULL OR e.department_id = $3)
         AND ${who}
       ORDER BY e.first_name, e.last_name, e.employee_id`,
     params,
@@ -669,7 +670,10 @@ async function dueToRepeat(db, now, batch) {
 /** Open tasks due in a window, for the reminders: one batch after the cursor. */
 async function dueBetween(db, from, to, after, batch) {
   const { rows } = await db.query(
-    `SELECT task_id, number::text AS number, title, primary_assignee_id, due_at FROM task
+    `SELECT task_id, number::text AS number, title, primary_assignee_id, due_at,
+            ARRAY(SELECT ta.employee_id FROM task_assignee ta WHERE ta.task_id = task.task_id
+                   ORDER BY ta.employee_id) AS member_employee_ids
+       FROM task
       WHERE status NOT IN ('done', 'cancelled') AND archived_at IS NULL
         AND primary_assignee_id IS NOT NULL AND due_at >= $1 AND due_at < $2
         AND ($3::timestamptz IS NULL OR (due_at, task_id) > ($3::timestamptz, $4::uuid))

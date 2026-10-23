@@ -262,9 +262,19 @@ route("GET /api/v1/tasks/summary", (req) => {
   });
 });
 route("GET /api/v1/tasks/people", (req) => {
-  const { shared, ...query } = req.query;
-  return paged(reachable(req.user!, shared === "true").map((p) => ref(p)!), { ...req, query }, { search: (p) => [p.display_name] });
+  const { shared, department_id: dept, ...query } = req.query;
+  // A department's possible leads: its people the user may set work for, the user too when they work there.
+  const rows = dept
+    ? PEOPLE.filter((p) => sid(`dept:${p.department}`) === dept && canSetFor(req.user!, p.employee_id))
+    : reachable(req.user!, shared === "true");
+  return paged(rows.map((p) => ref(p)!), { ...req, query }, { search: (p) => [p.display_name] });
 });
+/** A shared task's lead, as the API's checkLead decides: from the department, or the user or one of the people. */
+function leadProblem(user: string, leadId: string, b: { primary_assignee_id?: string; member_ids?: string[]; department_id?: string }): Record<string, string[]> | null {
+  if (b.department_id) return byId(leadId) && sid(`dept:${byId(leadId)!.department}`) === b.department_id ? null : { primary_assignee_id: ["Not in that department"] };
+  if (b.primary_assignee_id && b.member_ids && leadId !== me(user) && !b.member_ids.includes(leadId)) return { primary_assignee_id: ["Pick from the people"] };
+  return null;
+}
 route("GET /api/v1/tasks/:id", (req) => {
   const t = find(req.user!, req.params.id);
   return t ? ok(detail(req.user!, t)) : notFound();
@@ -277,10 +287,13 @@ route("POST /api/v1/tasks", (req) => {
   };
   if (!b.title || !b.title.trim()) return invalid({ title: ["Name the task"] });
   if (b.member_ids && b.department_id) return invalid({ department_id: ["People or a department"] });
+  if (b.department_id && !b.primary_assignee_id) return invalid({ primary_assignee_id: ["Pick a lead"] });
   const assignee = b.primary_assignee_id ? byId(b.primary_assignee_id) : byKey(req.user);
   if (!assignee || !canSetFor(req.user!, assignee.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
   const share = b.member_ids || b.department_id ? shareWith(req.user!, assignee.employee_id, b) : { ids: [] };
   if ("error" in share) return invalid(share.error);
+  const leadBad = b.member_ids || b.department_id ? leadProblem(req.user!, assignee.employee_id, b) : null;
+  if (leadBad) return invalid(leadBad);
   const problem = commitmentProblem(b);
   if (problem) return invalid(problem);
   const t: Task = {
@@ -311,6 +324,8 @@ route("PATCH /api/v1/tasks/:id", (req) => {
   if ("member_ids" in b || "department_id" in b) {
     const share = shareWith(req.user!, t.assignee!.employee_id, b as { member_ids?: string[]; department_id?: string });
     if ("error" in share) return invalid(share.error);
+    const leadBad = leadProblem(req.user!, t.assignee!.employee_id, b as { primary_assignee_id?: string; member_ids?: string[]; department_id?: string });
+    if (leadBad) return invalid(leadBad);
     t.members = share.ids.map((id) => ref(byId(id))!);
   }
   const approved = Boolean(t.is_commitment && t.original_due_at);

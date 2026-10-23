@@ -598,16 +598,27 @@ describeDb("my workspace against the real migrations", () => {
     expect(report.body.error.fields.member_ids).toEqual(["Not in your team"]);
   });
 
-  test("shared: a department becomes its people; the pickers list who the caller may add", async () => {
-    const dept = await as("ops").post("/tasks", { title: "Programmes stock count", department_id: await programmes() });
+  test("shared: a department becomes its people, under a lead picked from it; the pickers list who the caller may add", async () => {
+    const programmesId = await programmes();
+    const noLead = await as("ops").post("/tasks", { title: "Programmes stock count", department_id: programmesId });
+    expect(noLead.status).toBe(422);
+    expect(noLead.body.error.fields.primary_assignee_id).toEqual(["Pick a lead"]);
+    const elsewhere = await as("ops").post("/tasks", { title: "Programmes stock count", department_id: programmesId, primary_assignee_id: emp("outsider") });
+    expect(elsewhere.status).toBe(422);
+    expect(elsewhere.body.error.fields.primary_assignee_id).toEqual(["Not in that department"]);
+    const dept = await as("ops").post("/tasks", { title: "Programmes stock count", department_id: programmesId, primary_assignee_id: emp("manager") });
     expect(dept.status).toBe(201);
-    expect(dept.body.assignee.employee_id).toBe(emp("ops"));
-    expect(dept.body.members.map((p) => p.employee_id).sort()).toEqual([emp("manager"), emp("staff"), emp("peer")].sort());
+    expect(dept.body.assignee.employee_id).toBe(emp("manager"));
+    expect(dept.body.members.map((p) => p.employee_id).sort()).toEqual([emp("staff"), emp("peer")].sort());
 
     const finance = (await q("SELECT department_id FROM department WHERE name = 'Finance'")).rows[0].department_id;
-    const nobody = await as("staff").post("/tasks", { title: "Count Finance", department_id: finance });
+    const nobody = await as("staff").post("/tasks", { title: "Count Finance", department_id: finance, primary_assignee_id: emp("staff") });
     expect(nobody.status).toBe(422);
     expect(nobody.body.error.fields.department_id).toEqual(["Nobody to share with"]);
+
+    const named = await as("manager").post("/tasks", { title: "Pack the stand", primary_assignee_id: emp("staff"), member_ids: [emp("peer")] });
+    expect(named.status).toBe(422);
+    expect(named.body.error.fields.primary_assignee_id).toEqual(["Pick from the people"]);
 
     const who = (res) => res.body.data.map((p) => p.employee_id).sort();
     expect((await as("staff").get("/tasks/people")).body.page.total).toBe(0);
@@ -617,6 +628,24 @@ describeDb("my workspace against the real migrations", () => {
     expect(everyone).toEqual(expect.arrayContaining([emp("manager"), emp("staff"), emp("peer"), emp("outsider")]));
     expect(everyone).not.toContain(emp("ops"));
     expect(who(await as("ops").get("/tasks/people?q=zain"))).toEqual([emp("peer")]);
+    const leads = `/tasks/people?department_id=${programmesId}`;
+    expect(who(await as("ops").get(leads))).toEqual([emp("manager"), emp("staff"), emp("peer")].sort());
+    expect(who(await as("manager").get(leads))).toEqual([emp("manager"), emp("staff"), emp("peer")].sort());
+    expect(who(await as("staff").get(leads))).toEqual([emp("staff")]);
+  });
+
+  test("shared: due today reaches the lead and the people sharing it", async () => {
+    const thursdayMorning = new Date("2026-10-22T06:30:00Z"); // a Thursday, 07:30 in Lagos
+    const t = await as("manager").post("/tasks", { title: "Hand in the Ikeja float", member_ids: [emp("staff"), emp("peer")], due_on: "2026-10-22" });
+    expect(t.status).toBe(201);
+    await tasks.sweep(thursdayMorning);
+    await drain();
+    const told = await q(
+      `SELECT u.employee_id FROM notification n JOIN app_user u ON u.user_id = n.user_id
+        WHERE n.title = 'Due today' AND n.body LIKE $1`,
+      [`${t.body.number}:%`],
+    );
+    expect(told.rows.map((r) => r.employee_id).sort()).toEqual([emp("manager"), emp("staff"), emp("peer")].sort());
   });
 
   test("shared: the setter changes who shares it, and whoever is added hears", async () => {

@@ -52,10 +52,11 @@ export function EmployeePicker({
 
 /**
  * The people a task may be set for, or with `shared` shared with (My Workspace, GET /tasks/people):
- * the caller's own reach, never themselves, searched by the server.
+ * the caller's own reach, never themselves, searched by the server. With `department`, who in that
+ * department may lead a task shared with it, the caller included when they work there.
  */
-export function TaskPeoplePicker({ shared, value, onChange, multiple }: { shared?: boolean; value: PersonRef[]; onChange: (value: PersonRef[]) => void; multiple?: boolean }) {
-  const list = usePaged("GET /api/v1/tasks/people", { filters: shared ? { shared: "true" } : {} });
+export function TaskPeoplePicker({ shared, department, value, onChange, multiple }: { shared?: boolean; department?: string; value: PersonRef[]; onChange: (value: PersonRef[]) => void; multiple?: boolean }) {
+  const list = usePaged("GET /api/v1/tasks/people", { filters: { ...(shared ? { shared: "true" } : {}), ...(department ? { department_id: department } : {}) } });
   const photos = usePhotos(list.rows.map((row) => row.photo_url));
   return (
     <PersonPicker
