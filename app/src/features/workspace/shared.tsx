@@ -1,7 +1,8 @@
-/** What the Workspace tabs share: the words for codes, a card's pills, and the refresh after a write. */
+/** What the Workspace tabs share: the words for codes, a card's pills, Load More, and the refresh after a write. */
+import { useEffect, useState } from "react";
 import type { Task } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, useApi } from "@/api/hooks";
+import { invalidate, refresh as quietly, useApi, type PagedResult } from "@/api/hooks";
 import { formatDate, Pill, toast } from "@mycity/ui";
 
 export type Status = Task["status"];
@@ -38,7 +39,7 @@ export function duePill(t: Pick<Task, "status" | "due_at" | "overdue">): { tone:
   const day = formatDate(t.due_at);
   if (t.overdue) {
     const days = Math.max(1, Math.round((Date.now() - Date.parse(t.due_at)) / 86_400_000));
-    return { tone: "err", text: `Overdue ${days}d` };
+    return { tone: "err", text: `Overdue ${days} ${days === 1 ? "day" : "days"}` };
   }
   if (day === formatDate(new Date().toISOString())) return { tone: "warn", text: "Today" };
   if (day === formatDate(new Date(Date.now() + 86_400_000).toISOString())) return { tone: "neutral", text: "Tomorrow" };
@@ -64,11 +65,33 @@ export function CardPills({ t }: { t: Task }) {
 
 /**
  * May the reader set tasks for anyone but themselves (their workspace scope reaches someone)?
- * Assign To, Lead and My Team show then; the API decides each write.
+ * Assign To, Lead, My Team and Team This Week show then; the API decides each write. Undefined
+ * until the people read answers (a failed read is false), so a default can wait for it.
  */
-export function useSetsForOthers(): boolean {
-  const { data } = useApi("GET /api/v1/tasks/people", { query: {} });
-  return (data?.page.total ?? 0) > 0;
+export function useSetsForOthers(): boolean | undefined {
+  const { data, error } = useApi("GET /api/v1/tasks/people", { query: {} });
+  if (data) return data.page.total > 0;
+  return error ? false : undefined;
+}
+
+/**
+ * A server list read on with Load More: the pages so far, in order, each a page of 25 from the
+ * server (usePaged holds one). `top` goes back to the first page, after a write that lands there.
+ */
+export function usePages<R>(list: PagedResult<R>, key: (row: R) => string) {
+  const [pages, setPages] = useState<R[][]>([]);
+  const { page, rows } = list;
+  useEffect(() => {
+    if (page) setPages((kept) => [...kept.slice(0, page.number - 1), rows]);
+  }, [page, rows]);
+  // A row a write moved onto the next page while it was read shows once.
+  const seen = new Set<string>();
+  const all = pages.flat().filter((r) => !seen.has(key(r)) && Boolean(seen.add(key(r))));
+  return {
+    rows: all,
+    more: page?.has_next ? () => list.setPage(page.number + 1) : undefined,
+    top: () => (list.pageNumber === 1 ? list.reload() : list.setPage(1)),
+  };
 }
 
 /** The server's words for a refused write, or a plain fallback. */
@@ -80,3 +103,6 @@ export const refresh = () => {
   invalidate("/api/v1/workspace");
   invalidate("/api/v1/calendar");
 };
+
+/** The same reads again in place, settling once the last has landed: a moved card is held until its board shows the move. */
+export const refreshed = () => quietly("/api/v1/tasks", "/api/v1/workspace", "/api/v1/calendar");

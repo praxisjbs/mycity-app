@@ -1,7 +1,6 @@
 /** My Workspace · Analytics (docs/guides/workspace.md §10.1): how work is moving, mine or my team's. */
 import { useState } from "react";
 import { useApi } from "@/api/hooks";
-import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { AreaChart, Bars, Card, CardHeader, DataView, ErrorState, formatDate, Grid, KeyValue, LoadingRows, PageHeader, SegmentedControl, useIsPhone } from "@mycity/ui";
 import { LATE, PRIORITY, useSetsForOthers, type LateReason } from "./shared";
@@ -11,13 +10,14 @@ const BAND: Record<string, string> = { "1_3": "1 to 3 Days", "4_7": "4 to 7 Days
 const days = (n: number | null, none = "None yet") => (n === null ? none : `${n} days`);
 
 export function Analytics() {
-  const me = useMe();
   const others = useSetsForOthers();
   const phone = useIsPhone();
-  const [scope, setScope] = useState<"mine" | "team">(me.manages_people ? "team" : "mine");
+  // My Team first for whoever may set work for others, once that is known; the person's choice after.
+  const [picked, setScope] = useState<"mine" | "team" | null>(null);
+  const scope = picked ?? (others === undefined ? null : others ? "team" : "mine");
   const [period, setPeriod] = useState<"30d" | "90d" | "year">("30d");
   const [allLoad, setAllLoad] = useState(false);
-  const { data, error, reload } = useApi("GET /api/v1/workspace/analytics", { query: { scope, period } });
+  const { data, error, reload } = useApi("GET /api/v1/workspace/analytics", { query: { scope: scope ?? "mine", period }, enabled: scope !== null });
   const panel = useTaskPanel();
   const max = Math.max(1, ...(data?.workload.map((w) => w.open) ?? [1]));
   const maxPrio = Math.max(1, ...(data?.by_priority.map((p) => p.open) ?? [1]));
@@ -31,7 +31,7 @@ export function Analytics() {
         sub={data ? `${formatDate(data.from)} to ${formatDate(data.to)}` : undefined}
         actions={
           <>
-            {others && <SegmentedControl label="Whose Work" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            {others && scope && <SegmentedControl label="Whose Work" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
             <SegmentedControl label="Period" value={period} onChange={setPeriod} options={[["30d", "30 Days"], ["90d", "90 Days"], ["year", "This Year"]]} />
           </>
         }
@@ -71,7 +71,7 @@ export function Analytics() {
               title="Overdue Tasks by Reason"
               rows={data.overdue_by_reason}
               rowKey={(r) => r.reason ?? "none"}
-              empty={{ title: "Nothing Overdue", text: "Every open task is on time." }}
+              empty={{ title: "Nothing Overdue" }}
               columns={[
                 { key: "reason", label: "Reason", render: (r) => (r.reason ? LATE[r.reason as LateReason] : "No Reason Recorded") },
                 { key: "count", label: "Count", align: "n", render: (r) => r.count },
@@ -97,7 +97,7 @@ export function Analytics() {
               rows={data.blocked.data}
               rowKey={(b) => b.task.task_id}
               onRowClick={(b) => b.task.visible && panel.open(b.task.task_id, b.task.title)}
-              empty={{ title: "Nothing Blocked", text: "No task is held right now." }}
+              empty={{ title: "Nothing Blocked" }}
               columns={[
                 { key: "task", label: "Task", render: (b) => <span data-copy="content">{`${b.task.number} ${b.task.title}`}</span> },
                 { key: "note", label: "Blocked By", render: (b) => <span data-copy="content">{b.note}</span> },

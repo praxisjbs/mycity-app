@@ -109,6 +109,48 @@ describe("Kanban on desktop", () => {
     done();
   });
 
+  it("holds a card while its move is on its way: its Move To spins and refuses to open, and it moves once (F26)", async () => {
+    let done: () => void = () => undefined;
+    const onMove = vi.fn(() => new Promise<void>((r) => (done = r)));
+    render(<Kanban columns={COLUMNS} onMove={onMove} />);
+    const trigger = () => within(screen.getByRole("region", { name: "Lead" })).getByRole("button", { name: /Move/ });
+    await userEvent.click(trigger());
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Move to Signed" }));
+    await waitFor(() => expect(trigger()).toHaveAttribute("aria-busy", "true"));
+    expect(trigger()).toHaveAttribute("aria-disabled", "true");
+    expect(trigger()).not.toBeDisabled();
+    await userEvent.click(trigger());
+    expect(screen.queryByRole("menuitem", { name: "Move to Signed" })).toBeNull();
+    fireEvent.drop(screen.getByRole("region", { name: "Signed" }), { dataTransfer: { getData: () => "c1|lead", setData: () => undefined } });
+    expect(onMove).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Lagos Water Board").closest("[draggable]")).toHaveAttribute("draggable", "false");
+    done();
+    await waitFor(() => expect(trigger()).not.toHaveAttribute("aria-busy"));
+    await userEvent.click(trigger());
+    expect(await screen.findByRole("menuitem", { name: "Move to Signed" })).toBeInTheDocument();
+  });
+
+  it("holds nothing when the move hands back no work", async () => {
+    const onMove = vi.fn();
+    render(<Kanban columns={COLUMNS} onMove={onMove} />);
+    const lead = screen.getByRole("region", { name: "Lead" });
+    await userEvent.click(within(lead).getByRole("button", { name: /Move/ }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Move to Signed" }));
+    await waitFor(() => expect(onMove).toHaveBeenCalledTimes(1));
+    expect(within(lead).getByRole("button", { name: /Move/ })).not.toHaveAttribute("aria-busy");
+  });
+
+  it("while loading, an empty stage shows a placeholder and the empty state waits", () => {
+    const empty = COLUMNS.map((c) => ({ ...c, cards: [], count: undefined }));
+    const { container, rerender } = render(<Kanban columns={empty} loading empty={<p>No Tasks Yet</p>} />);
+    expect(screen.queryByText("No Tasks Yet")).toBeNull();
+    expect(screen.queryByText("Nothing here")).toBeNull();
+    expect(container.querySelector("[aria-busy=true]")).not.toBeNull();
+    expect(container.querySelectorAll("[data-skeleton]")).toHaveLength(3);
+    rerender(<Kanban columns={empty} empty={<p>No Tasks Yet</p>} />);
+    expect(screen.getByText("No Tasks Yet")).toBeInTheDocument();
+  });
+
   it("marks an empty stage, and shows the empty state when no stage holds a card", () => {
     const { rerender } = render(<Kanban columns={COLUMNS} empty={<p>No Tasks Yet</p>} />);
     expect(within(screen.getByRole("region", { name: "Signed" })).getByText("Nothing here")).toBeInTheDocument();
@@ -155,6 +197,26 @@ describe("Kanban on a phone (F19)", () => {
     render(<Kanban columns={COLUMNS} />);
     await userEvent.click(screen.getByRole("button", { name: /Signed 4/ }));
     expect(screen.getByText("Nothing in this stage")).toBeInTheDocument();
+  });
+
+  it("holds a card's Move To while its move is on its way", async () => {
+    let done: () => void = () => undefined;
+    const onMove = vi.fn(() => new Promise<void>((r) => (done = r)));
+    render(<Kanban columns={COLUMNS} onMove={onMove} />);
+    await userEvent.click(screen.getByRole("button", { name: "Move To" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Move to Signed" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Move To" })).toHaveAttribute("aria-busy", "true"));
+    await userEvent.click(screen.getByRole("button", { name: "Move To" }));
+    expect(screen.queryByRole("button", { name: "Move to Signed" })).toBeNull();
+    expect(onMove).toHaveBeenCalledTimes(1);
+    done();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Move To" })).not.toHaveAttribute("aria-busy"));
+  });
+
+  it("shows a placeholder, not an empty stage, while loading", () => {
+    const { container } = render(<Kanban columns={COLUMNS.map((c) => ({ ...c, cards: [] }))} loading />);
+    expect(screen.queryByText("Nothing in this stage")).toBeNull();
+    expect(container.querySelectorAll("[data-skeleton]")).toHaveLength(1);
   });
 
   it("offers Load More under the stage in view", async () => {

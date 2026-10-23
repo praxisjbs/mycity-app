@@ -17,6 +17,7 @@ import {
   Card,
   CardHeader,
   DateField,
+  ErrorState,
   Field,
   formatDate,
   formatDateTime,
@@ -37,6 +38,7 @@ import {
   toast,
   todayIso,
   Tooltip,
+  useConfirm,
   useContractForm,
   useIsPhone,
   useModal,
@@ -160,6 +162,11 @@ export function CalendarTab() {
   const monday = mondayOf(anchor);
   const title = view === "month" ? `${monthName(Number(month.slice(5, 7)) - 1)} ${month.slice(0, 4)}` : view === "week" ? `Week of ${formatDate(monday)}` : formatDate(anchor);
   const loading = here.loading && !here.rows.length;
+  // The month in view failed (and, for a week or a day, the months either side it reaches into).
+  const shown = view === "month" ? [here] : [prev, here, next];
+  const failed = shown.find((m) => m.error && !m.rows.length)?.error ?? null;
+  const ahead = [now, later].find((m) => m.error && !m.rows.length)?.error ?? null;
+  const retry = (months: Array<{ error: unknown; reload: () => Promise<void> }>) => () => Promise.all(months.filter((m) => m.error).map((m) => m.reload()));
   const unit = view === "month" ? "Month" : view === "week" ? "Week" : "Day";
 
   return (
@@ -196,7 +203,9 @@ export function CalendarTab() {
         }
       />
       <Grid cols="1.4/1">
-        {loading ? (
+        {failed ? (
+          <Card><ErrorState error={failed} onRetry={retry(shown)} /></Card>
+        ) : loading ? (
           <Card><LoadingRows count={8} /></Card>
         ) : view === "month" ? (
           <Calendar
@@ -212,7 +221,7 @@ export function CalendarTab() {
             <CardHeader title={`Week of ${formatDate(monday)}`} />
             {Array.from({ length: 7 }, (_, n) => addDays(monday, n)).map((day, n) => (
               <div key={day} className="border-b border-border py-1.5 last:border-b-0">
-                <button type="button" onClick={() => (setAnchor(day), setView("day"))} className={day === today ? "text-2xs font-bold text-primary" : "text-2xs font-semibold text-muted-foreground"}>
+                <button type="button" onClick={() => (setAnchor(day), setView("day"))} className={day === today ? "min-h-tap text-2xs font-bold text-primary" : "min-h-tap text-2xs font-semibold text-muted-foreground"}>
                   {short(day, n)}
                 </button>
                 {on(day).map((i) => <Line key={i.item_kind + i.item_id} i={i} onOpen={openItem} />)}
@@ -222,25 +231,31 @@ export function CalendarTab() {
           </Card>
         ) : (
           <Card>
-            <CardHeader title={short(anchor)} right={<span className="text-2xs text-subtle-foreground">Africa/Lagos</span>} />
+            <CardHeader title={short(anchor)} />
             {on(anchor).map((i) => <Line key={i.item_kind + i.item_id} i={i} onOpen={openItem} />)}
             {!on(anchor).length && <Empty day={anchor} today={today} onAdd={addOn} />}
           </Card>
         )}
         <Card>
           <CardHeader title="Coming Up" />
-          <TapList
-            flat
-            label="Coming Up"
-            items={upcoming.map((e) => ({
-              key: e.item_kind + e.item_id + e.starts_at,
-              title: <span data-copy="content">{e.title}</span>,
-              sub: short(lagosDay(e.starts_at)),
-              end: kindOf(e),
-              onSelect: () => openItem(e),
-            }))}
-          />
-          {!upcoming.length && <p className="text-2xs text-subtle-foreground">Nothing in the next 30 days.</p>}
+          {ahead ? (
+            <ErrorState error={ahead} onRetry={retry([now, later])} />
+          ) : (
+            <>
+              <TapList
+                flat
+                label="Coming Up"
+                items={upcoming.map((e) => ({
+                  key: e.item_kind + e.item_id + e.starts_at,
+                  title: <span data-copy="content">{e.title}</span>,
+                  sub: short(lagosDay(e.starts_at)),
+                  end: kindOf(e),
+                  onSelect: () => openItem(e),
+                }))}
+              />
+              {!upcoming.length && <p className="text-2xs text-subtle-foreground">Nothing in the next 30 days.</p>}
+            </>
+          )}
         </Card>
       </Grid>
       {panel.panel}
@@ -264,11 +279,18 @@ function Empty({ day, today, onAdd }: { day: string; today: string; onAdd: (day:
 }
 
 function EventPanel({ id, close }: { id: string; close: () => void }) {
-  const { data: e, reload } = useApi("GET /api/v1/calendar/:id", { params: { id } });
+  const { data: e, error, reload } = useApi("GET /api/v1/calendar/:id", { params: { id } });
   const respond = useMutation("POST /api/v1/calendar/:id/respond");
   const cancel = useMutation("POST /api/v1/calendar/:id/cancel");
   const modal = useModal();
-  if (!e) return <LoadingRows count={4} />;
+  const confirm = useConfirm();
+  // An event that is gone, or one the reader cannot see: the calendar stays, with nothing open.
+  const gone = error?.status === 404;
+  useEffect(() => {
+    if (gone) close();
+  }, [gone, close]);
+  if (gone) return null;
+  if (!e) return error ? <ErrorState error={error} onRetry={reload} /> : <LoadingRows count={4} />;
   const answer = async (response: "accepted" | "declined") => {
     try {
       await respond.run({ params: { id }, body: { response } });
@@ -280,6 +302,7 @@ function EventPanel({ id, close }: { id: string; close: () => void }) {
     }
   };
   const callOff = async () => {
+    if (!(await confirm({ title: "Call Off Event", body: <span data-copy="content">{e.title}</span>, confirmLabel: "Call Off", destructive: true }))) return;
     try {
       await cancel.run({ params: { id }, body: {} });
       invalidate("/api/v1/calendar");
@@ -315,8 +338,28 @@ function EventPanel({ id, close }: { id: string; close: () => void }) {
 /** Lagos wall clock on a day → the instant on the wire. */
 const lagosInstant = (day: string, hm: string) => new Date(`${day}T${hm}:00+01:00`).toISOString();
 
+/** The form's field for each body field the API may name: a start or end lands on its time, the lead times on Reminder. */
+const ON_FORM: Record<string, string> = { starts_at: "start", ends_at: "end", reminder_minutes: "remind" };
+const FORM_FIELDS = new Set(["title", "day", "start", "end", "event_type", "location", "visibility", "remind"]);
+
+/** A refused event's messages, by the form's fields (`reminder_minutes.0` is Reminder); attendees and the rest apart. */
+function eventMarks(fields: Record<string, string[]>) {
+  const marks: Record<string, string[]> = {};
+  const rest: string[] = [];
+  let attendees: string | null = null;
+  for (const [key, messages] of Object.entries(fields)) {
+    const base = key.split(".")[0]!;
+    const name = ON_FORM[base] ?? base;
+    if (base === "attendee_ids") attendees ??= messages[0] ?? null;
+    else if (FORM_FIELDS.has(name)) marks[name] = [...(marks[name] ?? []), ...messages];
+    else rest.push(...messages);
+  }
+  return { marks, attendees, rest };
+}
+
 function EventForm({ close, day = "", event }: { close: () => void; day?: string; event?: CalendarEvent }) {
   const [who, setWho] = useState<PersonRef[]>(event ? event.attendees.map((a) => a.employee) : []);
+  const [whoMark, setWhoMark] = useState<string | null>(null);
   // A new event takes what the address names (the assistant, Home's New button); a start with no end is an hour long.
   const filled = useAddressPrefill(calendar.CalendarEventPrefill, !event);
   const ends = filled.ends_at ?? (filled.starts_at ? new Date(Date.parse(filled.starts_at) + 3_600_000).toISOString() : undefined);
@@ -361,8 +404,15 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
       close();
       toast(event ? "Event changed" : "Added to the calendar");
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors({ ...e.fields, ...(e.fields.ends_at ? { end: e.fields.ends_at } : {}) });
-      else say(e);
+      if (!(e instanceof ApiError) || !Object.keys(e.fields).length) {
+        say(e);
+        return;
+      }
+      const { marks, attendees, rest } = eventMarks(e.fields);
+      f.setServerErrors(marks);
+      setWhoMark(attendees);
+      // A field the form does not show is said aloud, so a refusal never passes unseen.
+      if (rest.length) toast(rest[0]!);
     }
   };
   return (
@@ -374,7 +424,9 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
         <Field label="End" {...f.field("end")}><TimeField {...f.field("end")} /></Field>
       </Grid>
       <Field label="Kind"><SelectField options={[["meeting", "Meeting"], ["deadline", "Deadline"], ["campaign", "Campaign"], ["event", "Event"], ["interview", "Interview"]]} {...f.field("event_type")} /></Field>
-      <Field label="Attendees" optional><ColleaguePicker value={who} onChange={setWho} multiple /></Field>
+      <Field label="Attendees" optional state={whoMark ? "bad" : undefined} message={whoMark ?? undefined}>
+        <ColleaguePicker value={who} onChange={(p) => (setWho(p), setWhoMark(null))} multiple />
+      </Field>
       {/* address:none a meeting's room or call link, not a street address */}
       <Field label="Location" optional><TextField {...f.field("location")} /></Field>
       <Field label="Who Can See"><SelectField options={[["attendees", "Attendees"], ["everyone", "Everyone"], ["private", "Only Me"]]} {...f.field("visibility")} /></Field>

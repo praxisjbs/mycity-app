@@ -3842,7 +3842,7 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 | Use | A pipeline a person moves records along: partnerships, recruitment, tasks, requisitions. |
 | Avoid | A list that is not staged (use DataView); dragging as the only way to move a card; more than six stages. |
 | Phone | No dragging at all (F19): chips with counts choose the stage, and a card's Move To opens the other stages as an action sheet. |
-| Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. |
+| Accessibility | Each column is a named group; Move To is a real menu (with Move Up and Move Down within the stage), so a card can be moved and reordered by keyboard and by screen reader, never only by dragging. A card whose move is on its way says so (aria-busy) and its Move To stays focusable but does not open (F26). |
 | Status | stable |
 | Exports | `Kanban`, `KanbanCardBody` |
 | Import | `import { Kanban, KanbanCardBody } from "@mycity/ui";` |
@@ -3856,9 +3856,10 @@ A board of stages: columns of cards on desktop, and on a phone a stage switcher 
 |---|---|---|---|
 | `columns` | `KanbanColumn[]` | yes | The stages, left to right. |
 | `onOpen` | `(card: string, column: string) => void` |  | Opens a card's record. |
-| `onMove` | `(card: string, from: string, to: string, before: string \| null) => void` |  | Moves a card to another stage, or within its own. `before` is the card it now sits above (null: the foot of the stage). Without it the board is read only. On desktop a card can also be dragged onto a stage or onto a card; Move To (with Move Up and Move Down) exists either way, because a keyboard and a phone cannot drag (F19). |
+| `onMove` | `(card: string, from: string, to: string, before: string \| null) => unknown` |  | Moves a card to another stage, or within its own. `before` is the card it now sits above (null: the foot of the stage). Without it the board is read only. On desktop a card can also be dragged onto a stage or onto a card; Move To (with Move Up and Move Down) exists either way, because a keyboard and a phone cannot drag (F19). Hand back the work (a promise) and the card is held until it settles: its Move To spins and does not open, and it is neither dragged nor dropped again, so a quick second press never moves it twice (F26). |
 | `reorder` | `boolean` |  | The stages keep an order the person sets: Move Up and Move Down in the menu, and a drop onto a card places it above that card. Without it a card only moves between stages. |
 | `empty` | `ReactNode` |  | What shows in place of the board when no stage holds a card (an EmptyState). |
+| `loading` | `boolean` |  | The stages' cards are still on their way: an empty stage shows a placeholder rather than saying it is empty, and `empty` waits, so a board that is loading never reads as one with nothing on it. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 **KanbanCardBody** props (`KanbanCardBodyProps`)
