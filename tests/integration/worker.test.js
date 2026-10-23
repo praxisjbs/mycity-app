@@ -867,6 +867,13 @@ describe("scripts", () => {
     await q("DROP TABLE seeded");
     await q("DELETE FROM system_marker");
   });
+
+  test("a migration run marks the database once, and never writes over a marker", async () => {
+    expect(await migrate.markEnvironment(pool, "test")).toBe(true);
+    expect(await migrate.markEnvironment(pool, "staging")).toBe(false);
+    expect(await one("SELECT environment FROM system_marker")).toEqual({ environment: "test" });
+    await q("DELETE FROM system_marker");
+  });
 });
 
 describe("the worker process", () => {

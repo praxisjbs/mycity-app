@@ -151,7 +151,7 @@ brand column, no entity column (A2).
 | Money | `numeric(18,2)`, `decimal.js` in code, strings in payloads (gate 20) |
 | Time | `timestamptz` stored in UTC; business dates are `date` computed in Africa/Lagos; working days come from the per-day week table (A22) |
 | Audit | `audit_ledger` append-only, enforced by trigger (no UPDATE, no DELETE) |
-| Environment marker | Every database has `system_marker(environment)` written once at creation: `production` or `staging`. Seed and test tooling read it and refuse to run on `production` (A5) |
+| Environment marker | Every database has `system_marker(environment)`, written once by its first migration run from `APP_ENV` (`scripts/db/migrate.js`): `production`, `staging`, or `development` and `test` off the servers. A server whose database says another environment refuses to migrate before anything applies. Seed and test tooling read it and refuse to run on `production` (A5) |
 
 **Three data postures (A5).** Build and CI: synthetic seed into throwaway databases. Staging: realistic
 demonstration data, loaded by `scripts/db/seed.js --staging`. Production: created clean, never seeded.
