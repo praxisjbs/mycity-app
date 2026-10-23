@@ -171,6 +171,13 @@ const ACTIONS = Object.freeze([
     need: ["performance", "create"],
     words: ["objective", "key result", "okr", "organisational goal", "set a goal"],
   }),
+  a("set_up_quarter", "Set Up Quarter", {
+    screen: "performance.goals",
+    params: { action: "quarter" },
+    need: ["performance", "create"],
+    capability: "performance.manage",
+    words: ["quarter", "new quarter", "next quarter", "open the quarter", "scoring rules", "rating bands", "section weights", "lock date"],
+  }),
   a("report_month", "Report Month", {
     screen: "performance.goals",
     params: { action: "report" },

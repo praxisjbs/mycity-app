@@ -92,14 +92,23 @@ function keyResultView(kr, latest = null, rules) {
   };
 }
 
-/** Objective rows with their key results and latest months, as Objective, banded by their quarter's rules. */
-async function withKeyResults(db, objectives, until = null) {
+const isDraft = (planStatus) => planStatus === "draft" || planStatus === "returned";
+
+/**
+ * Objective rows with their key results and latest months, as Objective, banded by their quarter's
+ * rules. `can_edit` is the reader's: a draft or returned plan whose goals they set (none without one).
+ */
+async function withKeyResults(db, objectives, until = null, actor = null) {
   const krs = await repo.keyResultsOf(db, objectives.map((o) => o.okr_objective_id));
   const months = await repo.latestMonths(db, krs.map((k) => k.okr_key_result_id), until);
   const latestOf = new Map(months.map((m) => [m.okr_key_result_id, m]));
   const rulesOf = new Map();
   for (const periodId of new Set(objectives.map((o) => o.performance_period_id)))
     rulesOf.set(periodId, (await plans.periodOf(db, periodId)).rules);
+  const setsFor = new Map();
+  if (actor)
+    for (const departmentId of new Set(objectives.filter((o) => isDraft(o.plan_status)).map((o) => o.department_id)))
+      setsFor.set(departmentId, await authority.maySetGoals(db, actor, departmentId));
   return objectives.map((o) => {
     const rules = rulesOf.get(o.performance_period_id);
     const mine = krs.filter((k) => k.okr_objective_id === o.okr_objective_id).map((k) => keyResultView(k, latestOf.get(k.okr_key_result_id), rules));
@@ -116,14 +125,20 @@ async function withKeyResults(db, objectives, until = null) {
       plan_status: o.plan_status,
       score: scoring.formatScore(cascade.objectiveScore(mine)),
       key_results: mine,
+      can_edit: isDraft(o.plan_status) && setsFor.get(o.department_id) === true,
     };
   });
 }
 
 /** GET /performance/okrs */
-async function listOkrs(query) {
+async function listOkrs(query, actor = null) {
   const page = await repo.listObjectives(pool, query);
-  return { ...page, data: await withKeyResults(pool, page.data) };
+  return { ...page, data: await withKeyResults(pool, page.data, null, actor) };
+}
+
+/** GET /performance/key-results: a quarter's key results for a picker, 25 a page. */
+async function listKeyResults(query) {
+  return repo.listKeyResultRefs(pool, query);
 }
 
 /**
@@ -151,8 +166,8 @@ async function okrSummary(query) {
 }
 
 /** A plan's objectives with their key results. */
-async function objectivesOfPlan(db, planId) {
-  return withKeyResults(db, await repo.objectivesOfPlan(db, planId));
+async function objectivesOfPlan(db, planId, actor = null) {
+  return withKeyResults(db, await repo.objectivesOfPlan(db, planId), null, actor);
 }
 
 /** Refuse a change to a plan that is no longer a draft. */
@@ -196,13 +211,13 @@ async function createObjective(actor, body, opts = {}) {
     });
     return newId;
   });
-  return getObjective(id);
+  return getObjective(id, actor);
 }
 
-async function getObjective(id) {
+async function getObjective(id, actor = null) {
   const row = await repo.getObjective(pool, id);
   if (!row) throw notFound("That objective");
-  return (await withKeyResults(pool, [row]))[0];
+  return (await withKeyResults(pool, [row], null, actor))[0];
 }
 
 /** PATCH /performance/objectives/:id */
@@ -222,7 +237,7 @@ async function updateObjective(actor, id, patch) {
       payload: { okr_objective_id: id, code: before.code, title: patch.title || before.title, department_id: before.department_id },
     });
   });
-  return getObjective(id);
+  return getObjective(id, actor);
 }
 
 /** DELETE /performance/objectives/:id: a draft's objective, with its key results. */
@@ -304,6 +319,17 @@ async function getKeyResultView(id) {
 /** Fields a TBC key result's owner may change before the lock date, on a binding plan. */
 const TBC_FIELDS = new Set(["target_value", "target_text", "target_provisional"]);
 
+/** A binding key result's TBC target still open: provisional, not locked, its quarter's lock date not come (§6.7). */
+const tbcOpen = (ctx, today = lagos.today()) =>
+  ctx.target_provisional === true && !ctx.target_locked_at && (!ctx.targets_lock_on || day(ctx.targets_lock_on) > today);
+
+/** May the actor set this binding key result's TBC target in place: its owner, or whoever sets its function's goals? */
+async function maySetTarget(actor, ctx) {
+  if (!actor || ctx.plan_status !== "binding" || !tbcOpen(ctx)) return false;
+  if (actor.employee_id && actor.employee_id === ctx.accountable_employee_id) return true;
+  return (await authority.holds(actor, "goals.function")) && (await authority.maySetGoals(pool, actor, ctx.department_id));
+}
+
 /** PATCH /performance/key-results/:id */
 async function updateKeyResult(actor, id, patch) {
   const ctx = await repo.keyResultContext(pool, id);
@@ -312,8 +338,7 @@ async function updateKeyResult(actor, id, patch) {
   if (draft) {
     await authority.assertSetsGoals(pool, actor, ctx.department_id);
   } else {
-    const today = lagos.today();
-    const open = ctx.target_provisional && !ctx.target_locked_at && (!ctx.targets_lock_on || day(ctx.targets_lock_on) > today);
+    const open = tbcOpen(ctx);
     const onlyTarget = Object.keys(patch).every((k) => TBC_FIELDS.has(k));
     const owner = actor && actor.employee_id && actor.employee_id === ctx.accountable_employee_id;
     if (!(open && onlyTarget && (owner || (await authority.holds(actor, "goals.function")))))
@@ -358,7 +383,7 @@ async function deleteKeyResult(actor, id) {
 
 /** May the reader ask to change this key result's target? requestChange's checks, as a yes or no. */
 async function mayChangeTarget(actor, planStatus, ctx) {
-  if (!actor || planStatus !== "binding") return false;
+  if (!actor || planStatus !== "binding" || tbcOpen(ctx)) return false;
   if (await repo.changePending(pool, { okr_key_result_id: ctx.okr_key_result_id })) return false;
   if (!(await scopeFor(actor, "performance", "edit"))) return false;
   if (actor.employee_id && actor.employee_id === ctx.accountable_employee_id) return true;
@@ -382,6 +407,7 @@ async function getKeyResultDetail(id, actor = null) {
   return {
     ...keyResultView(kr, latest, ctx.rules),
     objective: { okr_objective_id: objective.okr_objective_id, code: objective.code, title: objective.title },
+    performance_period_id: objective.performance_period_id,
     department_id: objective.department_id,
     department: objective.department,
     plan_status: objective.plan_status,
@@ -391,6 +417,8 @@ async function getKeyResultDetail(id, actor = null) {
     target_history: changes.map(changeView),
     trace: path,
     can_change_target: await mayChangeTarget(actor, objective.plan_status, ctx),
+    can_edit: Boolean(actor) && isDraft(objective.plan_status) && (await authority.maySetGoals(pool, actor, objective.department_id)),
+    can_set_target: await maySetTarget(actor, ctx),
   };
 }
 
@@ -793,6 +821,8 @@ module.exports = {
   keyResultView,
   changeView,
   withKeyResults,
+  listKeyResults,
+  tbcOpen,
   listOkrs,
   objectivesOfPlan,
   createObjective,

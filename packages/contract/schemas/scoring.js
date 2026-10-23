@@ -57,7 +57,7 @@ const KeyResultRules = z
     band_watch: share,
   })
   .strict()
-  .refine((r) => r.band_good > r.band_watch, { message: "Good must be above Watch", path: ["band_good"] });
+  .refine((r) => r.band_good > r.band_watch, { message: "Must exceed Watch", path: ["band_good"] });
 
 const LineRules = z
   .object({
@@ -77,10 +77,8 @@ const RatingBands = z
     partly_meets: share,
   })
   .strict()
-  .refine((b) => b.exceeds > b.meets && b.meets > b.partly_meets, {
-    message: "Each band must be above the next",
-    path: ["exceeds"],
-  });
+  .refine((b) => b.exceeds > b.meets, { message: "Must exceed Meets", path: ["exceeds"] })
+  .refine((b) => b.meets > b.partly_meets, { message: "Must exceed Partly Meets", path: ["meets"] });
 
 /** The three sections of a scorecard and their weights; they total 100. */
 const SectionWeights = z
@@ -91,7 +89,7 @@ const SectionWeights = z
   })
   .strict()
   .refine((w) => w.results + w.kpis + w.accountability === 100, {
-    message: "The three sections must total 100",
+    message: "Sections must total 100",
     path: ["results"],
   });
 
@@ -111,7 +109,7 @@ const DueDays = z
   })
   .strict()
   .refine((d) => d.check_in <= d.review && d.review <= d.second_level && d.second_level <= d.close, {
-    message: "Each deadline must fall on or after the one before it",
+    message: "Before an earlier deadline",
     path: ["review"],
   });
 

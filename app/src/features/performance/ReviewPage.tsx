@@ -42,7 +42,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { fieldMessage, rating, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
+import { fieldMessage, figureOf, rating, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const STEP: Record<ReviewDetail["chain"][number]["key"], string> = { check_in: "Check-In", reviewer: "Reviewer", second_level: "Second Level", hr: "HR" };
@@ -216,7 +216,7 @@ function LinesTable({ r }: { r: ReviewDetail }) {
         },
         { key: "section", label: "Section", render: (i) => (i.line ? SECTION_NAMES[i.line.section] : "Probation"), desktop: true },
         { key: "target", label: "Target", render: (i) => (i.line ? targetOf(i.line) : "–") },
-        { key: "actual", label: "Actual", render: (i) => i.actual_value ?? i.actual_text ?? (i.achieved_on ? formatDate(i.achieved_on) : "–") },
+        { key: "actual", label: "Actual", render: (i) => figureOf(i.actual_value, i.actual_text, i.line?.unit) ?? (i.achieved_on ? formatDate(i.achieved_on) : "–") },
         { key: "evidence", label: "Evidence", render: evidenceOf, desktop: true },
         { key: "action", label: "Action", render: (i) => i.action_text ?? "–", desktop: true },
         { key: "proposed", label: <HelpTerm help="Worked out from the actual against the target.">Proposed</HelpTerm>, align: "n", render: (i) => score(i.proposed_score) },

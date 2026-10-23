@@ -36,6 +36,7 @@ import {
   FilterSelect,
   formatDate,
   formatMonth,
+  formatNumber,
   FormFooter,
   HelpTerm,
   KeyValue,
@@ -50,7 +51,7 @@ import {
   useModal,
 } from "@mycity/ui";
 import { Commitments } from "./Commitments";
-import { cardStatus, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, useQuarter } from "./shared";
+import { cardStatus, figureOf, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, targetOf, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
@@ -322,8 +323,8 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
           rowKey={(x) => x.okr_key_result_id}
           columns={[
             { key: "kr", label: "Key Result", render: (x) => x.code },
-            { key: "shares", label: "Shares", render: (x) => x.shares.map((s) => `${s.employee.display_name} ${s.share_value}`).join(", ") },
-            { key: "target", label: "Target", align: "n", render: (x) => x.target_value ?? "–" },
+            { key: "shares", label: "Shares", render: (x) => x.shares.map((s) => `${s.employee.display_name} ${formatNumber(s.share_value)}`).join(", ") },
+            { key: "target", label: "Target", align: "n", render: (x) => figureOf(x.target_value) ?? "–" },
             { key: "status", label: "Status", render: (x) => <StatusPill s={x.status === "ok" ? { tone: "ok", text: "OK" } : { tone: "err", text: "Rebalance" }} /> },
           ]}
         />
@@ -349,8 +350,8 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
 }
 
 /** A line's target as the scorecard shows it: its words, or its figure and unit. */
-const lineTarget = (l: Pick<ScorecardLine, "target_text" | "target_value" | "unit">) =>
-  `${l.target_text ?? l.target_value ?? "–"}${l.unit && l.target_value && !l.target_text ? (l.unit === "%" ? "%" : ` ${l.unit}`) : ""}`;
+/** A line's target as people read it: its words, or its figure with its unit (64,000 users; 40%). */
+const lineTarget = (l: Pick<ScorecardLine, "target_text" | "target_value" | "unit">) => targetOf(l);
 
 function SectionLines({ section, card, months, onOpen }: { section: ScorecardLine["section"]; card: ScorecardDetail; months: string[]; onOpen: (l: ScorecardLine) => void }) {
   const lines = card.lines.filter((l) => l.section === section);

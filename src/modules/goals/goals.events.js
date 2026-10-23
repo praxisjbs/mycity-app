@@ -16,6 +16,7 @@ const EVENTS = defineEvents("performance", {
   "period.changed": { summary: "A quarter's dates, rules or status were changed" },
   "period.targets_locked": { summary: "A quarter's provisional targets locked on its lock date" },
   "organisational_goal.saved": { summary: "An organisational goal was recorded or changed" },
+  "organisational_goal.deleted": { summary: "An organisational goal no company objective served was removed" },
   "objective.saved": { summary: "An objective was set or changed" },
   "objective.deleted": { summary: "A draft objective was removed" },
   "key_result.saved": { summary: "A key result was set or changed" },

@@ -14,7 +14,7 @@ import { ReasonForm } from "@/features/workspace/Commitment";
 import { useSearchParams } from "@/lib/router";
 import { Banner, Button, Chain, DataView, ErrorState, formatDateTime, formatMonth, FormFooter, KeyValue, LoadingRows, StatusPill, toast, useModal } from "@mycity/ui";
 import { useScorecardSheet } from "./Scorecards";
-import { cardStatus, changeStatus, person, planStatus } from "./shared";
+import { cardStatus, changeStatus, figureOf, person, planStatus } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 
@@ -202,7 +202,7 @@ function TargetChangeSheet({ id, close }: { id: string; close: () => void }) {
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!c) return <LoadingRows count={6} />;
   const w = instanceId ? instance.data : undefined;
-  const figure = (value: string | null, text: string | null) => text ?? (value === null ? null : `${value}${c.unit ? ` ${c.unit}` : ""}`);
+  const figure = (value: string | null, text: string | null) => figureOf(value, text, c.unit);
   const decide = async () => {
     if (!instanceId) return;
     try {

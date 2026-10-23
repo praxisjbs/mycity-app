@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { PerformancePeriod } from "@mycity/contract/contract.gen.ts";
 import { useApi, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import { formatMonth, Who } from "@mycity/ui";
+import { formatMonth, formatNumber, Who, type ContractSchema } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
@@ -13,6 +13,8 @@ export const person = (p: PersonRef) => <Who name={p.display_name} sub={p.depart
 /** The quarter the screen shows: the current one until another is picked. */
 export function useQuarter(): {
   period: PerformancePeriod | null;
+  /** The quarters set up, newest first: the latest is the one a new quarter copies. */
+  periods: PerformancePeriod[];
   options: Array<[string, string]>;
   periodId: string;
   setPeriodId: (id: string) => void;
@@ -24,10 +26,26 @@ export function useQuarter(): {
   const period = list.rows.find((p) => p.performance_period_id === picked) ?? current.data ?? list.rows[0] ?? null;
   return {
     period,
+    periods: [...list.rows].sort((a, b) => b.starts_on.localeCompare(a.starts_on)),
     options: list.rows.map((p) => [p.performance_period_id, p.name] as [string, string]),
     periodId: period?.performance_period_id ?? "",
     setPeriodId: setPicked,
     loading: current.loading && list.loading,
+  };
+}
+
+/**
+ * A contract schema for a form whose fields are flat: the form's values become the request's body
+ * (`toBody`), the contract checks that body, and each problem lands on the field `fieldOf` names for
+ * its path. The frontend declares no rule of its own (FRONTEND_GUIDE §8.3).
+ */
+export function bodySchema<T>(schema: ContractSchema, toBody: (values: T) => unknown, fieldOf: (path: PropertyKey[]) => string = (path) => String(path[0] ?? "")): ContractSchema {
+  return {
+    safeParse(values: unknown) {
+      const r = schema.safeParse(toBody(values as T));
+      if (r.success) return r;
+      return { success: false, error: { issues: (r.error?.issues ?? []).map((i) => ({ ...i, path: [fieldOf(i.path)] })) } };
+    },
   };
 }
 
@@ -149,6 +167,9 @@ export const reviewStatus = (s: string) => {
 /** The stages a list filters by; Returned sits with With Reviewer. */
 export const STAGE_OPTIONS: Array<[string, string]> = [["", "All Stages"], ["check_in", "Checking In"], ["with_reviewer", "With Reviewer"], ["second_level", "Second Level"], ["with_hr", "With HR"], ["closed", "Closed"], ["withdrawn", "Withdrawn"]];
 
+/** A target, actual or KPI figure as people read it: its words, else its number with its unit (64,000 users; 40%); null for none. */
+export const figureOf = (value: string | null | undefined, text?: string | null, unit?: string | null) =>
+  text ?? (value === null || value === undefined || value === "" ? null : formatNumber(value, unit));
+
 /** A line's target as people read it: its words, or its figure and unit. */
-export const targetOf = (l: { target_text: string | null; target_value: string | null; unit: string | null }) =>
-  l.target_text ?? (l.target_value === null ? "–" : `${l.target_value}${l.unit ? (l.unit === "%" ? "%" : ` ${l.unit}`) : ""}`);
+export const targetOf = (l: { target_text: string | null; target_value: string | null; unit: string | null }) => figureOf(l.target_value, l.target_text, l.unit) ?? "–";

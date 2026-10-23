@@ -25,15 +25,21 @@ module.exports = {
   goal: async (req, res) => ok(res, await service.getGoal(id(req))),
   createGoal: async (req, res) => created(res, await service.createGoal(withActor(req), req.validated.body)),
   updateGoal: async (req, res) => ok(res, await service.updateGoal(withActor(req), id(req), req.validated.body)),
+  deleteGoal: async (req, res) => {
+    await service.deleteGoal(withActor(req), id(req));
+    return noContent(res);
+  },
 
-  okrs: async (req, res) => sendPaged(res, await okrs.listOkrs(req.validated.query)),
+  okrs: async (req, res) => sendPaged(res, await okrs.listOkrs(req.validated.query, withActor(req))),
   okrSummary: async (req, res) => ok(res, await okrs.okrSummary(req.validated.query)),
+  objective: async (req, res) => ok(res, await okrs.getObjective(id(req), withActor(req))),
   createObjective: async (req, res) => created(res, await okrs.createObjective(withActor(req), req.validated.body)),
   updateObjective: async (req, res) => ok(res, await okrs.updateObjective(withActor(req), id(req), req.validated.body)),
   deleteObjective: async (req, res) => {
     await okrs.deleteObjective(withActor(req), id(req));
     return noContent(res);
   },
+  keyResults: async (req, res) => sendPaged(res, await okrs.listKeyResults(req.validated.query)),
   createKeyResult: async (req, res) => created(res, await okrs.createKeyResult(withActor(req), req.validated.body)),
   keyResult: async (req, res) => ok(res, await okrs.getKeyResultDetail(id(req), withActor(req))),
   updateKeyResult: async (req, res) => ok(res, await okrs.updateKeyResult(withActor(req), id(req), req.validated.body)),

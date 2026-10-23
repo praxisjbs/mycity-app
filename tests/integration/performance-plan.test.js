@@ -394,8 +394,17 @@ describeDb("performance plan against the real migrations", () => {
     const mayChange = async (who, kr = ids.kr1) => (await as(who).get(`/performance/key-results/${kr}`)).body.can_change_target;
     expect([await mayChange("head"), await mayChange("ceo"), await mayChange("ada"), await mayChange("other")]).toEqual([true, true, false, false]);
     // The accountable person may ask, though they set no goals for the function.
+    const owner1 = (await one("SELECT accountable_employee_id FROM okr_key_result WHERE okr_key_result_id = $1", [ids.kr1])).accountable_employee_id;
+    await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr1, emp("other")]);
+    expect(await mayChange("other", ids.kr1)).toBe(true);
+    await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr1, owner1]);
+    // A TBC target before its lock date is set in place by its owner or the head, never asked for (§6.7).
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr2, emp("other")]);
-    expect(await mayChange("other", ids.kr2)).toBe(true);
+    const tbc = async (who) => {
+      const body = (await as(who).get(`/performance/key-results/${ids.kr2}`)).body;
+      return [body.can_set_target, body.can_change_target];
+    };
+    expect([await tbc("other"), await tbc("head"), await tbc("ada")]).toEqual([[true, false], [true, false], [false, false]]);
     await q("UPDATE okr_key_result SET accountable_employee_id = $2 WHERE okr_key_result_id = $1", [ids.kr2, emp("head")]);
     const mayEdit = async (who) => (await as(who).get(`/performance/kpis/${ids.kpi}`)).body.can_edit;
     expect([await mayEdit("head"), await mayEdit("ops"), await mayEdit("ada"), await mayEdit("other")]).toEqual([true, true, false, false]);

@@ -99,6 +99,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
 | Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
+| Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
 | Forms | [PlacesField](#placesfield) | `PlacesField` | Several places picked from our own address search, each a chip with Remove: a proposal's cities. | stable |
@@ -3000,6 +3001,37 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 <MoneyField {...form.field("amount")} />
 ```
 
+### MoreFields
+
+The fields a form rarely needs, closed under one More row until the person opens it.
+
+| | |
+|---|---|
+| Use | Optional fields most people leave alone, where the feature guide names them for More (a key result's co-owner, baseline and start). Pass `invalid` so a marked field inside is never hidden. |
+| Avoid | A required field (it stays open); support text (use HelpTerm or Details); a second topic (use Wizard); more than one More in a form. |
+| Phone | A 44 px row that opens the fields in place, inside the form's sheet, never a sheet of its own. |
+| Accessibility | A button with aria-expanded that controls the fields. Closed fields stay mounted and keep their values; it opens itself while one is marked, so check() can reach it. |
+| Status | beta |
+| Exports | `MoreFields` |
+| Import | `import { MoreFields } from "@mycity/ui";` |
+| File | `packages/ui/src/form/MoreFields.tsx` |
+| Test | `packages/ui/src/form/MoreFields.test.tsx` |
+| Gallery | `packages/ui/src/form/MoreFields.gallery.tsx` (`npm run gallery`, `#/MoreFields`) |
+
+**MoreFields** props (`MoreFieldsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `children` | `ReactNode` |  | The fields behind the row (Field and its control, from the form system). |
+| `label` | `string` |  | The row's word, Title Case, at most 3 words. Default "More". |
+| `invalid` | `boolean` |  | A field inside is marked: it opens and stays open while one is. |
+| `defaultOpen` | `boolean` |  | Opens on arrival (an edit whose fields here hold values). Closed otherwise. |
+| `className` | `string` |  | Layout classes only (spacing, width); the look is the component's own. |
+
+```tsx
+<MoreFields invalid={Boolean(f.status("baseline_text").message)}><Field label="Baseline" optional><TextField {...f.field("baseline_text")} /></Field></MoreFields>
+```
+
 ### OtpField
 
 A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all.
@@ -5271,6 +5303,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `formatMoneyShort` | `lib/format.ts` | Short form for KPI tiles only: "₦1.3M", "₦850K". |
 | `isNegative` | `lib/format.ts` | Is this amount below zero? (string check; no float) |
 | `formatCount` | `lib/format.ts` | Whole-number count with thousands separators. |
+| `formatNumber` | `lib/format.ts` | A target, actual, baseline or KPI figure as people write it: thousands grouped, trailing zeros dropped, a per cent sign against it ("40%"), a currency sign before it ("₦30,000,000") and any other unit after it ("64,000 users"). |
 | `initials` | `lib/format.ts` | Initials for an avatar: "Cynthia Osakunih" → "CO". |
 | `formatBytes` | `lib/format.ts` | "84 KB", "1.1 MB", "23.4 GB", "1.25 TB" from a byte count. |
 | `plural` | `lib/format.ts` | Plural with count: plural(3, "employee") → "3 employees". |

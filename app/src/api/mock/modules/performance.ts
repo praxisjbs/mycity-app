@@ -11,6 +11,7 @@ import type {
   KpiMonth,
   Objective,
   OrganisationalGoal,
+  OrganisationalGoalTarget,
   PerformanceAnalytics,
   PerformanceApproval,
   PerformancePeriod,
@@ -41,7 +42,11 @@ const addMonths = (d: string, n: number) => {
 };
 
 route("GET /api/v1/performance/periods", (req) =>
-  paged(PERIODS, req, { filters: { status: (p, v) => p.status === v }, search: (p) => [p.name], sort: { starts_on: (a, b) => a.starts_on.localeCompare(b.starts_on) } }),
+  paged(PERIODS, req, {
+    filters: { status: (p, v) => p.status === v, plan_year: (p, v) => p.plan_year_starts_on.startsWith(String(v)) },
+    search: (p) => [p.name],
+    sort: { starts_on: (a, b) => a.starts_on.localeCompare(b.starts_on) },
+  }),
 );
 route("GET /api/v1/performance/periods/current", () => {
   const p = currentPeriod();
@@ -52,9 +57,10 @@ route("GET /api/v1/performance/periods/:id", (req) => {
   return p ? ok(p) : notFound();
 });
 route("POST /api/v1/performance/periods", (req) => {
-  const b = req.body as { starts_on?: string; name?: string; targets_lock_on?: string; live_from?: string };
+  const b = req.body as { starts_on?: string; name?: string; targets_lock_on?: string; live_from?: string; status?: "planning" | "active"; rules?: PerformancePeriod["rules"] };
   if (!b.starts_on || !/-(01|04|07|10)-01$/.test(b.starts_on)) return invalid({ starts_on: ["Pick a quarter's first day"] });
   if (PERIODS.some((p) => p.starts_on === b.starts_on)) return fail(409, "PERIOD_EXISTS", "That quarter is already set up", { starts_on: ["Already set up"] });
+  if (b.status === "active" && PERIODS.some((p) => p.status === "active")) return fail(409, "PERIOD_ACTIVE_EXISTS", "Close the active quarter first", { status: ["Another is active"] });
   const last = [...PERIODS].sort((a, c) => c.starts_on.localeCompare(a.starts_on))[0];
   const p: PerformancePeriod = {
     ...last,
@@ -65,7 +71,8 @@ route("POST /api/v1/performance/periods", (req) => {
     plan_year_starts_on: `${b.starts_on.slice(0, 4)}-01-01`,
     targets_lock_on: b.targets_lock_on || null,
     live_from: b.live_from || null,
-    status: "planning",
+    status: b.status ?? "planning",
+    rules: b.rules ?? last.rules,
     months: [0, 1, 2].map((n) => addMonths(b.starts_on!, n)),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -83,6 +90,9 @@ route("PATCH /api/v1/performance/periods/:id", (req) => {
 });
 
 const now = () => new Date().toISOString();
+/** A number for a new record's id: never the clock, which a test may hold still. */
+let made = 0;
+const fresh = () => (made += 1);
 const meOf = (req: Req) => byKey(req.user);
 const isCeo = (req: Req) => req.user === "ifeoma";
 const planOf = (periodId: string, departmentId: string | null) => {
@@ -134,6 +144,27 @@ const traceOf = (kr: KeyResult) => {
 };
 /** Who may set a function's goals here: the CEO, or the demonstration function's head. */
 const setsGoalsFor = (req: Req, departmentId: string | null) => isCeo(req) || (departmentId === deptId && meOf(req)?.user_key === "ngozi");
+/** An objective as the reader gets it: may they edit it now (a draft or returned plan whose goals they set)? */
+const withCan = (o: Objective, req: Req): Objective => ({ ...o, score: objectiveScore(o), can_edit: open(o.plan_status) && setsGoalsFor(req, o.department_id) });
+/** A TBC target still open: provisional, not locked, its quarter's lock date not come (§6.7). */
+const tbcOpen = (kr: KeyResult) => {
+  const lock = (PERIODS.find((p) => p.performance_period_id === objectiveOf(kr).performance_period_id) ?? PERIOD).targets_lock_on;
+  return kr.target_provisional && !kr.target_locked_at && (!lock || lock > new Date().toISOString().slice(0, 10));
+};
+const isOwner = (kr: KeyResult, req: Req) => Boolean(kr.accountable && kr.accountable.employee_id === meOf(req)?.employee_id);
+/** The form's people and links, as a key result carries them. */
+const krPeopleAndLinks = (b: Record<string, unknown>): Partial<KeyResult> => {
+  const out: Partial<KeyResult> = {};
+  const person = (id: unknown) => {
+    const p = byId(typeof id === "string" && id ? id : undefined);
+    return p ? refKey(p.user_key) : null;
+  };
+  if ("accountable_employee_id" in b) out.accountable = person(b.accountable_employee_id);
+  if ("co_accountable_employee_id" in b) out.co_accountable = person(b.co_accountable_employee_id);
+  if (Array.isArray(b.linked_company_key_result_ids))
+    out.linked_company_key_results = (b.linked_company_key_result_ids as string[]).map(krById).filter((x): x is KeyResult => Boolean(x)).map((x) => ({ okr_key_result_id: x.okr_key_result_id, code: x.code, statement: x.statement }));
+  return out;
+};
 const krDetail = (kr: KeyResult, req: Req): KeyResultDetail => {
   const o = objectiveOf(kr);
   return {
@@ -147,14 +178,19 @@ const krDetail = (kr: KeyResult, req: Req): KeyResultDetail => {
     months: kr.latest ? [kr.latest] : [],
     target_history: TARGET_CHANGES.filter((c) => c.okr_key_result_id === kr.okr_key_result_id),
     trace: traceOf(kr),
+    performance_period_id: o.performance_period_id,
     can_change_target:
       o.plan_status === "binding" &&
+      !tbcOpen(kr) &&
       !TARGET_CHANGES.some((c) => c.okr_key_result_id === kr.okr_key_result_id && c.status === "pending") &&
-      (kr.accountable?.employee_id === meOf(req)?.employee_id || setsGoalsFor(req, o.department_id)),
+      (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
+    can_edit: open(o.plan_status) && setsGoalsFor(req, o.department_id),
+    can_set_target: o.plan_status === "binding" && tbcOpen(kr) && (isOwner(kr, req) || setsGoalsFor(req, o.department_id)),
   };
 };
 
-/* Organisational goals */
+/* Organisational goals, and what each quarter of their year should reach */
+const GOAL_TARGETS = new Map<string, OrganisationalGoalTarget[]>();
 route("GET /api/v1/performance/goals", (req) =>
   paged(ORG_GOALS, req, {
     search: (g) => [g.code, g.title, g.strategic_theme],
@@ -167,7 +203,7 @@ route("GET /api/v1/performance/goals/:id", (req) => {
   if (!g) return notFound();
   const objectives = OBJECTIVES.filter((o) => o.organisational_goal_id === g.organisational_goal_id);
   const scores = objectives.map((o) => o.score).filter((x): x is string => Boolean(x)).map(Number);
-  return ok({ ...g, targets: [], objectives: objectives.map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })), progress: scores.length ? String(Math.round((scores.reduce((x, y) => x + y, 0) / scores.length) * 100) / 100) : null });
+  return ok({ ...g, targets: GOAL_TARGETS.get(g.organisational_goal_id) ?? [], objectives: objectives.map((o) => ({ okr_objective_id: o.okr_objective_id, code: o.code, title: o.title })), progress: scores.length ? String(Math.round((scores.reduce((x, y) => x + y, 0) / scores.length) * 100) / 100) : null });
 });
 route("POST /api/v1/performance/goals", (req) => {
   if (!isCeo(req)) return fail(403, "PERMISSION_DENIED", "Only the CEO sets organisational goals");
@@ -175,7 +211,7 @@ route("POST /api/v1/performance/goals", (req) => {
   if (!b.title?.trim()) return invalid({ title: ["Required"] });
   const year = (b.plan_year_starts_on ?? `${new Date().getUTCFullYear()}-01-01`).slice(0, 4);
   const g: OrganisationalGoal = {
-    organisational_goal_id: sid(`perf:goal:new:${ORG_GOALS.length}:${Date.now()}`),
+    organisational_goal_id: sid(`perf:goal:new:${fresh()}`),
     code: b.code || null,
     title: b.title.trim(),
     strategic_theme: b.strategic_theme || null,
@@ -200,15 +236,42 @@ route("PATCH /api/v1/performance/goals/:id", (req) => {
   const g = ORG_GOALS.find((x) => x.organisational_goal_id === req.params.id);
   if (!g) return notFound();
   if (!isCeo(req)) return fail(403, "PERMISSION_DENIED", "Only the CEO changes organisational goals");
-  const { targets: _t, ...rest } = req.body;
-  Object.assign(g, rest, { updated_at: now() });
+  const { targets, ...rest } = req.body as Record<string, unknown> & { targets?: Array<{ performance_period_id: string; target_text?: string; target_value?: string }> };
+  if (typeof rest.title === "string" && !rest.title.trim()) return invalid({ title: ["Required"] });
+  Object.assign(g, Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, v === "" ? null : v])), { updated_at: now() });
+  if (targets) {
+    const held = GOAL_TARGETS.get(g.organisational_goal_id) ?? [];
+    for (const t of targets) {
+      const period = PERIODS.find((p) => p.performance_period_id === t.performance_period_id);
+      const row: OrganisationalGoalTarget = {
+        organisational_goal_target_id: sid(`perf:goal-target:${g.organisational_goal_id}:${t.performance_period_id}`),
+        performance_period_id: t.performance_period_id,
+        period_name: period?.name ?? "",
+        target_text: t.target_text || null,
+        target_value: t.target_value || null,
+      };
+      const at = held.findIndex((x) => x.performance_period_id === t.performance_period_id);
+      if (at >= 0) held[at] = row;
+      else held.push(row);
+    }
+    GOAL_TARGETS.set(g.organisational_goal_id, held);
+  }
   return ok(g);
+});
+route("DELETE /api/v1/performance/goals/:id", (req) => {
+  const at = ORG_GOALS.findIndex((x) => x.organisational_goal_id === req.params.id);
+  if (at < 0) return notFound();
+  if (!isCeo(req)) return fail(403, "PERMISSION_DENIED", "Only the CEO removes organisational goals");
+  if (OBJECTIVES.some((o) => o.department_id === null && o.organisational_goal_id === req.params.id)) return fail(409, "GOAL_IN_USE", "A company objective serves this goal");
+  ORG_GOALS.splice(at, 1);
+  GOAL_TARGETS.delete(req.params.id);
+  return noContent();
 });
 
 /* Objectives and key results */
 route("GET /api/v1/performance/okrs", (req) =>
   paged(
-    OBJECTIVES.map((o) => ({ ...o, score: objectiveScore(o) })),
+    OBJECTIVES.map((o) => withCan(o, req)),
     req,
     {
       search: (o) => [o.code, o.title, ...o.key_results.flatMap((k) => [k.code, k.statement])],
@@ -243,7 +306,7 @@ route("POST /api/v1/performance/objectives", (req) => {
   let n = 1;
   while (used.has(n)) n += 1;
   const o: Objective = {
-    okr_objective_id: sid(`perf:obj:new:${Date.now()}`),
+    okr_objective_id: sid(`perf:obj:new:${fresh()}`),
     performance_period_id: periodId,
     performance_plan_id: plan.performance_plan_id,
     department_id: dept,
@@ -255,22 +318,31 @@ route("POST /api/v1/performance/objectives", (req) => {
     plan_status: plan.status,
     score: null,
     key_results: [],
+    can_edit: false,
   };
   OBJECTIVES.push(o);
   plan.objective_count += 1;
-  return created(o);
+  return created(withCan(o, req));
+});
+route("GET /api/v1/performance/objectives/:id", (req) => {
+  const o = OBJECTIVES.find((x) => x.okr_objective_id === req.params.id);
+  return o ? ok(withCan(o, req)) : notFound();
 });
 route("PATCH /api/v1/performance/objectives/:id", (req) => {
   const o = OBJECTIVES.find((x) => x.okr_objective_id === req.params.id);
   if (!o) return notFound();
-  if (!open(o.plan_status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding");
+  if (!open(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
   Object.assign(o, fieldsOf(req.body, ["title", "organisational_goal_id", "position"]));
-  return ok(o);
+  return ok(withCan(o, req));
 });
 route("DELETE /api/v1/performance/objectives/:id", (req) => {
   const i = OBJECTIVES.findIndex((x) => x.okr_objective_id === req.params.id);
   if (i < 0) return notFound();
-  if (!open(OBJECTIVES[i].plan_status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding");
+  if (!open(OBJECTIVES[i].plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!setsGoalsFor(req, OBJECTIVES[i].department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
+  const plan = PLANS.find((p) => p.performance_plan_id === OBJECTIVES[i].performance_plan_id);
+  if (plan) plan.objective_count = Math.max(0, plan.objective_count - 1);
   OBJECTIVES.splice(i, 1);
   return noContent();
 });
@@ -286,7 +358,7 @@ route("POST /api/v1/performance/key-results", (req) => {
   while (used.has(n)) n += 1;
   const owner = byId(b.accountable_employee_id as string | undefined);
   const k: KeyResult = {
-    okr_key_result_id: sid(`perf:kr:new:${Date.now()}`),
+    okr_key_result_id: sid(`perf:kr:new:${fresh()}`),
     okr_objective_id: o.okr_objective_id,
     code: `${o.code.replace("-O", "-KR")}.${n}`,
     statement: String(b.statement).trim(),
@@ -310,9 +382,21 @@ route("POST /api/v1/performance/key-results", (req) => {
     position: o.key_results.length,
     latest: null,
     ...(fieldsOf(b, KR_KEYS) as Partial<KeyResult>),
+    ...krPeopleAndLinks(b),
   };
   o.key_results.push(k);
   return created(k);
+});
+route("GET /api/v1/performance/key-results", (req) => {
+  const q = req.query as { period_id?: string; level?: string; department_id?: string };
+  const refs = allKrs()
+    .filter((k) => {
+      const o = objectiveOf(k);
+      return (!q.period_id || o.performance_period_id === q.period_id) && (!q.level || (q.level === "company") === (o.department_id === null)) && (!q.department_id || o.department_id === q.department_id);
+    })
+    .map((k) => ({ okr_key_result_id: k.okr_key_result_id, code: k.code, statement: k.statement }));
+  // The filters are applied above, where each key result's objective is known.
+  return paged(refs, req, { filters: { period_id: () => true, level: () => true, department_id: () => true }, search: (k) => [k.code, k.statement], sort: { code: (a, b) => a.code.localeCompare(b.code) } });
 });
 route("GET /api/v1/performance/key-results/:id", (req) => {
   const k = krById(req.params.id);
@@ -325,15 +409,23 @@ route("GET /api/v1/performance/key-results/:id/trace", (req) => {
 route("PATCH /api/v1/performance/key-results/:id", (req) => {
   const k = krById(req.params.id);
   if (!k) return notFound();
-  if (!open(objectiveOf(k).plan_status) && !k.target_provisional) return fail(409, "KEY_RESULT_BINDING", "A binding target changes through Change Target");
-  Object.assign(k, fieldsOf(req.body, KR_KEYS));
+  const o = objectiveOf(k);
+  const b = req.body as Record<string, unknown>;
+  if (open(o.plan_status)) {
+    if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
+  } else {
+    const onlyTarget = Object.keys(b).every((x) => ["target_value", "target_text", "target_provisional"].includes(x));
+    if (!(tbcOpen(k) && onlyTarget && (isOwner(k, req) || setsGoalsFor(req, o.department_id)))) return fail(409, "KEY_RESULT_BINDING", "This key result is binding: change its target instead");
+  }
+  Object.assign(k, fieldsOf(b, KR_KEYS), krPeopleAndLinks(b));
   return ok(k);
 });
 route("DELETE /api/v1/performance/key-results/:id", (req) => {
   const k = krById(req.params.id);
   if (!k) return notFound();
   const o = objectiveOf(k);
-  if (!open(o.plan_status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding");
+  if (!open(o.plan_status)) return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead");
+  if (!setsGoalsFor(req, o.department_id)) return fail(403, "PERMISSION_DENIED", "Only the function's head sets its goals");
   o.key_results = o.key_results.filter((x) => x !== k);
   return noContent();
 });
@@ -447,7 +539,7 @@ route("POST /api/v1/performance/plans/:id/submit", (req) => {
   if (!p) return notFound();
   const d = planDetail(req, p);
   if (!d.can_submit) return fail(409, "PLAN_NOT_READY", d.problems.find((x) => x.blocking)?.message ?? "The plan cannot be sent");
-  const wid = sid(`perf:wf:plan:${p.performance_plan_id}:${Date.now()}`);
+  const wid = sid(`perf:wf:plan:${p.performance_plan_id}:${fresh()}`);
   const sentBy = req.user!;
   FLOWS.push({ wid, planId: p.performance_plan_id, stages: stagesFor(p, sentBy), at: 0, by: sentBy, entered: now(), opened: now(), moves: [] });
   Object.assign(p, { status: "submitted", workflow_instance_id: wid, submitted_by: refKey(sentBy), submitted_at: now(), returned_reason: null, updated_at: now() });
@@ -475,6 +567,7 @@ route("POST /api/v1/performance/target-changes", (req) => {
   const b = req.body as Record<string, string | undefined>;
   const k = b.okr_key_result_id ? krById(b.okr_key_result_id) : undefined;
   if (b.okr_key_result_id && !k) return invalid({ okr_key_result_id: ["Pick a key result"] });
+  if (k && tbcOpen(k)) return fail(409, "TARGET_TBC", "Set this TBC target directly");
   const found = b.employee_target_id ? lineById(b.employee_target_id) : null;
   if (b.employee_target_id && !found) return notFound();
   // A line's target is changed by its scorecard's reviewer or the function's head, never its employee (§3.5).
@@ -484,7 +577,7 @@ route("POST /api/v1/performance/target-changes", (req) => {
   if (TARGET_CHANGES.some((x) => x.status === "pending" && x.okr_key_result_id === (b.okr_key_result_id || null) && x.employee_target_id === (b.employee_target_id || null)))
     return fail(409, "CHANGE_PENDING", "A change to this target is already waiting for a decision");
   const c: TargetChange = {
-    target_change_id: sid(`perf:change:${Date.now()}`),
+    target_change_id: sid(`perf:change:${fresh()}`),
     okr_key_result_id: b.okr_key_result_id || null,
     employee_target_id: b.employee_target_id || null,
     from_value: k?.target_value ?? found?.line.target_value ?? null,
@@ -494,7 +587,7 @@ route("POST /api/v1/performance/target-changes", (req) => {
     from_month: b.from_month ?? PERIOD.months[0],
     reason: b.reason.trim(),
     status: "pending",
-    workflow_instance_id: sid(`perf:wf:change:${Date.now()}`),
+    workflow_instance_id: sid(`perf:wf:change:${fresh()}`),
     requested_by: meOf(req) ? refKey(req.user!) : null,
     decided_at: null,
     created_at: now(),
@@ -852,7 +945,7 @@ route("POST /api/v1/performance/kpis", (req) => {
   const prefix = b.department_id === deptId ? "BM" : "FN";
   const n = FUNCTION_KPIS.filter((k) => k.code.startsWith(`${prefix}-K`)).length + 1;
   const k: Kpi = {
-    kpi_definition_id: sid(`perf:kpi:new:${Date.now()}`),
+    kpi_definition_id: sid(`perf:kpi:new:${fresh()}`),
     code: `${prefix}-K${String(n).padStart(2, "0")}`,
     name: b.name.trim(),
     description: b.description || null,
@@ -1069,7 +1162,7 @@ route("PUT /api/v1/performance/scorecards/:id/lines", (req) => {
     const kpi = l.kpi_definition_id ? FUNCTION_KPIS.find((k) => k.kpi_definition_id === l.kpi_definition_id) : undefined;
     const was = c.lines.find((x) => x.employee_target_id === l.employee_target_id);
     return {
-      employee_target_id: was?.employee_target_id ?? sid(`perf:line:${c.scorecard_id}:${Date.now()}:${i}`),
+      employee_target_id: was?.employee_target_id ?? sid(`perf:line:${c.scorecard_id}:${fresh()}:${i}`),
       scorecard_id: c.scorecard_id,
       section: l.section as ScorecardLine["section"],
       position: i,

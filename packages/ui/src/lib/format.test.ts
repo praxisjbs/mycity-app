@@ -7,6 +7,7 @@ import {
   formatMoney,
   formatMoneyShort,
   formatMonth,
+  formatNumber,
   formatPhone,
   formatPhoneLocal,
   formatTime,
@@ -107,5 +108,36 @@ describe("phone numbers, from E.164", () => {
     expect(formatPhoneLocal("+2342012345678")).toBe("0201 234 5678");
     expect(formatPhoneLocal("+41779539483")).toBe("+41779539483");
     expect(formatPhoneLocal(undefined)).toBe("");
+  });
+});
+
+describe("formatNumber, a quantity as people write it", () => {
+  it("groups thousands and drops the wire's trailing zeros", () => {
+    expect(formatNumber("64000.0000")).toBe("64,000");
+    expect(formatNumber("64000")).toBe("64,000");
+    expect(formatNumber("1250000.50")).toBe("1,250,000.5");
+    expect(formatNumber("0.95")).toBe("0.95");
+    expect(formatNumber("0.0000")).toBe("0");
+    expect(formatNumber("0007")).toBe("7");
+    expect(formatNumber(64000)).toBe("64,000");
+    expect(formatNumber(0.0000001)).toBe("0");
+  });
+
+  it("puts a per cent sign against the number, a currency sign before it and any other unit after it", () => {
+    expect(formatNumber("40", "%")).toBe("40%");
+    expect(formatNumber("64000.0000", "users")).toBe("64,000 users");
+    expect(formatNumber("12", " partners ")).toBe("12 partners");
+    expect(formatNumber("30000000", "₦")).toBe("₦30,000,000");
+    expect(formatNumber("-3.50", "₦")).toBe("−₦3.5");
+    expect(formatNumber("-12", "%")).toBe("−12%");
+    expect(formatNumber("-0.00")).toBe("0");
+  });
+
+  it("leaves nothing as empty and words as they are", () => {
+    expect(formatNumber(null)).toBe("");
+    expect(formatNumber(undefined, "users")).toBe("");
+    expect(formatNumber("")).toBe("");
+    expect(formatNumber("TBC")).toBe("TBC");
+    expect(formatNumber("64,000 users")).toBe("64,000 users");
   });
 });
