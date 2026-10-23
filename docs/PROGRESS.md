@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 11 | 0 | 1 | 10 | 0 | 0 |
+| M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **100** | **40** | **1** | **59** | **0** | **0** |
+| **Total** | **100** | **40** | **0** | **60** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -755,12 +755,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
-| 101 | Projects | `projects` | M2 | AJ | ☑ | ☐ | ☐ | In progress | 23/10/2026 |
+| 101 | Projects | `projects` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 
 **Notes**
 
+- 23/10/2026 · JP · My Workspace (#4, #5, #6, #7, #101), the 23/10 audit, part 3 of 3, screens: Projects (#101) is built: the list (Active, Completed, search, New Project) and a project's page with the board Tasks now shares (`TaskBoard`), New Task already in the project, Edit, Complete and Reopen Project; New Task and Edit Task gain Project (a server-searched `ProjectPicker`), the panel names it; Late Reasons behind the settings icon on Tasks for holders of `workspace.late_reasons` (`LateReasons`: one press switches a reason, Add Reason), and Why Late offers the reasons from the API; the Left pill on a card, the list and the panel; Tasks, a project's board and Today follow `task.changed` (`useLiveTasks`); Analytics names reasons as the server does; New Event fills its attendees from the address (a list prefill travels comma-separated, `answer.prefillOf`, `useAddressPrefill`). Mock: projects, the late reasons and their keepers, the task's new fields. App tests 7 new (`Projects.test.tsx`). Left: nothing.
 - 23/10/2026 · JP · My Workspace (#4, #5, #6, #7, #101), the 23/10 audit, part 3 of 3, server side (decisions JBS Praxis, 23/10/2026; `workspace.md` §1 to §13): My Workspace · Projects joins the inventory as #101 (MILESTONES §18): `/api/v1/projects` (anyone starts one, everyone lists it, counts and its board only the tasks the reader can see, completed projects take no new task), a task's `project_id` from New Task, Edit Task or the project; Why Late's reasons in `task_late_reason` (2510, six seeded in 2590 with Waiting on Client and Blocked by Another Team), added and switched by holders of the new `workspace.late_reasons`; invitations by email with an `.ics` (REQUEST, update, CANCEL; `calendar_event.ics_sequence`, 2520), held while system mail is paused; the live board (`task.changed` by realtime to everyone who may see a task; `task.reordered`); `assignee_left` for the Left pill; Home's roster fills Open Tasks; New Event's prefill names attendees and "start a project" opens New Project. Workspace integration 45 (6 new). Left: the screens (Projects tab, Late Reasons, the Left pill, live refresh, the Project field), the mock and frontend tests, then CI and merge.
 - 23/10/2026 · JP · My Workspace (#4 to #7), after the 23/10 audit (Workspace PR 2 of 3; `workspace.md` §4, §5, §10, §11): Edit Task is checked by `TaskEdit` on what it sends, so an approved commitment's date moves into a later month; Lead offers only people the reader may set work for; Assign To cleared hands a task back to the reader; a shared task's people are sent only when they or the lead change; a link to a task or an event that 404s opens nothing. The board shows placeholders while it loads and Try Again when it cannot, and `Kanban` (`packages/ui`, with its test and gallery) takes `loading` and holds a card until the move it hands back has landed (F26; Recruitment's board unchanged). Comments newest first and History with Load More; Send Commitments reads `/performance/commitments` a page at a time; Department is a server-searched picker; error states on My Week, a person's week, the month, the figures, the comments and Clocked In; an event's 422 marks every field it names; Call Off confirms by name; Today's phone order and 44 px day and link rows; the §10.1 copy (no Lagos headers or extra empty lines, Overdue 3 days, No lines or key results, Repeat's mark in four words); Team This Week, Analytics' default and Send Commitments' Person follow who may set work for others; Show Cancelled on the list; View All on My Week.
   Mock, merged with PR 1 (#142) and following its rules: a watcher can see the task, Analytics' Mine is what the reader leads or shares, the assignee of a task set by someone else never manages it, Due Today is open and not yet past, a card lands only above one the reader can see, a shared task's deadline is on its people's calendars, event times compare as instants; also explicit defaults for new and recovery tasks, PATCH checked before it changes, leave and an invitation on the calendar, This Year from 1 January, `can_edit`, the 25-people limit. Staging seed: a task shared with People and one with a Department, a repeating task, two reminders and this week's Support Needed lines, with a new integration test; it lands and re-runs clean on Postgres 16, and Home's and the commitments' seed suites pass on it. App workspace tests 32 (20 new), `Kanban` 24 (5 new). Left: nothing in this PR; PR 3 next (Projects, Why Late reasons, email invitations, live board updates, the Left pill).

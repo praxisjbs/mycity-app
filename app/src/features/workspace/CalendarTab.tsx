@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import type { CalendarEvent, CalendarItem } from "@mycity/contract/contract.gen.ts";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import calendar from "@mycity/contract/schemas/calendar.js";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
@@ -362,6 +362,21 @@ function EventForm({ close, day = "", event }: { close: () => void; day?: string
   const [whoMark, setWhoMark] = useState<string | null>(null);
   // A new event takes what the address names (the assistant, Home's New button); a start with no end is an hour long.
   const filled = useAddressPrefill(calendar.CalendarEventPrefill, !event);
+  // Attendees named in the address show by name: the picker holds people, found through their cards.
+  const named = filled.attendee_ids;
+  useEffect(() => {
+    if (!named) return;
+    let live = true;
+    Promise.all(
+      named.split(",").map((id) => api.call("GET /api/v1/community/people/:id/card", { params: { id } }).then((c) => c.person, () => null)),
+    ).then((people) => {
+      const found: PersonRef[] = people.flatMap((p) => (p ? [p] : []));
+      if (live && found.length) setWho((now) => (now.length ? now : found));
+    });
+    return () => {
+      live = false;
+    };
+  }, [named]);
   const ends = filled.ends_at ?? (filled.starts_at ? new Date(Date.parse(filled.starts_at) + 3_600_000).toISOString() : undefined);
   const f = useContractForm(
     {

@@ -26,7 +26,7 @@ const t = (label: string, slug: string): TabDef => ({ label, slug });
 
 export const MODULES: ModuleDef[] = [
   { key: "home", label: "Home", short: "Home", icon: "home", area: "", tabs: [t("Overview", "overview"), t("Team", "team"), t("Alerts", "alerts"), t("Reports", "reports")] },
-  { key: "workspace", label: "My Workspace", short: "Workspace", icon: "check", area: "", tabs: [t("Today", "today"), t("Tasks", "tasks"), t("Calendar", "calendar"), t("Analytics", "analytics")] },
+  { key: "workspace", label: "My Workspace", short: "Workspace", icon: "check", area: "", tabs: [t("Today", "today"), t("Tasks", "tasks"), t("Projects", "projects"), t("Calendar", "calendar"), t("Analytics", "analytics")] },
   {
     key: "ess", label: "Employee Self-Service", short: "Self-Service", icon: "user", area: "",
     tabs: [

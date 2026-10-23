@@ -6,11 +6,11 @@ import { api, ApiError } from "@/api/client";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
-import { ColleaguePicker, DepartmentPicker, TaskPeoplePicker } from "@/features/shared/pickers";
+import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
-import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
-import { LABEL, LATE_OPTIONS, refresh, refreshed, say, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
+import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { LABEL, refresh, refreshed, say, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
 const failed = (f: { setServerErrors: (e: Record<string, string[]>) => void }) => (e: unknown) => {
@@ -72,7 +72,20 @@ function useMayLead(people: PersonRef[]): (employeeId: string) => boolean {
 }
 
 /** New Task or Edit Task; `dueOn` starts a new one on that day (a day pressed on the calendar). */
-export function TaskForm({ close, task, commitment = false, dueOn }: { close: () => void; task?: TaskDetail; commitment?: boolean; dueOn?: string }) {
+export function TaskForm({
+  close,
+  task,
+  commitment = false,
+  dueOn,
+  project: inProject,
+}: {
+  close: () => void;
+  task?: TaskDetail;
+  commitment?: boolean;
+  dueOn?: string;
+  /** New Task on a project's page: the task joins it unless changed. */
+  project?: ProjectChoice;
+}) {
   const me = useMe();
   const months = commitmentMonths();
   const filled = useAddressPrefill(tasks.TaskPrefill, !task);
@@ -112,6 +125,25 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
     };
   }, [assignee]);
   const [counts, setCounts] = useState<CountsChoice[]>(choiceOf(task));
+  // The project it is in: the task's own, the page it was added from, or one named in the address.
+  const [project, setProject] = useState<ProjectChoice[]>(task?.project ? [task.project] : inProject ? [inProject] : []);
+  const named = !task && !inProject ? filled.project_id : undefined;
+  useEffect(() => {
+    if (!named) return;
+    let live = true;
+    api.call("GET /api/v1/projects/:id", { params: { id: named } }).then(
+      (p) => live && p.status === "active" && setProject((now) => (now.length ? now : [{ project_id: p.project_id, number: p.number, name: p.name }])),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [named]);
+  /** The project as an edit sends it: only when it changed, `null` taking the task out. */
+  const moved = () => {
+    const now = project[0]?.project_id ?? null;
+    return now !== (task?.project?.project_id ?? null) ? { project_id: now } : {};
+  };
   const canAssign = !task || task.can_reassign;
   // An approved commitment keeps its person, mark, month and criteria; its date may still move.
   const fixed = Boolean(task?.is_commitment && task.original_due_at);
@@ -191,7 +223,7 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
     try {
       if (task) {
         const { title, cadence, due_on, priority, description } = editFields(v);
-        const managed = task.can_reassign ? { title, cadence, due_on, ...leading(), ...sharing(), ...pointer() } : {};
+        const managed = task.can_reassign ? { title, cadence, due_on, ...leading(), ...sharing(), ...pointer(), ...moved() } : {};
         const body = { priority, description, ...managed, ...commitmentBody(v) };
         await editTask.run({ params: { id: task.task_id }, body: body as never });
         toast("Task saved");
@@ -204,6 +236,7 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
             ...(v.cadence && { cadence: v.cadence as "daily" | "weekly" }),
             ...(v.due_on && { due_on: v.due_on }),
             ...(v.description && { description: v.description }),
+            ...(project[0] && { project_id: project[0].project_id }),
             ...leading(),
             ...sharing(),
             ...(c?.kind === "line" && c.employee_target_id && { employee_target_id: c.employee_target_id }),
@@ -302,6 +335,11 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
         </Field>
       )}
       {canAssign && (
+        <Field label="Project" optional>
+          <ProjectPicker value={project} onChange={setProject} />
+        </Field>
+      )}
+      {canAssign && (
         <Field label="Cadence" optional help="Daily is due by the end of the day. Weekly is due by the end of the week.">
           <SelectField options={[["", "None"], ["daily", "Daily"], ["weekly", "Weekly"]]} {...f.field("cadence")} />
         </Field>
@@ -348,6 +386,7 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
 /** Why it is late, asked as an overdue task moves to Done; the move happens on Mark Done. */
 export function DoneLateForm({ task, close, onMoved }: { task: Pick<Task, "task_id" | "late_reason">; close: () => void; onMoved?: () => void }) {
   const f = useContractForm({ late_reason: (task.late_reason ?? "") as string }, { late_reason: (v: string) => (!v ? "Pick a reason" : null) });
+  const reasons = useLateOptions();
   const move = useMutation("POST /api/v1/tasks/:id/move");
   const submit = async () => {
     if (!f.check()) return;
@@ -363,7 +402,7 @@ export function DoneLateForm({ task, close, onMoved }: { task: Pick<Task, "task_
   };
   return (
     <>
-      <Field label="Why Late" {...f.field("late_reason")}><SelectField options={LATE_OPTIONS} {...f.field("late_reason")} /></Field>
+      {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Mark Done</Button>
@@ -375,6 +414,7 @@ export function DoneLateForm({ task, close, onMoved }: { task: Pick<Task, "task_
 /** The late reason on an overdue task, set from its panel. */
 export function LateReasonForm({ task, close, onSaved }: { task: TaskDetail; close: () => void; onSaved: () => void }) {
   const f = useContractForm({ late_reason: (task.late_reason ?? "") as string }, { late_reason: (v: string) => (!v ? "Pick a reason" : null) });
+  const reasons = useLateOptions();
   const save = useMutation("PATCH /api/v1/tasks/:id");
   const submit = async () => {
     if (!f.check()) return;
@@ -389,7 +429,7 @@ export function LateReasonForm({ task, close, onSaved }: { task: TaskDetail; clo
   };
   return (
     <>
-      <Field label="Why Late" {...f.field("late_reason")}><SelectField options={LATE_OPTIONS} {...f.field("late_reason")} /></Field>
+      {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Save Reason</Button>

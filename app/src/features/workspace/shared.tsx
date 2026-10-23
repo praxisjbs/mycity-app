@@ -1,8 +1,12 @@
-/** What the Workspace tabs share: the words for codes, a card's pills, Load More, and the refresh after a write. */
-import { useEffect, useState } from "react";
+/**
+ * What the Workspace tabs share: the words for codes, a card's pills, Load More, the refresh after
+ * a write, and following other people's changes as they happen (§6 The live board).
+ */
+import { useEffect, useRef, useState } from "react";
 import type { Task } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate, refresh as quietly, useApi, type PagedResult } from "@/api/hooks";
+import { invalidate, refresh as quietly, useApi, useInfinite, type PagedResult } from "@/api/hooks";
+import { useRealtime } from "@/api/realtime";
 import { formatDate, Pill, toast } from "@mycity/ui";
 
 export type Status = Task["status"];
@@ -13,13 +17,14 @@ type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 export const LABEL: Record<Status, string> = { todo: "To Do", in_progress: "In Progress", in_review: "In Review", done: "Done", cancelled: "Cancelled" };
 export const PRIORITY: Record<Task["priority"], string> = { urgent: "Urgent", high: "High", normal: "Normal", low: "Low" };
 export const CADENCE: Record<string, string> = { daily: "Daily", weekly: "Weekly" };
-export const LATE: Record<LateReason, string> = {
-  waiting_on_others: "Waiting on Others",
-  underestimated: "Underestimated",
-  deprioritised: "Deprioritised",
-  other: "Other",
-};
-export const LATE_OPTIONS = Object.entries(LATE) as Array<[LateReason, string]>;
+/**
+ * Why Late's reasons as a select offers them: those switched on, in their order (one page: the list
+ * holds at most 25). Their keepers change them behind the settings icon on Tasks (LateReasons).
+ */
+export function useLateOptions(): { options: Array<[LateReason, string]>; ready: boolean } {
+  const reasons = useInfinite("GET /api/v1/tasks/late-reasons", {});
+  return { options: reasons.rows.map((r) => [r.code, r.label]), ready: Boolean(reasons.page) };
+}
 
 /** The board's four columns, left to right, each with its series. */
 export const COLS: Array<[BoardStatus, string, 1 | 2 | 3 | 4]> = [
@@ -54,6 +59,7 @@ export function CardPills({ t }: { t: Task }) {
       <Pill tone={due.tone}>{due.text}</Pill>
       {t.is_commitment && <Pill tone="info">Commitment</Pill>}
       {t.members.length > 0 && <Pill tone="info" dot={false}>{`Shared +${t.members.length}`}</Pill>}
+      {t.assignee_left && <Pill tone="warn">Left</Pill>}
       {t.priority === "urgent" && <Pill tone="err">Urgent</Pill>}
       {t.priority === "high" && <Pill tone="warn">High</Pill>}
       {t.blocked_reason && <Pill tone="err">Blocked</Pill>}
@@ -97,12 +103,26 @@ export function usePages<R>(list: PagedResult<R>, key: (row: R) => string) {
 /** The server's words for a refused write, or a plain fallback. */
 export const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
 
-/** Every Workspace read again, after a write. */
+/** Every Workspace read again, after a write. A project's counts follow its tasks. */
 export const refresh = () => {
   invalidate("/api/v1/tasks");
   invalidate("/api/v1/workspace");
   invalidate("/api/v1/calendar");
+  invalidate("/api/v1/projects");
 };
 
 /** The same reads again in place, settling once the last has landed: a moved card is held until its board shows the move. */
-export const refreshed = () => quietly("/api/v1/tasks", "/api/v1/workspace", "/api/v1/calendar");
+export const refreshed = () => quietly("/api/v1/tasks", "/api/v1/workspace", "/api/v1/calendar", "/api/v1/projects");
+
+/**
+ * Other people's changes, as they happen (§6 The live board): the server says a task changed, by its
+ * id only, and what is on screen asks again in place. Several messages at once ask once.
+ */
+export function useLiveTasks() {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useRealtime("task.changed", () => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => void refreshed(), 300);
+  });
+}

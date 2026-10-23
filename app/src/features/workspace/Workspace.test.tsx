@@ -193,7 +193,7 @@ describe("my workspace", () => {
     const form = await screen.findByRole("dialog", { name: "Mark Done" });
     fireEvent.click(within(form).getByRole("button", { name: "Mark Done" }));
     await within(form).findByText("Pick a reason");
-    await chooseOption(within(form).getByRole("combobox", { name: /Why Late/ }), "Underestimated");
+    await chooseOption(await within(form).findByRole("combobox", { name: /Why Late/ }), "Underestimated");
     fireEvent.click(within(form).getByRole("button", { name: "Mark Done" }));
     await closed("Mark Done");
     await waitFor(() => expect(inStage("Done", "Send the late minutes")).toBeTruthy(), { timeout: 5000 });

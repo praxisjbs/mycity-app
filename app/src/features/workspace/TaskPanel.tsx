@@ -9,6 +9,7 @@ import type { TaskDependency, TaskDetail } from "@mycity/contract/contract.gen.t
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
 import { Link } from "@/lib/router";
+import { hrefFor } from "@/lib/routes";
 import {
   Button,
   ErrorState,
@@ -31,7 +32,7 @@ import {
   useModal,
   Who,
 } from "@mycity/ui";
-import { CADENCE, LABEL, LATE, PRIORITY, STATUS_TONE, refresh, say, usePages, type Status } from "./shared";
+import { CADENCE, LABEL, PRIORITY, STATUS_TONE, refresh, say, usePages, type Status } from "./shared";
 import { CommitmentActions, commitmentItems, COUNTS_HELP } from "./Commitment";
 import { BlockForm, CancelForm, LateReasonForm, LEAD_HELP, OverrideForm, PingForm, RemindersForm, RepeatForm, repeatText, StepForm, TaskForm, UnblockForm, WaitingForm, WatcherForm } from "./TaskForms";
 
@@ -137,9 +138,18 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
   const unlink = useMutation("DELETE /api/v1/tasks/:id/waiting-on/:child_id");
   const items: Array<[ReactNode, ReactNode]> = [
     ["Number", t.number],
-    [t.members.length ? <HelpTerm key="lead" help={LEAD_HELP}>Lead</HelpTerm> : "Assignee", t.assignee?.display_name ?? "Nobody"],
+    [
+      t.members.length ? <HelpTerm key="lead" help={LEAD_HELP}>Lead</HelpTerm> : "Assignee",
+      <span key="a" data-copy="content">
+        {t.assignee?.display_name ?? "Nobody"}
+        {t.assignee_left && <Pill tone="warn" className="ml-2">Left</Pill>}
+      </span>,
+    ],
     ...(t.members.length
       ? [["Shared With", <span key="sw" data-copy="content">{t.members.map((p) => p.display_name).join(", ")}</span>] as [ReactNode, ReactNode]]
+      : []),
+    ...(t.project
+      ? [["Project", <Link key="pj" className="font-semibold text-primary underline" to={hrefFor("workspace", "projects", { id: t.project.project_id })} data-copy="content">{t.project.name}</Link>] as [ReactNode, ReactNode]]
       : []),
     ["Set By", t.set_by?.display_name ?? "Nobody"],
     ["Due", t.due_at ? formatDateTime(t.due_at) : "No date"],
@@ -158,7 +168,7 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
         )}
       </span>,
     ]);
-  if (t.late_reason) items.push(["Why Late", LATE[t.late_reason]]);
+  if (t.late_reason) items.push(["Why Late", t.late_reason_label ?? t.late_reason]);
   if (t.cancel_reason) items.push(["Cancelled", t.cancel_reason]);
   items.push(...commitmentItems(t));
   const run = async (work: () => Promise<unknown>, done: string) => {

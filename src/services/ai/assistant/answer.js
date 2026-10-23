@@ -65,6 +65,11 @@ function prefillOf(route, values) {
   const out = {};
   for (const [k, v] of Object.entries(values)) {
     if (!Object.prototype.hasOwnProperty.call(shape, k) || (route.params && k in route.params)) continue;
+    // A list of plain values (New Event's attendees) travels as one comma-separated value.
+    if (Array.isArray(v) && v.length && v.every((x) => typeof x === "string" && !x.includes(","))) {
+      if (shape[k].safeParse(v).success) out[k] = v.join(",");
+      continue;
+    }
     if (typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean") continue;
     if (!shape[k].safeParse(v).success) continue;
     out[k] = String(v);

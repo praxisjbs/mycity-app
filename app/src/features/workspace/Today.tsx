@@ -4,7 +4,7 @@ import { useApi } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useScreenAction } from "@/shell/screen-action";
 import { Avatar, Button, Card, CardHeader, EmptyValue, ErrorState, formatDate, formatDateTime, formatTime, Grid, LoadingRows, PageHeader, Pill, Timeline, useIsPhone, useModal } from "@mycity/ui";
-import { CardPills, useSetsForOthers } from "./shared";
+import { CardPills, useLiveTasks, useSetsForOthers } from "./shared";
 import { happened, useTaskPanel } from "./TaskPanel";
 import { TaskForm } from "./TaskForms";
 import { MyWeekCard, TeamWeekCard } from "./Week";
@@ -34,6 +34,7 @@ export function Today() {
   const modal = useModal();
   const add = () => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> });
   useScreenAction({ label: "New Task", onSelect: add });
+  useLiveTasks();
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <LoadingRows count={8} />;
   const meetings = data.diary.data.filter((d) => d.item_kind === "event").length;

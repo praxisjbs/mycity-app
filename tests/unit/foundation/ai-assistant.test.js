@@ -146,6 +146,16 @@ describe("one question", () => {
     expect(out.reads).toHaveLength(5);
   });
 
+  test("a prefill's list (New Event's attendees) travels as one comma-separated value; anything else of the kind is dropped", () => {
+    const c = require("@mycity/contract");
+    const route = { prefill: c.calendar.CalendarEventPrefill, params: { new: "1" } };
+    const A = "00000000-0000-4000-8000-00000000000a";
+    const B = "00000000-0000-4000-8000-00000000000b";
+    expect(answer.prefillOf(route, { title: "Stand walk", attendee_ids: [A, B] })).toEqual({ title: "Stand walk", attendee_ids: `${A},${B}` });
+    expect(answer.prefillOf(route, { attendee_ids: ["not an id"] })).toEqual({});
+    expect(answer.prefillOf(route, { attendee_ids: [{ id: A }] })).toEqual({});
+  });
+
   test("the same read twice is not run again; the model must answer next", async () => {
     jest.spyOn(authorise, "runRead").mockResolvedValue(page([]));
     const vendors = model([reply("", [call("leave__requests", { page: 1 })]), reply("", [call("leave__requests", { page: 1 })]), reply(DRAFT())]);
