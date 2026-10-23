@@ -82,7 +82,10 @@ const TASKS: Task[] = ROWS.map((r, i) => ({
   blocked_reason: null,
   blocked_at: null,
   late_reason: null,
+  late_reason_label: null,
   counts_towards: null,
+  project: null,
+  assignee_left: false,
   entity_type: r[6] ? "partner" : null,
   entity_id: r[6] ? sid(`partner:${r[6]}`) : null,
   link: r[6] ? { module: "partnerships", tab: "partners", id: sid(`partner:${r[6]}`), path: `/partnerships?tab=partners&id=${sid(`partner:${r[6]}`)}` } : null,
@@ -683,8 +686,8 @@ route("GET /api/v1/workspace/analytics", (req) => {
         return band === "1_3" ? d < 4 : band === "4_7" ? d >= 4 && d < 8 : band === "8_14" ? d >= 8 && d < 15 : d >= 15;
       }).length,
     })),
-    overdue_by_reason: (["waiting_on_others", "underestimated", "deprioritised", "other", null] as const)
-      .map((reason) => ({ reason, count: openNow.filter((t) => t.overdue && t.late_reason === reason).length }))
+    overdue_by_reason: ([["waiting_on_others", "Waiting on Others"], ["underestimated", "Underestimated"], ["deprioritised", "Deprioritised"], ["other", "Other"], [null, null]] as const)
+      .map(([reason, label]) => ({ reason, label, count: openNow.filter((t) => t.overdue && t.late_reason === reason).length }))
       .filter((r) => r.count > 0),
     blocked: (() => {
       const held = openNow.filter((t) => t.blocked_reason).map((t) => {
