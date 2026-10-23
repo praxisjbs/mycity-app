@@ -3718,8 +3718,8 @@ A month at a glance, Monday first, with what happens on each day.
 |---|---|
 | Use | Leave across a month, a shift pattern, interviews, a payroll calendar, anything a person reads by date. |
 | Avoid | A list of dated records (use DataView); a date to type into a form (use DateField); more than three events on one day without opening it. |
-| Phone | The same seven columns at a shorter height; a day's events are one tap each, and the page never scrolls sideways. |
-| Accessibility | A table of weeks with the weekdays as real headers, so a screen reader can say "Wednesday 14"; Sundays are marked in words, not only by their shade. |
+| Phone | The same seven columns at a shorter height; a day's events are one tap each, an empty day a 44 px tap that adds to it, and the page never scrolls sideways. |
+| Accessibility | A table of weeks with the weekdays as real headers, so a screen reader can say "Wednesday 14"; Sundays are marked in words, not only by their shade. An empty day that adds is a button named by what it adds and the day ("Add Task, Friday 23 October"). |
 | Status | stable |
 | Exports | `Calendar` |
 | Import | `import { Calendar } from "@mycity/ui";` |
@@ -3735,6 +3735,9 @@ A month at a glance, Monday first, with what happens on each day.
 | `month` | `number` | yes | The month, 0 for January, as `Date` counts them. |
 | `events` | `CalendarEvent[]` | yes | Everything happening that month; days outside it are ignored. |
 | `actions` | `ReactNode` |  | What sits at the right of the title row (the month's own controls); the time zone otherwise. |
+| `onAddDay` | `(date: string) => void` |  | An empty day becomes a button that hands its date (ISO) here: New Task for that day, say. |
+| `addLabel` | `string` |  | What an empty day adds, Verb Noun (Add Task): its name and its hover label. Default `Add`. |
+| `addFrom` | `string` |  | The first day that can be added to (ISO, usually today); days before it, and Sundays, stay plain. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx

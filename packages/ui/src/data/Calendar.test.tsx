@@ -47,6 +47,16 @@ describe("Calendar", () => {
     expect(screen.queryByRole("button", { name: "Ada on leave" })).toBeNull();
   });
 
+  it("an empty day from addFrom on adds to that day; a busy day, an earlier day and Sunday stay plain", async () => {
+    const onAddDay = vi.fn();
+    render(<Calendar year={2026} month={9} events={EVENTS} onAddDay={onAddDay} addLabel="Add Task" addFrom="2026-10-13" />);
+    await userEvent.click(screen.getByRole("button", { name: "Add Task, Friday 23 October" }));
+    expect(onAddDay).toHaveBeenCalledWith("2026-10-23");
+    expect(screen.queryByRole("button", { name: "Add Task, Wednesday 14 October" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add Task, Monday 12 October" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add Task, Sunday 18 October" })).toBeNull();
+  });
+
   it("says Sunday is not a working day in words, not only by its shade", () => {
     render(<Calendar year={2026} month={9} events={[]} />);
     // 4 October 2026 is the first Sunday.
