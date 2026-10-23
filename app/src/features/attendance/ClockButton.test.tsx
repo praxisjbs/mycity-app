@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
@@ -93,6 +93,17 @@ async function signedInAs(email: string) {
 }
 
 const press = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
+/**
+ * Waits for the punch the panel sent to be answered. Text such as Review Required may already be on
+ * the panel from an earlier punch, so the next person must not sign in while this one is on its way.
+ */
+async function answered(call: MockInstance) {
+  const i = call.mock.calls.findIndex((c) => c[0] === "POST /api/v1/attendance/punches");
+  expect(i).toBeGreaterThanOrEqual(0);
+  await act(async () => {
+    await Promise.resolve(call.mock.results[i]!.value).catch(() => undefined);
+  });
+}
 /** Opens the panel and presses whichever punch it offers: the mock's day may already hold a clock-in. */
 async function openAndPunch() {
   act(() => clock!.open());
@@ -164,6 +175,7 @@ describe("the clock panel", () => {
     expect(screen.getByText(/turn Location on/)).toBeTruthy();
     const call = vi.spyOn(api, "call");
     press("Clock In Anyway");
+    await answered(call);
     await screen.findByText("Review Required");
     const body = call.mock.calls.find((c) => c[0] === "POST /api/v1/attendance/punches")?.[1] as { body: { latitude: null; location_error: string } };
     expect(body.body).toMatchObject({ latitude: null, longitude: null, location_error: "denied" });
@@ -239,6 +251,7 @@ describe("the clock panel", () => {
     expect(screen.queryByRole("button", { name: "Retry Location" })).toBeNull();
     const call = vi.spyOn(api, "call");
     fireEvent.click(screen.getByRole("button", { name: /Anyway$/ }));
+    await answered(call);
     await screen.findByText("Review Required");
     const body = call.mock.calls.find((c) => c[0] === "POST /api/v1/attendance/punches")?.[1] as { body: { location_error: string } };
     expect(body.body).toMatchObject({ latitude: null, location_error: "insecure" });
@@ -269,6 +282,7 @@ describe("the clock panel", () => {
     expect(screen.getByText(/Safari Websites, and turn on Precise Location/)).toBeTruthy();
     const call = vi.spyOn(api, "call");
     fireEvent.click(screen.getByRole("button", { name: /Anyway$/ }));
+    await answered(call);
     await screen.findByText("Review Required");
     const sent = call.mock.calls.find((c) => c[0] === "POST /api/v1/attendance/punches")?.[1] as { body: { accuracy_m: number } };
     expect(sent.body).toMatchObject({ accuracy_m: 1800, latitude: 6.44705 });
