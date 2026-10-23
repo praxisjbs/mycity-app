@@ -377,6 +377,10 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   seconds, and the server refuses the old session anyway.
 - **Unlocking as someone else.** The lock screen signs in only the person shown; Sign Out goes to
   the sign-in screen. A different account signed in from another tab reloads at Home.
+- **The next person on the same device.** Sign Out, and any sign-in as someone other than the last
+  person, forget every answer the data client kept (`createApi` `clear`), and an answer still on
+  its way is neither shown nor kept, so nothing one person read reaches the next. Unlocking as the
+  same person keeps them.
 - **Invited, never finished.** Status Invited; Resend Invitation sends a new link and the old one
   stops working.
 - **Suspended mid-session.** Every session ends; the next refresh locks the screen with "This
@@ -419,6 +423,8 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   them, the drawings standing in for the first four until they load.
 
 ## 14 · Change log
+
+- 23/10/2026 · JP · §11: Sign Out and a sign-in as someone else forget every answer the data client kept, and drop one still on its way (`createApi` `clear`, called by `AuthProvider`), so a read left in flight at Sign Out never fills the next person's screens (the 23/10 My Workspace audit, `docs/guides/workspace.md` §11).
 
 - 21/10/2026 · TB · `/auth/me` (and the sign-in answer's `user`) carries `appearance`: Settings · Appearance as every screen of the hub applies it, the dark tokens when the palette is not MyCity's own, the two fonts and the starting theme and density (`docs/guides/foundation.md` §6.15).
 - 21/10/2026 · TB · §6 Links: a queued invitation or reset is sent only while its link still works (`identity.linkStillOpen`, checked by the `email-send` job), and both still go while system mail is paused (`docs/guides/integrations.md` §6.15).

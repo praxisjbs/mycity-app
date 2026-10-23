@@ -292,6 +292,16 @@ export function createApi<E>(config: ApiConfig) {
   type Listener = (quiet: boolean) => Promise<void> | void;
   const cache = new Map<string, unknown>();
   const listeners = new Map<string, Set<Listener>>();
+  /**
+   * Whose reads these are. clear() moves it on, so an answer that left before is neither kept for
+   * the next person nor shown: a read still on its way at Sign Out never fills the next session.
+   */
+  let generation = 0;
+  /** Forget every kept answer: someone signed out, or someone else signed in. */
+  function clear() {
+    generation += 1;
+    cache.clear();
+  }
   const cacheKey = (key: string, params: unknown, query: unknown) => JSON.stringify([key, params ?? null, query ?? null]);
   const pathOf = (key: string, params: unknown) => {
     const p = (params ?? {}) as Record<string, string>;
@@ -374,14 +384,27 @@ export function createApi<E>(config: ApiConfig) {
         return;
       }
       let live = true;
+      const gen = generation;
       setState((s) => ({ ck, data: s.ck === ck ? s.data : cached(), error: null, loading: !(soft && s.ck === ck && s.data !== undefined) }));
       const [k, p, q] = JSON.parse(ck) as [K, ParamsOf<E, K>, QueryOf<E, K>];
+      // An answer from before clear() belongs to the last session: ask again rather than show it.
+      // Whoever waits for it waits for the new answer instead.
+      const stale = () => {
+        if (gen === generation) return false;
+        if (live) {
+          waiting.current.push(...mine.splice(0));
+          setTick((t) => t + 1);
+        }
+        return true;
+      };
       call(k, { params: p ?? undefined, query: q ?? undefined } as Opts<K>)
         .then((data) => {
+          if (stale()) return;
           if (config.cache) cache.set(ck, data);
           if (live) setState({ ck, data, error: null, loading: false });
         })
         .catch((e: unknown) => {
+          if (stale()) return;
           const error = e instanceof ApiError ? e : new ApiError(0, null);
           if (live) setState((s) => ({ ck, data: s.data, error, loading: false }));
         })
@@ -496,11 +519,23 @@ export function createApi<E>(config: ApiConfig) {
         return;
       }
       let live = true;
+      const gen = generation;
       const settle = () => waiting.current.splice(0).forEach((done) => done());
       const [k, p, f, q] = JSON.parse(resetKey) as [K, ParamsOf<E, K>, Record<string, unknown>, string];
       setState((s) => ({ ...s, loading: !(soft && s.reset === resetKey && s.rows.length > 0) }));
+      // Rows from before clear() belong to the last session: start again from the first page.
+      const stale = () => {
+        if (gen === generation) return false;
+        if (live) {
+          setState((s) => ({ ...s, rows: [], page: undefined }));
+          setPages(1);
+          setTick((t) => t + 1);
+        }
+        return true;
+      };
       call(k, { params: p ?? undefined, query: { ...f, page: pages, ...(q ? { q } : {}) } } as Opts<K>)
         .then((body) => {
+          if (stale()) return;
           const b = body as { data: RowOf<E, K>[]; page: PageMeta };
           if (!live) return;
           setState((s) => ({
@@ -513,6 +548,7 @@ export function createApi<E>(config: ApiConfig) {
           settle();
         })
         .catch((e: unknown) => {
+          if (stale()) return;
           if (live) setState((s) => ({ ...s, loading: false, error: e instanceof ApiError ? e : new ApiError(0, null) }));
           settle();
         });
@@ -552,5 +588,5 @@ export function createApi<E>(config: ApiConfig) {
     return { run, pending, error, fields: error?.fields ?? {}, reset: () => setError(null) };
   }
 
-  return { api: { call }, session, refreshSession, invalidate, refresh, useApi, usePaged, useInfinite, useMutation };
+  return { api: { call }, session, refreshSession, invalidate, refresh, clear, useApi, usePaged, useInfinite, useMutation };
 }

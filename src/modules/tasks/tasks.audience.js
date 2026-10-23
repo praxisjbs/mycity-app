@@ -9,8 +9,9 @@
  *    assignee, its setter or a co-assignee;
  *  - the setter manages a task (title, due day, cadence, assignee, who shares it,
  *    KPI, record, cancel), and so does anyone whose scope covers an assignee other
- *    than themselves; the assignee of a task someone else set, and the people sharing
- *    a task, move it, change its priority and notes, block it and comment;
+ *    than themselves; the assignee of a task someone else set (even with an `all`
+ *    grant), and the people sharing a task, move it, change its priority and notes,
+ *    block it and comment;
  *  - a shared task's people are anyone the caller may set a task for, and the
  *    caller's own department when they lead it (tasks.service shareWith).
  */
@@ -51,7 +52,6 @@ function mayManage(scope, task) {
   const me = scope.employee_id;
   if (me && task.set_by_employee_id === me) return true;
   if (!task.set_by_employee_id && task.primary_assignee_id === me) return true;
-  if (scope.scope === "all") return true;
   return task.primary_assignee_id !== me && inScope(scope, task.primary_assignee_id);
 }
 

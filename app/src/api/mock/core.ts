@@ -152,6 +152,8 @@ export const mockSession = {
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function dispatch(req: RawRequest): Promise<RawResponse> {
+  /* Who asks is fixed when the request arrives, as on the server: an answer still on its way when someone else signs in is the sender's. */
+  const sender = mockSession.get();
   await wait(90 + Math.random() * 160);
   /* A literal path beats a parameter: /queries/rules is never /queries/:id. */
   const ordered = [...routes].sort((a, b) => a.names.length - b.names.length);
@@ -159,7 +161,7 @@ export async function dispatch(req: RawRequest): Promise<RawResponse> {
     if (r.method !== req.method) continue;
     const m = r.re.exec(req.path);
     if (!m) continue;
-    const user = mockSession.get();
+    const user = sender;
     const bearer = req.headers.Authorization?.startsWith("Bearer mock.");
     if (!r.anonymous && (!user || !bearer)) return fail(401, "UNAUTHENTICATED", "Sign in to continue.");
     const params = Object.fromEntries(r.names.map((n, i) => [n, decodeURIComponent(m[i + 1])]));

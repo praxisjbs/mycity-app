@@ -1,9 +1,10 @@
 "use strict";
 /**
  * What the calendar records, and who it tells (docs/guides/workspace.md §7): the people
- * invited to an event when it is made, moved or called off, and the owner when someone
- * answers, and the owner and the invited who have not declined when a reminder set on the event
- * comes due. The person who acted is never told (fanout).
+ * invited to an event when it is made, changed (its time, title, place or details) or called
+ * off; someone added to an event hears an invitation, and someone taken off hears that; the
+ * owner when someone answers; and the owner and the invited who have not declined when a
+ * reminder set on the event comes due. The person who acted is never told (fanout).
  */
 const { defineEvents } = require("../../shared/events/catalogue");
 const { defineNotification } = require("../../shared/notifications/fanout");
@@ -15,6 +16,8 @@ const EVENTS = defineEvents("workspace", {
   "calendar_event.changed": { summary: "A calendar event was changed" },
   "calendar_event.cancelled": { summary: "A calendar event was called off" },
   "calendar_event.answered": { summary: "Someone answered an invitation" },
+  "calendar_event.invited": { summary: "Someone was added to an event" },
+  "calendar_event.uninvited": { summary: "Someone was taken off an event" },
   "calendar_event.reminder_due": { summary: "An event is about to start" },
 });
 
@@ -31,8 +34,20 @@ defineNotification(EVENTS.CALENDAR_EVENT_CREATED, {
 });
 
 defineNotification(EVENTS.CALENDAR_EVENT_CHANGED, {
-  to: [{ users: invited }],
+  to: [{ users: (e, client) => (e.payload.noticed === false ? [] : invited(e, client)) }],
   title: (e) => `Changed: ${e.payload.title}`,
+  body: (e) => e.payload.when || "",
+});
+
+defineNotification(EVENTS.CALENDAR_EVENT_INVITED, {
+  to: [{ users: invited }],
+  title: (e) => `Invitation: ${e.payload.title}`,
+  body: (e) => e.payload.when || "",
+});
+
+defineNotification(EVENTS.CALENDAR_EVENT_UNINVITED, {
+  to: [{ users: invited }],
+  title: (e) => `No longer invited: ${e.payload.title}`,
   body: (e) => e.payload.when || "",
 });
 

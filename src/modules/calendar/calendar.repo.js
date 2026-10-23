@@ -66,8 +66,8 @@ const PERFORMANCE_DATES = `
                              WHERE pr.performance_review_id = ip.performance_review_id AND pr.reviewer_employee_id = $1))`;
 
 /**
- * One page of a month: the reader's events, the deadlines of their open tasks, the days of
- * their approved leave and their performance dates, by start.
+ * One page of a month (or any run of days): the reader's events, the deadlines of the open tasks
+ * they lead or share, the days of their approved leave and their performance dates, by start.
  * @param {{query: Function}} db
  * @param {{employee_id: string, from: Date, to: Date, fromDay: string, toDay: string}} at
  * @param {{item_kind?: string, q?: string, sort?: object, page?: number}} query
@@ -90,7 +90,9 @@ function month(db, at, query) {
          SELECT 'task', t.task_id, t.title, t.due_at, t.due_at + interval '1 minute', false, 'deadline',
                 NULL, NULL, 'task', false, NULL
            FROM task t
-          WHERE t.primary_assignee_id = $1 AND t.archived_at IS NULL
+          WHERE (t.primary_assignee_id = $1
+                 OR EXISTS (SELECT 1 FROM task_assignee ta WHERE ta.task_id = t.task_id AND ta.employee_id = $1))
+            AND t.archived_at IS NULL
             AND t.status NOT IN ('done', 'cancelled') AND t.due_at >= $2 AND t.due_at < $3
          UNION ALL
          SELECT 'leave', lr.leave_request_id, lt.name, (lr.starts_on::timestamp AT TIME ZONE 'Africa/Lagos'),

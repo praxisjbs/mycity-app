@@ -140,16 +140,16 @@ event type codes, `cancelled`).
 
 | Method and path | Contract | Permission · scope | Paged | Notes |
 |---|---|---|---|---|
-| `GET /api/v1/workspace/today` | → `TodayView` | `workspace` view · own | no (each list is its first 25 with a total and a link to Tasks) | |
-| `GET /api/v1/workspace/analytics` | `AnalyticsQuery` → `WorkspaceAnalytics` | `workspace` view · own, team or all | no (aggregates) | `scope` `mine` or `team`; `period` `30d`, `90d`, `year`. `team` answers for the reader's `scope_ids` |
+| `GET /api/v1/workspace/today` | → `TodayView` | `workspace` view · own | no (each list is its first 25 with a total and a link to Tasks) | every list filtered on the server: Due Today is open and not yet past its time, From Your Manager is open and set by someone else, the diary is today's day (§6) |
+| `GET /api/v1/workspace/analytics` | `AnalyticsQuery` → `WorkspaceAnalytics` | `workspace` view · own, team or all | no (aggregates) | `scope` `mine` (the tasks the reader leads or shares) or `team` (adds the reader's `scope_ids` and the tasks they set for others); `period` `30d`, `90d`, `year` |
 | `GET /api/v1/tasks` | `TaskListQuery` → `TaskPage` | `workspace` view · own, team, all | yes, 25 | filters `status`, `scope` (`mine`, `team`), `assignee_id`, `cadence`, `priority`, `due` (`overdue`, `today`, `week`), `employee_target_id`, `is_commitment`, `commitment_month`, `q`; sort `sort_order` (default), `due_at`, `priority`, `created_at` |
 | `GET /api/v1/tasks/counts-towards` | `CountsTowardsQuery` → `CountsTowardsPage` | `workspace` view · the assignee is the caller or in scope | yes, 25 | `assignee_id`, `month`, `q`: the assignee's scorecard lines and key results (performance.md §6.18) |
 | `GET /api/v1/tasks/summary` | `TaskSummaryQuery` → `TaskSummary` | `workspace` view | no | the KPI cards for `mine` or `team`, with `done_30d` |
 | `GET /api/v1/tasks/people` | `TaskPeopleQuery` → `TaskPersonPage` | `workspace` create · scope | yes, 25 | the active people the caller may put on a task, never themselves, by name: who they may set a task for (an Individual task's assignee, a shared task's lead); with `shared` `true`, those and the colleagues of their own department (a shared task's people); with `department_id`, that department's people the caller may set a task for, themselves included when they work there (a department share's lead). `q` searches names. An empty first page hides Assign To and My Team |
 | `GET /api/v1/tasks/:id` | → `TaskDetail` | `workspace` view · scope | | 404 outside scope; steps, waiting on, holding up, watchers, the open hold, reminders, `can_plan`; a commitment's state, pending rescope, recovery and what the reader may do to it |
 | `POST /api/v1/tasks` | `TaskCreate` → `Task` | `workspace` create · scope | | `primary_assignee_id` (the assignee, or a shared task's lead) must be the caller or in their `scope_ids`; `member_ids` (up to 25 people) or `department_id` makes it Shared (§6): with `member_ids` a lead other than the caller is one of them, `department_id` needs a lead from that department; `is_commitment` with `acceptance_criteria`, `commitment_month` and a `due_on` in that month |
-| `PATCH /api/v1/tasks/:id` | `TaskEdit` → `Task` | `workspace` edit · scope | | the assignee and the people sharing it may edit its status, notes and priority, and the assignee its commitment fields; title, due, assignee and who shares it (`member_ids`, `[]` makes it Individual) only the setter or someone with the setter's scope; an approved commitment keeps its mark, month, criteria and lead (409 `COMMITMENT_APPROVED`) |
-| `POST /api/v1/tasks/:id/move` | `TaskMove` → `Task` | `workspace` edit · scope | | `status` and `before_task_id` (null = end of column) |
+| `PATCH /api/v1/tasks/:id` | `TaskEdit` → `Task` | `workspace` edit · scope | | the assignee and the people sharing it may edit its status, notes and priority, and the assignee its commitment fields; title, due, assignee and who shares it (`member_ids`, `[]` makes it Individual) only the setter or someone whose scope covers the assignee, never the assignee of a task someone else set, even with an `all` grant (403); an approved commitment keeps its mark, month, criteria and lead (409 `COMMITMENT_APPROVED`) |
+| `POST /api/v1/tasks/:id/move` | `TaskMove` → `Task` | `workspace` edit · scope | | `status` and `before_task_id` (null = end of column), a card in that column the caller can see (409 otherwise: the board reloads) |
 | `POST /api/v1/tasks/:id/move` (late) | `TaskMove.late_reason` | | | optional; recorded when the move is to Done |
 | `POST /api/v1/tasks/:id/block` | `TaskBlock` → `Task` | `workspace` edit · scope | | `blocked_reason`, `estimated_resolve_on`; 409 when already blocked |
 | `POST /api/v1/tasks/:id/unblock` | `TaskUnblock` → `Task` | `workspace` edit · scope | | `resolve_note`, `push_due` (default true) |
@@ -160,17 +160,17 @@ event type codes, `cancelled`).
 | `POST /api/v1/tasks/:id/waiting-on` | `TaskDependencyCreate` → `TaskDetail` | `workspace` edit · scope | | a task the caller can see; 422 on a loop |
 | `DELETE /api/v1/tasks/:id/waiting-on/:child_id` | → `TaskDetail` | `workspace` edit · scope | | |
 | `POST /api/v1/tasks/:id/waiting-on/:child_id/override` | `TaskDependencyOverride` → `TaskDetail` | `workspace` edit · scope | | Go Ahead, with an optional reason |
-| `POST /api/v1/tasks/:id/watchers` | `TaskWatcherAdd` → `TaskDetail` | `workspace` view · scope | | no `employee_id`: the caller; someone else: assignee or setter |
+| `POST /api/v1/tasks/:id/watchers` | `TaskWatcherAdd` → `TaskDetail` | `workspace` view · scope | | no `employee_id`: the caller; someone else: assignee or setter, and only someone who can already see the task (422 on `employee_id`, "Cannot see this task") |
 | `DELETE /api/v1/tasks/:id/watchers/:child_id` | → `TaskDetail` | `workspace` view · scope | | `child_id` is the employee |
-| `POST /api/v1/tasks/:id/ping` | `TaskPing` → `Task` | `workspace` view · scope | | `to` `assignee`, `watchers`, `everyone`; never the sender |
+| `POST /api/v1/tasks/:id/ping` | `TaskPing` → `Task` | `workspace` view · scope | | `to` `assignee`, `watchers` (those who can still see it), `everyone`; never the sender |
 | `PUT /api/v1/tasks/:id/reminders` | `TaskReminderSet` → `TaskDetail` | `workspace` edit · scope | | up to three; a lead time needs a due time; replaces the set |
 | `POST /api/v1/tasks/:id/cancel` | `TaskCancel` → `Task` | `workspace` edit · scope | | `cancel_reason`; setter only; never an approved commitment (409 `COMMITMENT_APPROVED`: rescope it) |
 | `GET /api/v1/tasks/:id/comments` | `CommentListQuery` → `TaskCommentPage` | `workspace` view · scope | yes, 25 | |
 | `POST /api/v1/tasks/:id/comments` | `TaskCommentCreate` → `TaskComment` | `workspace` view · scope | | anyone who can see the task may comment |
 | `GET /api/v1/tasks/:id/activity` | `ActivityListQuery` → `TaskActivityPage` | `workspace` view · scope | yes, 25 | |
-| `GET /api/v1/calendar` | `CalendarListQuery` → `CalendarItemPage` | `workspace` view · own | yes, 25 | `month` (YYYY-MM) required; events, task deadlines, approved leave and performance dates (`item_kind` `performance`, named by `performance_kind`), by start |
+| `GET /api/v1/calendar` | `CalendarListQuery` → `CalendarItemPage` | `workspace` view · own | yes, 25 | `month` (YYYY-MM) required; events, the deadlines of open tasks the reader leads or shares, approved leave and performance dates (`item_kind` `performance`, named by `performance_kind`), by start |
 | `POST /api/v1/calendar` | `CalendarEventCreate` → `CalendarEvent` | `workspace` create · own | | attendees are any employees on the staff (an invitation, like a message in Community); `reminder_minutes` up to three lead times |
-| `PATCH /api/v1/calendar/:id` | `CalendarEventEdit` → `CalendarEvent` | `workspace` edit · own | | owner only; `reminder_minutes` replaces the lead times, a new start moves them |
+| `PATCH /api/v1/calendar/:id` | `CalendarEventEdit` → `CalendarEvent` | `workspace` edit · own | | owner only; `reminder_minutes` replaces the lead times, a new start moves them; the end must come after the start as a time, whatever offset each is written in (422 on `ends_at`) |
 | `POST /api/v1/calendar/:id/cancel` | `EmptyBody` → `CalendarEvent` | `workspace` edit · own | | owner only; attendees are told |
 | `POST /api/v1/calendar/:id/respond` | `CalendarRespond` → `CalendarEvent` | `workspace` view · own | | an attendee's `response` |
 | `GET /api/v1/workspace/week` | `WeekQuery` → `WeekView` | `workspace` view · own (a manager may read someone in scope) | no (each list is its first 25 with a total) | `week_starts_on` (a Monday; this week unless given), `employee_id` |
@@ -202,7 +202,12 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
   assignee does: move it, mark it blocked, change its notes and priority, plan its steps, what it
   waits on, its reminders and watchers, comment. The lead alone marks it a commitment, and Counts
   Towards and a commitment are the lead's. Who shares it, like the lead, belongs to whoever manages
-  the task. Board order, Today, My Week, Analytics and Home count it for the lead only.
+  the task. Board order, Today, My Week and Home count it for the lead only; Analytics' Mine, the
+  calendar's deadlines and ⌘K count it for the people sharing it too (JBS Praxis, 23/10/2026).
+- **Who manages a task** (title, due, cadence, lead, who shares it, Counts Towards, record, repeat,
+  cancel): the person who set it, and anyone whose scope covers its lead other than the lead. The
+  assignee of a task someone else set never manages it, even with an `all` grant (JBS Praxis,
+  23/10/2026); they and the people sharing it work it (§6 above).
 - **Set by.** `set_by_employee_id` is the caller's employee. A task is "set by your manager" when
   `set_by_employee_id` differs from `primary_assignee_id`.
 - **Cadence.** A task set with cadence Daily is due that working day at 17:00 (15:00 on Saturday)
@@ -244,32 +249,47 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
   overdue = open tasks past due now; average completion time = mean of `completed_at − created_at`
   over tasks Done in the period, in days to one decimal; completed per week = Done by ISO week;
   workload by person = open tasks per assignee in scope, top 25 by count; tasks by priority = open
-  tasks per priority. Cancelled tasks count nowhere except a Cancelled figure.
+  tasks per priority. Cancelled tasks count nowhere except a Cancelled figure. Mine is the work the
+  reader does: the tasks they lead or share. A task they set for someone else counts under My Team,
+  with their scope's (JBS Praxis, 23/10/2026).
 - **Recurrence.** A task may repeat Daily, Weekly (chosen days) or Monthly (day of month). The
   next occurrence is created when the current one is Done or its due day passes, by an outbox job;
   any other rule is a 422 naming `recurrence` (ported canonicaliser). A series counts from its due
   day, so a repeating task must have one: a repeat without a due date, or clearing the due date of
   a repeating task, is a 422 naming `recurrence`. Set Repeat on the panel belongs to whoever manages
-  the task (a setter field).
+  the task (a setter field). The next occurrence arrives quietly: nobody is told (JBS Praxis,
+  23/10/2026). A task whose lead has left the staff stops repeating.
 - **Order within a column.** Move Up and Move Down on a card's menu, or a drop onto a card, place it
   above that card (`before_task_id`); a drop on the column's space puts it at the foot. Order is
   kept per assignee (`sort_order`), so on My Team a card is placed among its own assignee's cards.
+  The card it lands above must be one the reader can see in that column; any other is a stale board
+  (409).
 - **Event reminders.** Up to three lead times before the start (`reminder_minutes`), kept in the
   shared reminder engine (`calendar_event_reminder`, occurrences 1 to 3). New Event offers one,
   15 minutes before unless changed. Moving the start moves them; one whose time has passed is left
   out; calling the event off drops them. It fires to the owner and every attendee who has not
   declined, while the event stands and has not started.
+- **Changing an event.** People added hear an invitation; people taken off hear they are no longer
+  invited; the rest hear Changed only when its time, title, place, kind, visibility or details
+  change, not when only who else comes or the reminders change. Start and end compare as instants
+  (10:00+01:00 is 09:00Z).
 - **Calendar.** An event is visible to its owner, its attendees, and everyone when `visibility` is
   `everyone`. Times are stored as instants and shown in Africa/Lagos. A month is always the reader's
-  own (their events, invitations, open tasks' deadlines, approved leave, performance dates); a manager
+  own (their events, invitations, the deadlines of open tasks they lead or share, approved leave,
+  performance dates); a manager
   follows their team's work on Tasks, not on the calendar. A called-off event leaves every month.
   Performance dates are all day: their check-in due, the reviews they must write, the key results they
   own finishing, PIP reviews of theirs or of reviews they wrote (performance.md §6.18).
 - **Planning a task.** Steps, what it waits on and its reminders belong to its assignee and to whoever
   manages it (`can_plan`); ticking a step and watching are open to anyone who sees the task. A task
   waiting on one not yet Done cannot leave To Do; Go Ahead satisfies the link. A prerequisite the
-  reader cannot open is named "A task you cannot open" with no assignee. A cancelled prerequisite
-  never satisfies a link by itself.
+  reader cannot open (they neither see its lead through their scope, set it nor share it) is named
+  "A task you cannot open" with no assignee. A cancelled prerequisite never satisfies a link by
+  itself. When a task is done, the people on each open task waiting on it are told about their own
+  task, never the one done (JBS Praxis, 23/10/2026).
+- **Watchers** are only people who can already see the task (JBS Praxis, 23/10/2026): naming anyone
+  else is a 422 on `employee_id`, "Cannot see this task". Someone who stops being able to see it (a
+  move to another team) stops hearing about it and is left out of a nudge to the watchers.
 - **A hold.** One open per task. Clearing it moves an open task's due time on by the whole days it
   lasted, rounded up, unless `push_due` is false; the shift is kept on the hold. Moving a blocked
   task to Done clears its hold without a shift.
@@ -283,27 +303,32 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
   recorded counts); blocked work = open tasks with an open hold, oldest first, the first page.
 - **Since You Were Away** lists what other people did to the reader's tasks (assigned or set) from
   the start of the previous working day, newest first, one page.
-- **Today's Your Day** is the reader's open tasks overdue or due today, overdue first; **Set by
-  Your Manager** is their open tasks someone else set.
+- **Today's Your Day** is the reader's open tasks overdue or due today, overdue first. **Due Today**
+  counts open tasks due today and not yet past their time; once past it a task is Overdue, so Your
+  Day counts each task once. **From Your Manager** is their open tasks someone else set; **Diary** is
+  today's entries. Each is read on the server, its first 25 with its true total (JBS Praxis,
+  23/10/2026).
 
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
 |---|---|---|
-| `task.created` | a task is saved | notification to the assignee, and to the people sharing it, when the setter is someone else ("Ifeoma set you a task", "Ifeoma shared a task with you") |
+| `task.created` | a task is saved | notification to the assignee, and to the people sharing it, when the setter is someone else ("Ifeoma set you a task", "Ifeoma shared a task with you"); a repeat's next occurrence tells nobody |
 | `task.status_changed` | a move commits | activity row; realtime to the setter's board |
-| `task.completed` | a task enters Done | notification to the setter when it is someone else, the lead and the people sharing it, the watchers, and the assignees of open tasks waiting on it; carries the line it counts towards and the month, which Performance reads (performance.md §6.18) |
+| `task.completed` | a task enters Done | notification to the setter when it is someone else, the lead and the people sharing it, and the watchers who can still see it; carries the line it counts towards and the month, which Performance reads (performance.md §6.18) |
+| `task.prerequisite_done` | a task enters Done, once for each open task waiting on it | notification to that waiting task's lead and the people sharing it, naming their own task ("A task you wait on is done") |
 | `task.reopened` | a task leaves Done | as above, without a notice |
-| `task.blocked` / `task.unblocked` | Mark Blocked / Clear Blocker | notification to the assignee, the people sharing it, the setter and the watchers (blocked) |
+| `task.blocked` / `task.unblocked` | Mark Blocked / Clear Blocker | notification to the assignee, the people sharing it, the setter and the watchers who can still see it ("Blocked: …", "Unblocked: …" with how it cleared) |
 | `task.cancelled` | Cancel Task | notification to the assignee and the people sharing it |
 | `task.commented` | a comment is saved | notification to the assignee, the people sharing it and the setter, not the author |
 | `task.step_changed` | a step added, ticked, unticked or removed | history line |
 | `task.waiting_changed` | a link added, removed or overridden | history line |
 | `task.watchers_changed` | someone watches or stops | the person added by someone else is told |
-| `task.pinged` | Send Nudge | notification to whoever it names (Assignee: the lead and the people sharing it), never the sender |
+| `task.pinged` | Send Nudge | notification to whoever it names (Assignee: the lead and the people sharing it; Watchers: those who can still see it), never the sender |
 | `task.reminder_due` | a reminder set on the task comes due (reminder engine, `task_reminder`) | notification to the assignee and the people sharing it |
-| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day (counted from today when its day has passed, so a task days overdue repeats once, and never late at birth: a day whose due time has already gone gives the rule's next day); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task), to the assignee and the people sharing it |
-| `calendar_event.created`, `.changed`, `.cancelled` | save, change, call off | notification to the attendees (an ICS file by email is §13) |
+| job `task-recurrence` | 07:30 daily | the next occurrence of each repeating task that is done or past its day, while its lead is on the staff (counted from today when its day has passed, so a task days overdue repeats once, and never late at birth: a day whose due time has already gone gives the rule's next day); on a working day, `task.due_soon` for tasks due today and the next working day (once a day per task), to the assignee and the people sharing it |
+| `calendar_event.created`, `.changed`, `.cancelled` | save, change, call off | notification to the attendees; a change tells those already invited only when its time, title, place, kind, visibility or details change (an ICS file by email is §13) |
+| `calendar_event.invited`, `.uninvited` | a change adds or takes off attendees | "Invitation: …" to the people added, "No longer invited: …" to the people taken off |
 | `calendar_event.answered` | an attendee accepts or declines | notification to the owner |
 | `calendar_event.reminder_due` | an event's reminder comes due (reminder engine, `calendar_event_reminder`) | notification to the owner and the attendees who have not declined |
 | `week.summary_saved` | Support Needed or a summary saved | audit; Team This Week reads it |
@@ -319,6 +344,7 @@ report) live with Performance under `/api/v1/performance/commitments` (performan
 | Management, Operations & People | as their grant's scope (`all` for Management) | as above, organisation-wide |
 | CEO | everyone | everything |
 
+The assignee of a task someone else set works it but never manages it, whatever their grant (§6).
 No restricted fields. No capabilities: the grant's scope is the whole rule (README §5.2). A commitment
 set and a rescope are decided by the person the flow names (performance.md §6.11), whatever their grant.
 
@@ -326,7 +352,7 @@ set and a rescope are decided by the person the flow names (performance.md §6.1
 
 - **AI reads** (`tasks.ai.js`): `tasks.list` (TaskListQuery: "what is overdue on my team"),
   `calendar.ai.js`: `calendar.month` ("what's on Thursday"). Both `workspace` view, scoped, paged at
-  25. The `workspace` module itself (Today, Analytics) is `ai:none`: it is a view over these two.
+  25. A performance date is cited as its own record (a review, a key result, a PIP). The `workspace` module itself (Today, Analytics) is `ai:none`: it is a view over these two.
 - **AI routes**: "create a task" → `workspace.tasks` with `new=1`, New Task filled from the address
   (`tasks.TaskPrefill`: title, notes, priority, cadence, due day, and for a manager the assignee,
   shown by name through the colleague card); "set my commitments" → `workspace.tasks` with
@@ -338,7 +364,8 @@ set and a rescope are decided by the person the flow names (performance.md §6.1
 - **Feature AI**: Tidy With AI on the week, action `week-summary` (Default, personal data, TB,
   22/10/2026; prompt `services/ai/prompts/week-summary.md`), only when pressed (performance.md §6.18).
 - **Search** (`tasks.search.js`): type `task`, words task, todo, to do, commitment, commitments; number
-  and title. `calendar.search.js`: type `calendar_event`, words event, meeting; title; the reader's own
+  and title; the tasks led by people in the reader's scope and the tasks they set or share
+  (`scope.named`, as the board lists them). `calendar.search.js`: type `calendar_event`, words event, meeting; title; the reader's own
   events only (pinned to them, whatever their grant). ⌘K actions New Task, New Event and New Commitment
   (`shared/search/actions.js`). The week is a view over tasks: `ai:none` and `search:none`, as the rest
   of the `workspace` module.
@@ -394,7 +421,13 @@ is listed here as tier 1 or tier 2.**
 - **A reminder in the past**: refused when set; one a due-date change puts in the past is dropped.
 - **Empty board**: "No Tasks Yet" with New Task.
 - **A reader whose grant is `all`** (Management, Operations & People, the CEO) on My Team: every
-  task, with its four figures; Wait On Task, which always lists My Team, offers every task too.
+  task, with its four figures; Wait On Task, which always lists My Team, offers every task too. A
+  task someone else set them is still not theirs to manage.
+- **Sign Out, or someone else signing in on the same device**: every answer kept for the last
+  person is forgotten, and one still on its way is neither shown nor kept (`createApi` `clear`).
+- **A watcher moves team** and can no longer see the task: they stop hearing about it.
+- **A repeating task's lead leaves**: no new copies; the last one stays for whoever manages it.
+- **A day off** in the working week has no hours; a task due on one closes at 17:00.
 
 ## 12 · Donor code
 
@@ -410,13 +443,18 @@ is listed here as tier 1 or tier 2.**
 
 ## 13 · Open questions
 
-- Projects: the table exists (2000) but no screen asked for it; kept out of M2 screens. AJ, at the
-  23/10 demo.
-- Late reasons: built with four codes (Waiting on Others, Underestimated, Deprioritised, Other).
-  Whether MyCity wants other codes: Cynthia, at the 23/10 demo.
-- An ICS invitation by email beside the in-app notice (`services/calendar/ics`). AJ, after the demo.
+- Projects: decided (JBS Praxis, 23/10/2026): a Projects tab, its own board per project; anyone
+  creates one, everyone sees the list, the tasks in it keep their own visibility; a task joins one from
+  New Task or from the project. Built in part 3 of the 23/10 audit.
+- Late reasons: decided (JBS Praxis, 23/10/2026): two more codes, and a setting to add reasons or
+  switch them off, behind an icon on Tasks. Part 3. Which two: Cynthia, at the next review.
+- An ICS invitation by email beside the in-app notice (`services/calendar/ics`): decided yes (JBS
+  Praxis, 23/10/2026); while system mail is paused the invitations wait and go when it resumes.
+  Part 3.
 
 ## 14 · Change log
+
+- 23/10/2026 · JP · The 23/10 audit, part 1 of 3 (decisions JBS Praxis, 23/10/2026): the assignee of a task someone else set never manages it, even with an `all` grant; watchers are only people who can see the task, and watchers and nudges reach only them; a done task tells the people on each task waiting on it about their own task, never its title; Clear Blocker tells the setter; a repeat arrives quietly and stops when its lead leaves; a card lands only above one the reader can see; a task cancelled with its record drops its reminders. Today counts Due Today as open and not yet past, reads From Your Manager and the diary on the server; Analytics' Mine is what the reader leads or shares. A shared task's deadline is on its people's calendars and ⌘K finds it; an event's new people hear an invitation and people taken off hear that; event times compare as instants; the AI cites performance dates as their records. Sign Out forgets every kept answer (`createApi` `clear`), and the mock answers as the person who asked (§5, §6, §7, §8, §9, §11).
 
 - 23/10/2026 · JP · Shared tasks, the lead and reminders (JBS Praxis, 23/10/2026): with People the Lead is You or one of the people picked; with a Department it must be picked, from that department (`GET /tasks/people?department_id=`), and the head no longer leads by default. Due today and due tomorrow reach the people sharing a task as well as its lead (§5, §6, §7, §10).
 

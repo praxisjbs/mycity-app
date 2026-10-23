@@ -32,18 +32,23 @@ function periodOf(period, today) {
 }
 
 /**
- * The WHERE fragment for whose tasks count, as on the board. The caller's id is pushed only
- * when the fragment names it: Postgres refuses a parameter the SQL never reads.
+ * The WHERE fragment for whose tasks count. Mine is the work the reader does: tasks they lead or
+ * share. A task they set for someone else counts under My Team, with their reporting line's. The
+ * caller's id is pushed only when the fragment names it: Postgres refuses a parameter the SQL
+ * never reads.
  */
 function whose(listScope, scope, params) {
-  const mine = () => {
+  const me = () => {
     params.push(scope.employee_id || null);
-    const me = `$${params.length}::uuid`;
-    return `(t.primary_assignee_id = ${me} OR t.set_by_employee_id = ${me})`;
+    return `$${params.length}::uuid`;
   };
-  if (listScope !== "team") return `AND ${mine()}`;
+  const doing = (id) =>
+    `(t.primary_assignee_id = ${id} OR EXISTS (SELECT 1 FROM task_assignee ta WHERE ta.task_id = t.task_id AND ta.employee_id = ${id}))`;
+  if (listScope !== "team") return `AND ${doing(me())}`;
   const s = scopeClause(scope, { column: "t.primary_assignee_id" }, params);
-  return s.and ? `AND (${s.and.slice(4)} OR ${mine()})` : "";
+  if (!s.and) return "";
+  const id = me();
+  return `AND (${s.and.slice(4)} OR ${doing(id)} OR t.set_by_employee_id = ${id})`;
 }
 
 async function analytics(query, scope, now = new Date()) {
@@ -56,6 +61,10 @@ async function analytics(query, scope, now = new Date()) {
   // Every query names all three instants, typed, so the ones that do not use them still parse.
   const base = `FROM task t WHERE t.archived_at IS NULL AND $1::timestamptz < $2::timestamptz
     AND $3::timestamptz IS NOT NULL ${who}`;
+
+  // The blocked list also says whether the reader shares each task, so its link opens for them.
+  const heldParams = [...params, scope.employee_id || null];
+  const reader = `$${heldParams.length}::uuid`;
 
   const [figures, weeks, load, prio, aging, reasons, held] = await Promise.all([
     pool.query(
@@ -115,6 +124,7 @@ async function analytics(query, scope, now = new Date()) {
       `SELECT x.*, ${TOTAL_COL} FROM (
          SELECT t.task_id, t.number::text AS number, t.title, t.status, t.primary_assignee_id,
                 t.set_by_employee_id, ${personJson("e", "d")} AS assignee,
+                EXISTS (SELECT 1 FROM task_assignee ra WHERE ra.task_id = t.task_id AND ra.employee_id = ${reader}) AS reader_shares,
                 b.task_blockage_id, b.note, b.raised_at,
                 round((extract(epoch FROM $3::timestamptz - b.raised_at) / 86400.0)::numeric, 1)::float AS blocked_days
            FROM task t
@@ -123,7 +133,7 @@ async function analytics(query, scope, now = new Date()) {
            LEFT JOIN department d ON d.department_id = e.department_id
           WHERE t.archived_at IS NULL AND ${OPEN} AND $1::timestamptz < $2::timestamptz ${who}) x
         ORDER BY x.raised_at, x.task_blockage_id`,
-      params,
+      heldParams,
       { page: 1 },
     ),
   ]);

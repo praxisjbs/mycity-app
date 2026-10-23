@@ -6,11 +6,13 @@ import { core } from "./client";
  * answer at once, and invalidation by path so a write refreshes every list that
  * shows what it changed. `refresh` is the quiet one, for the pull and the
  * refresh button (FRONTEND_FOUNDATION F28): what is shown stays until the new
- * answers land, and its promise settles when the last one has.
+ * answers land, and its promise settles when the last one has. `clear` forgets
+ * every kept answer when the person changes (AuthProvider), so nothing one
+ * person read is shown to the next on the same device.
  *
  * Lists are ALWAYS the server's pages (FRONTEND_GUIDE §4): usePaged sends
  * `page`, `q`, one `sort` and the list's own filters, and shows `page.total`.
  * Nothing here filters, sorts or slices rows on the client.
  */
-export const { useApi, usePaged, useInfinite, useMutation, invalidate, refresh } = core;
+export const { useApi, usePaged, useInfinite, useMutation, invalidate, refresh, clear } = core;
 export type { PagedResult } from "@mycity/ui";
