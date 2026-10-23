@@ -247,6 +247,19 @@ describe("migration files", () => {
       /cannot be used together/,
     );
   });
+
+  test("a database is marked with APP_ENV once; a server marked as another refuses", () => {
+    expect(migrate.markerPlan({ appEnv: "staging", marker: undefined })).toEqual({ action: "mark" });
+    expect(migrate.markerPlan({ appEnv: "production", marker: null })).toEqual({ action: "mark" });
+    expect(migrate.markerPlan({ appEnv: "staging", marker: "staging" })).toEqual({ action: "keep" });
+    expect(migrate.markerPlan({ appEnv: "staging", marker: "production" })).toMatchObject({
+      action: "refuse",
+      message: expect.stringMatching(/says it is production, but APP_ENV is staging/),
+    });
+    expect(migrate.markerPlan({ appEnv: "production", marker: "staging" }).action).toBe("refuse");
+    // Off the servers a restored dump only warns: a laptop's database may say staging.
+    expect(migrate.markerPlan({ appEnv: "development", marker: "staging" }).action).toBe("report");
+  });
 });
 
 describe("seed guard", () => {
