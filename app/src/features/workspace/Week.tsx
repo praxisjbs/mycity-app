@@ -16,6 +16,7 @@ import {
   DataView,
   DesktopOnly,
   EmptyValue,
+  ErrorState,
   Field,
   formatDate,
   FormFooter,
@@ -30,27 +31,49 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
+import { say } from "./shared";
 
 const SUPPORT_HELP = "One line on what would help you this week. Your manager sees it.";
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
 const LISTS: Array<["done" | "planned" | "blocked", string]> = [
   ["done", "Done This Week"],
   ["planned", "Planned Next Week"],
   ["blocked", "Blocked"],
 ];
+/** How many of a list's tasks the desktop shows before View All. */
+const FIRST = 5;
 
-/** One of the week's lists: its tasks' titles, a blocked one with its reason. */
-function TaskLines({ rows }: { rows: Task[] }) {
+/** One of the week's lists: its tasks' titles, a blocked one with its reason; the count when the week holds more than it sent. */
+function TaskLines({ rows, total }: { rows: Task[]; total?: number }) {
   if (!rows.length) return <p className="text-2xs text-subtle-foreground">None.</p>;
   return (
-    <ul className="space-y-1">
-      {rows.map((t) => (
-        <li key={t.task_id} className="text-xs" data-copy="content">
-          {t.title}
-          {t.blocked_reason && <span className="block text-2xs text-subtle-foreground">{t.blocked_reason}</span>}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="space-y-1">
+        {rows.map((t) => (
+          <li key={t.task_id} className="text-xs" data-copy="content">
+            {t.title}
+            {t.blocked_reason && <span className="block text-2xs text-subtle-foreground">{t.blocked_reason}</span>}
+          </li>
+        ))}
+      </ul>
+      {total !== undefined && total > rows.length && <p className="mt-1.5 text-2xs text-subtle-foreground">{`${rows.length} of ${total}`}</p>}
+    </>
+  );
+}
+
+/** One list on desktop: its first five, and View All for the rest the week sent. */
+function WeekList({ label, list }: { label: string; list: WeekView["done"] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? list.data : list.data.slice(0, FIRST);
+  return (
+    <div>
+      <div className="mb-1.5 text-2xs font-semibold text-muted-foreground">{`${label} · ${list.total}`}</div>
+      <TaskLines rows={shown} total={all ? list.total : undefined} />
+      {!all && list.total > FIRST && (
+        <Button size="sm" variant="ghost" iconRight="right" className="mt-1" onClick={() => setAll(true)}>
+          View All
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -62,10 +85,7 @@ function WeekBody({ week }: { week: WeekView }) {
       <DesktopOnly>
         <Grid cols={3}>
           {LISTS.map(([key, label]) => (
-            <div key={key}>
-              <div className="mb-1.5 text-2xs font-semibold text-muted-foreground">{`${label} · ${week[key].total}`}</div>
-              <TaskLines rows={week[key].data.slice(0, 5)} />
-            </div>
+            <WeekList key={key} label={label} list={week[key]} />
           ))}
         </Grid>
       </DesktopOnly>
@@ -77,7 +97,7 @@ function WeekBody({ week }: { week: WeekView }) {
             key,
             title: label,
             end: String(week[key].total),
-            onSelect: () => modal.open({ title: label, body: () => <TaskLines rows={week[key].data} /> }),
+            onSelect: () => modal.open({ title: label, body: () => <TaskLines rows={week[key].data} total={week[key].total} /> }),
           }))}
         />
       </PhoneOnly>
@@ -100,7 +120,7 @@ export function MyWeekCard() {
   return (
     <Card>
       <CardHeader title="My Week" actions={week ? <Button size="sm" onClick={write}>Write Support Needed</Button> : undefined} />
-      {!week ? <LoadingRows count={3} /> : <WeekBody week={week} />}
+      {week ? <WeekBody week={week} /> : read.error ? <ErrorState error={read.error} onRetry={read.reload} /> : <LoadingRows count={3} />}
     </Card>
   );
 }
@@ -241,7 +261,7 @@ function TeamWeekList({ list, onOpen, bare = false }: { list: PagedResult<TeamWe
 /** Someone's week, as their manager reads it. */
 function PersonWeek({ employeeId }: { employeeId: string }) {
   const read = useApi("GET /api/v1/workspace/week", { query: { employee_id: employeeId } });
-  if (!read.data) return <LoadingRows count={4} />;
+  if (!read.data) return read.error ? <ErrorState error={read.error} onRetry={read.reload} /> : <LoadingRows count={4} />;
   return (
     <>
       <p className="mb-2 text-2xs text-subtle-foreground">{`Week of ${formatDate(read.data.week_starts_on)}`}</p>

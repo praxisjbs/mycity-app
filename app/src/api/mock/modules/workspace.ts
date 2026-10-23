@@ -17,13 +17,17 @@ import type {
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, uuid } from "../core";
 import { OBJECTIVES, SCORECARDS } from "../data/performance";
 import { byId, byKey, DEPARTMENTS, PEOPLE, ref, refKey, teamOf } from "../data/people";
+import { leaveRequests } from "./organisation";
 import { exportFile } from "./shared";
 
 /**
  * My Workspace in the browser, in the contract's shapes (docs/guides/workspace.md §5).
  * The same records seed staging (F13). Rules the API applies are kept where a screen
- * shows them: who may set a task for whom (A24), who may share one (a lead and the people
- * beside them), and a cancelled task off the board.
+ * shows them: who may set a task for whom (A24), who may share one (a lead and up to 25
+ * people beside them), who manages a task (its setter and those over its assignee, never
+ * the assignee of a task someone else set), who may watch one (someone who can see it),
+ * and a cancelled task off the board. The mock models no notices, so a repeat's quiet next
+ * copy has nothing to show here.
  */
 type Status = Task["status"];
 type R = [string, Status, string, number | null, Task["priority"], string | null, string | null];
@@ -62,46 +66,74 @@ const ROWS: R[] = [
 const due = (d: number | null) => (d == null ? null : at(-d, d === 0 ? "17:00" : "17:00"));
 /** The rows that are Shared: the people beside the lead, by key. */
 const SHARED: Record<number, string[]> = { 2: ["damilola", "funke"] };
-const TASKS: Task[] = ROWS.map((r, i) => ({
-  task_id: sid(`task:${i}`),
-  number: `TSK-${String(400 - i).padStart(4, "0")}`,
-  title: r[0],
-  description: null,
-  status: r[1],
-  priority: r[4],
-  cadence: r[5] ? "weekly" : null,
-  assignee: refKey(r[2]),
-  members: (SHARED[i] ?? []).map(refKey),
-  set_by: refKey(r[5] ?? r[2]),
-  due_at: due(r[3]),
-  overdue: false,
-  started_at: r[1] === "todo" ? null : at(3, "10:00"),
-  completed_at: r[1] === "done" ? at(Math.max(1, -(r[3] ?? 1)), "15:00") : null,
-  cancelled_at: null,
-  cancel_reason: null,
-  blocked_reason: null,
-  blocked_at: null,
-  late_reason: null,
-  counts_towards: null,
-  entity_type: r[6] ? "partner" : null,
-  entity_id: r[6] ? sid(`partner:${r[6]}`) : null,
-  link: r[6] ? { module: "partnerships", tab: "partners", id: sid(`partner:${r[6]}`), path: `/partnerships?tab=partners&id=${sid(`partner:${r[6]}`)}` } : null,
-  recurrence: null,
-  comment_count: 0,
-  steps_total: 0,
-  steps_done: 0,
-  waiting: false,
-  is_commitment: false,
-  acceptance_criteria: null,
-  commitment_month: null,
-  original_due_at: null,
-  rescoped_at: null,
-  rescope_reason: null,
-  commitment_set_id: null,
-  commitment_state: null,
-  created_at: at(10, "09:00"),
-  updated_at: at(1, "09:00"),
-}));
+/** At most this many people share a task beside its lead (the contract's MEMBERS_MAX). */
+const MEMBERS_MAX = 25;
+
+/**
+ * A new task as the service writes one: To Do, nothing held, late, cancelled, repeating or
+ * committed until something says so, then what the caller names. Never a copy of another task.
+ */
+function newTask(fields: Pick<Task, "task_id" | "number" | "title" | "assignee" | "set_by"> & Partial<Task>): Task {
+  const now = new Date().toISOString();
+  return {
+    description: null,
+    status: "todo",
+    priority: "normal",
+    cadence: null,
+    members: [],
+    due_at: null,
+    overdue: false,
+    started_at: null,
+    completed_at: null,
+    cancelled_at: null,
+    cancel_reason: null,
+    blocked_reason: null,
+    blocked_at: null,
+    late_reason: null,
+    counts_towards: null,
+    entity_type: null,
+    entity_id: null,
+    link: null,
+    recurrence: null,
+    comment_count: 0,
+    steps_total: 0,
+    steps_done: 0,
+    waiting: false,
+    is_commitment: false,
+    acceptance_criteria: null,
+    commitment_month: null,
+    original_due_at: null,
+    rescoped_at: null,
+    rescope_reason: null,
+    commitment_set_id: null,
+    commitment_state: null,
+    created_at: now,
+    updated_at: now,
+    ...fields,
+  };
+}
+
+const TASKS: Task[] = ROWS.map((r, i) =>
+  newTask({
+    task_id: sid(`task:${i}`),
+    number: `TSK-${String(400 - i).padStart(4, "0")}`,
+    title: r[0],
+    status: r[1],
+    priority: r[4],
+    cadence: r[5] ? "weekly" : null,
+    assignee: refKey(r[2]),
+    members: (SHARED[i] ?? []).map(refKey),
+    set_by: refKey(r[5] ?? r[2]),
+    due_at: due(r[3]),
+    started_at: r[1] === "todo" ? null : at(3, "10:00"),
+    completed_at: r[1] === "done" ? at(Math.max(1, -(r[3] ?? 1)), "15:00") : null,
+    entity_type: r[6] ? "partner" : null,
+    entity_id: r[6] ? sid(`partner:${r[6]}`) : null,
+    link: r[6] ? { module: "partnerships", tab: "partners", id: sid(`partner:${r[6]}`), path: `/partnerships?tab=partners&id=${sid(`partner:${r[6]}`)}` } : null,
+    created_at: at(10, "09:00"),
+    updated_at: at(1, "09:00"),
+  }),
+);
 const COMMENTS: TaskComment[] = [];
 const ACTIVITY: TaskActivity[] = [];
 
@@ -156,7 +188,10 @@ const scoped = (user: string, scope?: string) => {
   return TASKS.filter((t) => (t.assignee && team.has(t.assignee.employee_id)) || mine(user, t));
 };
 const canSetFor = (user: string, id: string) => id === me(user) || teamOf(user).some((p) => p.employee_id === id);
+/** The setter manages a task, and so does whoever is over its assignee; its assignee never does when someone else set it. */
 const manages = (user: string, t: Task) => t.set_by?.employee_id === me(user) || (t.assignee?.employee_id !== me(user) && canSetFor(user, t.assignee!.employee_id));
+/** Whether a person (by key) can see a task: they lead, share or set it, or its lead is in their team. */
+const seesTask = (user: string, t: Task) => mine(user, t) || Boolean(t.assignee && teamOf(user).some((p) => p.employee_id === t.assignee!.employee_id));
 const colleague = (user: string, id: string) => byId(id)?.department === byKey(user)?.department;
 /** Who the user may put on a task (GET /tasks/people): their team, and to share one, their department; never themselves. */
 const reachable = (user: string, shared: boolean) =>
@@ -168,10 +203,13 @@ function shareWith(user: string, lead: string, b: { member_ids?: string[]; depar
   if (b.department_id) {
     const name = DEPARTMENTS.find((n) => sid(`dept:${n}`) === b.department_id);
     if (!name) return { error: { department_id: ["Not a department"] } };
-    const ids = PEOPLE.filter((p) => p.department === name && p.employee_id !== lead && allowed(p.employee_id)).map((p) => p.employee_id);
-    return ids.length ? { ids } : { error: { department_id: ["Nobody to share with"] } };
+    // The department's people the caller may add: their reach, so never the caller beside another lead.
+    const ids = PEOPLE.filter((p) => p.department === name && p.employee_id !== lead && p.employee_id !== me(user) && allowed(p.employee_id)).map((p) => p.employee_id);
+    if (!ids.length) return { error: { department_id: ["Nobody to share with"] } };
+    return ids.length > MEMBERS_MAX ? { error: { department_id: [`More than ${MEMBERS_MAX} people`] } } : { ids };
   }
   const ids = [...new Set(b.member_ids ?? [])].filter((id) => id !== lead);
+  if (ids.length > MEMBERS_MAX) return { error: { member_ids: [`At most ${MEMBERS_MAX} people`] } };
   const bad = ids.find((id) => !byId(id) || !allowed(id));
   if (bad) return { error: { member_ids: [colleague(user, bad) && !peers ? "Lead it yourself" : "Not in your team"] } };
   return { ids };
@@ -213,7 +251,8 @@ const detail = (user: string, t: Task): TaskDetail => {
     watching: watchers.some((p) => p.employee_id === me(user)),
     blockage,
     reminders: REMINDERS.get(t.task_id) ?? [],
-    can_edit: true,
+    // Edit Task changes something for whoever manages, leads or shares it, while it is not cancelled.
+    can_edit: plans(user, t) && t.status !== "cancelled",
     can_reassign: manages(user, t),
     can_cancel: manages(user, t) && t.status !== "cancelled" && !approved,
     can_plan: plans(user, t) && t.status !== "cancelled",
@@ -296,59 +335,89 @@ route("POST /api/v1/tasks", (req) => {
   if (leadBad) return invalid(leadBad);
   const problem = commitmentProblem(b);
   if (problem) return invalid(problem);
-  const t: Task = {
-    ...TASKS[0], task_id: sid(`task:${Date.now()}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: b.title.trim(),
-    description: b.description || null, status: "todo", priority: b.priority ?? "normal", cadence: b.cadence || null,
-    assignee: ref(assignee)!, members: share.ids.map((id) => ref(byId(id))!), set_by: refKey(req.user!), due_at: b.due_on ? `${b.due_on}T16:00:00.000Z` : null,
-    started_at: null, completed_at: null, entity_type: b.entity_type ?? null, entity_id: b.entity_id ?? null, link: null, comment_count: 0,
-    counts_towards: countsTowardsOf(b), is_commitment: Boolean(b.is_commitment), acceptance_criteria: b.is_commitment ? b.acceptance_criteria ?? null : null,
-    commitment_month: b.is_commitment ? b.commitment_month ?? null : null, original_due_at: null, rescoped_at: null, rescope_reason: null, commitment_set_id: null,
-    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  };
+  const t = newTask({
+    task_id: sid(`task:${Date.now()}:${TASKS.length}`),
+    number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`,
+    title: b.title.trim(),
+    description: b.description || null,
+    priority: b.priority ?? "normal",
+    cadence: b.cadence || null,
+    assignee: ref(assignee)!,
+    members: share.ids.map((id) => ref(byId(id))!),
+    set_by: refKey(req.user!),
+    due_at: b.due_on ? `${b.due_on}T16:00:00.000Z` : null,
+    entity_type: b.entity_type ?? null,
+    entity_id: b.entity_id ?? null,
+    counts_towards: countsTowardsOf(b),
+    is_commitment: Boolean(b.is_commitment),
+    acceptance_criteria: b.is_commitment ? (b.acceptance_criteria ?? null) : null,
+    commitment_month: b.is_commitment ? (b.commitment_month ?? null) : null,
+  });
   TASKS.unshift(t);
   log(req.user!, t, "created", null, "todo");
   return created(fresh(t));
 });
+/** What only whoever manages a task changes (the API's SETTER_FIELDS). */
+const SETTER_FIELDS = ["title", "cadence", "due_on", "primary_assignee_id", "member_ids", "department_id", "employee_target_id", "entity_type", "entity_id", "recurrence"];
+const COMMITMENT_FIELDS = ["is_commitment", "acceptance_criteria", "commitment_month"];
+
 route("PATCH /api/v1/tasks/:id", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
+  if (t.status === "cancelled") return fail(409, "TASK_CANCELLED", "This task was cancelled");
   const b = req.body as Record<string, unknown>;
-  if (["title", "due_on", "cadence", "primary_assignee_id", "member_ids", "department_id"].some((k) => k in b) && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that");
-  if (["is_commitment", "acceptance_criteria", "commitment_month"].some((k) => k in b) && !manages(req.user!, t) && t.assignee?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only its lead can change that");
-  if (typeof b.primary_assignee_id === "string" && b.primary_assignee_id !== t.assignee?.employee_id) {
-    const lead = byId(b.primary_assignee_id);
-    if (!lead || !canSetFor(req.user!, lead.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
-    t.assignee = ref(lead)!;
-    t.members = t.members.filter((p) => p.employee_id !== lead.employee_id);
-  }
-  if ("member_ids" in b || "department_id" in b) {
-    const share = shareWith(req.user!, t.assignee!.employee_id, b as { member_ids?: string[]; department_id?: string });
-    if ("error" in share) return invalid(share.error);
-    const leadBad = leadProblem(req.user!, t.assignee!.employee_id, b as { primary_assignee_id?: string; member_ids?: string[]; department_id?: string });
-    if (leadBad) return invalid(leadBad);
-    t.members = share.ids.map((id) => ref(byId(id))!);
-  }
+  const touched = SETTER_FIELDS.find((k) => k in b);
+  if (touched && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that", { [touched]: ["Set by someone else"] });
+  if (COMMITMENT_FIELDS.some((k) => k in b) && !manages(req.user!, t) && t.assignee?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only its lead can change that");
+
+  // Everything is checked against the task as it stands, and only then changed: a refused edit leaves it as it was.
   const approved = Boolean(t.is_commitment && t.original_due_at);
-  const marks = ["is_commitment", "acceptance_criteria", "commitment_month"].some((k) => k in b && b[k] !== (t as unknown as Record<string, unknown>)[k]);
-  if (approved && marks) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
-  if (!approved && marks) {
-    const will = { is_commitment: "is_commitment" in b ? Boolean(b.is_commitment) : t.is_commitment, acceptance_criteria: (b.acceptance_criteria as string) ?? t.acceptance_criteria, commitment_month: (b.commitment_month as string) ?? t.commitment_month, due_on: "due_on" in b ? (b.due_on as string) : t.due_at?.slice(0, 10) };
+  const leadId = typeof b.primary_assignee_id === "string" ? b.primary_assignee_id : t.assignee!.employee_id;
+  const reassigned = leadId !== t.assignee?.employee_id;
+  if (reassigned) {
+    const lead = byId(leadId);
+    if (!lead || !canSetFor(req.user!, lead.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
+  }
+  let members = reassigned ? t.members.filter((p) => p.employee_id !== leadId) : t.members;
+  if ("member_ids" in b || "department_id" in b) {
+    const share = shareWith(req.user!, leadId, b as { member_ids?: string[]; department_id?: string });
+    if ("error" in share) return invalid(share.error);
+    const leadBad = leadProblem(req.user!, leadId, b as { primary_assignee_id?: string; member_ids?: string[]; department_id?: string });
+    if (leadBad) return invalid(leadBad);
+    members = share.ids.map((id) => ref(byId(id))!);
+  }
+  const marks = COMMITMENT_FIELDS.some((k) => k in b && b[k] !== (t as unknown as Record<string, unknown>)[k]);
+  if (approved && (marks || reassigned)) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
+  const dueAt = "due_on" in b ? (b.due_on ? `${String(b.due_on)}T16:00:00.000Z` : null) : t.due_at;
+  const will = {
+    is_commitment: "is_commitment" in b ? Boolean(b.is_commitment) : t.is_commitment,
+    acceptance_criteria: "acceptance_criteria" in b ? ((b.acceptance_criteria as string | null) ?? null) : t.acceptance_criteria,
+    commitment_month: "commitment_month" in b ? ((b.commitment_month as string | null) ?? null) : t.commitment_month,
+    due_on: dueAt?.slice(0, 10) ?? null,
+  };
+  // A draft commitment is checked as it will stand; an approved one keeps its month while its date moves on.
+  if (!approved && (marks || "due_on" in b)) {
     const problem = commitmentProblem(will);
     if (problem) return invalid(problem);
-    Object.assign(t, { is_commitment: will.is_commitment, acceptance_criteria: will.is_commitment ? will.acceptance_criteria ?? null : null, commitment_month: will.is_commitment ? will.commitment_month ?? null : null });
   }
+  if (approved && !dueAt) return invalid({ due_on: ["Pick a due date"] });
+  const repeats = "recurrence" in b ? b.recurrence : t.recurrence;
+  if (repeats && !dueAt) return invalid({ recurrence: ["Give it a due date to repeat from"] });
+
+  if (reassigned) t.assignee = ref(byId(leadId))!;
+  t.members = members;
+  if (!approved && marks)
+    Object.assign(t, { is_commitment: will.is_commitment, acceptance_criteria: will.is_commitment ? will.acceptance_criteria : null, commitment_month: will.is_commitment ? will.commitment_month : null });
   if ("employee_target_id" in b || "entity_type" in b) t.counts_towards = countsTowardsOf({ employee_target_id: b.employee_target_id as string, entity_type: b.entity_type as Task["entity_type"], entity_id: b.entity_id as string });
   if ("entity_type" in b) Object.assign(t, { entity_type: b.entity_type ?? null, entity_id: b.entity_id ?? null });
   if (typeof b.title === "string") t.title = b.title;
   if ("description" in b) t.description = (b.description as string) || null;
   if (b.priority) t.priority = b.priority as Task["priority"];
-  if ("due_on" in b) t.due_at = b.due_on ? `${b.due_on}T16:00:00.000Z` : null;
+  t.due_at = dueAt;
+  if ("cadence" in b) t.cadence = (b.cadence as Task["cadence"]) ?? null;
   if ("late_reason" in b) t.late_reason = (b.late_reason as Task["late_reason"]) ?? null;
-  if ("recurrence" in b) {
-    if (b.recurrence && !t.due_at && !("due_on" in b && b.due_on)) return invalid({ recurrence: ["Give it a due date to repeat from"] });
-    t.recurrence = (b.recurrence as Task["recurrence"]) ?? null;
-  }
-  log(req.user!, t, "edited");
+  if ("recurrence" in b) t.recurrence = (b.recurrence as Task["recurrence"]) ?? null;
+  log(req.user!, t, reassigned || "member_ids" in b || "department_id" in b ? "assigned" : "edited");
   return ok(fresh(t));
 });
 route("POST /api/v1/tasks/:id/move", (req) => {
@@ -364,7 +433,7 @@ route("POST /api/v1/tasks/:id/move", (req) => {
   if (to === "done" && why) t.late_reason = why;
   if (to === "done") REMINDERS.delete(t.task_id);
   // The board reads TASKS in order: the card goes above `before`, or to the foot.
-  const target = before ? TASKS.find((x) => x.task_id === before) : null;
+  const target = before ? find(req.user!, before) : null;
   if (before && (!target || target.status !== to)) return fail(409, "CONFLICT", "That card has moved, reload the board");
   TASKS.splice(TASKS.indexOf(t), 1);
   TASKS.splice(target ? TASKS.indexOf(target) : TASKS.length, 0, t);
@@ -433,7 +502,7 @@ route("GET /api/v1/tasks/:id/activity", (req) => {
 
 route("GET /api/v1/tasks/:id/blockages", (req) => {
   const t = find(req.user!, req.params.id);
-  return t ? paged(HOLDS.get(t.task_id) ?? [], req, { sort: { raised_at: (a, b) => b.raised_at.localeCompare(a.raised_at) } }) : notFound();
+  return t ? paged(HOLDS.get(t.task_id) ?? [], req, { sort: { raised_at: (a, b) => a.raised_at.localeCompare(b.raised_at) } }) : notFound();
 });
 route("POST /api/v1/tasks/:id/steps", (req) => {
   const t = find(req.user!, req.params.id);
@@ -502,6 +571,9 @@ route("POST /api/v1/tasks/:id/watchers", (req) => {
   const id = (req.body as { employee_id?: string }).employee_id || me(req.user);
   const person = ref(byId(id));
   if (!person) return invalid({ employee_id: ["Not on the staff"] });
+  // The caller watches it themselves; someone else is added by whoever plans it, and only if they can see it.
+  if (id !== me(req.user) && !plans(req.user!, t)) return fail(403, "FORBIDDEN", "Only its assignee or the person who set it can change that");
+  if (!seesTask(byId(id)!.user_key, t)) return invalid({ employee_id: ["Cannot see this task"] });
   const list = WATCHERS.get(t.task_id) ?? [];
   if (!list.some((p) => p.employee_id === id)) WATCHERS.set(t.task_id, [...list, person]);
   log(req.user!, t, "watcher_added");
@@ -554,6 +626,20 @@ const EVENTS: CalendarEvent[] = EVENT_ROWS.map(([d, title, type, hm, mins], i) =
     created_at: at(20, "09:00"),
   };
 });
+/* An invitation from someone else, still to be answered, and one already declined: Accept and Decline. */
+const invitation = (i: number, owner: string, title: string, daysAhead: number, hm: string, mins: number, answers: Array<[string, "pending" | "accepted" | "declined"]>): CalendarEvent => {
+  const starts = at(-daysAhead, hm);
+  return {
+    calendar_event_id: sid(`ev:invite:${i}`), title, description: null, event_type: "meeting", owner: refKey(owner),
+    starts_at: starts, ends_at: new Date(Date.parse(starts) + mins * 60000).toISOString(), all_day: false, location: "Victoria Island office",
+    visibility: "attendees", attendees: answers.map(([key, response]) => ({ employee: refKey(key), response })), my_response: null,
+    entity_type: null, entity_id: null, link: null, cancelled_at: null, reminder_minutes: [15], can_edit: false, created_at: at(3, "09:00"),
+  };
+};
+EVENTS.push(
+  invitation(0, "ngozi", "Partner pipeline review", 2, "14:00", 60, [["cynthia", "pending"], ["bashir", "accepted"]]),
+  invitation(1, "ifeoma", "Board pack walkthrough", 8, "16:00", 45, [["cynthia", "declined"], ["tolu", "pending"]]),
+);
 const asItem = (e: CalendarEvent): CalendarItem => ({ item_kind: "event", item_id: e.calendar_event_id, title: e.title, starts_at: e.starts_at, ends_at: e.ends_at, all_day: e.all_day, event_type: e.event_type, location: e.location, my_response: e.my_response, performance_kind: null, link: { module: "workspace", tab: "calendar", id: e.calendar_event_id, path: `/workspace?tab=calendar&id=${e.calendar_event_id}` } });
 const taskItem = (t: Task): CalendarItem => ({ item_kind: "task", item_id: t.task_id, title: t.title, starts_at: t.due_at!, ends_at: new Date(Date.parse(t.due_at!) + 60000).toISOString(), all_day: false, event_type: "deadline", location: null, my_response: null, performance_kind: null, link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` } });
 /** The reader's performance dates (performance.md §6.18): a check-in due and a key result finishing, all day. */
@@ -565,6 +651,25 @@ const performanceItems = (): CalendarItem[] => {
     { item_kind: "performance", item_id: sid("perf:kr:BM-KR1.2"), title: "BM-KR1.2 Publish 36 city stories across channels", ...allDay(day(6)), all_day: true, event_type: null, location: null, my_response: null, performance_kind: "key_result_due", link: { module: "performance", tab: "goals", id: sid("perf:kr:BM-KR1.2"), path: `/performance?tab=goals&id=${sid("perf:kr:BM-KR1.2")}` } },
   ];
 };
+/** The day after a date, as the end of an all-day item. */
+const dayAfter = (d: string) => new Date(Date.parse(`${d}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+/** The reader's approved leave touching a month (YYYY-MM), all day, as the API reads it through the leave service. */
+const leaveItems = (user: string, month: string): CalendarItem[] =>
+  leaveRequests()
+    .filter((l) => l.key === user && l.status === "approved" && l.starts_on.slice(0, 7) <= month && l.ends_on.slice(0, 7) >= month)
+    .map((l) => ({
+      item_kind: "leave",
+      item_id: l.leave_request_id,
+      title: l.leave_type_name,
+      starts_at: new Date(`${l.starts_on}T00:00:00+01:00`).toISOString(),
+      ends_at: new Date(`${dayAfter(l.ends_on)}T00:00:00+01:00`).toISOString(),
+      all_day: true,
+      event_type: null,
+      location: null,
+      my_response: null,
+      performance_kind: null,
+      link: { module: "people", tab: "leave", id: l.leave_request_id, path: `/people?tab=leave&id=${l.leave_request_id}` },
+    }));
 const sees = (user: string, e: CalendarEvent) => e.visibility === "everyone" || e.owner?.employee_id === me(user) || e.attendees.some((a) => a.employee.employee_id === me(user));
 const view = (user: string, e: CalendarEvent): CalendarEvent => ({ ...e, my_response: e.attendees.find((a) => a.employee.employee_id === me(user))?.response ?? null, can_edit: e.owner?.employee_id === me(user) && !e.cancelled_at });
 
@@ -572,10 +677,13 @@ route("GET /api/v1/calendar", (req) => {
   const { month } = req.query;
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return invalid({ month: ["must be a month as YYYY-MM"] });
   const items = [
-    ...EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e)).map(asItem),
-    ...TASKS.filter((t) => t.assignee?.employee_id === me(req.user) && open(t) && t.due_at).map(taskItem),
-    ...performanceItems(),
-  ].filter((i) => i.starts_at.startsWith(month)).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+    ...[
+      ...EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e)).map((e) => asItem(view(req.user!, e))),
+      ...TASKS.filter((t) => (t.assignee?.employee_id === me(req.user) || onIt(req.user!, t)) && open(t) && t.due_at).map(taskItem),
+      ...performanceItems(),
+    ].filter((i) => i.starts_at.startsWith(month)),
+    ...leaveItems(req.user!, month),
+  ].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   return paged(items, { ...req, query: Object.fromEntries(Object.entries(req.query).filter(([k]) => k !== "month")) }, {
     search: (i) => [i.title],
     filters: { item_kind: (i, v) => i.item_kind === v },
@@ -591,7 +699,7 @@ route("POST /api/v1/calendar", (req) => {
   const f: Record<string, string[]> = {};
   if (!b.title) f.title = ["Name the event"];
   if (!b.starts_at) f.starts_at = ["Pick a start"];
-  if (b.starts_at && b.ends_at && b.ends_at <= b.starts_at) f.ends_at = ["Ends before it starts"];
+  if (b.starts_at && b.ends_at && Date.parse(b.ends_at) <= Date.parse(b.starts_at)) f.ends_at = ["Ends before it starts"];
   if (Object.keys(f).length) return invalid(f);
   const e: CalendarEvent = {
     calendar_event_id: sid(`ev:${Date.now()}`), title: b.title!, description: null, event_type: b.event_type ?? "meeting", owner: refKey(req.user!),
@@ -607,6 +715,8 @@ route("PATCH /api/v1/calendar/:id", (req) => {
   if (!e || !sees(req.user!, e)) return notFound();
   if (e.owner?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only the person who made this event can change it");
   const { attendee_ids: ids, ...rest } = req.body as Partial<CalendarEvent> & { attendee_ids?: string[] };
+  // The end comes after the start as a time, whatever offset each is written in.
+  if (Date.parse(rest.ends_at ?? e.ends_at) <= Date.parse(rest.starts_at ?? e.starts_at)) return invalid({ ends_at: ["Ends before it starts"] });
   Object.assign(e, rest);
   if (ids) e.attendees = ids.map((id) => e.attendees.find((a) => a.employee.employee_id === id) ?? { employee: ref(byId(id))!, response: "pending" as const });
   return ok(view(req.user!, e));
@@ -632,11 +742,12 @@ route("GET /api/v1/workspace/today", (req) => {
   const id = me(req.user);
   const today = isoDaysAgo(0);
   const own = TASKS.filter((t) => t.assignee?.employee_id === id && open(t)).map(fresh);
-  const dueToday = own.filter((t) => t.due_at?.startsWith(today));
+  // Due Today is open and not yet past its time; once past it a task is Overdue, so Your Day holds each once.
+  const dueToday = own.filter((t) => t.due_at?.startsWith(today) && !t.overdue);
   const overdue = own.filter((t) => t.overdue);
-  const fromOthers = own.filter((t) => t.set_by && t.set_by.employee_id !== id);
+  const fromOthers = own.filter((t) => t.set_by && t.set_by.employee_id !== id).sort((a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"));
   const [from] = weekBounds();
-  const diary = EVENTS.filter((e) => sees(req.user!, e) && e.starts_at.startsWith(today)).map(asItem);
+  const diary = EVENTS.filter((e) => !e.cancelled_at && sees(req.user!, e) && e.starts_at.startsWith(today)).map((e) => asItem(view(req.user!, e)));
   const since = ACTIVITY.filter((a) => TASKS.some((t) => t.task_id === a.task_id && t.assignee?.employee_id === id) && a.actor?.employee_id !== id).slice(0, 25);
   return ok({
     date: today,
@@ -644,14 +755,16 @@ route("GET /api/v1/workspace/today", (req) => {
     overdue: overdue.length,
     in_review: own.filter((t) => t.status === "in_review").length,
     done_this_week: TASKS.filter((t) => t.assignee?.employee_id === id && t.status === "done" && (t.completed_at ?? "") >= from).length,
-    my_day: { data: [...overdue, ...dueToday.filter((t) => !t.overdue)].slice(0, 25), total: overdue.length + dueToday.length },
+    my_day: { data: [...overdue, ...dueToday].slice(0, 25), total: overdue.length + dueToday.length },
     set_by_manager: { data: fromOthers.slice(0, 25), total: fromOthers.length },
     diary: { data: diary, total: diary.length },
     since: { data: since.map((a) => ({ task_id: a.task_id, task_title: a.task_title, actor: a.actor, kind: a.kind, to_status: a.to_status, created_at: a.created_at })), total: since.length },
   });
 });
 route("GET /api/v1/workspace/analytics", (req) => {
-  const l = scoped(req.user!, req.query.scope).map(fresh);
+  // Mine is what the reader leads or shares; a task they set for someone else counts under My Team.
+  const own = (t: Task) => t.assignee?.employee_id === me(req.user) || onIt(req.user!, t);
+  const l = (req.query.scope === "team" ? scoped(req.user!, "team") : TASKS.filter(own)).map(fresh);
   const done = l.filter((t) => t.status === "done");
   const openNow = l.filter(open);
   const by = new Map<string, { employee: NonNullable<Task["assignee"]>; open: number }>();
@@ -661,10 +774,12 @@ route("GET /api/v1/workspace/analytics", (req) => {
     e.open += 1;
     by.set(t.assignee.employee_id, e);
   }
-  const days = req.query.period === "90d" ? 90 : req.query.period === "year" ? 290 : 30;
+  // The last 30 or 90 days, or the calendar year from 1 January (Africa/Lagos).
+  const today = isoDaysAgo(0);
+  const from = req.query.period === "year" ? `${today.slice(0, 4)}-01-01` : isoDaysAgo((req.query.period === "90d" ? 90 : 30) - 1);
   return ok({
-    from: isoDaysAgo(days - 1),
-    to: isoDaysAgo(0),
+    from,
+    to: today,
     completion_rate: done.length + openNow.length ? Math.round((done.length / (done.length + openNow.length)) * 1000) / 10 : null,
     overdue: openNow.filter((t) => t.overdue).length,
     avg_completion_days: 2.4,
@@ -877,13 +992,18 @@ route("POST /api/v1/performance/commitments/:id/recovery", (req) => {
   if (recoveryOf(t.task_id)) return fail(409, "RECOVERY_SET", "This commitment already has a recovery");
   const owner = byId(String(req.body.primary_assignee_id ?? ""));
   if (!owner || !canSetFor(req.user!, owner.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
-  const r: Task = {
-    ...TASKS[0], task_id: sid(`task:recovery:${t.task_id}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: `Recovery: ${t.title}`.slice(0, 200),
-    description: null, status: "todo", priority: "high", cadence: null, assignee: ref(owner)!, members: [], set_by: refKey(req.user!), due_at: `${String(req.body.due_on)}T16:00:00.000Z`,
-    started_at: null, completed_at: null, entity_type: "task", entity_id: t.task_id, link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` },
-    comment_count: 0, counts_towards: null, is_commitment: false, acceptance_criteria: null, commitment_month: null, original_due_at: null, rescoped_at: null, rescope_reason: null,
-    commitment_set_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  };
+  const r = newTask({
+    task_id: sid(`task:recovery:${t.task_id}`),
+    number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`,
+    title: `Recovery: ${t.title}`.slice(0, 200),
+    priority: "high",
+    assignee: ref(owner)!,
+    set_by: refKey(req.user!),
+    due_at: `${String(req.body.due_on)}T16:00:00.000Z`,
+    entity_type: "task",
+    entity_id: t.task_id,
+    link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` },
+  });
   TASKS.unshift(r);
   return created(commitmentOf(t));
 });
