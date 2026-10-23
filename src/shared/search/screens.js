@@ -24,6 +24,7 @@ const SCREENS = Object.freeze([
 
   s("workspace", "today", "Today", ["my day", "agenda", "to do"]),
   s("workspace", "tasks", "Tasks", ["task", "to do", "todo", "assignments", "work items"]),
+  s("workspace", "projects", "Projects", ["project", "projects", "workstream"]),
   s("workspace", "calendar", "Calendar", ["schedule", "meetings", "events", "diary"]),
   s("workspace", "analytics", "Analytics", ["my productivity", "my stats"]),
 

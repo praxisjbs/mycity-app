@@ -246,7 +246,8 @@ own button.
 | Intent | Opens | Fills |
 |---|---|---|
 | create a task | Workspace · Tasks, New Task (`tasks.TaskPrefill`) | Title, notes, priority, cadence, due day; the assignee by name for a manager (the colleague card) |
-| book a meeting | Workspace · Calendar, New Event (`calendar.CalendarEventPrefill`) | Title, kind, day, start and end (Lagos time; an hour long when only the start is given), location. Attendees are picked on the form |
+| book a meeting | Workspace · Calendar, New Event (`calendar.CalendarEventPrefill`) | Title, kind, day, start and end (Lagos time; an hour long when only the start is given), location; the attendees by name (the colleague card), up to 50 |
+| start a project | Workspace · Projects, New Project (`projects.ProjectPrefill`) | Name, notes, due day |
 | request leave | ESS · My Leave, Request Leave (`leave.LeaveRequestPrefill`) | Leave type, first and last day, note |
 | add an employee | People · Employees, Add Employee (`organisation.EmployeePrefill`) | Names, job title, department, start date, employment type, work pattern, contract end |
 
@@ -470,6 +471,8 @@ to this repository's rules, and ported code never names where it came from.
    take more than a few seconds on staging.
 
 ## 14 · Change log
+
+- 23/10/2026 · JP · §6.4: "book a meeting" fills New Event's attendees, named by the person and found through the colleague card (`CalendarEventPrefill.attendee_ids`); "start a project" opens New Project filled (`ProjectPrefill`, `docs/guides/workspace.md` §9).
 
 - 22/10/2026 · GE · After the PR went up, from GE's questions (where history lives, a standard chat window, what the screen button opens): (1) a change opens its exact form, filled (§6.4): New Task, New Event, Request Leave and Add Employee read the values the person gave from the address through `useAddressPrefill`, each route's `prefill` is now a schema of the form's own fields (`TaskPrefill`, `CalendarEventPrefill`, `LeaveRequestPrefill`, `EmployeePrefill`), and a manifest whose prefill names a restricted field or an address word fails at load; Request Leave and Add Employee now open on `new=1` (`useNewLink`), like every other route; Add Employee's `new=1` never opened it before. (2) The floating button's Praxis AI opens the conversation over the screen the person is on instead of leaving it for Ask (§2, §3 step 8, §10); the conversation moved to `Conversation.tsx` so Ask and the panel share it. Desktop has no floating button (F18), so this is phone only. (3) The route list shows each prefill field's form and today's date as YYYY-MM-DD too, and the prompt (version 3) says to write prefill values that way: a model told to write dates day first for people would otherwise fill a day the link drops (§6.1).
 - 22/10/2026 · GE · Merged with main's mailbox AI (#127), which gave the vault a `transient` document type and its own sweep of what a request left behind (`vault.purgeTransient`, hourly in `export-cleanup`). A spoken question's document type is now `transient`, and the `assistant-voice-sweep` scheduler and the vault's `transient` store option are gone: one sweep, not two. A recording left behind goes once an hour old rather than within 45 minutes (§6.6, §7, §11). Main's `10300_mail_thread_summary.sql` took 10300, so this build's migration is now `10310_assistant.sql` (§4); it was never merged, so nothing that ran it is affected.

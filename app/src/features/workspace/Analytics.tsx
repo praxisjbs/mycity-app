@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useApi } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { AreaChart, Bars, Card, CardHeader, DataView, ErrorState, formatDate, Grid, KeyValue, LoadingRows, PageHeader, SegmentedControl, useIsPhone } from "@mycity/ui";
-import { LATE, PRIORITY, useSetsForOthers, type LateReason } from "./shared";
+import { PRIORITY, useSetsForOthers } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 
 const BAND: Record<string, string> = { "1_3": "1 to 3 Days", "4_7": "4 to 7 Days", "8_14": "8 to 14 Days", "15_plus": "15 Days or More" };
@@ -73,7 +73,7 @@ export function Analytics() {
               rowKey={(r) => r.reason ?? "none"}
               empty={{ title: "Nothing Overdue" }}
               columns={[
-                { key: "reason", label: "Reason", render: (r) => (r.reason ? LATE[r.reason as LateReason] : "No Reason Recorded") },
+                { key: "reason", label: "Reason", render: (r) => (r.reason ? (r.label ?? r.reason) : "No Reason Recorded") },
                 { key: "count", label: "Count", align: "n", render: (r) => r.count },
                 { key: "share", label: "Share", align: "n", render: (r) => `${Math.round((r.count / Math.max(1, reasonsTotal)) * 100)}%` },
               ]}

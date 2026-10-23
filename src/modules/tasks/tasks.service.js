@@ -48,6 +48,7 @@ const { scopeFor } = require("../../middleware/rbac");
 const repo = require("./tasks.repo");
 const audience = require("./tasks.audience");
 const recurrence = require("./tasks.recurrence");
+const reasons = require("./tasks.reasons");
 const reminders = require("../notifications/notifications.reminders");
 const { EVENTS, REMINDER_KEY } = require("./tasks.events");
 
@@ -94,7 +95,10 @@ function toTask(row, now = new Date()) {
     blocked_reason: row.blocked_reason,
     blocked_at: iso(row.blocked_at),
     late_reason: row.late_reason ?? null,
+    late_reason_label: row.late_reason_label ?? null,
     counts_towards: countsTowardsOf(row),
+    project: row.project_id ? { project_id: row.project_id, number: row.project_number || "", name: row.project_name || "" } : null,
+    assignee_left: Boolean(row.assignee_left),
     entity_type: row.entity_type,
     entity_id: row.entity_id,
     link: row.entity_type ? linkFor(row.entity_type, row.entity_id) : null,
@@ -406,6 +410,11 @@ async function checkRecord(db, entityType, entityId) {
  * A commitment needs its criteria, its month and a due date in that month (§6.11). `t` is the
  * task as it will stand; `dueAt` its due instant.
  */
+/** A task joins an open project (422 otherwise): the projects service decides. */
+async function checkProject(db, projectId) {
+  if (projectId) await require("../projects/projects.service").assertOpen(db, projectId);
+}
+
 function checkCommitment(t, dueAt) {
   if (!t.is_commitment) return;
   if (!t.acceptance_criteria) throw invalid("acceptance_criteria", "Give the criteria");
@@ -492,11 +501,12 @@ async function create(actor, scope, body, { client: within = null } = {}) {
     if (shared) await checkLead(client, scope, assigneeId, body);
     await checkTarget(client, body.employee_target_id, assigneeId);
     await checkRecord(client, body.entity_type, body.entity_id);
+    await checkProject(client, body.project_id);
     const cal = await workingWeek.loadCalendar(client);
     const dueAt = recurrence.dueFor(body, lagos.today(), cal);
     const commitment = body.is_commitment === true;
     checkCommitment({ is_commitment: commitment, acceptance_criteria: body.acceptance_criteria, commitment_month: body.commitment_month }, dueAt);
-    if (body.recurrence && !dueAt) throw invalid("recurrence", "Give it a due date to repeat from");
+    if (body.recurrence && !dueAt) throw invalid("recurrence", "Needs a due date");
     const { number } = await numbering.allocate(client, "task");
     const id = await repo.insert(client, {
       number,
@@ -512,6 +522,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
       employee_target_id: body.employee_target_id || null,
       entity_type: body.entity_type || null,
       entity_id: body.entity_id || null,
+      project_id: body.project_id || null,
       recurrence: body.recurrence || null,
       sort_order: await repo.nextOrder(client, assigneeId, "todo"),
       is_commitment: commitment,
@@ -586,9 +597,12 @@ async function edit(actor, scope, id, body) {
     if ("employee_target_id" in body || body.primary_assignee_id)
       await checkTarget(client, targetId, assigneeId);
     if ("entity_type" in body) await checkRecord(client, body.entity_type, body.entity_id);
+    // A task may stay in a project completed since; joining one needs it open.
+    if (body.project_id && body.project_id !== before.project_id) await checkProject(client, body.project_id);
+    if (body.late_reason) await reasons.assertOn(client, body.late_reason);
 
     const changes = {};
-    for (const k of ["title", "priority", "cadence", "employee_target_id", "entity_type", "entity_id", "recurrence", "late_reason"])
+    for (const k of ["title", "priority", "cadence", "employee_target_id", "entity_type", "entity_id", "project_id", "recurrence", "late_reason"])
       if (k in body) changes[k] = body[k];
     if ("description" in body) changes.description = body.description || null;
     if ("due_on" in body) {
@@ -598,7 +612,7 @@ async function edit(actor, scope, id, body) {
     // A series counts from its due day: a repeating task keeps one (the rule a repeat is anchored by).
     const repeats = "recurrence" in body ? body.recurrence : before.recurrence;
     const dueAfter = "due_at" in changes ? changes.due_at : before.due_at;
-    if (repeats && !dueAfter) throw invalid("recurrence", "Give it a due date to repeat from");
+    if (repeats && !dueAfter) throw invalid("recurrence", "Needs a due date");
     if (reassigned) {
       changes.primary_assignee_id = body.primary_assignee_id;
       changes.sort_order = await repo.nextOrder(client, body.primary_assignee_id, before.status);
@@ -658,6 +672,7 @@ async function move(actor, scope, id, { status, before_task_id: beforeId, late_r
       throw new AppError("CONFLICT", "That card has moved, reload the board", 409);
     });
     if (before.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
+    if (status === "done" && lateReason) await reasons.assertOn(client, lateReason);
     if (before.status === "todo" && status !== "todo") {
       const pending = await repo.firstUnsatisfied(client, id);
       if (pending) {
@@ -717,6 +732,16 @@ async function move(actor, scope, id, { status, before_task_id: beforeId, late_r
         }),
       });
       if (status === "done") await tellWaiting(client, actor, after);
+    } else {
+      // Within its column: no history line and no notice, but open boards follow it.
+      await emit(client, {
+        key: EVENTS.TASK_REORDERED,
+        entity: { type: "task", id },
+        actor,
+        before: { sort_order: Number(before.sort_order) },
+        after: { sort_order: Number(after.sort_order) },
+        payload: payloadOf(after),
+      });
     }
     return toTask(after);
   });
@@ -1187,6 +1212,7 @@ async function repeatOne(id, cal, now = new Date()) {
       employee_target_id: t.employee_target_id,
       entity_type: t.entity_type,
       entity_id: t.entity_id,
+      project_id: t.project_id || null,
       recurrence: t.recurrence,
       sort_order: await repo.nextOrder(client, t.primary_assignee_id, "todo"),
     });

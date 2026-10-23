@@ -24,10 +24,12 @@
  * cannot reach a production browser.
  *
  * Every call is best effort: it returns false and logs when Redis is unavailable, and
- * never throws into the caller's work.
+ * never throws into the caller's work. A process that holds neither the server nor a Redis
+ * client (unit and integration tests, a script) has nowhere to send, and returns false at once
+ * rather than opening a connection nobody closes.
  */
 const { logger } = require("../../config/logger");
-const { createConnection, REDIS_PREFIX } = require("../../config/redis");
+const { createConnection, tryClient, REDIS_PREFIX } = require("../../config/redis");
 
 /** The pub/sub key shared by the adapter (API) and this emitter (worker). */
 const CHANNEL_KEY = `${REDIS_PREFIX}:socket.io`;
@@ -61,6 +63,7 @@ function broadcaster() {
 function send(room, event, payload) {
   if (!EVENT_RE.test(String(event)))
     throw new Error(`realtime: "${event}" is not an event name`);
+  if (!server && !redisEmitter && !tryClient()) return false;
   try {
     broadcaster().to(room).emit(event, payload);
     return true;

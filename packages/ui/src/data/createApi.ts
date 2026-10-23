@@ -450,10 +450,16 @@ export function createApi<E>(config: ApiConfig) {
     const [sort, setSortValue] = useState<string | undefined>(opts.sort as string | undefined);
     const filterKey = JSON.stringify(opts.filters ?? {});
     const lastFilters = useRef(filterKey);
+    const lastSent = useRef("");
 
+    // Back to page 1 only when the search sent changes: the pause after mounting, or a stray space,
+    // leaves the page the person moved to.
     useEffect(() => {
       const t = setTimeout(() => {
-        setQSent(q.trim());
+        const next = q.trim();
+        if (next === lastSent.current) return;
+        lastSent.current = next;
+        setQSent(next);
         setPage(1);
       }, 250);
       return () => clearTimeout(t);

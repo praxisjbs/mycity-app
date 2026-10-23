@@ -4,6 +4,8 @@ import type {
   Commitment,
   CommitmentSetRow,
   CountsTowardsOption,
+  LateReasonOption,
+  Project,
   Task,
   TaskActivity,
   TaskBlockage,
@@ -17,6 +19,7 @@ import type {
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, uuid } from "../core";
 import { OBJECTIVES, SCORECARDS } from "../data/performance";
 import { byId, byKey, DEPARTMENTS, PEOPLE, ref, refKey, teamOf } from "../data/people";
+import { me as meOf } from "./identity";
 import { leaveRequests } from "./organisation";
 import { exportFile } from "./shared";
 
@@ -27,7 +30,9 @@ import { exportFile } from "./shared";
  * people beside them), who manages a task (its setter and those over its assignee, never
  * the assignee of a task someone else set), who may watch one (someone who can see it),
  * and a cancelled task off the board. The mock models no notices, so a repeat's quiet next
- * copy has nothing to show here.
+ * copy has nothing to show here. Projects (anyone starts one, everyone lists it, a project's
+ * board and counts hold the tasks the reader can see) and Why Late's reasons (kept by holders of
+ * workspace.late_reasons) are here too, as is no live board: the mock has no server to push.
  */
 type Status = Task["status"];
 type R = [string, Status, string, number | null, Task["priority"], string | null, string | null];
@@ -90,7 +95,10 @@ function newTask(fields: Pick<Task, "task_id" | "number" | "title" | "assignee" 
     blocked_reason: null,
     blocked_at: null,
     late_reason: null,
+    late_reason_label: null,
     counts_towards: null,
+    project: null,
+    assignee_left: false,
     entity_type: null,
     entity_id: null,
     link: null,
@@ -134,6 +142,48 @@ const TASKS: Task[] = ROWS.map((r, i) =>
     updated_at: at(1, "09:00"),
   }),
 );
+/* Why Late's reasons (workspace.md §6): six to start; their keepers add more and switch them off. */
+const REASONS: LateReasonOption[] = [
+  ["waiting_on_others", "Waiting on Others"],
+  ["waiting_on_client", "Waiting on Client"],
+  ["blocked_by_another_team", "Blocked by Another Team"],
+  ["underestimated", "Underestimated"],
+  ["deprioritised", "Deprioritised"],
+  ["other", "Other"],
+].map(([code, label], i) => ({ task_late_reason_id: sid(`late_reason:${code}`), code, label, active: true, display_order: (i + 1) * 10 }));
+const reasonOn = (code: string) => REASONS.some((r) => r.code === code && r.active);
+const keepsReasons = (user: string) => meOf(user).is_ceo || meOf(user).capabilities.includes("workspace.late_reasons");
+
+/* Projects (workspace.md §6): anyone starts one; its board and counts hold the tasks the reader can see. */
+type MockProject = Omit<Project, "open" | "done" | "can_edit">;
+const PROJECTS: MockProject[] = [
+  ["Enugu Launch", "cynthia", 18, "active"],
+  ["Q4 Campaigns", "tolu", 40, "active"],
+  ["Abuja Hub Opening", "cynthia", -12, "completed"],
+].map(([name, owner, dueIn, status], i) => ({
+  project_id: sid(`project:${i}`),
+  number: `PRJ-2026-${String(i + 1).padStart(6, "0")}`,
+  name: name as string,
+  description: null,
+  owner: refKey(owner as string),
+  due_on: isoDaysAhead(dueIn as number),
+  status: status as Project["status"],
+  completed_at: status === "completed" ? at(12, "16:00") : null,
+  created_at: at(30 - i, "09:00"),
+}));
+const projectRef = (p: MockProject) => ({ project_id: p.project_id, number: p.number, name: p.name });
+const projectRefOf = (id: string) => {
+  const p = PROJECTS.find((x) => x.project_id === id);
+  return p ? projectRef(p) : null;
+};
+const projectProblem = (id: string): Record<string, string[]> | null => {
+  const p = PROJECTS.find((x) => x.project_id === id);
+  if (!p) return { project_id: ["No such project"] };
+  return p.status === "active" ? null : { project_id: ["Project is closed"] };
+};
+// The Enugu hires and the launch blog posts belong to Enugu Launch; the social calendar to Q4 Campaigns.
+for (const [taskIdx, projectIdx] of [[8, 0], [9, 0], [18, 1]] as const) TASKS[taskIdx]!.project = projectRef(PROJECTS[projectIdx]!);
+
 const COMMENTS: TaskComment[] = [];
 const ACTIVITY: TaskActivity[] = [];
 
@@ -177,6 +227,8 @@ const fresh = (t: Task): Task => {
     steps_done: steps.filter((x) => x.done_at).length,
     commitment_state: stateOf(t),
     waiting: EDGES.some((e) => e.task_id === t.task_id && !satisfied(e)),
+    late_reason_label: t.late_reason ? (REASONS.find((r) => r.code === t.late_reason)?.label ?? t.late_reason) : null,
+    project: t.project ? projectRefOf(t.project.project_id) : null,
   };
 };
 const me = (user?: string | null) => byKey(user)!.employee_id;
@@ -279,6 +331,7 @@ route("GET /api/v1/tasks", (req) => {
       employee_target_id: (t, v) => t.counts_towards?.employee_target_id === v,
       is_commitment: (t, v) => t.is_commitment === (v === "true"),
       commitment_month: (t, v) => t.commitment_month === v,
+      project_id: (t, v) => t.project?.project_id === v,
       due: (t, v) => (v === "overdue" ? t.overdue : v === "today" ? Boolean(t.due_at?.startsWith(today)) : Boolean(t.due_at && t.due_at >= from && t.due_at < to)),
     },
     sort: {
@@ -314,6 +367,89 @@ function leadProblem(user: string, leadId: string, b: { primary_assignee_id?: st
   if (b.primary_assignee_id && b.member_ids && leadId !== me(user) && !b.member_ids.includes(leadId)) return { primary_assignee_id: ["Pick from the people"] };
   return null;
 }
+route("GET /api/v1/tasks/late-reasons", (req) => {
+  const { all, ...query } = req.query;
+  const every = all === "true" && keepsReasons(req.user!);
+  return paged(REASONS.filter((r) => every || r.active), { ...req, query }, {});
+});
+route("POST /api/v1/tasks/late-reasons", (req) => {
+  if (!keepsReasons(req.user!)) return fail(403, "FORBIDDEN", "You cannot change the late reasons");
+  const label = String((req.body as { label?: string }).label ?? "").trim();
+  const code = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^[^a-z]+/, "");
+  if (!code) return invalid({ label: ["Use some letters"] });
+  if (REASONS.some((r) => r.code === code || r.label.toLowerCase() === label.toLowerCase())) return invalid({ label: ["Already a reason"] });
+  if (REASONS.length >= 25) return fail(409, "TOO_MANY_REASONS", "Why Late holds at most 25 reasons");
+  const r: LateReasonOption = { task_late_reason_id: uuid(), code, label, active: true, display_order: (REASONS.length + 1) * 10 };
+  REASONS.push(r);
+  return created(r);
+});
+route("PATCH /api/v1/tasks/late-reasons/:id", (req) => {
+  if (!keepsReasons(req.user!)) return fail(403, "FORBIDDEN", "You cannot change the late reasons");
+  const r = REASONS.find((x) => x.task_late_reason_id === req.params.id);
+  if (!r) return notFound();
+  r.active = Boolean((req.body as { active?: boolean }).active);
+  return ok(r);
+});
+
+/** A project as the reader sees it: its counts only over the tasks they could open on Tasks. */
+const projectFor = (user: string, p: MockProject): Project => {
+  const seen = TASKS.filter((t) => t.project?.project_id === p.project_id && t.status !== "cancelled" && seesTask(user, t));
+  const role = meOf(user).roles[0]?.code ?? "employee";
+  return {
+    ...p,
+    open: seen.filter(open).length,
+    done: seen.filter((t) => t.status === "done").length,
+    can_edit: p.owner?.employee_id === me(user) || meOf(user).is_ceo || ["management", "operations_people", "implementation"].includes(role),
+  };
+};
+route("GET /api/v1/projects", (req) => {
+  const { status = "active", ...query } = req.query;
+  const list = PROJECTS.filter((p) => p.status === status).map((p) => projectFor(req.user!, p));
+  return paged(list, { ...req, query }, {
+    search: (p) => [p.name, p.number],
+    sort: {
+      name: (a, b) => a.name.localeCompare(b.name),
+      due_on: (a, b) => (a.due_on ?? "9").localeCompare(b.due_on ?? "9"),
+      created_at: (a, b) => a.created_at.localeCompare(b.created_at),
+    },
+  });
+});
+route("GET /api/v1/projects/:id", (req) => {
+  const p = PROJECTS.find((x) => x.project_id === req.params.id);
+  return p ? ok(projectFor(req.user!, p)) : notFound();
+});
+route("POST /api/v1/projects", (req) => {
+  const b = req.body as { name?: string; description?: string; due_on?: string };
+  if (!b.name || !b.name.trim()) return invalid({ name: ["Name the project"] });
+  const p: MockProject = {
+    project_id: uuid(),
+    number: `PRJ-2026-${String(PROJECTS.length + 1).padStart(6, "0")}`,
+    name: b.name.trim(),
+    description: b.description || null,
+    owner: refKey(req.user!),
+    due_on: b.due_on || null,
+    status: "active",
+    completed_at: null,
+    created_at: new Date().toISOString(),
+  };
+  PROJECTS.unshift(p);
+  return created(projectFor(req.user!, p));
+});
+route("PATCH /api/v1/projects/:id", (req) => {
+  const p = PROJECTS.find((x) => x.project_id === req.params.id);
+  if (!p) return notFound();
+  if (!projectFor(req.user!, p).can_edit) return fail(403, "FORBIDDEN", "Only its owner can change this project");
+  const b = req.body as { name?: string; description?: string | null; due_on?: string | null; status?: Project["status"] };
+  if (typeof b.name === "string") p.name = b.name.trim();
+  if ("description" in b) p.description = b.description || null;
+  if ("due_on" in b) p.due_on = b.due_on || null;
+  if (b.status && b.status !== p.status) {
+    p.status = b.status;
+    p.completed_at = b.status === "completed" ? new Date().toISOString() : null;
+  }
+  return ok(projectFor(req.user!, p));
+});
+
 route("GET /api/v1/tasks/:id", (req) => {
   const t = find(req.user!, req.params.id);
   return t ? ok(detail(req.user!, t)) : notFound();
@@ -322,9 +458,11 @@ route("POST /api/v1/tasks", (req) => {
   const b = req.body as {
     title?: string; primary_assignee_id?: string; due_on?: string; cadence?: Task["cadence"]; priority?: Task["priority"]; description?: string;
     is_commitment?: boolean; acceptance_criteria?: string; commitment_month?: string; employee_target_id?: string; entity_type?: Task["entity_type"]; entity_id?: string;
-    member_ids?: string[]; department_id?: string;
+    member_ids?: string[]; department_id?: string; project_id?: string;
   };
   if (!b.title || !b.title.trim()) return invalid({ title: ["Name the task"] });
+  const joins = b.project_id ? projectProblem(b.project_id) : null;
+  if (joins) return invalid(joins);
   if (b.member_ids && b.department_id) return invalid({ department_id: ["People or a department"] });
   if (b.department_id && !b.primary_assignee_id) return invalid({ primary_assignee_id: ["Pick a lead"] });
   const assignee = b.primary_assignee_id ? byId(b.primary_assignee_id) : byKey(req.user);
@@ -352,13 +490,14 @@ route("POST /api/v1/tasks", (req) => {
     is_commitment: Boolean(b.is_commitment),
     acceptance_criteria: b.is_commitment ? (b.acceptance_criteria ?? null) : null,
     commitment_month: b.is_commitment ? (b.commitment_month ?? null) : null,
+    project: b.project_id ? projectRef(PROJECTS.find((p) => p.project_id === b.project_id)!) : null,
   });
   TASKS.unshift(t);
   log(req.user!, t, "created", null, "todo");
   return created(fresh(t));
 });
 /** What only whoever manages a task changes (the API's SETTER_FIELDS). */
-const SETTER_FIELDS = ["title", "cadence", "due_on", "primary_assignee_id", "member_ids", "department_id", "employee_target_id", "entity_type", "entity_id", "recurrence"];
+const SETTER_FIELDS = ["title", "cadence", "due_on", "primary_assignee_id", "member_ids", "department_id", "employee_target_id", "entity_type", "entity_id", "project_id", "recurrence"];
 const COMMITMENT_FIELDS = ["is_commitment", "acceptance_criteria", "commitment_month"];
 
 route("PATCH /api/v1/tasks/:id", (req) => {
@@ -402,7 +541,13 @@ route("PATCH /api/v1/tasks/:id", (req) => {
   }
   if (approved && !dueAt) return invalid({ due_on: ["Pick a due date"] });
   const repeats = "recurrence" in b ? b.recurrence : t.recurrence;
-  if (repeats && !dueAt) return invalid({ recurrence: ["Give it a due date to repeat from"] });
+  if (repeats && !dueAt) return invalid({ recurrence: ["Needs a due date"] });
+  // A task may stay in a project completed since; joining one needs it open.
+  if (typeof b.project_id === "string" && b.project_id !== t.project?.project_id) {
+    const joins = projectProblem(b.project_id);
+    if (joins) return invalid(joins);
+  }
+  if (b.late_reason && !reasonOn(String(b.late_reason))) return invalid({ late_reason: ["Pick a reason"] });
 
   if (reassigned) t.assignee = ref(byId(leadId))!;
   t.members = members;
@@ -417,6 +562,7 @@ route("PATCH /api/v1/tasks/:id", (req) => {
   if ("cadence" in b) t.cadence = (b.cadence as Task["cadence"]) ?? null;
   if ("late_reason" in b) t.late_reason = (b.late_reason as Task["late_reason"]) ?? null;
   if ("recurrence" in b) t.recurrence = (b.recurrence as Task["recurrence"]) ?? null;
+  if ("project_id" in b) t.project = b.project_id ? projectRef(PROJECTS.find((p) => p.project_id === b.project_id)!) : null;
   log(req.user!, t, reassigned || "member_ids" in b || "department_id" in b ? "assigned" : "edited");
   return ok(fresh(t));
 });
@@ -430,6 +576,7 @@ route("POST /api/v1/tasks/:id/move", (req) => {
     const e = EDGES.find((x) => x.task_id === t.task_id && !satisfied(x));
     if (e) return fail(409, "TASK_WAITING", `Waiting on ${TASKS.find((x) => x.task_id === e.depends_on_task_id)!.number}`);
   }
+  if (to === "done" && why && !reasonOn(why)) return invalid({ late_reason: ["Pick a reason"] });
   if (to === "done" && why) t.late_reason = why;
   if (to === "done") REMINDERS.delete(t.task_id);
   // The board reads TASKS in order: the card goes above `before`, or to the foot.
@@ -798,8 +945,8 @@ route("GET /api/v1/workspace/analytics", (req) => {
         return band === "1_3" ? d < 4 : band === "4_7" ? d >= 4 && d < 8 : band === "8_14" ? d >= 8 && d < 15 : d >= 15;
       }).length,
     })),
-    overdue_by_reason: (["waiting_on_others", "underestimated", "deprioritised", "other", null] as const)
-      .map((reason) => ({ reason, count: openNow.filter((t) => t.overdue && t.late_reason === reason).length }))
+    overdue_by_reason: [...REASONS.map((r) => [r.code, r.label] as const), [null, null] as const]
+      .map(([reason, label]) => ({ reason, label, count: openNow.filter((t) => t.overdue && t.late_reason === reason).length }))
       .filter((r) => r.count > 0),
     blocked: (() => {
       const held = openNow.filter((t) => t.blocked_reason).map((t) => {

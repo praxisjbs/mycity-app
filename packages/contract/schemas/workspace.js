@@ -7,7 +7,7 @@
 const { z } = require("zod");
 const { uuid, isoDate, isoDateTime, PAGE_SIZE, listQuery, Paged } = require("./common");
 const { PersonRef } = require("./organisation");
-const { Task, TaskRef, TaskPriority, TaskStatus, TaskActivityKind, TaskScope, LateReason } = require("./tasks");
+const { Task, TaskRef, TaskPriority, TaskStatus, TaskActivityKind, TaskScope, LateReason, LATE_REASONS_MAX } = require("./tasks");
 const { CalendarItem } = require("./calendar");
 
 /** The first page of a list on Today, with how many there are in all. */
@@ -64,7 +64,8 @@ const PriorityLoad = z.object({ priority: TaskPriority, open: z.number().int().m
 const AgingBand = z.enum(["1_3", "4_7", "8_14", "15_plus"]);
 const AgingCount = z.object({ band: AgingBand, count: z.number().int().min(0) }).strict();
 /** Open overdue tasks by the reason given; null: no reason recorded. */
-const ReasonCount = z.object({ reason: LateReason.nullable(), count: z.number().int().min(0) }).strict();
+/** Overdue tasks with one late reason, by its words (null: none given). */
+const ReasonCount = z.object({ reason: LateReason.nullable(), label: z.string().nullable(), count: z.number().int().min(0) }).strict();
 /** A task held by a blockage now, oldest hold first. */
 const BlockedWork = z
   .object({
@@ -90,7 +91,7 @@ const WorkspaceAnalytics = z
     workload: z.array(PersonLoad).max(PAGE_SIZE),
     by_priority: z.array(PriorityLoad).max(4),
     overdue_aging: z.array(AgingCount).max(4),
-    overdue_by_reason: z.array(ReasonCount).max(5),
+    overdue_by_reason: z.array(ReasonCount).max(LATE_REASONS_MAX + 1),
     blocked: firstPage(BlockedWork),
   })
   .strict();

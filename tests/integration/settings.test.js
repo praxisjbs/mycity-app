@@ -181,6 +181,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "mailbox.signature",
         "performance.manage",
         "policies.manage",
+        "workspace.late_reasons",
       ]);
 
       const m = await as("ops").get("/settings/roles/matrix");
@@ -246,6 +247,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "home.team",
         "performance.manage",
         "policies.manage",
+        "workspace.late_reasons",
       ]);
       const staff = await detail("employee");
       expect(staff.visible_fields).toEqual([]);
@@ -267,6 +269,7 @@ describeDb("access, settings and audit against the real migrations", () => {
         "home.team",
         "performance.manage",
         "policies.manage",
+        "workspace.late_reasons",
       ]);
       expect(await grantsCache.getCapabilities(pool, people.staff.user.user_id)).toEqual([]);
     });

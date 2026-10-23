@@ -119,7 +119,8 @@ export interface PrefillSchema {
  * assistant's screen button opens Request Leave on `?new=1&starts_on=2026-10-26`. Each field of
  * the contract's prefill schema that the address carries, and that the field takes on its own, is
  * read once as the form mounts and taken out of the address, so Back and a reload do not fill it
- * again. The person still presses the form's own button.
+ * again. A list field arrives comma-separated and is handed over as it came. The person still
+ * presses the form's own button.
  *
  *   const filled = useAddressPrefill(leave.LeaveRequestPrefill);
  *   const f = useContractForm({ ...blank, ...filled }, leave.LeaveRequestCreate);
@@ -133,7 +134,8 @@ export function useAddressPrefill<S extends PrefillSchema>(schema: S, enabled = 
     if (enabled)
       for (const [key, field] of Object.entries(schema.shape)) {
         const v = params.get(key);
-        if (v && field.safeParse(v).success) out[key] = v;
+        // A list field (New Event's attendees) comes as one comma-separated value.
+        if (v && (field.safeParse(v).success || field.safeParse(v.split(",")).success)) out[key] = v;
       }
     return out as Partial<Record<keyof S["shape"] & string, string>>;
   });

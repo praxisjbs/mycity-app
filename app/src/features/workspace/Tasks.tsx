@@ -4,32 +4,19 @@
  */
 import { useEffect, useState } from "react";
 import type { Task } from "@mycity/contract/contract.gen.ts";
-import { useApi, useInfinite, usePaged } from "@/api/hooks";
+import { useApi, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
-import { Button, CheckboxField, DataView, EmptyState, ErrorState, formatDate, Kanban, PageHeader, Pill, SearchInput, SegmentedControl, Toolbar, useModal, Who } from "@mycity/ui";
-import { CardPills, COLS, duePill, LABEL, PRIORITY, STATUS_TONE, useSetsForOthers, type BoardStatus } from "./shared";
+import { Button, CheckboxField, DataView, EmptyState, ErrorState, formatDate, IconButton, PageHeader, Pill, SearchInput, SegmentedControl, Toolbar, useModal, Who } from "@mycity/ui";
+import { duePill, LABEL, PRIORITY, STATUS_TONE, useLiveTasks, useSetsForOthers } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 import { SendCommitmentsForm } from "./Commitment";
-import { TaskForm, useMoveTask } from "./TaskForms";
+import { TaskForm } from "./TaskForms";
+import { TaskBoard, usePaused } from "./TaskBoard";
+import { LateReasons, useKeepsReasons } from "./LateReasons";
 
 type Scope = "mine" | "team";
-
-/** One column: its own server list, more pages appended under it. */
-function useColumn(status: BoardStatus, scope: Scope, q: string) {
-  return useInfinite("GET /api/v1/tasks", { filters: { status, scope }, q });
-}
-
-/** What is typed in the search, once the person pauses (as the paged lists wait), so four columns ask once. */
-function usePaused(q: string) {
-  const [sent, setSent] = useState(q);
-  useEffect(() => {
-    const t = setTimeout(() => setSent(q.trim()), 250);
-    return () => clearTimeout(t);
-  }, [q]);
-  return sent;
-}
 
 export function Tasks({ openId = null }: { openId?: string | null }) {
   const others = useSetsForOthers();
@@ -40,16 +27,11 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
   const sent = usePaused(q);
   const [cancelled, setCancelled] = useState(false);
   const summary = useApi("GET /api/v1/tasks/summary", { query: { scope } });
-  const cols = {
-    todo: useColumn("todo", scope, sent),
-    in_progress: useColumn("in_progress", scope, sent),
-    in_review: useColumn("in_review", scope, sent),
-    done: useColumn("done", scope, sent),
-  };
+  const keeps = useKeepsReasons();
+  useLiveTasks();
   const list = usePaged("GET /api/v1/tasks", { filters: { scope }, sort: "due_at", enabled: layout === "list" });
   const gone = usePaged("GET /api/v1/tasks", { filters: { status: "cancelled", scope }, enabled: cancelled });
   const panel = useTaskPanel();
-  const move = useMoveTask(modal.open);
   /* A task opened from a link (?id=): the bell, ⌘K, the Commitments view, a calendar date. */
   const [, setParams] = useSearchParams();
   const linked = openId;
@@ -62,14 +44,9 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
   const add = () => modal.open({ title: "New Task", body: (close) => <TaskForm close={close} /> });
   const addCommitment = () => modal.open({ title: "New Commitment", body: (close) => <TaskForm close={close} commitment /> });
   const sendMonth = () => modal.open({ title: "Send Commitments", wide: true, body: (close) => <SendCommitmentsForm close={close} /> });
+  const reasons = () => modal.open({ title: "Late Reasons", body: (close) => <LateReasons close={close} /> });
   useScreenAction({ label: "New Task", onSelect: add });
   useUrlAction("commitment", addCommitment);
-  const columns = Object.values(cols);
-  const all = columns.flatMap((c) => c.rows);
-  // A column whose first page has not come yet is loading; one that failed is the board's error.
-  const loading = columns.some((c) => !c.page && !c.error);
-  const failed = columns.find((c) => c.error)?.error ?? null;
-  const retry = () => Promise.all(columns.filter((c) => c.error).map((c) => c.reload()));
   const search = (v: string) => {
     setQ(v);
     list.setQ(v);
@@ -83,6 +60,7 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
           <>
             <SegmentedControl label="Tasks Layout" value={layout} onChange={setLayout} options={[["board", "Board"], ["list", "List"]]} />
             {others && <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            {keeps && <IconButton icon="cog" label="Late Reasons" onClick={reasons} />}
             <Button icon="send" onClick={sendMonth}>Send Commitments</Button>
             <Button variant="primary" icon="plus" onClick={add}>New Task</Button>
           </>
@@ -108,31 +86,12 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
         <CheckboxField label="Show Cancelled" value={cancelled} onChange={setCancelled} />
       </Toolbar>
       {layout === "board" ? (
-        failed ? (
-          <ErrorState error={failed} onRetry={retry} />
-        ) : (
-          <Kanban
-            reorder
-            loading={loading}
-            onMove={(card, _from, to, before) => {
-              const t = all.find((x) => x.task_id === card);
-              return t ? move(t, to as BoardStatus, before) : undefined;
-            }}
-            onOpen={(card) => {
-              const t = all.find((x) => x.task_id === card);
-              if (t) panel.open(t.task_id, t.title);
-            }}
-            empty={sent ? undefined : <EmptyState title="No Tasks Yet" action={<Button variant="primary" icon="plus" onClick={add}>New Task</Button>} />}
-            columns={COLS.map(([status, label, series]) => ({
-              key: status,
-              label,
-              series,
-              count: cols[status].page?.total,
-              onMore: cols[status].page?.has_next ? cols[status].more : undefined,
-              cards: cols[status].rows.map((t) => ({ key: t.task_id, title: t.title, meta: <CardPills t={t} />, owner: t.assignee?.display_name })),
-            }))}
-          />
-        )
+        <TaskBoard
+          filters={{ scope }}
+          q={sent}
+          onOpen={panel.open}
+          empty={<EmptyState title="No Tasks Yet" action={<Button variant="primary" icon="plus" onClick={add}>New Task</Button>} />}
+        />
       ) : (
         <DataView<Task>
           list={list}
@@ -143,7 +102,12 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
           empty={{ title: "No Tasks Yet" }}
           columns={[
             { key: "title", label: "Task", render: (t) => <span data-copy="content"><b className="font-semibold">{t.number}</b> {t.title}</span> },
-            { key: "assignee", label: "Assignee", render: (t) => (t.assignee ? <Who name={t.assignee.display_name} role={t.members.length ? `+${t.members.length} More` : undefined} /> : "") },
+            {
+              key: "assignee",
+              label: "Assignee",
+              render: (t) =>
+                t.assignee ? <Who name={t.assignee.display_name} role={t.assignee_left ? "Left" : t.members.length ? `+${t.members.length} More` : undefined} /> : "",
+            },
             { key: "status", label: "Status", render: (t) => <Pill tone={STATUS_TONE[t.status]}>{LABEL[t.status]}</Pill> },
             { key: "due_at", label: "Due", sortable: true, render: (t) => { const p = duePill(t); return <Pill tone={p.tone}>{p.text}</Pill>; } },
             { key: "priority", label: "Priority", sortable: true, render: (t) => PRIORITY[t.priority] },

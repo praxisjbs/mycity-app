@@ -45,7 +45,10 @@ module.exports = {
       await maskForUser(
         pool,
         req.user,
-        await team.roster(scopeOf(req), req.validated.query, { performance: await scopeFor(req.user, "performance", "view") }),
+        await team.roster(scopeOf(req), req.validated.query, {
+          performance: await scopeFor(req.user, "performance", "view"),
+          workspace: await scopeFor(req.user, "workspace", "view"),
+        }),
       ),
     ),
   teamAttendance: async (req, res) =>

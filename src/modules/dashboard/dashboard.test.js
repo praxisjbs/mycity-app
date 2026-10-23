@@ -1212,8 +1212,10 @@ describe("the Team tab", () => {
     expect(team.filtersOf({}, "2026-10-14").no_clock_out_yesterday).toBeUndefined();
   });
 
-  test("a roster row is a Team Roster row; KPI is the score asked for, Open Tasks stays null", () => {
+  test("a roster row is a Team Roster row; KPI and Open Tasks are what was read, null where nothing was", () => {
     expect(team.rowOf(rosterRow(), new Map([[ID, 82]])).kpi_percent).toBe(82);
+    expect(team.rowOf(rosterRow(), new Map(), new Map([[ID, 4]])).open_tasks).toBe(4);
+    expect(team.rowOf(rosterRow(), new Map(), new Map([[ID, 0]])).open_tasks).toBe(0);
     const row = team.rowOf(rosterRow());
     expect(row).toMatchObject({
       employee: { employee_id: ID, display_name: "Ada Obi", job_title: "Field Officer", department: "Programmes" },
@@ -1275,6 +1277,22 @@ describe("the Team tab", () => {
     );
   });
 
+  test("Open Tasks counts the people the reader's workspace view reaches, and nobody else", async () => {
+    const OTHER = "00000000-0000-4000-8000-0000000000ff";
+    jest
+      .spyOn(roster, "page")
+      .mockResolvedValue({ data: [rosterRow(), { ...rosterRow(), employee_id: OTHER }], page: { number: 1, size: 25, total: 2, pages: 1, has_next: false } });
+    db.query.mockResolvedValueOnce({ rows: [{ employee_id: ID, open: 3 }] });
+    const answer = await team.roster(TEAM, { page: 1 }, { now: NOW, db, workspace: { scope: "own", scope_ids: [ID] } });
+    expect(answer.data.map((r) => r.open_tasks)).toEqual([3, null]);
+    expect(db.query.mock.calls.at(-1)[1]).toEqual([[ID]]);
+    // Without the workspace view, nothing is read and nothing is drawn.
+    db.query.mockClear();
+    const none = await team.roster(TEAM, { page: 1 }, { now: NOW, db });
+    expect(none.data.map((r) => r.open_tasks)).toEqual([null, null]);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
   test("Attendance This Month: from the 1st of this month in Lagos to today", async () => {
     const month = jest.spyOn(roster, "month").mockResolvedValue({
       data: [{ ...rosterRow(), expected: 9, on_time: 6, late: 2, absent: 1, on_leave: 2 }],
@@ -1321,7 +1339,7 @@ describe("the Team tab", () => {
 
     const sent = res();
     await controller.team(req, sent);
-    expect(list).toHaveBeenCalledWith(TEAM, { page: 1 }, { performance: null });
+    expect(list).toHaveBeenCalledWith(TEAM, { page: 1 }, { performance: null, workspace: null });
     expect(sent.json.mock.calls[0][0].data[0].employee.display_name).toBe("Ada Obi");
     await controller.teamAttendance(req, res());
     expect(month).toHaveBeenCalledWith(TEAM, { page: 1 });

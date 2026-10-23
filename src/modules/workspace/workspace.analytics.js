@@ -13,7 +13,7 @@
  *   open                 open tasks now
  *   cycle_days           mean of completed_at − started_at over tasks done in the period
  *   overdue_aging        open overdue tasks by how many days late: 1–3, 4–7, 8–14, 15 and more
- *   overdue_by_reason    open overdue tasks by the late reason given (none recorded counts too)
+ *   overdue_by_reason    open overdue tasks by the late reason given, with its words (none recorded counts too)
  *   blocked              tasks held by an open blockage, oldest hold first (the first page)
  */
 const { pool } = require("../../config/db");
@@ -114,9 +114,12 @@ async function analytics(query, scope, now = new Date()) {
       params,
     ),
     pool.query(
-      `SELECT t.late_reason AS reason, count(*)::int AS count
-         ${base} AND ${OPEN} AND t.due_at < $3
-        GROUP BY 1`,
+      `SELECT x.reason, lr.label, x.count
+         FROM (SELECT t.late_reason AS reason, count(*)::int AS count
+                 ${base} AND ${OPEN} AND t.due_at < $3
+                GROUP BY 1) x
+         LEFT JOIN task_late_reason lr ON lr.code = x.reason
+        ORDER BY x.reason IS NULL, lr.display_order, lr.label, x.reason`,
       params,
     ),
     pageQuery(
@@ -161,9 +164,8 @@ async function analytics(query, scope, now = new Date()) {
       band,
       count: (aging.rows.find((r) => r.band === band) || { count: 0 }).count,
     })),
-    overdue_by_reason: ["waiting_on_others", "underestimated", "deprioritised", "other", null]
-      .map((reason) => ({ reason, count: (reasons.rows.find((r) => r.reason === reason) || { count: 0 }).count }))
-      .filter((r) => r.count > 0),
+    // Each reason with overdue tasks, in the list's order, then those with none given.
+    overdue_by_reason: reasons.rows.map((r) => ({ reason: r.reason, label: r.label ?? null, count: r.count })),
     blocked: {
       data: held.data.map((r) => ({
         task: tasks.toRef(r, scope),

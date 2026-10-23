@@ -49,6 +49,8 @@ const ROWS = `
          t.primary_assignee_id, t.set_by_employee_id, t.created_by,
          t.is_commitment, t.acceptance_criteria, t.commitment_month, t.original_due_at, t.rescoped_at,
          t.rescope_reason, t.commitment_set_id, cs.status AS set_status, t.late_reason,
+         lr.label AS late_reason_label, t.project_id, pr.number::text AS project_number, pr.name AS project_name,
+         COALESCE(ae.status IN ('left', 'archived'), false) AS assignee_left,
          ${COMMITMENT_STATE("t")} AS commitment_state,
          ${personJson("ae", "ad")} AS assignee,
          COALESCE((SELECT json_agg(${personJson("me", "md")} ORDER BY me.first_name, me.last_name, me.employee_id)
@@ -74,7 +76,9 @@ const ROWS = `
     LEFT JOIN department sd ON sd.department_id = se.department_id
     LEFT JOIN employee_target et ON et.employee_target_id = t.employee_target_id
     LEFT JOIN okr_key_result kr ON t.entity_type = 'key_result' AND kr.okr_key_result_id = t.entity_id
-    LEFT JOIN commitment_set cs ON cs.commitment_set_id = t.commitment_set_id`;
+    LEFT JOIN commitment_set cs ON cs.commitment_set_id = t.commitment_set_id
+    LEFT JOIN task_late_reason lr ON lr.code = t.late_reason
+    LEFT JOIN project pr ON pr.project_id = t.project_id`;
 
 const OPEN = `v.status NOT IN ('done', 'cancelled') AND v.archived_at IS NULL`;
 
@@ -85,7 +89,8 @@ const OUT = `v.task_id, v.number, v.title, v.description, v.status, v.priority, 
   v.created_at, v.updated_at, v.primary_assignee_id, v.set_by_employee_id, v.created_by,
   v.assignee, v.members, v.set_by, v.target_title, v.kr_code, v.kr_statement, v.comment_count, v.is_commitment,
   v.acceptance_criteria, v.commitment_month, v.original_due_at, v.rescoped_at, v.rescope_reason,
-  v.commitment_set_id, v.set_status, v.commitment_state, v.late_reason,
+  v.commitment_set_id, v.set_status, v.commitment_state, v.late_reason, v.late_reason_label,
+  v.project_id, v.project_number, v.project_name, v.assignee_left,
   v.steps_total, v.steps_done, v.waiting`;
 
 /** The SQL for each field TaskListQuery allow-lists. The first is the default order. */
@@ -143,6 +148,7 @@ function list(db, query, scope, at, only = {}) {
     at.week.to,
     query.is_commitment === undefined ? null : query.is_commitment === "true",
     query.commitment_month || null,
+    query.project_id || null,
   ];
   const who = audience(query.scope, scope, params);
   const narrower = [];
@@ -169,6 +175,7 @@ function list(db, query, scope, at, only = {}) {
              OR ($7 = 'week' AND v.due_at >= $11 AND v.due_at < $12))
         AND ($13::boolean IS NULL OR v.is_commitment = $13)
         AND ($14::date IS NULL OR v.commitment_month = $14)
+        AND ($15::uuid IS NULL OR v.project_id = $15)
         ${who} ${narrower.join(" ")}
       ORDER BY ${orderBy(query, SORTS, "v.task_id")}`,
     params,
@@ -366,6 +373,7 @@ const WRITABLE = [
   "recurrence",
   "sort_order",
   "late_reason",
+  "project_id",
   "is_commitment",
   "acceptance_criteria",
   "commitment_month",
@@ -452,6 +460,66 @@ async function nextOrder(client, assigneeId, status) {
     [assigneeId, status],
   );
   return Number(rows[0].next);
+}
+
+/* ------------------------------------------------------------------ *
+ * Why Late's reasons (workspace.md §6 Late reasons)
+ * ------------------------------------------------------------------ */
+
+const REASON = "task_late_reason_id, code, label, active, display_order";
+
+/** A page of the reasons, in their order: those switched on, or `all`. */
+function lateReasons(db, { all }, query) {
+  return pageQuery(
+    db,
+    `SELECT ${REASON}, ${TOTAL_COL} FROM task_late_reason
+      WHERE ($1::boolean OR active)
+      ORDER BY display_order, label, task_late_reason_id`,
+    [Boolean(all)],
+    query,
+  );
+}
+
+async function lateReason(db, id) {
+  const { rows } = await db.query(`SELECT ${REASON} FROM task_late_reason WHERE task_late_reason_id = $1`, [id]);
+  return rows[0] || null;
+}
+
+/** Is the code a reason switched on? */
+async function lateReasonOn(db, code) {
+  const { rows } = await db.query("SELECT 1 FROM task_late_reason WHERE code = $1 AND active", [code]);
+  return rows.length > 0;
+}
+
+/** How many reasons there are, and whether one already has this code or these words. */
+async function lateReasonClash(db, code, label) {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS total,
+            bool_or(code = $1 OR lower(btrim(label)) = lower(btrim($2))) AS taken
+       FROM task_late_reason`,
+    [code, label],
+  );
+  return { total: rows[0].total, taken: Boolean(rows[0].taken) };
+}
+
+/** A new reason at the foot of the list, switched on. */
+async function insertLateReason(client, { code, label, created_by }) {
+  const { rows } = await client.query(
+    `INSERT INTO task_late_reason (code, label, display_order, created_by)
+     SELECT $1, $2, COALESCE(max(display_order), 0) + 10, $3 FROM task_late_reason
+     ON CONFLICT (code) DO NOTHING
+     RETURNING ${REASON}`,
+    [code, label, created_by],
+  );
+  return rows[0] || null;
+}
+
+async function setLateReasonActive(client, id, active) {
+  const { rows } = await client.query(
+    `UPDATE task_late_reason SET active = $2 WHERE task_late_reason_id = $1 RETURNING ${REASON}`,
+    [id, active],
+  );
+  return rows[0] || null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -993,12 +1061,14 @@ async function openBlockage(db, taskId) {
 
 /** One page of a task's holds, newest first by default. */
 function blockages(db, taskId, query) {
+  // Newest first unless the reader sorts: the order and the page it reports agree.
+  const q = { ...query, sort: query.sort || { field: "raised_at", dir: "desc" } };
   return pageQuery(
     db,
     `SELECT v.*, ${TOTAL_COL} FROM (${HOLDS} WHERE b.task_id = $1) v
-      ORDER BY ${orderBy(query, { raised_at: "v.raised_at" }, "v.task_blockage_id")}`,
+      ORDER BY ${orderBy(q, { raised_at: "v.raised_at" }, "v.task_blockage_id")}`,
     [taskId],
-    { ...query, sort: query.sort || { field: "raised_at", dir: "desc" } },
+    q,
   );
 }
 
@@ -1050,6 +1120,12 @@ module.exports = {
   firstUnsatisfied,
   waitingTaskIds,
   usersOf,
+  lateReasons,
+  lateReason,
+  lateReasonOn,
+  lateReasonClash,
+  insertLateReason,
+  setLateReasonActive,
   watchers,
   watcherIds,
   addWatcher,
