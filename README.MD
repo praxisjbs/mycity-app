@@ -63,8 +63,10 @@ mycity-app/
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
 ├── seeds/staging/            demonstration data, staging only. Never production
-│                             (40_workspace.js: My Workspace's tasks and calendar through their
-│                             services; 45_performance_plan.js: MyCity's Q4 2026 plan, its quarter,
+│                             (40_workspace.js: My Workspace's tasks, shared, repeating and
+│                             reminded ones, the week's Support Needed lines and the calendar,
+│                             through their services, tested by tests/integration/
+│                             workspace-staging-seed.test.js; 45_performance_plan.js: MyCity's Q4 2026 plan, its quarter,
 │                             goals and the workbooks in performance/ through the import engine;
 │                             46_performance_reviews.js: October 2026's round with a review at
 │                             every stage, through the reviews service and the approval engine;

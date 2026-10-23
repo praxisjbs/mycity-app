@@ -3,7 +3,7 @@
  * its watchers and reminders, its hold; its steps; its comments; its history. A SidePanel on
  * desktop, a full-screen sheet on a phone. The small forms open over it in the shared modal.
  */
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import tasks from "@mycity/contract/schemas/tasks.js";
 import type { TaskDependency, TaskDetail } from "@mycity/contract/contract.gen.ts";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
@@ -31,7 +31,7 @@ import {
   useModal,
   Who,
 } from "@mycity/ui";
-import { CADENCE, LABEL, LATE, PRIORITY, STATUS_TONE, refresh, say, type Status } from "./shared";
+import { CADENCE, LABEL, LATE, PRIORITY, STATUS_TONE, refresh, say, usePages, type Status } from "./shared";
 import { CommitmentActions, commitmentItems, COUNTS_HELP } from "./Commitment";
 import { BlockForm, CancelForm, LateReasonForm, LEAD_HELP, OverrideForm, PingForm, RemindersForm, RepeatForm, repeatText, StepForm, TaskForm, UnblockForm, WaitingForm, WatcherForm } from "./TaskForms";
 
@@ -74,6 +74,12 @@ export function TaskPanel({ id, close, onOpenTask }: { id: string; close: () => 
   const { data: t, error, reload } = useApi("GET /api/v1/tasks/:id", { params: { id } });
   const [view, setView] = useState<View>("details");
   const modal = useModal();
+  // A task the reader cannot see, or one that is gone: the board stays, with no panel (§11).
+  const gone = error?.status === 404;
+  useEffect(() => {
+    if (gone) close();
+  }, [gone, close]);
+  if (gone) return null;
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!t) return <LoadingRows count={6} />;
   const changed = () => {
@@ -82,9 +88,11 @@ export function TaskPanel({ id, close, onOpenTask }: { id: string; close: () => 
   };
   const form = (title: string, body: (done: () => void) => ReactNode) => modal.open({ title, body });
   const open = t.status !== "cancelled";
+  // A lead time needs a due time to count back from; without one only reminders already set can change.
+  const remindable = t.can_plan && t.status !== "done" && (Boolean(t.due_at) || t.reminders.length > 0);
   const more = [
     { label: "Send Nudge", icon: "bell" as const, onSelect: () => form("Send Nudge", (done) => <PingForm id={t.task_id} hasWatchers={t.watchers.length > 0} close={done} />) },
-    ...(t.can_plan && t.status !== "done" ? [{ label: "Set Reminders", icon: "clock" as const, onSelect: () => form("Set Reminders", (done) => <RemindersForm task={t} close={done} onDone={changed} />) }] : []),
+    ...(remindable ? [{ label: "Set Reminders", icon: "clock" as const, onSelect: () => form("Set Reminders", (done) => <RemindersForm task={t} close={done} onDone={changed} />) }] : []),
     ...(t.can_reassign ? [{ label: t.recurrence ? "Change Repeat" : "Set Repeat", icon: "refresh" as const, onSelect: () => form("Repeat", (done) => <RepeatForm task={t} close={done} onDone={changed} />) }] : []),
     ...(t.overdue ? [{ label: "Say Why Late", icon: "alert" as const, onSelect: () => form("Why Late", (done) => <LateReasonForm task={t} close={done} onSaved={changed} />) }] : []),
     ...(t.can_cancel ? [{ label: "Cancel Task", icon: "x" as const, danger: true, onSelect: () => form("Cancel Task", (done) => <CancelForm id={t.task_id} close={() => (done(), close())} />) }] : []),
@@ -164,7 +172,7 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
   };
   const edge = (d: TaskDependency, mine: boolean) => (
     <div key={d.task_dependency_id} className="flex items-center gap-2 border-b border-border py-1.5 last:border-b-0">
-      <button type="button" disabled={!d.task.visible} onClick={() => onOpenTask(d.task.task_id, d.task.title)} className="min-w-0 flex-1 text-left">
+      <button type="button" disabled={!d.task.visible} onClick={() => onOpenTask(d.task.task_id, d.task.title)} className="min-h-tap min-w-0 flex-1 text-left">
         <span className="block truncate text-xs font-semibold" data-copy="content">{`${d.task.number} ${d.task.title}`}</span>
         <span className="text-2xs text-subtle-foreground">{d.task.assignee?.display_name ?? ""}</span>
       </button>
@@ -272,8 +280,20 @@ function Steps({ t, changed, form }: { t: TaskDetail; changed: () => void; form:
   );
 }
 
+/** Load More under a list the server holds more of; it spins while the next page comes. */
+function More({ more, loading }: { more?: () => void; loading: boolean }) {
+  if (!more) return null;
+  return (
+    <Button size="sm" block icon="down" busy={loading} onClick={more} className="mt-2">
+      Load More
+    </Button>
+  );
+}
+
+/** The comments, newest first, the box to add one above them, and older ones under Load More. */
 function Comments({ id, onAdded }: { id: string; onAdded: () => void }) {
-  const list = usePaged("GET /api/v1/tasks/:id/comments", { params: { id }, sort: "created_at" });
+  const list = usePaged("GET /api/v1/tasks/:id/comments", { params: { id }, sort: "-created_at" });
+  const read = usePages(list, (c) => c.task_comment_id);
   const f = useContractForm({ body: "" }, tasks.TaskCommentCreate);
   const save = useMutation("POST /api/v1/tasks/:id/comments");
   const submit = async () => {
@@ -281,7 +301,7 @@ function Comments({ id, onAdded }: { id: string; onAdded: () => void }) {
     try {
       await save.run({ params: { id }, body: f.values });
       f.reset({ body: "" });
-      list.reload();
+      await read.top();
       onAdded();
     } catch (e) {
       say(e);
@@ -289,20 +309,28 @@ function Comments({ id, onAdded }: { id: string; onAdded: () => void }) {
   };
   return (
     <>
-      {list.rows.map((c) => (
-        <div key={c.task_comment_id} className="border-b border-border py-2 last:border-b-0">
-          <div className="flex items-baseline gap-2">
-            <b className="text-xs">{c.author?.display_name ?? "MyCity"}</b>
-            <span className="ml-auto text-2xs text-subtle-foreground">{formatDateTime(c.created_at)}</span>
-          </div>
-          <p className="mt-1 text-xs" data-copy="content">{c.body}</p>
-        </div>
-      ))}
-      {!list.rows.length && !list.loading && <p className="text-2xs text-subtle-foreground">No comments yet.</p>}
       <Field label="Comment" {...f.field("body")}><TextAreaField {...f.field("body")} /></Field>
-      <div className="flex justify-end">
+      <div className="mb-2 flex justify-end">
         <Button size="sm" onClick={submit}>Add Comment</Button>
       </div>
+      {list.error && !read.rows.length ? (
+        <ErrorState error={list.error} onRetry={list.reload} />
+      ) : (
+        <>
+          {read.rows.map((c) => (
+            <div key={c.task_comment_id} className="border-b border-border py-2 last:border-b-0">
+              <div className="flex items-baseline gap-2">
+                <b className="text-xs">{c.author?.display_name ?? "MyCity"}</b>
+                <span className="ml-auto text-2xs text-subtle-foreground">{formatDateTime(c.created_at)}</span>
+              </div>
+              <p className="mt-1 text-xs" data-copy="content">{c.body}</p>
+            </div>
+          ))}
+          {!read.rows.length && list.loading && <LoadingRows count={3} />}
+          {!read.rows.length && !list.loading && <p className="text-2xs text-subtle-foreground">No comments yet.</p>}
+          <More more={read.more} loading={list.loading} />
+        </>
+      )}
     </>
   );
 }
@@ -333,29 +361,36 @@ export function happened(a: { kind: string; to_status: string | null; detail?: s
   return words[a.kind] ?? a.kind.replace("_", " ");
 }
 
+/** The history, newest first, then the holds it has had; older lines of each under Load More. */
 function History({ id }: { id: string }) {
   const history = usePaged("GET /api/v1/tasks/:id/activity", { params: { id }, sort: "-created_at" });
-  const holds = usePaged("GET /api/v1/tasks/:id/blockages", { params: { id } });
+  const lines = usePages(history, (a) => a.task_activity_id);
+  const holds = usePaged("GET /api/v1/tasks/:id/blockages", { params: { id }, sort: "-raised_at" });
+  const held = usePages(holds, (b) => b.task_blockage_id);
+  if (history.error && !lines.rows.length) return <ErrorState error={history.error} onRetry={history.reload} />;
+  if (!lines.rows.length && history.loading) return <LoadingRows count={4} />;
   return (
     <>
       <Timeline
-        items={history.rows.map((a) => ({
+        items={lines.rows.map((a) => ({
           title: `${a.actor?.display_name ?? "MyCity"} ${happened(a)}`,
           when: formatDateTime(a.created_at),
           text: a.detail ?? undefined,
         }))}
       />
-      {holds.rows.length > 0 && (
+      <More more={lines.more} loading={history.loading} />
+      {held.rows.length > 0 && (
         <Section title="Blocked Before">
           <Timeline
             label="Holds"
-            items={holds.rows.map((b) => ({
+            items={held.rows.map((b) => ({
               title: b.note,
               when: `${formatDate(b.raised_at)}, ${b.blocked_days} days`,
               text: [b.resolve_note, b.due_shift_days ? `Due moved ${b.due_shift_days} days` : null].filter(Boolean).join(". ") || undefined,
               tone: b.resolved_at ? ("done" as const) : ("now" as const),
             }))}
           />
+          <More more={held.more} loading={holds.loading} />
         </Section>
       )}
     </>

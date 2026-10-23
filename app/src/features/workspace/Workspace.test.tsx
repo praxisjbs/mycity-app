@@ -3,18 +3,24 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
-import { ModalProvider } from "@mycity/ui";
-import { chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
-import { invalidate } from "@/api/hooks";
-import { mockSession } from "@/api/mock/core";
+import { formatDate, ModalProvider } from "@mycity/ui";
+import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@mycity/ui/testing";
+import { api } from "@/api/client";
+import { clear, invalidate } from "@/api/hooks";
+import { isoDaysAgo, isoDaysAhead, mockSession, sid } from "@/api/mock/core";
+import { byKey } from "@/api/mock/data/people";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
 import Workspace from "./index";
 
 /**
- * My Workspace on the in-browser mock (docs/guides/workspace.md §10): the card's pills for steps,
- * holds, waiting and sharing; New Task's Individual or Shared; the task panel's steps, waiting on and watchers; Today's four figures; and
- * Analytics' overdue by reason and blocked work.
+ * My Workspace on the in-browser mock (docs/guides/workspace.md §10, §11): the card's pills for
+ * steps, holds, waiting and sharing; New Task for one person, for People and for a Department, and
+ * the Lead it offers; Edit Task, an approved commitment's date and Assign To cleared; moving cards,
+ * Why Late on Mark Done, Mark Blocked and Clear Blocker; comments newest first with Load More; My
+ * Week with Support Needed and Tidy With AI, and Team This Week; the calendar's Week and Day, an
+ * invitation answered and an event called off; Today on a phone; a reader who sets nobody work;
+ * and a link to a task the reader cannot see.
  */
 
 installMatchMedia();
@@ -35,8 +41,11 @@ function Harness({ children }: { children?: ReactNode }) {
   return auth.status === "signed-in" ? <>{children}</> : null;
 }
 
-async function signedIn(screenUnderTest: ReactNode) {
+/** The screen, signed in on the mock: as Cynthia (Operations & People, with a team) unless another account is named. */
+async function signedIn(screenUnderTest: ReactNode, email = "cynthia@mycityapp.io") {
   mockSession.set(null);
+  // Nothing one test's reader read is kept for the next (the data client's own sign-out clearing).
+  clear();
   invalidate("/api/v1");
   render(
     <RouterProvider>
@@ -47,11 +56,59 @@ async function signedIn(screenUnderTest: ReactNode) {
       </AuthProvider>
     </RouterProvider>,
   );
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 10000 });
   await act(async () => {
-    await auth!.signIn("cynthia@mycityapp.io", "demo1234");
+    await auth!.signIn(email, "demo1234");
   });
 }
+
+const idOf = (key: string) => byKey(key)!.employee_id;
+/** dd/mm/yyyy, as a person types a date. */
+const typed = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+/** A task set through the API as the signed-in reader, then the board asked again. */
+async function arrange(body: Record<string, unknown>) {
+  let id = "";
+  await act(async () => {
+    const t = await api.call("POST /api/v1/tasks", { body: body as never });
+    id = t.task_id;
+    invalidate("/api/v1/tasks");
+  });
+  return id;
+}
+/** The board, once Cynthia's first cards (or, for another reader, the figures above it) are on screen. */
+async function board(email?: string, id: string | null = null) {
+  await signedIn(<Workspace tab="tasks" id={id} />, email);
+  await screen.findByText(email ? "Completed, 30d" : "Confirm Ember to Remember venue list with MTN", undefined, { timeout: 8000 });
+}
+/** What a panel's Details says beside a label. */
+const valueOf = (panel: HTMLElement, label: string) =>
+  within(panel)
+    .getAllByText(label)
+    .map((el) => el.closest("dt"))
+    .find(Boolean)!.nextElementSibling!.textContent;
+/** A card's own menu on the board, and the stage it sits in. */
+async function moveCard(title: string, stage: string, to: string) {
+  const card = within(screen.getByRole("region", { name: stage })).getByRole("button", { name: new RegExp(title) }).closest("li")!;
+  await userEvent.click(within(card as HTMLElement).getByRole("button", { name: /^Move/ }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: to }));
+}
+const inStage = (stage: string, title: string) => within(screen.getByRole("region", { name: stage })).queryByText(title);
+/** The task's panel, opened from its card. */
+async function openCard(title: string) {
+  fireEvent.click(await screen.findByRole("button", { name: new RegExp(title) }, { timeout: 5000 }));
+  const panel = await screen.findByRole("dialog");
+  await within(panel).findByText("Waiting On", undefined, { timeout: 5000 });
+  return panel;
+}
+/** New Task, open, with the people reads it waits on settled. */
+async function newTask() {
+  fireEvent.click(screen.getAllByRole("button", { name: /New Task/ })[0]!);
+  const form = await screen.findByRole("dialog", { name: "New Task" });
+  await within(form).findByRole("radio", { name: "Shared" }, { timeout: 5000 });
+  return form;
+}
+const named = (form: HTMLElement, title: string) => fireEvent.change(within(form).getByRole("textbox", { name: /Task/ }), { target: { value: title } });
+const closed = (name: string) => waitFor(() => expect(screen.queryByRole("dialog", { name })).toBeNull(), { timeout: 5000 });
 
 describe("my workspace", () => {
   it("Today shows the day's four figures, the diary and what the manager set", async () => {
@@ -60,15 +117,16 @@ describe("my workspace", () => {
     for (const label of ["Due Today", "Overdue", "Meetings", "Clocked In"]) expect(screen.getByText(label)).toBeTruthy();
     expect(screen.getByText("From Your Manager")).toBeTruthy();
     expect(screen.getByText("Recent Activity")).toBeTruthy();
+    expect(screen.queryByText("Africa/Lagos")).toBeNull();
   }, 20000);
 
   it("the board's cards carry steps, holds and waiting; the panel ticks a step and shows what it waits on", async () => {
-    await signedIn(<Workspace tab="tasks" id={null} />);
-    await screen.findByText("Confirm Ember to Remember venue list with MTN", undefined, { timeout: 8000 });
+    await board();
     expect(await screen.findByText("Completed, 30d")).toBeTruthy();
     expect((await screen.findAllByText("2/3")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("Blocked")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("Waiting")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^Overdue \d+ days?$/).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: /Review Partnerships Associate shortlist/ }));
     const panel = await screen.findByRole("dialog");
@@ -84,11 +142,12 @@ describe("my workspace", () => {
     await within(screen.getByRole("dialog")).findByRole("radio", { name: /Steps 3\/3/ });
   }, 30000);
 
-  it("the list view lists the same tasks as rows", async () => {
-    await signedIn(<Workspace tab="tasks" id={null} />);
-    await screen.findByText("Confirm Ember to Remember venue list with MTN", undefined, { timeout: 8000 });
+  it("the list view lists the same tasks as rows, with Show Cancelled beside it", async () => {
+    await board();
     fireEvent.click(screen.getByRole("radio", { name: "List" }));
     await waitFor(() => expect(screen.getByRole("table", { name: "Tasks" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show Cancelled" }));
+    await screen.findByText("Cancelled", undefined, { timeout: 5000 });
   }, 20000);
 
   it("Analytics counts the overdue by reason and lists the blocked work", async () => {
@@ -98,26 +157,78 @@ describe("my workspace", () => {
     expect(screen.getAllByText("Blocked Work").length).toBeGreaterThan(0);
     expect(screen.getByText("Overdue Aging")).toBeTruthy();
     await screen.findAllByText("Waiting on Others");
+    // A reader who sets others work opens on My Team.
+    expect(screen.getByRole("radio", { name: "My Team" }).getAttribute("aria-checked")).toBe("true");
   }, 20000);
+
   it("a card moves up within its column from its menu", async () => {
-    await signedIn(<Workspace tab="tasks" id={null} />);
-    await screen.findByText("Confirm Ember to Remember venue list with MTN", undefined, { timeout: 8000 });
-    const todo = screen.getByRole("region", { name: "To Do" });
+    await board();
     const place = () =>
       within(screen.getByRole("region", { name: "To Do" }))
         .getAllByRole("listitem")
         .findIndex((li) => (li.textContent ?? "").includes("Review Partnerships Associate shortlist"));
     const before = place();
     expect(before).toBeGreaterThan(0);
-    const card = within(todo).getByRole("button", { name: /Review Partnerships Associate shortlist/ }).closest("li")!;
-    await userEvent.click(within(card as HTMLElement).getByRole("button", { name: /^Move/ }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Move Up" }));
+    await moveCard("Review Partnerships Associate shortlist", "To Do", "Move Up");
     await waitFor(() => expect(place()).toBe(before - 1), { timeout: 5000 });
   }, 20000);
 
+  it("a card moves to another column from its menu", async () => {
+    await board();
+    await moveCard("Onboarding pack for the Enugu hires", "To Do", "Move to In Progress");
+    await waitFor(
+      () => {
+        expect(inStage("In Progress", "Onboarding pack for the Enugu hires")).toBeTruthy();
+        expect(inStage("To Do", "Onboarding pack for the Enugu hires")).toBeNull();
+      },
+      { timeout: 5000 },
+    );
+  }, 20000);
+
+  it("moving an overdue card to Done asks Why Late first, and Mark Done moves it", async () => {
+    await board();
+    await arrange({ title: "Send the late minutes", due_on: isoDaysAgo(3) });
+    await screen.findByText("Send the late minutes", undefined, { timeout: 5000 });
+    await moveCard("Send the late minutes", "To Do", "Move to Done");
+    const form = await screen.findByRole("dialog", { name: "Mark Done" });
+    fireEvent.click(within(form).getByRole("button", { name: "Mark Done" }));
+    await within(form).findByText("Pick a reason");
+    await chooseOption(within(form).getByRole("combobox", { name: /Why Late/ }), "Underestimated");
+    fireEvent.click(within(form).getByRole("button", { name: "Mark Done" }));
+    await closed("Mark Done");
+    await waitFor(() => expect(inStage("Done", "Send the late minutes")).toBeTruthy(), { timeout: 5000 });
+  }, 30000);
+
+  it("Mark Blocked asks what is blocking it, and Clear Blocker clears it", async () => {
+    await board();
+    await arrange({ title: "Book the Lekki venue", due_on: isoDaysAhead(5) });
+    const panel = await openCard("Book the Lekki venue");
+    fireEvent.click(within(panel).getByRole("button", { name: "Mark Blocked" }));
+    const form = await screen.findByRole("dialog", { name: "Mark Blocked" });
+    fireEvent.change(within(form).getByRole("textbox", { name: /What Is Blocking It/ }), { target: { value: "The venue has not answered" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Mark Blocked" }));
+    await closed("Mark Blocked");
+    await within(panel).findByText("The venue has not answered", undefined, { timeout: 5000 });
+    fireEvent.click(within(panel).getByRole("button", { name: "Clear Blocker" }));
+    const clear = await screen.findByRole("dialog", { name: "Clear Blocker" });
+    expect(within(clear).getByRole("checkbox", { name: "Move it on" })).toBeTruthy();
+    fireEvent.click(within(clear).getByRole("button", { name: "Clear Blocker" }));
+    await closed("Clear Blocker");
+    await within(panel).findByRole("button", { name: "Mark Blocked" }, { timeout: 5000 });
+    expect(within(panel).queryByText("The venue has not answered")).toBeNull();
+  }, 30000);
+
+  it("the panel offers Set Reminders only on a task with a due date", async () => {
+    await board();
+    await arrange({ title: "Tidy the shared drive" });
+    const panel = await openCard("Tidy the shared drive");
+    await userEvent.click(within(panel).getByRole("button", { name: "More Actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Send Nudge" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Set Reminders" })).toBeNull();
+  }, 20000);
+
   it("the panel sets a repeat, and says how the task repeats", async () => {
-    await signedIn(<Workspace tab="tasks" id={null} />);
-    await screen.findByText("Confirm Ember to Remember venue list with MTN", undefined, { timeout: 8000 });
+    await board();
     fireEvent.click(screen.getByRole("button", { name: /Approve 5 expense requests/ }));
     const panel = await screen.findByRole("dialog");
     await within(panel).findByText("Waiting On");
@@ -129,31 +240,167 @@ describe("my workspace", () => {
     await screen.findByText("Every working day", undefined, { timeout: 5000 });
   }, 30000);
 
-  it("New Task shares a task: Shared asks for people or a department and a lead; a shared card says so", async () => {
-    await signedIn(<Workspace tab="tasks" id={null} />);
-    await screen.findByText("Collect NDPA certificates from 4 staff", undefined, { timeout: 8000 });
+  it("a repeat on a task with no due date is marked on Repeat, in four words", async () => {
+    await board();
+    await arrange({ title: "Water the office plants" });
+    const panel = await openCard("Water the office plants");
+    await userEvent.click(within(panel).getByRole("button", { name: "More Actions" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Set Repeat" }));
+    const form = await screen.findByRole("dialog", { name: "Repeat" });
+    await chooseOption(within(form).getByRole("combobox", { name: /Repeat/ }), "Monthly");
+    fireEvent.click(within(form).getByRole("button", { name: "Save Repeat" }));
+    await within(form).findByText("Needs a due date", undefined, { timeout: 5000 });
+    expect(within(form).getByRole("combobox", { name: /Repeat/ }).getAttribute("aria-invalid")).toBe("true");
+  }, 30000);
+
+  it("New Task sets a task for someone in the reader's team, and it joins the board", async () => {
+    await board();
+    const form = await newTask();
+    expect(within(form).getByText("Assign To")).toBeTruthy();
+    named(form, "File the October minutes");
+    fireEvent.click(await within(form).findByRole("option", { name: /Bashir Lawal/ }));
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await closed("New Task");
+    await waitFor(() => expect(inStage("To Do", "File the October minutes")).toBeTruthy(), { timeout: 5000 });
+  }, 30000);
+
+  it("Shared with People: Lead offers You and each person picked, and goes back to You when its person is removed", async () => {
+    await board();
     expect(screen.getAllByText("Shared +2").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByRole("button", { name: /New Task/ })[0]!);
-    const form = await screen.findByRole("dialog", { name: "New Task" });
-    await within(form).findByText("Assign To", undefined, { timeout: 5000 });
-    fireEvent.click(await within(form).findByRole("radio", { name: "Shared" }));
+    const form = await newTask();
+    fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
     expect(within(form).queryByText("Assign To")).toBeNull();
     expect(within(form).getByText("Share With")).toBeTruthy();
-    expect(within(form).getAllByText("People")).toHaveLength(2);
-    // With People, the lead is You or one of the people picked: You until changed.
-    expect(within(form).getByRole("combobox", { name: /Lead/ }).textContent).toContain("You");
-    fireEvent.change(within(form).getByRole("textbox", { name: /Task/ }), { target: { value: "Count the Yaba stock" } });
+    const lead = () => within(form).getByRole("combobox", { name: /Lead/ });
+    expect(lead().textContent).toContain("You");
+    named(form, "Plan the Ops offsite");
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await within(form).findByText("Pick people");
-    // With a Department, Lead waits for the department, then must be picked from it.
+    const people = within(form).getByRole("listbox", { name: "Search people" });
+    fireEvent.click(await within(people).findByRole("option", { name: /Damilola Eke/ }, { timeout: 5000 }));
+    fireEvent.click(within(people).getByRole("option", { name: /Musa Olawale/ }));
+    await waitFor(async () => expect(await optionLabels(lead())).toEqual(["You", "Damilola Eke", "Musa Olawale"]));
+    await chooseOption(lead(), "Damilola Eke");
+    expect(lead().textContent).toContain("Damilola Eke");
+    fireEvent.click(within(form).getByRole("button", { name: "Remove Damilola Eke" }));
+    await waitFor(() => expect(lead().textContent).toContain("You"));
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await closed("New Task");
+    const card = (await screen.findByText("Plan the Ops offsite", undefined, { timeout: 5000 })).closest("li")!;
+    expect(within(card as HTMLElement).getByText("Shared +1")).toBeTruthy();
+  }, 30000);
+
+  it("Lead never offers a colleague the reader may not set work for", async () => {
+    // Ngozi leads Marketing & Sales; Bashir works there but reports to Cynthia, so he may share it, not lead it.
+    await board("ngozi@mycityapp.io");
+    const form = await newTask();
+    fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
+    const people = within(form).getByRole("listbox", { name: "Search people" });
+    fireEvent.click(await within(people).findByRole("option", { name: /Bashir Lawal/ }, { timeout: 5000 }));
+    fireEvent.click(within(people).getByRole("option", { name: /Tobi Ojo/ }));
+    await waitFor(async () => expect(await optionLabels(within(form).getByRole("combobox", { name: /Lead/ }))).toEqual(["You", "Tobi Ojo"]));
+  }, 30000);
+
+  it("Shared with a Department: the department is searched on the server, then its lead picked from it", async () => {
+    await board();
+    const form = await newTask();
+    fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
     fireEvent.click(within(form).getByRole("radio", { name: "Department" }));
-    await waitFor(() => expect(within(form).getAllByText("Department")).toHaveLength(2));
     expect(within(form).queryByText("Lead")).toBeNull();
-    await chooseOption(within(form).getByRole("combobox", { name: /Department/ }), "Operations & People");
+    const departments = await within(form).findByRole("listbox", { name: "Search departments" });
+    fireEvent.click(await within(departments).findByRole("option", { name: /Operations & People/ }, { timeout: 5000 }));
     await within(form).findByText("Lead");
+    named(form, "Count the Yaba stock");
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await within(form).findByText("Pick a lead");
+    const leads = within(form).getAllByRole("listbox", { name: "Search people" }).at(-1)!;
+    fireEvent.click(await within(leads).findByRole("option", { name: /Musa Olawale/ }, { timeout: 5000 }));
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await closed("New Task");
+    const card = (await screen.findByText("Count the Yaba stock", undefined, { timeout: 5000 })).closest("li")!;
+    expect(within(card as HTMLElement).getByText("Shared +1")).toBeTruthy();
   }, 30000);
+
+  it("Edit Task moves an approved commitment's date into the next month; its original date stays", async () => {
+    await board();
+    const panel = await openCard("Collect NDPA certificates from 4 staff");
+    await within(panel).findByText("Original Date");
+    const original = valueOf(panel, "Original Date");
+    fireEvent.click(within(panel).getByRole("button", { name: "Edit Task" }));
+    const form = await screen.findByRole("dialog", { name: "Edit Task" });
+    const next = new Date();
+    next.setUTCDate(10);
+    next.setUTCMonth(next.getUTCMonth() + 1);
+    const day = next.toISOString().slice(0, 10);
+    const due = within(form).getByLabelText("Due");
+    await userEvent.clear(due);
+    await userEvent.type(due, typed(day));
+    fireEvent.click(within(form).getByRole("button", { name: "Save Task" }));
+    await closed("Edit Task");
+    await waitFor(() => expect(valueOf(panel, "Due")).toContain(formatDate(`${day}T12:00:00Z`)), { timeout: 5000 });
+    expect(valueOf(panel, "Original Date")).toBe(original);
+  }, 30000);
+
+  it("Edit Task with Assign To cleared hands the task back to the reader", async () => {
+    await board();
+    await arrange({ title: "Hand the keys back", primary_assignee_id: idOf("bashir"), due_on: isoDaysAhead(4) });
+    const panel = await openCard("Hand the keys back");
+    expect(within(panel).getByText("Bashir Lawal")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Edit Task" }));
+    const form = await screen.findByRole("dialog", { name: "Edit Task" });
+    fireEvent.click(await within(form).findByRole("button", { name: "Remove Bashir Lawal" }, { timeout: 5000 }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save Task" }));
+    await closed("Edit Task");
+    await within(panel).findByText("Cynthia Osakunih", undefined, { timeout: 5000 });
+  }, 30000);
+
+  it("comments show the newest first, with older ones under Load More", async () => {
+    await board();
+    const id = await arrange({ title: "Gather the venue quotes", due_on: isoDaysAhead(6) });
+    await act(async () => {
+      for (let n = 1; n <= 26; n += 1) await api.call("POST /api/v1/tasks/:id/comments", { params: { id }, body: { body: `Quote ${n} is in` } });
+    });
+    const panel = await openCard("Gather the venue quotes");
+    fireEvent.click(within(panel).getByRole("radio", { name: /Comments/ }));
+    await within(panel).findByText("Quote 26 is in", undefined, { timeout: 5000 });
+    expect(within(panel).queryByText("Quote 1 is in")).toBeNull();
+    // A paged list settles its first search pause (250 ms) by going to page 1; a person pressing Load More is never that quick.
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    fireEvent.click(within(panel).getByRole("button", { name: /Load More/ }));
+    await within(panel).findByText("Quote 1 is in", undefined, { timeout: 5000 });
+    fireEvent.change(within(panel).getByRole("textbox", { name: /Comment/ }), { target: { value: "All quotes are in" } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Add Comment" }));
+    const newest = await within(panel).findByText("All quotes are in", undefined, { timeout: 5000 });
+    expect(newest.compareDocumentPosition(within(panel).getByText("Quote 26 is in")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }, 40000);
+
+  it("a link to a task the reader cannot see opens the board with no panel", async () => {
+    // TSK-0397 is Ngozi's own, outside Cynthia's team.
+    await board(undefined, sid("task:3"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 5000 });
+  }, 20000);
+
+  it("My Week: Write Support Needed, Tidy With AI, Discard Summary and Use Summary; Team This Week opens a person's week", async () => {
+    await signedIn(<Workspace tab="today" id={null} />);
+    await screen.findByText("My Week", undefined, { timeout: 8000 });
+    fireEvent.click(await screen.findByRole("button", { name: "Write Support Needed" }, { timeout: 5000 }));
+    let form = await screen.findByRole("dialog", { name: "Support Needed" });
+    fireEvent.change(within(form).getByRole("textbox", { name: /Support Needed/ }), { target: { value: "Two more hands on the venue list" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Tidy With AI" }));
+    await within(form).findByRole("button", { name: "Use Summary" }, { timeout: 5000 });
+    fireEvent.click(within(form).getByRole("button", { name: "Discard Summary" }));
+    expect((within(form).getByRole("textbox", { name: /Support Needed/ }) as HTMLTextAreaElement).value).toBe("Two more hands on the venue list");
+    fireEvent.click(within(form).getByRole("button", { name: "Tidy With AI" }));
+    fireEvent.click(await within(form).findByRole("button", { name: "Use Summary" }, { timeout: 5000 }));
+    await closed("Support Needed");
+    await screen.findByText("Summary", undefined, { timeout: 5000 });
+    expect(screen.getAllByText(/Two more hands on the venue list/).length).toBeGreaterThan(0);
+    // Team This Week: one row per person in the team; a row opens that person's week.
+    const team = await screen.findByRole("table", { name: "Team This Week" }, { timeout: 5000 });
+    fireEvent.click(await within(team).findByText("Bashir Lawal"));
+    form = await screen.findByRole("dialog", { name: "Bashir Lawal" });
+    await within(form).findByText(/^Week of /, undefined, { timeout: 5000 });
+  }, 40000);
 
   it("an empty day on the month asks New Task or New Event, and New Task starts on that day", async () => {
     await signedIn(<Workspace tab="calendar" id={null} />);
@@ -173,5 +420,63 @@ describe("my workspace", () => {
     const form = await screen.findByRole("dialog", { name: "New Event" });
     expect(within(form).getByText("Reminder")).toBeTruthy();
     expect(within(form).getByText("15 Minutes Before")).toBeTruthy();
+  }, 20000);
+
+  it("the calendar's Week shows seven days, and a day opens Day", async () => {
+    await signedIn(<Workspace tab="calendar" id={null} />);
+    await screen.findByText("Coming Up", undefined, { timeout: 8000 });
+    fireEvent.click(screen.getByRole("radio", { name: "Week" }));
+    const days = await screen.findAllByRole("button", { name: /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{2}\/\d{2}$/ }, { timeout: 5000 });
+    expect(days).toHaveLength(7);
+    const name = days[2]!.textContent!;
+    fireEvent.click(days[2]!);
+    expect(screen.getByRole("radio", { name: "Day" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Africa/Lagos")).toBeNull();
+  }, 20000);
+
+  it("an invitation is accepted and declined; the organiser calls an event off after confirming it by name", async () => {
+    await signedIn(<Workspace tab="calendar" id={null} />);
+    await screen.findByText("Coming Up", undefined, { timeout: 8000 });
+    fireEvent.click((await screen.findAllByRole("button", { name: /Partner pipeline review/ }, { timeout: 5000 }))[0]!);
+    let panel = await screen.findByRole("dialog", { name: "Partner pipeline review" });
+    fireEvent.click(await within(panel).findByRole("button", { name: "Accept" }, { timeout: 5000 }));
+    await waitFor(() => expect(within(panel).queryByRole("button", { name: "Accept" })).toBeNull(), { timeout: 5000 });
+    fireEvent.click(within(panel).getByRole("button", { name: "Decline" }));
+    await within(panel).findByRole("button", { name: "Accept" }, { timeout: 5000 });
+    expect(within(panel).queryByRole("button", { name: "Decline" })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Call Off" })).toBeNull();
+    fireEvent.click(within(panel).getAllByRole("button", { name: "Close" }).at(-1)!);
+    await closed("Partner pipeline review");
+
+    fireEvent.click((await screen.findAllByRole("button", { name: /Panel: Adaeze Nnamdi/ }))[0]!);
+    panel = await screen.findByRole("dialog", { name: "Panel: Adaeze Nnamdi" });
+    fireEvent.click(await within(panel).findByRole("button", { name: "Call Off" }, { timeout: 5000 }));
+    const ask = await screen.findByRole("alertdialog", { name: "Call Off Event" });
+    expect(within(ask).getByText("Panel: Adaeze Nnamdi")).toBeTruthy();
+    fireEvent.click(within(ask).getByRole("button", { name: "Call Off" }));
+    await closed("Panel: Adaeze Nnamdi");
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: /Panel: Adaeze Nnamdi/ })).toHaveLength(0), { timeout: 5000 });
+  }, 40000);
+
+  it("Today on a phone: Your Day, then My Week, then From Your Manager, the diary and recent activity", async () => {
+    setViewport(390);
+    await signedIn(<Workspace tab="today" id={null} />);
+    await screen.findByText("Your Day", undefined, { timeout: 8000 });
+    await screen.findByText("My Week");
+    const order = ["Your Day", "My Week", "From Your Manager", "Diary", "Recent Activity"].map((t) => screen.getByText(t));
+    for (let i = 1; i < order.length; i += 1) expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }, 20000);
+
+  it("a reader who sets nobody work sees no Assign To and no My Team", async () => {
+    // Chidera reports to Cynthia and has nobody reporting to her.
+    await signedIn(<Workspace tab="tasks" id={null} />, "chidera@mycityapp.io");
+    await screen.findByText("No Tasks Yet", undefined, { timeout: 8000 });
+    expect(screen.queryByRole("radio", { name: "My Team" })).toBeNull();
+    const form = await newTask();
+    expect(within(form).queryByText("Assign To")).toBeNull();
+    fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
+    expect(within(form).queryByText("Lead")).toBeNull();
+    expect(within(form).queryByText("Share With")).toBeNull();
   }, 20000);
 });

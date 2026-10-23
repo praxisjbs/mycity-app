@@ -1,3 +1,4 @@
+import type { Department } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
@@ -104,6 +105,22 @@ export function LoginCandidatePicker({ value, onChange }: { value: PersonRef[]; 
       value={value}
       onChange={onChange}
       placeholder="Search staff"
+    />
+  );
+}
+
+/** The organisation's active departments, searched by name on the server (one, unless `multiple`). */
+export function DepartmentPicker({ value, onChange, multiple }: { value: Department[]; onChange: (value: Department[]) => void; multiple?: boolean }) {
+  const list = usePaged("GET /api/v1/departments", { filters: { active: "true" } });
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value}
+      onChange={onChange}
+      id={(d) => d.department_id}
+      title={(d) => d.name}
+      multiple={multiple}
+      placeholder="Search departments"
     />
   );
 }

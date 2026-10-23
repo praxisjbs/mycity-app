@@ -8,7 +8,7 @@ import { useApi, useInfinite, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
-import { Button, CheckboxField, DataView, EmptyState, formatDate, Kanban, PageHeader, Pill, SearchInput, SegmentedControl, Toolbar, useModal, Who } from "@mycity/ui";
+import { Button, CheckboxField, DataView, EmptyState, ErrorState, formatDate, Kanban, PageHeader, Pill, SearchInput, SegmentedControl, Toolbar, useModal, Who } from "@mycity/ui";
 import { CardPills, COLS, duePill, LABEL, PRIORITY, STATUS_TONE, useSetsForOthers, type BoardStatus } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 import { SendCommitmentsForm } from "./Commitment";
@@ -21,19 +21,30 @@ function useColumn(status: BoardStatus, scope: Scope, q: string) {
   return useInfinite("GET /api/v1/tasks", { filters: { status, scope }, q });
 }
 
+/** What is typed in the search, once the person pauses (as the paged lists wait), so four columns ask once. */
+function usePaused(q: string) {
+  const [sent, setSent] = useState(q);
+  useEffect(() => {
+    const t = setTimeout(() => setSent(q.trim()), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+  return sent;
+}
+
 export function Tasks({ openId = null }: { openId?: string | null }) {
   const others = useSetsForOthers();
   const modal = useModal();
   const [scope, setScope] = useState<Scope>("mine");
   const [layout, setLayout] = useState<"board" | "list">("board");
   const [q, setQ] = useState("");
+  const sent = usePaused(q);
   const [cancelled, setCancelled] = useState(false);
   const summary = useApi("GET /api/v1/tasks/summary", { query: { scope } });
   const cols = {
-    todo: useColumn("todo", scope, q),
-    in_progress: useColumn("in_progress", scope, q),
-    in_review: useColumn("in_review", scope, q),
-    done: useColumn("done", scope, q),
+    todo: useColumn("todo", scope, sent),
+    in_progress: useColumn("in_progress", scope, sent),
+    in_review: useColumn("in_review", scope, sent),
+    done: useColumn("done", scope, sent),
   };
   const list = usePaged("GET /api/v1/tasks", { filters: { scope }, sort: "due_at", enabled: layout === "list" });
   const gone = usePaged("GET /api/v1/tasks", { filters: { status: "cancelled", scope }, enabled: cancelled });
@@ -53,7 +64,16 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
   const sendMonth = () => modal.open({ title: "Send Commitments", wide: true, body: (close) => <SendCommitmentsForm close={close} /> });
   useScreenAction({ label: "New Task", onSelect: add });
   useUrlAction("commitment", addCommitment);
-  const all = Object.values(cols).flatMap((c) => c.rows);
+  const columns = Object.values(cols);
+  const all = columns.flatMap((c) => c.rows);
+  // A column whose first page has not come yet is loading; one that failed is the board's error.
+  const loading = columns.some((c) => !c.page && !c.error);
+  const failed = columns.find((c) => c.error)?.error ?? null;
+  const retry = () => Promise.all(columns.filter((c) => c.error).map((c) => c.reload()));
+  const search = (v: string) => {
+    setQ(v);
+    list.setQ(v);
+  };
   const s = summary.data;
   return (
     <>
@@ -68,34 +88,41 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
           </>
         }
       />
-      {s && (
-        <KpiTiles
-          mobileCols={2}
-          items={[
-            { key: "open", label: "Open", value: String(s.open) },
-            { key: "week", label: "Due This Week", value: String(s.due_this_week) },
-            { key: "over", label: "Overdue", value: String(s.overdue), tone: s.overdue ? "err" : undefined },
-            { key: "done", label: "Completed, 30d", value: String(s.done_30d), tone: "ok" },
-          ]}
-        />
+      {summary.error && !s ? (
+        <ErrorState error={summary.error} onRetry={summary.reload} className="mb-3" />
+      ) : (
+        s && (
+          <KpiTiles
+            mobileCols={2}
+            items={[
+              { key: "open", label: "Open", value: String(s.open) },
+              { key: "week", label: "Due This Week", value: String(s.due_this_week) },
+              { key: "over", label: "Overdue", value: String(s.overdue), tone: s.overdue ? "err" : undefined },
+              { key: "done", label: "Completed, 30d", value: String(s.done_30d), tone: "ok" },
+            ]}
+          />
+        )
       )}
+      <Toolbar>
+        <SearchInput value={q} onChange={search} placeholder="Search tasks" className="w-full md:w-64" />
+        <CheckboxField label="Show Cancelled" value={cancelled} onChange={setCancelled} />
+      </Toolbar>
       {layout === "board" ? (
-        <>
-          <Toolbar>
-            <SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-64" />
-            <CheckboxField label="Show Cancelled" value={cancelled} onChange={setCancelled} />
-          </Toolbar>
+        failed ? (
+          <ErrorState error={failed} onRetry={retry} />
+        ) : (
           <Kanban
             reorder
+            loading={loading}
             onMove={(card, _from, to, before) => {
               const t = all.find((x) => x.task_id === card);
-              if (t) void move(t, to as BoardStatus, before);
+              return t ? move(t, to as BoardStatus, before) : undefined;
             }}
             onOpen={(card) => {
               const t = all.find((x) => x.task_id === card);
               if (t) panel.open(t.task_id, t.title);
             }}
-            empty={q ? undefined : <EmptyState title="No Tasks Yet" text="Add the first one for today" action={<Button variant="primary" icon="plus" onClick={add}>New Task</Button>} />}
+            empty={sent ? undefined : <EmptyState title="No Tasks Yet" action={<Button variant="primary" icon="plus" onClick={add}>New Task</Button>} />}
             columns={COLS.map(([status, label, series]) => ({
               key: status,
               label,
@@ -105,16 +132,15 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
               cards: cols[status].rows.map((t) => ({ key: t.task_id, title: t.title, meta: <CardPills t={t} />, owner: t.assignee?.display_name })),
             }))}
           />
-        </>
+        )
       ) : (
         <DataView<Task>
           list={list}
           rowKey={(t) => t.task_id}
           caption="Tasks"
           noun="task"
-          search="Search tasks"
           onRowClick={(t) => panel.open(t.task_id, t.title)}
-          empty={{ title: "No Tasks Yet", text: "Add the first one for today" }}
+          empty={{ title: "No Tasks Yet" }}
           columns={[
             { key: "title", label: "Task", render: (t) => <span data-copy="content"><b className="font-semibold">{t.number}</b> {t.title}</span> },
             { key: "assignee", label: "Assignee", render: (t) => (t.assignee ? <Who name={t.assignee.display_name} role={t.members.length ? `+${t.members.length} More` : undefined} /> : "") },
@@ -133,8 +159,9 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
           error={gone.error}
           page={gone.page}
           onPage={gone.setPage}
+          onReload={gone.reload}
           onRowClick={(t) => panel.open(t.task_id, t.title)}
-          empty={{ title: "Nothing Cancelled", text: "Cancelled tasks show here." }}
+          empty={{ title: "Nothing Cancelled" }}
           columns={[
             { key: "n", label: "Task", render: (t) => t.title },
             { key: "a", label: "Assignee", render: (t) => t.assignee?.display_name ?? "" },

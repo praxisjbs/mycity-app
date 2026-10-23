@@ -10,6 +10,11 @@
  *               department and the line manager for their teams (A24), and people add their own;
  *               spread across the four columns, with steps, a task waiting on another, watchers,
  *               two holds, late reasons on the overdue, and six weeks of finished work for Analytics
+ *   shared      a task the head shares with two of their team under one of them as lead (People),
+ *               and one the CEO shares with the head's department under the head (Department)
+ *   repeating   a weekly report the line manager sets, due each Friday
+ *   reminders   two reminders (a day and an hour before) on the next open task due
+ *   week        this week's Support Needed line from two people, which Team This Week shows
  *   calendar    this week's meetings with their attendees, a walkthrough, a review, today's
  *               planning, and the month's campaign and review-cycle dates
  *
@@ -53,6 +58,7 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
   const { scopeFor } = src("middleware/rbac");
   const tasks = src("modules/tasks/tasks.service");
   const calendar = src("modules/calendar/calendar.service");
+  const workspace = src("modules/workspace/workspace.service");
 
   const client = await pool.connect();
   try {
@@ -79,32 +85,34 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
   // The run's day, as Home's seed takes it, so a test can read Home on a fixed date.
   const today = lagos.today(now);
   const day = (n) => lagos.addDays(today, n);
+  // Monday of the run's week (weekday is 1 for Monday, 7 for Sunday).
+  const monday = lagos.addDays(today, 1 - lagos.weekday(today));
+
+  const scopes = new Map();
+  const scopeOf = async (by, action) => {
+    const k = `${by.user_id}:${action}`;
+    if (!scopes.has(k)) scopes.set(k, await scopeFor(by, "workspace", action));
+    return scopes.get(k);
+  };
+  /** Set a task as `by` for `to`; the task as the service returns it, or null when either is missing. */
+  const set = async (by, to, body) => {
+    if (!by || !to) return null;
+    return tasks.create(by, await scopeOf(by, "create"), c.tasks.TaskCreate.parse({ ...body, primary_assignee_id: to.employee_id }));
+  };
+  const edit = async (by) => scopeOf(by, "edit");
+  /** Move it along the board, one column at a time, as the person who set it. */
+  const moveTo = async (by, t, status, lateReason) => {
+    const columns = ["in_progress", "in_review", "done"];
+    for (const step of columns.slice(0, columns.indexOf(status) + 1)) {
+      const body = { status: step, before_task_id: null, ...(step === "done" && lateReason ? { late_reason: lateReason } : {}) };
+      await tasks.move(by, await edit(by), t.task_id, c.tasks.TaskMove.parse(body));
+    }
+  };
 
   /* ---------------- My Workspace ---------------- */
 
   await part(log, "tasks", async () => {
     if (await exists(pool, "SELECT 1 FROM task WHERE number IS NOT NULL LIMIT 1")) return log("tasks: already there");
-    const scopes = new Map();
-    const scopeOf = async (by, action) => {
-      const k = `${by.user_id}:${action}`;
-      if (!scopes.has(k)) scopes.set(k, await scopeFor(by, "workspace", action));
-      return scopes.get(k);
-    };
-    /** Set a task as `by` for `to`; the task as the service returns it, or null when either is missing. */
-    const set = async (by, to, body) => {
-      if (!by || !to) return null;
-      return tasks.create(by, await scopeOf(by, "create"), c.tasks.TaskCreate.parse({ ...body, primary_assignee_id: to.employee_id }));
-    };
-    const edit = async (by) => scopeOf(by, "edit");
-    /** Move it along the board, one column at a time, as the person who set it. */
-    const moveTo = async (by, t, status, lateReason) => {
-      const columns = ["in_progress", "in_review", "done"];
-      for (const step of columns.slice(0, columns.indexOf(status) + 1)) {
-        const body = { status: step, before_task_id: null, ...(step === "done" && lateReason ? { late_reason: lateReason } : {}) };
-        await tasks.move(by, await edit(by), t.task_id, c.tasks.TaskMove.parse(body));
-      }
-    };
-
     const ops = staff.operations;
     const mgmt = staff.management;
     const headTeam3 = headTeam.slice(0, 3);
@@ -184,6 +192,68 @@ module.exports = async function seed({ pool, log = () => {}, now = new Date() })
       if (await set(me, p, { title: "Draft my notes for the team meeting", due_on: day(1), priority: "low" })) own += 1;
     }
     log(`tasks: ${made.filter(Boolean).length} set, ${back} finished in the last six weeks, ${own} of people's own`);
+  });
+
+  // Shared work (workspace.md §6): the Shared pill and Shared With on the board and the panel.
+  await part(log, "shared tasks", async () => {
+    if (await exists(pool, "SELECT 1 FROM task_assignee LIMIT 1")) return log("shared tasks: already there");
+    let shared = 0;
+    await part(log, "shared with people", async () => {
+      // The head shares it with their team's first three, the first of them leading (a lead other than
+      // the caller is one of the people named); with only one, the head leads it beside them.
+      const picked = headTeam.slice(0, 3);
+      const lead = picked.length >= 2 ? picked[0] : staff.head;
+      if (!picked.length || !lead) return log("shared with people: nobody to share with");
+      const t = await set(head, lead, { title: "Prepare the Q4 partner review", priority: "high", due_on: day(4), member_ids: picked.map((p) => p.employee_id) });
+      if (t) shared += 1;
+    });
+    await part(log, "shared with a department", async () => {
+      // The CEO shares it with the head's department; its lead comes from that department.
+      if (!staff.head || !staff.head.department_id) return log("shared with a department: no head of department");
+      const t = await set(ceo, staff.head, { title: "Collect the department's Q4 leave plans", due_on: day(5), department_id: staff.head.department_id });
+      if (t) shared += 1;
+    });
+    log(`shared tasks: ${shared} shared`);
+  });
+
+  // A task that repeats (workspace.md §6): Repeats on the panel, the next copy made by the morning sweep.
+  await part(log, "repeating task", async () => {
+    if (await exists(pool, "SELECT 1 FROM task WHERE recurrence IS NOT NULL LIMIT 1")) return log("repeating task: already there");
+    const [by, to] = [[manager, managerTeam[0]], [head, headTeam[0]], [ceo, staff.operations]].find(([b, t]) => b && t) || [];
+    // Due on the next Friday from the run's day, the day it repeats on.
+    const wd = lagos.weekday(today);
+    const friday = lagos.addDays(today, wd <= 5 ? 5 - wd : 12 - wd);
+    const t = await set(by, to, { title: "Send the weekly studio report", cadence: "weekly", due_on: friday, recurrence: { freq: "weekly", days: [5] } });
+    log(t ? "repeating task: weekly, each Friday" : "repeating task: nobody to set it for");
+  });
+
+  // Reminders on an open task (workspace.md §6): the panel's Reminders. Set by whoever set the task,
+  // on the next one due at least two days out, so both still lie ahead.
+  await part(log, "reminders", async () => {
+    if (await exists(pool, "SELECT 1 FROM reminder WHERE reminder_key = 'task_reminder' LIMIT 1")) return log("reminders: already there");
+    const { rows } = await pool.query(
+      `SELECT t.task_id, t.set_by_employee_id FROM task t
+        WHERE t.status NOT IN ('done', 'cancelled') AND t.archived_at IS NULL AND t.due_at > now() + interval '2 days'
+          AND t.set_by_employee_id = ANY($1::uuid[])
+        ORDER BY t.due_at, t.task_id LIMIT 1`,
+      [[...logins.keys()]],
+    );
+    const by = rows[0] && logins.get(rows[0].set_by_employee_id);
+    if (!by) return log("reminders: no open task due far enough ahead");
+    await tasks.setReminders(by, await edit(by), rows[0].task_id, c.tasks.TaskReminderSet.parse({ reminders: [{ minutes_before: 1440 }, { minutes_before: 60 }] }));
+    log("reminders: a day and an hour before, on one task");
+  });
+
+  // This week's one line (workspace.md §6, performance.md §6.18): Support Needed on My Week and Team This Week.
+  await part(log, "week", async () => {
+    const { rows } = await pool.query("SELECT 1 FROM weekly_summary WHERE week_starts_on = $1 LIMIT 1", [monday]);
+    if (rows.length) return log("week: already there");
+    const lines = [
+      [headTeam[0], "Sign-off on the MTN venue budget by Wednesday"],
+      [managerTeam[0], "A second camera for Thursday's shoot"],
+    ].filter(([p]) => p && as(p));
+    for (const [p, line] of lines) await workspace.save(as(p), c.workspace.WeekSave.parse({ week_starts_on: monday, support_needed: line }));
+    log(`week: ${lines.length} Support Needed lines`);
   });
 
   await part(log, "calendar", async () => {

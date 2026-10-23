@@ -7,12 +7,12 @@
 import { useState, type ReactNode } from "react";
 import targets from "@mycity/contract/schemas/targets.js";
 import workflow from "@mycity/contract/schemas/workflow.js";
-import type { CountsTowardsOption, TaskDetail } from "@mycity/contract/contract.gen.ts";
+import type { Commitment, CountsTowardsOption, TaskDetail } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { EmployeePicker, TaskPeoplePicker } from "@/features/shared/pickers";
 import {
   ActionGroup,
   Button,
@@ -32,9 +32,9 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
+import { say, useSetsForOthers } from "./shared";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
 
 export const COMMITMENT_HELP = "A priority for the month. Its date is fixed once approved.";
 export const ORIGINAL_HELP = "The date agreed when the month was approved. It never moves.";
@@ -219,22 +219,22 @@ function RecoveryForm({ t, close }: { t: TaskDetail; close: () => void }) {
 }
 
 /**
- * Send Commitments: a person's month (the reader's own, or for a manager someone in their team),
- * listing its commitments not yet approved.
+ * Send Commitments: a person's month (the reader's own, or someone they may set work for),
+ * listing its commitments not yet approved, as the server finds them, a page of 25 at a time.
  */
 export function SendCommitmentsForm({ close }: { close: () => void }) {
   const me = useMe();
+  const others = useSetsForOthers();
   const months = commitmentMonths();
   const [who, setWho] = useState<PersonRef[]>([]);
   const [month, setMonth] = useState(months[0][0]);
   const employeeId = who[0]?.employee_id ?? me.employee_id ?? "";
-  const list = usePaged("GET /api/v1/tasks", {
-    filters: { is_commitment: "true", commitment_month: month, assignee_id: employeeId, scope: who[0] ? "team" : "mine" },
+  const list = usePaged("GET /api/v1/performance/commitments", {
+    filters: { month: month.slice(0, 7), employee_id: employeeId, state: "awaiting_approval" },
     sort: "due_at",
     enabled: Boolean(employeeId),
   });
   const send = useMutation("POST /api/v1/performance/commitments/sets/:employee_id/:month/submit");
-  const unsent = list.rows.filter((t) => !t.original_due_at && !t.rescoped_at);
   const submit = async () => {
     try {
       const set = await send.run({ params: { employee_id: employeeId, month: month.slice(0, 7) }, body: {} });
@@ -247,26 +247,25 @@ export function SendCommitmentsForm({ close }: { close: () => void }) {
   };
   return (
     <>
-      {me.manages_people && (
+      {others && (
         <Field label="Person" optional>
-          <EmployeePicker value={who} onChange={setWho} placeholder="Your team" />
+          <TaskPeoplePicker value={who} onChange={setWho} />
         </Field>
       )}
       <Field label="Month">
         <ChoiceField value={month} onChange={setMonth} options={months} />
       </Field>
-      <DataView
+      <DataView<Commitment>
         bare
         caption="Commitments to Send"
-        rows={unsent}
-        loading={list.loading}
-        error={list.error}
-        rowKey={(t) => t.task_id}
+        list={list}
+        rowKey={(c) => c.task_id}
+        noun="commitment"
         empty={{ title: "Nothing to Send" }}
         columns={[
-          { key: "t", label: "Commitment", render: (t) => <span data-copy="content">{t.title}</span> },
-          { key: "d", label: "Due", render: (t) => (t.due_at ? formatDate(t.due_at) : "") },
-          { key: "s", label: "State", render: (t) => <StatusPill s={commitmentPill(t.commitment_state, null)} /> },
+          { key: "t", label: "Commitment", render: (c) => <span data-copy="content">{c.title}</span> },
+          { key: "d", label: "Due", render: (c) => (c.due_at ? formatDate(c.due_at) : "") },
+          { key: "s", label: "State", render: (c) => <StatusPill s={commitmentPill(c.state, c.set_status)} /> },
         ]}
       />
       <FormFooter>
@@ -296,6 +295,8 @@ export function CountsTowardsField({
   onChange: (v: CountsChoice[]) => void;
 }) {
   const list = usePaged("GET /api/v1/tasks/counts-towards", { filters: { ...(assigneeId ? { assignee_id: assigneeId } : {}), month } });
+  // Nothing of theirs to count towards (§11): said once, in place of an empty picker.
+  if (list.page?.total === 0 && !list.q && !value.length) return <p className="text-2xs text-subtle-foreground">No lines or key results</p>;
   return (
     <RecordPicker
       list={list}

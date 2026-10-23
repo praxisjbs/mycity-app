@@ -1,16 +1,16 @@
 /** The forms a task opens: New and Edit Task, and the small ones its panel and the board ask. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import tasks from "@mycity/contract/schemas/tasks.js";
-import type { Task, TaskDetail } from "@mycity/contract/contract.gen.ts";
+import type { Department, Task, TaskDetail } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
-import { ColleaguePicker, TaskPeoplePicker } from "@/features/shared/pickers";
+import { ColleaguePicker, DepartmentPicker, TaskPeoplePicker } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
 import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
-import { LABEL, LATE_OPTIONS, refresh, say, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
+import { LABEL, LATE_OPTIONS, refresh, refreshed, say, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
 const failed = (f: { setServerErrors: (e: Record<string, string[]>) => void }) => (e: unknown) => {
@@ -31,6 +31,46 @@ export const LEAD_HELP = "Answers for the task, and it counts on their scorecard
 type Kind = "individual" | "shared";
 type ShareBy = "people" | "department";
 
+/**
+ * Which of the people picked the reader may set work for, and so may name as the lead of a task
+ * shared with them (GET /tasks/people without `shared`; a colleague of their department is
+ * sharable but not theirs to lead). The first page answers when it holds everyone; past it, a
+ * person not on it is looked up by name, once.
+ */
+function useMayLead(people: PersonRef[]): (employeeId: string) => boolean {
+  const first = useApi("GET /api/v1/tasks/people", { query: {} });
+  const [found, setFound] = useState<Record<string, boolean>>({});
+  const onFirst = new Set((first.data?.data ?? []).map((p) => p.employee_id));
+  const past = Boolean(first.data?.page.has_next);
+  const latest = useRef(people);
+  latest.current = people;
+  const ask = past
+    ? people
+        .filter((p) => !onFirst.has(p.employee_id) && !(p.employee_id in found))
+        .map((p) => p.employee_id)
+        .join(",")
+    : "";
+  useEffect(() => {
+    if (!ask) return;
+    let live = true;
+    const todo = latest.current.filter((p) => ask.split(",").includes(p.employee_id));
+    Promise.all(
+      todo.map((p) =>
+        api.call("GET /api/v1/tasks/people", { query: { q: p.display_name } }).then(
+          (r) => [p.employee_id, r.data.some((x) => x.employee_id === p.employee_id)] as const,
+          () => [p.employee_id, false] as const,
+        ),
+      ),
+    ).then((pairs) => {
+      if (live) setFound((f) => ({ ...f, ...Object.fromEntries(pairs) }));
+    });
+    return () => {
+      live = false;
+    };
+  }, [ask]);
+  return (employeeId) => onFirst.has(employeeId) || found[employeeId] === true;
+}
+
 /** New Task or Edit Task; `dueOn` starts a new one on that day (a day pressed on the calendar). */
 export function TaskForm({ close, task, commitment = false, dueOn }: { close: () => void; task?: TaskDetail; commitment?: boolean; dueOn?: string }) {
   const me = useMe();
@@ -41,16 +81,18 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
   const others = useSetsForOthers();
   const sharable = useApi("GET /api/v1/tasks/people", { query: { shared: "true" } });
   const peopleView = Boolean(me.grants.people?.includes("view"));
-  const departments = useApi("GET /api/v1/departments", { query: { active: "true" }, enabled: peopleView });
   const [kind, setKind] = useState<Kind>(task?.members.length ? "shared" : "individual");
   const [by, setBy] = useState<ShareBy>("people");
   // Shared with People: the people picked, the lead among them (an existing lead shows as one of them).
-  const [members, setMembers] = useState<PersonRef[]>(
+  const [picks] = useState<PersonRef[]>(() =>
     task?.assignee && task.assignee.employee_id !== me.employee_id ? [task.assignee, ...task.members] : (task?.members ?? []),
   );
+  const [members, setMembers] = useState<PersonRef[]>(picks);
   const [lead, setLead] = useState(task?.assignee?.employee_id ?? me.employee_id);
-  // Shared with a Department: the department, and a lead picked from it.
-  const [department, setDepartment] = useState("");
+  const mayLead = useMayLead(members);
+  // Shared with a Department: the department, searched on the server, and a lead picked from it.
+  const [picked, setPicked] = useState<Department[]>([]);
+  const department = picked[0]?.department_id ?? "";
   const [deptLead, setDeptLead] = useState<PersonRef[]>([]);
   const [shareMark, setShareMark] = useState<string | null>(null);
   const [leadMark, setLeadMark] = useState<string | null>(null);
@@ -75,19 +117,30 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
   const fixed = Boolean(task?.is_commitment && task.original_due_at);
   // A commitment is its lead's: the people sharing a task leave the mark to the lead and whoever manages it.
   const mayMark = !fixed && (!task || (task.status !== "done" && (task.can_reassign || task.assignee?.employee_id === me.employee_id)));
-  const f = useContractForm(
-    {
-      title: task?.title ?? filled.title ?? "",
-      cadence: task?.cadence ?? filled.cadence ?? "",
-      due_on: task?.due_at ? task.due_at.slice(0, 10) : (dueOn ?? filled.due_on ?? ""),
-      priority: (task?.priority ?? filled.priority ?? "normal") as string,
-      description: task?.description ?? filled.description ?? "",
-      is_commitment: task?.is_commitment ?? commitment,
-      acceptance_criteria: task?.acceptance_criteria ?? "",
-      commitment_month: task?.commitment_month ?? months[0][0],
-    },
-    tasks.TaskCreate,
-  );
+  const initial = {
+    title: task?.title ?? filled.title ?? "",
+    cadence: task?.cadence ?? filled.cadence ?? "",
+    due_on: task?.due_at ? task.due_at.slice(0, 10) : (dueOn ?? filled.due_on ?? ""),
+    priority: (task?.priority ?? filled.priority ?? "normal") as string,
+    description: task?.description ?? filled.description ?? "",
+    is_commitment: task?.is_commitment ?? commitment,
+    acceptance_criteria: task?.acceptance_criteria ?? "",
+    commitment_month: task?.commitment_month ?? months[0][0],
+  };
+  type Values = typeof initial;
+  /** The fields Edit Task holds, as the PATCH takes them: an empty choice clears it. */
+  const editFields = (v: Values) => ({ title: v.title, cadence: v.cadence || null, due_on: v.due_on || null, priority: v.priority, description: v.description || null });
+  /** The commitment's fields, when the reader may mark it: an approved one sends none, so its date may move. */
+  const commitmentBody = (v: Values) =>
+    mayMark
+      ? v.is_commitment
+        ? { is_commitment: true, acceptance_criteria: v.acceptance_criteria || null, commitment_month: v.commitment_month || null }
+        : task?.is_commitment
+          ? { is_commitment: false }
+          : {}
+      : {};
+  // New Task is checked by TaskCreate; Edit Task by TaskEdit, on what it would send.
+  const f = useContractForm(initial, task ? { safeParse: (v: unknown) => tasks.TaskEdit.safeParse({ ...editFields(v as Values), ...commitmentBody(v as Values) }) } : tasks.TaskCreate);
   const createTask = useMutation("POST /api/v1/tasks");
   const editTask = useMutation("PATCH /api/v1/tasks/:id");
   const isCommitment = Boolean(f.values.is_commitment);
@@ -98,23 +151,27 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
     if (c?.kind === "key_result") return { employee_target_id: null, entity_type: "key_result" as const, entity_id: c.okr_key_result_id };
     return { employee_target_id: null, ...(task?.entity_type === "key_result" ? { entity_type: null, entity_id: null } : {}) };
   };
-  const commitmentBody = () =>
-    mayMark
-      ? isCommitment
-        ? { is_commitment: true, acceptance_criteria: f.values.acceptance_criteria || null, commitment_month: f.values.commitment_month || null }
-        : task?.is_commitment
-          ? { is_commitment: false }
-          : {}
-      : {};
-  /** Who shares it, as the body names them: the people, a department, or nobody (Individual). */
+  /**
+   * Who shares it, as the body names them: the people, a department, or nobody (Individual). An
+   * edit names them only when they or the lead changed: someone on it the reader could no longer
+   * add stays until the people are edited (§11).
+   */
   const sharing = () => {
     if (!shared) return task?.members.length ? { member_ids: [] } : {};
-    return by === "department" ? { department_id: department } : { member_ids: members.map((p) => p.employee_id) };
+    if (by === "department") return { department_id: department };
+    const ids = members.map((p) => p.employee_id);
+    const same = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
+    const unchanged = task && task.members.length > 0 && same(ids, picks.map((p) => p.employee_id)) && lead === (task.assignee?.employee_id ?? me.employee_id);
+    return unchanged ? {} : { member_ids: ids };
   };
   /** Who leads it, when that changes: the Individual assignee, or a shared task's lead. */
   const leading = (): { primary_assignee_id?: string } => {
     if (fixed) return {};
-    if (!shared) return who[0] ? { primary_assignee_id: who[0].employee_id } : {};
+    if (!shared) {
+      if (who[0]) return who[0].employee_id !== task?.assignee?.employee_id ? { primary_assignee_id: who[0].employee_id } : {};
+      // Assign To cleared on a task someone else holds: it comes back to the reader.
+      return task?.assignee && task.assignee.employee_id !== me.employee_id ? { primary_assignee_id: me.employee_id } : {};
+    }
     if (by === "department") return deptLead[0] ? { primary_assignee_id: deptLead[0].employee_id } : {};
     return lead !== (task?.assignee?.employee_id ?? me.employee_id) ? { primary_assignee_id: lead } : {};
   };
@@ -133,17 +190,9 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
     const v = f.values;
     try {
       if (task) {
-        const managed = task.can_reassign
-          ? {
-              title: v.title,
-              cadence: v.cadence || null,
-              due_on: v.due_on || null,
-              ...leading(),
-              ...sharing(),
-              ...pointer(),
-            }
-          : {};
-        const body = { priority: v.priority, description: v.description || null, ...managed, ...commitmentBody() };
+        const { title, cadence, due_on, priority, description } = editFields(v);
+        const managed = task.can_reassign ? { title, cadence, due_on, ...leading(), ...sharing(), ...pointer() } : {};
+        const body = { priority, description, ...managed, ...commitmentBody(v) };
         await editTask.run({ params: { id: task.task_id }, body: body as never });
         toast("Task saved");
       } else {
@@ -176,8 +225,14 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
       else say(e);
     }
   };
-  const assigneeId = !shared ? (who[0]?.employee_id ?? task?.assignee?.employee_id ?? null) : by === "department" ? (deptLead[0]?.employee_id ?? null) : lead;
-  const leadOptions: Array<[string, string]> = [[me.employee_id, "You"], ...members.filter((p) => p.employee_id !== me.employee_id).map((p) => [p.employee_id, p.display_name] as [string, string])];
+  const assigneeId = !shared ? (who[0]?.employee_id ?? (task ? me.employee_id : null)) : by === "department" ? (deptLead[0]?.employee_id ?? null) : lead;
+  // You, or one of the people picked the reader may set work for; a shared task's present lead stays offered.
+  const leadOptions: Array<[string, string]> = [
+    [me.employee_id, "You"],
+    ...members
+      .filter((p) => p.employee_id !== me.employee_id && (p.employee_id === task?.assignee?.employee_id || mayLead(p.employee_id)))
+      .map((p) => [p.employee_id, p.display_name] as [string, string]),
+  ];
   const month = isCommitment && f.values.commitment_month ? String(f.values.commitment_month) : `${(f.values.due_on || todayIso()).slice(0, 7)}-01`;
   return (
     <>
@@ -211,15 +266,13 @@ export function TaskForm({ close, task, commitment = false, dueOn }: { close: ()
       )}
       {canAssign && shared && by === "department" && (
         <Field label="Department" state={shareMark ? "bad" : undefined} message={shareMark ?? undefined}>
-          <SelectField
-            value={department}
+          <DepartmentPicker
+            value={picked}
             onChange={(d) => {
-              setDepartment(d);
+              setPicked(d);
               setDeptLead([]);
               setShareMark(null);
             }}
-            options={(departments.data?.data ?? []).map((d) => [d.department_id, d.name] as [string, string])}
-            placeholder="Choose One"
           />
         </Field>
       )}
@@ -345,7 +398,10 @@ export function LateReasonForm({ task, close, onSaved }: { task: TaskDetail; clo
   );
 }
 
-/** Move a card (above `before`, or to the foot), asking why first when it reaches Done late. */
+/**
+ * Move a card (above `before`, or to the foot), asking why first when it reaches Done late. It
+ * settles once the board has reloaded, so the board holds the card until it shows where it went.
+ */
 export function useMoveTask(openModal: (spec: { title: string; body: (close: () => void) => React.ReactNode }) => void) {
   const move = useMutation("POST /api/v1/tasks/:id/move");
   return async (t: Pick<Task, "task_id" | "status" | "overdue" | "late_reason">, to: BoardStatus, before: string | null = null) => {
@@ -355,12 +411,11 @@ export function useMoveTask(openModal: (spec: { title: string; body: (close: () 
     }
     try {
       await move.run({ params: { id: t.task_id }, body: { status: to, before_task_id: before } });
-      refresh();
       toast(t.status === to ? "Order saved" : `Moved to ${LABEL[to]}`);
     } catch (e) {
       say(e);
-      refresh();
     }
+    await refreshed();
   };
 }
 
@@ -621,11 +676,13 @@ export function RepeatForm({ task, close, onDone }: { task: TaskDetail; close: (
     {},
   );
   const [days, setDays] = useState<number[]>(r?.freq === "weekly" ? r.days : [1]);
-  const [error, setError] = useState<string | null>(null);
+  // Pick a Day marks the weekdays; what the API refuses marks Repeat itself.
+  const [dayMark, setDayMark] = useState<string | null>(null);
+  const [repeatMark, setRepeatMark] = useState<string | null>(null);
   const save = useMutation("PATCH /api/v1/tasks/:id");
   const submit = async () => {
     const v = f.values;
-    if (v.freq === "weekly" && !days.length) return setError("Pick a day");
+    if (v.freq === "weekly" && !days.length) return setDayMark("Pick a day");
     const recurrence = !v.freq ? null : v.freq === "daily" ? { freq: "daily" as const } : v.freq === "weekly" ? { freq: "weekly" as const, days: [...days].sort() } : { freq: "monthly" as const, day_of_month: Number(v.day_of_month) };
     try {
       await save.run({ params: { id: task.task_id }, body: { recurrence } });
@@ -633,19 +690,21 @@ export function RepeatForm({ task, close, onDone }: { task: TaskDetail; close: (
       close();
       toast(recurrence ? "Repeat set" : "Repeat stopped");
     } catch (e) {
-      if (e instanceof ApiError && e.fields.recurrence?.[0]) setError(e.fields.recurrence[0]);
+      // A series counts from its due day: without one the API refuses any repeat (§6), said in four words.
+      if (e instanceof ApiError && e.fields.recurrence?.[0]) setRepeatMark(task.due_at ? e.fields.recurrence[0] : "Needs a due date");
       else say(e);
     }
   };
+  const freq = f.field("freq");
   return (
     <>
-      <Field label="Repeat" state={error && !f.values.freq ? "bad" : undefined} message={error && f.values.freq !== "weekly" ? error : undefined}>
-        <SelectField options={[["", "Does Not Repeat"], ["daily", "Every Working Day"], ["weekly", "Weekly"], ["monthly", "Monthly"]]} {...f.field("freq")} />
+      <Field label="Repeat" state={repeatMark ? "bad" : undefined} message={repeatMark ?? undefined}>
+        <SelectField options={[["", "Does Not Repeat"], ["daily", "Every Working Day"], ["weekly", "Weekly"], ["monthly", "Monthly"]]} {...freq} state={repeatMark ? "bad" : freq.state} onChange={(v) => (freq.onChange(v), setRepeatMark(null))} />
       </Field>
       {f.values.freq === "weekly" && (
-        <Field label="On" state={error ? "bad" : undefined} message={error ?? undefined}>
+        <Field label="On" state={dayMark ? "bad" : undefined} message={dayMark ?? undefined}>
           {WEEKDAYS.map(([d, name]) => (
-            <CheckboxField key={d} label={name} value={days.includes(d)} onChange={(on) => (setDays((ds) => (on ? [...ds, d] : ds.filter((x) => x !== d))), setError(null))} />
+            <CheckboxField key={d} label={name} value={days.includes(d)} onChange={(on) => (setDays((ds) => (on ? [...ds, d] : ds.filter((x) => x !== d))), setDayMark(null))} />
           ))}
         </Field>
       )}
