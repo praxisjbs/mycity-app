@@ -90,7 +90,8 @@ function fakeServer() {
     markSeen: async () => true,
     move: async () => true,
     remove: async (path, ids) => ids.length,
-    send: async () => ({ messageId: "<sent@mycity.test>", raw: Buffer.from("raw"), sentPath: "INBOX.Sent" }),
+    send: async () => ({ messageId: "<sent@mycity.test>", raw: Buffer.from("raw") }),
+    copyToSent: async () => "INBOX.Sent",
   });
   return s;
 }

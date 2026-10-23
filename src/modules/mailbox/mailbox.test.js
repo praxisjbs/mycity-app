@@ -1,5 +1,6 @@
 "use strict";
-/** Mailbox's rules that need no database or mail server (the API is covered in tests/integration/mailbox.test.js). */
+/** Mailbox's rules that need no database or real mail server (the API is covered in tests/integration/mailbox.test.js). */
+const net = require("node:net");
 const { kindOf, mapFolders, cursorFor } = require("./folders");
 const {
   threadKeyFor,
@@ -11,7 +12,7 @@ const { mapSmtpError, mapImapError, retryPlan } = require("../../services/mail/s
 const { cleanHtml, textToHtml } = require("./visible");
 const { outgoingHtml, textOf } = require("./compose");
 const { settingsFor } = require("./autodiscover");
-const { normalise, bareAddress } = require("./providers/imap-smtp.provider");
+const { normalise, bareAddress, ImapSmtpProvider } = require("./providers/imap-smtp.provider");
 const { routesOf } = require("../../http/route");
 const { router } = require("./mailbox.routes");
 
@@ -226,6 +227,72 @@ describe("the provider", () => {
     expect(bareAddress('"Bola Ade" <bola@mycity.test>')).toBe(
       "bola@mycity.test",
     );
+  });
+});
+
+/** A stand-in IMAP server on a local port: it greets, then answers each command as `answer` says. */
+function imapServer(answer) {
+  return new Promise((resolve) => {
+    const server = net.createServer((socket) => {
+      socket.on("error", () => undefined);
+      socket.write("* OK ready\r\n");
+      let buffered = "";
+      socket.on("data", (chunk) => {
+        buffered += chunk;
+        for (let at = buffered.indexOf("\r\n"); at >= 0; at = buffered.indexOf("\r\n")) {
+          const [tag, command] = buffered.slice(0, at).split(" ");
+          buffered = buffered.slice(at + 2);
+          answer(socket, tag, String(command).toUpperCase());
+        }
+      });
+    });
+    server.listen(0, "127.0.0.1", () => resolve(server));
+  });
+}
+
+/** Signs in and says OK to everything else. */
+function obliging(socket, tag, command) {
+  if (command === "CAPABILITY") socket.write(`* CAPABILITY IMAP4rev1 AUTH=PLAIN\r\n${tag} OK done\r\n`);
+  else socket.write(`${tag} OK done\r\n`);
+}
+
+const at = (server) => ({
+  email: "bola@mycity.test",
+  username: "bola",
+  password: "mail-pass-1",
+  incoming_host: "127.0.0.1",
+  incoming_port: server.address().port,
+  tls: false,
+});
+
+describe("a mail server that hangs up or goes silent (faults #2 and #3, 22/10/2026)", () => {
+  const servers = [];
+  afterEach(() => servers.splice(0).forEach((s) => s.close()));
+
+  test("hanging up during sign-in fails the call, never the process", async () => {
+    const server = await imapServer((socket, tag, command) =>
+      command === "AUTHENTICATE" ? socket.end() : obliging(socket, tag, command),
+    );
+    servers.push(server);
+    await expect(new ImapSmtpProvider(at(server)).listFolders()).rejects.toThrow();
+    // The library raises its own error a turn later; heard, it ends nothing.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  test("silence fails the call once the connection's wait is up, never the process", async () => {
+    const server = await imapServer((socket, tag, command) => {
+      if (command !== "LIST") obliging(socket, tag, command);
+    });
+    servers.push(server);
+    const provider = new ImapSmtpProvider(at(server), { socketTimeout: 200 });
+    await expect(provider.listFolders()).rejects.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  test("a short-lived connection waits 2 minutes on a silent server; IDLE keeps the library's 5", () => {
+    const provider = new ImapSmtpProvider({ email: "bola@mycity.test", password: "mail-pass-1", incoming_host: "mycityapp.io" });
+    expect(provider.socketTimeout).toBe(2 * 60 * 1000);
+    expect(provider.imap().options.socketTimeout).toBeUndefined();
   });
 });
 

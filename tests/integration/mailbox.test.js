@@ -18,6 +18,7 @@ const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const realtime = require("../../src/services/realtime/emitter");
 const mailbox = require("../../src/modules/mailbox/mailbox.service");
+const mailboxRepo = require("../../src/modules/mailbox/mailbox.repo");
 
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async () => undefined),
@@ -55,6 +56,8 @@ function fakeServer() {
     uidValidity: 7,
     folders: { INBOX: [], "INBOX.Sent": [], "INBOX.Archive": [], "INBOX.Junk": [], "INBOX.Trash": [], "INBOX.Drafts": [] },
     sent: [],
+    copies: [],
+    onCopy: null,
     seen: [],
     moved: [],
     removed: [],
@@ -110,7 +113,12 @@ function fakeServer() {
       }
       const messageId = `<sent-${s.sent.length + 1}@mycity.test>`;
       s.sent.push({ ...msg, messageId });
-      return { messageId, raw: Buffer.from("raw"), sentPath: "INBOX.Sent" };
+      return { messageId, raw: Buffer.from("raw") };
+    },
+    async copyToSent(raw) {
+      if (s.onCopy) await s.onCopy();
+      s.copies.push(raw);
+      return "INBOX.Sent";
     },
   });
   return s;
@@ -315,6 +323,38 @@ describeDb("Mailbox against the real migrations", () => {
     expect((await one("SELECT title FROM notification WHERE event_key = 'mail_send.failed'")).title).toBe("Not sent: Hello");
 
     expect((await api().post("/mailbox/messages").send({ mail_draft_id: bounceId, to_addresses: ["not-an-address"] })).status).toBe(422);
+  });
+
+  test("a message the server accepted is never sent again, whatever fails after", async () => {
+    const draftId = "6f0e8f7b-6c3c-4a35-9f2a-0d4b1b8a7c19";
+    const queued = await api().post("/mailbox/messages").set("Idempotency-Key", "send-once-1").send({ mail_draft_id: draftId, to_addresses: ["ops@partner.test"], subject: "Sent once", body_html: "<p>Once.</p>" });
+    expect(queued.status).toBe(201);
+    const id = queued.body.mail_send_queue_id;
+    const statusOf = async () => (await one("SELECT status FROM mail_send_queue WHERE mail_send_queue_id = $1", [id])).status;
+    const before = server.sent.length;
+
+    // At the copy to Sent, where a dropped connection stopped the worker on 22/10, it already reads sent.
+    let atCopy = null;
+    server.onCopy = async () => {
+      atCopy = await statusOf();
+    };
+    // Filing it here then fails, as a lost database connection would.
+    const filing = jest.spyOn(mailboxRepo, "insertMessage").mockRejectedValueOnce(new Error("Connection terminated unexpectedly"));
+    try {
+      await expect(mailbox.flush(id)).rejects.toThrow("Connection terminated unexpectedly");
+    } finally {
+      filing.mockRestore();
+      server.onCopy = null;
+    }
+    expect(server.sent.length).toBe(before + 1);
+    expect(atCopy).toBe("sent");
+    expect(await statusOf()).toBe("sent");
+
+    // The sweep of rows stuck in sending, and the job's own retry, send nothing more.
+    await mailbox.flush();
+    await mailbox.flush(id);
+    expect(server.sent.length).toBe(before + 1);
+    expect((await api().del(`/mailbox/drafts/${draftId}`)).status).toBe(204);
   });
 
   test("attach: the composer's request, a phone photograph with its purpose, is taken; an unknown purpose is refused", async () => {
