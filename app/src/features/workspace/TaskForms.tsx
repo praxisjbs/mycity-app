@@ -31,7 +31,8 @@ export const LEAD_HELP = "Answers for the task, and it counts on their scorecard
 type Kind = "individual" | "shared";
 type ShareBy = "people" | "department";
 
-export function TaskForm({ close, task, commitment = false }: { close: () => void; task?: TaskDetail; commitment?: boolean }) {
+/** New Task or Edit Task; `dueOn` starts a new one on that day (a day pressed on the calendar). */
+export function TaskForm({ close, task, commitment = false, dueOn }: { close: () => void; task?: TaskDetail; commitment?: boolean; dueOn?: string }) {
   const me = useMe();
   const months = commitmentMonths();
   const filled = useAddressPrefill(tasks.TaskPrefill, !task);
@@ -71,7 +72,7 @@ export function TaskForm({ close, task, commitment = false }: { close: () => voi
     {
       title: task?.title ?? filled.title ?? "",
       cadence: task?.cadence ?? filled.cadence ?? "",
-      due_on: task?.due_at ? task.due_at.slice(0, 10) : (filled.due_on ?? ""),
+      due_on: task?.due_at ? task.due_at.slice(0, 10) : (dueOn ?? filled.due_on ?? ""),
       priority: (task?.priority ?? filled.priority ?? "normal") as string,
       description: task?.description ?? filled.description ?? "",
       is_commitment: task?.is_commitment ?? commitment,
