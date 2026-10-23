@@ -3,14 +3,14 @@ import { useEffect, useState } from "react";
 import tasks from "@mycity/contract/schemas/tasks.js";
 import type { Task, TaskDetail } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
-import { useMutation, usePaged } from "@/api/hooks";
+import { useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
-import { ColleaguePicker, EmployeePicker } from "@/features/shared/pickers";
+import { ColleaguePicker, TaskPeoplePicker } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
 import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
-import { LABEL, LATE_OPTIONS, refresh, say, type BoardStatus, type LateReason } from "./shared";
+import { LABEL, LATE_OPTIONS, refresh, say, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
 const failed = (f: { setServerErrors: (e: Record<string, string[]>) => void }) => (e: unknown) => {
@@ -26,13 +26,30 @@ const choiceOf = (t?: TaskDetail): CountsChoice[] =>
     ? [{ kind: t.counts_towards.kind, employee_target_id: t.counts_towards.employee_target_id, okr_key_result_id: t.counts_towards.okr_key_result_id, title: t.counts_towards.title, sub: null }]
     : [];
 
+export const LEAD_HELP = "Answers for the task, and it counts on their scorecard. Left empty, it is you, or the department's head.";
+
+type Kind = "individual" | "shared";
+type ShareBy = "people" | "department";
+
 export function TaskForm({ close, task, commitment = false }: { close: () => void; task?: TaskDetail; commitment?: boolean }) {
   const me = useMe();
   const months = commitmentMonths();
   const filled = useAddressPrefill(tasks.TaskPrefill, !task);
+  // Who it is for (Individual) or who leads it (Shared): the primary assignee, never the reader themselves.
   const [who, setWho] = useState<PersonRef[]>(task?.assignee && task.assignee.employee_id !== me.employee_id ? [task.assignee] : []);
-  // An assignee named in the address shows by name: a manager's picker holds the person, not an id.
-  const assignee = me.manages_people && filled.primary_assignee_id !== me.employee_id ? filled.primary_assignee_id : undefined;
+  const others = useSetsForOthers();
+  const sharable = useApi("GET /api/v1/tasks/people", { query: { shared: "true" } });
+  const peopleView = Boolean(me.grants.people?.includes("view"));
+  const departments = useApi("GET /api/v1/departments", { query: { active: "true" }, enabled: peopleView });
+  const [kind, setKind] = useState<Kind>(task?.members.length ? "shared" : "individual");
+  const [by, setBy] = useState<ShareBy>("people");
+  const [members, setMembers] = useState<PersonRef[]>(task?.members ?? []);
+  const [department, setDepartment] = useState("");
+  const [shareMark, setShareMark] = useState<string | null>(null);
+  const shared = kind === "shared";
+  const mayShare = (sharable.data?.page.total ?? 0) > 0 || Boolean(task?.members.length);
+  // An assignee named in the address shows by name: the picker holds the person, not an id.
+  const assignee = filled.primary_assignee_id && filled.primary_assignee_id !== me.employee_id ? filled.primary_assignee_id : undefined;
   useEffect(() => {
     if (!assignee) return;
     let live = true;
@@ -48,7 +65,8 @@ export function TaskForm({ close, task, commitment = false }: { close: () => voi
   const canAssign = !task || task.can_reassign;
   // An approved commitment keeps its person, mark, month and criteria; its date may still move.
   const fixed = Boolean(task?.is_commitment && task.original_due_at);
-  const mayMark = !fixed && (!task || task.status !== "done");
+  // A commitment is its lead's: the people sharing a task leave the mark to the lead and whoever manages it.
+  const mayMark = !fixed && (!task || (task.status !== "done" && (task.can_reassign || task.assignee?.employee_id === me.employee_id)));
   const f = useContractForm(
     {
       title: task?.title ?? filled.title ?? "",
@@ -80,8 +98,15 @@ export function TaskForm({ close, task, commitment = false }: { close: () => voi
           ? { is_commitment: false }
           : {}
       : {};
+  /** Who shares it, as the body names them: the people, a department, or nobody (Individual). */
+  const sharing = () => {
+    if (!shared) return task?.members.length ? { member_ids: [] } : {};
+    return by === "department" ? { department_id: department } : { member_ids: members.map((p) => p.employee_id) };
+  };
   const submit = async () => {
-    if (!f.check()) return;
+    const missing = shared && (by === "department" ? !department : !members.length) ? (by === "department" ? "Pick a department" : "Pick people") : null;
+    setShareMark(missing);
+    if (!f.check() || missing) return;
     const v = f.values;
     try {
       if (task) {
@@ -91,6 +116,7 @@ export function TaskForm({ close, task, commitment = false }: { close: () => voi
               cadence: v.cadence || null,
               due_on: v.due_on || null,
               ...(who[0] && !fixed ? { primary_assignee_id: who[0].employee_id } : {}),
+              ...sharing(),
               ...pointer(),
             }
           : {};
@@ -107,17 +133,20 @@ export function TaskForm({ close, task, commitment = false }: { close: () => voi
             ...(v.due_on && { due_on: v.due_on }),
             ...(v.description && { description: v.description }),
             ...(who[0] && { primary_assignee_id: who[0].employee_id }),
+            ...sharing(),
             ...(c?.kind === "line" && c.employee_target_id && { employee_target_id: c.employee_target_id }),
             ...(c?.kind === "key_result" && c.okr_key_result_id && { entity_type: "key_result" as const, entity_id: c.okr_key_result_id }),
             ...(isCommitment && { is_commitment: true, acceptance_criteria: v.acceptance_criteria, commitment_month: v.commitment_month }),
           },
         });
-        toast(who[0] ? `${t.number} set for ${who[0].display_name}` : `${t.number} created`);
+        toast(t.members.length ? `${t.number} shared with ${t.members.length + 1} people` : who[0] ? `${t.number} set for ${who[0].display_name}` : `${t.number} created`);
       }
       refresh();
       close();
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      const mark = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
+      if (mark) setShareMark(mark);
+      else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
     }
   };
@@ -126,9 +155,57 @@ export function TaskForm({ close, task, commitment = false }: { close: () => voi
   return (
     <>
       {canAssign && <Field label="Task" {...f.field("title")}><TextField {...f.field("title")} placeholder="Visit the venue" /></Field>}
-      {me.manages_people && canAssign && !fixed && (
+      {canAssign && !fixed && mayShare && (
+        <Field label="Type">
+          <ChoiceField value={kind} onChange={(k) => setKind(k as Kind)} options={[["individual", "Individual"], ["shared", "Shared"]]} />
+        </Field>
+      )}
+      {canAssign && !fixed && !shared && others && (
         <Field label="Assign To" optional>
-          <EmployeePicker value={who} onChange={setWho} placeholder="Your team" />
+          <TaskPeoplePicker value={who} onChange={setWho} />
+        </Field>
+      )}
+      {canAssign && shared && peopleView && (
+        <Field label="Share With">
+          <ChoiceField
+            value={by}
+            onChange={(b) => {
+              setBy(b as ShareBy);
+              setShareMark(null);
+            }}
+            options={[["people", "People"], ["department", "Department"]]}
+          />
+        </Field>
+      )}
+      {canAssign && shared && by === "people" && (
+        <Field label="People" state={shareMark ? "bad" : undefined} message={shareMark ?? undefined}>
+          <TaskPeoplePicker
+            shared
+            multiple
+            value={members}
+            onChange={(p) => {
+              setMembers(p);
+              setShareMark(null);
+            }}
+          />
+        </Field>
+      )}
+      {canAssign && shared && by === "department" && (
+        <Field label="Department" state={shareMark ? "bad" : undefined} message={shareMark ?? undefined}>
+          <SelectField
+            value={department}
+            onChange={(d) => {
+              setDepartment(d);
+              setShareMark(null);
+            }}
+            options={(departments.data?.data ?? []).map((d) => [d.department_id, d.name] as [string, string])}
+            placeholder="Choose One"
+          />
+        </Field>
+      )}
+      {canAssign && shared && !fixed && others && (
+        <Field label="Lead" optional help={LEAD_HELP}>
+          <TaskPeoplePicker value={who} onChange={setWho} />
         </Field>
       )}
       {canAssign && (

@@ -31,14 +31,19 @@ function periodOf(period, today) {
   return { from: lagos.addDays(today, period === "90d" ? -89 : -29), to: today };
 }
 
-/** The WHERE fragment for whose tasks count, as on the board. */
+/**
+ * The WHERE fragment for whose tasks count, as on the board. The caller's id is pushed only
+ * when the fragment names it: Postgres refuses a parameter the SQL never reads.
+ */
 function whose(listScope, scope, params) {
-  params.push(scope.employee_id || null);
-  const me = `$${params.length}::uuid`;
-  const mine = `(t.primary_assignee_id = ${me} OR t.set_by_employee_id = ${me})`;
-  if (listScope !== "team") return `AND ${mine}`;
+  const mine = () => {
+    params.push(scope.employee_id || null);
+    const me = `$${params.length}::uuid`;
+    return `(t.primary_assignee_id = ${me} OR t.set_by_employee_id = ${me})`;
+  };
+  if (listScope !== "team") return `AND ${mine()}`;
   const s = scopeClause(scope, { column: "t.primary_assignee_id" }, params);
-  return s.and ? `AND (${s.and.slice(4)} OR ${mine})` : "";
+  return s.and ? `AND (${s.and.slice(4)} OR ${mine()})` : "";
 }
 
 async function analytics(query, scope, now = new Date()) {

@@ -5,7 +5,9 @@
  * Every change to a task is one event. The person who did it is never told (fanout);
  * the people a task concerns are its assignee and the person who set it, so a task a
  * manager set tells the assignee when it is set or cancelled, and tells the manager
- * when it is done or blocked. A task someone set for themselves tells nobody.
+ * when it is done or blocked. A task someone set for themselves tells nobody. The people
+ * sharing a task (member_employee_ids) hear what its assignee, the lead, hears, and when
+ * it is done; someone put on a task by an edit is told so.
  *
  * Watchers hear when the task is done, blocked, cancelled or commented on; the assignees of
  * tasks waiting on it hear when it is done; a ping goes to whoever it names; a reminder set on
@@ -51,11 +53,21 @@ async function loginsOf(client, employeeIds) {
   return rows.map((r) => r.user_id);
 }
 
-/** Someone else set it: the assignee hears. */
+/** The people sharing the task beside its lead. */
+const membersOf = (e) => e.payload.member_employee_ids || [];
+
+/** Someone else set it: the assignee hears; and the people sharing it, whoever set it. */
 const assigneeWhenSetByOther = (e, client) =>
-  e.payload.set_by_employee_id && e.payload.set_by_employee_id !== e.payload.primary_assignee_id
-    ? loginsOf(client, [e.payload.primary_assignee_id])
-    : [];
+  loginsOf(client, [
+    ...(e.payload.set_by_employee_id && e.payload.set_by_employee_id !== e.payload.primary_assignee_id
+      ? [e.payload.primary_assignee_id]
+      : []),
+    ...membersOf(e),
+  ]);
+
+/** A shared task: everyone on it (fanout leaves out whoever did it). */
+const everyoneOnShared = (e, client) =>
+  membersOf(e).length ? loginsOf(client, [e.payload.primary_assignee_id, ...membersOf(e)]) : [];
 
 /** Someone else set it: the setter hears. */
 const setterWhenOther = (e, client) =>
@@ -64,7 +76,7 @@ const setterWhenOther = (e, client) =>
     : [];
 
 const both = (e, client) =>
-  loginsOf(client, [e.payload.primary_assignee_id, e.payload.set_by_employee_id]);
+  loginsOf(client, [e.payload.primary_assignee_id, e.payload.set_by_employee_id, ...membersOf(e)]);
 
 /** The people watching the task. */
 async function watchersOf(e, client) {
@@ -84,12 +96,15 @@ async function waitingOnIt(e, client) {
 
 defineNotification(EVENTS.TASK_CREATED, {
   to: [{ users: assigneeWhenSetByOther }],
-  title: (e) => `${e.payload.set_by_name || "Your manager"} set you a task`,
+  title: (e) =>
+    membersOf(e).length
+      ? `${e.payload.set_by_name || "Someone"} shared a task with you`
+      : `${e.payload.set_by_name || "Your manager"} set you a task`,
   body: (e) => `${e.payload.number}: ${e.payload.title}`,
 });
 
 defineNotification(EVENTS.TASK_COMPLETED, {
-  to: [{ users: setterWhenOther }, { users: watchersOf }, { users: waitingOnIt }],
+  to: [{ users: setterWhenOther }, { users: everyoneOnShared }, { users: watchersOf }, { users: waitingOnIt }],
   title: (e) => `${e.payload.assignee_name || "A task"} is done`,
   body: (e) => `${e.payload.number}: ${e.payload.title}`,
 });
@@ -136,8 +151,14 @@ defineNotification(EVENTS.TASK_WATCHERS_CHANGED, {
   body: (e) => e.payload.title,
 });
 
+defineNotification(EVENTS.TASK_EDITED, {
+  to: [{ users: (e, client) => loginsOf(client, e.payload.added_employee_ids || []) }],
+  title: (e) => `${e.payload.editor_name || "Someone"} put you on a task`,
+  body: (e) => `${e.payload.number}: ${e.payload.title}`,
+});
+
 defineNotification(EVENTS.TASK_REMINDER_DUE, {
-  to: [{ users: (e, client) => loginsOf(client, [e.payload.primary_assignee_id]) }],
+  to: [{ users: (e, client) => loginsOf(client, [e.payload.primary_assignee_id, ...membersOf(e)]) }],
   title: (e) => `Reminder: ${e.payload.title}`,
   body: (e) => e.payload.number,
   include_actor: true,

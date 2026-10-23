@@ -4,6 +4,7 @@
  *
  *   GET   /, /summary, /:id                 `workspace` view: the board, its figures, a task
  *   GET   /counts-towards                   `workspace` view: the assignee's lines and key results
+ *   GET   /people                           `workspace` create: who the caller may set a task for, or share one with
  *   POST  /                                 `workspace` create: for oneself, or someone in scope (A24)
  *   PATCH /:id                              `workspace` edit: the setter's fields, or the assignee's notes
  *   POST  /:id/move                         `workspace` edit: a drag between and within columns
@@ -41,6 +42,10 @@ route(router, "get", "/summary",
 route(router, "get", "/counts-towards",
   { query: t.CountsTowardsQuery, response: t.CountsTowardsPage, summary: "The scorecard lines and key results a task may count towards" },
   requirePermission("workspace", "view"), controller.countsTowards);
+
+route(router, "get", "/people",
+  { query: t.TaskPeopleQuery, response: t.TaskPersonPage, summary: "The people a task may be set for or shared with" },
+  requirePermission("workspace", "create"), controller.people);
 
 route(router, "get", "/:id",
   { ...one, response: t.TaskDetail, summary: "One task, and what the caller may do to it" },

@@ -51,6 +51,24 @@ export function EmployeePicker({
 }
 
 /**
+ * The people a task may be set for, or with `shared` shared with (My Workspace, GET /tasks/people):
+ * the caller's own reach, never themselves, searched by the server.
+ */
+export function TaskPeoplePicker({ shared, value, onChange, multiple }: { shared?: boolean; value: PersonRef[]; onChange: (value: PersonRef[]) => void; multiple?: boolean }) {
+  const list = usePaged("GET /api/v1/tasks/people", { filters: shared ? { shared: "true" } : {} });
+  const photos = usePhotos(list.rows.map((row) => row.photo_url));
+  return (
+    <PersonPicker
+      photo={(person) => photos(person.photo_url)}
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value}
+      onChange={onChange}
+      multiple={multiple}
+    />
+  );
+}
+
+/**
  * Colleagues to message or recognise (Staff Community): anyone with a login, open to
  * every member of staff, where the employee register above needs the People grant.
  */

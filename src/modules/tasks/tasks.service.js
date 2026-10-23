@@ -4,8 +4,12 @@
  *
  *   create()   a person sets a task for themselves, or a manager for someone in their
  *              reporting line (A24). It takes a number, lands at the foot of To Do, and
- *              is due at the end of the day it names, or of its cadence's day.
- *   edit()     the setter changes what they decided; the assignee their notes and priority.
+ *              is due at the end of the day it names, or of its cadence's day. Shared, it
+ *              has a lead (the primary assignee) and the people sharing it, named or a
+ *              whole department (shareWith).
+ *   people()   who the caller may put on a task, for New Task's pickers.
+ *   edit()     the setter changes what they decided, who shares it among them; the assignee
+ *              and the people sharing it their notes and priority.
  *   move()     a drag: a column and the card it now sits above. Entering In Progress the
  *              first time starts it; Done completes it; leaving Done reopens it.
  *   block(), unblock()   a hold with its note and expected day; clearing it moves the due
@@ -77,6 +81,7 @@ function toTask(row, now = new Date()) {
     priority: row.priority,
     cadence: row.cadence,
     assignee: row.assignee,
+    members: row.members || [],
     set_by: row.set_by,
     due_at: iso(row.due_at),
     overdue: Boolean(open && due && due < now),
@@ -142,6 +147,7 @@ const payloadOf = (row, extra = {}) => ({
   employee_target_id: row.employee_target_id,
   assignee_name: row.assignee ? row.assignee.display_name : null,
   set_by_name: row.set_by ? row.set_by.display_name : null,
+  member_employee_ids: (row.members || []).map((p) => p.employee_id),
   ...extra,
 });
 
@@ -173,13 +179,31 @@ async function list(query, scope) {
 
 const summary = (query, scope) => repo.summary(pool, query.scope, scope, windows());
 
-/** A task the caller may see, as a repo row; 404 otherwise. */
+/** A task the caller may see, as a repo row; 404 otherwise. `member`: the caller shares it. */
 async function visible(db, id, scope) {
   const row = await repo.get(db, id);
   if (!row) throw notFound();
   const shared = await repo.sharedWith(db, id, scope.employee_id);
   if (!audience.maySee(scope, row, shared)) throw notFound();
-  return row;
+  return { ...row, member: shared };
+}
+
+/**
+ * Who the caller may put on a task: their scope, and for a shared task they lead, also their own
+ * department (A24 as extended, workspace.md §6). The repo's reachClause reads it.
+ */
+async function reachOf(db, scope, { peers }) {
+  return {
+    all: scope.scope === "all",
+    ids: scope.scope === "all" ? [] : (scope.scope_ids || []),
+    peerDepartmentId: peers ? await repo.departmentOf(db, scope.employee_id) : null,
+  };
+}
+
+/** GET /tasks/people: who the caller may set a task for, or with `shared`, share one with. */
+async function people(query, scope) {
+  const reach = await reachOf(pool, scope, { peers: query.shared === "true" });
+  return repo.people(pool, query, { reach, excludeId: scope.employee_id });
 }
 
 /** Another task as a panel line: its words only when the reader may open it. */
@@ -232,8 +256,9 @@ function toBlockage(row) {
   };
 }
 
-/** May the caller plan the task: its steps, what it waits on, its reminders? */
-const mayPlan = (scope, row) => audience.mayManage(scope, row) || row.primary_assignee_id === scope.employee_id;
+/** May the caller plan the task: its steps, what it waits on, its reminders? Its people may. */
+const mayPlan = (scope, row) =>
+  audience.mayManage(scope, row) || row.primary_assignee_id === scope.employee_id || row.member === true;
 
 /** May the caller act on this person's commitment: they are its person, or the person is in their scope. */
 const actsFor = (scope, row) => row.primary_assignee_id === scope.employee_id || audience.inScope(scope, row.primary_assignee_id);
@@ -369,6 +394,48 @@ async function checkAssignee(db, scope, employeeId) {
     throw invalid("primary_assignee_id", "Not on the staff");
 }
 
+/**
+ * A shared task's lead when none is named: the department's head for a department the caller
+ * may set the head work in, otherwise the caller.
+ */
+async function defaultLead(db, scope, departmentId) {
+  if (!departmentId) return scope.employee_id;
+  const d = await repo.department(db, departmentId);
+  if (!d) throw invalid("department_id", "Not a department");
+  const head = d.head_employee_id;
+  return head && audience.maySetFor(scope, head) && (await repo.employeeActive(db, head)) ? head : scope.employee_id;
+}
+
+/**
+ * The people a shared task is shared with, beside its lead (workspace.md §6): named, or a
+ * department's active people the caller may add, at the moment of saving. Anyone the caller may
+ * set a task for; colleagues of their own department too when they lead it themselves.
+ * @returns {Promise<string[]>} employee ids, never the lead
+ */
+async function shareWith(db, scope, leadId, { member_ids: named, department_id: departmentId }) {
+  const peers = leadId === scope.employee_id;
+  const mine = await repo.departmentOf(db, scope.employee_id);
+  const reach = { ...(await reachOf(db, scope, { peers: false })), peerDepartmentId: peers ? mine : null };
+  if (departmentId) {
+    if (!(await repo.department(db, departmentId))) throw invalid("department_id", "Not a department");
+    const { total, ids } = await repo.departmentPeople(db, { departmentId, leadId, reach });
+    if (!total) throw invalid("department_id", "Nobody to share with");
+    if (total > repo.MEMBERS_MAX) throw invalid("department_id", `More than ${repo.MEMBERS_MAX} people`);
+    return ids;
+  }
+  const ids = [...new Set(named || [])].filter((id) => id !== leadId);
+  if (ids.length > repo.MEMBERS_MAX) throw invalid("member_ids", `At most ${repo.MEMBERS_MAX} people`);
+  const facts = new Map((await repo.peopleFacts(db, ids)).map((r) => [r.employee_id, r]));
+  for (const id of ids) {
+    const p = facts.get(id);
+    if (!p || p.status !== "active") throw invalid("member_ids", "Not on the staff");
+    const colleague = Boolean(mine) && p.department_id === mine;
+    if (!audience.maySetFor(scope, id) && !(peers && colleague))
+      throw invalid("member_ids", colleague ? "Lead it yourself" : "Not in your team");
+  }
+  return ids;
+}
+
 /* ------------------------------------------------------------------ *
  * Writing
  * ------------------------------------------------------------------ */
@@ -382,11 +449,13 @@ async function checkAssignee(db, scope, employeeId) {
  */
 async function create(actor, scope, body, { client: within = null } = {}) {
   if (!actor.employee_id) throw new AppError("FORBIDDEN", "Only an employee can hold tasks", 403);
-  const assigneeId = body.primary_assignee_id || actor.employee_id;
+  const shared = body.member_ids !== undefined || body.department_id !== undefined;
   // An importer sets tasks inside its own transaction (a key result's initiatives).
   const run = within ? (fn) => atomically(within, () => fn(within)) : tx;
   return run(async (client) => {
+    const assigneeId = body.primary_assignee_id || (shared ? await defaultLead(client, scope, body.department_id) : actor.employee_id);
     await checkAssignee(client, scope, assigneeId);
+    const members = shared ? await shareWith(client, scope, assigneeId, body) : [];
     await checkTarget(client, body.employee_target_id, assigneeId);
     await checkRecord(client, body.entity_type, body.entity_id);
     const cal = await workingWeek.loadCalendar(client);
@@ -415,6 +484,7 @@ async function create(actor, scope, body, { client: within = null } = {}) {
       acceptance_criteria: commitment ? body.acceptance_criteria : null,
       commitment_month: commitment ? body.commitment_month : null,
     });
+    if (members.length) await repo.setMembers(client, id, members);
     await repo.addActivity(client, { task_id: id, actor_user_id: actor.user_id, kind: "created", to_status: "todo" });
     const row = await repo.get(client, id);
     await emit(client, {
@@ -429,8 +499,9 @@ async function create(actor, scope, body, { client: within = null } = {}) {
 }
 
 /**
- * Change a task. The setter's fields need mayManage (§6); the assignee may change the
- * notes and priority of a task someone else set.
+ * Change a task. The setter's fields, who shares it among them, need mayManage (§6); the
+ * assignee and the people sharing it may change the notes and priority of a task someone else
+ * set, and only the assignee (the lead) its commitment fields.
  */
 async function edit(actor, scope, id, body) {
   return tx(async (client) => {
@@ -447,9 +518,19 @@ async function edit(actor, scope, id, body) {
     const assigneeId = body.primary_assignee_id || before.primary_assignee_id;
     const reassigned = Boolean(body.primary_assignee_id && body.primary_assignee_id !== before.primary_assignee_id);
     const approved = Boolean(before.is_commitment && before.original_due_at);
+    const day = (v) => (v ? String(v instanceof Date ? lagos.dateOf(v) : v).slice(0, 10) : null);
+    // The commitment fields the body changes, against the task as it stands.
+    const remarked = [
+      "is_commitment" in body && body.is_commitment !== Boolean(before.is_commitment) && "is_commitment",
+      "acceptance_criteria" in body && (body.acceptance_criteria || null) !== before.acceptance_criteria && "acceptance_criteria",
+      "commitment_month" in body && day(body.commitment_month) !== day(before.commitment_month) && "commitment_month",
+    ].find(Boolean);
+    // A commitment is its lead's (the assignee's): the people sharing the task leave it as it is.
+    if (remarked && !manage && before.primary_assignee_id !== scope.employee_id) {
+      throw new AppError("FORBIDDEN", "Only its lead can change that", 403, { [remarked]: ["Its lead's to change"] });
+    }
     // An approved commitment keeps its person, mark, month and criteria (§6.11).
     if (approved) {
-      const day = (v) => (v ? String(v instanceof Date ? lagos.dateOf(v) : v).slice(0, 10) : null);
       const moved =
         reassigned ||
         ("is_commitment" in body && body.is_commitment !== true) ||
@@ -458,6 +539,12 @@ async function edit(actor, scope, id, body) {
       if (moved) throw approvedCommitment();
     }
     if (reassigned) await checkAssignee(client, scope, body.primary_assignee_id);
+    // Who shares it: named again (or a department) replaces them; a new lead is never also one of them.
+    const resharing = "member_ids" in body || "department_id" in body;
+    const membersBefore = (before.members || []).map((p) => p.employee_id);
+    let members = null;
+    if (resharing) members = await shareWith(client, scope, assigneeId, body);
+    else if (reassigned && membersBefore.includes(assigneeId)) members = membersBefore.filter((m) => m !== assigneeId);
     const targetId = "employee_target_id" in body ? body.employee_target_id : before.employee_target_id;
     if ("employee_target_id" in body || body.primary_assignee_id)
       await checkTarget(client, targetId, assigneeId);
@@ -497,21 +584,27 @@ async function edit(actor, scope, id, body) {
       throw invalid("due_on", "Pick a due date");
     }
     await repo.update(client, id, changes);
+    if (members) await repo.setMembers(client, id, members);
     await repo.addActivity(client, {
       task_id: id,
       actor_user_id: actor.user_id,
-      kind: changes.primary_assignee_id ? "assigned" : "edited",
+      kind: changes.primary_assignee_id || members ? "assigned" : "edited",
       detail: Object.keys(body).join(", "),
     });
     const after = await repo.get(client, id);
     if ("due_on" in body) await followDue(client, id, after.due_at);
+    // Whoever is newly on it hears: people added, and a new lead.
+    const added = [
+      ...(reassigned ? [after.primary_assignee_id] : []),
+      ...(after.members || []).map((p) => p.employee_id).filter((m) => !membersBefore.includes(m)),
+    ].filter((m) => m !== before.primary_assignee_id);
     await emit(client, {
       key: EVENTS.TASK_EDITED,
       entity: { type: "task", id },
       actor,
       before: toTask(before),
       after: toTask(after),
-      payload: payloadOf(after),
+      payload: payloadOf(after, { added_employee_ids: [...new Set(added)], editor_name: actor.display_name || null }),
     });
     return toTask(after);
   });
@@ -908,14 +1001,15 @@ async function ping(actor, scope, id, { message, to }) {
     const row = await visible(client, id, scope);
     if (row.status === "cancelled") throw new AppError("TASK_CANCELLED", "This task was cancelled", 409);
     const watchers = to === "assignee" ? [] : await repo.watcherIds(client, id);
-    const people = [...(to === "watchers" ? [] : [row.primary_assignee_id]), ...watchers]
+    const onIt = [row.primary_assignee_id, ...(row.members || []).map((p) => p.employee_id)];
+    const told = [...(to === "watchers" ? [] : onIt), ...watchers]
       .filter((p) => p && p !== actor.employee_id);
-    if (!people.length) throw invalid("to", "Nobody else to tell");
+    if (!told.length) throw invalid("to", "Nobody else to tell");
     await noted(client, actor, row, {
       kind: "pinged",
       detail: message.slice(0, 140),
       key: EVENTS.TASK_PINGED,
-      extra: { ping_employee_ids: [...new Set(people)], message: message.slice(0, 280), sender_name: actor.display_name || null },
+      extra: { ping_employee_ids: [...new Set(told)], message: message.slice(0, 280), sender_name: actor.display_name || null },
     });
     return toTask(row);
   });
@@ -1037,6 +1131,7 @@ async function repeatOne(id, cal, now = new Date()) {
       sort_order: await repo.nextOrder(client, t.primary_assignee_id, "todo"),
     });
     await client.query("UPDATE task SET parent_task_id = $2 WHERE task_id = $1", [childId, id]);
+    await repo.copyMembers(client, id, childId);
     await repo.addActivity(client, { task_id: childId, actor_user_id: null, kind: "created", to_status: "todo", detail: `repeats ${t.number}` });
     const row = await repo.get(client, childId);
     await emit(client, {
@@ -1131,6 +1226,7 @@ async function settleRescope(client, actor, id, approved) {
 }
 
 module.exports = {
+  people,
   linkCommitments,
   fixOriginalDates,
   askRescope,

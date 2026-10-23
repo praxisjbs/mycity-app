@@ -16,13 +16,14 @@ import type {
 } from "@mycity/contract/contract.gen.ts";
 import { at, created, fail, invalid, isoDaysAgo, isoDaysAhead, notFound, ok, paged, route, sid, uuid } from "../core";
 import { OBJECTIVES, SCORECARDS } from "../data/performance";
-import { byId, byKey, ref, refKey, teamOf } from "../data/people";
+import { byId, byKey, DEPARTMENTS, PEOPLE, ref, refKey, teamOf } from "../data/people";
 import { exportFile } from "./shared";
 
 /**
  * My Workspace in the browser, in the contract's shapes (docs/guides/workspace.md §5).
  * The same records seed staging (F13). Rules the API applies are kept where a screen
- * shows them: who may set a task for whom (A24), and a cancelled task off the board.
+ * shows them: who may set a task for whom (A24), who may share one (a lead and the people
+ * beside them), and a cancelled task off the board.
  */
 type Status = Task["status"];
 type R = [string, Status, string, number | null, Task["priority"], string | null, string | null];
@@ -59,6 +60,8 @@ const ROWS: R[] = [
 ];
 
 const due = (d: number | null) => (d == null ? null : at(-d, d === 0 ? "17:00" : "17:00"));
+/** The rows that are Shared: the people beside the lead, by key. */
+const SHARED: Record<number, string[]> = { 2: ["damilola", "funke"] };
 const TASKS: Task[] = ROWS.map((r, i) => ({
   task_id: sid(`task:${i}`),
   number: `TSK-${String(400 - i).padStart(4, "0")}`,
@@ -68,6 +71,7 @@ const TASKS: Task[] = ROWS.map((r, i) => ({
   priority: r[4],
   cadence: r[5] ? "weekly" : null,
   assignee: refKey(r[2]),
+  members: (SHARED[i] ?? []).map(refKey),
   set_by: refKey(r[5] ?? r[2]),
   due_at: due(r[3]),
   overdue: false,
@@ -144,7 +148,8 @@ const fresh = (t: Task): Task => {
   };
 };
 const me = (user?: string | null) => byKey(user)!.employee_id;
-const mine = (user: string, t: Task) => t.assignee?.employee_id === me(user) || t.set_by?.employee_id === me(user);
+const onIt = (user: string, t: Task) => t.members.some((p) => p.employee_id === me(user));
+const mine = (user: string, t: Task) => t.assignee?.employee_id === me(user) || t.set_by?.employee_id === me(user) || onIt(user, t);
 const scoped = (user: string, scope?: string) => {
   if (scope !== "team") return TASKS.filter((t) => mine(user, t));
   const team = new Set([me(user), ...teamOf(user).map((p) => p.employee_id)]);
@@ -152,6 +157,25 @@ const scoped = (user: string, scope?: string) => {
 };
 const canSetFor = (user: string, id: string) => id === me(user) || teamOf(user).some((p) => p.employee_id === id);
 const manages = (user: string, t: Task) => t.set_by?.employee_id === me(user) || (t.assignee?.employee_id !== me(user) && canSetFor(user, t.assignee!.employee_id));
+const colleague = (user: string, id: string) => byId(id)?.department === byKey(user)?.department;
+/** Who the user may put on a task (GET /tasks/people): their team, and to share one, their department; never themselves. */
+const reachable = (user: string, shared: boolean) =>
+  PEOPLE.filter((p) => p.employee_id !== me(user) && (canSetFor(user, p.employee_id) || (shared && colleague(user, p.employee_id))));
+/** A shared task's people beside its lead, named or a department's, as the API's shareWith decides. */
+function shareWith(user: string, lead: string, b: { member_ids?: string[]; department_id?: string }): { ids: string[] } | { error: Record<string, string[]> } {
+  const peers = lead === me(user);
+  const allowed = (id: string) => canSetFor(user, id) || (peers && colleague(user, id));
+  if (b.department_id) {
+    const name = DEPARTMENTS.find((n) => sid(`dept:${n}`) === b.department_id);
+    if (!name) return { error: { department_id: ["Not a department"] } };
+    const ids = PEOPLE.filter((p) => p.department === name && p.employee_id !== lead && allowed(p.employee_id)).map((p) => p.employee_id);
+    return ids.length ? { ids } : { error: { department_id: ["Nobody to share with"] } };
+  }
+  const ids = [...new Set(b.member_ids ?? [])].filter((id) => id !== lead);
+  const bad = ids.find((id) => !byId(id) || !allowed(id));
+  if (bad) return { error: { member_ids: [colleague(user, bad) && !peers ? "Lead it yourself" : "Not in your team"] } };
+  return { ids };
+}
 const weekBounds = () => {
   const d = new Date();
   const wd = (d.getUTCDay() + 6) % 7;
@@ -171,7 +195,7 @@ const refOf = (user: string, id: string) => {
 const edgeOut = (user: string, e: Edge, other: string) => ({
   task_dependency_id: e.task_dependency_id, task: refOf(user, other), satisfied: satisfied(e), overridden_at: e.overridden_at, override_reason: e.override_reason,
 });
-const plans = (user: string, t: Task) => manages(user, t) || t.assignee?.employee_id === me(user);
+const plans = (user: string, t: Task) => manages(user, t) || t.assignee?.employee_id === me(user) || onIt(user, t);
 const detail = (user: string, t: Task): TaskDetail => {
   const f = fresh(t);
   const watchers = WATCHERS.get(t.task_id) ?? [];
@@ -237,6 +261,10 @@ route("GET /api/v1/tasks/summary", (req) => {
     done_30d: l.filter((t) => t.status === "done" && t.completed_at && t.completed_at >= isoDaysAgo(29)).length,
   });
 });
+route("GET /api/v1/tasks/people", (req) => {
+  const { shared, ...query } = req.query;
+  return paged(reachable(req.user!, shared === "true").map((p) => ref(p)!), { ...req, query }, { search: (p) => [p.display_name] });
+});
 route("GET /api/v1/tasks/:id", (req) => {
   const t = find(req.user!, req.params.id);
   return t ? ok(detail(req.user!, t)) : notFound();
@@ -245,16 +273,20 @@ route("POST /api/v1/tasks", (req) => {
   const b = req.body as {
     title?: string; primary_assignee_id?: string; due_on?: string; cadence?: Task["cadence"]; priority?: Task["priority"]; description?: string;
     is_commitment?: boolean; acceptance_criteria?: string; commitment_month?: string; employee_target_id?: string; entity_type?: Task["entity_type"]; entity_id?: string;
+    member_ids?: string[]; department_id?: string;
   };
   if (!b.title || !b.title.trim()) return invalid({ title: ["Name the task"] });
+  if (b.member_ids && b.department_id) return invalid({ department_id: ["People or a department"] });
   const assignee = b.primary_assignee_id ? byId(b.primary_assignee_id) : byKey(req.user);
   if (!assignee || !canSetFor(req.user!, assignee.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
+  const share = b.member_ids || b.department_id ? shareWith(req.user!, assignee.employee_id, b) : { ids: [] };
+  if ("error" in share) return invalid(share.error);
   const problem = commitmentProblem(b);
   if (problem) return invalid(problem);
   const t: Task = {
     ...TASKS[0], task_id: sid(`task:${Date.now()}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: b.title.trim(),
     description: b.description || null, status: "todo", priority: b.priority ?? "normal", cadence: b.cadence || null,
-    assignee: ref(assignee)!, set_by: refKey(req.user!), due_at: b.due_on ? `${b.due_on}T16:00:00.000Z` : null,
+    assignee: ref(assignee)!, members: share.ids.map((id) => ref(byId(id))!), set_by: refKey(req.user!), due_at: b.due_on ? `${b.due_on}T16:00:00.000Z` : null,
     started_at: null, completed_at: null, entity_type: b.entity_type ?? null, entity_id: b.entity_id ?? null, link: null, comment_count: 0,
     counts_towards: countsTowardsOf(b), is_commitment: Boolean(b.is_commitment), acceptance_criteria: b.is_commitment ? b.acceptance_criteria ?? null : null,
     commitment_month: b.is_commitment ? b.commitment_month ?? null : null, original_due_at: null, rescoped_at: null, rescope_reason: null, commitment_set_id: null,
@@ -268,7 +300,19 @@ route("PATCH /api/v1/tasks/:id", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
   const b = req.body as Record<string, unknown>;
-  if (["title", "due_on", "cadence", "primary_assignee_id"].some((k) => k in b) && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that");
+  if (["title", "due_on", "cadence", "primary_assignee_id", "member_ids", "department_id"].some((k) => k in b) && !manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can change that");
+  if (["is_commitment", "acceptance_criteria", "commitment_month"].some((k) => k in b) && !manages(req.user!, t) && t.assignee?.employee_id !== me(req.user)) return fail(403, "FORBIDDEN", "Only its lead can change that");
+  if (typeof b.primary_assignee_id === "string" && b.primary_assignee_id !== t.assignee?.employee_id) {
+    const lead = byId(b.primary_assignee_id);
+    if (!lead || !canSetFor(req.user!, lead.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
+    t.assignee = ref(lead)!;
+    t.members = t.members.filter((p) => p.employee_id !== lead.employee_id);
+  }
+  if ("member_ids" in b || "department_id" in b) {
+    const share = shareWith(req.user!, t.assignee!.employee_id, b as { member_ids?: string[]; department_id?: string });
+    if ("error" in share) return invalid(share.error);
+    t.members = share.ids.map((id) => ref(byId(id))!);
+  }
   const approved = Boolean(t.is_commitment && t.original_due_at);
   const marks = ["is_commitment", "acceptance_criteria", "commitment_month"].some((k) => k in b && b[k] !== (t as unknown as Record<string, unknown>)[k]);
   if (approved && marks) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
@@ -820,7 +864,7 @@ route("POST /api/v1/performance/commitments/:id/recovery", (req) => {
   if (!owner || !canSetFor(req.user!, owner.employee_id)) return invalid({ primary_assignee_id: ["Not in your team"] });
   const r: Task = {
     ...TASKS[0], task_id: sid(`task:recovery:${t.task_id}`), number: `TSK-${String(401 + TASKS.length).padStart(4, "0")}`, title: `Recovery: ${t.title}`.slice(0, 200),
-    description: null, status: "todo", priority: "high", cadence: null, assignee: ref(owner)!, set_by: refKey(req.user!), due_at: `${String(req.body.due_on)}T16:00:00.000Z`,
+    description: null, status: "todo", priority: "high", cadence: null, assignee: ref(owner)!, members: [], set_by: refKey(req.user!), due_at: `${String(req.body.due_on)}T16:00:00.000Z`,
     started_at: null, completed_at: null, entity_type: "task", entity_id: t.task_id, link: { module: "workspace", tab: "tasks", id: t.task_id, path: `/workspace?tab=tasks&id=${t.task_id}` },
     comment_count: 0, counts_towards: null, is_commitment: false, acceptance_criteria: null, commitment_month: null, original_due_at: null, rescoped_at: null, rescope_reason: null,
     commitment_set_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),

@@ -33,7 +33,7 @@ import {
 } from "@mycity/ui";
 import { CADENCE, LABEL, LATE, PRIORITY, STATUS_TONE, refresh, say, type Status } from "./shared";
 import { CommitmentActions, commitmentItems, COUNTS_HELP } from "./Commitment";
-import { BlockForm, CancelForm, LateReasonForm, OverrideForm, PingForm, RemindersForm, RepeatForm, repeatText, StepForm, TaskForm, UnblockForm, WaitingForm, WatcherForm } from "./TaskForms";
+import { BlockForm, CancelForm, LateReasonForm, LEAD_HELP, OverrideForm, PingForm, RemindersForm, RepeatForm, repeatText, StepForm, TaskForm, UnblockForm, WaitingForm, WatcherForm } from "./TaskForms";
 
 type View = "details" | "steps" | "comments" | "history";
 
@@ -129,7 +129,10 @@ function TaskDetails({ t, changed, form, onOpenTask }: { t: TaskDetail; changed:
   const unlink = useMutation("DELETE /api/v1/tasks/:id/waiting-on/:child_id");
   const items: Array<[ReactNode, ReactNode]> = [
     ["Number", t.number],
-    ["Assignee", t.assignee?.display_name ?? "Nobody"],
+    [t.members.length ? <HelpTerm key="lead" help={LEAD_HELP}>Lead</HelpTerm> : "Assignee", t.assignee?.display_name ?? "Nobody"],
+    ...(t.members.length
+      ? [["Shared With", <span key="sw" data-copy="content">{t.members.map((p) => p.display_name).join(", ")}</span>] as [ReactNode, ReactNode]]
+      : []),
     ["Set By", t.set_by?.display_name ?? "Nobody"],
     ["Due", t.due_at ? formatDateTime(t.due_at) : "No date"],
     ["Priority", PRIORITY[t.priority]],

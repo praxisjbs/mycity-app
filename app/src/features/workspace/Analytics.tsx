@@ -4,7 +4,7 @@ import { useApi } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { AreaChart, Bars, Card, CardHeader, DataView, ErrorState, formatDate, Grid, KeyValue, LoadingRows, PageHeader, SegmentedControl, useIsPhone } from "@mycity/ui";
-import { LATE, PRIORITY, type LateReason } from "./shared";
+import { LATE, PRIORITY, useSetsForOthers, type LateReason } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 
 const BAND: Record<string, string> = { "1_3": "1 to 3 Days", "4_7": "4 to 7 Days", "8_14": "8 to 14 Days", "15_plus": "15 Days or More" };
@@ -12,6 +12,7 @@ const days = (n: number | null, none = "None yet") => (n === null ? none : `${n}
 
 export function Analytics() {
   const me = useMe();
+  const others = useSetsForOthers();
   const phone = useIsPhone();
   const [scope, setScope] = useState<"mine" | "team">(me.manages_people ? "team" : "mine");
   const [period, setPeriod] = useState<"30d" | "90d" | "year">("30d");
@@ -30,7 +31,7 @@ export function Analytics() {
         sub={data ? `${formatDate(data.from)} to ${formatDate(data.to)}` : undefined}
         actions={
           <>
-            {me.manages_people && <SegmentedControl label="Whose Work" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            {others && <SegmentedControl label="Whose Work" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
             <SegmentedControl label="Period" value={period} onChange={setPeriod} options={[["30d", "30 Days"], ["90d", "90 Days"], ["year", "This Year"]]} />
           </>
         }

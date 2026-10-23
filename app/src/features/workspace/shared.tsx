@@ -1,7 +1,7 @@
 /** What the Workspace tabs share: the words for codes, a card's pills, and the refresh after a write. */
 import type { Task } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
-import { invalidate } from "@/api/hooks";
+import { invalidate, useApi } from "@/api/hooks";
 import { formatDate, Pill, toast } from "@mycity/ui";
 
 export type Status = Task["status"];
@@ -52,6 +52,7 @@ export function CardPills({ t }: { t: Task }) {
     <>
       <Pill tone={due.tone}>{due.text}</Pill>
       {t.is_commitment && <Pill tone="info">Commitment</Pill>}
+      {t.members.length > 0 && <Pill tone="info" dot={false}>{`Shared +${t.members.length}`}</Pill>}
       {t.priority === "urgent" && <Pill tone="err">Urgent</Pill>}
       {t.priority === "high" && <Pill tone="warn">High</Pill>}
       {t.blocked_reason && <Pill tone="err">Blocked</Pill>}
@@ -59,6 +60,15 @@ export function CardPills({ t }: { t: Task }) {
       {t.steps_total > 0 && <Pill tone={t.steps_done === t.steps_total ? "ok" : "neutral"} dot={false}>{`${t.steps_done}/${t.steps_total}`}</Pill>}
     </>
   );
+}
+
+/**
+ * May the reader set tasks for anyone but themselves (their workspace scope reaches someone)?
+ * Assign To, Lead and My Team show then; the API decides each write.
+ */
+export function useSetsForOthers(): boolean {
+  const { data } = useApi("GET /api/v1/tasks/people", { query: {} });
+  return (data?.page.total ?? 0) > 0;
 }
 
 /** The server's words for a refused write, or a plain fallback. */

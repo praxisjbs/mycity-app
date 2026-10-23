@@ -7,6 +7,10 @@
  * (`set_by`): the assignee themselves, or a manager setting work for their
  * reporting line (A24). Both kinds sit on one board.
  *
+ * A Shared task has one lead (the primary assignee, who answers for it) and the
+ * people sharing it beside them (`members`, task_assignee), picked by name or as a
+ * department the service turns into its people when the task is saved.
+ *
  * Statuses a person reads:
  *   todo, in_progress, in_review, done   the four columns, moved by drag
  *   cancelled                           reached only through Cancel Task, with a reason
@@ -164,6 +168,8 @@ const Task = z
     priority: TaskPriority,
     cadence: TaskCadence.nullable(),
     assignee: PersonRef.nullable(),
+    /** The people sharing it beside its lead (the assignee); empty for an Individual task. */
+    members: z.array(PersonRef).max(25),
     set_by: PersonRef.nullable(),
     due_at: isoDateTime.nullable(),
     overdue: z.boolean(),
@@ -318,6 +324,11 @@ const TaskSummary = z
   })
   .strict();
 
+/** The people a Shared task is shared with, beside its lead: named, or a whole department. */
+const MEMBERS_MAX = 25;
+const oneShare = (v) => !(v.member_ids !== undefined && v.department_id !== undefined);
+const ONE_SHARE = { message: "People or a department", path: ["department_id"] };
+
 /** The record a task points at: both given, or neither. */
 const pointerPair = (v) =>
   (v.entity_type === undefined || v.entity_type === null) ===
@@ -338,7 +349,10 @@ function commitmentProblems(v, ctx) {
     say("due_on", "Not in that month");
 }
 
-/** POST /tasks. No assignee: the caller's own task. */
+/**
+ * POST /tasks. No assignee: the caller's own task. `member_ids` or `department_id` makes it
+ * Shared, with `primary_assignee_id` its lead (workspace.md §6).
+ */
 const TaskCreate = z
   .object({
     title: text(200),
@@ -347,6 +361,8 @@ const TaskCreate = z
     cadence: blank(TaskCadence),
     due_on: blank(isoDate),
     primary_assignee_id: blank(uuid),
+    member_ids: z.array(uuid).max(MEMBERS_MAX).optional(),
+    department_id: blank(uuid),
     employee_target_id: blank(uuid),
     entity_type: blank(TaskEntityType),
     entity_id: blank(uuid),
@@ -357,6 +373,7 @@ const TaskCreate = z
   })
   .strict()
   .refine(pointerPair, POINTER)
+  .refine(oneShare, ONE_SHARE)
   .superRefine(commitmentProblems);
 
 /**
@@ -376,9 +393,9 @@ const TaskPrefill = z
   .strict();
 
 /**
- * PATCH /tasks/:id. The assignee may change the notes and priority of their own task;
- * the title, due day, cadence, assignee, KPI and record belong to the setter (§6).
- * `null` clears an optional link.
+ * PATCH /tasks/:id. The assignee, and the people sharing it, may change its notes and priority;
+ * the title, due day, cadence, assignee, who shares it, KPI and record belong to the setter (§6).
+ * `null` clears an optional link; `member_ids: []` makes a shared task Individual again.
  */
 const TaskEdit = z
   .object({
@@ -388,6 +405,8 @@ const TaskEdit = z
     cadence: TaskCadence.nullable().optional(),
     due_on: isoDate.nullable().optional(),
     primary_assignee_id: uuid.optional(),
+    member_ids: z.array(uuid).max(MEMBERS_MAX).optional(),
+    department_id: uuid.optional(),
     employee_target_id: uuid.nullable().optional(),
     entity_type: TaskEntityType.nullable().optional(),
     entity_id: uuid.nullable().optional(),
@@ -400,10 +419,19 @@ const TaskEdit = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field")
   .refine((v) => !("entity_type" in v || "entity_id" in v) || pointerPair(v), POINTER)
+  .refine(oneShare, ONE_SHARE)
   .superRefine((v, ctx) => {
     // The service checks the rest against the task as it stands: a body that marks it says it all.
     if (v.is_commitment === true && "due_on" in v && "commitment_month" in v) commitmentProblems(v, ctx);
   });
+
+/**
+ * GET /tasks/people: the active people the caller may put on a task, never themselves. Without
+ * `shared`, who they may set a task for (an assignee, a lead); with `shared` "true", those and the
+ * colleagues of their own department, whom they may share a task they lead with.
+ */
+const TaskPeopleQuery = listQuery({ shared: z.enum(["true", "false"]).optional() });
+const TaskPersonPage = Paged(PersonRef);
 
 /** POST /tasks/:id/move: drag to a column, before a card (null: the foot of the column). */
 const TaskMove = z
@@ -542,6 +570,7 @@ const TABLES = {
     table: "task",
     virtual: {
       assignee: "the person in task.primary_assignee_id",
+      members: "the task_assignee rows of the task, as people",
       set_by: "the person in task.set_by_employee_id",
       overdue: "worked out: open and task.due_at before now",
       counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
@@ -557,6 +586,7 @@ const TABLES = {
     table: "task",
     virtual: {
       assignee: "the person in task.primary_assignee_id",
+      members: "the task_assignee rows of the task, as people",
       set_by: "the person in task.set_by_employee_id",
       overdue: "worked out: open and task.due_at before now",
       counts_towards: "task.employee_target_id, or a key_result pointer, with its title and link",
@@ -626,7 +656,11 @@ const TABLES = {
   TaskSummary: { table: null, reason: "counts over task" },
   TaskCreate: {
     table: "task",
-    virtual: { due_on: "written to task.due_at: the end of that working day, Africa/Lagos" },
+    virtual: {
+      due_on: "written to task.due_at: the end of that working day, Africa/Lagos",
+      member_ids: "written to task_assignee, one row each",
+      department_id: "the department's active people, written to task_assignee",
+    },
   },
   TaskPrefill: {
     table: "task",
@@ -634,8 +668,14 @@ const TABLES = {
   },
   TaskEdit: {
     table: "task",
-    virtual: { due_on: "written to task.due_at: the end of that working day, Africa/Lagos" },
+    virtual: {
+      due_on: "written to task.due_at: the end of that working day, Africa/Lagos",
+      member_ids: "replaces the task's task_assignee rows",
+      department_id: "the department's active people replace the task's task_assignee rows",
+    },
   },
+  TaskPeopleQuery: { table: null, reason: "list controls for the people a task may be set for or shared with" },
+  TaskPersonPage: { table: null, reason: "a page of people" },
   TaskMove: {
     table: "task",
     virtual: { before_task_id: "the card it now sits above; decides task.sort_order" },
@@ -707,6 +747,8 @@ module.exports = {
   TaskCreate,
   TaskPrefill,
   TaskEdit,
+  TaskPeopleQuery,
+  TaskPersonPage,
   TaskMove,
   TaskBlock,
   TaskUnblock,

@@ -101,6 +101,7 @@ describeDb("my workspace against the real migrations", () => {
     await make("peer", "Zainab", "Lawal", "employee", "Field Officer");
     await make("outsider", "Bisi", "Ade", "employee", "Accounts Officer", "Finance");
     await make("director", "Ngozi", "Okafor", "management", "Operations Director", "Management");
+    await make("ops", "Ngozi", "Eze", "operations_people", "Operations & People Lead", "Operations");
     await q("UPDATE employee SET line_manager_id = $1 WHERE employee_id = ANY($2::uuid[])", [
       emp("manager"),
       [emp("staff"), emp("peer")],
@@ -184,6 +185,12 @@ describeDb("my workspace against the real migrations", () => {
     expect(cancelled.status).toBe(200);
     // Their own board is still only their own.
     expect((await as("director").get("/tasks")).body.page.total).toBe(0);
+  });
+
+  test("a reader whose grant reaches everyone reads My Team's analytics (fault #1 in Analytics)", async () => {
+    const analytics = await as("ops").get("/workspace/analytics?scope=team");
+    expect(analytics.status).toBe(200);
+    expect(analytics.body.workload.map((w) => w.employee.employee_id)).toEqual(expect.arrayContaining([emp("staff"), emp("outsider")]));
   });
 
   test("the assignee moves a manager's task but cannot change what the manager decided", async () => {
@@ -529,5 +536,118 @@ describeDb("my workspace against the real migrations", () => {
     const next = await q("SELECT due_at FROM task WHERE parent_task_id = $1", [r.body.task_id]);
     expect(next.rows.map((row) => lagos.dateOf(new Date(row.due_at)))).toEqual(["2026-10-26"]);
     expect((await tasks.sweep(thursdayEvening)).repeated).toBe(0);
+  });
+
+  /* Shared tasks: one lead, the people sharing it beside them (A24 as extended, workspace.md §6). */
+  const bell = async (who) =>
+    (await q(
+      `SELECT n.title FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1`,
+      [emp(who)],
+    )).rows.map((r) => r.title);
+  const programmes = async () => (await q("SELECT department_id FROM department WHERE name = 'Programmes'")).rows[0].department_id;
+
+  test("shared: a manager shares a task under a lead; the people on it see it, work it and hear of it", async () => {
+    const t = await as("manager").post("/tasks", {
+      title: "Run the Surulere pop-up",
+      primary_assignee_id: emp("staff"),
+      member_ids: [emp("peer"), emp("staff")],
+    });
+    expect(t.status).toBe(201);
+    expect(t.body.assignee.employee_id).toBe(emp("staff"));
+    expect(t.body.members.map((p) => p.employee_id)).toEqual([emp("peer")]);
+
+    const board = await as("peer").get("/tasks?q=Surulere");
+    expect(board.body.data.map((x) => x.task_id)).toEqual([t.body.task_id]);
+    expect((await as("peer").post(`/tasks/${t.body.task_id}/move`, { status: "in_progress" })).status).toBe(200);
+    const panel = await as("peer").get(`/tasks/${t.body.task_id}`);
+    expect(panel.body.can_plan).toBe(true);
+    expect(panel.body.can_reassign).toBe(false);
+    expect((await as("peer").post(`/tasks/${t.body.task_id}/steps`, { title: "Book the canopy" })).status).toBe(201);
+    expect((await as("peer").patch(`/tasks/${t.body.task_id}`, { priority: "high" })).status).toBe(200);
+    const mark = await as("peer").patch(`/tasks/${t.body.task_id}`, { is_commitment: true });
+    expect(mark.status).toBe(403);
+    const asIs = await as("peer").patch(`/tasks/${t.body.task_id}`, { is_commitment: false, description: "Canopy from Ojuelegba" });
+    expect(asIs.status).toBe(200);
+    expect((await as("peer").patch(`/tasks/${t.body.task_id}`, { member_ids: [] })).status).toBe(403);
+
+    await as("peer").post(`/tasks/${t.body.task_id}/move`, { status: "done" });
+    await drain();
+    expect(await bell("peer")).toEqual(expect.arrayContaining(["Ifeoma Chukwu shared a task with you"]));
+    expect(await bell("staff")).toEqual(expect.arrayContaining(["Ifeoma Chukwu shared a task with you", "Musa Danjuma is done"]));
+    expect((await as("outsider").get(`/tasks/${t.body.task_id}`)).status).toBe(404);
+  });
+
+  test("shared: staff share a task they lead with their own department, never beyond it or under another lead", async () => {
+    const own = await as("staff").post("/tasks", { title: "Swap stand duty", member_ids: [emp("peer")] });
+    expect(own.status).toBe(201);
+    expect(own.body.assignee.employee_id).toBe(emp("staff"));
+    expect(own.body.members.map((p) => p.employee_id)).toEqual([emp("peer")]);
+
+    const far = await as("staff").post("/tasks", { title: "Ask Finance for receipts", member_ids: [emp("outsider")] });
+    expect(far.status).toBe(422);
+    expect(far.body.error.fields.member_ids).toEqual(["Not in your team"]);
+    const both = await as("staff").post("/tasks", { title: "Both", member_ids: [emp("peer")], department_id: await programmes() });
+    expect(both.status).toBe(422);
+
+    const report = await as("manager").post("/tasks", {
+      title: "Ops handover",
+      primary_assignee_id: emp("staff"),
+      member_ids: [emp("ops")],
+    });
+    expect(report.status).toBe(422);
+    expect(report.body.error.fields.member_ids).toEqual(["Not in your team"]);
+  });
+
+  test("shared: a department becomes its people; the pickers list who the caller may add", async () => {
+    const dept = await as("ops").post("/tasks", { title: "Programmes stock count", department_id: await programmes() });
+    expect(dept.status).toBe(201);
+    expect(dept.body.assignee.employee_id).toBe(emp("ops"));
+    expect(dept.body.members.map((p) => p.employee_id).sort()).toEqual([emp("manager"), emp("staff"), emp("peer")].sort());
+
+    const finance = (await q("SELECT department_id FROM department WHERE name = 'Finance'")).rows[0].department_id;
+    const nobody = await as("staff").post("/tasks", { title: "Count Finance", department_id: finance });
+    expect(nobody.status).toBe(422);
+    expect(nobody.body.error.fields.department_id).toEqual(["Nobody to share with"]);
+
+    const who = (res) => res.body.data.map((p) => p.employee_id).sort();
+    expect((await as("staff").get("/tasks/people")).body.page.total).toBe(0);
+    expect(who(await as("staff").get("/tasks/people?shared=true"))).toEqual([emp("manager"), emp("peer")].sort());
+    expect(who(await as("manager").get("/tasks/people"))).toEqual([emp("staff"), emp("peer")].sort());
+    const everyone = who(await as("ops").get("/tasks/people"));
+    expect(everyone).toEqual(expect.arrayContaining([emp("manager"), emp("staff"), emp("peer"), emp("outsider")]));
+    expect(everyone).not.toContain(emp("ops"));
+    expect(who(await as("ops").get("/tasks/people?q=zain"))).toEqual([emp("peer")]);
+  });
+
+  test("shared: the setter changes who shares it, and whoever is added hears", async () => {
+    const t = await as("manager").post("/tasks", { title: "Print launch flyers", primary_assignee_id: emp("staff") });
+    expect(t.body.members).toEqual([]);
+    const shared = await as("manager").patch(`/tasks/${t.body.task_id}`, { member_ids: [emp("peer")] });
+    expect(shared.status).toBe(200);
+    expect(shared.body.members.map((p) => p.employee_id)).toEqual([emp("peer")]);
+    await drain();
+    expect(await bell("peer")).toEqual(expect.arrayContaining(["Ifeoma Chukwu put you on a task"]));
+
+    const lead = await as("manager").patch(`/tasks/${t.body.task_id}`, { primary_assignee_id: emp("peer") });
+    expect(lead.body.assignee.employee_id).toBe(emp("peer"));
+    expect(lead.body.members).toEqual([]);
+    const alone = await as("manager").patch(`/tasks/${t.body.task_id}`, { member_ids: [] });
+    expect(alone.body.members).toEqual([]);
+  });
+
+  test("shared: a repeat is shared with the same people", async () => {
+    const r = await as("manager").post("/tasks", {
+      title: "Restock the Yaba kiosk",
+      member_ids: [emp("staff")],
+      due_on: later(-2),
+      recurrence: { freq: "daily" },
+    });
+    expect(r.status).toBe(201);
+    await tasks.sweep(new Date());
+    const next = await q(
+      `SELECT ta.employee_id FROM task n JOIN task_assignee ta ON ta.task_id = n.task_id WHERE n.parent_task_id = $1`,
+      [r.body.task_id],
+    );
+    expect(next.rows.map((x) => x.employee_id)).toEqual([emp("staff")]);
   });
 });

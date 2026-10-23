@@ -5,12 +5,11 @@
 import { useEffect, useState } from "react";
 import type { Task } from "@mycity/contract/contract.gen.ts";
 import { useApi, useInfinite, usePaged } from "@/api/hooks";
-import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { Button, CheckboxField, DataView, EmptyState, formatDate, Kanban, PageHeader, Pill, SearchInput, SegmentedControl, Toolbar, useModal, Who } from "@mycity/ui";
-import { CardPills, COLS, duePill, LABEL, PRIORITY, STATUS_TONE, type BoardStatus } from "./shared";
+import { CardPills, COLS, duePill, LABEL, PRIORITY, STATUS_TONE, useSetsForOthers, type BoardStatus } from "./shared";
 import { useTaskPanel } from "./TaskPanel";
 import { SendCommitmentsForm } from "./Commitment";
 import { TaskForm, useMoveTask } from "./TaskForms";
@@ -23,7 +22,7 @@ function useColumn(status: BoardStatus, scope: Scope, q: string) {
 }
 
 export function Tasks({ openId = null }: { openId?: string | null }) {
-  const me = useMe();
+  const others = useSetsForOthers();
   const modal = useModal();
   const [scope, setScope] = useState<Scope>("mine");
   const [layout, setLayout] = useState<"board" | "list">("board");
@@ -63,7 +62,7 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
         actions={
           <>
             <SegmentedControl label="Tasks Layout" value={layout} onChange={setLayout} options={[["board", "Board"], ["list", "List"]]} />
-            {me.manages_people && <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
+            {others && <SegmentedControl label="Whose Tasks" value={scope} onChange={setScope} options={[["mine", "Mine"], ["team", "My Team"]]} />}
             <Button icon="send" onClick={sendMonth}>Send Commitments</Button>
             <Button variant="primary" icon="plus" onClick={add}>New Task</Button>
           </>
@@ -118,7 +117,7 @@ export function Tasks({ openId = null }: { openId?: string | null }) {
           empty={{ title: "No Tasks Yet", text: "Add the first one for today" }}
           columns={[
             { key: "title", label: "Task", render: (t) => <span data-copy="content"><b className="font-semibold">{t.number}</b> {t.title}</span> },
-            { key: "assignee", label: "Assignee", render: (t) => (t.assignee ? <Who name={t.assignee.display_name} /> : "") },
+            { key: "assignee", label: "Assignee", render: (t) => (t.assignee ? <Who name={t.assignee.display_name} role={t.members.length ? `+${t.members.length} More` : undefined} /> : "") },
             { key: "status", label: "Status", render: (t) => <Pill tone={STATUS_TONE[t.status]}>{LABEL[t.status]}</Pill> },
             { key: "due_at", label: "Due", sortable: true, render: (t) => { const p = duePill(t); return <Pill tone={p.tone}>{p.text}</Pill>; } },
             { key: "priority", label: "Priority", sortable: true, render: (t) => PRIORITY[t.priority] },

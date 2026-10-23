@@ -18,6 +18,7 @@ module.exports = {
   summary: async (req, res) => ok(res, await service.summary(req.validated.query, scopeOf(req))),
   get: async (req, res) => ok(res, await service.getFor(id(req), scopeOf(req), withActor(req))),
   countsTowards: async (req, res) => sendPaged(res, await service.countsTowards(req.validated.query, scopeOf(req))),
+  people: async (req, res) => sendPaged(res, await service.people(req.validated.query, scopeOf(req))),
   create: async (req, res) => created(res, await service.create(withActor(req), scopeOf(req), body(req))),
   edit: async (req, res) => ok(res, await service.edit(withActor(req), scopeOf(req), id(req), body(req))),
   move: async (req, res) => ok(res, await service.move(withActor(req), scopeOf(req), id(req), body(req))),

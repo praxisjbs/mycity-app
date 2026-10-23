@@ -16,7 +16,10 @@
  */
 const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
-const { personJson } = require("../../shared/db/person");
+const { personJson, photoUrlSql } = require("../../shared/db/person");
+
+/** The most people a shared task holds beside its lead (the contract's member_ids). */
+const MEMBERS_MAX = 25;
 
 /**
  * A commitment's state from its own columns, Africa/Lagos: rescoped; awaiting approval (no
@@ -48,6 +51,10 @@ const ROWS = `
          t.rescope_reason, t.commitment_set_id, cs.status AS set_status, t.late_reason,
          ${COMMITMENT_STATE("t")} AS commitment_state,
          ${personJson("ae", "ad")} AS assignee,
+         COALESCE((SELECT json_agg(${personJson("me", "md")} ORDER BY me.first_name, me.last_name, me.employee_id)
+                     FROM task_assignee ta JOIN employee me ON me.employee_id = ta.employee_id
+                     LEFT JOIN department md ON md.department_id = me.department_id
+                    WHERE ta.task_id = t.task_id), '[]'::json) AS members,
          ${personJson("se", "sd")} AS set_by,
          et.title AS target_title,
          kr.code AS kr_code, kr.statement AS kr_statement,
@@ -76,7 +83,7 @@ const OUT = `v.task_id, v.number, v.title, v.description, v.status, v.priority, 
   v.due_at, v.started_at, v.completed_at, v.cancelled_at, v.cancel_reason, v.blocked_reason,
   v.blocked_at, v.employee_target_id, v.entity_type, v.entity_id, v.recurrence, v.sort_order,
   v.created_at, v.updated_at, v.primary_assignee_id, v.set_by_employee_id, v.created_by,
-  v.assignee, v.set_by, v.target_title, v.kr_code, v.kr_statement, v.comment_count, v.is_commitment,
+  v.assignee, v.members, v.set_by, v.target_title, v.kr_code, v.kr_statement, v.comment_count, v.is_commitment,
   v.acceptance_criteria, v.commitment_month, v.original_due_at, v.rescoped_at, v.rescope_reason,
   v.commitment_set_id, v.set_status, v.commitment_state, v.late_reason,
   v.steps_total, v.steps_done, v.waiting`;
@@ -190,6 +197,130 @@ async function sharedWith(db, taskId, employeeId) {
     [taskId, employeeId],
   );
   return rows.length > 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Who is on a task: its lead, and the people sharing it (workspace.md §6)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Who the caller may put on a task, as SQL over employee `e`: everyone (`all`), the ids of their
+ * scope, or, for a shared task they lead, also everyone in their own department.
+ * @param {{all: boolean, ids: string[], peerDepartmentId: string|null}} reach
+ * @param {Array} params  appended to
+ */
+function reachClause(reach, params) {
+  params.push(reach.all, reach.ids, reach.peerDepartmentId);
+  const n = params.length;
+  return `($${n - 2}::boolean OR e.employee_id = ANY($${n - 1}::uuid[]) OR e.department_id = $${n}::uuid)`;
+}
+
+/**
+ * One page of the active people the caller may put on a task, never themselves, by name
+ * (GET /tasks/people).
+ */
+function people(db, query, { reach, excludeId }) {
+  const params = [excludeId || null, query.q || null];
+  const who = reachClause(reach, params);
+  return pageQuery(
+    db,
+    `SELECT e.employee_id, btrim(e.first_name || ' ' || e.last_name) AS display_name, e.job_title,
+            d.name AS department, ${photoUrlSql("e")} AS photo_url, ${TOTAL_COL}
+       FROM employee e
+       LEFT JOIN department d ON d.department_id = e.department_id
+      WHERE e.status = 'active'
+        AND ($1::uuid IS NULL OR e.employee_id <> $1)
+        AND ($2::text IS NULL OR search_fold(e.first_name || ' ' || e.last_name) LIKE '%' || search_fold($2) || '%')
+        AND ${who}
+      ORDER BY e.first_name, e.last_name, e.employee_id`,
+    params,
+    query,
+  );
+}
+
+/** The named people as the share rule reads them: department and whether they are on the staff. */
+async function peopleFacts(db, ids) {
+  if (!ids.length) return [];
+  // pagination:complete the people named on one task, at most MEMBERS_MAX (the contract refuses more)
+  const { rows } = await completeQuery(
+    db,
+    `SELECT employee_id, department_id, status FROM employee
+      WHERE employee_id = ANY($1::uuid[]) ORDER BY employee_id`,
+    [ids],
+    { label: "the people named on a task", ceiling: MEMBERS_MAX + 1 },
+  );
+  return rows;
+}
+
+/** A department and its head, or null when there is no such department. */
+async function department(db, departmentId) {
+  const { rows } = await db.query(
+    "SELECT department_id, head_employee_id FROM department WHERE department_id = $1",
+    [departmentId],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * A department's active people the caller may put on a shared task, never the lead: how many,
+ * and their ids when there are no more than MEMBERS_MAX (the service refuses more).
+ */
+async function departmentPeople(db, { departmentId, leadId, reach }) {
+  const params = [departmentId, leadId];
+  const who = reachClause(reach, params);
+  const from = `FROM employee e
+      WHERE e.department_id = $1 AND e.status = 'active' AND e.employee_id <> $2 AND ${who}`;
+  const { rows: count } = await db.query(`SELECT count(*)::int AS n ${from}`, params);
+  if (count[0].n > MEMBERS_MAX) return { total: count[0].n, ids: [] };
+  // pagination:complete the people a department gives one shared task, at most MEMBERS_MAX (counted above)
+  const { rows } = await completeQuery(db, `SELECT e.employee_id ${from} ORDER BY e.employee_id`, params, {
+    label: "a department's people on a task",
+    ceiling: MEMBERS_MAX,
+  });
+  return { total: count[0].n, ids: rows.map((r) => r.employee_id) };
+}
+
+/** An employee's department, or null. */
+async function departmentOf(db, employeeId) {
+  if (!employeeId) return null;
+  const { rows } = await db.query("SELECT department_id FROM employee WHERE employee_id = $1", [employeeId]);
+  return rows[0] ? rows[0].department_id : null;
+}
+
+/** The people sharing a task, beside its lead. */
+async function memberIds(db, taskId) {
+  // pagination:complete one task's people, at most MEMBERS_MAX (the service refuses more)
+  const { rows } = await completeQuery(
+    db,
+    "SELECT employee_id FROM task_assignee WHERE task_id = $1 ORDER BY employee_id",
+    [taskId],
+    { label: "a task's people", ceiling: MEMBERS_MAX },
+  );
+  return rows.map((r) => r.employee_id);
+}
+
+/** Make these the people sharing a task: the others leave it, the new ones join as collaborators. */
+async function setMembers(client, taskId, ids) {
+  await client.query("DELETE FROM task_assignee WHERE task_id = $1 AND NOT (employee_id = ANY($2::uuid[]))", [taskId, ids]);
+  if (ids.length)
+    await client.query(
+      `INSERT INTO task_assignee (task_id, employee_id, assignment_role)
+       SELECT $1, unnest($2::uuid[]), 'collaborator'
+       ON CONFLICT (task_id, employee_id) DO NOTHING`,
+      [taskId, ids],
+    );
+}
+
+/** A repeat shares its task with the same people, those still on the staff. */
+async function copyMembers(client, fromId, toId) {
+  await client.query(
+    `INSERT INTO task_assignee (task_id, employee_id, assignment_role)
+     SELECT $2, ta.employee_id, ta.assignment_role FROM task_assignee ta
+       JOIN employee e ON e.employee_id = ta.employee_id AND e.status = 'active'
+      WHERE ta.task_id = $1
+     ON CONFLICT (task_id, employee_id) DO NOTHING`,
+    [fromId, toId],
+  );
 }
 
 /** Lock a task's row for a change. */
@@ -862,6 +993,15 @@ async function resolveBlockage(client, taskId, { by, note, shiftDays }) {
 
 module.exports = {
   PLAN_MAX,
+  MEMBERS_MAX,
+  people,
+  peopleFacts,
+  department,
+  departmentPeople,
+  departmentOf,
+  memberIds,
+  setMembers,
+  copyMembers,
   steps,
   step,
   stepCount,

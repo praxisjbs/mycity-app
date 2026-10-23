@@ -13,7 +13,7 @@ import Workspace from "./index";
 
 /**
  * My Workspace on the in-browser mock (docs/guides/workspace.md §10): the card's pills for steps,
- * holds and waiting; the task panel's steps, waiting on and watchers; Today's four figures; and
+ * holds, waiting and sharing; New Task's Individual or Shared; the task panel's steps, waiting on and watchers; Today's four figures; and
  * Analytics' overdue by reason and blocked work.
  */
 
@@ -127,6 +127,25 @@ describe("my workspace", () => {
     await chooseOption(within(form).getByRole("combobox", { name: /Repeat/ }), "Every Working Day");
     fireEvent.click(within(form).getByRole("button", { name: "Save Repeat" }));
     await screen.findByText("Every working day", undefined, { timeout: 5000 });
+  }, 30000);
+
+  it("New Task shares a task: Shared asks for people or a department and a lead; a shared card says so", async () => {
+    await signedIn(<Workspace tab="tasks" id={null} />);
+    await screen.findByText("Collect NDPA certificates from 4 staff", undefined, { timeout: 8000 });
+    expect(screen.getAllByText("Shared +2").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: /New Task/ })[0]!);
+    const form = await screen.findByRole("dialog", { name: "New Task" });
+    await within(form).findByText("Assign To", undefined, { timeout: 5000 });
+    fireEvent.click(await within(form).findByRole("radio", { name: "Shared" }));
+    expect(within(form).queryByText("Assign To")).toBeNull();
+    expect(within(form).getByText("Share With")).toBeTruthy();
+    expect(within(form).getAllByText("People")).toHaveLength(2);
+    expect(within(form).getByText("Lead")).toBeTruthy();
+    fireEvent.change(within(form).getByRole("textbox", { name: /Task/ }), { target: { value: "Count the Yaba stock" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
+    await within(form).findByText("Pick people");
+    fireEvent.click(within(form).getByRole("radio", { name: "Department" }));
+    await waitFor(() => expect(within(form).getAllByText("Department")).toHaveLength(2));
   }, 30000);
 
   it("New Event offers a reminder, 15 minutes before unless changed", async () => {
