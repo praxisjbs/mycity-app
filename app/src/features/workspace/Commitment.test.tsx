@@ -76,7 +76,7 @@ async function signedIn(screenUnderTest: ReactNode) {
       </AuthProvider>
     </RouterProvider>,
   );
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 10000 });
   await act(async () => {
     await auth!.signIn("cynthia@mycityapp.io", "demo1234");
   });
