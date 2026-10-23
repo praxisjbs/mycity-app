@@ -683,9 +683,14 @@ const TargetChangeDetail = TargetChange.extend({
  * Approvals waiting on the reader (§6.4, §6.7)
  * ------------------------------------------------------------------ */
 
-const PerformanceApprovalKind = z.enum(["plan", "target_change"]);
+/** A function's plan, a target change, or a mid-quarter scorecard sent on its own (§11). */
+const PerformanceApprovalKind = z.enum(["plan", "target_change", "scorecard"]);
 
-/** A plan stage or a target change the reader decides: Goals · Waiting On You. */
+/**
+ * A plan stage, a target change or a mid-quarter scorecard the reader decides: Goals · Waiting On
+ * You. `record_id` is the plan, the change or the scorecard; `employee` the person whose
+ * scorecard it is (a scorecard, or a line's target change).
+ */
 const PerformanceApproval = z
   .object({
     kind: PerformanceApprovalKind,
@@ -695,6 +700,7 @@ const PerformanceApproval = z
     department: z.string().nullable(),
     key_result_code: z.string().nullable(),
     line_title: z.string().nullable(),
+    employee: PersonRef.nullable(),
     requested_by: PersonRef.nullable(),
     stage_name: z.string(),
     waiting_since: isoDateTime,
@@ -704,7 +710,7 @@ const PerformanceApproval = z
 
 const PerformanceApprovalPage = Paged(PerformanceApproval);
 
-/** GET /performance/approvals: oldest first; `q` finds a function, a key result or who asked. */
+/** GET /performance/approvals: oldest first; `q` finds a function, a key result, a person or who asked. */
 const PerformanceApprovalQuery = listQuery({});
 
 /* ------------------------------------------------------------------ *
@@ -1044,7 +1050,7 @@ const TABLES = {
   },
   PerformanceApproval: {
     table: null,
-    reason: "a pending performance.plan or performance.target_change workflow_instance naming the reader, with its record",
+    reason: "a pending performance.plan (a plan, or a scorecard sent on its own) or performance.target_change workflow_instance naming the reader, with its record",
   },
   PerformanceApprovalPage: { table: null, reason: "a page of approvals waiting on the reader" },
   PerformanceApprovalQuery: { table: null, reason: "list controls for the approvals waiting on the reader" },

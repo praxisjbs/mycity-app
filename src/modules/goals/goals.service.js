@@ -471,9 +471,10 @@ async function changeDetail(id, actor, scope) {
  * ------------------------------------------------------------------ */
 
 /**
- * GET /performance/approvals: the plan stages and target changes the reader decides, oldest first.
- * Deciding stays the engine's (POST /workflow/instances/:id/approve or reject); the outcome is
- * goals.approval.js's.
+ * GET /performance/approvals: the plan stages, target changes and mid-quarter scorecards (sent on
+ * their own through the plan's flow, §11) the reader decides, oldest first; a scorecard is named by
+ * its person. Deciding stays the engine's (POST /workflow/instances/:id/approve or reject); the
+ * outcome is goals.approval.js's.
  */
 async function approvals(query, actor) {
   const approvers = require("../../shared/workflow/approvers");
@@ -495,6 +496,7 @@ async function approvals(query, actor) {
         department: r.department,
         key_result_code: r.key_result_code,
         line_title: r.line_title,
+        employee: r.employee,
         requested_by: r.requested_by,
         stage_name: stage ? stage.name : r.current_stage,
         waiting_since: iso(r.stage_entered_at),
@@ -518,14 +520,15 @@ async function requestChange(actor, scope, body) {
     if (!owner) await authority.assertSetsGoals(pool, actor, ctx.department_id);
     from = { value: ctx.target_value, text: ctx.target_text };
   } else {
-    const line = await require("../targets/targets.repo").lineWithCard(pool, body.employee_target_id);
+    const targetsRepo = require("../targets/targets.repo");
+    const line = await targetsRepo.lineWithCard(pool, body.employee_target_id);
     if (!line) throw new AppError("NOT_FOUND", "That line does not exist", 404);
     if (!["binding", "agreed"].includes(line.scorecard_status)) throw new AppError("SCORECARD_NOT_BINDING", "Edit a draft's lines directly", 409);
-    if (!(await authority.runsTheCycle(actor))) {
-      const { assertInScope } = require("../../shared/rbac/scope");
-      assertInScope(scope, line.employee_id);
-      if (line.employee_id === (actor && actor.employee_id)) throw new AppError("PERMISSION_DENIED", "Your reviewer changes your targets", 403);
-    }
+    // A line's target is changed by its scorecard's reviewer or the function's head, never its employee (§3.5).
+    if (line.employee_id === (actor && actor.employee_id)) throw new AppError("PERMISSION_DENIED", "Your reviewer changes your targets", 403);
+    const card = await targetsRepo.get(pool, line.scorecard_id);
+    if (!(await require("../targets/targets.service").mayChangeLineTarget(pool, card, actor)))
+      throw new AppError("PERMISSION_DENIED", "The reviewer or the function's head changes this target", 403);
     from = { value: line.target_value, text: line.target_text };
   }
   if (await repo.changePending(pool, body))

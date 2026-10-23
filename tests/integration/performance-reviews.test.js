@@ -143,7 +143,7 @@ describeDb("performance reviews against the real migrations", () => {
       ids[`card_${who}`] = card.body.scorecard_id;
       const accountability = card.body.lines.map((l) =>
         Object.fromEntries(
-          Object.entries({ ...l, employee_target_id: undefined, key_result: undefined, kpi: undefined, team_key_results: undefined, months: undefined, score: undefined, scorecard_id: undefined, position: undefined, team_key_result_ids: [] })
+          Object.entries({ ...l, employee_target_id: undefined, key_result: undefined, kpi: undefined, team_key_results: undefined, months: undefined, score: undefined, can_change_target: undefined, pending_change: undefined, scorecard_id: undefined, position: undefined, team_key_result_ids: [] })
             .filter(([, v]) => v !== undefined && v !== null),
         ),
       );
@@ -199,9 +199,14 @@ describeDb("performance reviews against the real migrations", () => {
 
   test("self first: the reviewer is refused until the check-in is in (A17)", async () => {
     ids.reviewAda = (await reviewOf("ada")).performance_review_id;
+    // While the check-in is not yet due (§11 opens a late one to its reviewer, below).
+    const due = await one("SELECT check_in_due_on, head_check_in_due_on FROM performance_cycle WHERE performance_cycle_id = $1", [ids.round]);
+    await q("UPDATE performance_cycle SET check_in_due_on = '2099-01-05', head_check_in_due_on = '2099-01-06' WHERE performance_cycle_id = $1", [ids.round]);
     const refused = await as("head").get(`/performance/reviews/${ids.reviewAda}`);
     expect(refused.status).toBe(409);
     expect(refused.body.error.code).toBe("CHECK_IN_FIRST");
+    await q("UPDATE performance_cycle SET check_in_due_on = $2, head_check_in_due_on = $3 WHERE performance_cycle_id = $1", [ids.round, due.check_in_due_on, due.head_check_in_due_on]);
+    // Late, the reviewer opens it but still cannot score it until they choose Score Without Check-In.
     expect((await as("head").put(`/performance/reviews/${ids.reviewAda}/scores`, { items: [], actions: [] })).body.error.code).toBe("CHECK_IN_FIRST");
     // Someone the review does not name and their scope does not reach: not found.
     expect((await as("musa").get(`/performance/reviews/${ids.reviewAda}`)).status).toBe(404);
@@ -449,9 +454,17 @@ describeDb("performance reviews against the real migrations", () => {
     expect(sent.body).toMatchObject({ can_edit: false, can_send: false, amendment_instance_id: expect.any(String) });
     const instance = await pending(card.body.scorecard_id);
     expect(instance.current_stage).toBe("line_manager");
-    await act(instance.workflow_instance_id, "pm", "approve");
-    await act(instance.workflow_instance_id, "ops", "approve");
-    await act(instance.workflow_instance_id, "ceo", "approve");
+    // Each stage finds it on Goals › Waiting On You, named by its person, and decides it there.
+    for (const [who, next] of [["pm", "Operations & People"], ["ops", "CEO"], ["ceo", null]]) {
+      const waiting = (await as(who).get("/performance/approvals")).body.data.find((r) => r.record_id === card.body.scorecard_id);
+      expect(waiting).toMatchObject({ kind: "scorecard", workflow_instance_id: instance.workflow_instance_id, department: "Branding & Marketing", employee: { employee_id: emp("late") } });
+      expect((await as(who).get(`/performance/approvals?q=${encodeURIComponent("Efe")}`)).body.data.map((r) => r.record_id)).toContain(card.body.scorecard_id);
+      const decided = await as(who).post(`/workflow/instances/${instance.workflow_instance_id}/approve`, {});
+      expect(decided.status).toBe(200);
+      expect(decided.body.stage_name).toBe(next);
+      // The employee never sees it waiting, and decides nothing.
+      expect((await as("late").get("/performance/approvals")).body.data).toEqual([]);
+    }
     await drain();
     expect((await as("late").get(`/performance/scorecards/${card.body.scorecard_id}`)).body).toMatchObject({ status: "binding", can_agree: true });
     // September's round opened before it bound: September is not reviewed for it.
@@ -469,5 +482,139 @@ describeDb("performance reviews against the real migrations", () => {
     const waiting = await as("head").get("/performance/reviews?waiting_on_me=true");
     expect(waiting.body.page.total).toBe(0);
     expect((await as("head").get(`/performance/reviews?round_id=${ids.round}`)).body.data.map((r) => r.status).sort()).toEqual(["closed", "closed"]);
+  });
+
+  /* §11, after PR #130: Score Without Check-In and a review closed as Withdrawn. The job above opened
+     July's and August's rounds, whose check-ins are all late in this test's clock. */
+  const reviewIn = async (who, month) =>
+    (await one(
+      "SELECT pr.performance_review_id, pr.performance_cycle_id FROM performance_review pr JOIN performance_cycle c ON c.performance_cycle_id = pr.performance_cycle_id WHERE pr.employee_id = $1 AND c.month = $2",
+      [emp(who), month],
+    ));
+  const lastNotice = async (who) =>
+    one("SELECT title, body FROM notification n JOIN app_user u ON u.user_id = n.user_id WHERE u.employee_id = $1 ORDER BY n.created_at DESC LIMIT 1", [emp(who)]);
+
+  test("Score Without Check-In: refused before the due date; after it the reviewer opens the review without the drafts and scores it, the person told", async () => {
+    const { performance_review_id: id, performance_cycle_id: round } = await reviewIn("ada", "2026-08-01");
+    const was = await one("SELECT check_in_due_on, head_check_in_due_on FROM performance_cycle WHERE performance_cycle_id = $1", [round]);
+    // Before the due date, self first holds: nothing of the review reaches the reviewer.
+    await q("UPDATE performance_cycle SET check_in_due_on = '2099-01-05', head_check_in_due_on = '2099-01-06' WHERE performance_cycle_id = $1", [round]);
+    expect((await as("head").get(`/performance/reviews/${id}`)).body.error.code).toBe("CHECK_IN_FIRST");
+    expect((await as("head").post(`/performance/reviews/${id}/score-without-check-in`, { no_check_in_reason: "Nothing came in" })).status).toBe(409);
+    await q("UPDATE performance_cycle SET check_in_due_on = $2, head_check_in_due_on = $3 WHERE performance_cycle_id = $1", [round, was.check_in_due_on, was.head_check_in_due_on]);
+
+    // Ada drafts her August check-in but never sends it.
+    const draft = await as("ada").get("/ess/performance/check-in");
+    expect(draft.body.performance_review_id).toBe(id);
+    const results = draft.body.items.find((i) => i.line && i.line.source === "own");
+    expect((await as("ada").put("/ess/performance/check-in", { items: [{ performance_review_item_id: results.performance_review_item_id, actual_value: "9", evidence_kind: "note", evidence_note: "Stories log", self_score: "1", self_reason: "All in" }] })).status).toBe(200);
+
+    // Late: the reviewer opens it, sees none of the drafts and no score worked out from them, and may Score Without Check-In.
+    const late = await as("head").get(`/performance/reviews/${id}`);
+    expect(late.status).toBe(200);
+    expect(late.body.can).toMatchObject({ score_without_check_in: true, score: false, submit: false, withdraw: false });
+    const seen = late.body.items.find((i) => i.performance_review_item_id === results.performance_review_item_id);
+    expect(seen).toMatchObject({ actual_value: null, evidence_note: null, self_score: null, self_reason: null, proposed_score: null });
+    expect((await as("head").put(`/performance/reviews/${id}/scores`, { items: [], actions: [] })).body.error.code).toBe("CHECK_IN_FIRST");
+    expect((await as("ada").get(`/performance/reviews/${id}`)).body.can.score_without_check_in).toBe(false);
+    expect((await as("head").post(`/performance/reviews/${id}/score-without-check-in`, {})).status).toBe(422);
+
+    const scored = await as("head").post(`/performance/reviews/${id}/score-without-check-in`, { no_check_in_reason: "No check-in by its due date" });
+    expect(scored.status).toBe(200);
+    expect(scored.body).toMatchObject({ status: "with_reviewer", no_check_in_reason: "No check-in by its due date", no_check_in_at: expect.any(String) });
+    expect(scored.body.can).toMatchObject({ score: true, submit: true, score_without_check_in: false });
+    const items = scored.body.items;
+    // Her own line had no check-in to assess; Monthly Update On Time scores 0.
+    expect(items.find((i) => i.performance_review_item_id === results.performance_review_item_id)).toMatchObject({ assessable: false, proposed_score: null, actual_value: null });
+    const update = items.find((i) => i.line && i.line.source === "update_on_time");
+    expect(update).toMatchObject({ auto: true, proposed_score: "0" });
+    expect((await as("head").post(`/performance/reviews/${id}/score-without-check-in`, { no_check_in_reason: "Again" })).body.error.code).toBe("CHECK_IN_SENT");
+    // Her drafts stay hers; the reason is on her review too.
+    expect((await as("ada").get(`/performance/reviews/${id}`)).body).toMatchObject({ no_check_in_reason: "No check-in by its due date" });
+    await drain();
+    expect(await lastNotice("ada")).toMatchObject({ title: "Your August 2026 review goes ahead", body: "Scored without your check-in: No check-in by its due date" });
+
+    // The reviewer scores what they know and the review goes on through its chain.
+    const scores = items.map((i) => ({ performance_review_item_id: i.performance_review_item_id, score: i.proposed_score }));
+    const actions = [{ performance_review_item_id: update.performance_review_item_id, title: "Send the update on time", owner_employee_id: emp("ada"), due_on: "2026-11-04" }];
+    expect((await as("head").put(`/performance/reviews/${id}/scores`, { items: scores, actions })).status).toBe(200);
+    const sent = await as("head").post(`/performance/reviews/${id}/submit`);
+    expect(sent.status).toBe(200);
+    expect(sent.body.status).toBe("second_level");
+    const instance = await pending(id);
+    await act(instance.workflow_instance_id, "pm", "approve");
+    await drain();
+    await act(instance.workflow_instance_id, "ops", "approve");
+    await drain();
+    const closed = (await as("ops").get(`/performance/reviews/${id}`)).body;
+    expect(closed).toMatchObject({ status: "closed", no_check_in_reason: "No check-in by its due date" });
+    expect(closed.document_id).toBeTruthy();
+  });
+
+  test("Withdraw Review: Operations & People close an open review as Withdrawn with a reason; its approval ends; nobody else may", async () => {
+    const { performance_review_id: id } = await reviewIn("musa", "2026-08-01");
+    expect((await as("head").post(`/performance/reviews/${id}/score-without-check-in`, { no_check_in_reason: "Away all month" })).status).toBe(200);
+    const items = (await as("head").get(`/performance/reviews/${id}`)).body.items;
+    const scores = items.map((i) => ({ performance_review_item_id: i.performance_review_item_id, score: i.proposed_score }));
+    const actions = items
+      .filter((i) => i.proposed_score !== null && Number(i.proposed_score) < 1)
+      .map((i) => ({ performance_review_item_id: i.performance_review_item_id, title: "Catch up", owner_employee_id: emp("musa"), due_on: "2026-11-04" }));
+    expect((await as("head").put(`/performance/reviews/${id}/scores`, { items: scores, actions })).status).toBe(200);
+    expect((await as("head").post(`/performance/reviews/${id}/submit`)).body.status).toBe("second_level");
+    expect(await pending(id)).toBeTruthy();
+
+    expect((await as("ops").get(`/performance/reviews/${id}`)).body.can.withdraw).toBe(true);
+    expect((await as("head").post(`/performance/reviews/${id}/withdraw`, { withdrawn_reason: "x" })).status).toBe(403);
+    expect((await as("ops").post(`/performance/reviews/${id}/withdraw`, {})).status).toBe(422);
+    const out = await as("ops").post(`/performance/reviews/${id}/withdraw`, { withdrawn_reason: "Seconded to the Abuja launch" });
+    expect(out.status).toBe(200);
+    expect(out.body).toMatchObject({ status: "withdrawn", withdrawn_reason: "Seconded to the Abuja launch", withdrawn_at: expect.any(String), score_to_date: null, rating: null });
+    expect(out.body.chain.map((x) => [x.key, x.state])).toEqual([["check_in", "skipped"], ["reviewer", "done"], ["second_level", "skipped"], ["hr", "done"]]);
+    expect(Object.values(out.body.can).some(Boolean)).toBe(false);
+    // Its approval is withdrawn with it: nothing waits on the second level.
+    expect(await pending(id)).toBeUndefined();
+    expect((await as("pm").get("/performance/reviews?waiting_on_me=true")).body.data.map((r) => r.performance_review_id)).not.toContain(id);
+    expect((await as("ops").post(`/performance/reviews/${id}/withdraw`, { withdrawn_reason: "Again" })).body.error.code).toBe("REVIEW_ENDED");
+    await drain();
+    expect(await lastNotice("musa")).toMatchObject({ title: "Musa Danjuma's August 2026 review was withdrawn", body: "Seconded to the Abuja launch" });
+    expect(await lastNotice("head")).toMatchObject({ title: "Musa Danjuma's August 2026 review was withdrawn" });
+  });
+
+  test("a leaver archived today: their open reviews end Withdrawn at HR's stage, their scorecard closes, its scores stay", async () => {
+    const organisation = require("../../src/modules/organisation/organisation.service");
+    const { performance_review_id: july } = await reviewIn("musa", "2026-07-01");
+    const before = (await as("ops").get(`/performance/scorecards/${ids.card_musa}`)).body;
+    await tx((client) => organisation.archiveEmployee(client, emp("musa"), "Resigned", actor("ops")));
+    await drain();
+    const review = (await as("ops").get(`/performance/reviews/${july}`)).body;
+    expect(review).toMatchObject({ status: "withdrawn", withdrawn_reason: "The employee left." });
+    expect(review.chain.find((x) => x.key === "hr").state).toBe("done");
+    const card = (await as("ops").get(`/performance/scorecards/${ids.card_musa}`)).body;
+    expect(card).toMatchObject({ status: "closed", score_to_date: before.score_to_date, rating: before.rating });
+    expect(await lastNotice("head")).toMatchObject({ title: "Musa Danjuma's July 2026 review was withdrawn", body: "The employee left." });
+    // Run again, nothing changes.
+    await require("../../src/modules/reviews/reviews.service").leaverArchived(emp("musa"));
+    expect((await one("SELECT count(*)::int AS n FROM performance_review WHERE employee_id = $1 AND status = 'withdrawn'", [emp("musa")])).n).toBe(2);
+  });
+
+  test("a leaver with a leaving date ahead: nothing ends until that date, then the reminder engine ends it", async () => {
+    const organisation = require("../../src/modules/organisation/organisation.service");
+    const lagos = require("../../src/shared/time/lagos");
+    const { formatDate } = require("../../src/shared/time/day-first");
+    const { performance_review_id: july } = await reviewIn("ada", "2026-07-01");
+    const leftOn = lagos.addDays(lagos.today(), 10);
+    await q("UPDATE employee SET left_on = $2 WHERE employee_id = $1", [emp("ada"), leftOn]);
+    await tx((client) => organisation.archiveEmployee(client, emp("ada"), "Resigned", actor("ops")));
+    await drain();
+    expect((await one("SELECT status FROM performance_review WHERE performance_review_id = $1", [july])).status).toBe("check_in");
+    const reminder = await one("SELECT due_at, state FROM reminder WHERE reminder_key = 'review_leaver_withdraw' AND entity_id = $1", [emp("ada")]);
+    expect(reminder).toMatchObject({ state: "pending" });
+    expect(lagos.dateOf(reminder.due_at)).toBe(leftOn);
+
+    const reminders = require("../../src/modules/notifications/notifications.reminders");
+    await reminders.tick({ db: pool, now: new Date(lagos.instant(leftOn, "06:05").getTime()) });
+    await drain();
+    expect((await one("SELECT status, withdrawn_reason FROM performance_review WHERE performance_review_id = $1", [july]))).toEqual({ status: "withdrawn", withdrawn_reason: `The employee left on ${formatDate(leftOn)}.` });
+    expect((await one("SELECT status FROM scorecard WHERE scorecard_id = $1", [ids.card_ada])).status).toBe("closed");
   });
 });

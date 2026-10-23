@@ -155,6 +155,7 @@ const REVIEW: Record<string, [string, Tone]> = {
   second_level: ["Second Level", "info"],
   with_hr: ["With HR", "info"],
   closed: ["Closed", "ok"],
+  withdrawn: ["Withdrawn", "neutral"],
 };
 
 /** A review's stage as a pill. */
@@ -164,7 +165,7 @@ export const reviewStatus = (s: string) => {
 };
 
 /** The stages a list filters by; Returned sits with With Reviewer. */
-export const STAGE_OPTIONS: Array<[string, string]> = [["", "All Stages"], ["check_in", "Checking In"], ["with_reviewer", "With Reviewer"], ["second_level", "Second Level"], ["with_hr", "With HR"], ["closed", "Closed"]];
+export const STAGE_OPTIONS: Array<[string, string]> = [["", "All Stages"], ["check_in", "Checking In"], ["with_reviewer", "With Reviewer"], ["second_level", "Second Level"], ["with_hr", "With HR"], ["closed", "Closed"], ["withdrawn", "Withdrawn"]];
 
 /** A target, actual or KPI figure as people read it: its words, else its number with its unit (64,000 users; 40%); null for none. */
 export const figureOf = (value: string | null | undefined, text?: string | null, unit?: string | null) =>

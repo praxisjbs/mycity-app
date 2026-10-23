@@ -134,8 +134,8 @@ describe("Performance · Goals, Waiting On You", () => {
     expect(within(sheet).getByRole("list", { name: "Plan approval" })).toBeTruthy();
     expect(copyProblems()).toEqual([]);
     await press(sheet, "Approve Plan");
-    expect(((await api.call("GET /api/v1/performance/approvals")) as Waiting).data).toEqual([]);
-    expect(screen.queryByRole("table", { name: "Waiting On You" })).toBeNull();
+    // What still waits on them: the mid-quarter scorecard (Scorecards.test.tsx decides it).
+    expect(((await api.call("GET /api/v1/performance/approvals")) as Waiting).data.map((r) => r.kind)).toEqual(["scorecard"]);
   }, 30000);
 
   it("the CEO: a link opens the plan's sheet; Request Changes needs a reason and returns the plan with it", async () => {

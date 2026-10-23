@@ -106,7 +106,7 @@ route(router, "post", "/target-changes",
   { body: g.TargetChangeCreate, response: g.TargetChange, summary: "Ask to change a binding target" },
   requirePermission("performance", "edit"), controller.requestChange);
 route(router, "get", "/approvals",
-  { query: g.PerformanceApprovalQuery, response: g.PerformanceApprovalPage, summary: "Plan stages and target changes waiting on you" },
+  { query: g.PerformanceApprovalQuery, response: g.PerformanceApprovalPage, summary: "Plan stages, target changes and mid-quarter scorecards waiting on you" },
   view, controller.approvals);
 
 route(router, "get", "/analytics",

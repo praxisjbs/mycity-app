@@ -1,8 +1,10 @@
 /**
- * Performance · Goals, Waiting On You (docs/guides/performance.md §6.4, §6.7, §10): the plan stages
- * and target changes the reader decides, each opening its sheet, also from the bell, Need You and
- * ⌘K (?plan= and ?change=). A decision is the engine's (POST /workflow/instances/:id/approve, or
- * reject with a reason); the plan binds, or the target changes, when the outbox settles it.
+ * Performance · Goals, Waiting On You (docs/guides/performance.md §6.4, §6.7, §10, §11): the plan
+ * stages, target changes and mid-quarter scorecards the reader decides, each opening its sheet, also
+ * from the bell, Need You and ⌘K (?plan= and ?change=; a scorecard's link opens Scorecards, ?id=). A
+ * scorecard opens its own sheet (Scorecards.tsx), where its approver decides it. A decision is the
+ * engine's (POST /workflow/instances/:id/approve, or reject with a reason); the plan or scorecard
+ * binds, or the target changes, when the outbox settles it.
  */
 import { useEffect, useRef, type ReactNode } from "react";
 import type { PerformanceApproval } from "@mycity/contract/contract.gen.ts";
@@ -11,6 +13,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { ReasonForm } from "@/features/workspace/Commitment";
 import { useSearchParams } from "@/lib/router";
 import { Banner, Button, Chain, DataView, ErrorState, formatDateTime, formatMonth, FormFooter, KeyValue, LoadingRows, StatusPill, toast, useModal } from "@mycity/ui";
+import { useScorecardSheet } from "./Scorecards";
 import { cardStatus, changeStatus, figureOf, person, planStatus } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
@@ -28,9 +31,13 @@ function refresh() {
     invalidate(prefix);
 }
 
-/** A request in a word or two: the function's plan, or the target it changes. */
+/** A request in a word or two: the function's plan, the person whose scorecard it is, or the target it changes. */
 const requestOf = (r: PerformanceApproval) =>
-  r.kind === "plan" ? `${r.department ?? "Company"} Plan` : `Target Change · ${r.key_result_code ?? r.line_title ?? ""}`;
+  r.kind === "plan"
+    ? `${r.department ?? "Company"} Plan`
+    : r.kind === "scorecard"
+      ? `Scorecard · ${r.employee?.display_name ?? ""}`
+      : `Target Change · ${r.key_result_code ?? r.line_title ?? ""}`;
 
 /** Opens a plan's or a target change's sheet. */
 export function useApprovalSheets() {
@@ -66,10 +73,11 @@ export function useApprovalLinks() {
   }, [plan, change]);
 }
 
-/** Waiting On You: the plan stages and target changes the reader decides; hidden when there are none. */
+/** Waiting On You: the plan stages, target changes and mid-quarter scorecards the reader decides; hidden when there are none. */
 export function WaitingOnYou() {
   const list = usePaged("GET /api/v1/performance/approvals");
   const { openPlan, openChange } = useApprovalSheets();
+  const openScorecard = useScorecardSheet();
   if ((list.page?.total ?? 0) === 0) return null;
   return (
     <DataView
@@ -78,7 +86,7 @@ export function WaitingOnYou() {
       list={list}
       rowKey={(r) => r.workflow_instance_id}
       noun="request"
-      onRowClick={(r) => (r.kind === "plan" ? openPlan(r.record_id) : openChange(r.record_id))}
+      onRowClick={(r) => (r.kind === "plan" ? openPlan(r.record_id) : r.kind === "scorecard" ? openScorecard(r.record_id) : openChange(r.record_id))}
       columns={[
         { key: "request", label: "Request", render: (r) => <span className="font-semibold">{requestOf(r)}</span> },
         { key: "from", label: "From", render: (r) => (r.requested_by ? person(r.requested_by) : "–") },

@@ -324,6 +324,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 22/10/2026 · TB · Nothing on the Org Chart changed. Beside it in `app/src/features/ess/`, My Performance opens My Scorecard from the person's own scorecard link (`docs/guides/ess.md`, `docs/guides/performance.md` §14).
 - 22/10/2026 · GE · §9: Praxis AI's "add an employee" opens Add Employee on `?new=1`, which the screen now reads (`useNewLink`; it never opened the form before), filled from `organisation.EmployeePrefill` (`praxis-ai.md` §6.4).
 - 22/10/2026 · TB · Nothing on the Org Chart changed. Beside it in `app/src/features/ess/`, My Performance gains My Commitments (Performance PR 4, `docs/guides/ess.md`).
 - 21/10/2026 · TB · Nothing on the Organogram or Org Chart changed. Beside them, the employee record's Attendance tab becomes Work Schedule, after Job (`Employee360.tsx`, attendance's PR 3, `docs/guides/attendance.md` §6.13, §10); Reporting Line and Change Manager are untouched.
