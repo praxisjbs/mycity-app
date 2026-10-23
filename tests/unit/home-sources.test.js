@@ -38,6 +38,7 @@ const CALLS = {
     overdueCount: [{ now: NOW }, TEAM],
     overduePage: [{ now: NOW }, TEAM, QUERY],
     dueBetween: [{ employee_id: ID, from: NOW, to: NOW }, QUERY],
+    openCounts: [[ID]],
   },
   calendar: { eventsStarting: [{ employee_id: ID, from: NOW, to: NOW, running: true }, QUERY] },
   goals: {

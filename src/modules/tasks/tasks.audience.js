@@ -8,7 +8,7 @@
  *  - a person sees a task when its assignee is in their scope, or when they are its
  *    assignee, its setter or a co-assignee;
  *  - the setter manages a task (title, due day, cadence, assignee, who shares it,
- *    KPI, record, cancel), and so does anyone whose scope covers an assignee other
+ *    project, KPI, record, cancel), and so does anyone whose scope covers an assignee other
  *    than themselves; the assignee of a task someone else set (even with an `all`
  *    grant), and the people sharing a task, move it, change its priority and notes,
  *    block it and comment;
@@ -66,6 +66,7 @@ const SETTER_FIELDS = Object.freeze([
   "employee_target_id",
   "entity_type",
   "entity_id",
+  "project_id",
   "recurrence",
 ]);
 

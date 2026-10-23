@@ -37,6 +37,7 @@ const {
 } = require("./common");
 const { PersonRef } = require("./organisation");
 const { MonthStart } = require("./kpis");
+const { ProjectRef } = require("./projects");
 
 const TaskStatus = z.enum(["todo", "in_progress", "in_review", "done", "cancelled"]);
 /** The four columns a card can be dragged between. */
@@ -53,9 +54,33 @@ const TaskEntityType = z.enum(["partner", "vacancy", "goal", "key_result", "scor
 const TaskScope = z.enum(["mine", "team"]);
 /**
  * Why an overdue task is late: asked on the panel of an overdue task, and when a task
- * moves to Done after its due time. Analytics counts the overdue by it.
+ * moves to Done after its due time. Analytics counts the overdue by it. A code of
+ * task_late_reason, the list holders of `workspace.late_reasons` keep (workspace.md §6).
  */
-const LateReason = z.enum(["waiting_on_others", "underestimated", "deprioritised", "other"]);
+const LateReason = z.string().regex(/^[a-z][a-z0-9_]{0,59}$/, "must be a late reason's code");
+/** The most reasons the list holds, switched on or off. */
+const LATE_REASONS_MAX = 25;
+
+/** One of Why Late's reasons. Switched off (`active` false), it is offered no more but answers keep it. */
+const LateReasonOption = z
+  .object({
+    task_late_reason_id: uuid,
+    code: LateReason,
+    label: z.string(),
+    active: z.boolean(),
+    display_order: z.number().int(),
+  })
+  .strict();
+const LateReasonPage = Paged(LateReasonOption);
+
+/** GET /tasks/late-reasons: those switched on; `all` "true", for a holder of workspace.late_reasons, every one. */
+const LateReasonListQuery = listQuery({ all: z.enum(["true", "false"]).optional() });
+
+/** POST /tasks/late-reasons: a new reason, its code made from the label. */
+const LateReasonCreate = z.object({ label: text(60) }).strict();
+
+/** PATCH /tasks/late-reasons/:id: switch it off or on. */
+const LateReasonEdit = z.object({ active: z.boolean() }).strict();
 /** Who a ping reaches: the assignee, the watchers, or both. */
 const PingAudience = z.enum(["assignee", "watchers", "everyone"]);
 
@@ -180,7 +205,12 @@ const Task = z
     blocked_reason: z.string().nullable(),
     blocked_at: isoDateTime.nullable(),
     late_reason: LateReason.nullable(),
+    /** The reason's words, kept even when it is switched off. */
+    late_reason_label: z.string().nullable(),
     counts_towards: CountsTowards.nullable(),
+    project: ProjectRef.nullable(),
+    /** Its lead's employee record is left or archived: the Left pill. */
+    assignee_left: z.boolean(),
     entity_type: TaskEntityType.nullable(),
     entity_id: uuid.nullable(),
     link: Link.nullable(),
@@ -308,6 +338,7 @@ const TaskListQuery = listQuery(
     employee_target_id: uuid.optional(),
     is_commitment: z.enum(["true", "false"]).optional(),
     commitment_month: MonthStart.optional(),
+    project_id: uuid.optional(),
   },
   ["sort_order", "due_at", "priority", "created_at"],
 );
@@ -366,6 +397,7 @@ const TaskCreate = z
     employee_target_id: blank(uuid),
     entity_type: blank(TaskEntityType),
     entity_id: blank(uuid),
+    project_id: blank(uuid),
     recurrence: Recurrence.optional(),
     is_commitment: z.boolean().default(false),
     acceptance_criteria: optionalText(1000),
@@ -389,6 +421,7 @@ const TaskPrefill = z
     cadence: TaskCadence.optional(),
     due_on: isoDate.optional(),
     primary_assignee_id: uuid.optional(),
+    project_id: uuid.optional(),
   })
   .strict();
 
@@ -410,6 +443,7 @@ const TaskEdit = z
     employee_target_id: uuid.nullable().optional(),
     entity_type: TaskEntityType.nullable().optional(),
     entity_id: uuid.nullable().optional(),
+    project_id: uuid.nullable().optional(),
     recurrence: Recurrence.nullable().optional(),
     late_reason: LateReason.nullable().optional(),
     is_commitment: z.boolean().optional(),
@@ -582,6 +616,9 @@ const TABLES = {
       steps_done: "count of task_step with done_at",
       waiting: "a task_dependency of the task not satisfied",
       commitment_state: "worked out from the commitment's dates, completion and month (performance.md §6.11)",
+      late_reason_label: "task_late_reason.label of task.late_reason",
+      project: "the project in task.project_id",
+      assignee_left: "the employee in task.primary_assignee_id is left or archived",
     },
   },
   TaskDetail: {
@@ -614,8 +651,16 @@ const TABLES = {
       recovery: "the task whose entity_type is task and entity_id this commitment",
       can_rescope: "an approved commitment not done, not rescoped, the caller its person or in scope",
       can_set_recovery: "a missed commitment with no recovery, the caller its person or in scope",
+      late_reason_label: "task_late_reason.label of task.late_reason",
+      project: "the project in task.project_id",
+      assignee_left: "the employee in task.primary_assignee_id is left or archived",
     },
   },
+  LateReasonOption: { table: "task_late_reason" },
+  LateReasonPage: { table: null, reason: "a page of late reasons" },
+  LateReasonListQuery: { table: null, reason: "list controls for the late reasons" },
+  LateReasonCreate: { table: "task_late_reason" },
+  LateReasonEdit: { table: "task_late_reason" },
   TaskRef: { table: null, reason: "another task as a panel line names it" },
   TaskStep: {
     table: "task_step",
@@ -721,6 +766,12 @@ module.exports = {
   TaskEntityType,
   TaskScope,
   LateReason,
+  LATE_REASONS_MAX,
+  LateReasonOption,
+  LateReasonPage,
+  LateReasonListQuery,
+  LateReasonCreate,
+  LateReasonEdit,
   PingAudience,
   Recurrence,
   Link,

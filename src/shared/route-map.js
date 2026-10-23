@@ -41,7 +41,7 @@ const catalog = require("./access/access.catalog");
 /** Module key → tab slugs, in screen order (docs/PROGRESS.md; 80 staff-app screens). */
 const SCREENS = Object.freeze({
   home: ["overview", "alerts", "reports", "team"],
-  workspace: ["today", "tasks", "calendar", "analytics"],
+  workspace: ["today", "tasks", "projects", "calendar", "analytics"],
   ess: [
     "my-profile",
     "my-attendance",
@@ -138,6 +138,7 @@ const ENTITY_ROUTES = Object.freeze({
 
   // My Workspace
   task: screen("workspace", "tasks"),
+  project: screen("workspace", "projects"),
   calendar_event: screen("workspace", "calendar"),
 
   // Staff Community and Mailbox

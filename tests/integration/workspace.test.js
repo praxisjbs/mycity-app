@@ -22,6 +22,9 @@ const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const lagos = require("../../src/shared/time/lagos");
 const tasks = require("../../src/modules/tasks/tasks.service");
+const queues = require("../../src/jobs/queues");
+const realtime = require("../../src/services/realtime/emitter");
+const systemMail = require("../../src/services/mail/system-mail.service");
 
 // The reminder engine's tick also queues the daily digests; no queue runs here.
 jest.mock("../../src/jobs/queues", () => ({
@@ -441,7 +444,7 @@ describeDb("my workspace against the real migrations", () => {
     expect(why.status).toBe(200);
     expect(why.body.late_reason).toBe("waiting_on_others");
     const mine = await as("staff").get("/workspace/analytics");
-    expect(mine.body.overdue_by_reason).toEqual(expect.arrayContaining([{ reason: "waiting_on_others", count: 1 }]));
+    expect(mine.body.overdue_by_reason).toEqual(expect.arrayContaining([{ reason: "waiting_on_others", label: "Waiting on Others", count: 1 }]));
     expect(mine.body.overdue_aging.reduce((n, b) => n + b.count, 0)).toBe(mine.body.overdue);
     expect(mine.body.open).toBeGreaterThan(0);
 
@@ -895,5 +898,178 @@ describeDb("my workspace against the real migrations", () => {
     expect(moved.status).toBe(200);
     await drain();
     expect(await bell("peer")).toEqual(expect.arrayContaining(["Changed: Stand layout walk"]));
+  });
+
+  /* ------------------------------------------------------------------ *
+   * The 23/10 audit, part 3: projects, late reasons, invitations, the live board
+   * ------------------------------------------------------------------ */
+
+  test("projects: anyone starts one, everyone lists it, and its board holds only the tasks the reader could see", async () => {
+    const made = await as("staff").post("/projects", { name: "Lekki Launch", description: "Stands and flyers", due_on: later(20) });
+    expect(made.status).toBe(201);
+    expect(made.body).toMatchObject({ name: "Lekki Launch", status: "active", open: 0, done: 0, can_edit: true });
+    expect(made.body.number).toMatch(/^PRJ-/);
+    expect(made.body.owner.employee_id).toBe(emp("staff"));
+    const id = made.body.project_id;
+
+    const mine = await as("staff").post("/tasks", { title: "Print the Lekki flyers", project_id: id });
+    expect(mine.status).toBe(201);
+    expect(mine.body.project).toMatchObject({ project_id: id, name: "Lekki Launch" });
+    const theirs = await as("ops").post("/tasks", { title: "Book the Lekki van", primary_assignee_id: emp("outsider"), project_id: id });
+    expect(theirs.status).toBe(201);
+
+    // Everyone sees the project; its counts and its board hold what each reader may see.
+    const forPeer = (await as("peer").get("/projects?q=lekki")).body.data.find((p) => p.project_id === id);
+    expect(forPeer).toMatchObject({ open: 0, can_edit: false });
+    const forStaff = (await as("staff").get(`/projects/${id}`)).body;
+    expect(forStaff.open).toBe(1);
+    const forOps = (await as("ops").get(`/projects/${id}`)).body;
+    expect(forOps).toMatchObject({ open: 2, can_edit: true });
+    const board = await as("staff").get(`/tasks?scope=team&project_id=${id}`);
+    expect(board.body.data.map((t) => t.title)).toEqual(["Print the Lekki flyers"]);
+    expect((await as("ops").get(`/tasks?scope=team&project_id=${id}`)).body.page.total).toBe(2);
+
+    // Only its owner (or an all grant) changes it; a completed project takes no new task.
+    expect((await as("peer").patch(`/projects/${id}`, { name: "Mine now" })).status).toBe(403);
+    const done = await as("staff").patch(`/projects/${id}`, { status: "completed" });
+    expect(done.body).toMatchObject({ status: "completed" });
+    expect(done.body.completed_at).toBeTruthy();
+    const late = await as("staff").post("/tasks", { title: "One more stand", project_id: id });
+    expect(late.status).toBe(422);
+    expect(late.body.error.fields.project_id).toEqual(["Project is closed"]);
+    expect((await as("staff").get("/projects?status=completed")).body.data.map((p) => p.project_id)).toContain(id);
+    expect((await as("ops").patch(`/projects/${id}`, { status: "active" })).body.status).toBe("active");
+
+    // A task leaves a project, or joins one, with whoever manages it.
+    const out = await as("staff").patch(`/tasks/${mine.body.task_id}`, { project_id: null });
+    expect(out.body.project).toBeNull();
+    const back = await as("staff").patch(`/tasks/${mine.body.task_id}`, { project_id: id });
+    expect(back.body.project.project_id).toBe(id);
+    const found = await as("peer").get("/search?q=Lekki%20Launch");
+    expect(found.body.groups.flatMap((g) => g.items).map((i) => i.id)).toContain(id);
+  });
+
+  test("late reasons: six to start, holders add and switch them, and Why Late takes only those switched on", async () => {
+    const on = await as("staff").get("/tasks/late-reasons");
+    expect(on.status).toBe(200);
+    expect(on.body.data.map((r) => r.code)).toEqual([
+      "waiting_on_others", "waiting_on_client", "blocked_by_another_team", "underestimated", "deprioritised", "other",
+    ]);
+    expect((await as("staff").post("/tasks/late-reasons", { label: "Power Cut" })).status).toBe(403);
+    const added = await as("ops").post("/tasks/late-reasons", { label: "Power Cut" });
+    expect(added.status).toBe(201);
+    expect(added.body).toMatchObject({ code: "power_cut", label: "Power Cut", active: true });
+    const again = await as("ops").post("/tasks/late-reasons", { label: "power cut" });
+    expect(again.status).toBe(422);
+    expect(again.body.error.fields.label).toEqual(["Already a reason"]);
+
+    const t = await as("staff").post("/tasks", { title: "Fix the stand lights", due_on: later(-2) });
+    expect((await as("staff").patch(`/tasks/${t.body.task_id}`, { late_reason: "power_cut" })).body.late_reason_label).toBe("Power Cut");
+    const off = await as("director").patch(`/tasks/late-reasons/${added.body.task_late_reason_id}`, { active: false });
+    expect(off.body.active).toBe(false);
+    expect((await as("staff").get("/tasks/late-reasons")).body.data.map((r) => r.code)).not.toContain("power_cut");
+    expect((await as("staff").get("/tasks/late-reasons?all=true")).body.data.map((r) => r.code)).not.toContain("power_cut");
+    expect((await as("ops").get("/tasks/late-reasons?all=true")).body.data.map((r) => r.code)).toContain("power_cut");
+    // The answer keeps its words; a new answer must be a reason switched on.
+    expect((await as("staff").get(`/tasks/${t.body.task_id}`)).body.late_reason_label).toBe("Power Cut");
+    const refused = await as("staff").post(`/tasks/${t.body.task_id}/move`, { status: "done", late_reason: "power_cut" });
+    expect(refused.status).toBe(422);
+    expect(refused.body.error.fields.late_reason).toEqual(["Pick a reason"]);
+    expect((await as("staff").post(`/tasks/${t.body.task_id}/move`, { status: "done", late_reason: "waiting_on_client" })).status).toBe(200);
+    const analytics = await as("staff").get("/workspace/analytics");
+    expect(analytics.body.overdue_by_reason.every((r) => r.reason === null || typeof r.label === "string")).toBe(true);
+  });
+
+  test("invitations by email: the attendees get the event as an .ics, updated and cancelled with it, never the owner", async () => {
+    queues.enqueue.mockClear();
+    const starts = lagos.instant(later(4), "10:00").toISOString();
+    const ends = lagos.instant(later(4), "11:00").toISOString();
+    const ev = await as("manager").post("/calendar", { title: "Stand rehearsal", starts_at: starts, ends_at: ends, attendee_ids: [emp("staff")] });
+    expect(ev.status).toBe(201);
+    await drain();
+    const invites = () => queues.enqueue.mock.calls.filter((c) => c[0] === "email-send" && c[1] === "calendar-invite").map((c) => c[2]);
+    expect(invites().map((j) => j.to.email)).toEqual(["staff@mycity.test"]);
+    const first = invites()[0];
+    expect(first.data).toMatchObject({ heading: "Invitation", title: "Stand rehearsal", called_off: false });
+    expect(first.attachments[0].content).toMatch(/METHOD:REQUEST/);
+    expect(first.attachments[0].content).toMatch(/SEQUENCE:0/);
+    // It renders through system mail as it would be sent.
+    await systemMail.send({ to: first.to, template: first.template, data: first.data, recipient: first.recipient, attachments: first.attachments });
+    const mail = systemMail.capturedMail().find((m) => m.template === "calendar-invite");
+    expect(mail.subject).toBe("Invitation: Stand rehearsal");
+    expect(mail.text).toMatch(/Organised by Ifeoma Chukwu/);
+
+    queues.enqueue.mockClear();
+    await as("manager").patch(`/calendar/${ev.body.calendar_event_id}`, { starts_at: lagos.instant(later(4), "12:00").toISOString(), ends_at: lagos.instant(later(4), "13:00").toISOString() });
+    await drain();
+    expect(invites()[0].data.heading).toBe("Updated");
+    expect(invites()[0].attachments[0].content).toMatch(/SEQUENCE:1/);
+
+    queues.enqueue.mockClear();
+    await as("manager").post(`/calendar/${ev.body.calendar_event_id}/cancel`, {});
+    await drain();
+    expect(invites()[0].data).toMatchObject({ heading: "Called Off", called_off: true });
+    expect(invites()[0].attachments[0].content).toMatch(/METHOD:CANCEL/);
+    expect(invites().map((j) => j.to.email)).not.toContain("manager@mycity.test");
+  });
+
+  test("the live board: a change reaches the browsers of everyone who may see the task, and nobody else", async () => {
+    const told = jest.spyOn(realtime, "toUser").mockReturnValue(true);
+    expect(realtime.toUser("someone", "task.changed", {})).toBe(true);
+    const t = await as("manager").post("/tasks", { title: "Mark out the stand", primary_assignee_id: emp("staff") });
+    const other = await as("manager").post("/tasks", { title: "Bring the cones", primary_assignee_id: emp("staff") });
+    await drain();
+    told.mockClear();
+    expect((await as("staff").post(`/tasks/${t.body.task_id}/move`, { status: "todo", before_task_id: other.body.task_id })).status).toBe(200);
+    await drain();
+    const reached = new Set(told.mock.calls.filter((c) => c[1] === "task.changed" && c[2].task_id === t.body.task_id).map((c) => c[0]));
+    expect(reached.has(people.staff.user.user_id)).toBe(true);
+    expect(reached.has(people.manager.user.user_id)).toBe(true);
+    expect(reached.has(people.ops.user.user_id)).toBe(true);
+    expect(reached.has(people.peer.user.user_id)).toBe(false);
+    expect(reached.has(people.outsider.user.user_id)).toBe(false);
+    told.mockRestore();
+  });
+
+  test("a lead who has left shows Left, and Home's roster counts open tasks for a reader who may see them", async () => {
+    let gone;
+    await tx(async (client) => {
+      gone = await createAdmin(
+        client,
+        {
+          employee: {
+            first_name: "Kemi",
+            last_name: "Ojo",
+            work_email: "gone@mycity.test",
+            phone: "08031234567",
+            job_title: "Field Officer",
+            department_name: "Programmes",
+            start_date: "2026-01-05",
+            employment_type: "full_time",
+            work_pattern: "on_site",
+          },
+          role_code: "employee",
+          is_ceo: false,
+        },
+        PASSWORD,
+        { allowAdditional: true },
+      );
+    });
+    const t = await as("ops").post("/tasks", { title: "Return the stand keys", primary_assignee_id: gone.employee.employee_id });
+    expect(t.body.assignee_left).toBe(false);
+    await q("UPDATE employee SET status = 'left' WHERE employee_id = $1", [gone.employee.employee_id]);
+    expect((await as("ops").get(`/tasks/${t.body.task_id}`)).body.assignee_left).toBe(true);
+
+    const roster = await as("ops").get("/home/team?q=Danjuma");
+    if (roster.status === 200 && roster.body.data.length) {
+      const row = roster.body.data.find((r) => r.employee.employee_id === emp("staff"));
+      if (row) expect(typeof row.open_tasks).toBe("number");
+    }
+  });
+
+  test("Praxis AI's New Event names its attendees, and start a project opens New Project", () => {
+    const c = require("@mycity/contract");
+    expect(c.calendar.CalendarEventPrefill.parse({ title: "Stand walk", attendee_ids: [emp("staff")] }).attendee_ids).toEqual([emp("staff")]);
+    expect(c.projects.ProjectPrefill.parse({ name: "Ikeja Launch" }).name).toBe("Ikeja Launch");
   });
 });

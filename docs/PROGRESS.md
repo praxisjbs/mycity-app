@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 99 screens (93 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 100 screens (94 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -44,7 +44,7 @@ saying who agreed and when.
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
-| M2 Productivity & Performance | 10 | 0 | 0 | 10 | 0 | 0 |
+| M2 Productivity & Performance | 11 | 0 | 1 | 10 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
 | M5 Offers, Documentation & Onboarding | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **99** | **40** | **0** | **59** | **0** | **0** |
+| **Total** | **100** | **40** | **1** | **59** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -755,11 +755,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 4 | Today | `today` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 5 | Tasks | `tasks` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
+| 101 | Projects | `projects` | M2 | AJ | ☑ | ☐ | ☐ | In progress | 23/10/2026 |
 | 6 | Calendar | `calendar` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 | 7 | Analytics | `analytics` | M2 | AJ | ☑ | ☑ | ☑ | Built | 23/10/2026 |
 
 **Notes**
 
+- 23/10/2026 · JP · My Workspace (#4, #5, #6, #7, #101), the 23/10 audit, part 3 of 3, server side (decisions JBS Praxis, 23/10/2026; `workspace.md` §1 to §13): My Workspace · Projects joins the inventory as #101 (MILESTONES §18): `/api/v1/projects` (anyone starts one, everyone lists it, counts and its board only the tasks the reader can see, completed projects take no new task), a task's `project_id` from New Task, Edit Task or the project; Why Late's reasons in `task_late_reason` (2510, six seeded in 2590 with Waiting on Client and Blocked by Another Team), added and switched by holders of the new `workspace.late_reasons`; invitations by email with an `.ics` (REQUEST, update, CANCEL; `calendar_event.ics_sequence`, 2520), held while system mail is paused; the live board (`task.changed` by realtime to everyone who may see a task; `task.reordered`); `assignee_left` for the Left pill; Home's roster fills Open Tasks; New Event's prefill names attendees and "start a project" opens New Project. Workspace integration 45 (6 new). Left: the screens (Projects tab, Late Reasons, the Left pill, live refresh, the Project field), the mock and frontend tests, then CI and merge.
 - 23/10/2026 · JP · My Workspace (#4 to #7), the 23/10 audit, part 1 of 3: the server and the shared plumbing (decisions JBS Praxis, 23/10/2026; `workspace.md` §5 to §9, §11). The assignee of a task someone else set never manages it, even with an `all` grant; watchers are only people who can see the task, and watchers and nudges reach only them; a done task tells the people on each task waiting on it about their own task (`task.prerequisite_done`), never its title; Clear Blocker tells the setter; a repeat arrives quietly and stops when its lead leaves; a card lands only above one the reader can see; a task cancelled with its record drops its reminders; a prerequisite shared with the reader shows its title. Today: Due Today is open and not yet past, From Your Manager and the diary are read on the server with true totals. Analytics' Mine is what the reader leads or shares. Calendar: a shared task's deadline is on its people's calendars; people added to an event hear an invitation and people taken off hear that; times compare as instants; the AI cites performance dates as their records. ⌘K finds tasks the reader set or shares (`scope.named` on search providers). The working week's day off has no hours (was the text "null"). Sign Out forgets every kept answer and drops one still on its way (`createApi` `clear`); the mock answers as whoever sent the request; the flaky form test checks on leaving only. Workspace integration 39 (11 new). Left: part 2 (screens, mock, staging seed, frontend tests) and part 3 (Projects, Why Late reasons, email invitations, live board, Left pill).
 - 23/10/2026 · JP · My Workspace · Tasks (#5), shared tasks' lead and reminders (JBS Praxis, 23/10/2026; `workspace.md` §6, §7, §10): with People, Lead is You or one of the people picked; with a Department, Lead is required and picked from that department (`GET /api/v1/tasks/people?department_id=`), so the head no longer leads by default; due today and due tomorrow reach the people sharing a task as well as its lead. Workspace integration 29 (1 new), app workspace tests 12, typecheck and lint pass. Left: nothing.
 - 23/10/2026 · GE · My Workspace · Calendar (#6): an empty day asks New Task or New Event for that day (month cell, week and day views); the phone header is one line (Today, Previous, Next, New Event) with the view switch under it. Left: nothing.

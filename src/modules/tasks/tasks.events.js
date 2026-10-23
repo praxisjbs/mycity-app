@@ -16,12 +16,17 @@
  * goes to whoever it names; a reminder set on a task comes back to its people through the
  * shared reminder engine.
  *
+ * The live board (workspace.md §6): once a change to a task commits, the browsers of everyone
+ * who may see it hear `task.changed` with its id only, and their open boards ask again.
+ *
  * Done and reopened tasks that count towards a KPI are recounted by the performance
  * module, which registers its own outbox handler on TASK_COMPLETED and TASK_REOPENED
  * (src/modules/targets/targets.events.js).
  */
 const { defineEvents } = require("../../shared/events/catalogue");
-const { defineNotification } = require("../../shared/notifications/fanout");
+const outbox = require("../../shared/events/outbox");
+const { defineNotification, permissionHolders } = require("../../shared/notifications/fanout");
+const realtime = require("../../services/realtime/emitter");
 const reminders = require("../notifications/notifications.reminders");
 
 const EVENTS = defineEvents("workspace", {
@@ -41,6 +46,9 @@ const EVENTS = defineEvents("workspace", {
   "task.watchers_changed": { summary: "Someone started or stopped watching a task" },
   "task.pinged": { summary: "Someone nudged the people on a task" },
   "task.reminder_due": { summary: "A reminder set on a task came due" },
+  "task.reordered": { summary: "A card moved within its column" },
+  "task_late_reason.created": { summary: "A late reason was added" },
+  "task_late_reason.changed": { summary: "A late reason was switched off or on" },
 });
 
 /** The reminder engine's key for the reminders a person sets on a task (up to three). */
@@ -88,8 +96,8 @@ const both = (e, client) =>
 /** The people watching the task who may still see it (the service is required when called, as below). */
 async function watchersOf(e, client) {
   const { rows } = await client.query("SELECT employee_id FROM task_watcher WHERE task_id = $1", [e.payload.task_id]);
-  const seers = await require("./tasks.service").whoMaySee(client, e.payload, rows.map((r) => r.employee_id));
-  return loginsOf(client, seers);
+  const able = await require("./tasks.service").whoMaySee(client, e.payload, rows.map((r) => r.employee_id));
+  return loginsOf(client, able);
 }
 
 /** Everyone on the task: its lead and the people sharing it. */
@@ -177,6 +185,45 @@ defineNotification(EVENTS.TASK_REMINDER_DUE, {
   include_actor: true,
 });
 
+/**
+ * Everyone who may see the task, as logins: its lead, its setter, the people sharing it, its
+ * watchers, the holders of `workspace` view whose scope covers its lead, and the CEO.
+ */
+async function seers(client, e) {
+  const p = e.payload;
+  const { rows } = await client.query("SELECT employee_id FROM task_watcher WHERE task_id = $1", [p.task_id]);
+  const ceo = await client.query("SELECT user_id FROM app_user WHERE is_ceo AND status = 'active'");
+  return new Set([
+    ...(await loginsOf(client, [p.primary_assignee_id, p.set_by_employee_id, ...membersOf(e), ...rows.map((r) => r.employee_id)])),
+    ...(p.primary_assignee_id ? await permissionHolders(client, ["workspace", "view"], p.primary_assignee_id) : []),
+    ...ceo.rows.map((r) => r.user_id),
+  ]);
+}
+
+/** The changes an open board shows. A nudge, a reminder or a due-soon notice moves nothing on it. */
+const LIVE = [
+  EVENTS.TASK_CREATED,
+  EVENTS.TASK_EDITED,
+  EVENTS.TASK_STATUS_CHANGED,
+  EVENTS.TASK_COMPLETED,
+  EVENTS.TASK_REOPENED,
+  EVENTS.TASK_REORDERED,
+  EVENTS.TASK_BLOCKED,
+  EVENTS.TASK_UNBLOCKED,
+  EVENTS.TASK_CANCELLED,
+  EVENTS.TASK_COMMENTED,
+  EVENTS.TASK_STEP_CHANGED,
+  EVENTS.TASK_WAITING_CHANGED,
+  EVENTS.TASK_WATCHERS_CHANGED,
+];
+for (const key of LIVE) {
+  outbox.register(key, "tasks.live_board", async (event) => {
+    if (!event.payload || !event.payload.task_id) return;
+    const { pool } = require("../../config/db");
+    for (const userId of await seers(pool, event)) realtime.toUser(userId, "task.changed", { task_id: event.payload.task_id });
+  });
+}
+
 /*
  * A reminder a person set on a task. It fires only while the task is open; the service is
  * required when the engine calls it, since it requires this file for its keys.
@@ -187,4 +234,4 @@ reminders.defineReminder(REMINDER_KEY, {
   check: (client, row) => require("./tasks.service").reminderCheck(client, row),
 });
 
-module.exports = { EVENTS, REMINDER_KEY, loginsOf };
+module.exports = { EVENTS, REMINDER_KEY, loginsOf, seers };

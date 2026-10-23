@@ -8,7 +8,7 @@
  * `everyone` (docs/guides/workspace.md §6). A month is always the reader's own, so
  * scope does not widen it: a manager reads their team's work on Tasks, not here.
  */
-const { pageQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
+const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { personJson } = require("../../shared/db/person");
 
 const SEES = (me) => `(ce.owner_employee_id = ${me} OR ce.visibility = 'everyone'
@@ -163,6 +163,39 @@ async function update(client, id, changes) {
   );
 }
 
+/** One more change for its invitations (SEQUENCE). */
+async function nextSequence(client, id) {
+  await client.query("UPDATE calendar_event SET ics_sequence = ics_sequence + 1 WHERE calendar_event_id = $1", [id]);
+}
+
+/** What an invitation by email says: the event as it stands, and its owner by name and work email. */
+async function invitation(db, id) {
+  const { rows } = await db.query(
+    `SELECT ce.calendar_event_id, ce.title, ce.description, ce.starts_at, ce.ends_at, ce.all_day,
+            ce.location, ce.cancelled_at, ce.ics_sequence,
+            trim(oe.first_name || ' ' || oe.last_name) AS owner_name, oe.work_email::text AS owner_email
+       FROM calendar_event ce
+       LEFT JOIN employee oe ON oe.employee_id = ce.owner_employee_id
+      WHERE ce.calendar_event_id = $1`,
+    [id],
+  );
+  return rows[0] || null;
+}
+
+/** The people among these with a work email, by name. */
+async function mailable(db, ids) {
+  if (!ids.length) return [];
+  // pagination:complete an event's attendees, at most the contract's 50
+  const { rows } = await completeQuery(
+    db,
+    `SELECT employee_id, first_name, trim(first_name || ' ' || last_name) AS name, work_email::text AS email
+       FROM employee WHERE employee_id = ANY($1::uuid[]) AND work_email IS NOT NULL ORDER BY employee_id`,
+    [ids],
+    { label: "an event's attendees", ceiling: 100 },
+  );
+  return rows;
+}
+
 /** Make the attendee list exactly these people, keeping answers already given. */
 async function setAttendees(client, id, employeeIds) {
   await client.query(
@@ -206,4 +239,4 @@ async function activeOf(db, ids) {
   return rows.map((r) => r.employee_id);
 }
 
-module.exports = { month, getFor, lock, insert, update, setAttendees, attendeeIds, respond, activeOf };
+module.exports = { month, getFor, lock, insert, update, nextSequence, invitation, mailable, setAttendees, attendeeIds, respond, activeOf };

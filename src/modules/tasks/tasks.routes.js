@@ -5,6 +5,8 @@
  *   GET   /, /summary, /:id                 `workspace` view: the board, its figures, a task
  *   GET   /counts-towards                   `workspace` view: the assignee's lines and key results
  *   GET   /people                           `workspace` create: who the caller may set a task for, or share one with
+ *   GET   /late-reasons                     `workspace` view: Why Late's reasons (every one, with `all`, for their keepers)
+ *   POST  /late-reasons, PATCH /late-reasons/:id   `workspace` edit + `workspace.late_reasons`: add one, switch one
  *   POST  /                                 `workspace` create: for oneself, or someone in scope (A24)
  *   PATCH /:id                              `workspace` edit: the setter's fields, or the assignee's notes
  *   POST  /:id/move                         `workspace` edit: a drag between and within columns
@@ -23,7 +25,7 @@
 const express = require("express");
 const c = require("@mycity/contract");
 const { route } = require("../../http/route");
-const { requirePermission } = require("../../middleware/rbac");
+const { requirePermission, requireCapability } = require("../../middleware/rbac");
 const controller = require("./tasks.controller");
 
 const router = express.Router();
@@ -46,6 +48,18 @@ route(router, "get", "/counts-towards",
 route(router, "get", "/people",
   { query: t.TaskPeopleQuery, response: t.TaskPersonPage, summary: "The people a task may be set for or shared with" },
   requirePermission("workspace", "create"), controller.people);
+
+route(router, "get", "/late-reasons",
+  { query: t.LateReasonListQuery, response: t.LateReasonPage, summary: "Why Late's reasons" },
+  requirePermission("workspace", "view"), controller.lateReasons);
+
+route(router, "post", "/late-reasons",
+  { body: t.LateReasonCreate, response: t.LateReasonOption, summary: "Add a late reason" },
+  requirePermission("workspace", "edit"), requireCapability("workspace.late_reasons"), controller.addLateReason);
+
+route(router, "patch", "/late-reasons/:id",
+  { ...one, body: t.LateReasonEdit, response: t.LateReasonOption, summary: "Switch a late reason off or on" },
+  requirePermission("workspace", "edit"), requireCapability("workspace.late_reasons"), controller.setLateReason);
 
 route(router, "get", "/:id",
   { ...one, response: t.TaskDetail, summary: "One task, and what the caller may do to it" },

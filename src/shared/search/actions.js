@@ -164,6 +164,12 @@ const ACTIONS = Object.freeze([
     need: ["workspace", "create"],
     words: ["commitment", "commitments", "monthly commitment", "set my commitments", "priority for the month"],
   }),
+  a("new_project", "New Project", {
+    screen: "workspace.projects",
+    params: { action: "new" },
+    need: ["workspace", "create"],
+    words: ["project", "start a project", "new project", "workstream"],
+  }),
   // Performance (docs/guides/performance.md §9).
   a("new_goal", "New Goal", {
     screen: "performance.goals",

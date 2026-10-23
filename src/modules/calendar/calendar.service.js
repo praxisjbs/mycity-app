@@ -258,6 +258,7 @@ async function edit(actor, id, body) {
     // What the people already invited would notice; a change to who else comes, or to the
     // reminders, is not news to them.
     const noticed = Object.keys(changes).some((k) => !same(before[k], changes[k]));
+    if (noticed) await repo.nextSequence(client, id);
     // New lead times replace the old; a move keeps the lead times and moves their times with it.
     if (body.reminder_minutes || body.starts_at) {
       const lead = body.reminder_minutes || (await withReminders(client, before)).reminder_minutes;
@@ -285,6 +286,7 @@ async function cancel(actor, id) {
   return tx(async (client) => {
     const before = await owned(client, id, actor.employee_id);
     await repo.update(client, id, { cancelled_at: new Date() });
+    await repo.nextSequence(client, id);
     await reminders.cancel(client, { key: REMINDER_KEY, entity: entityOf(id) });
     const after = await repo.getFor(client, id, actor.employee_id);
     await emit(client, {
@@ -324,4 +326,4 @@ async function respond(actor, id, { response }) {
   });
 }
 
-module.exports = { toItem, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck };
+module.exports = { toItem, whenOf, month, day: oneDay, getFor, create, edit, cancel, respond, reminderCheck };

@@ -129,6 +129,24 @@ const CalendarEventPrefill = z
     ends_at: isoDateTime.optional(),
     // address:none a meeting's room or call link, not a street address
     location: optionalText(200),
+    /** The people the person named, found through the colleague card. */
+    attendee_ids: z.array(uuid).max(50).optional(),
+  })
+  .strict();
+
+/**
+ * The calendar-invite email (workspace.md §6 Invitations by email): what an attendee reads
+ * beside the .ics. `heading` says what happened: Invitation, Updated or Called Off.
+ */
+const CalendarInviteEmailVars = z
+  .object({
+    heading: z.enum(["Invitation", "Updated", "Called Off"]),
+    title: z.string(),
+    organiser: z.string(),
+    when: z.string(),
+    location: z.string().nullable(),
+    called_off: z.boolean(),
+    link_url: z.string(),
   })
   .strict();
 
@@ -186,7 +204,11 @@ const TABLES = {
       reminder_minutes: "scheduled in the shared reminder engine",
     },
   },
-  CalendarEventPrefill: { table: "calendar_event" },
+  CalendarEventPrefill: {
+    table: "calendar_event",
+    virtual: { attendee_ids: "the calendar_event_attendee rows the form starts with" },
+  },
+  CalendarInviteEmailVars: { table: null, reason: "an email template's variables" },
   CalendarEventEdit: {
     table: "calendar_event",
     virtual: {
@@ -198,6 +220,7 @@ const TABLES = {
 };
 
 module.exports = {
+  CalendarInviteEmailVars,
   TABLES,
   CalendarEventType,
   CalendarVisibility,

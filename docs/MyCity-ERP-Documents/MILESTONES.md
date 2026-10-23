@@ -1314,6 +1314,15 @@ Commitments view (`docs/guides/performance.md` P11). The inventory's count is un
 PR 1 applies the label to the table below, the app's catalogue, `src/shared/search/screens.js` and
 `docs/PROGRESS.md` (row #30).
 
+**Ratified 23/10/2026 (JBS Praxis).** One screen joins the inventory, taking the admin surface to 94
+and the inventory to 100: **My Workspace · Projects** (`projects`), a fifth tab in My Workspace, M2.
+Anyone starts a project and everyone sees the list; a project's page is a board of its tasks, which
+keep their own visibility (A24), and a task joins a project from New Task or from the project. The
+`project` table was in the 2000 schema without a screen. It reuses the `workspace` permission key.
+Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.js`,
+`src/shared/search/screens.js` and `docs/PROGRESS.md` (row #101). Its engineering shape is in
+`docs/guides/workspace.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1322,7 +1331,7 @@ staff never navigates to it to do their job.
 | Area | Module | Tabs | Screens | Built in |
 |---|---|---|---|---|
 | (ungrouped) | **Home** | 4 | Overview · Team · Alerts · Reports | M1 |
-| (ungrouped) | **My Workspace** | 4 | Today · Tasks · Calendar · Analytics | M2 |
+| (ungrouped) | **My Workspace** | 5 | Today · Tasks · Projects · Calendar · Analytics | M2 |
 | (ungrouped) | **Employee Self-Service** | 12 | My Profile · My Attendance · Work Location Requests · My Devices · Policy Updates · My Performance · My Payslips · My Leave · My Queries · My Documents · Org Chart · My Security | M1 |
 | Work | **Staff Community** | 3 | Channels · Direct Messages · Announcements | M1 |
 | Work | **Mailbox** | 6 | Inbox · Sent · Drafts · Archive · Spam · Trash | M1 |
