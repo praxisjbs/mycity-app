@@ -38,10 +38,12 @@ import {
   todayIso,
   Tooltip,
   useContractForm,
+  useIsPhone,
   useModal,
   zoneClock,
 } from "@mycity/ui";
 import { say } from "./shared";
+import { TaskForm } from "./TaskForms";
 import { useTaskPanel } from "./TaskPanel";
 
 type View = "month" | "week" | "day";
@@ -117,6 +119,21 @@ export function CalendarTab() {
   const panel = useTaskPanel();
   const { navigate } = useRouter();
   const add = () => modal.open({ title: "New Event", body: (close) => <EventForm close={close} day={view === "month" ? undefined : anchor} /> });
+  const phone = useIsPhone();
+  /** A day with nothing on it, pressed: a task due that day or an event on it. */
+  const addOn = (day: string) =>
+    modal.open({
+      title: short(day),
+      body: (close) => (
+        <TapList
+          label="Add To Day"
+          items={[
+            { key: "task", title: "New Task", onSelect: () => (close(), modal.open({ title: "New Task", body: (done) => <TaskForm close={done} dueOn={day} /> })) },
+            { key: "event", title: "New Event", onSelect: () => (close(), modal.open({ title: "New Event", body: (done) => <EventForm close={done} day={day} /> })) },
+          ]}
+        />
+      ),
+    });
   useScreenAction({ label: "New Event", onSelect: add });
   /* A link to one event (the bell, ⌘K): /workspace?tab=calendar&id=… opens it. */
   const [params, setParams] = useSearchParams();
@@ -151,18 +168,31 @@ export function CalendarTab() {
         title="Calendar"
         sub={title}
         actions={
-          <>
-            {/* Today stands apart; the arrows beside it step by the view, not by a day. */}
-            <Tooltip label={zoneClock(new Date(), "Africa/Lagos").day}>
+          phone ? (
+            <>
+              {/* A phone: Today, the arrows and New Event on one line, the view switch under them. */}
               <Button onClick={() => setAnchor(today)}>Today</Button>
-            </Tooltip>
-            <span className="flex items-center">
-              <IconButton icon="left" label={`Previous ${unit}`} onClick={() => step(-1)} />
-              <IconButton icon="right" label={`Next ${unit}`} onClick={() => step(1)} />
-            </span>
-            <SegmentedControl label="Calendar View" value={view} onChange={setView} options={[["month", "Month"], ["week", "Week"], ["day", "Day"]]} />
-            <Button variant="primary" icon="plus" onClick={add}>New Event</Button>
-          </>
+              <span className="flex items-center">
+                <IconButton icon="left" label={`Previous ${unit}`} onClick={() => step(-1)} />
+                <IconButton icon="right" label={`Next ${unit}`} onClick={() => step(1)} />
+              </span>
+              <Button className="ml-auto" variant="primary" icon="plus" onClick={add}>New Event</Button>
+              <SegmentedControl label="Calendar View" value={view} onChange={setView} options={[["month", "Month"], ["week", "Week"], ["day", "Day"]]} />
+            </>
+          ) : (
+            <>
+              {/* Today stands apart; the arrows beside it step by the view, not by a day. */}
+              <Tooltip label={zoneClock(new Date(), "Africa/Lagos").day}>
+                <Button onClick={() => setAnchor(today)}>Today</Button>
+              </Tooltip>
+              <span className="flex items-center">
+                <IconButton icon="left" label={`Previous ${unit}`} onClick={() => step(-1)} />
+                <IconButton icon="right" label={`Next ${unit}`} onClick={() => step(1)} />
+              </span>
+              <SegmentedControl label="Calendar View" value={view} onChange={setView} options={[["month", "Month"], ["week", "Week"], ["day", "Day"]]} />
+              <Button variant="primary" icon="plus" onClick={add}>New Event</Button>
+            </>
+          )
         }
       />
       <Grid cols="1.4/1">
@@ -173,6 +203,9 @@ export function CalendarTab() {
             year={Number(month.slice(0, 4))}
             month={Number(month.slice(5, 7)) - 1}
             events={here.rows.map((e) => ({ date: lagosDay(e.starts_at), label: e.title, highlight: e.item_kind === "task" || e.item_kind === "performance", onSelect: () => openItem(e) }))}
+            onAddDay={addOn}
+            addLabel="Add To Day"
+            addFrom={today}
           />
         ) : view === "week" ? (
           <Card>
@@ -183,7 +216,7 @@ export function CalendarTab() {
                   {short(day, n)}
                 </button>
                 {on(day).map((i) => <Line key={i.item_kind + i.item_id} i={i} onOpen={openItem} />)}
-                {!on(day).length && <p className="py-1 text-2xs text-subtle-foreground">Nothing booked.</p>}
+                {!on(day).length && <Empty day={day} today={today} onAdd={addOn} />}
               </div>
             ))}
           </Card>
@@ -191,7 +224,7 @@ export function CalendarTab() {
           <Card>
             <CardHeader title={short(anchor)} right={<span className="text-2xs text-subtle-foreground">Africa/Lagos</span>} />
             {on(anchor).map((i) => <Line key={i.item_kind + i.item_id} i={i} onOpen={openItem} />)}
-            {!on(anchor).length && <p className="text-2xs text-subtle-foreground">Nothing booked.</p>}
+            {!on(anchor).length && <Empty day={anchor} today={today} onAdd={addOn} />}
           </Card>
         )}
         <Card>
@@ -212,6 +245,21 @@ export function CalendarTab() {
       </Grid>
       {panel.panel}
     </>
+  );
+}
+
+/** A day with nothing on it: Add To Day from today on (not on a Sunday), plain words before. */
+function Empty({ day, today, onAdd }: { day: string; today: string; onAdd: (day: string) => void }) {
+  const sunday = new Date(`${day}T12:00:00Z`).getUTCDay() === 0;
+  return (
+    <div className="flex items-center justify-between gap-2 py-1">
+      <p className="text-2xs text-subtle-foreground">Nothing booked.</p>
+      {day >= today && !sunday && (
+        <Button size="sm" variant="ghost" icon="plus" onClick={() => onAdd(day)}>
+          Add To Day
+        </Button>
+      )}
+    </div>
   );
 }
 

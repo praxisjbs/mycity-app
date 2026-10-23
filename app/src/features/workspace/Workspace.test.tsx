@@ -148,6 +148,17 @@ describe("my workspace", () => {
     await waitFor(() => expect(within(form).getAllByText("Department")).toHaveLength(2));
   }, 30000);
 
+  it("an empty day on the month asks New Task or New Event, and New Task starts on that day", async () => {
+    await signedIn(<Workspace tab="calendar" id={null} />);
+    await screen.findByText("Coming Up", undefined, { timeout: 8000 });
+    const days = await screen.findAllByRole("button", { name: /^Add To Day, / });
+    fireEvent.click(days[days.length - 1]!);
+    const choose = await screen.findByRole("dialog");
+    fireEvent.click(within(choose).getByRole("button", { name: /New Task/ }));
+    const form = await screen.findByRole("dialog", { name: "New Task" });
+    expect(within(form).getByRole("button", { name: "Create Task" })).toBeTruthy();
+  }, 20000);
+
   it("New Event offers a reminder, 15 minutes before unless changed", async () => {
     await signedIn(<Workspace tab="calendar" id={null} />);
     await screen.findByText("Coming Up", undefined, { timeout: 8000 });
