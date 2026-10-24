@@ -314,7 +314,7 @@ step Praxis's `deploy.yaml` names but never completed (its review gate is `if: f
 **Interim, while the repository is private on a free plan (17/10/2026).** GitHub offers no
 required reviewers there, so steps 4 and 5 of §9.2 ran on their own: releases 130 to 134 reached
 production seconds after the seal. Until the repository is public again or on a plan that keeps
-required reviewers, production is not part of the automatic run. An approver (GE or TB) starts
+required reviewers, production is not part of the automatic run. An approver (GE, TB or the `praxisjbs` account) starts
 **Release** by hand from `main` with the sealed sha; an `approver` job in `release.yml` and
 `rollback.yml` refuses anyone else, any other branch and a short sha before the production job
 holds the key. This is weaker than the table above: a change to the workflow file can remove the

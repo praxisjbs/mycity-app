@@ -8,8 +8,8 @@ first, then `CLAUDE.md`, then the documents it points to.
 ## 1 · Start here
 
 You are continuing **M0, the shared foundation**, for Godwin-Okoh Elisha ("Wizzy", GE, GitHub
-`@swizfcodes`). The team is Tom-Blake Asaah (TB, `@tomblakeasaah196`, owns the GitHub repo
-`tomblakeasaah196/mycity-app`), Love Adeola (LA, `@LovedataX`, migrations and data) and Adole Jerome
+`@swizfcodes`). The team is Tom-Blake Asaah (TB, `@tomblakeasaah196`; the GitHub repo is
+`praxisjbs/mycity-app`, JBS Praxis's account), Love Adeola (LA, `@LovedataX`, migrations and data) and Adole Jerome
 (AJ, `@Ghosted34`, frontend foundation). Tom-Blake is a colleague, not the user.
 
 The plan approved on 13 October was six phases of shared code that M1 to M11 build on. **All six

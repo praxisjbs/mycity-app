@@ -1,7 +1,8 @@
 # Runbook · GitHub settings
 
-The repository is `tomblakeasaah196/mycity-app`. Only the owning account (TB) is an admin, so
-**only TB can apply or change these settings**. Collaborators cannot see or change them; that is
+The repository is `praxisjbs/mycity-app`, JBS Praxis's account (moved from
+`tomblakeasaah196/mycity-app` on 24/10/2026). Only the owning account is an admin, so **only whoever
+signs in as `praxisjbs` can apply or change these settings**. Collaborators cannot see or change them; that is
 what makes them hold. Re-check this page after any change to the repository's plan or visibility.
 
 ## Keep the repository public

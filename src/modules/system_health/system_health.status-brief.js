@@ -182,7 +182,7 @@ function instructions(count, server) {
   return `## Your job
 
 You are investigating the health of a running **MyCity App ERP** server
-(\`tomblakeasaah196/mycity-app\`): an Express and PostgreSQL API and a worker on one Ubuntu
+(\`praxisjbs/mycity-app\`): an Express and PostgreSQL API and a worker on one Ubuntu
 server, behind nginx, with Redis for sessions and queues and systemd running everything.
 ${count ? `Take ${problems} from this report to a system that is well again, without making anything worse on the way.` : "Nothing is down. Read it as a record of a healthy system, and say if anything in it still looks wrong."}
 

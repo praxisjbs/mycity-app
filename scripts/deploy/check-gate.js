@@ -36,7 +36,7 @@ function expected(gatePath = GATE) {
 }
 
 /** The steps that fix an out-of-date gate, in Markdown, for this commit. */
-function remedy({ sha, want, got, host = "<server address>", repo = "tomblakeasaah196/mycity-app" }) {
+function remedy({ sha, want, got, host = "<server address>", repo = "praxisjbs/mycity-app" }) {
   const short = sha.slice(0, 12);
   return [
     "## The server's deploy-gate is out of date",

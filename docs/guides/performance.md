@@ -213,7 +213,7 @@ Every prompt below begins with the same rules.
 COMMON RULES FOR EVERY PERFORMANCE PR
 
 You are building one pull request of the MyCity App ERP's Performance Management System
-(repository tomblakeasaah196/mycity-app). docs/guides/performance.md is the single source of
+(repository praxisjbs/mycity-app). docs/guides/performance.md is the single source of
 truth. Its §1.1 decisions were taken by TB on 22/10/2026: do not ask them again. If something
 genuinely blocks you that the guide does not settle, ask once with AskUserQuestion, your
 recommendation first, then record the answer in §1.1 and §14 of the guide.

@@ -28,7 +28,7 @@ As a user with sudo, on the server:
 
 ```
 sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/tomblakeasaah196/mycity-app.git ~/mycity-app
+git clone https://github.com/praxisjbs/mycity-app.git ~/mycity-app
 cd ~/mycity-app
 sudo LE_EMAIL=<the address Let's Encrypt writes to> bash ops/provision/provision.sh
 ```
