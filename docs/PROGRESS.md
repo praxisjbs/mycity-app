@@ -110,6 +110,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 24/10/2026 · GE · Repository moved to `praxisjbs/mycity-app` (JBS Praxis's account) from `tomblakeasaah196/mycity-app`, with every branch and release tag. The code and runbooks now name the new repository (`check-gate.js`, the System Health briefs, `github-settings.md`, `deploy.md`, `server-setup.md`, `HANDOFF.md`, the performance guide). Left: new deploy keys, the `staging` and `production` environments, and the repository variables and secrets (`deploy.md` §1), then one release end to end.
 - 23/10/2026 · TB · The environment marker is written, as SYSTEM_ARCHITECTURE §5 always said: `scripts/db/migrate.js`
   writes APP_ENV into `system_marker` on a database's first run, after the migrations that create the table,
   and on staging or production refuses before anything applies when the database already says another

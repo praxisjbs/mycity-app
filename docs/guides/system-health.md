@@ -454,6 +454,8 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 24/10/2026 · GE · The fix and status briefs name the repository `praxisjbs/mycity-app`; it moved from `tomblakeasaah196/mycity-app` (`docs/runbooks/github-settings.md`). No behaviour changes.
+
 - 21/10/2026 · TB · A refused form is recorded under the rule that refused it (`LEAVE_IN_THE_PAST: starts_on`, not `VALIDATION_FAILED: starts_on`) and every fault the API records carries the route as declared (`POST /api/v1/ess/leave`, not `POST /leave`), §6. The three open `VALIDATION_FAILED` lines of the 21/10 brief stop counting; their causes are fixed in the date field, `schemas/leave.js` and `schemas/settings.js`.
 
 - 21/10/2026 · TB · A fault's Where (`error_group.frame`, and the fingerprint) is the stack's first "at" line, not its second line: a mail server's 550 reply runs to three lines, so the fault on Settings · Status named a line of the reply instead of the code. Mail paused on Settings · Integrations reads `degraded`, mode `paused`, with its own Where to Look, and emits no check down or recovered (§3 step 4, §7; `integrations.md` §6.15). A refused address is one `warning` fault, counted and never pushed (`integrations.md` §6.16).

@@ -59,7 +59,7 @@ configuration, which refuses to start without SMTP.
 | Build             | `npm ci`, both frontends built, `release-manifest.js` packs the release with `RELEASE`, `BUILD.env` and `SHA256SUMS`                                                                                                                                                                                                                                               | anything fails to build                                                                                                                                                             |
 | Deploy to staging | `deploy-gate stage <sha>`, tarball over SSH: checked against `SHA256SUMS`, `npm ci --omit=dev`, every dependency confirmed installed, `pg_dump` of `mycity_stg`, migrations (refused before anything applies when the database says it is another environment; the first marks it staging), `current` switched, units restarted, readiness must report this sha                                                                                                                   | the tarball is from another commit or altered; install fails; a migration fails (code not switched); the new build does not come up (staging switched back to the previous release) |
 | Verify staging    | `verify-staging.js` over HTTPS: readiness on this sha, no module skipped, migrations at head, both frontends, each host refusing the other's API, staging markers, HTTPS redirect and HSTS. Then `deploy-gate seal` writes `STAGING_VERIFIED` (the tree's hash)                                                                                                    | any check fails: no seal, so nothing can be promoted                                                                                                                                |
-| Production        | **started by hand by an approver** (GE or TB; see below). Then `deploy-gate promote`: seal present, under 7 days old, staging still on this sha, tree hash unchanged, not 21 December to 5 January; `pg_dump` of `mycity_prod`; the sealed tree hard-linked into production; migrations (the same environment check; the first marks it production); switch; restart; readiness on this sha; tag `release-<date>-<sha>` | any of those checks; a production build that does not come up is switched back to the previous release                                                                              |
+| Production        | **started by hand by an approver** (GE, TB or `praxisjbs`; see below). Then `deploy-gate promote`: seal present, under 7 days old, staging still on this sha, tree hash unchanged, not 21 December to 5 January; `pg_dump` of `mycity_prod`; the sealed tree hard-linked into production; migrations (the same environment check; the first marks it production); switch; restart; readiness on this sha; tag `release-<date>-<sha>` | any of those checks; a production build that does not come up is switched back to the previous release                                                                              |
 
 Before releasing: open `https://hub.staging.mycityapp.io`, check the top bar shows the release's
 short sha, and walk the demo script for what this release touches (SYSTEM_ARCHITECTURE §9.8).
@@ -81,7 +81,8 @@ count(*) FROM okr_key_result"` is 0 before it.
 **To release** (interim while the repository is private, SYSTEM_ARCHITECTURE §9.3): the automatic
 run stops after the seal, and its summary shows the sealed sha. GitHub → Actions → **Release** →
 Run workflow, branch `main`, paste that full 40-character sha. The `approver` job refuses anyone
-but GE (`@swizfcodes`) or TB (`@tomblakeasaah196`), a run from another branch, and a short sha;
+but GE (`@swizfcodes`), TB (`@tomblakeasaah196`) or the `praxisjbs` account, a run from another
+branch, and a short sha;
 `deploy-gate promote` refuses a sha staging does not run or never sealed. Say in the team chat
 what was checked, since GitHub has no approval comment to hold it.
 
@@ -134,7 +135,7 @@ On the server, as `administrator`:
 # 1. This commit's gate (a GitHub token with read access to the repository's contents)
 curl -fsSL -H "Authorization: Bearer <your-token>" \
   -H "Accept: application/vnd.github.raw" \
-  "https://api.github.com/repos/tomblakeasaah196/mycity-app/contents/scripts/deploy/deploy-gate?ref=<sha>" \
+  "https://api.github.com/repos/praxisjbs/mycity-app/contents/scripts/deploy/deploy-gate?ref=<sha>" \
   -o ~/deploy-gate
 #    or, from a computer with the repository at that commit:
 #    scp scripts/deploy/deploy-gate administrator@108.181.196.53:~/deploy-gate

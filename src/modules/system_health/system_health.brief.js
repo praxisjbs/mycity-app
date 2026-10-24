@@ -109,7 +109,7 @@ const pullRequestStep = (each) => `**Open a draft pull request to \`main\` and d
 function instructions(count) {
   return `## Your job
 
-You are fixing production faults in the **MyCity App ERP** (\`tomblakeasaah196/mycity-app\`): an
+You are fixing production faults in the **MyCity App ERP** (\`praxisjbs/mycity-app\`): an
 Express and PostgreSQL backend with a worker, a staff React app in \`app/\` and a public React app in
 \`public-app/\`. Take ${count === 1 ? "this fault" : "these faults"} from report to a green pull request.
 
