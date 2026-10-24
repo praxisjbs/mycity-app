@@ -566,11 +566,11 @@ task (`.claude/hooks/stop-check.js`), so most of these are caught before you pus
 
 ### 8.5 Review and merge
 
-- One approval, **not yours**, and from a code owner of every path you touched
-  (`.github/CODEOWNERS`): change attendance and LA or her backup must approve.
-- A new push after approval dismisses the approval; ask again.
+- No approval is required (JBS Praxis, 24/10/2026); CI is the gate. The code owners of the paths
+  you touched (`.github/CODEOWNERS`) are still asked automatically: when a change needs a second
+  pair of eyes, wait for one of them.
 - Resolve every review conversation.
-- When CI is green and the PR is approved, the author merges, with **Squash and merge**.
+- When CI is green, the author merges, with **Squash and merge**.
 - Afterwards:
 
   ```

@@ -156,8 +156,9 @@ A task is not finished until:
 
 ## Working conventions
 
-- Branch `m<N>/<short-name>`. PR titles in Conventional Commits form. One approving review, not
-  the author. Merges to `main` deploy to staging; production waits for a person's approval.
+- Branch `m<N>/<short-name>`. PR titles in Conventional Commits form. No approving review is
+  required (JBS Praxis, 24/10/2026): a PR merges once CI is green, and its author merges it.
+  Merges to `main` deploy to staging; production waits for a person's approval.
 - Do not commit, push or open a PR unless asked.
 - Open a PR as a draft while the work goes on: a draft runs no CI on GitHub, so `npm run ci` runs
   locally; mark it ready for review once that is green (BACKEND_GUIDE §8.4).
