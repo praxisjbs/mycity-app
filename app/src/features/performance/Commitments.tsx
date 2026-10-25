@@ -10,6 +10,7 @@ import type { Commitment, CommitmentSetRow } from "@mycity/contract/contract.gen
 import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { useApi, useMutation, usePaged, type PagedResult } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { commitmentMonths, commitmentPill, ORIGINAL_HELP, ReasonForm, refreshCommitments } from "@/features/workspace/Commitment";
@@ -62,6 +63,8 @@ function monthOptions(today = todayIso()): Array<[string, string]> {
 /** The Commitments view; `switcher` is the Scorecards and Commitments switch above it. */
 export function Commitments({ switcher }: { switcher: ReactNode }) {
   const { navigate } = useRouter();
+  // The month-end report is `performance` export (targets.routes.js): offered only to a reader who holds it.
+  const mayExport = useAuth().can("performance", "export");
   const [params, setParams] = useSearchParams();
   const month = params.get("month") ?? commitmentMonths()[0][0].slice(0, 7);
   const dept = params.get("department_id") ?? "";
@@ -97,7 +100,7 @@ export function Commitments({ switcher }: { switcher: ReactNode }) {
         <FilterSelect label="Month" value={month} onChange={set("month")} options={monthOptions()} />
         <FilterSelect label="Department" value={dept} onChange={set("department_id")} options={deptOptions} />
         <FilterSelect label="State" value={state} onChange={set("state")} options={STATE_OPTIONS} />
-        <ExportButton onExport={exportReport} message="Report saved">Export Report</ExportButton>
+        {mayExport && <ExportButton onExport={exportReport} message="Report saved">Export Report</ExportButton>}
       </Toolbar>
       <DesktopOnly>
         <KpiTiles

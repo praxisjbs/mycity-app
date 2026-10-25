@@ -1,0 +1,94 @@
+{
+  "performance-analytics": {
+    "spec": "1fa59f6779696dd1",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-check-in": {
+    "spec": "5d12011592bd6708",
+    "source": "288bfd1502329081",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-commitments": {
+    "spec": "1e524271979b396b",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-goals": {
+    "spec": "f520311f57dc86cc",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-key-result": {
+    "spec": "c2d4a21cc0deee0c",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "performance-kpis": {
+    "spec": "d4de572b42bc5cd2",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-my": {
+    "spec": "de0d93e2536b2375",
+    "source": "288bfd1502329081",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-plan-approval": {
+    "spec": "48b82c757eeef3c4",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "performance-review": {
+    "spec": "730bb30185ca7cd2",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "performance-reviews": {
+    "spec": "ad015678a993639c",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-scorecard": {
+    "spec": "5d2bc4316c7f61e8",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "performance-scorecards": {
+    "spec": "7df2d275a8737bf6",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

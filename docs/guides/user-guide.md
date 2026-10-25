@@ -346,3 +346,10 @@ word limits do not count it, as they do not count an article.
   (both rewritten from their drafts), Knowledge Hub, and People's Organogram, Attendance, Leave,
   Devices and Worksites; eight Quick Start cards; 95 pictures in all. §6.6 point 9: `WAITING` is
   empty.
+- 25/10/2026 · JP · PR 3, Milestone 2: the My Workspace and Performance chapters
+  (`docs/manual/my-workspace.md`, `docs/manual/performance.md`, both `milestones: M2`), every M2
+  screen of `docs/PROGRESS.md` with its section, ESS · My Performance a section of the Performance
+  chapter (`screen=ess/my-performance`); 23 pictures, and eleven Quick Start cards after Check the
+  System, cut by grant and by the Performance capabilities. Two screen fixes found on the way
+  (`docs/guides/performance.md` §14). No picture is taken as `manager`: the demo's line manager
+  opens on a Policy Update prompt (`dismissible: false`) that the script's Escape does not close.

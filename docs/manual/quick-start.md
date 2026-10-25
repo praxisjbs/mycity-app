@@ -167,6 +167,110 @@ icon: spark
 3. Open [Settings · Faults](/settings?tab=faults) for the errors behind it. Read
    [Work through the faults](#settings-faults-work).
 
+## Plan Your Day {#qs-plan-day role="Everyone" icon=check screen=workspace/today}
+
+![My Workspace, Today](shot:qs-plan-day)
+
+1. Open [My Workspace · Today](/workspace?tab=today).
+2. **Your Day** lists what is late and due today. Press a task to open it.
+3. **From Your Manager** lists the tasks set for you.
+4. Under **My Week**, press **Write Support Needed** to say what would help this week. Read
+   [Today](#workspace-today).
+
+## Add a Task {#qs-add-task role="Everyone" icon=plus screen=workspace/tasks needs="workspace create"}
+
+![The New Task form](shot:qs-add-task)
+
+1. Open [My Workspace · Tasks](/workspace?tab=tasks) and press **New Task**.
+2. Type the **Task** and choose its **Due** date and **Priority**.
+3. Press **Create Task**. It joins your board under **To Do**.
+4. Drag it along the board as the work moves. Read [Add a task](#workspace-add-task).
+
+## Send Your Commitments {#qs-commitments role="Everyone" icon=flag screen=workspace/tasks needs="workspace create"}
+
+![Send Commitments](shot:qs-commitments)
+
+1. On each of the month's priority tasks, press **Edit Task** and tick **Mark as Commitment**.
+2. Write its **Acceptance Criteria** and press **Save Task**.
+3. Press **Send Commitments** on [My Workspace · Tasks](/workspace?tab=tasks).
+4. Check the **Month** and press **Send Commitments**. Read [Commitments](#workspace-commitments).
+
+## Do Your Check-In {#qs-check-in role="Everyone" icon=check screen=ess/my-performance}
+
+![The monthly check-in](shot:qs-check-in)
+
+1. Open [Employee Self-Service · My Performance](/ess?tab=my-performance) and press **Start
+   Check-In**.
+2. For each line, fill in the **Actual** and choose its **Evidence**.
+3. Write your **Action** for anything behind, or press **Dictate** and say it.
+4. Press **Save Draft**, then **Submit Check-In**. Read
+   [Do your monthly check-in](#performance-check-in).
+
+## Agree Your Scorecard {#qs-agree role="Everyone" icon=target screen=ess/my-performance}
+
+![My Performance](shot:qs-agree)
+
+1. Open [Employee Self-Service · My Performance](/ess?tab=my-performance).
+2. Read your lines under **My Scorecard**.
+3. Press **Agree Scorecard**, or **Disagree With Reason** if something is wrong. Read
+   [Agree your scorecard](#performance-my-agree).
+
+## Set Your Team's Tasks {#qs-team-tasks role="Line Managers" icon=users screen=workspace/tasks needs="workspace create, manager"}
+
+![My Team on Tasks](shot:qs-team-tasks)
+
+1. Open [My Workspace · Tasks](/workspace?tab=tasks) and press **My Team**.
+2. Press **New Task**, then pick the person in **Assign To**.
+3. Choose a **Cadence**, **Daily** or **Weekly**, and the **Due** date.
+4. Press **Create Task**. They are told. Read [Add a task](#workspace-add-task).
+
+## Approve Commitments {#qs-approve-commitments role="Line Managers" icon=ticks screen=performance/targets needs="performance approve"}
+
+![The Commitments view](shot:qs-approve-commitments)
+
+1. Open [Performance · Scorecards](/performance?tab=targets) and press **Commitments**.
+2. Under **Waiting On You**, read each person's month.
+3. Press **Approve Month**, or **Request Changes** with a reason. Read
+   [Approve a month of commitments](#performance-commitments-approve).
+
+## Score a Review {#qs-score-review role="Line Managers" icon=star screen=performance/reviews needs="manager"}
+
+![Performance, Reviews](shot:qs-score-review)
+
+1. Open [Performance · Reviews](/performance?tab=reviews).
+2. Press the review under **Waiting On You**. Its **Next** reads **Score**.
+3. Check each line's **Final Score**, and add a **Corrective Action** to any line under 1.
+4. Press **Submit Review**. Read [Score a review](#performance-review-score).
+
+## Report the Month {#qs-report-month role="Line Managers" icon=chart screen=performance/goals needs="performance edit, cap goals.function"}
+
+![Report Month on Goals](shot:qs-report-month)
+
+1. Open [Performance · Goals](/performance?tab=goals) and press **Report Month**.
+2. Pick the **Function** and the **Month**.
+3. For each key result, choose its **Status**, fill in the **Actual** and an **Update**.
+4. Press **Report Month**. Read [Report the month](#performance-report).
+
+## Set Up a Quarter {#qs-quarter role="People & HR" icon=calendar screen=performance/goals needs="performance create, cap performance.manage"}
+
+![Set Up Quarter](shot:qs-quarter)
+
+1. Open [Performance · Goals](/performance?tab=goals) and press **Manage Quarters**.
+2. Choose **Set Up Quarter**. Check its **Starts** date and **Lock Date**.
+3. Press **Next** through **Bands**, **Key Result Scoring**, **Line Scoring** and **Section
+   Weights**.
+4. Press **Set Up Quarter**. Read [Set up a quarter](#performance-quarter).
+
+## Close a Review {#qs-close-review role="People & HR" icon=ticks screen=performance/reviews needs="performance approve, cap performance.manage"}
+
+![A review with Operations and People](shot:qs-close-review)
+
+1. Open [Performance · Reviews](/performance?tab=reviews).
+2. Press a review under **Waiting On You** whose stage reads **With HR**.
+3. Read the lines and the reviewer's scores.
+4. Press **Close Review**, or **Request Changes** with a reason. Read
+   [Approve or close a review](#performance-review-approve).
+
 ```shot qs-sign-in
 open: /
 as: guest
@@ -319,4 +423,126 @@ device: desktop
 open: /settings?tab=status
 as: admin
 device: desktop
+```
+
+```shot qs-plan-day
+open: /workspace?tab=today
+as: operations
+device: desktop
+marks:
+  1: heading "Your Day" | Late and due today
+  2: button "Write Support Needed" | Your week's line
+```
+
+```shot qs-add-task
+open: /workspace?tab=tasks
+as: operations
+do:
+  - click: button "New Task"
+  - wait: label "Task"
+crop: modal
+marks:
+  1: label "Task" | What needs doing
+```
+
+```shot qs-commitments
+open: /workspace?tab=tasks
+as: operations
+device: desktop
+do:
+  - click: button "Send Commitments"
+  - wait: text "Commitments to Send"
+crop: modal
+marks:
+  1: button "Send Commitments" | Send the month
+```
+
+```shot qs-check-in
+open: /ess?tab=my-performance
+as: operations
+do:
+  - click: button "Start Check-In"
+  - wait: button "Submit Check-In"
+crop: modal
+sources:
+  - app/src/features/performance/my
+  - app/src/features/performance/CheckIn.tsx
+marks:
+  1: label "Actual" | What you achieved
+  2: text "Dictate" | Speak your action
+```
+
+```shot qs-agree
+open: /ess?tab=my-performance
+as: operations
+device: desktop
+sources:
+  - app/src/features/performance/my
+marks:
+  1: heading "My Scorecard" | Your lines
+```
+
+```shot qs-team-tasks
+open: /workspace?tab=tasks
+as: operations
+device: desktop
+do:
+  - click: role radio "My Team"
+marks:
+  1: role radio "My Team" | Your team's tasks
+  2: button "New Task" | Set a task
+```
+
+```shot qs-approve-commitments
+open: /performance?tab=targets&view=commitments
+as: operations
+device: desktop
+marks:
+  1: button "Approve Month" | Approve the month
+```
+
+```shot qs-score-review
+open: /performance?tab=reviews
+as: operations
+device: desktop
+do:
+  - click: heading "Reviews"
+  - wait: heading "Waiting On You"
+marks:
+  1: heading "Waiting On You" | What needs you
+```
+
+```shot qs-report-month
+open: /performance?tab=goals
+as: operations
+device: desktop
+marks:
+  1: button "Report Month" | Report the month
+```
+
+```shot qs-quarter
+open: /performance?tab=goals
+as: operations
+device: desktop
+do:
+  - click: button "Manage Quarters"
+  - click: role menuitem "Set Up Quarter"
+  - wait: text "Lock Date"
+crop: modal
+marks:
+  1: text "Lock Date" | When TBC targets lock
+  2: button "Next" | The next step
+```
+
+```shot qs-close-review
+open: /performance?tab=reviews
+as: operations
+device: desktop
+do:
+  - wait: heading "Waiting On You"
+  - click: text "Obinna Ike"
+  - wait: button "Close Review"
+crop: modal
+marks:
+  1: button "Close Review" | Close it
 ```

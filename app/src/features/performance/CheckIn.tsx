@@ -267,7 +267,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
             </Field>
             {open && (
               <div className="flex flex-wrap items-center gap-2">
-                <VoiceField label="Dictate" transcribe={dictate(id)} onTranscript={(text) => set(id, { action_text: text })} />
+                <VoiceField label="Action" action="Dictate" transcribe={dictate(id)} onTranscript={(text) => set(id, { action_text: text })} />
                 {r.action_text.trim() && !r.tidied && <Button size="sm" icon="spark" onClick={() => tidyText(id)}>Tidy With AI</Button>}
               </div>
             )}
