@@ -7,6 +7,38 @@
       "phone"
     ]
   },
+  "qs-announcement": {
+    "spec": "db708f827aaf9de8",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-approve-leave": {
+    "spec": "b8eeb29bd8163cd7",
+    "source": "973aaa7aef06646b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-channel": {
+    "spec": "344266c761e21850",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-clock-in": {
+    "spec": "51edfe0fed8ea055",
+    "source": "87c3e88eb9ae8a95",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-invite": {
     "spec": "eb4334b105905e32",
     "source": "199f220c9450ebe5",
@@ -14,11 +46,35 @@
       "desktop"
     ]
   },
+  "qs-mail": {
+    "spec": "6412fe26f671c6a8",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-notifications": {
     "spec": "41aa643b8a3f811d",
     "source": "6d62b037ddf8abb4",
     "devices": [
       "desktop"
+    ]
+  },
+  "qs-policy": {
+    "spec": "76af8b46d1d2858d",
+    "source": "535f39ef3d8f4df9",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-request-leave": {
+    "spec": "0db81a71cb5f5bc5",
+    "source": "4afa398999008188",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   },
   "qs-roles": {
@@ -48,6 +104,14 @@
     "source": "199f220c9450ebe5",
     "devices": [
       "desktop"
+    ]
+  },
+  "qs-team": {
+    "spec": "fb8093ebf06b841e",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   }
 }
