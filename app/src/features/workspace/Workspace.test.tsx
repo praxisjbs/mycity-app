@@ -256,7 +256,8 @@ describe("my workspace", () => {
   it("New Task sets a task for someone in the reader's team, and it joins the board", async () => {
     await board();
     const form = await newTask();
-    expect(within(form).getByText("Assign To")).toBeTruthy();
+    // The field follows the reader's team, which the form loads as it opens.
+    expect(await within(form).findByText("Assign To")).toBeTruthy();
     named(form, "File the October minutes");
     fireEvent.click(await within(form).findByRole("option", { name: /Bashir Lawal/ }));
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));

@@ -521,6 +521,13 @@ On GitHub the gates run as four jobs side by side, so a run takes as long as its
 the gates that open every screen) and **checks** (the fast static and process gates). The check
 called **ci** waits for all four, and it is the one branch protection requires. To run one job's
 gates yourself, `npm run ci -- --group=<name>`; `node scripts/ci-local.js --groups` lists them.
+Locally `npm run ci` runs the four groups at the same time too (JBS Praxis, 25/10/2026), each
+gate's line printed as it ends with its group, so a full run takes about as long as the backend's
+tests rather than the sum of all four; `-- --serial` runs one gate after another, and `-- --fast`
+stops at the first failure (serially). Beside the other groups the frontend's tests run on the
+machine's CPUs less two (`MYCITY_TEST_WORKERS`, read by `scripts/fe-test.js`), one workspace after
+another, since tests that wait on a clock fail when starved. While you work, run the group you touched, or
+`-- --only=<ids>`; run the whole thing once before marking the PR ready.
 Chromium, ffmpeg's packages and npm's downloads are cached between runs. Four jobs bill more
 runner minutes than one (each installs its own packages), so the draft rule below matters more,
 not less.

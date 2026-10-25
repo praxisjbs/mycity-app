@@ -1,12 +1,25 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * `npm run ci`: every gate, in CI's order, with the whole report at the end.
+ * `npm run ci`: every gate, with the whole report at the end.
  *
- * The same command runs locally before a push and as the only step of
+ * The same command runs locally before a push and in each job of
  * .github/workflows/ci.yml, so a green run here and a green run in CI mean the
  * same thing. It does not stop at the first failure (unless --fast): five
  * unrelated breakages are five lines in one report, not five round trips.
+ *
+ * PARALLEL. The gates fall in four groups (GROUPS below), which CI runs as four
+ * jobs at once. Locally the groups run at the same time too, each one's gates
+ * in order, so a full run takes as long as its slowest group (the backend's
+ * tests), not the sum of all four. Each gate's line prints when it ends, with
+ * its group. --serial runs every gate one after another, in GATES order; --fast
+ * does too, since it stops at the first failure. The groups share nothing that
+ * one could break for another: the screens group builds its own demo app and
+ * gallery (scripts/check/lib/screens.js, gallery.js), away from fe:build's.
+ * The processor they do share: the frontend's tests run on the machine's CPUs
+ * less two (MYCITY_TEST_WORKERS, read by scripts/fe-test.js), left to the
+ * backend's tests and the screens' browser, since tests that wait on a clock
+ * fail when starved.
  *
  * NOT BUILT IS NOT PASSED. Most gate scripts exist as empty files until their
  * M0 slice is written. Running an empty file exits 0, which would print a
@@ -14,8 +27,9 @@
  * NOT BUILT, listed at the end, and does not count as passed. With --strict
  * (CI switches this on once M0 is complete) a NOT BUILT gate fails the run.
  *
- *   node scripts/ci-local.js            everything, full report
- *   node scripts/ci-local.js --fast     stop at the first failure
+ *   node scripts/ci-local.js            everything, the four groups at once, full report
+ *   node scripts/ci-local.js --serial   everything, one gate after another
+ *   node scripts/ci-local.js --fast     one after another, stop at the first failure
  *   node scripts/ci-local.js --strict   NOT BUILT counts as a failure
  *   node scripts/ci-local.js --list     print the gates and exit
  *   node scripts/ci-local.js --only=progress,guides   run just these (by id)
@@ -30,7 +44,8 @@
  * tree a pull request's run already passed) run only the gates that read
  * documents, and report the rest as skipped. Unset, or on a laptop, it is full.
  */
-const { spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
+const os = require("node:os");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -42,6 +57,7 @@ const ONLY = onlyArg ? new Set(onlyArg.slice(7).split(",")) : null;
 const groupArg = argv.find((a) => a.startsWith("--group="));
 const GROUP = groupArg ? groupArg.slice(8) : null;
 const FAST = has("fast");
+const SERIAL = has("serial") || FAST;
 const STRICT = has("strict") || process.env.CI_STRICT === "1";
 const SCOPE = process.env.CI_SCOPE || "full";
 const scope = require("./check/lib/scope");
@@ -181,58 +197,90 @@ if (has("list")) {
   process.exit(0);
 }
 
-const results = [];
-for (const gate of GATES) {
-  if (ONLY && !ONLY.has(gate.id)) continue;
-  if (GROUP && groupOf(gate) !== GROUP) continue;
-  if (SCOPE !== "full" && !scope.DOC_GATES.includes(gate.id)) {
-    results.push({ gate, status: "SKIPPED" });
-    continue;
-  }
+/** Runs one gate in its own process; its output is kept for the report. */
+function run(args, env) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, args, { cwd: ROOT, env });
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (out += d));
+    child.on("error", (err) => resolve({ status: 1, out: `${out}${err.message}` }));
+    child.on("close", (status) => resolve({ status, out }));
+  });
+}
+
+/** One gate's result: PASS, FAIL, SKIPPED or NOT BUILT, with its output when it ran. */
+async function check(gate, tag) {
+  if (SCOPE !== "full" && !scope.DOC_GATES.includes(gate.id)) return { gate, status: "SKIPPED" };
   const c = command(gate);
-  if (c.notBuilt) {
-    results.push({ gate, status: "NOT BUILT" });
-    continue;
-  }
-  if (c.missing) {
-    results.push({ gate, status: "FAIL", output: c.missing });
-    if (FAST) break;
-    continue;
-  }
-  process.stdout.write(`▸ ${gate.label} … `);
+  if (c.notBuilt) return { gate, status: "NOT BUILT" };
+  if (c.missing) return { gate, status: "FAIL", output: c.missing };
+  // One after another, the line opens as the gate starts; at once, it is written whole as it ends.
+  if (!tag) process.stdout.write(`▸ ${gate.label} … `);
   const started = Date.now();
-  const r = spawnSync(process.execPath, c.argv, { cwd: ROOT, encoding: "utf8", env: process.env, maxBuffer: 64 * 1024 * 1024 });
+  // Beside the other groups, the frontend's tests leave two CPUs to the backend's tests and the screens' browser.
+  const share = tag && !process.env.MYCITY_TEST_WORKERS ? { MYCITY_TEST_WORKERS: String(Math.max(1, (os.availableParallelism?.() ?? os.cpus().length) - 2)) } : {};
+  const r = await run(c.argv, { ...process.env, ...share });
   const secs = ((Date.now() - started) / 1000).toFixed(1);
   const ok = r.status === 0;
-  console.log(`${ok ? "ok" : "FAILED"} (${secs}s)`);
-  results.push({ gate, status: ok ? "PASS" : "FAIL", output: `${r.stdout || ""}${r.stderr || ""}`.trim() });
-  if (!ok && FAST) break;
+  if (tag) console.log(`▸ ${gate.label} … ${ok ? "ok" : "FAILED"} (${secs}s)  [${tag}]`);
+  else console.log(`${ok ? "ok" : "FAILED"} (${secs}s)`);
+  return { gate, status: ok ? "PASS" : "FAIL", output: r.out.trim() };
 }
 
-const failed = results.filter((r) => r.status === "FAIL");
-const notBuilt = results.filter((r) => r.status === "NOT BUILT");
-const skipped = results.filter((r) => r.status === "SKIPPED");
-const passed = results.filter((r) => r.status === "PASS");
-
-for (const r of failed) {
-  console.log(`\n──── FAILED: ${r.gate.label} ────`);
-  console.log(r.output || "(no output)");
+/** The gates of one lane, in order; with --fast, none after the first failure. */
+async function lane(gates, tag) {
+  const out = [];
+  for (const gate of gates) {
+    const r = await check(gate, tag);
+    out.push(r);
+    if (FAST && r.status === "FAIL") break;
+  }
+  return out;
 }
 
-console.log("\n════ Summary ════");
-console.log(`passed     ${passed.length}`);
-console.log(`failed     ${failed.length}${failed.length ? `: ${failed.map((r) => r.gate.id).join(", ")}` : ""}`);
-console.log(`not built  ${notBuilt.length}${notBuilt.length ? `: ${notBuilt.map((r) => r.gate.id).join(", ")}` : ""}`);
-if (skipped.length)
-  console.log(`skipped    ${skipped.length}: scope ${SCOPE}, so only the gates that read documents ran`);
-if (notBuilt.length) {
-  console.log(
-    STRICT
-      ? "\n--strict: a gate that is not built counts as a failure."
-      : "\nNot built means the gate's script is still an empty file: those rules are NOT being checked yet.",
-  );
+async function main() {
+  const chosen = GATES.filter((g) => (!ONLY || ONLY.has(g.id)) && (!GROUP || groupOf(g) === GROUP));
+  const groups = GROUPS.map((g) => chosen.filter((x) => groupOf(x) === g)).filter((l) => l.length);
+  const together = !SERIAL && groups.length > 1;
+  if (together) console.log(`Running ${groups.length} groups at once: ${groups.map((l) => groupOf(l[0])).join(", ")}. --serial runs one gate at a time.\n`);
+  const started = Date.now();
+  const done = together ? (await Promise.all(groups.map((l) => lane(l, groupOf(l[0]))))).flat() : await lane(chosen, null);
+  // The report keeps GATES order, whichever group finished first.
+  const order = new Map(GATES.map((g, i) => [g, i]));
+  return { results: done.sort((a, b) => order.get(a.gate) - order.get(b.gate)), secs: Math.round((Date.now() - started) / 1000) };
 }
 
-// Not process.exit(): a failed gate's report can be long, and into a pipe (CI) exit drops what is
-// still being written, the summary included.
-process.exitCode = failed.length || (STRICT && notBuilt.length) ? 1 : 0;
+main().then(({ results, secs }) => {
+  const failed = results.filter((r) => r.status === "FAIL");
+  const notBuilt = results.filter((r) => r.status === "NOT BUILT");
+  const skipped = results.filter((r) => r.status === "SKIPPED");
+  const passed = results.filter((r) => r.status === "PASS");
+
+  for (const r of failed) {
+    console.log(`\n──── FAILED: ${r.gate.label} ────`);
+    console.log(r.output || "(no output)");
+  }
+
+  console.log("\n════ Summary ════");
+  console.log(`passed     ${passed.length}`);
+  console.log(`failed     ${failed.length}${failed.length ? `: ${failed.map((r) => r.gate.id).join(", ")}` : ""}`);
+  console.log(`not built  ${notBuilt.length}${notBuilt.length ? `: ${notBuilt.map((r) => r.gate.id).join(", ")}` : ""}`);
+  console.log(`time       ${Math.floor(secs / 60)} min ${secs % 60} s`);
+  if (skipped.length)
+    console.log(`skipped    ${skipped.length}: scope ${SCOPE}, so only the gates that read documents ran`);
+  if (notBuilt.length) {
+    console.log(
+      STRICT
+        ? "\n--strict: a gate that is not built counts as a failure."
+        : "\nNot built means the gate's script is still an empty file: those rules are NOT being checked yet.",
+    );
+  }
+
+  // Not process.exit(): a failed gate's report can be long, and into a pipe (CI) exit drops what is
+  // still being written, the summary included.
+  process.exitCode = failed.length || (STRICT && notBuilt.length) ? 1 : 0;
+}, (err) => {
+  console.error(`ci-local: ${err.stack || err.message}`);
+  process.exitCode = 1;
+});

@@ -48,7 +48,13 @@ const gallery = require("./gallery");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const DEMO = "docs/MyCity-ERP-Documents/demo.html";
-const APP_DIST = "app/dist";
+/*
+ * The screen gates' own demo build of the staff app (the in-browser mock), apart from app/dist,
+ * where `npm run fe:build` writes the release build: `npm run ci` runs the frontend and screens
+ * groups at the same time, and two builds in one folder would overwrite each other. It lives
+ * under node_modules/.cache, which every scanner, ESLint and git already skip, and never ships.
+ */
+const APP_DIST = "node_modules/.cache/mycity/demo-app";
 
 const WIDTHS = {
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
@@ -605,13 +611,20 @@ function ensureAppBuild() {
       return false;
     }
   };
-  // A production build in app/dist talks to the real API; the crawl needs the demo build.
+  // A production build talks to the real API; the crawl needs the demo build.
   if (fs.existsSync(built) && fs.statSync(built).mtimeMs >= source && mock()) return true;
-  if (!fs.existsSync(path.join(ROOT, "node_modules", "vite"))) {
+  const vite = path.join(ROOT, "node_modules", "vite", "bin", "vite.js");
+  if (!fs.existsSync(vite)) {
     throw new Error("The workspace has no packages installed. Run `npm ci` at the root (CI does this), then the gate again.");
   }
-  const r = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build:demo"], { cwd: app, encoding: "utf8", shell: process.platform === "win32" });
-  if (r.status !== 0) throw new Error(`app/ did not build (npm run build:demo):\n${String(r.stdout || "").slice(-1500)}${String(r.stderr || "").slice(-800)}`);
+  // Vite alone, as `npm run build:demo` builds after its type check: the type check is the
+  // frontend group's (fe-typecheck), and two `tsc -b` at once would share their build info.
+  const r = spawnSync(process.execPath, [vite, "build", "--mode", "demo", "--outDir", path.join(ROOT, APP_DIST), "--emptyOutDir", "--logLevel", "warn"], {
+    cwd: app,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (r.status !== 0) throw new Error(`app/ did not build (vite build --mode demo):\n${String(r.stdout || "").slice(-1500)}${String(r.stderr || "").slice(-800)}`);
   return true;
 }
 

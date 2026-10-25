@@ -6,12 +6,16 @@
  * port, and list its component pages. The screen gates (lib/screens.js, gates 8
  * and 11) and the accessibility gate (check/a11y.js) crawl it.
  *
+ * The gates build their own copy, in node_modules/.cache/mycity/gallery, apart
+ * from packages/ui/dist-gallery (`npm -w @mycity/ui run build`, which staging
+ * serves): `npm run ci` runs the frontend group, which builds that one, at the
+ * same time as the screens group, and two builds in one folder would overwrite
+ * each other. node_modules is skipped by every scanner, ESLint and git.
+ *
  * STALE means the inputs changed since the last build: every file the build
  * reads (packages/ui/src without its tests, packages/ui/gallery, the package's
  * config and the root lockfile) is hashed, and the hash is written beside the
- * build as dist-gallery/.inputs. A build that has no stamp, or another hash, is
- * rebuilt (npm -w @mycity/ui run build writes no stamp, so the next gate run
- * rebuilds once: a few seconds).
+ * build as .inputs. A build that has no stamp, or another hash, is rebuilt.
  *
  * Every component page is a hash route, `#/<Component>`; the gallery's own
  * navigation lists them as links.
@@ -24,7 +28,7 @@ const { spawnSync } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const UI = path.join(ROOT, "packages", "ui");
-const DIST = path.join(UI, "dist-gallery");
+const DIST = path.join(ROOT, "node_modules", ".cache", "mycity", "gallery");
 const STAMP = path.join(DIST, ".inputs");
 
 /** Files that do not change what the gallery build contains. */
@@ -81,7 +85,7 @@ function ensureGallery() {
   const hash = inputsHash();
   const stamp = fs.existsSync(STAMP) ? fs.readFileSync(STAMP, "utf8") : null;
   if (!isStale(stamp, hash, fs.existsSync(path.join(DIST, "index.html")))) return { dir: DIST, hash, built: false };
-  const r = spawnSync(process.execPath, [viteBin(), "build", "--config", "gallery/vite.config.ts", "--logLevel", "warn"], {
+  const r = spawnSync(process.execPath, [viteBin(), "build", "--config", "gallery/vite.config.ts", "--outDir", DIST, "--emptyOutDir", "--logLevel", "warn"], {
     cwd: UI,
     encoding: "utf8",
     env: process.env,
