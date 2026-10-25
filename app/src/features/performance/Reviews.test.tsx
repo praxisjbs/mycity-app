@@ -171,6 +171,8 @@ describe("ESS · My Performance", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Start Check-In" })[0]);
     await settled();
     const sheet = dialog();
+    // Each line's Action is dictated with Dictate, named for the field it fills.
+    expect(within(sheet).getAllByRole("button", { name: "Record Action" })[0]!.textContent).toContain("Dictate");
     // The first line is the person's own Results line: its actual, and where the figure came from.
     fireEvent.change(within(sheet).getAllByLabelText("Actual")[0], { target: { value: "6" } });
     await chooseOption(within(sheet).getAllByLabelText(/^Evidence/)[0], "Source");

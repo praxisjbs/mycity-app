@@ -1,0 +1,88 @@
+{
+  "workspace-analytics": {
+    "spec": "67e19dfcbbe75a17",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-calendar": {
+    "spec": "e7d07fdd6af9efca",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-new-event": {
+    "spec": "2939fda3bddb2342",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "workspace-new-task": {
+    "spec": "c0e527bf9bdb2bb2",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-project-page": {
+    "spec": "f0eba72519c93932",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-projects": {
+    "spec": "d25db6eab19e4f84",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-send-commitments": {
+    "spec": "f068d72d33e00cc1",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "workspace-support-needed": {
+    "spec": "f3bef088690041a9",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-task-panel": {
+    "spec": "f50c62b6cd592bd9",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-tasks": {
+    "spec": "f1c456fa5ee86286",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-today": {
+    "spec": "aa99a9a4e9dab0b8",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}
