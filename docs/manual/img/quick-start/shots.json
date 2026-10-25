@@ -9,7 +9,7 @@
   },
   "qs-invite": {
     "spec": "eb4334b105905e32",
-    "source": "6d13182011e388d6",
+    "source": "199f220c9450ebe5",
     "devices": [
       "desktop"
     ]
@@ -23,7 +23,7 @@
   },
   "qs-roles": {
     "spec": "6ddaf9c6aea1c7bb",
-    "source": "6d13182011e388d6",
+    "source": "199f220c9450ebe5",
     "devices": [
       "desktop"
     ]
@@ -45,7 +45,7 @@
   },
   "qs-status": {
     "spec": "78ceda875dc917b1",
-    "source": "6d13182011e388d6",
+    "source": "199f220c9450ebe5",
     "devices": [
       "desktop"
     ]

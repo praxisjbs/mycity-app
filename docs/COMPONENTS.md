@@ -786,7 +786,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | Use | A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit. |
 | Avoid | An explanation of the feature (tier 3); more than one action; a screen that has data on it. |
 | Phone | Centred, the drawing at the smaller size; the action is full width within thumb reach. |
-| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet; at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
+| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet, or the `level` its place needs (a bare one straight under the page title is 2); at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
 | Status | stable |
 | Exports | `EmptyState` |
 | Import | `import { EmptyState } from "@mycity/ui";` |
@@ -804,6 +804,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | `text` | `ReactNode` |  | One line, at most 8 words: what the person can do about it. |
 | `action` | `ReactNode` |  | At most one action, usually a primary Button. |
 | `bare` | `boolean` |  | Draw it without its card (inside a card or a sheet that already has one). |
+| `level` | `2 \| 3` |  | The title's heading level when the default does not fit its place: 2 for a bare one straight under the page title. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3757,7 +3758,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 | Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
 | Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
 | Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
-| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons, a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
+| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
 | Status | stable |
 | Exports | `DataView`, `LoadingRows` |
 | Import | `import { DataView, LoadingRows } from "@mycity/ui";` |

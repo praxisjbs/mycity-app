@@ -12,24 +12,34 @@ import { me } from "./identity";
  * uses (packages/contract/guide.js), and the real pictures beside them. A release build never
  * carries this file, so the pictures reach a live screen only through the API's own check.
  */
-const SOURCES = import.meta.glob("../../../../../docs/manual/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
-const PICTURES = import.meta.glob("../../../../../docs/manual/img/**/*.png", { query: "?url", import: "default", eager: true }) as Record<string, string>;
+/* Loaded on the guide's first request, not when the mock starts: every screen's test boots the mock. */
+const SOURCES = import.meta.glob("../../../../../docs/manual/*.md", { query: "?raw", import: "default" }) as Record<string, () => Promise<string>>;
+const PICTURES = import.meta.glob("../../../../../docs/manual/img/**/*.png", { query: "?url", import: "default" }) as Record<string, () => Promise<string>>;
 
-const parsed: { chapters: ParsedChapter[]; quick: ParsedChapter | null } = (() => {
-  const chapters: ParsedChapter[] = [];
-  let quick: ParsedChapter | null = null;
-  for (const [file, text] of Object.entries(SOURCES)) {
-    const name = file.split("/").pop() as string;
-    if (name === "README.md" || !text.startsWith("---")) continue;
-    const { chapter } = guide.parseChapter(text, name);
-    if (chapter.kind === "quick-start") quick = chapter;
-    else chapters.push(chapter);
-  }
-  const rail = MODULES.map((m) => m.key as string);
-  const key = (c: ParsedChapter) => (c.module && rail.includes(c.module) ? 1000 + rail.indexOf(c.module) : (c.order ?? 999));
-  chapters.sort((a, b) => key(a) - key(b) || a.title.localeCompare(b.title));
-  return { chapters, quick };
-})();
+type Parsed = { chapters: ParsedChapter[]; quick: ParsedChapter | null };
+let parsing: Promise<Parsed> | null = null;
+
+/** Every chapter and the Quick Start, parsed once. */
+function load(): Promise<Parsed> {
+  parsing ??= (async () => {
+    const chapters: ParsedChapter[] = [];
+    let quick: ParsedChapter | null = null;
+    for (const [file, read] of Object.entries(SOURCES)) {
+      const name = file.split("/").pop() as string;
+      if (name === "README.md") continue;
+      const text = await read();
+      if (!text.startsWith("---")) continue;
+      const { chapter } = guide.parseChapter(text, name);
+      if (chapter.kind === "quick-start") quick = chapter;
+      else chapters.push(chapter);
+    }
+    const rail = MODULES.map((m) => m.key as string);
+    const key = (c: ParsedChapter) => (c.module && rail.includes(c.module) ? 1000 + rail.indexOf(c.module) : (c.order ?? 999));
+    chapters.sort((a, b) => key(a) - key(b) || a.title.localeCompare(b.title));
+    return { chapters, quick };
+  })();
+  return parsing;
+}
 
 /** The signed-in account as the guide asks it: the tabs the shell shows them, the needs they hold. */
 function readerOf(user: string): Reader {
@@ -45,7 +55,8 @@ function readerOf(user: string): Reader {
   };
 }
 
-function cut(user: string): { chapters: GuideChapter[]; quick: GuideChapter | null } {
+async function cut(user: string): Promise<{ chapters: GuideChapter[]; quick: GuideChapter | null }> {
+  const parsed = await load();
   const reader = readerOf(user);
   const first = parsed.chapters.map((c) => guide.filterChapter(c, reader)).filter((c): c is GuideChapter => c !== null);
   const slugs = new Set(first.flatMap((c) => c.sections.flatMap((s) => [s.slug, ...s.tasks.map((t) => t.slug)])));
@@ -55,8 +66,8 @@ function cut(user: string): { chapters: GuideChapter[]; quick: GuideChapter | nu
   };
 }
 
-route("GET /api/v1/user-guide", (req) => {
-  const mine = cut(req.user!);
+route("GET /api/v1/user-guide", async (req) => {
+  const mine = await cut(req.user!);
   const contents: GuideContents = {
     chapters: mine.chapters.map((c) => ({
       slug: c.slug,
@@ -71,12 +82,12 @@ route("GET /api/v1/user-guide", (req) => {
   return ok(contents);
 });
 
-route("GET /api/v1/user-guide/quick-start", (req) =>
-  ok(cut(req.user!).quick ?? { slug: "quick-start", kind: "quick-start", title: "Quick Start", module: null, icon: null, summary: "", intro: [], sections: [], pictures: [] }),
+route("GET /api/v1/user-guide/quick-start", async (req) =>
+  ok((await cut(req.user!)).quick ?? { slug: "quick-start", kind: "quick-start", title: "Quick Start", module: null, icon: null, summary: "", intro: [], sections: [], pictures: [] }),
 );
 
-route("GET /api/v1/user-guide/chapters/:slug", (req) => {
-  const found = cut(req.user!).chapters.find((c) => c.slug === req.params.slug);
+route("GET /api/v1/user-guide/chapters/:slug", async (req) => {
+  const found = (await cut(req.user!)).chapters.find((c) => c.slug === req.params.slug);
   return found ? ok(found) : notFound();
 });
 
@@ -85,7 +96,7 @@ export async function mockPicture(url: string): Promise<Blob> {
   const m = /\/user-guide\/images\/([a-z0-9-]+)\/([a-z0-9.-]+\.png)$/.exec(url);
   const file = m ? Object.entries(PICTURES).find(([path]) => path.endsWith(`/img/${m[1]}/${m[2]}`)) : undefined;
   if (!file) throw new Error("That picture is not there.");
-  const res = await fetch(file[1]);
+  const res = await fetch(await file[1]());
   if (!res.ok) throw new Error("That picture is not there.");
   return res.blob();
 }

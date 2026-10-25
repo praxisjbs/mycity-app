@@ -5,7 +5,7 @@
  * @use Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners.
  * @avoid A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone.
  * @phone The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11).
- * @a11y The table has a caption, sortable headers carry aria-sort and are buttons, a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy.
+ * @a11y The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy.
  * @status stable
  * @exports LoadingRows
  * @example <DataView list={list} columns={columns} rowKey={(r) => r.employee_id} caption="Employees" noun="employee" search="Search People" />
@@ -24,6 +24,7 @@ import { EmptyValue } from "../display/EmptyValue";
 import { Skeleton } from "../display/Skeleton";
 import { ErrorState } from "../feedback/ErrorState";
 import { Menu, type MenuItem } from "../overlay/Menu";
+import { Tooltip } from "../overlay/Tooltip";
 import { SearchInput } from "../form/SearchInput";
 import { Tick } from "../form/Tick";
 import { ApiError, type PageMeta } from "./createApi";
@@ -42,6 +43,8 @@ export interface DataViewColumn<R> {
   render: (row: R, index: number) => ReactNode;
   /** The column header offers the server's sort on `key`, ascending then descending then off. */
   sortable?: boolean;
+  /** The column's name in words for its sort control, when `label` holds more than words (a help term). */
+  sortLabel?: string;
   /** Dropped on a phone, decided per screen in the feature guide's §10 (gate 11). */
   desktop?: boolean;
   /** Layout classes only (width, alignment). */
@@ -317,6 +320,22 @@ export function DataView<R>({
                 >
                   {!c.label ? (
                     <span className="sr-only">Actions</span>
+                  ) : canSort && typeof c.label !== "string" ? (
+                    /* A label with its own control (a help term) cannot sit inside the sort button:
+                       the sort is the glyph beside it. */
+                    <span {...slot("header")} className={cn("inline-flex items-center gap-1", active && "text-foreground")}>
+                      {c.label}
+                      <Tooltip label={`Sort by ${c.sortLabel ?? "This Column"}`}>
+                        <button
+                          type="button"
+                          aria-label={`Sort by ${c.sortLabel ?? "This Column"}`}
+                          onClick={() => setSort?.(nextSort(sort, c.key))}
+                          className="inline-flex items-center hover:text-foreground"
+                        >
+                          <Icon name={active ? (sorted.dir === "asc" ? "up" : "down") : "sort"} size="s" className={cn(!active && "opacity-40")} />
+                        </button>
+                      </Tooltip>
+                    </span>
                   ) : canSort ? (
                     <button
                       type="button"

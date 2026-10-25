@@ -176,7 +176,8 @@ export function Conversation({ id, onOpened, onGone, onAnswered }: { id: string 
       <div role="log" aria-label="Conversation" className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-4 max-md:p-3">
         {empty ? (
           <div className="m-auto flex w-full max-w-120 flex-col gap-3">
-            <EmptyState bare illustration="FirstRun" title={offered.length ? "Try Asking" : "Ask a Question"} />
+            {/* A section of the page beside Recent, and on a phone straight under its title: a second-level heading. */}
+            <EmptyState bare level={2} illustration="FirstRun" title={offered.length ? "Try Asking" : "Ask a Question"} />
             {suggestions.loading && <LoadingRows count={3} />}
             {offered.length > 0 && (
               <div data-copy="content">

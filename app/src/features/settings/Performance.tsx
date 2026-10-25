@@ -576,7 +576,7 @@ function Routes({ range }: { range: Range }) {
             </span>
           ),
         },
-        { key: "p95_ms", label: <HelpTerm help={HELP.p95}>p95</HelpTerm>, align: "n", sortable: true, render: (r) => ms(r.p95_ms) },
+        { key: "p95_ms", label: <HelpTerm help={HELP.p95}>p95</HelpTerm>, sortLabel: "p95", align: "n", sortable: true, render: (r) => ms(r.p95_ms) },
         { key: "mean_ms", label: "Mean", align: "n", sortable: true, render: (r) => ms(r.mean_ms) },
         { key: "requests", label: "Calls", align: "n", sortable: true, render: (r) => formatCount(r.requests) },
         { key: "errors", label: "Failed", align: "n", sortable: true, render: (r) => (r.errors ? <span className="text-destructive">{formatCount(r.errors)}</span> : "0") },
