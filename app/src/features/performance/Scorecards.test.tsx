@@ -198,6 +198,15 @@ describe("Performance · a mid-quarter scorecard, a scorecard's link and a line'
     expect(mine.lines.every((l) => !l.can_change_target)).toBe(true);
   }, 30000);
 
+  it("the Commitments view offers Export Report only to a reader who may export", async () => {
+    await openAs("kemi@mycityapp.io", "/performance?tab=targets&view=commitments");
+    expect((await screen.findAllByRole("heading", { name: "Commitments" })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Export Report" })).toBeNull();
+    cleanup();
+    await openAs("cynthia@mycityapp.io", "/performance?tab=targets&view=commitments");
+    expect(await screen.findByRole("button", { name: "Export Report" })).toBeTruthy();
+  }, 30000);
+
   it("on a phone: scorecards and lines are cards; a line opens its own sheet with Change Target at its foot", async () => {
     setViewport(390);
     await openAs("ngozi@mycityapp.io", "/performance?tab=targets");
