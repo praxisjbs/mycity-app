@@ -67,9 +67,13 @@ function Folders({ tab, id }: ModuleScreenProps) {
 
   const compose = (init: ComposeInit = {}, title = "New Message") => modal.open({ title, wide: true, full: true, body: (close) => <Composer from={from} init={init} close={close} /> });
   const refresh = async () => {
-    await api.call("POST /api/v1/mailbox/connection/sync", { body: {} });
-    invalidate("/api/v1/mailbox");
-    toast("Mailbox up to date");
+    try {
+      await api.call("POST /api/v1/mailbox/connection/sync", { body: {} });
+      invalidate("/api/v1/mailbox");
+      toast("Mailbox up to date");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not refreshed. Try again.");
+    }
   };
   if (status === "disconnected")
     return (
@@ -192,7 +196,12 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
   }, [row.mail_thread_id, row.unread]);
 
   const move = async (to: "inbox" | "archive" | "spam" | "trash") => {
-    await api.call("POST /api/v1/mailbox/threads/:id/move", { params: { id: row.mail_thread_id }, body: { to } });
+    try {
+      await api.call("POST /api/v1/mailbox/threads/:id/move", { params: { id: row.mail_thread_id }, body: { to } });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not moved. Try again.");
+      return;
+    }
     invalidate("/api/v1/mailbox");
     onMoved();
     toast(to === "inbox" ? "Moved back to Inbox" : `Moved to ${NAMES[to]}`);
@@ -214,7 +223,12 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
   };
   /* Always Show Images is the owner's, per sender, kept on the server (mailbox.md §6). */
   const trust = async (address: string, trusted: boolean) => {
-    await api.call("POST /api/v1/mailbox/image-trust", { body: { sender_address: address, trusted } });
+    try {
+      await api.call("POST /api/v1/mailbox/image-trust", { body: { sender_address: address, trusted } });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not changed. Try again.");
+      return;
+    }
     t.reload();
     toast(trusted ? `Images shown from ${address}` : `Images hidden from ${address}`);
   };
@@ -348,9 +362,13 @@ function DraftReader({ row, onBack, compose }: { row: ThreadRow; onBack: () => v
   const draft = d.data;
   const cancelSchedule = async () => {
     if (!row.scheduled) return;
-    await api.call("POST /api/v1/mailbox/queue/:id/cancel", { params: { id: row.scheduled.mail_send_queue_id }, body: {} });
-    invalidate("/api/v1/mailbox");
-    toast("Schedule cancelled");
+    try {
+      await api.call("POST /api/v1/mailbox/queue/:id/cancel", { params: { id: row.scheduled.mail_send_queue_id }, body: {} });
+      invalidate("/api/v1/mailbox");
+      toast("Schedule cancelled");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not cancelled. Try again.");
+    }
   };
   const body = prepareEmail(draft.body_html, { showRemote: false });
   return (
@@ -405,7 +423,17 @@ function ConnectMailbox({ email, close, done }: { email: string | null; close: (
 }
 
 function EmptyFolder({ kind, count, close }: { kind: "spam" | "trash"; count: number; close: () => void }) {
-  const [busy, setBusy] = useState(false);
+  /* The press hands back its work, so the button spins until it settles and can be pressed again after a failure (F26). */
+  const empty = async () => {
+    try {
+      const r = await api.call("POST /api/v1/mailbox/folders/:kind/empty", { params: { kind }, body: {} });
+      invalidate("/api/v1/mailbox");
+      close();
+      toast(`${r.removed} message${r.removed === 1 ? "" : "s"} deleted`);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not emptied. Try again.");
+    }
+  };
   return (
     <>
       <p className="text-sm text-muted-foreground">
@@ -413,17 +441,7 @@ function EmptyFolder({ kind, count, close }: { kind: "spam" | "trash"; count: nu
       </p>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button
-          variant="primary"
-          busy={busy}
-          onClick={async () => {
-            setBusy(true);
-            const r = await api.call("POST /api/v1/mailbox/folders/:kind/empty", { params: { kind }, body: {} });
-            invalidate("/api/v1/mailbox");
-            close();
-            toast(`${r.removed} message${r.removed === 1 ? "" : "s"} deleted`);
-          }}
-        >
+        <Button variant="primary" onClick={empty}>
           Empty {NAMES[kind]}
         </Button>
       </FormFooter>
