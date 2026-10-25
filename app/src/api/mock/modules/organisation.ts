@@ -10,6 +10,7 @@ import { decidePlan, decideTargetChange, performanceInstance, performanceWaiting
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
 import { assignSite, siteOf, WORKSITES } from "./worksites";
+import { loginOfEmployee } from "./settings";
 import organisation from "@mycity/contract/schemas/organisation.js";
 
 /**
@@ -27,10 +28,11 @@ const statusOf = (p: MockPerson): EmployeeRow["status"] => (p.status === "suspen
 const probationDue = (p: MockPerson) => (p.status === "probation" ? isoDaysAhead(18) : null);
 const confirmedOn = (p: MockPerson) => (p.status === "probation" ? null : p.start_date);
 
-/** Who has a login on the mock: the four who sign in, and two invited but never signed in. */
-const INVITED = ["damilola", "tolu"];
-const loginOf = (p: MockPerson): EmployeeRow["login"] =>
-  SIGN_INS[p.user_key] ? "active" : INVITED.includes(p.user_key) ? "invited" : p.status === "suspended" ? "suspended" : "none";
+/** Who has a login on the mock: Settings · Users' own list (settings.ts), so both screens agree. */
+const loginOf = (p: MockPerson): EmployeeRow["login"] => {
+  if (ARCHIVED.has(p.employee_id) && loginOfEmployee(p.employee_id)) return "left";
+  return loginOfEmployee(p.employee_id)?.state ?? "none";
+};
 
 const DEPTS = DEPARTMENTS.map((name, i) => ({
   department_id: sid(`dept:${name}`),
@@ -200,10 +202,10 @@ function base(p: MockPerson, viewer: string, canSee: boolean, first: string, res
     dotted_manager: dottedRef(p),
     direct_reports: reportsOf(p.user_key).length,
     login: {
-      user_id: loginOf(p) === "none" ? null : sid(`user:${p.user_key}`),
-      email: loginOf(p) === "none" ? null : p.work_email,
+      user_id: loginOfEmployee(p.employee_id)?.user_id ?? null,
+      email: loginOfEmployee(p.employee_id)?.email ?? null,
       state: loginOf(p),
-      roles: SIGN_INS[p.user_key] ? [{ code: SIGN_INS[p.user_key].view === "ceo" ? "management" : "operations_people", name: SIGN_INS[p.user_key].role }] : loginOf(p) === "none" ? [] : [{ code: "employee", name: "Staff" }],
+      roles: loginOfEmployee(p.employee_id)?.roles ?? [],
       last_sign_in_at: SIGN_INS[p.user_key] ? at(0, "08:40") : null,
     },
     date_of_birth: canSee ? p.date_of_birth : null,

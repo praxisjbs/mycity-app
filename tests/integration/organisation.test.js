@@ -755,6 +755,14 @@ describeDb("the organisation module against the real migrations", () => {
       const ngozi = after.body.nodes.find((n) => n.display_name === "Ngozi Umeh");
       expect(ngozi.dotted_line_to).toBeNull();
       await asOps()(request(app).post(`/api/v1/employees/${people.manager.employee.employee_id}/restore`)).send({});
+      /* Archiving closed their login (identity.md §6.1) and Restore does not reopen it: an
+         administrator reactivates it, and the manager signs in again for the tests below. */
+      await drain();
+      const reopened = await asOps()(request(app).post(`/api/v1/users/${people.manager.user.user_id}/reactivate`)).send({});
+      expect(reopened.status).toBe(200);
+      const again = await request(app).post("/api/v1/auth/login").set("X-Forwarded-For", "10.30.0.9").send({ email: "manager@mycity.test", password: MANAGER_PASSWORD });
+      expect(again.status).toBe(200);
+      tokens.manager = again.body.access_token;
     });
   });
 

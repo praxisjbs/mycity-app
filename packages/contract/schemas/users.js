@@ -32,12 +32,17 @@ const UserRow = z
     user_id: uuid,
     employee_id: uuid,
     display_name: z.string(),
+    /** The address the login signs in with. */
     email: z.string(),
+    /** The address on the employee's record; when it differs, Use Work Email moves the login to it. */
+    work_email: z.string(),
     job_title: z.string(),
     department: z.string(),
     roles: z.array(UserRole),
     is_ceo: z.boolean(),
     status: UserStatus,
+    /** When the last invitation was sent; null when none ever was (a roster login waits for Send Invite). */
+    invited_at: isoDateTime.nullable(),
     /** Two-step sign-in is on: an administrator may reset it (a lost phone). */
     two_step: z.boolean(),
     last_seen_at: isoDateTime.nullable(),
@@ -103,12 +108,18 @@ const LinkSent = z.object({ sent: z.literal(true), email: z.string() }).strict()
 const UserSessionsEnded = z.object({ ended: z.number().int().min(0) }).strict();
 
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
+/** POST /users/invite-pending: how many invitations went out. */
+const InvitesSent = z.object({ sent: z.number().int().min(0) }).strict();
+
 const TABLES = {
+  InvitesSent: { table: null, reason: "a count of invitations sent, not a row" },
   UserRole: { table: "role" },
   UserRow: {
     table: "app_user",
     virtual: {
       display_name: "the employee's name, joined from employee",
+      work_email: "the employee's work email, joined from employee",
+      invited_at: "the latest invitation link's created_at, from password_reset",
       job_title: "the employee's job title, joined from employee",
       department: "the department's name, joined through employee",
       roles: "the login's roles, from user_role and role",
@@ -139,6 +150,7 @@ const TABLES = {
 
 module.exports = {
   TABLES,
+  InvitesSent,
   UserStatus,
   RoleCode,
   UserRole,

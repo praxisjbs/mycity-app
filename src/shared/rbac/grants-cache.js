@@ -74,7 +74,10 @@ function getAuthUser(client, userId) {
       `SELECT u.user_id,
               u.employee_id,
               u.email,
-              u.status,
+              -- A login works only while its employee does (identity.repo.js EFFECTIVE_STATUS).
+              CASE WHEN e.status IN ('archived', 'left') THEN 'left'
+                   WHEN e.status = 'suspended' AND u.status = 'active' THEN 'suspended'
+                   ELSE u.status END AS status,
               u.is_ceo,
               trim(e.first_name || ' ' || e.last_name) AS display_name,
               COALESCE(array_agg(ur.role_id) FILTER (WHERE ur.role_id IS NOT NULL), '{}') AS role_ids

@@ -20,6 +20,8 @@ module.exports = {
     created(res, await service.invite(req.validated.body, withActor(req))),
   resendInvite: async (req, res) =>
     ok(res, await service.resendInvite(id(req), withActor(req))),
+  invitePending: async (req, res) => ok(res, await service.invitePending(withActor(req))),
+  useWorkEmail: async (req, res) => ok(res, await service.useWorkEmail(id(req), withActor(req))),
   setRoles: async (req, res) =>
     ok(res, await service.setRoles(id(req), req.validated.body.role_codes, withActor(req))),
   suspend: async (req, res) =>

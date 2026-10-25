@@ -133,10 +133,11 @@ People · Employees, open the person, Edit Record:
 
 Two things the screen cannot do yet:
 
-- **Chinyere's and David's logins keep the old address.** A login's email is its own copy, made when
-  the login was, and Send Invite sends to it; no screen changes it, which is what stops an edit to a
-  work email from redirecting someone's invitation. Do not Send Invite to either of them on staging.
-  Production creates both logins with the corrected address.
+- **Chinyere's and David's logins follow the corrected address** (since 25/10/2026,
+  `docs/guides/identity.md` §6.1): a login nobody has used yet moves with its employee's work email
+  once People correct it on the record, so after the correction above Send Invite reaches them on
+  staging too. A login already in use moves only with Use Work Email on Settings · Users. Production
+  creates both logins with the corrected address.
 - **The Marketing department stays in the department lists**, empty, once Aaron has moved: no screen
   retires a department yet. It no longer counts on People · Employees, which counts departments that
   have people.

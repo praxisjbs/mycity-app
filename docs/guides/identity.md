@@ -170,7 +170,9 @@ Schema migrations: `migrations/0200_identity_sessions.sql`, `migrations/0220_sig
 | `POST /api/v1/security/pin`, `/pin/remove` | `PinSet` → `SignInMethods`; `EmptyBody` → `SignInMethods` | own account, fresh | | 422 `WEAK_PIN` (the birthday is the server's check) |
 | `GET /api/v1/users` | `UserListQuery` → `UserPage` | `settings` view | yes, 25 | Filters `status`, `role`; sort `display_name`, `last_seen_at`, `created_at` |
 | `GET /api/v1/users/summary` | → `UsersSummary` | `settings` view | | |
-| `GET /api/v1/users/candidates` | `CandidateListQuery` → `CandidatePage` | `settings` view | yes, 25 | Employees with no login |
+| `GET /api/v1/users/candidates` | `CandidateListQuery` → `CandidatePage` | `settings` create | yes, 25 | Employees with no login |
+| `POST /api/v1/users/invite-pending` | `EmptyBody` → `InvitesSent` | `settings` edit, the per-person link limit | | Every Invited login nobody has emailed yet (§6.1) |
+| `POST /api/v1/users/:id/use-work-email` | `EmptyBody` → `UserRow` | `settings` edit, a fresh sign-in | | The login moves to its employee's work email; sessions end; both addresses are told (§6.1) |
 | `POST /api/v1/users` | `UserInvite` → `UserRow` | `settings` create | | |
 | `GET /api/v1/users/:id` | → `UserRow` | `settings` view | | |
 | `POST /api/v1/users/:id/invite`, `/reset-link` | `EmptyBody` → `LinkSent` | `settings` edit | | |
@@ -206,7 +208,8 @@ either, never lengthen it (`foundation.md` §6.4); the minutes below are the def
 - At least 8 characters, with a lowercase letter, an uppercase letter, a number and a symbol. Settings ·
   Security can ask for more characters (`security.password_min_length`, never below
   `PASSWORD_MIN_LENGTH`); it applies to the next password each person chooses.
-- Not one of the common passwords, not the name part of the person's email.
+- Not the name part of the person's email. (There is no list of common passwords; the breach
+  check below stands in for one.)
 - Not in a known breach (the k-anonymity range lookup; only five characters of the hash leave
   the server). The check fails open after 3 seconds. `PASSWORD_BREACH_CHECK=false` turns it off.
 - Hashed with Argon2id. Argon2 runs outside the transaction.
@@ -216,14 +219,16 @@ either, never lengthen it (`foundation.md` §6.4); the minutes below are the def
 unknown email and a wrong password get the same message and take the same time. A suspended
 account is told so only after the right password.
 
-**Links:** a reset link lasts 30 minutes, an invitation 72 hours. A new link closes the open ones of
-the same kind. Setting a password spends every open link and ends every session. A link's email
+**Links:** a reset link lasts 30 minutes, an invitation 72 hours. A new link closes every open link
+of the person, of either kind. Setting a password spends every open link and ends every session. A link's email
 that waited in the mail queue goes out only while its link still works (`linkStillOpen`): one a
 newer link replaced, or that expired meanwhile, is dropped (`docs/guides/integrations.md` §6.15).
 Invitations and resets are the system mail that still goes while IT has paused it.
 
-**Logins:** no login without an employee; a person cannot suspend, reactivate or change the roles of
-their own login.
+**Logins:** no login without an employee who works here (§6.1); a person cannot suspend, change the
+roles of or move the email of their own login. Anyone with `settings` edit may give any role to anyone
+else: there is no ceiling by rank (JBS Praxis, 25/10/2026, after the audit showed a System
+Administrator can make a colleague Implementation Team). Who holds `settings` edit is the control.
 
 **Two-step sign-in** (`security.mfa.js`, `security.signin.js`):
 
@@ -279,6 +284,39 @@ Renaming a passkey changes no way in and needs no window.
 the key, the recovery codes and every browser's trust and ends every session; the person sets
 two-step up again.
 
+### 6.1 Logins, after the employee creation audit (JBS Praxis, 25/10/2026)
+
+The audit of 25/10/2026 (`docs/guides/foundation.md` §6.16) found that a login outlived its employee
+and could be stranded on a mistyped address. These are the rules now, each held by
+`tests/integration/logins.test.js`.
+
+- **A login works only while its employee does.** Every way in reads the login's status through its
+  employee (`identity.repo.js` `EFFECTIVE_STATUS`, `grants-cache.getAuthUser`): an archived or departed
+  employee's login is closed (Left) and a suspended employee's is suspended, at once, before any job
+  runs. Sign-in, the PIN, a passkey, a session's refresh, an open link and Forgot Password all refuse
+  it. The outbox handler `identity.close_login` on `employee.archived` then writes `left`, ends every
+  session and spends every link (`app_user.left`). Restore does not reopen the login; Reactivate on
+  Settings · Users does, and waits until the record is restored (`EMPLOYEE_NOT_ACTIVE`).
+- **The login email and the work email.** A login nobody has used yet (no password chosen) follows
+  its employee's corrected work email (`identity.follow_work_email` on `employee.updated`), and its
+  invitation is spent, since it went to the old address. A login in use stays where it is: Settings ·
+  Users shows "Signs in with ... but the record says ...", and **Use Work Email** moves it after a
+  fresh sign-in, ends its sessions and tells both addresses (`app_user.email_changed`). A record may
+  not take an address another person's login still signs in with ("Used by a login").
+- **Invitations.** The staff roster makes logins and emails nobody: Settings · Users marks them **Not
+  Sent** (`UserRow.invited_at` is null) and **Invite All Pending** sends every one; a record whose
+  login is Invited offers **Send Invite**, which sends the first invitation or a fresh one. The
+  register's Not Yet Invited counts both. Administrators' invitations and reset links are limited per
+  person (60 in 15 minutes, `adminLinkLimiter`), no longer per address with everyone's Forgot
+  Password. Checking a link counts only failures (`linkCheckLimiter`), and a check that fails for any
+  reason but an invalid link shows **Link Not Checked** with Try Again, never Link Expired.
+- **One login per employee**, in the database too (`app_user_employee_uq`, migration 0500); a second
+  invitation is refused on the Employee field.
+- **View only.** Someone with `settings` view but not edit sees a login's details and no button the
+  API would refuse.
+- **create-admin** refuses to give a login to an employee who is not active, and shows the existing
+  record before the confirmation when the email is already on the register.
+
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
@@ -291,6 +329,8 @@ two-step up again.
 | `auth.link_requested` | Forgot, invite, resend, reset link | Outbox `identity.send_link`: mint the token, store its hash, queue the email (no token in the event, the ledger or a notification) |
 | `auth.password_set` | A password chosen from a link | Notice after a reset |
 | `app_user.created`, `app_user.suspended`, `app_user.reactivated` | Users actions | Audit (sensitive); suspension turns push off on every device of the person |
+| `app_user.left` | An employee archived (`identity.close_login` on `employee.archived`) | Audit (sensitive); the login closed, its sessions ended, its links spent (§6.1) |
+| `app_user.email_changed` | Use Work Email; a login nobody has used following a corrected work email | Audit (sensitive); Use Work Email tells the old and the new address (`identity.tell_email_changed`) |
 | `access.roles_set` | Roles changed | Audit (sensitive); the grants cache is dropped |
 | `auth.two_step_started` | A set-up began | Audit |
 | `auth.two_step_on`, `auth.two_step_changed`, `auth.two_step_off` | Two-step turned on, moved to a new app, turned off | Notice to the person |
@@ -423,6 +463,8 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   them, the drawings standing in for the first four until they load.
 
 ## 14 · Change log
+
+- 25/10/2026 · JP · §6.1 written, from the employee creation audit and JBS Praxis's decisions of 25/10/2026: a login works only while its employee does and closes on archive; an unused login follows a corrected work email, a used one moves with Use Work Email; Invite All Pending, Not Sent and Send Invite for roster logins; per-person link limits and Link Not Checked; one login per employee (0500); no ceiling on roles, written down. §5 corrected: candidates need `settings` create. §6: a new link closes every open link; there is no common-password list.
 
 - 25/10/2026 · JP · `/auth/me` (and the sign-in answer's `user`) carries `hidden_fields`: the record fields the person's role masks (`shared/rbac/field-mask.js`), so Add Employee and Edit leave them out; the API refuses a write to one (`docs/guides/foundation.md` §6.16, JBS Praxis's decision of 25/10/2026).
 

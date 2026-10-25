@@ -338,12 +338,15 @@ async function updateEmployee(client, employeeId, patch, actor) {
   } catch (err) {
     throw uniqueRefusal(err);
   }
+  const changedEmail = patch.work_email && patch.work_email.toLowerCase() !== String(before.work_email).toLowerCase();
   await emit(client, {
     key: EVENTS.EMPLOYEE_UPDATED,
     entity: { type: "employee", id: employeeId },
     actor,
     before,
     after: await repo.auditRow(client, employeeId),
+    // identity follows a corrected work email with a login nobody has used yet (identity.events.js).
+    payload: changedEmail ? { employee_id: employeeId, work_email: { from: before.work_email, to: after.work_email } } : { employee_id: employeeId },
   });
   return after;
 }
@@ -646,9 +649,12 @@ async function summary(client, scope) {
       action: { tone: "info", text: "Create vacancy" },
       link: screen("people", "organogram"),
     },
-    tally.no_login > 0 && {
+    tally.no_login + (tally.invite_unsent || 0) > 0 && {
       title: "Not Yet Invited",
-      text: `${people(tally.no_login)} with no login`,
+      // A roster login is Invited but was never emailed: it waits for Invite All Pending too.
+      text: tally.invite_unsent
+        ? `${people(tally.no_login + tally.invite_unsent)} not invited yet`
+        : `${people(tally.no_login)} with no login`,
       action: { tone: "info", text: "Send invites" },
       link: screen("settings", "users"),
     },

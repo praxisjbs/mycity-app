@@ -95,6 +95,7 @@ const UPDATE_COLUMNS = [
 /** The login a person has, as the register and the 360 name it. */
 const LOGIN_STATE = `
   CASE WHEN u.user_id IS NULL THEN 'none'
+       WHEN u.status = 'left' OR e.status IN ('archived', 'left') THEN 'left'
        WHEN u.status = 'suspended' THEN 'suspended'
        WHEN u.password_changed_at IS NULL THEN 'invited'
        ELSE 'active' END`;
@@ -244,7 +245,12 @@ async function counts(db, scope, today) {
             count(*) FILTER (WHERE e.status = 'active' AND e.line_manager_id IS NULL
                              AND e.line_manager_seat_id IS NULL
                              AND COALESCE(u.is_ceo, false) = false)::int AS no_manager,
-            count(*) FILTER (WHERE e.status = 'active' AND u.user_id IS NULL)::int AS no_login
+            count(*) FILTER (WHERE e.status = 'active' AND u.user_id IS NULL)::int AS no_login,
+            -- A roster login nobody has emailed yet: Invited on the register, but never sent.
+            count(*) FILTER (WHERE e.status = 'active' AND u.user_id IS NOT NULL AND u.status = 'active'
+                               AND u.password_changed_at IS NULL
+                               AND NOT EXISTS (SELECT 1 FROM password_reset p
+                                                WHERE p.user_id = u.user_id AND p.purpose = 'invite'))::int AS invite_unsent
        FROM employee e
        LEFT JOIN app_user u ON u.employee_id = e.employee_id
       WHERE true ${s.and}`,

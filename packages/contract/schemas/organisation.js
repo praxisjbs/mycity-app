@@ -156,7 +156,8 @@ const EMPLOYEE_STATUSES = ["active", "suspended", "left", "archived"];
 const EmployeeStatus = z.enum(EMPLOYEE_STATUSES);
 
 /** What a person's login is, as Settings and the register show it. */
-const LOGIN_STATES = ["none", "invited", "active", "suspended"];
+/** `left`: the employee was archived and their login closed with them (docs/guides/identity.md §6.1). */
+const LOGIN_STATES = ["none", "invited", "active", "suspended", "left"];
 const LoginState = z.enum(LOGIN_STATES);
 
 /**

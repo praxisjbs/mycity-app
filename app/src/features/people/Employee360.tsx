@@ -91,7 +91,8 @@ export function Employee360({ id }: { id: string }) {
 
   const canEdit = me.grants.people?.includes("edit");
   const canArchive = me.grants.people?.includes("delete");
-  const canInvite = me.grants.settings?.includes("create") && e.login.state === "none";
+  // Only someone on the active staff list is invited (the API refuses anyone else, users.invite.js).
+  const canInvite = me.grants.settings?.includes("create") && e.login.state === "none" && e.status === "active";
   const status = employmentStatus(e);
 
   const putAway = () =>
@@ -112,7 +113,12 @@ export function Employee360({ id }: { id: string }) {
 
   const bringBack = async () => {
     if (!(await confirm({ title: "Restore Record", body: `${e.display_name} goes back on the register.` }))) return;
-    await restore.run({ params: { id }, body: {} });
+    try {
+      await restore.run({ params: { id }, body: {} });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Not restored. Try again.");
+      return;
+    }
     invalidate("/api/v1/employees", "/api/v1/org-chart");
     reload();
     toast(`${e.display_name} restored`);
@@ -148,7 +154,7 @@ export function Employee360({ id }: { id: string }) {
                     title: "Invite to Sign In",
                     body: (close) => (
                       <InviteToSignIn
-                        close={close}
+                        close={() => (close(), reload())}
                         person={{ employee_id: e.employee_id, display_name: e.display_name, job_title: e.job_title, department: e.department }}
                       />
                     ),
@@ -202,8 +208,9 @@ function ArchiveForm({ id, name, close, onDone }: { id: string; name: string; cl
       close();
       onDone();
       toast(`${name} archived`);
-    } catch {
-      toast(archive.error?.message ?? "Not archived");
+    } catch (err) {
+      // The refusal itself (CEO_PROTECTED, ALREADY_ARCHIVED): the mutation's state is not yet the new one here.
+      toast.error(err instanceof ApiError ? err.message : "Not archived. Try again.");
     }
   };
   return (
@@ -352,6 +359,20 @@ function Login({ employee: e, onChanged }: { employee: Record360; onChanged: () 
   const me = useMe();
   const modal = useModal();
   const login = loginStatus(e.login.state);
+  const resend = useMutation("POST /api/v1/users/:id/invite");
+  /* A login made by the staff roster is Invited but was never emailed: Send Invite sends its
+     first invitation, or a fresh one that replaces the last (docs/guides/identity.md §6.1). */
+  const sendAgain = async () => {
+    if (!e.login.user_id) return;
+    try {
+      const sent = await resend.run({ params: { id: e.login.user_id }, body: {} });
+      invalidate("/api/v1/users");
+      onChanged();
+      toast(`Invitation sent to ${sent.email}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Not sent. Try again.");
+    }
+  };
   return (
     <Grid cols={2}>
       <Card>
@@ -363,7 +384,14 @@ function Login({ employee: e, onChanged }: { employee: Record360; onChanged: () 
             ["Last signed in", e.login.last_sign_in_at ? formatDate(e.login.last_sign_in_at.slice(0, 10)) : "Never"],
           ]}
         />
-        {me.grants.settings?.includes("create") && e.login.state === "none" && (
+        {me.grants.settings?.includes("edit") && e.login.state === "invited" && e.status === "active" && (
+          <div className="mt-3">
+            <Button variant="primary" icon="send" onClick={sendAgain}>
+              Send Invite
+            </Button>
+          </div>
+        )}
+        {me.grants.settings?.includes("create") && e.login.state === "none" && e.status === "active" && (
           <div className="mt-3">
             <Button
               variant="primary"

@@ -173,11 +173,12 @@ export function RolePicker({ value, onChange }: { value: RoleRef[]; onChange: (v
   return (
     <RecordPicker
       list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
-      value={list.rows.filter((r) => value.some((v) => v.code === r.code))}
+      // The roles chosen, whatever the search shows: a search that hides one must never drop it.
+      value={value as unknown as typeof list.rows}
       onChange={(rows) => onChange(rows.map((r) => ({ code: r.code, name: r.name })))}
       id={(r) => r.code}
       title={(r) => r.name}
-      sub={(r) => r.description ?? ""}
+      sub={(r) => ("description" in r && r.description ? r.description : "")}
       multiple
       placeholder="Search roles"
     />
