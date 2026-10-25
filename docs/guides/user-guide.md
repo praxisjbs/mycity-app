@@ -5,7 +5,7 @@
 | Owner | TB |
 | Milestone | M0 (brought forward from M11 by JBS Praxis, 25/10/2026; written milestone by milestone as each is approved) |
 | Backend modules | `user_guide` |
-| Frontend paths | `app/src/features/knowledge/guide/` |
+| Frontend paths | `app/src/features/knowledge/UserGuide.tsx`, `app/src/features/knowledge/guide/` (the way back), `packages/ui/src/documents/GuideBody.tsx`, the chip in `app/src/shell/Notices.tsx` |
 | Permission key(s) | `knowledge` (view); every chapter, section, task, step and picture is filtered by the reader's own grants |
 | Capabilities | none of its own; the guide reads every module's grants and capabilities to decide what each reader receives |
 | Screens (PROGRESS.md rows) | #102 Knowledge Hub · User Guide |
@@ -49,18 +49,18 @@ by naming itself in its own chapters' front matter, not in a shared list.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Knowledge Hub · User Guide (`user-guide`) | Staff app | Everyone with `knowledge` view (all seven roles by default) | Quick Start: illustrated cards by role. Full Guide: chapters and sections, filtered by the reader's grants | Switch Quick Start and Full Guide, pick a chapter and section, search the guide, open a screen from a step, go back to the step |
+| Knowledge Hub · User Guide (`user-guide`) | Staff app | Everyone with `knowledge` view (all seven roles by default) | Quick Start: illustrated cards by role. Full Guide: chapters and sections, filtered by the reader's grants | Switch Quick Start and Full Guide, pick a chapter and section, open a screen from a step or with Open Screen, go back to the step, enlarge a picture |
 | Every screen of the hub | Staff app | Whoever arrived from a guide link | The Back to Guide chip, bottom of the screen (above the bottom bar on a phone) | Return to the exact step they left, or dismiss the chip |
 | The floating button (phone) | Staff app | Everyone with `knowledge` view | Help opens the guide at the section for the screen in view | Open the guide where they are |
 | The account menu (desktop) | Staff app | Everyone with `knowledge` view | User Guide, opening the section for the screen in view | Open the guide where they are |
-| ⌘K Search | Everywhere | Everyone, by permission | A Guide group: sections and tasks whose words match | Open the guide at that section |
+| ⌘K Search | Everywhere | Everyone, by permission | A User Guide group: sections and tasks whose words match ("guide" or "how to" before the words narrows to it) | Open the guide at that section |
 
 ## 3 · How the screens relate
 
 1. **Reading.** A person opens Knowledge Hub · User Guide. `GET /api/v1/user-guide` returns the
    contents they may read; `GET /api/v1/user-guide/chapters/:slug` returns one chapter, already cut
-   to their grants. Pictures come from `GET /api/v1/user-guide/images/:name`, refused unless a
-   section the reader may read uses that picture.
+   to their grants. Pictures come from `GET /api/v1/user-guide/images/:chapter/:file`, refused
+   unless a part of the guide the reader may read shows that picture on that device.
 2. **Doing.** A step's link (`/people?tab=employees`) opens the real screen. Before it navigates,
    the guide records where the reader was (`sessionStorage`, `mc-guide-return`: the section, the
    step, its label). The shell shows **Back to Guide · Step 4** on every screen until the person
@@ -100,8 +100,8 @@ Schema migration file(s): none. Reference-data file(s): none.
 |---|---|---|---|---|
 | `GET /api/v1/user-guide` | → `GuideContents` | `knowledge` view | no: one document's outline (§6.7) | The chapters, each with its sections' titles, slugs and screens, and the Quick Start cards' titles, all cut to the reader |
 | `GET /api/v1/user-guide/chapters/:slug` | → `GuideChapter` | `knowledge` view | no: one chapter | 404 when the chapter does not exist or nothing in it is the reader's |
-| `GET /api/v1/user-guide/quick-start` | → `GuideQuickStart` | `knowledge` view | no: one document | The cards the reader may follow, each with its steps |
-| `GET /api/v1/user-guide/images/:name` | file | `knowledge` view | no | `name` is `<chapter>/<shot>.<desktop or phone>.png`; 404 unless a section the reader may read shows it |
+| `GET /api/v1/user-guide/quick-start` | → `GuideChapter` (kind `quick-start`) | `knowledge` view | no: one document | The cards the reader may follow, each with its steps; none at all is an empty Quick Start |
+| `GET /api/v1/user-guide/images/:chapter/:file` | file (`no_content` in the contract) | `knowledge` view | no | `file` is `<shot>.<desktop or phone>.png`; 404 unless a part the reader may read shows it on that device |
 
 ## 6 · Rules and calculations
 
@@ -232,12 +232,22 @@ Every run:
    spec (no orphans).
 8. For every milestone a chapter names in `milestones`, every screen of that milestone in
    `docs/PROGRESS.md` (Dropped aside) has a section with its `screen`.
+9. A file in `docs/manual/` that is neither a chapter (front matter) nor empty waits for its
+   milestone's guide pull request and is named, with why, in the gate's `WAITING` list
+   (`mailbox.md` and `staff-community.md`, written before the format, wait for Milestone 1's); an
+   entry whose file became a chapter is stale. Icons are the hub's own (`Icon.tsx`).
 
 On a change (the files the branch changed):
 
-9. A change to code a chapter covers (its screens' feature folders, its `covers`, its pictures'
-   `sources`) must change the chapter or its pictures. Escape hatch, in the PR description or a
-   commit message: `User-guide-unchanged: <reason>`. Pictures still must not be stale.
+10. A change to code a chapter covers (its screens' feature folders, its `covers`, its pictures'
+   `sources`; tests aside) must change the chapter or its pictures. Escape hatch, in the PR
+   description or a commit message: `User-guide-unchanged: <reason>`. Pictures still must not be
+   stale.
+
+Bold names are looked up in the app, `packages/ui`, `src/` (the API's messages), the contract's
+schemas and the reference seeds, with whitespace folded, so a label broken over two JSX lines is
+found. A name the screen builds from data ("New Department") is written as the screen shows it if
+the words are in the source, or not in bold.
 
 The Stop hook runs it with progress, guides and the README map.
 
@@ -281,7 +291,7 @@ No restricted field appears in the guide's text or pictures (the demo's data onl
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Knowledge Hub · User Guide | Quick Start and Full Guide switch; Search Guide; the contents (chapters and sections); the section's title, text, steps, pictures and their numbered legends; Open links on steps | None | How the guide is filtered, written and checked: this guide §6 |
+| Knowledge Hub · User Guide | Quick Start and Full Guide switch; the contents (chapters and sections); the section's chapter, title and Open Screen; its text, tasks, steps, pictures and their numbered legends; the screen links in steps | None | How the guide is filtered, written and checked: this guide §6 |
 | Back to Guide chip | Back to Guide · Step N, and a close button | None | Where the return is kept: this guide §3 |
 
 The guide's own text is content a person reads (`data-copy="content"`), not interface copy: gate 8's
