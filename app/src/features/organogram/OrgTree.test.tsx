@@ -173,6 +173,20 @@ describe("People · Organogram on desktop", () => {
   }, 30000);
 });
 
+describe("People · Organogram, as someone who may only read People", () => {
+  it("shows the tree with no Add Role, no open role actions and no dragging; Operations has them", async () => {
+    setViewport(1440);
+    await open("/people?tab=organogram", "ngozi@mycityapp.io", "Organogram");
+    expect(screen.getByText("Head of Finance")).toBeTruthy();
+    for (const name of ["Add Role", "Edit Role", "Create Vacancy"]) expect(screen.queryByRole("button", { name })).toBeNull();
+    expect(document.querySelector('.og-card[draggable="true"]')).toBeNull();
+    cleanup();
+    await organogramAsOperations();
+    for (const name of ["Add Role", "Edit Role", "Create Vacancy"]) expect(screen.getAllByRole("button", { name }).length).toBeGreaterThan(0);
+    expect(document.querySelector('.og-card[draggable="true"]')).toBeTruthy();
+  }, 30000);
+});
+
 describe("People · Organogram on a phone", () => {
   it("opens on Everyone; Focus starts on the CEO, lists a card left at the top, and a search lists the cards to tap", async () => {
     setViewport(390);

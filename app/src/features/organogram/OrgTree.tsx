@@ -80,6 +80,8 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const builder = mode === "builder";
   const phone = useIsPhone();
   const me = useMe();
+  /* Shaping the structure (roles, lines, vacancies) is People's edit grant; anyone else reads the builder's tree. */
+  const shapes = builder && Boolean(me.grants.people?.includes("edit"));
   const modal = useModal();
   const { data, error, reload } = useApi("GET /api/v1/org-chart", { query: { view: mode } });
   /* The desktop chart shows every face at once; a phone's tiles each ask for their own (NodeTile). */
@@ -100,7 +102,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       title: "Edit Open Role",
       body: (close) => <SeatForm close={close} onSaved={reload} seat={n} manager={n.manager_node_id ? byId.get(n.manager_node_id) : undefined} />,
     });
-  useScreenAction(builder ? { label: "Add Role", onSelect: addRole } : null);
+  useScreenAction(shapes ? { label: "Add Role", onSelect: addRole } : null);
 
   const nodes = useMemo(() => data?.nodes ?? [], [data]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.node_id, n])), [nodes]);
@@ -270,7 +272,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           </span>
           <b className="block text-sm leading-tight font-strong">{n.display_name}</b>
           <span className="mt-0.5 block text-2xs text-muted-foreground">{`Vacant · ${n.department}`}</span>
-          {builder ? (
+          {shapes ? (
             <span className="mt-2 flex flex-wrap items-center justify-center gap-1">
               <button
                 type="button"
@@ -299,7 +301,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       <div
         tabIndex={0}
         data-top={n.node_id === top ? "" : undefined}
-        draggable={builder && !n.is_ceo}
+        draggable={shapes && !n.is_ceo}
         onDragStart={() => setDragging(n)}
         onDragEnd={() => (setDragging(null), setOver(null))}
         onClick={() => openPerson(n)}
@@ -328,9 +330,9 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       <li
         key={n.node_id}
         className={cn(over === n.node_id && "drop-target")}
-        onDragOver={builder ? (e) => (e.preventDefault(), setOver(n.node_id)) : undefined}
-        onDragLeave={builder ? () => setOver((o) => (o === n.node_id ? null : o)) : undefined}
-        onDrop={builder ? (e) => drop(n, e) : undefined}
+        onDragOver={shapes ? (e) => (e.preventDefault(), setOver(n.node_id)) : undefined}
+        onDragLeave={shapes ? () => setOver((o) => (o === n.node_id ? null : o)) : undefined}
+        onDrop={shapes ? (e) => drop(n, e) : undefined}
       >
         {card(n)}
         {kids.length > 0 && <ul>{kids.map(node)}</ul>}
@@ -362,7 +364,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           <>
             <SearchInput value={q} onChange={setQ} placeholder="Name or role" className="w-48 max-md:w-full" />
             {builder && !phone && <Button onClick={() => (setCollapsed(new Set()), setExpandedAll((n) => n + 1))}>Expand All</Button>}
-            {builder && !phone && <Button icon="plus" onClick={addRole}>Add Role</Button>}
+            {shapes && !phone && <Button icon="plus" onClick={addRole}>Add Role</Button>}
             <ExportButton onExport={exportPdf} message="PDF downloaded">
               Download PDF
             </ExportButton>
@@ -378,7 +380,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
         <div className="mt-0.5 mb-1 flex flex-wrap gap-4 text-2xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <i className="inline-block w-5.5 border-t-2 border-input" />
-            {builder ? <HelpTerm help="Drag a card onto a new manager to change its reporting line.">Reporting Line</HelpTerm> : "Reporting Line"}
+            {shapes ? <HelpTerm help="Drag a card onto a new manager to change its reporting line.">Reporting Line</HelpTerm> : "Reporting Line"}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <i className="inline-block w-5.5 border-t-2 border-dashed border-input" />
@@ -427,7 +429,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
               onFocus={setFocus}
               onOpen={openPerson}
               onEditRole={editRole}
-              builder={builder}
+              builder={shapes}
               atStart={!focus || focus === start}
               startLabel={mine ? "Show Me" : "Show Top"}
               onStart={() => setFocus(null)}
