@@ -387,7 +387,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `maps` | `maps.service.js` (the places-name job's naming), `maps.events.js` (`place.named`) | `GET /maps/search` (the address search behind every address field, signed places, from the second character), `/maps/pin` (a pinned point's nearest address, signed), `/maps/tiles` (the map's tiles, signed in); every address is kept by its owner through `shared/places` (`services/maps`; `docs/guides/addresses.md`, F27) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
-| `user_guide` | `.search` (⌘K's User Guide group, matched in memory) | Knowledge Hub · User Guide: `docs/manual` read through `packages/contract/guide.js` and cut to each reader down to the step, its pictures behind the same check (`docs/guides/user-guide.md`; brought forward from M11, JBS Praxis, 25/10/2026) |
+| `user_guide` | `.search` (⌘K's User Guide group, matched in memory) | Knowledge Hub · User Guide: `docs/manual` read through `packages/contract/guide.js` and cut to each reader down to the step, its pictures behind the same check (`docs/guides/user-guide.md`; brought forward from M11, JBS Praxis, 25/10/2026); tested on the real chapters by `tests/integration/user-guide.test.js` |
 
 ### 5.4 M1 · Core Operations & Employee Management · TB, LA, AJ, GE · to 19 Oct
 

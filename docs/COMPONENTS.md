@@ -3184,7 +3184,7 @@ Picks records the server searches: one page of 25, narrowed as the person types,
 | Use | A field that points at another record: a worksite, a department, a partner, a vacancy, an expense category. |
 | Avoid | Fetching every record to fill a `<select>` (FRONTEND_GUIDE §4); a picker over a list short enough to be a SelectField; filtering the 25 rows on screen. |
 | Phone | The search box and the results are full width, each result a 44 px row; the picked chips wrap above it. |
-| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. |
+| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. Inside a Field, both are named by its label. |
 | Status | stable |
 | Exports | `RecordPicker` |
 | Import | `import { RecordPicker } from "@mycity/ui";` |
@@ -3256,7 +3256,7 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | Use | Above every list that searches; FilterSelect for one of a list's server filters. |
 | Avoid | Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design. |
 | Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker. |
-| Accessibility | The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked. |
+| Accessibility | The box is a searchbox named by its label (or its placeholder), or by its Field's label when it is a picker's box; FilterSelect's label is visible and linked. |
 | Status | stable |
 | Exports | `SearchInput`, `FilterSelect` |
 | Import | `import { SearchInput, FilterSelect } from "@mycity/ui";` |
@@ -3276,6 +3276,7 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `controls` | `string` |  | The id of the list this box narrows, when it moves through it (a searchable SelectField). |
 | `activeId` | `string` |  | The id of that list's highlighted option. |
 | `onKeyDown` | `(e: KeyboardEvent<HTMLInputElement>) => void` |  | Keys pressed in the box (the arrow keys and Enter of that list). |
+| `field` | `SearchField` |  | The Field this box is the control of (a picker's box): its id, its label and its error. |
 
 **FilterSelect** props (`FilterSelectProps`)
 

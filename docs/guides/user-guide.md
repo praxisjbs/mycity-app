@@ -213,6 +213,15 @@ targets and saves `<shot>.desktop.png` (1440 × 900) and `<shot>.phone.png` (390
 screen's feature folder, plus `sources`). `-- --chapter people` retakes one chapter, `-- --shot
 <id>` one picture, `-- --stale` only the ones the gate calls stale.
 
+A picture shows the screen and nothing that comes and goes by itself: toasts, the urgent bar, the
+shell's notices (`data-shell-notice`) and a tooltip left by focus are hidden, and a panel a step
+opened (the bell's) is closed before the next picture. With a dialog or sheet open, a target is
+looked for inside it first, since the screen behind may hold one of the same name. The marked
+targets are brought into view together, centred in the box that scrolls them, and measured only
+after the last scroll; a mark whose target is not on screen with the others fails the picture, so
+the spec drops the mark or splits the picture. A picture of the guide itself opens a section with
+no picture, or it would show an older copy of itself.
+
 The demo's data is the staging seed's (F13), so the pictures show the people and figures a trainee
 sees on staging. Nothing in a picture is a real person's private data.
 
@@ -330,3 +339,7 @@ word limits do not count it, as they do not count an article.
 
 - 25/10/2026 · JP · Written: the User Guide tab, its API filtered to the step, the pictures, the Back
   to Guide chip and the gate, from JBS Praxis's decisions of 25/10/2026 (§6.1).
+- 25/10/2026 · JP · §6.5: what a picture hides, targets looked for in the open dialog first, marks
+  measured after the last scroll and refused when off screen. The M0 chapters and their 31 pictures
+  written; `tests/integration/user-guide.test.js` reads them as staff, Operations and an
+  administrator.

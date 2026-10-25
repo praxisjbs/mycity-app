@@ -163,9 +163,7 @@ function parseAttributes(text) {
   const out = { slug: null, values: {} };
   const re = /#([a-z0-9-]+)|([a-z]+)=("([^"]*)"|[^\s}]+)/g;
   let m;
-  let used = 0;
   while ((m = re.exec(text))) {
-    used += m[0].length;
     if (m[1]) out.slug = m[1];
     else out.values[m[2]] = m[4] !== undefined ? m[4] : m[3];
   }
@@ -458,14 +456,14 @@ function parseChapter(text, file) {
       const own = lineNeeds(raw.trim());
       problems.push(...own.problems.map((p) => `${where(start)}: ${p}`));
       let tone = "note";
-      let text = own.text;
+      let said = own.text;
       for (const [lead, t] of Object.entries(NOTE_TONES)) {
-        if (text.startsWith(`**${lead}**`)) {
+        if (said.startsWith(`**${lead}**`)) {
           tone = t;
-          text = text.slice(lead.length + 4).trim();
+          said = said.slice(lead.length + 4).trim();
         }
       }
-      const r = inline(text, start);
+      const r = inline(said, start);
       if (r.shots.length) problems.push(`${where(start)}: a picture sits on its own line or on a step, not in a note`);
       target().push({ kind: "note", tone, spans: r.spans, needs: own.needs });
       continue;

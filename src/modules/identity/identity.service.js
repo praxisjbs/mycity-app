@@ -1077,20 +1077,20 @@ async function closeLoginOf(event) {
   const employeeId = event.entity && event.entity.id;
   if (!employeeId) return;
   const closed = await tx(async (client) => {
-    const login = await repo.findLoginByEmployeeId(client, employeeId);
-    if (!login || login.login_status === "left") return null;
-    await repo.setStatus(client, login.user_id, "left");
-    const ended = await repo.endUserSessions(client, login.user_id, { reason: "account_suspended" });
-    await repo.closeOpenLinks(client, login.user_id);
+    const held = await repo.findLoginByEmployeeId(client, employeeId);
+    if (!held || held.login_status === "left") return null;
+    await repo.setStatus(client, held.user_id, "left");
+    const ended = await repo.endUserSessions(client, held.user_id, { reason: "account_suspended" });
+    await repo.closeOpenLinks(client, held.user_id);
     await emit(client, {
       key: EVENTS.APP_USER_LEFT,
-      entity: { type: "app_user", id: login.user_id },
+      entity: { type: "app_user", id: held.user_id },
       actor: null,
-      before: { status: login.login_status },
+      before: { status: held.login_status },
       after: { status: "left" },
       payload: { employee_id: employeeId, sessions_ended: ended.length },
     });
-    return { userId: login.user_id, ended };
+    return { userId: held.user_id, ended };
   });
   if (!closed) return;
   await afterSessionsEnded(closed.userId, closed.ended);
@@ -1104,10 +1104,10 @@ async function closeLoginOf(event) {
  * @returns {Promise<{user_id: string, from: string, to: string, ended: string[]}>}
  */
 async function changeLoginEmail(client, userId, email, actor, { notify = false } = {}) {
-  const login = await repo.findLoginById(client, userId);
-  if (!login) throw new AppError("NOT_FOUND", "Not found", 404);
+  const held = await repo.findLoginById(client, userId);
+  if (!held) throw new AppError("NOT_FOUND", "Not found", 404);
   const to = String(email).trim().toLowerCase();
-  if (login.email.toLowerCase() === to) return { user_id: userId, from: login.email, to, ended: [] };
+  if (held.email.toLowerCase() === to) return { user_id: userId, from: held.email, to, ended: [] };
   const holder = await repo.findLoginByEmail(client, to);
   if (holder && holder.user_id !== userId)
     throw new AppError("LOGIN_EXISTS", "Another login signs in with this email.", 409, { email: ["Already has a login"] });
@@ -1118,11 +1118,11 @@ async function changeLoginEmail(client, userId, email, actor, { notify = false }
     key: EVENTS.APP_USER_EMAIL_CHANGED,
     entity: { type: "app_user", id: userId },
     actor,
-    before: { email: login.email },
+    before: { email: held.email },
     after: { email: to },
-    payload: { from: login.email, to, notify, first_name: login.first_name },
+    payload: { from: held.email, to, notify, first_name: held.first_name },
   });
-  return { user_id: userId, from: login.email, to, ended };
+  return { user_id: userId, from: held.email, to, ended };
 }
 
 /**
@@ -1137,11 +1137,11 @@ async function followWorkEmail(event) {
   const change = event.payload && event.payload.work_email;
   if (!change || !change.to) return;
   await tx(async (client) => {
-    const login = await repo.findLoginByEmployeeId(client, event.entity.id);
-    if (!login || login.password_changed_at || login.login_status !== "active") return;
+    const held = await repo.findLoginByEmployeeId(client, event.entity.id);
+    if (!held || held.password_changed_at || held.login_status !== "active") return;
     const holder = await repo.findLoginByEmail(client, change.to);
-    if (holder && holder.user_id !== login.user_id) return;
-    await changeLoginEmail(client, login.user_id, change.to, null);
+    if (holder && holder.user_id !== held.user_id) return;
+    await changeLoginEmail(client, held.user_id, change.to, null);
   });
 }
 
