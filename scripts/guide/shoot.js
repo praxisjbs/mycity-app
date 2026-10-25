@@ -132,7 +132,9 @@ function seen(l) {
   return l.evaluate((el) => {
     const r = el.getBoundingClientRect();
     const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-    return !!hit && (hit === el || el.contains(hit));
+    // A label that takes no pointer is hit through the button or link that holds it.
+    const holder = el.closest("button, a, [role=button], [role=option], [role=menuitem], [role=tab], label");
+    return !!hit && (hit === el || el.contains(hit) || hit === holder);
   });
 }
 
@@ -289,6 +291,7 @@ async function take(page, shot, device, file, { guest = false, origin = "" } = {
     await appSettle(page);
   }
   for (const step of shot.spec.do) {
+    if (step.device && step.device !== device) continue;
     await doStep(page, step);
     await appSettle(page);
   }

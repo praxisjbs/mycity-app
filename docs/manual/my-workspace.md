@@ -603,10 +603,9 @@ marks:
 ```shot workspace-send-commitments
 open: /workspace?tab=tasks
 as: operations
-device: desktop
 do:
   - click: button "Send Commitments"
-  - wait: text "Commitments to Send"
+  - wait: heading "Send Commitments"
 crop: modal
 marks:
   1: text "Month" | The month to send
@@ -645,7 +644,6 @@ marks:
 ```shot workspace-new-event
 open: /workspace?tab=calendar
 as: operations
-device: desktop
 do:
   - click: button "New Event"
   - wait: label "Event"

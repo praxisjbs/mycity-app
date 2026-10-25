@@ -24,10 +24,11 @@
     ]
   },
   "mailbox-configure": {
-    "spec": "209d3eacaaed8a7c",
+    "spec": "6c4628ec8557c947",
     "source": "a3b03ced86a3fad4",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "mailbox-drafts": {

@@ -221,27 +221,32 @@ function parseShot(id, lines, at) {
     if (item && list) {
       const body = item[1];
       if (list === "do") {
-        const d = /^(click|fill|press|wait|scroll|lock):\s*(.+)$/.exec(body);
-        if (!d) {
-          problems.push(`${where}: a do step reads "click: <target>", "fill: <target> = <text>", "press: <key>", "wait: <target>", "scroll: <target>" or "lock: <reason>"`);
+        // A step may name one device ("phone click: ..."): the phone reaches some controls another
+        // way, through a menu or Quick Actions, while the picture shows the same thing.
+        const m = /^(?:(desktop|phone) )?(click|fill|press|wait|scroll|lock):\s*(.+)$/.exec(body);
+        if (!m) {
+          problems.push(`${where}: a do step reads "click: <target>", "fill: <target> = <text>", "press: <key>", "wait: <target>", "scroll: <target>" or "lock: <reason>", after "phone " or "desktop " for one device only`);
           continue;
         }
-        if (d[1] === "press") spec.do.push({ action: "press", key: d[2].trim() });
+        const [, only, act, arg] = m;
+        const before = spec.do.length;
+        if (act === "press") spec.do.push({ action: "press", key: arg.trim() });
         // The lock screen, as another tab or the session's clock would bring it: idle, time or ended.
-        else if (d[1] === "lock") {
-          if (LOCKS.includes(d[2].trim())) spec.do.push({ action: "lock", reason: d[2].trim() });
+        else if (act === "lock") {
+          if (LOCKS.includes(arg.trim())) spec.do.push({ action: "lock", reason: arg.trim() });
           else problems.push(`${where}: lock reads "lock: idle", "lock: time" or "lock: ended"`);
         }
-        else if (d[1] === "fill") {
-          const f = /^(.+?)\s+=\s+(.*)$/.exec(d[2]);
+        else if (act === "fill") {
+          const f = /^(.+?)\s+=\s+(.*)$/.exec(arg);
           const target = f && parseTarget(f[1]);
           if (!target) problems.push(`${where}: fill reads "fill: <target> = <text>"`);
           else spec.do.push({ action: "fill", target, value: f[2] });
         } else {
-          const target = parseTarget(d[2]);
-          if (!target) problems.push(`${where}: "${d[2]}" is not a target (button "X", label "X", text "X", css ...)`);
-          else spec.do.push({ action: d[1], target });
+          const target = parseTarget(arg);
+          if (!target) problems.push(`${where}: "${arg}" is not a target (button "X", label "X", text "X", css ...)`);
+          else spec.do.push({ action: act, target });
         }
+        if (only && spec.do.length > before) spec.do[before].device = only;
       } else if (list === "marks") {
         const k = /^(\d+):\s*(.+?)\s*(?:\|\s*(.+))?$/.exec(body);
         const target = k && parseTarget(k[2]);

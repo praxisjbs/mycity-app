@@ -630,9 +630,9 @@ marks:
 ```shot performance-key-result
 open: /performance?tab=goals
 as: ceo
-device: desktop
 do:
-  - click: text "Publish 36 city stories across channels"
+  - desktop click: text "Publish 36 city stories across channels"
+  - phone click: button "BM-KR1.2"
   - wait: button "Confirm Score"
 crop: modal
 marks:
@@ -644,7 +644,6 @@ marks:
 ```shot performance-plan-approval
 open: /performance?tab=goals
 as: operations
-device: desktop
 do:
   - click: text "Content Plan"
   - wait: button "Approve Plan"
@@ -666,7 +665,6 @@ marks:
 ```shot performance-scorecard
 open: /performance?tab=targets
 as: operations
-device: desktop
 do:
   - click: text "Grace Okon"
   - wait: button "Approve Scorecard"
@@ -708,7 +706,6 @@ marks:
 ```shot performance-review
 open: /performance?tab=reviews
 as: operations
-device: desktop
 do:
   - wait: heading "Waiting On You"
   - click: text "Obinna Ike"

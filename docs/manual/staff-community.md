@@ -219,13 +219,13 @@ marks:
 ```shot community-plus
 open: /community?tab=channels
 as: staff
-device: desktop
 do:
+  - phone click: text "general"
   - click: button "Add to message"
-  - wait: role menuitem "Recognise a Colleague"
+  - wait: text "Recognise a Colleague"
 marks:
-  1: role menuitem "Recognise a Colleague" | Thank a colleague
-  2: role menuitem "Attach a File" | Send files
+  1: text "Recognise a Colleague" | Thank a colleague
+  2: text "Attach a File" | Send files
 ```
 
 ```shot community-direct-messages
