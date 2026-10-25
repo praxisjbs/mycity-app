@@ -16,6 +16,10 @@
  * does too, since it stops at the first failure. The groups share nothing that
  * one could break for another: the screens group builds its own demo app and
  * gallery (scripts/check/lib/screens.js, gallery.js), away from fe:build's.
+ * The processor they do share: the frontend's tests run on the machine's CPUs
+ * less two (MYCITY_TEST_WORKERS, read by scripts/fe-test.js), left to the
+ * backend's tests and the screens' browser, since tests that wait on a clock
+ * fail when starved.
  *
  * NOT BUILT IS NOT PASSED. Most gate scripts exist as empty files until their
  * M0 slice is written. Running an empty file exits 0, which would print a
@@ -41,6 +45,7 @@
  * documents, and report the rest as skipped. Unset, or on a laptop, it is full.
  */
 const { spawn } = require("node:child_process");
+const os = require("node:os");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -193,9 +198,9 @@ if (has("list")) {
 }
 
 /** Runs one gate in its own process; its output is kept for the report. */
-function run(args) {
+function run(args, env) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, args, { cwd: ROOT, env: process.env });
+    const child = spawn(process.execPath, args, { cwd: ROOT, env });
     let out = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (out += d));
@@ -213,7 +218,9 @@ async function check(gate, tag) {
   // One after another, the line opens as the gate starts; at once, it is written whole as it ends.
   if (!tag) process.stdout.write(`▸ ${gate.label} … `);
   const started = Date.now();
-  const r = await run(c.argv);
+  // Beside the other groups, the frontend's tests leave two CPUs to the backend's tests and the screens' browser.
+  const share = tag && !process.env.MYCITY_TEST_WORKERS ? { MYCITY_TEST_WORKERS: String(Math.max(1, (os.availableParallelism?.() ?? os.cpus().length) - 2)) } : {};
+  const r = await run(c.argv, { ...process.env, ...share });
   const secs = ((Date.now() - started) / 1000).toFixed(1);
   const ok = r.status === 0;
   if (tag) console.log(`▸ ${gate.label} … ${ok ? "ok" : "FAILED"} (${secs}s)  [${tag}]`);
