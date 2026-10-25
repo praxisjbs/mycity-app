@@ -56,9 +56,12 @@ export function shortMessage(error: { type?: string; message?: string } | undefi
       // A schema's own message for a missing or wrong value ("Pick an address") over the generic one.
       return message && !/^(Required|Expected )/.test(message) && words(message).length <= 4 ? sentence(message) : "Required";
     case "too_small":
-      return /at least 1 /.test(message) ? "Required" : "Too short";
     case "too_big":
-      return "Too long";
+      // A schema's own words for its limit ("At least 150 m", "Add a recipient") over the generic
+      // ones; Zod's own ("String must contain at least 3 character(s)") never fit in four words.
+      if (message && words(message).length <= 4) return sentence(message);
+      if (error.type === "too_big") return "Too long";
+      return /at least 1 /.test(message) ? "Required" : "Too short";
     case "invalid_enum_value":
       return "Choose one";
     case "invalid_date":
