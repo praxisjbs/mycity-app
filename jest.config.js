@@ -42,7 +42,9 @@ module.exports = {
   testMatch: ["<rootDir>/src/**/*.test.js", "<rootDir>/tests/**/*.test.js", "<rootDir>/scripts/**/*.test.js"],
   testPathIgnorePatterns: ignored,
   passWithNoTests: true,
-  testTimeout: 15000,
+  // The integration files rebuild the test database's schema in beforeAll (every migration), which
+  // took longer than 15 s on a loaded machine (npm run ci's four groups at once on four CPUs).
+  testTimeout: process.env.RUN_DB_TESTS === "1" ? 60000 : 15000,
   // APP_ENV=test: responses are checked against their contract and a mismatch fails the test.
   setupFiles: ["<rootDir>/tests/setup-env.js"],
   // The error reporter's batch timer never outlives the file that started it.
