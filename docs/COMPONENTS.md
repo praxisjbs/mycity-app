@@ -133,6 +133,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
+| Documents | [GuideBody](#guidebody) | `GuideBody` | A User Guide chapter's body: numbered steps with Open links, notes, tables and annotated pictures. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
@@ -4287,6 +4288,40 @@ A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its n
 
 ```tsx
 <FileCard name="Call sheet.pdf" mime="application/pdf" sizeBytes={245000} pages={3} preview={src} hasPreview onOpen={open} onDownload={save} />
+```
+
+### GuideBody
+
+A User Guide chapter's body: numbered steps with Open links, notes, tables and annotated pictures.
+
+| | |
+|---|---|
+| Use | The Knowledge Hub's User Guide, the Full Guide and the Quick Start cards, fed the blocks the API sent (docs/guides/user-guide.md §6.2). |
+| Avoid | An article someone wrote (ArticleBody); a document the product generated (Paper); help on a field (HelpTerm). |
+| Phone | Steps keep their numbers on the left, a picture is the phone shot when there is one, and a wide table scrolls inside its own box. |
+| Accessibility | Steps are an ordered list, each with its own id so a reader can come back to it; a picture carries its text and its marks are listed under it. A link to another site says it opens in a new tab. |
+| Status | beta |
+| Exports | `GuideBody` |
+| Import | `import { GuideBody } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/GuideBody.tsx` |
+| Test | `packages/ui/src/documents/GuideBody.test.tsx` |
+| Gallery | `packages/ui/src/documents/GuideBody.gallery.tsx` (`npm run gallery`, `#/GuideBody`) |
+
+**GuideBody** props (`GuideBodyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `blocks` | `GuideBlock[]` | yes | The blocks, as the API sent them. |
+| `anchor` | `string` | yes | The section's or task's slug: each step's id is `<anchor>-step-<n>`. |
+| `picture` | `(shot: string) => GuidePicture \| null` |  | A picture's files and marks by its shot id; null when it has none. |
+| `fetchImage` | `(url: string) => Promise<Blob>` |  | Fetches a picture that needs the session; without it the address is drawn as it is. |
+| `onLink` | `(href: string, from: GuideLinkFrom) => void` |  | Called for a screen (`/people?tab=x`) or a section (`#slug`) link; without it they are plain links. |
+| `onZoom` | `(shot: string) => void` |  | Called when a picture is pressed, to show it full size. |
+| `highlight` | `number \| null` |  | The step to mark as the one the reader came back to. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<GuideBody blocks={section.blocks} anchor="people-add-employee" picture={pictureOf} onLink={open} />
 ```
 
 ### ImageViewer
