@@ -45,7 +45,8 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
     if (mod.key === "settings" && SYSTEM_HEALTH_TABS.includes(t.slug)) return healthView(me);
     if (mod.key === "settings" && t.slug === "integrations") return integrationsView(me);
     if (mod.key === "settings") return !!FULL(me);
-    if (mod.key === "people" && !FULL(me)) return t.slug === "attendance" || t.slug === "organogram";
+    /* A line manager decides their team's leave on People · Leave, the list scoped to their team (docs/guides/ess.md §2). */
+    if (mod.key === "people" && !FULL(me)) return t.slug === "attendance" || t.slug === "organogram" || (t.slug === "leave" && me.manages_people);
     /* Announcements is the posting and read-tracking side; staff read them in #announcements. */
     if (mod.key === "community" && t.slug === "announcements") return !!me.grants.people?.includes("create");
     if (mod.key === "queries" && !FULL(me)) return t.slug === "queries";

@@ -18,6 +18,7 @@
 const { AppError } = require("../../shared/errors");
 const repo = require("./organisation.repo");
 const { PHOTO_VARIANTS, photoPath } = require("../../shared/db/person");
+const { employeeFieldNames } = require("@mycity/contract/schemas/organisation");
 
 const day = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : (v ?? null));
 const at = (v) => (v instanceof Date ? v.toISOString() : (v ?? null));
@@ -97,9 +98,9 @@ async function history(client, employeeId, query) {
   };
 }
 
-/** The line the History tab shows: what was done, and to which fields. */
+/** The line the History tab shows: what was done, and to which fields, in the record's own words. */
 function summaryOf(row) {
-  const fields = (row.changed_fields || []).filter(Boolean);
+  const fields = employeeFieldNames(row.changed_fields);
   const said = {
     "employee.created": "Record created",
     "employee.updated": "Record changed",

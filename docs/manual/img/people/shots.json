@@ -15,6 +15,38 @@
       "phone"
     ]
   },
+  "people-add-worksite": {
+    "spec": "13e04a9de901571f",
+    "source": "a1987ca1da207395",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-attendance": {
+    "spec": "b309e30b085f4402",
+    "source": "9c0e96929676b9a1",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-attendance-day": {
+    "spec": "bf1435298229e249",
+    "source": "9c0e96929676b9a1",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-devices": {
+    "spec": "919c4a0f0e2155de",
+    "source": "b8e16992194579dc",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "people-employees": {
     "spec": "5953b0f4b3738e2e",
     "source": "973aaa7aef06646b",
@@ -23,9 +55,41 @@
       "phone"
     ]
   },
+  "people-leave": {
+    "spec": "a754bbefe30a7b46",
+    "source": "973aaa7aef06646b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-leave-request": {
+    "spec": "96179e1b497d79d4",
+    "source": "973aaa7aef06646b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-organogram": {
+    "spec": "a8c85e33f01ef229",
+    "source": "3147e67c7ee7d57f",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "people-record": {
     "spec": "dabf9149a2344980",
     "source": "973aaa7aef06646b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-worksites": {
+    "spec": "ae05a0bb276baf92",
+    "source": "a1987ca1da207395",
     "devices": [
       "desktop",
       "phone"

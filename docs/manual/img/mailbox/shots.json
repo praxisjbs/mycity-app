@@ -1,0 +1,89 @@
+{
+  "mailbox-ai": {
+    "spec": "b2a7172f1d1fb27e",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-archive": {
+    "spec": "80dcc6a618bc05ed",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-compose": {
+    "spec": "6612fdd0bcde7dee",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-configure": {
+    "spec": "209d3eacaaed8a7c",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "mailbox-drafts": {
+    "spec": "d831da63adcf11f5",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-inbox": {
+    "spec": "600cdd97cbf144b9",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-message": {
+    "spec": "81568fd6877e1597",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-sent": {
+    "spec": "79363810291199d6",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-signature": {
+    "spec": "0a8668265397107a",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-spam": {
+    "spec": "70842acd00500c2b",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-trash": {
+    "spec": "3a9e6f56e4665384",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

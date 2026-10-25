@@ -63,6 +63,11 @@ describe("shell access", () => {
     expect(visibleModules(me).map((m) => m.key)).toEqual(["people"]);
   });
 
+  it("a line manager opens People · Leave to decide their team's leave; anyone else without Settings does not", () => {
+    expect(visibleTabs(person([], { manages_people: true }), people).map((t) => t.slug)).toEqual(["organogram", "attendance", "leave"]);
+    expect(visibleTabs(person([]), people).map((t) => t.slug)).not.toContain("leave");
+  });
+
   it("every other module's tabs are gated as before", () => {
     expect(visibleTabs(person(["home.team"]), people).map((t) => t.slug)).toEqual(["organogram", "attendance"]);
     expect(visibleTabs(person([], { is_ceo: true }), people)).toHaveLength(people.tabs.length);

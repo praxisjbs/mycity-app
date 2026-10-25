@@ -17,9 +17,17 @@
   },
   "qs-agree": {
     "spec": "1f4315f2fc2da129",
-    "source": "c85bbf51d86d6d70",
+    "source": "902e8a3fb4181468",
     "devices": [
       "desktop"
+    ]
+  },
+  "qs-announcement": {
+    "spec": "db708f827aaf9de8",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   },
   "qs-approve-commitments": {
@@ -29,9 +37,33 @@
       "desktop"
     ]
   },
+  "qs-approve-leave": {
+    "spec": "b8eeb29bd8163cd7",
+    "source": "973aaa7aef06646b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-channel": {
+    "spec": "344266c761e21850",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "288bfd1502329081",
+    "source": "ecd0b0d199a54ab9",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-clock-in": {
+    "spec": "51edfe0fed8ea055",
+    "source": "87c3e88eb9ae8a95",
     "devices": [
       "desktop",
       "phone"
@@ -58,6 +90,14 @@
       "desktop"
     ]
   },
+  "qs-mail": {
+    "spec": "6412fe26f671c6a8",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-notifications": {
     "spec": "41aa643b8a3f811d",
     "source": "6d62b037ddf8abb4",
@@ -72,6 +112,14 @@
       "desktop"
     ]
   },
+  "qs-policy": {
+    "spec": "76af8b46d1d2858d",
+    "source": "535f39ef3d8f4df9",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-quarter": {
     "spec": "381ff6c701a85111",
     "source": "9e1c460117e75c46",
@@ -84,6 +132,14 @@
     "source": "9e1c460117e75c46",
     "devices": [
       "desktop"
+    ]
+  },
+  "qs-request-leave": {
+    "spec": "0db81a71cb5f5bc5",
+    "source": "4afa398999008188",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   },
   "qs-roles": {
@@ -120,6 +176,14 @@
     "source": "199f220c9450ebe5",
     "devices": [
       "desktop"
+    ]
+  },
+  "qs-team": {
+    "spec": "fb8093ebf06b841e",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   },
   "qs-team-tasks": {

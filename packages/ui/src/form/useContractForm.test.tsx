@@ -103,6 +103,12 @@ describe("useContractForm", () => {
     expect(shortMessage({ type: "invalid_type", message: "Required" })).toBe("Required");
     expect(shortMessage({ type: "invalid_type", message: "Expected object, received string" })).toBe("Required");
     expect(shortMessage({ type: "invalid_type", message: "Pick an address" })).toBe("Pick an address");
+    // A limit the schema words itself is shown in its words; Zod's own limits keep the short ones.
+    expect(shortMessage({ type: "too_small", message: "At least 150 m" })).toBe("At least 150 m");
+    expect(shortMessage({ type: "too_small", message: "Add a recipient" })).toBe("Add a recipient");
+    expect(shortMessage({ type: "too_big", message: "At most 500 m" })).toBe("At most 500 m");
+    expect(shortMessage({ type: "too_small", message: "String must contain at least 3 character(s)" })).toBe("Too short");
+    expect(shortMessage({ type: "too_big", message: "Number must be less than or equal to 500" })).toBe("Too long");
   });
 });
 

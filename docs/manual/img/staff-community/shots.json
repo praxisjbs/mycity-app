@@ -1,0 +1,57 @@
+{
+  "community-announcements": {
+    "spec": "8178e5da3db37957",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "community-channel-open": {
+    "spec": "1c8b1d196a4d8894",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "community-channels": {
+    "spec": "228c84c59c33cb4a",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "community-direct-messages": {
+    "spec": "91f0db9eec5f57a3",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "community-new-announcement": {
+    "spec": "7517e535ad4d6b39",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "community-new-channel": {
+    "spec": "8813caa88f36ed03",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "community-plus": {
+    "spec": "e0e1fc6643979e31",
+    "source": "da280e1c4c1f6901",
+    "devices": [
+      "desktop"
+    ]
+  }
+}

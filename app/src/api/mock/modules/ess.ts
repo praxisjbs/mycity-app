@@ -1,6 +1,7 @@
 import type { RawResponse } from "../../client";
 import { at, invalid, isoDaysAgo, isoDaysAhead, ok, paged, route, sid, fail } from "../core";
 import type { EmployeeHistoryEntry, EssProfile, ExportFile } from "@mycity/contract/contract.gen.ts";
+import organisation from "@mycity/contract/schemas/organisation.js";
 import { exportFile } from "./shared";
 import { byKey, managerOf } from "../data/people";
 import { workWeekOf } from "./attendance";
@@ -63,7 +64,7 @@ function historyOf(key: string): EmployeeHistoryEntry[] {
   const p = byKey(key)!;
   return [
     ...(HISTORY.get(key) ?? []),
-    { event_id: sid(`hist:${key}:bank`), occurred_at: at(61, "10:00"), action: "employee.updated", actor_name: p.display_name, changed_fields: ["bank_name", "account_number"], summary: "Record changed: bank_name, account_number" },
+    { event_id: sid(`hist:${key}:bank`), occurred_at: at(61, "10:00"), action: "employee.updated", actor_name: p.display_name, changed_fields: ["bank_name", "account_number"], summary: "Record changed: Bank, Account Number" },
     { event_id: sid(`hist:${key}:created`), occurred_at: `${p.start_date}T09:00:00.000Z`, action: "employee.created", actor_name: "Operations & People", changed_fields: [], summary: "Record created" },
   ];
 }
@@ -86,7 +87,7 @@ route("PATCH /api/v1/ess/profile", (req) => {
   if (home) HOMES.set(req.user!, home);
   const fields = [...Object.keys(b), ...(home ? ["home_address"] : [])];
   HISTORY.set(req.user!, [
-    { event_id: sid(`hist:${req.user}:${Date.now()}`), occurred_at: new Date().toISOString(), action: "employee.updated", actor_name: byKey(req.user)!.display_name, changed_fields: fields, summary: `Record changed: ${fields.join(", ")}` },
+    { event_id: sid(`hist:${req.user}:${Date.now()}`), occurred_at: new Date().toISOString(), action: "employee.updated", actor_name: byKey(req.user)!.display_name, changed_fields: fields, summary: `Record changed: ${organisation.employeeFieldNames(fields).join(", ")}` },
     ...(HISTORY.get(req.user!) ?? []),
   ]);
   return ok(profile(req.user!));

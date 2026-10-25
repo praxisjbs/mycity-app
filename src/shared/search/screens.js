@@ -178,7 +178,8 @@ function tabVisible(screen, reader) {
   if (module === "home" && tab === "reports") return hasCapability(reader, "home.reports");
   // Knowledge Hub · Policies is for those who write policies; everyone reads theirs on Policy Updates.
   if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
-  if (module === "people" && !full) return tab === "attendance" || tab === "organogram";
+  // A line manager decides their team's leave on People · Leave (docs/guides/ess.md §2).
+  if (module === "people" && !full) return tab === "attendance" || tab === "organogram" || (tab === "leave" && reader.manages_people);
   if (module === "community" && tab === "announcements") return can("people", "create");
   if (module === "queries" && !full) return tab === "queries";
   if (module === "expenses" && !full)

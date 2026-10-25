@@ -1,0 +1,112 @@
+{
+  "ess-attendance": {
+    "spec": "207947064e7bdf5e",
+    "source": "e7f9344a304cf4e5",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-clock": {
+    "spec": "68dcd8deac77ee3c",
+    "source": "87c3e88eb9ae8a95",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-devices": {
+    "spec": "12c539916b4839a8",
+    "source": "f922454a378d6001",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-documents": {
+    "spec": "478e2773dd22920e",
+    "source": "315d921dfcb86143",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-leave": {
+    "spec": "11b9162cdaa5f6f3",
+    "source": "315d921dfcb86143",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-org-chart": {
+    "spec": "fa8db6541369de9f",
+    "source": "bae117e8973301db",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-policies": {
+    "spec": "3cfe5a1b37968e4d",
+    "source": "c58ae818c8e04046",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-policy-prompt": {
+    "spec": "e1686d31f835f864",
+    "source": "16c5c1c13ef4fe8d",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-profile": {
+    "spec": "76c6e2e4c39ee5fa",
+    "source": "315d921dfcb86143",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-profile-edit": {
+    "spec": "bb2b1816539f178f",
+    "source": "315d921dfcb86143",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-request-leave": {
+    "spec": "c8bbd2782de7a52f",
+    "source": "4afa398999008188",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-security": {
+    "spec": "0b05e2a9d9ed9dcb",
+    "source": "315d921dfcb86143",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "ess-security-phone": {
+    "spec": "5484db2fbf6c6b6f",
+    "source": "315d921dfcb86143",
+    "devices": [
+      "phone"
+    ]
+  },
+  "ess-work-location": {
+    "spec": "84a4b6ec1786e07a",
+    "source": "0adb9a4c73dffa85",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

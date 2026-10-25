@@ -116,9 +116,13 @@ export function MySecurityPage() {
   };
   const others = async () => {
     if (!(await confirm({ title: "Sign Out Others", confirmLabel: "Sign Out" }))) return;
-    const r = await endOthers.run({ body: {} });
-    refresh();
-    toast(r.ended === 1 ? "1 device signed out" : `${r.ended} devices signed out`);
+    try {
+      const r = await endOthers.run({ body: {} });
+      refresh();
+      toast(r.ended === 1 ? "1 device signed out" : `${r.ended} devices signed out`);
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not signed out. Try again.");
+    }
   };
 
   const pw = (

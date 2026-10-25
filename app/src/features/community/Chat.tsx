@@ -985,6 +985,9 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
       await onSend({ message_type: "text", body, ...(link.removedFrom(body) ? { no_link_preview: true } : {}) });
       setText("");
       link.reset();
+    } catch (e) {
+      // The words stay in the box, so the person can send them again.
+      toast(e instanceof ApiError ? e.message : "Not sent. Try again.");
     } finally {
       setBusy(false);
     }
