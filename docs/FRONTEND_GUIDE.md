@@ -6,7 +6,7 @@ React apps: the staff app (`app/`, `hub.mycityapp.io`) and the public site (`pub
 
 Status: **the rules here are settled. The foundation (§9) is one design system for both apps,
 `packages/ui` (`@mycity/ui`), owned by AJ (Adole Jerome), backup TB.** It is built in three PRs
-planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F27 are binding: where this guide
+planned in `docs/FRONTEND_FOUNDATION.md`, whose decisions F1 to F31 are binding: where this guide
 and that file differ, that file wins and this one is fixed. Started 13 October 2026 from
 MILESTONES §1.1, §3 and §17 and the 12 October internal meeting; §5, §7 and §8 rewritten 14 October
 2026 into the screen content, two shells and form conventions; §1 to §3, §6, §9, §10 and §11
@@ -14,7 +14,8 @@ rewritten 15 October 2026 for `packages/ui` (PR 1, Ground), and §5, §7 and §8
 §1, §7, §9 and §10 brought up to the built shells the same day (PR 2, Shell); §8.8 and gate 21
 (nothing the browser styles itself, F25) added 18 October 2026, and one press, one request (F26:
 §8.4, §9.4, the `no-void-press` lint) the same day; refresh (F28) and back and forward (F29) in the
-hub added 20 October 2026 (§7, §9.2, §9.5, §9.7).
+hub added 20 October 2026 (§7, §9.2, §9.5, §9.7); a record opens in a sheet on a phone, never below
+its list (F31, `ListDetail`, gate 11) added 25 October 2026 (§7, §10).
 If something here is wrong or missing, fix the guide in the same PR as the code.
 
 **Feature guides are full-stack guides.** A guide in `docs/guides/` covers the backend modules,
@@ -36,7 +37,7 @@ the client has already accepted.
 Guides lead, gates confirm (F9). Every builder, person or AI, starts here, so the gates in §10
 confirm work that was built right instead of rejecting it at the end.
 
-1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F27 and where each foundation PR
+1. **Read `docs/FRONTEND_FOUNDATION.md`**: the decisions F1 to F31 and where each foundation PR
    stands. Then **read `docs/COMPONENTS.md`**, the catalogue of every shared component: what it is
    for, when not to use it, its props and how it behaves on a phone. It is generated from the code
    (`npm run gen:components`), so it is never out of date.
@@ -339,6 +340,14 @@ action (`useScreenAction`, below), and never rely on dragging on a phone.
   spring and closes by dragging down (F6); a long form becomes a full screen sheet. `Menu` becomes
   an action sheet. A sheet stays above the keyboard; once it holds a text field, a drag or a scrim
   tap never closes it, so typing is never lost to a stray swipe.
+- **A record opens in a sheet, never below its list** (F31). A tapped row opens its record in a
+  bottom sheet; the list stays where it was underneath, and nothing opens until a row is tapped. A
+  list and the record it opens are always `ListDetail` (side by side on desktop from 1181 px, the
+  centred dialog below that, the sheet on a phone), or `DetailPane` where the desktop layout puts
+  the record elsewhere on the page. A screen shows a first pick unasked only while `useSideBySide()`
+  is true (or, for a `DetailPane`, off a phone). Never a record card under, over or beside the list
+  in a phone's page. A record with its own screen (an `id` route) and a reader that fills the
+  screen (`SplitPanes`) keep their own shapes.
 - **The main action within thumb reach**: at the bottom of the screen or the sheet, full width.
 - **Tap targets at least 44 × 44 px.** Inline help terms inside a sentence or heading are the only
   exception.
@@ -361,7 +370,9 @@ floating button never show.
 and desktop size (1440 × 900) in Chromium: the gallery, every app screen (the mock build, signed
 in), and `demo.html` only when a change touches it (F23). It fails on: sideways page scrolling, the desktop
 sidebar on a phone, the bottom bar on desktop, a visible table on a phone, a tap target under
-44 px, more than 40 words of interface copy on the first phone screen, and any script error. The
+44 px, more than 40 words of interface copy on the first phone screen, a record that opens in the
+page with its list (it taps each phone screen's first two rows that open something, F31), and any
+script error. The
 feature guide's §10 carries a per-screen phone table, and the pull request body states the steps
 taken for the native app feel (the PR template asks). No screenshots are required.
 
@@ -593,7 +604,8 @@ packages/ui/
     icons/                    Icon (Lucide underneath)
     actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
                               Form and Modal share (F26)
-    layout/                   Card, PageHeader, Grid, Stack, Inline, PhoneOnly, DesktopOnly
+    layout/                   Card, PageHeader, Grid, Stack, Inline, PhoneOnly, DesktopOnly, SplitPanes,
+                              ListDetail and DetailPane (a list and the record it opens, F31)
     display/                  Pill, StatusPill, Avatar, Who, CountBadge, KeyValue, Banner, EmptyState,
                               EmptyValue, Skeleton, Spinner, ProgressBar, Meter, Kbd, Money
     navigation/               Tabs, SegmentedControl, Chips
@@ -934,7 +946,9 @@ person wrote or received is marked `data-copy="content"` and is not counted: mes
 lists, mail rows, announcements, articles and documents, timelines, chains, bars, pills, people and
 record names (`CardHeader record`), the org chart and the phone card list. A heading written by hand
 in a feature carries `data-ui="title"` or `data-copy="content"`, so the gate sees it. On a phone,
-every button, chip, tab, input and switch is at least 44 × 44 px. The gates crawl the gallery and
+every button, chip, tab, input and switch is at least 44 × 44 px. The button that opens a row
+(DataView's phone card, a TapList row, a Kanban card) carries `data-row-open`, which gate 11 taps
+to see where the record opens (F31). The gates crawl the gallery and
 every app screen (the mock build, as the Operations account); a screen only Staff or the CEO see is
 held to the same rules by review until the crawl signs in as them too.
 
@@ -1101,7 +1115,7 @@ when a change touches it (F23). Several gates are lint rules in
 | Gate | Where | Refuses |
 |---|---|---|
 | 8 Five-second rule | `scripts/check/five-second.js` | A word limit broken (§5.3), an explainer title, chrome not in Title Case, help visible on load, a subtitle or chart caption on a phone, text in a modal footer |
-| 11 Two shells | `scripts/check/two-shells.js` | Sideways scrolling, the wrong navigation for the width, a table on a phone, a tap target under 44 px, a wordy first phone screen, a script error (§7) |
+| 11 Two shells | `scripts/check/two-shells.js` | Sideways scrolling, the wrong navigation for the width, a table on a phone, a tap target under 44 px, a wordy first phone screen, a tapped row whose record opens in the page instead of a sheet (F31), a script error (§7) |
 | 12 Inline validation and the form system | `scripts/check/forms.js` | A raw form element or `react-hook-form` outside `packages/ui/src/form/`, a hand-made label, an asterisk, an instruction as a placeholder, a long field error, a Submit or OK button (§8) |
 | 13 Palette | lint `no-hex`; `scripts/check/palette.js` | A raw hex outside `tokens.css`; `#FFCD05` or `#004F70` anywhere; a colour, an arbitrary value or a `style` prop in an app (F4), with no exemptions |
 | 14 Contrast | `scripts/check/contrast.js` | A text pair in `tokens.css` below AA (4.5:1) in either theme, chart series included (§9.3) |
@@ -1137,6 +1151,8 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
 - [ ] Help only through `HelpTerm`, `InfoButton` and `Details`, closed by default
 - [ ] Icons through `Icon`; empty states carry the shared illustration
 - [ ] Desktop and mobile shells both built; the PR body states the native app feel measures (gate 11)
+- [ ] A list and the record it opens through `ListDetail` or `DetailPane`: on a phone the record
+  opens in a sheet when a row is tapped, never in the page below the list (F31)
 - [ ] Forms only from the form system in `@mycity/ui` (`packages/ui/src/form/`), validated as filled
   by `useContractForm` from the contract schema, or INTERIM rules until it exists (gate 12)
 - [ ] Day-first dates, formatted money, through the `@mycity/ui` helpers

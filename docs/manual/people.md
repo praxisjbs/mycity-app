@@ -259,8 +259,9 @@ them.
 2. The figures count those **On Leave Today**, those **Pending Approval**, those
    **Starting Soon** in the next 14 days, and those **Approved This Year**.
 3. Press a chip, such as **Pending**, or type in **Name or type**.
-4. Press a request. Its card shows the **Employee**, **Type**, **From**, **To**, **Days**,
-   **Status**, who it is **Waiting On**, and **Also Away**: who else in the department is off then.
+4. Press a request. It opens beside the list, or over it on a phone, with the **Employee**,
+   **Type**, **From**, **To**, **Days**, **Status**, who it is **Waiting On**, and **Also Away**: who
+   else in the department is off then. On a phone, drag it down to close it.
 5. **Leave Calendar** shows a month of approved and waiting leave.
 
 ### Approve or reject leave {#people-leave-decide needs="people approve"}
@@ -455,6 +456,8 @@ marks:
 ```shot people-leave-request
 open: /people?tab=leave
 as: operations
+sources:
+  - packages/ui/src/layout/ListDetail.tsx
 do:
   - click: button "Pending"
   - click: row 1

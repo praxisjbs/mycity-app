@@ -874,6 +874,27 @@ there reads as words. Phone accepts the ten digits the field invites after +234 
 without repeating the code. Account Number keeps digits only. The Wizard keeps focus in the field
 being typed in (a parent re-rendering pulled it to the step's heading after each key).
 
+### 6.17 A record opens in a sheet on a phone (JBS Praxis, 25/10/2026; FRONTEND_FOUNDATION F31)
+
+On a phone, People · Leave put a tapped request's card under the list, where nobody saw it open. JBS
+Praxis's four answers that day (FRONTEND_FOUNDATION §5) made it a rule for every screen of both apps:
+
+- **On a phone a tapped row opens its record in a bottom sheet** (the shared `Modal`; a full sheet for a
+  payslip, a letter or a document). The list stays where it was underneath, Back and a drag down close
+  it, and nothing opens until a row is tapped: a screen's first pick (the first waiting request, the
+  summary's focus) is a desktop convenience only.
+- **On desktop the list and the record stay side by side** from 1181 px; between 761 and 1180 px, where
+  two columns do not fit, the record opens in the centred dialog. A record the desktop layout places
+  elsewhere (under the list beside a chart, above it) stays there.
+- **One way to build it**: `ListDetail` from `@mycity/ui` for a list beside its record, `DetailPane` for a
+  record placed elsewhere, and `useSideBySide()` before showing a first pick. A screen never stacks a
+  list and a record card in a `Grid` itself.
+- **Held by gate 11**: at phone size `check/two-shells.js` taps each screen's first two rows that open
+  something (DataView's cards, TapList's rows and Kanban's cards mark theirs) and fails a screen whose
+  record lands in the page. There is no exemption line.
+- **Not affected**: a record with its own screen (an employee's record, a partner's 360) and a reader
+  that fills the screen (`SplitPanes`: the mailbox, chat, Settings · Roles).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -1042,6 +1063,7 @@ screen.
 
 ## 14 · Change log
 
+- 25/10/2026 · JP · §6.17 written: a record opens in a sheet on a phone, never below its list (FRONTEND_FOUNDATION F31, `ListDetail`, gate 11). People · Leave moved onto it, with ESS · My Payslips (`docs/guides/ess.md`) and the M3 to M6 screens that paired a list with a record (Payroll · Payslips, Partnerships · Proposals, Queries and Letter Templates, Recruitment · Candidates, Interviews, Offers and Onboarding, Expenses · My Requests, Approvals and Requisitions).
 - 25/10/2026 · JP · §6.1 and §6.16, the bulk audit: roles by exact title only and logins only for people the roster brought; names once per version of `nomenclature.json` (`department.names_applied`); the counter reserved before a load and numeric Staff IDs padded; a roster person never renumbered and a same-name row with no Staff ID held back; unreadable optional cells left out with a note; departments made only from `nomenclature.json`, found punctuation aside; closed seats kept closed and seats matched by department; birthdays by email; two-pass column mapping, tidied names, phone, year and choice spellings; revert puts lines and emptied fields back, refuses a person now in use and a seat changed since; the Imports screen's Changes view, labelled problems, header-row choice and masked rows. What is left is named in §6.16.
 - 25/10/2026 · JP · §10: the Imports drop zone takes and says 10 MB, the server's limit for a
   workbook, where it said 25.

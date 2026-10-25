@@ -9,7 +9,7 @@ import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportAction, PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/sections";
 import { Letter } from "@/features/shared/Letter";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AddressField, Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useModal, Who, Wizard, type PlaceValue } from "@mycity/ui";
+import { AddressField, Button, Card, CardHeader, ChoiceField, cn, DataView, DateField, DesktopOnly, DetailPane, ErrorState, Field, FilterSelect, formatDate, formatDateTime, FormFooter, Grid, Kanban, KeyValue, ListDetail, LoadingRows, Meter, Money, MoneyField, PageHeader, Pill, Quote, SelectField, StatusPill, TextAreaField, TextField, Timeline, toast, todayIso, Toolbar, useContractForm, useIsPhone, useModal, useSideBySide, Who, Wizard, type PlaceValue } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
 import { toTrail } from "@/features/shared/wire";
@@ -186,6 +186,7 @@ function Candidates({ id }: { id: string | null }) {
   const move = useMutation("POST /api/v1/recruitment/candidates/:id/move");
   const [sel, setSel] = useState<string | null>(id);
   const focus = sel ?? cols[2].rows[0]?.candidate_id ?? null;
+  const byId = new Map(cols.flatMap((c) => c.rows).map((c) => [c.candidate_id, c]));
   const openCard = (c: Candidate) => {
     setSel(c.candidate_id);
     modal.open({ title: c.name, body: (close) => <CandidateDetail id={c.candidate_id} close={close} /> });
@@ -217,16 +218,21 @@ function Candidates({ id }: { id: string | null }) {
       </Toolbar>
       <Kanban
         onMove={onMove}
+        onOpen={(key) => {
+          const c = byId.get(key);
+          if (c) openCard(c);
+        }}
         columns={STAGES.map(([k, label, color], i) => ({
           key: k,
           label,
           color,
           count: cols[i].page?.total,
-          cards: cols[i].rows.map((c) => ({ key: c.candidate_id, title: c.name, meta: <><Pill dot={false}>{c.vacancy.title}</Pill><StatusPill s={c.chip} /></>, onClick: () => openCard(c) })),
+          cards: cols[i].rows.map((c) => ({ key: c.candidate_id, title: c.name, meta: <><Pill dot={false}>{c.vacancy.title}</Pill><StatusPill s={c.chip} /></> })),
         }))}
       />
       <Grid cols={2} className="mt-3">
-        {focus ? <CandidateCard id={focus} /> : <Card><LoadingRows /></Card>}
+        {/* The last candidate opened, beside the scores; on a phone a candidate opens only in its own sheet (F31). */}
+        <DesktopOnly unmount>{focus ? <CandidateCard id={focus} /> : <Card><LoadingRows /></Card>}</DesktopOnly>
         {s.data ? <BarsCard title="Score Distribution, All Applicants" rows={s.data.distribution} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
@@ -399,12 +405,32 @@ function AssessmentForm({ close }: { close: () => void }) {
 
 function Interviews({ id }: { id: string | null }) {
   const modal = useModal();
+  const phone = useIsPhone();
   const list = usePaged("GET /api/v1/recruitment/interviews");
   const [sel, setSel] = useState<string | null>(id);
-  const focus = sel ?? list.rows[0]?.interview_id ?? null;
+  // On desktop the first interview shows unasked; on a phone one opens in a sheet when tapped (F31).
+  const focus = sel ?? (phone ? null : (list.rows[0]?.interview_id ?? null));
   const d = useApi("GET /api/v1/recruitment/interviews/:id", { params: { id: focus ?? "" }, enabled: !!focus });
   const consolidate = useMutation("POST /api/v1/recruitment/interviews/:id/consolidate");
   const x = d.data;
+  const consolidateButton = (
+    <Button
+      variant="primary"
+      disabled={!x || x.round.text === "Closed" || consolidate.pending}
+      onClick={async () => {
+        try {
+          await consolidate.run({ params: { id: x!.interview_id }, body: {} });
+          invalidate("/api/v1/recruitment/interviews");
+          toast("Round closed. The panel now sees scores");
+        } catch (e) {
+          fail(e);
+        }
+      }}
+    >
+      Consolidate
+    </Button>
+  );
+  const activity = x ? <TrailCard title="Round Activity" items={x.activity.map((a) => ({ ...a, when: formatDateTime(a.when) }))} /> : <Card><LoadingRows /></Card>;
   return (
     <>
       <PageHeader
@@ -413,40 +439,38 @@ function Interviews({ id }: { id: string | null }) {
         actions={
           <>
             <Button icon="clock" onClick={() => modal.open({ title: "Schedule Interview", body: (close) => <ScheduleInterview close={close} /> })}>Schedule</Button>
-            <Button
-              variant="primary"
-              disabled={!x || x.round.text === "Closed" || consolidate.pending}
-              onClick={async () => {
-                try {
-                  await consolidate.run({ params: { id: x!.interview_id }, body: {} });
-                  invalidate("/api/v1/recruitment/interviews");
-                  toast("Round closed. The panel now sees scores");
-                } catch (e) {
-                  fail(e);
-                }
-              }}
-            >
-              Consolidate
-            </Button>
+            {!phone && consolidateButton}
           </>
         }
       />
-      {x && (
-        <Grid cols={2}>
-          <DataView
-            title="Panel"
-            right={<StatusPill s={x.round} />}
-            rows={x.panel}
-            rowKey={(p) => p.panellist.employee_id}
-            columns={[
-              { key: "p", label: "Panellist", render: (p) => <Who name={p.panellist.display_name} sub={p.panellist.department ?? undefined} /> },
-              { key: "s", label: "Submitted", render: (p) => <StatusPill s={p.submitted ? { tone: "ok", text: "Submitted" } : { tone: "warn", text: "Pending" }} /> },
-              { key: "n", label: "Score", align: "n", render: (p) => (p.sealed ? <span className="text-subtle-foreground">Hidden</span> : (p.score ?? <span className="text-subtle-foreground">None</span>)) },
-            ]}
-          />
-          <BarsCard title="Weighted Scorecard" rows={x.scorecard} />
-        </Grid>
-      )}
+      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Interview">
+        {x ? (
+          <>
+            <Grid cols={2}>
+              <DataView
+                title="Panel"
+                right={<StatusPill s={x.round} />}
+                rows={x.panel}
+                rowKey={(p) => p.panellist.employee_id}
+                columns={[
+                  { key: "p", label: "Panellist", render: (p) => <Who name={p.panellist.display_name} sub={p.panellist.department ?? undefined} /> },
+                  { key: "s", label: "Submitted", render: (p) => <StatusPill s={p.submitted ? { tone: "ok", text: "Submitted" } : { tone: "warn", text: "Pending" }} /> },
+                  { key: "n", label: "Score", align: "n", render: (p) => (p.sealed ? <span className="text-subtle-foreground">Hidden</span> : (p.score ?? <span className="text-subtle-foreground">None</span>)) },
+                ]}
+              />
+              <BarsCard title="Weighted Scorecard" rows={x.scorecard} />
+            </Grid>
+            {phone && (
+              <>
+                <div className="mt-3">{activity}</div>
+                <div className="mt-3 flex flex-col">{consolidateButton}</div>
+              </>
+            )}
+          </>
+        ) : (
+          phone && focus && <Card><LoadingRows /></Card>
+        )}
+      </DetailPane>
       <div className="mt-3">
         <PagedTable<InterviewRow>
           title="Upcoming and Recent"
@@ -463,9 +487,7 @@ function Interviews({ id }: { id: string | null }) {
           ]}
         />
       </div>
-      <Grid cols={2} className="mt-3">
-        {x ? <TrailCard title="Round Activity" items={x.activity.map((a) => ({ ...a, when: formatDateTime(a.when) }))} /> : <Card><LoadingRows /></Card>}
-      </Grid>
+      {!phone && <Grid cols={2} className="mt-3">{activity}</Grid>}
     </>
   );
 }
@@ -508,36 +530,47 @@ function Offers() {
   const modal = useModal();
   const s = useApi("GET /api/v1/recruitment/offers/summary");
   const list = usePaged("GET /api/v1/recruitment/offers");
+  const beside = useSideBySide();
   const [sel, setSel] = useState<OfferRow | null>(null);
-  const shown = sel ?? list.rows[0] ?? null;
+  // Beside the list the first offer shows unasked; elsewhere one opens when it is pressed (F31).
+  const shown = sel ?? (beside ? (list.rows[0] ?? null) : null);
   const letter = useApi("GET /api/v1/recruitment/offers/:id/letter", { params: { id: shown?.offer_id ?? "" }, enabled: !!shown });
   const send = useMutation("POST /api/v1/recruitment/offers/:id/send");
   return (
     <>
       <PageHeader title="Offers" sub="Generated, sent, signed" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Offer", body: (close) => <OfferForm close={close} /> })}>New Offer</Button>} />
       {s.data && <KpiTiles items={[{ label: "Awaiting Signature", value: String(s.data.awaiting_signature), tone: s.data.awaiting_signature ? "warn" : undefined }, { label: "Signed, This Year", value: String(s.data.signed_this_year), tone: "ok" }, { label: "Declined", value: String(s.data.declined) }, { label: "Average Time to Sign", value: s.data.average_days_to_sign }]} />}
-      <Grid cols="1/1.5">
-        <PagedTable<OfferRow>
-          title="Offers"
-          list={list}
-          rowKey={(o) => o.offer_id}
-          noun="offer"
-          onRowClick={setSel}
-          columns={[
-            { key: "c", label: "Candidate", render: (o) => <span className={cn(o.offer_id === shown?.offer_id && "font-semibold")}>{o.candidate}</span> },
-            { key: "m", label: "Salary", align: "n", render: (o) => <Money value={o.salary} /> },
-            { key: "s", label: "Status", render: (o) => <StatusPill s={o.status} /> },
-          ]}
-        />
-        <div>
-          {letter.data ? <Letter l={letter.data} note={`Offer letter ${letter.data.reference}, generated from the template and the vacancy.`} /> : <Card><LoadingRows count={6} /></Card>}
-          {shown?.status.text === "Draft" && (
-            <div className="mt-2 flex justify-end">
-              <Button variant="primary" icon="send" busy={send.pending} onClick={async () => { try { await send.run({ params: { id: shown.offer_id }, body: {} }); invalidate("/api/v1/recruitment/offers"); toast(`${shown.number} sent to ${shown.candidate} to sign`); } catch (e) { fail(e); } }}>Send to Sign</Button>
-            </div>
-          )}
-        </div>
-      </Grid>
+      <ListDetail
+        cols="1/1.5"
+        full
+        open={sel !== null}
+        onClose={() => setSel(null)}
+        title="Offer Letter"
+        list={
+          <PagedTable<OfferRow>
+            title="Offers"
+            list={list}
+            rowKey={(o) => o.offer_id}
+            noun="offer"
+            onRowClick={setSel}
+            columns={[
+              { key: "c", label: "Candidate", render: (o) => <span className={cn(o.offer_id === shown?.offer_id && "font-semibold")}>{o.candidate}</span> },
+              { key: "m", label: "Salary", align: "n", render: (o) => <Money value={o.salary} /> },
+              { key: "s", label: "Status", render: (o) => <StatusPill s={o.status} /> },
+            ]}
+          />
+        }
+        detail={
+          <div>
+            {letter.data ? <Letter l={letter.data} note={`Offer letter ${letter.data.reference}, generated from the template and the vacancy.`} /> : <Card><LoadingRows count={6} /></Card>}
+            {shown?.status.text === "Draft" && (
+              <div className="mt-2 flex justify-end">
+                <Button variant="primary" icon="send" busy={send.pending} onClick={async () => { try { await send.run({ params: { id: shown.offer_id }, body: {} }); invalidate("/api/v1/recruitment/offers"); toast(`${shown.number} sent to ${shown.candidate} to sign`); } catch (e) { fail(e); } }}>Send to Sign</Button>
+              </div>
+            )}
+          </div>
+        }
+      />
     </>
   );
 }
@@ -576,8 +609,10 @@ function OfferForm({ close }: { close: () => void }) {
 function Onboarding() {
   const s = useApi("GET /api/v1/recruitment/onboarding/summary");
   const list = usePaged("GET /api/v1/recruitment/onboarding");
+  const phone = useIsPhone();
   const [sel, setSel] = useState<string | null>(null);
-  const focus = sel ?? s.data?.focus_id ?? null;
+  // On desktop the summary's focus shows unasked under the list; on a phone a new hire opens in a sheet when tapped (F31).
+  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
   const d = useApi("GET /api/v1/recruitment/onboarding/:id", { params: { id: focus ?? "" }, enabled: !!focus });
   const remind = useMutation("POST /api/v1/recruitment/onboarding/:id/remind");
   const x = d.data;
@@ -604,28 +639,32 @@ function Onboarding() {
           { key: "st", label: "Stage", render: (o) => <StatusPill s={o.stage} /> },
         ]}
       />
-      {x && (
-        <Grid cols={2} className="mt-3">
-          <DataView
-            title="Document Checklist"
-            right={<span className="w-36"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
-            rows={x.checklist}
-            rowKey={(r) => r.name}
-            columns={[{ key: "d", label: "Required Document", render: (r) => r.name }, { key: "s", label: x.name, render: (r) => <StatusPill s={r.status} /> }]}
-            footer={
-              x.documents_done < x.documents_total && (
-                <div className="flex justify-end border-t border-border px-3.5 py-2.5">
-                  <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { await remind.run({ params: { id: x.onboarding_id }, body: {} }); toast(`Reminder sent to ${x.name} for ${x.documents_total - x.documents_done} documents`); }}>Remind {x.name.split(" ")[0]}</Button>
-                </div>
-              )
-            }
-          />
-          <Card>
-            <CardHeader title="Onboarding Plan" />
-            <Timeline items={toTrail(x.plan.map((p) => ({ title: p.title, when: p.text, tone: p.done ? "ok" as const : null })))} />
-          </Card>
-        </Grid>
-      )}
+      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Onboarding">
+        {x ? (
+          <Grid cols={2} className="mt-3 phone:mt-0">
+            <DataView
+              title="Document Checklist"
+              right={<span className="w-36"><Meter pct={Math.round((x.documents_done * 100) / x.documents_total)} label={`${x.documents_done} of ${x.documents_total}`} /></span>}
+              rows={x.checklist}
+              rowKey={(r) => r.name}
+              columns={[{ key: "d", label: "Required Document", render: (r) => r.name }, { key: "s", label: x.name, render: (r) => <StatusPill s={r.status} /> }]}
+              footer={
+                x.documents_done < x.documents_total && (
+                  <div className="flex justify-end border-t border-border px-3.5 py-2.5">
+                    <Button size="sm" icon="bell" busy={remind.pending} onClick={async () => { await remind.run({ params: { id: x.onboarding_id }, body: {} }); toast(`Reminder sent to ${x.name} for ${x.documents_total - x.documents_done} documents`); }}>Remind {x.name.split(" ")[0]}</Button>
+                  </div>
+                )
+              }
+            />
+            <Card>
+              <CardHeader title="Onboarding Plan" />
+              <Timeline items={toTrail(x.plan.map((p) => ({ title: p.title, when: p.text, tone: p.done ? "ok" as const : null })))} />
+            </Card>
+          </Grid>
+        ) : (
+          phone && focus && <Card><LoadingRows /></Card>
+        )}
+      </DetailPane>
     </>
   );
 }

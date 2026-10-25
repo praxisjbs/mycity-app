@@ -25,6 +25,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Actions | [Button](#button) | `Button`, `IconButton`, `BigButton` | The pill button: default, primary (the yellow one), ghost and danger, with an optional icon either side; busy from the press until the work it starts is done. | stable |
 | Layout | [Card](#card) | `Card`, `CardHeader` | The raised panel every section sits in, with an optional title row (CardHeader) and one Details row at its foot. | stable |
 | Layout | [Grid](#grid) | `Grid` | The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsing to one column on a phone. | stable |
+| Layout | [ListDetail](#listdetail) | `ListDetail`, `DetailPane` | A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31). | stable |
 | Layout | [PageHeader](#pageheader) | `PageHeader` | A page's title, its one-line subtitle (desktop only) and the page's actions. | stable |
 | Layout | [PhoneOnly](#phoneonly) | `PhoneOnly`, `DesktopOnly` | Shows its content on a phone only; DesktopOnly shows it on a desktop only. What each shell leaves out is decided per screen. | stable |
 | Layout | [SplitPanes](#splitpanes) | `SplitPanes` | A list beside the record it opens, with a divider the person can drag; on a phone the list fills the screen and the record covers it. | stable |
@@ -358,6 +359,54 @@ The page grid: 2, 3 or 4 equal columns, or a wide and a narrow column, collapsin
 ```tsx
 <Grid cols={4} phoneCols={2}>{kpis}</Grid>
 <Grid cols="1.4/1"><Card /><Card /></Grid>
+```
+
+### ListDetail
+
+A list and the record a row opens: side by side on a wide desktop, and on a phone the list alone with the opened record in a bottom sheet, never below the list (F31).
+
+| | |
+|---|---|
+| Use | Any list whose row opens a record on the same screen: leave requests, payslips, proposals, offers, letter templates. DetailPane is the same rule for a record the desktop layout places elsewhere on the page (under the list beside a chart, above the list). `useSideBySide()` says when a first pick may show unasked. |
+| Avoid | A record with its own screen (navigate to its `id`); a reader read one at a time that fills the screen (SplitPanes: the mailbox, chat); a form (Modal); a record shown below its list on a phone, in any shape. |
+| Phone | No second column: the list fills the page and a tapped row opens its record in the shared Modal, a bottom sheet that drags down to close (`full` for a payslip, a letter or a document). Nothing opens until a row is tapped, so the screen's first pick is a desktop convenience only (`useSideBySide`). Between 761 and 1180 px, where two columns do not fit, the record opens in the centred dialog. |
+| Accessibility | The sheet is the shared Modal: titled by `title`, focus moves in and returns to the row on close, Esc and the phone's Back close it (F29). Side by side, the record is a plain column after the list in reading order. |
+| Status | stable |
+| Exports | `ListDetail`, `DetailPane` |
+| Import | `import { ListDetail, DetailPane } from "@mycity/ui";` |
+| File | `packages/ui/src/layout/ListDetail.tsx` |
+| Test | `packages/ui/src/layout/ListDetail.test.tsx` |
+| Gallery | `packages/ui/src/layout/ListDetail.gallery.tsx` (`npm run gallery`, `#/ListDetail`) |
+
+**ListDetail** props (`ListDetailProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `list` | `ReactNode` | yes | The list: a DataView or a paged table whose `onRowClick` picks the record. |
+| `detail` | `ReactNode` | yes | The record in view: the picked one, or side by side the screen's first pick (null for none). |
+| `open` | `boolean` | yes | A row was picked: on a phone, and on a desktop too narrow for two columns, its record opens in a sheet. |
+| `onClose` | `() => void` | yes | Closes the opened record (a drag down, Esc, Back or the close button); the screen drops its pick. |
+| `title` | `ReactNode` | yes | The sheet's title: a noun phrase of at most 4 words, Title Case ("Leave Request"). |
+| `cols` | `"1.4/1" \| "1/1.5"` |  | Side by side, which column is wider: the list (`1.4/1`, the default) or the record (`1/1.5`: a payslip, a letter). |
+| `full` | `boolean` |  | The sheet fills the phone's screen, for a record read like a document (a payslip, a letter). |
+| `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
+| `className` | `string` |  | Layout classes only (spacing), on the side-by-side grid. |
+
+**DetailPane** props (`DetailPaneProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | A record was picked: on a phone it opens in a sheet. |
+| `onClose` | `() => void` | yes | Closes the opened record on a phone (a drag down, Esc, Back or the close button); the screen drops its pick. |
+| `title` | `ReactNode` | yes | The sheet's title: a noun phrase of at most 4 words, Title Case ("Expense Request"). |
+| `full` | `boolean` |  | The sheet fills the phone's screen, for a record read like a document. |
+| `container` | `HTMLElement \| null` |  | Where the sheet mounts; document.body by default (the gallery passes its themed frame). |
+| `children` | `ReactNode` |  | The record, drawn where the pane sits on desktop. |
+
+```tsx
+const beside = useSideBySide(); const shown = picked ?? (beside ? rows[0] : null);
+<ListDetail open={!!picked} onClose={() => setPicked(null)} title="Leave Request" list={<DataView ... onRowClick={setPicked} />} detail={shown && <RequestCard leave={shown} />} />
+<DetailPane open={!!picked} onClose={() => setPicked(null)} title="Query">{focus && <QueryCard id={focus} />}</DetailPane>
 ```
 
 ### PageHeader

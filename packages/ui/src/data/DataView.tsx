@@ -260,7 +260,7 @@ export function DataView<R>({
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="text-sm font-semibold wrap-any">
                 {onRowClick ? (
-                  <button type="button" onClick={() => onRowClick(row)} className="stretch-link text-left">
+                  <button type="button" data-row-open="" onClick={() => onRowClick(row)} className="stretch-link text-left">
                     {headCell}
                   </button>
                 ) : (

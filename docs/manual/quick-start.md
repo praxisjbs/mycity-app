@@ -352,6 +352,8 @@ marks:
 ```shot qs-approve-leave
 open: /people?tab=leave
 as: operations
+sources:
+  - packages/ui/src/layout/ListDetail.tsx
 do:
   - click: button "Pending"
   - click: row 1
