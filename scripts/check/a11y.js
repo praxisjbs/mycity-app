@@ -27,7 +27,8 @@
  *
  * Results are cached in the OS temp folder, keyed by the inputs (the gallery's
  * input hash, the app build) and this file, so an unchanged target is not
- * checked twice.
+ * checked twice. A run where a page did not render (the browser closed, a
+ * timeout) is never kept: the next run opens every page again.
  *
  * Usage:
  *   node scripts/check/a11y.js                     exit 0 ok, 1 problems
@@ -266,7 +267,9 @@ async function main() {
       const axe = axeSource();
       for (const [target, cacheFile] of todo) {
         results[target] = target === "gallery" ? await checkGallery(browser, axe) : await checkAppTarget(browser, axe);
-        fs.writeFileSync(cacheFile, JSON.stringify(results[target]));
+        // A page that did not render (the browser closed under it, a timeout) says nothing about the
+        // inputs: kept, it would fail every later run on the same build without opening a page.
+        if (!results[target].violations.some((v) => v.id === "page-did-not-render")) fs.writeFileSync(cacheFile, JSON.stringify(results[target]));
       }
     } finally {
       await browser.close();
