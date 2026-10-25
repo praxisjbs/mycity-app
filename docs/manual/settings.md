@@ -342,7 +342,7 @@ its error file.
 
 1. Press **Start Import**. You only see the imports your role may run.
 2. On **Upload**, choose **What To Import**. **Blank Sheet** downloads a sheet with the right
-   columns and notes. Upload your Excel or CSV file.
+   columns and notes. Upload your Excel file (up to 10 MB) or CSV file (up to 5 MB).
 3. On **Map**, check which field each column fills. **Leave Out** skips a column. If the column
    names are not on the first row, choose the right row in **Column Names Row**.
 4. Press **Next**. **Preview** shows what would happen: how many rows **To Create**, **To Update**,

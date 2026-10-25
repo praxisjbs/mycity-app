@@ -66,6 +66,9 @@ const ROW_VIEWS: Array<[RowView, string]> = [
   ["change", "Changes"],
 ];
 
+/** The biggest sheet the server reads (src/shared/spreadsheet/parse.js), not the vault's 25 MB; a CSV's is about 5 MB of text. */
+const SHEET_MAX_BYTES = 10 * 1024 * 1024;
+
 /** The rows of the sheet the header may be on: the first 20, as the engine looks. */
 const HEADER_ROWS: Array<[string, string]> = Array.from({ length: 20 }, (_, i) => [String(i), `Row ${i + 1}`]);
 
@@ -305,6 +308,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
             fields={{ importer_key: key }}
             accept=".xlsx,.csv"
             multiple={false}
+            maxBytes={SHEET_MAX_BYTES}
             kinds="Excel or CSV"
             onUploaded={([answer]) => {
               // The route answers with the batch it started, which carries the

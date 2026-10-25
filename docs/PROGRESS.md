@@ -1264,7 +1264,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
   counter reserved first, nobody it brought renumbered, same-name rows held back, unreadable optional
   cells left out, departments only from `nomenclature.json`, closed seats kept closed, birthdays by
   email. Choosing the Column Names Row and Revert say so in a toast when they fail, where they
-  failed silently. Tests: unit (cells, names, mapping, roles) and 12 integration tests in
+  failed silently; the drop zone takes and says 10 MB, the server's limit for a workbook, not 25. Tests: unit (cells, names, mapping, roles) and 12 integration tests in
   `organisation.test.js`.
   Left (named in §6.16): the staging seed's raw SQL for M1 tables, month-first dates in a mixed
   column, one seat for two VACANT rows of one title in one department, a dry run storing the sheet.
