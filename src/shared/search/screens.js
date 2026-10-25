@@ -132,6 +132,7 @@ const SCREENS = Object.freeze([
   s("settings", "security", "Security", ["password rules", "sessions", "two step", "failed sign ins"]),
   s("settings", "audit-log", "Audit Log", ["audit", "history", "who changed", "activity log"]),
   s("settings", "imports", "Imports", ["import", "upload", "spreadsheet", "import history"]),
+  s("knowledge", "user-guide", "User Guide", ["help", "manual", "how to", "guide", "instructions", "tutorial", "quick start", "getting started"]),
   // new:screen adds screens above this line
 ]);
 

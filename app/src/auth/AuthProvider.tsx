@@ -7,6 +7,7 @@ import type { Me, Session } from "@/api/types/identity";
 import type { SignInResult } from "@mycity/contract/contract.gen.ts";
 import { hrefFor } from "@/lib/routes";
 import { forgetTrail } from "@/lib/trail";
+import { clearGuideReturn } from "@/features/knowledge/guide/return";
 import { applyAppearance, toast } from "@mycity/ui";
 import { passkeyCancelled, signWithPasskey } from "./passkey";
 
@@ -378,6 +379,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signedOut();
     // This device's trail of places leaves with the person (F29), so the next one on it never sees it.
     forgetTrail();
+    // The way back to the User Guide belongs to this person too (docs/guides/user-guide.md §11).
+    clearGuideReturn();
     tell({ t: "signed-out" });
   }, [signedOut, tell]);
 

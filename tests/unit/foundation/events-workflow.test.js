@@ -279,7 +279,7 @@ describe("route map", () => {
       if (row && !/\| Dropped \|/.test(line)) (found[module] = found[module] || []).push(row[1]);
     }
     expect(found).toEqual(routeMap.SCREENS);
-    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(94);
+    expect(Object.values(routeMap.SCREENS).flat()).toHaveLength(95);
   });
 });
 

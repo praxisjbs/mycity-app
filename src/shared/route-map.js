@@ -93,7 +93,7 @@ const SCREENS = Object.freeze({
     "budgets",
     "categories",
   ],
-  knowledge: ["policies", "sops", "faqs", "training", "announcements"],
+  knowledge: ["policies", "sops", "faqs", "training", "announcements", "user-guide"],
   praxis_ai: ["ask", "history"],
   ai_control: ["actions", "models", "spend"],
   settings: [
@@ -375,6 +375,8 @@ const ENTITY_ROUTES = Object.freeze({
   expense_category: screen("expenses", "categories"), // search:none not built yet (src/modules/expense_categories)
 
   // Knowledge Hub
+  // A section or task of the User Guide, by its slug: the guide opens at it (user_guide.search.js).
+  guide_section: screen("knowledge", "user-guide"),
   sop: screen("knowledge", "sops"), // search:none not built yet (src/modules/knowledge)
   faq: screen("knowledge", "faqs"), // search:none not built yet (src/modules/knowledge)
   training_course: screen("knowledge", "training"), // search:none not built yet (src/modules/knowledge)

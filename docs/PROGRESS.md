@@ -1,6 +1,6 @@
 # MyCity App ERP · Progress
 
-**The single record of what is built.** 100 screens (94 in the staff app, 6 on the public site) plus
+**The single record of what is built.** 101 screens (95 in the staff app, 6 on the public site) plus
 the M0 foundation. Every change that moves a screen or a foundation item forward updates this file
 in the same commit. An AI assistant does this as part of finishing a task (CLAUDE.md, step 5); a
 person does it by hand. Nobody should have to ask "where are we on X".
@@ -43,7 +43,7 @@ saying who agreed and when.
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
 | M0 Foundation | 33 items below: 32 done, 1 open | | | | | |
-| M1 Core Operations & Employee Management | 32 | 0 | 0 | 32 | 0 | 0 |
+| M1 Core Operations & Employee Management | 33 | 1 | 0 | 32 | 0 | 0 |
 | M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
 | M4 Recruitment End to End | 8 | 8 | 0 | 0 | 0 | 0 |
@@ -53,7 +53,7 @@ saying who agreed and when.
 | M8 Expenses & Budget Control | 6 | 6 | 0 | 0 | 0 | 0 |
 | M9 Settings & Governance | 12 | 0 | 0 | 12 | 0 | 0 |
 | M10 Staff Knowledge Hub & AI Assistance | 9 | 4 | 0 | 5 | 0 | 0 |
-| **Total** | **100** | **40** | **0** | **60** | **0** | **0** |
+| **Total** | **101** | **41** | **0** | **60** | **0** | **0** |
 
 M1 counts Employees with People although its API is M0 work. Three ESS tabs are counted with the
 milestone that delivers their module: My Performance (M2), My Queries (M3), My Payslips (M6). Policy
@@ -1147,9 +1147,11 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 64 | FAQs | `faqs` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 65 | Training | `training` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
 | 66 | Announcements | `announcements` | M10 | TB | ☐ | ☐ | ☐ | Not started | |
+| 102 | User Guide | `user-guide` | M0 | TB | ☐ | ☐ | ☐ | Not started | |
 
 **Notes**
 
+- 25/10/2026 · TB · User Guide added with npm run new:screen (catalogue, route map, screen file, Coming Soon); not started.
 - 22/10/2026 · TB · Policies (#62): the Attendance worksheet's Location Checks gains Home Location, a switch with Home Check and Home Radius beneath it while it is on (`docs/guides/attendance.md` §1.3); off by default, it changes through a version like every rule, and while it is off Working From Home reads "Working from home, your location is not checked." `policies.heldSince` names the stretch it stays on, for the push to set a home.
 - 21/10/2026 · TB · Policies (#62): the Attendance worksheet shows every rule (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts; `app/src/features/policies/worksheet.ts`), each a switch with its figures, with the server's suggestions for a first draft; a rule compares as changed whatever order its keys came in. Closes PR 1's "Left: the worksheet's PR 3 sections". Left: Tidy With AI against a real model.
 - 20/10/2026 · TB · Policies (#62), attendance's PR 4: the Attendance policy's `site_geofence_mode` reads Temporary Site Check on the worksheet, with new help, and its section At a Temporary Site covers a site's addresses and its check-ins and ends with "Working somewhere else? Add it from Home, or ask People." (`docs/guides/policies.md` §14). Left: nothing.
