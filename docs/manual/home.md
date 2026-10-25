@@ -392,9 +392,10 @@ marks:
 ```shot home-choose-cards
 open: /home?tab=overview
 as: staff
-device: desktop
 do:
-  - click: button "Choose Cards"
+  - desktop click: button "Choose Cards"
+  - phone click: button "More Actions"
+  - phone click: text "Choose Cards"
   - wait: button "Save Cards"
 crop: modal
 marks:
@@ -461,14 +462,13 @@ marks:
 ```shot home-alert-rules
 open: /home?tab=alerts
 as: operations
-device: desktop
 do:
   - click: button "Alert Rules"
   - wait: button "Set in Attendance Policy"
 crop: modal
 marks:
   1: button "Set in Attendance Policy" | Change the policy's limits
-  2: role table "Attendance Policy Rules" | The policy's five rules
+  2: text "Late Arrivals" | The policy's five rules
 ```
 
 ```shot home-new-rule

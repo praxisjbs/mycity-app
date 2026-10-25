@@ -33,9 +33,21 @@ icon: spark
 
 ## Get Help Anywhere {#qs-help role="Everyone" icon=help}
 
+![Help, from any screen](shot:qs-help)
+
 1. On a phone, press the round button with a plus at the bottom right, then **Help**.
 2. On a computer, press your name at the foot of the menu, then **User Guide**.
 3. The guide opens at the screen you were on. Read [Using This Guide](#start-user-guide).
+
+## Ask Praxis AI {#qs-praxis role="Everyone" icon=spark screen=praxis_ai/ask needs="praxis_ai create"}
+
+![Praxis AI, Ask](shot:qs-praxis)
+
+1. Open [Praxis AI · Ask](/praxis-ai?tab=ask), or on a phone press **Quick Actions**, then
+   **Praxis AI**.
+2. Type a question in **Ask a Question**, such as "How many leave days do I have left?", and press
+   **Send**.
+3. Press a record under **From** to open it. Read [Ask](#praxis-ask).
 
 ## Clock In {#qs-clock-in role="Everyone" icon=clock screen=ess/my-attendance}
 
@@ -138,6 +150,8 @@ icon: spark
 
 ## Import a Staff List {#qs-import role="People & HR" icon=sheet needs="people create"}
 
+![Import Staff on Employees](shot:qs-import)
+
 1. Open [People · Employees](/people?tab=employees) and press **Import Staff**.
 2. Upload the sheet, check the columns, then read the **Preview**.
 3. Press **Commit Import**. Read [Import a spreadsheet](#settings-imports-run).
@@ -153,6 +167,8 @@ icon: spark
 
 ## Help With a Login {#qs-login-help role="Administrators" icon=key screen=settings/users needs="settings edit"}
 
+![A login's actions](shot:qs-login-help)
+
 1. Open [Settings · Users](/settings?tab=users) and press the person.
 2. **Send Reset Link** for a forgotten password, **Reset Two-Step** for a lost phone,
    **Sign Out Everywhere** for a lost device.
@@ -166,6 +182,14 @@ icon: spark
 2. Press **Open** on any check that is not up.
 3. Open [Settings · Faults](/settings?tab=faults) for the errors behind it. Read
    [Work through the faults](#settings-faults-work).
+
+## Watch AI Spend {#qs-ai-spend role="Administrators" icon=wallet screen=ai_control/spend}
+
+![AI Control, Spend](shot:qs-ai-spend)
+
+1. Open [AI Control · Spend](/ai-control?tab=spend).
+2. **All AI** shows this month's spend against its cap; each provider shows its own.
+3. Top up a provider before it reaches **At Cap**. Read [Spend](#ai-control-spend).
 
 ## Plan Your Day {#qs-plan-day role="Everyone" icon=check screen=workspace/today}
 
@@ -282,9 +306,8 @@ marks:
 ```shot qs-search
 open: /home?tab=overview
 as: staff
-device: desktop
 do:
-  - click: text "Search Anything"
+  - press: Control+k
   - fill: css input[aria-label="Search"] = leave
   - wait: text "Screens"
 crop: modal
@@ -293,7 +316,6 @@ crop: modal
 ```shot qs-notifications
 open: /home?tab=overview
 as: staff
-device: desktop
 do:
   - click: button "Notifications"
   - wait: button "Mark All Read"
@@ -408,7 +430,6 @@ crop: modal
 ```shot qs-invite
 open: /settings?tab=users
 as: operations
-device: desktop
 marks:
   1: button "Invite User" | Give someone a login
 ```
@@ -416,19 +437,16 @@ marks:
 ```shot qs-roles
 open: /settings?tab=roles-and-permissions
 as: admin
-device: desktop
 ```
 
 ```shot qs-status
 open: /settings?tab=status
 as: admin
-device: desktop
 ```
 
 ```shot qs-plan-day
 open: /workspace?tab=today
 as: operations
-device: desktop
 marks:
   1: heading "Your Day" | Late and due today
   2: button "Write Support Needed" | Your week's line
@@ -448,10 +466,9 @@ marks:
 ```shot qs-commitments
 open: /workspace?tab=tasks
 as: operations
-device: desktop
 do:
   - click: button "Send Commitments"
-  - wait: text "Commitments to Send"
+  - wait: heading "Send Commitments"
 crop: modal
 marks:
   1: button "Send Commitments" | Send the month
@@ -475,17 +492,15 @@ marks:
 ```shot qs-agree
 open: /ess?tab=my-performance
 as: operations
-device: desktop
 sources:
   - app/src/features/performance/my
 marks:
-  1: heading "My Scorecard" | Your lines
+  1: text "My Scorecard" | Your lines
 ```
 
 ```shot qs-team-tasks
 open: /workspace?tab=tasks
 as: operations
-device: desktop
 do:
   - click: role radio "My Team"
 marks:
@@ -496,7 +511,6 @@ marks:
 ```shot qs-approve-commitments
 open: /performance?tab=targets&view=commitments
 as: operations
-device: desktop
 marks:
   1: button "Approve Month" | Approve the month
 ```
@@ -504,7 +518,6 @@ marks:
 ```shot qs-score-review
 open: /performance?tab=reviews
 as: operations
-device: desktop
 do:
   - click: heading "Reviews"
   - wait: heading "Waiting On You"
@@ -515,7 +528,6 @@ marks:
 ```shot qs-report-month
 open: /performance?tab=goals
 as: operations
-device: desktop
 marks:
   1: button "Report Month" | Report the month
 ```
@@ -523,10 +535,9 @@ marks:
 ```shot qs-quarter
 open: /performance?tab=goals
 as: operations
-device: desktop
 do:
   - click: button "Manage Quarters"
-  - click: role menuitem "Set Up Quarter"
+  - click: text "Set Up Quarter"
   - wait: text "Lock Date"
 crop: modal
 marks:
@@ -537,7 +548,6 @@ marks:
 ```shot qs-close-review
 open: /performance?tab=reviews
 as: operations
-device: desktop
 do:
   - wait: heading "Waiting On You"
   - click: text "Obinna Ike"
@@ -545,4 +555,51 @@ do:
 crop: modal
 marks:
   1: button "Close Review" | Close it
+```
+
+```shot qs-praxis
+open: /praxis-ai?tab=ask
+as: staff
+do:
+  - wait: text "Try Asking"
+marks:
+  1: label "Ask a Question" | Type your question
+```
+
+```shot qs-ai-spend
+open: /ai-control?tab=spend
+as: admin
+marks:
+  1: text "All AI" | All AI against its cap
+```
+
+```shot qs-help
+open: /home?tab=overview
+as: staff
+do:
+  - desktop click: css nav button[aria-haspopup=menu]
+  - phone click: button "Quick Actions"
+  - wait: css [role=menuitem]:has-text("User Guide"), button:has-text("Help")
+marks:
+  1: css [role=menuitem]:has-text("User Guide"), button:has-text("Help") | The guide, at this screen
+```
+
+```shot qs-import
+open: /people?tab=employees
+as: operations
+marks:
+  1: button "Import Staff" | Bring in a sheet
+```
+
+```shot qs-login-help
+open: /settings?tab=users
+as: admin
+do:
+  - click: text "Ifeoma Chukwu"
+  - wait: button "Send Reset Link"
+crop: modal
+marks:
+  1: button "Send Reset Link" | A forgotten password
+  2: button "Sign Out Everywhere" | A lost device
+  3: button "Reset Two-Step" | A lost phone
 ```

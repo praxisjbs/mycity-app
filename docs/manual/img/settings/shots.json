@@ -1,30 +1,42 @@
 {
   "settings-appearance": {
-    "spec": "d3fbd04ff30bb7bc",
+    "spec": "024d179d2283c685",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-approvals": {
-    "spec": "0a0dc40391138f43",
+    "spec": "73c98f8a166aecc9",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-audit-log": {
-    "spec": "81d5fceed221adf7",
+    "spec": "f9689b0da0e6de11",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-faults": {
-    "spec": "15e08f83013c58cb",
+    "spec": "dee09ded64305fc2",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-holiday": {
+    "spec": "ce66ec69aa1136f5",
+    "source": "199f220c9450ebe5",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   },
   "settings-imports": {
@@ -36,59 +48,67 @@
     ]
   },
   "settings-integrations": {
-    "spec": "02c364fd0174ef42",
+    "spec": "977ac329cb861236",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-notifications": {
-    "spec": "6a9dbc8dd7ecc641",
+    "spec": "fe2e4fdc5a247410",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-numbering": {
-    "spec": "8753b7b679b76353",
+    "spec": "a70a7c3dfc5fab40",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-organisation": {
-    "spec": "2e806809f94f5513",
+    "spec": "816a9d58ee18739a",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-performance": {
-    "spec": "20f80ddbcba5d946",
+    "spec": "79d9b9ff3e775699",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-roles": {
-    "spec": "558dcc3621ef73e2",
+    "spec": "30eb49b933a978a9",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-security": {
-    "spec": "a13bb0a1df88359d",
+    "spec": "ca54753bbd5331f9",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-status": {
-    "spec": "7875677490fca95c",
+    "spec": "bb87914e1cc8f22f",
     "source": "199f220c9450ebe5",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "settings-users": {

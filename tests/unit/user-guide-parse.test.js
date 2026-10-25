@@ -96,6 +96,26 @@ describe("parseChapter", () => {
     expect(problems.join("\n")).toMatch(/only fenced block is a picture spec/);
   });
 
+  test("a picture spec may open the lock screen, for one of its three reasons", () => {
+    const spec = (step) => `---\ntitle: X\n---\n\n## A {#a}\n\n![Locked](shot:locked)\n\n\`\`\`shot locked\nopen: /home\ndo:\n  - ${step}\n\`\`\`\n`;
+    const ok = parseChapter(spec("lock: idle"), "x.md");
+    expect(ok.problems).toEqual([]);
+    expect(ok.chapter.shots.locked.do).toEqual([{ action: "lock", reason: "idle" }]);
+    expect(parseChapter(spec("lock: asleep"), "x.md").problems).toEqual(['x.md: shot locked, line 12: lock reads "lock: idle", "lock: time" or "lock: ended"']);
+  });
+
+  test("a picture spec's step may run on one device only", () => {
+    const md = `---\ntitle: X\n---\n\n## A {#a}\n\n![Cards](shot:cards)\n\n\`\`\`shot cards\nopen: /home\ndo:\n  - desktop click: button "Choose Cards"\n  - phone click: button "More Actions"\n  - wait: button "Save Cards"\n  - tablet click: button "X"\n\`\`\`\n`;
+    const { chapter, problems } = parseChapter(md, "x.md");
+    expect(chapter.shots.cards.do).toEqual([
+      { action: "click", target: { kind: "button", name: "Choose Cards" }, device: "desktop" },
+      { action: "click", target: { kind: "button", name: "More Actions" }, device: "phone" },
+      { action: "wait", target: { kind: "button", name: "Save Cards" } },
+    ]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/line 15: a do step reads/);
+  });
+
   test("a picture spec nobody shows is a problem", () => {
     const text = "---\ntitle: X\n---\n\n## A {#a}\n\nText.\n\n```shot unused\nopen: /home\n```\n";
     expect(parseChapter(text, "x.md").problems).toEqual(["x.md: picture spec unused is not shown anywhere"]);

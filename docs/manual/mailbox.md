@@ -245,7 +245,8 @@ If the field says **Not a phone number**, type it as `0803 123 4567`.
 
 ### Set the company's links {#mailbox-signature-configure needs="cap mailbox.signature"}
 
-1. Press **Configure** at the top right of [Mailbox · Signature](/mailbox?tab=signature).
+1. Press **Configure** at the top right of [Mailbox · Signature](/mailbox?tab=signature). On a
+   phone, press the cog there, **Configure Signature**.
    ![Configure Signature](shot:mailbox-configure)
 2. On **App Links**, paste the **App Store** and **Google Play** addresses. Press **Next**.
 3. On **Social Links**, paste MyCity's **Instagram**, **TikTok**, **LinkedIn**, **Facebook** and
@@ -356,9 +357,9 @@ marks:
 ```shot mailbox-configure
 open: /mailbox?tab=signature
 as: ceo
-device: desktop
 do:
-  - click: button "Configure"
+  - desktop click: button "Configure"
+  - phone click: button "Configure Signature"
   - wait: label "App Store"
 crop: modal
 marks:

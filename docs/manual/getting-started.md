@@ -105,6 +105,8 @@ typing is lost.
   changed it).
 - **Signed Out** means your session was ended somewhere else, for example by a new password.
 
+![The lock screen](shot:start-lock)
+
 1. Type your PIN, or your password, on the lock screen.
 2. Press **Unlock**. The hub says **Welcome back** and you carry on where you were.
 3. Press **Sign Out** instead if you are done for the day.
@@ -138,7 +140,8 @@ you can do on one you can do on the other.
 2. The module's screens are tabs under its name. Swipe them sideways to see them all.
 3. The icons at the top right are **Search**, **Notifications** and your account.
 4. The round button with a plus at the bottom right holds quick actions: the screen's own action
-   (such as *Request Leave*), clocking in, **Praxis AI** and **Help**. **Hide Here** tucks it
+   (such as *Request Leave*), clocking in, **Praxis AI** ([Ask from any screen on a phone](#praxis-ask-anywhere))
+   and **Help**. **Hide Here** tucks it
    away on this page.
 5. Your phone's own Back gesture goes back a screen and closes any sheet first.
 
@@ -196,6 +199,8 @@ These choices are yours and are kept on this device only.
 
 On a computer they are in your account menu. On a phone they are the icons beside your name in
 **More**.
+
+![Theme, density and text size](shot:start-display)
 
 ### Install the app {#start-install}
 
@@ -280,9 +285,8 @@ marks:
 ```shot start-search
 open: /home?tab=overview
 as: staff
-device: desktop
 do:
-  - click: text "Search Anything"
+  - press: Control+k
   - fill: css input[aria-label="Search"] = leave
   - wait: text "Screens"
 crop: modal
@@ -294,7 +298,6 @@ marks:
 ```shot start-notifications
 open: /home?tab=overview
 as: staff
-device: desktop
 do:
   - click: button "Notifications"
   - wait: button "Mark All Read"
@@ -310,4 +313,29 @@ marks:
   1: role radio "Quick Start" | Short cards by role
   2: role radio "Full Guide" | Every chapter in full
   3: role navigation "Chapters" | The sections you can read
+```
+
+```shot start-lock
+open: /home?tab=overview
+as: staff
+do:
+  - lock: idle
+  - wait: button "Unlock"
+marks:
+  1: text "Session Locked" | Why it locked
+  2: button "Unlock" | Back to your work
+  3: button "Sign Out" | Done for the day
+```
+
+```shot start-display
+open: /home?tab=overview
+as: staff
+do:
+  - desktop click: css nav button[aria-haspopup=menu]
+  - phone click: button "Your Account"
+  - wait: css [aria-label="Text Size"], [role=menuitem]:has-text("Text Size")
+marks:
+  1: css [aria-label="Dark Theme"], [role=menuitem]:has-text("Dark Theme") | The colours
+  2: css [aria-label$=" Density"], [role=menuitem]:has-text("Density") | More or less room
+  3: css [aria-label="Text Size"], [role=menuitem]:has-text("Text Size") | The size of the writing
 ```
