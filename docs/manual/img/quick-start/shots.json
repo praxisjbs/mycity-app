@@ -17,7 +17,7 @@
   },
   "qs-agree": {
     "spec": "1f4315f2fc2da129",
-    "source": "c85bbf51d86d6d70",
+    "source": "902e8a3fb4181468",
     "devices": [
       "desktop"
     ]
@@ -55,7 +55,7 @@
   },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "288bfd1502329081",
+    "source": "ecd0b0d199a54ab9",
     "devices": [
       "desktop",
       "phone"
