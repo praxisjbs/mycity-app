@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 22/10/2026 |
+| Last changed | 25/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -754,6 +754,59 @@ MILESTONES §5.1.
   paints it before the bundle loads. Someone else's hub picks up a new palette at their next sign-in
   or reload.
 
+### 6.16 Employee creation, audited (JBS Praxis, 25/10/2026)
+
+Every path that makes an employee or their login was audited on 25/10/2026: People · Employees'
+Add Employee and Edit, `POST` and `PATCH /employees`, the service and repo, the staff importer and
+the roster loader, create-admin, and the logins that follow (`docs/guides/identity.md` §6). Add
+Employee could not save at all: its form held `home_address: ""`, which the contract (a picked place
+since F27) refuses, so the last step's whole-form check failed on a field no step shows and nothing
+happened. Edit failed the same way. These are the rules now, each held by a test.
+
+**Nothing is refused only at the end.**
+
+- A form holds only the fields it shows; each wizard step (Person, Job, Pay and Bank, Next of Kin)
+  checks every field it shows before Next. An empty required field reads Required (it read "Check
+  the format"), on every form (`useContractForm`).
+- Every rule a form can know is the contract's, so it is marked as the field is filled: a contract,
+  probation or confirmation never ends before the start date and a birthday comes before it
+  (`employeeDateProblems`, also on create-admin's `AdminBootstrap`); gross pay is never below zero;
+  an empty optional reference (line manager, worksite, staff number) is not given.
+- Someone who works On Site or Hybrid names their worksite (`EmployeeAdd`, the route's body; JBS
+  Praxis, 25/10/2026), so they can clock in on day one. A roster load and create-admin use
+  `EmployeeCreate`, which does not ask: people arrive before any worksite exists.
+- A refusal from the server names its field, and the wizard goes back to the step that holds it;
+  one with no field (a lost connection, a server fault) is one line above the footer. The service
+  checks what the database used to refuse without a field: a department or worksite not in use, a
+  line manager who is not active (archived, left or suspended; also on Change Reporting Line), dates
+  out of order (a correction answers for the dates it touches), a work email another person's login
+  still signs in with ("Used by a login"), an archived holder of the email ("Archived record:
+  restore it instead"), and two saves racing for one email or staff number.
+- Someone who may only view the register is told so on the first step ("You can view employees but
+  not add them"), when Praxis AI's Add Employee link opens the form for them, or when the server
+  refuses mid-save because their role changed.
+
+**Fields a role hides** (JBS Praxis, 25/10/2026). `/auth/me` carries `hidden_fields`, the record
+fields the person's role masks; Add Employee and Edit leave them out, and the API refuses a write to
+one (403 `FIELD_RESTRICTED`, the field marked Not yours to set; `field-mask.assertWritable`). A
+person's own record and the CEO are never refused, as they are never masked.
+
+**Edit sends only what changed.** A field emptied on Edit is cleared (the contract's `clearable`
+fields send null; the repo writes it), and a field left alone is never sent, so a stored value from
+an old import never blocks a correction elsewhere. Start Date, Middle Name, Gender, Date of Birth,
+Worksite and Next of Kin are editable there now.
+
+**The staff-number counter reads only its own numbers.** A staff number counts towards the counter
+only in the scheme's shape, at most two digits past its padding (`numbering.sequencePattern`): a
+phone number typed as a staff number used to push every later number past eight billion. A given
+number moves the counter before the record is written, in the same order allocate takes it.
+
+**Smaller.** The audit row of a create and a correction holds every field the write touched (salary,
+bank and dates included; the Audit Log masks them per reader), so History names a confirmed
+probation. Phone accepts the ten digits the field invites after +234 and shows a stored number
+without repeating the code. Account Number keeps digits only. The Wizard keeps focus in the field
+being typed in (a parent re-rendering pulled it to the step's heading after each key).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -922,6 +975,7 @@ screen.
 
 ## 14 · Change log
 
+- 25/10/2026 · JP · §6.16 written: the employee creation audit's rules (fields checked as they are filled, every refusal on its field, EmployeeAdd with the worksite, hidden fields refused, Edit clearing, the staff-number counter by the scheme's shape), from JBS Praxis's audit and decisions of 25/10/2026.
 - 22/10/2026 · GE · §6.7: an address that opens a form may fill it with the contract's prefill fields (`useAddressPrefill`); People · Employees' Add Employee and ESS · My Leave's Request Leave read them for Praxis AI's screen buttons (`praxis-ai.md` §6.4).
 - 22/10/2026 · TB · Performance PR 3: upload purpose `performance_evidence` (`documents.js` `UploadPurpose`, 15 MB in `body-limits.js`, PDF, images and Office files in `mime-policy.js`) for a check-in line's evidence file (`docs/guides/performance.md` §6.14). A route whose multipart body is strict accepts the `purpose` field the upload engine sends beside the file, as `EssDocumentUpload` does.
 - 22/10/2026 · TB · Search (§6.7): a record provider may name `available(client)`, asked before its query; false leaves its group out for everyone. Home Locations uses it while the Attendance policy's Home Location is off (`attendance.md` §1.3).

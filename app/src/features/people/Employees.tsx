@@ -55,8 +55,10 @@ export function Employees() {
   const open = (r: EmployeeRow) => navigate(hrefFor("people", "employees", { id: r.employee_id }));
   const add = () => modal.open({ title: "Add Employee", wide: true, body: (close) => <AddEmployee close={close} /> });
   useScreenAction(canCreate ? { label: "Add Employee", onSelect: add } : null);
-  // The assistant's Add Employee button: ?new=1 and the names and job (docs/guides/praxis-ai.md §6.4).
-  useNewLink(canCreate ? add : null);
+  /* The assistant's Add Employee button: ?new=1 and the names and job (docs/guides/praxis-ai.md §6.4).
+     It opens for everyone, so someone who may only view is told so on the first step rather than
+     finding nothing happens (docs/guides/foundation.md §6.16). */
+  useNewLink(add);
 
   return (
     <>

@@ -135,22 +135,31 @@ export interface PhoneFieldProps extends BoundProps, NativeInput {
   countryCode?: string;
 }
 
-/** A Nigerian number: +234 shown, the rest as typed; the contract normalises it to E.164. */
+/**
+ * A Nigerian number: +234 shown, the rest as typed; the contract normalises it to E.164. A stored
+ * +234 number shows its national part after the code (not "+234 +234..."), and a number abroad
+ * (+44...) shows whole, without the code.
+ */
 export function PhoneField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, countryCode = "+234", className, id, ...rest }: PhoneFieldProps) {
   const a = useFieldControl({ id, state });
+  const raw = typeof value === "string" ? value : "";
+  const abroad = raw.trim().startsWith("+") && !raw.trim().startsWith(countryCode);
+  const shown = raw.startsWith(countryCode) ? raw.slice(countryCode.length).trimStart() : raw;
   return (
     <span className="relative flex items-center">
-      <span aria-hidden className="pointer-events-none absolute left-3 text-field text-muted-foreground tabular-nums">
-        {countryCode}
-      </span>
+      {!abroad && (
+        <span aria-hidden className="pointer-events-none absolute left-3 text-field text-muted-foreground tabular-nums">
+          {countryCode}
+        </span>
+      )}
       <input
         {...rest}
         {...a}
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"
-        className={cn(controlClass(a.state), "h-control pl-14 tabular-nums", a.state && "pr-9", className)}
-        value={value ?? ""}
+        className={cn(controlClass(a.state), "h-control tabular-nums", abroad ? "pl-3" : "pl-14", a.state && "pr-9", className)}
+        value={shown}
         onChange={(e) => onChange(e.target.value.replace(/[^\d\s()+-]/g, ""))}
         onBlur={onBlur}
       />

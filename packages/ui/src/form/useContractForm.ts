@@ -72,14 +72,22 @@ export function shortMessage(error: { type?: string; message?: string } | undefi
 
 const isSchema = (r: unknown): r is ContractSchema => !!r && typeof (r as ContractSchema).safeParse === "function";
 
-/** Every field's first problem, from the schema or the INTERIM rules. */
+const isEmpty = (v: unknown) => v === "" || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
+
+/**
+ * Every field's first problem, from the schema or the INTERIM rules. A field left empty that the
+ * schema needs reads Required, whatever the type would have said of a wrong value ("Check the
+ * format" on an empty date or department said nothing useful); a rule's own words ("Pick a
+ * worksite") still speak for themselves.
+ */
 function problemsOf<T extends Record<string, unknown>>(values: T, rules: FormRules<T> | ContractSchema): Partial<Record<keyof T, string>> {
   const out: Partial<Record<keyof T, string>> = {};
   if (isSchema(rules)) {
     const r = rules.safeParse(values);
     for (const issue of r.success ? [] : (r.error?.issues ?? [])) {
       const k = String(issue.path[0] ?? "") as keyof T;
-      if (k && !out[k]) out[k] = shortMessage({ type: issue.code, message: issue.message });
+      if (!k || out[k]) continue;
+      out[k] = isEmpty(values[k]) && issue.code !== "custom" ? "Required" : shortMessage({ type: issue.code, message: issue.message });
     }
     return out;
   }
@@ -220,7 +228,15 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
     setOwn({});
   };
 
-  const setServerErrors = (fields: ServerFields) => setServer(Object.fromEntries(Object.entries(fields).filter((e): e is [string, string[]] => !!e[1]?.length)));
+  /** The server's per-field messages on the marks, each kept to four words like the form's own. */
+  const setServerErrors = (fields: ServerFields) =>
+    setServer(
+      Object.fromEntries(
+        Object.entries(fields)
+          .filter((e): e is [string, string[]] => !!e[1]?.length)
+          .map(([k, msgs]) => [k, msgs.map((m) => shortMessage({ type: "custom", message: m }) ?? m)]),
+      ),
+    );
 
   return { values, setValues, set, field, status, errors, check, submit, reset, setServerErrors, isDirty: form.formState.isDirty, valid: Object.keys(errors).length === 0 };
 }

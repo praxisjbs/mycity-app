@@ -419,6 +419,92 @@ describeDb("the organisation module against the real migrations", () => {
       expect(res.body.error.fields.work_email).toEqual(["Already in use"]);
     });
 
+    describe("every refusal names its field, so a form shows it where it is (foundation.md §6.16)", () => {
+      const body = (over = {}) => ({
+        first_name: "Kemi",
+        last_name: "Ade",
+        work_email: `kemi.${Math.random().toString(36).slice(2, 8)}@mycity.test`,
+        phone: "803 123 4573",
+        job_title: "Delivery Analyst",
+        start_date: "2026-04-01",
+        employment_type: "full_time",
+        work_pattern: "remote",
+        department_id: people.delivery.department_id,
+        ...over,
+      });
+      const add = (over) => asOps()(request(app).post("/api/v1/employees")).send(body(over));
+
+      test("a department no longer in use", async () => {
+        const retired = await tx((client) => organisation.createDepartment(client, { name: `Retired ${Date.now()}` }, null));
+        await q("UPDATE department SET active = false WHERE department_id = $1", [retired.department_id]);
+        const res = await add({ department_id: retired.department_id });
+        expect(res.status).toBe(422);
+        expect(res.body.error.fields).toEqual({ department_id: ["Not a department"] });
+      });
+
+      test("a line manager who no longer works here", async () => {
+        const gone = await tx((client) =>
+          organisation.createEmployee(client, { ...body(), first_name: "Gone", phone: "+2348031234574" }, null),
+        );
+        // Suspended rather than archived, so the archive test below still finds one archived record.
+        await q("UPDATE employee SET status = 'suspended' WHERE employee_id = $1", [gone.employee_id]);
+        const res = await add({ line_manager_id: gone.employee_id });
+        expect(res.status).toBe(422);
+        expect(res.body.error.fields).toEqual({ line_manager_id: ["Not an employee"] });
+      });
+
+      test("dates out of order, on the field they belong to", async () => {
+        const res = await add({ contract_ends_on: "2026-03-01", confirmation_due_on: "2026-03-31", date_of_birth: "2026-05-01" });
+        expect(res.status).toBe(422);
+        expect(res.body.error.fields).toEqual({
+          contract_ends_on: ["Not before the start"],
+          confirmation_due_on: ["Not before the start"],
+          date_of_birth: ["Before the start date"],
+        });
+      });
+
+      test("On Site without a worksite; a worksite that does not exist", async () => {
+        const none = await add({ work_pattern: "on_site" });
+        expect(none.status).toBe(422);
+        expect(none.body.error.fields).toEqual({ worksite_id: ["Pick a worksite"] });
+        const unknown = await add({ work_pattern: "on_site", worksite_id: "7d1b0b9e-1d2b-4b8e-9b1e-1a2b3c4d5e6f" });
+        expect(unknown.status).toBe(422);
+        expect(unknown.body.error.fields).toEqual({ worksite_id: ["Not a worksite"] });
+      });
+
+      test("an empty optional field is not given; a negative salary is refused", async () => {
+        const ok = await add({ line_manager_id: "", worksite_id: "", staff_number: "", gross_monthly: "" });
+        expect(ok.status).toBe(201);
+        const negative = await add({ gross_monthly: "-5.00" });
+        expect(negative.status).toBe(422);
+        expect(negative.body.error.fields).toEqual({ gross_monthly: ["Not below zero"] });
+      });
+
+      test("a work email another person's login still signs in with", async () => {
+        const res = await add({ work_email: "ops@mycity.test" });
+        expect(res.status).toBe(409);
+        expect(res.body.error.fields).toEqual({ work_email: ["Already in use"] });
+        // The ops lead's record moves to a new address; their active login keeps the old one until Use Work Email.
+        await q("UPDATE employee SET work_email = 'ops.lead@mycity.test' WHERE employee_id = $1", [people.ops.employee.employee_id]);
+        try {
+          const taken = await add({ work_email: "ops@mycity.test" });
+          expect(taken.status).toBe(409);
+          expect(taken.body.error.fields).toEqual({ work_email: ["Used by a login"] });
+        } finally {
+          await q("UPDATE employee SET work_email = 'ops@mycity.test' WHERE employee_id = $1", [people.ops.employee.employee_id]);
+        }
+      });
+
+      test("a phone number typed as a staff number never moves the counter", async () => {
+        const odd = await add({ staff_number: "08031234567" });
+        expect(odd.status).toBe(201);
+        expect(odd.body.staff_number).toBe("08031234567");
+        const next = await add();
+        expect(next.status).toBe(201);
+        expect(next.body.staff_number).toMatch(/^\d{5}$/);
+      });
+    });
+
     test("Edit changes only what it was given", async () => {
       const res = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({
         job_title: "Senior Delivery Analyst",
@@ -435,21 +521,15 @@ describeDb("the organisation module against the real migrations", () => {
       expect(audit.changed_fields.sort()).toEqual(["job_title", "work_pattern"]);
     });
 
-    test("an edit leaves every field it was not given alone, masked ones included", async () => {
+    test("an edit leaves every field it was not given alone", async () => {
       const before = await one(
         "SELECT gross_monthly, bank_name, account_number, date_of_birth, home_address FROM employee WHERE employee_id = $1",
         [people.staff.employee_id],
       );
       expect(before.gross_monthly).not.toBeNull();
-      /* What a viewer without the field grant sees: those fields come back null, and a
-         form that sent them back as they look (empty, or null for a typed field) would
-         blank them. */
+      // Edit sends only what the person changed (EmployeeForm.tsx), so a field it leaves out is never touched.
       const res = await asOps()(request(app).patch(`/api/v1/employees/${people.staff.employee_id}`)).send({
         job_title: "Senior Analyst",
-        gross_monthly: null,
-        bank_name: "",
-        account_number: null,
-        date_of_birth: "",
       });
       expect(res.status).toBe(200);
       expect(res.body.job_title).toBe("Senior Analyst");
@@ -463,6 +543,35 @@ describeDb("the organisation module against the real migrations", () => {
         [people.staff.employee_id],
       );
       expect(audit.changed_fields).toEqual(["job_title"]);
+    });
+
+    test("a field emptied on Edit is cleared, and the audit names it", async () => {
+      const res = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ contract_ends_on: "" });
+      expect(res.status).toBe(200);
+      expect(res.body.contract_ends_on).toBeNull();
+      const audit = await one(
+        "SELECT changed_fields FROM audit_ledger WHERE entity_id = $1 AND action = 'employee.updated' ORDER BY occurred_at DESC",
+        [addedId],
+      );
+      expect(audit.changed_fields).toEqual(["contract_ends_on"]);
+    });
+
+    test("a field the caller's role hides is not theirs to set or clear (JBS Praxis, 25/10/2026)", async () => {
+      const ops = await one("SELECT role_id FROM role WHERE code = 'operations_people'");
+      await pool.query("UPDATE field_visibility SET visibility = 'masked' WHERE role_id = $1 AND field_key = 'employee.salary'", [ops.role_id]);
+      await grantsCache.invalidateGrants();
+      try {
+        const before = await one("SELECT gross_monthly FROM employee WHERE employee_id = $1", [people.staff.employee_id]);
+        const res = await asOps()(request(app).patch(`/api/v1/employees/${people.staff.employee_id}`)).send({ gross_monthly: null });
+        expect(res.status).toBe(403);
+        expect(res.body.error.fields).toEqual({ gross_monthly: ["Not yours to set"] });
+        expect(await one("SELECT gross_monthly FROM employee WHERE employee_id = $1", [people.staff.employee_id])).toEqual(before);
+        const me = await asOps()(request(app).get("/api/v1/auth/me"));
+        expect(me.body.hidden_fields).toContain("gross_monthly");
+      } finally {
+        await pool.query("UPDATE field_visibility SET visibility = 'visible' WHERE role_id = $1 AND field_key = 'employee.salary'", [ops.role_id]);
+        await grantsCache.invalidateGrants();
+      }
     });
 
     test("an empty edit is refused by the contract", async () => {

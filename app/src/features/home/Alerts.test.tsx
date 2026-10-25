@@ -704,9 +704,9 @@ describe("New Rule and Edit Rule", () => {
     expect(within(dialog).getByRole("radio", { name: "Medium" }).getAttribute("aria-checked")).toBe("true");
     expect(field(dialog, "Who Can Clear").textContent).toBe("People Approvers");
 
-    // Nothing typed: the form marks what is missing and sends nothing.
+    // Nothing typed: the form marks what is missing, each empty field Required, and sends nothing.
     fireEvent.click(within(dialog).getByRole("button", { name: "Create Rule" }));
-    expect(await within(dialog).findByText("Required")).toBeTruthy();
+    expect((await within(dialog).findAllByText("Required")).length).toBeGreaterThan(0);
 
     // A deadline metric counts whole days, and is cleared by its own grant.
     fireEvent.change(field(dialog, "Rule Name"), { target: { value: "Visa Expiry" } });

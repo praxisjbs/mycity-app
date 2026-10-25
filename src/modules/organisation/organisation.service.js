@@ -24,6 +24,7 @@ const managerText = require("./manager-text");
 const { layout } = require("./org-chart.layout");
 const repo = require("./organisation.repo");
 const places = require("../../shared/places/places");
+const { employeeDateProblems } = require("@mycity/contract").organisation;
 
 /** A person's home address field (shared/places/owners.js). */
 const HOME = "employee.home_address";
@@ -150,43 +151,149 @@ async function findOrCreateDepartment(client, name, actor) {
 /**
  * Keep the staff-number counter above every number already issued, so the next person
  * added on screen cannot be given a number an imported sheet already used
- * (docs/DATABASE_SCHEMA.md M0: the importer moves the counter past imported numbers).
+ * (docs/DATABASE_SCHEMA.md M0: the importer moves the counter past imported numbers). Only
+ * numbers of the scheme's own shape count (numbering.sequencePattern), in the period of
+ * `date` for a scheme that resets.
  */
-async function advanceStaffNumbers(client) {
-  const highest = await repo.highestStaffNumberSeq(client);
-  if (highest > 0) await numbering.advanceTo(client, "employee", highest);
+async function advanceStaffNumbers(client, { date } = {}) {
+  const { pattern } = await numbering.sequenceOf(client, "employee", { date });
+  if (!pattern) return 0;
+  const highest = await repo.highestStaffNumberSeq(client, pattern);
+  if (highest > 0) await numbering.advanceTo(client, "employee", highest, { date });
   return highest;
 }
 
 /**
+ * Move the counter past a staff number someone gave, before the record that carries it is
+ * written. Taking the counter first is the order allocate() takes it, so a create with a
+ * number and a create without one cannot wait on each other. A number of another shape
+ * leaves the counter alone.
+ */
+async function advancePast(client, staffNumber, date) {
+  const { pattern } = await numbering.sequenceOf(client, "employee", { date });
+  const m = pattern ? new RegExp(pattern).exec(staffNumber) : null;
+  if (m) await numbering.advanceTo(client, "employee", Number(m[1]), { date });
+}
+
+/** The answer for a work email already on a record: an archived holder is named, since the register hides them. */
+function emailTaken(holder) {
+  if (holder.status === "archived")
+    return new AppError("EMPLOYEE_EXISTS", "An archived record has this work email. Restore it instead.", 409, {
+      work_email: ["Archived record"],
+    });
+  return new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, {
+    work_email: ["Already in use"],
+  });
+}
+
+/**
+ * A work email the person may hold: no other record has it, and no other person's login
+ * signs in with it (a login keeps its address until it follows, docs/guides/identity.md §6).
+ */
+async function assertWorkEmailFree(client, email, employeeId = null) {
+  const holder = await repo.findEmployeeByWorkEmail(client, email);
+  if (holder && holder.employee_id !== employeeId) throw emailTaken(holder);
+  const owner = await repo.loginEmailOwner(client, email);
+  if (owner && owner !== employeeId)
+    throw new AppError("LOGIN_EMAIL_TAKEN", "Another person's login signs in with this email.", 409, {
+      work_email: ["Used by a login"],
+    });
+}
+
+/** The department, line and dotted managers and worksite a record names exist and are in use. */
+async function assertReferences(client, body, employeeId = null) {
+  if (body.department_id) {
+    const department = await repo.findDepartmentById(client, body.department_id);
+    if (!department || department.active === false)
+      throw new AppError("DEPARTMENT_NOT_FOUND", "Pick a department in use.", 422, {
+        department_id: ["Not a department"],
+      });
+  }
+  for (const key of ["line_manager_id", "dotted_manager_id"]) {
+    const id = body[key];
+    if (!id) continue;
+    if (id === employeeId)
+      throw new AppError("REPORTS_TO_SELF", "Nobody reports to themselves.", 422, { [key]: ["Not themselves"] });
+    const manager = await repo.findEmployeeById(client, id);
+    if (!manager || manager.status !== "active")
+      throw new AppError("MANAGER_NOT_FOUND", "Pick a manager who works here now.", 422, {
+        [key]: ["Not an employee"],
+      });
+  }
+  if (body.worksite_id) {
+    // Required here, not at the top: worksites.service requires this file.
+    const site = await require("../worksites/worksites.service").fenceFor(client, body.worksite_id);
+    if (!site)
+      throw new AppError("WORKSITE_NOT_FOUND", "Pick a worksite in use.", 422, { worksite_id: ["Not a worksite"] });
+  }
+}
+
+/**
+ * The order an employee's dates keep (the contract's employeeDateProblems, the same rule a form
+ * checks as it is filled), and two that need today: a birthday and a probation confirmation are
+ * never in the future. Applied to a whole record, so a correction is checked against what is stored.
+ */
+function assertDates(record, only = null) {
+  const today = lagos.today();
+  let problems = employeeDateProblems(record);
+  if (record.date_of_birth && record.date_of_birth > today) problems.push({ path: "date_of_birth", message: "Not in the future" });
+  if (record.confirmed_on && record.confirmed_on > today) problems.push({ path: "confirmed_on", message: "Not in the future" });
+  // A correction answers for the dates it touches: a stored oddity never blocks an unrelated edit.
+  if (only) problems = problems.filter((p) => only.includes(p.path));
+  if (!problems.length) return;
+  const fields = {};
+  for (const p of problems) fields[p.path] = [p.message];
+  throw new AppError("EMPLOYEE_DATES", "Check the dates.", 422, fields);
+}
+
+/**
+ * Two saves racing with one work email or staff number both pass the checks above; the
+ * database refuses the second, and this names its field as the checks would have.
+ */
+function uniqueRefusal(err) {
+  if (err && err.code === "23505") {
+    if (/work_email/.test(err.constraint || ""))
+      return new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, { work_email: ["Already in use"] });
+    if (/number/.test(err.constraint || ""))
+      return new AppError("STAFF_NUMBER_TAKEN", "Another employee has this staff number.", 409, { staff_number: ["Already in use"] });
+  }
+  return err;
+}
+
+/**
+ * Add a person. Every check names its field, so a form shows what to fix where it is
+ * (docs/guides/foundation.md §6.16).
  * @param {import("pg").PoolClient} client  inside atomically()
- * @param {object} body  EmployeeCreate, already parsed
+ * @param {object} body  EmployeeCreate (or EmployeeAdd), already parsed; or the importer's row
  * @param {object} actor
  * @returns {Promise<object>} the employee, with employee_id and staff_number
  */
 async function createEmployee(client, body, actor) {
-  if (await repo.findEmployeeByWorkEmail(client, body.work_email)) {
-    throw new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, {
-      work_email: ["Already in use"],
-    });
-  }
+  await assertWorkEmailFree(client, body.work_email);
   if (body.staff_number && (await repo.findEmployeeByStaffNumber(client, body.staff_number))) {
     throw new AppError("STAFF_NUMBER_TAKEN", "Another employee has this staff number.", 409, {
       staff_number: ["Already in use"],
     });
   }
+  await assertReferences(client, body);
+  assertDates(body);
+  if (body.staff_number) await advancePast(client, body.staff_number, body.start_date);
   const staffNumber = body.staff_number
     ? body.staff_number
     : (await numbering.allocate(client, "employee", { date: body.start_date })).number;
 
   const home = body.home_address;
-  const employee = await repo.insertEmployee(client, {
-    ...body,
-    home_address: home ? places.lineOf(home) : null,
-    staff_number: staffNumber,
-  });
+  let employee;
+  try {
+    employee = await repo.insertEmployee(client, {
+      ...body,
+      home_address: home ? places.lineOf(home) : null,
+      staff_number: staffNumber,
+    });
+  } catch (err) {
+    throw uniqueRefusal(err);
+  }
   if (home) await places.save(client, HOME, employee.employee_id, home, { field: "home_address" });
-  if (body.staff_number) await advanceStaffNumbers(client);
   if (employee.line_manager_id)
     await repo.recordReportingLine(
       client,
@@ -198,7 +305,7 @@ async function createEmployee(client, body, actor) {
     key: EVENTS.EMPLOYEE_CREATED,
     entity: { type: "employee", id: employee.employee_id },
     actor,
-    after: employee,
+    after: await repo.auditRow(client, employee.employee_id),
     payload: { employee_id: employee.employee_id, staff_number: employee.staff_number },
   });
   return employee;
@@ -206,30 +313,37 @@ async function createEmployee(client, body, actor) {
 
 /** PATCH /employees/:id: correct a record. */
 async function updateEmployee(client, employeeId, patch, actor) {
-  const before = await repo.findEmployeeById(client, employeeId);
+  const before = await repo.auditRow(client, employeeId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
-  if (patch.work_email && patch.work_email !== before.work_email) {
-    const taken = await repo.findEmployeeByWorkEmail(client, patch.work_email);
-    if (taken)
-      throw new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, {
-        work_email: ["Already in use"],
-      });
-  }
-  if (patch.department_id && !(await repo.findDepartmentById(client, patch.department_id)))
-    throw new AppError("DEPARTMENT_NOT_FOUND", "Pick a department that exists.", 422, {
-      department_id: ["Not a department"],
-    });
+  if (patch.work_email && patch.work_email.toLowerCase() !== String(before.work_email).toLowerCase())
+    await assertWorkEmailFree(client, patch.work_email, employeeId);
+  await assertReferences(
+    client,
+    {
+      ...(patch.department_id && patch.department_id !== before.department_id ? { department_id: patch.department_id } : {}),
+      ...(patch.worksite_id && patch.worksite_id !== before.worksite_id ? { worksite_id: patch.worksite_id } : {}),
+    },
+    employeeId,
+  );
+  const given = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined && v !== ""));
+  const dated = ["contract_ends_on", "confirmation_due_on", "confirmed_on", "date_of_birth"];
+  assertDates({ ...before, ...given }, "start_date" in given ? dated : dated.filter((k) => k in given));
   const change = { ...patch };
   // The home address is a place (F27), kept through shared/places; the record keeps its line.
   if (patch.home_address !== undefined)
     change.home_address = (await places.save(client, HOME, employeeId, patch.home_address, { field: "home_address" })).line;
-  const after = await repo.updateEmployee(client, employeeId, change);
+  let after;
+  try {
+    after = await repo.updateEmployee(client, employeeId, change);
+  } catch (err) {
+    throw uniqueRefusal(err);
+  }
   await emit(client, {
     key: EVENTS.EMPLOYEE_UPDATED,
     entity: { type: "employee", id: employeeId },
     actor,
     before,
-    after,
+    after: await repo.auditRow(client, employeeId),
   });
   return after;
 }
@@ -265,7 +379,7 @@ async function setBirthday(client, employeeId, { day, month }, actor) {
 async function renumberEmployee(client, employeeId, actor) {
   const before = await repo.findEmployeeById(client, employeeId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
-  await advanceStaffNumbers(client);
+  await advanceStaffNumbers(client, { date: before.start_date });
   let number = null;
   for (let tries = 0; tries < 50 && number === null; tries += 1) {
     const next = (await numbering.allocate(client, "employee", { date: before.start_date })).number;
@@ -359,8 +473,9 @@ async function setReportingLine(client, employeeId, input, actor) {
       throw new AppError("REPORTS_TO_SELF", "Nobody reports to themselves.", 422, {
         [key]: ["Not themselves"],
       });
-    if (!(await repo.findEmployeeById(client, id)))
-      throw new AppError("MANAGER_NOT_FOUND", "That manager is not on the staff list.", 422, {
+    const manager = await repo.findEmployeeById(client, id);
+    if (!manager || manager.status !== "active")
+      throw new AppError("MANAGER_NOT_FOUND", "That manager is not on the staff list now.", 422, {
         [key]: ["Not an employee"],
       });
   }

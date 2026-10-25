@@ -1,4 +1,4 @@
-import type { Department, Project } from "@mycity/contract/contract.gen.ts";
+import type { Department, EmployeeListQuery, Project, Worksite } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
@@ -11,20 +11,23 @@ import { PersonPicker, RecordPicker } from "@mycity/ui";
  * the list and drive its search, so the endpoint stays the app's.
  *
  * Everyone with an employee record, paged at 25 by the server and narrowed by
- * what the person types (FRONTEND_GUIDE §4: never a dropdown of everyone).
+ * what the person types (FRONTEND_GUIDE §4: never a dropdown of everyone). `filters` narrows
+ * it on the server: `{ status: "active" }` for a line manager, who must work here now.
  */
 export function EmployeePicker({
   value,
   onChange,
   multiple,
   placeholder,
+  filters,
 }: {
   value: PersonRef[];
   onChange: (value: PersonRef[]) => void;
   multiple?: boolean;
   placeholder?: string;
+  filters?: Pick<EmployeeListQuery, "status" | "department_id">;
 }) {
-  const list = usePaged("GET /api/v1/employees");
+  const list = usePaged("GET /api/v1/employees", filters ? { filters } : undefined);
   const photos = usePhotos(list.rows.map((row) => row.photo_url));
   return (
     <PersonPicker
@@ -121,6 +124,25 @@ export function DepartmentPicker({ value, onChange, multiple }: { value: Departm
       title={(d) => d.name}
       multiple={multiple}
       placeholder="Search departments"
+    />
+  );
+}
+
+/** A worksite as a picker holds it: enough to show and send. */
+export type WorksiteChoice = Pick<Worksite, "worksite_id" | "name" | "code">;
+
+/** The worksites in use, searched by name on the server (one): where an on-site person clocks in. */
+export function WorksitePicker({ value, onChange }: { value: WorksiteChoice[]; onChange: (value: WorksiteChoice[]) => void }) {
+  const list = usePaged("GET /api/v1/worksites", { filters: { active: "true" } });
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value as Worksite[]}
+      onChange={(rows) => onChange(rows.map((r) => ({ worksite_id: r.worksite_id, name: r.name, code: r.code })))}
+      id={(w) => w.worksite_id}
+      title={(w) => w.name}
+      sub={(w) => w.code}
+      placeholder="Search worksites"
     />
   );
 }

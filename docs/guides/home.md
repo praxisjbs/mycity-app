@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 22/10/2026 |
+| Last changed | 25/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -828,6 +828,8 @@ rows, and nothing in the code says where anything came from.
   other currencies out. Owner to decide whether such sums group by currency when M7 and M8 land.
 
 ## 14 · Change log
+
+- 25/10/2026 · JP · Tests only, for the employee creation rules (`docs/guides/foundation.md` §6.16): Team's month test gives the two On Site people it adds a worksite, and New Rule's empty fields each read Required. No Home behaviour changed.
 
 - 23/10/2026 · JP · Team's Open Tasks is filled: each person's open tasks they lead, for a reader whose `workspace` view reaches them, null otherwise (`docs/guides/workspace.md` §2; §5, §6 here).
 

@@ -37,6 +37,11 @@ const ASSIGNED = new Map<string, string | null>(
   PEOPLE.map((p) => [p.user_key, p.work_pattern === "remote" ? null : (WORKSITES.find((w) => w.name === p.worksite)?.worksite_id ?? null)]),
 );
 
+/** Set where someone works (Add Employee and Edit on the mock, as the API's employee.worksite_id). */
+export function assignSite(key: string, id: string | null) {
+  ASSIGNED.set(key, id);
+}
+
 /** The worksite a person's punch is matched to, when it is in use. */
 export function siteOf(key: string): Site | null {
   const id = ASSIGNED.get(key);

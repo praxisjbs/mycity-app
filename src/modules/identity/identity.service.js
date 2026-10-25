@@ -38,6 +38,7 @@ const { emit } = require("../../shared/events/emit");
 const { AppError } = require("../../shared/errors");
 const catalog = require("../../shared/access/access.catalog");
 const grantsCache = require("../../shared/rbac/grants-cache");
+const fieldMask = require("../../shared/rbac/field-mask");
 const sessions = require("../../shared/rbac/sessions");
 const policy = require("./identity.session-policy");
 const passwordPolicy = require("./identity.password-policy");
@@ -182,6 +183,7 @@ async function me(db, userId) {
     manages_people: row.manages_people === true,
     // Required here, not at the top: settings.appearance reads security, which reads this file.
     appearance: await require("../settings/settings.appearance").applied(db),
+    hidden_fields: await fieldMask.hiddenFieldsFor(db, { user_id: row.user_id, is_ceo: row.is_ceo === true }),
   };
 }
 

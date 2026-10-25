@@ -595,21 +595,15 @@ function insertEmployee(db, e) {
 }
 
 /**
- * Apply an EmployeeUpdate. Only the keys that carry a value are touched: a key that
- * arrives empty means "not given", never "clear it".
- *
- * A form holds every one of its fields, and a field the person may not see arrives
- * masked (null). Writing those through would blank a salary or a date of birth because
- * somebody corrected a job title, so the one write path refuses to: clearing a field is
- * its own change, not a side effect of an edit.
+ * Apply an EmployeeUpdate. A key left out (undefined) or arriving empty ("") is not touched;
+ * a key set to null is cleared. Only a correction's clearable fields (EmployeeUpdate) can carry
+ * null, and only for a field the person emptied on Edit: a field their role hides is refused at
+ * the controller before it gets here (shared/rbac/field-mask.js assertWritable), so a masked
+ * value is never written back as a blank (docs/guides/foundation.md §6.16).
  */
 function updateEmployee(db, employeeId, patch) {
   const keys = UPDATE_COLUMNS.filter(
-    (k) =>
-      Object.prototype.hasOwnProperty.call(patch, k) &&
-      patch[k] !== undefined &&
-      patch[k] !== null &&
-      patch[k] !== "",
+    (k) => Object.prototype.hasOwnProperty.call(patch, k) && patch[k] !== undefined && patch[k] !== "",
   );
   if (keys.length === 0) return findEmployeeById(db, employeeId);
   const sets = keys.map((k, i) => `${k} = $${i + 2}`);
@@ -620,6 +614,28 @@ function updateEmployee(db, employeeId, patch) {
       RETURNING ${EMPLOYEE_COLUMNS.replace(/\be\./g, "")}`,
     [employeeId, ...keys.map((k) => patch[k])],
   );
+}
+
+/**
+ * Every field of a record that a create or a correction writes, for the audit row, so the
+ * ledger names a changed salary, bank account or probation date as well as a job title
+ * (shared/events/emit.js: restricted fields are kept, and masked per reader on the Audit Log).
+ */
+function auditRow(db, employeeId) {
+  return one(
+    db,
+    `SELECT e.employee_id, e.status, ${[...new Set([...INSERT_COLUMNS, ...UPDATE_COLUMNS, "line_manager_seat_id", "dotted_manager_seat_id"])]
+      .map((c) => (c === "staff_number" || c === "work_email" ? `e.${c}::text AS ${c}` : `e.${c}`))
+      .join(", ")}
+       FROM employee e WHERE e.employee_id = $1`,
+    [employeeId],
+  );
+}
+
+/** The employee a login's email belongs to, when a login uses this address (identity's app_user, read only). */
+async function loginEmailOwner(db, email) {
+  const row = await one(db, "SELECT u.employee_id FROM app_user u WHERE u.email = $1", [email]);
+  return row ? row.employee_id : null;
 }
 
 /**
@@ -885,13 +901,20 @@ async function tree(db) {
   return rows;
 }
 
-/** The highest sequence a staff number carries, so numbering can be moved past it. */
-async function highestStaffNumberSeq(db) {
+/**
+ * The highest sequence a staff number of the scheme's own shape carries (numbering.sequencePattern),
+ * so numbering can be moved past it. A number of another shape is never read as a sequence: a
+ * phone number in a Staff ID column once pushed every later number past eight billion.
+ * @param {{query: Function}} db
+ * @param {string} pattern  the scheme's sequence pattern, its one captured group the sequence
+ */
+async function highestStaffNumberSeq(db, pattern) {
   const row = await one(
     db,
-    `SELECT COALESCE(max((regexp_replace(staff_number::text, '\\D', '', 'g'))::bigint), 0)::bigint AS seq
+    `SELECT COALESCE(max(substring(staff_number::text from $1)::bigint), 0)::bigint AS seq
        FROM employee
-      WHERE staff_number::text ~ '[0-9]'`,
+      WHERE staff_number::text ~ $1`,
+    [pattern],
   );
   return row ? Number(row.seq) : 0;
 }
@@ -934,6 +957,8 @@ module.exports = {
   findCeoEmployee,
   insertEmployee,
   updateEmployee,
+  auditRow,
+  loginEmailOwner,
   setStaffNumber,
   archiveEmployee,
   restoreEmployee,

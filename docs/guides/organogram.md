@@ -10,7 +10,7 @@
 | Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
 | Status | Built |
-| Last changed | 21/10/2026 |
+| Last changed | 25/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -323,6 +323,8 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
   column-shifted row. Confirm it with People.
 
 ## 14 · Change log
+
+- 25/10/2026 · JP · A line or dotted manager must work here now: Change Reporting Line and Add Employee refuse someone archived, left or suspended (`MANAGER_NOT_FOUND`, on the field), and Add Employee's picker offers only active staff, so nobody reports to a person the tree no longer shows (`docs/guides/foundation.md` §6.16).
 
 - 22/10/2026 · TB · Nothing on the Org Chart changed. Beside it in `app/src/features/ess/`, My Performance opens My Scorecard from the person's own scorecard link (`docs/guides/ess.md`, `docs/guides/performance.md` §14).
 - 22/10/2026 · GE · §9: Praxis AI's "add an employee" opens Add Employee on `?new=1`, which the screen now reads (`useNewLink`; it never opened the form before), filled from `organisation.EmployeePrefill` (`praxis-ai.md` §6.4).

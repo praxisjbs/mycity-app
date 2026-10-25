@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `/auth/me` lists the ones the person holds (§5) |
 | Screens (PROGRESS.md rows) | #70 Users, #90 My Security, and the M0 sign-in item |
 | Status | Built |
-| Last changed | 21/10/2026 |
+| Last changed | 25/10/2026 |
 
 Sources: MILESTONES §5.3 (brand on the sign-in screen), §14 (roles) and A2; BACKEND_STRUCTURE §11
 and §17; the session rules of the donor product (REUSE_MAP), chosen by TB on 16/10/2026. Two-step
@@ -423,6 +423,8 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
   them, the drawings standing in for the first four until they load.
 
 ## 14 · Change log
+
+- 25/10/2026 · JP · `/auth/me` (and the sign-in answer's `user`) carries `hidden_fields`: the record fields the person's role masks (`shared/rbac/field-mask.js`), so Add Employee and Edit leave them out; the API refuses a write to one (`docs/guides/foundation.md` §6.16, JBS Praxis's decision of 25/10/2026).
 
 - 23/10/2026 · JP · §11: Sign Out and a sign-in as someone else forget every answer the data client kept, and drop one still on its way (`createApi` `clear`, called by `AuthProvider`), so a read left in flight at Sign Out never fills the next person's screens (the 23/10 My Workspace audit, `docs/guides/workspace.md` §11).
 

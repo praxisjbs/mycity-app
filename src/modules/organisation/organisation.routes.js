@@ -29,7 +29,7 @@ route(router, "get", "/employees/summary",
   view, controller.summary);
 
 route(router, "post", "/employees",
-  { body: c.organisation.EmployeeCreate, response: c.organisation.Employee360, summary: "Add an employee" },
+  { body: c.organisation.EmployeeAdd, response: c.organisation.Employee360, summary: "Add an employee" },
   create, controller.create);
 
 route(router, "get", "/employees/:id",

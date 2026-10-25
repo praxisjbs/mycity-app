@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -46,6 +47,37 @@ describe("Wizard", () => {
     expect(screen.getByRole("button", { name: "Back" })).toHaveAttribute("data-press", "waiting");
     await act(async () => finish());
     await waitFor(() => expect(publish).not.toHaveAttribute("aria-busy"));
+  });
+
+  it("shows the general error above its footer, and goes to the step the form names", async () => {
+    const user = userEvent.setup();
+    const go = vi.fn();
+    const { rerender } = render(<Wizard steps={steps()} finish="Publish Vacancy" onFinish={() => undefined} step={2} onStepChange={go} error="Not saved. Try again." />);
+    expect(screen.getByRole("heading", { name: "Review" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Not saved. Try again.");
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(go).toHaveBeenCalledWith(1);
+    rerender(<Wizard steps={steps()} finish="Publish Vacancy" onFinish={() => undefined} step={0} onStepChange={go} />);
+    expect(screen.getByRole("heading", { name: "The Role" })).toHaveFocus();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps focus in the field being typed in while its parent re-renders", async () => {
+    const user = userEvent.setup();
+    function Typing() {
+      const [text, setText] = useState("");
+      return (
+        <Wizard
+          steps={[{ title: "The Role", body: <input aria-label="Title" value={text} onChange={(e) => setText(e.target.value)} /> }, { title: "Review", body: <p>Review</p> }]}
+          finish="Publish Vacancy"
+          onFinish={() => undefined}
+          onStepChange={() => undefined}
+        />
+      );
+    }
+    render(<Typing />);
+    await user.type(screen.getByLabelText("Title"), "Engineer");
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Engineer");
   });
 
   it("has no accessibility violations", async () => {

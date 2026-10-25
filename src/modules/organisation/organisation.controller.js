@@ -13,7 +13,7 @@ const { atomically } = require("../../shared/db/tx");
 const { ok, created, accepted } = require("../../shared/http/respond");
 const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf, assertInScope } = require("../../shared/rbac/scope");
-const { maskForUser } = require("../../shared/rbac/field-mask");
+const { maskForUser, assertWritable } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
 const employee360 = require("./employee-360.service");
 const service = require("./organisation.service");
@@ -51,6 +51,8 @@ module.exports = {
   get: async (req, res) => ok(res, await maskUnlessOwn(req, await readable(req))),
 
   create: async (req, res) => {
+    // A field the caller's role hides is not theirs to set (shared/rbac/field-mask.js).
+    await assertWritable(pool, req.user, req.validated.body);
     const employee = await tx((client) =>
       service.createEmployee(client, req.validated.body, withActor(req)),
     );
@@ -59,6 +61,7 @@ module.exports = {
 
   update: async (req, res) => {
     await readable(req);
+    await assertWritable(pool, req.user, req.validated.body, { own: req.user && id(req) === req.user.employee_id });
     await tx((client) => service.updateEmployee(client, id(req), req.validated.body, withActor(req)));
     return ok(res, await maskUnlessOwn(req, await employee360.get(pool, id(req))));
   },
