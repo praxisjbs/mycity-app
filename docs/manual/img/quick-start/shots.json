@@ -7,6 +7,50 @@
       "phone"
     ]
   },
+  "qs-add-task": {
+    "spec": "221d9119480a0a72",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-agree": {
+    "spec": "1f4315f2fc2da129",
+    "source": "c85bbf51d86d6d70",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-approve-commitments": {
+    "spec": "b9c4ee2317e25932",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-check-in": {
+    "spec": "590035331c4ca0f0",
+    "source": "288bfd1502329081",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-close-review": {
+    "spec": "1df220ea380dbbe0",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-commitments": {
+    "spec": "b9759e741c084c76",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop"
+    ]
+  },
   "qs-invite": {
     "spec": "eb4334b105905e32",
     "source": "199f220c9450ebe5",
@@ -21,9 +65,37 @@
       "desktop"
     ]
   },
+  "qs-plan-day": {
+    "spec": "a7d3a868c62e7c63",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-quarter": {
+    "spec": "381ff6c701a85111",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-report-month": {
+    "spec": "5c1cdd7324b6c56c",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop"
+    ]
+  },
   "qs-roles": {
     "spec": "6ddaf9c6aea1c7bb",
     "source": "199f220c9450ebe5",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-score-review": {
+    "spec": "04c823c54c09c45e",
+    "source": "9e1c460117e75c46",
     "devices": [
       "desktop"
     ]
@@ -46,6 +118,13 @@
   "qs-status": {
     "spec": "78ceda875dc917b1",
     "source": "199f220c9450ebe5",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-team-tasks": {
+    "spec": "909797d8c421de27",
+    "source": "21139d113d7b8794",
     "devices": [
       "desktop"
     ]
