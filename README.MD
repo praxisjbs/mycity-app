@@ -234,8 +234,9 @@ src/
 │   │                  one reader of a connection's values: saved here, else the server file) · state ·
 │   │                  usage (each provider call counted a day, flushed every 15 s) · quota (a Free plan's
 │   │                  daily limit as a hard stop) · refusals (the addresses the mail server refused)
-│   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms) ·
-│   │                  actions (⌘K actions: each screen's New action, Clock In, Request Leave)
+│   ├── search/        provider · registry · search.service · screens (⌘K screens and synonyms;
+│   │                  screens.test: which tabs a reader sees) · actions (⌘K actions: each screen's
+│   │                  New action, Clock In, Request Leave)
 │   ├── ai/            manifest · registry · catalogue-sync · authorise · cite
 │   └── observability/ scrub · metrics · error-reporter · request-stats (a minute of traffic a
 │                      row and each route a quarter hour, with latency buckets, for Settings ·

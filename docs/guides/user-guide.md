@@ -242,9 +242,8 @@ Every run:
 8. For every milestone a chapter names in `milestones`, every screen of that milestone in
    `docs/PROGRESS.md` (Dropped aside) has a section with its `screen`.
 9. A file in `docs/manual/` that is neither a chapter (front matter) nor empty waits for its
-   milestone's guide pull request and is named, with why, in the gate's `WAITING` list
-   (`mailbox.md` and `staff-community.md`, written before the format, wait for Milestone 1's); an
-   entry whose file became a chapter is stale. Icons are the hub's own (`Icon.tsx`).
+   milestone's guide pull request and is named, with why, in the gate's `WAITING` list (empty
+   since Milestone 1's chapters); an entry whose file became a chapter is stale. Icons are the hub's own (`Icon.tsx`).
 
 On a change (the files the branch changed):
 
@@ -343,3 +342,7 @@ word limits do not count it, as they do not count an article.
   measured after the last scroll and refused when off screen. The M0 chapters and their 31 pictures
   written; `tests/integration/user-guide.test.js` reads them as staff, Operations and an
   administrator.
+- 25/10/2026 · JP · Milestone 1's chapters: Home, Employee Self-Service, Mailbox and Staff Community
+  (both rewritten from their drafts), Knowledge Hub, and People's Organogram, Attendance, Leave,
+  Devices and Worksites; eight Quick Start cards; 95 pictures in all. §6.6 point 9: `WAITING` is
+  empty.
