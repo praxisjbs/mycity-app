@@ -84,7 +84,7 @@ mycity-app/
 ├── assets/brand/             logo vector masters, pin mark, app icons
 ├── assets/fonts/             Geist, for PDFs
 ├── scripts/
-│   ├── ci-local.js           runs every CI gate locally, full report
+│   ├── ci-local.js           runs every CI gate locally, its four groups at once, full report
 │   ├── fe-test.js            the three frontend workspaces' tests side by side (npm run fe:test)
 │   ├── gen/                  contract and .env.example generators; components.js writes docs/COMPONENTS.md;
 │   │                         dark-theme-samples.js writes docs/MyCity-ERP-Documents/dark-theme-samples.html (F30)
@@ -736,7 +736,11 @@ data, not code. Services call `openInstance()` inside their transaction and reac
 
 ## 8 · CI gates
 
-`npm run ci` runs every gate in CI's order and reports all failures, not the first.
+`npm run ci` runs every gate and reports all failures, not the first. Its four groups (backend,
+frontend, screens, checks) run at the same time, as CI's four jobs do, so a full run takes about as
+long as the backend's tests; `npm run ci -- --serial` runs one gate after another. The screens
+group builds its own demo app and gallery under `node_modules/.cache/mycity/`, away from
+`npm run fe:build`'s `app/dist` and `packages/ui/dist-gallery`.
 
 | Gate | From | Script |
 |---|---|---|
