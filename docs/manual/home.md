@@ -137,10 +137,9 @@ Your request waits for People's decision on
 
 | The field says | What it means | What to do |
 |---|---|---|
-| **Required** | It cannot be left empty | Fill it in |
+| **Required** | It cannot be left empty, or no address was picked | Fill it in. For an address, pick one from the list or drop a pin |
 | **At least 3 characters** | The name is too short | Give the site a longer name |
 | **At least 30 characters** | The description is too short | Say more about the work |
-| **Add an address** | No address was picked | Pick one from the list, or drop a pin |
 | **At least 150 m** or **At most 500 m** | The radius is out of range | Type a number from 150 to 500 |
 | **Ends before it starts** | The last day or end time is before the first | Correct the date or time |
 | **At most 90 days** | The site is longer than 90 days | Split it into shorter sites |
