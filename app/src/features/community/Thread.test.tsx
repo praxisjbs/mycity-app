@@ -1,18 +1,19 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
-import { ModalProvider } from "@mycity/ui";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { ModalProvider, Toaster } from "@mycity/ui";
 import { installMatchMedia, setViewport } from "@mycity/ui/testing";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { emitRealtimeForTest } from "@/api/realtime";
 import type { Message } from "@/api/types/community";
-import { ThreadBody, useThread } from "./Chat";
+import { Composer, ThreadBody, useThread } from "./Chat";
 
 /**
  * A conversation's thread against a stand-in server (docs/guides/community.md §3 steps 10 and
  * 20): a receipt is read but never answered, a new message from the other person is said
  * delivered once, a quiet read never empties the screen, the first unread is reached, older
- * pages lay in above, and pushes at once make one more read, not one each.
+ * pages lay in above, and pushes at once make one more read, not one each. The composer says why a
+ * message was refused and keeps its words.
  */
 
 installMatchMedia();
@@ -183,5 +184,22 @@ describe("a conversation's thread", () => {
     );
     await screen.findByText("2 Unread Messages");
     expect(screen.getAllByText(/^(Today|Yesterday|\d{2}\/\d{2}\/\d{4}|.+ \d{4})$/).length).toBeGreaterThan(0);
+  });
+});
+
+describe("the composer", () => {
+  it("says why a message was refused, and keeps the words to send again", async () => {
+    const onSend = vi.fn().mockRejectedValueOnce(new ApiError(422, { error: { code: "CHANNEL_CLOSED", message: "Only admins post here" } }));
+    render(
+      <ModalProvider>
+        <Composer placeholder="Message #general" onSend={onSend} onVoice={async () => undefined} />
+        <Toaster />
+      </ModalProvider>,
+    );
+    const box = screen.getByPlaceholderText("Message #general");
+    fireEvent.change(box, { target: { value: "Morning all" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Only admins post here")).toBeTruthy();
+    expect((box as HTMLTextAreaElement).value).toBe("Morning all");
   });
 });

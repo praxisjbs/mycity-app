@@ -128,9 +128,13 @@ function Channels() {
     }
   };
   const muteChannel = async (c: Channel) => {
-    await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
-    toast(c.muted ? `Notifications on for #${c.name}` : `#${c.name} muted`);
-    reloadList();
+    try {
+      await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
+      toast(c.muted ? `Notifications on for #${c.name}` : `#${c.name} muted`);
+      reloadList();
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not changed. Try again.");
+    }
   };
 
   const thread = current ? (
@@ -403,7 +407,12 @@ function Recognise({ close, done }: { close: () => void; done: () => void }) {
   const go = async () => {
     setTried(true);
     if (!who.length) return;
-    await save.run({ body: { to_employee_id: who[0].employee_id, message: text.trim() || undefined } });
+    try {
+      await save.run({ body: { to_employee_id: who[0].employee_id, message: text.trim() || undefined } });
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not posted. Try again.");
+      return;
+    }
     close();
     done();
     toast("Posted to #general");
@@ -428,7 +437,11 @@ function Celebrate({ close, send }: { close: () => void; send: (b: { message_typ
     setTried(true);
     if (!who.length) return;
     close();
-    await send({ message_type: what, subject_employee_id: who[0].employee_id });
+    try {
+      await send({ message_type: what, subject_employee_id: who[0].employee_id });
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not posted. Try again.");
+    }
   };
   return (
     <>
@@ -564,9 +577,13 @@ function Direct() {
     }
   };
   const mute = async (c: Conversation) => {
-    await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
-    toast(c.muted ? `Notifications on for ${chatName(c)}` : `Muted ${chatName(c)}`);
-    reloadList();
+    try {
+      await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
+      toast(c.muted ? `Notifications on for ${chatName(c)}` : `Muted ${chatName(c)}`);
+      reloadList();
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "Not changed. Try again.");
+    }
   };
   const showProfile = () => {
     if (!current) return;
