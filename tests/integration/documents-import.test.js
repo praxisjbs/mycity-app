@@ -997,8 +997,10 @@ describeDb("documents, PDFs, mail and imports against Postgres", () => {
         { gross_monthly: ["450000.00", "500000.00"] },
       ]);
       expect(byRow[3].status).toBe("unchanged");
-      expect([byRow[4].status, byRow[5].status]).toEqual(["error", "error"]);
-      expect(byRow[4].problems[0].message).toMatch(/loop/);
+      /* Two new people managing each other are written without the line: warnings, counted
+         and reverted as created, never errors that leave a record nobody can see. */
+      expect([byRow[4].status, byRow[5].status]).toEqual(["warning", "warning"]);
+      expect(byRow[4].problems[0].message).toMatch(/would make a loop.*; saved without/);
     });
 
     test("mapping is remembered by header signature", async () => {

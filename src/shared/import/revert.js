@@ -19,14 +19,17 @@ const requestContext = require("../../config/request-context");
 const { emit } = require("../events/emit");
 const engine = require("./engine");
 
-/** Rows whose record was changed after the commit by anything but this batch. */
-async function changedSince(client, batch, entityType, ids) {
+/**
+ * Rows whose record was changed after the commit by anything but this batch. `entityTypes` is
+ * every kind of record the importer writes (a staff row is a person, or a VACANT row's seat).
+ */
+async function changedSince(client, batch, entityTypes, ids) {
   if (ids.length === 0) return new Set();
   const { rows } = await client.query(
     `SELECT DISTINCT entity_id FROM event_log
-      WHERE entity_type = $1 AND entity_id = ANY($2::text[]) AND occurred_at > $3
+      WHERE entity_type = ANY($1::text[]) AND entity_id = ANY($2::text[]) AND occurred_at > $3
         AND import_batch_id IS DISTINCT FROM $4`,
-    [entityType, ids, batch.committed_at, batch.import_batch_id],
+    [[].concat(entityTypes), ids, batch.committed_at, batch.import_batch_id],
   );
   return new Set(rows.map((r) => r.entity_id));
 }
@@ -70,7 +73,7 @@ async function revert(
           const changed = await changedSince(
             client,
             batch,
-            imp.entity,
+            [imp.entity, ...(imp.alsoEntities || [])],
             rows.map((r) => r.target_id),
           );
           const blocked = [];

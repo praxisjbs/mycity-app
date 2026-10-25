@@ -569,9 +569,18 @@ async function updateSeat(client, seatId, patch, actor) {
   return after;
 }
 
-/** The seat with this title, or a new one (the importer's VACANT rows). */
-async function findOrCreateSeat(client, { title, department_id: departmentId }, actor) {
-  const existing = await repo.findSeatByTitle(client, title);
+/**
+ * The seat with this title, or a new one (the importer's VACANT rows). A seat in the row's own
+ * department is the one; failing that, a seat of that title made before this import (one the
+ * names step moved to another department), never one an earlier row of the same import made,
+ * so two departments' vacancies with one title stay two seats. `keepClosed` (the roster) also
+ * finds a closed seat and leaves it closed: a post People closed does not come back.
+ * @param {{keepClosed?: boolean, before?: Date|string|null}} [opts]  before: the import's start
+ */
+async function findOrCreateSeat(client, { title, department_id: departmentId }, actor, { keepClosed = false, before = null } = {}) {
+  const existing =
+    (await repo.findSeatByTitle(client, title, { departmentId, includeClosed: keepClosed })) ||
+    (await repo.findSeatByTitle(client, title, { includeClosed: keepClosed, createdBefore: before || new Date(0) }));
   if (existing) return { seat: existing, created: false };
   const seat = await createSeat(client, { title, department_id: departmentId }, actor);
   return { seat, created: true };
@@ -774,17 +783,13 @@ async function resolveManager(client, target, { exclude = null } = {}) {
     const hit = onePerson(await repo.findEmployeesByName(client, name));
     if (hit) return { employee_id: hit.employee_id };
   }
+  /* A first name alone ("Chinyere - Head PR & Marketing") is one person only when nobody
+     else has it, and when a post is written beside it, only when that person holds it. */
   if (target.name && !target.name.includes(" ")) {
-    const folded = managerText.fold(target.name);
-    const page = await repo.list(
-      client,
-      { page: 1, q: target.name },
-      { scope: "all", scope_ids: null },
-    );
-    const byFirstName = page.data.filter(
-      (r) => managerText.fold(r.display_name).split(" ")[0] === folded && r.employee_id !== exclude,
-    );
-    if (byFirstName.length === 1) return { employee_id: byFirstName[0].employee_id };
+    const byFirstName = notExcluded(await repo.findEmployeesByFirstName(client, target.name));
+    const hit = byFirstName.length === 1 ? byFirstName[0] : null;
+    if (hit && (!target.title || managerText.matchesTitle(target.title, hit.job_title)))
+      return { employee_id: hit.employee_id };
   }
   for (const title of [target.title, target.text].filter(Boolean)) {
     const exact = onePerson(await repo.findEmployeesByJobTitle(client, title));
@@ -836,18 +841,35 @@ async function importRow(client, values, ctx = {}) {
       client,
       { title: values.job_title, department_id: values.department },
       actor,
+      { keepClosed: Boolean(options.keep_existing), before: ctx.batch ? ctx.batch.created_at : null },
     );
     return { action: created ? "create" : "none", target_id: seat.org_seat_id, before: null };
   }
 
-  const workEmail =
-    values.work_email ||
-    (options.work_email_by_job_title || {})[String(values.job_title || "").trim()] ||
-    null;
+  const postEmail = (options.work_email_by_job_title || {})[String(values.job_title || "").trim()] || null;
+  const workEmail = values.work_email || postEmail || null;
   let byNumber = values.staff_number
     ? await repo.findEmployeeByStaffNumber(client, values.staff_number)
     : null;
   const byEmail = workEmail ? await repo.findEmployeeByWorkEmail(client, workEmail) : null;
+
+  /*
+   * The row's Email cell is empty and the post's address (roles.json) is already somebody's.
+   * That somebody is this row only when the number or the name says so: a second person in
+   * the same post must bring their own address, or they would be read as the first.
+   */
+  if (!values.work_email && postEmail && byEmail) {
+    const other = values.staff_number
+      ? byEmail.staff_number !== values.staff_number
+      : !sameName(byEmail, name);
+    if (other)
+      throw new AppError(
+        "WORK_EMAIL_REQUIRED",
+        `${postEmail} belongs to staff number ${byEmail.staff_number}; give this person their own email.`,
+        422,
+        { work_email: ["Required"] },
+      );
+  }
 
   /*
    * The staff number this row claims is held by a different work email, so the holder is
@@ -866,10 +888,16 @@ async function importRow(client, values, ctx = {}) {
    */
   if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail) && !sameName(byNumber, name)) {
     const onSheet = (options.roster_work_emails || []).some((e) => sameEmail(e, byNumber.work_email));
-    if (!byEmail && (!options.reclaim_staff_numbers || onSheet))
+    /* Somebody an earlier roster brought is MyCity's own person under this number: a new
+       name and a new email on their row is them, changed, never a stranger to move aside. */
+    const ours =
+      !byEmail && options.reclaim_staff_numbers && !onSheet && (await repo.importedByRoster(client, byNumber.employee_id));
+    if (!byEmail && (!options.reclaim_staff_numbers || onSheet || ours))
       throw new AppError(
         "STAFF_NUMBER_TAKEN",
-        `Staff number ${values.staff_number} belongs to ${byNumber.work_email}.`,
+        ours
+          ? `Staff number ${values.staff_number} belongs to ${byNumber.work_email}, loaded from the roster before; correct their record on screen.`
+          : `Staff number ${values.staff_number} belongs to ${byNumber.work_email}.`,
         409,
         { staff_number: ["Already in use"] },
       );
@@ -901,6 +929,19 @@ async function importRow(client, values, ctx = {}) {
     throw new AppError("WORK_EMAIL_REQUIRED", "Work Email is required to create a person.", 422, {
       work_email: ["Required"],
     });
+  /* A row with no staff number whose email matched nobody: somebody of the same first and
+     last name already on the register is most likely this person under a changed address,
+     and a second record would split their history. The row names its staff number to go on. */
+  if (!values.staff_number) {
+    const namesakes = await repo.findEmployeesByFirstAndLast(client, name.first_name, name.last_name);
+    if (namesakes.length)
+      throw new AppError(
+        "POSSIBLE_DUPLICATE",
+        `${name.first_name} ${name.last_name} may already be staff number ${namesakes[0].staff_number}; add their Staff ID to the row.`,
+        409,
+        { full_name: ["Already on the register"] },
+      );
+  }
   const employee = await createEmployee(
     client,
     {
@@ -942,13 +983,36 @@ function optional(values, keys) {
   return out;
 }
 
-/** One Name cell into first, middle and last. A single word is both first and last name. */
-function splitName(full) {
+/** Titles a sheet writes before a name ("Mrs", "Engr."): not part of anybody's name. */
+const HONORIFICS = new Set([
+  "mr", "mrs", "ms", "miss", "mx", "dr", "engr", "prof", "chief", "alhaji", "alhaja", "barr",
+  "pastor", "rev", "hon", "sir", "dame", "arc", "pharm",
+]);
+
+/** A word written all in capitals or all in small letters ("OBI", "obi"), as a name is spelt: Obi. "McCarthy" stays. */
+const nameCase = (word) =>
+  /\p{L}/u.test(word) && (word === word.toUpperCase() || word === word.toLowerCase())
+    ? word.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
+    : word;
+
+/**
+ * A Name cell tidied: spacing collapsed, leading titles dropped ("Engr. Tunde Bakare"), a word
+ * in capitals or small letters put in name case ("TOBILOBA dada" → "Tobiloba Dada"). The importer's Name column
+ * runs it (employee.import.js clean), so a sheet's spelling is compared as the record holds it.
+ */
+function cleanName(full) {
   const parts = String(full ?? "")
     .replace(/\s+/g, " ")
     .trim()
     .split(" ")
     .filter(Boolean);
+  while (parts.length > 1 && HONORIFICS.has(parts[0].toLowerCase().replace(/\.$/, ""))) parts.shift();
+  return parts.map(nameCase).join(" ");
+}
+
+/** One Name cell into first, middle and last. A single word is both first and last name. */
+function splitName(full) {
+  const parts = cleanName(full).split(" ").filter(Boolean);
   if (parts.length === 0) return { first_name: "", middle_name: undefined, last_name: "" };
   if (parts.length === 1)
     return { first_name: parts[0], middle_name: undefined, last_name: parts[0] };
@@ -958,6 +1022,36 @@ function splitName(full) {
     last_name: parts[parts.length - 1],
   };
 }
+
+/**
+ * Keep the staff-number counter above every number a roster about to be loaded claims, before
+ * any row is written: a row with no Staff ID is then given a number above all of them, and a
+ * holder moved off a number lands above them too, once.
+ * @param {string[]} numbers  the sheet's Staff ID cells
+ */
+async function reserveStaffNumbers(client, numbers) {
+  const pad = await numbering.paddingOf(client, "employee");
+  for (const n of numbers) {
+    const text = String(n ?? "").trim().toUpperCase();
+    if (text) await advancePast(client, /^\d+$/.test(text) && text.length < pad ? text.padStart(pad, "0") : text);
+  }
+}
+
+/**
+ * Note that MyCity's names (seeds/staff/nomenclature.json, at this checksum) were applied, so
+ * the next deploy does not apply them again over what People changed on screen since.
+ */
+async function recordNamesApplied(client, sha256, tally, actor) {
+  await emit(client, {
+    key: EVENTS.DEPARTMENT_NAMES_APPLIED,
+    entity: { type: "nomenclature", id: sha256 },
+    actor,
+    payload: { sha256, ...tally },
+  });
+}
+
+/** Whether the names at this checksum were applied already. */
+const namesApplied = (client, sha256) => repo.namesApplied(client, sha256);
 
 module.exports = {
   setBirthday,
@@ -989,4 +1083,8 @@ module.exports = {
   resolveManager,
   importRow,
   splitName,
+  cleanName,
+  reserveStaffNumbers,
+  recordNamesApplied,
+  namesApplied,
 };

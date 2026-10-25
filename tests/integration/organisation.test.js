@@ -873,6 +873,13 @@ describeDb("the organisation module against the real migrations", () => {
 
     let sheetFile;
 
+    /** The invented company's own names: the one department the sheet may bring. */
+    const namesFile = () => {
+      const file = path.join(temp, "nomenclature.json");
+      fs.writeFileSync(file, JSON.stringify({ departments: [{ name: "Trading Desk", code: "TRD" }] }));
+      return file;
+    };
+
     beforeAll(async () => {
       sheetFile = path.join(temp, "staff-list.xlsx");
       fs.writeFileSync(sheetFile, await sheet(rows()));
@@ -885,6 +892,7 @@ describeDb("the organisation module against the real migrations", () => {
         log: (m) => log.push(m),
         sheet: sheetFile,
         rolesFile: rolesFile(),
+        nomenclatureFile: namesFile(),
       });
       expect(result.status).toBe("loaded");
       expect(result.stats.create).toBe(5);
@@ -902,7 +910,7 @@ describeDb("the organisation module against the real migrations", () => {
         phone: null,
       });
 
-      /* The DOB column's day and month are kept for the celebrations, matched by email, else staff number. */
+      /* The DOB column's day and month are kept for the celebrations, matched by work email (the post's, from roles.json, when the cell is empty). */
       expect(result.birthdays).toEqual({ set: 4, unmatched: 0 });
       expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0001'")).toEqual({ birth_day: 12, birth_month: 12 });
       expect(await one("SELECT birth_day, birth_month FROM employee WHERE staff_number = 'T0002'")).toEqual({ birth_day: 26, birth_month: 9 });
@@ -1307,6 +1315,194 @@ describeDb("the organisation module against the real migrations", () => {
       expect(res.body.data.map((r) => r.status)).toContain("warning");
       const errors = await asOps()(request(app).get(`/api/v1/imports/${batch.import_batch_id}/rows?status=error`));
       expect(errors.body.data.every((r) => r.status === "error")).toBe(true);
+    });
+
+    test("a roster person whose name and email both change keeps their number and their one record", async () => {
+      const before = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0003'");
+      const changed = rows().map((r) => (r[0] === "T0003" ? Object.assign([...r], { 1: "Emeka Nwankwo", 8: "emeka.new@mycity.test" }) : r));
+      const file = path.join(temp, "renamed.xlsx");
+      fs.writeFileSync(file, await sheet(changed));
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/Staff Number: Staff number T0003 belongs to .*, loaded from the roster before/);
+      expect((await one("SELECT employee_id FROM employee WHERE staff_number = 'T0003'")).employee_id).toBe(before.employee_id);
+      expect(await one("SELECT 1 AS x FROM employee WHERE work_email = 'emeka.new@mycity.test'")).toBeUndefined();
+    });
+
+    test("a row with no staff number whose name is already on the register is held back, not added twice", async () => {
+      const file = path.join(temp, "namesake.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([["", "Sade Akin", "Trading Officer", "Trading Desk", "Female", "", "", "", "sade.other@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]]),
+      );
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/Name: Sade Akin may already be staff number T0004; add their Staff ID to the row/);
+      expect(await one("SELECT count(*)::int AS n FROM employee WHERE first_name = 'Sade' AND last_name = 'Akin'")).toEqual({ n: 1 });
+    });
+
+    test("a second person in a post roles.json gives an email to must bring their own", async () => {
+      const file = path.join(temp, "second-head.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([["T0801", "Musa Bello", "Head of Trading", "Trading Desk", "Male", "", "", "", "", "", "FTE", "Remote", "Mon - Fri", ""]]),
+      );
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, unchanged: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/trading@mycity\.test belongs to staff number T0002; give this person their own email/);
+    });
+
+    test("somebody added on screen gets no login from the roster, whatever their title", async () => {
+      const res = await asOps()(request(app).post("/api/v1/employees")).send({
+        first_name: "Deputy",
+        last_name: "Chief",
+        work_email: "deputy.chief@mycity.test",
+        phone: "08031234576",
+        job_title: "Deputy Chief Executive Officer",
+        start_date: "2026-05-06",
+        employment_type: "full_time",
+        work_pattern: "remote",
+        department_id: people.delivery.department_id,
+      });
+      expect(res.status).toBe(201);
+      const again = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile() });
+      expect(again.status).toBe("already_loaded");
+      expect(await one("SELECT 1 AS x FROM app_user WHERE employee_id = $1", [res.body.employee_id])).toBeUndefined();
+    });
+
+    test("a manager written by first and last name is found when their record has a middle name", async () => {
+      const file = path.join(temp, "middle-name.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([
+          ["T0601", "Tobi Ife Dada", "Settlement Lead", "Trading Desk", "Male", "", "", "Zuri Danladi", "tobi.dada@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+          ["T0602", "Ada Eze", "Settlement Officer", "trading-desk", "Female", "", "", "Tobi Dada", "ada.eze@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+        ]),
+      );
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(result.stats).toMatchObject({ create: 2, warning: 0, error: 0 });
+      const ada = await one(
+        `SELECT btrim(m.first_name || ' ' || m.last_name) AS manager, d.name AS department
+           FROM employee e JOIN employee m ON m.employee_id = e.line_manager_id JOIN department d ON d.department_id = e.department_id
+          WHERE e.staff_number = 'T0602'`,
+      );
+      /* "trading-desk" is the Trading Desk, punctuation and case aside. */
+      expect(ada).toEqual({ manager: "Tobi Dada", department: "Trading Desk" });
+    });
+
+    test("a department MyCity does not name is not made by the roster; its rows wait for People", async () => {
+      const file = path.join(temp, "unknown-department.xlsx");
+      fs.writeFileSync(
+        file,
+        await sheet([["T0701", "Bola Ige", "Analyst", "Treasury Unit", "Male", "", "", "", "bola.ige@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]]),
+      );
+      const log = [];
+      const result = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile(), log: (m) => log.push(m) });
+      expect(result.stats).toMatchObject({ create: 0, error: 1 });
+      expect(log.join("\n")).toMatch(/department "Treasury Unit" is not one of MyCity's/);
+      expect(await one("SELECT 1 AS x FROM department WHERE name = 'Treasury Unit'")).toBeUndefined();
+    });
+
+    test("a seat People closed stays closed when the sheet still lists it", async () => {
+      const audit = [["", "VACANT", "Head of Audit", "Trading Desk", "", "", "", "Zuri Danladi", "", "", "FTE", "Hybrid", "Mon - Fri", ""]];
+      const file = path.join(temp, "closed-seat.xlsx");
+      fs.writeFileSync(file, await sheet(audit));
+      expect((await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() })).stats).toMatchObject({ create: 1 });
+      const seat = await one("SELECT org_seat_id FROM org_seat WHERE title = 'Head of Audit'");
+      await tx((client) => organisation.updateSeat(client, seat.org_seat_id, { status: "closed" }, null));
+      audit[0][13] = "Changed";
+      fs.writeFileSync(file, await sheet(audit));
+      const again = await loader.loadStaff({ db: pool, sheet: file, rolesFile: rolesFile() });
+      expect(again.stats).toMatchObject({ create: 0, unchanged: 1 });
+      expect((await q("SELECT status FROM org_seat WHERE title = 'Head of Audit'")).rows).toEqual([{ status: "closed" }]);
+    });
+
+    test("names applied once stay as People change them on screen", async () => {
+      const file = path.join(temp, "names-once.json");
+      fs.writeFileSync(file, JSON.stringify({ departments: [], job_titles: { "Risk Analyst": "Risk Officer" } }));
+      const first = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile(), nomenclatureFile: file });
+      expect(first.names.titles).toBe(1);
+      expect((await one("SELECT job_title FROM employee WHERE staff_number = 'T0401'")).job_title).toBe("Risk Officer");
+      /* People give him back the old title on screen; the next deploy leaves it. */
+      const femi = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0401'");
+      await tx((client) => organisation.updateEmployee(client, femi.employee_id, { job_title: "Risk Analyst" }, null));
+      const next = await loader.loadStaff({ db: pool, sheet: sheetFile, rolesFile: rolesFile(), nomenclatureFile: file });
+      expect(next.names.titles).toBe(0);
+      expect((await one("SELECT job_title FROM employee WHERE staff_number = 'T0401'")).job_title).toBe("Risk Analyst");
+    });
+
+    test("an import by hand is reverted whole: its lines and the fields it filled go back", async () => {
+      const engine = require("../../src/shared/import/engine");
+      const { revert } = require("../../src/shared/import/revert");
+      const yusuf = await one("SELECT employee_id, phone, line_manager_id FROM employee WHERE staff_number = 'T0102'");
+      expect(yusuf).toMatchObject({ phone: null, line_manager_id: null });
+      const buffer = await sheet([
+        ["T0102", "Yusuf Garba", "Trading Officer", "Trading Desk", "Male", "", "", "Zuri Danladi", "yusuf@mycity.test", "08031234599", "FTE", "Remote", "Mon - Fri", ""],
+        ["T0901", "Halima Musa", "Trading Officer", "Trading Desk", "Female", "", "", "Nobody At All", "halima@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""],
+      ]);
+      const batch = await tx((client) =>
+        engine.createBatch(client, {
+          importer_key: "employees",
+          file: { buffer, originalname: "by-hand.xlsx", mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: buffer.length },
+          actor: loader.SYSTEM,
+        }),
+      );
+      await engine.preview(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      const done = await engine.commit(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      /* Halima is written without the manager nobody holds: a warning, counted as created. */
+      expect(done.stats).toMatchObject({ create: 1, update: 1, error: 0, warning: 1 });
+      const changed = await asOps()(request(app).get(`/api/v1/imports/${batch.import_batch_id}/rows?status=change`));
+      expect(changed.status).toBe(200);
+      expect(changed.body.data.map((r) => r.row_number)).toEqual([2]);
+      expect(Object.keys(changed.body.data[0].diff)).toEqual(["phone"]);
+
+      const out = await revert(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      expect(out).toMatchObject({ archived: 1, restored: 1 });
+      /* The phone the import filled is cleared, and the line it set is taken away. */
+      expect(await one("SELECT phone, line_manager_id FROM employee WHERE staff_number = 'T0102'")).toEqual({ phone: null, line_manager_id: null });
+      expect((await one("SELECT status FROM employee WHERE staff_number = 'T0901'")).status).toBe("archived");
+    });
+
+    test("a person the import made who now has a login is not archived by a revert", async () => {
+      const engine = require("../../src/shared/import/engine");
+      const { revert } = require("../../src/shared/import/revert");
+      const buffer = await sheet([["T0902", "Ngozi Eke", "Trading Officer", "Trading Desk", "Female", "", "", "", "ngozi.eke@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]]);
+      const batch = await tx((client) =>
+        engine.createBatch(client, {
+          importer_key: "employees",
+          file: { buffer, originalname: "in-use.xlsx", mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: buffer.length },
+          actor: loader.SYSTEM,
+        }),
+      );
+      await engine.preview(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      await engine.commit(batch.import_batch_id, { actor: loader.SYSTEM, db: pool });
+      const ngozi = await one("SELECT employee_id FROM employee WHERE staff_number = 'T0902'");
+      const invited = await asOps()(request(app).post("/api/v1/users")).send({ employee_id: ngozi.employee_id, role_codes: ["employee"] });
+      expect(invited.status).toBe(201);
+      await expect(revert(batch.import_batch_id, { actor: loader.SYSTEM, db: pool })).rejects.toMatchObject({ code: "IMPORT_REVERT_BLOCKED" });
+      expect((await one("SELECT status FROM employee WHERE staff_number = 'T0902'")).status).toBe("active");
+    });
+
+    test("an import whose header row was not found is mapped from the row the person names", async () => {
+      const engine = require("../../src/shared/import/engine");
+      const buffer = await sheet([["T0999", "Kunle Afolabi", "Trading Officer", "Trading Desk", "Male", "", "", "", "kunle@mycity.test", "", "FTE", "Remote", "Mon - Fri", ""]], {
+        headers: ["Ref", "Who", "Post", "Unit"],
+      });
+      const batch = await tx((client) =>
+        engine.createBatch(client, {
+          importer_key: "employees",
+          file: { buffer, originalname: "no-header.xlsx", mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size: buffer.length },
+          actor: loader.SYSTEM,
+        }),
+      );
+      expect(batch.header_row).toBeNull();
+      const res = await asOps()(request(app).put(`/api/v1/imports/${batch.import_batch_id}/mapping`)).send({ header_row: 0 });
+      expect(res.status).toBe(200);
+      expect(res.body.header_row).toBe(0);
+      expect(res.body.mapping.columns.map((col) => col.header).slice(0, 4)).toEqual(["Ref", "Who", "Post", "Unit"]);
     });
 
     test("no sheet in the build means nothing happens at all", async () => {

@@ -80,6 +80,11 @@ async function sequenceOf(client, docType, { date } = {}) {
   return { period, pattern: sequencePattern(scheme, period) };
 }
 
+/** The digits a number for `docType` is padded to (0 for none): what an import pads a bare sequence to. */
+async function paddingOf(client, docType) {
+  return (await schemeOf(client, docType)).padding;
+}
+
 async function schemeOf(client, docType) {
   const { rows } = await client.query(
     "SELECT prefix, padding, separator, reset, include_period FROM numbering_scheme WHERE doc_type = $1",
@@ -208,4 +213,4 @@ async function checkSchemes(client) {
   }
 }
 
-module.exports = { allocate, advanceTo, preview, format, periodOf, sequencePattern, sequenceOf, checkSchemes };
+module.exports = { allocate, advanceTo, preview, format, periodOf, sequencePattern, sequenceOf, paddingOf, checkSchemes };

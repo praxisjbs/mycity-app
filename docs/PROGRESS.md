@@ -1241,10 +1241,27 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 | 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
+| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 
 **Notes**
 
+- 25/10/2026 · JP · Imports (#93), from the bulk half of the employee creation audit
+  (`docs/guides/foundation.md` §6.1, §6.16): the preview lists Problems or Changes, each changed row
+  naming its fields; a row's status reads in words; a refusal reads with its column's label and the
+  service's sentence; a commit refused for problems reads the counts again and offers Commit Valid
+  Rows; a new value to tick is named by its field; a sheet whose row of column names was not found
+  can name it (Column Names Row, `PUT /imports/:id/mapping` with `header_row` alone); restricted
+  columns are blanked in the preview's rows for a reader masked from them. The engine maps a
+  column's own name before an alias, reads phones in number cells, refuses a year alone in a date
+  column, pads a Staff ID a spreadsheet read as a number, and takes other spellings of a choice
+  (`aliases` on an enum option); revert puts lines and emptied fields back, refuses a person now in
+  use or a seat changed since, and a person written without their line is a warning, not an error.
+  The roster: roles by exact title, logins only for people it brought, names once per version, the
+  counter reserved first, nobody it brought renumbered, same-name rows held back, unreadable optional
+  cells left out, departments only from `nomenclature.json`, closed seats kept closed, birthdays by
+  email. Tests: unit (cells, names, mapping, roles) and 12 integration tests in `organisation.test.js`.
+  Left (named in §6.16): the staging seed's raw SQL for M1 tables, month-first dates in a mixed
+  column, one seat for two VACANT rows of one title in one department, a dry run storing the sheet.
 - 25/10/2026 · JP · Users (#70), from the employee creation audit (`docs/guides/identity.md` §6.1, JBS Praxis's decisions of 25/10/2026): an archived employee's login is refused at once on every way in and then closed with its sessions and links (it used to keep working); Reactivate waits for Restore. A login nobody has used follows a corrected work email; one in use moves with Use Work Email (fresh sign-in, both addresses told). Invite All Pending and Not Sent for roster logins never emailed, Send Invite for an Invited record; invitations limited per administrator, not per office address; a link check that fails for another reason shows Link Not Checked, not Link Expired; one login per employee in the database (`0500`); view-only Settings shows no action buttons; picking a role while searching keeps the others. No ceiling on roles, as decided. The empty `users.test.js` is gone: `tests/integration/logins.test.js` holds the module's tests. Left: nothing for Users.
 - 21/10/2026 · TB · Appearance (#75) built, brought forward from M9 by TB (owner GE → TB) after the Milestone 1 handover (`docs/guides/foundation.md` §6.15): the Dark Theme card (Deep Green, Charcoal, Black and Dark Grey as presets, the four colours as `ColorField`s, Save Palette, Restore Previous), the live Preview (`ThemePreview`) drawn from the contract's maths as it is typed, Contrast (the lowest pair, the pairs checked, what was adjusted), Fonts (Heading Font, Body Font, Save Fonts) and Defaults (Theme for Everyone, Density for Everyone, saved as picked). `GET` and `PATCH /settings/appearance`, `POST /settings/appearance/restore` (`settings.appearance.js`, `setting` rows `appearance.*`, no migration), a fresh sign-in for every change, `settings.changed` for the Audit Log; `/auth/me` carries `appearance` for every screen. The INTERIM `app/src/api/types/settings.ts` is gone. Phone: the cards one under another, the preset chips scrolling in their row, the fields full width, Save Palette at the foot of its card. Tests: `settings.test.js` (integration), `appearance-contract.test.js`, `Appearance.test.tsx`. Left: Edidiong to pick a palette from the samples, then paste it on staging and production.
 - 21/10/2026 · TB · From the 21/10 System Health brief. Documents & Numbering (#76), fault #3: a scheme's three rules are the contract's (`NumberingSchemeSave`), so the form marks them as it is filled rather than on Save ("Needed when it resets", "Add sequence digits", "Add digits or period"), and Each Year or Each Month ticks Period. Faults (#97): a refused form is recorded under its own rule and the route as declared (`LEAVE_SPANS_YEARS: ends_on` at `POST /api/v1/ess/leave`, where three lines had read `VALIDATION_FAILED` at `POST /leave`). Of the brief's other faults, #5 and #6 were already fixed (Find Prices as a job, #107; refused addresses, #111) and #4 is Geoapify's outage (Ignore it). Tests: `app/src/features/settings/Numbering.test.tsx`, `domain.test.js`, `middleware.test.js`. Left: mark #1 to #3 Fixed and #4 Ignored once this is on staging.

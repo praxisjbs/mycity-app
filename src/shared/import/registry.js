@@ -19,7 +19,8 @@
  *   type           text (default), int, number, money, phone, email, enum, date, boolean, reference
  *   required       the cell must have a value
  *   aliases        other header spellings ("staff no", "employee id")
- *   options        enum values: ["remote", ...] or [{ value, label }]
+ *   options        enum values: ["remote", ...] or [{ value, label, aliases }]; aliases are other
+ *                  spellings a sheet uses ("WFH" for Remote), read but never offered
  *   ref            a reference field: what it points at ("department", "employee")
  *   pass           2: resolved after every row of pass 1 exists (a line manager who is
  *                  another row of the same file)
@@ -28,6 +29,11 @@
  *   mask           a field key (shared/rbac/field-mask.js): hidden in previews and error
  *                  files from people masked from it
  *   max            a text field's longest value; 500 characters unless set
+ *   clean          a text field's tidy-up, (text) => text, run before the value is compared or
+ *                  written ("Mrs Ada OBI" → "Ada Obi")
+ *   sequenceOf     a text field holding a number the numbering engine issues ("employee"): a
+ *                  cell of digits shorter than the scheme's padding is padded, as a spreadsheet
+ *                  drops the leading zeros of a number it reads as a number (19 → 00019)
  *   example, hint  shown on the template's Reference sheet
  *
  * Functions the importer supplies (every write goes through the module's SERVICE, so
@@ -46,6 +52,8 @@
  *   archive(client, id, ctx)                   revert a create
  *   restore(client, id, before, ctx)           revert an update to its before-snapshot
  *   isReferenced(client, id, {batch})          optional: true refuses reverting a row it created
+ *   alsoEntities                               optional: other entity types a row may write (a VACANT
+ *                                              row's seat), read for "changed since" on revert
  *   extract(sheets)                            optional: a whole workbook as the business keeps it
  *                                              (sheets as readSheets gives them) → { rows, notes },
  *                                              each row keyed by field. Its rows are imported as one
@@ -107,6 +115,13 @@ function optionsOf(field) {
     typeof o === "string"
       ? { value: o, label: o }
       : { value: o.value, label: o.label || String(o.value) },
+  );
+}
+
+/** Every spelling an enum cell may use for each value: its value, its label and its aliases. */
+function spellingsOf(field) {
+  return (field.options || []).map((o) =>
+    typeof o === "string" ? { value: o, names: [o] } : { value: o.value, names: [o.value, o.label, ...(o.aliases || [])].filter(Boolean) },
   );
 }
 
@@ -195,6 +210,7 @@ function __reset() {
 }
 
 module.exports = {
+  spellingsOf,
   TYPES,
   defineImporter,
   get,

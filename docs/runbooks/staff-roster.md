@@ -151,7 +151,9 @@ Back-office Ops (Technology merged into it and retired), HR & Operations becomes
 in place; Partnership & Growth is created and takes its posts; the chart's titles, David's line to
 Chinyere, the department codes and heads, and the seven new vacant seats follow. The deploy log lists
 each change under `names:`; a second deploy lists none. A title already corrected on screen to something
-else is left as it is.
+else is left as it is. Since 25/10/2026 the changes to people and seats are applied once per version of
+`nomenclature.json`: after that, a title, department or line People change on screen stays, even one
+that matches an old name. A new version of the file applies once again.
 
 ## 7 · Check
 
@@ -161,4 +163,16 @@ sudo -u mycity-stg node --env-file=/srv/mycity/stg/shared/.env \
   scripts/db/load-staff.js --dry-run
 ```
 
-It reads `20 rows, 0 to create, 0 to update, 20 unchanged` once the corrected sheet has loaded.
+Once the sheet in the build has loaded, it says `this sheet is already loaded (batch IMP-...); a dry
+run has nothing to preview` and writes nothing. A changed sheet is previewed: the log lists each row
+to create or update and each problem, with nothing committed.
+
+A row the log reports is corrected on People · Employees or in the next sheet. The ones to expect
+since 25/10/2026, each with what to do:
+
+| The log says | Do |
+|---|---|
+| `Staff number ... belongs to ..., loaded from the roster before` | The sheet changed that person's name and email together. Correct their record on screen; the row then matches |
+| `... may already be staff number ...; add their Staff ID to the row` | Put the person's Staff ID in the sheet's row, or correct their email there |
+| `... belongs to staff number ...; give this person their own email` | A second person in a post whose email `roles.json` gives: put their own address in the sheet |
+| `department "..." is not one of MyCity's` | A typo in Team: correct it in the sheet. A real new department goes into `nomenclature.json` first |

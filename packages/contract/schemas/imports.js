@@ -165,15 +165,21 @@ const ImportCreate = z
   })
   .strict();
 
-/** PUT /imports/:id/mapping: column index to field key, null to ignore a column. */
+/**
+ * PUT /imports/:id/mapping: column index to field key, null to ignore a column. With
+ * `header_row` and no `fields`, the columns of that row are matched afresh, for the person
+ * to confirm: the way on when the row of column names was not found on upload.
+ */
 const ImportMappingSet = z
   .object({
     sheet: optionalText(120),
     header_row: z.coerce.number().int().min(0).max(999).optional(),
-    fields: z.record(
-      z.string().regex(/^\d+$/, "a column number"),
-      z.string().regex(/^[a-z][a-z0-9_]*$/).nullable(),
-    ),
+    fields: z
+      .record(
+        z.string().regex(/^\d+$/, "a column number"),
+        z.string().regex(/^[a-z][a-z0-9_]*$/).nullable(),
+      )
+      .optional(),
     save_profile: z.boolean().optional(),
     profile_name: optionalText(120),
   })
@@ -223,10 +229,10 @@ const ImportRowRecord = z
 /**
  * A batch's rows by status, or "problem" for every row the preview lists: an error, a
  * duplicate, or a warning (a row that saves with something missing, such as a Line
- * Manager nobody holds).
+ * Manager nobody holds); or "change" for every row that changes a record already there.
  */
 const ImportRowListQuery = listQuery(
-  { status: z.enum([...ImportRowStatus.options, "problem"]).optional() },
+  { status: z.enum([...ImportRowStatus.options, "problem", "change"]).optional() },
   ["row_number"],
 );
 const ImportRowPage = Paged(ImportRowRecord);

@@ -92,16 +92,16 @@ function readRoles(file = ROLES) {
   };
 }
 
-/** What a post is given: its own entry, by exact title then by the words it uses. */
+/**
+ * What a post is given: its own entry, by its exact title (case and punctuation aside), else
+ * the default. Never by the words a title shares with a post: "Deputy Chief Technology
+ * Officer" is not the Chief Technology Officer and must not be made an administrator.
+ */
 function rolesForTitle(roles, jobTitle) {
   const managerText = require(path.join(ROOT, "src/modules/organisation/manager-text.js"));
-  const entries = Object.entries(roles.by_job_title);
   const wanted = managerText.fold(jobTitle);
-  const exact = entries.find(([title]) => managerText.fold(title) === wanted);
-  if (exact) return exact[1];
-  const byWords = entries.filter(([title]) => managerText.matchesTitle(title, jobTitle));
-  if (byWords.length === 1) return byWords[0][1];
-  return roles.default;
+  const exact = Object.entries(roles.by_job_title).find(([title]) => managerText.fold(title) === wanted);
+  return exact ? exact[1] : roles.default;
 }
 
 /** Every work email `roles.json` holds for a post whose sheet cell is empty. */
@@ -183,9 +183,10 @@ async function alreadyLoaded(db, checksum) {
 }
 
 /**
- * Give everyone on the register a login with the roles their post is granted. A person
- * who already has one is left alone, roles included: roles apply when the login is
- * created, so a change made on screen stands (docs/guides/foundation.md §11).
+ * Give each person the roster brought a login with the roles their post is granted. A person
+ * who already has one is left alone, roles included: roles apply when the login is created,
+ * so a change made on screen stands (docs/guides/foundation.md §11). Somebody People added on
+ * screen is theirs to invite or not: the roster never gives them a login.
  *
  * @returns {Promise<{created: number, kept: number, failed: number}>}
  */
@@ -199,6 +200,9 @@ async function applyRoles({ pool, atomically, log, roles }) {
        FROM employee e
        LEFT JOIN app_user u ON u.employee_id = e.employee_id
       WHERE e.status = 'active'
+        AND EXISTS (SELECT 1 FROM import_row r JOIN import_batch b ON b.import_batch_id = r.import_batch_id
+                     WHERE b.importer_key = 'employees' AND b.status = 'committed' AND b.options ? 'source_sha256'
+                       AND r.action = 'create' AND r.target_id = e.employee_id::text)
       ORDER BY e.created_at, e.employee_id`,
   );
   for (const person of rows) {
@@ -258,6 +262,7 @@ async function applyLines({ pool, atomically, log, roles }) {
   for (const person of rows) {
     const entry = rolesForTitle(roles, person.job_title);
     if (!entry.line_manager) continue;
+    /* One line that cannot be set (a loop, a seat gone) is logged; it never stops the steps after it. */
     await withTx(pool, atomically, async (client) => {
       const target = await organisation.resolveManager(
         client,
@@ -282,6 +287,9 @@ async function applyLines({ pool, atomically, log, roles }) {
       );
       out.set += 1;
       log(`${person.display_name} (${person.job_title}) now reports to the ${entry.line_manager}`);
+    }).catch((err) => {
+      out.unresolved += 1;
+      log(`WARNING: no line manager for ${person.display_name} (${person.job_title}): ${err.message}`);
     });
   }
   return out;
@@ -300,14 +308,16 @@ function dayMonth(cell) {
 
 /**
  * Birthdays the sheet gives as a day and month with no year, which the importer cannot
- * read as a date of birth. Each is matched to its person by work email, else staff
- * number, and written only for a person with no date of birth and no birthday yet, so
- * nothing entered on screen is written over. Runs on every deploy, as the sheet may have
- * been loaded before this step existed. Logs counts only: a birthday is personal.
+ * read as a date of birth. Each is matched to its person by work email only, the cell's own or
+ * the one roles.json gives the post when the cell is empty (a staff number may have moved to
+ * somebody else since), and written only for a person with no date of
+ * birth and no birthday yet, so nothing entered on screen is written over. Runs on every
+ * deploy, as the sheet may have been loaded before this step existed. Logs counts only: a
+ * birthday is personal.
  *
  * @returns {Promise<{set: number, unmatched: number}>}
  */
-async function applyBirthdays({ pool, atomically, book }) {
+async function applyBirthdays({ pool, atomically, book, roles = { by_job_title: {} } }) {
   const organisation = require(path.join(ROOT, "src/modules/organisation/organisation.service.js"));
   const out = { set: 0, unmatched: 0 };
   const grid = (book && book.sheets && book.sheets[0] && book.sheets[0].rows) || [];
@@ -318,18 +328,18 @@ async function applyBirthdays({ pool, atomically, book }) {
   const col = (...names) => header.findIndex((h) => names.includes(h));
   const dob = col("dob", "dateofbirth", "birthday");
   const email = col("email", "workemail");
-  const staff = col("staffid", "staffnumber", "staffno");
+  const post = col("designation", "jobtitle", "position");
+  const byPost = emailsByJobTitle(roles);
   for (const row of grid.slice(headerRow + 1)) {
     const when = dayMonth((row || [])[dob]);
     if (!when) continue;
-    const mail = email >= 0 ? String(row[email] ?? "").trim().toLowerCase() : "";
-    const number = staff >= 0 ? String(row[staff] ?? "").trim() : "";
+    const own = email >= 0 ? String(row[email] ?? "").trim().toLowerCase() : "";
+    const mail = own || (post >= 0 ? byPost[String(row[post] ?? "").trim()] || "" : "");
     const { rows } = await pool.query(
       `SELECT employee_id, date_of_birth, birth_day FROM employee
-        WHERE ($1 <> '' AND lower(work_email::text) = $1) OR ($2 <> '' AND staff_number = $2)
-        ORDER BY (lower(work_email::text) = $1) DESC
+        WHERE $1 <> '' AND lower(work_email::text) = $1
         LIMIT 1`,
-      [mail, number],
+      [mail],
     );
     const person = rows[0];
     if (!person) {
@@ -364,11 +374,26 @@ function sheetTeams(book) {
   return [...out];
 }
 
-/** Step 10: the nomenclature, in its own transactions; a problem is logged, never fatal. */
+/** The checksum of nomenclature.json, or null when the build has none. */
+function namesChecksum(file) {
+  return fs.existsSync(file) ? crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex") : null;
+}
+
+/**
+ * Step 10: the nomenclature, in its own transactions; a problem is logged, never fatal.
+ *
+ * The renames of posts, seats, moves, merges and lines are applied once per version of
+ * nomenclature.json, so a title, a department or a line People change on screen afterwards
+ * stays (`once`). The departments' names, codes and heads are kept on every run: they only
+ * fill what is missing.
+ */
 async function applyNames({ db, atomically, log, file, book }) {
   const { applyNomenclature } = require("./staff-nomenclature");
+  const organisation = require(path.join(ROOT, "src/modules/organisation/organisation.service.js"));
+  const sha = namesChecksum(file);
   try {
-    const r = await applyNomenclature({ pool: db, atomically, log, actor: SYSTEM, file, teams: sheetTeams(book) });
+    const once = sha ? await organisation.namesApplied(db, sha) : false;
+    const r = await applyNomenclature({ pool: db, atomically, log, actor: SYSTEM, file, teams: sheetTeams(book), once });
     const changed = Object.values(r).reduce((a, b) => a + b, 0);
     if (changed) log(`names: ${JSON.stringify(r)}`);
     return r;
@@ -376,6 +401,41 @@ async function applyNames({ db, atomically, log, file, book }) {
     log(`WARNING: names not applied: ${err.message}`);
     return null;
   }
+}
+
+/** Note that this version of the names was applied, after the run's last names step. */
+async function namesDone({ db, atomically, file, names }) {
+  const sha = namesChecksum(file);
+  if (!sha || !names) return;
+  const organisation = require(path.join(ROOT, "src/modules/organisation/organisation.service.js"));
+  if (await organisation.namesApplied(db, sha)) return;
+  await withTx(db, atomically, (client) => organisation.recordNamesApplied(client, sha, names, SYSTEM));
+}
+
+/**
+ * The departments the roster may create without a person ticking them: the ones
+ * nomenclature.json names, under their name or a former one. Any other department the sheet
+ * names and the system lacks is a problem on its rows, so a typo never becomes a department.
+ * Null, every one, for a build with no nomenclature.json (it has no list to hold a sheet to).
+ */
+function knownDepartments(file) {
+  const { readNomenclature, fold } = require("./staff-nomenclature");
+  const plan = readNomenclature(file);
+  if (!plan) return null;
+  const out = new Set();
+  for (const d of (plan && plan.departments) || []) for (const n of [d.name, ...(d.was || [])]) out.add(fold(n));
+  return out;
+}
+
+/** The Staff ID cells of the mapped Staff Number column. */
+function staffNumbersOf(grid, headerRow, fields) {
+  const at = Object.entries(fields).find(([, key]) => key === "staff_number");
+  if (!at) return [];
+  const col = Number(at[0]);
+  return grid
+    .slice(headerRow + 1)
+    .map((r) => String((r || [])[col] ?? "").trim())
+    .filter(Boolean);
 }
 
 async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, rolesFile = ROLES, nomenclatureFile = NOMENCLATURE }) {
@@ -398,13 +458,18 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
   const checksum = crypto.createHash("sha256").update(buffer).digest("hex");
 
   const loaded = await alreadyLoaded(db, checksum);
-  if (loaded && !dryRun) {
+  if (loaded && dryRun) {
+    log(`this sheet is already loaded (batch ${loaded.number}); a dry run has nothing to preview`);
+    return { status: "already_loaded", batch: loaded.import_batch_id };
+  }
+  if (loaded) {
     log(`this sheet is already loaded (batch ${loaded.number}); checking names, logins and lines only`);
     const loadedBook = await readSheets({ buffer, filename: path.basename(sheet) });
     const names = await applyNames({ db, atomically, log, file: nomenclatureFile, book: loadedBook });
+    await namesDone({ db, atomically, file: nomenclatureFile, names });
     const logins = await applyRoles({ pool: db, atomically, log, roles });
     const lines = await applyLines({ pool: db, atomically, log, roles });
-    const birthdays = await applyBirthdays({ pool: db, atomically, book: loadedBook });
+    const birthdays = await applyBirthdays({ pool: db, atomically, book: loadedBook, roles });
     log(`birthdays by day and month: ${birthdays.set} recorded, ${birthdays.unmatched} matched nobody`);
     await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
     return { status: "already_loaded", batch: loaded.import_batch_id, names, logins, lines, birthdays };
@@ -427,6 +492,7 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
         work_email_by_job_title: emailsByJobTitle(roles),
         reclaim_staff_numbers: true,
         roster_work_emails: sheetWorkEmails(book, roles),
+        skip_unreadable_optional: true,
         source: "staff roster, loaded by the deploy",
         source_sha256: checksum,
       },
@@ -444,6 +510,10 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
     engine.setMapping(client, batch.import_batch_id, { sheet: batch.sheet, header_row: headerRow, fields }, SYSTEM),
   );
 
+  /* The counter goes above every number the sheet claims first, so a row with no Staff ID,
+     or a holder moved off a number, is given one above them all. */
+  if (!dryRun) await withTx(db, atomically, (client) => organisation.reserveStaffNumbers(client, staffNumbersOf(grid, headerRow, fields)));
+
   /* 3. Preview, which is the commit rolled back, then commit the rows that are good. */
   const previewed = await engine.preview(batch.import_batch_id, { actor: SYSTEM, db });
   const missing = previewed.stats.missing || {};
@@ -460,11 +530,16 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
     return { status: "previewed", batch: batch.import_batch_id, stats: previewed.stats, dropped };
   }
 
+  const { fold } = require("./staff-nomenclature");
+  const known = knownDepartments(nomenclatureFile);
+  const creatable = (missing.department || []).filter((name) => !known || known.has(fold(name)));
+  for (const name of (missing.department || []).filter((n) => !creatable.includes(n)))
+    log(`WARNING: department "${name}" is not one of MyCity's (nomenclature.json); its rows are left for People`);
   const committed = await engine.commit(batch.import_batch_id, {
     actor: SYSTEM,
     db,
     valid_only: true,
-    create_missing: missing,
+    create_missing: { ...missing, department: creatable },
   });
   log(
     `committed: ${committed.stats.create} created, ${committed.stats.update} updated, ` +
@@ -475,9 +550,10 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
   /* 4. Logins and roles, the lines of posts outside the sheet, then the counter past the
         numbers the sheet brought. */
   const names = await applyNames({ db, atomically, log, file: nomenclatureFile, book });
+  await namesDone({ db, atomically, file: nomenclatureFile, names });
   const logins = await applyRoles({ pool: db, atomically, log, roles });
   const lines = await applyLines({ pool: db, atomically, log, roles });
-  const birthdays = await applyBirthdays({ pool: db, atomically, book });
+  const birthdays = await applyBirthdays({ pool: db, atomically, book, roles });
   log(`birthdays by day and month: ${birthdays.set} recorded, ${birthdays.unmatched} matched nobody`);
   const highest = await withTx(db, atomically, (client) => organisation.advanceStaffNumbers(client));
   log(`staff numbers continue after ${highest}`);
@@ -555,6 +631,8 @@ module.exports = {
   NOMENCLATURE,
   IMPORTER,
   sheetTeams,
+  knownDepartments,
+  staffNumbersOf,
   loadImporters,
   readRoles,
   rolesForTitle,
