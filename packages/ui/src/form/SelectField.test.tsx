@@ -133,6 +133,15 @@ describe("SelectField and ChoiceField", () => {
     expect(onChange).toHaveBeenCalledWith("hybrid");
   });
 
+  it("ChoiceField inside a Field is named by the Field's label", () => {
+    render(
+      <Field label="Work Pattern">
+        <ChoiceField value="remote" onChange={() => undefined} options={[["on_site", "On Site"], ["remote", "Remote"]]} />
+      </Field>,
+    );
+    expect(screen.getByRole("radiogroup", { name: "Work Pattern" })).toBeInTheDocument();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(
       <div>

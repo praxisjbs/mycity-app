@@ -21,7 +21,8 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SHOT_ID = SLUG;
 const SCREEN = /^([a-z_]+)\/([a-z0-9-]+)$/;
 const DEVICES = ["desktop", "phone"];
-const ACCOUNTS = ["operations", "ceo", "manager", "staff", "admin"];
+/** The demo accounts a picture is taken as; `guest` is nobody signed in (the sign-in screen, a link). */
+const ACCOUNTS = ["operations", "ceo", "manager", "staff", "admin", "guest"];
 const ROLES = ["Everyone", "Line Managers", "People & HR", "Administrators"];
 const NOTE_TONES = { "Tip:": "tip", "Important:": "important" };
 const FRONT_KEYS = ["title", "module", "order", "milestones", "summary", "covers", "kind", "icon"];
@@ -268,7 +269,7 @@ function parseShot(id, lines, at) {
       if (value) problems.push(`${where}: ${key} lists its items on the lines under it`);
     } else problems.push(`${where}: unknown key "${key}"`);
   }
-  if (!spec.open || !/^\/[a-z-]+(\?\S*)?$/.test(spec.open)) problems.push(`shot ${id}: open is the screen's address, like /people?tab=employees`);
+  if (!spec.open || !/^\/([a-z-]+)?(\?\S*)?$/.test(spec.open)) problems.push(`shot ${id}: open is the screen's address, like /people?tab=employees (or / for the sign-in screen)`);
   const ns = spec.marks.map((m) => m.n);
   if (ns.some((n, i) => n !== i + 1)) problems.push(`shot ${id}: marks are numbered 1, 2, 3 in order`);
   return { spec, problems };

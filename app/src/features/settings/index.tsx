@@ -74,7 +74,7 @@ function Users() {
     try {
       const { sent } = await pending.run({ body: {} });
       invalidate("/api/v1/users", "/api/v1/employees");
-      toast(sent ? `${sent} invitations sent` : "Every invitation already sent");
+      toast(sent ? `${sent} ${sent === 1 ? "invitation" : "invitations"} sent` : "Every invitation already sent");
     } catch (e) {
       fail(e);
     }
@@ -268,8 +268,9 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
             Reset Two-Step
           </Button>
         )}
-        {!self && u.status !== "suspended" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}
-        {!self && u.status === "suspended" && <Button busy={reactivate.pending} onClick={() => run(() => reactivate.run({ params, body: {} }), "Login reactivated")}>Reactivate</Button>}
+        {!self && u.status !== "suspended" && u.status !== "left" && !u.is_ceo && (reason == null ? <Button onClick={() => setReason("")}>Suspend</Button> : <Button variant="danger" busy={suspend.pending} onClick={() => (reasonBad ? setTried(true) : run(() => suspend.run({ params, body: { reason: reason.trim() } }), "Login suspended"))}>Confirm Suspend</Button>)}
+        {/* A Left login reopens here once its employee record is restored; the server says so if it is not yet. */}
+        {!self && (u.status === "suspended" || u.status === "left") && <Button busy={reactivate.pending} onClick={() => run(() => reactivate.run({ params, body: {} }), "Login reactivated")}>Reactivate</Button>}
         <Button onClick={close}>Close</Button>
         {!self && (
           <Button

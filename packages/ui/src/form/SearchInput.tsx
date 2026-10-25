@@ -5,7 +5,7 @@
  * @use Above every list that searches; FilterSelect for one of a list's server filters.
  * @avoid Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design.
  * @phone Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker.
- * @a11y The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked.
+ * @a11y The box is a searchbox named by its label (or its placeholder), or by its Field's label when it is a picker's box; FilterSelect's label is visible and linked.
  * @status stable
  * @exports FilterSelect
  * @example <SearchInput label="Search Employees" placeholder="Name or Email" value={q} onChange={setQ} />
@@ -32,10 +32,20 @@ export interface SearchInputProps {
   activeId?: string;
   /** Keys pressed in the box (the arrow keys and Enter of that list). */
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  /** The Field this box is the control of (a picker's box): its id, its label and its error. */
+  field?: SearchField;
+}
+
+/** What a Field gives the box that is its control. */
+export interface SearchField {
+  id?: string;
+  labelId?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }
 
 /** Search box for a list. The text goes to the server as `q`. */
-export function SearchInput({ value, onChange, placeholder = "Search", label, className, controls, activeId, onKeyDown }: SearchInputProps) {
+export function SearchInput({ value, onChange, placeholder = "Search", label, className, controls, activeId, onKeyDown, field }: SearchInputProps) {
   return (
     <span className={cn("flex h-control min-w-0 items-center gap-2 rounded-full border border-input bg-background px-3 text-field focus-within:border-ring", className)}>
       <Icon name="srch" size="s" className="text-subtle-foreground" />
@@ -45,7 +55,11 @@ export function SearchInput({ value, onChange, placeholder = "Search", label, cl
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        aria-label={label ?? placeholder}
+        id={field?.id}
+        aria-label={field?.labelId ? undefined : (label ?? placeholder)}
+        aria-labelledby={field?.labelId}
+        aria-describedby={field?.["aria-describedby"]}
+        aria-invalid={field?.["aria-invalid"]}
         aria-controls={controls}
         aria-activedescendant={activeId}
         onKeyDown={onKeyDown}

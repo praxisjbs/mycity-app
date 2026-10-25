@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global document, window, PopStateEvent */
+/* global document, window, getComputedStyle, PopStateEvent */
 "use strict";
 /**
  * Take the User Guide's pictures (docs/guides/user-guide.md §6.5; docs/manual/README.md).
@@ -75,54 +75,97 @@ function wanted(opts) {
 
 /** A target as a Playwright locator: the first one of its kind that is on screen. */
 async function find(page, target) {
+  // With a dialog or a sheet open, the target is in it: the screen behind may hold one of the
+  // same name (a list's Department filter behind the form's Department field).
+  const modal = page.locator("[data-ui=modal]");
+  const scope = (await modal.count()) ? modal.last() : page;
   let loc;
   switch (target.kind) {
     case "button":
-      loc = page.getByRole("button", { name: target.name, exact: true });
+      loc = scope.getByRole("button", { name: target.name, exact: true });
       break;
     case "link":
-      loc = page.getByRole("link", { name: target.name, exact: true });
+      loc = scope.getByRole("link", { name: target.name, exact: true });
       break;
     case "tab":
-      loc = page.getByRole("tab", { name: target.name, exact: true });
+      loc = scope.getByRole("tab", { name: target.name, exact: true });
       break;
     case "label":
-      loc = page.getByLabel(target.name, { exact: true });
+      loc = scope.getByLabel(target.name, { exact: true });
       break;
     case "text":
-      loc = page.getByText(target.name, { exact: true });
+      loc = scope.getByText(target.name, { exact: true });
       break;
     case "heading":
-      loc = page.getByRole("heading", { name: target.name, exact: true });
+      loc = scope.getByRole("heading", { name: target.name, exact: true });
       break;
     case "searchbox":
-      loc = page.locator("input[type=search], [role=searchbox]");
+      loc = scope.locator("input[type=search], [role=searchbox]");
       break;
     case "row":
-      loc = page.locator("[data-ui=page] tbody tr, [data-ui=page] [role=listitem]").nth(target.index - 1);
+      // A desktop table's row, or a phone card (DataView draws each as a list item).
+      loc = page.locator("[data-ui=page] tbody tr:visible, [data-ui=page] ul[data-copy=content] > li:visible").nth(target.index - 1);
       break;
     case "role":
-      loc = page.getByRole(target.role, { name: target.name, exact: true });
+      loc = scope.getByRole(target.role, { name: target.name, exact: true });
       break;
     case "css":
-      loc = page.locator(target.selector);
+      loc = scope.locator(target.selector);
       break;
     default:
       throw new Error(`unknown target ${target.kind}`);
   }
-  const all = target.kind === "row" ? [loc] : await loc.all();
-  for (const l of all) if (await l.isVisible().catch(() => false)) return l;
-  throw new Error(`${target.kind}${target.name ? ` "${target.name}"` : ""} is not on screen`);
+  // A screen may still be drawing (a record loading, a card animating in): look for 5 seconds.
+  const until = Date.now() + 5000;
+  for (;;) {
+    const all = target.kind === "row" ? [loc] : await loc.all();
+    for (const l of all) if (await l.isVisible().catch(() => false)) return l;
+    if (Date.now() > until) break;
+    await page.waitForTimeout(150);
+  }
+  const what = target.name || target.selector || (target.index ? String(target.index) : "");
+  throw new Error(`${target.kind}${what ? ` "${what}"` : ""} is not on screen`);
+}
+
+/** Whether a reader sees a target: its middle is on screen and not under a header, a footer or the edge of its scrolling box. */
+function seen(l) {
+  return l.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !!hit && (hit === el || el.contains(hit));
+  });
 }
 
 /** Draw the numbered marks over their targets, in the page, with the hub's own colours. */
 async function drawMarks(page, marks) {
+  const found = [];
+  for (const m of marks) found.push({ n: m.n, l: await find(page, m.target) });
+  // Bring every target into view, then centre them together in the box that scrolls the first,
+  // so its label shows above it, and measure only once nothing scrolls any more: a box measured
+  // before the page scrolls to the next target would sit off its target.
+  for (const { l } of found) await l.scrollIntoViewIfNeeded().catch(() => null);
+  const handles = await Promise.all(found.map((f) => f.l.elementHandle()));
+  await page.evaluate((els) => {
+    const scroller = (el) => {
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const y = getComputedStyle(p).overflowY;
+        if ((y === "auto" || y === "scroll") && p.scrollHeight > p.clientHeight) return p;
+      }
+      return document.scrollingElement;
+    };
+    const box = scroller(els[0]);
+    const view = box === document.scrollingElement ? { top: 0, height: window.innerHeight } : box.getBoundingClientRect();
+    const rects = els.filter((el) => scroller(el) === box).map((el) => el.getBoundingClientRect());
+    const top = Math.min(...rects.map((r) => r.top));
+    const bottom = Math.max(...rects.map((r) => r.bottom));
+    box.scrollTop += top - view.top - Math.max(0, (view.height - (bottom - top)) / 2);
+  }, handles);
+  await page.waitForTimeout(80);
+  const hidden = [];
+  for (const f of found) if (!(await seen(f.l))) hidden.push(f.n);
+  if (hidden.length) throw new Error(`mark ${hidden.join(", ")} is not on screen with mark ${found[0].n}: drop it or split the picture`);
   const boxes = [];
-  for (const m of marks) {
-    const l = await find(page, m.target);
-    await l.scrollIntoViewIfNeeded().catch(() => null);
-    boxes.push({ n: m.n, box: await l.boundingBox() });
-  }
+  for (const f of found) boxes.push({ n: f.n, box: await f.l.boundingBox() });
   await page.evaluate((list) => {
     const layer = document.createElement("div");
     layer.setAttribute("data-guide-marks", "");
@@ -185,29 +228,56 @@ async function doStep(page, step) {
   throw new Error(`unknown step ${step.action}`);
 }
 
-/** Sign in once per account and device; every picture of theirs is taken in that session. */
+/**
+ * What never reaches a picture: the demo's own chrome (the mock's account buttons, the prototype
+ * view switch) and what comes and goes by itself (toasts, the urgent bar, the shell's notices, a
+ * tooltip opened by the focus a step left behind).
+ */
+const HIDE_DEMO = "[data-ui-ignore], [data-sonner-toaster], [data-urgent-bar], [data-shell-notice], [data-state=delayed-open], [data-state=instant-open] { display: none !important; }";
+
+/** What a step can leave open: a dialog or sheet, or a panel such as the bell's. */
+const OPEN = "[data-ui=modal], [role=dialog][data-state=open]";
+
+/**
+ * Sign in once per account and device; every picture of theirs is taken in that session. A
+ * `guest` is nobody: each of their pictures opens its address afresh (the sign-in screen, a link).
+ */
 async function session(browser, origin, account, device) {
   const ctx = await browser.newContext({ ...SIZES[device], serviceWorkers: "block", reducedMotion: "reduce" });
   const page = await ctx.newPage();
   page.setDefaultTimeout(8000);
+  if (account === "guest") return { ctx, page, guest: true };
   await page.goto(`${origin}/`);
+  await page.addStyleTag({ content: HIDE_DEMO });
   await page.fill("#email", ACCOUNTS[account]);
   await page.fill("#pass", PASSWORD);
   await page.press("#pass", "Enter");
-  await page.waitForSelector("[data-ui=page]", { timeout: 10000 });
+  // An account whose two-step asks for a code (the demo's CEO): the demo takes any six digits.
+  const code = await page.waitForSelector("[data-ui=page], input[autocomplete=one-time-code]", { timeout: 10000 });
+  if ((await code.getAttribute("autocomplete")) === "one-time-code") {
+    await page.keyboard.type("123456");
+    await page.waitForSelector("[data-ui=page]", { timeout: 10000 });
+  }
   await page.evaluate(() => document.fonts.ready.then(() => true));
   return { ctx, page };
 }
 
-async function take(page, shot, device, file) {
-  // Move inside the app: a reload would sign out (the session lives in memory).
-  await page.evaluate((to) => {
-    window.history.pushState(null, "", to);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }, shot.spec.open);
+async function take(page, shot, device, file, { guest = false, origin = "" } = {}) {
+  if (guest) {
+    await page.goto(`${origin}${shot.spec.open}`);
+    await page.addStyleTag({ content: HIDE_DEMO });
+    await page.waitForSelector("#root *", { timeout: 10000 });
+    await page.evaluate(() => document.fonts.ready.then(() => true));
+  } else {
+    // Move inside the app: a reload would sign out (the session lives in memory).
+    await page.evaluate((to) => {
+      window.history.pushState(null, "", to);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }, shot.spec.open);
+  }
   await appSettle(page);
   // A prompt that opens by itself (clock in, a policy to acknowledge) is not the screen.
-  for (let i = 0; i < 3 && (await page.$("[data-ui=modal]")) && !shot.spec.do.length; i += 1) {
+  for (let i = 0; i < 3 && (await page.$(OPEN)) && !shot.spec.do.length; i += 1) {
     await page.keyboard.press("Escape");
     await appSettle(page);
   }
@@ -222,7 +292,12 @@ async function take(page, shot, device, file) {
   await page.screenshot({ path: file, clip: await clipOf(page, shot.spec.crop), animations: "disabled", caret: "hide" });
   await page.evaluate(() => document.querySelectorAll("[data-guide-marks]").forEach((n) => n.remove()));
   // Close whatever the steps opened, so the next picture starts from its screen.
-  for (let i = 0; i < 3 && (await page.$("[data-ui=modal]")); i += 1) await page.keyboard.press("Escape");
+  for (let i = 0; i < 3 && (await page.$(OPEN)); i += 1) {
+    await page.keyboard.press("Escape");
+    await appSettle(page);
+  }
+  // Escape hands focus back to what opened it, whose ring would show in the next picture.
+  await page.evaluate(() => document.activeElement?.blur?.());
 }
 
 async function main(argv) {
@@ -250,7 +325,7 @@ async function main(argv) {
         for (const shot of mine) {
           const file = path.join(IMG, shot.chapter, `${shot.id}.${device}.png`);
           try {
-            await take(s.page, shot, device, file);
+            await take(s.page, shot, device, file, { guest: s.guest, origin });
             taken.set(`${shot.chapter}/${shot.id}`, shot);
             console.log(`  ${shot.chapter}/${shot.id}.${device}.png`);
           } catch (err) {

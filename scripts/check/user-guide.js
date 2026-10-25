@@ -17,7 +17,7 @@
  *      declares that action's grant, itself or in its section, so a reader without it never
  *      receives the step
  *   6. every bold name is found in the hub's own source (the app, the shared components, the
- *      API's messages, the contract, the reference seeds): a button renamed on screen fails the
+ *      API's messages, the contract, the reference seeds, the emails): a button renamed on screen fails the
  *      chapter that still names the old one. A link's words are its screen's name, not checked
  *   7. every picture has its spec, every file its devices need, and an entry in its chapter's
  *      shots.json whose hashes are today's (scripts/guide/lib.js): a picture whose screen or
@@ -96,7 +96,7 @@ const ICONS = (() => {
 
 /** Every text the hub carries: where a bold name must be found (6). */
 const CORPUS = (() => {
-  const roots = ["app/src", "packages/ui/src", "src", "packages/contract/schemas", "seeds/reference"];
+  const roots = ["app/src", "packages/ui/src", "src", "packages/contract/schemas", "seeds/reference", "templates"];
   const parts = [];
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -104,7 +104,7 @@ const CORPUS = (() => {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
         if (!["node_modules", "dist", "mock"].includes(e.name)) walk(full);
-      } else if (/\.(tsx?|jsx?|sql|json)$/.test(e.name) && !/\.test\.|\.gallery\./.test(e.name)) parts.push(fs.readFileSync(full, "utf8"));
+      } else if (/\.(tsx?|jsx?|sql|json|html)$/.test(e.name) && !/\.test\.|\.gallery\./.test(e.name)) parts.push(fs.readFileSync(full, "utf8"));
     }
   };
   for (const r of roots) walk(path.join(ROOT, r));

@@ -1,0 +1,102 @@
+{
+  "settings-appearance": {
+    "spec": "d3fbd04ff30bb7bc",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-approvals": {
+    "spec": "0a0dc40391138f43",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-audit-log": {
+    "spec": "81d5fceed221adf7",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-faults": {
+    "spec": "15e08f83013c58cb",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-imports": {
+    "spec": "9101f23f850baab6",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "settings-integrations": {
+    "spec": "02c364fd0174ef42",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-notifications": {
+    "spec": "6a9dbc8dd7ecc641",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-numbering": {
+    "spec": "8753b7b679b76353",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-organisation": {
+    "spec": "2e806809f94f5513",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-performance": {
+    "spec": "20f80ddbcba5d946",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-roles": {
+    "spec": "558dcc3621ef73e2",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-security": {
+    "spec": "a13bb0a1df88359d",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-status": {
+    "spec": "7875677490fca95c",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "settings-users": {
+    "spec": "49d0dba53bfdd851",
+    "source": "a8e19257d9777c2a",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

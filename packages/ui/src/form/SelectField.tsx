@@ -447,7 +447,8 @@ export interface ChoiceFieldProps<V extends string = string> {
 
 /** Two to five options as one segmented row (the merged Seg). */
 export function ChoiceField<V extends string = string>({ value, onChange, onBlur, options, disabled, label, state, message: _message, className }: ChoiceFieldProps<V>) {
-  const a = useFieldControl({ state });
+  // A radio group is not named by <label for>: inside a Field, its label names it by id.
+  const a = useFieldControl({ state, group: true });
   return (
     <RadioGroup.Root
       value={value}

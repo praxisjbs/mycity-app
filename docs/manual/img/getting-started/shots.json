@@ -1,0 +1,46 @@
+{
+  "start-desktop": {
+    "spec": "ec4b8baceab8df59",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "start-notifications": {
+    "spec": "87dcfefdfacd1514",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "start-phone": {
+    "spec": "c148a7d836ed50df",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "phone"
+    ]
+  },
+  "start-search": {
+    "spec": "aca2beefb18f1945",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "start-sign-in": {
+    "spec": "f484b5bd9fc72c55",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-user-guide": {
+    "spec": "7f5ac62bd1c37298",
+    "source": "535f39ef3d8f4df9",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}

@@ -196,10 +196,15 @@ function BatchDetail({ batch, confirm }: { batch: ImportBatch; confirm: ReturnTy
             busy={revert.pending}
             onClick={async () => {
               if (!(await confirm({ title: "Revert Import", body: "Records it created are archived and records it changed go back.", destructive: true }))) return;
-              const out = await revert.run({ params: { id: batch.import_batch_id } });
-              setDone(true);
-              invalidate("/api/v1/imports");
-              toast(`${out.archived} archived, ${out.restored} put back`);
+              try {
+                const out = await revert.run({ params: { id: batch.import_batch_id } });
+                setDone(true);
+                invalidate("/api/v1/imports");
+                toast(`${out.archived} archived, ${out.restored} put back`);
+              } catch (e) {
+                // Refused whole when a record changed since or is in use: the reason names the rows.
+                toast(e instanceof Error ? e.message : "Not reverted. Try again.");
+              }
             }}
           >
             Revert
@@ -258,9 +263,13 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
      of that row are matched afresh for them to confirm. */
   const pickHeader = async (row: string) => {
     if (!batch) return;
-    const next = await setMapping.run({ params: { id: batch.import_batch_id }, body: { header_row: Number(row) } });
-    setBatch(next);
-    setFields(Object.fromEntries(next.mapping.columns.map((c) => [String(c.index), c.field])));
+    try {
+      const next = await setMapping.run({ params: { id: batch.import_batch_id }, body: { header_row: Number(row) } });
+      setBatch(next);
+      setFields(Object.fromEntries(next.mapping.columns.map((c) => [String(c.index), c.field])));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "That row did not work");
+    }
   };
 
   const options = useMemo(
