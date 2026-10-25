@@ -1,0 +1,96 @@
+{
+  "home-alert-rules": {
+    "spec": "bf9878ea225fbe84",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "home-alert-sheet": {
+    "spec": "e06a975a1cf40b53",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-alerts": {
+    "spec": "96aa7d8a957c6e12",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-card-records": {
+    "spec": "5cd99979f8c23f10",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-choose-cards": {
+    "spec": "210d01eae97b5eb6",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "home-new-report": {
+    "spec": "346747c11d5e0ac7",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-new-rule": {
+    "spec": "4fbd7cb30fd72e17",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-overview": {
+    "spec": "f49bd34b24d768eb",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-reports": {
+    "spec": "37c533a4f7920c45",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-team": {
+    "spec": "c7875338e6660ff6",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-team-person": {
+    "spec": "9b249fae6fdc57a6",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-work-site": {
+    "spec": "3b0b4c0d73b8dcdf",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  }
+}
