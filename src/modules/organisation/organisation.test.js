@@ -268,10 +268,20 @@ describe("the staff importer the register offers", () => {
 });
 
 describe("the History tab's line", () => {
-  test("names what was done and which fields changed", () => {
+  test("names what was done and which fields changed, in the record's own words", () => {
     expect(
       employee360.summaryOf({ action: "employee.updated", changed_fields: ["job_title", "phone"] }),
-    ).toBe("Record changed: job_title, phone");
+    ).toBe("Record changed: Job Title, Phone");
+    expect(
+      employee360.summaryOf({ action: "employee.updated", changed_fields: ["account_number", "bank_name"] }),
+    ).toBe("Record changed: Account Number, Bank");
+    // A person or a seat as manager is one Line Manager; a key with no name reads as words, never as a key.
+    expect(
+      employee360.summaryOf({
+        action: "employee.updated",
+        changed_fields: ["line_manager_id", "line_manager_seat_id", "home_address_place_id"],
+      }),
+    ).toBe("Record changed: Line Manager, Home address place");
     expect(employee360.summaryOf({ action: "employee.created", changed_fields: [] })).toBe(
       "Record created",
     );

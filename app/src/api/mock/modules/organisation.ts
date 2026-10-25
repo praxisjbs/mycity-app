@@ -238,7 +238,7 @@ route("GET /api/v1/employees/:id/history", (req) => {
   const p = mine(req);
   if (!p) return notFound();
   const entries = [
-    { event_id: uuid(), occurred_at: at(2, "11:20"), action: "employee.updated", actor_name: "Cynthia Osakunih", changed_fields: ["job_title"], summary: "Record changed: job_title" },
+    { event_id: uuid(), occurred_at: at(2, "11:20"), action: "employee.updated", actor_name: "Cynthia Osakunih", changed_fields: ["job_title"], summary: "Record changed: Job Title" },
     { event_id: uuid(), occurred_at: at(40, "09:05"), action: "employee.reporting_line_changed", actor_name: "Cynthia Osakunih", changed_fields: ["line_manager_id"], summary: "Reporting line changed" },
     { event_id: uuid(), occurred_at: at(200, "09:00"), action: "employee.created", actor_name: "System", changed_fields: [], summary: "Record created" },
   ];

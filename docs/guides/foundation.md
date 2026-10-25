@@ -867,7 +867,10 @@ rules for the roster:
 
 **Smaller.** The audit row of a create and a correction holds every field the write touched (salary,
 bank and dates included; the Audit Log masks them per reader), so History names a confirmed
-probation. Phone accepts the ten digits the field invites after +234 and shows a stored number
+probation. History (and My Profile's Record History) names each field as the record's screens do,
+"Record changed: Bank, Account Number", never a column's key: one map in the contract
+(`EMPLOYEE_FIELD_LABELS`, `employeeFieldNames`), read by the API and the mock; a key with no name
+there reads as words. Phone accepts the ten digits the field invites after +234 and shows a stored number
 without repeating the code. Account Number keeps digits only. The Wizard keeps focus in the field
 being typed in (a parent re-rendering pulled it to the step's heading after each key).
 
@@ -1226,3 +1229,4 @@ screen.
 - 20/10/2026 · TB · Settings · Attendance Policy (#73) is dropped: policies live on Knowledge Hub · Policies (`docs/guides/policies.md`), brought forward from M10; §2 and §6.8 say so, and Settings · Approvals gains the Policy Approval route (and the Temporary Site route with attendance's PR 4).
 - 20/10/2026 · TB · §6.5: an approval may exclude people from deciding it (`exclude_employee_ids` on `openInstance`, `workflow_instance.excluded_employee_ids`, `1455`), read by `canAct`, `waitingOnClause` and the stage's notice; attendance's temporary sites exclude everyone on them (attendance.md §6.11). §6.7: ⌘K's Add Work Site and Add Temporary Site; a screen may register a second action for the floating button (`useScreenAction(action, { second: true })`, Home's Add Work Site beside New). §6.8's Temporary Site route is built as it says.
 - 22/10/2026 · TB · Performance PR 1: §6.5 adds the named-person approver (`employee_in_context`) and Settings · Approvals shows it; §6.1 adds MyCity's names (`seeds/staff/nomenclature.json`, applied by the loader before and after the sheet), the sheet and `roles.json` renamed to the October chart (five departments, the chart's titles, seven vacant seats, David under Chinyere).
+- 25/10/2026 · JP · §6.16: History names the fields a change touched in the record's own words, not its column keys (`EMPLOYEE_FIELD_LABELS` in the contract), found while writing the M1 User Guide.

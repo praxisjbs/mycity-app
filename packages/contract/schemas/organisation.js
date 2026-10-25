@@ -393,6 +393,62 @@ const EmployeeReportingUpdate = z
     { message: "a person reports to a person or to a seat, never both" },
   );
 
+/**
+ * Each field of an employee record as its screens name it (People's form, My Profile), for the
+ * line that says what changed: "Record changed: Bank, Account Number", never a column's key.
+ */
+const EMPLOYEE_FIELD_LABELS = Object.freeze({
+  staff_number: "Staff Number",
+  status: "Status",
+  first_name: "First Name",
+  middle_name: "Middle Name",
+  last_name: "Last Name",
+  preferred_name: "Preferred Name",
+  work_email: "Work Email",
+  personal_email: "Personal Email",
+  phone: "Phone",
+  gender: "Gender",
+  date_of_birth: "Date of Birth",
+  birth_day: "Birthday",
+  birth_month: "Birthday",
+  home_address: "Home Address",
+  job_title: "Job Title",
+  department_id: "Department",
+  worksite_id: "Worksite",
+  line_manager_id: "Line Manager",
+  line_manager_seat_id: "Line Manager",
+  dotted_manager_id: "Dotted Line",
+  dotted_manager_seat_id: "Dotted Line",
+  employment_type: "Employment Type",
+  work_pattern: "Work Pattern",
+  start_date: "Start Date",
+  contract_ends_on: "Contract Ends",
+  confirmation_due_on: "Probation Ends",
+  confirmed_on: "Confirmed On",
+  left_on: "Left On",
+  gross_monthly: "Gross Monthly",
+  bank_name: "Bank",
+  account_number: "Account Number",
+  next_of_kin_name: "Next of Kin",
+  next_of_kin_phone: "Next of Kin Phone",
+  next_of_kin_relationship: "Relationship",
+});
+
+/**
+ * The fields a change touched, in its screens' words, each once: "Line Manager" for a person or a
+ * seat alike. A key with no name here reads as words ("home_address_place_id" as "Home address
+ * place"), so a column added later never reaches a screen as a key.
+ * @param {string[]} keys
+ * @returns {string[]}
+ */
+function employeeFieldNames(keys) {
+  const words = (key) => {
+    const said = String(key).replace(/_id$/, "").replace(/_/g, " ").trim();
+    return said.charAt(0).toUpperCase() + said.slice(1);
+  };
+  return [...new Set((keys || []).filter(Boolean).map((k) => EMPLOYEE_FIELD_LABELS[k] || words(k)))];
+}
+
 /** GET /employees/:id/history: what has been done to this record. */
 const EmployeeHistoryEntry = z
   .object({
@@ -849,6 +905,8 @@ module.exports = {
   EmployeesSummary,
   EmployeeLogin,
   Employee360,
+  EMPLOYEE_FIELD_LABELS,
+  employeeFieldNames,
   EmployeeHistoryEntry,
   EmployeeHistoryPage,
   Department,
