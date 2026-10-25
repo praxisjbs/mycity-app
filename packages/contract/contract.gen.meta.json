@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "088b0b7a90189fcc9a96f926f6134fc68e5f4dcf61d3db5f2b5502c438f6afa5",
+  "source_hash": "ec61b777983984143ed2be656df55abbe3b6d87dfe1cdf49697fe86d4a1107a6",
   "schemas": 1181,
   "endpoints": 572,
   "inputs": {
@@ -44,7 +44,7 @@
     "packages/contract/schemas/notifications.js": "a4baec22c42e3ef6f4fb5850bca3376efc08e9b1014a150c67ba9c59816c3e6c",
     "packages/contract/schemas/offers.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/onboarding.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/organisation.js": "2dc5a5522fd3ef8e16699bcbd04c0bbab1d670eae3979c7a992949ffe2e45744",
+    "packages/contract/schemas/organisation.js": "039240161a87dba66b63ca74c0cda9183a76b8f42717fbb65f1a12de649a5460",
     "packages/contract/schemas/partner_pipeline.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partners.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/partnership_analytics.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -71,7 +71,7 @@
     "packages/contract/schemas/targets.js": "0e00f5a4fcad7533faed14b7ef9bc4b84518455ec7408453b90ca37ce892eab9",
     "packages/contract/schemas/tasks.js": "0203a06d8cad76c44e331f2b1179f86f38563756b5e81720e4e770d7441b6c36",
     "packages/contract/schemas/templates.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/user_guide.js": "ceb2f770f0c0ea80182cc36da19e8538e725464bfb83a9a8d04e4c4d6b6afb64",
+    "packages/contract/schemas/user_guide.js": "a529e6af7df606a31ea4bc7d337906a52a60ff842eb2132628f6dde747aa4f27",
     "packages/contract/schemas/users.js": "c62a6bfc703543682f6d190a19a68e86f34363c3f7846a46c54ba905e978064d",
     "packages/contract/schemas/vacancies.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/workflow.js": "4308fac069f1df42fe9b375b345a05c9cfd29581e70f8a43ea6bf906e9d2aabc",
