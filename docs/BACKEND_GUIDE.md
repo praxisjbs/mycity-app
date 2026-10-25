@@ -292,6 +292,11 @@ request, never inside a transaction, and what it returns is provisional until a 
   `RUN_DB_TESTS=1`. Every response is parsed with its contract schema in integration tests.
 - Tick the screen's **API** column in `docs/PROGRESS.md` and leave a note.
 - If behaviour changed, the feature guide in `docs/guides/` changed with it.
+- If what a person sees or must do changed (a refusal's words, a rule a form now enforces, a new
+  step), the User Guide chapter for that screen changed with it (`docs/manual/`,
+  `docs/manual/README.md`), and its pictures were retaken (`npm run guide:shots -- --stale`).
+  `check/user-guide.js` holds every bold name in a chapter to the hub's source, the API's messages
+  included, so a renamed button or a reworded refusal fails the chapter that still names the old one.
 
 ---
 
@@ -525,7 +530,8 @@ and why):
 
 - **A change to documents only** (Markdown at the root, under `docs/` or in `.github/`, other than
   `docs/PROGRESS.md` and `MILESTONES.md`, which the apps' build reads) runs the gates that read
-  documents: progress, guides, README map, CODEOWNERS, dashes and the component catalogue.
+  documents: progress, guides, README map, CODEOWNERS, dashes, the component catalogue and the
+  User Guide.
 - **After a merge**, `main` runs the whole suite again only when its tree is not the one the PR's
   last run passed. When nothing reached `main` in between, it is the same tree, and the document
   gates are enough; Release then deploys it as before.
@@ -592,5 +598,7 @@ task (`.claude/hooks/stop-check.js`), so most of these are caught before you pus
 - [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked and a note left
 - [ ] The feature guide in `docs/guides/` matches what was built
+- [ ] The User Guide chapter in `docs/manual/` matches what a person now sees, its pictures current
+  (`check/user-guide.js`; `User-guide-unchanged: <reason>` only when nothing a person sees changed)
 
 Engineered by JBS Praxis.

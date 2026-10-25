@@ -1151,5 +1151,10 @@ The Stop hook runs them when a change touches `packages/ui/`, `app/`, `public-ap
 - [ ] Pushed as a branch, PR opened with the template filled in; CI green on the PR
 - [ ] `docs/PROGRESS.md` row ticked (UI, Mobile) and a note left
 - [ ] The feature guide in `docs/guides/` matches what was built
+- [ ] The User Guide chapter in `docs/manual/` reads as the screen now does: every button and field
+  named in bold exactly as it reads, every screen linked, a step needing a grant marked `needs`,
+  and its pictures retaken on the demo build, desktop and phone (`npm run guide:shots -- --stale`;
+  `docs/manual/README.md`, `check/user-guide.js`). A new screen of a delivered milestone gets its
+  section
 
 Engineered by JBS Praxis.

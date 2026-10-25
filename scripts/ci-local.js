@@ -123,6 +123,7 @@ const GATES = [
   { id: "progress", label: "PROGRESS.md updated and well formed", script: "scripts/check/progress.js" },
   { id: "guides", label: "Feature guides followed and complete", script: "scripts/check/guides.js" },
   { id: "readme-map", label: "New files are on the README map", script: "scripts/check/readme-map.js" },
+  { id: "user-guide", label: "User Guide matches the screens", script: "scripts/check/user-guide.js" },
   { id: "codeowners", label: "CODEOWNERS complete and valid", script: "scripts/check/codeowners.js" },
 ];
 

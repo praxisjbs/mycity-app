@@ -58,7 +58,8 @@ mycity-app/
 │                             staging at /gallery/) and a test per component;
 │                             catalogue in docs/COMPONENTS.md (FRONTEND_GUIDE §9)
 ├── src/                      backend source (§4, §5)
-├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2)
+├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2); guide.js, the User Guide's
+│                             one parser and filter (the API, the mock and check/user-guide.js read it)
 ├── migrations/               NNNN_name.sql schema steps (§6.3)
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
@@ -113,6 +114,9 @@ mycity-app/
 │   │                         restore-drill.js (weekly), installed on the server as mycity-backup,
 │   │                         mycity-restore-drill
 │   ├── import/               command-line import
+│   ├── guide/                the User Guide's pictures: shoot.js (npm run guide:shots) takes each chapter's
+│   │                         pictures on the demo build, desktop and phone, with numbered marks; lib.js,
+│   │                         shared with check/user-guide.js: the chapters on disk and each picture's hashes
 │   ├── ai/                   eval-assistant.js: Praxis AI's graded questions, asked by hand on staging
 │   │                         with a real key before a change to its prompt or loop ships (not in CI)
 │   ├── ops/                  health-brief.js: the Status brief made on the server (npm run health:brief),
@@ -141,7 +145,7 @@ mycity-app/
 │   ├── FRONTEND_GUIDE.md     how to write frontend code (read first)
 │   ├── FRONTEND_FOUNDATION.md the frontend foundation: decisions F1 to F27, the three PRs
 │   ├── COMPONENTS.md         the component catalogue, GENERATED from packages/ui (never edit)
-│   ├── PROGRESS.md           93 screens + M0 items, updated with every change
+│   ├── PROGRESS.md           the screens + M0 items, updated with every change
 │   ├── guides/               one engineering guide per feature, from _TEMPLATE.md
 │   ├── runbooks/             deploy, rollback, backup-restore, incident, monitoring, system-health,
 │   │                         add-a-module,
@@ -151,7 +155,10 @@ mycity-app/
 │   │                         push-notifications (web push keys, live mail, a device's health)
 │   ├── handoff/              a build carried across sessions: its decisions, plan and log
 │   │                         (push-notifications)
-│   └── manual/               user manual, one file per module (M11, written as each ships)
+│   └── manual/               the User Guide (Knowledge Hub · User Guide, docs/guides/user-guide.md): one
+│       │                     chapter per module plus getting-started.md and quick-start.md, written as
+│       │                     each milestone is approved; README.md says how to write one; img/<chapter>/
+│       │                     its pictures and shots.json (taken by npm run guide:shots); served by the API
 │       └── performance-guide/ the Performance training and test guide, A4 for trainers and MyCity:
 │                             template.html, img/ (screenshots on the staging seed), brand/ (logos,
 │                             fonts) and build.js (the standalone page in dist/; --check fits each
@@ -380,6 +387,7 @@ reference seed inserts, and a seeded code the catalogue lacks. BACKEND_GUIDE §5
 | `maps` | `maps.service.js` (the places-name job's naming), `maps.events.js` (`place.named`) | `GET /maps/search` (the address search behind every address field, signed places, from the second character), `/maps/pin` (a pinned point's nearest address, signed), `/maps/tiles` (the map's tiles, signed in); every address is kept by its owner through `shared/places` (`services/maps`; `docs/guides/addresses.md`, F27) |
 | `documents` | | Upload, download, versions, generated documents |
 | `imports` | | Generic import API: upload, map, preview, commit, report, revert |
+| `user_guide` | `.search` (⌘K's User Guide group, matched in memory) | Knowledge Hub · User Guide: `docs/manual` read through `packages/contract/guide.js` and cut to each reader down to the step, its pictures behind the same check (`docs/guides/user-guide.md`; brought forward from M11, JBS Praxis, 25/10/2026) |
 
 ### 5.4 M1 · Core Operations & Employee Management · TB, LA, AJ, GE · to 19 Oct
 
@@ -550,8 +558,10 @@ The assistant **reads only** (A23). It answers from the manifests every module h
 
 ### 5.14 M11 · Handover & Training · TB, all · 14 to 18 Dec
 
-No new modules. Fills `docs/manual/*.md` (one per staff module plus the public site) and brings
-`docs/runbooks/*.md` up to date. The nightly backup, the weekly restore drill and the uptime probe
+No new modules. The User Guide (`docs/manual/`, the Knowledge Hub's User Guide tab) is written
+milestone by milestone from M0 as each is approved (JBS Praxis, 25/10/2026,
+`docs/guides/user-guide.md` §1.1); M11 completes it with the public site's chapter and the
+training sessions, and brings `docs/runbooks/*.md` up to date. The nightly backup, the weekly restore drill and the uptime probe
 were built in M0 and run from then on; M11 shows them working for the handover: a restore drill
 timed in front of MyCity (`scripts/db/restore-drill.js`, its history in
 `/srv/mycity/backups/drills.jsonl`) and an alert from the probe.
@@ -776,9 +786,12 @@ Process gates, from M0. They check that the work is recorded where the team read
 | Guides | `scripts/check/guides.js` | Code a guide covers changed and the guide gained no Change log line; or a guide lost a template section or is missing from the index |
 | README map | `scripts/check/readme-map.js` | A new file is neither where the map says files go nor named in this README |
 | CODEOWNERS | `scripts/check/codeowners.js` | A placeholder or invalid username, a path with one owner, a renamed path, or a module or guide with no owner line |
+| User Guide | `scripts/check/user-guide.js` | A chapter does not parse, links a screen or section that is not there, names a button the hub does not have, gives a step an action without its grant, or has a stale or missing picture; a milestone a chapter covers has a screen with no section; or code a chapter covers changed and the chapter and its pictures did not (`docs/guides/user-guide.md` §6.6) |
 
-The first two accept a reason instead, as a line in the PR description or a commit message:
-`Progress-unchanged: <reason>` or `Guide-unchanged: <reason>`.
+Progress, Guides and User Guide accept a reason instead, as a line in the PR description or a
+commit message: `Progress-unchanged: <reason>`, `Guide-unchanged: <reason>` or
+`User-guide-unchanged: <reason>`. A stale User Guide picture takes no reason: retake it
+(`npm run guide:shots -- --stale`).
 
 **Not built is not passed.** A gate whose script is still an empty file is reported as NOT BUILT
 and listed at the end of `npm run ci`; it checks nothing yet. `npm run ci:list` shows each gate's

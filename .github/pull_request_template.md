@@ -16,6 +16,7 @@ Branch: m<N>/<short-name>
 - [ ] `npm run ci` is green locally, the whole run, not one file
 - [ ] `docs/PROGRESS.md`: rows ticked, Status and Updated set, a dated note added under the module
 - [ ] Feature guide in `docs/guides/` matches what was built, with a Change log line
+- [ ] User Guide (`docs/manual/`): every chapter about a screen this changes still reads as the screen does, its pictures retaken (`npm run guide:shots -- --stale`); a new screen of a delivered milestone has its section (`docs/manual/README.md`)
 - [ ] New files are on the README map (README §11)
 - [ ] Every list pages at 25 through `shared/http/paged.js`
 - [ ] Contract changed first; `npm run gen:contract` run; `contract.gen.ts` not edited by hand
@@ -44,4 +45,5 @@ Only if a check does not apply. Keep the line, give a reason; the checks read th
 
 Progress-unchanged: <reason>
 Guide-unchanged: <reason>
+User-guide-unchanged: <reason>
 -->

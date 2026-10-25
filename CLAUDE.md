@@ -32,6 +32,9 @@ State the type in your first message ("This is a full-stack change to My Attenda
    it, whatever the task type. If your task changes behaviour the guide describes, **update the
    guide first** and say so.
 3. The milestone's section of `docs/MyCity-ERP-Documents/MILESTONES.md`.
+4. The User Guide chapter for the screens you touch, `docs/manual/<chapter>.md` (what a person is
+   told to press and see there), and `docs/manual/README.md` before you write one. If your task
+   changes what a screen shows or does, the chapter changes with it.
 
 **Then by type:**
 
@@ -90,6 +93,13 @@ silently.
 - **Search reaches everything.** Every new screen, action and record type is findable from ⌘K
   (its module's `.search.js`, the route map, the screen's New action), or carries
   `search:none <reason>`; the search coverage gate fails it otherwise (`docs/guides/foundation.md` §6.7).
+- **The User Guide follows the screens** (JBS Praxis, 25/10/2026; `docs/guides/user-guide.md`). A
+  change to a screen a chapter of `docs/manual/` covers changes the chapter in the same PR, and its
+  pictures are retaken (`npm run guide:shots -- --stale`); a new screen of a delivered milestone
+  gets its section. Steps name buttons in bold exactly as the screen reads them and link the screen;
+  a step needing a grant says so (`needs`), so a reader without it never receives it.
+  `check/user-guide.js` fails it otherwise; `User-guide-unchanged: <reason>` only when nothing a
+  person sees changed. A stale picture has no exemption.
 - **Addresses are picked, never typed** (F27, gate 22; TB, 20/10/2026). Every address or location a
   person enters, on hub and go, live and staging, is an `AddressField` (a `PlacesField` for a list
   of cities) bound to the contract's `PlaceInput` and saved with `places.save()` in the owning
@@ -130,11 +140,12 @@ silently.
 
 ## Step 5 · Finish
 
-A Stop hook (`.claude/hooks/stop-check.js`) runs `check/progress.js`, `check/guides.js` and
-`check/readme-map.js` when you try to finish. If they fail you are sent back with the reasons;
-fix them rather than arguing with them. If one genuinely does not apply (a refactor that moves no
-screen, a test-only change), say so to the user and give the PR line to use:
-`Progress-unchanged: <reason>` or `Guide-unchanged: <reason>`. CI runs the same checks on every PR.
+A Stop hook (`.claude/hooks/stop-check.js`) runs `check/progress.js`, `check/guides.js`,
+`check/readme-map.js` and `check/user-guide.js` when you try to finish. If they fail you are sent
+back with the reasons; fix them rather than arguing with them. If one genuinely does not apply (a
+refactor that moves no screen, a test-only change), say so to the user and give the PR line to use:
+`Progress-unchanged: <reason>`, `Guide-unchanged: <reason>` or `User-guide-unchanged: <reason>`.
+CI runs the same checks on every PR.
 When your change touches `packages/ui/`, `app/`, `public-app/` or `demo.html`, the hook also runs
 the screen gates (`components`, `palette`, `forms`, `dashes`, `five-second`, `two-shells`, `native-ui`); they have
 no exemption line. Fix the screen.
@@ -146,7 +157,8 @@ A task is not finished until:
    Status and Updated (day-first date), update the summary counts if a Status changed, and add a
    note under the module: date · initials · what was done · what is left. For foundation work,
    tick the M0 item and add a note there.
-3. The feature guide matches what you built.
+3. The feature guide matches what you built, and so does the User Guide chapter (`docs/manual/`),
+   its pictures retaken.
 4. `README.MD` lists any new file you created (README §11).
 5. A finished module keeps no empty files: delete its stubs that stayed empty and take them off
    `README.MD` and the guide (README §11.5). Stubs a later milestone fills stay.

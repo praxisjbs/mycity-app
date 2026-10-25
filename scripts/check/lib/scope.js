@@ -26,7 +26,7 @@ const path = require("node:path");
 const changes = require("./changes");
 
 /** The gates that read documents (by their id in ci-local.js): all a docs or tested run needs. */
-const DOC_GATES = ["dashes", "components-catalogue", "components", "progress", "guides", "readme-map", "codeowners"];
+const DOC_GATES = ["dashes", "components-catalogue", "components", "progress", "guides", "readme-map", "codeowners", "user-guide"];
 
 /**
  * Documents that code reads: a change to one is a code change. The apps' build reads the
