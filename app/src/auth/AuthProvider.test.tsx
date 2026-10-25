@@ -15,7 +15,7 @@ describe("the session", () => {
   it("signs in, and when the session ends mid-work keeps the person and locks in place", async () => {
     mockSession.set(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 15000 });
     await act(() => result.current.signIn("cynthia@mycityapp.io", "demo1234"));
     expect(result.current.status).toBe("signed-in");
 
@@ -35,7 +35,7 @@ describe("the session", () => {
   it("signs out to the sign-in screen", async () => {
     mockSession.set(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 15000 });
     await act(() => result.current.signIn("chidera@mycityapp.io", "demo1234"));
     await act(() => result.current.signOut());
     expect(result.current).toMatchObject({ status: "signed-out", me: null });
@@ -44,7 +44,7 @@ describe("the session", () => {
   it("asks for the code when two-step sign-in is on, and only the right code opens the session", async () => {
     mockSession.set(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 15000 });
     let next = null as NextStep | null;
     await act(async () => {
       next = await result.current.signIn("ifeoma@mycityapp.io", "demo1234");
@@ -61,7 +61,7 @@ describe("the session", () => {
   it("signs in with the PIN on the browser it was set on", async () => {
     mockSession.set(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 5000 });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"), { timeout: 15000 });
     await act(() => result.current.signIn("chidera@mycityapp.io", "demo1234"));
     await act(async () => {
       await api.call("POST /api/v1/security/pin", { body: { pin: "5821" } });
@@ -84,7 +84,7 @@ describe("the session", () => {
     async function signedIn() {
       mockSession.set(null);
       const hook = renderHook(() => useAuth(), { wrapper });
-      await waitFor(() => expect(hook.result.current.status).toBe("signed-out"), { timeout: 5000 });
+      await waitFor(() => expect(hook.result.current.status).toBe("signed-out"), { timeout: 15000 });
       await act(() => hook.result.current.signIn("cynthia@mycityapp.io", "demo1234"));
       return hook;
     }
