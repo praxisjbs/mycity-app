@@ -508,17 +508,37 @@ describeDb("the organisation module against the real migrations", () => {
     test("Edit changes only what it was given", async () => {
       const res = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({
         job_title: "Senior Delivery Analyst",
-        work_pattern: "hybrid",
+        employment_type: "full_time",
       });
       expect(res.status).toBe(200);
       expect(res.body.job_title).toBe("Senior Delivery Analyst");
-      expect(res.body.work_pattern).toBe("hybrid");
-      expect(res.body.employment_type).toBe("contractor");
+      expect(res.body.employment_type).toBe("full_time");
+      expect(res.body.work_pattern).toBe("remote");
       const audit = await one(
         "SELECT changed_fields FROM audit_ledger WHERE entity_id = $1 AND action = 'employee.updated' ORDER BY occurred_at DESC",
         [addedId],
       );
-      expect(audit.changed_fields.sort()).toEqual(["job_title", "work_pattern"]);
+      expect(audit.changed_fields.sort()).toEqual(["employment_type", "job_title"]);
+    });
+
+    test("Edit to On Site or Hybrid asks for a worksite; a correction elsewhere never does", async () => {
+      const moved = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ work_pattern: "hybrid" });
+      expect(moved.status).toBe(422);
+      expect(moved.body.error.fields).toEqual({ worksite_id: ["Pick a worksite"] });
+      const emptied = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ work_pattern: "on_site", worksite_id: null });
+      expect(emptied.status).toBe(422);
+      expect(emptied.body.error.fields).toEqual({ worksite_id: ["Pick a worksite"] });
+      expect((await one("SELECT work_pattern FROM employee WHERE employee_id = $1", [addedId])).work_pattern).toBe("remote");
+      // A roster record made On Site before any worksite existed is still corrected elsewhere.
+      await q("UPDATE employee SET work_pattern = 'on_site', worksite_id = NULL WHERE employee_id = $1", [addedId]);
+      try {
+        const named = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ job_title: "Delivery Lead" });
+        expect(named.status).toBe(200);
+        const remote = await asOps()(request(app).patch(`/api/v1/employees/${addedId}`)).send({ work_pattern: "remote" });
+        expect(remote.status).toBe(200);
+      } finally {
+        await q("UPDATE employee SET work_pattern = 'remote' WHERE employee_id = $1", [addedId]);
+      }
     });
 
     test("an edit leaves every field it was not given alone", async () => {

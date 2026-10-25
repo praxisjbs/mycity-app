@@ -329,6 +329,13 @@ route("PATCH /api/v1/employees/:id", (req) => {
   if (refused) return refused;
   if (typeof b.work_email === "string" && PEOPLE.some((x) => x !== p && x.work_email === b.work_email))
     return fail(409, "EMPLOYEE_EXISTS", "An employee already has this work email.", { work_email: ["Already in use"] });
+  // As the service: a move to On Site or Hybrid keeps a worksite; a correction elsewhere is never asked.
+  if ("work_pattern" in b || "worksite_id" in b) {
+    const pattern = (b.work_pattern as string | undefined) ?? p.work_pattern;
+    const site = "worksite_id" in b ? b.worksite_id : (siteOf(p.user_key)?.worksite_id ?? null);
+    if (organisation.ON_SITE_PATTERNS.includes(pattern) && !site)
+      return fail(422, "WORKSITE_REQUIRED", "Pick a worksite for someone who works On Site or Hybrid.", { worksite_id: ["Pick a worksite"] });
+  }
   const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string) : undefined);
   if (str("first_name")) p.first_name = str("first_name")!;
   if (str("last_name")) p.last_name = str("last_name")!;

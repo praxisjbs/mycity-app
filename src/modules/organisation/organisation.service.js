@@ -24,7 +24,7 @@ const managerText = require("./manager-text");
 const { layout } = require("./org-chart.layout");
 const repo = require("./organisation.repo");
 const places = require("../../shared/places/places");
-const { employeeDateProblems } = require("@mycity/contract").organisation;
+const { employeeDateProblems, ON_SITE_PATTERNS } = require("@mycity/contract").organisation;
 
 /** A person's home address field (shared/places/owners.js). */
 const HOME = "employee.home_address";
@@ -325,6 +325,15 @@ async function updateEmployee(client, employeeId, patch, actor) {
     },
     employeeId,
   );
+  // On Site and Hybrid keep a worksite, so clock-in has an office to check. Asked only when the
+  // edit moves the pattern or the worksite: a roster record made before its worksite existed can
+  // still be corrected elsewhere (JBS Praxis, 25/10/2026).
+  if ("work_pattern" in patch || "worksite_id" in patch) {
+    const pattern = patch.work_pattern || before.work_pattern;
+    const site = "worksite_id" in patch ? patch.worksite_id : before.worksite_id;
+    if (ON_SITE_PATTERNS.includes(pattern) && !site)
+      throw new AppError("WORKSITE_REQUIRED", "Pick a worksite for someone who works On Site or Hybrid.", 422, { worksite_id: ["Pick a worksite"] });
+  }
   const given = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined && v !== ""));
   const dated = ["contract_ends_on", "confirmation_due_on", "confirmed_on", "date_of_birth"];
   assertDates({ ...before, ...given }, "start_date" in given ? dated : dated.filter((k) => k in given));

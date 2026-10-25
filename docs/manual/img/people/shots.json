@@ -1,7 +1,7 @@
 {
   "people-add-job": {
     "spec": "807d900a2d0f960f",
-    "source": "d0155c8a55f21024",
+    "source": "973aaa7aef06646b",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "people-add-person": {
     "spec": "2833d3e5ac9b6e19",
-    "source": "d0155c8a55f21024",
+    "source": "973aaa7aef06646b",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "people-employees": {
     "spec": "5953b0f4b3738e2e",
-    "source": "d0155c8a55f21024",
+    "source": "973aaa7aef06646b",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "people-record": {
     "spec": "dabf9149a2344980",
-    "source": "d0155c8a55f21024",
+    "source": "973aaa7aef06646b",
     "devices": [
       "desktop",
       "phone"

@@ -87,7 +87,7 @@ The form marks a field as soon as you leave it, and the mark goes the moment it 
 | **Required** | It cannot be left empty | Fill it in |
 | **Check the email** | Not an email address | Check the spelling, with one @ |
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number with its country code | Type it as `0803 123 4567` |
-| **Pick a worksite** | On Site or Hybrid with no worksite | Pick one, or choose Remote |
+| **Pick a worksite** | On Site or Hybrid with no worksite, on Add Employee or Edit Record | Pick one, or choose Remote |
 | **Not before the start** | A contract or probation end before the start date | Correct the date |
 | **Before the start date** | A date of birth on or after the start date | Correct the date |
 | **Already in use** | Another employee has this work email | Use the person's own address, or open the other record |
@@ -108,7 +108,7 @@ A record's tabs are **Profile**, **Job**, **Work Schedule**, **Reporting Line**,
 1. Open the person from [People · Employees](/people?tab=employees).
 2. {needs="people edit"} Press **Edit Record**. The form holds the same fields as Add Employee.
 3. {needs="people edit"} Change what is wrong and press **Save Record**. Empty a field to remove what
-   it held.
+   it held. Moving someone to **On Site** or **Hybrid** asks for their **Worksite**.
 4. **History** lists every change: what changed, who changed it and when.
 
 Fields shown as **Restricted** are ones your role does not see, or that nobody has filled in yet.

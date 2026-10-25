@@ -322,6 +322,14 @@ const Employee360 = z
   .strict();
 
 /** PATCH /employees/:id. Every field of the record a person may correct. */
+/** The work patterns that come to a worksite, so clock-in has an office to check. */
+const ON_SITE_PATTERNS = ["on_site", "hybrid"];
+
+/**
+ * PATCH /employees/:id carries only what changed. Moving someone to On Site or Hybrid while
+ * emptying their worksite in the same edit is refused here; a move that leaves the stored
+ * worksite empty is refused by the service, which knows it (JBS Praxis, 25/10/2026).
+ */
 const EmployeeUpdate = z
   .object({
     first_name: text(100),
@@ -355,7 +363,11 @@ const EmployeeUpdate = z
   .partial()
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
-  .superRefine(employeeDates);
+  .superRefine(employeeDates)
+  .superRefine((v, ctx) => {
+    if (ON_SITE_PATTERNS.includes(v.work_pattern) && "worksite_id" in v && !v.worksite_id)
+      ctx.addIssue({ code: "custom", path: ["worksite_id"], message: "Pick a worksite" });
+  });
 
 /** POST /employees/:id/archive. */
 const EmployeeArchive = z.object({ archive_reason: text(200) }).strict();
@@ -629,9 +641,6 @@ const EmployeeCreate = z
   })
   .strict()
   .superRefine(employeeDates);
-
-/** The work patterns that come to a worksite, so clock-in has an office to check. */
-const ON_SITE_PATTERNS = ["on_site", "hybrid"];
 
 /**
  * POST /api/v1/employees, Add Employee: EmployeeCreate, and someone who works On Site or Hybrid

@@ -303,7 +303,10 @@ export function EditEmployee({ employee, close }: { employee: Employee360; close
   const withStart = (v: Values): Values => {
     const changed = changedOf(v);
     const dated = Object.keys(changed).some((k) => dates.includes(k));
-    return dated && v.start_date && !("start_date" in changed) ? { ...changed, start_date: v.start_date } : changed;
+    const withDates = dated && v.start_date && !("start_date" in changed) ? { ...changed, start_date: v.start_date } : changed;
+    // A pattern and its worksite are checked together once either moves: On Site and Hybrid keep one.
+    const placed = "work_pattern" in changed || "worksite_id" in changed;
+    return placed && shown.includes("worksite_id") ? { ...withDates, work_pattern: v.work_pattern, worksite_id: v.worksite_id } : withDates;
   };
   const f = useContractForm<Values>(start, checked(organisation.EmployeeUpdate, withStart));
   const [departments, setDepartments] = useState<Department[]>([{ department_id: employee.department_id, name: employee.department } as Department]);
@@ -319,12 +322,13 @@ export function EditEmployee({ employee, close }: { employee: Employee360; close
     const changed = changedOf(f.values);
     if (Object.keys(changed).length === 0) return close();
     try {
-      await save.run({ params: { id: employee.employee_id }, body: toWire(changed) as never });
+      const saved = await save.run({ params: { id: employee.employee_id }, body: toWire(changed) as never });
       invalidate("/api/v1/employees");
       invalidate("/api/v1/org-chart");
       invalidate("/api/v1/departments");
       close();
-      toast(`${employee.display_name} saved`);
+      // The name as saved: a corrected name reads in its toast.
+      toast(`${saved.display_name} saved`);
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) {
         f.setServerErrors(e.fields);

@@ -800,7 +800,11 @@ happened. Edit failed the same way. These are the rules now, each held by a test
   an empty optional reference (line manager, worksite, staff number) is not given.
 - Someone who works On Site or Hybrid names their worksite (`EmployeeAdd`, the route's body; JBS
   Praxis, 25/10/2026), so they can clock in on day one. A roster load and create-admin use
-  `EmployeeCreate`, which does not ask: people arrive before any worksite exists.
+  `EmployeeCreate`, which does not ask: people arrive before any worksite exists. Edit asks only
+  when it moves the pattern or the worksite (`EmployeeUpdate` when both are sent, the service
+  against the stored worksite otherwise, `WORKSITE_REQUIRED` on `worksite_id`), so a roster record
+  made before its worksite existed is still corrected elsewhere. Edit's toast names the person as
+  saved.
 - A refusal from the server names its field, and the wizard goes back to the step that holds it;
   one with no field (a lost connection, a server fault) is one line above the footer. The service
   checks what the database used to refuse without a field: a department or worksite not in use, a
@@ -1036,6 +1040,8 @@ screen.
 ## 14 · Change log
 
 - 25/10/2026 · JP · §6.1 and §6.16, the bulk audit: roles by exact title only and logins only for people the roster brought; names once per version of `nomenclature.json` (`department.names_applied`); the counter reserved before a load and numeric Staff IDs padded; a roster person never renumbered and a same-name row with no Staff ID held back; unreadable optional cells left out with a note; departments made only from `nomenclature.json`, found punctuation aside; closed seats kept closed and seats matched by department; birthdays by email; two-pass column mapping, tidied names, phone, year and choice spellings; revert puts lines and emptied fields back, refuses a person now in use and a seat changed since; the Imports screen's Changes view, labelled problems, header-row choice and masked rows. What is left is named in §6.16.
+- 25/10/2026 · JP · §6.16: Edit asks for a worksite when it moves someone to On Site or Hybrid, and
+  its toast names the person as saved.
 - 25/10/2026 · JP · §6.16 written: the employee creation audit's rules (fields checked as they are filled, every refusal on its field, EmployeeAdd with the worksite, hidden fields refused, Edit clearing, the staff-number counter by the scheme's shape), from JBS Praxis's audit and decisions of 25/10/2026.
 - 22/10/2026 · GE · §6.7: an address that opens a form may fill it with the contract's prefill fields (`useAddressPrefill`); People · Employees' Add Employee and ESS · My Leave's Request Leave read them for Praxis AI's screen buttons (`praxis-ai.md` §6.4).
 - 22/10/2026 · TB · Performance PR 3: upload purpose `performance_evidence` (`documents.js` `UploadPurpose`, 15 MB in `body-limits.js`, PDF, images and Office files in `mime-policy.js`) for a check-in line's evidence file (`docs/guides/performance.md` §6.14). A route whose multipart body is strict accepts the `purpose` field the upload engine sends beside the file, as `EssDocumentUpload` does.

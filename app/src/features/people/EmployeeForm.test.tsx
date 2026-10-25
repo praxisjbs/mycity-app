@@ -20,7 +20,9 @@ const m = vi.hoisted(() => ({
   can: true,
   hidden: [] as string[],
   refreshMe: vi.fn(async () => undefined),
+  toast: Object.assign(vi.fn(), { error: vi.fn() }),
 }));
+vi.mock("@mycity/ui", async (actual) => ({ ...(await actual<typeof import("@mycity/ui")>()), toast: m.toast }));
 vi.mock("@/api/hooks", () => ({
   invalidate: vi.fn(),
   useApi: () => ({ data: undefined, error: null, reload: () => undefined }),
@@ -231,6 +233,31 @@ describe("Edit Employee", { timeout: 20000 }, () => {
     const { body } = m.run.mock.calls[0]![0] as { body: Record<string, unknown> };
     expect(body).toEqual({ job_title: "Senior Content Associate", contract_ends_on: "" });
     expect(organisation.EmployeeUpdate.parse(body)).toEqual({ job_title: "Senior Content Associate", contract_ends_on: null });
+  });
+
+  it("asks for a worksite when Edit moves someone to On Site, and saves once one is picked", async () => {
+    const user = userEvent.setup();
+    open(<EditEmployee employee={employee} close={vi.fn()} />);
+    await user.click(screen.getByRole("radio", { name: "On Site" }));
+    await user.click(screen.getByRole("button", { name: "Save Record" }));
+    expect(await screen.findByText("Pick a worksite")).toBeTruthy();
+    expect(m.run).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Pick Lekki" }));
+    await user.click(screen.getByRole("button", { name: "Save Record" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
+    const { body } = m.run.mock.calls[0]![0] as { body: Record<string, unknown> };
+    expect(body).toEqual({ work_pattern: "on_site", worksite_id: "8d1b0b9e-1d2b-4b8e-9b1e-1a2b3c4d5e6f" });
+  });
+
+  it("names the person as saved in its toast", async () => {
+    const user = userEvent.setup();
+    m.run.mockResolvedValueOnce({ ...employee, first_name: "Adaeze", display_name: "Adaeze Obi" });
+    open(<EditEmployee employee={employee} close={vi.fn()} />);
+    const first = screen.getByLabelText("First Name");
+    await user.clear(first);
+    await user.type(first, "Adaeze");
+    await user.click(screen.getByRole("button", { name: "Save Record" }));
+    await waitFor(() => expect(m.toast).toHaveBeenCalledWith("Adaeze Obi saved"));
   });
 
   it("shows a refused work email on its field", async () => {
