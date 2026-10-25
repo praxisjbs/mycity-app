@@ -42,7 +42,7 @@ saying who agreed and when.
 
 | Milestone | Screens | Not started | In progress | Built | On staging | Accepted |
 |---|---|---|---|---|---|---|
-| M0 Foundation | 34 items below: 33 done, 1 open | | | | | |
+| M0 Foundation | 35 items below: 34 done, 1 open | | | | | |
 | M1 Core Operations & Employee Management | 33 | 0 | 0 | 33 | 0 | 0 |
 | M2 Productivity & Performance | 11 | 0 | 0 | 11 | 0 | 0 |
 | M3 Queries & Consequence Management | 5 | 5 | 0 | 0 | 0 | 0 |
@@ -108,9 +108,11 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | Refresh and history in the hub (F28, F29; TB, 20/10/2026): pull to refresh with two depths (the Pin Drop), the desktop capsule with the Hold Ring, back and forward in the installed app, Back closing a phone's sheets first, this device's trail (8 back, 1 ahead), the installed app reopening where the person was, ⌘K Refresh Screen and Reload App (`docs/FRONTEND_FOUNDATION.md` §3, §5) | TB | ☑ | 20/10/2026 |
 | Appearance in the hub (F30; TB, 21/10/2026): the dark palette derived from four colours in the contract (`appearance.js`, tokens.css's dark block its Deep Green), applied before first paint from `app/public/boot.js` (the theme script left `index.html`, which the security policy never ran), two fonts from a vetted self-hosted list, each person's Text Size, the organisation's default theme and density, `ColorField` and `ThemePreview` (`docs/guides/foundation.md` §6.15) | TB | ☑ | 21/10/2026 |
 | User Guide and its gate (JBS Praxis, 25/10/2026): `docs/manual/` chapters cut to each reader on the server, `npm run guide:shots`, gate `check/user-guide.js` with `User-guide-unchanged: <reason>`, the conventions in CLAUDE.md, README, both guides, the PR template and the Stop hook (`docs/guides/user-guide.md`) | JP | ☑ | 25/10/2026 |
+| A record opens in a sheet on a phone (F31; JBS Praxis, 25/10/2026): `ListDetail` and `DetailPane` in `packages/ui` (the list beside the record on desktop, the tapped record in a bottom sheet on a phone, nothing opening unasked), gate 11 tapping each phone screen's first two rows and failing a record that lands in the page, the rule in CLAUDE.md, FRONTEND_GUIDE §7 and `docs/guides/foundation.md` §6.17; thirteen views moved onto it | JP | ☑ | 25/10/2026 |
 
 **Notes**
 
+- 25/10/2026 · JP · A record opens in a sheet on a phone (FRONTEND_FOUNDATION F31, `docs/guides/foundation.md` §6.17): People · Leave put a tapped request under its list on a phone. New `ListDetail` and `DetailPane` (Layout), with `useSideBySide`; DataView's phone cards, TapList's rows and Kanban's cards mark their open button (`data-row-open`), and gate 11 (`check/two-shells.js`, `lib/screens.js` `rowOpens`) taps each phone screen's first two and fails one whose record lands in the page (it found ten views before the fix). Moved onto it: People · Leave, ESS · My Payslips, and the M3 to M8 screens built on the mock (notes under each module). Left: nothing.
 - 25/10/2026 · JP · User Guide pictures for both devices: the 38 that were taken on a computer only now have their phone picture too, five sections that had none have one (When the Screen Locks, Your Display and the App, and the Quick Start's Get Help Anywhere, Import a Staff List and Help With a Login), and a picture's step can run on one device only (`phone click: ...`, `docs/guides/user-guide.md` §6.5). The chapters now say where a phone keeps New Holiday and New Role (Quick Actions), Configure Signature (the cog) and the Audit Log's filters, and that Export is on a computer. 147 pictures; every section has one. Left: nothing.
 - 25/10/2026 · JP · User Guide, Milestone 1 chapters (`docs/guides/user-guide.md`): `check/user-guide.js` waits on no chapter now, Mailbox and Staff Community being chapters. Two shared fixes found while writing them: a field's error shows the schema's own words when they fit in four (`shortMessage`, so a radius reads *At least 150 m*, not *Too short*), and History names the fields a change touched by their labels (*Record changed: Job Title, Phone*), not their column keys (`employeeFieldNames`, `docs/guides/foundation.md` §6.16). Tests: `useContractForm.test.tsx`, `organisation.test.js`.
 - 25/10/2026 · JP · CI wiring: `npm run ci` runs its four groups (backend, frontend, screens, checks) at the same time on a laptop, as CI's jobs do, each gate's line printed as it ends with its group, so a full run takes about as long as the backend's tests instead of the sum of all four (about 40 minutes one after another); `--serial` keeps the old order and `--fast` stops at the first failure. The screens group builds its own demo app and gallery under `node_modules/.cache/mycity/` (Vite alone; the type check stays the frontend group's), so it never meets `npm run fe:build`'s `app/dist` or `packages/ui/dist-gallery`. Beside the other groups the frontend's tests run on the CPUs less two (`MYCITY_TEST_WORKERS` in `scripts/fe-test.js`): with every core theirs, the screens' tests timed out under the backend's tests and the browser. The database tests allow 60 s (their beforeAll rebuilds the schema, past 15 s on a loaded machine), and New Task's test waits for Assign To instead of reading it as the form opens. Nothing changes on GitHub, where each job runs one group. Left: nothing.
@@ -812,6 +814,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 25/10/2026 · JP · My Payslips (#11, M6, still on the mock): a month on a phone opens its payslip as a full sheet (F31); it opened nothing before, the list passing a prop TapList does not take, and its status pill never showed. On desktop the payslip stays beside the list, in the dialog below 1181 px. Status unchanged. Left: the M6 API.
 - 25/10/2026 · JP · User Guide chapter Employee Self-Service (`docs/manual/employee-self-service.md`): the nine M1 tabs (#8, #9, #12, #14, #87 to #91) with their pictures. My Security's Sign Out Others now says why when the server refuses it; it failed silently. Left: My Performance (#10) in the M2 chapter.
 - 22/10/2026 · TB · My Performance (#10), after PR #130: a link to the person's own scorecard opens My Scorecard once and leaves the address (`docs/guides/performance.md` §14). Left: nothing.
 - 22/10/2026 · TB · My Performance (#10) complete with Performance PR 4 merged in: the figures (Commitments On Time from PR 4's commitments), the banner when the scorecard or check-in waits, My Scorecard with Agree and Disagree, This Month's Check-In, My Commitments, Rolls Up To, My Reviews and My PIP, on the real API, desktop and phone. API, UI and Mobile ticked; Built.
@@ -964,6 +967,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 25/10/2026 · JP · Leave (#26): a tapped request opens in a sheet over the list on a phone (F31, `ListDetail`), never under it, and the first waiting request shows unasked only beside the list on desktop (from 1181 px; narrower, a request opens in the dialog). On a phone Approve, Reject and Cancel Leave are full width at the sheet's foot. Also Away shows each person's status pill, which never showed. The People chapter's Leave steps and pictures follow. Left: nothing.
 - 25/10/2026 · JP · User Guide: the People chapter gains Organogram (#92), Attendance (#25), Leave (#26), Devices (#27) and Worksites (#28), with their pictures. A line manager now opens People · Leave to decide their team's leave: the shell and ⌘K hid the tab from anyone without full People access (`access.ts`, `screens.js` `tabVisible`). Organogram's Add Role, Edit Role, Create Vacancy and dragging now need People edit; a line manager saw them and was refused. Tests: `access.test.ts`, `screens.test.js`, `OrgTree.test.tsx`. Left: on a phone, a Leave card shows Type, From and To but not Status; the Pending chip finds the waiting ones.
 - 25/10/2026 · JP · Employees (#24), the employee creation audit (`docs/guides/foundation.md` §6.16, JBS Praxis's decisions of 25/10/2026): Add Employee could not save (its form held an address the contract refuses, on a field no step shows) and Edit could not either; both now hold only the fields they show and check each as it is filled, every server refusal lands on its field and takes the wizard back to its step, a refusal with no field is one line above the footer, and someone who may only view is told on the first step. The contract and service check dates, departments, managers, worksites and the email against other logins on the field; On Site and Hybrid ask for the worksite (`EmployeeAdd`); fields a role hides are left out and refused (`Me.hidden_fields`); Edit clears an emptied field; the staff-number counter reads only its own numbers; the Wizard keeps focus while typing. Tests: `EmployeeForm.test.tsx`, `Wizard.test.tsx`, `tests/integration/organisation.test.js`. Department, Worksite and Line Manager (`RecordPicker`) and Work Pattern (`ChoiceField`) are now named by their label for a screen reader, and a picker's error is read with it; their labels pointed at nothing before. Edit asks for a worksite when it moves someone to On Site or Hybrid (never for a correction elsewhere), and its toast names the person as saved. Left: nothing for Add Employee or Edit; the login and import fixes are under Users (#70) and Imports (#93).
 - 23/10/2026 · JP · People · Attendance (#25), the clock panel's test only: `ClockButton.test.tsx` failed now and then (CI, PR 140) because a test moved on while its punch was still on its way, Review Required already showing from an earlier punch, and the in-browser mock answered that punch as the next person signed in (funke clocked out, so the next test found no Start or Finish). The tests now wait for the punch's own answer before the next person signs in. No screen changed. The clock tests pass 15 runs in a row in UTC, as CI runs them. Left: the mock answers a request as whoever is signed in when it answers, not who sent it; reading the sender instead showed that a read still on its way when someone else signs in fills the app's shared read cache with the first person's day, worth a look on its own.
@@ -1088,6 +1092,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 25/10/2026 · JP · Queries (#34) and Letter Templates (#37), on the mock: a tapped query or template opens in a sheet on a phone (F31: `DetailPane`, `ListDetail`), never under the list; on desktop the summary's focus and the first template still show unasked. A row opens its query in place rather than through the address. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/queries/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/queries.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Recruitment
@@ -1104,6 +1109,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 25/10/2026 · JP · Candidates (#39), Interviews (#41), Offers (#42) and Onboarding (#43), on the mock: on a phone a tapped record opens in a sheet (F31: `ListDetail`, `DetailPane`), never under the list; Interviews' Consolidate moves into that sheet on a phone. A candidate's card on the board opened nothing (it passed a prop Kanban does not take); it opens the candidate now. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/recruitment/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/recruitment.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Payroll
@@ -1118,6 +1124,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 25/10/2026 · JP · Payslips (#46), on the mock: a tapped payslip opens as a full sheet on a phone (F31: `DetailPane`), never under the list; on desktop the first with a deduction still shows under it. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/payroll/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/payroll.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Partnerships
@@ -1133,6 +1140,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 25/10/2026 · JP · Proposals (#53), on the mock: a tapped proposal opens as a full sheet on a phone (F31: `ListDetail`), never under the list; on desktop it stays beside it. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/partnerships/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/partnerships.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Expenses
@@ -1148,6 +1156,7 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 
 **Notes**
 
+- 25/10/2026 · JP · My Requests (#56), Approvals (#57) and Requisitions (#58), on the mock: on a phone a tapped request or requisition opens in a sheet (F31: `DetailPane`), with its chain, history or Approve, never above or under the list; on desktop the summary's focus still shows where it did. Status unchanged.
 - 15/10/2026 · AJ · Frontend built in `app/src/features/expenses/` against the in-browser mock API (INTERIM shapes in `app/src/api/types/expenses.ts`), desktop and phone, checked against demo.html. No ticks: UI is ticked once the screens run on the real API. Left: the backend endpoints and contract, then swap the INTERIM types for `contract.gen.ts`.
 
 ### Knowledge Hub

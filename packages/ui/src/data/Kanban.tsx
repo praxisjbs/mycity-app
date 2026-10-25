@@ -203,7 +203,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
               const wait = busy.has(card.key);
               return (
                 <li key={card.key} className="relative rounded-box border border-border bg-card p-2.5">
-                  <button type="button" onClick={() => onOpen?.(card.key, current.key)} className={cn("w-full text-left", onOpen && "stretch-link")}>
+                  <button type="button" data-row-open={onOpen ? "" : undefined} onClick={() => onOpen?.(card.key, current.key)} className={cn("w-full text-left", onOpen && "stretch-link")}>
                     <KanbanCardBody card={card} />
                   </button>
                   {onMove && (
@@ -284,7 +284,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
                     onDragStart={onMove ? (e: DragEvent) => e.dataTransfer.setData("text/plain", `${card.key}|${column.key}`) : undefined}
                     className={cn("rounded-box border border-border bg-card p-2.5 transition hover:-translate-y-0.5 hover:shadow-2", onMove && !wait && "cursor-grab active:cursor-grabbing")}
                   >
-                    <button type="button" onClick={() => onOpen?.(card.key, column.key)} className={cn("w-full text-left", onOpen && "stretch-link")}>
+                    <button type="button" data-row-open={onOpen ? "" : undefined} onClick={() => onOpen?.(card.key, column.key)} className={cn("w-full text-left", onOpen && "stretch-link")}>
                       <KanbanCardBody card={card} />
                     </button>
                     {onMove && (

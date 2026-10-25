@@ -22,7 +22,7 @@ map, read §11 first.
 | `docs/DATABASE_SCHEMA.md` | **The database design**: the core every milestone attaches to, each milestone's tables as built and what it still owes, and what is not built and why. Read before any milestone's schema work |
 | `docs/MIGRATIONS.md` | **The migration and reference-seed conventions**: numbering, idempotency, DOWN, table shape, matching the code, what a seed may hold (A26), checks before the PR. Read before any migration |
 | `docs/FRONTEND_GUIDE.md` | **How to write frontend code here**: contract client, 25-per-page lists, what a screen carries (three tiers, help terms, word limits), two shells, one form system. Read before any frontend change |
-| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F27 (binding) and the three PRs that build `packages/ui` |
+| `docs/FRONTEND_FOUNDATION.md` | The frontend foundation: decisions F1 to F31 (binding) and the three PRs that build `packages/ui` |
 | `docs/COMPONENTS.md` | Every shared component in `packages/ui`, generated from the code. Check it before building anything; a missing one is added with `npm run new:component` |
 | `docs/guides/<module>.md` | One full-stack engineering guide per feature: backend, API, events and every screen it touches, and how they relate. A change passes through its guide first |
 | `docs/PROGRESS.md` | The 86 screens and the M0 items, ticked as they are built, with a note per change |
@@ -732,6 +732,10 @@ data, not code. Services call `openInstance()` inside their transaction and reac
     only a place our address search or a pin signed, or the device's location while search is down;
     the Details line (flat, gate) is the only free text, printed before the address
     (FRONTEND_FOUNDATION F27, `docs/guides/addresses.md`, gate 22).
+21. **A record opens in a sheet, never below its list.** On a phone a tapped row opens its record
+    in a bottom sheet and nothing opens until a row is tapped; on desktop the list and the record
+    sit side by side. A list and the record it opens are `ListDetail` (or `DetailPane`) from
+    `@mycity/ui`, and gate 11 taps each phone screen's rows (FRONTEND_FOUNDATION F31, no exemptions).
 
 ---
 
@@ -755,7 +759,7 @@ group builds its own demo app and gallery under `node_modules/.cache/mycity/`, a
 | 8 Five-second rule | M0 | `check/five-second.js` (every screen, phone and desktop, in Chromium); backend copy in `check/dashes.js` |
 | 9 AI manifest coverage | M1 | `check/ai-manifest-coverage.js` |
 | 10 Search coverage | M1 | `check/search-coverage.js` |
-| 11 Two shells | M1 | `check/two-shells.js` (every screen, phone and desktop, in Chromium) |
+| 11 Two shells | M1 | `check/two-shells.js` (every screen, phone and desktop, in Chromium; on a phone it taps each screen's first two rows and fails a record that opens in the page, F31) |
 | 12 Inline validation, one form system | M1 | `check/forms.js` |
 | 13 Palette | M1 | `check/palette.js` (hex only in `tokens.css`; F4 styling exemptions in `check/lib/styling-exemptions.json`, shared with both apps' lint) and the `no-hex` lint rule |
 | 14 Contrast | M1 | `check/contrast.js` (runs `packages/ui/src/styles/tokens.test.ts`: every text pair, both themes) |

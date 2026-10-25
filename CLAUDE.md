@@ -41,7 +41,7 @@ State the type in your first message ("This is a full-stack change to My Attenda
 | Type | Read |
 |---|---|
 | Backend | `docs/BACKEND_GUIDE.md` in full. Then the sections of `docs/BACKEND_STRUCTURE.md` it points to for what you are touching. `README.MD` §4 to §7 for where files live and the rules. For a migration or a reference seed, `docs/DATABASE_SCHEMA.md` (what exists and what your milestone owes) and `docs/MIGRATIONS.md` in full |
-| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F27, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
+| Frontend | `docs/FRONTEND_GUIDE.md` in full, `docs/FRONTEND_FOUNDATION.md` (decisions F1 to F31, binding) and `docs/COMPONENTS.md` (every shared component; open them in `npm run gallery`). The feature guide's **§10 On screen and mobile** for what each screen shows open, behind help and on a phone. The screen in `docs/MyCity-ERP-Documents/demo.html` for look only |
 | Full stack | Both guides. **Contract first**: write or change `packages/contract/schemas/<module>.js`, then the backend, then the frontend against the generated types |
 | Docs only | The document you are changing, and anything it cross-references |
 | Ops | `docs/SYSTEM_ARCHITECTURE.md` §1, §2, §9, §10, §11, and `docs/runbooks/` |
@@ -56,7 +56,7 @@ says what the code does and why. `scripts/check/provenance.js` fails the build o
 1. `MILESTONES.md` is binding for scope and decisions A1 to A26.
 2. `REUSE_MAP.md` wins over `MILESTONES.md` where they disagree.
 3. For the frontend foundation (`packages/ui`, tokens, shared components, the app shells and the
-   frontend gates), decisions F1 to F27 in `docs/FRONTEND_FOUNDATION.md` §3 win over
+   frontend gates), decisions F1 to F31 in `docs/FRONTEND_FOUNDATION.md` §3 win over
    `MILESTONES.md`, `FRONTEND_GUIDE.md` and `demo.html` (decided with TB, 15/10/2026).
 4. `SYSTEM_ARCHITECTURE.md`, `BACKEND_STRUCTURE.md`, then the backend and frontend guides.
 5. `README.MD` is the map of every file.
@@ -116,6 +116,11 @@ silently.
   40. Title Case chrome, Verb Noun buttons, Lucide icons, no em dashes in copy a person reads.
 - **Two shells** (gate 11): mobile is a native-feeling app (bottom bar, cards not tables, sheets,
   44 px targets, less text), desktop is desktop software. Never one layout scaled.
+- **A record opens in a sheet, never below its list** (F31, gate 11; JBS Praxis, 25/10/2026). On a
+  phone a tapped row opens its record in a bottom sheet and nothing opens until a row is tapped; on
+  desktop the list and the record sit side by side. A list and the record it opens are always
+  `ListDetail` from `@mycity/ui` (`DetailPane` where desktop puts the record elsewhere). The gate
+  taps each phone screen's rows and has no exemption.
 - **Components only from `@mycity/ui`** (`packages/ui`, listed in `docs/COMPONENTS.md`). A missing
   one is added in `packages/ui` with `npm run new:component` (header, test and gallery page), never
   inside a feature; nothing new goes in `app/src/components/` or `public-app/src/components/`.

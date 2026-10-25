@@ -51,7 +51,7 @@ app's session on the upload engine.
 
 ---
 
-## 3 · Decisions (15/10/2026, TB; F25 and F26 added 18/10/2026; F27 to F29 added 20/10/2026; F30 added 21/10/2026)
+## 3 · Decisions (15/10/2026, TB; F25 and F26 added 18/10/2026; F27 to F29 added 20/10/2026; F30 added 21/10/2026; F31 added 25/10/2026)
 
 | # | Decision |
 |---|---|
@@ -85,6 +85,7 @@ app's session on the upload engine.
 | F28 | **Refresh in place, reload on purpose** (added 20/10/2026, TB; the hub only). Refresh asks every read on the screen again where it is: scroll, filters, the open record and anything typed stay, nothing turns back into a skeleton, and it ends when the last read lands (the data client's `refresh`). **Phone:** pull down at the top of the page, the Pin Drop. The pin drops in a disc under the header while a yellow ring fills; at 64 px the ring closes and the pin lands (a tick on Android), and letting go refreshes, the ring spinning until the reads are in. Pulled on past 136 px the disc turns Deep Green with the reload mark, and letting go restarts the app on the same screen (two depths). The pull only listens and never holds up scrolling: it starts only when the page and every list under the finger are at their top, after a clear move down, never on a fit page (Chat, Mailbox) or over anything marked `data-pull="off"` (a map, the signature pad, a document), and the hub turns the browser's own pull off. **Desktop:** the refresh button at the start of the top bar, the Hold Ring: a click refreshes, its arrow turning until the reads are in; held, a yellow ring closes around it in 0.6 s and the app reloads; Shift and Enter reload from the keyboard. Refresh shows in a browser tab as well as in the installed app. A reload hands over to a waiting new version; F5 and Ctrl R keep the browser's own full reload. ⌘K offers Refresh Screen and Reload App (FRONTEND_GUIDE §7, §9.5) |
 | F29 | **Back and forward, one history** (added 20/10/2026, TB; the hub only). The window's own history is the only record of where a person has been, so Android's Back, the iPhone's edge swipe, a mouse's side buttons, Alt and an arrow key, and the hub's own controls always agree. A new screen, tab or opened record (`id`) is a step; filters, search, sort and the page change that step in place, so Back returns to a list as it was left. On a phone an open sheet, page, menu, search or viewer takes a step of its own, so Back closes it first; one holding unsaved work asks, as Esc does. Each device keeps its own trail, never sent to the server or shared with the person's other devices: the installed app reopens where they were, Back still working, when they left it within the last 12 hours, and Sign Out wipes it. **Desktop, installed app only:** back and forward join the refresh button in one capsule at the start of the top bar; hovering an arrow names where it goes; holding an arrow, right clicking it or holding the pin opens the trail, the last 8 places and the 1 ahead, to jump straight to one. **Phone:** no back button. Android's Back and the iPhone's edge swipe go back, and in the installed app holding the pin opens the trail as a sheet. A browser tab keeps the browser's own back and forward (FRONTEND_GUIDE §7, §9.2) |
 | F30 | **Appearance is configurable, in the hub, within AA** (added 21/10/2026, TB, after the Milestone 1 handover). Settings · Appearance sets the hub's dark palette from four pasted colours (Background, Card, Brand Green, Primary Yellow); every other dark token is worked out by fixed maths in the contract (`packages/contract/schemas/appearance.js` `deriveDark`), never by a model, each ink lightened and tint darkened until every pair keeps 4.5:1, and a colour no nudge can save refused on its field. Presets: Deep Green (§5.2, shipped), Charcoal, Black, Dark Grey. Two fonts (heading, body) from a vetted self-hosted list; the theme and density a person starts on. Each person's Text Size (Small to Largest) on their device. Saved by `settings` edit after a fresh sign-in, audited, with Restore Previous; a live preview first. The light theme, corner radius, the public site, documents and email do not change. Raw hex stays out of source (gate 13): a palette is data, applied by `lib/appearance.ts` (`docs/guides/foundation.md` §6.15) |
+| F31 | **A record opens in a sheet, never below its list** (added 25/10/2026, JBS Praxis, from a phone screenshot of People · Leave with the request's card under the list). **Phone:** a list fills the page and a tapped row opens its record in a bottom sheet (the shared `Modal`, `full` for a payslip, a letter or a document), which drags down, Esc and Back close; nothing opens until a row is tapped, so a screen's first pick never shows unasked, and a record never sits in the page under, over or beside its list. **Desktop:** the list and the record stay side by side; where two columns do not fit (761 to 1180 px) the record opens in the centred dialog. A record the desktop layout places elsewhere (under the list beside a chart, above it) stays there on desktop and is a sheet on a phone. Enforced three ways: `ListDetail` and `DetailPane` in `packages/ui` are the only way a screen pairs a list with the record it opens (`useSideBySide` says when a first pick may show); gate 11 (`check/two-shells.js`) taps each phone screen's first two rows and fails one whose record lands in the page, with no exemption; and this rule in FRONTEND_GUIDE §7 and CLAUDE.md. A record with its own screen (an `id` route) and a reader that fills the screen (SplitPanes: the mailbox, chat, Roles) are not affected |
 
 ---
 
@@ -243,6 +244,23 @@ Etudor and Cynthia Osakunih asked for the dark theme off its green background, w
     everyone** (heading and body); **the organisation's default theme and density, and each person's
     Text Size**; corner radius **kept fixed**; **one dark palette for everybody**.
 
+**F31 · A record opens in a sheet** (25/10/2026, JBS Praxis). Four questions, from a phone screenshot
+of People · Leave, where tapping a request put its card under the list.
+
+1. What shape does a record take on a phone? **A bottom sheet**: the shared Modal's phone form, which
+   slides over the list, drags down to close and grows to full height for a long record. A full-screen
+   page with a back arrow, and a centred dialog, were turned down.
+2. What happens on desktop? **The list and the record stay side by side**; only the phone changes. A
+   first pick may still show beside the list on desktop, never on a phone. A modal everywhere and a
+   slide-over panel were turned down.
+3. How is it enforced? **A shared component, a screen gate and a written rule**: `ListDetail` (with
+   `DetailPane`) in `packages/ui`, gate 11 tapping rows at phone size, and F31 here, in FRONTEND_GUIDE
+   §7 and in CLAUDE.md. Banning rows that expand in place was not asked for.
+4. How far does it go? **Every screen now**, in one pull request, so the gate passes from its first
+   day: People · Leave, ESS · My Payslips, Payroll · Payslips, Partnerships · Proposals, Queries and
+   Letter Templates, Recruitment · Candidates, Interviews, Offers and Onboarding, and Expenses · My
+   Requests, Approvals and Requisitions.
+
 **F28 and F29 · Refresh and history** (20/10/2026, TB). Eight questions, each asked with a live design
 board of the options (pull them, hold them), for the hub only, production and staging alike.
 
@@ -281,6 +299,7 @@ board of the options (pull them, hold them), for the hub only, production and st
 
 **Notes** (newest first; date · initials · what was done · what is left)
 
+- 25/10/2026 · JP · F31, a record opens in a sheet on a phone (§5's four answers). New in the Layout group: `ListDetail` (the list beside the record from 1181 px; below that the list alone and the picked record in the shared Modal, a bottom sheet on a phone) with `DetailPane` (the record where the desktop layout puts it, a sheet on a phone) and `useSideBySide`. DataView's phone cards, TapList's rows and Kanban's cards mark the button that opens a row (`data-row-open`), and gate 11 (`lib/screens.js` `rowOpens`) taps each phone screen's first two and fails one whose record lands in the page. Thirteen views moved onto it (§5 question 4). Found on the way: Recruitment · Candidates' cards and My Payslips' phone months opened nothing (a prop the components do not take), and Also Away's status pill never showed. Left: nothing.
 - 21/10/2026 · TB · F30, Appearance in the hub (§5's twelve answers; `docs/guides/foundation.md` §6.15). The
   pair table and the contrast maths moved from `tokens.test.ts` into the contract, where the dark palette is
   derived; tokens.css's dark block is now that derivation of MILESTONES §5.2's four colours, and the test

@@ -324,6 +324,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 25/10/2026 · JP · Nothing on the Organogram or Org Chart changed. Beside them, People · Leave and ESS · My Payslips open a record in a sheet on a phone, never below the list (FRONTEND_FOUNDATION F31, `docs/guides/ess.md` §10).
 - 25/10/2026 · JP · A line or dotted manager must work here now: Change Reporting Line and Add Employee refuse someone archived, left or suspended (`MANAGER_NOT_FOUND`, on the field), and Add Employee's picker offers only active staff, so nobody reports to a person the tree no longer shows (`docs/guides/foundation.md` §6.16).
 
 - 22/10/2026 · TB · Nothing on the Org Chart changed. Beside it in `app/src/features/ess/`, My Performance opens My Scorecard from the person's own scorecard link (`docs/guides/ess.md`, `docs/guides/performance.md` §14).

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PayslipRow } from "@/api/types/payroll";
 import "@/api/types/payroll";
-import { Button, Card, DataView, DesktopOnly, EmptyState, ErrorState, formatDate, formatMoney, formatMonth, Grid, InlineSelect, LoadingRows, Money, PageHeader, Pager, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, PhoneOnly, Pill, TapList, toast, useModal } from "@mycity/ui";
+import { Button, Card, DataView, DesktopOnly, EmptyState, ErrorState, formatDate, formatMoney, formatMonth, InlineSelect, ListDetail, LoadingRows, Money, PageHeader, Pager, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, PhoneOnly, Pill, TapList, toast, useModal, useSideBySide } from "@mycity/ui";
 import { hrefFor, useRouter } from "@/lib/router";
 
 const statusPill = (r: PayslipRow) => (r.status === "in_run" ? <Pill tone="warn">In the run</Pill> : r.has_query_deduction ? <Pill tone="warn">Paid, deduction</Pill> : <Pill tone="ok">Paid</Pill>);
@@ -13,7 +13,11 @@ export function MyPayslipsPage() {
   const y = summary.data?.year ? String(summary.data.year) : year;
   const list = usePaged("GET /api/v1/payslips", { filters: { scope: "own", ...(y && { year: y }) }, enabled: !!y });
   const [selId, setSelId] = useState<string | null>(null);
-  const sel = list.rows.find((r) => r.payslip_id === selId) ?? list.rows.find((r) => r.status === "paid");
+  const beside = useSideBySide();
+  const picked = list.rows.find((r) => r.payslip_id === selId) ?? null;
+  const sel = picked ?? list.rows.find((r) => r.status === "paid");
+  // The latest payslip shows unasked only beside the list; elsewhere a month opens when it is pressed (F31).
+  const shown = beside ? sel : picked;
   const modal = useModal();
   const email = useMutation("POST /api/v1/payslips/:id/email");
   const s = summary.data;
@@ -30,7 +34,7 @@ export function MyPayslipsPage() {
   const openSlip = (r: PayslipRow) =>
     r.status === "in_run"
       ? modal.open({ title: formatMonth(r.period), body: <EmptyState icon="clock" title="In This Month’s Run" text="It appears once the run is approved." /> })
-      : modal.open({ title: `Payslip, ${formatMonth(r.period)}`, wide: true, body: <SlipPaper id={r.payslip_id} /> });
+      : modal.open({ title: `Payslip, ${formatMonth(r.period)}`, wide: true, full: true, body: <SlipPaper id={r.payslip_id} /> });
   return (
     <>
       <PageHeader
@@ -66,28 +70,34 @@ export function MyPayslipsPage() {
         </div>
       )}
       <PhoneOnly>
-        <TapList items={list.rows.map((r) => ({ key: r.payslip_id, title: formatMonth(r.period), sub: `Net ${formatMoney(r.net)}`, right: statusPill(r), onClick: () => openSlip(r) }))} />
+        <TapList items={list.rows.map((r) => ({ key: r.payslip_id, title: formatMonth(r.period), sub: `Net ${formatMoney(r.net)}`, end: statusPill(r), onSelect: () => openSlip(r) }))} />
         <Pager page={list.page} onPage={list.setPage} noun="payslip" className="px-0" />
       </PhoneOnly>
       <DesktopOnly>
-        <Grid cols="1/1.5">
-          <DataView
-            title={`Payslips, ${y ?? ""}`}
-            rows={list.rows}
-            rowKey={(r) => r.payslip_id}
-            loading={list.loading}
-            selectedKey={sel?.payslip_id}
-            onRowClick={(r) => (r.status === "in_run" ? openSlip(r) : setSelId(r.payslip_id))}
-            columns={[
-              { key: "m", label: "Month", render: (r) => formatMonth(r.period) },
-              { key: "n", label: "Net", align: "n", render: (r) => <Money value={r.net} /> },
-              { key: "s", label: "Status", render: statusPill },
-              { key: "x", label: "", render: (r) => (r.status === "in_run" ? <span className="text-2xs text-subtle-foreground">On approval</span> : <Button size="sm" icon="doc" onClick={(e) => (e.stopPropagation(), toast(`${r.number}.pdf downloading`))}>PDF</Button>) },
-            ]}
-            footer={<Pager page={list.page} onPage={list.setPage} noun="payslip" />}
-          />
-          {sel ? <SlipPaper id={sel.payslip_id} /> : <Card><LoadingRows /></Card>}
-        </Grid>
+        <ListDetail
+          cols="1/1.5"
+          open={picked !== null}
+          onClose={() => setSelId(null)}
+          title={picked ? `Payslip, ${formatMonth(picked.period)}` : "Payslip"}
+          list={
+            <DataView
+              title={`Payslips, ${y ?? ""}`}
+              rows={list.rows}
+              rowKey={(r) => r.payslip_id}
+              loading={list.loading}
+              selectedKey={sel?.payslip_id}
+              onRowClick={(r) => (r.status === "in_run" ? openSlip(r) : setSelId(r.payslip_id))}
+              columns={[
+                { key: "m", label: "Month", render: (r) => formatMonth(r.period) },
+                { key: "n", label: "Net", align: "n", render: (r) => <Money value={r.net} /> },
+                { key: "s", label: "Status", render: statusPill },
+                { key: "x", label: "", render: (r) => (r.status === "in_run" ? <span className="text-2xs text-subtle-foreground">On approval</span> : <Button size="sm" icon="doc" onClick={(e) => (e.stopPropagation(), toast(`${r.number}.pdf downloading`))}>PDF</Button>) },
+              ]}
+              footer={<Pager page={list.page} onPage={list.setPage} noun="payslip" />}
+            />
+          }
+          detail={shown ? <SlipPaper id={shown.payslip_id} /> : <Card><LoadingRows /></Card>}
+        />
       </DesktopOnly>
     </>
   );

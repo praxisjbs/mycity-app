@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import "@/api/types/queries";
@@ -6,11 +6,10 @@ import type { Firing, LetterTemplate, Outcome, QueryRow, Rule, RuleCreate, Sanct
 import type { PersonRef } from "@/api/types/common";
 import { useAuth } from "@/auth/AuthProvider";
 import { Letter } from "@/features/shared/Letter";
-import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { Banner, Button, Card, CardHeader, Chain, Chips, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, KeyValue, LoadingRows, Money, MoneyField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useModal, Who } from "@mycity/ui";
+import { Banner, Button, Card, CardHeader, Chain, Chips, ErrorState, Field, formatDate, formatDateTime, formatWhen, DetailPane, FormFooter, Grid, KeyValue, ListDetail, LoadingRows, Money, MoneyField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
 
 export default function Queries({ tab, id }: ModuleScreenProps) {
@@ -26,13 +25,16 @@ const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ??
 
 function QueriesTab({ id }: { id: string | null }) {
   const modal = useModal();
-  const { navigate } = useRouter();
   const { me } = useAuth();
+  const phone = useIsPhone();
   const full = !!(me?.grants.settings?.includes("view") || me?.is_ceo);
   const [scope, setScope] = useState<"all" | "mine">(full ? "all" : "mine");
   const s = useApi("GET /api/v1/queries/summary");
   const list = usePaged("GET /api/v1/queries", { filters: { scope } });
-  const focus = id ?? s.data?.focus_id ?? null;
+  // A query the address names opens at once; on desktop the summary's focus shows unasked, on a phone nothing does (F31).
+  const [sel, setSel] = useState<string | null>(id);
+  useEffect(() => setSel(id), [id]);
+  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
   return (
     <>
       <PageHeader
@@ -49,7 +51,7 @@ function QueriesTab({ id }: { id: string | null }) {
         rowKey={(q) => q.query_id}
         noun="query"
         nounPlural="queries"
-        onRowClick={(q) => navigate(`/queries?tab=queries&id=${q.query_id}`)}
+        onRowClick={(q) => setSel(q.query_id)}
         wide
         empty={{ title: "No Queries", text: "Queries you raise, and those rules raise on your team, appear here." }}
         columns={[
@@ -63,7 +65,9 @@ function QueriesTab({ id }: { id: string | null }) {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {focus ? <QueryCard id={focus} /> : <Card><p className="text-xs text-subtle-foreground">Pick a query to see it here.</p></Card>}
+        <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Query">
+          {focus ? <QueryCard id={focus} /> : <Card><p className="text-xs text-subtle-foreground">Pick a query to see it here.</p></Card>}
+        </DetailPane>
         {s.data ? <BarsCard title="Queries by Reason" rows={s.data.by_reason} /> : <Card><LoadingRows /></Card>}
       </Grid>
     </>
@@ -362,8 +366,10 @@ function Templates() {
   const modal = useModal();
   const s = useApi("GET /api/v1/queries/templates/summary");
   const list = usePaged("GET /api/v1/queries/templates");
+  const beside = useSideBySide();
   const [sel, setSel] = useState<LetterTemplate | null>(null);
-  const shown = sel ?? list.rows[0] ?? null;
+  // Beside the list the first template shows unasked; elsewhere one opens when it is pressed (F31).
+  const shown = sel ?? (beside ? (list.rows[0] ?? null) : null);
   const preview = useApi("GET /api/v1/queries/templates/:id/preview", { params: { id: shown?.template_id ?? "" }, enabled: !!shown });
   return (
     <>
@@ -372,29 +378,34 @@ function Templates() {
         sub="The system fills name, date and reason"
         actions={
           <>
-            <Button icon="doc" disabled={!preview.data} onClick={() => preview.data && modal.open({ title: shown!.name, wide: true, body: <Letter l={preview.data} /> })}>Preview</Button>
+            {beside && <Button icon="doc" disabled={!preview.data} onClick={() => preview.data && modal.open({ title: shown!.name, wide: true, body: <Letter l={preview.data} /> })}>Preview</Button>}
             <Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Template", body: (close) => <TemplateForm close={close} /> })}>New Template</Button>
           </>
         }
       />
       {s.data && <StatStrip items={[{ label: "Templates", value: s.data.templates }, { label: "Active", value: s.data.active, tone: "ok" }, { label: "Awaiting Sample", value: s.data.awaiting, tone: "warn" }, { label: "Letters Sent, 90d", value: s.data.sent_90d }, { label: "Languages", value: s.data.languages, desktop: true }]} />}
-      <Grid cols="1/1.5">
-        <PagedTable<LetterTemplate>
-          title="Templates"
-          list={list}
-          rowKey={(t) => t.template_id}
-          noun="template"
-          onRowClick={setSel}
-          columns={[
-            { key: "n", label: "Template", render: (t) => <span className={t.template_id === shown?.template_id ? "font-semibold" : undefined}>{t.name}</span> },
-            { key: "u", label: "Used For", render: (t) => t.used_for },
-            { key: "s", label: "Status", render: (t) => <StatusPill s={t.status} /> },
-          ]}
-        />
-        <div>
-          {preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><Banner tone="warn">{preview.error.message}</Banner></Card> : <Card><LoadingRows count={6} /></Card>}
-        </div>
-      </Grid>
+      <ListDetail
+        cols="1/1.5"
+        full
+        open={sel !== null}
+        onClose={() => setSel(null)}
+        title="Letter Template"
+        list={
+          <PagedTable<LetterTemplate>
+            title="Templates"
+            list={list}
+            rowKey={(t) => t.template_id}
+            noun="template"
+            onRowClick={setSel}
+            columns={[
+              { key: "n", label: "Template", render: (t) => <span className={t.template_id === shown?.template_id ? "font-semibold" : undefined}>{t.name}</span> },
+              { key: "u", label: "Used For", render: (t) => t.used_for },
+              { key: "s", label: "Status", render: (t) => <StatusPill s={t.status} /> },
+            ]}
+          />
+        }
+        detail={preview.data ? <Letter l={preview.data} /> : preview.error ? <Card><Banner tone="warn">{preview.error.message}</Banner></Card> : <Card><LoadingRows count={6} /></Card>}
+      />
     </>
   );
 }

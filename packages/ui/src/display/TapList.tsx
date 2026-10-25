@@ -48,7 +48,7 @@ export function TapList({ items, label, flat, className }: TapListProps) {
     >
       {items.map((item) => (
         <li key={item.key} className="border-b border-border last:border-b-0">
-          <button type="button" onClick={item.onSelect} className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left phone:min-h-tap">
+          <button type="button" data-row-open={item.onSelect ? "" : undefined} onClick={item.onSelect} className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left phone:min-h-tap">
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <b className="text-sm font-semibold wrap-any">{item.title}</b>
               {item.sub != null && <span className="text-2xs text-subtle-foreground">{item.sub}</span>}

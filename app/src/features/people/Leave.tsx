@@ -22,9 +22,9 @@ import {
   Field,
   formatDate,
   FormFooter,
-  Grid,
   Grow,
   KeyValue,
+  ListDetail,
   monthName,
   PageHeader,
   Pager,
@@ -39,6 +39,7 @@ import {
   useConfirm,
   useContractForm,
   useModal,
+  useSideBySide,
   Who,
 } from "@mycity/ui";
 
@@ -75,8 +76,10 @@ export function PeopleLeave() {
     sort: "-starts_on",
   });
   const photo = usePhotos(list.rows.map((r) => r.employee.photo_url));
+  const beside = useSideBySide();
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
-  const sel = selected ?? list.rows.find((r) => r.status === "submitted") ?? list.rows[0] ?? null;
+  // Side by side the first waiting request shows unasked; on a phone nothing opens until a row is tapped (F31).
+  const sel = selected ?? (beside ? (list.rows.find((r) => r.status === "submitted") ?? list.rows[0] ?? null) : null);
   const now = todayIso();
   const s = summary.data;
   return (
@@ -108,44 +111,51 @@ export function PeopleLeave() {
           ]}
         />
       )}
-      <Grid cols="1.4/1">
-        <div className="min-w-0">
-          <Toolbar>
-            <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-64" />
-          </Toolbar>
-          <Chips
-            value={status}
-            onChange={(v) => setStatus(v as "all" | LeaveStatus)}
-            options={[["all", "All"], ["submitted", "Pending"], ["approved", "Approved"], ["rejected", "Rejected"], ["cancelled", "Cancelled"]]}
-          />
-          <DataView
-            title="Requests"
-            rows={list.rows}
-            rowKey={(r) => r.leave_request_id}
-            loading={list.loading}
-            error={list.error}
-            selectedKey={sel?.leave_request_id}
-            onRowClick={(r) => setSelected(r)}
-            empty={{ title: "No Leave Requests", text: "Requests appear here once made." }}
-            columns={[
-              { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department ?? undefined} src={photo(r.employee.photo_url)} /> },
-              { key: "t", label: "Type", render: (r) => r.leave_type_name },
-              { key: "f", label: "From", render: (r) => formatDate(r.starts_on) },
-              { key: "o", label: "To", render: (r) => formatDate(r.ends_on) },
-              { key: "d", label: "Days", align: "n", render: (r) => r.days },
-              { key: "s", label: "Status", render: statusPill },
-            ]}
-            footer={<Pager page={list.page} onPage={list.setPage} noun="request" />}
-          />
-        </div>
-        {sel ? (
-          <RequestCard key={sel.leave_request_id} leave={sel} onDone={() => setSelected(null)} />
-        ) : (
-          <Card>
-            <p className="text-xs text-subtle-foreground">Select a request to check cover.</p>
-          </Card>
-        )}
-      </Grid>
+      <ListDetail
+        open={selected !== null}
+        onClose={() => setSelected(null)}
+        title="Leave Request"
+        list={
+          <>
+            <Toolbar>
+              <SearchInput value={list.q} onChange={list.setQ} placeholder="Name or type" className="w-full md:w-64" />
+            </Toolbar>
+            <Chips
+              value={status}
+              onChange={(v) => setStatus(v as "all" | LeaveStatus)}
+              options={[["all", "All"], ["submitted", "Pending"], ["approved", "Approved"], ["rejected", "Rejected"], ["cancelled", "Cancelled"]]}
+            />
+            <DataView
+              title="Requests"
+              rows={list.rows}
+              rowKey={(r) => r.leave_request_id}
+              loading={list.loading}
+              error={list.error}
+              selectedKey={sel?.leave_request_id}
+              onRowClick={(r) => setSelected(r)}
+              empty={{ title: "No Leave Requests", text: "Requests appear here once made." }}
+              columns={[
+                { key: "e", label: "Employee", render: (r) => <Who name={r.employee.display_name} sub={r.employee.department ?? undefined} src={photo(r.employee.photo_url)} /> },
+                { key: "t", label: "Type", render: (r) => r.leave_type_name },
+                { key: "f", label: "From", render: (r) => formatDate(r.starts_on) },
+                { key: "o", label: "To", render: (r) => formatDate(r.ends_on) },
+                { key: "d", label: "Days", align: "n", render: (r) => r.days },
+                { key: "s", label: "Status", render: statusPill },
+              ]}
+              footer={<Pager page={list.page} onPage={list.setPage} noun="request" />}
+            />
+          </>
+        }
+        detail={
+          sel ? (
+            <RequestCard key={sel.leave_request_id} leave={sel} onDone={() => setSelected(null)} />
+          ) : (
+            <Card>
+              <p className="text-xs text-subtle-foreground">Select a request to check cover.</p>
+            </Card>
+          )
+        }
+      />
     </>
   );
 }
@@ -222,7 +232,7 @@ function RequestCard({ leave: r, onDone }: { leave: LeaveRequest; onDone: () => 
                 key: c.leave_request_id,
                 title: c.employee.display_name,
                 sub: `${formatDate(c.starts_on)} to ${formatDate(c.ends_on)}`,
-                right: statusPill(c),
+                end: statusPill(c),
               }))}
             />
             <Pager page={clashes.page} onPage={clashes.setPage} noun="request" />
@@ -232,8 +242,8 @@ function RequestCard({ leave: r, onDone }: { leave: LeaveRequest; onDone: () => 
         )}
       </div>
       {waiting && grants.includes("approve") && (
-        <div className="mt-3 flex gap-2">
-          <Grow />
+        <div className="mt-3 flex gap-2 phone:flex-col phone:items-stretch">
+          <Grow className="phone:hidden" />
           <Button onClick={no}>Reject</Button>
           <Button variant="primary" icon="ok" busy={approve.pending} onClick={yes}>
             Approve
@@ -241,8 +251,8 @@ function RequestCard({ leave: r, onDone }: { leave: LeaveRequest; onDone: () => 
         </div>
       )}
       {cancellable && (
-        <div className="mt-3 flex gap-2">
-          <Grow />
+        <div className="mt-3 flex gap-2 phone:flex-col phone:items-stretch">
+          <Grow className="phone:hidden" />
           <Button busy={cancel.pending} onClick={stop}>
             Cancel Leave
           </Button>

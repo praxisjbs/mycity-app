@@ -8,7 +8,7 @@ import { useRouter } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ChainCard, ExportAction, KvCard, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AddressField, AreaChart, BackButton, Button, Card, CardHeader, Chain, Chips, DataView, DateField, ErrorState, Field, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, FormFooter, Grid, KeyValue, LoadingRows, Meter, Money, MoneyField, PageHeader, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, Pill, ProfileHeader, rules, SelectField, StatStrip, StatusPill, PlacesField, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who, Wizard, type PlaceValue } from "@mycity/ui";
+import { AddressField, AreaChart, BackButton, Button, Card, CardHeader, Chain, Chips, DataView, DateField, ErrorState, Field, formatDate, formatDateTime, formatMoney, formatMoneyShort, formatMonth, FormFooter, Grid, KeyValue, ListDetail, LoadingRows, Meter, Money, MoneyField, PageHeader, Paper, PaperFoot, PaperLogo, PaperTable, PaperTitle, Pill, ProfileHeader, rules, SelectField, StatStrip, StatusPill, PlacesField, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, useSideBySide, Who, Wizard, type PlaceValue } from "@mycity/ui";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { places } from "@/features/shared/places";
 
@@ -434,8 +434,10 @@ function Proposals() {
   const { location, navigate } = useRouter();
   const s = useApi("GET /api/v1/partnerships/proposals/summary");
   const list = usePaged("GET /api/v1/partnerships/proposals");
+  const beside = useSideBySide();
   const [sel, setSel] = useState<Proposal | null>(null);
-  const shown = sel ?? list.rows.find((p) => p.status.text === "Viewed") ?? list.rows[0] ?? null;
+  // Beside the list the first viewed proposal shows unasked; elsewhere one opens when it is pressed (F31).
+  const shown = sel ?? (beside ? (list.rows.find((p) => p.status.text === "Viewed") ?? list.rows[0] ?? null) : null);
   const doc = useApi("GET /api/v1/partnerships/proposals/:id/document", { params: { id: shown?.proposal_id ?? "" }, enabled: !!shown });
   const preset = location.params.get("new");
   const openNew = (partner = "") => modal.open({ title: "New Proposal", wide: true, body: (close) => <ProposalForm close={close} partner={partner} /> });
@@ -449,22 +451,29 @@ function Proposals() {
     <>
       <PageHeader title="Proposals" sub="Generated from a short questionnaire" actions={<Button variant="primary" icon="plus" onClick={() => openNew()}>New Proposal</Button>} />
       {s.data && <KpiTiles items={[{ label: "Sent This Year", value: String(s.data.sent_this_year) }, { label: "Accepted", value: String(s.data.accepted), tone: "ok" }, { label: "Viewed, No Reply", value: String(s.data.viewed_no_reply), tone: "warn" }, { label: "Acceptance Rate", value: s.data.acceptance_rate }]} />}
-      <Grid cols="1/1.5">
-        <PagedTable<Proposal>
-          title="Proposals"
-          list={list}
-          rowKey={(p) => p.proposal_id}
-          noun="proposal"
-          onRowClick={setSel}
-          columns={[
-            { key: "t", label: "Proposal", render: (p) => <span className={p.proposal_id === shown?.proposal_id ? "font-semibold" : undefined}>{p.title}</span> },
-            { key: "p", label: "Partner", render: (p) => p.partner, desktop: true },
-            { key: "v", label: "Value", align: "n", render: (p) => formatMoneyShort(p.value) },
-            { key: "s", label: "Status", render: (p) => <StatusPill s={p.status} /> },
-          ]}
-        />
-        <div>{doc.data ? <ProposalPaper d={doc.data} /> : <Card><LoadingRows count={6} /></Card>}</div>
-      </Grid>
+      <ListDetail
+        cols="1/1.5"
+        full
+        open={sel !== null}
+        onClose={() => setSel(null)}
+        title="Proposal"
+        list={
+          <PagedTable<Proposal>
+            title="Proposals"
+            list={list}
+            rowKey={(p) => p.proposal_id}
+            noun="proposal"
+            onRowClick={setSel}
+            columns={[
+              { key: "t", label: "Proposal", render: (p) => <span className={p.proposal_id === shown?.proposal_id ? "font-semibold" : undefined}>{p.title}</span> },
+              { key: "p", label: "Partner", render: (p) => p.partner, desktop: true },
+              { key: "v", label: "Value", align: "n", render: (p) => formatMoneyShort(p.value) },
+              { key: "s", label: "Status", render: (p) => <StatusPill s={p.status} /> },
+            ]}
+          />
+        }
+        detail={doc.data ? <ProposalPaper d={doc.data} /> : <Card><LoadingRows count={6} /></Card>}
+      />
     </>
   );
 }

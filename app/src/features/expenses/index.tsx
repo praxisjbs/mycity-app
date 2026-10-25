@@ -8,7 +8,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { BarsCard, ExportAction, PagedTable, TrailCard } from "@/features/shared/sections";
 import type { ModuleScreenProps } from "@/shell/screens";
-import { AreaChart, Button, Card, CardHeader, Chain, cn, DataView, DateField, ErrorState, Field, formatBytes, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, Icon, KeyValue, LoadingRows, Money, MoneyField, PageHeader, rules, SelectField, StatusPill, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useModal, Who, Wizard } from "@mycity/ui";
+import { AreaChart, Button, Card, CardHeader, Chain, cn, DataView, DateField, DetailPane, ErrorState, Field, formatBytes, formatDate, formatDateTime, formatMoneyShort, FormFooter, Grid, Icon, KeyValue, LoadingRows, Money, MoneyField, PageHeader, rules, SelectField, StatusPill, TextAreaField, TextField, toast, todayIso, UploadField, useContractForm, useIsPhone, useModal, Who, Wizard } from "@mycity/ui";
 import { upload } from "@/api/upload";
 
 export default function Expenses({ tab, id }: ModuleScreenProps) {
@@ -30,13 +30,22 @@ function MyRequests({ id }: { id: string | null }) {
   const modal = useModal();
   const s = useApi("GET /api/v1/expenses/mine/summary");
   const list = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "mine" } });
+  const phone = useIsPhone();
   const [sel, setSel] = useState<string | null>(id);
-  const focus = sel ?? s.data?.focus_id ?? null;
+  // On desktop the summary's focus shows unasked; on a phone a request opens in a sheet when tapped (F31).
+  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
   return (
     <>
       <PageHeader title="My Requests" sub="Your own expense requests" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Request", wide: true, body: (close) => <RequestForm close={close} /> })}>New Request</Button>} />
       {s.data && <KpiTiles items={[{ label: "In Flight", value: String(s.data.in_flight), tone: s.data.in_flight ? "warn" : undefined }, { label: "Disbursed This Year", value: formatMoneyShort(s.data.disbursed_this_year) }, { label: "Average Turnaround", value: s.data.average_turnaround }, { label: "Rejected", value: String(s.data.rejected), tone: s.data.rejected ? "err" : "ok" }]} />}
-      {focus && <FocusChain id={focus} />}
+      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Expense Request">
+        {focus && (
+          <>
+            <FocusChain id={focus} />
+            {phone && <History id={focus} />}
+          </>
+        )}
+      </DetailPane>
       <PagedTable<ExpenseRow>
         title="My Requests"
         list={list}
@@ -53,9 +62,11 @@ function MyRequests({ id }: { id: string | null }) {
           { key: "s", label: "Stage", render: (r) => <StatusPill s={r.stage_status} /> },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        {focus ? <History id={focus} /> : <Card><LoadingRows /></Card>}
-      </Grid>
+      {!phone && (
+        <Grid cols={2} className="mt-3">
+          {focus ? <History id={focus} /> : <Card><LoadingRows /></Card>}
+        </Grid>
+      )}
     </>
   );
 }
@@ -155,13 +166,17 @@ function RequestForm({ close }: { close: () => void }) {
 function Approvals({ id }: { id: string | null }) {
   const s = useApi("GET /api/v1/expenses/approvals/summary");
   const list = usePaged("GET /api/v1/expenses/requests", { filters: { scope: "approvals" } });
+  const phone = useIsPhone();
   const [sel, setSel] = useState<string | null>(id);
-  const focus = sel ?? s.data?.focus_id ?? null;
+  // On desktop the oldest request waiting shows unasked; on a phone one opens in a sheet when tapped (F31).
+  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
   return (
     <>
       <PageHeader title="Approvals" sub="Requests waiting on you" />
       {s.data && <KpiTiles items={[{ label: "With You", value: String(s.data.with_you), tone: s.data.with_you ? "warn" : "ok" }, { label: "Total Value", value: formatMoneyShort(s.data.total_value) }, { label: "Oldest", value: `${s.data.oldest_days} days` }, { label: "Approved This Month", value: String(s.data.approved_this_month), tone: "ok" }]} />}
-      {focus && <ApprovalCard id={focus} onDone={() => setSel(null)} />}
+      <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Expense Request">
+        {focus && <ApprovalCard id={focus} onDone={() => setSel(null)} />}
+      </DetailPane>
       <PagedTable<ExpenseRow>
         title="Queue"
         list={list}
@@ -237,8 +252,10 @@ function Requisitions() {
   const modal = useModal();
   const s = useApi("GET /api/v1/expenses/requisitions/summary");
   const list = usePaged("GET /api/v1/expenses/requisitions");
+  const phone = useIsPhone();
   const [sel, setSel] = useState<string | null>(null);
-  const focus = sel ?? s.data?.focus_id ?? null;
+  // On desktop the summary's focus shows unasked under the list; on a phone one opens in a sheet when tapped (F31).
+  const focus = sel ?? (phone ? null : (s.data?.focus_id ?? null));
   return (
     <>
       <PageHeader title="Requisitions" sub="Approved requests grouped for the CEO" actions={<Button variant="primary" icon="plus" onClick={() => modal.open({ title: "New Requisition", wide: true, body: (close) => <NewRequisition close={close} /> })}>New Requisition</Button>} />
@@ -259,7 +276,9 @@ function Requisitions() {
         ]}
       />
       <Grid cols={2} className="mt-3">
-        {focus ? <RequisitionCard id={focus} /> : <Card><LoadingRows /></Card>}
+        <DetailPane open={sel !== null} onClose={() => setSel(null)} title="Requisition">
+          {focus ? <RequisitionCard id={focus} /> : <Card><LoadingRows /></Card>}
+        </DetailPane>
       </Grid>
     </>
   );
