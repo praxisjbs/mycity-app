@@ -138,7 +138,8 @@ you can do on one you can do on the other.
 2. The module's screens are tabs under its name. Swipe them sideways to see them all.
 3. The icons at the top right are **Search**, **Notifications** and your account.
 4. The round button with a plus at the bottom right holds quick actions: the screen's own action
-   (such as *Request Leave*), clocking in, **Praxis AI** and **Help**. **Hide Here** tucks it
+   (such as *Request Leave*), clocking in, **Praxis AI** ([Ask from any screen on a phone](#praxis-ask-anywhere))
+   and **Help**. **Hide Here** tucks it
    away on this page.
 5. Your phone's own Back gesture goes back a screen and closes any sheet first.
 

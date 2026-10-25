@@ -222,6 +222,11 @@ after the last scroll; a mark whose target is not on screen with the others fail
 the spec drops the mark or splits the picture. A picture of the guide itself opens a section with
 no picture, or it would show an older copy of itself.
 
+When a screen is reached differently on a phone (the account menu on a computer, More on a phone),
+the section takes two pictures, one for each device, each beside the sentence about its device: a
+spec's steps are the same on both. A `lock:` step shows the lock screen as another tab would tell
+it (the session's channel), and the next picture starts signed in afresh.
+
 The demo's data is the staging seed's (F13), so the pictures show the people and figures a trainee
 sees on staging. Nothing in a picture is a real person's private data.
 
@@ -336,6 +341,7 @@ word limits do not count it, as they do not count an article.
 
 ## 14 · Change log
 
+- 25/10/2026 · JP · Praxis AI and AI Control get their chapters (`praxis-ai.md`, `ai-control.md`), live screens brought forward from M10, without naming M10; the Quick Start gains Ask Praxis AI and Watch AI Spend. §6.5: a `lock:` step, and two pictures where a phone reaches a screen another way. Phone pictures for the sections that had a desktop one only.
 - 25/10/2026 · JP · Written: the User Guide tab, its API filtered to the step, the pictures, the Back
   to Guide chip and the gate, from JBS Praxis's decisions of 25/10/2026 (§6.1).
 - 25/10/2026 · JP · §6.5: what a picture hides, targets looked for in the open dialog first, marks

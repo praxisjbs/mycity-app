@@ -23,6 +23,8 @@ const SCREEN = /^([a-z_]+)\/([a-z0-9-]+)$/;
 const DEVICES = ["desktop", "phone"];
 /** The demo accounts a picture is taken as; `guest` is nobody signed in (the sign-in screen, a link). */
 const ACCOUNTS = ["operations", "ceo", "manager", "staff", "admin", "guest"];
+/** Why the lock screen shows (app/src/auth/LockSheet.tsx): Session Locked, Session Ended, Signed Out. */
+const LOCKS = ["idle", "time", "ended"];
 const ROLES = ["Everyone", "Line Managers", "People & HR", "Administrators"];
 const NOTE_TONES = { "Tip:": "tip", "Important:": "important" };
 const FRONT_KEYS = ["title", "module", "order", "milestones", "summary", "covers", "kind", "icon"];
@@ -219,12 +221,17 @@ function parseShot(id, lines, at) {
     if (item && list) {
       const body = item[1];
       if (list === "do") {
-        const d = /^(click|fill|press|wait|scroll):\s*(.+)$/.exec(body);
+        const d = /^(click|fill|press|wait|scroll|lock):\s*(.+)$/.exec(body);
         if (!d) {
-          problems.push(`${where}: a do step reads "click: <target>", "fill: <target> = <text>", "press: <key>", "wait: <target>" or "scroll: <target>"`);
+          problems.push(`${where}: a do step reads "click: <target>", "fill: <target> = <text>", "press: <key>", "wait: <target>", "scroll: <target>" or "lock: <reason>"`);
           continue;
         }
         if (d[1] === "press") spec.do.push({ action: "press", key: d[2].trim() });
+        // The lock screen, as another tab or the session's clock would bring it: idle, time or ended.
+        else if (d[1] === "lock") {
+          if (LOCKS.includes(d[2].trim())) spec.do.push({ action: "lock", reason: d[2].trim() });
+          else problems.push(`${where}: lock reads "lock: idle", "lock: time" or "lock: ended"`);
+        }
         else if (d[1] === "fill") {
           const f = /^(.+?)\s+=\s+(.*)$/.exec(d[2]);
           const target = f && parseTarget(f[1]);

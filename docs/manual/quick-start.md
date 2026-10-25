@@ -37,6 +37,16 @@ icon: spark
 2. On a computer, press your name at the foot of the menu, then **User Guide**.
 3. The guide opens at the screen you were on. Read [Using This Guide](#start-user-guide).
 
+## Ask Praxis AI {#qs-praxis role="Everyone" icon=spark screen=praxis_ai/ask needs="praxis_ai create"}
+
+![Praxis AI, Ask](shot:qs-praxis)
+
+1. Open [Praxis AI · Ask](/praxis-ai?tab=ask), or on a phone press **Quick Actions**, then
+   **Praxis AI**.
+2. Type a question in **Ask a Question**, such as "How many leave days do I have left?", and press
+   **Send**.
+3. Press a record under **From** to open it. Read [Ask](#praxis-ask).
+
 ## Clock In {#qs-clock-in role="Everyone" icon=clock screen=ess/my-attendance}
 
 ![The clock](shot:qs-clock-in)
@@ -166,6 +176,14 @@ icon: spark
 2. Press **Open** on any check that is not up.
 3. Open [Settings · Faults](/settings?tab=faults) for the errors behind it. Read
    [Work through the faults](#settings-faults-work).
+
+## Watch AI Spend {#qs-ai-spend role="Administrators" icon=wallet screen=ai_control/spend}
+
+![AI Control, Spend](shot:qs-ai-spend)
+
+1. Open [AI Control · Spend](/ai-control?tab=spend).
+2. **All AI** shows this month's spend against its cap; each provider shows its own.
+3. Top up a provider before it reaches **At Cap**. Read [Spend](#ai-control-spend).
 
 ## Plan Your Day {#qs-plan-day role="Everyone" icon=check screen=workspace/today}
 
@@ -545,4 +563,20 @@ do:
 crop: modal
 marks:
   1: button "Close Review" | Close it
+```
+
+```shot qs-praxis
+open: /praxis-ai?tab=ask
+as: staff
+do:
+  - wait: text "Try Asking"
+marks:
+  1: label "Ask a Question" | Type your question
+```
+
+```shot qs-ai-spend
+open: /ai-control?tab=spend
+as: admin
+marks:
+  1: text "All AI" | All AI against its cap
 ```

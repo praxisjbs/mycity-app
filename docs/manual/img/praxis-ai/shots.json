@@ -1,0 +1,33 @@
+{
+  "praxis-answer": {
+    "spec": "48722632bdd2501c",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "praxis-ask": {
+    "spec": "4553c6da32c98f17",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "praxis-history": {
+    "spec": "c317c8411ef47b5c",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "praxis-panel": {
+    "spec": "b33982f99312b2b9",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "phone"
+    ]
+  }
+}

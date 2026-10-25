@@ -22,6 +22,14 @@
       "desktop"
     ]
   },
+  "qs-ai-spend": {
+    "spec": "ea7ddac863630f45",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "qs-announcement": {
     "spec": "db708f827aaf9de8",
     "source": "da280e1c4c1f6901",
@@ -115,6 +123,14 @@
   "qs-policy": {
     "spec": "76af8b46d1d2858d",
     "source": "535f39ef3d8f4df9",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-praxis": {
+    "spec": "d6b1d3146dae6a6f",
+    "source": "e3b0c44298fc1c14",
     "devices": [
       "desktop",
       "phone"

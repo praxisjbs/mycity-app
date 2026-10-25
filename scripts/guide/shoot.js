@@ -220,6 +220,13 @@ async function clipOf(page, crop) {
 
 async function doStep(page, step) {
   if (step.action === "press") return page.keyboard.press(step.key);
+  // The lock screen, told as another tab tells it (app/src/auth/AuthProvider.tsx, its session channel).
+  if (step.action === "lock")
+    return page.evaluate((reason) => {
+      const c = new window.BroadcastChannel("mycity-session");
+      c.postMessage({ t: "locked", reason });
+      c.close();
+    }, step.reason);
   const l = await find(page, step.target);
   if (step.action === "click") return l.click();
   if (step.action === "fill") return l.fill(step.value);
@@ -328,6 +335,11 @@ async function main(argv) {
             await take(s.page, shot, device, file, { guest: s.guest, origin });
             taken.set(`${shot.chapter}/${shot.id}`, shot);
             console.log(`  ${shot.chapter}/${shot.id}.${device}.png`);
+            // A locked session takes no more pictures: the next one starts signed in afresh.
+            if (shot.spec.do.some((st) => st.action === "lock")) {
+              await s.ctx.close();
+              s = await session(browser, origin, account, device);
+            }
           } catch (err) {
             failed.push(`${shot.chapter}/${shot.id} (${device}): ${String(err.message).split("\n")[0]}`);
             // A failed picture can leave the page anywhere: the next one starts from a fresh session.
