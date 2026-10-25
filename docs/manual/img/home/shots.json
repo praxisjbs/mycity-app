@@ -1,9 +1,10 @@
 {
   "home-alert-rules": {
-    "spec": "bf9878ea225fbe84",
+    "spec": "bea38cb368928a92",
     "source": "6d62b037ddf8abb4",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "home-alert-sheet": {
@@ -31,10 +32,11 @@
     ]
   },
   "home-choose-cards": {
-    "spec": "210d01eae97b5eb6",
+    "spec": "1810060ccf930ccd",
     "source": "6d62b037ddf8abb4",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "home-new-report": {

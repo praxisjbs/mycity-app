@@ -32,10 +32,11 @@
     ]
   },
   "performance-key-result": {
-    "spec": "c2d4a21cc0deee0c",
+    "spec": "4d87e2dc587f605e",
     "source": "9e1c460117e75c46",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "performance-kpis": {
@@ -55,17 +56,19 @@
     ]
   },
   "performance-plan-approval": {
-    "spec": "48b82c757eeef3c4",
+    "spec": "03fabd542f9502f4",
     "source": "9e1c460117e75c46",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "performance-review": {
-    "spec": "730bb30185ca7cd2",
+    "spec": "5023510dede24242",
     "source": "9e1c460117e75c46",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "performance-reviews": {
@@ -77,10 +80,11 @@
     ]
   },
   "performance-scorecard": {
-    "spec": "5d2bc4316c7f61e8",
+    "spec": "a0a411f85987c4e4",
     "source": "9e1c460117e75c46",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "performance-scorecards": {

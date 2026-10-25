@@ -39,7 +39,9 @@ Letters, signatures and the hub's own mail use them at once.
 
 ### Add a public holiday {#settings-organisation-holiday needs="settings create"}
 
-1. Under **Public Holidays**, press **New Holiday** at the top of the page.
+1. Under **Public Holidays**, press **New Holiday** at the top of the page. On a phone, press
+   **Quick Actions**, then **New Holiday**.
+   ![New Holiday](shot:settings-holiday)
 2. Choose the **Date** and type the **Name**, such as `Independence Day`.
 3. Press **Add Holiday**.
 4. A holiday the government has not declared yet shows as **Expected**. When it is declared, open
@@ -175,7 +177,7 @@ Everyone gets their access from their roles.
 
 ### Create a role {#settings-roles-create needs="settings create"}
 
-1. Press **New Role**.
+1. Press **New Role**. On a phone, press **Quick Actions**, then **New Role**.
 2. Type the **Role Name**. To start from an existing role, pick it in **Start From**. Press
    **Next**.
 3. For each module, set the level and the records, and tick **Approve** or **Export** if needed.
@@ -325,11 +327,13 @@ Who did what, when, to which record. Nobody can change it.
 
 ![Settings, Audit Log](shot:settings-audit-log)
 
-1. Search by person or what was done, or choose a **Module** and **Dates**.
+1. Search by person or what was done, or choose a **Module** and **Dates**. On a phone, press
+   **Filter** for them.
 2. Press an entry to see every field it changed, before and after. A value your role does not see
    reads **Restricted**.
 3. **Open Record** opens the record it is about.
-4. {needs="settings export"} **Export** saves the filtered entries as a spreadsheet.
+4. {needs="settings export"} On a computer, **Export** saves the filtered entries as a
+   spreadsheet.
 
 ## Imports {#settings-imports screen=settings/imports icon=sheet}
 
@@ -371,17 +375,28 @@ its error file.
 ```shot settings-organisation
 open: /settings?tab=organisation
 as: operations
-device: desktop
 marks:
   1: button "Edit Profile" | The company's details
-  2: button "New Holiday" | Add a public holiday
-  3: button "Edit Week" | The working week
+```
+
+```shot settings-holiday
+open: /settings?tab=organisation
+as: operations
+do:
+  - desktop click: button "New Holiday"
+  - phone click: button "Quick Actions"
+  - phone click: button "New Holiday"
+  - wait: button "Add Holiday"
+crop: modal
+marks:
+  1: label "Date" | The day
+  2: label "Name" | What it is called
+  3: button "Add Holiday" | Add it
 ```
 
 ```shot settings-status
 open: /settings?tab=status
 as: admin
-device: desktop
 marks:
   1: button "Download Brief" | One file about everything
 ```
@@ -389,7 +404,6 @@ marks:
 ```shot settings-performance
 open: /settings?tab=performance
 as: admin
-device: desktop
 marks:
   1: button "Edit Targets" | The targets
 ```
@@ -397,7 +411,6 @@ marks:
 ```shot settings-faults
 open: /settings?tab=faults
 as: admin
-device: desktop
 marks:
   1: searchbox | Find a fault
 ```
@@ -413,7 +426,8 @@ marks:
 ```shot settings-roles
 open: /settings?tab=roles-and-permissions
 as: admin
-device: desktop
+do:
+  - phone click: button "Quick Actions"
 marks:
   1: button "New Role" | Create a role
 ```
@@ -421,7 +435,6 @@ marks:
 ```shot settings-approvals
 open: /settings?tab=approvals
 as: admin
-device: desktop
 marks:
   1: searchbox | Find a flow
 ```
@@ -429,7 +442,6 @@ marks:
 ```shot settings-notifications
 open: /settings?tab=notifications
 as: admin
-device: desktop
 marks:
   1: button "Edit Reminders" | The reminders
 ```
@@ -437,7 +449,6 @@ marks:
 ```shot settings-appearance
 open: /settings?tab=appearance
 as: admin
-device: desktop
 marks:
   1: button "Save Palette" | Save the dark theme
 ```
@@ -445,7 +456,6 @@ marks:
 ```shot settings-numbering
 open: /settings?tab=documents-and-numbering
 as: admin
-device: desktop
 marks:
   1: searchbox | Find a document
 ```
@@ -453,7 +463,6 @@ marks:
 ```shot settings-integrations
 open: /settings?tab=integrations
 as: admin
-device: desktop
 marks:
   1: text "System Sender" | The hub's mail server
 ```
@@ -461,7 +470,6 @@ marks:
 ```shot settings-security
 open: /settings?tab=security
 as: admin
-device: desktop
 marks:
   1: button "Save Rules" | Save the sign-in rules
 ```
@@ -469,9 +477,8 @@ marks:
 ```shot settings-audit-log
 open: /settings?tab=audit-log
 as: admin
-device: desktop
 marks:
-  1: button "Export" | Save the entries
+  1: row 1 | Press for what changed
 ```
 
 ```shot settings-imports

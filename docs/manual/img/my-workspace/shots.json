@@ -16,10 +16,11 @@
     ]
   },
   "workspace-new-event": {
-    "spec": "2939fda3bddb2342",
+    "spec": "cc3f8a2278affbeb",
     "source": "21139d113d7b8794",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "workspace-new-task": {
@@ -47,10 +48,11 @@
     ]
   },
   "workspace-send-commitments": {
-    "spec": "f068d72d33e00cc1",
+    "spec": "1b7e4f434a5d64b7",
     "source": "21139d113d7b8794",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "workspace-support-needed": {

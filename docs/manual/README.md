@@ -22,7 +22,9 @@ waiting for their milestone). An empty file is a stub a later milestone fills.
 
 A milestone's chapters are written once that milestone is delivered and approved, in its own pull
 request (JBS Praxis, 25/10/2026): PR 1 the foundation, M0 and Settings; PR 2 Milestone 1; PR 3
-Milestone 2; then one per milestone. Each chapter is its own file with its own pictures folder, so
+Milestone 2; then one per milestone. A screen brought forward and built early (Settings, Praxis AI,
+AI Control) gets its chapter as soon as it is live, without naming its milestone in `milestones`,
+which would ask for that milestone's screens not built yet. Each chapter is its own file with its own pictures folder, so
 two pull requests never edit the same file.
 
 ## A chapter
@@ -100,7 +102,7 @@ under it). Its spec is a fenced `shot <id>` block anywhere in the same file:
 | `open` | The screen's address, `/people?tab=employees` |
 | `as` | The demo account: `operations` (People), `ceo`, `manager`, `staff`, `admin` |
 | `device` | `both` (the default), `desktop` or `phone` |
-| `do` | Steps before the picture: `click: button "Add Employee"`, `fill: label "First Name" = Ada`, `press: Escape`, `wait: text "Saved"`, `scroll: heading "Bank"` |
+| `do` | Steps before the picture: `click: button "Add Employee"`, `fill: label "First Name" = Ada`, `press: Escape`, `wait: text "Saved"`, `scroll: heading "Bank"`, `lock: idle` (the lock screen, as Session Locked; `time` is Session Ended, `ended` Signed Out). A step starting `phone ` or `desktop ` runs on that device only: `phone click: button "More Actions"` |
 | `marks` | Numbered marks drawn on the picture: `1: button "Add Employee" \| Add a person`. The legend under the picture lists them |
 | `crop` | `page` (the default), `modal` (only the open dialog or sheet), `viewport`, or a CSS selector |
 | `sources` | More files the picture depends on, beside the screen's feature folder |

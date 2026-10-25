@@ -6,11 +6,28 @@
       "desktop"
     ]
   },
-  "start-notifications": {
-    "spec": "87dcfefdfacd1514",
+  "start-display": {
+    "spec": "7cf2f13894e86ffb",
     "source": "6d62b037ddf8abb4",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-lock": {
+    "spec": "d7b4756feb3ea399",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "start-notifications": {
+    "spec": "db12270dc85487fd",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   },
   "start-phone": {
@@ -21,10 +38,11 @@
     ]
   },
   "start-search": {
-    "spec": "aca2beefb18f1945",
+    "spec": "f1f41035cceab305",
     "source": "6d62b037ddf8abb4",
     "devices": [
-      "desktop"
+      "desktop",
+      "phone"
     ]
   },
   "start-sign-in": {
