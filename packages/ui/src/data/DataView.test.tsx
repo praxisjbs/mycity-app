@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { setViewport } from "../testing/viewport";
 import { DataView, type DataViewColumn, type DataViewList } from "./DataView";
+import { HelpTerm } from "../help/HelpTerm";
 import { installOverlayTestEnv } from "../overlay/test-env";
 import { ApiError } from "./createApi";
 
@@ -79,6 +80,19 @@ describe("DataView on desktop", () => {
     expect(screen.getByRole("columnheader", { name: /Name/ })).toHaveAttribute("aria-sort", "descending");
     await userEvent.click(screen.getByRole("button", { name: /Name/ }));
     expect(setSort).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("a header holding a help term keeps it, and sorts from the glyph beside it", async () => {
+    desktop();
+    const setSort = vi.fn();
+    const columns: DataViewColumn<Row>[] = [
+      { key: "display_name", label: <HelpTerm help="The name they go by">Name</HelpTerm>, sortLabel: "Name", sortable: true, render: (r) => r.display_name },
+      { key: "department", label: "Department", render: (r) => r.department },
+    ];
+    const { container } = view({ list: list({ setSort }), columns });
+    await userEvent.click(screen.getByRole("button", { name: "Sort by Name" }));
+    await vi.waitFor(() => expect(setSort).toHaveBeenLastCalledWith("display_name"));
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it("a column that is not sortable has no header button and no aria-sort", () => {

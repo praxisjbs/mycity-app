@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ApiError } from "@/api/client";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import type { ManagerRef } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
@@ -46,8 +47,9 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
       onSaved();
       close();
       toast(`${e.display_name} reassigned`);
-    } catch {
-      toast(save.error?.message ?? "Not changed");
+    } catch (err) {
+      // The refusal itself (REPORTS_TO_SELF, REPORTING_LOOP, an inactive manager): read from the error, not stale state.
+      toast.error(err instanceof ApiError ? err.message : "Not changed. Try again.");
     }
   };
 
@@ -65,7 +67,7 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
       </Field>
       {kind === "person" ? (
         <Field label="Line Manager">
-          <EmployeePicker value={manager} onChange={setManager} placeholder="Manager's name" />
+          <EmployeePicker value={manager} onChange={setManager} filters={{ status: "active" }} placeholder="Manager's name" />
         </Field>
       ) : (
         <Field label="Open Role">
@@ -78,7 +80,7 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
         </Field>
       )}
       <Field label="Dotted Line" optional>
-        <EmployeePicker value={dotted} onChange={setDotted} placeholder="Second manager" />
+        <EmployeePicker value={dotted} onChange={setDotted} filters={{ status: "active" }} placeholder="Second manager" />
       </Field>
       <Field label="Reason" optional>
         <TextField value={reason} onChange={setReason} placeholder="New structure" />

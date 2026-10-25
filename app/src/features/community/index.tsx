@@ -138,7 +138,8 @@ function Channels() {
       <ThreadHead onBack={() => setOpen(false)} backLabel="Back to channels">
         {mobile && <IconButton icon="menu" label="Switch channel" onClick={() => setDrawer(true)} />}
         <span className="min-w-0 flex-1">
-          <b className="flex items-center gap-1.5 truncate text-base font-strong"># {current.name}{!current.can_post && <Pill>Read Only</Pill>}</b>
+          {/* The channel's name heads its posts (each an h3). */}
+          <h2 className="flex items-center gap-1.5 truncate text-base font-strong"># {current.name}{!current.can_post && <Pill>Read Only</Pill>}</h2>
           <span className="block truncate text-2xs text-subtle-foreground">
             {current.members} {current.members === 1 ? "member" : "members"}
             {!mobile && current.description && <> · {current.description}</>}

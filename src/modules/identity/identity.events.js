@@ -37,6 +37,14 @@ const EVENTS = defineEvents("settings", {
     summary: "A login was reactivated",
     security: true,
   },
+  "app_user.left": {
+    summary: "A login was closed: its employee was archived",
+    security: true,
+  },
+  "app_user.email_changed": {
+    summary: "A login moved to another email address",
+    security: true,
+  },
 });
 
 defineVariables("email", "password-reset", c.identity.PasswordResetEmailVars);
@@ -110,6 +118,25 @@ defineNotification(EVENTS.AUTH_SESSION_ENDED, {
 // The service is required lazily: it requires this file for EVENTS.
 outbox.register(EVENTS.AUTH_LINK_REQUESTED, "identity.send_link", (event) =>
   require("./identity.service").sendCredentialLink(event),
+);
+
+/*
+ * No login without an employee who works here (docs/guides/identity.md §6.1): archiving a
+ * record closes its login, ends its sessions and spends its open links. Signing in already
+ * refuses it before this runs (identity.repo.js EFFECTIVE_STATUS).
+ */
+outbox.register("employee.archived", "identity.close_login", (event) =>
+  require("./identity.service").closeLoginOf(event),
+);
+
+/* Both addresses hear of a move made with Use Work Email. */
+outbox.register(EVENTS.APP_USER_EMAIL_CHANGED, "identity.tell_email_changed", (event) =>
+  require("./identity.service").tellEmailChanged(event),
+);
+
+/* A login nobody has used yet follows its employee's corrected work email (JBS Praxis, 25/10/2026). */
+outbox.register("employee.updated", "identity.follow_work_email", (event) =>
+  require("./identity.service").followWorkEmail(event),
 );
 
 module.exports = { EVENTS };

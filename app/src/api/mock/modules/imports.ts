@@ -17,12 +17,12 @@ const IMPORTERS = [
     permission: "people.create",
     match_keys: ["staff_number", "work_email"],
     fields: [
-      { key: "staff_number", label: "Staff ID", type: "text", required: false, aliases: ["staff no", "employee id"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "00017", hint: null },
-      { key: "first_name", label: "First Name", type: "text", required: true, aliases: [], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: null, hint: null },
-      { key: "last_name", label: "Last Name", type: "text", required: true, aliases: [], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: null, hint: null },
-      { key: "work_email", label: "Work Email", type: "email", required: false, aliases: [], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: null, hint: null },
-      { key: "department", label: "Department", type: "reference", required: false, aliases: [], options: [], ref: "department", pass: 1, create_missing: true, masked: false, example: null, hint: null },
-      { key: "line_manager", label: "Line Manager", type: "reference", required: false, aliases: [], options: [], ref: "employee", pass: 2, create_missing: false, masked: false, example: null, hint: null },
+      { key: "staff_number", label: "Staff Number", type: "text", required: false, aliases: ["staff id", "staff no", "employee id", "employee number"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "00019", hint: "Left empty, the system issues the next one" },
+      { key: "full_name", label: "Name", type: "text", required: true, aliases: ["full name", "staff name"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "Tobiloba Iyanuoluwa Dada", hint: "VACANT marks a post nobody holds yet" },
+      { key: "job_title", label: "Designation", type: "text", required: true, aliases: ["job title", "role", "position", "title"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "Content & Listing Associate", hint: null },
+      { key: "department", label: "Department", type: "reference", required: true, aliases: ["team", "unit"], options: [], ref: "department", pass: 1, create_missing: true, masked: false, example: "Backend Operations", hint: null },
+      { key: "work_email", label: "Work Email", type: "email", required: false, aliases: ["email"], options: [], ref: null, pass: 1, create_missing: false, masked: false, example: "name@mycityapp.io", hint: null },
+      { key: "line_manager", label: "Line Manager", type: "reference", required: false, aliases: ["manager", "reports to"], options: [], ref: "employee", pass: 2, create_missing: false, masked: false, example: "Bode Oluwasanmi", hint: "A name, a post, or a post with a dotted line beside it" },
     ],
   },
 ];
@@ -76,20 +76,35 @@ route("GET /api/v1/imports/:id/rows", (req) =>
       {
         import_row_id: sid(`row:${req.params.id}:4`),
         row_number: 4,
-        raw: { "First Name": "", "Last Name": "Ade" },
+        raw: { Name: "", Designation: "Trading Officer" },
         values: null,
         status: "error",
-        problems: [{ field: "first_name", message: "first_name: is required" }],
+        problems: [{ field: "full_name", message: "Name is required" }],
         action: null,
         target_id: null,
         diff: null,
+      },
+      {
+        import_row_id: sid(`row:${req.params.id}:6`),
+        row_number: 6,
+        raw: { Name: "Kemi Alabi", Designation: "Settlement Lead" },
+        values: { full_name: "Kemi Alabi", job_title: "Settlement Lead" },
+        status: "ok",
+        problems: [],
+        action: "update",
+        target_id: sid("emp:kemi"),
+        diff: { job_title: ["Trading Officer", "Settlement Lead"] },
       },
     ],
     req,
     {
       filters: {
-        /* "problem" is the preview's list, as on the API: errors, duplicates and warnings. */
-        status: (r, v) => r.status === v || (v === "problem" && ["error", "duplicate", "warning"].includes(r.status)),
+        /* "problem" is the preview's list, as on the API: errors, duplicates and warnings;
+           "change" is every row that changes a record already there. */
+        status: (r, v) =>
+          r.status === v ||
+          (v === "problem" && ["error", "duplicate", "warning"].includes(r.status)) ||
+          (v === "change" && r.action === "update" && r.status !== "error"),
       },
     },
   ),

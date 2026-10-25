@@ -276,7 +276,7 @@ describe("my workspace", () => {
     named(form, "Plan the Ops offsite");
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await within(form).findByText("Pick people");
-    const people = within(form).getByRole("listbox", { name: "Search people" });
+    const people = within(form).getByRole("listbox", { name: "People" });
     fireEvent.click(await within(people).findByRole("option", { name: /Damilola Eke/ }, { timeout: 5000 }));
     fireEvent.click(within(people).getByRole("option", { name: /Musa Olawale/ }));
     await waitFor(async () => expect(await optionLabels(lead())).toEqual(["You", "Damilola Eke", "Musa Olawale"]));
@@ -295,7 +295,7 @@ describe("my workspace", () => {
     await board("ngozi@mycityapp.io");
     const form = await newTask();
     fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
-    const people = within(form).getByRole("listbox", { name: "Search people" });
+    const people = within(form).getByRole("listbox", { name: "People" });
     fireEvent.click(await within(people).findByRole("option", { name: /Bashir Lawal/ }, { timeout: 5000 }));
     fireEvent.click(within(people).getByRole("option", { name: /Tobi Ojo/ }));
     await waitFor(async () => expect(await optionLabels(within(form).getByRole("combobox", { name: /Lead/ }))).toEqual(["You", "Tobi Ojo"]));
@@ -307,13 +307,13 @@ describe("my workspace", () => {
     fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
     fireEvent.click(within(form).getByRole("radio", { name: "Department" }));
     expect(within(form).queryByText("Lead")).toBeNull();
-    const departments = await within(form).findByRole("listbox", { name: "Search departments" });
+    const departments = await within(form).findByRole("listbox", { name: "Department" });
     fireEvent.click(await within(departments).findByRole("option", { name: /Operations & People/ }, { timeout: 5000 }));
     await within(form).findByText("Lead");
     named(form, "Count the Yaba stock");
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await within(form).findByText("Pick a lead");
-    const leads = within(form).getAllByRole("listbox", { name: "Search people" }).at(-1)!;
+    const leads = within(form).getAllByRole("listbox", { name: /Lead/ }).at(-1)!;
     fireEvent.click(await within(leads).findByRole("option", { name: /Musa Olawale/ }, { timeout: 5000 }));
     fireEvent.click(within(form).getByRole("button", { name: "Create Task" }));
     await closed("New Task");

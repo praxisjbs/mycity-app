@@ -21,6 +21,21 @@ const ROLE: Record<string, { code: string; name: string }> = {
   Staff: { code: "employee", name: "Staff" },
 };
 
+/**
+ * What a role hides (shared/rbac/field-mask.js, seed 0449): everyone outside Implementation,
+ * Operations & People and Management has salary, bank, personal and statutory fields masked.
+ */
+const HIDDEN = [
+  "salary", "base_salary", "basic_salary", "gross_pay", "net_pay", "monthly_gross", "annual_gross", "gross_monthly", "net_monthly",
+  "total_allowances", "total_deductions", "salary_grade_amount", "pay_amount",
+  "bank_name", "bank_code", "account_number", "bank_account_number", "account_name", "bvn",
+  "date_of_birth", "home_address", "home_latitude", "home_longitude", "residential_address", "personal_email", "personal_phone",
+  "marital_status", "state_of_origin", "lga_of_origin", "nin", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship",
+  "next_of_kin_address", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
+  "tax_id", "tin", "pension_pin", "pension_administrator", "nhf_number", "nsitf_number",
+].sort();
+const SEES_ALL = ["implementation", "operations_people", "management"];
+
 /** The /me answer for a demonstration account; Home's mock reads it to decide which cards each may see. */
 export function me(key: string): Me {
   const p = byKey(key)!;
@@ -42,6 +57,7 @@ export function me(key: string): Me {
     home_view: SIGN_INS[key]?.view ?? "staff",
     manages_people: teamOf(key).length > 0,
     appearance: appearanceApplied(),
+    hidden_fields: isCeo || SEES_ALL.includes(role.code) ? [] : HIDDEN,
   };
 }
 

@@ -35,6 +35,7 @@
  * (FIELD_KEYS); nothing is masked until an administrator says so.
  */
 const grantsCache = require("./grants-cache");
+const { AppError } = require("../errors");
 
 /** field_visibility.field_key → label, and the response property names it governs. */
 const FIELDS = Object.freeze({
@@ -170,6 +171,31 @@ async function maskForUser(client, user, data) {
   return maskData(data, keys);
 }
 
+/**
+ * Refuse a write to a field the caller may not see (JBS Praxis, 25/10/2026): a role that hides
+ * a salary, a bank account or personal details may not set them, or overwrite them blind on a
+ * correction. The form leaves those fields out (Me.hidden_fields); this is the check behind it.
+ * A person's own record and the CEO are never refused, as they are never masked. A key left out
+ * (undefined) is not a write; a value or a null (clearing it) is.
+ * @param {{query: Function}} client
+ * @param {{user_id: string, is_ceo?: boolean}} user  req.user
+ * @param {object} body  the validated body
+ * @param {{own?: boolean}} [opts]
+ */
+async function assertWritable(client, user, body, { own = false } = {}) {
+  if (own) return;
+  const props = maskedPropsFor(await maskedKeysFor(client, user));
+  const fields = {};
+  for (const [k, v] of Object.entries(body || {})) if (props.has(k) && v !== undefined) fields[k] = ["Not yours to set"];
+  if (Object.keys(fields).length)
+    throw new AppError("FIELD_RESTRICTED", "Your role cannot set these details.", 403, fields);
+}
+
+/** The property names a caller's role hides, for /auth/me (Me.hidden_fields), A to Z. */
+async function hiddenFieldsFor(client, user) {
+  return [...maskedPropsFor(await maskedKeysFor(client, user))].sort();
+}
+
 /** May the caller see this field key? For hiding a column on an export. */
 async function canSee(client, user, fieldKey) {
   return !(await maskedKeysFor(client, user)).includes(fieldKey);
@@ -184,5 +210,7 @@ module.exports = {
   maskData,
   maskedKeysFor,
   maskForUser,
+  assertWritable,
+  hiddenFieldsFor,
   canSee,
 };

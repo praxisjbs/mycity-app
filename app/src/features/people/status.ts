@@ -27,11 +27,12 @@ export function loginStatus(state: LoginState): Status {
   if (state === "active") return { tone: "ok", text: "Active" };
   if (state === "invited") return { tone: "info", text: "Invited" };
   if (state === "suspended") return { tone: "err", text: "Suspended" };
+  if (state === "left") return { tone: "neutral", text: "Left" };
   return { tone: "neutral", text: "No Login" };
 }
 
 /** The one help term on the register (tier 2): what Invited means. */
-export const INVITED_HELP = "Invited means the person has a login and has not signed in yet. Send Invite emails them a link to choose their own password.";
+export const INVITED_HELP = "Invited means the person has a login but has not chosen a password yet. Send Invite on their record emails them a link to choose one.";
 
 /** Who may see a masked field, for the Restricted help term on a record. */
 export const RESTRICTED_HELP =

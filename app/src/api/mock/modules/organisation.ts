@@ -9,6 +9,9 @@ import { decideLocationRequest, locationRequestInstance, locationRequestsWaiting
 import { decidePlan, decideTargetChange, performanceInstance, performanceWaitingOn } from "./performance";
 import { decideReview, reviewsWaitingOn } from "./reviews";
 import { decideCommitment } from "./workspace";
+import { assignSite, siteOf, WORKSITES } from "./worksites";
+import { loginOfEmployee } from "./settings";
+import organisation from "@mycity/contract/schemas/organisation.js";
 
 /**
  * The organisation module on the mock, in the contract's own shapes
@@ -25,10 +28,11 @@ const statusOf = (p: MockPerson): EmployeeRow["status"] => (p.status === "suspen
 const probationDue = (p: MockPerson) => (p.status === "probation" ? isoDaysAhead(18) : null);
 const confirmedOn = (p: MockPerson) => (p.status === "probation" ? null : p.start_date);
 
-/** Who has a login on the mock: the four who sign in, and two invited but never signed in. */
-const INVITED = ["damilola", "tolu"];
-const loginOf = (p: MockPerson): EmployeeRow["login"] =>
-  SIGN_INS[p.user_key] ? "active" : INVITED.includes(p.user_key) ? "invited" : p.status === "suspended" ? "suspended" : "none";
+/** Who has a login on the mock: Settings · Users' own list (settings.ts), so both screens agree. */
+const loginOf = (p: MockPerson): EmployeeRow["login"] => {
+  if (ARCHIVED.has(p.employee_id) && loginOfEmployee(p.employee_id)) return "left";
+  return loginOfEmployee(p.employee_id)?.state ?? "none";
+};
 
 const DEPTS = DEPARTMENTS.map((name, i) => ({
   department_id: sid(`dept:${name}`),
@@ -151,9 +155,24 @@ route("GET /api/v1/employees/summary", (req) => {
 });
 
 /** The 360, masked exactly as the API masks it: restricted fields are null for a viewer without the grant. */
+/**
+ * What Add Employee and Edit set that the roster's people do not carry (middle name, gender,
+ * contract and probation dates, next of kin, the account), kept per person on this laptop. A
+ * null clears it, as the API's correction does.
+ */
+const EXTRA = new Map<string, Partial<Employee360>>();
+
 function record(p: MockPerson, viewer: string): Employee360 {
   const canSee = full(viewer) || viewer === p.user_key;
   const [first, ...rest] = p.display_name.split(" ");
+  const extra = EXTRA.get(p.employee_id) ?? {};
+  const restricted = new Set(["date_of_birth", "home_address", "personal_email", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "bank_name", "account_number", "gross_monthly"]);
+  const own = Object.fromEntries(Object.entries(extra).filter(([k]) => canSee || !restricted.has(k)));
+  return { ...base(p, viewer, canSee, first, rest), worksite_id: siteOf(p.user_key)?.worksite_id ?? null, ...own };
+}
+
+function base(p: MockPerson, viewer: string, canSee: boolean, first: string, rest: string[]): Employee360 {
+  void viewer;
   return {
     employee_id: p.employee_id,
     staff_number: p.staff_number,
@@ -183,10 +202,10 @@ function record(p: MockPerson, viewer: string): Employee360 {
     dotted_manager: dottedRef(p),
     direct_reports: reportsOf(p.user_key).length,
     login: {
-      user_id: loginOf(p) === "none" ? null : sid(`user:${p.user_key}`),
-      email: loginOf(p) === "none" ? null : p.work_email,
+      user_id: loginOfEmployee(p.employee_id)?.user_id ?? null,
+      email: loginOfEmployee(p.employee_id)?.email ?? null,
       state: loginOf(p),
-      roles: SIGN_INS[p.user_key] ? [{ code: SIGN_INS[p.user_key].view === "ceo" ? "management" : "operations_people", name: SIGN_INS[p.user_key].role }] : loginOf(p) === "none" ? [] : [{ code: "employee", name: "Staff" }],
+      roles: loginOfEmployee(p.employee_id)?.roles ?? [],
       last_sign_in_at: SIGN_INS[p.user_key] ? at(0, "08:40") : null,
     },
     date_of_birth: canSee ? p.date_of_birth : null,
@@ -226,67 +245,117 @@ route("GET /api/v1/employees/:id/history", (req) => {
   return paged(entries, req);
 });
 
-const NG_PHONE = /^(\+?234|0)\d{10}$/;
+/** The contract's refusal, as the API's error handler sends it: every issue on its field. */
+function refusal(issues: Array<{ path: PropertyKey[]; message: string }>) {
+  const f: Record<string, string[]> = {};
+  for (const i of issues) (f[String(i.path[0] ?? "body")] ??= []).push(i.message);
+  return invalid(f);
+}
+
+/** The fields a role that does not see everything may not set (shared/rbac/field-mask.js, seed 0449). */
+const RESTRICTED = ["gross_monthly", "bank_name", "account_number", "date_of_birth", "home_address", "personal_email", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship"];
+const notYours = (user: string, b: Record<string, unknown>, own = false) => {
+  if (own || full(user)) return null;
+  const keys = Object.keys(b).filter((k) => RESTRICTED.includes(k) && b[k] !== undefined);
+  return keys.length ? fail(403, "FIELD_RESTRICTED", "Your role cannot set these details.", Object.fromEntries(keys.map((k) => [k, ["Not yours to set"]]))) : null;
+};
+
+/** The references a record names exist and are in use (organisation.service.js assertReferences). */
+function references(b: { department_id?: string; line_manager_id?: string; worksite_id?: string | null }) {
+  if (b.department_id && !DEPTS.some((d) => d.department_id === b.department_id)) return invalid({ department_id: ["Not a department"] });
+  if (b.line_manager_id) {
+    const m = byId(b.line_manager_id);
+    if (!m || ARCHIVED.has(m.employee_id) || m.status === "suspended") return invalid({ line_manager_id: ["Not an employee"] });
+  }
+  if (b.worksite_id && !WORKSITES.some((w) => w.worksite_id === b.worksite_id && w.active)) return invalid({ worksite_id: ["Not a worksite"] });
+  return null;
+}
 
 route("POST /api/v1/employees", (req) => {
-  const b = req.body as Record<string, string>;
-  const f: Record<string, string[]> = {};
-  const need = ["first_name", "last_name", "work_email", "phone", "job_title", "start_date", "employment_type", "work_pattern", "department_id"];
-  for (const k of need) if (!b[k] || !String(b[k]).trim()) f[k] = ["Required"];
-  if (b.work_email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(b.work_email)) f.work_email = ["Check the spelling"];
-  if (b.work_email && PEOPLE.some((p) => p.work_email === b.work_email.toLowerCase())) f.work_email = ["Already in use"];
-  if (b.phone && !NG_PHONE.test(b.phone.replace(/[\s\-().]/g, ""))) f.phone = ["must be a Nigerian phone number"];
-  if (b.account_number && !/^\d{10}$/.test(b.account_number)) f.account_number = ["must be a 10-digit NUBAN"];
-  if (b.gross_monthly && !/^\d{1,16}\.\d{2}$/.test(b.gross_monthly)) f.gross_monthly = ["must be an amount like 1250000.00"];
-  if (Object.keys(f).length) return invalid(f);
+  const parsed = organisation.EmployeeAdd.safeParse(req.body);
+  if (!parsed.success) return refusal(parsed.error.issues);
+  const b = parsed.data;
+  const refused = notYours(req.user!, req.body as Record<string, unknown>) ?? references(b);
+  if (refused) return refused;
+  if (PEOPLE.some((p) => p.work_email === b.work_email))
+    return fail(409, "EMPLOYEE_EXISTS", "An employee already has this work email.", { work_email: ["Already in use"] });
   const key = b.work_email.split("@")[0];
   const dept = DEPTS.find((d) => d.department_id === b.department_id) ?? deptOf("Operations & People");
   const p: MockPerson = {
     employee_id: sid(`employee:${key}`),
     user_key: key,
-    staff_number: String(PEOPLE.length + 1).padStart(5, "0"),
+    staff_number: b.staff_number ?? String(PEOPLE.length + 1).padStart(5, "0"),
     first_name: b.first_name,
     last_name: b.last_name,
     display_name: `${b.first_name} ${b.last_name}`,
     job_title: b.job_title,
     department: dept.name,
     grade: "G1 · Associate",
-    manager: byId(b.line_manager_id)?.user_key ?? null,
-    work_email: b.work_email.toLowerCase(),
+    manager: b.line_manager_id ? (byId(b.line_manager_id)?.user_key ?? null) : null,
+    work_email: b.work_email,
     phone: b.phone,
     start_date: b.start_date,
-    date_of_birth: b.date_of_birth || "1998-01-01",
+    date_of_birth: b.date_of_birth ?? "1998-01-01",
     employment_type: b.employment_type as MockPerson["employment_type"],
     work_pattern: b.work_pattern as MockPerson["work_pattern"],
     status: b.confirmed_on ? "confirmed" : "probation",
-    worksite: "MTN Head Office, Ikoyi",
-    gross_monthly: b.gross_monthly || "0.00",
-    bank_name: b.bank_name || "",
-    account_last4: (b.account_number || "0000").slice(-4),
-    next_of_kin: b.next_of_kin_name || "",
+    worksite: WORKSITES.find((w) => w.worksite_id === b.worksite_id)?.name ?? "",
+    gross_monthly: b.gross_monthly ?? "0.00",
+    bank_name: b.bank_name ?? "",
+    account_last4: (b.account_number ?? "0000").slice(-4),
+    next_of_kin: b.next_of_kin_name ?? "",
   };
   PEOPLE.push(p);
+  assignSite(key, b.worksite_id ?? null);
+  EXTRA.set(p.employee_id, {
+    middle_name: b.middle_name ?? null,
+    gender: b.gender ?? null,
+    contract_ends_on: b.contract_ends_on ?? null,
+    confirmation_due_on: b.confirmation_due_on ?? null,
+    next_of_kin_phone: b.next_of_kin_phone ?? null,
+    next_of_kin_relationship: b.next_of_kin_relationship ?? null,
+    account_number: b.account_number ?? null,
+  });
   return created(record(p, req.user!));
 });
 
 route("PATCH /api/v1/employees/:id", (req) => {
   const p = mine(req);
   if (!p) return notFound();
-  const b = req.body as Record<string, string>;
-  if (!Object.keys(b).length) return invalid({ first_name: ["Change at least one field"] });
-  if (b.work_email && PEOPLE.some((x) => x !== p && x.work_email === b.work_email.toLowerCase())) return invalid({ work_email: ["Already in use"] });
-  if (b.first_name) p.first_name = b.first_name;
-  if (b.last_name) p.last_name = b.last_name;
-  if (b.first_name || b.last_name) p.display_name = `${p.first_name} ${p.last_name}`;
-  if (b.job_title) p.job_title = b.job_title;
-  if (b.work_email) p.work_email = b.work_email.toLowerCase();
-  if (b.phone) p.phone = b.phone;
-  if (b.work_pattern) p.work_pattern = b.work_pattern as MockPerson["work_pattern"];
-  if (b.employment_type) p.employment_type = b.employment_type as MockPerson["employment_type"];
-  if (b.department_id) p.department = (DEPTS.find((d) => d.department_id === b.department_id) ?? deptOf(p.department)).name;
-  if (b.gross_monthly) p.gross_monthly = b.gross_monthly;
-  if (b.bank_name) p.bank_name = b.bank_name;
-  if (b.confirmed_on) p.status = "confirmed";
+  const parsed = organisation.EmployeeUpdate.safeParse(req.body);
+  if (!parsed.success) return refusal(parsed.error.issues);
+  const b = parsed.data as Record<string, unknown> & Partial<Record<string, string | null>>;
+  const refused = notYours(req.user!, req.body as Record<string, unknown>, req.user === p.user_key) ?? references(b as never);
+  if (refused) return refused;
+  if (typeof b.work_email === "string" && PEOPLE.some((x) => x !== p && x.work_email === b.work_email))
+    return fail(409, "EMPLOYEE_EXISTS", "An employee already has this work email.", { work_email: ["Already in use"] });
+  // As the service: a move to On Site or Hybrid keeps a worksite; a correction elsewhere is never asked.
+  if ("work_pattern" in b || "worksite_id" in b) {
+    const pattern = (b.work_pattern as string | undefined) ?? p.work_pattern;
+    const site = "worksite_id" in b ? b.worksite_id : (siteOf(p.user_key)?.worksite_id ?? null);
+    if (organisation.ON_SITE_PATTERNS.includes(pattern) && !site)
+      return fail(422, "WORKSITE_REQUIRED", "Pick a worksite for someone who works On Site or Hybrid.", { worksite_id: ["Pick a worksite"] });
+  }
+  const str = (k: string) => (typeof b[k] === "string" ? (b[k] as string) : undefined);
+  if (str("first_name")) p.first_name = str("first_name")!;
+  if (str("last_name")) p.last_name = str("last_name")!;
+  if (str("first_name") || str("last_name")) p.display_name = `${p.first_name} ${p.last_name}`;
+  if (str("job_title")) p.job_title = str("job_title")!;
+  if (str("work_email")) p.work_email = str("work_email")!;
+  if (str("phone")) p.phone = str("phone")!;
+  if (str("start_date")) p.start_date = str("start_date")!;
+  if (str("work_pattern")) p.work_pattern = str("work_pattern") as MockPerson["work_pattern"];
+  if (str("employment_type")) p.employment_type = str("employment_type") as MockPerson["employment_type"];
+  if (str("department_id")) p.department = (DEPTS.find((d) => d.department_id === str("department_id")) ?? deptOf(p.department)).name;
+  if ("worksite_id" in b && b.worksite_id !== undefined) assignSite(p.user_key, (b.worksite_id as string | null) ?? null);
+  if (b.gross_monthly !== undefined) p.gross_monthly = (b.gross_monthly as string | null) ?? "0.00";
+  if (b.bank_name !== undefined) p.bank_name = (b.bank_name as string | null) ?? "";
+  if (str("date_of_birth")) p.date_of_birth = str("date_of_birth")!;
+  if (str("confirmed_on")) p.status = "confirmed";
+  const extra = { ...(EXTRA.get(p.employee_id) ?? {}) } as Record<string, unknown>;
+  for (const k of ["middle_name", "gender", "contract_ends_on", "confirmation_due_on", "next_of_kin_name", "next_of_kin_phone", "next_of_kin_relationship", "account_number", "personal_email"])
+    if (b[k] !== undefined) extra[k] = b[k];
+  EXTRA.set(p.employee_id, extra as Partial<Employee360>);
   return ok(record(p, req.user!));
 });
 

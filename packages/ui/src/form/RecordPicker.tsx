@@ -5,7 +5,7 @@
  * @use A field that points at another record: a worksite, a department, a partner, a vacancy, an expense category.
  * @avoid Fetching every record to fill a `<select>` (FRONTEND_GUIDE §4); a picker over a list short enough to be a SelectField; filtering the 25 rows on screen.
  * @phone The search box and the results are full width, each result a 44 px row; the picked chips wrap above it.
- * @a11y A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely.
+ * @a11y A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. Inside a Field, both are named by its label.
  * @status stable
  * @example <RecordPicker list={worksites} value={picked} onChange={setPicked} id={(w) => w.worksite_id} title={(w) => w.name} />
  */
@@ -14,6 +14,7 @@ import { cn } from "../lib/cn";
 import { formatCount } from "../lib/format";
 import { Icon } from "../icons/Icon";
 import type { DataViewList } from "../data/DataView";
+import { useFieldControl, useFieldLabelId } from "./Field";
 import { SearchInput } from "./SearchInput";
 
 export interface RecordPickerProps<R> {
@@ -43,6 +44,9 @@ export interface RecordPickerProps<R> {
 
 export function RecordPicker<R>({ list, value, onChange, id, title, sub, lead, multiple, placeholder = "Search", chip, className }: RecordPickerProps<R>) {
   const [open, setOpen] = useState(false);
+  // Inside a Field, its label names the box and the list, and its error is read with them.
+  const { id: fieldId, "aria-describedby": describedBy, "aria-invalid": invalid } = useFieldControl({});
+  const labelId = useFieldLabelId();
   const picked = (row: R) => value.some((v) => id(v) === id(row));
   const label = (row: R) => chip?.(row) ?? (typeof title(row) === "string" ? (title(row) as string) : id(row));
 
@@ -91,6 +95,7 @@ export function RecordPicker<R>({ list, value, onChange, id, title, sub, lead, m
             setOpen(true);
           }}
           placeholder={placeholder}
+          field={{ id: fieldId, labelId, "aria-describedby": describedBy, "aria-invalid": invalid }}
           className="mb-2"
         />
       )}
@@ -102,7 +107,7 @@ export function RecordPicker<R>({ list, value, onChange, id, title, sub, lead, m
            * listbox: a button inside a role="option" would be a control inside
            * a control, and the row would not be where the tap lands.
            */}
-          <div role="listbox" aria-label={placeholder} className="max-h-64 overflow-y-auto rounded-box border border-border">
+          <div role="listbox" aria-label={labelId ? undefined : placeholder} aria-labelledby={labelId} className="max-h-64 overflow-y-auto rounded-box border border-border">
             {list.rows.map((row) => {
               const on = picked(row);
               return (

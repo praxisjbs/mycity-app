@@ -454,6 +454,7 @@ As built: the roll-up lives in the worker rather than the error reporter, becaus
 
 ## 14 · Change log
 
+- 25/10/2026 · JP · Settings · Performance: the p95 column keeps its help term and sorts from the glyph beside it (`DataView` `sortLabel`), since a help term inside the sort button was a control inside a control (the accessibility gate's nested-interactive).
 - 24/10/2026 · GE · The fix and status briefs name the repository `praxisjbs/mycity-app`; it moved from `tomblakeasaah196/mycity-app` (`docs/runbooks/github-settings.md`). No behaviour changes.
 
 - 21/10/2026 · TB · A refused form is recorded under the rule that refused it (`LEAVE_IN_THE_PAST: starts_on`, not `VALIDATION_FAILED: starts_on`) and every fault the API records carries the route as declared (`POST /api/v1/ess/leave`, not `POST /leave`), §6. The three open `VALIDATION_FAILED` lines of the 21/10 brief stop counting; their causes are fixed in the date field, `schemas/leave.js` and `schemas/settings.js`.

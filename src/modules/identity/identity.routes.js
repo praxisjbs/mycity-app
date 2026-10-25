@@ -61,7 +61,7 @@ route(router, "post", "/forgot",
 
 route(router, "post", "/link",
   { body: c.identity.LinkCheckBody, response: c.identity.LinkCheck, anonymous: true, summary: "Check a reset or invitation link" },
-  limits.resetLimiter, controller.checkLink);
+  limits.linkCheckLimiter, controller.checkLink);
 
 route(router, "post", "/reset",
   { body: c.identity.ResetBody, response: c.identity.ResetDone, anonymous: true, summary: "Choose a password from a link" },

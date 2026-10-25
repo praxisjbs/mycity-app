@@ -65,37 +65,63 @@ async function linkSeat(client, seatId, managerId, { keep, actor }) {
 }
 
 /**
- * The sheet's values for a person already on the register, so the engine can diff them.
- * The reporting line is part of the snapshot: a sheet that names the manager somebody
+ * The sheet's values for a person already on the register, so the engine can diff them, and
+ * revert can put them back. Every column the importer writes is here, an empty one as null,
+ * so a cell the record lacks shows as a change once and a revert clears what the import
+ * filled. The reporting line is part of the snapshot: a sheet that names the manager somebody
  * already has is not a change, and the batch must not report one.
  */
-const valuesOf = (employee, row) => ({
+const valuesOf = (employee, extra) => ({
   staff_number: employee.staff_number,
-  full_name: row ? row.display_name : undefined,
+  full_name: [employee.first_name, extra.middle_name, employee.last_name].filter(Boolean).join(" "),
   job_title: employee.job_title,
   department: employee.department_id,
   work_email: employee.work_email,
-  phone: employee.phone,
+  phone: employee.phone ?? null,
   employment_type: employee.employment_type,
   work_pattern: employee.work_pattern,
-  start_date: employee.start_date,
-  line_manager: employee.line_manager_id || employee.line_manager_seat_id || undefined,
+  start_date: employee.start_date ?? null,
+  gender: extra.gender ?? null,
+  date_of_birth: extra.date_of_birth ?? null,
+  bank_name: extra.bank_name ?? null,
+  line_manager: employee.line_manager_id || employee.line_manager_seat_id || null,
+  dotted_manager: employee.dotted_manager_id || employee.dotted_manager_seat_id || null,
 });
 
 async function found(client, employee) {
   if (!employee) return null;
   const row = await repo.findEmployeeById(client, employee.employee_id);
-  return {
-    id: employee.employee_id,
-    values: valuesOf(row, { display_name: `${row.first_name} ${row.last_name}`.trim() }),
-  };
+  const extra = (await repo.importSnapshot(client, employee.employee_id)) || {};
+  return { id: employee.employee_id, values: valuesOf(row, extra) };
+}
+
+/** The fields a revert puts back as they were, an empty one cleared. */
+const RESTORED = {
+  job_title: "job_title",
+  department: "department_id",
+  work_email: "work_email",
+  phone: "phone",
+  employment_type: "employment_type",
+  work_pattern: "work_pattern",
+  start_date: "start_date",
+  gender: "gender",
+  date_of_birth: "date_of_birth",
+  bank_name: "bank_name",
+};
+
+/** A reporting line as setReportingLine takes it: to a person, to a seat, or to nobody. */
+async function lineTo(client, id, person, seat) {
+  if (!id) return { [person]: null, [seat]: null };
+  return (await repo.findSeatById(client, id)) ? { [seat]: id } : { [person]: id };
 }
 
 const FIELDS = [
   {
     key: "staff_number",
     label: "Staff Number",
-    aliases: ["staff id", "staff no", "employee id", "employee number", "id", "number"],
+    /* Not "id" or "number": a sheet's ID column is as often a NIN or a phone number. */
+    aliases: ["staff id", "staff no", "employee id", "employee number", "staff number"],
+    sequenceOf: "employee",
     example: "00019",
     hint: "Left empty, the system issues the next one",
   },
@@ -104,6 +130,8 @@ const FIELDS = [
     label: "Name",
     aliases: ["full name", "staff name", "employee name", "employee"],
     required: true,
+    /* A title before the name and a name in capitals are tidied before anything compares it. */
+    clean: (text) => (managerText.isVacantName(text) ? text : service.cleanName(text)),
     example: "Tobiloba Iyanuoluwa Dada",
     hint: "VACANT marks a post nobody holds yet",
   },
@@ -153,14 +181,13 @@ const FIELDS = [
     label: "Employment Type",
     aliases: ["emploment type", "engagement", "engagement type", "contract type"],
     type: "enum",
-    /* The last entry is the short form MyCity's own sheets use for full time. */
+    /* The aliases are the other ways sheets write each one (FTE is MyCity's own). */
     options: [
-      { value: "full_time", label: "Full Time" },
-      { value: "part_time", label: "Part Time" },
-      { value: "contractor", label: "Contractor" },
+      { value: "full_time", label: "Full Time", aliases: ["FTE", "FT", "Permanent", "Full"] },
+      { value: "part_time", label: "Part Time", aliases: ["PT", "Part"] },
+      { value: "contractor", label: "Contractor", aliases: ["Contract"] },
       { value: "consultant", label: "Consultant" },
-      { value: "intern", label: "Intern" },
-      { value: "full_time", label: "FTE" },
+      { value: "intern", label: "Intern", aliases: ["Internship", "Industrial Training", "SIWES"] },
     ],
     example: "Full Time",
   },
@@ -170,9 +197,9 @@ const FIELDS = [
     aliases: ["work pattern", "arrangement", "work mode", "location type"],
     type: "enum",
     options: [
-      { value: "on_site", label: "On Site" },
+      { value: "on_site", label: "On Site", aliases: ["Onsite", "Office", "In Office", "Physical"] },
       { value: "hybrid", label: "Hybrid" },
-      { value: "remote", label: "Remote" },
+      { value: "remote", label: "Remote", aliases: ["WFH", "Work From Home", "Home"] },
     ],
     example: "Remote",
   },
@@ -188,8 +215,8 @@ const FIELDS = [
     label: "Gender",
     type: "enum",
     options: [
-      { value: "female", label: "Female" },
-      { value: "male", label: "Male" },
+      { value: "female", label: "Female", aliases: ["F"] },
+      { value: "male", label: "Male", aliases: ["M"] },
     ],
     example: "Female",
   },
@@ -216,6 +243,8 @@ defineImporter({
   label: "Employees",
   permission: ["people", "create"],
   entity: "employee",
+  /* A VACANT row writes a seat: a seat changed since the import blocks its revert too. */
+  alsoEntities: ["org_seat"],
   schema: c.organisation.EmployeeImportRow,
   matchKeys: ["staff_number", "work_email"],
   fields: FIELDS,
@@ -301,6 +330,9 @@ defineImporter({
     return true;
   },
 
+  /** A person the import created who now has a login, a leave request or a clock-in is in use. */
+  isReferenced: async (client, id) => repo.employeeInUse(client, id),
+
   /** Revert a create: the person is archived, a seat is closed. Nothing is deleted. */
   archive: async (client, id, ctx) => {
     const employee = await repo.findEmployeeById(client, id);
@@ -312,20 +344,39 @@ defineImporter({
       await service.updateSeat(client, id, { status: "closed" }, ctx.actor);
   },
 
-  /** Revert an update: the record goes back to the snapshot taken before the import. */
+  /**
+   * Revert an update: the record goes back to the snapshot taken before the import. A field
+   * the snapshot holds as empty is cleared, so what the import filled in goes too; the
+   * reporting lines go back as they were, while their manager is still on the staff.
+   */
   restore: async (client, id, before, ctx) => {
     if (!before) return;
-    const patch = {
-      ...(before.full_name ? service.splitName(before.full_name) : {}),
-      ...(before.job_title ? { job_title: before.job_title } : {}),
-      ...(before.department ? { department_id: before.department } : {}),
-      ...(before.work_email ? { work_email: before.work_email } : {}),
-      ...(before.phone ? { phone: before.phone } : {}),
-      ...(before.employment_type ? { employment_type: before.employment_type } : {}),
-      ...(before.work_pattern ? { work_pattern: before.work_pattern } : {}),
-      ...(before.start_date ? { start_date: before.start_date } : {}),
-    };
+    const has = (k) => Object.prototype.hasOwnProperty.call(before, k);
+    const patch = {};
+    if (before.full_name) {
+      const name = service.splitName(before.full_name);
+      Object.assign(patch, { first_name: name.first_name, middle_name: name.middle_name ?? null, last_name: name.last_name });
+    }
+    for (const [key, column] of Object.entries(RESTORED))
+      if (has(key) && (before[key] !== null || !["job_title", "department", "work_email", "employment_type", "work_pattern"].includes(key)))
+        patch[column] = before[key];
     if (Object.keys(patch).length) await service.updateEmployee(client, id, patch, ctx.actor);
+
+    if (!has("line_manager") && !has("dotted_manager")) return;
+    const now = await repo.findEmployeeById(client, id);
+    const line = {};
+    if (has("line_manager") && (now.line_manager_id || now.line_manager_seat_id || null) !== before.line_manager)
+      Object.assign(line, await lineTo(client, before.line_manager, "line_manager_id", "line_manager_seat_id"));
+    if (has("dotted_manager") && (now.dotted_manager_id || now.dotted_manager_seat_id || null) !== before.dotted_manager)
+      Object.assign(line, await lineTo(client, before.dotted_manager, "dotted_manager_id", "dotted_manager_seat_id"));
+    if (!Object.keys(line).length) return;
+    try {
+      await service.setReportingLine(client, id, { ...line, reason: "The staff import was reverted" }, ctx.actor);
+    } catch (err) {
+      /* The old manager has left since: the line stays as the import set it. The checks
+         refuse before anything is written, so the revert's transaction is untouched. */
+      if (!(err && ["MANAGER_NOT_FOUND", "SEAT_NOT_FOUND", "REPORTING_LOOP"].includes(err.code))) throw err;
+    }
   },
 });
 

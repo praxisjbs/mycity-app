@@ -31,9 +31,10 @@ script refuses if it is not this `.env`'s `APP_ENV`.
 The whole employee record is in the script (`BUILD_ACCOUNT` in `scripts/db/create-admin.js`):
 JBS Praxis Implementation Team (known as JBS Praxis), Implementation Partner in the Implementation
 department, consultant, remote, on a contract from 09/10/2026 to 09/12/2026 at ₦1,850,000.00 a
-month, confirmed from the start (a consultant has no probation), with phone 0802 749 2738, home
-address, date of birth, next of kin and bank details. Every field is filled except the worksite
-and managers, which a remote first account has none of, and the leaving date. You type two
+month, confirmed from the start (a consultant has no probation), with phone 0802 749 2738, date of
+birth, next of kin and bank details. Every field is filled except the home address (an address is
+picked on screen, never typed into a script, F27), the worksite and managers, which a remote first
+account has none of, and the leaving date. You type two
 things: the email (kept as both work and personal email) and the password.
 
 ```sh

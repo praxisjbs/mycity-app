@@ -8,9 +8,11 @@
  *  - detectHeaderRow() looks at the first 20 rows and picks the one whose cells match
  *    the most field labels and aliases (at least two), so "MyCity Staff List, October"
  *    above the header is skipped.
- *  - autoMap() matches each header cell to a field by its normalised key, label or an
- *    alias. Each field is used once; a column nobody recognises is left unmapped and
- *    shown to the person to choose.
+ *  - autoMap() matches each header cell to a field by its normalised key or label first,
+ *    across the whole header, then by an alias for the columns still unmatched. Each field
+ *    is used once; a column nobody recognises is left unmapped and shown to the person to
+ *    choose. So "Designation" takes the job title even when a "Title" (Mr, Mrs) column
+ *    comes before it, and "Work Email" wins over a personal "Email" to its left.
  *  - A mapping a person confirmed is saved as a profile keyed by the header signature
  *    (the set of normalised headers), so next month's sheet with the same columns maps
  *    itself, and a renamed column is mapped once and remembered.
@@ -82,18 +84,23 @@ function detectHeaderRow(rows, fields) {
  */
 function autoMap(headerCells, fields) {
   const used = new Set();
-  const columns = (headerCells || []).map((cell, index) => {
-    const n = normalise(cell);
-    const field = n
-      ? fields.find((f) => !used.has(f.key) && namesOf(f).has(n))
-      : null;
-    if (field) used.add(field.key);
-    return {
-      index,
-      header: cell === null || cell === undefined ? "" : String(cell),
-      field: field ? field.key : null,
-    };
-  });
+  const cells = (headerCells || []).map(normalise);
+  const chosen = new Array(cells.length).fill(null);
+  const own = (f) => new Set([f.key, f.label].map(normalise).filter(Boolean));
+  for (const pass of [own, namesOf]) {
+    cells.forEach((n, index) => {
+      if (!n || chosen[index]) return;
+      const field = fields.find((f) => !used.has(f.key) && pass(f).has(n));
+      if (!field) return;
+      used.add(field.key);
+      chosen[index] = field.key;
+    });
+  }
+  const columns = (headerCells || []).map((cell, index) => ({
+    index,
+    header: cell === null || cell === undefined ? "" : String(cell),
+    field: chosen[index],
+  }));
   return { columns };
 }
 

@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 22/10/2026 |
+| Last changed | 25/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -267,12 +267,15 @@ longer than 4.5 seconds.
   in the deploy log and the batch in Imports history, and does not stop the deploy.
 - **This overrules "production is never seeded" for the real staff only** (TB, 16/10/2026).
   Demonstration data still never reaches production. CLAUDE.md says so.
-- Each person gets a complete employee record, a login in the invited state and their roles. **No
-  email is sent**: Send Invite (one or all) does that, later.
+- Each person the roster brought gets a complete employee record, a login in the invited state and
+  their roles. **No email is sent**: Send Invite (one or all) does that, later. Somebody People add
+  on screen is theirs to invite or not: the roster never gives them a login (25/10/2026).
 - Roles (`roles.json`): the CEO flag and Management for the CEO; Management for the Program Manager
   and the CTO, who is also System Administrator; Operations & People for the Operations & People
   Lead; Head of Department for the Head of PR, Marketing and Brand Strategy; Line Manager for the
-  Back-end Manager; Staff for everyone else.
+  Back-end Manager; Staff for everyone else. A post is matched by its exact title, case and
+  punctuation aside, never by the words it shares with one: "Deputy Chief Technology Officer" is
+  Staff, not System Administrator (25/10/2026).
 - **A post the sheet does not hold** can be given its line manager in `roles.json`, in the same
   words as the sheet's Line Manager column: the Implementation Partner (the build account, which
   `create-admin` makes before any roster) reports to the CTO (TB, 19/10/2026). The loader gives that
@@ -294,9 +297,13 @@ longer than 4.5 seconds.
   (GM, TBO, BM, PG, PC) where the system made one from the name, retires a department merged into
   another once empty (Technology into Technology & Back-office Ops), gives posts and open seats the
   chart's titles, moves the Partnership & Growth posts out of Branding & Marketing, moves David's line to
-  Chinyere, and fills an empty department head. Each step changes only what still holds the old value,
-  so an edit made on screen stays and a second deploy changes nothing; the deploy log lists what it
-  changed. The sheet and `roles.json` carry the same names, so a fresh database ends the same way.
+  Chinyere, and fills an empty department head. Each step changes only what still holds the old value;
+  the deploy log lists what it changed. The changes to people and seats (merges, titles, seats, moves,
+  lines) are applied **once per version of `nomenclature.json`** (the event `department.names_applied`
+  carries its checksum), so a title, a department or a line People change on screen afterwards stays,
+  even one that matches an old name; the departments' names, codes and heads only fill what is
+  missing and run every time (25/10/2026). The sheet and `roles.json` carry the same names, so a
+  fresh database ends the same way.
 - **The sheet was corrected on 19/10/2026 (TB).** Aaron Agama's team is Sales & Marketing (the
   sheet said Marketing, a department of one); Markerting is Marketing in three titles; Operations&
   People Lead is Operations & People Lead, and its `roles.json` key with it; two work emails had a
@@ -305,18 +312,24 @@ longer than 4.5 seconds.
 - FTE is `full_time`; Remote and Hybrid are `remote` and `hybrid`. The working hours column (Monday
   to Friday 09:00 to 17:00, Saturday 09:00 to 15:00) is the organisation's working week (A22), set by
   track C, not per person.
-- A person with no staff ID gets one from `numbering.allocate()`, and the counter is moved past
-  every number the sheet brought (`numbering.advanceTo()`), so the next person added on screen
-  cannot be given one that is taken.
+- A person with no staff ID gets one from `numbering.allocate()`. The counter is moved past every
+  number the sheet claims **before any row is written**, so a row with no Staff ID is never given a
+  number a later row claims, and a holder moved off a number lands above them all, once; it is moved
+  again after the load, so the next person added on screen cannot be given one that is taken. A
+  Staff ID a spreadsheet read as a number (19) gets its leading zeros back (00019).
 - **A column the whole sheet gets wrong is not imported**, and the deploy log says why. MyCity's own
   sheet holds a day and month with no year under DOB, and the same placeholder under Phone, in every
   row: mapping either would fail every row instead of loading the person. A column with one good
   cell among bad ones is imported, and its bad cells are row problems as usual. Work Hours and S/N
-  are not fields of a person at all (the working week is one organisation setting, A22).
+  are not fields of a person at all (the working week is one organisation setting, A22). In any
+  other optional column, a cell that does not read ("N/A" under Gender) is left out of that person
+  with a note on the row, never the whole row (`skip_unreadable_optional`, 25/10/2026): one stray
+  cell no longer keeps people off the register on a fresh database.
 - **A birthday given as a day and month is kept anyway** (GE, 20/10/2026): on every deploy, loaded
   sheet or not, each DOB cell like `03/07` (day first) is written to `employee.birth_day` and
   `birth_month` (migration `1180`) through `organisation.setBirthday`, for the person it names by
-  work email, else staff number, only when they have no date of birth and no birthday yet. The
+  work email (the cell's own, or the one `roles.json` gives the post), never by staff number, which
+  may have moved to somebody else, only when they have no date of birth and no birthday yet. The
   Staff Community celebrations read it (community guide §3 step 3). The log gives counts only.
 - The loader asks the import engine for things no person asks for, as batch options: **keep what
   the app already has** (an existing person is left exactly as People hold them, and the reporting
@@ -332,13 +345,26 @@ longer than 4.5 seconds.
   row is reported), and a person already here under another number. A holder with the row's own
   first and last name is not somebody else: it is the same person, whose work email the sheet now
   spells differently (a corrected domain), and the row is theirs, so nobody moves and no second
-  record is made (TB, 19/10/2026). Importing a sheet by hand moves
+  record is made (TB, 19/10/2026). Nor is anybody an earlier roster brought: a row that changes such
+  a person's name and email together is reported, never a stranger to renumber (the person keeps
+  their number, record and login, and People correct them on screen). A row with no staff number
+  whose email matches nobody, while somebody of the same first and last name is on the register, is
+  held back as a possible duplicate until it names its Staff ID; and the email `roles.json` gives a
+  post is never read as a second person's in that post (25/10/2026). Importing a sheet by hand moves
   nobody: a taken staff number is a problem on the row, as it is on the Add Employee form. Reverting
   such a batch archives the people it created but leaves the holder on the number they moved to; a
   number is given back on screen, not by a revert.
 - **A deploy that changes no file changes no record.** The loader keeps the sheet's checksum on its
   batch; a later deploy with the same sheet checks the logins and stops. A corrected sheet loads
   again, adding what is new and leaving the rest alone.
+- **The roster makes no department by itself** but the ones `nomenclature.json` names (25/10/2026):
+  a Team cell naming any other ("Partnership & Growh") leaves its rows for People, with a warning in
+  the deploy log, so a typo never becomes a production department. A department is found with case,
+  accents and punctuation set aside ("Technology & Back Office Ops" is the TBO). A build with no
+  `nomenclature.json` creates every one, as before.
+- **A seat People closed stays closed** when the sheet still lists its VACANT row, and a VACANT row
+  matches a seat in its own department (or one made before the load and moved since), so one title
+  in two departments is two seats (25/10/2026).
 
 ### 6.2 Staging demonstration data
 
@@ -754,6 +780,97 @@ MILESTONES §5.1.
   paints it before the bundle loads. Someone else's hub picks up a new palette at their next sign-in
   or reload.
 
+### 6.16 Employee creation, audited (JBS Praxis, 25/10/2026)
+
+Every path that makes an employee or their login was audited on 25/10/2026: People · Employees'
+Add Employee and Edit, `POST` and `PATCH /employees`, the service and repo, the staff importer and
+the roster loader, create-admin, and the logins that follow (`docs/guides/identity.md` §6). Add
+Employee could not save at all: its form held `home_address: ""`, which the contract (a picked place
+since F27) refuses, so the last step's whole-form check failed on a field no step shows and nothing
+happened. Edit failed the same way. These are the rules now, each held by a test.
+
+**Nothing is refused only at the end.**
+
+- A form holds only the fields it shows; each wizard step (Person, Job, Pay and Bank, Next of Kin)
+  checks every field it shows before Next. An empty required field reads Required (it read "Check
+  the format"), on every form (`useContractForm`).
+- Every rule a form can know is the contract's, so it is marked as the field is filled: a contract,
+  probation or confirmation never ends before the start date and a birthday comes before it
+  (`employeeDateProblems`, also on create-admin's `AdminBootstrap`); gross pay is never below zero;
+  an empty optional reference (line manager, worksite, staff number) is not given.
+- Someone who works On Site or Hybrid names their worksite (`EmployeeAdd`, the route's body; JBS
+  Praxis, 25/10/2026), so they can clock in on day one. A roster load and create-admin use
+  `EmployeeCreate`, which does not ask: people arrive before any worksite exists. Edit asks only
+  when it moves the pattern or the worksite (`EmployeeUpdate` when both are sent, the service
+  against the stored worksite otherwise, `WORKSITE_REQUIRED` on `worksite_id`), so a roster record
+  made before its worksite existed is still corrected elsewhere. Edit's toast names the person as
+  saved.
+- A refusal from the server names its field, and the wizard goes back to the step that holds it;
+  one with no field (a lost connection, a server fault) is one line above the footer. The service
+  checks what the database used to refuse without a field: a department or worksite not in use, a
+  line manager who is not active (archived, left or suspended; also on Change Reporting Line), dates
+  out of order (a correction answers for the dates it touches), a work email another person's login
+  still signs in with ("Used by a login"), an archived holder of the email ("Archived record:
+  restore it instead"), and two saves racing for one email or staff number.
+- Someone who may only view the register is told so on the first step ("You can view employees but
+  not add them"), when Praxis AI's Add Employee link opens the form for them, or when the server
+  refuses mid-save because their role changed.
+
+**Fields a role hides** (JBS Praxis, 25/10/2026). `/auth/me` carries `hidden_fields`, the record
+fields the person's role masks; Add Employee and Edit leave them out, and the API refuses a write to
+one (403 `FIELD_RESTRICTED`, the field marked Not yours to set; `field-mask.assertWritable`). A
+person's own record and the CEO are never refused, as they are never masked.
+
+**Edit sends only what changed.** A field emptied on Edit is cleared (the contract's `clearable`
+fields send null; the repo writes it), and a field left alone is never sent, so a stored value from
+an old import never blocks a correction elsewhere. Start Date, Middle Name, Gender, Date of Birth,
+Worksite and Next of Kin are editable there now.
+
+**The staff-number counter reads only its own numbers.** A staff number counts towards the counter
+only in the scheme's shape, at most two digits past its padding (`numbering.sequencePattern`): a
+phone number typed as a staff number used to push every later number past eight billion. A given
+number moves the counter before the record is written, in the same order allocate takes it.
+
+**Bulk: the staff importer and the roster.** The same audit read every path a sheet takes (Settings
+· Imports, the engine, the employees importer, the roster loader, the names step). Beside §6.1's
+rules for the roster:
+
+- Columns are matched in two passes, a column's own name before any alias, so "Designation" takes
+  the job title when a "Title" (Mr, Mrs) column stands before it, and "Work Email" beats a personal
+  "Email". "ID" and "Number" are no longer staff-number aliases (a NIN column took them).
+- A Name cell is tidied before anything compares it: a title before the name goes ("Engr.", "Mrs",
+  "Dr" and the rest), and a word in capitals or small letters is put in name case. A manager is
+  found written in full or by first and last name (a middle name on record no longer hides them),
+  hyphens and apostrophes aside, and only among active staff; a first name alone counts only when
+  nobody else has it and the post beside it is theirs.
+- Cells: a phone in a number cell is read (it was given a leading 0 and refused), a year alone in a
+  date column is refused (1991 read as 13/06/1905), and the ways sheets write a choice (FT,
+  Contract, Onsite, WFH, F, M) are read without being offered as choices.
+- Revert undoes what it did: a person written in the first pass whose line could not be set is a
+  warning (it was an error the revert skipped, leaving them live); a revert puts back the reporting
+  lines and clears what the import filled into empty fields; a person the import made who has since
+  got a login, a leave request or a clock-in is not archived (the revert is refused, naming the row);
+  a seat changed since blocks it too. A re-org that swaps two managers is tried again after the
+  other rows, so the order of the sheet no longer makes a false loop.
+- The Imports screen: the preview lists Problems or Changes (each changed row names its fields),
+  the row's status reads in words, a refusal reads with its column's label and the service's own
+  sentence ("Staff Number: Staff number 00012 belongs to ..."), a commit refused for problems reads
+  the counts again and offers Commit Valid Rows, a new value to tick is named by its field ("New
+  Department"), and a sheet whose row of column names was not found can name it (Column Names Row).
+  A restricted column (bank, personal) is blanked in the preview's rows for a reader masked from
+  it, as the error file blanks it.
+- Left, each named: the staging seed still writes vacancy, budget, expense and partner rows with
+  raw SQL (`seeds/staging/lib/forward-rows.js`; those modules now have services, staging only); a
+  date column that mixes month-first dates is still read day-first where it can be; two VACANT rows
+  with one title in one department are one seat; a dry run still stores the sheet; the roster's
+  new rows after a names version is applied keep the sheet's titles.
+
+**Smaller.** The audit row of a create and a correction holds every field the write touched (salary,
+bank and dates included; the Audit Log masks them per reader), so History names a confirmed
+probation. Phone accepts the ten digits the field invites after +234 and shows a stored number
+without repeating the code. Account Number keeps digits only. The Wizard keeps focus in the field
+being typed in (a parent re-rendering pulled it to the step's heading after each key).
+
 ## 7 · Events, jobs and notifications
 
 | Event | Track | Follow-on |
@@ -819,7 +936,7 @@ screen.
 | People · Employees | The counts (Headcount, Confirmed, On Probation, Attrition 90 Days) and the work-pattern strip; the staff list: name and job title, staff number, department, line manager, work pattern, status, login; Add Employee, Import Staff, search and the department, status and work pattern filters; Headcount by Department; Needs a Decision | Help term on Invited: has a login, not yet signed in | How the roster loads on deploy: §6.1 here. Attendance Today, which returns to the list with the attendance API (LA, M1) |
 | Employee record | Profile, Job, Work Schedule (attendance.md §10, LA), Reporting Line, Login and History as tabs; the status, work pattern, manager and since chips; Edit Record, Archive Record or Restore Record, Send Invite, Change Manager; Download Their Data for the CEO alone (toast "Their data downloaded", or why not today; `docs/guides/ess.md` §3 step 8) | Masked fields show Restricted with a help term naming who may see them; a help term on Dotted line | Field mask rules: §6.3, §8 |
 | Settings · Imports (#93) | History: Reference, Import, File, Who, When, Created, Updated, Problems, Status; Start Import. A batch opens its counts with Download Errors and Revert | Help term on Unchanged | Who may run an import, and the two-pass manager matching: §5, §6.1 |
-| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
+| Settings · Imports, the wizard | Steps Upload, Map, Preview, Commit; Blank Sheet; the drop zone's "Excel or CSV, up to 10 MB" (a workbook's limit in `shared/spreadsheet/parse.js`); counts Rows, To Create, To Update, Unchanged, Problems; the rows with problems and why, rows that will save with something missing (a Line Manager nobody holds) among them; new values to tick; Commit Valid Rows; Commit Import | Help term on Unchanged | That the preview is the commit rolled back: BACKEND_STRUCTURE §9.2 |
 | Settings · Organisation (#69) | Company: legal and trading name, RC number, tax ID, address (suggestions as it is typed, §6.13), phone, email, website, currency, time zone; Brand: Logo, White Logo (shown on Deep Green), Icon, each with its picture or an empty mark, Upload Logo, Upload White Logo, Upload Icon and Remove, toasts "Logo updated", "White logo updated", "Icon updated" and "Logo removed" (and the same for the other two); Public Holidays by year, each Declared or Expected; Working Week (day, hours, worked); Edit Profile, New Holiday, Edit Week; Confirm Holiday on an expected one | Help term on the Brand title: "PNG or WebP with a clear background. Signatures, letters and system mail use them at once." | Who reads the working week and holidays: §3; why some are Expected: §4; where each brand file goes: §6.11 |
 | Settings · Roles & Permissions | Roles and Matrix; the roles (name, people, modules, record scope); a role's name, Built-In or Custom, people, modules and Home; Access (each module's level with Approve and Export, records), Details (purpose, Home, Sensitive Fields, Capabilities), People (who holds it, 25 a page); the matrix of every role by module with a level meter, its short level and letters; the letter key; Edit Role, Save Role, Create Role, Delete Role, New Role, Next, Back, Keep Editing, Discard Changes; the review: Gains, Loses, Changes and how many people it reaches | ⓘ Role Summary beside the role's name; help terms on Record Scope and on each letter T, O, A, X; Optional on the role's purpose | Grants cache and security events: §7; the lockout rule: §8; how levels map to actions: §6.10 |
 | Settings · Documents & Numbering (#76) | Document Types, Numbers Issued, Reset Each Period; each document's next number, prefix, when it starts again, how many issued; a scheme opens prefix, digits, separator, reset, period and the next number it would give, Period ticked once it starts again, each rule's mark as the scheme is filled; Save Numbering | None | How numbers are allocated: BACKEND_STRUCTURE |
@@ -922,6 +1039,12 @@ screen.
 
 ## 14 · Change log
 
+- 25/10/2026 · JP · §6.1 and §6.16, the bulk audit: roles by exact title only and logins only for people the roster brought; names once per version of `nomenclature.json` (`department.names_applied`); the counter reserved before a load and numeric Staff IDs padded; a roster person never renumbered and a same-name row with no Staff ID held back; unreadable optional cells left out with a note; departments made only from `nomenclature.json`, found punctuation aside; closed seats kept closed and seats matched by department; birthdays by email; two-pass column mapping, tidied names, phone, year and choice spellings; revert puts lines and emptied fields back, refuses a person now in use and a seat changed since; the Imports screen's Changes view, labelled problems, header-row choice and masked rows. What is left is named in §6.16.
+- 25/10/2026 · JP · §10: the Imports drop zone takes and says 10 MB, the server's limit for a
+  workbook, where it said 25.
+- 25/10/2026 · JP · §6.16: Edit asks for a worksite when it moves someone to On Site or Hybrid, and
+  its toast names the person as saved.
+- 25/10/2026 · JP · §6.16 written: the employee creation audit's rules (fields checked as they are filled, every refusal on its field, EmployeeAdd with the worksite, hidden fields refused, Edit clearing, the staff-number counter by the scheme's shape), from JBS Praxis's audit and decisions of 25/10/2026.
 - 22/10/2026 · GE · §6.7: an address that opens a form may fill it with the contract's prefill fields (`useAddressPrefill`); People · Employees' Add Employee and ESS · My Leave's Request Leave read them for Praxis AI's screen buttons (`praxis-ai.md` §6.4).
 - 22/10/2026 · TB · Performance PR 3: upload purpose `performance_evidence` (`documents.js` `UploadPurpose`, 15 MB in `body-limits.js`, PDF, images and Office files in `mime-policy.js`) for a check-in line's evidence file (`docs/guides/performance.md` §6.14). A route whose multipart body is strict accepts the `purpose` field the upload engine sends beside the file, as `EssDocumentUpload` does.
 - 22/10/2026 · TB · Search (§6.7): a record provider may name `available(client)`, asked before its query; false leaves its group out for everyone. Home Locations uses it while the Attendance policy's Home Location is off (`attendance.md` §1.3).

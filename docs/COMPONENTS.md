@@ -133,6 +133,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [DocumentPreview](#documentpreview) | `DocumentPreview` | A file from the vault in a frame: a PDF's pages drawn in the app (PdfViewer), a picture in the image viewer, and Open in Tab on both. | stable |
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
+| Documents | [GuideBody](#guidebody) | `GuideBody` | A User Guide chapter's body: numbered steps with Open links, notes, tables and annotated pictures. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
@@ -785,7 +786,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | Use | A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit. |
 | Avoid | An explanation of the feature (tier 3); more than one action; a screen that has data on it. |
 | Phone | Centred, the drawing at the smaller size; the action is full width within thumb reach. |
-| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet; at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
+| Accessibility | The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet, or the `level` its place needs (a bare one straight under the page title is 2); at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative. |
 | Status | stable |
 | Exports | `EmptyState` |
 | Import | `import { EmptyState } from "@mycity/ui";` |
@@ -803,6 +804,7 @@ Nothing to show, said plainly: a drawing, a title, one short line and at most on
 | `text` | `ReactNode` |  | One line, at most 8 words: what the person can do about it. |
 | `action` | `ReactNode` |  | At most one action, usually a primary Button. |
 | `bare` | `boolean` |  | Draw it without its card (inside a card or a sheet that already has one). |
+| `level` | `2 \| 3` |  | The title's heading level when the default does not fit its place: 2 for a bare one straight under the page title. |
 | `className` | `string` |  | Layout classes only (spacing). |
 
 ```tsx
@@ -3183,7 +3185,7 @@ Picks records the server searches: one page of 25, narrowed as the person types,
 | Use | A field that points at another record: a worksite, a department, a partner, a vacancy, an expense category. |
 | Avoid | Fetching every record to fill a `<select>` (FRONTEND_GUIDE §4); a picker over a list short enough to be a SelectField; filtering the 25 rows on screen. |
 | Phone | The search box and the results are full width, each result a 44 px row; the picked chips wrap above it. |
-| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. |
+| Accessibility | A search box with a listbox of options, each saying whether it is picked, and the count of what matched announced politely. Inside a Field, both are named by its label. |
 | Status | stable |
 | Exports | `RecordPicker` |
 | Import | `import { RecordPicker } from "@mycity/ui";` |
@@ -3255,7 +3257,7 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | Use | Above every list that searches; FilterSelect for one of a list's server filters. |
 | Avoid | Filtering the 25 rows on screen in the browser (FRONTEND_GUIDE §4); a second search box design. |
 | Phone | Full width, 44 px tall; the keyboard's search key; FilterSelect opens a branded bottom sheet, never the phone's own picker. |
-| Accessibility | The box is a searchbox named by its label (or its placeholder); FilterSelect's label is visible and linked. |
+| Accessibility | The box is a searchbox named by its label (or its placeholder), or by its Field's label when it is a picker's box; FilterSelect's label is visible and linked. |
 | Status | stable |
 | Exports | `SearchInput`, `FilterSelect` |
 | Import | `import { SearchInput, FilterSelect } from "@mycity/ui";` |
@@ -3275,6 +3277,7 @@ The one search box for a list, sent to the server as q; with FilterSelect, a lab
 | `controls` | `string` |  | The id of the list this box narrows, when it moves through it (a searchable SelectField). |
 | `activeId` | `string` |  | The id of that list's highlighted option. |
 | `onKeyDown` | `(e: KeyboardEvent<HTMLInputElement>) => void` |  | Keys pressed in the box (the arrow keys and Enter of that list). |
+| `field` | `SearchField` |  | The Field this box is the control of (a picker's box): its id, its label and its error. |
 
 **FilterSelect** props (`FilterSelectProps`)
 
@@ -3703,6 +3706,8 @@ A long form in steps: one topic per step, a step indicator, Back and Next, and a
 | `onCancel` | `() => void` |  | Cancel, shown on the first step instead of Back. |
 | `initialStep` | `number` |  | The step to start on (a draft resumed); 0. |
 | `onStepChange` | `(index: number) => void` |  | Called with the step index each time it changes, so a draft can remember it. |
+| `step` | `number` |  | The step in view, when the form decides it (a refusal on a field of step 1 takes the person back there). Set it with `onStepChange`; left unset, the wizard keeps its own step. |
+| `error` | `ReactNode` |  | The one general error, above the footer: a refusal that names no field (FRONTEND_GUIDE §8.3). |
 
 ```tsx
 <Wizard steps={steps} finish="Publish Vacancy" onFinish={publish} onCancel={close} />
@@ -3753,7 +3758,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 | Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
 | Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
 | Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
-| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons, a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
+| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
 | Status | stable |
 | Exports | `DataView`, `LoadingRows` |
 | Import | `import { DataView, LoadingRows } from "@mycity/ui";` |
@@ -4285,6 +4290,40 @@ A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its n
 
 ```tsx
 <FileCard name="Call sheet.pdf" mime="application/pdf" sizeBytes={245000} pages={3} preview={src} hasPreview onOpen={open} onDownload={save} />
+```
+
+### GuideBody
+
+A User Guide chapter's body: numbered steps with Open links, notes, tables and annotated pictures.
+
+| | |
+|---|---|
+| Use | The Knowledge Hub's User Guide, the Full Guide and the Quick Start cards, fed the blocks the API sent (docs/guides/user-guide.md §6.2). |
+| Avoid | An article someone wrote (ArticleBody); a document the product generated (Paper); help on a field (HelpTerm). |
+| Phone | Steps keep their numbers on the left, a picture is the phone shot when there is one, and a wide table scrolls inside its own box. |
+| Accessibility | Steps are an ordered list, each with its own id so a reader can come back to it; a picture carries its text and its marks are listed under it. A link to another site says it opens in a new tab. |
+| Status | beta |
+| Exports | `GuideBody` |
+| Import | `import { GuideBody } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/GuideBody.tsx` |
+| Test | `packages/ui/src/documents/GuideBody.test.tsx` |
+| Gallery | `packages/ui/src/documents/GuideBody.gallery.tsx` (`npm run gallery`, `#/GuideBody`) |
+
+**GuideBody** props (`GuideBodyProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `blocks` | `GuideBlock[]` | yes | The blocks, as the API sent them. |
+| `anchor` | `string` | yes | The section's or task's slug: each step's id is `<anchor>-step-<n>`. |
+| `picture` | `(shot: string) => GuidePicture \| null` |  | A picture's files and marks by its shot id; null when it has none. |
+| `fetchImage` | `(url: string) => Promise<Blob>` |  | Fetches a picture that needs the session; without it the address is drawn as it is. |
+| `onLink` | `(href: string, from: GuideLinkFrom) => void` |  | Called for a screen (`/people?tab=x`) or a section (`#slug`) link; without it they are plain links. |
+| `onZoom` | `(shot: string) => void` |  | Called when a picture is pressed, to show it full size. |
+| `highlight` | `number \| null` |  | The step to mark as the one the reader came back to. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<GuideBody blocks={section.blocks} anchor="people-add-employee" picture={pictureOf} onLink={open} />
 ```
 
 ### ImageViewer

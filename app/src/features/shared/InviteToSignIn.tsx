@@ -20,11 +20,13 @@ export function InviteToSignIn({ close, person }: { close: () => void; person?: 
     if (!who.length || !roles.length) return;
     try {
       await inv.run({ body: { employee_id: who[0].employee_id, role_codes: roles.map((r) => r.code) } });
-      invalidate("/api/v1/users");
+      invalidate("/api/v1/users", "/api/v1/employees");
       close();
       toast(`Invitation sent to ${who[0].display_name}`);
     } catch (e) {
-      if (!(e instanceof ApiError) || !Object.keys(e.fields).length) toast(e instanceof ApiError ? e.message : "Something went wrong");
+      // A refusal on a field this form shows is marked there; any other is said in a toast, never lost.
+      const shown = e instanceof ApiError && (e.fields.employee_id || e.fields.role_codes);
+      if (!shown) toast(e instanceof ApiError ? e.message : "Something went wrong");
     }
   };
   return (

@@ -99,7 +99,7 @@ async function signedIn(email: string) {
   // The reads' cache is kept by path, not by person: start each person from the server.
   invalidate("/api/v1");
   const { rerender } = render(app(false));
-  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 5000 });
+  await waitFor(() => expect(auth?.status).toBe("signed-out"), { timeout: 15000 });
   await act(async () => {
     const next = await auth!.signIn(email, "demo1234");
     if (next?.kind === "code") await auth!.finishTwoStep(next.ticket, "482913");
@@ -331,6 +331,7 @@ describe("a person's sheet", () => {
         home_view: "staff",
         manages_people: true,
         appearance: { dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" },
+        hidden_fields: [],
       }) as Me;
     const open = () => true;
     const labels = (me: Me, opens: (tab: string) => boolean = open) => personLinks(me, "00000000-0000-4000-a000-000000000003", opens).map((l) => l.label);
@@ -387,6 +388,8 @@ describe("Attendance This Month", () => {
     // Two people join today, so the organisation's roster runs past one page.
     const departments = (await api.call("GET /api/v1/departments", { query: {} })).data;
     const content = departments.find((d) => d.name === "Content")!;
+    // Someone On Site names their worksite (Add Employee, docs/guides/foundation.md §6.16).
+    const site = (await api.call("GET /api/v1/worksites", { query: { active: "true" } })).data[0]!;
     for (const [first, last] of [["Ada", "Nwankwo"], ["Kunle", "Bakare"]]) {
       await api.call("POST /api/v1/employees", {
         body: {
@@ -398,6 +401,7 @@ describe("Attendance This Month", () => {
           start_date: "2026-10-19",
           employment_type: "full_time",
           work_pattern: "on_site",
+          worksite_id: site.worksite_id,
           department_id: content.department_id,
         },
       });

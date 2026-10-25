@@ -67,11 +67,25 @@ const staffNumber = z
 const accountNumber = z
   .string()
   .trim()
-  .regex(/^\d{10}$/, "must be a 10-digit NUBAN");
+  .regex(/^\d{10}$/, "Ten digits");
+
+/** Gross pay: an amount, never below zero (employee_gross_monthly_check, migration 0110). */
+const pay = money.refine((v) => !v.startsWith("-"), "Not below zero");
+
+/**
+ * An optional field on a correction (PATCH): "" or null clears it, left out leaves it. Edit
+ * sends only the fields the person changed, so an emptied field is one they cleared.
+ */
+const clearable = (schema) =>
+  schema
+    .or(z.literal(""))
+    .nullable()
+    .optional()
+    .transform((v) => (v === "" ? null : v));
 
 /** The fields every employee has, whoever creates them and however. */
 const employeeCore = {
-  staff_number: staffNumber.optional(),
+  staff_number: blank(staffNumber),
   first_name: text(100),
   middle_name: optionalText(100),
   last_name: text(100),
@@ -105,7 +119,28 @@ const employeeRestricted = {
   personal_email: blank(email),
   bank_name: optionalText(100),
   account_number: blank(accountNumber),
-  gross_monthly: blank(money),
+  gross_monthly: blank(pay),
+};
+
+/**
+ * The order an employee's dates keep (migrations 0040 and 0210 hold the first two in the
+ * database too): a contract, a probation and its confirmation never end before the start date,
+ * and a person is born before they start. Each issue lands on its own field, so the form marks
+ * it as it is filled rather than when Add Employee is pressed (docs/guides/foundation.md §6.16).
+ * The service applies the same to a correction against the stored record (employeeDateProblems).
+ */
+function employeeDateProblems(v) {
+  const out = [];
+  const start = v.start_date;
+  if (!start) return out;
+  for (const key of ["contract_ends_on", "confirmation_due_on", "confirmed_on"])
+    if (v[key] && v[key] < start) out.push({ path: key, message: "Not before the start" });
+  if (v.date_of_birth && v.date_of_birth >= start) out.push({ path: "date_of_birth", message: "Before the start date" });
+  return out;
+}
+
+const employeeDates = (v, ctx) => {
+  for (const p of employeeDateProblems(v)) ctx.addIssue({ code: "custom", path: [p.path], message: p.message });
 };
 
 /* ------------------------------------------------------------------ *
@@ -121,7 +156,8 @@ const EMPLOYEE_STATUSES = ["active", "suspended", "left", "archived"];
 const EmployeeStatus = z.enum(EMPLOYEE_STATUSES);
 
 /** What a person's login is, as Settings and the register show it. */
-const LOGIN_STATES = ["none", "invited", "active", "suspended"];
+/** `left`: the employee was archived and their login closed with them (docs/guides/identity.md §6.1). */
+const LOGIN_STATES = ["none", "invited", "active", "suspended", "left"];
 const LoginState = z.enum(LOGIN_STATES);
 
 /**
@@ -286,39 +322,52 @@ const Employee360 = z
   .strict();
 
 /** PATCH /employees/:id. Every field of the record a person may correct. */
+/** The work patterns that come to a worksite, so clock-in has an office to check. */
+const ON_SITE_PATTERNS = ["on_site", "hybrid"];
+
+/**
+ * PATCH /employees/:id carries only what changed. Moving someone to On Site or Hybrid while
+ * emptying their worksite in the same edit is refused here; a move that leaves the stored
+ * worksite empty is refused by the service, which knows it (JBS Praxis, 25/10/2026).
+ */
 const EmployeeUpdate = z
   .object({
     first_name: text(100),
-    middle_name: optionalText(100),
+    middle_name: clearable(z.string().trim().max(100)),
     last_name: text(100),
-    preferred_name: optionalText(100),
+    preferred_name: clearable(z.string().trim().max(100)),
     work_email: email,
-    personal_email: blank(email),
+    personal_email: clearable(email),
     phone,
     job_title: text(150),
     department_id: uuid,
-    worksite_id: uuid,
+    worksite_id: clearable(uuid),
     employment_type: EmploymentType,
     work_pattern: WorkPattern,
     start_date: isoDate,
-    contract_ends_on: blank(isoDate),
-    confirmation_due_on: blank(isoDate),
-    confirmed_on: blank(isoDate),
-    left_on: blank(isoDate),
-    gender: blank(Gender),
-    date_of_birth: blank(isoDate),
-    next_of_kin_name: optionalText(150),
-    next_of_kin_phone: blank(phone),
-    next_of_kin_relationship: optionalText(50),
+    contract_ends_on: clearable(isoDate),
+    confirmation_due_on: clearable(isoDate),
+    confirmed_on: clearable(isoDate),
+    left_on: clearable(isoDate),
+    gender: clearable(Gender),
+    date_of_birth: clearable(isoDate),
+    next_of_kin_name: clearable(z.string().trim().max(150)),
+    next_of_kin_phone: clearable(phone),
+    next_of_kin_relationship: clearable(z.string().trim().max(50)),
     /** Picked or pinned, never typed (F27); left out, it stays as it is. No People form asks for it. */
     home_address: PlaceInput.optional(),
-    bank_name: optionalText(100),
-    account_number: blank(accountNumber),
-    gross_monthly: blank(money),
+    bank_name: clearable(z.string().trim().max(100)),
+    account_number: clearable(accountNumber),
+    gross_monthly: clearable(pay),
   })
   .partial()
   .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" });
+  .refine((v) => Object.keys(v).length > 0, { message: "change at least one field" })
+  .superRefine(employeeDates)
+  .superRefine((v, ctx) => {
+    if (ON_SITE_PATTERNS.includes(v.work_pattern) && "worksite_id" in v && !v.worksite_id)
+      ctx.addIssue({ code: "custom", path: ["worksite_id"], message: "Pick a worksite" });
+  });
 
 /** POST /employees/:id/archive. */
 const EmployeeArchive = z.object({ archive_reason: text(200) }).strict();
@@ -576,17 +625,33 @@ const EmployeeImportRow = z
   })
   .strict();
 
-/** POST /api/v1/employees. References are ids, resolved on screen through pickers. */
+/**
+ * A new employee, however they arrive: the screen (EmployeeAdd, below), create-admin and the
+ * demonstration data. References are ids, resolved on screen through pickers; one left empty
+ * is not given.
+ */
 const EmployeeCreate = z
   .object({
     ...employeeCore,
     ...employeeRestricted,
     department_id: uuid,
-    line_manager_id: uuid.optional(),
-    dotted_manager_id: uuid.optional(),
-    worksite_id: uuid.optional(),
+    line_manager_id: blank(uuid),
+    dotted_manager_id: blank(uuid),
+    worksite_id: blank(uuid),
   })
-  .strict();
+  .strict()
+  .superRefine(employeeDates);
+
+/**
+ * POST /api/v1/employees, Add Employee: EmployeeCreate, and someone who works On Site or Hybrid
+ * names their worksite, so they can clock in on their first day (JBS Praxis, 25/10/2026). A
+ * roster load and create-admin make people before any worksite exists, so they use
+ * EmployeeCreate and the worksite is set later on People · Worksites.
+ */
+const EmployeeAdd = EmployeeCreate.superRefine((v, ctx) => {
+  if (ON_SITE_PATTERNS.includes(v.work_pattern) && !v.worksite_id)
+    ctx.addIssue({ code: "custom", path: ["worksite_id"], message: "Pick a worksite" });
+});
 
 /**
  * What a screen button may fill on Add Employee through the address (docs/guides/praxis-ai.md
@@ -621,7 +686,8 @@ const AdminBootstrap = z
         ...employeeRestricted,
         department_name: text(100),
       })
-      .strict(),
+      .strict()
+      .superRefine(employeeDates),
     role_code: z
       .string()
       .trim()
@@ -638,6 +704,7 @@ const AdminBootstrap = z
  */
 const TABLES = {
   EmployeeCreate: { table: "employee" },
+  EmployeeAdd: { table: "employee" },
   EmployeePrefill: { table: "employee" },
   EmployeeUpdate: { table: "employee" },
   EmployeeArchive: { table: "employee" },
@@ -769,6 +836,9 @@ module.exports = {
   PersonRef,
   ManagerRef,
   EmployeeCreate,
+  EmployeeAdd,
+  ON_SITE_PATTERNS,
+  employeeDateProblems,
   EmployeePrefill,
   EmployeeUpdate,
   EmployeeArchive,

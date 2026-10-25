@@ -12,13 +12,18 @@ import { PagedTable, TrailCard, useDepartmentOptions } from "@/features/shared/s
 import type { ModuleScreenProps } from "@/shell/screens";
 import { PoliciesTab } from "@/features/policies/PoliciesHub";
 import { Accordion, ArticleBody, Button, Card, Chips, ChoiceField, DataView, DateField, ErrorState, Field, formatDate, FormFooter, Grid, LoadingRows, Meter, PageHeader, Pill, Reader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { UserGuide } from "./UserGuide";
 
 export default function Knowledge({ tab, id }: ModuleScreenProps) {
-  if (tab === "sops") return <Articles kind="sop" id={id} />;
-  if (tab === "faqs") return <Faqs />;
-  if (tab === "training") return <Training />;
-  if (tab === "announcements") return <Announcements />;
-  return <PoliciesTab />;
+  switch (tab) {
+    case "sops": return <Articles kind="sop" id={id} />;
+    case "faqs": return <Faqs />;
+    case "training": return <Training />;
+    case "announcements": return <Announcements />;
+    case "user-guide":
+      return <UserGuide id={id} />;
+    default: return <PoliciesTab />;
+  }
 }
 
 const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something went wrong");

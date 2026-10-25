@@ -80,9 +80,12 @@ const BOOLEAN = new Map([
 
 /**
  * One cell to its field's type.
+ * @param {object} field
+ * @param {*} raw
+ * @param {{pad?: number}} [opts]  pad: the padding of the number a `sequenceOf` field holds
  * @returns {{value: *, error: string|null}}  value null for an empty cell
  */
-function coerce(field, raw) {
+function coerce(field, raw, opts = {}) {
   const empty =
     raw === null ||
     raw === undefined ||
@@ -93,12 +96,17 @@ function coerce(field, raw) {
   const text = raw instanceof Date ? null : String(raw).trim();
   switch (type) {
     case "text":
-    case "reference":
+    case "reference": {
       if (raw instanceof Date)
         return { value: null, error: "should be text, not a date" };
-      return text.length > (field.max || 500)
+      let value = text;
+      if (opts.pad && /^\d+$/.test(value) && value.length < opts.pad)
+        value = value.padStart(opts.pad, "0");
+      if (typeof field.clean === "function") value = field.clean(value);
+      return value.length > (field.max || 500)
         ? { value: null, error: `is longer than ${field.max || 500} characters` }
-        : { value: text, error: null };
+        : { value, error: null };
+    }
     case "int": {
       const n = Number(text.replace(/,/g, ""));
       return Number.isInteger(n)
@@ -124,8 +132,9 @@ function coerce(field, raw) {
     }
     case "phone": {
       const c = require("@mycity/contract");
+      // A number cell has lost its leading 0; the contract reads ten digits and 234... alike.
       const r = c.common.phone.safeParse(
-        typeof raw === "number" ? `0${raw}` : text,
+        typeof raw === "number" ? String(raw) : text,
       );
       return r.success
         ? { value: r.data, error: null }
@@ -138,17 +147,16 @@ function coerce(field, raw) {
         : { value: null, error: "should be an email address" };
     }
     case "enum": {
-      const opts = registry.optionsOf(field);
+      const choices = registry.optionsOf(field);
       const n = mapping.normalise(text);
-      const hit = opts.find(
-        (o) =>
-          mapping.normalise(o.value) === n || mapping.normalise(o.label) === n,
-      );
+      const hit = registry
+        .spellingsOf(field)
+        .find((o) => o.names.some((name) => mapping.normalise(name) === n));
       return hit
         ? { value: hit.value, error: null }
         : {
             value: null,
-            error: `should be one of: ${opts.map((o) => o.label).join(", ")}`,
+            error: `should be one of: ${choices.map((o) => o.label).join(", ")}`,
           };
     }
     case "date": {
@@ -176,9 +184,15 @@ const fieldMap = (imp) => new Map(imp.fields.map((f) => [f.key, f]));
 
 /**
  * The data rows under the header, coerced and validated. Pure.
+ *
+ * `options.skip_unreadable_optional` (the roster loader's): a cell of an optional column that
+ * does not read as its field is left out with a note, instead of failing the whole row, so one
+ * "N/A" under Gender never keeps a person off the register.
+ *
+ * @param {{options?: object, pads?: Record<string, number>}} [opts]
  * @returns {Array<{row_number, raw, values, problems, status}>}
  */
-function buildRows(imp, grid, headerRow, columnsMap) {
+function buildRows(imp, grid, headerRow, columnsMap, { options = {}, pads = {} } = {}) {
   const fields = fieldMap(imp);
   const header = grid[headerRow] || [];
   const mapped = columnsMap.columns.filter(
@@ -201,10 +215,14 @@ function buildRows(imp, grid, headerRow, columnsMap) {
     });
     const values = {};
     const problems = [];
+    const notes = [];
     for (const c of mapped) {
       const f = fields.get(c.field);
-      const { value, error } = coerce(f, cells[c.index]);
-      if (error)
+      const { value, error } = coerce(f, cells[c.index], { pad: pads[f.key] });
+      const optional = !f.required && !imp.matchKeys.includes(f.key);
+      if (error && optional && options.skip_unreadable_optional)
+        notes.push({ field: f.key, message: `${f.label} ${error}; left out` });
+      else if (error)
         problems.push({ field: f.key, message: `${f.label} ${error}` });
       else if (value !== null) values[f.key] = value;
     }
@@ -225,13 +243,13 @@ function buildRows(imp, grid, headerRow, columnsMap) {
             message: `${label}: ${issue.message}`,
           });
         }
-      }
+      } else Object.assign(values, parsed.data); // the contract's own form: trimmed, upper-cased
     }
     out.push({
       row_number: i + 1,
       raw,
       values,
-      problems,
+      problems: [...problems, ...notes],
       status: problems.length ? "error" : "ok",
       action: "none",
       target_id: null,
@@ -439,8 +457,10 @@ async function createBatch(client, { importer_key: key, file, actor, options = {
  * Confirm or correct the mapping.
  * @param {import("pg").PoolClient} client  inside atomically()
  * @param {string} batchId
- * @param {{sheet?: string, header_row?: number, fields: Record<number, string|null>, save_profile?: boolean, profile_name?: string}} input
- *   fields  column index → field key (null to ignore the column)
+ * @param {{sheet?: string, header_row?: number, fields?: Record<number, string|null>, save_profile?: boolean, profile_name?: string}} input
+ *   fields  column index → field key (null to ignore the column). Left out, the columns of the
+ *           chosen header row are matched afresh (autoMap) and the person confirms them: the
+ *           way past a sheet whose header row was not found on upload
  */
 async function setMapping(client, batchId, input, actor) {
   if (!inTransaction(client))
@@ -471,6 +491,15 @@ async function setMapping(client, batchId, input, actor) {
       422,
     );
   const headerCells = sheet.rows[headerRow];
+  if (input.fields === undefined || input.fields === null) {
+    const auto = mapping.autoMap(headerCells, imp.fields);
+    const { rows } = await client.query(
+      `UPDATE import_batch SET sheet = $2, header_row = $3, mapping = $4::jsonb, status = 'mapped', previewed_at = NULL
+        WHERE import_batch_id = $1 RETURNING ${BATCH_COLUMNS}`,
+      [batchId, sheet.name, headerRow, JSON.stringify(auto)],
+    );
+    return rows[0];
+  }
   const columns = {
     columns: headerCells.map((cell, index) => ({
       index,
@@ -506,14 +535,28 @@ async function setMapping(client, batchId, input, actor) {
  * Running: preview and commit share every line
  * ------------------------------------------------------------------ */
 
-function problemOf(err) {
+/** A service's field key as the importer's own: the id a reference became is its column. */
+function columnOf(imp, key) {
+  const keys = new Set(imp.fields.map((f) => f.key));
+  if (keys.has(key)) return key;
+  const bare = key.replace(/(_seat)?_id$/, "");
+  return keys.has(bare) ? bare : null;
+}
+
+/**
+ * What a refused write says on its row: the service's own sentence, under the label of the
+ * column it is about ("Staff Number: Staff number 00012 belongs to ..."), never a field key.
+ */
+function problemOf(err, imp) {
   if (err instanceof AppError) {
-    const fields = err.fields ? Object.entries(err.fields) : [];
-    if (fields.length)
-      return fields.map(([f, msgs]) => ({
-        field: f,
-        message: `${f}: ${[].concat(msgs).join(", ")}`,
-      }));
+    const keys = err.fields ? Object.keys(err.fields) : [];
+    const labels = imp ? fieldMap(imp) : new Map();
+    if (keys.length)
+      return keys.map((k) => {
+        const column = imp ? columnOf(imp, k) : null;
+        const label = column ? labels.get(column).label : null;
+        return { field: column || k, message: label ? `${label}: ${err.message}` : err.message };
+      });
     return [{ field: null, message: err.message }];
   }
   return [{ field: null, message: "This row could not be saved" }];
@@ -669,7 +712,7 @@ async function processRows(client, imp, rows, ctx) {
     if (!res.ok) {
       row.status = "error";
       row.action = "none";
-      row.problems.push(...problemOf(res.err));
+      row.problems.push(...problemOf(res.err, imp));
       continue;
     }
     row.target_id = String(res.out.id);
@@ -720,16 +763,14 @@ async function processRows(client, imp, rows, ctx) {
         edges.set(row.target_id, { to: String(id), row: row.row_number });
     }
     const cyclic = cycleRows(edges);
-    for (const [row, id] of resolved) {
-      if (cyclic.has(row.row_number) || id === row.target_id) {
-        row.status = "error";
-        row.problems.push({
-          field: f.key,
-          message: `${f.label} would make a loop (someone managing themselves, directly or through others)`,
-        });
-        continue;
-      }
-      const res = await inSavepoint(client, () =>
+    /* A row written in pass 1 keeps its record when its line cannot be set: it is a
+       warning, saved without the line, so it is counted, reported and reverted as written. */
+    const unlinked = (row, problems) => {
+      row.status = row.action === "none" ? "error" : "warning";
+      row.problems.push(...problems);
+    };
+    const link = (row, id) =>
+      inSavepoint(client, () =>
         imp.link(
           client,
           row.target_id,
@@ -737,10 +778,8 @@ async function processRows(client, imp, rows, ctx) {
           { ...ctx, row_number: row.row_number, values: row.values },
         ),
       );
-      if (!res.ok) {
-        row.status = "error";
-        row.problems.push(...problemOf(res.err));
-      } else if (
+    const linked = (row, id, res) => {
+      if (
         // An importer's link answers false when it wrote nothing (it keeps what a person
         // set on screen), and the row then stays unchanged rather than counting as an update.
         res.out !== false &&
@@ -755,6 +794,29 @@ async function processRows(client, imp, rows, ctx) {
           [f.key]: [row.before ? row.before[f.key] || null : null, id],
         };
       }
+    };
+    /* A loop the database sees may be one this file is about to undo (a re-org that swaps two
+       people), so a row refused for a loop is tried once more after the others. */
+    const again = [];
+    for (const [row, id] of resolved) {
+      if (cyclic.has(row.row_number) || id === row.target_id) {
+        unlinked(row, [
+          {
+            field: f.key,
+            message: `${f.label} would make a loop (someone managing themselves, directly or through others)${row.action === "none" ? "" : `; saved without ${f.label}`}`,
+          },
+        ]);
+        continue;
+      }
+      const res = await link(row, id);
+      if (res.ok) linked(row, id, res);
+      else if (res.err instanceof AppError && res.err.code === "REPORTING_LOOP") again.push([row, id]);
+      else unlinked(row, problemOf(res.err, imp));
+    }
+    for (const [row, id] of again) {
+      const res = await link(row, id);
+      if (res.ok) linked(row, id, res);
+      else unlinked(row, problemOf(res.err, imp));
     }
   }
 
@@ -850,7 +912,13 @@ async function run(
       });
 
     const sheet = sheetOf(await sourceGrid(client, batch), batch.sheet);
-    const rows = buildRows(imp, sheet.rows, batch.header_row, batch.mapping);
+    const pads = {};
+    for (const f of imp.fields)
+      if (f.sequenceOf) pads[f.key] = await numbering.paddingOf(client, f.sequenceOf);
+    const rows = buildRows(imp, sheet.rows, batch.header_row, batch.mapping, {
+      options: batch.options || {},
+      pads,
+    });
     markDuplicates(imp, rows);
     const ctx = {
       actor,
@@ -950,7 +1018,8 @@ const commit = (batchId, opts) => run(batchId, { ...opts, commit: true });
 
 /**
  * A page of a batch's rows, optionally by status; "problem" is the preview's list: every
- * error, duplicate and warning, so a row that saves with something missing is seen too.
+ * error, duplicate and warning, so a row that saves with something missing is seen too;
+ * "change" is every row that changes a record already in the system.
  * @param {{query: Function}} client
  */
 function rowsOf(client, batchId, query = {}) {
@@ -960,7 +1029,8 @@ function rowsOf(client, batchId, query = {}) {
        FROM import_row
       WHERE import_batch_id = $1
         AND ($2::text IS NULL OR status = $2
-             OR ($2::text = 'problem' AND status IN ('error', 'duplicate', 'warning')))
+             OR ($2::text = 'problem' AND status IN ('error', 'duplicate', 'warning'))
+             OR ($2::text = 'change' AND action = 'update' AND status <> 'error'))
       ORDER BY row_number, import_row_id`,
     [batchId, query.status || null],
     query,

@@ -24,6 +24,7 @@ const managerText = require("./manager-text");
 const { layout } = require("./org-chart.layout");
 const repo = require("./organisation.repo");
 const places = require("../../shared/places/places");
+const { employeeDateProblems, ON_SITE_PATTERNS } = require("@mycity/contract").organisation;
 
 /** A person's home address field (shared/places/owners.js). */
 const HOME = "employee.home_address";
@@ -150,43 +151,149 @@ async function findOrCreateDepartment(client, name, actor) {
 /**
  * Keep the staff-number counter above every number already issued, so the next person
  * added on screen cannot be given a number an imported sheet already used
- * (docs/DATABASE_SCHEMA.md M0: the importer moves the counter past imported numbers).
+ * (docs/DATABASE_SCHEMA.md M0: the importer moves the counter past imported numbers). Only
+ * numbers of the scheme's own shape count (numbering.sequencePattern), in the period of
+ * `date` for a scheme that resets.
  */
-async function advanceStaffNumbers(client) {
-  const highest = await repo.highestStaffNumberSeq(client);
-  if (highest > 0) await numbering.advanceTo(client, "employee", highest);
+async function advanceStaffNumbers(client, { date } = {}) {
+  const { pattern } = await numbering.sequenceOf(client, "employee", { date });
+  if (!pattern) return 0;
+  const highest = await repo.highestStaffNumberSeq(client, pattern);
+  if (highest > 0) await numbering.advanceTo(client, "employee", highest, { date });
   return highest;
 }
 
 /**
+ * Move the counter past a staff number someone gave, before the record that carries it is
+ * written. Taking the counter first is the order allocate() takes it, so a create with a
+ * number and a create without one cannot wait on each other. A number of another shape
+ * leaves the counter alone.
+ */
+async function advancePast(client, staffNumber, date) {
+  const { pattern } = await numbering.sequenceOf(client, "employee", { date });
+  const m = pattern ? new RegExp(pattern).exec(staffNumber) : null;
+  if (m) await numbering.advanceTo(client, "employee", Number(m[1]), { date });
+}
+
+/** The answer for a work email already on a record: an archived holder is named, since the register hides them. */
+function emailTaken(holder) {
+  if (holder.status === "archived")
+    return new AppError("EMPLOYEE_EXISTS", "An archived record has this work email. Restore it instead.", 409, {
+      work_email: ["Archived record"],
+    });
+  return new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, {
+    work_email: ["Already in use"],
+  });
+}
+
+/**
+ * A work email the person may hold: no other record has it, and no other person's login
+ * signs in with it (a login keeps its address until it follows, docs/guides/identity.md §6).
+ */
+async function assertWorkEmailFree(client, email, employeeId = null) {
+  const holder = await repo.findEmployeeByWorkEmail(client, email);
+  if (holder && holder.employee_id !== employeeId) throw emailTaken(holder);
+  const owner = await repo.loginEmailOwner(client, email);
+  if (owner && owner !== employeeId)
+    throw new AppError("LOGIN_EMAIL_TAKEN", "Another person's login signs in with this email.", 409, {
+      work_email: ["Used by a login"],
+    });
+}
+
+/** The department, line and dotted managers and worksite a record names exist and are in use. */
+async function assertReferences(client, body, employeeId = null) {
+  if (body.department_id) {
+    const department = await repo.findDepartmentById(client, body.department_id);
+    if (!department || department.active === false)
+      throw new AppError("DEPARTMENT_NOT_FOUND", "Pick a department in use.", 422, {
+        department_id: ["Not a department"],
+      });
+  }
+  for (const key of ["line_manager_id", "dotted_manager_id"]) {
+    const id = body[key];
+    if (!id) continue;
+    if (id === employeeId)
+      throw new AppError("REPORTS_TO_SELF", "Nobody reports to themselves.", 422, { [key]: ["Not themselves"] });
+    const manager = await repo.findEmployeeById(client, id);
+    if (!manager || manager.status !== "active")
+      throw new AppError("MANAGER_NOT_FOUND", "Pick a manager who works here now.", 422, {
+        [key]: ["Not an employee"],
+      });
+  }
+  if (body.worksite_id) {
+    // Required here, not at the top: worksites.service requires this file.
+    const site = await require("../worksites/worksites.service").fenceFor(client, body.worksite_id);
+    if (!site)
+      throw new AppError("WORKSITE_NOT_FOUND", "Pick a worksite in use.", 422, { worksite_id: ["Not a worksite"] });
+  }
+}
+
+/**
+ * The order an employee's dates keep (the contract's employeeDateProblems, the same rule a form
+ * checks as it is filled), and two that need today: a birthday and a probation confirmation are
+ * never in the future. Applied to a whole record, so a correction is checked against what is stored.
+ */
+function assertDates(record, only = null) {
+  const today = lagos.today();
+  let problems = employeeDateProblems(record);
+  if (record.date_of_birth && record.date_of_birth > today) problems.push({ path: "date_of_birth", message: "Not in the future" });
+  if (record.confirmed_on && record.confirmed_on > today) problems.push({ path: "confirmed_on", message: "Not in the future" });
+  // A correction answers for the dates it touches: a stored oddity never blocks an unrelated edit.
+  if (only) problems = problems.filter((p) => only.includes(p.path));
+  if (!problems.length) return;
+  const fields = {};
+  for (const p of problems) fields[p.path] = [p.message];
+  throw new AppError("EMPLOYEE_DATES", "Check the dates.", 422, fields);
+}
+
+/**
+ * Two saves racing with one work email or staff number both pass the checks above; the
+ * database refuses the second, and this names its field as the checks would have.
+ */
+function uniqueRefusal(err) {
+  if (err && err.code === "23505") {
+    if (/work_email/.test(err.constraint || ""))
+      return new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, { work_email: ["Already in use"] });
+    if (/number/.test(err.constraint || ""))
+      return new AppError("STAFF_NUMBER_TAKEN", "Another employee has this staff number.", 409, { staff_number: ["Already in use"] });
+  }
+  return err;
+}
+
+/**
+ * Add a person. Every check names its field, so a form shows what to fix where it is
+ * (docs/guides/foundation.md §6.16).
  * @param {import("pg").PoolClient} client  inside atomically()
- * @param {object} body  EmployeeCreate, already parsed
+ * @param {object} body  EmployeeCreate (or EmployeeAdd), already parsed; or the importer's row
  * @param {object} actor
  * @returns {Promise<object>} the employee, with employee_id and staff_number
  */
 async function createEmployee(client, body, actor) {
-  if (await repo.findEmployeeByWorkEmail(client, body.work_email)) {
-    throw new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, {
-      work_email: ["Already in use"],
-    });
-  }
+  await assertWorkEmailFree(client, body.work_email);
   if (body.staff_number && (await repo.findEmployeeByStaffNumber(client, body.staff_number))) {
     throw new AppError("STAFF_NUMBER_TAKEN", "Another employee has this staff number.", 409, {
       staff_number: ["Already in use"],
     });
   }
+  await assertReferences(client, body);
+  assertDates(body);
+  if (body.staff_number) await advancePast(client, body.staff_number, body.start_date);
   const staffNumber = body.staff_number
     ? body.staff_number
     : (await numbering.allocate(client, "employee", { date: body.start_date })).number;
 
   const home = body.home_address;
-  const employee = await repo.insertEmployee(client, {
-    ...body,
-    home_address: home ? places.lineOf(home) : null,
-    staff_number: staffNumber,
-  });
+  let employee;
+  try {
+    employee = await repo.insertEmployee(client, {
+      ...body,
+      home_address: home ? places.lineOf(home) : null,
+      staff_number: staffNumber,
+    });
+  } catch (err) {
+    throw uniqueRefusal(err);
+  }
   if (home) await places.save(client, HOME, employee.employee_id, home, { field: "home_address" });
-  if (body.staff_number) await advanceStaffNumbers(client);
   if (employee.line_manager_id)
     await repo.recordReportingLine(
       client,
@@ -198,7 +305,7 @@ async function createEmployee(client, body, actor) {
     key: EVENTS.EMPLOYEE_CREATED,
     entity: { type: "employee", id: employee.employee_id },
     actor,
-    after: employee,
+    after: await repo.auditRow(client, employee.employee_id),
     payload: { employee_id: employee.employee_id, staff_number: employee.staff_number },
   });
   return employee;
@@ -206,30 +313,49 @@ async function createEmployee(client, body, actor) {
 
 /** PATCH /employees/:id: correct a record. */
 async function updateEmployee(client, employeeId, patch, actor) {
-  const before = await repo.findEmployeeById(client, employeeId);
+  const before = await repo.auditRow(client, employeeId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
-  if (patch.work_email && patch.work_email !== before.work_email) {
-    const taken = await repo.findEmployeeByWorkEmail(client, patch.work_email);
-    if (taken)
-      throw new AppError("EMPLOYEE_EXISTS", "An employee already has this work email.", 409, {
-        work_email: ["Already in use"],
-      });
+  if (patch.work_email && patch.work_email.toLowerCase() !== String(before.work_email).toLowerCase())
+    await assertWorkEmailFree(client, patch.work_email, employeeId);
+  await assertReferences(
+    client,
+    {
+      ...(patch.department_id && patch.department_id !== before.department_id ? { department_id: patch.department_id } : {}),
+      ...(patch.worksite_id && patch.worksite_id !== before.worksite_id ? { worksite_id: patch.worksite_id } : {}),
+    },
+    employeeId,
+  );
+  // On Site and Hybrid keep a worksite, so clock-in has an office to check. Asked only when the
+  // edit moves the pattern or the worksite: a roster record made before its worksite existed can
+  // still be corrected elsewhere (JBS Praxis, 25/10/2026).
+  if ("work_pattern" in patch || "worksite_id" in patch) {
+    const pattern = patch.work_pattern || before.work_pattern;
+    const site = "worksite_id" in patch ? patch.worksite_id : before.worksite_id;
+    if (ON_SITE_PATTERNS.includes(pattern) && !site)
+      throw new AppError("WORKSITE_REQUIRED", "Pick a worksite for someone who works On Site or Hybrid.", 422, { worksite_id: ["Pick a worksite"] });
   }
-  if (patch.department_id && !(await repo.findDepartmentById(client, patch.department_id)))
-    throw new AppError("DEPARTMENT_NOT_FOUND", "Pick a department that exists.", 422, {
-      department_id: ["Not a department"],
-    });
+  const given = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined && v !== ""));
+  const dated = ["contract_ends_on", "confirmation_due_on", "confirmed_on", "date_of_birth"];
+  assertDates({ ...before, ...given }, "start_date" in given ? dated : dated.filter((k) => k in given));
   const change = { ...patch };
   // The home address is a place (F27), kept through shared/places; the record keeps its line.
   if (patch.home_address !== undefined)
     change.home_address = (await places.save(client, HOME, employeeId, patch.home_address, { field: "home_address" })).line;
-  const after = await repo.updateEmployee(client, employeeId, change);
+  let after;
+  try {
+    after = await repo.updateEmployee(client, employeeId, change);
+  } catch (err) {
+    throw uniqueRefusal(err);
+  }
+  const changedEmail = patch.work_email && patch.work_email.toLowerCase() !== String(before.work_email).toLowerCase();
   await emit(client, {
     key: EVENTS.EMPLOYEE_UPDATED,
     entity: { type: "employee", id: employeeId },
     actor,
     before,
-    after,
+    after: await repo.auditRow(client, employeeId),
+    // identity follows a corrected work email with a login nobody has used yet (identity.events.js).
+    payload: changedEmail ? { employee_id: employeeId, work_email: { from: before.work_email, to: after.work_email } } : { employee_id: employeeId },
   });
   return after;
 }
@@ -265,7 +391,7 @@ async function setBirthday(client, employeeId, { day, month }, actor) {
 async function renumberEmployee(client, employeeId, actor) {
   const before = await repo.findEmployeeById(client, employeeId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
-  await advanceStaffNumbers(client);
+  await advanceStaffNumbers(client, { date: before.start_date });
   let number = null;
   for (let tries = 0; tries < 50 && number === null; tries += 1) {
     const next = (await numbering.allocate(client, "employee", { date: before.start_date })).number;
@@ -359,8 +485,9 @@ async function setReportingLine(client, employeeId, input, actor) {
       throw new AppError("REPORTS_TO_SELF", "Nobody reports to themselves.", 422, {
         [key]: ["Not themselves"],
       });
-    if (!(await repo.findEmployeeById(client, id)))
-      throw new AppError("MANAGER_NOT_FOUND", "That manager is not on the staff list.", 422, {
+    const manager = await repo.findEmployeeById(client, id);
+    if (!manager || manager.status !== "active")
+      throw new AppError("MANAGER_NOT_FOUND", "That manager is not on the staff list now.", 422, {
         [key]: ["Not an employee"],
       });
   }
@@ -451,9 +578,18 @@ async function updateSeat(client, seatId, patch, actor) {
   return after;
 }
 
-/** The seat with this title, or a new one (the importer's VACANT rows). */
-async function findOrCreateSeat(client, { title, department_id: departmentId }, actor) {
-  const existing = await repo.findSeatByTitle(client, title);
+/**
+ * The seat with this title, or a new one (the importer's VACANT rows). A seat in the row's own
+ * department is the one; failing that, a seat of that title made before this import (one the
+ * names step moved to another department), never one an earlier row of the same import made,
+ * so two departments' vacancies with one title stay two seats. `keepClosed` (the roster) also
+ * finds a closed seat and leaves it closed: a post People closed does not come back.
+ * @param {{keepClosed?: boolean, before?: Date|string|null}} [opts]  before: the import's start
+ */
+async function findOrCreateSeat(client, { title, department_id: departmentId }, actor, { keepClosed = false, before = null } = {}) {
+  const existing =
+    (await repo.findSeatByTitle(client, title, { departmentId, includeClosed: keepClosed })) ||
+    (await repo.findSeatByTitle(client, title, { includeClosed: keepClosed, createdBefore: before || new Date(0) }));
   if (existing) return { seat: existing, created: false };
   const seat = await createSeat(client, { title, department_id: departmentId }, actor);
   return { seat, created: true };
@@ -531,9 +667,12 @@ async function summary(client, scope) {
       action: { tone: "info", text: "Create vacancy" },
       link: screen("people", "organogram"),
     },
-    tally.no_login > 0 && {
+    tally.no_login + (tally.invite_unsent || 0) > 0 && {
       title: "Not Yet Invited",
-      text: `${people(tally.no_login)} with no login`,
+      // A roster login is Invited but was never emailed: it waits for Invite All Pending too.
+      text: tally.invite_unsent
+        ? `${people(tally.no_login + tally.invite_unsent)} not invited yet`
+        : `${people(tally.no_login)} with no login`,
       action: { tone: "info", text: "Send invites" },
       link: screen("settings", "users"),
     },
@@ -653,17 +792,13 @@ async function resolveManager(client, target, { exclude = null } = {}) {
     const hit = onePerson(await repo.findEmployeesByName(client, name));
     if (hit) return { employee_id: hit.employee_id };
   }
+  /* A first name alone ("Chinyere - Head PR & Marketing") is one person only when nobody
+     else has it, and when a post is written beside it, only when that person holds it. */
   if (target.name && !target.name.includes(" ")) {
-    const folded = managerText.fold(target.name);
-    const page = await repo.list(
-      client,
-      { page: 1, q: target.name },
-      { scope: "all", scope_ids: null },
-    );
-    const byFirstName = page.data.filter(
-      (r) => managerText.fold(r.display_name).split(" ")[0] === folded && r.employee_id !== exclude,
-    );
-    if (byFirstName.length === 1) return { employee_id: byFirstName[0].employee_id };
+    const byFirstName = notExcluded(await repo.findEmployeesByFirstName(client, target.name));
+    const hit = byFirstName.length === 1 ? byFirstName[0] : null;
+    if (hit && (!target.title || managerText.matchesTitle(target.title, hit.job_title)))
+      return { employee_id: hit.employee_id };
   }
   for (const title of [target.title, target.text].filter(Boolean)) {
     const exact = onePerson(await repo.findEmployeesByJobTitle(client, title));
@@ -715,18 +850,35 @@ async function importRow(client, values, ctx = {}) {
       client,
       { title: values.job_title, department_id: values.department },
       actor,
+      { keepClosed: Boolean(options.keep_existing), before: ctx.batch ? ctx.batch.created_at : null },
     );
     return { action: created ? "create" : "none", target_id: seat.org_seat_id, before: null };
   }
 
-  const workEmail =
-    values.work_email ||
-    (options.work_email_by_job_title || {})[String(values.job_title || "").trim()] ||
-    null;
+  const postEmail = (options.work_email_by_job_title || {})[String(values.job_title || "").trim()] || null;
+  const workEmail = values.work_email || postEmail || null;
   let byNumber = values.staff_number
     ? await repo.findEmployeeByStaffNumber(client, values.staff_number)
     : null;
   const byEmail = workEmail ? await repo.findEmployeeByWorkEmail(client, workEmail) : null;
+
+  /*
+   * The row's Email cell is empty and the post's address (roles.json) is already somebody's.
+   * That somebody is this row only when the number or the name says so: a second person in
+   * the same post must bring their own address, or they would be read as the first.
+   */
+  if (!values.work_email && postEmail && byEmail) {
+    const other = values.staff_number
+      ? byEmail.staff_number !== values.staff_number
+      : !sameName(byEmail, name);
+    if (other)
+      throw new AppError(
+        "WORK_EMAIL_REQUIRED",
+        `${postEmail} belongs to staff number ${byEmail.staff_number}; give this person their own email.`,
+        422,
+        { work_email: ["Required"] },
+      );
+  }
 
   /*
    * The staff number this row claims is held by a different work email, so the holder is
@@ -745,10 +897,16 @@ async function importRow(client, values, ctx = {}) {
    */
   if (byNumber && workEmail && !sameEmail(byNumber.work_email, workEmail) && !sameName(byNumber, name)) {
     const onSheet = (options.roster_work_emails || []).some((e) => sameEmail(e, byNumber.work_email));
-    if (!byEmail && (!options.reclaim_staff_numbers || onSheet))
+    /* Somebody an earlier roster brought is MyCity's own person under this number: a new
+       name and a new email on their row is them, changed, never a stranger to move aside. */
+    const ours =
+      !byEmail && options.reclaim_staff_numbers && !onSheet && (await repo.importedByRoster(client, byNumber.employee_id));
+    if (!byEmail && (!options.reclaim_staff_numbers || onSheet || ours))
       throw new AppError(
         "STAFF_NUMBER_TAKEN",
-        `Staff number ${values.staff_number} belongs to ${byNumber.work_email}.`,
+        ours
+          ? `Staff number ${values.staff_number} belongs to ${byNumber.work_email}, loaded from the roster before; correct their record on screen.`
+          : `Staff number ${values.staff_number} belongs to ${byNumber.work_email}.`,
         409,
         { staff_number: ["Already in use"] },
       );
@@ -780,6 +938,19 @@ async function importRow(client, values, ctx = {}) {
     throw new AppError("WORK_EMAIL_REQUIRED", "Work Email is required to create a person.", 422, {
       work_email: ["Required"],
     });
+  /* A row with no staff number whose email matched nobody: somebody of the same first and
+     last name already on the register is most likely this person under a changed address,
+     and a second record would split their history. The row names its staff number to go on. */
+  if (!values.staff_number) {
+    const namesakes = await repo.findEmployeesByFirstAndLast(client, name.first_name, name.last_name);
+    if (namesakes.length)
+      throw new AppError(
+        "POSSIBLE_DUPLICATE",
+        `${name.first_name} ${name.last_name} may already be staff number ${namesakes[0].staff_number}; add their Staff ID to the row.`,
+        409,
+        { full_name: ["Already on the register"] },
+      );
+  }
   const employee = await createEmployee(
     client,
     {
@@ -821,13 +992,36 @@ function optional(values, keys) {
   return out;
 }
 
-/** One Name cell into first, middle and last. A single word is both first and last name. */
-function splitName(full) {
+/** Titles a sheet writes before a name ("Mrs", "Engr."): not part of anybody's name. */
+const HONORIFICS = new Set([
+  "mr", "mrs", "ms", "miss", "mx", "dr", "engr", "prof", "chief", "alhaji", "alhaja", "barr",
+  "pastor", "rev", "hon", "sir", "dame", "arc", "pharm",
+]);
+
+/** A word written all in capitals or all in small letters ("OBI", "obi"), as a name is spelt: Obi. "McCarthy" stays. */
+const nameCase = (word) =>
+  /\p{L}/u.test(word) && (word === word.toUpperCase() || word === word.toLowerCase())
+    ? word.toLowerCase().replace(/(^|[-'’])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
+    : word;
+
+/**
+ * A Name cell tidied: spacing collapsed, leading titles dropped ("Engr. Tunde Bakare"), a word
+ * in capitals or small letters put in name case ("TOBILOBA dada" → "Tobiloba Dada"). The importer's Name column
+ * runs it (employee.import.js clean), so a sheet's spelling is compared as the record holds it.
+ */
+function cleanName(full) {
   const parts = String(full ?? "")
     .replace(/\s+/g, " ")
     .trim()
     .split(" ")
     .filter(Boolean);
+  while (parts.length > 1 && HONORIFICS.has(parts[0].toLowerCase().replace(/\.$/, ""))) parts.shift();
+  return parts.map(nameCase).join(" ");
+}
+
+/** One Name cell into first, middle and last. A single word is both first and last name. */
+function splitName(full) {
+  const parts = cleanName(full).split(" ").filter(Boolean);
   if (parts.length === 0) return { first_name: "", middle_name: undefined, last_name: "" };
   if (parts.length === 1)
     return { first_name: parts[0], middle_name: undefined, last_name: parts[0] };
@@ -837,6 +1031,36 @@ function splitName(full) {
     last_name: parts[parts.length - 1],
   };
 }
+
+/**
+ * Keep the staff-number counter above every number a roster about to be loaded claims, before
+ * any row is written: a row with no Staff ID is then given a number above all of them, and a
+ * holder moved off a number lands above them too, once.
+ * @param {string[]} numbers  the sheet's Staff ID cells
+ */
+async function reserveStaffNumbers(client, numbers) {
+  const pad = await numbering.paddingOf(client, "employee");
+  for (const n of numbers) {
+    const text = String(n ?? "").trim().toUpperCase();
+    if (text) await advancePast(client, /^\d+$/.test(text) && text.length < pad ? text.padStart(pad, "0") : text);
+  }
+}
+
+/**
+ * Note that MyCity's names (seeds/staff/nomenclature.json, at this checksum) were applied, so
+ * the next deploy does not apply them again over what People changed on screen since.
+ */
+async function recordNamesApplied(client, sha256, tally, actor) {
+  await emit(client, {
+    key: EVENTS.DEPARTMENT_NAMES_APPLIED,
+    entity: { type: "nomenclature", id: sha256 },
+    actor,
+    payload: { sha256, ...tally },
+  });
+}
+
+/** Whether the names at this checksum were applied already. */
+const namesApplied = (client, sha256) => repo.namesApplied(client, sha256);
 
 module.exports = {
   setBirthday,
@@ -868,4 +1092,8 @@ module.exports = {
   resolveManager,
   importRow,
   splitName,
+  cleanName,
+  reserveStaffNumbers,
+  recordNamesApplied,
+  namesApplied,
 };

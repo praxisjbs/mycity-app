@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
 import { saveFile } from "@/api/download";
@@ -13,6 +14,7 @@ import {
   DesktopOnly,
   EmptyState,
   Field,
+  FilterSelect,
   formatDateTime,
   KeyValue,
   KpiGrid,
@@ -48,14 +50,27 @@ const STATUS: Record<string, { tone: "ok" | "warn" | "err" | "neutral" | "info";
   failed: { tone: "err", text: "Failed" },
 };
 
-const ROW_TONE: Record<string, "ok" | "warn" | "err" | "neutral"> = {
-  ok: "ok",
-  warning: "warn",
-  error: "err",
-  duplicate: "err",
-  unchanged: "neutral",
-  skipped: "neutral",
+const ROW_STATUS: Record<string, { tone: "ok" | "warn" | "err" | "neutral"; text: string }> = {
+  ok: { tone: "ok", text: "Ready" },
+  warning: { tone: "warn", text: "Saved With Note" },
+  error: { tone: "err", text: "Not Imported" },
+  duplicate: { tone: "err", text: "Duplicate" },
+  unchanged: { tone: "neutral", text: "Unchanged" },
+  skipped: { tone: "neutral", text: "Skipped" },
 };
+
+/** The rows the Preview step lists: the ones to look at, or the ones that change a record. */
+type RowView = "problem" | "change";
+const ROW_VIEWS: Array<[RowView, string]> = [
+  ["problem", "Problems"],
+  ["change", "Changes"],
+];
+
+/** The biggest sheet the server reads (src/shared/spreadsheet/parse.js), not the vault's 25 MB; a CSV's is about 5 MB of text. */
+const SHEET_MAX_BYTES = 10 * 1024 * 1024;
+
+/** The rows of the sheet the header may be on: the first 20, as the engine looks. */
+const HEADER_ROWS: Array<[string, string]> = Array.from({ length: 20 }, (_, i) => [String(i), `Row ${i + 1}`]);
 
 const count = (n: number | undefined) => String(n ?? 0);
 
@@ -184,10 +199,15 @@ function BatchDetail({ batch, confirm }: { batch: ImportBatch; confirm: ReturnTy
             busy={revert.pending}
             onClick={async () => {
               if (!(await confirm({ title: "Revert Import", body: "Records it created are archived and records it changed go back.", destructive: true }))) return;
-              const out = await revert.run({ params: { id: batch.import_batch_id } });
-              setDone(true);
-              invalidate("/api/v1/imports");
-              toast(`${out.archived} archived, ${out.restored} put back`);
+              try {
+                const out = await revert.run({ params: { id: batch.import_batch_id } });
+                setDone(true);
+                invalidate("/api/v1/imports");
+                toast(`${out.archived} archived, ${out.restored} put back`);
+              } catch (e) {
+                // Refused whole when a record changed since or is in use: the reason names the rows.
+                toast(e instanceof Error ? e.message : "Not reverted. Try again.");
+              }
             }}
           >
             Revert
@@ -229,6 +249,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
   const [fields, setFields] = useState<Record<string, string | null>>({});
   const [validOnly, setValidOnly] = useState(false);
   const [ticked, setTicked] = useState<Record<string, string[]>>({});
+  const [view, setView] = useState<RowView>("problem");
   const setMapping = useMutation("PUT /api/v1/imports/:id/mapping");
   const preview = useMutation("POST /api/v1/imports/:id/preview");
   const commit = useMutation("POST /api/v1/imports/:id/commit");
@@ -236,9 +257,23 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
 
   const rows = usePaged("GET /api/v1/imports/:id/rows", {
     params: { id: batch?.import_batch_id ?? "" },
-    filters: { status: "problem" },
+    filters: { status: view },
     enabled: Boolean(batch) && batch?.status === "previewed",
   });
+  const labelOf = (key: string) => importer?.fields.find((f) => f.key === key)?.label ?? key;
+
+  /* The row of column names was not found: the person says which row it is, and the columns
+     of that row are matched afresh for them to confirm. */
+  const pickHeader = async (row: string) => {
+    if (!batch) return;
+    try {
+      const next = await setMapping.run({ params: { id: batch.import_batch_id }, body: { header_row: Number(row) } });
+      setBatch(next);
+      setFields(Object.fromEntries(next.mapping.columns.map((c) => [String(c.index), c.field])));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "That row did not work");
+    }
+  };
 
   const options = useMemo(
     () => [["", "Leave Out"] as [string, string], ...(importer?.fields ?? []).map((f) => [f.key, f.label] as [string, string])],
@@ -273,6 +308,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
             fields={{ importer_key: key }}
             accept=".xlsx,.csv"
             multiple={false}
+            maxBytes={SHEET_MAX_BYTES}
             kinds="Excel or CSV"
             onUploaded={([answer]) => {
               // The route answers with the batch it started, which carries the
@@ -295,6 +331,14 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
       title: "Map",
       body: (
         <div className="grid gap-2">
+          <Field label="Column Names Row" help="The row of the sheet that holds the column names.">
+            <SelectField
+              value={batch?.header_row === null || batch?.header_row === undefined ? "" : String(batch.header_row)}
+              onChange={(v) => pickHeader(v)}
+              options={HEADER_ROWS}
+              placeholder="Choose Row"
+            />
+          </Field>
           {(batch?.mapping.columns ?? []).map((c) => (
             <Field key={c.index} label={c.header || `Column ${c.index + 1}`}>
               <SelectField
@@ -333,18 +377,30 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
               onPage={rows.setPage}
               loading={rows.loading}
               rowKey={(r: ImportRowRecord) => r.import_row_id}
-              caption="Rows with problems"
+              caption={view === "change" ? "Rows that change a record" : "Rows with problems"}
               noun="row"
+              actions={<FilterSelect label="Show" value={view} onChange={(v) => setView(v as RowView)} options={ROW_VIEWS} />}
               columns={[
                 { key: "n", label: "Row", align: "n" as const, render: (r: ImportRowRecord) => String(r.row_number) },
                 {
                   key: "s",
                   label: "Status",
-                  render: (r: ImportRowRecord) => <Pill tone={ROW_TONE[r.status] ?? "neutral"}>{r.status}</Pill>,
+                  render: (r: ImportRowRecord) => (
+                    <Pill tone={ROW_STATUS[r.status]?.tone ?? "neutral"}>{ROW_STATUS[r.status]?.text ?? r.status}</Pill>
+                  ),
+                },
+                {
+                  key: "c",
+                  label: "Changes",
+                  render: (r: ImportRowRecord) => Object.keys(r.diff ?? {}).map(labelOf).join(", "),
                 },
                 { key: "p", label: "Problem", render: (r: ImportRowRecord) => r.problems.map((p) => p.message).join("; ") },
               ]}
-              empty={{ title: "Every Row Is Fine", text: "Nothing needs fixing before you commit.", icon: "check" }}
+              empty={
+                view === "change"
+                  ? { title: "Nothing Changes", text: "No record already here is changed by this sheet.", icon: "check" }
+                  : { title: "Every Row Is Fine", text: "Nothing needs fixing before you commit.", icon: "check" }
+              }
             />
           </DesktopOnly>
           <PhoneOnly>
@@ -365,9 +421,9 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
       body: batch && (
         <>
           <Counts stats={batch.stats} />
-          {Object.entries(batch.stats.missing ?? {}).map(([field, values]) => (
+          {Object.entries(batch.stats.missing ?? {}).filter(([, values]) => values.length > 0).map(([field, values]) => (
             <Card key={field} className="mt-3">
-              <CardHeader title="New Values" />
+              <CardHeader title={`New ${labelOf(field)}`} />
               {values.map((v) => (
                 <Tick
                   key={v}
@@ -383,7 +439,9 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
               ))}
             </Card>
           ))}
-          {Number(batch.stats.error ?? 0) + Number(batch.stats.duplicate ?? 0) > 0 && (
+          {/* A row whose new value is left unticked fails at commit, so the switch shows then too. */}
+          {(Number(batch.stats.error ?? 0) + Number(batch.stats.duplicate ?? 0) > 0 ||
+            Object.values(batch.stats.missing ?? {}).some((v) => v.length > 0)) && (
             <Switch
               className="mt-3"
               label="Commit Valid Rows"
@@ -413,7 +471,14 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
           toast(`${out.stats.create} created, ${out.stats.update} updated`);
           close();
         } catch (e) {
+          // A refused commit keeps every row's result: the counts and the rows are read again,
+          // so the person sees what to fix, or turns on Commit Valid Rows, and tries again.
           toast(e instanceof Error ? e.message : "That import did not commit");
+          if (e instanceof ApiError && e.code === "IMPORT_HAS_ERRORS") {
+            const fresh = await api.call("GET /api/v1/imports/:id", { params: { id: batch.import_batch_id } });
+            setBatch(fresh);
+            setView("problem");
+          }
         }
       }}
     />

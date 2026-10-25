@@ -614,6 +614,7 @@ fields, never in a toast.
 
 ## 14 · Change log
 
+- 25/10/2026 · JP · A channel's name at the head of its thread is its heading (h2), so each post's title (h3) sits under it: the accessibility gate refused h1 straight to h3 (heading-order). Nothing on screen changes.
 - 13/10/2026 · GE · First version, from the 12 October internal workflow meeting and MILESTONES §6.4.
 - 13/10/2026 · GE · Added View Profile and Search in Conversation (TB review of the demo).
 - 13/10/2026 · GE · Added message ticks, voice note playback and transcription, read and not read lists on announcements, resizable list; removed work details from the profile (TB review).

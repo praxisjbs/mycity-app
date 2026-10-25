@@ -5,7 +5,7 @@
  * @use A list, a search or a page with nothing in it yet; a filter that matched nothing; a first visit.
  * @avoid An explanation of the feature (tier 3); more than one action; a screen that has data on it.
  * @phone Centred, the drawing at the smaller size; the action is full width within thumb reach.
- * @a11y The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet; at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative.
+ * @a11y The title is a heading (data-ui="title"): h2 as its own card on a page, h3 when bare inside a card or a sheet, or the `level` its place needs (a bare one straight under the page title is 2); at most 4 words; the line (data-ui="empty-text") at most 8. The drawing is decorative.
  * @status stable
  * @example <EmptyState illustration="Search" title="No Matches" text="Try another name or department" />
  * @example <EmptyState title="No Requests Yet" action={<Button variant="primary">Request Leave</Button>} />
@@ -29,13 +29,15 @@ export interface EmptyStateProps {
   action?: ReactNode;
   /** Draw it without its card (inside a card or a sheet that already has one). */
   bare?: boolean;
+  /** The title's heading level when the default does not fit its place: 2 for a bare one straight under the page title. */
+  level?: 2 | 3;
   /** Layout classes only (spacing). */
   className?: string;
 }
 
-export function EmptyState({ illustration, icon, title, text, action, bare, className }: EmptyStateProps) {
+export function EmptyState({ illustration, icon, title, text, action, bare, level, className }: EmptyStateProps) {
   // Its own card on a page is a section of it (h2); bare, inside a card or a sheet, it sits under that title (h3).
-  const Heading = bare ? "h3" : "h2";
+  const Heading = level === 2 ? "h2" : level === 3 ? "h3" : bare ? "h3" : "h2";
   const art =
     illustration || !icon ? (
       <Illustration name={illustration ?? "Empty"} className="mx-auto mb-3 phone:w-18" />

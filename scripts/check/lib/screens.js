@@ -594,7 +594,10 @@ function ensureAppBuild() {
   if (!fs.existsSync(app)) return false;
   const built = path.join(ROOT, APP_DIST, "screens.json");
   // packages/ui is built into the app, so a change to a shared component makes the build stale too.
-  const source = Math.max(newest(path.join(app, "src")), newest(path.join(ROOT, "packages", "ui", "src")), newest(path.join(app, "index.html")), newest(path.join(app, "vite.config.ts")), newest(path.join(app, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")));
+  // The demo carries the User Guide's chapters (the mock reads docs/manual), so a changed chapter rebuilds it too; its pictures do not.
+  const manual = path.join(ROOT, "docs", "manual");
+  const chapters = fs.existsSync(manual) ? fs.readdirSync(manual).filter((f) => f.endsWith(".md")).map((f) => newest(path.join(manual, f))) : [];
+  const source = Math.max(newest(path.join(app, "src")), newest(path.join(ROOT, "packages", "ui", "src")), newest(path.join(app, "index.html")), newest(path.join(app, "vite.config.ts")), newest(path.join(app, "package.json")), newest(path.join(ROOT, "docs", "PROGRESS.md")), ...chapters);
   const mock = () => {
     try {
       return JSON.parse(fs.readFileSync(built, "utf8")).api_mode === "mock";
@@ -813,4 +816,4 @@ function run(gate, body) {
   });
 }
 
-module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, serve, appSettle, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, ROOT };
+module.exports = { crawl, demoWanted, summarise, finish, run, collect, ensureAppBuild, serve, appSettle, launch, hashOf, WIDTHS, DEMO_TARGET, GALLERY_TARGET, APP_TARGET, APP_DIST, ROOT };

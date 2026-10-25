@@ -1,0 +1,53 @@
+{
+  "qs-add-employee": {
+    "spec": "ecaa81f3ffa184d4",
+    "source": "973aaa7aef06646b",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-invite": {
+    "spec": "eb4334b105905e32",
+    "source": "199f220c9450ebe5",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-notifications": {
+    "spec": "41aa643b8a3f811d",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-roles": {
+    "spec": "6ddaf9c6aea1c7bb",
+    "source": "199f220c9450ebe5",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-search": {
+    "spec": "2bf2ae6cab946e17",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "qs-sign-in": {
+    "spec": "308a044ac4c64c5a",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "qs-status": {
+    "spec": "78ceda875dc917b1",
+    "source": "199f220c9450ebe5",
+    "devices": [
+      "desktop"
+    ]
+  }
+}

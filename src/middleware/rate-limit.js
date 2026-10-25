@@ -199,6 +199,29 @@ const resetLimiter = makeLimiter({
 });
 
 /**
+ * Checking a link before its page shows: only failures count. A 256-bit token cannot be
+ * guessed, and a whole office opening its invitations from one address must not be told its
+ * links have expired (docs/guides/identity.md §6.1).
+ */
+const linkCheckLimiter = makeLimiter({
+  name: "link-check",
+  max: 10,
+  windowMs: 15 * 60_000,
+  failuresOnly: true,
+});
+
+/**
+ * An administrator sending invitations and reset links from Settings · Users: per person, not
+ * per address, so one office's Forgot Password never uses up Operations' invitations.
+ */
+const adminLinkLimiter = makeLimiter({
+  name: "admin-links",
+  max: 60,
+  windowMs: 15 * 60_000,
+  key: (req) => (req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`),
+});
+
+/**
  * Changing a password while signed in: per person, after auth has established who.
  * A stolen access token must not be a licence to guess the current password.
  */
@@ -295,6 +318,8 @@ module.exports = {
   refreshLimiter,
   forgotLimiter,
   resetLimiter,
+  linkCheckLimiter,
+  adminLinkLimiter,
   changePasswordLimiter,
   deviceLimiter,
   twoStepLimiter,

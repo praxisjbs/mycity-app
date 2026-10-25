@@ -98,6 +98,12 @@ const Me = z
     manages_people: z.boolean(),
     /** Settings · Appearance as every screen of the hub applies it (appearance.js). */
     appearance: AppearanceApplied,
+    /**
+     * The record fields the person's role hides (gross_monthly, bank_name, date_of_birth...),
+     * A to Z, from shared/rbac/field-mask.js: a form leaves them out, and the API refuses them.
+     * Empty for the CEO.
+     */
+    hidden_fields: z.array(z.string()),
   })
   .strict();
 

@@ -33,6 +33,7 @@ const { defineVariables } = require("../../shared/templates/variables");
 const EVENTS = defineEvents("people", {
   "department.created": { summary: "A department was created" },
   "department.updated": { summary: "A department was changed" },
+  "department.names_applied": { summary: "MyCity's names for departments, posts and seats were applied" },
   "employee.created": { summary: "An employee record was created", sensitive: true },
   "employee.updated": { summary: "An employee record was changed", sensitive: true },
   "employee.archived": { summary: "An employee record was archived" },

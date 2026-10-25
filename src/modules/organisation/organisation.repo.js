@@ -95,6 +95,7 @@ const UPDATE_COLUMNS = [
 /** The login a person has, as the register and the 360 name it. */
 const LOGIN_STATE = `
   CASE WHEN u.user_id IS NULL THEN 'none'
+       WHEN u.status = 'left' OR e.status IN ('archived', 'left') THEN 'left'
        WHEN u.status = 'suspended' THEN 'suspended'
        WHEN u.password_changed_at IS NULL THEN 'invited'
        ELSE 'active' END`;
@@ -244,7 +245,12 @@ async function counts(db, scope, today) {
             count(*) FILTER (WHERE e.status = 'active' AND e.line_manager_id IS NULL
                              AND e.line_manager_seat_id IS NULL
                              AND COALESCE(u.is_ceo, false) = false)::int AS no_manager,
-            count(*) FILTER (WHERE e.status = 'active' AND u.user_id IS NULL)::int AS no_login
+            count(*) FILTER (WHERE e.status = 'active' AND u.user_id IS NULL)::int AS no_login,
+            -- A roster login nobody has emailed yet: Invited on the register, but never sent.
+            count(*) FILTER (WHERE e.status = 'active' AND u.user_id IS NOT NULL AND u.status = 'active'
+                               AND u.password_changed_at IS NULL
+                               AND NOT EXISTS (SELECT 1 FROM password_reset p
+                                                WHERE p.user_id = u.user_id AND p.purpose = 'invite'))::int AS invite_unsent
        FROM employee e
        LEFT JOIN app_user u ON u.employee_id = e.employee_id
       WHERE true ${s.and}`,
@@ -335,12 +341,17 @@ function historyOf(db, employeeId, query) {
   );
 }
 
+/** A name with its punctuation as spaces: "Technology & Back-Office Ops" is "Technology & Back Office Ops". */
+const LOOSE_NAME = (sql) => `btrim(regexp_replace(search_fold(${sql}), '[^a-z0-9]+', ' ', 'g'))`;
+
+/** A department by name: as written first, else with case, accents and punctuation set aside. */
 function findDepartmentByName(db, name) {
   return one(
     db,
     `SELECT department_id, code::text AS code, name, active
-       FROM department WHERE lower(name) = lower($1)
-      ORDER BY active DESC, created_at
+       FROM department
+      WHERE lower(name) = lower($1) OR ${LOOSE_NAME("name")} = ${LOOSE_NAME("$1::text")}
+      ORDER BY (lower(name) = lower($1)) DESC, active DESC, created_at
       LIMIT 1`,
     [name],
   );
@@ -508,20 +519,105 @@ function findEmployeeById(db, employeeId) {
 }
 
 /**
- * The people whose name matches, for the importer's two-pass manager matching: one hit
- * is the manager, several are an error on the row and never a guess.
+ * A name as two spellings of it compare: hyphens and runs of space as one space, apostrophes
+ * dropped, then search_fold (case and accents). "Shola-Adido" and "Shola Adido" are one name.
+ */
+const NAME_FOLD = (sql) =>
+  `search_fold(btrim(regexp_replace(regexp_replace(${sql}, '[''’]', '', 'g'), '[\\s-]+', ' ', 'g')))`;
+
+/**
+ * The active people whose name matches, for the importer's manager matching: one hit is the
+ * manager, several are an error on the row and never a guess. A name matches written in full
+ * (with the middle name) or as first and last name only, the way a sheet usually writes it.
  */
 async function findEmployeesByName(db, name) {
   const { rows } = await db.query(
     `SELECT e.employee_id, ${DISPLAY_NAME} AS display_name, e.job_title
        FROM employee e
-      WHERE e.status <> 'archived'
-        AND search_fold(btrim(regexp_replace(e.first_name || ' ' || COALESCE(e.middle_name, '') || ' ' || e.last_name, '\\s+', ' ', 'g')))
-            = search_fold(btrim(regexp_replace($1::text, '\\s+', ' ', 'g')))
+      WHERE e.status = 'active'
+        AND (${NAME_FOLD("e.first_name || ' ' || COALESCE(e.middle_name, '') || ' ' || e.last_name")} = ${NAME_FOLD("$1::text")}
+             OR ${NAME_FOLD("e.first_name || ' ' || e.last_name")} = ${NAME_FOLD("$1::text")})
       ORDER BY e.employee_id`,
     [name],
   );
   return rows;
+}
+
+/** The active people with this first name, at most two: one is the answer, two are ambiguous. */
+async function findEmployeesByFirstName(db, firstName) {
+  const { rows } = await db.query(
+    `SELECT e.employee_id, ${DISPLAY_NAME} AS display_name, e.job_title
+       FROM employee e
+      WHERE e.status = 'active' AND ${NAME_FOLD("e.first_name")} = ${NAME_FOLD("$1::text")}
+      ORDER BY e.employee_id
+      LIMIT 2 -- pagination:batch one hit is the answer and a second makes it ambiguous`,
+    [firstName],
+  );
+  return rows;
+}
+
+/**
+ * The people on the register, archived aside, with this first and last name: before a roster
+ * row with no staff number creates somebody, so a changed email cannot make a second record.
+ */
+async function findEmployeesByFirstAndLast(db, firstName, lastName) {
+  const { rows } = await db.query(
+    `SELECT e.employee_id, e.staff_number::text AS staff_number, e.work_email::text AS work_email
+       FROM employee e
+      WHERE e.status <> 'archived'
+        AND ${NAME_FOLD("e.first_name")} = ${NAME_FOLD("$1::text")}
+        AND ${NAME_FOLD("e.last_name")} = ${NAME_FOLD("$2::text")}
+      ORDER BY e.employee_id`,
+    [firstName, lastName],
+  );
+  return rows;
+}
+
+/**
+ * Whether a committed staff roster batch (one carrying the sheet's checksum) created this
+ * person: the roster never takes a staff number back from somebody it brought itself.
+ */
+async function importedByRoster(db, employeeId) {
+  const row = await one(
+    db,
+    `SELECT 1 AS x
+       FROM import_row r
+       JOIN import_batch b ON b.import_batch_id = r.import_batch_id
+      WHERE b.importer_key = 'employees' AND b.status = 'committed' AND b.options ? 'source_sha256'
+        AND r.action = 'create' AND r.target_id = $1::text
+      LIMIT 1`,
+    [employeeId],
+  );
+  return Boolean(row);
+}
+
+/**
+ * Whether anything now hangs off a person the import created: a login, a leave request or a
+ * clock-in. Reverting the import would archive somebody already in use, so it is refused.
+ */
+async function employeeInUse(db, employeeId) {
+  const row = await one(
+    db,
+    `SELECT EXISTS (SELECT 1 FROM app_user WHERE employee_id = $1)
+         OR EXISTS (SELECT 1 FROM leave_request WHERE employee_id = $1)
+         OR EXISTS (SELECT 1 FROM attendance_event WHERE employee_id = $1) AS used`,
+    [employeeId],
+  );
+  return Boolean(row && row.used);
+}
+
+/**
+ * The fields of a person the staff importer compares and puts back on revert that a record
+ * read does not carry: the middle name and the personal fields. Read only by the importer,
+ * whose preview and error file mask what a reader may not see.
+ */
+function importSnapshot(db, employeeId) {
+  return one(
+    db,
+    `SELECT e.middle_name, e.gender, to_char(e.date_of_birth, 'YYYY-MM-DD') AS date_of_birth, e.bank_name
+       FROM employee e WHERE e.employee_id = $1`,
+    [employeeId],
+  );
 }
 
 /** The people holding a job title, for a manager named by their post ("Program Manager"). */
@@ -529,7 +625,7 @@ async function findEmployeesByJobTitle(db, title) {
   const { rows } = await db.query(
     `SELECT e.employee_id, ${DISPLAY_NAME} AS display_name, e.job_title
        FROM employee e
-      WHERE e.status <> 'archived'
+      WHERE e.status = 'active'
         AND search_fold(e.job_title) = search_fold(btrim($1::text))
       ORDER BY e.employee_id`,
     [title],
@@ -548,7 +644,7 @@ async function jobTitles(db) {
     db,
     `SELECT e.employee_id, e.job_title, ${DISPLAY_NAME} AS display_name
        FROM employee e
-      WHERE e.status <> 'archived'
+      WHERE e.status = 'active'
       ORDER BY e.employee_id`,
     [],
     { label: "staff job titles", ceiling: TREE_CEILING },
@@ -595,21 +691,15 @@ function insertEmployee(db, e) {
 }
 
 /**
- * Apply an EmployeeUpdate. Only the keys that carry a value are touched: a key that
- * arrives empty means "not given", never "clear it".
- *
- * A form holds every one of its fields, and a field the person may not see arrives
- * masked (null). Writing those through would blank a salary or a date of birth because
- * somebody corrected a job title, so the one write path refuses to: clearing a field is
- * its own change, not a side effect of an edit.
+ * Apply an EmployeeUpdate. A key left out (undefined) or arriving empty ("") is not touched;
+ * a key set to null is cleared. Only a correction's clearable fields (EmployeeUpdate) can carry
+ * null, and only for a field the person emptied on Edit: a field their role hides is refused at
+ * the controller before it gets here (shared/rbac/field-mask.js assertWritable), so a masked
+ * value is never written back as a blank (docs/guides/foundation.md §6.16).
  */
 function updateEmployee(db, employeeId, patch) {
   const keys = UPDATE_COLUMNS.filter(
-    (k) =>
-      Object.prototype.hasOwnProperty.call(patch, k) &&
-      patch[k] !== undefined &&
-      patch[k] !== null &&
-      patch[k] !== "",
+    (k) => Object.prototype.hasOwnProperty.call(patch, k) && patch[k] !== undefined && patch[k] !== "",
   );
   if (keys.length === 0) return findEmployeeById(db, employeeId);
   const sets = keys.map((k, i) => `${k} = $${i + 2}`);
@@ -620,6 +710,28 @@ function updateEmployee(db, employeeId, patch) {
       RETURNING ${EMPLOYEE_COLUMNS.replace(/\be\./g, "")}`,
     [employeeId, ...keys.map((k) => patch[k])],
   );
+}
+
+/**
+ * Every field of a record that a create or a correction writes, for the audit row, so the
+ * ledger names a changed salary, bank account or probation date as well as a job title
+ * (shared/events/emit.js: restricted fields are kept, and masked per reader on the Audit Log).
+ */
+function auditRow(db, employeeId) {
+  return one(
+    db,
+    `SELECT e.employee_id, e.status, ${[...new Set([...INSERT_COLUMNS, ...UPDATE_COLUMNS, "line_manager_seat_id", "dotted_manager_seat_id"])]
+      .map((c) => (c === "staff_number" || c === "work_email" ? `e.${c}::text AS ${c}` : `e.${c}`))
+      .join(", ")}
+       FROM employee e WHERE e.employee_id = $1`,
+    [employeeId],
+  );
+}
+
+/** The employee a login's email belongs to, when a login uses this address (identity's app_user, read only). */
+async function loginEmailOwner(db, email) {
+  const row = await one(db, "SELECT u.employee_id FROM app_user u WHERE u.email = $1", [email]);
+  return row ? row.employee_id : null;
 }
 
 /**
@@ -801,16 +913,23 @@ async function findSeatById(db, seatId) {
   return row ? toSeat(row) : null;
 }
 
-/** A seat by the title the sheet or a screen names, ignoring case and spacing. */
-async function findSeatByTitle(db, title) {
+/**
+ * A seat by the title the sheet or a screen names, ignoring case and spacing; an open one
+ * unless `includeClosed`, an open one first when it is. `departmentId` keeps to one department
+ * and `createdBefore` to seats made before then (the staff importer's VACANT rows).
+ * @param {{departmentId?: string|null, includeClosed?: boolean, createdBefore?: Date|string|null}} [opts]
+ */
+async function findSeatByTitle(db, title, { departmentId = null, includeClosed = false, createdBefore = null } = {}) {
   const row = await one(
     db,
     `SELECT ${SEAT_SELECT} ${SEAT_JOINS}
-      WHERE s.status <> 'closed'
+      WHERE ($3::boolean OR s.status <> 'closed')
+        AND ($2::uuid IS NULL OR s.department_id = $2)
+        AND ($4::timestamptz IS NULL OR s.created_at < $4)
         AND search_fold(btrim(regexp_replace(s.title, '\\s+', ' ', 'g'))) = search_fold(btrim(regexp_replace($1::text, '\\s+', ' ', 'g')))
-      ORDER BY s.created_at
+      ORDER BY (s.status <> 'closed') DESC, s.created_at
       LIMIT 1`,
-    [title],
+    [title, departmentId, includeClosed, createdBefore],
   );
   return row ? toSeat(row) : null;
 }
@@ -841,6 +960,16 @@ async function updateSeat(db, seatId, patch) {
     [seatId, ...keys.map((k) => patch[k] ?? null)],
   );
   return findSeatById(db, seatId);
+}
+
+/** Whether MyCity's names at this checksum were applied (organisation.service.recordNamesApplied). */
+async function namesApplied(db, sha256) {
+  const row = await one(
+    db,
+    "SELECT 1 AS x FROM event_log WHERE event_key = 'department.names_applied' AND entity_id = $1 LIMIT 1",
+    [sha256],
+  );
+  return Boolean(row);
 }
 
 /* ------------------------------------------------------------------ *
@@ -885,13 +1014,20 @@ async function tree(db) {
   return rows;
 }
 
-/** The highest sequence a staff number carries, so numbering can be moved past it. */
-async function highestStaffNumberSeq(db) {
+/**
+ * The highest sequence a staff number of the scheme's own shape carries (numbering.sequencePattern),
+ * so numbering can be moved past it. A number of another shape is never read as a sequence: a
+ * phone number in a Staff ID column once pushed every later number past eight billion.
+ * @param {{query: Function}} db
+ * @param {string} pattern  the scheme's sequence pattern, its one captured group the sequence
+ */
+async function highestStaffNumberSeq(db, pattern) {
   const row = await one(
     db,
-    `SELECT COALESCE(max((regexp_replace(staff_number::text, '\\D', '', 'g'))::bigint), 0)::bigint AS seq
+    `SELECT COALESCE(max(substring(staff_number::text from $1)::bigint), 0)::bigint AS seq
        FROM employee
-      WHERE staff_number::text ~ '[0-9]'`,
+      WHERE staff_number::text ~ $1`,
+    [pattern],
   );
   return row ? Number(row.seq) : 0;
 }
@@ -928,12 +1064,20 @@ module.exports = {
   findEmployeeByStaffNumber,
   findEmployeeById,
   findEmployeesByName,
+  findEmployeesByFirstName,
+  findEmployeesByFirstAndLast,
+  importedByRoster,
+  employeeInUse,
+  importSnapshot,
+  namesApplied,
   findEmployeesByJobTitle,
   jobTitles,
   seatTitles,
   findCeoEmployee,
   insertEmployee,
   updateEmployee,
+  auditRow,
+  loginEmailOwner,
   setStaffNumber,
   archiveEmployee,
   restoreEmployee,

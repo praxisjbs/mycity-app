@@ -1,11 +1,15 @@
 import { useCallback, useState } from "react";
 import { Button, Icon, ShellNotice, toast, useModal } from "@mycity/ui";
 import { enablePush, usePushState } from "@/features/notifications/push";
+import { clearGuideReturn, guideHref, useGuideReturn } from "@/features/knowledge/guide/return";
+import { useRouter } from "@/lib/router";
 import { install, installLater, usePwa } from "./pwa";
 
 /**
  * The shell's notices, one at a time, floating at the foot of the page
- * (ShellNotice): a new version is ready (Reload); turning notifications on for
+ * (ShellNotice): a new version is ready (Reload); the way back to the User Guide
+ * after a step opened a screen (Back to Guide, docs/guides/user-guide.md §3),
+ * on every screen but the guide itself; turning notifications on for
  * this device, never asked yet (docs/guides/notifications.md §2: never the
  * browser's prompt unasked; Not Now holds 14 days on this device); or the
  * one-time offer to install the app (PR 2 question 4: from the second visit,
@@ -23,6 +27,9 @@ const pushLaterUntil = () => {
 
 export function ShellNotices() {
   const { update, banner } = usePwa();
+  const back = useGuideReturn();
+  const { location, navigate } = useRouter();
+  const onGuide = location.module === "knowledge" && location.tab === "user-guide";
   const installApp = useInstallApp();
   const push = usePushState();
   const [laterUntil, setLaterUntil] = useState(pushLaterUntil);
@@ -46,6 +53,33 @@ export function ShellNotices() {
         }
       >
         A new version is ready
+      </ShellNotice>
+    );
+  }
+  if (back && !onGuide) {
+    return (
+      <ShellNotice
+        icon="book"
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={clearGuideReturn}>
+              Close
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon="left"
+              onClick={() => {
+                navigate(guideHref(back));
+                clearGuideReturn();
+              }}
+            >
+              Back to Guide
+            </Button>
+          </>
+        }
+      >
+        <span data-copy="content">{back.step ? `${back.title} · Step ${back.step}` : back.title}</span>
       </ShellNotice>
     );
   }

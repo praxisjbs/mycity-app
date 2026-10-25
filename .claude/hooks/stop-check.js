@@ -3,9 +3,10 @@
 /**
  * Claude Code Stop hook: before Claude ends its turn, run the process gates
  * on the work it has done (committed or not). If PROGRESS.md was not updated,
- * a feature guide was bypassed, or a new file is not on the README map,
- * Claude is told exactly what is missing and keeps working instead of
- * stopping (exit 2, message on stderr).
+ * a feature guide was bypassed, a new file is not on the README map, or the
+ * User Guide no longer matches a screen the change touched (or a picture of
+ * it is stale), Claude is told exactly what is missing and keeps working
+ * instead of stopping (exit 2, message on stderr).
  *
  * It catches the miss inside the session, where it costs one more step,
  * instead of at review. CI runs the same checks for every PR, whoever or
@@ -33,7 +34,7 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const MAX_BLOCKS = 2;
-const CHECKS = ["progress", "guides", "readme-map"];
+const CHECKS = ["progress", "guides", "readme-map", "user-guide"];
 const SCREEN_CHECKS = ["components", "palette", "forms", "dashes", "five-second", "two-shells", "native-ui"];
 const TOUCHES_SCREENS = /^(packages\/ui|app|public-app)\/|^docs\/MyCity-ERP-Documents\/demo\.html$/;
 
@@ -97,9 +98,10 @@ if (blocks >= MAX_BLOCKS) {
 
 writeCount(blocks + 1);
 console.error(
-  "Before finishing, fix these (CLAUDE.md step 5). Update docs/PROGRESS.md and the feature guide, " +
-    "or, if they genuinely do not apply, tell the user why and suggest the PR trailer " +
-    '("Progress-unchanged: <reason>" / "Guide-unchanged: <reason>").\n\n' +
+  "Before finishing, fix these (CLAUDE.md step 5). Update docs/PROGRESS.md, the feature guide and the " +
+    "User Guide chapter (docs/manual), or, if they genuinely do not apply, tell the user why and suggest the PR trailer " +
+    '("Progress-unchanged: <reason>" / "Guide-unchanged: <reason>" / "User-guide-unchanged: <reason>"). ' +
+    "A stale User Guide picture has no trailer: retake it (npm run guide:shots -- --stale).\n\n" +
     report,
 );
 process.exit(2);

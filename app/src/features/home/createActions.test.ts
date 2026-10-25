@@ -23,6 +23,7 @@ function person(over: Partial<Me> = {}): Me {
     home_view: "staff",
     manages_people: false,
     appearance: { dark: null, fonts: { heading: "geist", body: "geist" }, theme_default: "system", density_default: "compact" },
+    hidden_fields: [],
     ...over,
   } as Me;
 }

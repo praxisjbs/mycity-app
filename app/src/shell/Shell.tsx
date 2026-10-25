@@ -30,6 +30,7 @@ import { UrgentNotices, urgentModules, useUrgentNotices } from "@/features/notif
 import { useScreenState } from "@/lib/plan";
 import { hrefFor, moduleKeyOf, useRouter } from "@/lib/router";
 import { goTrail, startTrail, useTrail } from "@/lib/trail";
+import { guideAt } from "@/features/knowledge/guide/return";
 import { visibleModules, visibleTabs } from "./access";
 import { BellButton } from "./Bell";
 import { moduleByKey, type ModuleDef, type TabDef } from "./catalogue";
@@ -283,10 +284,11 @@ function DesktopFrame({ modules, mod, tabs, page, fit, badges, urgent, alert, op
   );
 }
 
-/** The desktop account menu: the person's own screens, theme, density, text size, Install App, Sign Out. */
+/** The desktop account menu: the person's own screens, the User Guide at the screen in view, theme, density, text size, Install App, Sign Out. */
 function useAccountMenu(): MenuItem[] {
-  const { signOut } = useAuth();
-  const { navigate } = useRouter();
+  const { signOut, can } = useAuth();
+  const { location, navigate } = useRouter();
+  const here = location.module && location.tab ? `${moduleKeyOf(location.module)}/${location.tab}` : null;
   const { theme, toggle } = useTheme();
   const density = useDensity();
   const textSize = useTextSizeSheet();
@@ -295,6 +297,7 @@ function useAccountMenu(): MenuItem[] {
   return [
     { label: "My Profile", icon: "user", onSelect: () => navigate(hrefFor("ess", "my-profile")) },
     { label: "My Security", icon: "shield", onSelect: () => navigate(hrefFor("ess", "my-security")) },
+    ...(can("knowledge") ? [{ label: "User Guide", icon: "book" as const, onSelect: () => navigate(guideAt(here)) }] : []),
     "sep",
     { label: theme === "dark" ? "Light Theme" : "Dark Theme", icon: theme === "dark" ? "sun" : "moon", onSelect: toggle },
     { label: density.density === "compact" ? "Comfortable Density" : "Compact Density", icon: "rows", onSelect: density.toggle },

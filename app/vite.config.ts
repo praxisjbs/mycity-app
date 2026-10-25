@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath } from "node:url";
 import { defineConfig, mergeConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
@@ -44,6 +45,9 @@ export default defineConfig(({ mode }) =>
     },
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+    },
+    test: {
+      setupFiles: ["./src/test-setup.ts"],
     },
     server: {
       port: 5173,

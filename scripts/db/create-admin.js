@@ -387,6 +387,14 @@ async function createAdmin(client, input, password, opts = {}) {
   let employeeCreated = false;
 
   if (employee) {
+    // A login is only ever given to someone on the active staff list (no login without an employee who works here).
+    if (employee.status !== "active") {
+      throw new AppError(
+        "EMPLOYEE_NOT_ACTIVE",
+        `Employee ${employee.staff_number} (${e.work_email}) is ${employee.status}. Restore their record in the app first.`,
+        409,
+      );
+    }
     if (await identity.findUserByEmployeeId(client, employee.employee_id)) {
       throw new AppError(
         "LOGIN_EXISTS",
@@ -477,6 +485,7 @@ async function main() {
   const { atomically } = require("../../src/shared/db/tx");
   const requestContext = require("../../src/config/request-context");
   const access = require("../../src/modules/access/access.service");
+  const organisation = require("../../src/modules/organisation/organisation.service");
 
   const term = makeTerminal();
   const client = await pool.connect();
@@ -513,6 +522,15 @@ async function main() {
     console.log(
       `  database environment ${env}${args["dry-run"] ? " (dry run, nothing kept)" : ""}`,
     );
+    // Someone already on the register (the staff roster) keeps their record: only the login is
+    // added, and the name, job and department typed above are not used. Say so before the confirm.
+    const onRecord = await organisation.findEmployeeByWorkEmail(client, e.work_email);
+    if (onRecord) {
+      console.log(
+        `\n  ${e.work_email} is already employee ${onRecord.staff_number}, ${onRecord.first_name} ${onRecord.last_name}, ` +
+          `${onRecord.job_title} (${onRecord.status}). Only a login is added to that record; the details typed above are not used.`,
+      );
+    }
 
     // --env=<name> is the same confirmation, given on the command line.
     const typed = args.env === env ? env : await term.ask(`\nType "${env}" to continue`);

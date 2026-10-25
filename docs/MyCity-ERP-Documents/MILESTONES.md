@@ -1323,6 +1323,18 @@ Applied to the table below, `scripts/check/progress.js`, `src/shared/route-map.j
 `src/shared/search/screens.js` and `docs/PROGRESS.md` (row #101). Its engineering shape is in
 `docs/guides/workspace.md`.
 
+**Ratified 25/10/2026 (JBS Praxis).** One screen joins the inventory, taking the admin surface to 95
+and the inventory to 101: **Knowledge Hub · User Guide** (`user-guide`), a sixth tab in the
+Knowledge Hub, brought forward from M11 to M0. M11's manual ("written per module against the
+screens as shipped, with screenshots from the shipped build") becomes a tab of the hub instead of a
+document beside it: a Quick Start of illustrated cards by role and the Full Guide, each step linked
+to its screen with a way back to the same step, pictures taken on desktop and phone with numbered
+marks, and each reader sent only the parts for what they may open, down to the step. It is written
+milestone by milestone as each is approved, and a gate holds it to the screens. It reuses the
+`knowledge` permission key. Applied to the table below, `scripts/check/progress.js`,
+`src/shared/route-map.js`, `src/shared/search/screens.js` and `docs/PROGRESS.md` (row #102). Its
+engineering shape is in `docs/guides/user-guide.md`.
+
 **The public site is not a sixteenth module.** It is the third deployable named in A9: its own
 application, its own build, its own origin, listed below only because it carries six of the 92
 screens and those screens need names too. Nothing in the admin rail links to it, and a member of
@@ -1342,7 +1354,7 @@ staff never navigates to it to do their job.
 | People | **Payroll** | 5 | Payroll Runs · Payslips · Salary Structure · Deductions · Statutory | M6 |
 | Business | **Partnerships** | 6 | Pipeline · Partners · Leads · Proposals · Contracts & MOUs · Analytics | M7 |
 | Business | **Expenses** | 6 | My Requests · Approvals · Requisitions · Disbursements · Budgets · Categories | M8 |
-| System | **Knowledge Hub** | 5 | Policies · SOPs · FAQs · Training · Announcements | M1 (Policies), M10 |
+| System | **Knowledge Hub** | 6 | Policies · SOPs · FAQs · Training · Announcements · User Guide | M1 (Policies), M10, M0 (User Guide) |
 | System | **Praxis AI** | 2 | Ask · History | M10 |
 | System | **Settings** | 13 | Organisation · Status · Performance · Faults · Users · Roles & Permissions · Approvals · Notifications · Appearance · Documents & Numbering · Integrations · Security · Audit Log | M9 |
 
@@ -1352,7 +1364,7 @@ staff never navigates to it to do their job.
 |---|---|---|---|---|
 | Public | **Public site** | 6 | Careers · Vacancy · Apply · Assessment · Sign Offer · Verify Document | M4, M5 |
 
-Three of the above span a milestone boundary. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026) and SOPs, FAQs, Training and Announcements in M10. **Recruitment** gets Vacancies through Interviews in M4 and
+Three of the above span a milestone boundary. **Knowledge Hub** gets Policies in M1 (ratified 20/10/2026), the User Guide in M0 (ratified 25/10/2026) and SOPs, FAQs, Training and Announcements in M10. **Recruitment** gets Vacancies through Interviews in M4 and
 Offers, Onboarding and Talent Pool in M5. The **public site** gets Careers, Vacancy, Apply and
 Assessment in M4, and Sign Offer and Verify Document in M5. **Settings → Notifications** is built
 with the notification engine, not in M9 with the rest of the module (brought forward from M6 to

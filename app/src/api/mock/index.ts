@@ -24,6 +24,7 @@ import "./modules/payroll";
 import "./modules/partnerships";
 import "./modules/expenses";
 import "./modules/knowledge";
+import "./modules/user_guide";
 import "./modules/assistant";
 import "./modules/policies";
 import "./modules/settings";
