@@ -53,7 +53,6 @@ const say = (p) => problems.push(p);
  * when its file becomes a chapter; the gate fails a line whose file no longer needs it.
  */
 const WAITING = {
-  "mailbox.md": "M1: the Milestone 1 guide pull request turns it into a chapter, with its pictures",
   "staff-community.md": "M1: the Milestone 1 guide pull request turns it into a chapter, with its pictures",
 };
 
