@@ -189,7 +189,10 @@ icon: spark
 
 1. Open [AI Control · Spend](/ai-control?tab=spend).
 2. **All AI** shows this month's spend against its cap; each provider shows its own.
-3. Top up a provider before it reaches **At Cap**. Read [Spend](#ai-control-spend).
+3. Top up each provider's own account on its website before its balance runs out. Read
+   [Spend](#ai-control-spend).
+4. {needs="ai_control edit"} **At Cap** means MyCity's own monthly cap is reached. Press
+   **Set Cap** to raise it.
 
 ## Plan Your Day {#qs-plan-day role="Everyone" icon=check screen=workspace/today}
 
