@@ -412,8 +412,11 @@ async function renumberEmployee(client, employeeId, actor) {
   return after;
 }
 
-/** Archive a record: off every list and out of the tree, its history kept. */
-async function archiveEmployee(client, employeeId, reason, actor) {
+/**
+ * Archive a record: off every list and out of the tree, its history kept. `leftOn` is the last day
+ * (Archive Record's, today by default), which Attrition counts; null keeps the record's own.
+ */
+async function archiveEmployee(client, employeeId, reason, actor, leftOn = null) {
   const before = await repo.findEmployeeById(client, employeeId);
   if (!before) throw new AppError("NOT_FOUND", "Not found", 404);
   if (before.status === "archived")
@@ -421,14 +424,18 @@ async function archiveEmployee(client, employeeId, reason, actor) {
   const ceo = await repo.findCeoEmployee(client);
   if (ceo && ceo.employee_id === employeeId)
     throw new AppError("CEO_PROTECTED", "The CEO's record cannot be archived.", 422);
-  const after = await repo.archiveEmployee(client, employeeId, reason);
+  if (leftOn && leftOn > lagos.today())
+    throw new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { left_on: ["Not after today"] });
+  if (leftOn && before.start_date && leftOn < String(before.start_date).slice(0, 10))
+    throw new AppError("VALIDATION_FAILED", "Check the highlighted fields", 422, { left_on: ["Before their start"] });
+  const after = await repo.archiveEmployee(client, employeeId, reason, leftOn);
   await emit(client, {
     key: EVENTS.EMPLOYEE_ARCHIVED,
     entity: { type: "employee", id: employeeId },
     actor,
     before,
     after,
-    metadata: { archive_reason: reason },
+    metadata: { archive_reason: reason, ...(leftOn && { left_on: leftOn }) },
   });
   return after;
 }
@@ -647,13 +654,14 @@ async function summary(client, scope) {
       title: "Probation Ending",
       text: `${people(tally.probation_due)} in the next 30 days`,
       action: { tone: "warn", text: "Confirm or extend" },
-      link: screen("people", "employees"),
+      // Confirmed or extended through the probation review (the owner, 26/10/2026).
+      link: routeMap.screenPath("performance", "reviews", { params: { kind: "probation" } }),
     },
     tally.contracts_ending > 0 && {
       title: "Contracts Ending",
       text: `${people(tally.contracts_ending)} in the next 30 days`,
       action: { tone: "warn", text: "Renew or close" },
-      link: screen("people", "employees"),
+      link: routeMap.screenPath("people", "employees", { params: { contract: "ending" } }),
     },
     tally.no_manager > 0 && {
       title: "No Line Manager",

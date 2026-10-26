@@ -67,14 +67,18 @@ export function Reviews() {
   const [view, setView] = useState<"reviews" | "pips">("reviews");
   const [dept, setDept] = useState("");
   const [stage, setStage] = useState("");
-  const [kind, setKind] = useState("");
-  const ready = Boolean(round);
-  const base = round ? { round_id: round.performance_cycle_id } : {};
+  // `?kind=probation` (People's Probation Ending) opens on the probation reviews.
+  const [kind, setKind] = useState(params.get("kind") === "probation" ? "probation" : "");
+  // A probation review belongs to no round: under Probation the round's filter is off.
+  const probation = kind === "probation";
+  const ready = Boolean(round) || probation;
+  const base = round && !probation ? { round_id: round.performance_cycle_id } : {};
   const list = usePaged("GET /api/v1/performance/reviews", {
     filters: { ...base, ...(dept ? { department_id: dept } : {}), ...(stage ? { status: stage as Review["status"] } : {}), ...(kind ? { kind: kind as Review["review_kind"] } : {}) },
     enabled: ready,
   });
-  const waiting = usePaged("GET /api/v1/performance/reviews", { filters: { ...base, waiting_on_me: "true" }, enabled: ready });
+  // What waits on the reader, whatever its round, a probation review among it.
+  const waiting = usePaged("GET /api/v1/performance/reviews", { filters: { waiting_on_me: "true" } });
   const pips = usePaged("GET /api/v1/performance/pips", { enabled: view === "pips" });
   const closeRound = useMutation("POST /api/v1/performance/rounds/:id/close");
 

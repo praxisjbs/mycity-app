@@ -716,7 +716,7 @@ const canManage = (u: string) => ["operations", "ceo"].includes(SIGN_INS[u]?.vie
 const isCeo = (u: string) => SIGN_INS[u]?.view === "ceo";
 const forbidden = () => fail(403, "FORBIDDEN", "You do not have access to this.");
 
-function overview(p: Pol, reader?: string): Policy {
+function overview(p: Pol, reader?: string | null): Policy {
   const today = todayIso();
   const top = newest(p.policy_id);
   const now = inForce(p.policy_id, today);

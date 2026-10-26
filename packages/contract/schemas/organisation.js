@@ -196,6 +196,8 @@ const EmployeeListQuery = listQuery(
     work_pattern: WorkPattern.optional(),
     employment_type: EmploymentType.optional(),
     line_manager_id: uuid.optional(),
+    /** `ending`: active people whose contract ends within 30 days, as Contracts Ending counts them. */
+    contract: z.enum(["ending"]).optional(),
   },
   ["display_name", "staff_number", "job_title", "department", "start_date", "created_at"],
 );
@@ -297,6 +299,8 @@ const Employee360 = z
     confirmation_due_on: isoDate.nullable(),
     confirmed_on: isoDate.nullable(),
     left_on: isoDate.nullable(),
+    /** The CEO's own record, which cannot be archived. */
+    is_ceo: z.boolean(),
     archived_at: isoDateTime.nullable(),
     archive_reason: z.string().nullable(),
     work_email: z.string(),
@@ -369,8 +373,11 @@ const EmployeeUpdate = z
       ctx.addIssue({ code: "custom", path: ["worksite_id"], message: "Pick a worksite" });
   });
 
-/** POST /employees/:id/archive. */
-const EmployeeArchive = z.object({ archive_reason: text(200) }).strict();
+/**
+ * POST /employees/:id/archive. `left_on` is their last day (today when not given), kept as
+ * employee.left_on, which Attrition counts; not after today, nor before they started.
+ */
+const EmployeeArchive = z.object({ archive_reason: text(200), left_on: isoDate.optional() }).strict();
 
 /**
  * PATCH /employees/:id/line-manager: a person or a vacant seat, and the

@@ -57,15 +57,17 @@ const grouped = (n: string) => (/^\d{4,}$/.test(n) ? Number(n).toLocaleString("e
  * these sentences raw, so they are read whatever kind the problem arrives as.
  */
 function zodLimit(message: string): string | undefined {
-  let m = /^(String|Array|Set) must contain (at least|at most|exactly) (\d+) /.exec(message);
-  if (m) {
-    const n = Number(m[3]);
-    if (m[2] === "at least" && n <= 1) return "Required";
-    const unit = m[1] === "String" ? (n === 1 ? " character" : " characters") : "";
-    return `${m[2] === "at least" ? "At least" : m[2] === "at most" ? "At most" : "Exactly"} ${grouped(m[3])}${unit}`;
+  const size = /^(String|Array|Set) must contain (at least|at most|exactly) (\d+) /.exec(message);
+  if (size) {
+    const [, kind, how, count = "0"] = size;
+    const n = Number(count);
+    if (how === "at least" && n <= 1) return "Required";
+    const unit = kind === "String" ? (n === 1 ? " character" : " characters") : "";
+    return `${how === "at least" ? "At least" : how === "at most" ? "At most" : "Exactly"} ${grouped(count)}${unit}`;
   }
-  m = /^(?:Number|BigInt|Date) must be (greater than or equal to|greater than|less than or equal to|less than|exactly equal to) (\S+?)\.?$/.exec(message);
-  if (m) return `${{ "greater than or equal to": "At least", "greater than": "Over", "less than or equal to": "At most", "less than": "Under", "exactly equal to": "Exactly" }[m[1]]} ${grouped(m[2])}`;
+  const bound = /^(?:Number|BigInt|Date) must be (greater than or equal to|greater than|less than or equal to|less than|exactly equal to) (\S+?)\.?$/.exec(message);
+  const words: Record<string, string> = { "greater than or equal to": "At least", "greater than": "Over", "less than or equal to": "At most", "less than": "Under", "exactly equal to": "Exactly" };
+  if (bound) return `${words[bound[1] ?? ""] ?? "Check"} ${grouped(bound[2] ?? "")}`;
   if (/^Number must be a multiple of/.test(message)) return "Check the number";
   if (/^Expected integer/.test(message)) return "Whole numbers only";
   return undefined;

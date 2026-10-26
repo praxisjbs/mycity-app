@@ -1,7 +1,7 @@
 {
   "ess-attendance": {
     "spec": "207947064e7bdf5e",
-    "source": "859c714c2ccf6933",
+    "source": "904c07becd03994e",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "ess-clock": {
     "spec": "68dcd8deac77ee3c",
-    "source": "38e87266c146e264",
+    "source": "0da76f0fbc9c4d79",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "ess-devices": {
     "spec": "12c539916b4839a8",
-    "source": "dbe4ed68d0625f17",
+    "source": "19118fb7c13c2bef",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "ess-documents": {
     "spec": "478e2773dd22920e",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "ess-documents-upload": {
     "spec": "45ef3a59f7d7fc9e",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "ess-leave": {
     "spec": "11b9162cdaa5f6f3",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "ess-org-chart": {
     "spec": "fa8db6541369de9f",
-    "source": "a00afdcc3676bb41",
+    "source": "1ab5004fd054581f",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "ess-policies": {
     "spec": "3cfe5a1b37968e4d",
-    "source": "03aeb29224f2d069",
+    "source": "dcab77b3fd2a17bc",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "ess-policy-prompt": {
     "spec": "e1686d31f835f864",
-    "source": "383dae425d6388b4",
+    "source": "17dd52f3df67a425",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "ess-policy-read": {
     "spec": "cd4c771ae8115e55",
-    "source": "03aeb29224f2d069",
+    "source": "dcab77b3fd2a17bc",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "ess-profile": {
     "spec": "76c6e2e4c39ee5fa",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "ess-profile-edit": {
     "spec": "bb2b1816539f178f",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "desktop",
       "phone"
@@ -97,7 +97,7 @@
   },
   "ess-request-leave": {
     "spec": "c8bbd2782de7a52f",
-    "source": "42acfa40b78919ce",
+    "source": "3cfcae7948a75be4",
     "devices": [
       "desktop",
       "phone"
@@ -105,28 +105,28 @@
   },
   "ess-security": {
     "spec": "0b05e2a9d9ed9dcb",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "desktop"
     ]
   },
   "ess-security-phone": {
     "spec": "5484db2fbf6c6b6f",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "phone"
     ]
   },
   "ess-security-two-step": {
     "spec": "b38e9cb62fd8e2ad",
-    "source": "8a14807f2d7e8410",
+    "source": "152159ee26dfb694",
     "devices": [
       "desktop"
     ]
   },
   "ess-site": {
     "spec": "25644583075b344a",
-    "source": "33dff6ad71d148c0",
+    "source": "7bfa02934303b506",
     "devices": [
       "desktop",
       "phone"
@@ -134,7 +134,7 @@
   },
   "ess-work-location": {
     "spec": "84a4b6ec1786e07a",
-    "source": "aaf8397b46b11f05",
+    "source": "3a0dcf982ab18e99",
     "devices": [
       "desktop",
       "phone"

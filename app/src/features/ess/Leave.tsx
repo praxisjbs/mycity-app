@@ -222,7 +222,7 @@ function MyLeaveCalendar() {
 /** Leave Taken: the approved leave of the year that has begun, newest first, 25 a page. */
 function LeaveTaken({ year, onOpen }: { year?: number; onOpen: (r: LeaveRequest) => void }) {
   const today = todayIso();
-  const list = usePaged("GET /api/v1/ess/leave", { filters: { status: "approved", to: today, ...(year ? { year: String(year) } : {}) }, sort: "-starts_on" });
+  const list = usePaged("GET /api/v1/ess/leave", { filters: { status: "approved", to: today, ...(year ? { year } : {}) }, sort: "-starts_on" });
   return (
     <DataView
       bare

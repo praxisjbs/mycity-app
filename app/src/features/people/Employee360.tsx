@@ -1,4 +1,5 @@
 import { useState } from "react";
+import organisation from "@mycity/contract/schemas/organisation.js";
 import { ApiError } from "@/api/client";
 import { usePhoto } from "@/api/download";
 import { saveExport } from "@/api/exports";
@@ -17,8 +18,10 @@ import {
   Card,
   CardHeader,
   DataView,
+  DateField,
   ErrorState,
   Field,
+  Form,
   FormFooter,
   formatDate,
   Grid,
@@ -31,7 +34,9 @@ import {
   Tabs,
   TextField,
   toast,
+  todayIso,
   useConfirm,
+  useContractForm,
   useModal,
 } from "@mycity/ui";
 import { EditEmployee } from "./EmployeeForm";
@@ -98,7 +103,7 @@ export function Employee360({ id }: { id: string }) {
   const putAway = () =>
     modal.open({
       title: "Archive Record",
-      body: (close) => <ArchiveForm id={id} name={e.display_name} close={close} onDone={reload} />,
+      body: (close) => <ArchiveForm id={id} name={e.display_name} startDate={e.start_date} close={close} onDone={reload} />,
     });
 
   /* Download Their Data: the CEO only, downloaded here; the person's one a day (docs/guides/ess.md §6). */
@@ -169,7 +174,7 @@ export function Employee360({ id }: { id: string }) {
                 Restore Record
               </Button>
             )}
-            {canArchive && e.status !== "archived" && <Button onClick={putAway}>Archive Record</Button>}
+            {canArchive && e.status !== "archived" && !e.is_ceo && <Button onClick={putAway}>Archive Record</Button>}
             {canEdit && (
               <Button
                 variant="primary"
@@ -193,38 +198,41 @@ export function Employee360({ id }: { id: string }) {
   );
 }
 
-/** Archive asks why: the reason is kept on the audit row, and the record keeps its history. */
-function ArchiveForm({ id, name, close, onDone }: { id: string; name: string; close: () => void; onDone: () => void }) {
-  const [reason, setReason] = useState("");
-  const [tried, setTried] = useState(false);
+/**
+ * Archive asks why and their last day: the reason is kept on the audit row, the day as their
+ * `left_on` (Attrition counts it), and the record keeps its history.
+ */
+function ArchiveForm({ id, name, startDate, close, onDone }: { id: string; name: string; startDate: string | null; close: () => void; onDone: () => void }) {
+  const f = useContractForm({ archive_reason: "", left_on: todayIso() }, organisation.EmployeeArchive);
   const archive = useMutation("POST /api/v1/employees/:id/archive");
-  const bad = reason.trim().length < 5;
   const submit = async () => {
-    setTried(true);
-    if (bad) return;
     try {
-      await archive.run({ params: { id }, body: { archive_reason: reason.trim() } });
+      await archive.run({ params: { id }, body: { archive_reason: f.values.archive_reason.trim(), left_on: f.values.left_on } });
       invalidate("/api/v1/employees", "/api/v1/org-chart");
       close();
       onDone();
       toast(`${name} archived`);
     } catch (err) {
       // The refusal itself (CEO_PROTECTED, ALREADY_ARCHIVED): the mutation's state is not yet the new one here.
-      toast.error(err instanceof ApiError ? err.message : "Not archived. Try again.");
+      if (err instanceof ApiError && Object.keys(err.fields).length) f.setServerErrors(err.fields);
+      else toast.error(err instanceof ApiError ? err.message : "Not archived. Try again.");
     }
   };
   return (
-    <>
-      <Field label="Reason" state={tried ? (bad ? "bad" : "good") : undefined} message="At least 5 characters">
-        <TextField value={reason} onChange={setReason} placeholder="Left the company" state={tried ? (bad ? "bad" : "good") : undefined} />
+    <Form onSubmit={f.submit(submit)}>
+      <Field label="Reason" {...f.status("archive_reason")}>
+        <TextField {...f.field("archive_reason")} placeholder="Left the company" maxLength={200} />
+      </Field>
+      <Field label="Last Day" {...f.status("left_on")}>
+        <DateField {...f.field("left_on")} max={todayIso()} min={startDate ?? undefined} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={archive.pending} onClick={() => submit()}>
+        <Button variant="primary" type="submit">
           Archive Record
         </Button>
       </FormFooter>
-    </>
+    </Form>
   );
 }
 

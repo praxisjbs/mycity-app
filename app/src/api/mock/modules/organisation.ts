@@ -118,6 +118,8 @@ route("GET /api/v1/employees", (req) => {
       work_pattern: (r, v) => r.work_pattern === v,
       employment_type: (r, v) => r.employment_type === v,
       line_manager_id: (r, v) => r.line_manager?.employee_id === v,
+      // The demo's contracts end 120 days on (record()), so none ends within 30.
+      contract: () => false,
     },
     sort: {
       display_name: (a, b) => text(a.display_name, b.display_name),
@@ -192,7 +194,8 @@ function base(p: MockPerson, viewer: string, canSee: boolean, first: string, res
     contract_ends_on: p.employment_type === "contractor" ? isoDaysAhead(120) : null,
     confirmation_due_on: probationDue(p),
     confirmed_on: confirmedOn(p),
-    left_on: null,
+    left_on: LEFT_ON.get(p.employee_id) ?? null,
+    is_ceo: p.user_key === "ifeoma",
     archived_at: ARCHIVED.has(p.employee_id) ? at(0, "09:00") : null,
     archive_reason: ARCHIVED.has(p.employee_id) ? "Archived on this laptop" : null,
     work_email: p.work_email,
@@ -359,13 +362,19 @@ route("PATCH /api/v1/employees/:id", (req) => {
   return ok(record(p, req.user!));
 });
 
+/** The last day Archive Record was given, by employee: their left_on until restored. */
+const LEFT_ON = new Map<string, string>();
+
 route("POST /api/v1/employees/:id/archive", (req) => {
   const p = mine(req);
   if (!p) return notFound();
   if (!(req.body as { archive_reason?: string }).archive_reason) return invalid({ archive_reason: ["Say why"] });
   if (ARCHIVED.has(p.employee_id)) return fail(422, "ALREADY_ARCHIVED", "This record is already archived.");
   if (p.user_key === "ifeoma") return fail(422, "CEO_PROTECTED", "The CEO's record cannot be archived.");
+  const leftOn = (req.body as { left_on?: string }).left_on ?? isoDaysAgo(0);
+  if (leftOn > isoDaysAgo(0)) return invalid({ left_on: ["Not after today"] });
   ARCHIVED.add(p.employee_id);
+  LEFT_ON.set(p.employee_id, leftOn);
   return ok(record(p, req.user!));
 });
 
@@ -374,6 +383,7 @@ route("POST /api/v1/employees/:id/restore", (req) => {
   if (!p) return notFound();
   if (!ARCHIVED.has(p.employee_id)) return fail(422, "NOT_ARCHIVED", "This record is not archived.");
   ARCHIVED.delete(p.employee_id);
+  LEFT_ON.delete(p.employee_id);
   return ok(record(p, req.user!));
 });
 

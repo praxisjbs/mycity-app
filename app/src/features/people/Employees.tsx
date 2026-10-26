@@ -5,7 +5,7 @@ import type { EmployeeRow } from "@/api/types/organisation";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { toBars } from "@/features/shared/wire";
-import { hrefFor, useRouter } from "@/lib/router";
+import { hrefFor, useRouter, useSearchParams } from "@/lib/router";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 import {
   Bars,
@@ -36,6 +36,7 @@ import { employmentStatus, INVITED_HELP, loginStatus, workPattern } from "./stat
  */
 export function Employees() {
   const me = useMe();
+  const [params] = useSearchParams();
   const modal = useModal();
   const { navigate } = useRouter();
   const summary = useApi("GET /api/v1/employees/summary");
@@ -43,11 +44,14 @@ export function Employees() {
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
   const [pattern, setPattern] = useState("");
+  // `?contract=ending` (Needs a Decision's Contracts Ending) opens on the contracts ending in 30 days.
+  const [contract, setContract] = useState(params.get("contract") === "ending" ? "ending" : "");
   const list = usePaged("GET /api/v1/employees", {
     filters: {
       ...(department && { department_id: department }),
       ...(status && { status }),
       ...(pattern && { work_pattern: pattern }),
+      ...(contract === "ending" && { contract: "ending" as const }),
     },
   });
   const photo = usePhotos(list.rows.map((r) => r.photo_url));
@@ -109,6 +113,15 @@ export function Employees() {
             ["on_site", "On Site"],
             ["hybrid", "Hybrid"],
             ["remote", "Remote"],
+          ]}
+        />
+        <FilterSelect
+          label="Contract"
+          value={contract}
+          onChange={setContract}
+          options={[
+            ["", "Any Contract"],
+            ["ending", "Ending in 30 Days"],
           ]}
         />
       </Toolbar>

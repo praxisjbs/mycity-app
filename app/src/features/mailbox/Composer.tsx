@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
-import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, formatDateTime, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, shortMessage, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
+import { addDaysIso, Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, formatDateTime, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, shortMessage, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 import { partsOf, WriteWithAi } from "./Assist";
 
@@ -23,12 +23,7 @@ export interface ComposeInit {
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /** The most addresses a row takes (MailSend's To, Cc and Bcc). */
 const MAX_RECIPIENTS = 50;
-/** The furthest a send may be scheduled (mailbox.service: within 90 days). */
-const addDaysIso = (iso: string, n: number) => {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-};
+
 
 
 /** Recipients as chips: Enter, comma or semicolon adds one; a bad address is marked as it is typed. */
@@ -188,7 +183,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
     } catch (e) {
       setBusy(false);
       const f = e instanceof ApiError ? e.fields : {};
-      const said = (k: string) => (Array.isArray(f[k]) && f[k].length ? shortMessage({ type: "custom", message: f[k][0] }) : null);
+      const said = (k: string) => (Array.isArray(f[k]) && f[k].length ? (shortMessage({ type: "custom", message: f[k][0] }) ?? f[k][0]) : null);
       if (said("release_at")) setSched((s) => ({ ...s, open: true, past: said("release_at") }));
       else if (said("to_addresses") || said("cc_addresses") || said("bcc_addresses")) {
         setBad({ to: said("to_addresses"), cc: said("cc_addresses"), bcc: said("bcc_addresses") });

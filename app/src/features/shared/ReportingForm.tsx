@@ -34,9 +34,14 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
   const seats = usePaged("GET /api/v1/org-seats", { filters: { status: "vacant" } });
   const [seat, setSeat] = useState<string>(e.line_manager?.org_seat_id ?? "");
   const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
   const save = useMutation("PATCH /api/v1/employees/:id/line-manager");
+  // An open role must be picked: none sent would keep the manager they have, not reassign them.
+  const noSeat = kind === "seat" && !seat;
 
   const submit = async () => {
+    setTried(true);
+    if (noSeat) return;
     const body =
       kind === "seat"
         ? { line_manager_seat_id: seat || null, dotted_manager_id: dotted[0]?.employee_id ?? null, reason: reason.trim() }
@@ -70,7 +75,7 @@ export function ReportingForm({ employee: e, close, onSaved }: { employee: Repor
           <EmployeePicker value={manager} onChange={setManager} filters={{ status: "active" }} placeholder="Manager's name" />
         </Field>
       ) : (
-        <Field label="Open Role">
+        <Field label="Open Role" state={tried && noSeat ? "bad" : undefined} message={tried && noSeat ? "Pick an open role" : undefined}>
           <SelectField
             value={seat}
             onChange={setSeat}

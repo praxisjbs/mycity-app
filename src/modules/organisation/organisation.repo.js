@@ -16,6 +16,7 @@
 const { pageQuery, completeQuery, orderBy, TOTAL_COL } = require("../../shared/http/paged");
 const { scopeClause } = require("../../shared/rbac/scope");
 const { photoUrlSql, personJson } = require("../../shared/db/person");
+const lagos = require("../../shared/time/lagos");
 
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 
@@ -190,6 +191,7 @@ async function list(db, query, scope) {
     query.work_pattern ?? null,
     query.employment_type ?? null,
     query.line_manager_id ?? null,
+    query.contract === "ending" ? lagos.today() : null,
   ];
   const s = scopeClause(scope, { column: "e.employee_id" }, params);
   const page = await pageQuery(
@@ -209,6 +211,7 @@ async function list(db, query, scope) {
         AND ($4::text IS NULL OR e.work_pattern = $4)
         AND ($5::text IS NULL OR e.employment_type = $5)
         AND ($6::uuid IS NULL OR e.line_manager_id = $6)
+        AND ($7::date IS NULL OR (e.status = 'active' AND e.contract_ends_on IS NOT NULL AND e.contract_ends_on <= $7::date + 30))
         ${s.and}
       ORDER BY ${orderBy(query, EMPLOYEE_SORTS, "e.employee_id")}`,
     params,
@@ -770,14 +773,16 @@ function setStaffNumber(db, employeeId, staffNumber) {
   );
 }
 
-function archiveEmployee(db, employeeId, reason) {
+/** `leftOn`: the last day, or null to keep what is there (an import reverted names no leaver). */
+function archiveEmployee(db, employeeId, reason, leftOn = null) {
   return one(
     db,
     `UPDATE employee
-        SET status = 'archived', archived_at = now(), archive_reason = $2, updated_at = now()
+        SET status = 'archived', archived_at = now(), archive_reason = $2,
+            left_on = COALESCE($3::date, left_on), updated_at = now()
       WHERE employee_id = $1
       RETURNING ${EMPLOYEE_COLUMNS.replace(/\be\./g, "")}`,
-    [employeeId, reason],
+    [employeeId, reason, leftOn],
   );
 }
 
@@ -785,7 +790,7 @@ function restoreEmployee(db, employeeId) {
   return one(
     db,
     `UPDATE employee
-        SET status = 'active', archived_at = NULL, archive_reason = NULL, updated_at = now()
+        SET status = 'active', archived_at = NULL, archive_reason = NULL, left_on = NULL, updated_at = now()
       WHERE employee_id = $1
       RETURNING ${EMPLOYEE_COLUMNS.replace(/\be\./g, "")}`,
     [employeeId],

@@ -23,9 +23,10 @@ holds their job, their pay and bank details, their manager and their login.
   **On Site**, **Hybrid** and **Remote**. On a computer, the line under **Employees** counts the
   staff and the departments.
 - Type in the search box to find someone by name, job title, staff number or work email.
-- **Department**, **Status** and **Work Pattern** narrow the list. They start on
-  **All Departments**, **Any Status** and **Any Pattern**. Archived people are hidden until you
-  choose **Archived** under Status.
+- **Department**, **Status**, **Work Pattern** and **Contract** narrow the list. They start on
+  **All Departments**, **Any Status**, **Any Pattern** and **Any Contract**; **Ending in 30 Days**
+  shows the contracts ending soon. Archived people are hidden until you choose **Archived** under
+  Status.
 - **All Employees** shows each person's **Employee** (name and job title), **Number**,
   **Department**, **Line Manager**, **Work Pattern**, **Status** and **Login**.
 - On a computer, press the **Employee**, **Number** or **Department** heading to sort by it. Press
@@ -35,8 +36,11 @@ holds their job, their pay and bank details, their manager and their login.
   yet), **Suspended**, **Left** or **No Login**.
 - Press a row, or **View Record** on a computer, to open the person's record.
 - **Headcount by Department** shows, as bars, how many staff each department has.
-- Below the list, **Needs a Decision** lists what is waiting. **Probation Ending** and
-  **Contracts Ending** count the people whose probation or contract ends in the next 30 days.
+- Below the list, **Needs a Decision** lists what is waiting. **Probation Ending** counts the
+  people whose probation ends in the next 30 days and opens their probation reviews on
+  [Performance · Reviews](/performance?tab=reviews), where each is confirmed or extended.
+  **Contracts Ending** counts the contracts ending in the next 30 days and opens the list on
+  **Contract**, *Ending in 30 Days*.
   **No Line Manager** and **Open Seats** open [People · Organogram](/people?tab=organogram).
   **Not Yet Invited** opens [Settings · Users](/settings?tab=users).
 
@@ -186,7 +190,8 @@ Lateness and absence follow these days and hours.
 ### Set someone's work schedule {#people-schedule-set needs="people edit"}
 
 Set a person's own week when it differs from the company hours, such as a part-time consultant. You
-cannot set your own.
+cannot set your own, nor that of someone archived, suspended or gone: **Set Schedule** is not offered
+there. **From** can be at most 90 days ahead.
 
 1. Open the person's record and choose **Work Schedule**.
 2. Press **Set Schedule** under the week. On a phone it opens full screen.
@@ -223,7 +228,8 @@ the hub could not be reached: press **Save Schedule** again.
 2. Press **Change Manager** on the **Reports To** card. **Change Reporting Line** opens.
    ![Change Reporting Line](shot:people-reporting)
 3. Under **Manager Is**, choose **A Person** and pick the **Line Manager**. Or choose
-   **An Open Role** and pick the post under **Open Role**.
+   **An Open Role** and pick the post under **Open Role**; **Pick an open role** means none is
+   picked.
 4. Optionally pick a **Dotted Line**, a second manager for shared work. It does not change who
    approves their leave, expenses or tasks.
 5. Type a **Reason** if it helps, and press **Save Line**. The message names them, such as
@@ -273,10 +279,12 @@ A person needs a login to sign in. The hub emails them a link to choose their ow
 ### Archive or restore a record {#people-archive needs="people delete"}
 
 Archive a person when they leave MyCity. Their record and history are kept, but they leave every
-list and the organogram, and their login stops working at once.
+list and the organogram, and their login stops working at once. The CEO's record has no
+**Archive Record**.
 
 1. Open the person's record and press **Archive Record**.
-2. Type the **Reason**, at least 5 characters, such as `Left the company`, and press
+2. Type the **Reason**, such as `Left the company`, and choose their **Last Day**: it starts on
+   today and cannot be later. **Attrition, 90 Days** counts them from that day. Press
    **Archive Record**. The message names them, such as *Ada Okafor archived*.
 3. Anyone who reported to them now sits at the top of
    [People · Organogram](/people?tab=organogram). Give each a new manager.
@@ -290,9 +298,10 @@ An archived record reads **Archived**. **Job** shows the day and the reason. Its
 
 | Message | What it means | What to do |
 |---|---|---|
-| **At least 5 characters** | The reason is too short | Say why in a few words |
-| **Check the highlighted fields** | The reason is over 200 characters | Shorten the reason |
-| **The CEO's record cannot be archived.** | The CEO's record always stays | Press **Cancel** |
+| **Required** | No reason given | Say why in a few words |
+| *At most 200 characters* | The reason is over 200 characters | Shorten the reason |
+| **Not after today** | The **Last Day** is still to come | Archive them on or after their last day |
+| **Before their start** | The **Last Day** is before they started | Pick a later day |
 | **This record is already archived.** | Someone archived it while you had it open | Close the form; it now reads **Archived** |
 | **This record is not archived.** | Someone restored it first | Nothing to do |
 | **Not archived. Try again.** or **Not restored. Try again.** | The hub could not be reached | Press again |
@@ -371,8 +380,8 @@ that match; tap one to focus it. **No Match** means nothing matched.
    card cannot be moved. Or press their card, then **Change Manager**, and follow
    [Change who someone reports to](#people-reporting).
 2. {needs="people create"} To add a post nobody holds yet, press **Add Role**. On a phone it is in
-   **Quick Actions**. **Add Open Role** opens. Type the **Role Title**, pick the **Department**
-   and, if you know it, who it **Reports To**. Press **Add Role**. The message names it, such as
+   **Quick Actions**. **Add Open Role** opens. Type the **Role Title**, search for the **Department**
+   (those in use) and, if you know it, who it **Reports To**. Press **Add Role**. The message names it, such as
    *Head of Sales added as an open role*.
    ![Add Open Role](shot:people-add-role)
 3. To correct an open role, press **Edit Role** on its card. **Edit Open Role** opens with the same
@@ -382,8 +391,8 @@ that match; tap one to focus it. **No Match** means nothing matched.
 |---|---|---|
 | **Name the role** | **Role Title** is empty | Type the role's title |
 | **Pick a department** | No department picked | Pick the department it sits in |
-| **Not moved** | The move was refused, often because the new manager reports to this person | Pick another manager, or use **Change Manager**, which says why |
-| **Not saved** | The role was not saved, such as a loop in its line | Check who it **Reports To** and press again |
+| *That would make a loop in the reporting line.*, or another reason | The move or the role was refused, and the message says why | Pick another manager, or check who it **Reports To** |
+| **Not moved. Try again.** or **Not saved. Try again.** | The hub could not be reached | Check your connection and press again |
 | **That file could not be made. Try again.** | The PDF failed | Press **Download PDF** again |
 | **That file is taking too long. Try again.** | It was not ready in five minutes | Press **Download PDF** again |
 

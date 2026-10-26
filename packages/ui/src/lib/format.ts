@@ -87,6 +87,13 @@ export function todayIso(now = new Date()): string {
   return p ? `${p.year}-${p.month}-${p.day}` : now.toISOString().slice(0, 10);
 }
 
+/** An ISO day some days on (or back, for a negative n): a date field's `max`, "2026-10-26" and 90 → "2027-01-24". */
+export function addDaysIso(iso: string, n: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Day-first text a person typed ("13/10/2026", "13-10-2026", "13.10.26") → ISO, or null. */
 export function parseDayFirst(text: string): string | null {
   const m = /^\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\s*$/.exec(text);

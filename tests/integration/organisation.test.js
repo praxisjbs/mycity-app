@@ -606,6 +606,9 @@ describeDb("the organisation module against the real migrations", () => {
       expect(archived.status).toBe(200);
       expect(archived.body.status).toBe("archived");
       expect(archived.body.archive_reason).toBe("Contract ended early");
+      // Their last day, today unless given (the owner, 26/10/2026), is what Attrition counts.
+      expect(archived.body.left_on).toBe(lagos.today());
+      expect(archived.body.is_ceo).toBe(false);
 
       const list = await asOps()(request(app).get("/api/v1/employees"));
       expect(list.body.data.map((r) => r.employee_id)).not.toContain(addedId);
@@ -616,6 +619,17 @@ describeDb("the organisation module against the real migrations", () => {
       expect(restored.status).toBe(200);
       expect(restored.body.status).toBe("active");
       expect(restored.body.archived_at).toBeNull();
+      expect(restored.body.left_on).toBeNull();
+    });
+
+    test("Archive takes a last day, never after today", async () => {
+      const ahead = await asOps()(request(app).post(`/api/v1/employees/${addedId}/archive`)).send({ archive_reason: "Leaving soon", left_on: "2999-01-01" });
+      expect(ahead.status).toBe(422);
+      expect(ahead.body.error.fields).toEqual({ left_on: ["Not after today"] });
+      const day = lagos.today();
+      const given = await asOps()(request(app).post(`/api/v1/employees/${addedId}/archive`)).send({ archive_reason: "Left last week", left_on: day });
+      expect(given.body.left_on).toBe(day);
+      await asOps()(request(app).post(`/api/v1/employees/${addedId}/restore`)).send({});
     });
 
     test("archiving twice is refused, and so is archiving the CEO", async () => {
