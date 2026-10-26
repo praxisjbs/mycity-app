@@ -4,6 +4,7 @@ import { MODULES } from "@/shell/catalogue";
 // A chapter's `cap` need is checked as hasCapability does; the user-guide gate holds each code to the catalogue.
 import { visibleTabs } from "@/shell/access";
 import { invalid, notFound, ok, paged, route } from "../core";
+import { ON_UPLOAD } from "../uploads";
 import { me } from "./identity";
 
 /**
@@ -82,6 +83,9 @@ route("GET /api/v1/user-guide", async (req) => {
       sections: c.sections.map((s) => ({ slug: s.slug, title: s.title, screen: s.screen, tasks: s.tasks.map((t) => ({ slug: t.slug, title: t.title })) })),
     })),
     quick_start: (mine.quick?.sections ?? []).map((s) => ({ slug: s.slug, title: s.title, role: s.role })),
+    // The demo answers and hears, as staging does with its AI set up.
+    answers: true,
+    voice: true,
   };
   return ok(contents);
 });
@@ -146,3 +150,8 @@ export async function mockPicture(url: string): Promise<Blob> {
   if (!res.ok) throw new Error("That picture is not there.");
   return res.blob();
 }
+
+/* A spoken search travels through the upload engine, which the mock answers itself: the words ride on the "stored" recording, as the route's AiTranscript does. */
+ON_UPLOAD.push((endpoint, doc) => {
+  if (endpoint === "/api/v1/user-guide/transcribe") Object.assign(doc, { text: "How do I request leave?", draft: false });
+});

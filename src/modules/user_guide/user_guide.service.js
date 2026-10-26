@@ -21,6 +21,8 @@ const { AppError } = require("../../shared/errors");
 const { atomically } = require("../../shared/db/tx");
 const vault = require("../../shared/documents/vault");
 const ai = require("../../services/ai/llm.service");
+const governance = require("../../services/ai/governance");
+const jobs = require("../../services/ai/jobs");
 const transcription = require("../../services/ai/transcription");
 const { GUIDE_VOICE } = require("./user_guide.events");
 const catalog = require("../../shared/access/access.catalog");
@@ -98,10 +100,29 @@ async function guideFor(db, user, opts) {
   return cut(load(opts), asReader(await readerOf(db, user)));
 }
 
+/**
+ * Whether an action can be asked now for the guide: AI on, the Knowledge Hub's AI on, the cap not
+ * reached, the stub not switched on, and a Ready model on the action's chain. The screen offers
+ * Get Answer and the microphone only then.
+ */
+async function canAsk(db, action) {
+  try {
+    const g = await governance.check(db, { module: "knowledge" });
+    if (g.settings.forced_stub) return false;
+    return (await jobs.walk(action, { db })).length > 0;
+  } catch (err) {
+    if (err instanceof AppError) return false;
+    throw err;
+  }
+}
+
 /** The contents: every chapter this person may read, with its sections and tasks by title. */
 async function contents(db, user, opts) {
   const mine = await guideFor(db, user, opts);
+  const [answers, voice] = await Promise.all([canAsk(db, "guide-answer"), canAsk(db, "guide-voice")]);
   return {
+    answers,
+    voice,
     chapters: mine.chapters.map((c) => ({
       slug: c.slug,
       title: c.title,

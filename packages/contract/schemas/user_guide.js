@@ -119,6 +119,10 @@ const GuideContents = z
   .object({
     chapters: z.array(GuideContentsChapter),
     quick_start: z.array(z.object({ slug, title: z.string(), role: z.string().nullable() }).strict()),
+    /** Whether an answer can be written now: AI on for the Knowledge Hub, a model ready on Guide Answer's chain. */
+    answers: z.boolean(),
+    /** Whether a search can be spoken now: a model ready on Guide Voice Search's chain. */
+    voice: z.boolean(),
   })
   .strict();
 

@@ -134,6 +134,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Documents | [EmailFrame](#emailframe) | `EmailFrame` | One email body in a sealed frame: the sender's layout kept, scaled down to fit the column, and unable to reach the app. | beta |
 | Documents | [FileCard](#filecard) | `FileCard` | A file in a chat bubble or a list, as on WhatsApp: a PDF's first page over its name, then its pages, type and size, with Download. | beta |
 | Documents | [GuideBody](#guidebody) | `GuideBody` | A User Guide chapter's body: numbered steps with Open links, notes, tables and annotated pictures. | beta |
+| Documents | [GuideResults](#guideresults) | `GuideResults`, `GuideAnswerCard` | The User Guide's search results, each a section or task with the line that answers marked, and its short answer with numbered sources. | beta |
 | Documents | [ImageViewer](#imageviewer) | `ImageViewer` | A picture at a readable size, with zoom and a way to open it full size in a new tab. | stable |
 | Documents | [MediaViewer](#mediaviewer) | `MediaViewer` | A photo, a video or a PDF full screen, as on WhatsApp: zoom, step to the next, Download, Share on a phone, and Forward where the screen offers it. | beta |
 | Documents | [Paper](#paper) | `Paper`, `PaperLogo`, `PaperTitle`, `PaperTable`, `PaperFoot`, `Signature` | A document the product generated, as it will print: white paper in both themes, with the City Green mark and its yellow rule. | stable |
@@ -4324,6 +4325,44 @@ A User Guide chapter's body: numbered steps with Open links, notes, tables and a
 
 ```tsx
 <GuideBody blocks={section.blocks} anchor="people-add-employee" picture={pictureOf} onLink={open} />
+```
+
+### GuideResults
+
+The User Guide's search results, each a section or task with the line that answers marked, and its short answer with numbered sources.
+
+| | |
+|---|---|
+| Use | The Knowledge Hub's User Guide while a search is typed: the results the API ranked (GuideResults) and, once asked, the answer written from them (GuideAnswerCard). |
+| Avoid | A list of records (DataView); ⌘K's own results (CommandPalette); a match in text a person wrote (LinkText). |
+| Phone | The same list: each result is a full width row at least 44 px tall, its step a pill under the title; the answer's sources are full width rows below it. |
+| Accessibility | Results are an ordered list of buttons named by their titles, the marked words a mark element; the answer is a live region, each source a button naming its number and title. |
+| Status | beta |
+| Exports | `GuideResults`, `GuideAnswerCard` |
+| Import | `import { GuideResults, GuideAnswerCard } from "@mycity/ui";` |
+| File | `packages/ui/src/documents/GuideResults.tsx` |
+| Test | `packages/ui/src/documents/GuideResults.test.tsx` |
+| Gallery | `packages/ui/src/documents/GuideResults.gallery.tsx` (`npm run gallery`, `#/GuideResults`) |
+
+**GuideResults** props (`GuideResultsProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `hits` | `GuideHitView[]` | yes | The results, best first, as the API sent them. |
+| `onOpen` | `(hit: GuideHitView) => void` | yes | Opens a result: the guide at its section or task, at its step. |
+| `label` | `string` |  | Names the list for assistive technology. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+**GuideAnswerCard** props (`GuideAnswerCardProps`)
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `answer` | `GuideAnswerView \| null` | yes | The answer once written; null while it is being written. |
+| `onOpen` | `(hit: GuideHitView) => void` | yes | Opens one of its sources, as a result does. |
+| `className` | `string` |  | Layout classes only (spacing). |
+
+```tsx
+<GuideResults hits={page.data} onOpen={open} label="Guide Results" />
 ```
 
 ### ImageViewer
