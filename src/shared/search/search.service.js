@@ -46,6 +46,7 @@ const { pageOf, envelope, PAGE_SIZE } = require("../http/paged");
 const catalog = require("../access/access.catalog");
 const grantsCache = require("../rbac/grants-cache");
 const routeMap = require("../route-map");
+const deliveryPlan = require("../delivery-plan");
 const registry = require("./registry");
 const { SCREENS, tabVisible } = require("./screens");
 const { ACTIONS, linkOf } = require("./actions");
@@ -118,8 +119,10 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
     candidates.some((p) => p.capability) && !(user && user.is_ceo === true)
       ? await grantsCache.getCapabilities(db, user && user.user_id)
       : [];
+  // A record whose screen has not shipped would open Coming Soon (shared/delivery-plan): its group never runs.
   const run = candidates
     .filter((p) => scopes.has(p.module) && (!p.capability || (user && user.is_ceo === true) || caps.includes(p.capability)))
+    .filter((p) => deliveryPlan.typeOpens(p.type))
     .sort((a, b) => Number(b.lead === true) - Number(a.lead === true));
   if (run.length === 0) return out;
 
@@ -296,7 +299,7 @@ const tabLabel = (module, tab) => {
 
 /** The screens this reader may open, as catalogue entries carrying their result. */
 function screenEntries(reader) {
-  return SCREENS.filter((x) => tabVisible(x, reader)).map((x) => {
+  return SCREENS.filter((x) => tabVisible(x, reader) && deliveryPlan.screenOpen(x.module, x.tab)).map((x) => {
     const moduleLabel = catalog.MODULE_META[x.module].label;
     return {
       title: x.label,
@@ -326,7 +329,8 @@ function actionEntries(reader) {
     (x) =>
       (!x.need || can(x.need)) &&
       (!x.capability || holds(x.capability)) &&
-      (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)),
+      (!x.module || tabVisible({ module: x.module, tab: x.tab }, reader)) &&
+      deliveryPlan.linkOpens(linkOf(x)),
   ).map((x) => {
     const where = x.module ? tabLabel(x.module, x.tab) : null;
     return {
@@ -398,4 +402,4 @@ async function everything(db, user, { q = "", type = null, page = 1 } = {}) {
   return { q: records.q, hint: records.hint, groups };
 }
 
-module.exports = { search, everything, readerOf, rankOf, fold, withinOne, nearWord, typeHint, trigramReady, MIN_TERM };
+module.exports = { search, everything, readerOf, screenEntries, actionEntries, rankOf, fold, withinOne, nearWord, typeHint, trigramReady, MIN_TERM };

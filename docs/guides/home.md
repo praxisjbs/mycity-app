@@ -10,7 +10,7 @@
 | Capabilities | `home.team` (open the Team tab and its figures), `home.reports` (build, schedule, run and receive reports), `alerts.manage` (create, change and switch off alert rules), `alerts.clear` (clear or dismiss an alert, together with the rule's own grant) |
 | Screens (PROGRESS.md rows) | #1 Overview, #86 Team, #2 Alerts, #3 Reports |
 | Status | Agreed |
-| Last changed | 25/10/2026 |
+| Last changed | 26/10/2026 |
 
 Home is the command centre, renamed to **Home** at the 12 October kickoff and fixed in MILESTONES
 §18.1 (a plain word that survives translation and fits an icons-only rail). This guide is the
@@ -365,7 +365,8 @@ run downloads from `GET /api/v1/documents/:id/content`, and the clock-in panel u
   alert count whose read fails is logged and left null, never drawn as a zero or an empty list,
   as a card is. The server sends figures; every title and caption is written on the screen.
 - **Need You** is on every Overview: the requests waiting on the reader (`GET /workflow/mine`, its
-  own paged list) and `alerts_to_clear`, the open alerts of any severity they may clear (a holder
+  own paged list, which never holds a request about a record whose screen has not shipped, such as
+  an expense before Milestone 8: `shared/delivery-plan.js`, foundation.md §6.7) and `alerts_to_clear`, the open alerts of any severity they may clear (a holder
   of `alerts.clear` whose grant on the rule's `permission_key` reaches the alert's subject; null
   for anyone without `alerts.clear`). Staff hold `approve` nowhere, so theirs is empty in M1 and
   shows its empty state.
@@ -837,6 +838,7 @@ rows, and nothing in the code says where anything came from.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · QA DEF-01 finished: Need You leaves out, on the server, a request about a record whose screen has not shipped (an expense before Milestone 8), so its page and count hold only what opens; ⌘K's KPI Cards group leaves out a card whose module has not shipped, on the server as in the app (`shared/delivery-plan.js`, foundation.md §6.7).
 - 26/10/2026 · JP · QA DEF-01, §6: a card and a picker option name their module, and the Overview, Choose Cards and ⌘K leave out a card whose module is Coming Soon in that build (Expenses before Milestone 8), for every role.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Team's View Attendance opens that person's day on People · Attendance (`?employee=`), not the whole register; Choose Cards' refusals are error toasts and the list reloads as it now is; a Daily Attendance report saved holding a status its day cannot (Absent on Today) opens with it dropped; §6 and §10.1 say Window Days shows for no listed metric today. Clear N Alerts was checked and kept: its count and the Open Alerts list are the same set.
 - 25/10/2026 · JP · Tests only, for the employee creation rules (`docs/guides/foundation.md` §6.16): Team's month test gives the two On Site people it adds a worksite, and New Rule's empty fields each read Required. No Home behaviour changed.

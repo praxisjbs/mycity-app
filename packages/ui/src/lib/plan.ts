@@ -23,61 +23,40 @@
  * a change to the M column in PROGRESS, nothing in code.
  */
 import { useCallback, useSyncExternalStore } from "react";
+import contractPlan from "@mycity/contract/plan.js";
+import type * as Shared from "@mycity/contract/plan.js";
 import { todayIso } from "./format";
 import { useEnvironment } from "./environment";
 
 /** One milestone from MILESTONES §4. */
-export interface PlanMilestone {
-  key: string;
-  n: number;
-  name: string;
-  /** Its demo day, ISO; null when the table gives none. */
-  demo: string | null;
-}
-
+export type PlanMilestone = Shared.PlanMilestone;
 /** One screen's row in PROGRESS: its milestone, and which ticks it has. */
-export interface PlanScreen {
-  m: string;
-  /** API ticked: staging opens it. */
-  api: boolean;
-  /** API, UI and Mobile all ticked: production opens it. */
-  delivered: boolean;
-}
-
+export type PlanScreen = Shared.PlanScreen;
 /** The whole plan, as vite.shared.js deliveryPlan() writes it. */
-export interface DeliveryPlan {
-  milestones: PlanMilestone[];
-  screens: Record<string, PlanScreen>;
-}
-
+export type DeliveryPlan = Shared.DeliveryPlan;
 /** Which rule decides what opens. */
-export type OpenRule = "production" | "staging" | "mock";
+export type OpenRule = Shared.OpenRule;
 /** The Prototype View switch, in mock mode only. */
-export type PlanView = "full" | "delivered";
+export type PlanView = Shared.PlanView;
+
+/*
+ * The rule itself is @mycity/contract/plan's, which the API decides by too (Need You, ⌘K, Home's
+ * cards), so a screen the app shows as Coming Soon is never offered by the server either.
+ */
 
 /** The rule for where this build runs. */
 export function openRule(options: { mode: string | undefined; dev: boolean; environment: "staging" | "other" }): OpenRule {
-  if (options.mode === "mock") return "mock";
-  if (options.environment === "staging" || options.dev) return "staging";
-  return "production";
+  return contractPlan.openRule(options);
 }
-
-const mNum = (key: string) => Number(key.slice(1));
 
 /** The milestone being delivered now: the earliest one with screens that is neither past its demo day nor fully ticked. */
 export function currentMilestone(plan: DeliveryPlan, today = todayIso()): PlanMilestone | undefined {
-  const rows = Object.values(plan.screens);
-  const planned = plan.milestones.filter((m) => m.n >= 1 && rows.some((r) => r.m === m.key));
-  const done = (m: PlanMilestone) => (!!m.demo && m.demo < today) || rows.filter((r) => r.m === m.key).every((r) => r.delivered);
-  return planned.find((m) => !done(m)) ?? planned[planned.length - 1];
+  return contractPlan.currentMilestone(plan, today);
 }
 
 /** Does this screen open under this rule? A screen missing from the plan opens only in mock mode. */
 export function screenOpens(screen: PlanScreen | null, rule: OpenRule, view: PlanView, current?: PlanMilestone): boolean {
-  if (rule === "production") return !!screen?.delivered;
-  if (rule === "staging") return !!screen?.api;
-  if (view === "full" || !screen) return true;
-  return screen.delivered || !current || mNum(screen.m) <= current.n;
+  return contractPlan.screenOpens(screen, rule, view, current);
 }
 
 /** What useScreenState returns. */

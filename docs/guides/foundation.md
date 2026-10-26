@@ -222,7 +222,7 @@ Users keeps `GET /access/roles`.
 
 | Route | Permission |
 |---|---|
-| `GET /workflow/mine` (waiting on me; `module_key` filter), `/workflow/mine/count` (`waiting`, `overdue`) | the caller's own: the requests whose current stage names them, in modules where they hold `approve` |
+| `GET /workflow/mine` (waiting on me; `module_key` filter), `/workflow/mine/count` (`waiting`, `overdue`) | the caller's own: the requests whose current stage names them, in modules where they hold `approve`, never one about a record whose screen has not shipped (`shared/delivery-plan.js` `closedTypes`) |
 | `GET /workflow/instances/:id` (the route, the decisions, `can_decide`, `can_withdraw`, `can_reassign`) | whoever opened it, the employee it is about, the people its stage names, anyone who decided on it, or `view` on its module within scope; anyone else a 404 |
 | `POST /workflow/instances/:id/approve` (optional note), `/reject`, `/request-changes` (a reason, required) | named on the current stage, and `approve` on the request's module (§8) |
 | `POST /workflow/instances/:id/withdraw` | the requester, or the CEO |
@@ -537,11 +537,12 @@ As built (17/10/2026):
   three, best and newest first, and never page past them; People · Attendance holds the rest. Each
   reads as the person, then the status or exception and the full date ("Present · 26/10/2026",
   "Missing Clock-Out · 26/10/2026"), in the result's visible words and so its accessible name.
-- Nothing that would open Coming Soon is offered (F14). The app leaves out a screen, an action or a
-  record whose link lands on a screen not open in that build, and a Home card result counting a module
-  that is not open (a hit's `module`), for every role, by the shell's own rule (`useOpens` in
-  `app/src/lib/plan.ts`; `app/src/shell/Search.tsx`). Before Milestone 8, ⌘K finds no Expenses
-  screen, request or card.
+- Nothing that would open Coming Soon is offered (F14). The API leaves out a record group whose type
+  opens on a screen that has not shipped, a screen and an action that would land on one, and a Home
+  card counting a module that has not (`shared/delivery-plan.js`), so a group's page of 25 counts only
+  what opens. The app checks the same hits by the same rule (`useOpens` in `app/src/lib/plan.ts`;
+  `app/src/shell/Search.tsx`), which covers the in-browser mock. Before Milestone 8, ⌘K finds no
+  Expenses screen, request or card.
 - A record group also stands down while its feature is switched off: a provider's `available(client)`
   (`shared/search/provider.js`) is asked before its query, and false leaves the group out for
   everyone (Home Locations while the Attendance policy's Home Location is off, `attendance.md` §1.3).
@@ -1080,6 +1081,7 @@ screen.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · QA DEF-01 finished, F14 on the server: the delivery plan has one reader and one rule (`packages/contract/plan.js`), which the app's build reads the docs with (`packages/ui/vite.shared.js`), the app opens screens by (`packages/ui/src/lib/plan.ts`, `app/src/lib/plan.ts`) and the API decides by (`src/shared/delivery-plan.js`), from the plan the app was built with (`app/dist/delivery-plan.json`, which a release carries; the docs where there is no build). My Approvals and Need You (`/workflow/mine` and its count) and ⌘K (record groups, screens, actions) leave out what would only open Coming Soon on the server, so their pages of 25 count only what opens. By APP_ENV: production by API, UI and Mobile, staging and development by API, a test everything unless it sets a plan (`use`).
 - 26/10/2026 · JP · From the QA bug register (Milestone 2): the form system's `reset()` drops a pause check still waiting from the last key, so a field emptied after a quick save (a task comment) is never marked Required (DEF-06).
 - 26/10/2026 · JP · QA DEF-03, DEF-04 and DEF-07, the shared form fields: a limit no schema worded reads by what it limits (`shortMessage`): a number At most or At least its bound, a list Too many, a date Too late, never Too long on a number (a latitude of 91 read so). `MoneyField` keeps a minus typed or pasted ("-100", "₦-100", "(100)") and reads Not below zero, never dropping it; zero is an amount; a second point or a comma out of place reads Check the amount and a third decimal Two decimals at most, never cut. `DateRangeField` gives each end its own id (the Field's label points at From) and names the ends and their calendar buttons From and To (Pick From Date, Pick To Date), where both were the Field's label twice under one id.
 
