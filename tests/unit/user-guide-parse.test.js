@@ -109,7 +109,7 @@ describe("parseChapter", () => {
     const ok = parseChapter(spec("prompt: keep"), "x.md");
     expect(ok.problems).toEqual([]);
     expect(ok.chapter.shots.owed.prompt).toBe("keep");
-    expect(parseChapter(spec("crop: modal"), "x.md").chapter.shots.owed.prompt).toBeNull();
+    expect(parseChapter(spec("crop: modal"), "x.md").chapter.shots.owed).not.toHaveProperty("prompt");
     expect(parseChapter(spec("prompt: close"), "x.md").problems).toEqual(["x.md: shot owed, line 11: prompt is keep"]);
   });
 
