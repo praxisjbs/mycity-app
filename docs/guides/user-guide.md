@@ -189,6 +189,10 @@ A chapter is filtered on the server before it is sent, by the reader `shared/sea
 - A section with a `screen` is kept when `tabVisible(screen, reader)` holds, and its `needs` too.
 - A task, step, paragraph, picture, note or table row with `needs` is kept only when the reader holds
   every one. A step that goes leaves the numbering whole: steps are renumbered after filtering.
+- A need is `<module> <action>`, `cap <code>`, `manager`, `ceo`, or `team`: whoever sets work for
+  others, as My Workspace decides (the CEO, or anyone whose `workspace` create reaches another active
+  employee). `<one> or <another>` is held when either is, for a task two kinds of reader take, such
+  as a scorecard drafted by a manager or by Operations and People.
 - A link to a screen the reader may not open becomes plain text; so does a link to a section they
   may not read.
 - A chapter with nothing left is not listed, and `GET /chapters/:slug` answers 404.
@@ -230,7 +234,11 @@ step that starts `phone ` or `desktop ` runs on that device only. A `lock:` step
 it (the session's channel), and the next picture starts signed in afresh.
 
 The demo's data is the staging seed's (F13), so the pictures show the people and figures a trainee
-sees on staging. Nothing in a picture is a real person's private data.
+sees on staging. Nothing in a picture is a real person's private data. The pictures run on a fixed
+clock, 25/10/2026 at 12:00 in Lagos, so a date in them, and the prompts that open at a shift's start,
+are the same on every run; a prompt that opens on arrival is closed before the `do` steps. A menu, or
+a select's list that floats outside its dialog, is searched before the dialog while it is open, so a
+step can pick an option (`click: role option "Marketing & Sales"`).
 
 ### 6.6 The gate (`scripts/check/user-guide.js`, in `npm run ci`)
 
@@ -342,6 +350,15 @@ word limits do not count it, as they do not count an article.
 - Who signs off each milestone's chapters before the next PR starts (TB proposed as reviewer).
 
 ## 14 · Change log
+
+- 26/10/2026 · JP · Every chapter checked against its screens, string by string (a sweep of each
+  screen's buttons, fields, columns, messages, server refusals and schema marks, then a reader per
+  chapter giving each a verdict), and every gap closed in one PR: the steps a screen asks for, each
+  message it can show with what to do, success messages, what differs on a phone, and the grant each
+  step needs. Getting Started gains Confirm It's You (one task, linked from ESS and Settings), Sign
+  out, saving a download, and When a Screen Cannot Open (offline, a new version, Coming Soon, errors,
+  a link you cannot open, unsaved changes). §6.3: the needs `team` and `<one> or <another>`. §6.5:
+  the fixed clock and the floating list. 199 pictures.
 
 - 25/10/2026 · JP · Praxis AI and AI Control get their chapters (`praxis-ai.md`, `ai-control.md`), live screens brought forward from M10, without naming M10; the Quick Start gains Ask Praxis AI and Watch AI Spend. §6.5: a `lock:` step, a step for one device (`phone click: ...`) where only the way in differs, and two pictures where a phone reaches a screen another way. Phone pictures for the 38 that had a desktop one only, and pictures for the five sections that had none (the lock screen, the display, help, importing staff, a login's actions); 147 pictures.
 - 25/10/2026 · JP · Written: the User Guide tab, its API filtered to the step, the pictures, the Back

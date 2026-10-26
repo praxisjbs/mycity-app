@@ -324,6 +324,10 @@ screen before the live hub does.
 | **You do not have access to this** | Your role cannot open this record | Ask the person who sent it, or your manager |
 | **This was not found** | The record was removed, or the link is wrong | Check the link, or search for the record |
 
+When a press does not go through because the hub could not be reached, a message says so and ends
+in *Try again*, such as **Not saved. Try again.** Check your connection and press the button again.
+What you typed stays.
+
 ### A link you cannot open {#start-no-access}
 
 - A link to a module your role does not open takes you to Home instead. A link to a tab you cannot

@@ -748,6 +748,7 @@ The card then reads **On**, with how many recovery codes are left.
 | **Set-up expired** | More than 15 minutes passed since you began | Press **Cancel**, then **Set Up Two-Step** again, and scan the new code |
 | **Too many requests. Wait a moment and try again.** | Too many codes tried | Wait a few minutes |
 | **Your role needs two-step sign-in, so it stays on.** | Your role now requires two-step | Keep it on |
+| **Two-step sign-in is not on.** | It was turned off elsewhere, or reset by an administrator, while the page was open | Reopen My Security and set it up again |
 
 Once it is on:
 
