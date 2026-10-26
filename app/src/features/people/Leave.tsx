@@ -66,6 +66,16 @@ export const statusPill = (r: LeaveRequest) => <Pill tone={LEAVE_STATUS[r.status
 
 export const dayCount = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
+/** Who a waiting request waits on: the one person its stage names, else the stage (a role decides it). */
+export const waitingOnOf = (r: LeaveRequest) => r.approver_name ?? r.waiting_on;
+
+/** The message once a request is sent, naming whoever it went to as its detail does. */
+const sentTo = (r: LeaveRequest) => {
+  if (r.status === "approved") return "Leave approved";
+  const who = waitingOnOf(r);
+  return who ? `Sent to ${who}` : "Request sent";
+};
+
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
 
 export function PeopleLeave() {
@@ -228,7 +238,7 @@ function RequestCard({ leave: r, onDone }: { leave: LeaveRequest; onDone: () => 
           ["To", formatDate(r.ends_on)],
           ["Days", dayCount(r.days)],
           ["Status", statusPill(r)],
-          ...(r.waiting_on ? ([["Waiting On", r.waiting_on]] as Array<[string, string]>) : []),
+          ...(waitingOnOf(r) ? ([["Waiting On", waitingOnOf(r)]] as Array<[string, string]>) : []),
           ...(r.recorded ? ([["Recorded By", "People"]] as Array<[string, string]>) : []),
           ...(r.reason ? ([["Reason", r.reason]] as Array<[string, string]>) : []),
         ]}
@@ -364,8 +374,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
         const r = await recordIt.run({ body: { ...body, employee_id: who[0].employee_id } });
         toast(`Leave recorded for ${r.employee.display_name}`);
       } else {
-        await ask.run({ body });
-        toast("Sent to your line manager");
+        toast(sentTo(await ask.run({ body })));
       }
       invalidate("/api/v1/leave");
       invalidate("/api/v1/ess/leave");

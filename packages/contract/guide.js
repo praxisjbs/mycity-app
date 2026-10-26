@@ -279,7 +279,12 @@ function parseShot(id, lines, at) {
       else if (DEVICES.includes(value)) spec.devices = [value];
       else problems.push(`${where}: device is both, desktop or phone`);
     } else if (key === "crop") spec.crop = value;
-    else if (key === "do" || key === "marks" || key === "sources") {
+    else if (key === "prompt") {
+      // A picture of a prompt that opens by itself once per sign-in (a policy to acknowledge). Set
+      // only when written, so every other spec, and the hash shots.json keeps of it, stays as it was.
+      if (value === "keep") spec.prompt = "keep";
+      else problems.push(`${where}: prompt is keep`);
+    } else if (key === "do" || key === "marks" || key === "sources") {
       list = key;
       if (value) problems.push(`${where}: ${key} lists its items on the lines under it`);
     } else problems.push(`${where}: unknown key "${key}"`);

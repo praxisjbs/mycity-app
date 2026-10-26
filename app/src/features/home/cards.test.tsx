@@ -5,6 +5,7 @@ import type { HomeActivityItem, HomeKpiCard, HomeKpiCell } from "@mycity/contrac
 import { figureOf } from "./cards";
 import { Cell, momentOf } from "./KpiDetail";
 import { activityLine } from "./labels";
+import { openCards } from "./Overview";
 
 /** How a card's figure, a record's cell and an activity line read (docs/guides/home.md §6, §10.1). */
 
@@ -20,9 +21,18 @@ const card = (over: Partial<HomeKpiCard>): HomeKpiCard => ({
   tone: null,
   trend: null,
   opens: true,
+  module: "people",
   ...over,
 });
 const shown = (node: ReturnType<typeof figureOf>) => render(<>{node}</>).container.textContent;
+
+describe("the cards the row shows", () => {
+  it("leaves out a card whose module is Coming Soon in this build, whoever may see it (F14)", () => {
+    const cards = [card({}), card({ key: "expenses_pending", title: "Expenses Awaiting Approval", unit: "money", value: null, amount: "747000.00", module: "expenses" })];
+    expect(openCards(cards, (m) => m !== "expenses").map((c) => c.key)).toEqual(["headcount"]);
+    expect(openCards(cards, () => true).map((c) => c.key)).toEqual(["headcount", "expenses_pending"]);
+  });
+});
 
 describe("a card's figure", () => {
   it("is a count with thousands grouped", () => {

@@ -8,7 +8,9 @@
  * rather than a table. Every login holds `home` view, the only check the search service
  * makes, so the provider decides per person: only cards eligible for the reader (their
  * module's `view`, the card's capability, its field unmasked; kpi-catalog/eligibility.js)
- * and offered on the Overview, never a card they cannot open. Paged at 25, as every list.
+ * and offered on the Overview, never a card they cannot open. Paged at 25, as every list. Each
+ * result names its card's module, so the app leaves out a card whose module is Coming Soon in
+ * that build, as the Overview does.
  */
 const { pageOf, envelope } = require("../../shared/http/paged");
 const routeMap = require("../../shared/route-map");
@@ -45,6 +47,7 @@ module.exports = Object.freeze({
       sub: null,
       status: null,
       link: routeMap.linkFor("home_kpi", e.id).path,
+      module: e.module,
     }));
     return { page: envelope(items, number, found.length).page, items };
   },

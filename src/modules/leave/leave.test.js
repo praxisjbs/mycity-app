@@ -44,6 +44,25 @@ describe("the allowance", () => {
     );
   });
 
+  test("the Last Day's mark gives the days asked for and the days left, short enough for the form to show", () => {
+    const { wordCount } = require("../../../scripts/check/lib/copy");
+    const markOf = (balance, days) => {
+      try {
+        rules.assertWithinAllowance(balance, days);
+      } catch (e) {
+        return e.fields.ends_on[0];
+      }
+      return null;
+    };
+    // The QA case: 19 Annual days left, 02/11/2026 to 15/12/2026 is 32 working days.
+    expect(markOf({ name: "Annual", entitled: 20, remaining: 19 }, 32)).toBe("32 working days, 19 left");
+    expect(markOf({ name: "Annual", entitled: 20, remaining: 0 }, 1)).toBe("1 working day, 0 left");
+    // A year already over its allowance reads 0 left, never a negative.
+    expect(markOf({ name: "Annual", entitled: 20, remaining: -2 }, 3)).toBe("3 working days, 0 left");
+    // The form shows a server's mark as it is only when it fits its four words (else "Check this value").
+    expect(wordCount(markOf({ name: "Annual", entitled: 20, remaining: 19 }, 32))).toBeLessThanOrEqual(4);
+  });
+
   test("a type with no allowance has no ceiling", () => {
     expect(() => rules.assertWithinAllowance({ name: "Unpaid", entitled: null, remaining: null }, 200)).not.toThrow();
     expect(() => rules.assertWithinAllowance(undefined, 3)).not.toThrow();

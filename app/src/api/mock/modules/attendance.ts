@@ -195,6 +195,13 @@ const UNCLEAR_TEXT: Record<string, string> = {
 const DAYS = new Map<string, Day>();
 const EVENTS: Ev[] = [];
 const EXCS: Ex[] = [];
+
+/** Every person's days up to today, for ⌘K (data/search.ts), as the API's attendance provider finds them. */
+export const searchableDays = () =>
+  [...DAYS.values()].flatMap((d) => {
+    const person = byKey(d.key);
+    return person && d.attendance_date <= todayIso() ? [{ person, attendance_day_id: d.attendance_day_id, attendance_date: d.attendance_date, status: d.status }] : [];
+  });
 const dk = (key: string, date: string) => `${key}|${date}`;
 let seq = 0;
 

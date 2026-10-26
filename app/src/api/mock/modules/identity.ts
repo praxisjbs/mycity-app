@@ -4,6 +4,7 @@ import { capabilitiesOf } from "../data/access";
 import { appearanceApplied } from "../data/appearance";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
 import { searchResult } from "../data/search";
+import { searchableDays } from "./attendance";
 import { codeGiven, codeOk, markFresh, needsCode, passkeyOwner, waysOf } from "./security";
 
 /**
@@ -486,5 +487,5 @@ route("POST /api/v1/notifications/push/read", () => noContent(), { anonymous: tr
 route("GET /api/v1/search", (req) => {
   for (const k of Object.keys(req.query)) if (!["q", "page", "type"].includes(k)) return invalid({ [k]: ["is not a filter on this list"] });
   const page = Math.max(1, Number.parseInt(req.query.page ?? "1", 10) || 1);
-  return ok(searchResult(PEOPLE, grantsFor(req.user!), req.query.q ?? "", req.query.type ?? null, page));
+  return ok(searchResult(PEOPLE, grantsFor(req.user!), req.query.q ?? "", req.query.type ?? null, page, searchableDays()));
 });

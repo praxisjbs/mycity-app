@@ -10,7 +10,7 @@
 | Capabilities | none; the builder is the `people` grant and the viewer every member of staff |
 | Screens (PROGRESS.md rows) | #92 People · Organogram, #91 ESS · Org Chart (ratified 15/10/2026) |
 | Status | Built |
-| Last changed | 25/10/2026 |
+| Last changed | 26/10/2026 |
 
 This guide was written from a brainstorm with the client representative on 13/10/2026. The two
 screens it describes are a **proposed addition** to the approved screen inventory (MILESTONES §18,
@@ -324,6 +324,7 @@ while the seat is empty, Etudor Edidiong (Program Manager) answers for them (§6
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · Nothing on the Organogram or Org Chart changed. Beside them, from the QA bug register: ESS · My Leave and People · Leave name the real approver and mark a request past the allowance with its days and balance (`docs/guides/ess.md`), and Add Employee refuses a negative Gross Monthly (`docs/guides/foundation.md` §6).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Add Role (and ⌘K's) needs `people` create, as `POST /org-seats` does; a refused drag or open role says the server's reason ("That would make a loop in the reporting line."), not the last call's; the open role's Department is the shared picker of departments in use, searched on the server; Change Reporting Line asks for an open role when An Open Role is chosen ("Pick an open role"). Create Vacancy stays, opening Recruitment's Coming Soon (the owner, 26/10/2026).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: the "sit at the top" banner shows only on People · Organogram to those who may move people; a desktop search opens the folded branches holding its matches; §10.1's ESS · Org Chart row names Open Record and Change Manager by grant, as §8 does.
 - 25/10/2026 · JP · Nothing on the Organogram or Org Chart changed. Beside them, People · Leave and ESS · My Payslips open a record in a sheet on a phone, never below the list (FRONTEND_FOUNDATION F31, `docs/guides/ess.md` §10).

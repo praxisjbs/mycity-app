@@ -774,6 +774,7 @@ function cardOf(card: MockCard, f: Figure): HomeKpiCard {
     tone: card.tone && !isZero(card.unit, f) ? card.tone : null,
     trend: null,
     opens: true,
+    module: card.module,
   };
 }
 
@@ -830,7 +831,7 @@ function pickerOf(user: string): HomeKpiPicker {
   const c = choiceOf(user);
   return {
     max: MAX_CARDS,
-    cards: CARDS.filter((card) => pickable(card.key, c.eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit })),
+    cards: CARDS.filter((card) => pickable(card.key, c.eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit, module: card.module })),
     kpi_ids: c.picks ? keepEligible(c.picks, c.eligible).slice(0, MAX_CARDS) : null,
     default_ids: c.fallback.ids,
     locked_ids: c.locked.slice(0, MAX_CARDS),
@@ -1848,7 +1849,7 @@ function roleCardsOf(roleId: string, code: string): HomeRoleKpis {
     locked_ids: row ? keepEligible(row.locked_ids, eligible).filter((id) => defaults.includes(id)) : [],
     configured: !!row,
     view_default_ids: keepEligible(VIEW_DEFAULTS[me(ROLE_HOLDER[code]).home_view] ?? [], eligible).slice(0, MAX_CARDS),
-    cards: CARDS.filter((card) => pickable(card.key, eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit })),
+    cards: CARDS.filter((card) => pickable(card.key, eligible)).map((card) => ({ key: card.key, title: card.title, domain: card.domain, unit: card.unit, module: card.module })),
   };
 }
 

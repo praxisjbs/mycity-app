@@ -147,6 +147,26 @@ describe("Add Employee", { timeout: 20000 }, () => {
     expect(parsed.error && parsed.error.issues).toBeUndefined();
   });
 
+  it("refuses a negative Gross Monthly as typed, never turning it positive, and takes zero", async () => {
+    const user = userEvent.setup();
+    open(<AddEmployee close={vi.fn()} />);
+    await person(user);
+    await job(user);
+    const pay = screen.getByLabelText("Gross Monthly");
+    await user.type(pay, "-100");
+    expect((pay as HTMLInputElement).value).toBe("-100");
+    expect(await screen.findByText("Not below zero")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("heading", { name: "Pay and Bank" })).toBeTruthy();
+    await user.clear(pay);
+    await user.type(pay, "0");
+    await waitFor(() => expect(screen.queryByText("Not below zero")).toBeNull());
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Add Employee" }));
+    await waitFor(() => expect(m.run).toHaveBeenCalledOnce());
+    expect((m.run.mock.calls[0]![0] as { body: Record<string, unknown> }).body.gross_monthly).toBe("0.00");
+  });
+
   it("takes the person back to the step with the field the server refused", async () => {
     const user = userEvent.setup();
     m.run.mockRejectedValueOnce(new ApiError(409, { error: { code: "EMPLOYEE_EXISTS", message: "An employee already has this work email.", fields: { work_email: ["Already in use"] } } } as never));
