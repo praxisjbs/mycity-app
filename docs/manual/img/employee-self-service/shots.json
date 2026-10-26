@@ -57,7 +57,7 @@
   },
   "ess-policies": {
     "spec": "3cfe5a1b37968e4d",
-    "source": "dcab77b3fd2a17bc",
+    "source": "ff1f36d8edd53fe0",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "ess-policy-read": {
     "spec": "cd4c771ae8115e55",
-    "source": "dcab77b3fd2a17bc",
+    "source": "ff1f36d8edd53fe0",
     "devices": [
       "desktop",
       "phone"
