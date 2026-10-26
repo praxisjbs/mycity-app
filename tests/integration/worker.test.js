@@ -615,6 +615,7 @@ describe("schedules and heartbeat", () => {
       "targets-lock",
       "task-recurrence",
       "urgent-repeats",
+      "user-guide-index",
       "workflow-timeout",
     ]);
   });

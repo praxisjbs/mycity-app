@@ -153,8 +153,8 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-25",
     built: true,
   }),
-  // Its short answer, written only from the passages the reader may read (§6.9). Fast, by JBS
-  // Praxis's choice of 25/10/2026.
+  // Its short answer, written only from the passages the reader may read (§6.9), on Fast as
+  // chosen on 25/10/2026 (§6.1 decision 10).
   "guide-answer": Object.freeze({
     label: "Guide Answer",
     module: "knowledge",

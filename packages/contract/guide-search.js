@@ -268,8 +268,8 @@ function distance(a, b, max) {
     const cur = [i];
     let best = i;
     for (let j = 1; j <= b.length; j += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      let d = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      const change = a[i - 1] === b[j - 1] ? 0 : 1;
+      let d = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + change);
       if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, prev2[j - 2] + 1);
       cur[j] = d;
       if (d < best) best = d;
@@ -381,7 +381,7 @@ function countIn(list, seq) {
  * Where a run of stems is found in a passage: its weighted count (what it says, then the section
  * or task it sits in, then its chapter) and how fully that finds the word (1 when it says it).
  */
-function found(doc, seq) {
+function whereFound(doc, seq) {
   const own = countIn(doc.stems, seq);
   const path = countIn(doc.context, seq);
   const chapter = countIn(doc.chapter, seq) ? 1 : 0;
@@ -411,7 +411,7 @@ function scoreDoc(index, doc, query, relaxed = false) {
     let by = null;
     let fully = 0;
     for (const v of c.variants) {
-      const f = found(doc, v.stems);
+      const f = whereFound(doc, v.stems);
       const tf = f.tf;
       if (!tf) continue;
       // Another word for it never counts for more than the word typed would.

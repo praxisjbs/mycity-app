@@ -14,7 +14,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { parseChapter, filterChapter, passagesOf, passageFor } = require("@mycity/contract/guide");
 const engine = require("@mycity/contract/guide-search");
-const c = require("@mycity/contract");
+const contract = require("@mycity/contract");
 const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
 const { AppError } = require("../../shared/errors");
@@ -234,7 +234,7 @@ async function search(db, user, query, opts) {
 
 /** The answer's shape with its sources checked: a cited number is one of the passages sent. */
 const cited = (n) =>
-  c.user_guide.GuideAnswerOutput.superRefine((v, ctx) => {
+  contract.user_guide.GuideAnswerOutput.superRefine((v, ctx) => {
     v.sentences.forEach((s, i) => {
       if (s.sources.some((x) => x > n)) ctx.addIssue({ code: "custom", path: ["sentences", i, "sources"], message: `cite passages 1 to ${n} only` });
     });
