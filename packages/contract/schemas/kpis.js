@@ -17,7 +17,7 @@ const KpiResult = z.enum(["met", "not_met", "na"]);
 const KpiFrequency = z.enum(["weekly", "monthly", "quarterly"]);
 
 /** The first day of a month, the key of every monthly figure ("2026-10-01"). */
-const MonthStart = isoDate.refine((v) => v.endsWith("-01"), "must be the first day of a month");
+const MonthStart = isoDate.refine((v) => v.endsWith("-01"), "Pick a month");
 
 /** One KPI's actual for one month. */
 const KpiMonth = z

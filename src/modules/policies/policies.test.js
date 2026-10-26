@@ -193,6 +193,19 @@ describe("the Attendance policy type", () => {
     const c = require("@mycity/contract");
     expect([...attendanceType.VISIBLE].sort()).toEqual(Object.keys(c.attendance.AttendanceRules.shape).sort());
   });
+
+  test("a working day's wrong time is marked on that day, in four words or fewer", () => {
+    const c = require("@mycity/contract");
+    const hours = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, working: weekday < 6, starts_at: weekday < 6 ? "09:00" : null, ends_at: weekday < 6 ? "17:00" : null }));
+    hours[2] = { ...hours[2], working: true, starts_at: "17:00", ends_at: "09:00" };
+    hours[4] = { ...hours[4], working: true, starts_at: null, ends_at: "17:00" };
+    const draft = c.attendance.AttendanceRulesDraft.safeParse({ hours });
+    const issues = draft.error.issues.map((i) => [i.path.join("."), i.message]);
+    expect(issues).toEqual(expect.arrayContaining([["hours.2.ends_at", "Ends after it starts"], ["hours.4.starts_at", "Required"]]));
+    const none = c.attendance.AttendanceRulesDraft.safeParse({ hours: hours.map((d) => ({ ...d, working: false, starts_at: null, ends_at: null })) });
+    expect(none.error.issues.map((i) => i.message)).toContain("Tick a working day");
+    for (const [, message] of [...issues, ...none.error.issues.map((i) => [0, i.message])]) expect(message.split(" ").length).toBeLessThanOrEqual(4);
+  });
 });
 
 describe("the rules of the version that judged something (rulesOfVersion, §6.8)", () => {

@@ -61,7 +61,7 @@ A bank change is logged and People are told. The message then reads
 | It says | What it means | What to do |
 |---|---|---|
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number without its country code | Type it as `0803 123 4567` |
-| **Check the format** | The account number is not ten digits | Type all ten digits, with no spaces |
+| **Ten digits** | The account number is not ten digits | Type all ten digits, with no spaces |
 | **Not saved. Try again.** | The connection failed | Press **Save Changes** again |
 
 To change your password, press **Change Password**. It opens [My Security](/ess?tab=my-security)
@@ -612,7 +612,7 @@ Leave People recorded for you reads **People** under **Approver**.
 | **Overlaps other leave** | You already asked for leave on some of those days | Change the days, or cancel the other request |
 | **More than you have left** | You do not have that many days left this year | Ask for fewer days, or another type |
 | **Not offered** | People stopped offering that type while you filled the form | Pick another **Leave Type** |
-| **Too long** | The note is over 500 characters | Shorten the **Note** |
+| *At most 500 characters* | The note is over 500 characters | Shorten the **Note** |
 
 ### Cancel a request {#ess-leave-cancel}
 
@@ -810,7 +810,7 @@ message says **Passkey removed**.
 | **This request has expired. Start again.** | Press **Add Passkey** again, and answer your device sooner |
 | **Passkeys do not work on this address** | Open the hub at its usual address, then try again |
 | **The passkey did not work** | Try again, or use your password |
-| **Required** or **Too long** under **Name** | Type a name of up to 60 characters |
+| **Required** or *At most 60 characters* under **Name** | Type a name of up to 60 characters |
 
 If you close your device's prompt, nothing changes.
 

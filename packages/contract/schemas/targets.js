@@ -37,7 +37,7 @@ const LineSource = z.enum([
 ]);
 
 /** A line's weight inside its section: numeric(5,2) as a string ("15", "12.5"). */
-const Weight = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, "must be a weight like 15 or 12.5");
+const Weight = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, "Like 15 or 12.5");
 
 /** A key result as a line or a check names it. */
 const KeyResultRef = z

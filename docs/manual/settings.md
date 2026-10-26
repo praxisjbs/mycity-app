@@ -42,7 +42,7 @@ The company's details, its brand files, its public holidays and its working week
 | **Not a phone number** | Not a Nigerian number, or a foreign one without its country code | Type it as `0803 123 4567`, or start with `+` and the country code |
 | **Check the email** | Not an email address | Check the spelling, with one @ |
 | **Not a web address** | The website is not a whole address | Paste it whole, starting with `https://` |
-| **Too long** | More than the field holds | Shorten it |
+| *At most 200 characters*, or another number | More than the field holds | Shorten it |
 
 ### Change the logo {#settings-organisation-brand needs="settings edit"}
 
@@ -440,7 +440,7 @@ Who decides each kind of request, in which order, and how long each has.
 | **Required** | The Stage Name or the Time Limit is empty | Fill it in |
 | **Pick a role**, **Pick a person** or **Pick who** | The approver is not chosen | Choose one |
 | **Enter a value** | Applies When has no value to compare | Type the value, or choose **Always** |
-| **Too short** or **Too long** under **Time Limit, Hours** | Not between 1 and 2160 hours | Use a number in that range |
+| *At least 1* or *At most 2,160* under **Time Limit, Hours** | Not between 1 and 2,160 hours | Use a number in that range |
 | **This flow changed since you opened it. Open it again.** | Someone saved this flow first | Press **Cancel**, open the flow again, and redo your change |
 | **This approval route is not valid:** and a list | A stage breaks a rule the list names | Correct each stage it names, then press **Save Stages** |
 | **Check the highlighted fields** | More than 10 stages | Remove stages until there are 10 at most |
@@ -472,7 +472,7 @@ it chooses the level, as for an announcement. **Off** means nobody is told. Secu
 | The field says | What it means | What to do |
 |---|---|---|
 | **Required** | The box is empty | Type a number, or switch the reminder off |
-| **Too short** or **Too long** | The number is outside its limit | Hours from 1 to 168, days from 1 to 90 |
+| *At least 1*, *At most 168* or *At most 90* | The number is outside its limit | Hours from 1 to 168, days from 1 to 90 |
 | **Reminders not saved** | The hub could not save them | Press **Save Reminders** again |
 
 ### Change a notice {#settings-notifications-notice needs="settings edit"}

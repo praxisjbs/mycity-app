@@ -65,7 +65,7 @@ not see this tab.
 |---|---|---|
 | **Required** under **Title** | The title is empty | Type a title |
 | **At least 3 characters** | The title is too short | Type a longer title |
-| **Check this value** under **Applies To** | You chose **Some People** but picked nobody | Pick a department, a work pattern or a person, or choose **Everyone** |
+| **Pick the people** under **Applies To** | You chose **Some People** but picked nobody | Pick a department, a work pattern or a person, or choose **Everyone** |
 | **At least 1** or **At most 30** | **Acknowledge Within** is out of range | Type a number of days from 1 to 30 |
 | **Required** under **Acknowledge Within** | The days are empty | Type the days, such as `7` |
 | **Check the highlighted fields** or **Write or paste the policy first** | **Policy Text** is empty when you press **Tidy With AI** | Type or paste the policy, then press **Tidy With AI** |
@@ -231,10 +231,11 @@ A new version applies from its first day. Days before it keep the rules they wer
 | **Required** | A figure is empty | Type it |
 | **Enter the amount** | A fixed deduction or **Fixed per Hour** overtime has no amount | Type the amount, or choose another method |
 | **₦1 to ₦1,000,000** | The amount is out of range | Type an amount in that range |
-| **At least 150** | **Home Radius** is under 150 metres | Type 150 or more |
+| **At least 150**, or *At least 50* | **Home Radius** is under 150 metres while Home Location is on, or under 50 | Type 150 or more |
 | **Flag or Refuse** | A check must flag or refuse | Choose **Flag** or **Refuse** |
-| **At least one working day** | No day is ticked **Working** | Tick at least one day |
-| **Check this value** under Monday's **Working** | A working day ends before it starts, or has no times | Check each day's **Starts** and **Ends** |
+| **Tick a working day** | No day is ticked **Working** | Tick at least one day |
+| **Ends after it starts** under a day's **Ends** | That working day ends before it starts | Correct its **Starts** or **Ends** |
+| **Required** under a day's **Starts** or **Ends** | That working day has no time there | Type the time |
 
 ### Archive a policy {#knowledge-policies-archive needs="knowledge delete"}
 

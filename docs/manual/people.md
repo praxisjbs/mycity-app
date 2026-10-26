@@ -99,8 +99,8 @@ The form marks a field as soon as you leave it, and the mark goes the moment it 
 | **Required** | It cannot be left empty | Fill it in |
 | **Check the email** | Not an email address | Check the spelling, with one @ |
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number with its country code | Type it as `0803 123 4567` |
-| **Check the format** | The account number is not ten digits | Type all ten digits |
-| **Too long** | A name, job title, bank or next of kin is longer than the field holds | Shorten it |
+| **Ten digits** | The account number is not ten digits | Type all ten digits |
+| *At most 100 characters*, or another number | A name, job title, bank or next of kin is longer than the field holds | Shorten it |
 | **Pick a worksite** | On Site or Hybrid with no worksite | Pick one, or choose Remote |
 | **Not a worksite** | The worksite was retired while the form was open | Pick another worksite |
 | **Not before the start** | A contract or probation end before the start date | Correct the date |
@@ -157,7 +157,7 @@ A record's tabs are **Profile**, **Job**, **Work Schedule**, **Reporting Line**,
 | The field says | What it means | What to do |
 |---|---|---|
 | **Required** | A needed field was emptied | Fill it in again |
-| **Check the email**, **Not a phone number**, **Check the format**, **Too long** | As on Add Employee | Correct it |
+| **Check the email**, **Not a phone number**, **Ten digits**, *At most 100 characters* | As on Add Employee | Correct it |
 | **Pick a worksite** | On Site or Hybrid with no worksite | Pick one, or choose Remote |
 | **Not before the start** | A contract or probation end before the start date | Correct the date |
 | **Before the start date** | A date of birth on or after the start date | Correct the date |
@@ -205,10 +205,10 @@ A schedule from the same first day replaces the earlier one. A later first day w
 |---|---|---|
 | **Required** | The Reason is empty | Type why |
 | **At least 10 characters** | The Reason is too short | Say a little more |
-| **Too long** | The Reason is over 500 characters | Shorten it |
+| *At most 500 characters* | The Reason is over 500 characters | Shorten it |
 | **Both times or neither** | Only Starts or only Ends is filled | Fill both, or empty both for company hours |
 | **Ends after it starts** | Ends is not later than Starts | Correct the times |
-| **Check this value**, on Monday | No day is ticked **Working** | Tick at least one day |
+| **Tick a working day**, on Monday | No day is ticked **Working** | Tick at least one day |
 | **Give the hours** | A working day the company does not work, with no hours | Type its Starts and Ends |
 | **Too far ahead** | From is more than 90 days away | Pick a nearer day |
 | **Already past** | From is before today | Pick today or later |
@@ -754,8 +754,8 @@ rest. The buttons that add a worksite or a temporary site are also in **Quick Ac
 4. Set the **Radius, Metres**: a punch within it counts as on site. MyCity's offices use about 100.
 5. Press **Add Worksite**. A message says **Worksite added**.
 
-A radius from 25 to 1,000 metres is allowed. Outside that, the field says **Too short** or
-**Too long**. With no address picked and no centre typed, **Latitude** and **Longitude** say
+A radius from 25 to 1,000 metres is allowed. Outside that, the field says *At least 25* or
+*At most 1,000*. With no address picked and no centre typed, **Latitude** and **Longitude** say
 **Required**.
 
 ### Change, retire or assign {#people-worksites-change needs="people edit"}

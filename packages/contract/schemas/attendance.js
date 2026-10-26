@@ -973,7 +973,7 @@ const ScheduleDays = z
   .array(ScheduleDayInput)
   .length(7, "All seven days")
   .refine((days) => days.every((d, i) => d.weekday === i + 1), "Monday to Sunday, in order")
-  .refine((days) => days.some((d) => d.working), "At least one working day");
+  .refine((days) => days.some((d) => d.working), "Tick a working day");
 
 /** One version of a person's schedule: their week from a first day, as it was set. */
 const ScheduleVersion = z
@@ -1069,11 +1069,17 @@ const WorkingHours = z
   .array(HoursDay)
   .length(7, "All seven days")
   .refine((days) => days.every((d, i) => d.weekday === i + 1), "Monday to Sunday, in order")
-  .refine((days) => days.some((d) => d.working), "At least one working day")
-  .refine(
-    (days) => days.every((d) => !d.working || (d.starts_at && d.ends_at && d.ends_at > d.starts_at)),
-    "Each working day ends after it starts",
-  );
+  .refine((days) => days.some((d) => d.working), "Tick a working day")
+  .superRefine((days, ctx) => {
+    // Each problem sits on the day that has it, so the sheet marks that day's time.
+    days.forEach((d, i) => {
+      if (!d.working) return;
+      if (!d.starts_at) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i, "starts_at"], message: "Required" });
+      if (!d.ends_at) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i, "ends_at"], message: "Required" });
+      else if (d.starts_at && d.ends_at <= d.starts_at)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i, "ends_at"], message: "Ends after it starts" });
+    });
+  });
 
 const count = z.number().int().min(1, "At least 1").max(31, "At most 31");
 const lateHours = z.number().min(0.5, "At least 0.5").max(40, "At most 40");

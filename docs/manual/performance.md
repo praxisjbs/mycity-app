@@ -173,7 +173,7 @@ example, *BM-O1 deleted*.
 |---|---|---|
 | **An objective holds at most four key results** | The objective has four already | Add it to another objective |
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
-| **Check the format** under **Target** | The target holds a comma or a word | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
+| **Like 64000 or 0.95** under **Target** | The target holds a comma or a word | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
@@ -301,7 +301,7 @@ and scores already given do not change.
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the new target** | **New Target** is empty | Type the new figure |
-| **Check the format** under **New Target** | It holds a comma or a word | Type the figure only |
+| **Like 64000 or 0.95** under **New Target** | It holds a comma or a word | Type the figure only |
 | **Check this value** under **From Month** | The day picked is not the 1st of a month | Pick the 1st of the month |
 | **A change to this target is already waiting for a decision** | Only one change waits at a time | Wait for the CEO's decision |
 
@@ -332,7 +332,7 @@ starts with a copy of the last quarter's rules.
 
 | The form says | What it means | What to do |
 |---|---|---|
-| **Check this value** under **Starts** | It is not a quarter's first day | Pick 1 January, 1 April, 1 July or 1 October |
+| **Pick a quarter start** under **Starts** | It is not a quarter's first day | Pick 1 January, 1 April, 1 July or 1 October |
 | **Already set up** under **Starts** | That quarter exists | Pick the next quarter, or change this one |
 | **Another is active** under **Status** | Another quarter is **Active** | Choose **Planning**, or close the active quarter first |
 | **Outside the quarter** under **Lock Date** | The lock date is not in the quarter | Pick a day between **Starts** and **Ends** |
@@ -340,7 +340,7 @@ starts with a copy of the last quarter's rules.
 | **Must exceed Meets** under **Exceeds From** | Exceeds must start above Meets | Raise **Exceeds From**, or lower **Meets From** |
 | **Must exceed Partly Meets** under **Meets From** | Meets must start above Partly Meets | Raise **Meets From**, or lower **Partly Meets From** |
 | **Sections must total 100** under **Results** | **Results**, **KPIs** and **Accountability** do not add to 100 | Change them so they total 100 |
-| **Too long** under a score | A score above 1 | Type a figure from 0 to 1, such as 0.7 |
+| **From 0 to 1** under a score | A score above 1 | Type a figure from 0 to 1, such as 0.7 |
 
 ### Change a quarter {#performance-quarter-edit needs="performance edit, cap performance.manage"}
 
@@ -603,7 +603,7 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 | The hub says | What it means | What to do |
 |---|---|---|
 | **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
-| **Check the format** under **Target** | The target holds a comma or a word | Type the figure only, or use **Target Wording** |
+| **Like 64000 or 0.95** under **Target** | The target holds a comma or a word | Type the figure only, or use **Target Wording** |
 
 ### Record a month's result {#performance-kpi-actual needs="performance edit, cap goals.function"}
 
@@ -619,7 +619,7 @@ You record your own function's KPIs. Operations and People and the CEO may recor
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the actual** under **Actual** | **Met** and **Not Met** need the figure | Fill in the **Actual**, or choose **N/A** |
-| **Check the format** under **Actual** | The actual holds a comma or a word | Type the figure only |
+| **Like 64000 or 0.95** under **Actual** | The actual holds a comma or a word | Type the figure only |
 | **Check the highlighted fields** | On **Edit KPI**, the **KPI** name is empty | Type it again |
 
 ## Reviews {#performance-reviews screen=performance/reviews icon=ticks}

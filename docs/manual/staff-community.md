@@ -64,7 +64,7 @@ delete anyone's wish: its admins, and in #general People and the CEO.
 | The message says | What it means | What to do |
 |---|---|---|
 | **Write a wish** | The wish is empty | Type a wish |
-| **Too long** | The wish is over 280 characters | Shorten it |
+| *At most 280 characters* | The wish is over 280 characters | Shorten it |
 | **Check this value** | The card was deleted while you wrote | Press **Cancel** |
 | **There is no such wish** | Someone deleted the wish first | Nothing to do |
 
@@ -120,7 +120,7 @@ words stay in the box to send again.
 | Larger than 25 MB | The file is too big to send | Remove it and send a smaller copy |
 | **This file type is not accepted here.** and the kinds it takes | Chats do not take this kind of file | Remove it, or save it as one of those |
 | **This is an old Office file. Save it as .docx or .xlsx and upload it again.** | It is an old .doc or .xls file | Save it as .docx or .xlsx and pick it again |
-| **Too long** | The caption is over 4,000 characters | Shorten it |
+| *At most 4,000 characters* | The caption is over 4,000 characters | Shorten it |
 
 ### Open a photo, video or file {#community-channels-files}
 

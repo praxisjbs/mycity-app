@@ -462,7 +462,7 @@ When a task is late, people pick why from a short list. You keep that list.
 |---|---|---|
 | **Already a reason** | That reason is on the list | Switch the old one back on instead |
 | **Use some letters** | The reason has no letters | Type it in words |
-| **Required** or **Too long** | **Reason** is empty, or over 60 letters | Type a short reason |
+| **Required** or *At most 60 characters* | **Reason** is empty, or over 60 characters | Type a short reason |
 | Why Late holds at most 25 reasons | The list is full | Reuse a reason that is switched off |
 
 ### When something is refused {#workspace-tasks-refused}
@@ -484,7 +484,7 @@ The hub says what went wrong in a short message at the foot of the screen, or on
 | **Needs a due date** | A repeat with no due date | Set **Due** first |
 | **Give the task a due date** | A reminder with no due date | Set **Due** first |
 | **Cannot see this task** | That watcher cannot open the task | Pick someone who can |
-| **Too long** | The text is longer than the field takes | Shorten it |
+| *At most 200 characters*, or another number | The text is longer than the field takes | Shorten it |
 | **Pick people** | **Shared** is chosen with nobody in **People** | Pick at least one person, or choose **Individual** |
 | **Pick a department** | **Department** is chosen but empty | Pick the department |
 | **Lead it yourself** | You picked a colleague from your department, and someone else leads | Choose **You** as **Lead**, or take them off |

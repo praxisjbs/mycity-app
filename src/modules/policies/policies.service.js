@@ -556,7 +556,7 @@ async function readyDraft(client, policy) {
       throw new AppError("NO_CHANGES", "The draft changes nothing", 409);
   }
   if (!content.applies_to.everyone && !audience.some((a) => a.policy_version_id === draft.policy_version_id))
-    throw new AppError("NOBODY_ASKED", "Pick who it applies to", 422, { applies_to: ["Pick who it applies to"] });
+    throw new AppError("NOBODY_ASKED", "Pick the people", 422, { applies_to: ["Pick the people"] });
   return { draft, content, newest };
 }
 

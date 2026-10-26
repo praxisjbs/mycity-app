@@ -45,7 +45,7 @@ const AppliesTo = z
   })
   .strict()
   .refine((a) => a.everyone || a.department_ids.length + a.work_patterns.length + a.employee_ids.length > 0, {
-    message: "Pick who it applies to",
+    message: "Pick the people",
     path: ["everyone"],
   });
 

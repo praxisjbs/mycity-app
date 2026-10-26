@@ -189,7 +189,7 @@ Models:
 
 | The field says | What it means | What to do |
 |---|---|---|
-| **Check the format** | The price has a sign, a comma, letters or more than four places | Type only digits and a dot, such as 0.30 |
+| **Not a price** | The price has a sign, a comma, letters or more than four places | Type only digits and a dot, such as 0.30 |
 
 ## Spend {#ai-control-spend screen=ai_control/spend icon=wallet}
 

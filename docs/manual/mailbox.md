@@ -182,7 +182,7 @@ what you wrote. Nothing is sent until you press **Send** yourself.
 | The screen says | What to do |
 |---|---|
 | **Say what to write** | Type a line in **What To Say** |
-| **Too long** | **What To Say** takes up to 2,000 characters, **Note** up to 4,000. Shorten it |
+| *At most 2,000 characters* or *At most 4,000 characters* | **What To Say** takes up to 2,000 characters, **Note** up to 4,000. Shorten it |
 | **Microphone not allowed** | Allow the microphone in your browser, or type instead |
 | **This browser cannot record** | Type instead, or open the hub in another browser |
 | **Could not transcribe** | Press **Dictate** again, or type instead |
@@ -391,7 +391,7 @@ for a number abroad. **Not saved. Try again.** means the change did not reach th
 **Back** returns to the step before. **Cancel** on the first step closes it without saving.
 
 If a link field says **Not a web address**, paste the whole address, starting with `https://`. If
-**Confidentiality Note** says **Too long**, keep it under 300 characters. **Not saved. Try again.**
+**Confidentiality Note** says *At most 300 characters*, shorten it. **Not saved. Try again.**
 means the change did not reach the hub: press **Save Signature** again.
 
 ```shot mailbox-inbox
