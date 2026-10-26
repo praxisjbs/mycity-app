@@ -128,6 +128,18 @@ async function readIds(db, userId, ids) {
   return rows.map((r) => r.notification_id);
 }
 
+/** Which of these records (a list's page, at most 25) carry an unread bell row of the caller's, of these types. */
+async function unreadRecordIds(db, userId, entityTypes, entityIds) {
+  const { rows } = await db.query(
+    `SELECT DISTINCT entity_id FROM notification
+      WHERE user_id = $1 AND read_at IS NULL AND 'in_app' = ANY(channels)
+        AND entity_type = ANY($2::text[]) AND entity_id = ANY($3::text[])
+      ORDER BY entity_id`,
+    [userId, entityTypes, entityIds],
+  );
+  return rows.map((r) => r.entity_id);
+}
+
 /** Marks the caller's unread notices about one record read; returns the rows marked. */
 async function markReadForRecord(db, userId, entityType, entityId) {
   const { rows } = await db.query(
@@ -957,6 +969,7 @@ module.exports = {
   markRead,
   markAllRead,
   readIds,
+  unreadRecordIds,
   markReadForRecord,
   urgentOpen,
   acknowledge,

@@ -1,5 +1,5 @@
 import type { Me, SignIn } from "@mycity/contract/contract.gen.ts";
-import { at, fail, invalid, mockSession, ok, noContent, paged, route } from "../core";
+import { at, fail, invalid, mockSession, ok, noContent, paged, route, sid } from "../core";
 import { capabilitiesOf } from "../data/access";
 import { appearanceApplied } from "../data/appearance";
 import { byKey, grantsFor, PEOPLE, SIGN_INS, teamOf } from "../data/people";
@@ -263,20 +263,27 @@ const NOTES = [
   ["queries", "3 late arrivals in 30 days", "A query was raised automatically for Bashir Lawal.", 0, "09:44", "high", "queries", "queries", "query", "normal"],
   ["recruitment", "New application", "Adaeze Okonkwo applied for Content Producer.", 0, "07:20", "normal", "recruitment", "candidates", "candidate", "normal"],
   ["comms", "You were recognised", "Ifeoma Chukwu: \"Kept the Enugu shoot on schedule.\"", 1, "16:12", "normal", "community", "channels", "recognition", "normal"],
-  ["people", "Leave request", "Tobi Ojo requested 5 days from 20/10.", 1, "11:03", "normal", "people", "leave", "leave_request", "normal"],
+  ["people", "Leave request", "Amara Okafor requested 5 days.", 1, "11:03", "normal", "people", "leave", "leave_request", "normal"],
   ["partnerships", "Eko Hotels has gone quiet", "34 days since the last contact.", 2, "09:00", "high", "partnerships", "partners", "partner", "important"],
   ["payroll", "Payroll preview ready", "October run, 25 employees.", 3, "10:30", "normal", "payroll", "payroll-runs", "payroll_run", "normal"],
+  ["people", "Probation ending: Chidera Nwosu", "Confirmation is due in 14 days.", 1, "09:00", "normal", "people", "employees", "employee", "important"],
 ] as const;
 
+/**
+ * The real records some notices are about, so People marks their rows (the leave request
+ * Amara sent, Chidera's record); the rest stand for records the mock does not hold.
+ */
+const RECORDS: Record<number, string> = { 5: sid("leave:1"), 8: sid("employee:chidera") };
+
 const noteId = (i: number) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`;
-/** Read marks, kept for the session: the first four arrive unread. Acknowledgements likewise. */
-const READ = new Set(NOTES.map((_, i) => noteId(i)).slice(4));
+/** Read marks, kept for the session: the first four and People's arrive unread. Acknowledgements likewise. */
+const READ = new Set(NOTES.flatMap((n, i) => (i >= 4 && n[0] !== "people" ? [noteId(i)] : [])));
 const ACKED = new Set<string>();
 
 const notes = () =>
   NOTES.map((n, i) => {
     const id = noteId(i);
-    const entityId = `${n[8]}-${i + 1}`;
+    const entityId = RECORDS[i] ?? `${n[8]}-${i + 1}`;
     const ack = n[9] === "urgent" && n[8] === "announcement";
     return {
       notification_id: id,
@@ -315,9 +322,24 @@ route("POST /api/v1/notifications/:id/acknowledge", (req) => {
 });
 route("GET /api/v1/notifications/unread-count", () => ok({ unread: notes().filter((n) => n.read_at === null).length }));
 route("GET /api/v1/notifications/badges", () => {
-  const out: Record<string, number> = {};
-  for (const n of notes()) if (n.read_at === null) out[n.link.module] = (out[n.link.module] ?? 0) + 1;
-  return ok(out);
+  const modules: Record<string, number> = {};
+  const tabs: Record<string, Record<string, number>> = {};
+  for (const { read_at, link } of notes()) {
+    if (read_at !== null) continue;
+    modules[link.module] = (modules[link.module] ?? 0) + 1;
+    tabs[link.module] = { ...tabs[link.module], [link.tab]: (tabs[link.module]?.[link.tab] ?? 0) + 1 };
+  }
+  return ok({ modules, tabs });
+});
+/** The notices about a record shown on one screen: what marks its row there, and what opening it reads. */
+const onScreen = (module: unknown, tab: unknown) => notes().filter((n) => n.link.module === module && n.link.tab === tab);
+route("GET /api/v1/notifications/unread-records", (req) => {
+  const ids = String(req.query.ids ?? "").split(",");
+  return ok({ ids: [...new Set(onScreen(req.query.module, req.query.tab).filter((n) => n.read_at === null && ids.includes(n.entity_id)).map((n) => n.entity_id))] });
+});
+route("POST /api/v1/notifications/read-record", (req) => {
+  for (const n of onScreen(req.body.module, req.body.tab)) if (n.entity_id === req.body.entity_id) READ.add(n.notification_id);
+  return noContent();
 });
 route("POST /api/v1/notifications/:id/read", (req) => {
   if (!NOTES.some((_, i) => noteId(i) === req.params.id)) return fail(404, "NOT_FOUND", "There is no such notification.");

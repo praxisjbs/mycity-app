@@ -32,6 +32,26 @@ function Narrow() {
   );
 }
 
+/** A module's strip in the hub: what waits on the reader on each tab, red where something is urgent. */
+function Waiting() {
+  const [tab, setTab] = useState("employees");
+  return (
+    <Tabs
+      label="People"
+      value={tab}
+      onValueChange={setTab}
+      items={[
+        { value: "employees", label: "Employees", count: 2, tone: "primary" },
+        { value: "organogram", label: "Organogram" },
+        { value: "attendance", label: "Attendance", count: 4, tone: "primary" },
+        { value: "leave", label: "Leave", count: 3, tone: "err" },
+        { value: "devices", label: "Devices" },
+        { value: "worksites", label: "Worksites" },
+      ]}
+    />
+  );
+}
+
 function WithPanels() {
   const [tab, setTab] = useState("profile");
   return (
@@ -62,6 +82,7 @@ export default {
   component: "Tabs",
   states: {
     "Module Strip": () => <Strip />,
+    "Waiting On You": () => <Waiting />,
     "With Panels": () => <WithPanels />,
     "Many Tabs, Narrow": () => <Narrow />,
   },
