@@ -93,7 +93,7 @@ On an action that uses its job's chain, this gives the action its own chain. It 
 | The message says | What it means | What to do |
 |---|---|---|
 | **No model at that place** | Someone changed this chain after you opened it | Close the chain, open it again, and press **Make First** again |
-| **Check the chain** | The chain holds a DeepSeek model, and this action sends something about a person | Press **Edit Chain**, take DeepSeek out, and press **Save Chain** |
+| *DeepSeek V3: Carries personal data*, naming the model | The chain holds a DeepSeek model, and this action sends something about a person | Press **Edit Chain**, take DeepSeek out, and press **Save Chain** |
 
 ### Give one action its own chain {#ai-control-actions-own needs="ai_control edit"}
 
@@ -105,9 +105,9 @@ On an action that uses its job's chain, this gives the action its own chain. It 
 3. To put it back on its job's chain, press the action, then **Use Job Chain**. A message says
    **Back on its job's chain**.
 
-**Data Answers**, Praxis AI's action, starts with a chain of its own: Gemini's Flash, then its Pro.
-It shows **Own Chain** from the start. **Use Job Chain** shows only after you change it, and puts it
-back on Flash then Pro, not on **Default**'s chain.
+**Data Answers**, Praxis AI's action, starts with a chain chosen for it: Gemini's Flash, then its
+Pro. It shows **Own Chain** from the start. Once you change it, **Restore Chain** puts it back on
+Flash then Pro, not on **Default**'s chain. A message says **Back on its chosen chain**.
 
 ## Models {#ai-control-models screen=ai_control/models icon=grid}
 
@@ -155,7 +155,7 @@ is saved until you accept it. Each search is billed by the provider.
 4. Press **Accept** to save a price. A message says **Prices saved**. Press **Dismiss** to drop it.
    A message says **Proposal dismissed**.
 5. Press **Accept All** to save every price waiting. A message says how many, such as
-   *12 prices saved*.
+   *12 prices saved*, or **Nothing left to accept** when a colleague saved them first.
 6. **Still to Price** counts the models with no price yet, and **Not Listed** the models the
    provider's page does not price. Press **Find More** to search for the rest. A message says
    **Finding prices**.
@@ -165,8 +165,8 @@ reads **Review Prices**: press it to open **New Prices** again.
 
 | The message says | What it means | What to do |
 |---|---|---|
-| **Find Prices is already running** | A colleague started a search a moment ago | Reload the page, then press **Review Prices** to follow it |
-| **That proposal is no longer open** | A colleague accepted or dismissed it first | Close **New Prices** and press **Review Prices** again |
+| **Find Prices is already running** | A colleague started a search a moment ago | The button now reads **Review Prices**: press it to follow the search |
+| **That proposal is no longer open** | A colleague accepted or dismissed it first | Nothing to do. The list shows what still waits |
 
 If a search stops, a pill says why, in **New Prices** and beside the button for everyone who opens
 Models:
@@ -224,7 +224,7 @@ account.
 
 | The field says | What it means | What to do |
 |---|---|---|
-| **Free plan** under **Monthly Cap** | The provider was moved to the Free plan, and only a paid one has a cap | Press **Cancel**. Change its plan on Settings · Integrations first if it should be paid |
+| **Free plan** under **Monthly Cap**, and **Only a paid provider has a cap** | The provider was moved to the Free plan, and only a paid one has a cap | Press **Cancel**. Change its plan on Settings · Integrations first if it should be paid |
 
 | Cap | When it is reached |
 |---|---|

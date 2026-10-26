@@ -16,6 +16,7 @@ import { Button, IconButton } from "../actions/Button";
 import { Icon } from "../icons/Icon";
 import { Spinner } from "../display/Skeleton";
 import { toast } from "../feedback/toast";
+import { ApiError } from "../data/createApi";
 
 /** How a recording becomes words: the app's own call, so no vendor reaches the package. */
 export type Transcribe = (audio: Blob) => Promise<string>;
@@ -93,8 +94,9 @@ export function VoiceField({ label, action = "Record Answer", transcribe, onTran
         const words = await transcribe(new Blob(chunks.current, { type: media.mimeType || "audio/webm" }));
         onTranscript(words);
         setState("idle");
-      } catch {
-        setProblem("Could not transcribe");
+      } catch (e) {
+        // The server's own reason (AI off, its cap reached, no voice model answering) says what to do.
+        setProblem(e instanceof ApiError && e.status > 0 ? e.message : "Could not transcribe");
         setState("idle");
       }
     };

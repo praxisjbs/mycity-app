@@ -3,7 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AiActionRow, AiChain, AiControlModel, AiJobRow, AiPriceProposal, AiPriceRun, AiSpend } from "@mycity/contract/contract.gen.ts";
-import { ModalProvider } from "@mycity/ui";
+import { ApiError, ModalProvider, toast } from "@mycity/ui";
 
 const m = vi.hoisted(() => ({
   call: vi.fn(async (..._args: unknown[]): Promise<unknown> => ({})),
@@ -69,6 +69,7 @@ const ACTIONS: AiActionRow[] = [
     chosen_at: "2026-10-20",
     built: true,
     own_chain: false,
+    set_chain: false,
     chain: JOBS[0].chain,
     calls_today: 4,
   },
@@ -186,6 +187,16 @@ describe("AI Control", () => {
       expect(m.call).toHaveBeenCalledWith("POST /api/v1/ai-control/chains/:scope/:key/first", { params: { scope: "job", key: "top_tier" }, body: { position: 2 } }),
     );
     expect(m.invalidate).toHaveBeenCalledWith("/api/v1/ai-control");
+  });
+
+  it("Make First refused for one model names it, as an error", async () => {
+    const said = vi.spyOn(toast, "error");
+    m.rows = { "GET /api/v1/ai-control/jobs": JOBS, "GET /api/v1/ai-control/actions": [] };
+    // The reordered chain is refused at its first place: the model being moved there.
+    m.call.mockRejectedValueOnce(new ApiError(422, { error: { code: "MODEL_CANNOT_DO_JOB", message: "Check the chain", fields: { "links.0.model": ["Cannot do this job"] } } }));
+    page("actions");
+    await userEvent.click(screen.getAllByRole("button", { name: "Make First" })[0]);
+    await waitFor(() => expect(said).toHaveBeenCalledWith("Claude Sonnet 5.5: Cannot do this job"));
   });
 
   it("Edit Chain opens with the chain in use and saves it whole", async () => {

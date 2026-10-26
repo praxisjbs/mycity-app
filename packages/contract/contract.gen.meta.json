@@ -1,12 +1,12 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "545063b86bf92c0fa63488d68a812d8603fe2ff2d769768e8c6b2df3939cb207",
+  "source_hash": "e57c26025e8704ae5d83967dbda337a1f1fba3e2706ad3d47239887771247b4d",
   "schemas": 1189,
   "endpoints": 575,
   "inputs": {
     "packages/contract/schemas/access.js": "25b9df19adaa26c2f91f0adbd206677806a04242cb789d9dc2f8f3f7b60dee5f",
     "packages/contract/schemas/agreements.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/ai_control.js": "ea483e6721385b6329a99a2b84b1ad3dc142431dd3dee0cb9783a69888f3b218",
+    "packages/contract/schemas/ai_control.js": "28ecd4cc75a3cbbd9606155473c5ecb797896c4851a551dfe5adc88cf70f2009",
     "packages/contract/schemas/ai_governance.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/alerts.js": "195343e02ff208fab074981e1459bb8a302a7dc51894c77e33315c0c0ba48f40",
     "packages/contract/schemas/announcements.js": "fd6e37d081b609ad75ee98a84357db39b3b07fa995369f55100a0d2d4f727af5",

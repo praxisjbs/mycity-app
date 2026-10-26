@@ -54,7 +54,12 @@ function CapForm({ provider, cap, done }: { provider: AiProvider | null; cap: st
       done();
     } catch (e) {
       const err = e instanceof ApiError ? e : null;
-      if (err && Object.keys(err.fields).length) return f.setServerErrors(err.fields);
+      if (err && Object.keys(err.fields).length) {
+        f.setServerErrors(err.fields);
+        // A refusal with its own sentence ("Only a paid provider has a cap") says it beside the mark.
+        if (err.code !== "VALIDATION_FAILED") setProblem(err.message);
+        return;
+      }
       setProblem(err?.message ?? "Not saved");
     }
   };

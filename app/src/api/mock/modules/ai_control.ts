@@ -305,6 +305,7 @@ route("GET /api/v1/ai-control/actions", (req) => {
       chosen_at: "2026-10-20",
       built: a.built,
       own_chain: chain.scope === "action",
+      set_chain: Boolean(a.chain),
       chain,
       calls_today: CALLS_TODAY[a.key] ?? 0,
     };

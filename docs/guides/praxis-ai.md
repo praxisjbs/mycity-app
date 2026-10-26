@@ -401,7 +401,7 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), From with the records read as chips opening each (the first 6, then "+12 More"), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; Recent empty: No Questions Yet; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, Could not transcribe) | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
+| Praxis AI · Ask (`ask`) | Praxis AI as the title, with New Conversation once a conversation is open; on desktop, Recent beside the conversation (titles and when last asked, newest first, 25 a page); empty: an illustration, Try Asking with up to 6 questions to tap; the conversation: Show Earlier when older questions remain, each question as the person's bubble, each answer as a card with its words, its table (`DataView`, bare), Showing 25 of 312 when its read had more (Showing 26 to 50 of 312 on a later page), Show Next 25 on the newest answer that has more, its screen button ("Open Leave"; a change opens its form filled, §6.4), From with the records read as chips opening each (the first 6, then "+12 More"), Helpful and Not Helpful (pressed again, taken back); while waiting, Reading Your Records; a refused answer in plain words; a failed one with its reason and Try Again; the box: Ask a Question, the microphone (Record Question, then the time and Stop Recording) and Send; Recent empty: No Questions Yet; toasts "Thanks for the feedback", "That conversation was deleted", a refused question's reason, the microphone's problem (Microphone not allowed, No words heard, Transcription is not set up, the server's reason, Could not transcribe); a 500's reference after its reason | Help term on From (the records this answer was read from, as you would see them) | How reads, permissions, redaction and the loop work: §1.1, §6 here and the manual |
 | Praxis AI · History (`history`) | History as the title; this month's Questions, Conversations and Records Read, each captioned with the month; Conversations, 25 a page: Title, Last Asked, Questions, Records Read, a row opening it on Ask, a row menu with Delete Conversation, confirmed in the shared dialog ("Delete Conversation"); Search Conversations; empty: No Questions Yet, "Ask one on the Ask tab."; Clear History, confirmed in the shared dialog ("Clear History", "Every conversation is removed.", Clear History); Questions by Module (desktop); toasts "Conversation deleted", "History cleared" | Help term on Records Read (how many records this month's answers were read from) | Where spend and the cap are (AI Control · Spend), what deleting keeps: §6.5 |
 | Praxis AI over a screen (the floating button, phone) | Praxis AI as the title, Back, New Conversation once a conversation is open; the conversation exactly as on Ask (Try Asking when new, the answers, the box) | As on Ask | As on Ask |
 
@@ -436,17 +436,25 @@ manual, the AI assistant). Both tables are read by `scripts/check/guides.js`.
 - **The person moves to another conversation, or leaves, while an answer is being made**: the
   answer is saved where it was asked and shown there; the conversation on screen is not touched.
 - **A question refused as it stands** (a 4xx other than 404 and 409, such as one over 500
-  characters): the words go back to the box with the reason in a toast; Try Again is only for a
-  question that may succeed if sent again.
+  characters, and `AI_DISABLED`, `AI_MODULE_DISABLED` and `AI_BAD_OUTPUT`, which asking the same
+  words again cannot change): the words go back to the box with the reason in a toast; Try Again is
+  only for a question that may succeed if sent again. A 500's red line carries its reference.
+- **Send pressed while an answer is coming**: it spins until that answer lands, and the words stay
+  in the box.
+- **Anything unexpected while answering**: the run is recorded `AI_FAILED` and the screen gets the
+  same (500, "The assistant could not answer. Try again."), not the generic fault.
 - **A person loses a grant after asking**: their History keeps the old answer's words; a citation
   opens through the screen's own check, which may now refuse.
 - **A cited record is deleted later**: the citation opens the screen's not-found state.
-- **A conversation deleted in another tab**: asking in it is 404 and the screen starts a new
+- **A conversation deleted in another tab**: Helpful or Not Helpful on its answer, or deleting it
+  again from Recent or History, says "That conversation was deleted" (the list reloads). Asking in it is 404 and the screen starts a new
   conversation with the same question in the box; opening it (from History or ⌘K) does the same,
   with "That conversation was deleted"; deleted while its answer was being made, the question is
   saved in a new conversation.
-- **A recording that never transcribes**: the box stays empty and Could not transcribe shows in a
-  toast (the stub's placeholder is not put in the box either); the recording
+- **A recording that never transcribes**: the box stays empty and the reason shows by the
+  microphone: the server's own (AI off, the cap, no model answering), "Transcription is not set up"
+  for the stub's placeholder (never put in the box), "No words heard", or Could not transcribe when
+  the recording did not reach the server; the recording
   is removed in the same request, or by the vault's sweep once an hour old.
 - **A question in another language**: answered in English.
 
@@ -476,6 +484,7 @@ to this repository's rules, and ported code never names where it came from.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · From the User Guide audit's screen defects: an unexpected failure answers `AI_FAILED` as §5 says (it was the generic 500); a 500 shows its reference; AI off and an unusable answer put the words back in the box (no Try Again); Send waits on an answer still coming; the microphone gives the server's reason; Helpful on, or Delete of, a conversation deleted elsewhere says so (§10, §11).
 - 26/10/2026 · JP · §6.9: the User Guide's `guide.search` read, so a how-to question is answered from the guide, cut to the asker's grants (`user-guide.md` §9).
 
 - 25/10/2026 · JP · Ask's empty conversation (Try Asking, Ask a Question) is a second-level heading (`EmptyState` `level={2}`): on a phone it sits straight under the page title, and the accessibility gate refused h1 straight to h3. Nothing on screen changes.

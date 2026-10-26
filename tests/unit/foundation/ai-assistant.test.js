@@ -202,6 +202,11 @@ describe("one question", () => {
     expect(finished).toEqual([expect.objectContaining({ status: "failed", error_code: "AI_BAD_OUTPUT" })]);
   });
 
+  test("anything unexpected is AI_FAILED (500) to the screen, as the run records it (§5)", async () => {
+    jest.spyOn(authorise, "allowedReads").mockRejectedValue(new TypeError("reads is not iterable"));
+    await expect(ask(model([]))).rejects.toMatchObject({ code: "AI_FAILED", status: 500, message: "The assistant could not answer. Try again." });
+  });
+
   test("past the question's budget the model is not asked again", async () => {
     jest.spyOn(authorise, "runRead").mockResolvedValue(page([]));
     const vendors = model([reply("", [call("leave__requests", {})]), reply(DRAFT())]);
