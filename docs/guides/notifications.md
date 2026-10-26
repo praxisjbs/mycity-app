@@ -5,10 +5,10 @@
 | Owner | TB |
 | Milestone | M0 (web push and personal preferences brought forward from M6 by TB, 19/10/2026; urgency, every device and urgent repeats added the same day; Settings · Notifications, the reminder engine, the daily digest and quiet hours brought forward from M6 the same day) |
 | Backend modules | `notifications` |
-| Frontend paths | `app/src/features/notifications/`, `app/src/shell/Bell.tsx`, `app/src/sw.ts`, `app/src/features/settings/Notifications.tsx` |
+| Frontend paths | `app/src/features/notifications/`, `app/src/shell/Bell.tsx`, `app/src/shell/nav.ts`, `app/src/sw.ts`, `app/src/features/settings/Notifications.tsx` |
 | Permission key(s) | `settings` (view, edit) for Settings · Notifications, the company's rules; every other route is the caller's own (`self`), and two are reached by a device token (`anonymous`) |
 | Capabilities | none |
-| Screens (PROGRESS.md rows) | #74 Settings · Notifications (brought forward from M6); the bell, its pane, the banner, the urgent bar and Notification Settings are shell parts on every screen |
+| Screens (PROGRESS.md rows) | #74 Settings · Notifications (brought forward from M6); the bell, its pane, the banner, the urgent bar, Notification Settings, the counts on the menu and on each module's tabs, and the unread dot on a list's rows are shell parts on every screen |
 | Status | Built |
 | Last changed | 26/10/2026 |
 
@@ -46,6 +46,8 @@ left alone.
 | Turn-on notice (`ShellNotice`) | Foot of the shell on Home only, any tab, once per device | Everyone, until answered | One line and two buttons | Turn On, Not Now |
 | Phone or computer notification | The device's own notification shade, lock screen and badge | The person, on every device with notifications on, app open or closed (the device in hand shows it beside the banner) | Title (with how many are new when grouped), text, the sender's initials or the app icon, the MyCity pin, the count on the app icon; an urgent notice again every 30 minutes of the working day until it is dealt with | Tap to open the record (through sign-in when the session ended), Mark Read |
 | Mailbox (`inbox` and the other folders) | Staff app | The mailbox owner | Unchanged | Reading a conversation marks its notices read |
+| Counts on the menu and the tabs | The rail, the bottom bar and More's tiles; each module's tab strip, both shells | Everyone, for the screens they may open | Beside a module, how many unread notices open in it; beside each of its tabs, how many open on that tab (they add up to the module's). Yellow, red while an urgent notice opens there | Press the tab to go where they are |
+| Unread rows | Every list on a screen (`DataView`), both shells | Everyone | A yellow dot before a row and a soft tint on it (a phone's card likewise) while an unread notice of theirs is about that record and opens on this screen | Open the row (or the record by its link): its notices are read, and the dot, the tab's count, the module's and the bell's drop together |
 
 ## 3 · How the screens relate
 
@@ -74,10 +76,18 @@ left alone.
    notice has no screen): the app opens on the record, through sign-in when needed, and marks the
    notices read. Mark Read on the notification marks them read without opening the app (the device
    token, §5).
-6. A read mark anywhere (`notification.read`, `notification.read_all`, reading a mail conversation)
-   reaches the person's other tabs (`notification_read`); when an app comes to the front it closes
-   any notification in its shade that is already read.
-7. **Urgency.** The fan-out writes each notice's urgency (`normal`, `important`, `urgent`) and
+6. A read mark anywhere (`notification.read`, `notification.read_all`, reading a mail conversation,
+   opening a record a notice is about) reaches the person's other tabs (`notification_read`); when
+   an app comes to the front it closes any notification in its shade that is already read.
+7. **Where it waits** (JBS Praxis, 26/10/2026). The badges count each unread notice where it opens
+   for its reader (§6, Where a notice opens): per module for the menu, and per tab for the module's
+   tab strip. On the screen, a list asks which of the rows on its page carry an unread notice that
+   opens there (`GET /notifications/unread-records`, only while that tab counts something) and marks
+   them. Opening one, by its row or by its address (`?id=`, or a record's own key such as
+   `?home=`), sends `POST /notifications/read-record`: the person's unread notices about that record
+   that open on that screen are read, each emitting `notification.read`, so every tab and device
+   drops the dot and the counts together.
+8. **Urgency.** The fan-out writes each notice's urgency (`normal`, `important`, `urgent`) and
    whether it needs Acknowledge. An urgent notice stays open until it is acknowledged (when it needs
    Acknowledge) or opened (otherwise). Every open urgent notice shows in the urgent bar on every
    screen (`GET /notifications/urgent`), and the `urgent-repeats` sweep alerts it again on every
@@ -85,16 +95,16 @@ left alone.
    until it closes. Acknowledge on the bar (`POST /notifications/:id/acknowledge`) or on the
    announcement itself closes it on every device; the announcement records who acknowledged
    (`docs/guides/community.md`).
-8. **The company's rules.** Before step 1 writes a row, the fan-out reads the notice's rule from
+9. **The company's rules.** Before step 1 writes a row, the fan-out reads the notice's rule from
    Settings · Notifications (`notification_rule`): Off tells nobody (Security excepted); the roles
    and people added receive the notice's copy; the urgency set there replaces the code's; its
    default channels apply wherever the person has not chosen their own (§6).
-9. **Reminders.** Every 5 minutes the `reminders` scheduler finds what has come due (approvals
+10. **Reminders.** Every 5 minutes the `reminders` scheduler finds what has come due (approvals
    still waiting, probations about to end, and whatever a module scheduled), checks each is still
    due, and emits its event, which the fan-out turns into notices like any other: every device,
    the banner, urgency. At the company's digest time it queues each person's daily digest on the
    `reminders` queue, which emails what arrived unread in the last 24 hours.
-10. **Quiet hours.** `notification-deliver` holds a person's pushes until their quiet hours end
+11. **Quiet hours.** `notification-deliver` holds a person's pushes until their quiet hours end
    (a delayed `notification-push`, skipped if the notice was read meanwhile); urgent notices and
    Security go at once. The bell, the banner in an open app and email are not held.
 
@@ -123,7 +133,9 @@ Reference-data file(s): none.
 |---|---|---|---|---|
 | `GET /api/v1/notifications` | `NotificationListQuery` → `NotificationPage` | self | yes, 25 | `status` unread or read |
 | `GET /api/v1/notifications/unread-count` | → `UnreadCount` | self | | |
-| `GET /api/v1/notifications/badges` | → `NavBadges` | self | | |
+| `GET /api/v1/notifications/badges` | → `NavBadges` | self | | `modules` (unread per module) and `tabs` (per module, unread per tab slug), each counted where the notice opens for the caller (§6); only counts of 1 or more |
+| `GET /api/v1/notifications/unread-records` | `UnreadRecordsQuery` → `UnreadRecords` | self | at most 25 ids | `module`, `tab` and the ids a list shows: which carry an unread notice of the caller's that opens on that screen |
+| `POST /api/v1/notifications/read-record` | `RecordRead` → 204 | self | | `module`, `tab`, `entity_id`: a record opened there. The caller's unread notices about it that open on that screen are read, each emitting `notification.read`; another screen's, or another person's, are untouched |
 | `GET /api/v1/notifications/read-state` | `NotificationReadStateQuery` → `NotificationReadState` | self | at most 25 ids | Which of these ids are read, to close shade notifications |
 | `POST /api/v1/notifications/:id/read`, `/read-all` | `EmptyBody` | self | | |
 | `GET /api/v1/notifications/urgent` | `UrgentNoticeQuery` → `NotificationPage` | self | yes, 25 | The caller's open urgent notices, newest first: the urgent bar |
@@ -210,6 +222,21 @@ Reference-data file(s): none.
   the one saved there, else `VAPID_SUBJECT` (`mailto:jbspraxisllc@gmail.com`). Replace Keys changes
   the key id, so every device subscribes again the next time the app starts (§3).
 
+- **Where a notice opens** (one rule, `screenTo` in `notifications.service.js`). A record's route in
+  `shared/route-map.js` names its screen. The reader who may open the module its route names
+  (`permission`, else the screen's module) opens it there; one who cannot opens the screen the route
+  names for the people the record concerns (`self`, in another module) when they may open that one;
+  otherwise it opens nowhere and has no link. The bell's link, the badges per module and per tab,
+  a list's unread rows and the read mark on opening a record all follow this rule, so a module's
+  tabs add up to its count and the count matches what the bell links to (a leave request a member
+  of staff is told about counts on Self-Service · My Leave; System Health's notices count on
+  Settings, on Status and Faults).
+- **Read by opening** (JBS Praxis, 26/10/2026). Opening a record on the screen its notices open on
+  reads them, as opening the notice in the bell does: from its row in a list, or by its address. A
+  record shown first unasked (the first pick a desktop shows beside its list) is not opened. A
+  notice about a record no list on its screen shows (a document on People · Employees) still counts
+  on the tab, and is read in the bell or by opening the record where it opens.
+
 - **System mail paused** (`docs/guides/integrations.md` §6.15, TB 21/10/2026). While IT has paused
   system mail, nothing is emailed: a notice due by email is pushed to the person's devices instead,
   even where their push switch for its category is off, and it is never emailed later. The bell is
@@ -274,7 +301,7 @@ it on again reminds what is still waiting at the next tick.
 | `notification-deliver` (job) | Per event with rows | Socket `notification`; email; queues `notification-push` per row with `push`, at once (counted as `push_queued`) |
 | `notification-push` (job) | Per row; per urgent repeat (`round`); a test from `push.test_requested` | Skips a notice read meanwhile (`skipped_read`, not Security; a repeat skips a closed notice), sends to each device still owed in its round, records `push_delivery`, revokes dead subscriptions; fails to be retried while a device is owed |
 | `urgent-repeats` (scheduler, every 5 minutes) | 08:00 to 18:00 Lagos | Alerts again each open urgent notice due (§6): socket `notification` with its `repeat`, and `notification-push` for the next round |
-| `notification.read`, `notification.read_all` | A read mark | Tells the person's other tabs (`notification_read`) |
+| `notification.read`, `notification.read_all` | A read mark, opening a record its notices are about included (`read-record`, one `notification.read` per notice) | Tells the person's other tabs (`notification_read`) |
 | `notification.acknowledged` | Acknowledge on the urgent bar | Tells the person's other tabs (`notification_read`); the record's module hears it (an announcement records the acknowledgement) |
 | `notification.withdrawn` | The record a notice is about was taken down (`withdrawForRecord`, called by the record's module: an archived announcement) | Deletes the notices nobody has opened (acknowledged, when it needs Acknowledge), their push rows with them; tells each person's tabs (`notification_read`) so the bell and the urgent bar refresh. Opened or acknowledged notices stay |
 | `announcement.acknowledged` (community) | Acknowledge on the announcement in #announcements | Marks the person's notices of that announcement acknowledged and read, and tells their other tabs |
@@ -370,6 +397,8 @@ listed here as tier 1 or tier 2.
 | In-app banner | The notice's title and two lines of text, avatar or glyph, Dismiss (×); red when urgent, amber when important | None | How every device is alerted: §3 |
 | Urgent bar | The newest open urgent notice's title; "1 of 3" when more are open; Acknowledge (an urgent announcement) or Open; the arrows to step through them on desktop | None | The repeat schedule and what closes a notice: §6 |
 | Turn-on notice | "Get notified of new mail and approvals"; Not Now, Turn On | None | Why the browser's own prompt is not used: §6 |
+| Counts on the tabs | Beside each tab of a module, its count of unread notices, yellow (red while an urgent one opens there); nothing for none | None | How a count is worked out: §3, §6 |
+| Unread rows | A yellow dot before a row and a soft tint on it; screen readers hear "Unread" before its first value | None | When a row is marked and what reads it: §6 |
 
 ### 10.2 Phone layout
 
@@ -380,6 +409,8 @@ listed here as tier 1 or tier 2.
 | Settings · Notifications | Reminders as three rows (name, what it is set to, On or Off), then the search and the category filter, then Notices as cards of 25 (the name, then Who, Channels and Level with Off or Always On) | The table (cards instead) | Tap a card: Edit Notice in a sheet, Save Notice in its footer | Pager under the cards; the sheet closes with Cancel or a swipe down |
 | In-app banner | Drops from under the status bar, 44 px targets | The time | Tap to open | Swipe up dismisses |
 | Urgent bar | Full width under the top bar on every screen: the title on one line and the count | The step arrows (swipe the bar sideways instead) | Acknowledge or Open, 44 px | Stays until every urgent notice is closed |
+| Counts on the tabs | The same counts on the tabs under the module's name, which scroll sideways | Nothing | Tap a tab | The bottom bar's More counts every module behind it |
+| Unread rows | The dot at the top left of a card and the tint on the whole card | Nothing | Tap the card: its record opens in a sheet and the dot goes | |
 
 ## 11 · Edge cases
 
@@ -440,6 +471,18 @@ listed here as tier 1 or tier 2.
 - **System mail paused.** No email of any notice; each is pushed instead, and the day's digest is
   dropped, not sent on Resume.
 - **The digest's time changed after today's was sent.** Tomorrow's goes at the new time.
+- **A tab counts something no row shows.** A notice about a record that is not a row of any list on
+  its screen (a document or a document request on People · Employees, an attendance day on the
+  Register, whose rows are people) counts on the tab and marks no row. It is read in the bell, or by
+  opening the record where its link goes.
+- **The same record told twice** (a request and its reminder). One row, one dot; opening it reads
+  both, and the counts drop by both.
+- **Opened on another screen.** Opening a record somewhere its notices do not open (an employee's
+  record reached from Attendance) reads nothing; the dot stays where the notice opens.
+- **Opened on one device.** The dot and the counts go on the person's other tabs and devices at once
+  (`notification_read`), as for any read mark.
+- **The read fails** (offline, the server refused). The dot comes back when the list reloads; the
+  notice stays unread in the bell.
 
 ## 12 · Donor code
 
@@ -459,6 +502,9 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
 ## 14 · Change log
 
 - 26/10/2026 · JP · §2: the turn-on notice, like the update and install offers, shows on Home only, any tab, never on another screen, where at the foot of the page it sat over the page's own content (QA DEF-12, the phone run's update prompt over a report); this replaces keeping them off Staff Community and Praxis AI's Ask.
+
+- 26/10/2026 · JP · Where it waits (JBS Praxis): each module's tabs carry their share of its count, and a list marks the records its reader has an unread notice about, with a yellow dot and a soft tint, until they are opened, which reads them (§2, §3 step 7, §5, §6, §7, §10, §11). `GET /notifications/badges` now answers `{ modules, tabs }`, both counted where the notice opens for the reader (`screenTo`), so the self screen counts too (a member of staff's leave notice on Self-Service · My Leave) and System Health's notices count on Settings; `GET /notifications/unread-records` and `POST /notifications/read-record` are new; `route-map.screenOf` and `typesOn`; `RowMarksContext` in `@mycity/ui`, given by `features/notifications/marks.tsx` around every screen. Left: rows that are not the record a notice is about (the Register's people, a document's employee) are not marked.
+
 - 26/10/2026 · JP · §2: the turn-on notice, like the update and install offers, waits off a screen whose message box sits at the foot of the page (every Staff Community tab, Praxis AI's Ask), so it never covers what a person types (FRONTEND_GUIDE, PWA; `writingScreen` in `app/src/shell/Notices.tsx`). Left: nothing.
 
 - 22/10/2026 · GE · §7.1: `pendingFor` reads a record's pending occurrences of a reminder, so a screen can list them; My Workspace's task reminders are its first user (`task_reminder`).

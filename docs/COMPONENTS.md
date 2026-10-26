@@ -2013,7 +2013,7 @@ The module's tab strip: one row of tabs under the page header, one of them activ
 |---|---|
 | Use | Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload. |
 | Avoid | Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen. |
-| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). |
+| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). A count's `tone` reads the same on both: yellow for what waits on the reader, red when it is urgent. |
 | Accessibility | A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. |
 | Status | stable |
 | Exports | `Tabs`, `TabPanel` |
@@ -3813,7 +3813,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 | Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
 | Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
 | Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
-| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
+| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. A row marked as new (RowMarksContext: something unread is about it) says Unread before its first value as well as showing its dot and tint. |
 | Status | stable |
 | Exports | `DataView`, `LoadingRows` |
 | Import | `import { DataView, LoadingRows } from "@mycity/ui";` |
@@ -5469,6 +5469,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `normaliseLink` | `lib/links.ts` | The form a link's card is asked for in: https:// added, the host in lower case, the fragment dropped. |
 | `firstLink` | `lib/links.ts` | The first link in a text in its card form, or null when there is none or it may not have a card. |
 | `hostOf` | `lib/links.ts` | The host a link goes to, without www., for a card's last line. |
+| `RowMarks` (type) | `lib/marks.ts` | Rows a list marks as new to its reader, because something unread is about them (the hub's notifications, docs/guides/notifications.md §6). |
+| `RowMarksContext` | `lib/marks.ts` | The app's row marks; give a `RowMarks` whose `useMarked` is one stable hook. |
+| `useRowMarks` | `lib/marks.ts` | A list's marked rows, and what to call when one of them is opened. |
 | `PHONE_QUERY` | `lib/media.ts` | A phone: 760 px wide and below (gate 11). |
 | `useMediaQuery` | `lib/media.ts` | true while the media query matches; false before the first render on a server. |
 | `useIsPhone` | `lib/media.ts` | true on a phone: the phone shell renders (gate 11). |

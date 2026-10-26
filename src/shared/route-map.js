@@ -485,6 +485,34 @@ function linkFor(entityType, entityId, { self = false } = {}) {
 }
 
 /**
+ * The screen a record of this type opens on, without naming the record: its staff screen, or with
+ * `self` its own employee's where the route has one. Null for a type with no screen. The bell's
+ * badges count by it, per module and per tab.
+ * @param {string} entityType
+ * @param {{self?: boolean}} [opts]
+ * @returns {{module: string, tab: string}|null}
+ */
+function screenOf(entityType, { self = false } = {}) {
+  const r = ENTITY_ROUTES[entityType];
+  if (!r) return null;
+  const target = self && r.self ? r.self : r;
+  return { module: target.module, tab: target.tab };
+}
+
+/**
+ * The record types that open on one screen, as their staff screen or as their own employee's:
+ * what a list on that screen may mark as unread.
+ * @param {string} module
+ * @param {string} tab
+ * @returns {string[]}
+ */
+function typesOn(module, tab) {
+  return Object.entries(ENTITY_ROUTES)
+    .filter(([, r]) => [r, r.self].some((s) => s && s.module === module && s.tab === tab))
+    .map(([type]) => type);
+}
+
+/**
  * The module a viewer must hold to open a record (its staff view), or null. Used to check
  * the viewer may open it: the screen's module, or the `permission` its route names.
  */
@@ -502,6 +530,8 @@ module.exports = {
   moduleSlug,
   screenPath,
   linkFor,
+  screenOf,
+  typesOn,
   moduleOf,
   hasRoute,
 };
