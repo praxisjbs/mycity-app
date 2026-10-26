@@ -260,7 +260,7 @@ you can do on one you can do on the other.
 2. **More** opens a sheet: your name with **Dark Theme**, **Compact Density**, **Text Size** and
    **Settings** (**My Security** when you do not look after Settings), a **Search** bar, every
    other module as a tile, **Install App** and **Sign Out**. Tiles use short names: **Knowledge**
-   is the Knowledge Hub, **Praxis** is Praxis AI.
+   is the Knowledge Hub, **Assistant** is Praxis AI.
 3. The module's screens are tabs under its name. Swipe them sideways to see them all.
 4. The icons at the top right are **Search**, **Notifications** and **Your Account**, your picture,
    which opens More too. The MyCity App logo at the top left goes Home.
