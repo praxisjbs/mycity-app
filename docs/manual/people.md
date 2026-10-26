@@ -1025,7 +1025,7 @@ marks:
 open: /people?tab=employees
 as: operations
 sources:
-  - app/src/shared/ReportingForm.tsx
+  - app/src/features/shared/ReportingForm.tsx
 do:
   - click: row 2
   - click: tab "Reporting Line"
