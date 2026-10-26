@@ -1086,10 +1086,11 @@ app's own, `src/sw.ts` (typed by `tsconfig.sw.json`, the WebWorker library, and 
   is installed (opened standalone, or the browser reports `appinstalled`). Where the browser offers
   its own prompt (`beforeinstallprompt`) Install App uses it; on an iPhone or iPad it shows the Add
   to Home Screen steps.
-- **Never over a message box** (JBS Praxis, 26/10/2026): on a screen whose message box sits at the
-  foot of the page (every Staff Community tab, Praxis AI's Ask), the update, install and
-  notifications offers wait for the next other screen (`writingScreen` in `shell/Notices.tsx`), on
-  a phone and on desktop. Back to Guide still shows there: the reader asked for it, and it closes.
+- **On Home only** (JBS Praxis, 26/10/2026): the update, install and notifications offers show on
+  Home, any tab, and on no other screen (`offersScreen` in `shell/Notices.tsx`), on a phone and on
+  desktop. Floating at the foot of another page they sat over its own content: a message box, a
+  report, a list's last rows. Back to Guide shows wherever a step led: the reader asked for it, and
+  it closes.
 - **Installed** (F28, F29): `useInstalled()` from `@mycity/ui` is true when the app runs as an
   installed app (display mode standalone, minimal-ui or window controls overlay, or an iPhone's home
   screen). Only then does the desktop capsule show back and forward and the pin open the trail; the

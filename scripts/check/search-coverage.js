@@ -94,7 +94,7 @@ function check({ dir = MODULES } = {}) {
   try {
     out.types = require(path.join(ROOT, "src", "shared", "search", "registry"))
       .load({ dir })
-      .map((p) => p.type);
+      .flatMap((p) => p.types || [p.type]);
   } catch (err) {
     out.loadError = err.message;
   }

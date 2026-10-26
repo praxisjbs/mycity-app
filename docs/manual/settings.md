@@ -792,8 +792,9 @@ Who did what, when, to which record. Nobody can change it.
 - Each entry says **When**, **Who** did it (**System** when the hub did it itself), **What** was
   done and to which **Record**. A computer also shows its **Module** and **Entries by Module**.
 
-1. Search by person or what was done, or choose a **Module** and **Dates**. On a phone, press
-   **Filter**, choose them, and press **Show Entries**. **Clear Filters** removes them.
+1. Search by person or what was done, or choose a **Module** and the **Dates**, **From** and
+   **To**. A day typed wrong is marked under its own box, such as **Not a real date**. On a phone,
+   press **Filter**, choose them, and press **Show Entries**. **Clear Filters** removes them.
 2. Press an entry. It shows **When**, **Who**, the **Record**, the **Action** and the **Address** it
    came from, then each **Field** **Before** and **After**. A value your role does not see reads
    **Restricted**.

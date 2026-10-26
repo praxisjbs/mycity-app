@@ -427,11 +427,12 @@ and reads their team's exceptions; Operations and People decide them.
 6. On a temporary site's day, **Route** lists the clock-in, each check-in with **Inside**,
    **Recorded** or **Flagged**, then the clock-out. **Exceptions** under it lists the day's
    exceptions; press one to decide it.
-7. {needs="people export"} Press **Export**, choose the **Period**, at most 31 days, and the
-   **Status**: it starts on the status chip you chose, such as **Late**, or **All**. Press
-   **Export Register**. **Preparing your export** shows, then a message says **Export downloaded**
-   once the file is saved on this device. **At most 31 days** means the period is too long;
-   **Export failed. Try again.** means the file could not be made.
+7. {needs="people export"} Press **Export**, choose the **Period**, its **From** and **To** days at
+   most 31 days apart, and the **Status**: it starts on the status chip you chose, such as
+   **Late**, or **All**. Press **Export Register**. **Preparing your export** shows, then a message
+   says **Export downloaded** once the file is saved on this device. A day typed wrong is marked
+   under its own box, such as **Not a real date**; **At most 31 days** under both means the period
+   is too long; **Export failed. Try again.** means the file could not be made.
 
 | Word | What it means |
 |---|---|
@@ -447,6 +448,12 @@ and reads their team's exceptions; Operations and People decide them.
 A punch's **Result** reads **Accepted**, **Review** (waiting on People), **Not Counted** (refused
 at the clock) or **Rejected** (People rejected it). **Source** reads **Clock**, *Added by* and a name, or
 **System Clock-Out**.
+
+To see every day of one person, search their name with ⌘K and press the last row of
+**Attendance Days**, such as *All Days of Ada Obi*. A panel with their name lists their days of
+this month, newest first, with **Date**, **Clock In**, **Clock Out**, **Hours** and **Status**.
+Choose another month at the top. Press a day to open its evidence over the panel; close it to come
+back to their days.
 
 On a phone the figures sit two to a row, and each person is a card with **Status**, **Clock In** and
 **Clock Out**. Tap the card for the rest. In the day's sheet a punch shows **Punch**,

@@ -6,6 +6,8 @@ import { installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
+import { PEOPLE } from "@/api/mock/data/people";
+import { PERIOD, SCORECARDS } from "@/api/mock/data/performance";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import Ess from "@/features/ess";
 import { RouterProvider, useRouter } from "@/lib/router";
@@ -218,5 +220,32 @@ describe("Performance · a mid-quarter scorecard, a scorecard's link and a line'
     await settled();
     expect(within(top()).getByRole("button", { name: "Change Target" })).toBeTruthy();
     expect(copyProblems()).toEqual([]);
+  }, 30000);
+
+  it("Edit Lines totals each section against its share as weights are typed, by the rule the save is held to (QA OBS-04)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=targets");
+    // A draft the CEO starts for someone with no scorecard this quarter, outside a function whose plan is with its approvers.
+    const someone = PEOPLE.find(
+      (p) => p.user_key !== "ifeoma" && p.department !== "Content" && !SCORECARDS.some((c) => c.employee.employee_id === p.employee_id && c.performance_period_id === PERIOD.performance_period_id),
+    )!;
+    let id = "";
+    await act(async () => {
+      const made = await api.call("POST /api/v1/performance/scorecards", { body: { employee_id: someone.employee_id, performance_period_id: PERIOD.performance_period_id } as never });
+      id = (made as { scorecard_id: string }).scorecard_id;
+    });
+    window.history.pushState(null, "", `/performance?tab=targets&id=${id}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await settled();
+    await press(top(), "Edit Lines");
+    const form = top();
+    const totals = within(form).getByRole("group", { name: "Section Weights" });
+    const tone = (text: string) => within(totals).getByText(text).closest("[data-tone]")?.getAttribute("data-tone");
+    // It starts with Accountability's two lines, 10 and 5, which fill its 15.
+    expect(tone("Accountability 15 of 15")).toBe("ok");
+    expect(tone("Results 0 of 60")).toBe("err");
+    expect(tone("KPIs 0 of 25")).toBe("err");
+    // A weight typed: the total follows at once, before any save.
+    fireEvent.change(within(form).getAllByLabelText("Weight")[0]!, { target: { value: "12.5" } });
+    expect(tone("Accountability 17.5 of 15")).toBe("err");
   }, 30000);
 });

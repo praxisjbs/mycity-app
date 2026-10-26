@@ -352,4 +352,27 @@ describeDb("performance goals set and changed on screen, against the real migrat
     const logged = await one("SELECT count(*)::int AS n FROM event_outbox WHERE event_key = 'organisational_goal.deleted'");
     expect(logged.n).toBe(1);
   });
+
+  test("Functions: each reader is told which of the company and the functions they may set, with the quarter's plan (QA DEF-10, DEF-11)", async () => {
+    const offered = async (who) => {
+      const r = await as(who).get(`/performance/functions?period_id=${ids.q4}`);
+      expect(r.status).toBe(200);
+      return Object.fromEntries(r.body.data.map((f) => [f.name ?? "Company", f.may_set]));
+    };
+    // The CEO sets everything; Management the company's; Operations & People every function's;
+    // a head their own function's; someone with no goals grant nothing.
+    expect(await offered("ceo")).toMatchObject({ Company: true, "Branding & Marketing": true, "Technology & Back-office Ops": true });
+    expect(await offered("pm")).toMatchObject({ Company: true, "Branding & Marketing": false, "Technology & Back-office Ops": false });
+    expect(await offered("ops")).toMatchObject({ Company: false, "Branding & Marketing": true, "Technology & Back-office Ops": true });
+    expect(await offered("head")).toMatchObject({ Company: false, "Branding & Marketing": true, "Technology & Back-office Ops": false });
+    expect(await offered("other")).toMatchObject({ Company: false, "Branding & Marketing": false, "Technology & Back-office Ops": true });
+    expect(Object.values(await offered("ada")).every((may) => may === false)).toBe(true);
+    // The company first, then the functions by name, each with its plan in the quarter, in pages of 25.
+    const page = (await as("head").get(`/performance/functions?period_id=${ids.q4}`)).body;
+    expect(page.data[0]).toMatchObject({ department_id: null, name: null });
+    expect(page.data.find((f) => f.department_id === ids.bm).plan_status).toBe("binding");
+    expect(page.page).toMatchObject({ number: 1, size: 25 });
+    // Asked without a quarter, no plan is named.
+    expect((await as("head").get("/performance/functions")).body.data.every((f) => f.plan_status === null)).toBe(true);
+  });
 });

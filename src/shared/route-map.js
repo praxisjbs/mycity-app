@@ -196,6 +196,9 @@ const ENTITY_ROUTES = Object.freeze({
     ...screen("people", "attendance"),
     self: screen("ess", "my-attendance"),
   },
+  // All of one person's days, ⌘K's last row after the days it lists (attendance.search.js `more`):
+  // People · Attendance lists them by month (`?person=`, an employee's id).
+  attendance_days: { ...screen("people", "attendance"), param: "person" },
   // A pending deduction or overtime (§6.17): People · Attendance opens its day; the person's own opens on
   // My Attendance (both read /attendance/records/:id).
   // search:none a pay item is found through its day, never looked up on its own

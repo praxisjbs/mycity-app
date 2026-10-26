@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
+import scoring from "@mycity/contract/schemas/scoring.js";
 import targetsContract from "@mycity/contract/schemas/targets.js";
 import type { KeyResult, ScorecardDetail, ScorecardLine } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
@@ -625,6 +626,13 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
       }
     }
   };
+  // Each section's lines against its share as typed, by the rule the scorecard is held to (scoring.sectionWeightProblems).
+  const shares = { results: card.results_weight, kpis: card.kpis_weight, accountability: card.accountability_weight };
+  const off = scoring.sectionWeightProblems(rows.map((r) => ({ section: r.section, weight: r.weight })), shares);
+  const totals = (["results", "kpis", "accountability"] as const).map((section) => {
+    const p = off.find((x) => x.section === section);
+    return { section, total: p ? p.total : shares[section], expected: shares[section], adds: !p };
+  });
   const err = (i: number, ...keys: string[]) => keys.map((k) => errors[`lines.${i}.${k}`]?.[0]).find(Boolean);
   const mark = (i: number, short: string, ...keys: string[]) => {
     const message = fieldMessage(err(i, ...keys), short);
@@ -632,6 +640,11 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
   };
   return (
     <>
+      <div role="group" aria-label="Section Weights" className="mb-3 flex flex-wrap gap-1.5">
+        {totals.map((t) => (
+          <StatusPill key={t.section} s={{ tone: t.adds ? "ok" : "err", text: `${SECTION_NAMES[t.section]} ${formatNumber(t.total)} of ${t.expected}` }} />
+        ))}
+      </div>
       {rows.map((r, i) => (
         <Card key={r.employee_target_id || `new-${i}`} className="mb-2">
           <CardHeader

@@ -191,8 +191,8 @@ export function MyAttendancePage() {
   );
 }
 
-/** A day's columns, as My Days and a figure's days show them. */
-const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
+/** A day's columns, as My Days, a figure's days and People · Attendance's All Days show them. */
+export const DAY_COLUMNS: Array<{ key: string; label: string; sortable?: boolean; align?: "n"; desktop?: boolean; render: (d: AttendanceDay) => ReactNode }> = [
   { key: "attendance_date", label: "Date", sortable: true, render: (d) => formatDate(d.attendance_date) },
   { key: "i", label: "Clock In", render: (d) => (d.first_clock_in_at ? formatTime(d.first_clock_in_at) : null) },
   { key: "o", label: "Clock Out", render: (d) => clockOutOf(d.last_clock_out_at, d.clock_out_automatic) },

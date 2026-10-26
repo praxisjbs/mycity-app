@@ -2802,7 +2802,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | Use | Every date a person enters (gate 15); DateRangeField for a from and to pair (a report period); TimeField for a 24-hour time. |
 | Avoid | <input type="date"> (its format follows the browser's locale); a date shown and not entered (use formatDate). |
 | Phone | The calendar opens as a bottom sheet; days are 44 px targets; the keyboard is numeric. |
-| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id and are named From and To, as are their calendar buttons. |
+| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id, a visible From or To label and their own error, tied to that end alone; their calendar buttons are named From and To too. |
 | Status | stable |
 | Exports | `DateField`, `DateRangeField`, `TimeField` |
 | Import | `import { DateField, DateRangeField, TimeField } from "@mycity/ui";` |
@@ -2820,13 +2820,14 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with what was typed ("Not a real date", "Pick 21/10/2026 or later"), or undefined once it is right. |
 | `min` | `string` |  | The earliest date that may be picked or typed, ISO. |
 | `max` | `string` |  | The latest date that may be picked or typed, ISO. |
-| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
-| `message` | `string` |  | Unused here (the Field shows it). |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise (an end of a period takes only its own). |
+| `message` | `ReactNode` |  | Unused on its own (the Field shows it). On an end of a period: the period's message about this end, shown under it. |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
 | `placeholder` | `string` |  | The format example; DD/MM/YYYY. |
 | `disabled` | `boolean` |  | Shown and not changed (a record already sent): no typing and no calendar. |
-| `end` | `"From" \| "To"` |  | Which end of a period this is (DateRangeField): the field is named by its Field's label and the end, as is its calendar button. |
+| `end` | `"From" \| "To"` |  | Which end of a period this is (DateRangeField): the field shows the end as a small label above it and is named by its Field's label and the end ("Dates From"), as is its calendar button. What is wrong with it is said under it and tied to it alone. |
+| `describedBy` | `string` |  | On an end of a period: the ids of the period's messages that are about both ends. |
 
 **DateRangeField** props (`DateRangeFieldProps`)
 
@@ -2839,7 +2840,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `min` | `string` |  | The earliest date either end may take, ISO. |
 | `max` | `string` |  | The latest date either end may take, ISO. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
-| `message` | `string` |  | Unused here (the Field shows it). |
+| `message` | `string` |  | Unused here: the Field's message is shown beside the end it is about. |
 
 **TimeField** props (`TimeFieldProps`)
 

@@ -16,7 +16,8 @@
  * 26/10/2026", "Missing Clock-Out · 26/10/2026"), in the words People · Attendance uses, so
  * two days of one person never read the same. A person has a day for every working day, so
  * each lists at most three, newest first (`cap`); the person's own record comes before them
- * (organisation.search.js `lead`) and People · Attendance holds the rest.
+ * (organisation.search.js `lead`), and the days end with "All Days of <the person>" for each
+ * person listed (`more`), opening People · Attendance on that person's days (`?person=`).
  */
 const { recordProvider } = require("../../shared/search/provider");
 
@@ -43,10 +44,11 @@ module.exports = [
     key: "ad.attendance_day_id",
     columns: ["e.first_name", "e.last_name", "e.preferred_name"],
     select: `ad.attendance_day_id AS id, ${DAY} AS ref, btrim(e.first_name || ' ' || e.last_name) AS title,
-      ${DAY_STATUS} || ' · ' || ${DAY} AS sub, ad.status AS status`,
+      ${DAY_STATUS} || ' · ' || ${DAY} AS sub, ad.status AS status, ad.employee_id AS person_id`,
     order: "ad.attendance_date DESC",
     scope: { column: "ad.employee_id" },
     cap: DAYS_LISTED,
+    more: { type: "attendance_days", id: "person_id", title: (r) => `All Days of ${r.title}` },
   }),
   recordProvider({
     type: "attendance_exception",

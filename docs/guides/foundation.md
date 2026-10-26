@@ -536,7 +536,11 @@ As built (17/10/2026):
   capped (`cap` in `shared/search/provider.js`): Attendance Days and Attendance Exceptions list at most
   three, best and newest first, and never page past them; People · Attendance holds the rest. Each
   reads as the person, then the status or exception and the full date ("Present · 26/10/2026",
-  "Missing Clock-Out · 26/10/2026"), in the result's visible words and so its accessible name.
+  "Missing Clock-Out · 26/10/2026"), in the result's visible words and so its accessible name. A capped
+  group may end with the way to the rest (`more: { type, id, title }`): Attendance Days end with All
+  Days of each person they listed, a row of the route map's `attendance_days` opening that person's
+  days on People · Attendance (`?person=`). A provider declares its `more` type beside its own
+  (`types`), and the search coverage gate reads both.
 - Nothing that would open Coming Soon is offered (F14). The API leaves out a record group whose type
   opens on a screen that has not shipped, a screen and an action that would land on one, and a Home
   card counting a module that has not (`shared/delivery-plan.js`), so a group's page of 25 counts only
@@ -1081,6 +1085,8 @@ screen.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · QA DEF-02 and DEF-12, §6.7 and the shell: a capped search group may end with `more` rows (Attendance Days end with All Days of each person listed, `attendance_days`), declared in the provider's `types` for the coverage gate; the shell's update, install and notifications offers show on Home only (`offersScreen`, FRONTEND_GUIDE's PWA section).
+- 26/10/2026 · JP · QA DEF-04 finished, the shared `DateRangeField` (Settings · Audit Log's Dates, People · Attendance's export Period): each end shows a small **From** or **To** label above its box and says its own problem under it, tied to that end alone (`aria-describedby`, `aria-invalid`): a half-typed From marks From once the person pauses or leaves it, a To before From marks To at once, and the other end stays unmarked. The Field's message about the period is shown by the range in place of the Field's own line (`useFieldError`): under the end still empty when only one is, else once under both, tied to both; a problem the form marks on Save is said under its end though the person never left it. `useFieldControl` takes `part` for one end of a field: only its own mark and messages.
 - 26/10/2026 · JP · QA DEF-01 finished, F14 on the server: the delivery plan has one reader and one rule (`packages/contract/plan.js`), which the app's build reads the docs with (`packages/ui/vite.shared.js`), the app opens screens by (`packages/ui/src/lib/plan.ts`, `app/src/lib/plan.ts`) and the API decides by (`src/shared/delivery-plan.js`), from the plan the app was built with (`app/dist/delivery-plan.json`, which a release carries; the docs where there is no build). My Approvals and Need You (`/workflow/mine` and its count) and ⌘K (record groups, screens, actions) leave out what would only open Coming Soon on the server, so their pages of 25 count only what opens. By APP_ENV: production by API, UI and Mobile, staging and development by API, a test everything unless it sets a plan (`use`).
 - 26/10/2026 · JP · From the QA bug register (Milestone 2): the form system's `reset()` drops a pause check still waiting from the last key, so a field emptied after a quick save (a task comment) is never marked Required (DEF-06).
 - 26/10/2026 · JP · QA DEF-03, DEF-04 and DEF-07, the shared form fields: a limit no schema worded reads by what it limits (`shortMessage`): a number At most or At least its bound, a list Too many, a date Too late, never Too long on a number (a latitude of 91 read so). `MoneyField` keeps a minus typed or pasted ("-100", "₦-100", "(100)") and reads Not below zero, never dropping it; zero is an amount; a second point or a comma out of place reads Check the amount and a third decimal Two decimals at most, never cut. `DateRangeField` gives each end its own id (the Field's label points at From) and names the ends and their calendar buttons From and To (Pick From Date, Pick To Date), where both were the Field's label twice under one id.

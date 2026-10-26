@@ -10,7 +10,7 @@
  * @exports FormRow, FormError
  * @example <Field label="Work Email" {...form.status("work_email")}><TextField type="email" {...form.field("work_email")} /></Field>
  */
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { describedBy, useControlIds, type ControlIds } from "../lib/ids";
 import { Icon } from "../icons/Icon";
@@ -23,6 +23,10 @@ interface FieldContextValue extends ControlIds {
   labelledBy: boolean;
   hasHelp: boolean;
   hasError: boolean;
+  /** The error the Field holds, for a control that shows it beside the part at fault (useFieldError). */
+  message: ReactNode;
+  /** A control that shows the Field's error itself says so while it is mounted; the Field's own line then stays empty. */
+  takeError: (taken: boolean) => void;
   /** The field carries the Optional tag: it may be left empty. */
   optional: boolean;
 }
@@ -32,17 +36,39 @@ const FieldContext = createContext<FieldContextValue | null>(null);
 /**
  * The ids and aria attributes a control inside a Field takes. Used by the controls in this folder.
  * A group (a radio group) is not named by a <label for>, so with `group` it is always labelled by id.
+ * A `part` of a field (one end of a period) carries only its own mark and is described by its own
+ * messages (`describedBy`), never by the whole field's error, so the end at fault is the one marked.
  */
-export function useFieldControl(own: { id?: string; state?: FieldState; group?: boolean }) {
+export function useFieldControl(own: { id?: string; state?: FieldState; group?: boolean; part?: boolean; describedBy?: string }) {
   const ctx = useContext(FieldContext);
-  const state = own.state ?? ctx?.state;
+  const state = own.part ? own.state : (own.state ?? ctx?.state);
   return {
     id: own.id ?? ctx?.id,
     state,
     "aria-labelledby": ctx && (ctx.labelledBy || own.group) ? ctx.labelId : undefined,
-    "aria-describedby": ctx ? describedBy(ctx.hasHelp && ctx.helpId, ctx.hasError && ctx.errorId) : undefined,
+    "aria-describedby": own.part
+      ? describedBy(ctx?.hasHelp && ctx.helpId, own.describedBy)
+      : ctx
+        ? describedBy(ctx.hasHelp && ctx.helpId, ctx.hasError && ctx.errorId)
+        : undefined,
     "aria-invalid": state === "bad" || undefined,
   };
+}
+
+/**
+ * For a control that shows its Field's error itself, beside the part it is about (a period's From
+ * or To): the Field's mark and its message while it is bad. While the control is mounted the
+ * Field's own error line stays empty, so the error is never shown or announced twice.
+ */
+export function useFieldError(): { state: FieldState; message?: ReactNode } {
+  const ctx = useContext(FieldContext);
+  const take = ctx?.takeError;
+  useEffect(() => {
+    if (!take) return undefined;
+    take(true);
+    return () => take(false);
+  }, [take]);
+  return { state: ctx?.state, message: ctx?.hasError ? ctx.message : undefined };
 }
 
 /** The id of the Field's label, so a control that opens a sheet can title it with the label's words. */
@@ -81,7 +107,9 @@ export function Field({ label, help, info, optional, state, message, children, h
   const id = htmlFor ?? ids.id;
   const helpText = help ?? info;
   const hasError = state === "bad" && !!message;
-  const ctx: FieldContextValue = { ...ids, id, state, labelledBy: !!helpText, hasHelp: !!helpText, hasError, optional: !!optional };
+  // A control that shows the error beside its own part (DateRangeField) takes it from the Field's line.
+  const [taken, setTaken] = useState(false);
+  const ctx: FieldContextValue = { ...ids, id, state, labelledBy: !!helpText, hasHelp: !!helpText, hasError, message, takeError: setTaken, optional: !!optional };
   return (
     <FieldContext.Provider value={ctx}>
       <div className={cn("mb-3.5", className)} data-state={state}>
@@ -100,8 +128,8 @@ export function Field({ label, help, info, optional, state, message, children, h
           {optional && <span className="text-2xs font-medium text-subtle-foreground">Optional</span>}
         </div>
         {children}
-        <p id={ids.errorId} aria-live="polite" className={cn("mt-1 items-center gap-1 text-xs text-destructive", hasError ? "flex" : "hidden")}>
-          {hasError && (
+        <p id={ids.errorId} aria-live="polite" className={cn("mt-1 items-center gap-1 text-xs text-destructive", hasError && !taken ? "flex" : "hidden")}>
+          {hasError && !taken && (
             <>
               <Icon name="alert" size="s" />
               <span>{message}</span>

@@ -557,6 +557,31 @@ describe("search providers", () => {
     expect(() => recordProvider({ ...spec, cap: 0 })).toThrow(/cap is a whole number/);
   });
 
+  test("a capped group with more ends with All Days of each person it listed, opening their days (QA DEF-02)", async () => {
+    const rows = [
+      { id: "day-1", title: "Ada Obi", person_id: "p-ada", _total: 6 },
+      { id: "day-2", title: "Ada Bello", person_id: "p-bello", _total: 6 },
+      { id: "day-3", title: "Ada Obi", person_id: "p-ada", _total: 6 },
+      { id: "day-4", title: "Ada Obi", person_id: "p-ada", _total: 6 },
+    ];
+    const client = { query: async () => ({ rows }) };
+    const more = { type: "attendance_days", id: "person_id", title: (r) => `All Days of ${r.title}` };
+    const days = recordProvider({ ...spec, type: "attendance_record", label: "Attendance Days", cap: 3, more });
+    expect(days.types).toEqual(["attendance_record", "attendance_days"]);
+    const r = await days.search(client, { term: "ada", page: 1 });
+    expect(r.items.map((i) => [i.type, i.id, i.title])).toEqual([
+      ["attendance_record", "day-1", "Ada Obi"],
+      ["attendance_record", "day-2", "Ada Bello"],
+      ["attendance_record", "day-3", "Ada Obi"],
+      ["attendance_days", "p-ada", "All Days of Ada Obi"],
+      ["attendance_days", "p-bello", "All Days of Ada Bello"],
+    ]);
+    expect(r.items.at(-1).link).toBe("/people?tab=attendance&person=p-bello");
+    expect(r.page).toMatchObject({ total: 5, pages: 1, has_next: false });
+    expect(() => recordProvider({ ...spec, more })).toThrow(/more ends a capped group/);
+    expect(() => recordProvider({ ...spec, cap: 3, more: { type: "attendance_days", id: "person_id" } })).toThrow(/more is \{ type, id, title\(row\) \}/);
+  });
+
   test("attendance days and exceptions read as the person, the status and the date, three at most; the people lead", () => {
     const attendance = require("../../../src/modules/attendance/attendance.search");
     const organisation = require("../../../src/modules/organisation/organisation.search");
@@ -566,10 +591,14 @@ describe("search providers", () => {
       expect(p.lead).toBe(false);
     }
     expect(organisation.find((x) => x.type === "employee").lead).toBe(true);
+    // The days end with All Days of each person listed; the exceptions do not.
+    expect(attendance.find((x) => x.type === "attendance_record").types).toEqual(["attendance_record", "attendance_days"]);
+    expect(attendance.find((x) => x.type === "attendance_exception").types).toEqual(["attendance_exception"]);
     const declared = fs.readFileSync(path.join(ROOT, "src/modules/attendance/attendance.search.js"), "utf8");
     expect(declared).toMatch(/WHEN 'leave' THEN 'On Leave'/);
     expect(declared).toMatch(/WHEN 'missing_clock_out' THEN 'Missing Clock-Out'/);
     expect(declared).toMatch(/\$\{DAY_STATUS\} \|\| ' · ' \|\| \$\{DAY\} AS sub/);
+    expect(declared).toMatch(/ad\.employee_id AS person_id/);
   });
 
   test("a name typed finds the person before the days about them", async () => {

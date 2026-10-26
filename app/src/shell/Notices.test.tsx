@@ -4,13 +4,13 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
 import { setGuideReturn, clearGuideReturn } from "@/features/knowledge/guide/return";
 import { RouterProvider } from "@/lib/router";
-import { ShellNotices, writingScreen } from "./Notices";
+import { offersScreen, ShellNotices } from "./Notices";
 import { resetPwaForTest } from "./pwa";
 
 /**
- * The shell's floating offers keep off a screen whose message box sits at the foot of the page
- * (Staff Community, Praxis AI's Ask), so they never cover what a person is typing, and come back
- * on the next other screen. Back to Guide, which the reader asked for, still shows there.
+ * The shell's floating offers (a new version, notifications, installing the app) show on Home
+ * only, any tab, so they never sit over another page's own content at its foot: a message box,
+ * a report, a list's last rows. Back to Guide, which the reader asked for, shows wherever it led.
  */
 
 let push = "on";
@@ -36,49 +36,51 @@ afterEach(() => {
   at("/");
 });
 
-describe("the shell's offers on a screen with a message box", () => {
-  it("knows the screens: every Staff Community tab and Praxis AI's Ask", () => {
-    expect(writingScreen("community", "channels")).toBe(true);
-    expect(writingScreen("community", "direct-messages")).toBe(true);
-    expect(writingScreen("community", "announcements")).toBe(true);
-    expect(writingScreen("community", null)).toBe(true);
-    expect(writingScreen("praxis-ai", "ask")).toBe(true);
-    expect(writingScreen("praxis-ai", null)).toBe(true);
-    expect(writingScreen("praxis-ai", "history")).toBe(false);
-    expect(writingScreen("mailbox", "inbox")).toBe(false);
-    expect(writingScreen("home", null)).toBe(false);
-    expect(writingScreen(null, null)).toBe(false);
+describe("the shell's offers, on Home only", () => {
+  it("knows the screen: Home, any tab, and nowhere else", () => {
+    expect(offersScreen("home")).toBe(true);
+    expect(offersScreen("community")).toBe(false);
+    expect(offersScreen("praxis-ai")).toBe(false);
+    expect(offersScreen("people")).toBe(false);
+    expect(offersScreen("mailbox")).toBe(false);
+    expect(offersScreen(null)).toBe(false);
   });
 
-  it("keeps the install offer off Staff Community, and shows it on the next other screen", () => {
+  it("shows the install offer on Home's tabs, and on no other screen", () => {
     installOffer();
-    at("/community?tab=channels");
-    const { unmount } = show();
-    expect(screen.queryByText("Install MyCity App on this device")).toBeNull();
-    unmount();
-    at("/home");
-    show();
-    expect(screen.getByText("Install MyCity App on this device")).toBeTruthy();
+    for (const url of ["/community?tab=channels", "/praxis-ai?tab=ask", "/people?tab=employees", "/settings?tab=audit-log"]) {
+      at(url);
+      const { unmount } = show();
+      expect(screen.queryByText("Install MyCity App on this device")).toBeNull();
+      unmount();
+    }
+    for (const url of ["/home?tab=overview", "/home?tab=reports"]) {
+      at(url);
+      const { unmount } = show();
+      expect(screen.getByText("Install MyCity App on this device")).toBeTruthy();
+      unmount();
+    }
   });
 
-  it("keeps the new version and notifications offers off a chat too", () => {
+  it("keeps the new version and notifications offers for Home too", () => {
     resetPwaForTest({ update: async () => undefined });
     push = "ask";
-    at("/community?tab=direct-messages");
+    at("/people?tab=attendance");
     const { unmount } = show();
     expect(screen.queryByText("A new version is ready")).toBeNull();
     expect(screen.queryByText("Get notified of new mail and approvals")).toBeNull();
     unmount();
-    at("/praxis-ai?tab=ask");
-    const again = show();
-    expect(screen.queryByText("A new version is ready")).toBeNull();
-    again.unmount();
-    at("/people?tab=employees");
-    show();
+    at("/home?tab=reports");
+    const home = show();
     expect(screen.getByText("A new version is ready")).toBeTruthy();
+    home.unmount();
+    resetPwaForTest();
+    at("/home?tab=overview");
+    show();
+    expect(screen.getByText("Get notified of new mail and approvals")).toBeTruthy();
   });
 
-  it("still shows Back to Guide on a chat, as the reader asked for it", () => {
+  it("still shows Back to Guide off Home, as the reader asked for it", () => {
     installOffer();
     act(() => setGuideReturn({ id: "start-a-poll", step: 2, title: "Start a Poll" }));
     at("/community?tab=channels");

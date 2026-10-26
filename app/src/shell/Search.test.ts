@@ -8,7 +8,8 @@ import { shownHit } from "./Search";
 
 /**
  * ⌘K (docs/guides/foundation.md §6.7): nothing that would open Coming Soon in this build, and a
- * person's attendance days read as the person, the status and the date, three at most after them.
+ * person's attendance days read as the person, the status and the date, three at most after them,
+ * then All Days of the person.
  */
 
 const hit = (over: Partial<SearchHit>): SearchHit => ({ id: "x", kind: "record", type: "expense", title: "EXR-0004", sub: null, ref: null, status: null, link: null, run: null, ...over });
@@ -76,10 +77,14 @@ describe("a person's attendance days in ⌘K (the mock, as the API)", () => {
     const groups = searchResult(PEOPLE, all, ada.first_name, null, 1, days).groups;
     const types = groups.filter((g) => g.kind === "record").map((g) => g.type);
     expect(types).toEqual(["employee", "attendance_record"]);
-    const shownDays = groups.find((g) => g.type === "attendance_record")!.items;
+    const items = groups.find((g) => g.type === "attendance_record")!.items;
+    const shownDays = items.filter((d) => d.type === "attendance_record");
     expect(shownDays.map((d) => d.sub)).toEqual(["Late · 26/10/2026", "Not Counted · 22/10/2026", "Present · 21/10/2026"]);
     expect(shownDays.every((d) => d.title === `${ada.first_name} ${ada.last_name}`)).toBe(true);
     expect(shownDays[0]!.link).toBe("/people?tab=attendance&id=day-1");
+    // Then the way to the rest: All Days of the person, opening all of theirs (QA DEF-02).
+    expect(items.at(-1)).toMatchObject({ type: "attendance_days", id: ada.employee_id, title: `All Days of ${ada.first_name} ${ada.last_name}`, link: `/people?tab=attendance&person=${ada.employee_id}` });
+    expect(items).toHaveLength(4);
   });
 
   it("finds no days without People, and none for a line too short to search", () => {

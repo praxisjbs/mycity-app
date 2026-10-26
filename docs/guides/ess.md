@@ -10,7 +10,7 @@
 | Capabilities | none |
 | Screens (PROGRESS.md rows) | #8 My Profile, #9 My Attendance, #87 Work Location Requests, #88 My Devices, #89 Policy Updates, #10 My Performance, #11 My Payslips, #12 My Leave, #13 My Queries, #14 My Documents, #91 Org Chart, #90 My Security, #26 People · Leave |
 | Status | Draft |
-| Last changed | 25/10/2026 |
+| Last changed | 26/10/2026 |
 
 Sources: MILESTONES §6.3 and §18; REUSE_MAP §2.3; the internal workflow meeting of 12 October 2026
 (AJ presenting ESS, TB reviewing). The demo (`demo.html`, Employee Self-Service) was updated on
@@ -396,6 +396,7 @@ Deductions figure and every form open the shared modal.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · QA OBS-05, checked end to end (tests/integration/leave.test.js): the answer Send Request's message reads, My Requests' Approver, People · Leave's Waiting On, and the approval's route and history (`GET /workflow/instances/:id`) name the same approver on the line manager's stage, on a stage reassigned to a delegate (its history line names who gave it and why), and on a stage a role decides, named Admin Override, where no one person is named and the stage says who everywhere.
 - 26/10/2026 · JP · From the QA bug register (Milestone 1). DEF-08: a request past the allowance is marked on the Last Day "32 working days, 19 left" (the days asked for and the days left), for My Leave and Record Leave alike; "More than you have left", five words, was cut by the form to "Check this value". OBS-05: `LeaveRequest.approver_name`, the one person the waiting stage names (null when a role decides it); Send Request's message reads "Sent to <name>", else "Sent to <stage>", else "Leave approved", and My Requests' Approver and People · Leave's Waiting On read the same. §6 and both §10 rows updated; the ESS and People chapters with them.
 - 26/10/2026 · JP · From the User Guide audit's screen defects, People · Leave: `?id=` opens the request it names (Need You, ⌘K, a notification); Approve and Reject show only when the approval waits on the reader (`can_decide` from the workflow instance); the Leave Calendar shows waiting leave too and moves between months (`LeaveListQuery.live`); Record Leave offers active staff only and shows a refusal's mark on Employee, and its messages say "they" ("They already have leave on some of those days", "More than they have left"); a leave type's Name is held to 80 characters, its code always has two, and only a duplicate reads Already a type. §5 and §10 updated; the People chapter with it.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: My Documents' upload box carries the vault's 15 MB and its types; My Leave's Taken opens the leave taken, Approved Upcoming reads the next booking on its own (`EssLeaveListQuery` takes `from` and `to`) and does nothing with none, and Cancel Request asks first; Change Password says why a refusal with no field failed; Ask for a Code sends one request per choice; the Passkeys list says when this browser cannot add one; a Download My Data refused because People made today's copy says so; §10 My Profile reads as the Edit Profile steps do (Save Changes, Next of Kin Phone is Phone).

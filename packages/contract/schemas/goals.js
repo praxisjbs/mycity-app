@@ -606,6 +606,25 @@ const PlanListQuery = listQuery(
   ["department", "status"],
 );
 
+/**
+ * GET /performance/functions: the company (first, `department_id` null) and each active
+ * function, whether the reader may set its goals and KPIs (goals.authority, the server's rule
+ * alone), and its plan's status in the quarter asked for (null with no plan yet, or no quarter).
+ * New Objective and New KPI offer only the rows the reader may set (§6.4).
+ */
+const PerformanceFunction = z
+  .object({
+    department_id: uuid.nullable(),
+    name: z.string().nullable(),
+    may_set: z.boolean(),
+    plan_status: PlanStatus.nullable(),
+  })
+  .strict();
+
+const PerformanceFunctionPage = Paged(PerformanceFunction);
+
+const PerformanceFunctionListQuery = listQuery({ period_id: uuid.optional() });
+
 /** Why a plan cannot be sent yet (§6.4). */
 const PlanProblem = z
   .object({
@@ -1020,6 +1039,16 @@ const TABLES = {
   Plan: { table: "performance_plan", virtual: PLAN_VIRTUAL },
   PlanPage: { table: null, reason: "a page of quarter plans" },
   PlanListQuery: { table: null, reason: "list controls and filters for the plans" },
+  PerformanceFunction: {
+    table: "department",
+    virtual: {
+      name: "department.name; null for the company",
+      may_set: "the reader may set its goals and KPIs (goals.authority)",
+      plan_status: "the quarter's performance_plan.status, null without one",
+    },
+  },
+  PerformanceFunctionPage: { table: null, reason: "a page of the functions a reader may set goals for" },
+  PerformanceFunctionListQuery: { table: null, reason: "list controls and the quarter for the functions" },
   PlanProblem: { table: null, reason: "a reason the plan cannot be sent, worked out" },
   PlanDetail: {
     table: "performance_plan",
@@ -1130,6 +1159,9 @@ module.exports = {
   Plan,
   PlanPage,
   PlanListQuery,
+  PerformanceFunction,
+  PerformanceFunctionPage,
+  PerformanceFunctionListQuery,
   PlanProblem,
   PlanDetail,
   TargetChangeCreate,

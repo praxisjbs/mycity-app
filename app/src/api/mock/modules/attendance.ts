@@ -1095,6 +1095,21 @@ route("GET /api/v1/attendance/summary", (req) => {
   });
 });
 
+/** All Days: one person's days of a month, within the reader's people view, as their own list reads (GET /attendance/me). */
+route("GET /api/v1/attendance/days", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  if (!req.query.employee_id) return invalid({ employee_id: ["Required"] });
+  const p = byId(req.query.employee_id);
+  if (!p || !g.sees(p.user_key)) return notFound();
+  const month = monthOf(req.query);
+  const status = req.query.status;
+  const wanted = (s: string | null | undefined) => !status || (status === "present" ? s === "present" || s === "late" : s === status);
+  const rows = [...DAYS.values()].filter((d) => d.key === p.user_key && d.attendance_date.startsWith(month) && (d.status || d.first_clock_in_at) && wanted(d.status)).sort(byNewest).map(dayOut);
+  const { month: _m, status: _s, employee_id: _e, ...query } = req.query;
+  return paged(rows, { ...req, query }, req.query.sort ? { sort: { attendance_date: (a, b) => a.attendance_date.localeCompare(b.attendance_date) } } : {});
+});
+
 route("GET /api/v1/attendance/register/:employee_id", (req) => {
   const g = peopleGrant(req.user!, "view");
   if (!g.may) return forbidden();

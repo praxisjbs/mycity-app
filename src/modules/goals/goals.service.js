@@ -311,6 +311,24 @@ async function listPlans(query) {
   return { ...page, data: page.data.map(planView) };
 }
 
+/**
+ * GET /performance/functions: a page of the company and the functions, each with whether the
+ * reader may set its goals and KPIs (goals.authority, the one rule) and its plan's status in the
+ * quarter. New Objective and New KPI offer only those the reader may set (§6.4).
+ */
+async function listFunctions(actor, query) {
+  const page = await repo.listFunctions(pool, query);
+  const data = [];
+  for (const f of page.data)
+    data.push({
+      department_id: f.department_id,
+      name: f.name,
+      may_set: await authority.maySetGoals(pool, actor, f.department_id),
+      plan_status: f.plan_status,
+    });
+  return { ...page, data };
+}
+
 /** What stops a plan being sent, and what only warns (§6.4). */
 async function planProblems(db, plan, { objectives, scorecards, contributions }) {
   const out = [];
@@ -602,6 +620,7 @@ module.exports = {
   deleteGoal,
   planView,
   listPlans,
+  listFunctions,
   planDetail,
   submitPlan,
   listChanges,
