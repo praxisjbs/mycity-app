@@ -11,6 +11,16 @@ type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 /** A person in a table cell: their name, and their department beneath it. */
 export const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;
 
+/**
+ * The company (`department_id` null) and the functions the reader may set goals and KPIs for, as
+ * the server's goals.authority answers (GET /performance/functions), each with its plan's status
+ * in the quarter when one is given. New Objective and New KPI offer only these (§6.4).
+ */
+export function useSettableFunctions(periodId: string | null) {
+  const list = usePaged("GET /api/v1/performance/functions", { filters: periodId ? { period_id: periodId } : {} });
+  return { rows: list.rows.filter((f) => f.may_set), loading: list.loading, error: list.error, reload: list.reload };
+}
+
 /** The quarter the screen shows: the current one until another is picked. */
 export function useQuarter(): {
   period: PerformancePeriod | null;

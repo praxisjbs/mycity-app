@@ -37,7 +37,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, sayRefusal, useQuarter } from "./shared";
+import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, sayRefusal, useQuarter, useSettableFunctions } from "./shared";
 
 type KpiCreateBody = Endpoints["POST /api/v1/performance/kpis"]["body"];
 type KpiActualBody = Endpoints["POST /api/v1/performance/kpis/:id/actuals"]["body"];
@@ -190,17 +190,31 @@ function KpiSheet({ id, months, close }: { id: string; months: string[]; close: 
   );
 }
 
+/**
+ * New KPI: the functions the reader may set KPIs for, from the server (useSettableFunctions; a KPI
+ * is always a function's, never the company's). The form opens once they are known, on the page's
+ * Function when the reader sets it, else on their one function.
+ */
 function KpiForm({ close, periodId, departmentId }: { close: () => void; periodId: string; departmentId: string }) {
-  const departments = useApi("GET /api/v1/departments", { query: { active: "true" } });
+  const settable = useSettableFunctions(null);
+  if (settable.error) return <ErrorState error={settable.error} onRetry={settable.reload} />;
+  if (settable.loading) return <LoadingRows count={4} />;
+  const options = settable.rows.flatMap((x) => (x.department_id ? [[x.department_id, x.name ?? ""] as [string, string]] : []));
+  const first = options.some(([id]) => id === departmentId) ? departmentId : options.length === 1 ? options[0]![0] : "";
+  return <KpiFields close={close} periodId={periodId} departmentId={first} options={options} />;
+}
+
+function KpiFields({ close, periodId, departmentId, options }: { close: () => void; periodId: string; departmentId: string; options: Array<[string, string]> }) {
   const f = useContractForm(
     { department_id: departmentId, name: "", formula: "", unit: "", direction: "higher", target_text: "", target_value: "", frequency: "monthly", data_source: "", starts_period_id: periodId },
     kpisContract.KpiCreate,
   );
   const [problem, setProblem] = useState<string | null>(null);
   const save = useMutation("POST /api/v1/performance/kpis");
+  const none = options.length === 0;
   const submit = async () => {
     setProblem(null);
-    if (!f.check()) return;
+    if (none || !f.check()) return;
     try {
       const k = await save.run({ body: f.values as KpiCreateBody });
       invalidate("/api/v1/performance/kpis");
@@ -212,8 +226,8 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
   };
   return (
     <>
-      <Field label="Function" {...f.status("department_id")}>
-        <SelectField options={(departments.data?.data ?? []).map((d) => [d.department_id, d.name] as [string, string])} {...f.field("department_id")} />
+      <Field label="Function" {...(none ? { state: "bad" as const, message: "None you may set" } : f.status("department_id"))}>
+        <SelectField options={options} placeholder="Pick a function" {...f.field("department_id")} />
       </Field>
       <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
       <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>

@@ -611,6 +611,19 @@ async function dayDetail(employeeId, query, scope) {
   };
 }
 
+/**
+ * One person's days of a month (this month when none is named, in their own zone), within the
+ * caller's scope, newest first: People · Attendance's All Days, as My Attendance lists the
+ * reader's own (myDays).
+ */
+async function personDays(query, scope) {
+  assertInScope(scope, query.employee_id);
+  const person = await repo.person(pool, query.employee_id);
+  if (!person) throw new AppError("NOT_FOUND", "Not found", 404);
+  const { first, last } = monthOf(person, query.month);
+  return repo.listDays(pool, query.employee_id, first, last, query);
+}
+
 /** One person's punches on a date: coordinates only for a reader with scope all. */
 function events(query, scope) {
   assertInScope(scope, query.employee_id);
@@ -657,6 +670,7 @@ module.exports = {
   register,
   summary,
   dayDetail,
+  personDays,
   events,
   exceptions,
   decide: reconcile.decide,

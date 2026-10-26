@@ -5,6 +5,8 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { Field } from "./Field";
 import { DateField, DateRangeField, TimeField } from "./DateField";
+import { Form } from "./Form";
+import { useContractForm } from "./useContractForm";
 
 /** A DateField held the way a form holds it: every value it hands over comes back as its value. */
 function Held({ min, max, sent, told }: { min?: string; max?: string; sent: string[]; told?: (message: string | undefined, now?: boolean) => void }) {
@@ -185,6 +187,120 @@ describe("DateField, DateRangeField, TimeField", () => {
     expect(screen.getAllByRole("button", { name: "Pick From Date" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Pick To Date" })).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Pick a date" })).not.toBeInTheDocument();
+    // Each end shows its own label above it, and pressing it lands in that end.
+    expect(document.querySelector(`label[for="${to.id}"]`)?.textContent).toBe("To");
+    expect([...document.querySelectorAll(`label[for="${from.id}"]`)].map((l) => l.textContent)).toEqual(["Dates", "From"]);
+  });
+
+  /** A period held the way a form holds it, inside its Field (a filter: no form, no message of its own). */
+  function HeldRange({ start }: { start: { from: string; to: string } }) {
+    const [value, setValue] = useState(start);
+    return (
+      <Field label="Dates" optional>
+        <DateRangeField value={value} onChange={setValue} />
+      </Field>
+    );
+  }
+  const describedText = (el: HTMLElement) =>
+    (el.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent ?? "")
+      .join(" ");
+
+  it("DateRangeField says half a From under From alone, once the person leaves it", async () => {
+    const user = userEvent.setup();
+    render(<HeldRange start={{ from: "", to: "" }} />);
+    const from = screen.getByRole("textbox", { name: "Dates From" });
+    const to = screen.getByRole("textbox", { name: "Dates To" });
+    await user.type(from, "28/10/202");
+    // Still on the way to a date: nothing said yet.
+    expect(screen.queryByText("Not a real date")).not.toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByText("Not a real date")).toBeInTheDocument();
+    expect(from).toHaveAttribute("aria-invalid", "true");
+    expect(describedText(from)).toContain("Not a real date");
+    expect(to).not.toHaveAttribute("aria-invalid");
+    expect(describedText(to)).not.toContain("Not a real date");
+    // Put right, the mark and the words go.
+    await user.clear(from);
+    await user.type(from, "01/10/2026");
+    expect(screen.queryByText("Not a real date")).not.toBeInTheDocument();
+    expect(from).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("DateRangeField marks a To before From on To alone, at once", async () => {
+    const user = userEvent.setup();
+    render(<HeldRange start={{ from: "2026-10-10", to: "" }} />);
+    const from = screen.getByRole("textbox", { name: "Dates From" });
+    const to = screen.getByRole("textbox", { name: "Dates To" });
+    await user.type(to, "05/10/2026");
+    expect(screen.getByText("Pick 10/10/2026 or later")).toBeInTheDocument();
+    expect(to).toHaveAttribute("aria-invalid", "true");
+    expect(describedText(to)).toContain("Pick 10/10/2026 or later");
+    expect(from).not.toHaveAttribute("aria-invalid");
+    expect(describedText(from)).toBe("");
+  });
+
+  it("DateRangeField shows its Field's message once: under the end still empty, else under both, tied to both", () => {
+    const { unmount } = render(
+      <Field label="Period" state="bad" message="Required">
+        <DateRangeField value={{ from: "2026-10-01", to: "" }} onChange={() => undefined} />
+      </Field>,
+    );
+    expect(screen.getAllByText("Required")).toHaveLength(1);
+    expect(screen.getByRole("textbox", { name: "Period To" })).toHaveAttribute("aria-invalid", "true");
+    expect(describedText(screen.getByRole("textbox", { name: "Period To" }))).toContain("Required");
+    expect(screen.getByRole("textbox", { name: "Period From" })).not.toHaveAttribute("aria-invalid");
+    unmount();
+    render(
+      <Field label="Period" state="bad" message="At most 31 days">
+        <DateRangeField value={{ from: "2026-01-01", to: "2026-03-01" }} onChange={() => undefined} />
+      </Field>,
+    );
+    expect(screen.getAllByText("At most 31 days")).toHaveLength(1);
+    for (const end of ["Period From", "Period To"]) {
+      const input = screen.getByRole("textbox", { name: end });
+      expect(input).toHaveAttribute("aria-invalid", "true");
+      expect(describedText(input)).toContain("At most 31 days");
+    }
+  });
+
+  it("DateRangeField says an end's problem the form marked on Save, though the person never left it", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    function Export() {
+      const f = useContractForm({ period: { from: "", to: "" } }, { period: (v: { from: string; to: string }) => (v.from && v.to ? null : "Required") }, { pauseMs: 60_000 });
+      return (
+        <Form onSubmit={f.submit(onSave)}>
+          <Field label="Period" {...f.status("period")}>
+            <DateRangeField value={f.values.period} onChange={(p) => f.set("period", p)} onProblem={f.field("period").onProblem} />
+          </Field>
+          <button type="submit">Export Register</button>
+        </Form>
+      );
+    }
+    render(<Export />);
+    const from = screen.getByRole("textbox", { name: "Period From" });
+    await user.type(from, "28/10/202{Enter}");
+    expect(onSave).not.toHaveBeenCalled();
+    expect(from).toHaveFocus();
+    expect(screen.getAllByText("Not a real date")).toHaveLength(1);
+    expect(from).toHaveAttribute("aria-invalid", "true");
+    expect(describedText(from)).toContain("Not a real date");
+    expect(screen.getByRole("textbox", { name: "Period To" })).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("DateRangeField is reached in order from the keyboard: From, its calendar, To, its calendar", async () => {
+    const user = userEvent.setup();
+    render(<HeldRange start={{ from: "2026-10-01", to: "2026-10-31" }} />);
+    await user.click(screen.getByRole("textbox", { name: "Dates From" }));
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Pick From Date" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("textbox", { name: "Dates To" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Pick To Date" })).toHaveFocus();
   });
 
   it("has no accessibility violations", async () => {
@@ -195,6 +311,9 @@ describe("DateField, DateRangeField, TimeField", () => {
         </Field>
         <Field label="Report Period">
           <DateRangeField value={{ from: "2026-10-01", to: "2026-10-31" }} onChange={() => undefined} />
+        </Field>
+        <Field label="Export Period" state="bad" message="Required">
+          <DateRangeField value={{ from: "2026-10-01", to: "" }} onChange={() => undefined} />
         </Field>
       </div>,
     );

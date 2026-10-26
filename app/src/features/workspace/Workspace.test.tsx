@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
@@ -7,7 +7,7 @@ import { formatDate, ModalProvider } from "@mycity/ui";
 import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { clear, invalidate } from "@/api/hooks";
-import { isoDaysAgo, isoDaysAhead, mockSession, sid } from "@/api/mock/core";
+import { dispatch, fail, isoDaysAgo, isoDaysAhead, mockSession, sid } from "@/api/mock/core";
 import { byKey } from "@/api/mock/data/people";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
@@ -22,6 +22,12 @@ import Workspace from "./index";
  * invitation answered and an event called off; Today on a phone; a reader who sets nobody work;
  * and a link to a task the reader cannot see.
  */
+
+// Every request the screen sends passes through as it is; a test counts them, or refuses one.
+vi.mock("@/api/mock/core", async (importOriginal) => {
+  const core = await importOriginal<typeof import("@/api/mock/core")>();
+  return { ...core, dispatch: vi.fn(core.dispatch) };
+});
 
 installMatchMedia();
 if (!("ResizeObserver" in window)) {
@@ -109,6 +115,8 @@ async function newTask() {
 }
 const named = (form: HTMLElement, title: string) => fireEvent.change(within(form).getByRole("textbox", { name: /Task/ }), { target: { value: title } });
 const closed = (name: string) => waitFor(() => expect(screen.queryByRole("dialog", { name })).toBeNull(), { timeout: 5000 });
+/** How many writes to a path like this one the screen has sent. */
+const posts = (path: RegExp) => vi.mocked(dispatch).mock.calls.filter(([r]) => r.method === "POST" && path.test(r.path)).length;
 
 describe("my workspace", () => {
   it("Today shows the day's four figures, the diary and what the manager set", async () => {
@@ -198,6 +206,46 @@ describe("my workspace", () => {
     await closed("Mark Done");
     await waitFor(() => expect(inStage("Done", "Send the late minutes")).toBeTruthy(), { timeout: 5000 });
   }, 30000);
+
+  it("moving a waiting card asks first: the sheet names what it waits on and sends nothing; Go Ahead then moves it (QA OBS-06)", async () => {
+    await board();
+    const first = await arrange({ title: "Book the venue", due_on: isoDaysAhead(3) });
+    const waits = await arrange({ title: "Send the invitations", due_on: isoDaysAhead(6) });
+    await act(async () => {
+      await api.call("POST /api/v1/tasks/:id/waiting-on", { params: { id: waits }, body: { depends_on_task_id: first } });
+      invalidate("/api/v1/tasks");
+    });
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "To Do" })).getByRole("button", { name: /Send the invitations/ }).closest("li")!.textContent).toContain("Waiting"), { timeout: 5000 });
+    const moves = () => posts(/\/tasks\/[^/]+\/move$/);
+    const sent = moves();
+
+    // Open Task opens the task it waits on.
+    await moveCard("Send the invitations", "To Do", "Move to In Progress");
+    let sheet = await screen.findByRole("dialog", { name: "Waiting On" }, { timeout: 5000 });
+    expect(within(sheet).getByText(/Book the venue/)).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole("button", { name: "Open Task" }));
+    await screen.findByRole("dialog", { name: "Book the venue" }, { timeout: 5000 });
+    await userEvent.keyboard("{Escape}");
+    await closed("Book the venue");
+
+    // Close leaves it in To Do; nothing was sent.
+    await moveCard("Send the invitations", "To Do", "Move to In Progress");
+    sheet = await screen.findByRole("dialog", { name: "Waiting On" }, { timeout: 5000 });
+    // Its footer's Close; the sheet's corner button is named Close too.
+    fireEvent.click(within(sheet).getAllByRole("button", { name: "Close" }).at(-1)!);
+    await closed("Waiting On");
+    expect(moves()).toBe(sent);
+    expect(inStage("To Do", "Send the invitations")).toBeTruthy();
+
+    // Go Ahead: the card goes where it was moved, in one request.
+    await moveCard("Send the invitations", "To Do", "Move to In Progress");
+    sheet = await screen.findByRole("dialog", { name: "Waiting On" }, { timeout: 5000 });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Go Ahead" }));
+    const form = await screen.findByRole("dialog", { name: "Go Ahead" });
+    fireEvent.click(within(form).getByRole("button", { name: "Go Ahead" }));
+    await waitFor(() => expect(inStage("In Progress", "Send the invitations")).toBeTruthy(), { timeout: 5000 });
+    expect(moves()).toBe(sent + 1);
+  }, 40000);
 
   it("Mark Blocked asks what is blocking it, and Clear Blocker clears it", async () => {
     await board();
@@ -387,6 +435,58 @@ describe("my workspace", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "Add Comment" }));
     const newest = await within(panel).findByText("All quotes are in", undefined, { timeout: 5000 });
     expect(newest.compareDocumentPosition(within(panel).getByText("Quote 26 is in")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }, 40000);
+
+  it("Add Comment: an empty box is marked and sends nothing; a refused comment keeps its words; one press adds exactly one (QA DEF-06)", async () => {
+    await board();
+    const id = await arrange({ title: "Draft the venue brief", due_on: isoDaysAhead(5) });
+    const panel = await openCard("Draft the venue brief");
+    fireEvent.click(within(panel).getByRole("radio", { name: /Comments/ }));
+    await within(panel).findByText("No comments yet.", undefined, { timeout: 5000 });
+    const box = () => within(panel).getByRole("textbox", { name: /Comment/ }) as HTMLTextAreaElement;
+    const comments = () => posts(new RegExp(`/tasks/${id}/comments$`));
+    const said = (text: string) => within(panel).queryAllByText(text, { selector: "p" });
+
+    // Empty: Required on the box, nothing sent.
+    fireEvent.click(within(panel).getByRole("button", { name: "Add Comment" }));
+    await within(panel).findByText("Required");
+    expect(box().getAttribute("aria-invalid")).toBe("true");
+    expect(comments()).toBe(0);
+
+    // Refused: the words stay in the box, to send again.
+    const real = vi.mocked(dispatch).getMockImplementation()!;
+    let refuse = true;
+    vi.mocked(dispatch).mockImplementation((req) => {
+      if (refuse && req.method === "POST" && req.path.endsWith(`/tasks/${id}/comments`)) {
+        refuse = false;
+        return Promise.resolve(fail(503, "UNAVAILABLE", "The hub is busy. Try again."));
+      }
+      return real(req);
+    });
+    try {
+      fireEvent.change(box(), { target: { value: "Venue confirmed for Friday" } });
+      fireEvent.click(within(panel).getByRole("button", { name: "Add Comment" }));
+      await waitFor(() => expect(comments()).toBe(1));
+      await act(() => new Promise((r) => setTimeout(r, 400)));
+      expect(box().value).toBe("Venue confirmed for Friday");
+      expect(said("Venue confirmed for Friday")).toHaveLength(0);
+    } finally {
+      vi.mocked(dispatch).mockImplementation(real);
+    }
+
+    // One press, even pressed twice: exactly one comment, and the emptied box is not marked.
+    const add = within(panel).getByRole("button", { name: "Add Comment" });
+    fireEvent.click(add);
+    fireEvent.click(add);
+    await waitFor(() => expect(said("Venue confirmed for Friday")).toHaveLength(1), { timeout: 5000 });
+    // Past the form's pause check: still one comment, an empty box and no mark.
+    await act(() => new Promise((r) => setTimeout(r, 900)));
+    expect(comments()).toBe(2);
+    expect(said("Venue confirmed for Friday")).toHaveLength(1);
+    expect(box().value).toBe("");
+    expect(within(panel).queryByText("Required")).toBeNull();
+    const stored = await api.call("GET /api/v1/tasks/:id/comments", { params: { id } });
+    expect(stored.data.map((c) => c.body)).toEqual(["Venue confirmed for Friday"]);
   }, 40000);
 
   it("a link to a task the reader cannot see opens the board with no panel", async () => {

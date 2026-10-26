@@ -39,6 +39,11 @@
  * the screen a result opens holds the rest. `lead: true` lists the group before every other
  * group of records (the people themselves, before the days and requests about them).
  *
+ * `more: { type, id, title }` ends a capped group with the way to the rest: one row for each
+ * person it listed. `id` names the select's column holding the person (`ad.employee_id AS
+ * person_id`), `title(row)` words the row from a listed row ("All Days of Ada Obi"), and `type`
+ * is the route map's type the row opens. The provider declares it beside its own (`types`).
+ *
  * `owner: { column }` is for records that belong to one person whatever their grant says
  * (their own mail): the query always adds `column = <the caller's user_id>`, so a scope of
  * `all` (the CEO, People) still finds only the caller's own rows. Without a caller it
@@ -123,6 +128,13 @@ function recordProvider(spec) {
     throw new Error(`search provider ${spec.type}: available is (client) => boolean`);
   if (spec.cap !== undefined && !(Number.isInteger(spec.cap) && spec.cap >= 1 && spec.cap < PAGE_SIZE))
     throw new Error(`search provider ${spec.type}: cap is a whole number under ${PAGE_SIZE}`);
+  if (spec.more !== undefined) {
+    const m = spec.more;
+    if (!spec.cap) throw new Error(`search provider ${spec.type}: more ends a capped group; give it a cap`);
+    if (!m || !/^[a-z][a-z0-9_]*$/.test(String(m.type)) || !m.id || typeof m.title !== "function")
+      throw new Error(`search provider ${spec.type}: more is { type, id, title(row) }`);
+    if (spec.cap * 2 > PAGE_SIZE) throw new Error(`search provider ${spec.type}: a cap with more fits a page of ${PAGE_SIZE}`);
+  }
   const words = (spec.words || [])
     .map((w) => String(w).toLowerCase().trim())
     .filter(Boolean);
@@ -186,25 +198,40 @@ function recordProvider(spec) {
                   ORDER BY search_rank DESC${spec.order ? `, ${spec.order}` : ""}, ${spec.key}`;
     const result = await pageQuery(c, sql, params, { page });
     const rows = spec.cap ? result.data.slice(0, spec.cap) : result.data;
+    const items = rows.map((r) => {
+      const link = routeMap.linkFor(spec.type, r.id);
+      return {
+        id: String(r.id),
+        type: spec.type,
+        ref: r.ref || null,
+        title: r.title || r.ref || null,
+        sub: r.sub || null,
+        status: r.status || null,
+        link: link ? link.path : null,
+      };
+    });
+    if (spec.more) {
+      // The way to the rest: one row per person the capped group listed, in the order they came.
+      const people = new Map();
+      for (const r of rows) {
+        const who = r[spec.more.id];
+        if (who !== null && who !== undefined && !people.has(String(who))) people.set(String(who), r);
+      }
+      for (const [who, r] of people) {
+        const link = routeMap.linkFor(spec.more.type, who);
+        items.push({ id: who, type: spec.more.type, ref: null, title: spec.more.title(r), sub: null, status: null, link: link ? link.path : null });
+      }
+    }
     return {
-      page: spec.cap ? { ...result.page, total: rows.length, pages: rows.length ? 1 : 0, has_next: false } : result.page,
-      items: rows.map((r) => {
-        const link = routeMap.linkFor(spec.type, r.id);
-        return {
-          id: String(r.id),
-          type: spec.type,
-          ref: r.ref || null,
-          title: r.title || r.ref || null,
-          sub: r.sub || null,
-          status: r.status || null,
-          link: link ? link.path : null,
-        };
-      }),
+      page: spec.cap ? { ...result.page, total: items.length, pages: items.length ? 1 : 0, has_next: false } : result.page,
+      items,
     };
   }
 
   return Object.freeze({
     type: spec.type,
+    // Every type its rows carry: its own, and its `more` rows'.
+    types: Object.freeze([spec.type, ...(spec.more ? [spec.more.type] : [])]),
     module: spec.module,
     label: spec.label,
     words,

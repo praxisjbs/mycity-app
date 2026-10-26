@@ -207,8 +207,10 @@ Moving a late task to **Done** first asks **Why Late**. Pick the reason, such as
 Others**, and press **Mark Done**. If it says **Pick a reason**, pick one from the list. If it says
 **No late reasons are switched on**, press **Mark Done**: it moves without one.
 
-A task waiting on another stays in **To Do** until that one is done. Moving it says why, with a
-warning mark, such as *Waiting on TSK-0397: Book the venue*. Its **Waiting On** lists what it waits on.
+A task waiting on another stays in **To Do** until that one is done. Moving it opens **Waiting On**,
+naming each task it waits on. Press **Open Task** to see one, or, if you plan the task, **Go Ahead**,
+give a **Reason** if you like and press **Go Ahead** again: the card then moves where you put it.
+**Close** leaves it in **To Do**.
 
 Other people's changes to a task you can see appear on your board as they happen.
 

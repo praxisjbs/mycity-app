@@ -142,9 +142,11 @@ plan is a draft, or after it comes back. A new objective goes into the quarter c
    **What**.
 2. Pick the **Function**, type the **Objective**, and pick the **Organisational Goal** it serves.
    Press **Set Objective**. The hub gives it its code, such as *BM-O3 set*.
+   **Function** lists only what you may set; a head finds their own function already picked. One
+   whose plan is already sent or binding says so beside its name, such as
+   *Marketing & Sales · Binding*, and takes no new objective. **None you may set** means your role
+   sets no function's goals.
 3. {needs="cap goals.company"} For a company objective, choose **Company** in **Function**.
-   A function whose plan is already sent or binding says so beside its name, such as
-   *Company · Binding*, and takes no new objective.
 4. For a key result, press **New Goal** and choose **Key Result**.
 5. Pick its **Objective**, and type the **Key Result**, such as `Grow monthly active users to
    64,000`. The **Objective** list holds every objective of the quarter whose plan is a draft or
@@ -435,7 +437,9 @@ sent. Operations and People may draft one for anyone but themselves.
 6. Pick its **Section**: **Results**, **KPIs** or **Accountability**. Type the **Goal**.
 7. Choose its **Measure**. A **Results** line is **Numeric** or **Milestone**. A **KPIs** or
    **Accountability** line is **Standard** or **Yes or No**.
-8. Fill in the **Target** if it has one, and the **Weight**, such as `15` or `12.5`.
+8. Fill in the **Target** if it has one, and the **Weight**, such as `15` or `12.5`. Above the
+   lines, each section shows its lines' total against its share as you type, such as
+   *Accountability 22.5 of 15*, red until it adds up.
 9. Pick its **Key Result**, or its **KPI** on a **KPIs** line, or **None** for a line the person
    reports themselves. A team result line ticks its **Team Key Results** instead. A **Milestone**
    line also needs its **Due Date**.
@@ -607,6 +611,8 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
    is in **Quick Actions**.
    ![New KPI](shot:performance-kpi-new)
 2. Pick the **Function** and type the **KPI**, such as `Social response within 24 hours`.
+   **Function** lists only the functions you may set KPIs for; a head finds their own already
+   picked. **None you may set** means your role sets no function's KPIs.
 3. Add the **Formula** and **Unit** if it has them.
 4. Choose the **Direction**: **Higher Is Better** or **Lower Is Better**. Fill in the **Target** as
    a figure, or **Target Wording** as people say it. Choose the **Frequency**: **Monthly**,

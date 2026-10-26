@@ -19,8 +19,8 @@ const DAYS_LISTED = 3;
 /**
  * Stands in for GET /search (src/shared/search) on laptops and in CI: the screens a
  * person's grants open, the actions most screens offer, people by name and then at most
- * three of their attendance days, newest first, each with its status and date, in the
- * contract's groups of 25. The server's catalogues (synonyms, every action, every
+ * three of their attendance days, newest first, each with its status and date, ending with
+ * All Days of each person listed (the provider's `more`), in the contract's groups of 25. The server's catalogues (synonyms, every action, every
  * module's records) are the real thing; this only draws the palette.
  */
 const SIZE = __CONTRACT_PAGE_SIZE__;
@@ -77,25 +77,32 @@ export function searchResult(people: MockPerson[], grants: Record<string, string
           .filter((p) => match(p.display_name, p.staff_number, p.job_title))
           .map((p) => hit({ id: p.employee_id, kind: "record", type: "employee", title: p.display_name, ref: p.staff_number, sub: `${p.job_title} · ${p.department}`, link: `/people?tab=employees&id=${p.employee_id}` }))
       : [];
-  const attendance =
+  const listed =
     term.length >= 2 && can("people")
       ? days
           .filter((d) => match(d.person.display_name, `${d.person.first_name} ${d.person.last_name}`))
           .sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
           .slice(0, DAYS_LISTED)
-          .map((d) =>
-            hit({
-              id: d.attendance_day_id,
-              kind: "record",
-              type: "attendance_record",
-              title: `${d.person.first_name} ${d.person.last_name}`,
-              ref: formatDate(d.attendance_date),
-              sub: `${(d.status && DAY_STATUS[d.status]) || "Not Counted"} · ${formatDate(d.attendance_date)}`,
-              status: d.status,
-              link: `/people?tab=attendance&id=${d.attendance_day_id}`,
-            }),
-          )
       : [];
+  const named = (d: SearchDay) => `${d.person.first_name} ${d.person.last_name}`;
+  const attendance = [
+    ...listed.map((d) =>
+      hit({
+        id: d.attendance_day_id,
+        kind: "record",
+        type: "attendance_record",
+        title: named(d),
+        ref: formatDate(d.attendance_date),
+        sub: `${(d.status && DAY_STATUS[d.status]) || "Not Counted"} · ${formatDate(d.attendance_date)}`,
+        status: d.status,
+        link: `/people?tab=attendance&id=${d.attendance_day_id}`,
+      }),
+    ),
+    // The way to the rest: All Days of each person listed, in the order they came.
+    ...[...new Map(listed.map((d) => [d.person.employee_id, d] as const)).values()].map((d) =>
+      hit({ id: d.person.employee_id, kind: "record", type: "attendance_days", title: `All Days of ${named(d)}`, link: `/people?tab=attendance&person=${d.person.employee_id}` }),
+    ),
+  ];
   const groups = [
     !type || type === "screen" ? group("screen", "screen", "Screens", screens, page) : null,
     !type || type === "action" ? group("action", "action", "Actions", actions, page) : null,

@@ -88,6 +88,8 @@ module.exports = {
 
   events: async (req, res) => sendPaged(res, await service.events(q(req), scopeOf(req))),
 
+  personDays: async (req, res) => sendPaged(res, await service.personDays(q(req), scopeOf(req))),
+
   exceptions: async (req, res) =>
     sendPaged(res, await masked(req, await decidable(req, await service.exceptions(q(req), scopeOf(req)), "open"))),
 

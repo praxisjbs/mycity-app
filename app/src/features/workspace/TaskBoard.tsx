@@ -48,7 +48,8 @@ export function TaskBoard({
     in_review: useColumn("in_review", filters, q),
     done: useColumn("done", filters, q),
   };
-  const move = useMoveTask(modal.open);
+  // A waiting card asks first; its Open Task opens the task it waits on, as a card opens here.
+  const move = useMoveTask(modal.open, onOpen);
   const columns = Object.values(cols);
   const all = columns.flatMap((c) => c.rows);
   // A column whose first page has not come yet is loading; one that failed is the board's error.

@@ -302,8 +302,8 @@ works. Press **Try Again** once you are back online.
 
 ### A new version is ready {#start-new-version}
 
-1. When MyCity updates the hub, a bar at the foot of the screen says **A new version is ready**.
-   In Staff Community and Praxis AI it waits until you open another screen.
+1. When MyCity updates the hub, a bar at the foot of [Home](/home) says **A new version is ready**.
+   It shows on Home only, so open Home to see it.
 2. Save what you are typing, then press **Reload**. The hub restarts on the same screen.
 
 ### Coming Soon {#start-coming-soon}
@@ -364,8 +364,9 @@ Search finds every screen, action and record you are allowed to open, from anywh
 5. {needs="people view"} `staff ada` finds employees called Ada, in the **Employees** group.
 6. {needs="people view"} A person's name finds the person first, then at most three of their
    **Attendance Days**, newest first, each with its status and date, such as
-   *Present · 26/10/2026*. Press a day to open it on [People · Attendance](/people?tab=attendance),
-   which holds the rest.
+   *Present · 26/10/2026*. Press a day to open it on [People · Attendance](/people?tab=attendance).
+   The last row, such as *All Days of Ada Obi*, opens all of their days there. Arrow keys move
+   through the results and Enter opens the one chosen.
 7. Press Escape to close search. On a phone, press **Close Search**, the cross beside the line, or
    your phone's Back.
 
@@ -420,7 +421,7 @@ like any app's. Press it to open the record; the hub asks you to sign in first i
 Read** on it marks it read without opening the hub.
 
 > **Tip:** To get notifications on this phone or computer, press **Turn On** when the bar at the foot
-> says **Get notified of new mail and approvals**, and allow it when the device asks. A message says
+> of Home says **Get notified of new mail and approvals**, and allow it when the device asks. A message says
 > **Notifications are on**. **Not Now** hides the offer for 14 days. On an iPhone or iPad,
 > [install the app](#start-install) first. **Notifications are blocked here** means the browser
 > refuses: see [Choose how you are told](#start-notification-settings). **Notifications not turned
@@ -479,14 +480,15 @@ On a computer they are in your account menu. On a phone they are the icons besid
 The hub installs like an app, with its own icon, and opens faster.
 
 1. Press **Install App** in your account menu (computer) or in **More** (phone). From your second
-   visit, a bar also offers **Install MyCity App on this device**: press **Install App** there.
+   visit, a bar on [Home](/home) also offers **Install MyCity App on this device**: press
+   **Install App** there.
 2. Confirm in your browser's own window.
 3. On an iPhone or iPad, the window **Install MyCity App** shows how: tap Share in Safari's toolbar,
    choose Add to Home Screen, then press **Done**.
 
 > **Tip:** **Install App** only shows where this browser can install the hub and it is not installed
 > yet. **Not Now** hides the offer for 30 days. Once the hub is installed, the bar never shows again.
-> It also waits while you are in Staff Community or Praxis AI, so it never covers your message.
+> The bar shows on Home only, so it never covers another screen.
 
 ## Using This Guide {#start-user-guide screen=knowledge/user-guide icon=book}
 

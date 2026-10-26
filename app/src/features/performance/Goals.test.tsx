@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
-import { chooseOption, installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@mycity/ui/testing";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
@@ -157,6 +157,40 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(OBJECTIVES.length).toBe(before);
     expect(within(dialog()).getByText("Plan is binding")).toBeTruthy();
     expect(valueOf(dialog(), "Objective")).toBe("QA objective on a binding plan");
+  }, 60000);
+
+  it("New Objective offers Operations & People every function and never the company: what the server says they may set (QA DEF-10)", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    const form = dialog();
+    await chooseOption(within(form).getByLabelText("What"), "Objective");
+    await settled();
+    const offered = await optionLabels(within(form).getByLabelText("Function"));
+    expect(offered).not.toContain("Company");
+    expect(offered).toEqual(expect.arrayContaining(["Engineering", "Finance", "Marketing & Sales · Binding"]));
+  }, 60000);
+
+  it("a head is offered their own function alone, and starts on it: New Objective marks its binding plan, New KPI offers nothing else (QA DEF-10, DEF-11)", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    let form = dialog();
+    await chooseOption(within(form).getByLabelText("What"), "Objective");
+    await settled();
+    expect(await optionLabels(within(form).getByLabelText("Function"))).toEqual(["Marketing & Sales · Binding"]);
+    expect(valueOf(form, "Function")).toBe(deptId);
+    expect(within(form).getByText("Plan is binding")).toBeTruthy();
+    fireEvent.click(within(form).getByRole("button", { name: "Cancel" }));
+    await settled();
+    window.history.replaceState(null, "", "/performance?tab=kpis");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await settled();
+    fireEvent.click((await screen.findAllByRole("button", { name: /New KPI/ }, { timeout: 5000 }))[0]!);
+    await settled();
+    form = dialog();
+    expect(await optionLabels(within(form).getByLabelText("Function"))).toEqual(["Marketing & Sales"]);
+    expect(valueOf(form, "Function")).toBe(deptId);
   }, 60000);
 
   it("Operations & People set up Q1 2027 from ⌘K in October: the rules start as Q4's, and each is checked on its field", async () => {

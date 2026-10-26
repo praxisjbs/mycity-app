@@ -5,19 +5,21 @@
  * @use Every date a person enters (gate 15); DateRangeField for a from and to pair (a report period); TimeField for a 24-hour time.
  * @avoid <input type="date"> (its format follows the browser's locale); a date shown and not entered (use formatDate).
  * @phone The calendar opens as a bottom sheet; days are 44 px targets; the keyboard is numeric.
- * @a11y The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id and are named From and To, as are their calendar buttons.
+ * @a11y The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id, a visible From or To label and their own error, tied to that end alone; their calendar buttons are named From and To too.
  * @status stable
  * @exports DateRangeField, TimeField
  * @example <DateField min={todayIso()} {...form.field("start_date")} />
  */
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { describedBy as describe } from "../lib/ids";
 import { formatDate, monthName, parseDayFirst, todayIso } from "../lib/format";
 import { Icon } from "../icons/Icon";
 import { Popover } from "../overlay/Popover";
 import type { FieldState } from "./binding";
-import { useFieldControl, useFieldLabelId } from "./Field";
+import { useFieldControl, useFieldError, useFieldLabelId } from "./Field";
 import { controlClass } from "./TextField";
+import { PAUSE_MS } from "./useContractForm";
 
 export interface DateFieldProps {
   /** ISO date (YYYY-MM-DD), or "" for none. */
@@ -32,10 +34,10 @@ export interface DateFieldProps {
   min?: string;
   /** The latest date that may be picked or typed, ISO. */
   max?: string;
-  /** The mark; the Field supplies one otherwise. */
+  /** The mark; the Field supplies one otherwise (an end of a period takes only its own). */
   state?: FieldState;
-  /** Unused here (the Field shows it). */
-  message?: string;
+  /** Unused on its own (the Field shows it). On an end of a period: the period's message about this end, shown under it. */
+  message?: ReactNode;
   /** The control's id; the Field supplies one otherwise. */
   id?: string;
   /** The field's name, so a failed submit can focus it. */
@@ -44,8 +46,14 @@ export interface DateFieldProps {
   placeholder?: string;
   /** Shown and not changed (a record already sent): no typing and no calendar. */
   disabled?: boolean;
-  /** Which end of a period this is (DateRangeField): the field is named by its Field's label and the end, as is its calendar button. */
+  /**
+   * Which end of a period this is (DateRangeField): the field shows the end as a small label above
+   * it and is named by its Field's label and the end ("Dates From"), as is its calendar button. What
+   * is wrong with it is said under it and tied to it alone.
+   */
   end?: "From" | "To";
+  /** On an end of a period: the ids of the period's messages that are about both ends. */
+  describedBy?: string;
 }
 
 /**
@@ -63,16 +71,24 @@ function readTyped(text: string, min?: string, max?: string): { iso: string; pro
   return { iso };
 }
 
-export function DateField({ value, onChange, onBlur, onProblem, min, max, state, message: _message, id, name, placeholder = "DD/MM/YYYY", disabled, end }: DateFieldProps) {
-  const a = useFieldControl({ id, state });
-  // An end of a period is named by the Field's label and its end ("Dates From"), not the label alone.
-  const labelId = useFieldLabelId();
-  const endId = useId();
-  const labelledBy = end ? [labelId, endId].filter(Boolean).join(" ") : a["aria-labelledby"];
-  const pick = end ? `Pick ${end} Date` : "Pick a Date";
+export function DateField({ value, onChange, onBlur, onProblem, min, max, state, message, id, name, placeholder = "DD/MM/YYYY", disabled, end, describedBy }: DateFieldProps) {
   const [text, setText] = useState(formatDate(value));
   const [problem, setProblem] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
+  // An end of a period is named by the Field's label and its end ("Dates From"), not the label alone,
+  // and says what is wrong with it under itself: what was typed, else the period's word about it.
+  // What was typed is said as the form says it: at once when typing more cannot mend it, else after
+  // a pause in typing or on leaving the end, never while the person is still on their way to a date.
+  const [heard, setHeard] = useState(false);
+  const pause = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(pause.current), []);
+  const labelId = useFieldLabelId();
+  const endId = useId();
+  const errorId = useId();
+  const said = end ? ((heard ? problem : undefined) ?? message) : undefined;
+  const a = useFieldControl({ id, state, part: !!end, describedBy: end ? describe(said ? errorId : undefined, describedBy) : undefined });
+  const labelledBy = end ? [labelId, endId].filter(Boolean).join(" ") : a["aria-labelledby"];
+  const pick = end ? `Pick ${end} Date` : "Pick a Date";
   // The value this field last handed over. Its echo is not a change from outside, so the text stays
   // as typed: rewritten from it, "28/10/20" became 28/10/2020 and the year never reached 2026.
   const sent = useRef<string | null>(null);
@@ -84,6 +100,7 @@ export function DateField({ value, onChange, onBlur, onProblem, min, max, state,
     sent.current = null;
     setText(formatDate(value));
     setProblem(undefined);
+    setHeard(false);
     problemRef.current?.(undefined);
   }, [value]);
 
@@ -92,6 +109,11 @@ export function DateField({ value, onChange, onBlur, onProblem, min, max, state,
     const typed = readTyped(t, min, max);
     setProblem(typed.problem);
     onProblem?.(typed.problem, typed.final);
+    if (end) {
+      window.clearTimeout(pause.current);
+      if (!typed.problem || typed.final) setHeard(!!typed.problem);
+      else pause.current = window.setTimeout(() => setHeard(true), PAUSE_MS);
+    }
     if (typed.iso !== value) {
       sent.current = typed.iso;
       onChange(typed.iso);
@@ -101,18 +123,15 @@ export function DateField({ value, onChange, onBlur, onProblem, min, max, state,
   /** Leaving the field shows a whole date as it is kept: 1.2.26 reads 01/02/2026. */
   const leave = () => {
     if (value && parseDayFirst(text) === value) setText(formatDate(value));
+    if (end && problem) setHeard(true);
     onBlur?.();
   };
 
-  const shown: FieldState = problem ? "bad" : a.state;
+  // On its own the field marks what was typed at once and the Field says why; an end marks it when it says it.
+  const shown: FieldState = (end ? said : problem) ? "bad" : a.state;
 
-  return (
+  const control = (
     <span className="relative flex w-full items-center desk:max-w-48">
-      {end && (
-        <span id={endId} hidden>
-          {end}
-        </span>
-      )}
       <input
         {...a}
         aria-labelledby={labelledBy}
@@ -148,6 +167,23 @@ export function DateField({ value, onChange, onBlur, onProblem, min, max, state,
           }}
         />
       </Popover>
+    </span>
+  );
+  if (!end) return control;
+  return (
+    <span className="flex w-full min-w-0 flex-col desk:max-w-48">
+      <label id={endId} htmlFor={a.id} className="mb-1 text-2xs font-semibold text-muted-foreground">
+        {end}
+      </label>
+      {control}
+      <span id={errorId} aria-live="polite" className={cn("mt-1 items-center gap-1 text-xs text-destructive", said ? "flex" : "hidden")}>
+        {said && (
+          <>
+            <Icon name="alert" size="s" />
+            <span>{said}</span>
+          </>
+        )}
+      </span>
     </span>
   );
 }
@@ -230,30 +266,62 @@ export interface DateRangeFieldProps {
   max?: string;
   /** The mark; the Field supplies one otherwise. */
   state?: FieldState;
-  /** Unused here (the Field shows it). */
+  /** Unused here: the Field's message is shown beside the end it is about. */
   message?: string;
 }
 
+type End = "from" | "to";
+
 /**
  * From and to, each day-first; the to date can never be before the from date. Each end has its
- * own id (the Field's label points at From) and is named by the label and its end, so the two are
- * never one field twice to a screen reader.
+ * own id (the Field's label points at From), a small From or To label above it, and its own error
+ * under it, tied to that end alone: a half-typed From marks From, a To before From marks To. The
+ * Field's message about the period is shown here too, in place of the Field's own line: under the
+ * end still empty when only one is, else once under both, tied to both.
  */
 export function DateRangeField({ value, onChange, onBlur, onProblem, min, max, state }: DateRangeFieldProps) {
   const { id } = useFieldControl({ state });
+  const field = useFieldError();
+  const bothId = useId();
   // Each end's own problem: the period reports the first, so fixing one end never hides the other's.
   const ends = useRef<{ from?: string; to?: string }>({});
-  const told = (end: "from" | "to") => (message: string | undefined, now?: boolean) => {
+  const [problems, setProblems] = useState<{ from?: string; to?: string }>({});
+  const told = (end: End) => (message: string | undefined, now?: boolean) => {
     ends.current = { ...ends.current, [end]: message };
+    setProblems(ends.current);
     onProblem?.(ends.current.from ?? ends.current.to, now);
   };
+  const marked = state ?? field.state;
+  // The Field's message, unless it is an end's own problem, which that end already says.
+  const period = field.message !== undefined && field.message !== problems.from && field.message !== problems.to ? field.message : undefined;
+  const empty: End | null = !value.from === !value.to ? null : value.from ? "to" : "from";
+  const about: End | "both" | null = period === undefined ? null : (empty ?? "both");
+  // An end is marked only for what is about it: a problem at the other end leaves it unmarked.
+  const stateOf = (end: End): FieldState => (about === end || about === "both" ? "bad" : marked === "bad" ? undefined : marked);
+  // The form marked an end's own problem (a check on Save, a pause): that end says it now, though
+  // the person has not left it yet.
+  const marks = (end: End) => field.message !== undefined && field.message === problems[end];
+  const part = (end: End) => ({
+    state: stateOf(end),
+    message: about === end ? period : marks(end) ? field.message : undefined,
+    describedBy: about === "both" ? bothId : undefined,
+    onBlur,
+    onProblem: told(end),
+  });
   return (
-    <span className="flex flex-col gap-2 desk:flex-row desk:items-center">
-      <DateField id={id} end="From" value={value.from} onChange={(from) => onChange({ ...value, from })} onBlur={onBlur} onProblem={told("from")} min={min} max={value.to || max} state={state} />
-      <span className="hidden text-sm text-muted-foreground desk:inline" aria-hidden>
-        to
+    <span className="flex flex-col">
+      <span className="flex flex-col gap-2 desk:flex-row desk:items-start desk:gap-3">
+        <DateField id={id} end="From" value={value.from} onChange={(from) => onChange({ ...value, from })} min={min} max={value.to || max} {...part("from")} />
+        <DateField id={id && `${id}-to`} end="To" value={value.to} onChange={(to) => onChange({ ...value, to })} min={value.from || min} max={max} {...part("to")} />
       </span>
-      <DateField id={id && `${id}-to`} end="To" value={value.to} onChange={(to) => onChange({ ...value, to })} onBlur={onBlur} onProblem={told("to")} min={value.from || min} max={max} state={state} />
+      <span id={bothId} aria-live="polite" className={cn("mt-1 items-center gap-1 text-xs text-destructive", about === "both" ? "flex" : "hidden")}>
+        {about === "both" && (
+          <>
+            <Icon name="alert" size="s" />
+            <span>{period}</span>
+          </>
+        )}
+      </span>
     </span>
   );
 }

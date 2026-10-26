@@ -52,6 +52,7 @@ module.exports = {
   confirm: async (req, res) => ok(res, await okrs.confirmScore(withActor(req), id(req), req.validated.body)),
 
   plans: async (req, res) => sendPaged(res, await service.listPlans(req.validated.query)),
+  functions: async (req, res) => sendPaged(res, await service.listFunctions(withActor(req), req.validated.query)),
   plan: async (req, res) => ok(res, await service.planDetail(id(req), withActor(req), scopeOf(req))),
   submitPlan: async (req, res) => ok(res, await service.submitPlan(withActor(req), id(req), scopeOf(req))),
 

@@ -43,7 +43,7 @@ left alone.
 | Settings · Notifications (`settings`, tab `notifications`) | Staff app, Settings | Holders of `settings` view (the CEO, Operations & People, Management, the Administrator, Implementation) | Reminders: Approvals Waiting, Probation Ending and Daily Digest with what each is set to; Notices: every notice with who it goes to, its default channels, urgency and On or Off, 25 a page, filtered by category and searched | With `settings` edit: edit a reminder; edit a notice (On or Off, urgency, default In App, Email and Push, add roles or people where it takes copies), Reset to Default |
 | In-app banner | Top of the screen on both shells | The person it is for, app open | Who or what, two lines of its text, an avatar or the category's glyph; red for an urgent notice, amber for an important one | Tap to open, swipe or × to dismiss |
 | Urgent bar | Under the top bar on every screen of both shells | The person, while any urgent notice of theirs is open | The newest open urgent notice's title, how many are open, pulsing slowly in red (steady when motion is off) | Acknowledge (an urgent announcement), Open (anything else urgent), step to the next one |
-| Turn-on notice (`ShellNotice`) | Foot of the shell, once per device; never over a message box (Staff Community, Praxis AI's Ask) | Everyone, until answered | One line and two buttons | Turn On, Not Now |
+| Turn-on notice (`ShellNotice`) | Foot of the shell on Home only, any tab, once per device | Everyone, until answered | One line and two buttons | Turn On, Not Now |
 | Phone or computer notification | The device's own notification shade, lock screen and badge | The person, on every device with notifications on, app open or closed (the device in hand shows it beside the banner) | Title (with how many are new when grouped), text, the sender's initials or the app icon, the MyCity pin, the count on the app icon; an urgent notice again every 30 minutes of the working day until it is dealt with | Tap to open the record (through sign-in when the session ended), Mark Read |
 | Mailbox (`inbox` and the other folders) | Staff app | The mailbox owner | Unchanged | Reading a conversation marks its notices read |
 
@@ -458,6 +458,7 @@ channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5,
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · §2: the turn-on notice, like the update and install offers, shows on Home only, any tab, never on another screen, where at the foot of the page it sat over the page's own content (QA DEF-12, the phone run's update prompt over a report); this replaces keeping them off Staff Community and Praxis AI's Ask.
 - 26/10/2026 · JP · §2: the turn-on notice, like the update and install offers, waits off a screen whose message box sits at the foot of the page (every Staff Community tab, Praxis AI's Ask), so it never covers what a person types (FRONTEND_GUIDE, PWA; `writingScreen` in `app/src/shell/Notices.tsx`). Left: nothing.
 
 - 22/10/2026 · GE · §7.1: `pendingFor` reads a record's pending occurrences of a reminder, so a screen can list them; My Workspace's task reminders are its first user (`task_reminder`).

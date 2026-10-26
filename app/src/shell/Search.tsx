@@ -41,6 +41,7 @@ const ICONS: Record<string, IconName> = {
   approval: "check",
   workflow_definition: "check",
   import_batch: "rows",
+  attendance_days: "calendar",
 };
 const RUN_ICONS: Record<string, IconName> = {
   clock: "clock",

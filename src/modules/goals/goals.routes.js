@@ -18,6 +18,7 @@
  *   POST  /reports                                         `performance` edit: the head, or the accountable person
  *   POST  /key-results/:id/confirm                         `performance` approve, goals.confirm
  *   GET   /plans · /plans/:id                              `performance` view
+ *   GET   /functions                                       `performance` view: the company and each function, may the reader set it
  *   POST  /plans/:id/submit                                `performance` create, goals.company or goals.function
  *   GET   /target-changes · POST /target-changes           view (a line's within scope) · edit: opens performance.target_change
  *   GET   /target-changes/:id                              `performance` view: one change, named in full
@@ -93,6 +94,9 @@ route(router, "post", "/key-results/:id/confirm",
   requirePermission("performance", "approve"), requireCapability("goals.confirm"), controller.confirm);
 
 route(router, "get", "/plans", { query: g.PlanListQuery, response: g.PlanPage, summary: "Quarter plans" }, view, controller.plans);
+route(router, "get", "/functions",
+  { query: g.PerformanceFunctionListQuery, response: g.PerformanceFunctionPage, summary: "The functions the reader may set goals and KPIs for" },
+  view, controller.functions);
 route(router, "get", "/plans/:id", { params: id, response: g.PlanDetail, summary: "One quarter plan" }, view, controller.plan);
 route(router, "post", "/plans/:id/submit",
   { params: id, body: c.common.EmptyBody, response: g.PlanDetail, summary: "Send a plan for approval" },

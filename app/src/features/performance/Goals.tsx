@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
 import scoring from "@mycity/contract/schemas/scoring.js";
-import type { KeyResult, KeyResultDetail, KeyResultMonth, Kpi, KpiMonth, Objective, OrganisationalGoalDetail, PerformancePeriod, Plan } from "@mycity/contract/contract.gen.ts";
+import type { KeyResult, KeyResultDetail, KeyResultMonth, Kpi, KpiMonth, Objective, OrganisationalGoalDetail, PerformanceFunction, PerformancePeriod } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
@@ -58,7 +58,7 @@ import {
 import { useApprovalLinks, WaitingOnYou } from "./Approvals";
 import { KeyResultForm, KR_TYPES, SetTargetForm } from "./KeyResultForm";
 import { QuarterWizard } from "./Quarter";
-import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, monthChoices, planStatus, reportingMonth, sayRefusal, score, startMonth, useQuarter } from "./shared";
+import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, monthChoices, planStatus, reportingMonth, sayRefusal, score, startMonth, useQuarter, useSettableFunctions } from "./shared";
 
 type KrMonthStatus = KeyResultMonth["status"];
 
@@ -104,7 +104,7 @@ export function Goals() {
   const manage = hasCapability(me, "performance.manage");
   const maySetUp = manage && can("performance", "create");
   const mayEditQuarter = manage && can("performance", "edit");
-  const newGoal = () => modal.open({ title: "New Goal", full: true, body: (close) => <NewGoalForm close={close} period={period} objectives={okrs.rows} plans={plans.rows} /> });
+  const newGoal = () => modal.open({ title: "New Goal", full: true, body: (close) => <NewGoalForm close={close} period={period} objectives={okrs.rows} /> });
   const latest = quarter.periods[0];
   const setUpQuarter = () =>
     modal.open({ title: "Set Up Quarter", wide: true, full: true, body: (close) => <QuarterWizard close={close} latest={latest} onSaved={(p) => quarter.setPeriodId(p.performance_period_id)} /> });
@@ -877,7 +877,7 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
 }
 
 /** New Goal: an organisational goal (the CEO), an objective or a key result, as the reader may. */
-function NewGoalForm({ close, period, objectives, plans }: { close: () => void; period: PerformancePeriod | null; objectives: Objective[]; plans: Plan[] }) {
+function NewGoalForm({ close, period, objectives }: { close: () => void; period: PerformancePeriod | null; objectives: Objective[] }) {
   const me = useMe();
   const kinds: Array<[string, string]> = [
     ...(hasCapability(me, "goals.organisation") ? ([["goal", "Organisational Goal"]] as Array<[string, string]>) : []),
@@ -888,7 +888,7 @@ function NewGoalForm({ close, period, objectives, plans }: { close: () => void; 
     <>
       <Field label="What"><SelectField options={kinds} value={kind} onChange={setKind} /></Field>
       {kind === "goal" && <GoalForm close={close} period={period} />}
-      {kind === "objective" && <ObjectiveForm close={close} period={period} plans={plans} />}
+      {kind === "objective" && <ObjectiveForm close={close} period={period} />}
       {kind === "key_result" && <NewKeyResult close={close} period={period} objectives={objectives} />}
     </>
   );
@@ -940,9 +940,9 @@ function GoalForm({ close, period }: { close: () => void; period: PerformancePer
 }
 
 /** New Objective, or Edit Objective (`objective`): its title and the organisational goal it serves. */
-function ObjectiveForm({ close, period, objective, onSaved, plans = [] }: { close: () => void; period?: PerformancePeriod | null; objective?: Objective; onSaved?: () => void; plans?: Plan[] }) {
+function ObjectiveForm({ close, period, objective, onSaved }: { close: () => void; period?: PerformancePeriod | null; objective?: Objective; onSaved?: () => void }) {
   if (objective) return <ObjectiveEditForm close={close} objective={objective} onSaved={onSaved} />;
-  return <ObjectiveNewForm close={close} period={period ?? null} plans={plans} />;
+  return <ObjectiveNewForm close={close} period={period ?? null} />;
 }
 
 /** What a plan already sent or binding says on Function: it takes no new objective (§6.4). */
@@ -954,27 +954,39 @@ function useGoalOptions(period: PerformancePeriod | null): Array<[string, string
   return [["", "None"], ...goals.rows.map((g) => [g.organisational_goal_id, `${g.code ?? ""} ${g.title}`.trim()] as [string, string])];
 }
 
-function ObjectiveNewForm({ close, period, plans }: { close: () => void; period: PerformancePeriod | null; plans: Plan[] }) {
-  const me = useMe();
-  const departments = useApi("GET /api/v1/departments", { query: { active: "true" } });
+/**
+ * New Objective: the company and the functions the reader may set this quarter, from the server
+ * (useSettableFunctions); the form opens once they are known, on the company when the reader sets
+ * it, else on their one function.
+ */
+function ObjectiveNewForm({ close, period }: { close: () => void; period: PerformancePeriod | null }) {
+  const settable = useSettableFunctions(period?.performance_period_id ?? null);
+  if (settable.error) return <ErrorState error={settable.error} onRetry={settable.reload} />;
+  if (settable.loading) return <LoadingRows count={3} />;
+  return <ObjectiveNewFields close={close} period={period} functions={settable.rows} />;
+}
+
+function ObjectiveNewFields({ close, period, functions }: { close: () => void; period: PerformancePeriod | null; functions: PerformanceFunction[] }) {
   const goalOptions = useGoalOptions(period);
-  const company = hasCapability(me, "goals.company");
+  const company = functions.some((x) => x.department_id === null);
   // A function (or the company, "") whose plan this quarter is sent or binding: named so in its option, and marked as picked.
-  const statusOf = (departmentId: string) =>
-    plans.find((p) => p.performance_period_id === period?.performance_period_id && (p.department_id ?? "") === departmentId)?.status;
+  const statusOf = (departmentId: string) => functions.find((x) => (x.department_id ?? "") === departmentId)?.plan_status ?? null;
   const shut = (departmentId: string) => SHUT[statusOf(departmentId) ?? ""];
-  const named = (departmentId: string, name: string) => (shut(departmentId) ? `${name} · ${planStatus(statusOf(departmentId)!).text}` : name);
-  const options: Array<[string, string]> = [
-    ...(company ? ([["", named("", "Company")]] as Array<[string, string]>) : []),
-    ...(departments.data?.data ?? []).map((d) => [d.department_id, named(d.department_id, d.name)] as [string, string]),
-  ];
-  // No value is the company: a reader who may not set the company's is asked for a function instead.
-  const f = useContractForm({ performance_period_id: period?.performance_period_id ?? "", department_id: "", title: "", organisational_goal_id: "" }, goalsContract.ObjectiveCreate);
+  const options: Array<[string, string]> = functions.map((x) => {
+    const id = x.department_id ?? "";
+    const name = x.name ?? "Company";
+    return [id, shut(id) ? `${name} · ${planStatus(statusOf(id)!).text}` : name];
+  });
+  // No value is the company: a reader who may not set the company's starts on their one function, else picks one.
+  const first = company || options.length !== 1 ? "" : options[0]![0];
+  const f = useContractForm({ performance_period_id: period?.performance_period_id ?? "", department_id: first, title: "", organisational_goal_id: "" }, goalsContract.ObjectiveCreate);
   const [problem, setProblem] = useState<string | null>(null);
   const save = useMutation("POST /api/v1/performance/objectives");
+  const none = options.length === 0;
   const closed = company || f.values.department_id ? shut(f.values.department_id) : undefined;
   const submit = async () => {
     setProblem(null);
+    if (none) return;
     if (!company && !f.values.department_id) {
       f.setServerErrors({ department_id: ["Pick a function"] });
       return;
@@ -993,9 +1005,10 @@ function ObjectiveNewForm({ close, period, plans }: { close: () => void; period:
       sayRefusal(e, f, setProblem);
     }
   };
+  const mark = none ? { state: "bad" as const, message: "None you may set" } : closed ? { state: "bad" as const, message: closed } : f.status("department_id");
   return (
     <>
-      <Field label="Function" {...(closed ? { state: "bad" as const, message: closed } : f.status("department_id"))}>
+      <Field label="Function" {...mark}>
         <SelectField options={options} placeholder="Pick a function" {...f.field("department_id")} />
       </Field>
       <Field label="Objective" {...f.status("title")}><TextField {...f.field("title")} /></Field>
