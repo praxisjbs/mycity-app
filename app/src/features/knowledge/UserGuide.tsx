@@ -26,6 +26,7 @@ import {
   type IconName,
 } from "@mycity/ui";
 import { clearGuideReturn, setGuideReturn } from "./guide/return";
+import { GuideSearch } from "./guide/GuideSearch";
 
 /**
  * Knowledge Hub · User Guide (`user-guide`, M0; docs/guides/user-guide.md). Two views of the same
@@ -37,6 +38,9 @@ import { clearGuideReturn, setGuideReturn } from "./guide/return";
  * Guide chip brings the person back to the same step (`?id=<section or task>&step=<n>`). Help on
  * the floating button and User Guide in the account menu open it at the screen in view
  * (`?screen=<module>/<tab>`).
+ *
+ * Above both, the guide's search (guide/GuideSearch.tsx): its results take the guide's place while
+ * a search is typed, and a result opens the Full Guide at its section or task, at the step.
  */
 const MOCK = import.meta.env.VITE_API_MODE === "mock";
 
@@ -91,10 +95,15 @@ export function UserGuide({ id }: { id: string | null }) {
         <LoadingRows count={6} />
       ) : contents.data.chapters.length === 0 && contents.data.quick_start.length === 0 ? (
         <EmptyState title="Nothing To Read Yet" text="The guide's chapters appear here." icon="book" />
-      ) : view === "quick" ? (
-        <QuickStart />
       ) : (
-        <FullGuide contents={contents.data} id={id} screen={screen} step={Number(params.get("step")) || null} />
+        <GuideSearch
+          answers={contents.data.answers}
+          voice={contents.data.voice}
+          closeOn={view}
+          onOpen={(hit) => setParams({ view: "full", id: hit.anchor, step: hit.step === null ? null : String(hit.step), screen: null })}
+        >
+          {view === "quick" ? <QuickStart /> : <FullGuide contents={contents.data} id={id} screen={screen} step={Number(params.get("step")) || null} />}
+        </GuideSearch>
       )}
     </>
   );

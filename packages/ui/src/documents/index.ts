@@ -15,6 +15,7 @@ export { Reader, ArticleBody, type ReaderProps, type ReaderGroup, type ArticleBo
 export * from "./EmailFrame";
 export * from "./FileCard";
 export * from "./GuideBody";
+export * from "./GuideResults";
 export * from "./MediaViewer";
 export * from "./PdfViewer";
 export * from "./RichText";

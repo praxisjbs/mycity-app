@@ -2,14 +2,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { GuideChapter, GuideContents } from "@mycity/contract/contract.gen.ts";
+import type { GuideAnswer, GuideChapter, GuideContents, GuideHit, GuideSearchPage } from "@mycity/contract/contract.gen.ts";
 import { ModalProvider } from "@mycity/ui";
 import { installMatchMedia } from "@mycity/ui/testing";
 
 /**
  * Knowledge Hub · User Guide (docs/guides/user-guide.md §3, §10): a step's screen link opens the
  * screen and leaves the way back; coming back opens the guide at that step, marked; the Quick
- * Start groups its cards by role. What each reader receives is the server's (user_guide tests).
+ * Start groups its cards by role. The search (§6.8 to §6.10): results as the words are typed, in
+ * the body of a POST; an answer once asked; a result opens the guide at its step. What each reader
+ * receives is the server's (user_guide tests).
  */
 
 const span = (text: string, extra: Partial<{ bold: boolean; href: string | null }> = {}) => ({ text, bold: false, italic: false, code: false, href: null, ...extra });
@@ -26,6 +28,8 @@ const CONTENTS: GuideContents = {
     },
   ],
   quick_start: [{ slug: "qs-add-employee", title: "Add an Employee", role: "People & HR" }],
+  answers: true,
+  voice: false,
 };
 
 const CHAPTER: GuideChapter = {
@@ -73,7 +77,31 @@ const QUICK: GuideChapter = {
   sections: [{ slug: "qs-add-employee", title: "Add an Employee", screen: null, role: "People & HR", icon: "users", blocks: [{ kind: "paragraph", spans: [span("Four steps.")] }], tasks: [] }],
 };
 
-const m = vi.hoisted(() => ({ navigate: vi.fn(), params: new URLSearchParams(), set: vi.fn() }));
+const HIT: GuideHit = {
+  anchor: "people-add-employee",
+  kind: "task",
+  chapter: "people",
+  chapter_title: "People",
+  section: "people-employees",
+  section_title: "Employees",
+  title: "Add an Employee",
+  screen: "people/employees",
+  step: 2,
+  snippet: [
+    { text: "Press ", hit: false },
+    { text: "Add Employee", hit: true },
+    { text: ".", hit: false },
+  ],
+  by: "both",
+};
+const PAGE: GuideSearchPage = { data: [HIT], page: { number: 1, size: 25, total: 1, pages: 1, has_next: false } };
+const ANSWER: GuideAnswer = { found: true, sentences: [{ text: "Open People · Employees and press Add Employee.", sources: [1] }], sources: [HIT] };
+
+const m = vi.hoisted(() => ({ navigate: vi.fn(), params: new URLSearchParams(), set: vi.fn(), call: vi.fn() }));
+vi.mock("@/api/client", () => ({
+  api: { call: m.call },
+  ApiError: class ApiError extends Error {},
+}));
 vi.mock("@/api/hooks", () => ({
   useApi: (key: string) => ({
     data: key === "GET /api/v1/user-guide" ? CONTENTS : key === "GET /api/v1/user-guide/quick-start" ? QUICK : CHAPTER,
@@ -90,7 +118,10 @@ import { UserGuide } from "./UserGuide";
 import { GUIDE_RETURN } from "./guide/return";
 
 installMatchMedia();
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => {
+  sessionStorage.clear();
+  m.call.mockImplementation(async (key: string) => (key === "POST /api/v1/user-guide/search" ? PAGE : ANSWER));
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -132,5 +163,47 @@ describe("User Guide", () => {
     draw(null);
     expect(screen.getByRole("heading", { name: "People & HR" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Add an Employee" })).toBeTruthy();
+  });
+
+  it("searches as the words are typed, in a POST body, and opens a result at its step", async () => {
+    draw(null);
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search the Guide" }), "add someone");
+    expect(await screen.findByRole("list", { name: "Guide Results" })).toBeTruthy();
+    expect(m.call).toHaveBeenLastCalledWith("POST /api/v1/user-guide/search", { body: { q: "add someone", page: 1 } });
+    expect(screen.getByText("Step 2")).toBeTruthy();
+    expect(screen.getByText("Add Employee", { selector: "mark" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /Add an Employee/ }));
+    expect(m.set).toHaveBeenCalledWith({ view: "full", id: "people-add-employee", step: "2", screen: null });
+    // The guide shows again, the words still in the box.
+    expect(screen.queryByRole("list", { name: "Guide Results" })).toBeNull();
+    expect((screen.getByRole("searchbox", { name: "Search the Guide" }) as HTMLInputElement).value).toBe("add someone");
+  });
+
+  it("asks for an answer with Enter or Get Answer, once, and opens its source", async () => {
+    draw(null);
+    const box = screen.getByRole("searchbox", { name: "Search the Guide" });
+    await userEvent.type(box, "how do I add an employee");
+    await userEvent.click(await screen.findByRole("button", { name: "Get Answer" }));
+    expect(await screen.findByText("Open People · Employees and press Add Employee.")).toBeTruthy();
+    expect(m.call).toHaveBeenCalledWith("POST /api/v1/user-guide/answer", { body: { q: "how do I add an employee" } });
+    expect(screen.queryByRole("button", { name: "Get Answer" })).toBeNull();
+    await userEvent.type(box, "{Enter}");
+    expect(m.call.mock.calls.filter(([k]) => k === "POST /api/v1/user-guide/answer")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: /Source 1: Add an Employee/ }));
+    expect(m.set).toHaveBeenCalledWith({ view: "full", id: "people-add-employee", step: "2", screen: null });
+  });
+
+  it("offers no answer and no microphone when neither can be had", async () => {
+    CONTENTS.answers = false;
+    try {
+      draw(null);
+      await userEvent.type(screen.getByRole("searchbox", { name: "Search the Guide" }), "how do I add an employee{Enter}");
+      expect(await screen.findByRole("list", { name: "Guide Results" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Get Answer" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Record/ })).toBeNull();
+      expect(m.call.mock.calls.some(([k]) => k === "POST /api/v1/user-guide/answer")).toBe(false);
+    } finally {
+      CONTENTS.answers = true;
+    }
   });
 });

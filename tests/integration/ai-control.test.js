@@ -235,6 +235,9 @@ describeDb("AI Control against the real migrations", () => {
         "mail-tidy",
         "mail-summary",
         "mail-dictation",
+        "guide-search",
+        "guide-answer",
+        "guide-voice",
       ]);
       const by = Object.fromEntries(res.body.data.map((a) => [a.key, a]));
       expect(by["data-answers"]).toMatchObject({ job: "default", built: true, own_chain: true, personal_data: true, chosen_by: "TB" });
@@ -246,11 +249,15 @@ describeDb("AI Control against the real migrations", () => {
       // The mailbox's (mailbox.md §9): Default for writing, tidying and summaries, Transcription for Dictate.
       expect(by["mail-draft"]).toMatchObject({ job: "default", personal_data: true, own_chain: false, chosen_by: "TB" });
       expect(by["mail-dictation"]).toMatchObject({ job: "transcription", personal_data: true });
+      // The User Guide's (user-guide.md §6.8 to §6.10), each chosen by JBS Praxis: the answer on Fast.
+      expect(by["guide-search"]).toMatchObject({ job: "embeddings", personal_data: true, own_chain: false, chosen_by: "JP" });
+      expect(by["guide-answer"]).toMatchObject({ job: "fast", personal_data: true, own_chain: false, chosen_by: "JP" });
       expect((await as("admin").get("/ai-control/actions?job=transcription")).body.data.map((a) => a.key)).toEqual([
         "voice-note-transcription",
         "praxis-ai-voice",
         "review-dictation",
         "mail-dictation",
+        "guide-voice",
       ]);
     });
   });

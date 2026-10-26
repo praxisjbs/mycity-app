@@ -121,7 +121,10 @@ quiet hours and digest) and `reminder` (one row per occurrence of a declared rem
 row per address field of a record (`owner`, `owner_key`), picked, pinned, the device's location or
 typed before the rule, with its line, details, point, kind and whether it waits to be named;
 backfilled from every address already saved, as typed and unverified · `0499` the leave flow, `leave.approval` (the line manager, then Operations &
-People over 5 days; §6.5).
+People over 5 days; §6.5) · `0510` `user_guide_passage` (JP, 26/10/2026; `docs/guides/user-guide.md`
+§4, §6.8): the User Guide's meaning index, one `vector(1536)` per distinct passage of `docs/manual`
+on the Guide Search model, keyed by the hash of what was embedded and the model (HNSW cosine index);
+no words, nothing a person typed, rebuilt from the files.
 
 **Owes:**
 - The `system_marker` row: provisioning does not write it yet (`ops/provision/provision.sh`).
@@ -544,7 +547,8 @@ gist, up to five key points and things asked of the owner, the message count and
 covered, its AI run) · `10310` Praxis AI's Ask and History (`docs/guides/praxis-ai.md` §4):
 `ai_conversation` gains `last_asked_at` and `questions`; `ai_message` gains `rows_read`, `module_key`
 and a CHECK on `role`; `ai_message_citation` gains `entity_type`, `entity_id`, `read_key` and
-`position`, so a citation names a database record and keeps the answer's order.
+`position`, so a citation names a database record and keeps the answer's order · `10320` an
+`ai_run_step` may be an `embedding` (the Embeddings job's vectors, `docs/guides/ai-control.md` §6.6).
 
 **Owes:**
 - `updated_at` triggers for these seven tables (they came after `9095`).

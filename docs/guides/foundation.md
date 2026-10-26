@@ -534,6 +534,10 @@ As built (17/10/2026):
 - A record group also stands down while its feature is switched off: a provider's `available(client)`
   (`shared/search/provider.js`) is asked before its query, and false leaves the group out for
   everyone (Home Locations while the Attendance policy's Home Location is off, `attendance.md` §1.3).
+- Work a provider needs from outside the database is its `prepare({ term, user })`, run for every
+  provider that will search before the transaction opens, so no connection waits on a network
+  call; what it returns reaches its search as `prepared`, and one that fails costs only itself. The
+  User Guide's group asks for a term's vector there, for three words or more (`user-guide.md` §6.8).
 - A type word at either end of the line ("login halima", "staff ada") narrows the records to that
   type; the screens and actions are still matched on the whole line.
 - An action opens its screen asked to start it: `?action=new` runs the screen's New action
@@ -1062,6 +1066,8 @@ screen.
 - The sign-in screen's drawings or licensed photographs: TB (`identity.md` §13).
 
 ## 14 · Change log
+
+- 26/10/2026 · JP · §6.7: a search provider's `prepare`, run before ⌘K's transaction, for the User Guide's search by meaning (`user-guide.md` §6.8).
 
 - 25/10/2026 · JP · §6.17 written: a record opens in a sheet on a phone, never below its list (FRONTEND_FOUNDATION F31, `ListDetail`, gate 11). People · Leave moved onto it, with ESS · My Payslips (`docs/guides/ess.md`) and the M3 to M6 screens that paired a list with a record (Payroll · Payslips, Partnerships · Proposals, Queries and Letter Templates, Recruitment · Candidates, Interviews, Offers and Onboarding, Expenses · My Requests, Approvals and Requisitions).
 - 25/10/2026 · JP · §6.1 and §6.16, the bulk audit: roles by exact title only and logins only for people the roster brought; names once per version of `nomenclature.json` (`department.names_applied`); the counter reserved before a load and numeric Staff IDs padded; a roster person never renumbered and a same-name row with no Staff ID held back; unreadable optional cells left out with a note; departments made only from `nomenclature.json`, found punctuation aside; closed seats kept closed and seats matched by department; birthdays by email; two-pass column mapping, tidied names, phone, year and choice spellings; revert puts lines and emptied fields back, refuses a person now in use and a seat changed since; the Imports screen's Changes view, labelled problems, header-row choice and masked rows. What is left is named in §6.16.

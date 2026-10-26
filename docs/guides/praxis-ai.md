@@ -321,6 +321,10 @@ that module's guide changed):
   today unless `date` is given, through the Overview's own query, allow-list and scopes (`home.md`
   §6, §9). `employee_id`, or part of a name in `q`, keeps one person's: what they did and what is
   about them. "What happened today?" and "what has Aisha done today?" are one read each.
+- **User Guide** (built): `guide.search` (`PageQuery`), how to do something in the hub: the
+  sections and tasks of the guide the asker may read that answer `q`, ranked by the guide's own
+  search, a page of 25, each row citing its section (`guide_section`, opening the guide at it)
+  (`user-guide.md` §6.8, §9). "How do I request leave?" is answered from the guide, never guessed.
 
 The six target questions of MILESTONES §15 answer as their modules land: overdue tasks (M2,
 `tasks.list` today), expenses awaiting approval (M8), due for confirmation (people), inactive
@@ -471,6 +475,8 @@ to this repository's rules, and ported code never names where it came from.
    take more than a few seconds on staging.
 
 ## 14 · Change log
+
+- 26/10/2026 · JP · §6.9: the User Guide's `guide.search` read, so a how-to question is answered from the guide, cut to the asker's grants (`user-guide.md` §9).
 
 - 25/10/2026 · JP · Ask's empty conversation (Try Asking, Ask a Question) is a second-level heading (`EmptyState` `level={2}`): on a phone it sits straight under the page title, and the accessibility gate refused h1 straight to h3. Nothing on screen changes.
 - 23/10/2026 · JP · §6.4: "book a meeting" fills New Event's attendees, named by the person and found through the colleague card (`CalendarEventPrefill.attendee_ids`); "start a project" opens New Project filled (`ProjectPrefill`, `docs/guides/workspace.md` §9).

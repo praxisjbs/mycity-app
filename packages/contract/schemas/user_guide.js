@@ -7,10 +7,16 @@
  *   GET /user-guide/chapters/:slug      GuideChapter    one chapter, as this reader may read it
  *   GET /user-guide/quick-start         GuideChapter    the Quick Start's cards this reader may follow
  *   GET /user-guide/images/:chapter/:file               a picture a section this reader may read shows
+ *   POST /user-guide/search             GuideSearchPage the sections and tasks that answer a search, best first
+ *   POST /user-guide/answer             GuideAnswer     a short answer written from those, each sentence citing them
+ *
+ * A search and a question travel in the body, never the address, so the access log never holds
+ * what anyone typed (docs/guides/user-guide.md §6.1 decision 12). Neither writes anything.
  *
  * The text is content a person reads, not interface copy (FRONTEND_GUIDE §5.3).
  */
 const { z } = require("zod");
+const { LIST_CONTROLS, Paged } = require("./common");
 
 const slug = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "lower-case words and hyphens");
 
@@ -113,6 +119,78 @@ const GuideContents = z
   .object({
     chapters: z.array(GuideContentsChapter),
     quick_start: z.array(z.object({ slug, title: z.string(), role: z.string().nullable() }).strict()),
+    /** Whether an answer can be written now: AI on for the Knowledge Hub, a model ready on Guide Answer's chain. */
+    answers: z.boolean(),
+    /** Whether a search can be spoken now: a model ready on Guide Voice Search's chain. */
+    voice: z.boolean(),
+  })
+  .strict();
+
+/**
+ * POST /user-guide/search: the words of a search (at most 200 characters) and the page. Under
+ * two letters is an empty page.
+ */
+const GuideSearchBody = z.object({ q: z.string().trim().max(200), page: LIST_CONTROLS.page }).strict();
+
+/** A run of a result's line; `hit` marks the words the search found. */
+const GuideSnippetRun = z.object({ text: z.string(), hit: z.boolean() }).strict();
+
+/**
+ * One section or task that answers a search: where it is, the line that answers best with the
+ * words found marked, and the step that line is, as this reader numbers it. `by` says whether its
+ * words, its meaning or both found it.
+ */
+const GuideHit = z
+  .object({
+    anchor: slug,
+    kind: z.enum(["section", "task"]),
+    chapter: slug,
+    chapter_title: z.string(),
+    section: slug,
+    section_title: z.string(),
+    title: z.string(),
+    screen: z.string().nullable(),
+    step: z.number().int().min(1).nullable(),
+    snippet: z.array(GuideSnippetRun),
+    by: z.enum(["words", "meaning", "both"]),
+  })
+  .strict();
+
+/** A page of 25 results, best first. */
+const GuideSearchPage = Paged(GuideHit);
+
+/** POST /user-guide/answer: the question, as typed or spoken. */
+const GuideAnswerBody = z.object({ q: z.string().trim().min(3).max(300) }).strict();
+
+/** One sentence of an answer and the sources it came from, numbered from 1 in `sources`. */
+const GuideAnswerSentence = z
+  .object({ text: z.string(), sources: z.array(z.number().int().min(1)) })
+  .strict();
+
+/**
+ * A short answer written only from the parts of the guide this reader may read (at most six,
+ * best first). `found` is false when those parts do not answer it: `sentences` is then empty and
+ * the results stand alone.
+ */
+const GuideAnswer = z
+  .object({
+    found: z.boolean(),
+    sentences: z.array(GuideAnswerSentence).max(6),
+    sources: z.array(GuideHit).max(6),
+  })
+  .strict();
+
+/**
+ * What the Fast job is asked for (services/ai/prompts/guide-answer.md): whether the passages
+ * answer the question, and up to three sentences, each citing the passages it came from by number.
+ * The service turns it into a GuideAnswer and never keeps it.
+ */
+const GuideAnswerOutput = z
+  .object({
+    answered: z.boolean(),
+    sentences: z
+      .array(z.object({ text: z.string().trim().min(1).max(300), sources: z.array(z.number().int().min(1).max(6)).min(1).max(3) }).strict())
+      .max(3),
   })
   .strict();
 
@@ -139,6 +217,14 @@ const TABLES = {
   GuideContents: { table: null, reason: "the outline of every chapter the reader may read" },
   GuideChapterParams: { table: null, reason: "a chapter's file name" },
   GuideImageParams: { table: null, reason: "a picture's chapter and file name" },
+  GuideSearchBody: { table: null, reason: "the words of a search and its page; never kept" },
+  GuideSnippetRun: { table: null, reason: "a run of a passage's text, from docs/manual" },
+  GuideHit: { table: null, reason: "a section or task of docs/manual that answers a search" },
+  GuideSearchPage: { table: null, reason: "a page of search results" },
+  GuideAnswerBody: { table: null, reason: "a question asked of the guide; never kept" },
+  GuideAnswerSentence: { table: null, reason: "a sentence of an answer, written for this request and never kept" },
+  GuideAnswer: { table: null, reason: "an answer written from docs/manual for this request, never kept" },
+  GuideAnswerOutput: { table: null, reason: "the AI's answer before it is checked; never kept" },
 };
 
 module.exports = {
@@ -154,4 +240,12 @@ module.exports = {
   GuideContents,
   GuideChapterParams,
   GuideImageParams,
+  GuideSearchBody,
+  GuideSnippetRun,
+  GuideHit,
+  GuideSearchPage,
+  GuideAnswerBody,
+  GuideAnswerSentence,
+  GuideAnswer,
+  GuideAnswerOutput,
 };

@@ -30,6 +30,12 @@
  * Beyond recordProvider, a provider may answer an empty line (`empty: true`: what waits on
  * the reader), ask to come first (`pinned: true`), and read the reader themselves (`user`
  * is passed to its search), for a list that is the reader's own rather than a table's.
+ *
+ * Work a provider needs from outside the database (the User Guide's search by meaning asks a
+ * model for the term's vector) is its `prepare({ term, user })`, run for every provider that
+ * will search before the transaction opens, so no connection waits on a network call; what it
+ * returns is handed to its search as `prepared`. One that fails or is slow costs only itself:
+ * its search runs with `prepared` null.
  */
 const { logger } = require("../../config/logger");
 const { atomically } = require("../db/tx");
@@ -114,6 +120,19 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
   );
   if (run.length === 0) return out;
 
+  const prepared = new Map();
+  await Promise.all(
+    run
+      .filter((p) => typeof p.prepare === "function")
+      .map(async (p) => {
+        try {
+          prepared.set(p.type, await p.prepare({ term, user }));
+        } catch (err) {
+          logger.warn({ err: err.message, type: p.type }, "search provider could not prepare; it searches without");
+        }
+      }),
+  );
+
   const client = await db.connect();
   try {
     await atomically(client, async () => {
@@ -130,6 +149,7 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
             fuzzy,
             scope: scopes.get(p.module),
             user,
+            prepared: prepared.has(p.type) ? prepared.get(p.type) : null,
           });
           await client.query("RELEASE SAVEPOINT search_provider");
           if (r.items.length)

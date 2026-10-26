@@ -12,9 +12,9 @@
  *     Top Tier entry without a written reason; an own chain naming an unknown provider or family;
  *  2. a built action with a chain and no prompt file (services/ai/prompts/<key>.md);
  *  3. an AI call in src/ (`ai.complete`, `llm.complete`, `ai.converse`, `ai.search`, `llm.search`,
- *     `transcription.transcribe`, or a ledger run opened in services/ai) whose purpose is not a
- *     registered action, or is not written as a literal string;
- *  4. a complete(), converse() or search() call with no purpose.
+ *     `ai.embed`, `llm.embed`, `transcription.transcribe`, or a ledger run opened in services/ai)
+ *     whose purpose is not a registered action, or is not written as a literal string;
+ *  4. a complete(), converse(), search() or embed() call with no purpose.
  * Comments are not code.
  *
  * Usage: node scripts/check/ai-actions.js     exit 0 clean, 1 on a problem
@@ -26,7 +26,7 @@ const { stripComments } = require("./ai-no-writes");
 const ROOT = path.resolve(__dirname, "..", "..");
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "coverage", ".git", "vendors", "prompts"]);
 
-const CALL = /\b(?:ai|llm)\.(complete|search|converse)\s*\(\s*\{|\btranscription\.transcribe\s*\(\s*\{|\bledger\.startRun\s*\(\s*\w+\s*,\s*\{/g;
+const CALL = /\b(?:ai|llm)\.(complete|search|converse|embed)\s*\(\s*\{|\btranscription\.transcribe\s*\(\s*\{|\bledger\.startRun\s*\(\s*\w+\s*,\s*\{/g;
 const PURPOSE_LITERAL = /\bpurpose\s*:\s*["']([^"']*)["']/;
 const PURPOSE_ANY = /\bpurpose\s*[:,}]/;
 const DEFAULT_PURPOSE = /\bpurpose\s*=\s*["']([a-z][a-z0-9-]*)["']/g;

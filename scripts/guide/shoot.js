@@ -268,6 +268,13 @@ async function session(browser, origin, account, device) {
     await page.waitForSelector("[data-ui=page]", { timeout: 10000 });
   }
   await page.evaluate(() => document.fonts.ready.then(() => true));
+  // On a working day the clock's start-of-day prompt opens by itself and must be answered (Esc
+  // does not close it): Not Now, once, and the device does not ask again that day.
+  const prompt = await page.waitForSelector('[data-ui=modal]:has-text("Start Your Day")', { timeout: 4000 }).catch(() => null);
+  if (prompt) {
+    await page.click('[data-ui=modal] button:has-text("Not Now")');
+    await appSettle(page);
+  }
   return { ctx, page };
 }
 
