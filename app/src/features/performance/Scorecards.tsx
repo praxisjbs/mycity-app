@@ -42,6 +42,7 @@ import {
   HelpTerm,
   KeyValue,
   LoadingRows,
+  NumberField,
   PageHeader,
   SegmentedControl,
   SelectField,
@@ -474,7 +475,7 @@ function LineChangeForm({ line, months, done }: { line: ScorecardLine; months: s
   return (
     <>
       <Field label="New Target" {...mark}>
-        {words ? <TextField {...f.field("to_text")} /> : <TextField {...f.field("to_value")} inputMode="decimal" />}
+        {words ? <TextField {...f.field("to_text")} /> : <NumberField decimal signed {...f.field("to_value")} />}
       </Field>
       <Field label="From Month" {...f.status("from_month")}>
         <SelectField {...f.field("from_month")} options={monthChoices(months)} />

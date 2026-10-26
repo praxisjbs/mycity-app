@@ -804,7 +804,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 |---|---|---|---|---|---|---|---|---|---|
 | 8 | My Profile | `my-profile` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
-| 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
+| 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
@@ -1052,9 +1052,9 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
-| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
-| 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 29 | Goals | `goals` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 30 | Scorecards | `targets` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 31 | KPIs | `kpis` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 32 | Reviews | `reviews` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 33 | Analytics | `analytics` | M2 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
@@ -1072,6 +1072,14 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 **Notes**
 
 - 26/10/2026 · JP · User Guide audit, screen defects: Report Month takes the company's key results and a function's KPIs and names a refused row; Set Up Quarter returns to a refused field's step; Change Target's From Month picks a month of the quarter; Edit KPI on the form system; Reviews gain a quarter switch, Waiting On You across rounds and Close Review at With HR; Scorecards' loading and error states, Delivered On read-only once sent, month scores in a line's sheet; Commitments' State filter matches the pills (`sent`); My Performance reads a review sent back as With Reviewer. Tests: `performance/shared.test.tsx`, integration. Left: nothing.
+- 26/10/2026 · JP · Fault #1 on staging (`VALIDATION_FAILED: key_results.0.actual_value` at
+  `POST /api/v1/performance/reports`, 23/10/2026): Report Month's Actual was a text box sent as typed, so a
+  figure written as the screen writes it (64,000) was refused by the contract. Every figure a person enters on
+  Performance (Report Month's Actual, a key result's Target and Set Target, Change Target, a KPI's Target and
+  Record Actual, a line's New Target, the check-in's Actual) is now a `NumberField` keeping digits, one point and
+  a leading minus (`signed`, new); Report Month checks each Actual on its field and sends nothing while one is
+  refused (`Goals.test.tsx`, `TextField.test.tsx`; `performance.md` §11, §14; the Performance chapter and its
+  pictures). Faults #2 to #5 of the same brief were already fixed by `ed123fd` (#135). Left: nothing.
 - 25/10/2026 · JP · User Guide, Milestone 2 (PR 3 of 3; `docs/guides/user-guide.md`): the Performance chapter, `docs/manual/performance.md`, covers Goals (#29), Scorecards and the Commitments view (#30), KPIs (#31), Reviews (#32), Analytics (#33) and ESS · My Performance (#10, as a section about that tab): reading the tree and a key result, recording goals, setting objectives and key results, sending and deciding the quarter plan, Report Month, Confirm Score, Set Target and Change Target, Set Up Quarter; scorecards, drafting, agreeing, a line's target, Change Reviewer, approving a month of commitments and the month-end report; KPIs and their actuals; the round, scoring, input, second level, HR's close, conduct, PIPs, probation and rounds; the figures; the check-in with evidence, Dictate and Tidy With AI. Cut by grant and capability (`goals.organisation`, `goals.function`, `goals.confirm`, `performance.manage`, approve, export). 12 pictures and seven Quick Start cards (Do Your Check-In, Agree Your Scorecard, Approve Commitments, Score a Review, Report the Month, Set Up a Quarter, Close a Review). Two screen fixes found while writing it, each with its test: the Commitments view offered Export Report to readers without `performance` export, whom the API refuses (Staff, Line Managers; `Scorecards.test.tsx`); the check-in's dictation button read Record Answer and was announced as Record Dictate, now Dictate, named Record Action (`Reviews.test.tsx`; `performance.md` §10, §14). Left: the reviewer's scoring form has no picture, because the demo's only reviewer account (the line manager) opens on a Policy Update prompt the picture script cannot close.
 - 22/10/2026 · TB · Goals (#29): the six items left after PR 130, as TB decided them (22/10/2026). Set Up Quarter and Edit Quarter for Operations & People (Manage Quarters, and ⌘K): a wizard of the quarter and its scoring rules (bands, key result and line scoring, section weights), starting from the last quarter's and checked by `ScoringRules` on each field; Q1 2027 is set up in October as planning while Q4 2026 runs. Edit and delete an organisational goal (the CEO; refused with 409 `GOAL_IN_USE` while a company objective serves it, `DELETE /performance/goals/:id`), an objective (its card's menu and its sheet) and a key result (its panel) while the plan is draft or returned, each delete confirmed by name; the API says who may (`can_edit`), and taking a part out of a draft is an edit of the plan. New and Edit Key Result share one form with every field: Feeds picked 25 at a time (`GET /performance/key-results`), TBC and target in words open, Scored From, co-owner, direction, baseline, start, type and owner note behind More (`MoreFields`, new in `@mycity/ui`). Set Target on a TBC key result before its lock date, by its owner or the head, with no approval; Change Target only after the lock (409 `TARGET_TBC`). One number formatter, `formatNumber` in `@mycity/ui`, for every target, actual, baseline and KPI figure on the Performance screens, the scorecard lines, My Performance (#10) and the Target Change sheet. ⌘K opens a goal's and an objective's sheet and a key result's panel. Integration tests on the real migrations (`performance-goals-edit`), app tests on the mock on desktop and phone (`Goals.test.tsx`). Left: nothing of the six; the M2 demo walk (§3.7) still waits for staging.
 - 22/10/2026 · TB · Goals (#29), after PR #130: Waiting On You also lists a mid-quarter scorecard sent on its own (Scorecard and the person, `GET /performance/approvals` kind `scorecard`); its row opens the scorecard's sheet, where its approver presses Approve Scorecard ("Sent on to …", "Scorecard approved") or Request Changes with a reason; on the mock, Grace's scorecard waits on Operations & People. Left: nothing.

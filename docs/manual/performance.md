@@ -173,7 +173,7 @@ example, *BM-O1 deleted*.
 |---|---|---|
 | **An objective holds at most four key results** | The objective has four already | Add it to another objective |
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
-| **Like 64000 or 0.95** under **Target** | The target holds a comma or a word | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
+| **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
@@ -255,7 +255,8 @@ head reports how its key results and KPIs did. Management report the company's k
    starts on the month just ended. Changing it once you have typed asks first: **Change Month**
    clears what you typed, **Keep It** stays.
 3. For each key result you report, choose its **Status** and fill in the **Actual** and a short
-   **Update**.
+   **Update**. Type the **Actual** as a figure: a comma or a unit stays out, so `64,000` goes in
+   as `64000`. A minus is kept, such as `-5`. A figure it cannot take is marked as you leave it.
    ![Report Month](shot:performance-report)
 4. If the score falls under 0.4, or the status is **At Risk**, **Off Track** or **Missed**, name
    the **Recovery Owner** and the **Recovery Date**.
@@ -274,7 +275,7 @@ its page.
 | **Nothing To Report** | The function has no binding key results and no KPIs this quarter |
 | **Name owner and date** under **Recovery Owner** | Name the **Recovery Owner** and **Recovery Date** on that key result |
 | **Pick a status** under **Status** | Choose the key result's status |
-| **Enter a number** under **Actual** | Type the figure only, such as `18000000` |
+| **Like 64000 or 0.95** under **Actual** | Finish the figure, with at most four decimals, such as `0.95`. A key result on another page is named in the message |
 | **Pick a date** under **Recovery Date** | Pick the date the key result should recover by |
 | **Shorten the update** under **Update** | Keep the update shorter |
 | **Only the function's head reports its month** | Ask the head to report it |
@@ -305,7 +306,7 @@ and scores already given do not change.
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the new target** | **New Target** is empty | Type the new figure |
-| **Like 64000 or 0.95** under **New Target** | It holds a comma or a word | Type the figure only |
+| **Like 64000 or 0.95** under **New Target** | It is unfinished or has more than four decimals | Type the figure only |
 | **A change to this target is already waiting for a decision** | Only one change waits at a time | Wait for the CEO's decision |
 
 ### Set up a quarter {#performance-quarter needs="performance create, cap performance.manage"}
@@ -608,7 +609,7 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 | The hub says | What it means | What to do |
 |---|---|---|
 | **Only the function's head sets its KPIs** | You picked another function | Pick your own function in **Function** |
-| **Like 64000 or 0.95** under **Target** | The target holds a comma or a word | Type the figure only, or use **Target Wording** |
+| **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
 
 ### Record a month's result {#performance-kpi-actual needs="performance edit, cap goals.function"}
 
@@ -624,7 +625,7 @@ You record your own function's KPIs. Operations and People and the CEO may recor
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the actual** under **Actual** | **Met** and **Not Met** need the figure | Fill in the **Actual**, or choose **N/A** |
-| **Like 64000 or 0.95** under **Actual** | The actual holds a comma or a word | Type the figure only |
+| **Like 64000 or 0.95** under **Actual** | The figure is unfinished or has more than four decimals | Type the figure only |
 | **Required** under **KPI** | On **Edit KPI**, the **KPI** name is empty | Type it again |
 
 ## Reviews {#performance-reviews screen=performance/reviews icon=ticks}
@@ -993,7 +994,7 @@ read **Not Assessable**, and *Monthly update on time* scores 0.
 | **Check the highlighted lines** | A line needs something | Read the field marked in red on that line |
 | **Give a reason** under **Reason** | You changed a score without saying why | Type the **Reason** |
 | **Give a score** under **Your Score** | It is not from 0 to 1 | Type a score such as 0.75 |
-| **Enter a number** under **Actual** | The figure cannot be read | Type the figure only, such as 12 or 0.95 |
+| **Like 64000 or 0.95** under **Actual** | The figure is unfinished or has more than four decimals | Type the figure only, such as 12 or 0.95 |
 | **Name the source** | **Source** is chosen but empty | Name the report it came from |
 | **Add the link** | **Link** is chosen but empty | Paste the web address |
 | **Pick a task** under **Task** | **Task** is chosen but none is picked | Pick one of your tasks |

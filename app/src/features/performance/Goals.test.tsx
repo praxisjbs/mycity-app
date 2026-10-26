@@ -319,6 +319,37 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(await status(api.call("DELETE /api/v1/performance/goals/:id", { params: { id: served } }))).toBe(409);
   }, 60000);
 
+  it("the head reports the month: a figure goes in as typed, and one the contract refuses is marked on its field, never sent (fault #1, 23/10/2026)", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=goals&action=report");
+    const reports = () => vi.mocked(dispatch).mock.calls.filter(([r]) => r.method === "POST" && r.path.endsWith("/performance/reports"));
+    const [users, stories] = within(dialog()).getAllByLabelText(/^Actual/) as HTMLInputElement[];
+
+    // Written as the screen shows it: the comma never gets in, a minus does. The figures sent at the
+    // end are the month's own, so the tests after this one read October as it was.
+    fireEvent.change(users!, { target: { value: "−5" } });
+    expect(users!.value).toBe("-5");
+    fireEvent.change(users!, { target: { value: "38,400" } });
+    expect(users!.value).toBe("38400");
+
+    // A fifth decimal: marked as the field is left, and Report Month sends nothing.
+    fireEvent.change(stories!, { target: { value: "27.12345" } });
+    fireEvent.blur(stories!);
+    await settled();
+    expect(within(dialog()).getByText("Like 64000 or 0.95")).toBeTruthy();
+    const before = reports().length;
+    await press(dialog(), "Report Month");
+    expect(reports().length).toBe(before);
+
+    // Put right, the mark clears as it is typed and the month goes.
+    fireEvent.change(stories!, { target: { value: "27" } });
+    expect(within(dialog()).queryByText("Like 64000 or 0.95")).toBeNull();
+    await press(dialog(), "Report Month");
+    expect(reports().length).toBe(before + 1);
+    const sent = reports().at(-1)![0].body as { key_results: Array<{ actual_value?: string }> };
+    expect(sent.key_results.map((k) => k.actual_value)).toEqual(["38400", "27"]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  }, 60000);
+
   it("on a phone: the head reads figures as people write them, and the key result's actions sit in its sheet", async () => {
     setViewport(390);
     await openAs("ngozi@mycityapp.io", "/performance?tab=goals");

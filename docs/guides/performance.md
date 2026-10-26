@@ -10,7 +10,7 @@
 | Capabilities | `goals.organisation` (record the organisational goals), `goals.company` (set the company objectives and key results), `goals.function` (set a function's objectives, key results and KPIs and send its quarter plan), `goals.confirm` (confirm the month's key result scores), `performance.manage` (run the cycle: quarters and their rules, monthly rounds, reviewer changes, conduct, PIPs, probation outcomes, imports) |
 | Screens (PROGRESS.md rows) | #29 Goals, #30 Targets (labelled Scorecards), #31 KPIs, #32 Reviews, #33 Analytics, #10 My Performance |
 | Status | Agreed |
-| Last changed | 25/10/2026 |
+| Last changed | 26/10/2026 |
 
 Sources, all read in full on 22/10/2026: MyCity's own **MyCityApp Q4 2026 OKRs V2** workbook (11
 sheets: the CEO's decisions, Company OKRs, the Q4 Scorecard roll-up, the four function sheets with
@@ -1453,6 +1453,15 @@ is listed here as tier 1 or tier 2.**
   offline is refused with "No connection. Try again." (no local queue).
 - **Two quarters overlap in planning**: only one quarter is `active`; Q1's plan may be drafted while Q4 is
   active, and scorecards for Q1 become binding without touching Q4's reviews.
+- **A figure typed as the screen writes it** (64,000; 40%; −5): every figure a person enters here is a
+  `NumberField` (`decimal signed`): Report Month's Actual, a key result's Target and Set Target, Change
+  Target, a KPI's Target and Record Actual, a line's New Target and the check-in's Actual. A comma, a
+  unit or a per cent sign never gets in, so 64,000 is sent as `64000`; a leading minus is kept. Report
+  Month's rows are its own, not `useContractForm`, so it checks each Actual against
+  `KeyResultReport` as the field is left (the contract's Like 64000 or 0.95) and sends nothing while one is refused, naming the refused rows in a toast since one may sit on another page (two
+  points, a fifth decimal): a refusal stays on its field and never reaches System Health (fault #1 on
+  staging, 23/10/2026). An iPhone's decimal keypad has no minus key, as before; a negative is typed on
+  desktop or Android.
 
 ## 12 · Donor code
 
@@ -1506,6 +1515,13 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Report Month takes the company's key results (Management, `goals.company`) and a function's KPIs, names a refused row in a toast (it may be on another page), and asks before a month change clears what was typed; Set Up Quarter goes back to a refused field's step with a toast; New Objective asks for a function when the reader may not set the company's; New Key Result lists every editable objective of the quarter, whatever Function Goals shows; Change Target's From Month is a choice of the quarter's months, and a key result's takes Target in Words; Edit KPI is on the form system; a KPI opens from `?id=`; a KPI refusal says KPIs (`goals.authority` `assertSetsGoals` takes what is set); Edit Goal, Delete Goal, Set Up Quarter and Edit Quarter show only with the `performance` grant their route asks; the On Track figure reads Scoring Good, a key result's panel names the month it shows, the score figures, TBC and Scored From carry their help, and the phone's floating button is Report Month for a function's head. Reviews: a quarter switch, Waiting On You paged and across rounds, Next reads Close Review at With HR, Second Level its own figure, Open Round only while a month is free, Plan extended. Scorecards: loading and error states, Not in your team for someone outside the reader's reach, the Goal's marks read Zod's limits, Team Key Results on Edit Lines, month scores in the line's sheet (and My Scorecard's), Delivered On read-only once sent (`DateField` `disabled`), Pick a task, Dictate to three minutes, Not Assessable lines scoreable with a reason, the End Employment bar. Commitments' State filter takes `sent`, `not_sent` and `returned`. My Performance reads a review sent back to its reviewer as With Reviewer. §5 and §10 updated; §10 now says the Function select the screens use (chips were never built).
 - 26/10/2026 · JP · Field messages in four words (FRONTEND_GUIDE §8.3), which the form cut to Check this value or Check the format: "Pick a quarter start", "Like 15 or 12.5" (a weight), "From 0 to 1" (a score or a rule's share, which read Too long), "Like 64000 or 0.95" (a quantity), "Pick a month" (a KPI's month).
+- 26/10/2026 · JP · Report Month refused a figure written as the screen writes it (fault #1 on
+  staging: `VALIDATION_FAILED: key_results.0.actual_value` at `POST /api/v1/performance/reports`,
+  23/10/2026). Its Actual was a text box sent as typed, so 64,000 reached the contract's `Quantity`
+  and was refused there. Every figure a person enters on Performance is now a `NumberField` that
+  keeps digits, one point and a leading minus (`signed`, new on `NumberField`), and Report Month
+  checks each Actual against `KeyResultReport` on its field before it sends anything (§11).
+
 - 25/10/2026 · JP · Two screen fixes found while writing the User Guide's Performance chapter
   (`docs/manual/performance.md`): the Commitments view offers Export Report only to a reader who
   holds `performance` export, as `POST /performance/commitments/report` requires (Staff and Line

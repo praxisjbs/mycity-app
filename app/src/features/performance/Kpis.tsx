@@ -26,6 +26,7 @@ import {
   HelpTerm,
   KeyValue,
   LoadingRows,
+  NumberField,
   PageHeader,
   SelectField,
   StatusPill,
@@ -216,7 +217,7 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
       <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>
       <Field label="Unit" optional {...f.status("unit")}><TextField {...f.field("unit")} /></Field>
       <Field label="Direction" {...f.status("direction")}><SelectField options={DIRECTIONS} {...f.field("direction")} /></Field>
-      <Field label="Target" optional {...f.status("target_value")}><TextField {...f.field("target_value")} inputMode="decimal" /></Field>
+      <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} /></Field>
       <Field label="Target Wording" optional {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
       <Field label="Frequency" {...f.status("frequency")}><SelectField options={FREQUENCIES} {...f.field("frequency")} /></Field>
       <Field label="Data Source" optional {...f.status("data_source")}><TextField {...f.field("data_source")} /></Field>
@@ -283,7 +284,7 @@ function ActualForm({ id, months, close }: { id: string; months: string[]; close
     <>
       <Field label="Month" {...f.status("month")}><SelectField options={months.map((m) => [m, formatMonth(m)] as [string, string])} {...f.field("month")} /></Field>
       <Field label="Result" {...f.status("result")}><SelectField options={RESULTS} {...f.field("result")} /></Field>
-      <Field label="Actual" optional {...f.status("actual_value")}><TextField {...f.field("actual_value")} inputMode="decimal" /></Field>
+      <Field label="Actual" optional {...f.status("actual_value")}><NumberField decimal signed {...f.field("actual_value")} /></Field>
       <Field label="Comment" optional {...f.status("comment")}><TextField {...f.field("comment")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
