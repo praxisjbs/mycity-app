@@ -3,12 +3,13 @@ import query_rules from "@mycity/contract/schemas/query_rules.js";
 import sanctions from "@mycity/contract/schemas/sanctions.js";
 import templates from "@mycity/contract/schemas/templates.js";
 import type { ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
 import { Letter, LetterFile } from "@/features/shared/Letter";
+import { withSignature } from "@/features/shared/signature";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
@@ -17,7 +18,7 @@ import { hasCapability } from "@/shell/access";
 import type { ModuleScreenProps } from "@/shell/screens";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  KeyValue, ListDetail, LoadingRows, RichText, Money, MoneyField, NumberField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who,
+  KeyValue, ListDetail, LoadingRows, RichText, Money, MoneyField, NumberField, PageHeader, SelectField, SignatureField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who, type SignatureFieldHandle,
 } from "@mycity/ui";
 
 /**
@@ -149,19 +150,23 @@ function QueryCard({ id }: { id: string }) {
   );
 }
 
-type RaiseValues = { subject: string; details: string };
+type RaiseValues = { subject: string; details: string; signature: string };
 
 function RaiseQuery({ close }: { close: () => void }) {
   const [who, setWho] = useState<PickedPerson[]>([]);
   const [tried, setTried] = useState(false);
   const employee = who[0]?.employee_id ?? "";
-  const f = useContractForm<RaiseValues>({ subject: "", details: "" }, { safeParse: (v: RaiseValues) => queries.QueryCreate.safeParse({ employee_id: employee || undefined, ...v }) });
+  const pad = useRef<SignatureFieldHandle>(null);
+  const f = useContractForm<RaiseValues>(
+    { subject: "", details: "", signature: "" },
+    withSignature({ safeParse: (v: unknown) => queries.QueryCreate.safeParse({ employee_id: employee || undefined, ...(v as RaiseValues) }) }, pad),
+  );
   const save = useMutation("POST /api/v1/queries");
   const submit = async () => {
     setTried(true);
     if (!f.check() || !employee) return;
     try {
-      const q = await save.run({ body: { employee_id: employee, subject: f.values.subject.trim(), details: f.values.details.trim() } });
+      const q = await save.run({ body: { employee_id: employee, subject: f.values.subject.trim(), details: f.values.details.trim(), signature: pad.current?.toPng() ?? "" } });
       invalidate("/api/v1/queries");
       close();
       toast(`${q.number} raised, letter sent`);
@@ -174,6 +179,9 @@ function RaiseQuery({ close }: { close: () => void }) {
       <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out" /></Field>
       <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
+      <Field label="Your Signature" {...f.status("signature")}>
+        <SignatureField ref={pad} label="Your Signature" onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
+      </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="send" busy={save.pending} onClick={submit}>Raise Query</Button>
@@ -182,19 +190,30 @@ function RaiseQuery({ close }: { close: () => void }) {
   );
 }
 
-type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string };
+type DecideValues = { outcome: string; consequence_step_id: string; reason: string; fine_amount: string; effective_on: string; ends_on: string; signature: string };
 const decisionOf = (v: DecideValues) => ({
   outcome: v.outcome as "no_action" | "sanction",
   reason: v.reason,
-  ...(v.outcome === "sanction" && { consequence_step_id: v.consequence_step_id || undefined, fine_amount: v.fine_amount.replace(/,/g, ""), effective_on: v.effective_on, ends_on: v.ends_on }),
+  ...(v.outcome === "sanction" && { consequence_step_id: v.consequence_step_id || undefined, fine_amount: v.fine_amount.replace(/,/g, ""), effective_on: v.effective_on, ends_on: v.ends_on, signature: v.signature || undefined }),
 });
 const money = (s: string) => (s && !s.includes(".") ? `${s}.00` : s && /\.\d$/.test(s) ? `${s}0` : s);
 
 function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDone: () => void }) {
   const chain = useApi("GET /api/v1/sanctions/chain", { query: { active: "true" } });
+  const pad = useRef<SignatureFieldHandle>(null);
   const f = useContractForm<DecideValues>(
-    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "" },
-    { safeParse: (v: DecideValues) => queries.QueryDecision.safeParse({ ...decisionOf(v), ...(v.outcome === "sanction" && { fine_amount: money(v.fine_amount.replace(/,/g, "")) }) }) },
+    { outcome: "no_action", consequence_step_id: q.next_step?.consequence_step_id ?? "", reason: "", fine_amount: "", effective_on: "", ends_on: "", signature: "" },
+    withSignature(
+      {
+        safeParse: (value: unknown) => {
+          const v = value as DecideValues;
+          return queries.QueryDecision.safeParse({ ...decisionOf(v), ...(v.outcome === "sanction" && { fine_amount: money(v.fine_amount.replace(/,/g, "")) }) });
+        },
+      },
+      pad,
+      // Only a sanction is signed (guide §6.4).
+      (v) => v.outcome === "sanction",
+    ),
   );
   const save = useMutation("POST /api/v1/queries/:id/decision");
   const steps = (chain.data?.data ?? []).filter((s) => s.letter_ready);
@@ -202,7 +221,10 @@ function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDon
   const submit = async () => {
     if (!f.check()) return;
     try {
-      const body = { ...decisionOf(f.values), ...(f.values.outcome === "sanction" && { fine_amount: money(f.values.fine_amount.replace(/,/g, "")) || undefined }) };
+      const body = {
+        ...decisionOf(f.values),
+        ...(f.values.outcome === "sanction" && { fine_amount: money(f.values.fine_amount.replace(/,/g, "")) || undefined, signature: pad.current?.toPng() ?? undefined }),
+      };
       const r = await save.run({ params: { id: q.employee_query_id }, body });
       invalidate("/api/v1/queries");
       onDone();
@@ -234,6 +256,11 @@ function Decide({ q, close, onDone }: { q: QueryDetail; close: () => void; onDon
         </>
       )}
       <Field label="Reason" {...f.status("reason")}><TextAreaField {...f.field("reason")} placeholder="Explanation accepted" /></Field>
+      {f.values.outcome === "sanction" && (
+        <Field label="Your Signature" {...f.status("signature")}>
+          <SignatureField ref={pad} label="Your Signature" onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
+        </Field>
+      )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Record Decision</Button>

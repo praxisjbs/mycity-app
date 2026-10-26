@@ -25,7 +25,7 @@ const {
   Paged,
 } = require("./common");
 const { PersonRef } = require("./organisation");
-const { RichTextBlock } = require("./policies");
+const { RichTextBlock, SignaturePng } = require("./policies");
 
 const QueryStatus = z.enum(["awaiting_response", "under_review", "resolved"]);
 const QueryOutcome = z.enum(["no_action", "sanctioned"]);
@@ -124,6 +124,8 @@ const QueryCreate = z
     subject: z.string().trim().min(4, "Name the subject").max(150),
     details: z.string().trim().min(20, "Give the facts").max(4000),
     letter_template: z.string().trim().max(64).optional(),
+    // The raiser's drawn signature (guide §6.2), kept in the vault and printed on the letter.
+    signature: SignaturePng,
   })
   .strict();
 
@@ -141,8 +143,14 @@ const QueryDecision = z
     ends_on: blank(isoDate),
     evidence: evidence.optional(),
     fine_amount: blank(money),
+    // The proposer's drawn signature, for a sanction (guide §6.4); printed on its letters.
+    signature: SignaturePng.optional(),
   })
   .strict()
+  .refine((v) => v.outcome !== "sanction" || Boolean(v.signature), {
+    message: "Sign in the box",
+    path: ["signature"],
+  })
   .refine((v) => v.outcome !== "sanction" || Boolean(v.consequence_step_id), {
     message: "Pick the sanction",
     path: ["consequence_step_id"],
@@ -279,7 +287,10 @@ const TABLES = {
   QueryListQuery: { table: null, reason: "list controls and filters for the Queries list" },
   QueryCreate: {
     table: "employee_query",
-    virtual: { letter_template: "the letter_template key the query letter is generated from" },
+    virtual: {
+      letter_template: "the letter_template key the query letter is generated from",
+      signature: "the drawn PNG, stored through the vault as signature_document_id",
+    },
   },
   QueryDecision: {
     table: null,

@@ -41,7 +41,8 @@ async function tx(fn) {
 function detailOf(row) {
   const {
     employee_id: _e, raised_by: _r, query_subject: _s, query_details: _d, query_raised_at: _a,
-    position: _p, letter_template: _l, financial_effect: _f, fine_amount: _m, ...out
+    position: _p, letter_template: _l, financial_effect: _f, fine_amount: _m,
+    signature_document_id: _sig, decided_by_title: _t, ...out
   } = row;
   return out;
 }
@@ -136,6 +137,11 @@ async function propose(client, actor, query, body) {
     ends_on: endsOn,
   });
   if (body.fine_amount) await repo.insertFine(client, id, body.fine_amount);
+  // The proposer signs it (guide §6.4); the issued letters print it.
+  if (body.signature) {
+    const queries = require("../queries/queries.service");
+    await repo.setSignature(client, id, await queries.storeSignature(client, body.signature, { type: "sanction", id }, actor));
+  }
   const payload = {
     sanction_id: id,
     employee_query_id: query.employee_query_id,

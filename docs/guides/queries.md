@@ -85,15 +85,16 @@ ESS · My Queries.
 | Table | Key columns | Notes |
 |---|---|---|
 | `query_rule` (3000, extended by 3010) | `code`, `name`, `source_event`, `measure`, `threshold`, `window_days`, `letter_template`, `active`, `activated_at` | One rule a row. `source_event` is the trigger (§6.3). A rule is a draft until first activated (`activated_at` null), active, or paused (`active` false after activation). No rule is seeded: thresholds are MyCity's choice (A26) |
-| `employee_query` (3000, 3010) | `number`, `employee_id`, `query_rule_id`, `raised_by`, `subject`, `details`, `evidence`, `status`, `outcome`, `response_due_at`, `reminded_at`, `dedup_key`, `letter_document_id`, `workflow_instance_id`, `reviewed_by`, `reviewed_at` | `raised_by` null means a rule raised it. `dedup_key` is unique, so a breach delivered twice raises one query. `status` is `awaiting_response`, `under_review`, `resolved`; `outcome` is `no_action` or `sanctioned` once resolved |
+| `employee_query` (3000, 3010, 3020) | `number`, `employee_id`, `query_rule_id`, `raised_by`, `subject`, `details`, `evidence`, `status`, `outcome`, `response_due_at`, `reminded_at`, `dedup_key`, `letter_document_id`, `signature_document_id`, `workflow_instance_id`, `reviewed_by`, `reviewed_at` | `raised_by` null means a rule raised it. `dedup_key` is unique, so a breach delivered twice raises one query. `status` is `awaiting_response`, `under_review`, `resolved`; `outcome` is `no_action` or `sanctioned` once resolved |
 | `query_response` (3000) | `employee_query_id`, `employee_id`, `body`, `submitted_at` | One per query, never updated |
 | `consequence_step` (3010) | `code`, `name`, `position`, `letter_template`, `financial_effect`, `default_days`, `valid_days`, `evidence_required`, `active` | MyCity's ladder, one rung a row, ordered by `position`. Entered on Chain Settings, not seeded (A26). `financial_effect`: `none`, `unpaid_days`, `ends_employment` |
-| `sanction` (3000, 3010) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `reason`, `evidence`, `decided_by`, `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed. `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
+| `sanction` (3000, 3010, 3020) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `reason`, `evidence`, `decided_by`, `signature_document_id`, `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed. `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
 | `sanction_fine` (3000) | `sanction_id`, `amount_ngn`, `settlement_status`, `settled_at` | An attachable outcome on any sanction, never a rung. `pending` until M6 accepts it into a run (`accepted`, then `settled`) or waives it |
 | `sanction_letter` (3000) | `sanction_id`, `document_id`, `letter_type` | The issued letters, from the vault: the rung's, and `salary-deduction-letter` when it carries a fine |
 | `letter_template` (3010) | `key`, `name`, `purpose`, `status` | The letters this module may send. The wording is `template_version` (0080) under the same key; the shipped default is `templates/documents/<key>.html`. `purpose`: `query`, `sanction` or `fine` (§6.6) |
 
-Schema migration file(s): `migrations/3000_queries_sanctions.sql` (merged), `migrations/3010_queries_chain.sql`.
+Schema migration file(s): `migrations/3000_queries_sanctions.sql` (merged), `migrations/3010_queries_chain.sql`,
+`migrations/3020_queries_signatures.sql` (the drawn signatures' `signature_document_id`).
 Reference-data file(s): `seeds/reference/3099_seed_queries_sanctions.sql` (merged),
 `seeds/reference/3190_seed_queries_chain.sql`: the `queries.configure` capability and its holders,
 the `queries.consequence` approval, the shipped letter templates' rows, and `3099`'s invalid
@@ -168,6 +169,10 @@ here.
   be recorded.
 - The query letter is generated in the same transaction (§6.7). A manual query uses the active
   letter template of purpose `query` chosen on the form, or the default `query-letter`.
+- **Signed.** The person raising it draws their signature on the form (`SignatureField`, a PNG
+  data URL, `signature`); the service stores it through the vault (`purpose: "signature"`, doc type
+  `query_signature`) as `employee_query.signature_document_id` and prints it on the letter above
+  their name. A rule's query has no signer to draw one: its letter is signed Operations & People.
 
 ### 6.3 Rules
 
@@ -199,9 +204,11 @@ here.
 - Before the response window ends, a decision needs the employee's response; after it, it does not.
 - **Close, no action**: a reason of at least 10 characters. Status `resolved`, outcome `no_action`.
 - **Propose a sanction**: a rung (`consequence_step_id`), a reason, evidence when the rung requires
-  it, the dates when its financial effect is `unpaid_days`, an optional fine. Writes the `sanction`
+  it, the dates when its financial effect is `unpaid_days`, an optional fine, and the proposer's
+  drawn signature (`signature`, stored as `sanction.signature_document_id`). Writes the `sanction`
   as `pending_approval` and opens `queries.consequence` with context `{ rank, fine_amount }`, in one
-  transaction. One open proposal a query.
+  transaction. One open proposal a query. The issued letters (§6.7) carry the proposer's signature,
+  name and job title: they decided it; the approval only lets it stand.
 
 ### 6.5 The chain
 
@@ -248,6 +255,12 @@ here.
 - Purposes: `query` (a query's letter), `sanction` (a rung's letter), `fine` (the deduction letter
   a fine sends, §6.6). Seven letters ship: Query, Warning, Question, Suspension, Suspension Without
   Pay, Termination and Salary Deduction.
+- **Layout** (meeting 26/10): a letter fits one page where its wording allows (the letterhead's
+  margins and type are set for it, and the signature block never splits from its name). Past one
+  page, the letterhead's header (logo, number, date) and footer (Settings · Organisation: name,
+  RC number, address, phone, email, website) repeat on every page, and every page is numbered
+  "Page 2 of 3". The letterhead is the shared one (`templates/documents/letterhead.html`), so every
+  generated document gains the repeat.
 - Letter templates added on the screen take a key `<slug>-letter`; generate() is given the template
   key with the shared doc types `query_letter` and `sanction_letter` (a small extension to
   `shared/documents/generate.js`: an explicit `template` for a doc type that allows it).
@@ -316,8 +329,9 @@ or tier 2.**
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
+| Raise a Query | Employee, Subject, What Happened, Your Signature | None | Where the signature is kept: §6.2 |
 | Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by, raised, response due, counted days, response, sanction); Raise a Query, Send Reminder, View Letter (the PDF the employee received), Record Decision | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 48 hour window | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
-| Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
+| Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason, Your Signature (for a sanction) | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
 | Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 30 days", status); Recent Firings; New Rule, Activate, Pause | Help on Measure: count or late minutes | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
@@ -390,6 +404,10 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · Signatures and layout (meeting 26/10): Raise a Query and a sanction's proposal
+  take a drawn signature, stored through the vault (`signature_document_id`, migration 3020) and
+  printed on the letter (§6.2, §6.4); the shared letterhead repeats its header and footer on every
+  page past the first, numbered (§6.7).
 - 26/10/2026 · GE · Letters (meeting 26/10): the Caution Letter is the Question Letter, its rung after
   the Warning (§6.5, §13); a fine sends the new Salary Deduction letter (purpose `fine`, amount
   through `shared/money`) beside the rung's, in one email (§4, §6.6, §6.7).

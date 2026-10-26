@@ -144,6 +144,10 @@ async function setLetter(db, id, documentId) {
   await db.query("UPDATE employee_query SET letter_document_id = $2 WHERE employee_query_id = $1", [id, documentId]);
 }
 
+async function setSignature(db, id, documentId) {
+  await db.query("UPDATE employee_query SET signature_document_id = $2 WHERE employee_query_id = $1", [id, documentId]);
+}
+
 async function setReminded(db, id) {
   await db.query("UPDATE employee_query SET reminded_at = now() WHERE employee_query_id = $1", [id]);
 }
@@ -277,6 +281,7 @@ module.exports = {
   insert,
   dedupTaken,
   setLetter,
+  setSignature,
   setReminded,
   resolve,
   setReview,

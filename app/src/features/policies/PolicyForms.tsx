@@ -1,9 +1,10 @@
 import policies from "@mycity/contract/schemas/policies.js";
 import type { Policy } from "@mycity/contract/contract.gen.ts";
-import { useRef, type RefObject } from "react";
+import { useRef } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useMutation } from "@/api/hooks";
-import { Button, DateField, Field, FormFooter, SignatureField, TextAreaField, toast, todayIso, useContractForm, type ContractSchema, type SignatureFieldHandle } from "@mycity/ui";
+import { Button, DateField, Field, FormFooter, SignatureField, TextAreaField, toast, todayIso, useContractForm, type SignatureFieldHandle } from "@mycity/ui";
+import { withSignature } from "@/features/shared/signature";
 import { WhatChanged } from "./PolicyText";
 
 /**
@@ -12,20 +13,6 @@ import { WhatChanged } from "./PolicyText";
  * and the reasons for Withdraw, Recall, Archive and Reject. Each validates with the contract's
  * schema; the signature is the pad's PNG, read when the form is checked.
  */
-
-/** The contract's schema with the pad's PNG put in for `signature`, and a plain mark when it is empty. */
-function withSignature(schema: ContractSchema, pad: RefObject<SignatureFieldHandle | null>): ContractSchema {
-  return {
-    safeParse: (value: unknown) => {
-      const v = value as Record<string, unknown>;
-      const png = v.signature ? (pad.current?.toPng() ?? null) : null;
-      const r = schema.safeParse({ ...v, signature: png ?? "" });
-      if (r.success || png) return r;
-      const others = (r.error?.issues ?? []).filter((i) => i.path[0] !== "signature");
-      return { success: false, error: { issues: [...others, { path: ["signature"], message: "Sign in the box", code: "custom" }] } };
-    },
-  };
-}
 
 /**
  * A refusal on the sheet: its fields' marks, and the reason as a toast when no field on the sheet

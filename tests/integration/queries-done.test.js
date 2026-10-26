@@ -81,6 +81,10 @@ async function settle() {
   }
 }
 
+/** A drawn signature, as the pad sends it: a real PNG (one pixel). */
+const SIGNATURE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
 describeDb("M3 definition of done", () => {
   let app;
   const people = {};
@@ -124,6 +128,7 @@ describeDb("M3 definition of done", () => {
       outcome: "sanction",
       consequence_step_id: step,
       reason: "The explanation does not account for the late arrivals.",
+      signature: SIGNATURE,
       ...extra,
     });
     expect(res.status).toBe(200);

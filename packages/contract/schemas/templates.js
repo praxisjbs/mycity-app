@@ -127,7 +127,18 @@ const ConsequenceLetterVars = z
     ends_on: isoDate.nullable().default(null),
     days: z.number().int().nullable().default(null),
     fine_amount: money.nullable().default(null),
-    signer: z.object({ name: z.string(), role: z.string() }).strict(),
+    signer: z
+      .object({
+        name: z.string(),
+        role: z.string(),
+        // The signer's drawn signature as a PNG data URL, printed above their name (guide §6.2).
+        signature: z
+          .string()
+          .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/)
+          .nullable()
+          .default(null),
+      })
+      .strict(),
   })
   .strict();
 

@@ -5,7 +5,6 @@ title: "Query {{ query_number }}"
   .ql p { margin: 0 0 10px 0; }
   .ql .ql-ref { font-size: 9pt; color: #71717A; }
   .ql h2 { font-size: 12pt; margin: 16px 0 8px 0; }
-  .ql .ql-sign { margin-top: 28px; }
 </style>
 <div class="ql">
   <p class="ql-ref">{{ query_number }} · {{ longdate raised_on }}</p>
@@ -14,5 +13,4 @@ title: "Query {{ query_number }}"
   <p>Dear {{ employee.first_name }},</p>
   <p>{{ details }}</p>
   <p>Please explain this in writing{{#if response_due}} by {{ datetime response_due }}{{/if}}, in My Queries on the MyCity hub. Your response is read before any decision is made.</p>
-  <p class="ql-sign">{{ signer.name }}<br>{{ signer.role }}</p>
 </div>

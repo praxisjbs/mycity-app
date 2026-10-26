@@ -20,6 +20,7 @@ const { defineVariables } = require("../../shared/templates/variables");
 const outbox = require("../../shared/events/outbox");
 const vault = require("../../shared/documents/vault");
 const { QUERY_LETTER } = require("../templates/templates.events");
+const { defineDocumentType } = require("../../shared/documents/types");
 
 const EVENTS = defineEvents("queries", {
   "query.raised": { summary: "A query was raised" },
@@ -71,4 +72,8 @@ outbox.register(vault.EVENTS.DOCUMENT_GENERATED, "queries.letter_email", async (
   await require("./queries.service").emailLetter(event.payload.document_id);
 });
 
-module.exports = { EVENTS };
+/** A drawn signature on a query or a proposed sanction (guide §6.2, §6.4), kept in the vault. */
+const SIGNATURE_DOC_TYPE = "query_signature";
+defineDocumentType(SIGNATURE_DOC_TYPE, { label: "Query signature", module: "queries", sensitivity: "normal" });
+
+module.exports = { EVENTS, SIGNATURE_DOC_TYPE };

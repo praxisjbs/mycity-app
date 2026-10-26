@@ -5,7 +5,6 @@ title: "Salary Deduction: {{ query_number }}"
   .sd p { margin: 0 0 10px 0; }
   .sd .sd-ref { font-size: 9pt; color: #71717A; }
   .sd h2 { font-size: 12pt; margin: 16px 0 8px 0; }
-  .sd .sd-sign { margin-top: 28px; }
 </style>
 <div class="sd">
   <p class="sd-ref">{{ query_number }} · {{ longdate effective_on }}</p>
@@ -15,5 +14,4 @@ title: "Salary Deduction: {{ query_number }}"
   <p>Following query {{ query_number }} ({{ subject }}){{#if step_name}} and the {{ step_name }} issued with it{{/if}}, {{ money fine_amount }} will be deducted from your salary.</p>
   {{#if reason}}<p>{{ reason }}</p>{{/if}}
   <p>The deduction is made in a payroll run once Operations &amp; People accept it into that run. Your payslip for that month shows it with this query's number.</p>
-  <p class="sd-sign">{{ signer.name }}<br>{{ signer.role }}</p>
 </div>

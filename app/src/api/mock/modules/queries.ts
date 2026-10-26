@@ -354,10 +354,11 @@ route("GET /api/v1/queries/:id", (req) => {
   return q ? ok(view(q, req.user!)) : notFound();
 });
 route("POST /api/v1/queries", (req) => {
-  const b = req.body as { employee_id?: string; subject?: string; details?: string };
+  const b = req.body as { employee_id?: string; subject?: string; details?: string; signature?: string };
   const p = byId(b.employee_id);
   const f: Record<string, string[]> = {};
   if (!p) f.employee_id = ["Required"];
+  if (!/^data:image\/png;base64,/.test(b.signature ?? "")) f.signature = ["Sign in the box"];
   if (!b.subject || b.subject.trim().length < 4) f.subject = ["Name the subject"];
   if (!b.details || b.details.trim().length < 20) f.details = ["Give the facts"];
   if (Object.keys(f).length) return invalid(f);
@@ -380,8 +381,9 @@ route("POST /api/v1/queries/:id/decision", (req) => {
   const q = findQ(user, req.params.id);
   if (!q) return notFound();
   if (!view(q, user).can_decide) return fail(409, "QUERY_NOT_DECIDABLE", "Wait for the response or the deadline");
-  const b = req.body as { outcome?: string; reason?: string; consequence_step_id?: string; fine_amount?: string; effective_on?: string; ends_on?: string };
+  const b = req.body as { outcome?: string; reason?: string; consequence_step_id?: string; fine_amount?: string; effective_on?: string; ends_on?: string; signature?: string };
   if (!b.reason || b.reason.trim().length < 10) return invalid({ reason: ["Record the reason"] });
+  if (b.outcome === "sanction" && !/^data:image\/png;base64,/.test(b.signature ?? "")) return invalid({ signature: ["Sign in the box"] });
   if (b.outcome === "no_action") {
     Object.assign(q, { status: "resolved", outcome: "no_action", reviewed_at: now(), reviewed_by_name: nameOf(user) });
     return ok(view(q, user));

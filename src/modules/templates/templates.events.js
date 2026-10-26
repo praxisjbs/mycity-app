@@ -56,6 +56,7 @@ defineDocType(QUERY_LETTER, {
   numbering: "letter",
   sensitivity: "personal",
   title: (d) => `Query ${d.query_number}: ${d.subject}`,
+  signedBy: (d) => d.signer,
 });
 
 defineDocType(SANCTION_LETTER, {
@@ -66,6 +67,7 @@ defineDocType(SANCTION_LETTER, {
   numbering: "letter",
   sensitivity: "personal",
   title: (d) => `${d.step_name || "Sanction"}: ${d.query_number}`,
+  signedBy: (d) => d.signer,
 });
 
 module.exports = { EVENTS, SHIPPED, FINE_LETTER_KEY, declare, QUERY_LETTER, SANCTION_LETTER };

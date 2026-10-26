@@ -12,6 +12,7 @@ const { pool } = require("../../config/db");
 const documents = require("../../shared/documents/generate");
 const vault = require("../../shared/documents/vault");
 const lagos = require("../../shared/time/lagos");
+const storage = require("../../services/storage/storage.service");
 const templates = require("../templates/templates.service");
 const {
   SANCTION_LETTER,
@@ -19,11 +20,26 @@ const {
 } = require("../templates/templates.events");
 const repo = require("./sanctions.repo");
 
-/** Who signs a sanction letter: the function that approved it. */
+/** Who signs a sanction letter without a drawn signature on it (one proposed before 3020). */
 const SIGNER = Object.freeze({
   name: "Operations & People",
   role: "Operations & People",
 });
+
+/**
+ * The person who proposed the sanction signs its letters (guide §6.4): their name, job title
+ * and the signature they drew, read back from the vault.
+ */
+async function signerOf(db, row) {
+  if (!row.signature_document_id) return SIGNER;
+  const doc = await vault.get(db, row.signature_document_id);
+  const bytes = doc ? await storage.get(doc.storage_key).catch(() => null) : null;
+  return {
+    name: row.decided_by_name || SIGNER.name,
+    role: row.decided_by_title || SIGNER.role,
+    signature: bytes ? `data:image/png;base64,${bytes.toString("base64")}` : null,
+  };
+}
 
 async function employeeOf(db, employeeId) {
   const { rows } = await db.query(
@@ -74,7 +90,7 @@ async function generate(client, row, number, actor) {
     ends_on: row.ends_on,
     days: daysOf(row),
     fine_amount: row.fine_amount || null,
-    signer: SIGNER,
+    signer: await signerOf(client, row),
   };
   const letter = (template) =>
     documents.generate(client, {

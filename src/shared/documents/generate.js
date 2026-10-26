@@ -47,6 +47,11 @@
  *   defineDocType("sanction_letter", { template: "warning-letter", templateChoice: true, ... });
  *   await documents.generate(client, { doc_type: "sanction_letter", template: step.letter_template, ... });
  *
+ * A doc type whose documents someone signs off declares `signedBy: (data) => data.signer`. The
+ * letterhead then closes the body with that person's block, `{ name, role, signature }` (a PNG
+ * data URL drawn on a SignatureField, or null), whatever the template, so a letter written on a
+ * screen in Markdown is signed like a shipped one.
+ *
  * Brand: the Logo uploaded on Settings · Organisation (else assets/brand/logo.png when
  * present, else the company's name in the letterhead's type) and the Geist fonts
  * (assets/fonts/*.woff2) are embedded as data URLs, because the PDF renderer fetches nothing.
@@ -79,7 +84,8 @@ const SENSITIVITIES = new Set(["normal", "personal", "restricted"]);
  * @param {string} docType  snake_case
  * @param {{template: string, numbering?: string|null, sensitivity?: string, title: (data: object) => string,
  *          landscape?: boolean, label?: string, module?: string|null, signable?: boolean, wet?: boolean,
- *          export?: boolean, templateChoice?: boolean}} spec
+ *          export?: boolean, templateChoice?: boolean,
+ *          signedBy?: (data: object) => ({name: string, role: string, signature?: string|null}|null)}} spec
  */
 function defineDocType(docType, spec) {
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(docType))
@@ -96,6 +102,8 @@ function defineDocType(docType, spec) {
     );
   if (typeof spec.title !== "function")
     throw new Error(`defineDocType(${docType}): title is (data) => string`);
+  if (spec.signedBy !== undefined && typeof spec.signedBy !== "function")
+    throw new Error(`defineDocType(${docType}): signedBy is (data) => the signer`);
   if (DOC_TYPES.has(docType) && DOC_TYPES.get(docType) !== spec)
     throw new Error(`defineDocType: ${docType} is already defined`);
   DOC_TYPES.set(
@@ -271,7 +279,7 @@ async function generate(
     org,
     number,
     today: day,
-    doc: { title },
+    doc: { title, signer: spec.signedBy ? spec.signedBy(checked) || null : null },
   });
 
   const id = crypto.randomUUID();

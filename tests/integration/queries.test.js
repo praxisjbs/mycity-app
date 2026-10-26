@@ -23,6 +23,9 @@ const realtime = require("../../src/services/realtime/emitter");
 
 // The queues would hold Redis connections open past the run: the jobs a handler queues are
 // kept here (the letter's PDF render, its email).
+/** A drawn signature, as the pad sends it: a real PNG (one pixel). */
+const SIGNATURE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 const sent = [];
 jest.mock("../../src/jobs/queues", () => ({
   enqueue: jest.fn(async (queue, name, data, opts) => {
@@ -257,6 +260,7 @@ describeDb("queries and sanctions against the real migrations", () => {
         employee_id: people[employee].employee.employee_id,
         subject,
         details: "There is no clock-out recorded for Thursday's shift at the Yaba site.",
+        signature: SIGNATURE,
       });
     const notified = async (who, key) =>
       (
@@ -268,6 +272,14 @@ describeDb("queries and sanctions against the real migrations", () => {
     const ids = {};
 
     test("a manager raises a query: numbered, awaiting a response, with its letter; the employee is told", async () => {
+      // Unsigned, it is refused on the pad.
+      const unsigned = await as("manager").post("/queries", {
+        employee_id: people.staff.employee.employee_id,
+        subject: "Missing clock-out on Thursday",
+        details: "There is no clock-out recorded for Thursday's shift at the Yaba site.",
+      });
+      expect(unsigned.status).toBe(422);
+      expect(Object.keys(unsigned.body.error.fields)).toEqual(["signature"]);
       const res = await raise("manager", "staff");
       expect(res.status).toBe(201);
       expect(res.body).toMatchObject({
@@ -295,6 +307,11 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(html).toContain("QRY-0001");
       expect(html).toContain("Dear Musa,");
       expect(html).toContain("Kemi Alade");
+      // Signed: the drawn signature is kept in the vault and printed above the raiser's name.
+      expect(html).toContain('<img src="data:image/png;base64,');
+      expect(html).toContain('alt="Signature of Kemi Alade"');
+      const kept = (await q("SELECT signature_document_id FROM employee_query WHERE employee_query_id = $1", [ids.first])).rows[0];
+      expect(kept.signature_document_id).toBeTruthy();
       const doc = await documents.renderPending(docId, { db: pool });
       expect(doc.locked_at).toBeTruthy();
 
@@ -451,6 +468,7 @@ describeDb("queries and sanctions against the real migrations", () => {
         employee_id: people.other.employee.employee_id,
         subject,
         details: "The incident is recorded in the site log for the day in question.",
+        signature: SIGNATURE,
       });
       expect(raised.status).toBe(201);
       const id = raised.body.employee_query_id;
@@ -465,6 +483,7 @@ describeDb("queries and sanctions against the real migrations", () => {
         outcome: "sanction",
         consequence_step_id: steps[step],
         reason: "The explanation does not account for the incident.",
+        signature: SIGNATURE,
         ...extra,
       });
     const approve = async (who, instanceId) => {
@@ -554,6 +573,8 @@ describeDb("queries and sanctions against the real migrations", () => {
       const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [docId])).rows[0].render_html;
       expect(html).toContain("Dear Zainab, following query");
       expect(html).toContain("this is a written warning: The explanation does not account for the incident.");
+      // Signed by its proposer (guide §6.4), with the signature they drew.
+      expect(html).toContain('alt="Signature of');
       await documents.renderPending(docId, { db: pool });
       sent.length = 0;
       await drain();

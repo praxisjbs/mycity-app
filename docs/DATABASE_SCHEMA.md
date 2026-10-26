@@ -376,9 +376,12 @@ invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six star
 **Built:** `3000` query rules, queries, responses, sanctions, fines, letters · `3099` seed ·
 `3010` the chain (`consequence_step`, one rung a row in position order), `letter_template`, a rule's
 `measure`, letter and drafts, the query's `dedup_key` (three punches raise exactly one query),
-outcome and letter, a sanction's number, rung, evidence and approval · `3190` the `queries.configure`
+outcome and letter, a sanction's number, rung, evidence and approval; `letter_template.purpose`
+`query`, `sanction` or `fine` · `3020` the drawn signatures, `signature_document_id` on
+`employee_query` and `sanction` (the vault keeps the PNG) · `3190` the `queries.configure`
 capability, the `queries.consequence` approval (replacing `3099`'s invalid `employee_consequence`,
-switched off) and the shipped letters' rows (docs/guides/queries.md §4).
+switched off) and the shipped letters' rows, seven with the Question and Salary Deduction letters
+(docs/guides/queries.md §4).
 
 **Owes:**
 - Fines as pending deductions accepted into the M6 payroll run (MILESTONES §8): M6 reads

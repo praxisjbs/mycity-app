@@ -28,7 +28,7 @@ const { QUERY_LETTER } = require("../templates/templates.events");
 const md = require("../../shared/documents/markdown");
 const repo = require("./queries.repo");
 const visibility = require("./queries.visibility");
-const { EVENTS } = require("./queries.events");
+const { EVENTS, SIGNATURE_DOC_TYPE } = require("./queries.events");
 
 /** How long the employee has to answer (guide §6.2), until Settings · Queries (M9) holds it. */
 const RESPONSE_HOURS = 48;
@@ -106,6 +106,24 @@ async function get(id, user, scope) {
  * Raising
  * ------------------------------------------------------------------ */
 
+/**
+ * A drawn signature (the pad's PNG data URL) kept through the vault for the record it signs.
+ * The sanctions service stores a proposer's the same way.
+ * @returns {Promise<string>} the document_id
+ */
+async function storeSignature(client, png, entity, actor) {
+  const buffer = Buffer.from(String(png).replace(/^data:image\/png;base64,/, ""), "base64");
+  const doc = await vault.store(client, {
+    file: { buffer, originalname: "signature.png" },
+    purpose: "signature",
+    doc_type: SIGNATURE_DOC_TYPE,
+    entity,
+    sensitivity: "normal",
+    actor,
+  });
+  return doc.document_id;
+}
+
 /** What every query letter fills from (ConsequenceLetterVars). */
 function letterData(person, row, signer) {
   return {
@@ -128,7 +146,7 @@ function letterData(person, row, signer) {
  * The insert, the letter and the event, on the caller's transaction. Returns the new id,
  * or null when `dedup_key` was already taken.
  */
-async function insertQuery(client, { person, subject, details, evidence, rule, raisedBy, dedupKey, letterKey, signer, actor }) {
+async function insertQuery(client, { person, subject, details, evidence, rule, raisedBy, dedupKey, letterKey, signer, signature = null, actor }) {
   if (dedupKey && (await repo.dedupTaken(client, dedupKey))) return null;
   const number = (await numbering.allocate(client, "query")).number;
   const responseDue = new Date(Date.now() + RESPONSE_HOURS * 3600 * 1000).toISOString();
@@ -144,6 +162,7 @@ async function insertQuery(client, { person, subject, details, evidence, rule, r
     dedup_key: dedupKey,
   });
   if (!id) return null;
+  if (signature) await repo.setSignature(client, id, await storeSignature(client, signature, { type: "query", id }, actor));
   const doc = await documents.generate(client, {
     doc_type: QUERY_LETTER,
     template: letterKey,
@@ -200,7 +219,10 @@ async function raise(actor, scope, body) {
       raisedBy: actor.user_id,
       dedupKey: null,
       letterKey,
-      signer: me ? { name: me.display_name, role: me.job_title || "Manager" } : PEOPLE_SIGNER,
+      signer: me
+        ? { name: me.display_name, role: me.job_title || "Manager", signature: body.signature }
+        : { ...PEOPLE_SIGNER, signature: body.signature },
+      signature: body.signature,
       actor,
     });
   });
@@ -364,6 +386,7 @@ module.exports = {
   respond,
   emailLetter,
   letterData,
+  storeSignature,
   decidable,
   remindable,
 };
