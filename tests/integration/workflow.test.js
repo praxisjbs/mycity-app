@@ -10,6 +10,8 @@
  * public schema. Every person here is invented.
  */
 const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
 const request = require("supertest");
 const c = require("@mycity/contract");
 const { config } = require("../../src/config/env");
@@ -20,6 +22,8 @@ const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
 const engine = require("../../src/shared/workflow/engine");
+const deliveryPlan = require("../../src/shared/delivery-plan");
+const contractPlan = require("@mycity/contract/plan");
 
 const describeDb = String(config.DB_NAME || "").endsWith("_test") ? describe : describe.skip;
 
@@ -335,5 +339,24 @@ describeDb("approvals against the real migrations", () => {
     const seen = await as("ceo").get(`/workflow/instances/${id}`);
     expect(seen.body).toMatchObject({ can_decide: true, can_reassign: true });
     expect((await as("ceo").post(`/workflow/instances/${id}/approve`, {})).body.state).toBe("approved");
+  });
+
+  test("a request about a record whose screen has not shipped waits in nobody's Need You (QA DEF-01)", async () => {
+    const { workflow_instance_id: id } = await openLeave("staff", 1);
+    // As a request about an expense would read, before Expenses has its API on staging.
+    await q("UPDATE workflow_instance SET entity_type = 'expense' WHERE workflow_instance_id = $1", [id]);
+    const listed = async () => (await as("manager").get("/workflow/mine")).body.data.map((r) => r.workflow_instance_id);
+    const counted = async () => (await as("manager").get("/workflow/mine/count")).body.waiting;
+    const waiting = await counted();
+    expect(await listed()).toContain(id);
+    const docs = contractPlan.readPlan((rel) => fs.readFileSync(path.join(__dirname, "../..", rel), "utf8"));
+    deliveryPlan.use({ plan: docs, rule: "staging" });
+    try {
+      expect(await listed()).not.toContain(id);
+      expect(await counted()).toBe(waiting - 1);
+    } finally {
+      deliveryPlan.use();
+    }
+    expect(await listed()).toContain(id);
   });
 });

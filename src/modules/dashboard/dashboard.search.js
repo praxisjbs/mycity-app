@@ -8,12 +8,13 @@
  * rather than a table. Every login holds `home` view, the only check the search service
  * makes, so the provider decides per person: only cards eligible for the reader (their
  * module's `view`, the card's capability, its field unmasked; kpi-catalog/eligibility.js)
- * and offered on the Overview, never a card they cannot open. Paged at 25, as every list. Each
- * result names its card's module, so the app leaves out a card whose module is Coming Soon in
- * that build, as the Overview does.
+ * and offered on the Overview, never a card they cannot open, nor one whose module has not
+ * shipped (shared/delivery-plan: it would count records behind Coming Soon). Paged at 25, as
+ * every list. Each result names its card's module, which the app checks by the same rule.
  */
 const { pageOf, envelope } = require("../../shared/http/paged");
 const routeMap = require("../../shared/route-map");
+const deliveryPlan = require("../../shared/delivery-plan");
 const kpi = require("./kpi-catalog");
 const eligibility = require("./kpi-catalog/eligibility");
 
@@ -37,7 +38,9 @@ module.exports = Object.freeze({
   async search(client, { term, page = 1, user }) {
     const wanted = fold(term);
     const { eligible } = await eligibility.forUser(client, user);
-    const found = kpi.CATALOG.filter((e) => kpi.isPickable(e.id) && eligible.has(e.id) && matches(e, wanted));
+    const found = kpi.CATALOG.filter(
+      (e) => kpi.isPickable(e.id) && eligible.has(e.id) && deliveryPlan.moduleOpen(e.module) && matches(e, wanted),
+    );
     const { number, size, offset } = pageOf({ page });
     const items = found.slice(offset, offset + size).map((e) => ({
       id: e.id,
