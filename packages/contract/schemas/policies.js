@@ -121,6 +121,8 @@ const PolicyVersion = z
     effective_from: isoDate,
     note: z.string(),
     ...contentFields,
+    /** Whether it went through approval: a new draft starts with the same. */
+    needs_approval: z.boolean(),
     published_at: isoDateTime.nullable(),
     published_by_name: z.string().nullable(),
     withdrawn_at: isoDateTime.nullable(),
@@ -164,6 +166,10 @@ const PolicySubmission = z
     submitted_by_name: z.string().nullable(),
     stage_name: z.string().nullable(),
     workflow_instance_id: uuid.nullable(),
+    /** What was sent, as the editor shows it while it waits. */
+    content: PolicyDraft,
+    /** Whether the reader may recall it: the person who sent it, or the CEO. */
+    can_recall: z.boolean(),
   })
   .strict();
 

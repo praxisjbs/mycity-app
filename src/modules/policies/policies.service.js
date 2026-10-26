@@ -238,6 +238,7 @@ function asVersion(d, today, inForceId) {
     applies_to_text: content.applies_to_text,
     needs_acknowledgement: row.needs_acknowledgement,
     acknowledge_within_days: Number(row.acknowledge_within_days),
+    needs_approval: Boolean(row.needs_approval),
     body: d.body,
     rules: content.rules,
     sections: d.sections,
@@ -296,9 +297,8 @@ async function get(user, id, { db = pool } = {}) {
   const shown = [land.inForce, land.waiting].filter(Boolean);
   const decorated = await decorate(db, shown, today);
   const byId = new Map(decorated.map((d) => [d.row.policy_version_id, d]));
-  const draftRow = land.draft;
-  let draft = null;
-  if (draftRow) {
+  /** A working version as the editor loads it: the draft, or what a submission sent. */
+  const editorOf = async (draftRow) => {
     const [audience, baseAudience, people] = await Promise.all([
       repo.audienceOf(db, [draftRow.policy_version_id]),
       land.newest ? repo.audienceOf(db, [land.newest.policy_version_id]) : [],
@@ -307,7 +307,7 @@ async function get(user, id, { db = pool } = {}) {
     const content = contentOf(draftRow, audience);
     const base = land.newest ? contentOf(land.newest, baseAudience) : null;
     const change = changesOf(policy.kind, base, content);
-    draft = {
+    return {
       policy_version_id: draftRow.policy_version_id,
       title: content.title,
       applies_to: content.applies_to,
@@ -322,7 +322,8 @@ async function get(user, id, { db = pool } = {}) {
       updated_at: iso(draftRow.updated_at),
       updated_by_name: draftRow.updated_by_name || null,
     };
-  }
+  };
+  const draft = land.draft ? await editorOf(land.draft) : null;
   const submission = land.submission
     ? {
         policy_version_id: land.submission.policy_version_id,
@@ -332,6 +333,8 @@ async function get(user, id, { db = pool } = {}) {
         submitted_by_name: land.submission.submitted_by_name || null,
         stage_name: await stageName(db, land.submission.workflow_instance_id),
         workflow_instance_id: land.submission.workflow_instance_id || null,
+        content: await editorOf(land.submission),
+        can_recall: policy.status === "active" && mayRecall(user, land.submission),
       }
     : null;
   const spec = types.typeOf(policy.kind);
@@ -686,6 +689,8 @@ async function recall(user, id, body) {
     await repo.lock(client, policy.policy_id);
     const submission = await repo.workingVersion(client, policy.policy_id, "submitted");
     if (!submission) throw new AppError("NOT_SUBMITTED", "Nothing is waiting for approval", 409);
+    if (!mayRecall(user, submission))
+      throw new AppError("NOT_YOURS", "Only the person who sent it, or the CEO, can recall it", 403);
     if (submission.workflow_instance_id)
       await workflow.cancel(client, { instance_id: submission.workflow_instance_id, actor: user, reason: body.reason });
     await repo.backToDraft(client, submission.policy_version_id);
@@ -700,6 +705,9 @@ async function recall(user, id, body) {
   });
   return get(user, policyId);
 }
+
+/** Who may recall a submission: the person who sent it, or the CEO (the engine's rule for a request). */
+const mayRecall = (user, submission) => Boolean(user) && (user.is_ceo === true || submission.submitted_by === user.user_id);
 
 /** POST /policies/versions/:id/withdraw: a version waiting to start never applies. */
 async function withdraw(user, versionId, body) {
@@ -759,6 +767,9 @@ async function archive(user, id, body) {
     await repo.lock(client, policy.policy_id);
     if (policy.kind !== "document")
       throw new AppError("CANNOT_ARCHIVE", "A rules policy always applies; change its rules instead", 422);
+    // An approval still open would publish a version of an archived policy (the owner, 26/10/2026).
+    if (await repo.workingVersion(client, policy.policy_id, "submitted"))
+      throw new AppError("SUBMISSION_WAITING", "A version waits for approval. Recall it first.", 409);
     if (!(await repo.archivePolicy(client, policy.policy_id, { reason: body.reason, userId: user.user_id })))
       throw new AppError("POLICY_ARCHIVED", "This policy is already archived", 409);
     await emit(client, {
@@ -851,7 +862,8 @@ async function settleApproval(event) {
     const reason = event.payload.reason || "No reason given";
     await emit(client, {
       key: EVENTS.POLICY_REJECTED,
-      entity: { type: VERSION_ENTITY, id: versionId },
+      // The version is a draft again: the notice opens the policy on Knowledge Hub, where the draft is.
+      entity: { type: "policy", id: row.policy_id },
       actor: event.actor_user_id || null,
       after: { status: "draft", state, reason },
       payload: {
@@ -960,6 +972,7 @@ async function myVersion(user, versionId, { db = pool } = {}) {
     asked: _asked,
     acknowledged: _acknowledged,
     overdue: _overdue,
+    needs_approval: _approval,
     ...shown
   } = asVersion(d, today, inForceId);
   return {

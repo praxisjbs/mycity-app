@@ -19,6 +19,7 @@ import {
   Pill,
   Reader,
   SegmentedControl,
+  useIsPhone,
   useModal,
   type GuideBlock,
   type GuideLinkFrom,
@@ -162,11 +163,13 @@ function Zoomed({ url, alt }: { url: string; alt: string }) {
 
 function useZoom(chapter: GuideChapter | undefined) {
   const modal = useModal();
+  const phone = useIsPhone();
   return (shot: string) => {
     if (!chapter) return;
     const p = chapter.pictures.find((x) => x.shot === shot);
     if (!p) return;
-    const device = p.devices.includes("desktop") ? "desktop" : "phone";
+    // The picture the text showed: the phone's on a phone when there is one, else the computer's.
+    const device = (phone && p.devices.includes("phone")) || !p.devices.includes("desktop") ? "phone" : "desktop";
     modal.open({ title: "Picture", wide: true, body: <Zoomed url={imageUrl(chapter.slug, shot, device)} alt={shot} /> });
   };
 }

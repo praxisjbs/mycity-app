@@ -397,9 +397,19 @@ describeDb("policies against the real migrations", () => {
     const back = await as("ops").get(`/policies/${itId}`);
     expect(back.body).toMatchObject({ state: "in_force", submission: null, draft: expect.objectContaining({ policy_version_id: id }) });
     const [notice] = await noticesOf("ops", "policy.rejected");
-    expect(notice).toMatchObject({ title: "Policy not approved", body: "IT Equipment: Name what must be returned" });
+    // It opens the policy, where the draft is: the version it named is a draft again.
+    expect(notice).toMatchObject({ title: "Policy not approved", body: "IT Equipment: Name what must be returned", entity_type: "policy", entity_id: itId });
 
     await as("ops").post(`/policies/${itId}/submit`, { effective_from: day(1), note: "Everything returned", signature });
+    // While it waits, the editor shows what was sent, and only its sender (or the CEO) may recall it.
+    expect((await as("ops").get(`/policies/${itId}`)).body.submission).toMatchObject({
+      can_recall: true,
+      content: expect.objectContaining({ policy_version_id: id, needs_approval: true, body_html: expect.stringContaining("Return everything") }),
+    });
+    // An approval still open would publish a version of an archived policy: recall it first (the owner, 26/10/2026).
+    const archiving = await as("ops").post(`/policies/${itId}/archive`, { reason: "Replaced by the handbook" });
+    expect(archiving.status).toBe(409);
+    expect(archiving.body.error.code).toBe("SUBMISSION_WAITING");
     const recalled = await as("ops").post(`/policies/${itId}/recall`, { reason: "Adding the list first" });
     expect(recalled.body).toMatchObject({ submission: null, draft: expect.objectContaining({ policy_version_id: id }) });
     expect((await as("ceo").get("/policies/me?state=waiting_on_me")).body.data).toEqual([]);

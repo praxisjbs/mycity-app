@@ -27,9 +27,15 @@ function withSignature(schema: ContractSchema, pad: RefObject<SignatureFieldHand
   };
 }
 
-const failed = (e: unknown, fallback: string, setFields: (f: Record<string, string[]>) => void) => {
-  if (e instanceof ApiError && Object.keys(e.fields).length) setFields(e.fields);
-  else toast(e instanceof ApiError ? e.message : fallback);
+/**
+ * A refusal on the sheet: its fields' marks, and the reason as a toast when no field on the sheet
+ * holds it (an empty policy text is the editor's, not this sheet's).
+ */
+const failed = (e: unknown, fallback: string, setFields: (f: Record<string, string[]>) => void, bound: readonly string[]) => {
+  if (e instanceof ApiError && Object.keys(e.fields).length) {
+    setFields(e.fields);
+    if (Object.keys(e.fields).some((k) => !bound.includes(k))) toast.error(e.message);
+  } else toast.error(e instanceof ApiError ? e.message : fallback);
 };
 
 /** The day after an ISO date. */
@@ -60,7 +66,7 @@ export function SendForm({ p, close }: { p: Policy; close: () => void }) {
       const v = out.waiting ?? out.in_force;
       toast(approval ? "Sent for approval" : v ? `Version ${v.version} published` : "Policy published");
     } catch (e) {
-      failed(e, approval ? "Not sent, try again" : "Not published, try again", f.setServerErrors);
+      failed(e, approval ? "Not sent, try again" : "Not published, try again", f.setServerErrors, ["effective_from", "note", "signature"]);
     }
   };
   return (
@@ -99,7 +105,7 @@ export function ApproveForm({ versionId, close, onDone }: { versionId: string; c
       onDone();
       toast("Policy approved");
     } catch (e) {
-      failed(e, "Not approved, try again", f.setServerErrors);
+      failed(e, "Not approved, try again", f.setServerErrors, ["signature"]);
     }
   };
   return (
@@ -142,7 +148,7 @@ export function ReasonForm({
       close();
       toast(done);
     } catch (e) {
-      failed(e, "Not done, try again", f.setServerErrors);
+      failed(e, "Not done, try again", f.setServerErrors, ["reason"]);
     }
   };
   return (
