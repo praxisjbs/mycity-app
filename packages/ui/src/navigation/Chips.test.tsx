@@ -36,11 +36,11 @@ describe("Chips", () => {
         ]}
       />,
     );
-    expect(screen.getByRole("button", { name: "All 2 unread" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Late 4 1 unread" })).toBeInTheDocument();
-    const urgent = screen.getByRole("button", { name: "Cancelled 1 unread" });
+    expect(screen.getByRole("button", { name: "All 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Late 4 1" })).toBeInTheDocument();
+    const urgent = screen.getByRole("button", { name: "Cancelled 1" });
     expect(urgent.querySelector("[data-count]")).toHaveClass("bg-destructive");
-    expect(screen.getByRole("button", { name: "All 2 unread" }).querySelector("[data-count]")).toHaveClass("bg-primary");
+    expect(screen.getByRole("button", { name: "All 2" }).querySelector("[data-count]")).toHaveClass("bg-primary");
     expect(screen.getByRole("button", { name: "Done" }).querySelector("[data-count]")).toBeNull();
   });
 

@@ -105,7 +105,7 @@ export function SegmentedControl<V extends string = string>({ value, onChange, o
             {item.count != null && " "}
             {item.count != null && <span className="text-xs tabular-nums">{item.count}</span>}
             {unreadOf(item) > 0 && " "}
-            <CountBadge count={unreadOf(item)} tone={item.urgent ? "err" : "primary"} label="unread" />
+            <CountBadge count={unreadOf(item)} tone={item.urgent ? "err" : "primary"} />
           </button>
         );
       })}

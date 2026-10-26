@@ -79,10 +79,10 @@ const checked = (name: string) => screen.getByRole("radio", { name }).getAttribu
 describe("People · Worksites, where its count waits", () => {
   it("Worksites 2 on Temporary: the side and the chip holding them say so, and the screen opens there", async () => {
     await asOperations(2);
-    await waitFor(() => expect(checked("Temporary 2 unread")).toBe("true"), { timeout: 5000 });
+    await waitFor(() => expect(checked("Temporary 2")).toBe("true"), { timeout: 5000 });
     expect(checked("Permanent")).toBe("false");
     const chips = await screen.findByRole("group", { name: "Temporary Sites" }, { timeout: 5000 });
-    expect(within(chips).getByRole("button", { name: "All 2 unread" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(chips).getByRole("button", { name: "All 2" }).getAttribute("aria-pressed")).toBe("true");
     // Withdrawn has no chip of its own: All holds it, and no other chip claims it.
     expect(within(chips).getByRole("button", { name: "Cancelled" })).toBeTruthy();
     expect(within(chips).getByRole("button", { name: "Awaiting Approval" })).toBeTruthy();

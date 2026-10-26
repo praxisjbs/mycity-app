@@ -308,7 +308,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
               <span aria-hidden="true" className="size-2 flex-none rounded-sm bg-(--stage-ink)" style={{ "--stage-ink": seriesInk(column.series ?? 1) } as CSSProperties} />
               {column.label}
               {unreadOf(column) > 0 && " "}
-              <CountBadge count={unreadOf(column)} tone={column.urgent ? "err" : "primary"} label="unread" />
+              <CountBadge count={unreadOf(column)} tone={column.urgent ? "err" : "primary"} />
               <em className="ml-auto text-2xs text-subtle-foreground not-italic tabular-nums">{column.count ?? column.cards.length}</em>
             </h2>
             <ul {...content} className="m-0 flex list-none flex-col gap-2 p-0">

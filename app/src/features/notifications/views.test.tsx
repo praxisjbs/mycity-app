@@ -49,15 +49,15 @@ describe("where it waits inside a tab", () => {
   it("each chip carries the unread notices about the records it shows, and All the whole of them", async () => {
     window.history.replaceState(null, "", "/people?tab=leave");
     render(<Screen count={1} start="all" />);
-    expect(await screen.findByRole("button", { name: "Pending 1 unread" })).toBeTruthy();
-    expect(pressed("All 1 unread")).toBe("true");
+    expect(await screen.findByRole("button", { name: "Pending 1" })).toBeTruthy();
+    expect(pressed("All 1")).toBe("true");
     expect(screen.getByRole("button", { name: "Approved" })).toBeTruthy();
   });
 
   it("opens on the chip holding the news when the one it opened on holds none", async () => {
     window.history.replaceState(null, "", "/people?tab=leave");
     render(<Screen count={1} start="approved" />);
-    await waitFor(() => expect(pressed("Pending 1 unread")).toBe("true"));
+    await waitFor(() => expect(pressed("Pending 1")).toBe("true"));
     expect(pressed("Approved")).toBe("false");
   });
 

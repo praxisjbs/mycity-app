@@ -35,7 +35,7 @@ describe("SegmentedControl", () => {
         ]}
       />,
     );
-    const temporary = screen.getByRole("radio", { name: "Temporary 2 unread" });
+    const temporary = screen.getByRole("radio", { name: "Temporary 2" });
     expect(temporary.querySelector("[data-count]")).toHaveClass("bg-primary");
     expect(screen.getByRole("radio", { name: "Permanent" }).querySelector("[data-count]")).toBeNull();
   });

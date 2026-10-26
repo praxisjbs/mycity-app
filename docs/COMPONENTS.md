@@ -1947,7 +1947,7 @@ A row of filter chips above a list, each with an optional count: one chosen (sin
 | Use | Narrowing a list by a status or a group (Everyone, Late 4, Remote 2); a board's stage switcher on a phone (F19); picking several departments with `selected`. |
 | Avoid | Switching between views (use SegmentedControl or Tabs); a choice inside a form (use ChoiceField or CheckboxField); a status shown on a record (use Pill). |
 | Phone | One row that scrolls sideways inside itself, never the page; each chip is a 44 px target. |
-| Accessibility | A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4), and an unread count after it (Late 4 1 unread). |
+| Accessibility | A group named by `label`; each chip is a button with aria-pressed, so a screen reader hears which are on. The count is read with the label (Late 4), and an unread count after it, as a tab reads its own (Late 4 1, Pending 1). |
 | Status | stable |
 | Exports | `Chips` |
 | Import | `import { Chips } from "@mycity/ui";` |

@@ -213,7 +213,7 @@ describe("Kanban: what waits on the reader", () => {
     expect(screen.getByText("Lagos Water Board")).toBeInTheDocument();
     rerender(<Kanban columns={WAITING} />);
     await waitFor(() => expect(screen.getByText("Ikeja Mall")).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: /Qualified 8 2 unread/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Qualified 8 2/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: /Lead 12/ }));
     rerender(<Kanban columns={WAITING.map((c) => ({ ...c, unread: (c.unread ?? 0) + 1 }))} />);
     expect(screen.getByText("Lagos Water Board")).toBeInTheDocument();
