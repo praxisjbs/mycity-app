@@ -1,10 +1,25 @@
-import type { SearchGroup, SearchHit, SearchResult } from "@mycity/contract/contract.gen.ts";
+import type { AttendanceDay, SearchGroup, SearchHit, SearchResult } from "@mycity/contract/contract.gen.ts";
+import { formatDate } from "@mycity/ui";
 import { MODULES } from "@/shell/catalogue";
 import type { MockPerson } from "./people";
 
+/** One person's attendance day, as ⌘K finds it by their name (src/modules/attendance/attendance.search.js). */
+export interface SearchDay {
+  person: MockPerson;
+  attendance_day_id: string;
+  attendance_date: string;
+  status: AttendanceDay["status"];
+}
+
+/** A day's status in the words the attendance screens show (features/attendance/labels.ts). */
+const DAY_STATUS: Record<string, string> = { present: "Present", late: "Late", absent: "Absent", leave: "On Leave" };
+/** Days listed at most, newest first, after the person (the provider's `cap`). */
+const DAYS_LISTED = 3;
+
 /**
  * Stands in for GET /search (src/shared/search) on laptops and in CI: the screens a
- * person's grants open, the actions most screens offer, and people by name, in the
+ * person's grants open, the actions most screens offer, people by name and then at most
+ * three of their attendance days, newest first, each with its status and date, in the
  * contract's groups of 25. The server's catalogues (synonyms, every action, every
  * module's records) are the real thing; this only draws the palette.
  */
@@ -46,7 +61,7 @@ function group(kind: SearchGroup["kind"], type: string, label: string, items: Se
   return { kind, type, label, module: kind === "record" ? "people" : null, page: { number: page, size: SIZE as SearchGroup["page"]["size"], total: items.length, pages, has_next: page < pages }, items: data };
 }
 
-export function searchResult(people: MockPerson[], grants: Record<string, string[]>, q: string, type: string | null, page: number): SearchResult {
+export function searchResult(people: MockPerson[], grants: Record<string, string[]>, q: string, type: string | null, page: number, days: SearchDay[] = []): SearchResult {
   const term = fold(q).trim();
   const can = (m: string, a = "view") => (grants[m] ?? []).includes(a);
   const match = (...texts: unknown[]) => !term || texts.some((t) => fold(t).includes(term));
@@ -62,10 +77,30 @@ export function searchResult(people: MockPerson[], grants: Record<string, string
           .filter((p) => match(p.display_name, p.staff_number, p.job_title))
           .map((p) => hit({ id: p.employee_id, kind: "record", type: "employee", title: p.display_name, ref: p.staff_number, sub: `${p.job_title} · ${p.department}`, link: `/people?tab=employees&id=${p.employee_id}` }))
       : [];
+  const attendance =
+    term.length >= 2 && can("people")
+      ? days
+          .filter((d) => match(d.person.display_name, `${d.person.first_name} ${d.person.last_name}`))
+          .sort((a, b) => b.attendance_date.localeCompare(a.attendance_date))
+          .slice(0, DAYS_LISTED)
+          .map((d) =>
+            hit({
+              id: d.attendance_day_id,
+              kind: "record",
+              type: "attendance_record",
+              title: `${d.person.first_name} ${d.person.last_name}`,
+              ref: formatDate(d.attendance_date),
+              sub: `${(d.status && DAY_STATUS[d.status]) || "Not Counted"} · ${formatDate(d.attendance_date)}`,
+              status: d.status,
+              link: `/people?tab=attendance&id=${d.attendance_day_id}`,
+            }),
+          )
+      : [];
   const groups = [
     !type || type === "screen" ? group("screen", "screen", "Screens", screens, page) : null,
     !type || type === "action" ? group("action", "action", "Actions", actions, page) : null,
     !type || type === "employee" ? group("record", "employee", "Employees", staff, page) : null,
+    !type || type === "attendance_record" ? group("record", "attendance_record", "Attendance Days", attendance, page) : null,
   ].filter((g): g is SearchGroup => g !== null);
   return { q: q.trim(), hint: null, groups };
 }

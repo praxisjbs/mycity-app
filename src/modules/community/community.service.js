@@ -17,7 +17,7 @@
  * outbox handlers in community.events.js.
  */
 const crypto = require("node:crypto");
-const { FORWARDABLE: FORWARDABLE_TYPES } = require("@mycity/contract").community;
+const { FORWARDABLE: FORWARDABLE_TYPES, repeatedChoices } = require("@mycity/contract").community;
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { emit } = require("../../shared/events/emit");
@@ -642,6 +642,20 @@ async function storeMedia(channelId, upload, user) {
   });
 }
 
+/** A poll's options as they are kept: refused when two read the same, the repeat marked on its option. */
+function distinctChoices(options) {
+  const repeated = repeatedChoices(options);
+  if (repeated.length) {
+    throw new AppError(
+      "REPEATED_OPTION",
+      "Two options are the same",
+      422,
+      Object.fromEntries(repeated.map((i) => [`options.${i}`, ["Already an option"]])),
+    );
+  }
+  return options;
+}
+
 async function postMessage(channelId, body, user) {
   const posted = await tx(async (client) => {
     const m = await member(client, channelId, user);
@@ -694,7 +708,7 @@ async function postMessage(channelId, body, user) {
       type === "text"
         ? await links.linkFor(client, body.body, metadata)
         : { community_link_preview_id: null, fetch: null };
-    if (type === "poll") metadata.options = body.options;
+    if (type === "poll") metadata.options = distinctChoices(body.options);
     if (type === "birthday" || type === "anniversary") {
       const persons = await repo.people(client, [body.subject_employee_id]);
       if (!persons.has(body.subject_employee_id))
@@ -1007,7 +1021,7 @@ async function editMessage(messageId, body, user) {
           { body: ["Already has votes"] },
         );
       }
-      if (body.options) metadata.options = body.options;
+      if (body.options) metadata.options = distinctChoices(body.options);
     } else {
       throw new AppError(
         "NOT_EDITABLE",

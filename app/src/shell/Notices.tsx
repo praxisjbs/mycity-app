@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Button, Icon, ShellNotice, useModal } from "@mycity/ui";
 import { turnOnPush, usePushState } from "@/features/notifications/push";
 import { clearGuideReturn, guideHref, useGuideReturn } from "@/features/knowledge/guide/return";
-import { useRouter } from "@/lib/router";
+import { moduleKeyOf, useRouter } from "@/lib/router";
 import { install, installLater, usePwa } from "./pwa";
 
 /**
@@ -13,7 +13,8 @@ import { install, installLater, usePwa } from "./pwa";
  * this device, never asked yet (docs/guides/notifications.md §2: never the
  * browser's prompt unasked; Not Now holds 14 days on this device); or the
  * one-time offer to install the app (PR 2 question 4: from the second visit,
- * phone and desktop, Not Now holds 30 days, never once installed).
+ * phone and desktop, Not Now holds 30 days, never once installed). None of the
+ * offers floats over a message box (writingScreen).
  */
 const PUSH_LATER = "mc-push-later";
 const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
@@ -25,11 +26,23 @@ const pushLaterUntil = () => {
   }
 };
 
+/**
+ * A screen whose message box sits at the foot of the page, where a floating offer would cover
+ * it: every Staff Community tab, and Praxis AI's Ask (its first tab, so also with no tab). The
+ * update, notifications and install offers wait for the next other screen; Back to Guide still
+ * shows there, as the reader asked for it and it closes.
+ */
+export function writingScreen(module: string | null, tab: string | null): boolean {
+  const key = module ? moduleKeyOf(module) : null;
+  return key === "community" || (key === "praxis_ai" && (tab ?? "ask") === "ask");
+}
+
 export function ShellNotices() {
   const { update, banner } = usePwa();
   const back = useGuideReturn();
   const { location, navigate } = useRouter();
   const onGuide = location.module === "knowledge" && location.tab === "user-guide";
+  const writing = writingScreen(location.module, location.tab);
   const installApp = useInstallApp();
   const push = usePushState();
   const [laterUntil, setLaterUntil] = useState(pushLaterUntil);
@@ -42,7 +55,7 @@ export function ShellNotices() {
     }
     setLaterUntil(until);
   };
-  if (update) {
+  if (update && !writing) {
     return (
       <ShellNotice
         icon="refresh"
@@ -83,6 +96,7 @@ export function ShellNotices() {
       </ShellNotice>
     );
   }
+  if (writing) return null;
   if (push === "ask" && laterUntil < Date.now()) {
     return (
       <ShellNotice

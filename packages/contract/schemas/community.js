@@ -275,6 +275,32 @@ const MessageListQuery = listQuery();
 const MessagePage = Paged(Message);
 
 /**
+ * The places of a poll's options that repeat an earlier one, as a person reads them: spaces at
+ * the ends and between words and the case ignored ("Bukka Hut" and " bukka  hut" are one
+ * choice). Empty options are left to their own rule.
+ */
+function repeatedChoices(options) {
+  const seen = new Set();
+  const repeated = [];
+  (options || []).forEach((o, i) => {
+    const key = String(o ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+    if (!key) return;
+    if (seen.has(key)) repeated.push(i);
+    else seen.add(key);
+  });
+  return repeated;
+}
+
+/** A poll's options, 2 to 4, no two the same: the repeat is marked on its own option. */
+const PollChoices = z
+  .array(text(80))
+  .min(2)
+  .max(4)
+  .superRefine((options, ctx) => {
+    for (const i of repeatedChoices(options)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i], message: "Already an option" });
+  });
+
+/**
  * POST /community/channels/:id/messages.
  *   text            body; no_link_preview when the sender removed the first link's card
  *   image, audio, video, file   document_id (uploaded first), body optional as a caption;
@@ -291,7 +317,7 @@ const MessageCreate = z
     document_id: uuid.optional(),
     duration_s: z.number().int().min(1).max(300).optional(),
     captions: optionalText(10000),
-    options: z.array(text(80)).min(2).max(4).optional(),
+    options: PollChoices.optional(),
     subject_employee_id: uuid.optional(),
     album_key: uuid.optional(),
     no_link_preview: z.boolean().optional(),
@@ -323,7 +349,7 @@ const RecognitionCreate = z
 const MessageEdit = z
   .object({
     body: text(4000),
-    options: z.array(text(80)).min(2).max(4).optional(),
+    options: PollChoices.optional(),
   })
   .strict();
 
@@ -613,6 +639,8 @@ module.exports = {
   Message,
   MessageListQuery,
   MessagePage,
+  repeatedChoices,
+  PollChoices,
   MessageCreate,
   RecognitionCreate,
   WISH_MAX,

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button, Calendar, Card, CardHeader, DataView, DesktopOnly, formatDate, Grid, KeyValue, KpiCard, Meter, PageHeader, Pager, TapList, toast, todayIso, useConfirm, useModal } from "@mycity/ui";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { PhoneCards } from "@/features/shared/PhoneCards";
-import { dayCount, LeaveForm, statusPill } from "@/features/people/Leave";
+import { dayCount, LeaveForm, statusPill, waitingOnOf } from "@/features/people/Leave";
 import { useNewLink, useScreenAction } from "@/shell/screen-action";
 
 /**
@@ -22,7 +22,7 @@ const headline = (balances: LeaveBalance[]) =>
   balances.find((b) => b.code === "annual") ?? balances.find((b) => b.entitled !== null) ?? null;
 
 /** Who a request waits on, or who settled it. */
-const approverOf = (r: LeaveRequest) => r.waiting_on ?? (r.recorded ? "People" : r.status === "cancelled" ? "Withdrawn" : "Decided");
+const approverOf = (r: LeaveRequest) => waitingOnOf(r) ?? (r.recorded ? "People" : r.status === "cancelled" ? "Withdrawn" : "Decided");
 
 export function MyLeavePage() {
   const modal = useModal();

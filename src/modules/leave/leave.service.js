@@ -195,7 +195,7 @@ async function checked(client, employeeId, body, type, own = true) {
   const balance = (await repo.balances(client, employeeId, year, lagos.today())).find(
     (b) => b.leave_type_id === type.leave_type_id,
   );
-  rules.assertWithinAllowance(balance, days, own);
+  rules.assertWithinAllowance(balance, days);
   return days;
 }
 

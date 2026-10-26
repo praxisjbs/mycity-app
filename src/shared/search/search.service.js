@@ -27,6 +27,9 @@
  * either end narrows the search to that type and searches the rest. A term that is
  * only the word is a search for the page, which the app's own registry answers.
  *
+ * Groups come in the registry's order, a provider marked `lead` (the people) before the other
+ * records, so a name typed finds the person before the days and requests about them.
+ *
  * Beyond recordProvider, a provider may answer an empty line (`empty: true`: what waits on
  * the reader), ask to come first (`pinned: true`), and read the reader themselves (`user`
  * is passed to its search), for a list that is the reader's own rather than a table's.
@@ -115,9 +118,9 @@ async function search(db, user, { q, types = null, page = 1 } = {}) {
     candidates.some((p) => p.capability) && !(user && user.is_ceo === true)
       ? await grantsCache.getCapabilities(db, user && user.user_id)
       : [];
-  const run = candidates.filter(
-    (p) => scopes.has(p.module) && (!p.capability || (user && user.is_ceo === true) || caps.includes(p.capability)),
-  );
+  const run = candidates
+    .filter((p) => scopes.has(p.module) && (!p.capability || (user && user.is_ceo === true) || caps.includes(p.capability)))
+    .sort((a, b) => Number(b.lead === true) - Number(a.lead === true));
   if (run.length === 0) return out;
 
   const prepared = new Map();

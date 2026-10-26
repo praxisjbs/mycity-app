@@ -104,6 +104,8 @@ The form marks a field as soon as you leave it, and the mark goes the moment it 
 | **Check the email** | Not an email address | Check the spelling, with one @ |
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number with its country code | Type it as `0803 123 4567` |
 | **Ten digits** | The account number is not ten digits | Type all ten digits |
+| **Not below zero** | **Gross Monthly** has a minus | Type the amount without it. Zero is allowed |
+| **Check the amount** or **Two decimals at most** | **Gross Monthly** has a second point, a comma out of place, or more than two decimals | Type it as `350,000` or `350000.50` |
 | *At most 100 characters*, or another number | A name, job title, bank or next of kin is longer than the field holds | Shorten it |
 | **Pick a worksite** | On Site or Hybrid with no worksite | Pick one, or choose Remote |
 | **Not a worksite** | The worksite was retired while the form was open | Pick another worksite |
@@ -671,7 +673,7 @@ Leave cannot be recorded for someone suspended or who has left.
 | **Ends in another year** | It runs past 31 December | Record two, one for each year |
 | **No working days** | Every day is a day off or a holiday | Pick working days |
 | **Overlaps other leave** | They already have leave on some of those days | Change the days, or cancel the other |
-| **More than they have left** | It takes their year past the type's allowance | Record fewer days, or raise their allowance |
+| *32 working days, 19 left* | It takes their year past the type's allowance: the working days asked for, then the days left | Record fewer days, or raise their allowance |
 | **Not offered** | The type was retired meanwhile | Pick another type |
 
 ### Cancel granted leave {#people-leave-cancel needs="people edit"}
@@ -776,9 +778,10 @@ rest. The buttons that add a worksite or a temporary site are also in **Quick Ac
 4. Set the **Radius, Metres**: a punch within it counts as on site. MyCity's offices use about 100.
 5. Press **Add Worksite**. A message says **Worksite added**.
 
-A radius from 25 to 1,000 metres is allowed. Outside that, the field says *At least 25* or
-*At most 1,000*. With no address picked and no centre typed, **Latitude** and **Longitude** say
-**Required**.
+A radius from 25 to 1,000 metres is allowed. Outside that, the field says **From 25 to 1,000 m**.
+A **Latitude** outside -90 to 90 says **From -90 to 90**, and a **Longitude** outside -180 to 180
+says **From -180 to 180**. With no address picked and no centre typed, **Latitude** and
+**Longitude** say **Required**.
 
 ### Change, retire or assign {#people-worksites-change needs="people edit"}
 

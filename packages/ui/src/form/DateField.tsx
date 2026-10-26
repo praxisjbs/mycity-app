@@ -5,18 +5,18 @@
  * @use Every date a person enters (gate 15); DateRangeField for a from and to pair (a report period); TimeField for a 24-hour time.
  * @avoid <input type="date"> (its format follows the browser's locale); a date shown and not entered (use formatDate).
  * @phone The calendar opens as a bottom sheet; days are 44 px targets; the keyboard is numeric.
- * @a11y The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date.
+ * @a11y The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id and are named From and To, as are their calendar buttons.
  * @status stable
  * @exports DateRangeField, TimeField
  * @example <DateField min={todayIso()} {...form.field("start_date")} />
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "../lib/cn";
 import { formatDate, monthName, parseDayFirst, todayIso } from "../lib/format";
 import { Icon } from "../icons/Icon";
 import { Popover } from "../overlay/Popover";
 import type { FieldState } from "./binding";
-import { useFieldControl } from "./Field";
+import { useFieldControl, useFieldLabelId } from "./Field";
 import { controlClass } from "./TextField";
 
 export interface DateFieldProps {
@@ -44,6 +44,8 @@ export interface DateFieldProps {
   placeholder?: string;
   /** Shown and not changed (a record already sent): no typing and no calendar. */
   disabled?: boolean;
+  /** Which end of a period this is (DateRangeField): the field is named by its Field's label and the end, as is its calendar button. */
+  end?: "From" | "To";
 }
 
 /**
@@ -61,8 +63,13 @@ function readTyped(text: string, min?: string, max?: string): { iso: string; pro
   return { iso };
 }
 
-export function DateField({ value, onChange, onBlur, onProblem, min, max, state, message: _message, id, name, placeholder = "DD/MM/YYYY", disabled }: DateFieldProps) {
+export function DateField({ value, onChange, onBlur, onProblem, min, max, state, message: _message, id, name, placeholder = "DD/MM/YYYY", disabled, end }: DateFieldProps) {
   const a = useFieldControl({ id, state });
+  // An end of a period is named by the Field's label and its end ("Dates From"), not the label alone.
+  const labelId = useFieldLabelId();
+  const endId = useId();
+  const labelledBy = end ? [labelId, endId].filter(Boolean).join(" ") : a["aria-labelledby"];
+  const pick = end ? `Pick ${end} Date` : "Pick a Date";
   const [text, setText] = useState(formatDate(value));
   const [problem, setProblem] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
@@ -101,8 +108,14 @@ export function DateField({ value, onChange, onBlur, onProblem, min, max, state,
 
   return (
     <span className="relative flex w-full items-center desk:max-w-48">
+      {end && (
+        <span id={endId} hidden>
+          {end}
+        </span>
+      )}
       <input
         {...a}
+        aria-labelledby={labelledBy}
         aria-invalid={shown === "bad" || undefined}
         name={name}
         inputMode="numeric"
@@ -115,12 +128,12 @@ export function DateField({ value, onChange, onBlur, onProblem, min, max, state,
         onBlur={leave}
       />
       <Popover
-        title="Pick a Date"
+        title={pick}
         open={open && !disabled}
         onOpenChange={(next) => setOpen(next && !disabled)}
         align="end"
         trigger={
-          <button type="button" aria-label="Pick a date" disabled={disabled} className="absolute right-0 flex h-control min-h-tap w-11 items-center justify-center text-subtle-foreground hover:text-foreground">
+          <button type="button" aria-label={end ? pick : "Pick a date"} disabled={disabled} className="absolute right-0 flex h-control min-h-tap w-11 items-center justify-center text-subtle-foreground hover:text-foreground">
             <Icon name="check" size="s" />
           </button>
         }
@@ -221,8 +234,13 @@ export interface DateRangeFieldProps {
   message?: string;
 }
 
-/** From and to, each day-first; the to date can never be before the from date. */
+/**
+ * From and to, each day-first; the to date can never be before the from date. Each end has its
+ * own id (the Field's label points at From) and is named by the label and its end, so the two are
+ * never one field twice to a screen reader.
+ */
 export function DateRangeField({ value, onChange, onBlur, onProblem, min, max, state }: DateRangeFieldProps) {
+  const { id } = useFieldControl({ state });
   // Each end's own problem: the period reports the first, so fixing one end never hides the other's.
   const ends = useRef<{ from?: string; to?: string }>({});
   const told = (end: "from" | "to") => (message: string | undefined, now?: boolean) => {
@@ -231,11 +249,11 @@ export function DateRangeField({ value, onChange, onBlur, onProblem, min, max, s
   };
   return (
     <span className="flex flex-col gap-2 desk:flex-row desk:items-center">
-      <DateField value={value.from} onChange={(from) => onChange({ ...value, from })} onBlur={onBlur} onProblem={told("from")} min={min} max={value.to || max} state={state} />
+      <DateField id={id} end="From" value={value.from} onChange={(from) => onChange({ ...value, from })} onBlur={onBlur} onProblem={told("from")} min={min} max={value.to || max} state={state} />
       <span className="hidden text-sm text-muted-foreground desk:inline" aria-hidden>
         to
       </span>
-      <DateField value={value.to} onChange={(to) => onChange({ ...value, to })} onBlur={onBlur} onProblem={told("to")} min={value.from || min} max={max} state={state} />
+      <DateField id={id && `${id}-to`} end="To" value={value.to} onChange={(to) => onChange({ ...value, to })} onBlur={onBlur} onProblem={told("to")} min={value.from || min} max={max} state={state} />
     </span>
   );
 }

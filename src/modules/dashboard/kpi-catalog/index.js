@@ -182,11 +182,12 @@ function cardOf(entry, figure) {
     tone: entry.tone && !isZero(entry.unit, figure) ? entry.tone : null,
     trend: null,
     opens: true,
+    module: entry.module,
   };
 }
 
 /** A card as the picker and a role's editor offer it (HomeKpiOption). */
-const optionOf = (entry) => ({ key: entry.id, title: entry.label, domain: entry.domain, unit: entry.unit });
+const optionOf = (entry) => ({ key: entry.id, title: entry.label, domain: entry.domain, unit: entry.unit, module: entry.module });
 
 /**
  * What the records behind a card are (HomeKpiDetailMeta): their title, the line above them,

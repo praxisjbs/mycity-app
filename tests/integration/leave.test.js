@@ -163,6 +163,8 @@ describeDb("leave against the real migrations", () => {
       days: 3,
       status: "submitted",
       waiting_on: "Line Manager",
+      // The person the stage resolved to, as the toast and the request name them (OBS-05).
+      approver_name: "Kemi Alade",
       recorded: false,
       leave_type_name: "Annual",
       employee: { display_name: "Musa Danjuma", department: "Programmes" },
@@ -218,6 +220,11 @@ describeDb("leave against the real migrations", () => {
     const tooMuch = await ask("staff", "annual", d("03-01"), d("03-27"));
     expect(tooMuch.status).toBe(422);
     expect(tooMuch.body.error.code).toBe("LEAVE_ALLOWANCE_EXCEEDED");
+    // The Last Day says by how much (DEF-08), and a refused request takes nothing from the year.
+    expect(tooMuch.body.error.fields).toEqual({ ends_on: [`${24 - off[0].n} working days, 17 left`] });
+    const after = await as("staff").get(`/ess/leave/balances?year=${Y}`);
+    expect(after.body.balances.find((b) => b.code === "annual")).toMatchObject({ pending: 3, remaining: 17 });
+    expect((await as("staff").get(`/ess/leave?year=${Y}`)).body.page.total).toBe(1);
     // A type with no allowance has no ceiling.
     const unpaid = await ask("staff", "unpaid", d("03-01"), d("03-27"));
     expect(unpaid.status).toBe(201);
@@ -257,9 +264,10 @@ describeDb("leave against the real migrations", () => {
     expect(long.body.days).toBe(8);
     const id = long.body.workflow_instance_id;
     await as("manager").post(`/workflow/instances/${id}/approve`, {});
-    expect((await as("staff").get(`/ess/leave/${long.body.leave_request_id}`)).body.waiting_on).toBe(
-      "Operations & People",
-    );
+    const atOps = (await as("staff").get(`/ess/leave/${long.body.leave_request_id}`)).body;
+    expect(atOps.waiting_on).toBe("Operations & People");
+    // A role decides this stage, so no one person is named; the stage's name says who.
+    expect(atOps.approver_name).toBeNull();
     const no = await as("ops").post(`/workflow/instances/${id}/reject`, { reason: "Programme launch that week" });
     expect(no.body.state).toBe("rejected");
     await drain();

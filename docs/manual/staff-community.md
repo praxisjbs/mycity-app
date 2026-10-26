@@ -178,6 +178,7 @@ can.
 | **Add a question** | Type a question |
 | *At least 4 characters* | Make the question at least four characters |
 | **Add an option** | Fill in both of the first two options |
+| **Already an option** | Make each option different. Capitals and spaces do not count |
 | *At most 80 characters* under an option | Shorten the option |
 
 ### Do something with a message {#community-channels-message}

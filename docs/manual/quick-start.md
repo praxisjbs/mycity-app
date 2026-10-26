@@ -153,7 +153,7 @@ icon: spark
 ![Import Staff on Employees](shot:qs-import)
 
 1. Open [People · Employees](/people?tab=employees) and press **Import Staff**.
-2. Upload the sheet, check the columns, then read the **Preview**.
+2. Upload the sheet, give every **Required** field a column, then read the **Preview**.
 3. Press **Commit Import**. Read [Import a spreadsheet](#settings-imports-run).
 
 ## Change a Role {#qs-roles role="Administrators" icon=shield screen=settings/roles-and-permissions needs="settings edit"}

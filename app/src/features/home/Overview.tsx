@@ -7,6 +7,7 @@ import { useRealtime } from "@/api/realtime";
 import { useMe } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
 import { useWorkSiteSheet } from "@/features/attendance/TemporarySites";
+import { useOpens } from "@/lib/plan";
 import { useRouter, useSearchParams } from "@/lib/router";
 import { useScreenAction, useUrlAction } from "@/shell/screen-action";
 import { Button, DesktopOnly, ErrorState, formatCount, formatDate, Grid, IconButton, LoadingRows, Menu, PageHeader, PhoneOnly, toast, zoneClock } from "@mycity/ui";
@@ -150,6 +151,9 @@ function SectionRows({ sections }: { sections: Section[] }) {
   );
 }
 
+/** The cards the row shows: none whose module is Coming Soon in this build (F14), whoever may see it. */
+export const openCards = (cards: HomeKpiCard[], moduleOpens: (moduleKey: string) => boolean) => cards.filter((c) => moduleOpens(c.module));
+
 export function Overview({ linked }: { linked: string | null }) {
   const me = useMe();
   const { navigate } = useRouter();
@@ -159,6 +163,7 @@ export function Overview({ linked }: { linked: string | null }) {
   const openDetail = useKpiDetail();
   const openPicker = useKpiPicker();
   const create = useCreateActions(me);
+  const opens = useOpens();
 
   const first = create[0];
   // search:none the Overview's New runs another screen's own create action, which ⌘K lists with that screen
@@ -172,17 +177,20 @@ export function Overview({ linked }: { linked: string | null }) {
   const shown = useRef<string | null>(null);
   useEffect(() => {
     if (!asked || !data || shown.current === asked) return;
+    const card = data.cards.find((c) => c.key === asked);
+    if (card && !opens.module(card.module)) return;
     shown.current = asked;
-    openDetail(asked, data.cards.find((c) => c.key === asked)?.title, () => {
+    openDetail(asked, card?.title, () => {
       shown.current = null;
       setParams({ kpi: null, id: null }, { replace: true });
     });
-  }, [asked, data, openDetail, setParams]);
+  }, [asked, data, opens, openDetail, setParams]);
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!data) return <LoadingRows count={8} />;
 
   const open = (card: HomeKpiCard) => openDetail(card.key, card.title);
+  const cards = openCards(data.cards, opens.module);
 
   return (
     <>
@@ -220,7 +228,7 @@ export function Overview({ linked }: { linked: string | null }) {
           Choose Cards
         </Button>
       </DesktopOnly>
-      {data.cards.length > 0 && <CardRow cards={data.cards} onOpen={open} />}
+      {cards.length > 0 && <CardRow cards={cards} onOpen={open} />}
       <SectionRows sections={sectionsOf(data)} />
     </>
   );

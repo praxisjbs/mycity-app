@@ -160,6 +160,33 @@ describe("DateField, DateRangeField, TimeField", () => {
     expect(onChange).toHaveBeenLastCalledWith("09:30");
   });
 
+  it("DateRangeField gives each end its own id and names it From and To, as are its calendar buttons", async () => {
+    render(
+      <div>
+        <Field label="Dates" optional>
+          <DateRangeField value={{ from: "2026-10-01", to: "2026-10-31" }} onChange={() => undefined} />
+        </Field>
+        <Field label="Report Period">
+          <DateRangeField value={{ from: "", to: "" }} onChange={() => undefined} />
+        </Field>
+      </div>,
+    );
+    const from = screen.getByRole("textbox", { name: "Dates From" });
+    const to = screen.getByRole("textbox", { name: "Dates To" });
+    expect(from).toHaveValue("01/10/2026");
+    expect(to).toHaveValue("31/10/2026");
+    const ids = screen.getAllByRole("textbox").map((e) => e.id);
+    expect(ids.every(Boolean)).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The Field's label still points at the From end, so pressing it starts the period.
+    expect(document.querySelector(`label[for="${from.id}"]`)?.textContent).toBe("Dates");
+    expect(screen.getByRole("textbox", { name: "Report Period From" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Report Period To" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Pick From Date" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Pick To Date" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Pick a date" })).not.toBeInTheDocument();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(
       <div>

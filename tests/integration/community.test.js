@@ -418,6 +418,27 @@ describeDb("Staff Community against the real migrations", () => {
     expect((await as("bola").post(`/community/messages/${id}/vote`).send({ option_index: 3 })).status).toBe(422);
   });
 
+  test("a poll's options differ: a repeat, by case or spacing, is refused on its option; distinct ones post and keep their votes", async () => {
+    const g = await general("ceo");
+    const at = `/community/channels/${g.community_channel_id}/messages`;
+    for (const options of [["QA Option A", "QA Option A"], ["QA Option A", " qa  option a "], ["Rice", "Beans", "rice"]]) {
+      const refused = await as("ceo").post(at).send({ message_type: "poll", body: "Lunch on Friday?", options });
+      expect(refused.status).toBe(422);
+      expect(refused.body.error.fields).toEqual({ [`options.${options.length - 1}`]: ["Already an option"] });
+    }
+    const poll = await as("ceo").post(at).send({ message_type: "poll", body: "Lunch on Friday?", options: ["QA Option A", "QA Option B"] });
+    expect(poll.status).toBe(201);
+    const id = poll.body.community_message_id;
+    // Edited into a repeat before its first vote: refused the same way, the poll unchanged.
+    const edit = await as("ceo").put(`/community/messages/${id}`).send({ body: "Lunch on Friday?", options: ["QA Option A", "qa option a"] });
+    expect(edit.status).toBe(422);
+    expect(edit.body.error.fields).toEqual({ "options.1": ["Already an option"] });
+    expect((await as("bola").post(`/community/messages/${id}/vote`).send({ option_index: 1 })).status).toBe(200);
+    const read = await as("ceo").get(at);
+    const kept = read.body.data.find((m) => m.community_message_id === id);
+    expect(kept.poll.options).toEqual([{ text: "QA Option A", votes: 0 }, { text: "QA Option B", votes: 1 }]);
+  });
+
   test("edit, delete and close: the author's text for 15 minutes, a poll before its first vote, moderators delete", async () => {
     const made = await as("bola").post("/community/channels").send({ name: "edit-desk", member_ids: [people.tunde.employee.employee_id, people.ceo.employee.employee_id] });
     const id = made.body.community_channel_id;

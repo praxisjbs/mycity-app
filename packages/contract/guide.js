@@ -217,7 +217,7 @@ function parseTarget(text) {
 
 function parseShot(id, lines, at) {
   const problems = [];
-  const spec = { id, open: null, as: "operations", devices: [...DEVICES], crop: "page", do: [], marks: [], sources: [], line: at };
+  const spec = { id, open: null, as: "operations", devices: [...DEVICES], crop: "page", prompt: null, do: [], marks: [], sources: [], line: at };
   let list = null;
   for (const [n, raw] of lines.entries()) {
     const where = `shot ${id}, line ${at + n + 1}`;
@@ -279,7 +279,11 @@ function parseShot(id, lines, at) {
       else if (DEVICES.includes(value)) spec.devices = [value];
       else problems.push(`${where}: device is both, desktop or phone`);
     } else if (key === "crop") spec.crop = value;
-    else if (key === "do" || key === "marks" || key === "sources") {
+    else if (key === "prompt") {
+      // A picture of a prompt that opens by itself once per sign-in (a policy to acknowledge).
+      if (value === "keep") spec.prompt = "keep";
+      else problems.push(`${where}: prompt is keep`);
+    } else if (key === "do" || key === "marks" || key === "sources") {
       list = key;
       if (value) problems.push(`${where}: ${key} lists its items on the lines under it`);
     } else problems.push(`${where}: unknown key "${key}"`);

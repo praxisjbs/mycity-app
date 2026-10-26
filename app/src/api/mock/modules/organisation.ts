@@ -576,6 +576,11 @@ type L = { key: string; type: LeaveTypeCode; from: number; to: number; days: num
 const L_ROWS = roster.leave as L[];
 const iso = (n: number) => (n >= 0 ? isoDaysAhead(n) : isoDaysAgo(-n));
 type MockLeave = LeaveRequest & { key: string };
+/** The line manager a request waits on, by name, as the API's approver_name reads it. */
+function lineManagerName(key: string): string | null {
+  const p = byKey(key);
+  return (p && managerOf(p)?.display_name) ?? null;
+}
 const LEAVE: MockLeave[] = L_ROWS.map((l, i) => ({
   leave_request_id: sid(`leave:${i}`),
   employee: personRef(byKey(l.key)!),
@@ -589,6 +594,7 @@ const LEAVE: MockLeave[] = L_ROWS.map((l, i) => ({
   status: l.status,
   workflow_instance_id: l.status === "submitted" ? sid(`leave-flow:${i}`) : null,
   waiting_on: l.status === "submitted" ? (l.days > 5 ? "Operations & People" : "Line Manager") : null,
+  approver_name: l.status === "submitted" && l.days <= 5 ? lineManagerName(l.key) : null,
   recorded: false,
   submitted_at: at(5 + i, "10:00"),
   decided_at: l.status === "submitted" ? null : at(4 + i, "12:00"),
@@ -668,6 +674,16 @@ const yearOf = (key: string, year: number) => {
     }),
   };
 };
+/** A request the year's allowance cannot hold, refused as the API refuses it (leave.balance.js); else null. */
+function overAllowance(key: string, t: LeaveType, from: string, to: string) {
+  const left = yearOf(key, Number(from.slice(0, 4))).balances.find((x) => x.leave_type_id === t.leave_type_id)?.remaining;
+  const days = workingDays(from, to);
+  if (left == null || days <= left) return null;
+  const n = Math.max(left, 0);
+  return fail(422, "LEAVE_ALLOWANCE_EXCEEDED", `Only ${n} ${t.name} ${n === 1 ? "day is" : "days are"} left this year`, {
+    ends_on: [`${days} working ${days === 1 ? "day" : "days"}, ${n} left`],
+  });
+}
 route("GET /api/v1/leave/balances", (req) => {
   const who = byId(req.query.employee_id);
   if (!who) return notFound();
@@ -720,9 +736,11 @@ route("POST /api/v1/leave/requests", (req) => {
   if (ARCHIVED.has(who.employee_id) || statusOf(who) !== "active") return fail(422, "EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", { employee_id: ["Not active"] });
   if (LEAVE.some((x) => x.key === who.user_key && (x.status === "submitted" || x.status === "approved") && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
     return fail(409, "LEAVE_OVERLAP", "They already have leave on some of those days", { starts_on: ["Overlaps other leave"] });
+  const tooMany = overAllowance(who.user_key, t, b.starts_on, b.ends_on);
+  if (tooMany) return tooMany;
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(who), key: who.user_key, leave_type_id: t.leave_type_id, leave_type_name: t.name, starts_on: b.starts_on, ends_on: b.ends_on,
-    days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, recorded: true,
+    days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, approver_name: null, recorded: true,
     submitted_at: new Date().toISOString(), decided_at: new Date().toISOString(), created_at: new Date().toISOString(),
   };
   LEAVE.unshift(l);
@@ -755,10 +773,12 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
   if (l.key === req.user) return fail(403, "PERMISSION_DENIED", "You are not an approver for this stage");
   if (approve && l.days > 5 && l.waiting_on === "Line Manager") {
     l.waiting_on = "Operations & People";
+    l.approver_name = null;
     return ok({ workflow_instance_id: l.workflow_instance_id, state: "pending", stage_name: l.waiting_on });
   }
   l.status = approve ? "approved" : "rejected";
   l.waiting_on = null;
+  l.approver_name = null;
   l.decided_at = new Date().toISOString();
   return ok({ workflow_instance_id: l.workflow_instance_id, state: l.status, stage_name: null });
 };
@@ -779,7 +799,14 @@ function leaveInstance(user: string, wid: string): ApprovalInstance | null {
     opened_by: null, opened_by_name: l.employee.display_name, opened_at: entered, completed_at: l.decided_at,
     route: stages.map(([key, name]) => ({
       key, name, state: !pending ? (state === "approved" ? "done" : "stopped") : key === now ? "now" : key === "line_manager" ? "done" : "todo",
-      approvers: [key === "line_manager" ? { type: "manager_of_subject", value: null, label: "Line Manager" } : { type: "role", value: "operations_people", label: "Operations & People" }],
+      // The stage it waits at names its person, as the API's snapshot does; the others name their kind.
+      approvers: [
+        key === "line_manager"
+          ? pending && key === now && l.approver_name
+            ? { type: "employee", value: null, label: l.approver_name }
+            : { type: "manager_of_subject", value: null, label: "Line Manager" }
+          : { type: "role", value: "operations_people", label: "Operations & People" },
+      ],
     })),
     decisions: [],
     can_decide: pending && l.key !== user && waitingOn(user).some((w) => w.workflow_instance_id === wid),
@@ -868,10 +895,12 @@ route("POST /api/v1/ess/leave", (req) => {
   const me = byKey(req.user)!;
   if (myLeave(req.user!).some((x) => ["submitted", "approved"].includes(x.status) && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
     return fail(409, "LEAVE_OVERLAP", "You already have leave on some of those days", { starts_on: ["Overlaps other leave"] });
+  const tooMany = overAllowance(me.user_key, t!, b.starts_on, b.ends_on);
+  if (tooMany) return tooMany;
   const days = workingDays(b.starts_on, b.ends_on);
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(me), key: me.user_key, leave_type_id: t!.leave_type_id, leave_type_name: t!.name, starts_on: b.starts_on, ends_on: b.ends_on,
-    days, reason: b.reason ?? null, status: "submitted", workflow_instance_id: uuid(), waiting_on: "Line Manager", recorded: false,
+    days, reason: b.reason ?? null, status: "submitted", workflow_instance_id: uuid(), waiting_on: "Line Manager", approver_name: lineManagerName(me.user_key), recorded: false,
     submitted_at: new Date().toISOString(), decided_at: null, created_at: new Date().toISOString(),
   };
   LEAVE.unshift(l);
@@ -883,6 +912,7 @@ route("POST /api/v1/ess/leave/:id/cancel", (req) => {
   if (!(l.status === "submitted" || (l.status === "approved" && l.starts_on > isoDaysAgo(0)))) return fail(409, "LEAVE_NOT_CANCELLABLE", "This leave can no longer be cancelled");
   l.status = "cancelled";
   l.waiting_on = null;
+  l.approver_name = null;
   return ok(out(l));
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { upload } from "@/api/upload";
@@ -7,6 +7,7 @@ import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import type { ImportBatch, Importer, ImportRowRecord } from "@mycity/contract/contract.gen.ts";
 import {
+  Banner,
   Button,
   Card,
   CardHeader,
@@ -75,6 +76,13 @@ const SHEET_MAX_BYTES = 10 * 1024 * 1024;
 const HEADER_ROWS: Array<[string, string]> = Array.from({ length: 20 }, (_, i) => [String(i), `Row ${i + 1}`]);
 
 const count = (n: number | undefined) => String(n ?? 0);
+
+/** "Name", "Name and Department", "Name, Designation and Department". */
+const listOf = (labels: string[]) => (labels.length < 2 ? labels.join("") : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`);
+
+/** The Map step's refusal for required fields with no column: each named while they fit one short line. */
+const missingLine = (labels: string[]) =>
+  labels.length > 4 ? `Choose columns for ${labels.length} required fields` : `Choose a column for ${listOf(labels)}`;
 
 /** The rows a person should look at: errors and duplicates block, warnings save with something missing. */
 const problemsOf = (stats: ImportBatch["stats"]) =>
@@ -260,7 +268,7 @@ function Counts({ stats, className }: { stats: ImportBatch["stats"]; className?:
 /* ───────────── the wizard ───────────── */
 
 /** The wizard once the reader's importers are known: pressed early, it waits for them rather than saying there is nothing to import. */
-function ImportWizard({ preferred, resume, close }: { preferred: string | null; resume: ImportBatch | null; close: () => void }) {
+export function ImportWizard({ preferred, resume, close }: { preferred: string | null; resume: ImportBatch | null; close: () => void }) {
   const importers = useApi("GET /api/v1/imports/importers");
   if (importers.error) return <ErrorState error={importers.error} onRetry={importers.reload} />;
   if (!importers.data) return <LoadingRows count={4} />;
@@ -277,6 +285,12 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
   const [validOnly, setValidOnly] = useState(false);
   const [ticked, setTicked] = useState<Record<string, string[]>>({});
   const [view, setView] = useState<RowView>("problem");
+  // Map's refusal stays in the window until the mapping is put right: the required fields still
+  // without a column, or the server's first problem with the mapping (a field mapped twice).
+  const [tried, setTried] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const summary = useRef<HTMLDivElement>(null);
   const setMapping = useMutation("PUT /api/v1/imports/:id/mapping");
   const preview = useMutation("POST /api/v1/imports/:id/preview");
   const commit = useMutation("POST /api/v1/imports/:id/commit");
@@ -288,6 +302,15 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
     enabled: Boolean(batch) && batch?.status === "previewed",
   });
   const labelOf = (key: string) => importer?.fields.find((f) => f.key === key)?.label ?? key;
+  const required = (importer?.fields ?? []).filter((f) => f.required);
+  const mapped = new Set(Object.values(fields).filter(Boolean));
+  const missing = required.filter((f) => !mapped.has(f.key));
+  const mapProblem = tried ? (missing.length ? missingLine(missing.map((f) => f.label)) : refused) : null;
+
+  // A refused Next takes focus to the refusal, so it is read out and seen where the person is.
+  useEffect(() => {
+    if (attempt) summary.current?.focus();
+  }, [attempt]);
 
   /* The row of column names was not found: the person says which row it is, and the columns
      of that row are matched afresh for them to confirm. */
@@ -295,6 +318,7 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
     if (!batch) return;
     try {
       const next = await setMapping.run({ params: { id: batch.import_batch_id }, body: { header_row: Number(row) } });
+      setRefused(null);
       setBatch(next);
       setFields(Object.fromEntries(next.mapping.columns.map((c) => [String(c.index), c.field])));
     } catch (e) {
@@ -363,6 +387,11 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
       title: "Map",
       body: (
         <div className="grid gap-2">
+          {mapProblem && (
+            <div ref={summary} tabIndex={-1}>
+              <Banner tone="err">{mapProblem}</Banner>
+            </div>
+          )}
           <Field label="Column Names Row" help="The row of the sheet that holds the column names.">
             <SelectField
               value={batch?.header_row === null || batch?.header_row === undefined ? "" : String(batch.header_row)}
@@ -371,25 +400,58 @@ function ImportSteps({ importers, preferred, resume, close }: { importers: Impor
               placeholder="Choose Row"
             />
           </Field>
+          {required.length > 0 && (
+            <KeyValue
+              className="mb-2"
+              items={[
+                [
+                  "Required",
+                  <span className="flex flex-wrap gap-1.5">
+                    {required.map((f) => (
+                      <Pill key={f.key} tone={mapped.has(f.key) ? "ok" : "neutral"}>
+                        {f.label}
+                      </Pill>
+                    ))}
+                  </span>,
+                ],
+              ]}
+            />
+          )}
           {(batch?.mapping.columns ?? []).map((c) => (
             <Field key={c.index} label={c.header || `Column ${c.index + 1}`}>
               <SelectField
                 value={fields[String(c.index)] ?? ""}
-                onChange={(v) => setFields((f) => ({ ...f, [String(c.index)]: v || null }))}
+                onChange={(v) => {
+                  setRefused(null);
+                  setFields((f) => ({ ...f, [String(c.index)]: v || null }));
+                }}
                 options={options}
               />
             </Field>
           ))}
         </div>
       ),
+      // Required fields without a column are refused here, before anything is sent; the server
+      // checks the mapping again and its refusal shows in the same place.
       check: async () => {
         if (!batch) return false;
+        setTried(true);
+        if (missing.length) {
+          setAttempt((n) => n + 1);
+          return false;
+        }
         try {
-          const mapped = await setMapping.run({ params: { id: batch.import_batch_id }, body: { fields } });
+          const saved = await setMapping.run({ params: { id: batch.import_batch_id }, body: { fields } });
           const out = await preview.run({ params: { id: batch.import_batch_id }, body: {} });
-          setBatch({ ...mapped, ...out.batch, stats: out.stats });
+          setRefused(null);
+          setBatch({ ...saved, ...out.batch, stats: out.stats });
           return true;
         } catch (e) {
+          if (e instanceof ApiError && e.code === "IMPORT_MAPPING_INVALID") {
+            setRefused(e.fields.mapping?.[0] ?? e.message);
+            setAttempt((n) => n + 1);
+            return false;
+          }
           toast.error(e instanceof Error ? e.message : "That mapping did not work");
           return false;
         }

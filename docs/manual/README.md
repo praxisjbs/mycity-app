@@ -107,6 +107,7 @@ under it). Its spec is a fenced `shot <id>` block anywhere in the same file:
 | `do` | Steps before the picture: `click: button "Add Employee"`, `fill: label "First Name" = Ada`, `press: Escape`, `wait: text "Saved"`, `scroll: heading "Bank"`, `lock: idle` (the lock screen, as Session Locked; `time` is Session Ended, `ended` Signed Out). A step starting `phone ` or `desktop ` runs on that device only: `phone click: button "More Actions"` |
 | `marks` | Numbered marks drawn on the picture: `1: button "Add Employee" \| Add a person`. The legend under the picture lists them |
 | `crop` | `page` (the default), `modal` (only the open dialog or sheet), `viewport`, or a CSS selector |
+| `prompt` | `keep`: the picture is of a prompt that opens by itself once per sign-in (a policy to acknowledge), so it is taken in a sign-in of its own, before the prompt is closed |
 | `sources` | More files the picture depends on, beside the screen's feature folder |
 
 A target is `button "Name"`, `link "Name"`, `tab "Name"`, `label "Field"`, `text "Words"`,
