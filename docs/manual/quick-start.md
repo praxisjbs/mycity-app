@@ -73,11 +73,10 @@ icon: spark
 
 ![The Inbox](shot:qs-mail)
 
-1. Open [Mailbox · Inbox](/mailbox?tab=inbox). The first time, type your email **Password** and
-   press **Connect**.
-2. Press a message to open it.
-3. Press **Reply** to answer it, or **Compose** to write a new one. Read
-   [Read your mail](#mailbox-read).
+1. Open [Mailbox · Inbox](/mailbox?tab=inbox).
+2. {needs="mailbox create"} The first time, type your email **Password** and press **Connect**.
+3. Press a message to open it. Read [Read your mail](#mailbox-read).
+4. {needs="mailbox create"} Press **Reply** to answer it, or **Compose** to write a new one.
 
 ## Post in a Channel {#qs-channel role="Everyone" icon=msg screen=community/channels}
 
