@@ -94,10 +94,10 @@ icon: spark
 ![A request waiting on you](shot:qs-approve-leave)
 
 1. Open [People · Leave](/people?tab=leave) and press **Pending**. A request in **Need You** on
-   [Home · Overview](/home?tab=overview) opens here too.
+   [Home · Overview](/home?tab=overview) brings you here too.
 2. Press the request. Check **Also Away** for who else is off.
-3. Press **Approve**, or **Reject** and type the **Reason**. The person is told. Read
-   [Approve or reject leave](#people-leave-decide).
+3. Press **Approve**, or **Reject**, type the **Reason** and press **Reject Leave**. The person is
+   told. Read [Approve or reject leave](#people-leave-decide).
 
 ## See Your Team {#qs-team role="Line Managers" icon=users screen=home/team needs="manager"}
 
@@ -240,7 +240,7 @@ icon: spark
 ![My Performance](shot:qs-agree)
 
 1. Open [Employee Self-Service · My Performance](/ess?tab=my-performance).
-2. Read your lines under **My Scorecard**.
+2. Read your lines under **My Scorecard**. On a phone, press the **My Scorecard** card.
 3. Press **Agree Scorecard**, or **Disagree With Reason** if something is wrong. Read
    [Agree your scorecard](#performance-my-agree).
 
@@ -267,7 +267,7 @@ icon: spark
 ![Performance, Reviews](shot:qs-score-review)
 
 1. Open [Performance · Reviews](/performance?tab=reviews).
-2. Press the review under **Waiting On You**. Its **Next** reads **Score**.
+2. Press the review under **Waiting On You**. On a computer, its **Next** reads **Score**.
 3. Check each line's **Final Score**, and add a **Corrective Action** to any line under 1.
 4. Press **Submit Review**. Read [Score a review](#performance-review-score).
 
