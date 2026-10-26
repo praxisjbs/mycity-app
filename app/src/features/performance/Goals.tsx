@@ -6,7 +6,8 @@
  * and target changes the reader decides (./Approvals); Report Month for the head, Confirm Score for
  * the CEO, Set Target on a TBC target before its lock date and Change Target after it; Set Up
  * Quarter and Edit Quarter (./Quarter) for whoever runs the cycle. ⌘K opens a goal (?goal=), an
- * objective (?objective=) and a key result (?id=). Everyone sees the whole tree.
+ * objective (?objective=) and a key result (?id=). Everyone sees the whole tree; New Goal and Report
+ * Month are offered only to a reader who may act on a function or the company (useSettableFunctions).
  */
 import { useEffect, useRef, useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
@@ -98,7 +99,10 @@ export function Goals() {
   const functions: Array<[string, string]> = (departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string]);
   const chips: Array<[string, string]> = [["", "All Functions"], ["company", "Company"], ...functions];
 
-  const mayGoal = hasCapability(me, "goals.organisation") || hasCapability(me, "goals.company") || hasCapability(me, "goals.function");
+  // What the reader may act on, as the API's goals.authority answers (useSettableFunctions): New Goal and Report
+  // Month are offered only to a reader with something to act on, so everyone else reads and nothing more.
+  const settable = useSettableFunctions(quarter.periodId || null);
+  const mayGoal = hasCapability(me, "goals.organisation") || settable.rows.length > 0;
   const { can } = useAuth();
   // Setting up a quarter is `performance` create, changing one `performance` edit, both with the capability (goals.routes).
   const manage = hasCapability(me, "performance.manage");
@@ -111,10 +115,10 @@ export function Goals() {
   const editQuarter = () =>
     period && modal.open({ title: "Edit Quarter", wide: true, full: true, body: (close) => <QuarterWizard close={close} period={period} /> });
   // Report Month is one function's, or the company's for Management: the one picked, else the reader's own, else the first.
-  const mayReportCompany = hasCapability(me, "goals.company");
-  const mayReport = hasCapability(me, "goals.function") || mayReportCompany;
-  const reportable: Array<[string, string]> = [...(mayReportCompany ? ([["company", "Company"]] as Array<[string, string]>) : []), ...functions];
-  const ownFunction = functions.find(([, name]) => name === me.department)?.[0];
+  // It lists the company and the functions the reader may act for, no others.
+  const reportable: Array<[string, string]> = settable.rows.map((x) => (x.department_id ? [x.department_id, x.name ?? ""] : ["company", "Company"]));
+  const mayReport = reportable.length > 0;
+  const ownFunction = reportable.find(([, name]) => name === me.department)?.[0];
   const report = () =>
     modal.open({
       title: "Report Month",
@@ -123,8 +127,8 @@ export function Goals() {
     });
   // The floating button on a phone (§10.2): Report Month for a function's head, else New Goal.
   const heads = hasCapability(me, "goals.function") && !hasCapability(me, "goals.company");
-  useScreenAction(period ? (heads ? { label: "Report Month", onSelect: report } : mayGoal ? { label: "New Goal", onSelect: newGoal } : null) : null);
-  useUrlAction("report", mayReport && period && departments.data ? report : null);
+  useScreenAction(period ? (heads && mayReport ? { label: "Report Month", onSelect: report } : mayGoal ? { label: "New Goal", onSelect: newGoal } : mayReport ? { label: "Report Month", onSelect: report } : null) : null);
+  useUrlAction("report", mayReport && period ? report : null);
   useUrlAction("quarter", maySetUp && !quarter.loading ? setUpQuarter : null);
   useApprovalLinks();
   const openKrId = (id: string, code = "Key Result") => modal.open({ title: code, wide: true, body: (close) => <KeyResultSheet id={id} close={close} /> });

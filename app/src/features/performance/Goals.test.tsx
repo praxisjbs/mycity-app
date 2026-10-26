@@ -413,4 +413,39 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(within(sheet).getByText("27 stories")).toBeTruthy();
     expect(copyProblems()).toEqual([]);
   }, 60000);
+
+  /** A select's choices, read by opening it. */
+  const choices = (root: HTMLElement, label: string) => optionLabels(within(root).getByRole("combobox", { name: label }));
+
+  it("Staff read only: New Goal, Report Month and New KPI are not offered", async () => {
+    await openAs("chidera@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Report Month" })).toBeNull();
+    cleanup();
+
+    await openAs("chidera@mycityapp.io", "/performance?tab=kpis");
+    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New KPI" })).toBeNull();
+  }, 60000);
+
+  it("Report Month lists only what the reader may act for: a head their own function, Operations & People every function, the CEO the company too", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "Report Month");
+    expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
+    cleanup();
+
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "Report Month");
+    const operations = await choices(dialog(), "Function");
+    expect(operations).toEqual(expect.arrayContaining(["Marketing & Sales", "Content", "Engineering"]));
+    expect(operations).not.toContain("Company");
+    cleanup();
+
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "Report Month");
+    const ceo = await choices(dialog(), "Function");
+    expect(ceo[0]).toBe("Company");
+    expect(ceo).toContain("Marketing & Sales");
+  }, 60000);
 });

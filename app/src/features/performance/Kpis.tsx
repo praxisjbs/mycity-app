@@ -8,11 +8,9 @@ import kpisContract from "@mycity/contract/schemas/kpis.js";
 import type { Endpoints, Kpi } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useSearchParams } from "@/lib/router";
-import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
@@ -48,7 +46,6 @@ const FREQUENCIES: Array<[string, string]> = [["monthly", "Monthly"], ["weekly",
 const naHelp = "No eligible cases this month. It never counts as met.";
 
 export function Kpis() {
-  const me = useMe();
   const modal = useModal();
   const quarter = useQuarter();
   const period = quarter.period;
@@ -67,7 +64,8 @@ export function Kpis() {
     { label: "Awaiting Actual", value: counted(summary.data?.awaiting) },
   ];
   const deptOptions: Array<[string, string]> = [["", "All Functions"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
-  const mayEdit = hasCapability(me, "goals.function");
+  // New KPI is offered only to a reader who may set some function's KPIs, as the API's goals.authority answers.
+  const mayAdd = useSettableFunctions(null).rows.some((x) => x.department_id !== null);
   const newKpi = () => modal.open({ title: "New KPI", body: (close) => <KpiForm close={close} periodId={quarter.periodId} departmentId={dept} /> });
   const openKpiId = (id: string, code = "KPI") => modal.open({ title: code, wide: true, body: (close) => <KpiSheet id={id} months={months} close={close} /> });
   const openKpi = (k: Kpi) => openKpiId(k.kpi_definition_id, k.code);
@@ -82,14 +80,14 @@ export function Kpis() {
     openKpiId(linked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linked]);
-  useScreenAction(mayEdit ? { label: "New KPI", onSelect: newKpi } : null);
+  useScreenAction(mayAdd ? { label: "New KPI", onSelect: newKpi } : null);
 
   return (
     <>
       <PageHeader
         title="KPIs"
         sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined}
-        actions={mayEdit ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
+        actions={mayAdd ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
       />
       <Toolbar>
         <FilterSelect label="Function" value={dept} onChange={setDept} options={deptOptions} />

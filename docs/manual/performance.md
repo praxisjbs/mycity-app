@@ -136,6 +136,8 @@ Operations and People and the CEO may set any function's. They can be added and 
 plan is a draft, or after it comes back. A new objective goes into the quarter chosen in
 **Quarter** on Goals.
 
+**New Goal** shows only if you may set goals for a function or the company.
+
 ![New Goal, an objective](shot:performance-new-goal)
 
 1. Press **New Goal** on [Performance · Goals](/performance?tab=goals) and choose **Objective** in
@@ -182,7 +184,7 @@ example, *BM-O1 deleted*.
 | **Plan awaits approval** under **Function** | That function's plan is with its approvers | Wait until it is returned or binding |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
-| **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
+| **Only the function's head sets its goals** | Your role changed since the page opened | Reload the page and pick again |
 | **Pick a function** under **Function** | No function picked, and your role does not set the company's | Pick your function |
 | **You cannot set a function's goals** | Your role sets only the company's objectives | Choose **Company** in **Function** |
 
@@ -259,10 +261,11 @@ What waits for you sits in **Waiting On You** near the top of
 By the third working day of each month (Monday to Friday, not a public holiday), each function's
 head reports how its key results and KPIs did. Management report the company's key results.
 
-1. Press **Report Month** at the top of [Performance · Goals](/performance?tab=goals).
-2. Pick the **Function** (or **Company**, for Management) and the **Month** first. The **Month**
-   starts on the month just ended. Changing it once you have typed asks first: **Change Month**
-   clears what you typed, **Keep It** stays.
+1. Press **Report Month** at the top of [Performance · Goals](/performance?tab=goals). It shows
+   only if you report for a function or the company.
+2. Pick the **Function** (or **Company**, for Management) and the **Month** first. **Function**
+   lists only those you report for. The **Month** starts on the month just ended. Changing it once
+   you have typed asks first: **Change Month** clears what you typed, **Keep It** stays.
 3. For each key result you report, choose its **Status** and fill in the **Actual** and a short
    **Update**. Type the **Actual** as a figure: a comma or a unit stays out, so `64,000` goes in
    as `64000`. A minus is kept, such as `-5`. A figure it cannot take is marked as you leave it.
@@ -608,7 +611,7 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 ### Add a KPI {#performance-kpi-new needs="performance create, cap goals.function"}
 
 1. Press **New KPI** at the top right of [Performance · KPIs](/performance?tab=kpis). On a phone it
-   is in **Quick Actions**.
+   is in **Quick Actions**. It shows only if you set a function's KPIs.
    ![New KPI](shot:performance-kpi-new)
 2. Pick the **Function** and type the **KPI**, such as `Social response within 24 hours`.
    **Function** lists only the functions you may set KPIs for; a head finds their own already
@@ -622,7 +625,7 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 
 | The hub says | What it means | What to do |
 |---|---|---|
-| **Only the function's head sets its KPIs** | You picked another function | Pick your own function in **Function** |
+| **Only the function's head sets its KPIs** | Your role changed since the page opened | Reload the page and pick again |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
 
 **Only the function's head sets its KPIs** shows in red above **Set KPI** and stays until you press
