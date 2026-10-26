@@ -354,7 +354,8 @@ describe("my workspace", () => {
     await board();
     const form = await newTask();
     fireEvent.click(within(form).getByRole("radio", { name: "Shared" }));
-    fireEvent.click(within(form).getByRole("radio", { name: "Department" }));
+    // Share With waits on whether the reader sets tasks for others (its own read).
+    fireEvent.click(await within(form).findByRole("radio", { name: "Department" }, { timeout: 5000 }));
     expect(within(form).queryByText("Lead")).toBeNull();
     const departments = await within(form).findByRole("listbox", { name: "Department" });
     fireEvent.click(await within(departments).findByRole("option", { name: /Operations & People/ }, { timeout: 5000 }));
