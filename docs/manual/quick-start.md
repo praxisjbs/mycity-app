@@ -119,14 +119,15 @@ icon: spark
 4. Press **Publish Announcement**. Everyone in the audience is told. Read
    [Post an announcement](#community-announcements-new).
 
-## Publish a Policy {#qs-policy role="People & HR" icon=book screen=knowledge/policies needs="knowledge create"}
+## Publish a Policy {#qs-policy role="People & HR" icon=book screen=knowledge/policies needs="knowledge create, knowledge edit"}
 
 ![New Policy](shot:qs-policy)
 
 1. Open [Knowledge Hub · Policies](/knowledge?tab=policies) and press **New Policy**.
 2. Type its **Title** and press **Start Policy**.
 3. Choose who it **Applies To**, write the **Policy Text**, and press **Save Draft**.
-4. Press **Publish Policy**, choose the **First Day**, sign, and press **Publish Policy**. Read
+4. Press **Publish Policy**, choose the **First Day**, add a **Note** on what changed, sign, and
+   press **Publish Policy**. Read
    [Publish a policy](#knowledge-policies-publish).
 
 ## Add an Employee {#qs-add-employee role="People & HR" icon=users needs="people create"}

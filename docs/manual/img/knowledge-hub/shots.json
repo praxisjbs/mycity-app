@@ -30,5 +30,21 @@
       "desktop",
       "phone"
     ]
+  },
+  "knowledge-publish": {
+    "spec": "db971129801a1f5e",
+    "source": "6f8ba6559168fe98",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "knowledge-version": {
+    "spec": "bc65fb7a518ea746",
+    "source": "a3fd3da7742d6823",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
   }
 }

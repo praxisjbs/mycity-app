@@ -225,8 +225,9 @@ colleagues may see different chapters.
 1. Open [User Guide](/knowledge?tab=user-guide) in the Knowledge Hub.
 2. Choose **Quick Start** for short illustrated cards, grouped by role, or **Full Guide** for every
    chapter in full.
-3. In the Full Guide, pick a section from the list on the left. On a phone the sections are a row
-   above the text: swipe it sideways.
+3. In the Full Guide, pick a section from the list on the left. On a phone or a narrow window, the
+   sections are a row above the text: swipe it sideways. The chapter's name is above the section's
+   title.
 4. To jump to a topic from anywhere, open search, type `guide` and a few words, such as
    `guide add employee`, and choose the result.
 
@@ -234,8 +235,10 @@ colleagues may see different chapters.
 
 1. When a step names a screen as an underlined link, press it. The screen opens.
 2. Do what the step says. A small bar at the foot of the screen names the step you came from.
-3. Press **Back to Guide** on that bar. The guide opens at the same step, marked in yellow.
+3. Press **Back to Guide** on that bar. The guide opens at the same step, shaded.
 4. Press **Close** on the bar if you do not need to go back.
+
+> **Tip:** A link to another part of this guide opens it here, with no bar.
 
 > **Tip:** At the top of a section, **Open Screen** opens the screen the section is about, with the
 > same way back.
@@ -243,11 +246,12 @@ colleagues may see different chapters.
 ### Help from any screen {#start-user-guide-help}
 
 - On a phone, press the round button with a plus at the bottom right, then **Help**. The guide opens
-  at the section about the screen you were on.
+  at the section about the screen you were on. A screen with no section yet opens the guide at its
+  start.
 - On a computer, press your name at the foot of the menu, then **User Guide**. It opens at the same
   place.
 - Pictures carry numbered marks. The list under each picture says what each number points at.
-  Press a picture to see it larger.
+  Press a picture to see it larger in **Picture**. On a phone it shows the computer's picture.
 
 ```shot start-sign-in
 open: /
