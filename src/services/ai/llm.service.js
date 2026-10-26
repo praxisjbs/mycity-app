@@ -37,7 +37,8 @@
  * saves it through its own service with the run_id on the audit row.
  *
  * The assistant talks to a model over several rounds with tools: converse() keeps one run for the
- * whole question on this same path (docs/guides/praxis-ai.md §6.7).
+ * whole question on this same path (docs/guides/praxis-ai.md §6.7). Search's vectors come from
+ * embed(), on the Embeddings job, the same way (docs/guides/ai-control.md §6.6).
  *
  * Everything the caller puts in `input` is presented to the model as data, and the
  * instructions say so, so a CV that contains "ignore your instructions" stays a CV.
@@ -179,6 +180,7 @@ const resets = (err) => Boolean(err) && (err.status === 402 || (err.kind === "ra
  * @param {string[]} [req.keep]  restricted field keys this task needs (redact.js)
  * @param {number} [req.temperature]
  * @param {number} [req.maxTokens]
+ * @param {number} [req.timeoutMs]  how long each attempt waits; AI_REQUEST_TIMEOUT_MS unless a screen waits on it
  * @param {{query: Function}} [req.db]
  * @param {{gemini?: object, anthropic?: object, deepseek?: object, stub: object}} [req.vendors]  tests
  * @param {string} [req.promptsDir]  tests
@@ -195,6 +197,7 @@ async function complete(req) {
     keep = [],
     temperature = 0.2,
     maxTokens = config.AI_MAX_OUTPUT_TOKENS,
+    timeoutMs = config.AI_REQUEST_TIMEOUT_MS,
     db = require("../../config/db").pool,
     vendors = DEFAULT_VENDORS,
     promptsDir = PROMPTS_DIR,
@@ -255,7 +258,7 @@ async function complete(req) {
     const started = Date.now();
     const counted = link.provider !== "stub";
     try {
-      const res = await ask(ctx.vendor, link.provider, { apiKey: ctx.apiKey, model: link.model, messages: msgs, output, temperature, maxTokens });
+      const res = await ask(ctx.vendor, link.provider, { apiKey: ctx.apiKey, model: link.model, messages: msgs, output, temperature, maxTokens, timeoutMs });
       const c = await ledger.recordStep(db, runId, {
         step_no: step,
         kind,
@@ -729,6 +732,119 @@ async function search({
   throw new AppError("AI_UNAVAILABLE", "The AI service is not answering. Try again in a few minutes.", 503);
 }
 
+/** The size of every vector the hub keeps: OpenAI's small embedding model (ai-control.md decision 18). */
+const EMBEDDING_DIMENSIONS = 1536;
+/** Texts sent in one request, each request one step: well inside OpenAI's limits on inputs and tokens. */
+const EMBED_BATCH = 96;
+
+/**
+ * Vectors for search (the Embeddings job, docs/guides/ai-control.md §6.6): governance, the
+ * action's chain and the ledger as complete() takes them, on the chain's one model (vectors from
+ * two models cannot be compared, so there is no fallback). Each batch of texts is one step,
+ * charged on its input tokens, retried once unless the caller is waiting on a screen.
+ *
+ * With no provider of the chain set up, or the stub switched on, there are no vectors and no run
+ * (`vectors: null`): a search then goes by its words alone, where a stub run would record one for
+ * every search typed.
+ * @param {{purpose: string, module: string, actor?: object|string|null, input: string|string[],
+ *          egress?: "external"|"reasoning", timeoutMs?: number, retry?: boolean,
+ *          db?: {query: Function}, vendors?: object}} req
+ * @returns {Promise<{vectors: number[][]|null, model: string|null, vendor: string, run_id: string|null, cost_ngn: string}>}
+ */
+async function embed({
+  purpose,
+  module,
+  actor = null,
+  input,
+  egress = "external",
+  timeoutMs = 20_000,
+  retry = true,
+  db = require("../../config/db").pool,
+  vendors = DEFAULT_VENDORS,
+}) {
+  if (!PURPOSE_RE.test(String(purpose || ""))) throw new Error(`ai.embed: purpose is kebab-case, got "${purpose}"`);
+  if (!catalog.isModule(module)) throw new Error(`ai.embed: "${module}" is not a module key`);
+  const texts = (Array.isArray(input) ? input : [input]).map((t) => String(t ?? ""));
+  const none = { vectors: null, model: null, vendor: "stub", run_id: null, cost_ngn: "0.00" };
+  let g;
+  try {
+    g = await governance.check(db, { module });
+  } catch (err) {
+    if (err instanceof AppError) await ledger.refused(db, { purpose, module, actor, error: err });
+    throw err;
+  }
+  const can = (provider) => Boolean(vendors[provider]) && typeof vendors[provider].embed === "function";
+  const chain = g.settings.forced_stub ? null : await jobs.resolve(purpose, { db });
+  if (!chain || !chain.links.some((l) => l.state !== "not_set_up" && can(l.provider))) return none;
+  if (!texts.length) return { ...none, vectors: [], vendor: chain.links[0].provider };
+
+  const link = chain.links.find((l) => l.state === "ready" && can(l.provider));
+  if (!link) {
+    const first = chain.links[0];
+    const runId = await ledger.startRun(db, { purpose, module, actor, vendor: first.provider, model: first.model, prompt: null });
+    const why = chain.links.map((l) => `${l.provider} ${l.model}: ${l.state}`).join("; ");
+    await ledger.finishRun(db, runId, { status: "failed", error_code: "AI_UNAVAILABLE", error: `every model was passed by (${why})` });
+    throw new AppError("AI_UNAVAILABLE", "The AI service is not answering. Try again in a few minutes.", 503);
+  }
+  const runId = await ledger.startRun(db, { purpose, module, actor, vendor: link.provider, model: link.model, prompt: null });
+  const fail = async (code, message, status, detail) => {
+    await ledger.finishRun(db, runId, { status: "failed", error_code: code, error: detail || message });
+    return new AppError(code, message, status);
+  };
+  const apiKey = await integrations.secret(link.provider, "api_key", { db });
+  const charged = await prices.forStep(db, { ...link, embeddings: true });
+  const safe = texts.map((t) => redactValue(t, { egress }));
+  // Only the third generation of OpenAI's models takes a size; the rest are 1,536 already.
+  const dimensions = /^text-embedding-3/.test(link.model) ? EMBEDDING_DIMENSIONS : undefined;
+  const vectors = [];
+  let cost = "0.00";
+  let step = 0;
+  for (let i = 0; i < safe.length; i += EMBED_BATCH) {
+    const batch = safe.slice(i, i + EMBED_BATCH);
+    const tries = retry ? 2 : 1;
+    for (let attempt = 1; attempt <= tries; attempt += 1) {
+      step += 1;
+      const started = Date.now();
+      let res;
+      try {
+        res = await vendors[link.provider].embed({ apiKey, model: link.model, input: batch, dimensions, timeoutMs });
+      } catch (err) {
+        usage.record(link.provider, "call", { ok: false, error_code: callCode(err) });
+        await ledger.recordStep(db, runId, { step_no: step, kind: "embedding", vendor: link.provider, model: link.model, prices: charged, latency_ms: Date.now() - started, outcome: "failed", error: err.message });
+        if (err.kind === "config") {
+          logger.error({ err, purpose, provider: link.provider, model: link.model }, "AI vendor configuration error: check the key on Settings · Integrations and the model on AI Control");
+          require("../../shared/observability/error-reporter").report(err, { origin: "ai", severity: "error", route: `ai ${purpose}` });
+          throw await fail("AI_VENDOR_CONFIG", "The AI service is not set up correctly. An administrator has been told.", 503, err.message);
+        }
+        if (resets(err)) await skips.mark(link.provider, err.retryAfterMs, callCode(err));
+        if (resets(err) || attempt >= tries) throw await fail("AI_UNAVAILABLE", "The AI service is not answering. Try again in a few minutes.", 503, err.message);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      usage.record(link.provider, "call", { ok: true });
+      const whole = Array.isArray(res.vectors) && res.vectors.length === batch.length && res.vectors.every((v) => Array.isArray(v) && v.length === EMBEDDING_DIMENSIONS);
+      const c = await ledger.recordStep(db, runId, {
+        step_no: step,
+        kind: "embedding",
+        vendor: link.provider,
+        model: res.model || link.model,
+        usage: res.usage,
+        prices: charged,
+        latency_ms: Date.now() - started,
+        outcome: whole ? "ok" : "invalid",
+        error: whole ? null : `expected ${batch.length} vectors of ${EMBEDDING_DIMENSIONS}`,
+      });
+      cost = money.toWire(money.money(cost).plus(money.money(c)));
+      // A vector of another size could never be compared with the index: nothing half-returned.
+      if (!whole) throw await fail("AI_BAD_OUTPUT", "The AI answer could not be used. Try again.", 502, `expected ${batch.length} vectors of ${EMBEDDING_DIMENSIONS}`);
+      vectors.push(...res.vectors);
+      break;
+    }
+  }
+  await ledger.finishRun(db, runId, { status: "ok", vendor: link.provider, model: link.model });
+  return { vectors, model: link.model, vendor: link.provider, run_id: runId, cost_ngn: cost };
+}
+
 /**
  * A vendor error as Settings · Integrations names it (docs/guides/integrations.md §6.3). A
  * 402 is a prepaid balance spent (DeepSeek), which reads as over quota.
@@ -852,6 +968,8 @@ module.exports = {
   complete,
   converse,
   search,
+  embed,
+  EMBEDDING_DIMENSIONS,
   checkKey,
   testAnswer,
   callCode,

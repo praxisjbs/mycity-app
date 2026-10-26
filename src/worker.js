@@ -139,6 +139,12 @@ async function start() {
         "AI catalogue not synced (ai_catalogue arrives with migration 0095)",
       ),
     );
+  // The User Guide's meaning index follows the chapters this release ships (user-guide.md §6.8):
+  // a schedule already set up waits its interval after a deploy, so the boot brings it up to date.
+  // One worker runs it; it never holds up the boot.
+  require("./jobs/cron-lock")
+    .withCronLock("user-guide-index", () => require("./modules/user_guide/user_guide.meaning").sync())
+    .catch((err) => logger.warn({ err: err.message }, "User Guide not indexed at boot; its schedule will"));
   const registry = require("./jobs/registry");
   const workers = registry.startConsumers();
   const schedules = await registry.startSchedules();

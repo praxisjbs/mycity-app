@@ -12,11 +12,20 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { parseChapter, filterChapter } = require("@mycity/contract/guide");
+const { parseChapter, filterChapter, passagesOf, passageFor } = require("@mycity/contract/guide");
+const engine = require("@mycity/contract/guide-search");
+const c = require("@mycity/contract");
+const { pool } = require("../../config/db");
 const { logger } = require("../../config/logger");
 const { AppError } = require("../../shared/errors");
+const { atomically } = require("../../shared/db/tx");
+const vault = require("../../shared/documents/vault");
+const ai = require("../../services/ai/llm.service");
+const transcription = require("../../services/ai/transcription");
+const { GUIDE_VOICE } = require("./user_guide.events");
 const catalog = require("../../shared/access/access.catalog");
 const { readerOf } = require("../../shared/search/search.service");
+const { pageOf, envelope, PAGE_SIZE } = require("../../shared/http/paged");
 const { tabVisible } = require("../../shared/search/screens");
 
 const MANUAL = path.resolve(__dirname, "../../../docs/manual");
@@ -141,4 +150,149 @@ async function image(db, user, { chapter: slug, file }, opts = {}) {
   return full;
 }
 
-module.exports = { MANUAL, IMAGES, load, asReader, cut, contents, chapter, quickStart, image };
+/* ------------------------------------------------------------------ *
+ * Search (§6.8)
+ * ------------------------------------------------------------------ */
+
+const indexes = new WeakMap();
+
+/** The words index of a guide's chapters (every passage, the Quick Start aside), built once per load. */
+function indexOf(guide) {
+  let index = indexes.get(guide);
+  if (!index) {
+    index = engine.indexOf(guide.chapters.flatMap(passagesOf));
+    indexes.set(guide, index);
+  }
+  return index;
+}
+
+/** Under this many letters a search is not run. */
+const MIN_SEARCH = 2;
+/** Passages an answer is written from: the best results, at most this many. */
+const ANSWER_SOURCES = 6;
+/** A source's lines sent to the model, at most. */
+const SOURCE_LINES = 40;
+
+/**
+ * Every section and task this person may read that answers a search, best first: the words half
+ * and the meaning half (user_guide.meaning.js) together. A failing meaning half costs only itself:
+ * the words carry on alone.
+ * @param {{q?: string}} query
+ * @param {{meaning?: false|((index: object, visible: Map<number, object>, q: string) => Promise<Map<number, number>|null>),
+ *          dir?: string, fresh?: boolean}} [opts]  meaning: false for the words alone; a function in
+ *          place of the vectors (⌘K's prepared search, tests)
+ */
+async function hitsFor(db, user, query, opts = {}) {
+  const q = String(query.q || "").replace(/\s+/g, " ").trim();
+  const guide = load(opts);
+  const index = indexOf(guide);
+  const visible = engine.visibleTo(index, asReader(await readerOf(db, user)), passageFor);
+  if (q.length < MIN_SEARCH) return { q, index, visible, hits: [] };
+  const near =
+    opts.meaning === false
+      ? null
+      : opts.meaning || ((i, v, words) => require("./user_guide.meaning").similarities({ index: i, visible: v, q: words, user }));
+  let meaning = null;
+  if (near) {
+    try {
+      meaning = await near(index, visible, q);
+    } catch (err) {
+      logger.warn({ err: err.message }, "the User Guide's meaning search failed; its words answer alone");
+    }
+  }
+  const hits = engine.search(index, q, { visible, meaning }).map(({ score, ...hit }) => hit);
+  return { q, index, visible, hits };
+}
+
+/** POST /user-guide/search: a page of 25 of what answers a search. */
+async function search(db, user, query, opts) {
+  const { hits } = await hitsFor(db, user, query, opts);
+  const { number, offset } = pageOf(query);
+  return envelope(hits.slice(offset, offset + PAGE_SIZE), number, hits.length);
+}
+
+/** The answer's shape with its sources checked: a cited number is one of the passages sent. */
+const cited = (n) =>
+  c.user_guide.GuideAnswerOutput.superRefine((v, ctx) => {
+    v.sentences.forEach((s, i) => {
+      if (s.sources.some((x) => x > n)) ctx.addIssue({ code: "custom", path: ["sentences", i, "sources"], message: `cite passages 1 to ${n} only` });
+    });
+    if (v.answered && !v.sentences.length) ctx.addIssue({ code: "custom", path: ["sentences"], message: "an answer has at least one sentence" });
+  });
+
+/**
+ * POST /user-guide/answer: a short answer written by the Guide Answer action (Fast job) from the
+ * best results this person may read, each sentence citing them (§6.9). Nothing is kept. With AI
+ * off, or the passages silent on it, `found` is false and the results stand alone.
+ */
+async function answer(db, user, body, opts = {}) {
+  const { q, index, visible, hits } = await hitsFor(db, user, { q: body.q }, opts);
+  const sources = hits.slice(0, ANSWER_SOURCES);
+  const none = { found: false, sentences: [], sources };
+  if (!sources.length) return none;
+  const passages = sources.map((h, i) => ({
+    n: i + 1,
+    chapter: h.chapter_title,
+    title: h.kind === "task" ? `${h.section_title} › ${h.title}` : h.title,
+    lines: engine.linesOf(index, h.anchor, visible).slice(0, SOURCE_LINES),
+  }));
+  let run;
+  try {
+    run = await ai.complete({
+      purpose: "guide-answer",
+      module: "knowledge",
+      actor: user,
+      input: { question: q, passages },
+      output: cited(sources.length),
+      egress: "reasoning",
+      temperature: 0.1,
+      maxTokens: 600,
+      timeoutMs: 15_000,
+    });
+  } catch (err) {
+    if (err instanceof AppError && /^AI_/.test(err.code)) return none;
+    throw err;
+  }
+  if (run.vendor === "stub" || !run.output || !run.output.answered) return none;
+  const sentences = run.output.sentences
+    .map((s) => ({ text: s.text.trim(), sources: [...new Set(s.sources)].sort((a, b) => a - b) }))
+    .filter((s) => s.text && s.sources.length);
+  return { found: sentences.length > 0, sentences, sources };
+}
+
+async function tx(fn) {
+  const client = await pool.connect();
+  try {
+    return await atomically(client, () => fn(client));
+  } finally {
+    client.release();
+  }
+}
+
+/** Remove one recording: its row in the transaction, its bytes after commit. */
+async function removeRecording(documentId, actor) {
+  const keys = await tx((client) => vault.remove(client, documentId, { actor, reason: "a spoken search's words were read" }));
+  if (keys) await vault.removeFiles(keys);
+}
+
+/**
+ * POST /user-guide/transcribe: a spoken search to words, on the Guide Voice Search action's chain
+ * (Transcription job). The recording is removed whatever happens (§6.10).
+ * @param {{buffer: Buffer, originalname: string}} file  readUpload(req)
+ * @param {object} actor
+ */
+async function transcribe(file, actor) {
+  const doc = await tx((client) =>
+    vault.store(client, { file, purpose: "voice_note", doc_type: GUIDE_VOICE, entity: { type: GUIDE_VOICE, id: actor.user_id }, actor }),
+  );
+  try {
+    const t = await transcription.transcribe({ document_id: doc.document_id, module: "knowledge", purpose: "guide-voice", actor, db: pool });
+    return { document_id: doc.document_id, text: t.text, draft: t.draft };
+  } finally {
+    await removeRecording(doc.document_id, actor).catch((err) =>
+      logger.warn({ err, document_id: doc.document_id }, "User Guide: a spoken search's recording was not removed; the vault's sweep will"),
+    );
+  }
+}
+
+module.exports = { MANUAL, IMAGES, load, asReader, cut, contents, chapter, quickStart, image, indexOf, hitsFor, search, answer, transcribe };

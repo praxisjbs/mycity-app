@@ -58,17 +58,18 @@ async function modelRow(db, provider, model) {
 /**
  * The prices one step is charged at.
  * @param {{query: Function}} db
- * @param {{provider: string, model: string, audio?: boolean}} step
+ * @param {{provider: string, model: string, audio?: boolean, embeddings?: boolean}} step  `embeddings`: an
+ *        embedding model is priced on its input alone, so its missing output price is nothing
  * @returns {Promise<{input_ngn_per_million: string, output_ngn_per_million: string, ngn_per_audio_hour: string|null,
  *                    ngn_per_search: string|null, usd_ngn_rate: string|null, rate_day: string|null}>}
  */
-async function forStep(db, { provider, model, audio = false }) {
+async function forStep(db, { provider, model, audio = false, embeddings = false }) {
   if (!provider || provider === "stub") return zero();
   if ((await quota.plan(provider, { db })) === "free") return zero();
   const [row, newest] = await Promise.all([modelRow(db, provider, model), fx.newest({ db })]);
   const rate = newest && newest.usd_ngn ? newest.usd_ngn : null;
   const input = row && (audio && row.audio_usd_per_million ? row.audio_usd_per_million : row.input_usd_per_million);
-  const output = row && row.output_usd_per_million;
+  const output = row && (row.output_usd_per_million || (embeddings && input ? "0" : null));
   if (rate && input && output)
     return {
       input_ngn_per_million: naira(input, rate),

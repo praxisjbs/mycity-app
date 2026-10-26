@@ -142,6 +142,38 @@ const ACTIONS = Object.freeze({
     chosen_at: "2026-10-22",
     built: true,
   }),
+  // The User Guide's search (docs/guides/user-guide.md §6.8): its passages and each search, on one
+  // embedding model so the two can be compared. A search can name a person.
+  "guide-search": Object.freeze({
+    label: "Guide Search",
+    module: "knowledge",
+    job: "embeddings",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-10-25",
+    built: true,
+  }),
+  // Its short answer, written only from the passages the reader may read (§6.9). Fast, by JBS
+  // Praxis's choice of 25/10/2026.
+  "guide-answer": Object.freeze({
+    label: "Guide Answer",
+    module: "knowledge",
+    job: "fast",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-10-25",
+    built: true,
+  }),
+  // A search spoken into the guide's box (§6.10).
+  "guide-voice": Object.freeze({
+    label: "Guide Voice Search",
+    module: "knowledge",
+    job: "transcription",
+    personal_data: true,
+    chosen_by: "JP",
+    chosen_at: "2026-10-25",
+    built: true,
+  }),
   "integration-test": Object.freeze({
     label: "Connection Test",
     module: "integrations",

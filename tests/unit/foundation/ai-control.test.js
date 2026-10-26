@@ -196,6 +196,8 @@ describe("the registry and its check (§6.5)", () => {
         { rel: "src/modules/x/d.service.js", code: 'await transcription.transcribe({ purpose: "dictation", document_id });' },
         // A comment is not code.
         { rel: "src/modules/x/e.service.js", code: '// ai.complete({ purpose: "made-up" })' },
+        { rel: "src/modules/x/f.service.js", code: 'await ai.embed({ purpose: "made-up-vectors", module: "knowledge", input });' },
+        { rel: "src/modules/x/g.service.js", code: 'await ai.embed({ purpose: "guide-search", module: "knowledge", input });' },
       ],
     });
     expect(bad).toEqual([
@@ -203,6 +205,7 @@ describe("the registry and its check (§6.5)", () => {
       expect.stringMatching(/b\.service\.js:1: name the action as a literal string/),
       expect.stringMatching(/c\.service\.js:1: complete\(\) names no purpose/),
       expect.stringMatching(/d\.service\.js:1: purpose "dictation" is not registered/),
+      expect.stringMatching(/f\.service\.js:1: purpose "made-up-vectors" is not registered/),
     ]);
   });
 });

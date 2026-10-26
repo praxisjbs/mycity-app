@@ -1,9 +1,9 @@
 import type { ParsedChapter, Reader } from "@mycity/contract/guide.js";
-import type { GuideChapter, GuideContents } from "@mycity/contract/contract.gen.ts";
+import type { GuideAnswer, GuideChapter, GuideContents, GuideHit } from "@mycity/contract/contract.gen.ts";
 import { MODULES } from "@/shell/catalogue";
 // A chapter's `cap` need is checked as hasCapability does; the user-guide gate holds each code to the catalogue.
 import { visibleTabs } from "@/shell/access";
-import { notFound, ok, route } from "../core";
+import { invalid, notFound, ok, paged, route } from "../core";
 import { me } from "./identity";
 
 /**
@@ -93,6 +93,48 @@ route("GET /api/v1/user-guide/quick-start", async (req) =>
 route("GET /api/v1/user-guide/chapters/:slug", async (req) => {
   const found = (await cut(req.user!)).chapters.find((c) => c.slug === req.params.slug);
   return found ? ok(found) : notFound();
+});
+
+type Engine = typeof import("@mycity/contract/guide-search.js").default;
+type Searchable = { engine: Engine; index: ReturnType<Engine["indexOf"]> };
+let indexing: Promise<Searchable> | null = null;
+
+/** The words index of every chapter, built on the first search. The mock has no meaning half. */
+function searchable(): Promise<Searchable> {
+  indexing ??= (async () => {
+    const engine = (await import("@mycity/contract/guide-search.js")).default;
+    const { guide, chapters } = await load();
+    return { engine, index: engine.indexOf(chapters.flatMap((c) => guide.passagesOf(c))) };
+  })();
+  return indexing;
+}
+
+/** What answers a search for this account, best first, as the API ranks it with its words alone. */
+async function hitsFor(user: string, q: string): Promise<{ hits: GuideHit[]; lines: (anchor: string) => string[] }> {
+  const { guide } = await load();
+  const { engine, index } = await searchable();
+  const visible = engine.visibleTo(index, readerOf(user), guide.passageFor);
+  const hits = q.trim().length >= 2 ? engine.search(index, q, { visible }).map(({ score: _score, ...hit }) => hit) : [];
+  return { hits, lines: (anchor) => engine.linesOf(index, anchor, visible) };
+}
+
+route("GET /api/v1/user-guide/search", async (req) => paged((await hitsFor(req.user!, req.query.q ?? "")).hits, req));
+
+/**
+ * The answer, on the mock: the opening lines of the best two results, each citing its source. The
+ * API writes it with the Fast job from the same sources (docs/guides/user-guide.md §6.9).
+ */
+route("POST /api/v1/user-guide/answer", async (req) => {
+  const q = String(req.body.q ?? "").trim();
+  if (q.length < 3) return invalid({ q: ["Type a question"] });
+  const { hits, lines } = await hitsFor(req.user!, q);
+  const sources = hits.slice(0, 6);
+  const sentences = sources.slice(0, 2).flatMap((h, i) => {
+    const first = lines(h.anchor).find((l) => l.length > 0);
+    return first ? [{ text: `${h.title}: ${first.replace(/^Step \d+: /, "")}`, sources: [i + 1] }] : [];
+  });
+  const answer: GuideAnswer = { found: sentences.length > 0, sentences, sources };
+  return ok(answer);
 });
 
 /** A picture's bytes, from the file beside its chapter (the screen's fetchImage in mock mode). */
