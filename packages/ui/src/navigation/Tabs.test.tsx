@@ -24,6 +24,24 @@ describe("Tabs", () => {
     expect(screen.getByRole("tablist").className).toContain("overflow-x-auto");
   });
 
+  it("colours a count by its tone: quiet by default, yellow for what waits, red when urgent", () => {
+    render(
+      <Tabs
+        label="People"
+        value="employees"
+        items={[
+          { value: "employees", label: "Employees", count: 2, tone: "primary" },
+          { value: "leave", label: "Leave", count: 1, tone: "err" },
+          { value: "devices", label: "Devices", count: 4 },
+        ]}
+      />,
+    );
+    const badge = (name: string) => screen.getByRole("tab", { name }).querySelector("[data-count]")!;
+    expect(badge("Employees 2").className).toContain("bg-primary");
+    expect(badge("Leave 1").className).toContain("bg-destructive");
+    expect(badge("Devices 4").className).toContain("bg-muted");
+  });
+
   it("routes a plain click through onValueChange instead of reloading", async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();

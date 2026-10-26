@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "../testing/axe";
 import { setViewport } from "../testing/viewport";
 import { DataView, type DataViewColumn, type DataViewList } from "./DataView";
+import { RowMarksContext, type RowMarks } from "../lib/marks";
 import { HelpTerm } from "../help/HelpTerm";
 import { installOverlayTestEnv } from "../overlay/test-env";
 import { ApiError } from "./createApi";
@@ -120,6 +121,57 @@ describe("DataView on desktop", () => {
     await userEvent.keyboard("{Enter}");
     expect(onRowClick).toHaveBeenCalledTimes(2);
     expect(onRowClick).toHaveBeenLastCalledWith(ROWS[0]);
+  });
+});
+
+describe("DataView marks", () => {
+  /** The app's marks, standing in: e1 has something unread about it. */
+  const marksOf = (opened = vi.fn()): RowMarks => ({ useMarked: (keys) => new Set(keys.filter((k) => k === "e1")), opened });
+  const marked = (marks: RowMarks, props: Parameters<typeof view>[0]) =>
+    render(
+      <RowMarksContext.Provider value={marks}>
+        <DataView columns={COLUMNS} rowKey={(r) => r.employee_id} caption="Employees" {...props} />
+      </RowMarksContext.Provider>,
+    );
+
+  it("marks a row with something unread, says so, and tells the app when it is opened", async () => {
+    desktop();
+    const opened = vi.fn();
+    const onRowClick = vi.fn();
+    marked(marksOf(opened), { list: list(), onRowClick });
+    const row = screen.getByRole("cell", { name: /^Unread,\s*Ada Obi$/ }).closest("tr")!;
+    expect(row.className).toContain("bg-warning-soft");
+    expect(row.querySelector("[data-unread]")).not.toBeNull();
+    const other = screen.getByRole("cell", { name: "Chidi Eze" }).closest("tr")!;
+    expect(other.querySelector("[data-unread]")).toBeNull();
+    await userEvent.click(row);
+    expect(opened).toHaveBeenCalledWith("e1");
+    expect(onRowClick).toHaveBeenCalledWith(ROWS[0]);
+    await userEvent.click(other);
+    expect(opened).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks a phone card the same way", async () => {
+    phone();
+    const opened = vi.fn();
+    marked(marksOf(opened), { list: list(), onRowClick: vi.fn() });
+    const card = screen.getByRole("button", { name: "Ada Obi" }).closest("li")!;
+    expect(card.className).toContain("bg-warning-soft");
+    expect(within(card).getByText("Unread,")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ada Obi" }));
+    expect(opened).toHaveBeenCalledWith("e1");
+  });
+
+  it("marks nothing without the app's marks", () => {
+    desktop();
+    const { container } = view({ list: list(), onRowClick: vi.fn() });
+    expect(container.querySelector("[data-unread]")).toBeNull();
+  });
+
+  it("has no accessibility violations with a marked row", async () => {
+    desktop();
+    const { container } = marked(marksOf(), { list: list(), onRowClick: vi.fn(), title: "Employees" });
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
 

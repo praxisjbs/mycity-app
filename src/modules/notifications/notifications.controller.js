@@ -19,6 +19,11 @@ module.exports = {
   acknowledge: async (req, res) => ok(res, await service.acknowledge(withActor(req), req.validated.params.id)),
   unreadCount: async (req, res) => ok(res, await service.unreadCount(req.user)),
   badges: async (req, res) => ok(res, await service.badges(req.user)),
+  unreadRecords: async (req, res) => ok(res, await service.unreadRecords(req.user, req.validated.query)),
+  readRecord: async (req, res) => {
+    await service.readRecord(withActor(req), req.validated.body);
+    noContent(res);
+  },
   markRead: async (req, res) => {
     await service.markRead(withActor(req), req.validated.params.id);
     noContent(res);

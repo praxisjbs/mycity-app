@@ -253,8 +253,8 @@ describe("temporary sites", () => {
     let site = (await api.call("GET /api/v1/attendance/temporary-sites", { query: { q: "TS-0001" } })).data[0];
     expect(site).toMatchObject({ people: 1, status: "approved" });
 
-    // The sheet opens from the list's row: the list reads TS-0001 again first, without Tolu.
-    await waitFor(() => expect(within(screen.getByText("TS-0001 · Partner Training Week").closest("tr")!).queryByText(/Tolu Adeyemi/)).toBeNull(), { timeout: 5000 });
+    // The list has its new answer before the site opens again from it.
+    await waitFor(() => expect(screen.getByText("TS-0001 · Partner Training Week").closest("tr")!.textContent).not.toContain("Tolu Adeyemi"));
     fireEvent.click(await screen.findByText("TS-0001 · Partner Training Week"));
     dialog = await screen.findByRole("dialog", { name: "TS-0001 · Partner Training Week" });
     await waitFor(() => expect(within(dialog).queryByRole("button", { name: "Take Off" })).toBeNull());

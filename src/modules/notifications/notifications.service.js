@@ -49,22 +49,43 @@ function opener(user) {
   };
 }
 
+/**
+ * The screen a record of this type opens on for this reader, or null when nowhere. The bell's
+ * links, the badges per module and tab, a list's unread marks and the read mark on opening a
+ * record all follow it, so they always agree.
+ */
+async function screenTo(entityType, canOpen) {
+  const screen = routeMap.screenOf(entityType);
+  if (!screen) return null;
+  // Who may open it is the route's own permission: System Health's tabs sit in Settings
+  // but are held by system_health (shared/route-map.js).
+  if (await canOpen(routeMap.moduleOf(entityType))) return { ...screen, self: false };
+  // Someone who cannot open the staff screen opens their own instead, where the route names one
+  // (a temporary site they are on opens on Work Location Requests); else the notice has no link.
+  const own = routeMap.screenOf(entityType, { self: true });
+  return own.module !== screen.module && (await canOpen(own.module)) ? { ...own, self: true } : null;
+}
+
 async function present(rows, canOpen) {
   const out = [];
   for (const row of rows) {
-    let link = routeMap.linkFor(row.entity_type, row.entity_id);
-    // Who may open it is the route's own permission: System Health's tabs sit in Settings
-    // but are held by system_health (shared/route-map.js).
-    if (link && !(await canOpen(routeMap.moduleOf(row.entity_type)))) {
-      // Someone who cannot open the staff screen opens their own instead, where the route names one
-      // (a temporary site they are on opens on Work Location Requests); else the notice has no link.
-      const own = routeMap.linkFor(row.entity_type, row.entity_id, { self: true });
-      link = own && own.module !== link.module && (await canOpen(own.module)) ? own : null;
-    }
+    const screen = await screenTo(row.entity_type, canOpen);
+    const link = screen && routeMap.linkFor(row.entity_type, row.entity_id, { self: screen.self });
     const shown = link ? { module: link.module, tab: link.tab, path: link.path } : null;
     out.push({ ...row, body: row.body || null, link: shown });
   }
   return out;
+}
+
+/** The record types whose notices open on this screen for this reader. */
+async function typesShownOn(user, moduleKey, tab) {
+  const canOpen = opener(user);
+  const types = [];
+  for (const type of routeMap.typesOn(moduleKey, tab)) {
+    const screen = await screenTo(type, canOpen);
+    if (screen && screen.module === moduleKey && screen.tab === tab) types.push(type);
+  }
+  return types;
 }
 
 async function list(user, query) {
@@ -110,15 +131,41 @@ async function unreadCount(user) {
   return { unread: await repo.unreadCount(pool, user.user_id) };
 }
 
-/** Unread notifications per module the caller may open; modules with none are left out. */
+/**
+ * Unread notifications counted where each opens for the caller: per module, and per tab within it,
+ * so a module's tabs add up to its count. Screens with none, and notices that open nowhere the
+ * caller may go, are left out.
+ */
 async function badges(user) {
   const canOpen = opener(user);
-  const out = {};
+  const modules = {};
+  const tabs = {};
   for (const { entity_type: type, unread } of await repo.unreadByEntityType(pool, user.user_id)) {
-    const moduleKey = routeMap.moduleOf(type);
-    if (moduleKey && (await canOpen(moduleKey))) out[moduleKey] = (out[moduleKey] || 0) + unread;
+    const screen = await screenTo(type, canOpen);
+    if (!screen) continue;
+    modules[screen.module] = (modules[screen.module] || 0) + unread;
+    tabs[screen.module] = tabs[screen.module] || {};
+    tabs[screen.module][screen.tab] = (tabs[screen.module][screen.tab] || 0) + unread;
   }
-  return out;
+  return { modules, tabs };
+}
+
+/** Which of the records a list shows on one screen carry an unread notice of the caller's that opens there. */
+async function unreadRecords(user, query) {
+  const types = await typesShownOn(user, query.module, query.tab);
+  return { ids: types.length ? await repo.unreadRecordIds(pool, user.user_id, types, query.ids) : [] };
+}
+
+/**
+ * A record opened on a screen: the caller's unread notices about it that open there are read, and
+ * their other tabs and devices are told (`notification_read`, as for any read mark).
+ */
+async function readRecord(user, body) {
+  const types = await typesShownOn(user, body.module, body.tab);
+  if (!types.length) return;
+  await tx(async (client) => {
+    for (const type of types) await markReadForRecord(client, user, type, body.entity_id);
+  });
 }
 
 /** Marks one of the caller's own notifications read. Already read is a quiet no-op. */
@@ -621,6 +668,8 @@ module.exports = {
   urgent,
   unreadCount,
   badges,
+  unreadRecords,
+  readRecord,
   markRead,
   markAllRead,
   opener,
