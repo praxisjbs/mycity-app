@@ -12,6 +12,9 @@
  *
  * An open seat (a post nobody holds yet, such as Head Sales & Revenue) is found by its title or
  * department, and opens on the Organogram focused on it.
+ *
+ * The people lead the records (`lead`): a name typed finds the person before their attendance
+ * days, leave and requests.
  */
 const { recordProvider } = require("../../shared/search/provider");
 
@@ -28,6 +31,7 @@ const employees = recordProvider({
   where: "e.status <> 'archived'",
   scope: { column: "e.employee_id" },
   phones: ["e.phone"],
+  lead: true,
 });
 
 const departments = recordProvider({

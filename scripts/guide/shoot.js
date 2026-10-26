@@ -258,8 +258,10 @@ const POLICY_PROMPT = '[data-ui=modal]:has([data-ui=title]:text-is("Policy Updat
 /**
  * Sign in once per account and device; every picture of theirs is taken in that session. A
  * `guest` is nobody: each of their pictures opens its address afresh (the sign-in screen, a link).
+ * `keepPrompts` leaves open the policies the account owes, for a picture of that prompt
+ * (`prompt: keep`): it opens once per sign-in, so it is taken in a session of its own.
  */
-async function session(browser, origin, account, device) {
+async function session(browser, origin, account, device, { keepPrompts = false } = {}) {
   const ctx = await browser.newContext({ ...SIZES[device], serviceWorkers: "block", reducedMotion: "reduce" });
   // Every picture shows the same moment, whenever it is taken: the demo's clock prompts, greetings
   // and "today" follow the clock, and a Monday morning would open Clock In over the screen.
@@ -288,7 +290,7 @@ async function session(browser, origin, account, device) {
   }
   // Then each policy the account owes opens, one at a time, once per sign-in: Esc does not close
   // it (app/src/features/policies/AcknowledgeSheet.tsx), its X does, and nothing is acknowledged.
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; !keepPrompts && i < 5; i += 1) {
     const owed = await page.waitForSelector(POLICY_PROMPT, { timeout: i ? 1500 : 3000 }).catch(() => null);
     if (!owed) break;
     await page.click(`${POLICY_PROMPT} button[aria-label=Close]`);
@@ -362,6 +364,19 @@ async function main(argv) {
         let s = await session(browser, origin, account, device);
         for (const shot of mine) {
           const file = path.join(IMG, shot.chapter, `${shot.id}.${device}.png`);
+          if (shot.spec.prompt === "keep") {
+            // The prompt opens once per sign-in: its picture is taken in a sign-in of its own.
+            const own = await session(browser, origin, account, device, { keepPrompts: true });
+            try {
+              await take(own.page, shot, device, file, { guest: own.guest, origin });
+              taken.set(`${shot.chapter}/${shot.id}`, shot);
+              console.log(`  ${shot.chapter}/${shot.id}.${device}.png`);
+            } catch (err) {
+              failed.push(`${shot.chapter}/${shot.id} (${device}): ${String(err.message).split("\n")[0]}`);
+            }
+            await own.ctx.close();
+            continue;
+          }
           try {
             await take(s.page, shot, device, file, { guest: s.guest, origin });
             taken.set(`${shot.chapter}/${shot.id}`, shot);

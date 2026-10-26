@@ -99,7 +99,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
-| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
+| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
@@ -2013,7 +2013,7 @@ The module's tab strip: one row of tabs under the page header, one of them activ
 |---|---|
 | Use | Sibling views of one module or record (Register, Field Assignments, Location Requests). Controlled by value, so the router drives it from ?tab=; give each tab an href so it opens in a new tab and survives a reload. |
 | Avoid | Two or three views of one list in a toolbar (use SegmentedControl); filtering a list (use Chips); steps of a form (use Wizard); more than one strip on a screen. |
-| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). |
+| Phone | One row that scrolls sideways inside itself, never the page; the active tab is brought into view; each tab is a 44 px target. On a desktop too narrow for every tab, the row keeps the tabs that fit, the active one always among them, and the rest wait behind More Tabs (a ⋯ menu at the end, dotted when a hidden tab has a count). A count's `tone` reads the same on both: yellow for what waits on the reader, red when it is urgent. |
 | Accessibility | A tablist named by `label` (Radix underneath): one Tab stop for the strip, Left and Right between tabs, Home and End to the ends, Enter or Space activates (manual activation, so arrowing does not load every view). With TabPanel children each tab controls its panel; as a bare strip over a routed screen it controls nothing. |
 | Status | stable |
 | Exports | `Tabs`, `TabPanel` |
@@ -2802,7 +2802,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | Use | Every date a person enters (gate 15); DateRangeField for a from and to pair (a report period); TimeField for a 24-hour time. |
 | Avoid | <input type="date"> (its format follows the browser's locale); a date shown and not entered (use formatDate). |
 | Phone | The calendar opens as a bottom sheet; days are 44 px targets; the keyboard is numeric. |
-| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. |
+| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id, a visible From or To label and their own error, tied to that end alone; their calendar buttons are named From and To too. |
 | Status | stable |
 | Exports | `DateField`, `DateRangeField`, `TimeField` |
 | Import | `import { DateField, DateRangeField, TimeField } from "@mycity/ui";` |
@@ -2820,12 +2820,14 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with what was typed ("Not a real date", "Pick 21/10/2026 or later"), or undefined once it is right. |
 | `min` | `string` |  | The earliest date that may be picked or typed, ISO. |
 | `max` | `string` |  | The latest date that may be picked or typed, ISO. |
-| `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
-| `message` | `string` |  | Unused here (the Field shows it). |
+| `state` | `FieldState` |  | The mark; the Field supplies one otherwise (an end of a period takes only its own). |
+| `message` | `ReactNode` |  | Unused on its own (the Field shows it). On an end of a period: the period's message about this end, shown under it. |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
 | `placeholder` | `string` |  | The format example; DD/MM/YYYY. |
 | `disabled` | `boolean` |  | Shown and not changed (a record already sent): no typing and no calendar. |
+| `end` | `"From" \| "To"` |  | Which end of a period this is (DateRangeField): the field shows the end as a small label above it and is named by its Field's label and the end ("Dates From"), as is its calendar button. What is wrong with it is said under it and tied to it alone. |
+| `describedBy` | `string` |  | On an end of a period: the ids of the period's messages that are about both ends. |
 
 **DateRangeField** props (`DateRangeFieldProps`)
 
@@ -2838,7 +2840,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `min` | `string` |  | The earliest date either end may take, ISO. |
 | `max` | `string` |  | The latest date either end may take, ISO. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
-| `message` | `string` |  | Unused here (the Field shows it). |
+| `message` | `string` |  | Unused here: the Field's message is shown beside the end it is about. |
 
 **TimeField** props (`TimeFieldProps`)
 
@@ -3023,7 +3025,7 @@ The sign-in screen's larger field: label, control, its mark, and a message that 
 
 ### MoneyField
 
-An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float.
+An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped.
 
 | | |
 |---|---|
@@ -3043,8 +3045,9 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `value` | `string` | yes | What the person typed ("250,000" or "250000.5"). |
-| `onChange` | `(value: string) => void` | yes | Called with what they type, digits, commas and one point only. |
+| `onChange` | `(value: string) => void` | yes | Called with what they type: digits, commas and points, and a leading minus when they typed one. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with the amount as typed ("Not below zero", "Two decimals at most"), or undefined once it is right. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
@@ -3810,7 +3813,7 @@ THE shared list: a dense table on desktop and a card list on a phone from the sa
 | Use | Every list of records a person reads or acts on: employees, leave requests, expenses, candidates, partners. |
 | Avoid | A second table of your own; sorting or filtering the 25 rows on screen; a column chooser; a visible table on a phone. |
 | Phone | The columns become cards: the first value is the card's title, the next three are label and value pairs, and sort moves into an action sheet. There is never a <table> (gate 11). |
-| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. |
+| Accessibility | The table has a caption, sortable headers carry aria-sort and are buttons (a header holding its own control, a help term, keeps it and sorts from the glyph beside it, named by `sortLabel`), a clickable row is reachable by Tab and Enter, and a reloading list says aria-busy. A row marked as new (RowMarksContext: something unread is about it) says Unread before its first value as well as showing its dot and tint. |
 | Status | stable |
 | Exports | `DataView`, `LoadingRows` |
 | Import | `import { DataView, LoadingRows } from "@mycity/ui";` |
@@ -5466,6 +5469,9 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `normaliseLink` | `lib/links.ts` | The form a link's card is asked for in: https:// added, the host in lower case, the fragment dropped. |
 | `firstLink` | `lib/links.ts` | The first link in a text in its card form, or null when there is none or it may not have a card. |
 | `hostOf` | `lib/links.ts` | The host a link goes to, without www., for a card's last line. |
+| `RowMarks` (type) | `lib/marks.ts` | Rows a list marks as new to its reader, because something unread is about them (the hub's notifications, docs/guides/notifications.md §6). |
+| `RowMarksContext` | `lib/marks.ts` | The app's row marks; give a `RowMarks` whose `useMarked` is one stable hook. |
+| `useRowMarks` | `lib/marks.ts` | A list's marked rows, and what to call when one of them is opened. |
 | `PHONE_QUERY` | `lib/media.ts` | A phone: 760 px wide and below (gate 11). |
 | `useMediaQuery` | `lib/media.ts` | true while the media query matches; false before the first render on a server. |
 | `useIsPhone` | `lib/media.ts` | true on a phone: the phone shell renders (gate 11). |

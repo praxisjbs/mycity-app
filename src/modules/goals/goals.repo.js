@@ -258,6 +258,26 @@ function listPlans(db, query) {
 
 const getPlan = (db, id) => one(db, `SELECT ${PLAN} ${PLAN_FROM} WHERE pl.performance_plan_id = $1`, [id]);
 
+/**
+ * GET /performance/functions: the company first (no department), then each active function by
+ * name, with its plan's status in the quarter `period_id` (none without one). Whether the reader
+ * may set each is the service's question for goals.authority, never this query's.
+ */
+function listFunctions(db, query) {
+  return pageQuery(
+    db,
+    `SELECT f.department_id, f.name, pl.status AS plan_status, ${TOTAL_COL}
+       FROM (SELECT NULL::uuid AS department_id, NULL::text AS name, 0 AS rank
+             UNION ALL
+             SELECT d.department_id, d.name, 1 FROM department d WHERE d.active) f
+       LEFT JOIN performance_plan pl
+         ON pl.performance_period_id = $1::uuid AND pl.department_id IS NOT DISTINCT FROM f.department_id
+      ORDER BY f.rank, f.name, f.department_id`,
+    [query.period_id || null],
+    query,
+  );
+}
+
 async function updatePlan(client, id, patch) {
   const keys = ["status", "workflow_instance_id", "submitted_by", "submitted_at", "returned_reason", "binding_at"].filter(
     (k) => patch[k] !== undefined,
@@ -936,6 +956,7 @@ module.exports = {
   isCeoEmployee,
   holdsRoleCode,
   listPlans,
+  listFunctions,
   getPlan,
   getChangeDetail,
   approvalsWaiting,

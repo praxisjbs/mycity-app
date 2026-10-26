@@ -6,10 +6,12 @@ import { usePhotos } from "@/api/download";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth, useMe } from "@/auth/AuthProvider";
+import { MonthPicker } from "@/features/shared/MonthPicker";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, SelectField, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, SelectField, SidePanel, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, locationShown, PATTERN, PUNCH_STATE, REGISTER_STATUS, UNCLEAR_HELP, VERDICT } from "./labels";
+import { DAY_COLUMNS } from "./EssAttendance";
 import { DayRoute } from "./TemporarySites";
 import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
 
@@ -39,6 +41,7 @@ export function PeopleAttendance() {
   const id = params.get("id");
   const homeId = params.get("home");
   const employeeId = params.get("employee");
+  const personId = params.get("person");
   const { can } = useAuth();
   const modal = useModal();
   const [date, setDate] = useState(todayIso());
@@ -56,9 +59,13 @@ export function PeopleAttendance() {
     ["deductions", "Deductions"],
     ["overtime", "Overtime"],
   ];
-  const openDay = (employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> });
+  const openDay = useCallback((employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> }), [modal]);
   useRecordLink(id, openDay);
   usePersonLink(employeeId, openDay);
+  // ⌘K's All Days of a person (`?person=`): their days by month in a panel; a day opens over it.
+  const [person, setPerson] = useState<{ employee_id: string; name: string } | null>(null);
+  const openPerson = useCallback((who: string, name: string) => setPerson({ employee_id: who, name }), []);
+  usePersonDaysLink(personId, openPerson);
   const openHome = useCallback((h: HomeRequest) => modal.open({ title: h.employee.display_name, body: (close) => <HomeView h={h} close={close} /> }), [modal]);
   useHomeLink(homesOn ? homeId : null, openHome, () => setView("homes"));
   // Deductions ticked on the Deductions view put Waive Selected in the phone's floating button.
@@ -115,8 +122,47 @@ export function PeopleAttendance() {
       ) : (
         <Homes openHome={openHome} />
       )}
+      <SidePanel open={!!person} onClose={() => setPerson(null)} title={person?.name ?? "All Days"} size="wide">
+        {person && <PersonDays key={person.employee_id} employeeId={person.employee_id} name={person.name} openDay={openDay} />}
+      </SidePanel>
     </>
   );
+}
+
+/** All Days: one person's days of a month, newest first, 25 a page; a day opens its own sheet over the panel. */
+function PersonDays({ employeeId, name, openDay }: { employeeId: string; name: string; openDay: (employeeId: string, name: string, date: string) => void }) {
+  const thisMonth = todayIso().slice(0, 7);
+  const [month, setMonth] = useState(thisMonth);
+  const list = usePaged("GET /api/v1/attendance/days", { filters: { employee_id: employeeId, month } });
+  return (
+    <>
+      <MonthPicker value={month} onChange={setMonth} min={`${Number(thisMonth.slice(0, 4)) - 2}-01`} max={thisMonth} className="mb-3" />
+      <DataView
+        title="All Days"
+        list={list}
+        rowKey={(d) => d.attendance_day_id}
+        onRowClick={(d) => openDay(employeeId, name, d.attendance_date)}
+        noun="day"
+        empty={{ icon: "clock", title: "No Days This Month" }}
+        columns={[...DAY_COLUMNS, { key: "r", label: "Review", desktop: true, render: (d) => (d.open_exceptions ? <Pill tone="warn">{`${d.open_exceptions} Open`}</Pill> : null) }]}
+      />
+    </>
+  );
+}
+
+/**
+ * A link to all of a person's days (⌘K's All Days of them, `?person=`) opens them, once. The name
+ * comes from their record, which a person not on today's register (on leave, left) still has.
+ */
+function usePersonDaysLink(employeeId: string | null, open: (employeeId: string, name: string) => void) {
+  const person = useApi("GET /api/v1/employees/:id", { params: { id: employeeId ?? "" }, enabled: !!employeeId });
+  const done = useRef<string | null>(null);
+  useEffect(() => {
+    if (person.data && done.current !== person.data.employee_id) {
+      done.current = person.data.employee_id;
+      open(person.data.employee_id, person.data.display_name);
+    }
+  }, [person.data, open]);
 }
 
 /** A link naming a person (Home's View Attendance) opens their today, once. */

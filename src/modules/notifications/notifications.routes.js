@@ -35,8 +35,12 @@ route(router, "get", "/unread-count",
   controller.unreadCount);
 
 route(router, "get", "/badges",
-  { response: c.notifications.NavBadges, self: true, summary: "My unread notifications per module" },
+  { response: c.notifications.NavBadges, self: true, summary: "My unread notifications per module and tab" },
   controller.badges);
+
+route(router, "get", "/unread-records",
+  { query: c.notifications.UnreadRecordsQuery, response: c.notifications.UnreadRecords, self: true, summary: "Which records a list shows have my unread notifications" },
+  controller.unreadRecords);
 
 route(router, "get", "/read-state",
   { query: c.notifications.NotificationReadStateQuery, response: c.notifications.NotificationReadState, self: true, summary: "Which of my shown notifications are read" },
@@ -105,6 +109,10 @@ route(router, "post", "/push/renew",
 route(router, "post", "/push/read",
   { body: c.notifications.PushDeviceRead, no_content: true, anonymous: true, summary: "Mark Read pressed on a notification a device shows" },
   limits.pushDeviceLimiter, controller.markReadFromDevice);
+
+route(router, "post", "/read-record",
+  { body: c.notifications.RecordRead, no_content: true, self: true, summary: "Mark my notifications about a record I opened read" },
+  controller.readRecord);
 
 route(router, "post", "/read-all",
   { body: c.common.EmptyBody, no_content: true, self: true, summary: "Mark all my notifications read" },

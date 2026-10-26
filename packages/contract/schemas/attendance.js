@@ -477,6 +477,16 @@ const AttendanceDayPage = Paged(AttendanceDay);
  */
 const MyDayListQuery = listQuery({ month: month.optional(), status: DayStatus.optional() }, ["attendance_date"]);
 
+/**
+ * GET /attendance/days: one person's days of a month (this month when absent), newest first,
+ * within the reader's `people` scope: People · Attendance's All Days (`?person=`), which ⌘K's
+ * "All Days of <the person>" opens after the days it lists.
+ */
+const PersonDayListQuery = listQuery(
+  { employee_id: uuid, month: month.optional(), status: DayStatus.optional() },
+  ["attendance_date"],
+);
+
 /** GET /attendance/me/summary */
 const MySummaryQuery = z.object({ month: month.optional() }).strict();
 const MyAttendanceSummary = z
@@ -1527,6 +1537,7 @@ const TABLES = {
   },
   AttendanceDayPage: { table: null, reason: "a page of a person's days" },
   MyDayListQuery: { table: null, reason: "list controls for my days" },
+  PersonDayListQuery: { table: null, reason: "the person, the month and the list controls for one person's days" },
   MySummaryQuery: { table: null, reason: "the month the figures are for" },
   MyAttendanceSummary: { table: null, reason: "a month's figures, counted from attendance_day" },
   AttendanceEvent: {
@@ -1716,6 +1727,7 @@ module.exports = {
   AttendanceDay,
   AttendanceDayPage,
   MyDayListQuery,
+  PersonDayListQuery,
   MySummaryQuery,
   MyAttendanceSummary,
   AttendanceEvent,

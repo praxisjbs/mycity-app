@@ -1,5 +1,6 @@
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, type Req } from "../core";
-import { byId, byKey, managerOf, refKey, teamOf } from "../data/people";
+import { byId, byKey, DEPARTMENTS, managerOf, refKey, teamOf } from "../data/people";
+import { me } from "./identity";
 import type {
   AnalyticsPerson,
   ApprovalInstance,
@@ -14,6 +15,7 @@ import type {
   OrganisationalGoalTarget,
   PerformanceAnalytics,
   PerformanceApproval,
+  PerformanceFunction,
   PerformancePeriod,
   Plan,
   PlanDetail,
@@ -300,7 +302,10 @@ route("POST /api/v1/performance/objectives", (req) => {
   const periodId = b.performance_period_id || PERIOD.performance_period_id;
   const dept = b.department_id || null;
   const plan = planOf(periodId, dept);
-  if (!open(plan.status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding", { department_id: ["Plan is binding"] });
+  if (!open(plan.status))
+    return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead", {
+      department_id: [plan.status === "submitted" ? "Plan awaits approval" : "Plan is binding"],
+    });
   const prefix = dept === null ? "CO" : dept === deptId ? "BM" : "FN";
   const used = new Set(OBJECTIVES.filter((o) => o.code.startsWith(`${prefix}-O`)).map((o) => Number(o.code.split("-O")[1])));
   let n = 1;
@@ -530,6 +535,27 @@ route("GET /api/v1/performance/plans", (req) =>
     sort: { department: (a, b) => (a.department ?? "").localeCompare(b.department ?? ""), status: (a, b) => a.status.localeCompare(b.status) },
   }),
 );
+/**
+ * GET /performance/functions: the company first, then each function by name, whether the reader may
+ * set its goals and KPIs as the API's goals.authority answers (the CEO everything; goals.company the
+ * company's; goals.function with performance.manage, or as the function's head, a function's), and
+ * its plan's status in the quarter asked for.
+ */
+route("GET /api/v1/performance/functions", (req) => {
+  const caps = me(req.user ?? "").capabilities;
+  const periodId = req.query.period_id || null;
+  const maySet = (departmentId: string | null) =>
+    isCeo(req) ||
+    (departmentId === null ? caps.includes("goals.company") : caps.includes("goals.function") && (caps.includes("performance.manage") || setsGoalsFor(req, departmentId)));
+  const statusOf = (departmentId: string | null) =>
+    (periodId && PLANS.find((p) => p.performance_period_id === periodId && p.department_id === departmentId)?.status) || null;
+  const rows: PerformanceFunction[] = [null, ...[...DEPARTMENTS].sort((a, b) => a.localeCompare(b))].map((name) => {
+    const id = name === null ? null : sid(`dept:${name}`);
+    return { department_id: id, name, may_set: maySet(id), plan_status: statusOf(id) };
+  });
+  // The quarter names each plan; it narrows nothing.
+  return paged(rows, req, { filters: { period_id: () => true } });
+});
 route("GET /api/v1/performance/plans/:id", (req) => {
   const p = PLANS.find((x) => x.performance_plan_id === req.params.id);
   return p ? ok(planDetail(req, p)) : notFound();
@@ -1152,6 +1178,7 @@ route("PUT /api/v1/performance/scorecards/:id/lines", (req) => {
     if (!String(l.title ?? "").trim()) problems[at("title")] = ["Required"];
     if (!MEASURES[String(l.section)]?.includes(String(l.measure))) problems[at("measure")] = [`Pick ${MEASURES[String(l.section)]?.join(" or ") ?? "a measure"}`];
     if (!(Number(l.weight) > 0)) problems[at("weight")] = ["Above zero"];
+    else if (Number(l.weight) > 100) problems[at("weight")] = ["At most 100"];
     if (l.source === "key_result" && !l.okr_key_result_id) problems[at("okr_key_result_id")] = ["Link a key result"];
     if (l.source === "function_kpi" && !l.kpi_definition_id) problems[at("kpi_definition_id")] = ["Link a KPI"];
     if (l.measure === "milestone" && !l.milestone_due_on) problems[at("milestone_due_on")] = ["Pick a date"];

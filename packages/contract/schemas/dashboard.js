@@ -59,6 +59,9 @@ const HomeKpiSource = z.enum(["user", "role", "view"]);
 /** Which way the figure moved against the same day last week. */
 const HomeKpiTrend = z.enum(["up", "down", "flat"]);
 
+/** The module key a card's records belong to ("expenses"), as access.catalog names it. */
+const HomeKpiModule = z.string().regex(/^[a-z][a-z_]*$/);
+
 /**
  * One KPI card, flat. Zero is a figure and is shown; a card the server could not compute
  * is left out of the row instead (home.md §6). A ratio keeps what it is out of, so "0 of
@@ -83,6 +86,8 @@ const HomeKpiCard = z
     trend: HomeKpiTrend.nullable(),
     /** The card opens the records behind it (GET /home/kpi/:key). */
     opens: z.boolean(),
+    /** The module whose records it counts: Home leaves it out while that module is Coming Soon in this build (F14). */
+    module: HomeKpiModule,
   })
   .strict();
 
@@ -93,6 +98,8 @@ const HomeKpiOption = z
     title: z.string(),
     domain: HomeKpiDomain,
     unit: HomeKpiUnit,
+    /** As on the card: the picker leaves it out while its module is Coming Soon. */
+    module: HomeKpiModule,
   })
   .strict();
 

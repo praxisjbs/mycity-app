@@ -104,6 +104,15 @@ describe("parseChapter", () => {
     expect(parseChapter(spec("lock: asleep"), "x.md").problems).toEqual(['x.md: shot locked, line 12: lock reads "lock: idle", "lock: time" or "lock: ended"']);
   });
 
+  test("a picture of a prompt that opens once per sign-in keeps it (prompt: keep), and nothing else", () => {
+    const spec = (line) => `---\ntitle: X\n---\n\n## A {#a}\n\n![Owed](shot:owed)\n\n\`\`\`shot owed\nopen: /ess?tab=policy-updates\n${line}\n\`\`\`\n`;
+    const ok = parseChapter(spec("prompt: keep"), "x.md");
+    expect(ok.problems).toEqual([]);
+    expect(ok.chapter.shots.owed.prompt).toBe("keep");
+    expect(parseChapter(spec("crop: modal"), "x.md").chapter.shots.owed).not.toHaveProperty("prompt");
+    expect(parseChapter(spec("prompt: close"), "x.md").problems).toEqual(["x.md: shot owed, line 11: prompt is keep"]);
+  });
+
   test("a need may be team, or either of two", () => {
     const { needs, problems } = parseNeeds("workspace create, team, manager or cap performance.manage");
     expect(problems).toEqual([]);

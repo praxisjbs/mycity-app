@@ -23,6 +23,11 @@ export function urgentModules(rows: Notification[]): Set<string> {
   return new Set(rows.flatMap((n) => (n.link ? [n.link.module] : [])));
 }
 
+/** The tabs an open urgent notice opens on, as `module/tab`: their counts show red. */
+export function urgentTabs(rows: Notification[]): Set<string> {
+  return new Set(rows.flatMap((n) => (n.link ? [`${n.link.module}/${n.link.tab}`] : [])));
+}
+
 export function UrgentNotices({ rows }: { rows: Notification[] }) {
   const [index, setIndex] = useState(0);
   const { navigate } = useRouter();

@@ -29,6 +29,17 @@ describe("the contract", () => {
     expect(ok({ ...base, timezone: "not a zone" })).toBe(false);
   });
 
+  test("a centre outside its range is refused with the whole range; the ends themselves are kept", () => {
+    const words = (body) => c.worksites.WorksiteCreate.safeParse(body).error.issues.map((i) => `${i.path[0]}: ${i.message}`);
+    expect(words({ ...base, latitude: 91, longitude: 181 })).toEqual(["latitude: From -90 to 90", "longitude: From -180 to 180"]);
+    expect(words({ ...base, latitude: -91, longitude: -181 })).toEqual(["latitude: From -90 to 90", "longitude: From -180 to 180"]);
+    expect(words({ ...base, radius_m: 1001 })).toEqual(["radius_m: From 25 to 1,000 m"]);
+    expect(words({ ...base, radius_m: 24 })).toEqual(["radius_m: From 25 to 1,000 m"]);
+    expect(words({ ...base, radius_m: 100.5 })).toEqual(["radius_m: Whole metres only"]);
+    for (const [latitude, longitude] of [[90, 180], [-90, -180]]) expect(ok({ ...base, latitude, longitude })).toBe(true);
+    expect(c.worksites.WorksiteUpdate.safeParse({ latitude: 90.0001 }).error.issues[0].message).toBe("From -90 to 90");
+  });
+
   test("a change must change something", () => {
     expect(c.worksites.WorksiteUpdate.safeParse({}).success).toBe(false);
     expect(c.worksites.WorksiteUpdate.safeParse({ active: false }).success).toBe(true);

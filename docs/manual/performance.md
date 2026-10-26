@@ -136,8 +136,7 @@ Operations and People and the CEO may set any function's. They can be added and 
 plan is a draft, or after it comes back. A new objective goes into the quarter chosen in
 **Quarter** on Goals.
 
-**New Goal** shows only if you may set goals for a function or the company. **Function** lists only
-those you may set goals for, whose plan is a draft or has come back.
+**New Goal** shows only if you may set goals for a function or the company.
 
 ![New Goal, an objective](shot:performance-new-goal)
 
@@ -145,6 +144,10 @@ those you may set goals for, whose plan is a draft or has come back.
    **What**.
 2. Pick the **Function**, type the **Objective**, and pick the **Organisational Goal** it serves.
    Press **Set Objective**. The hub gives it its code, such as *BM-O3 set*.
+   **Function** lists only what you may set; a head finds their own function already picked. One
+   whose plan is already sent or binding says so beside its name, such as
+   *Marketing & Sales · Binding*, and takes no new objective. **None you may set** means your role
+   sets no function's goals.
 3. {needs="cap goals.company"} For a company objective, choose **Company** in **Function**.
 4. For a key result, press **New Goal** and choose **Key Result**.
 5. Pick its **Objective**, and type the **Key Result**, such as `Grow monthly active users to
@@ -177,11 +180,16 @@ example, *BM-O1 deleted*.
 | **An objective holds at most four key results** | The objective has four already | Add it to another objective |
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
+| **Plan is binding** under **Function** | That function's plan for the quarter is approved | Pick another function, or change a target |
+| **Plan awaits approval** under **Function** | That function's plan is with its approvers | Wait until it is returned or binding |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | Your role changed since the page opened | Reload the page and pick again |
 | **Pick a function** under **Function** | No function picked, and your role does not set the company's | Pick your function |
 | **You cannot set a function's goals** | Your role sets only the company's objectives | Choose **Company** in **Function** |
+
+A message that names no field shows in red above **Set Objective** and stays until you press it
+again. Nothing is saved, and what you typed stays.
 
 ### Send the quarter plan {#performance-plan-send needs="performance create, cap goals.function"}
 
@@ -432,7 +440,9 @@ sent. Operations and People may draft one for anyone but themselves.
 6. Pick its **Section**: **Results**, **KPIs** or **Accountability**. Type the **Goal**.
 7. Choose its **Measure**. A **Results** line is **Numeric** or **Milestone**. A **KPIs** or
    **Accountability** line is **Standard** or **Yes or No**.
-8. Fill in the **Target** if it has one, and the **Weight**, such as `15` or `12.5`.
+8. Fill in the **Target** if it has one, and the **Weight**, such as `15` or `12.5`. Above the
+   lines, each section shows its lines' total against its share as you type, such as
+   *Accountability 22.5 of 15*, red until it adds up.
 9. Pick its **Key Result**, or its **KPI** on a **KPIs** line, or **None** for a line the person
    reports themselves. A team result line ticks its **Team Key Results** instead. A **Milestone**
    line also needs its **Due Date**.
@@ -459,6 +469,7 @@ its approvers.
 | **Link a KPI** | The line takes its figures from a KPI, and none is picked | Pick its **KPI** |
 | **Pick a date** | A **Milestone** line has no **Due Date** | Pick the **Due Date** |
 | **Above zero** | The **Weight** is 0 | Give it a weight above zero |
+| **At most 100** | The **Weight** is over 100 | Give it a weight of 100 or less |
 | **Check the weight** | The **Weight** is not like 15 or 12.5 | Type a number with at most two decimals |
 | **Pick the key results** | A team result line has none ticked | Tick its **Team Key Results** |
 | **Required** under **Goal** | The **Goal** is empty | Type the goal |
@@ -602,8 +613,9 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 1. Press **New KPI** at the top right of [Performance · KPIs](/performance?tab=kpis). On a phone it
    is in **Quick Actions**. It shows only if you set a function's KPIs.
    ![New KPI](shot:performance-kpi-new)
-2. Pick the **Function**, which lists only those you set KPIs for, and type the **KPI**, such as
-   `Social response within 24 hours`.
+2. Pick the **Function** and type the **KPI**, such as `Social response within 24 hours`.
+   **Function** lists only the functions you may set KPIs for; a head finds their own already
+   picked. **None you may set** means your role sets no function's KPIs.
 3. Add the **Formula** and **Unit** if it has them.
 4. Choose the **Direction**: **Higher Is Better** or **Lower Is Better**. Fill in the **Target** as
    a figure, or **Target Wording** as people say it. Choose the **Frequency**: **Monthly**,
@@ -615,6 +627,9 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 |---|---|---|
 | **Only the function's head sets its KPIs** | Your role changed since the page opened | Reload the page and pick again |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
+
+**Only the function's head sets its KPIs** shows in red above **Set KPI** and stays until you press
+it again. Nothing is saved, and what you typed stays.
 
 ### Record a month's result {#performance-kpi-actual needs="performance edit, cap goals.function"}
 

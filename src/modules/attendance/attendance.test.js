@@ -885,6 +885,14 @@ describe("the routes", () => {
     }
   });
 
+  test("All Days: one person's days are People's to read under view, the person named in the query (QA DEF-02)", () => {
+    const days = routes.find((r) => r.method === "GET" && r.path === "/days");
+    expect(days.permission).toMatchObject({ key: "people", action: "view" });
+    expect(days.contract.self).toBeFalsy();
+    expect(days.contract.query.safeParse({ month: "2026-10" }).success).toBe(false);
+    expect(days.contract.query.safeParse({ employee_id: "00000000-0000-4000-a000-000000000001", month: "2026-10" }).success).toBe(true);
+  });
+
   test("a work location request takes no new entry from PR 4; People still read requests, and decide them in the approval", () => {
     expect(routes.some((r) => r.method === "POST" && r.path === "/me/requests")).toBe(false);
     expect(routes.find((r) => r.method === "POST" && r.path === "/me/requests/:id/cancel").contract.self).toBe(true);

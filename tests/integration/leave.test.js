@@ -163,6 +163,8 @@ describeDb("leave against the real migrations", () => {
       days: 3,
       status: "submitted",
       waiting_on: "Line Manager",
+      // The person the stage resolved to, as the toast and the request name them (OBS-05).
+      approver_name: "Kemi Alade",
       recorded: false,
       leave_type_name: "Annual",
       employee: { display_name: "Musa Danjuma", department: "Programmes" },
@@ -218,6 +220,11 @@ describeDb("leave against the real migrations", () => {
     const tooMuch = await ask("staff", "annual", d("03-01"), d("03-27"));
     expect(tooMuch.status).toBe(422);
     expect(tooMuch.body.error.code).toBe("LEAVE_ALLOWANCE_EXCEEDED");
+    // The Last Day says by how much (DEF-08), and a refused request takes nothing from the year.
+    expect(tooMuch.body.error.fields).toEqual({ ends_on: [`${24 - off[0].n} working days, 17 left`] });
+    const after = await as("staff").get(`/ess/leave/balances?year=${Y}`);
+    expect(after.body.balances.find((b) => b.code === "annual")).toMatchObject({ pending: 3, remaining: 17 });
+    expect((await as("staff").get(`/ess/leave?year=${Y}`)).body.page.total).toBe(1);
     // A type with no allowance has no ceiling.
     const unpaid = await ask("staff", "unpaid", d("03-01"), d("03-27"));
     expect(unpaid.status).toBe(201);
@@ -257,9 +264,10 @@ describeDb("leave against the real migrations", () => {
     expect(long.body.days).toBe(8);
     const id = long.body.workflow_instance_id;
     await as("manager").post(`/workflow/instances/${id}/approve`, {});
-    expect((await as("staff").get(`/ess/leave/${long.body.leave_request_id}`)).body.waiting_on).toBe(
-      "Operations & People",
-    );
+    const atOps = (await as("staff").get(`/ess/leave/${long.body.leave_request_id}`)).body;
+    expect(atOps.waiting_on).toBe("Operations & People");
+    // A role decides this stage, so no one person is named; the stage's name says who.
+    expect(atOps.approver_name).toBeNull();
     const no = await as("ops").post(`/workflow/instances/${id}/reject`, { reason: "Programme launch that week" });
     expect(no.body.state).toBe("rejected");
     await drain();
@@ -448,5 +456,62 @@ describeDb("leave against the real migrations", () => {
     expect(await whose("manager")).toEqual([id("manager"), id("staff")].sort());
     expect(await whose("ops")).toEqual(["staff", "other", "manager", "outsider"].map(id).sort());
     expect((await as("staff").get("/ess/leave/calendar?month=2026-13")).status).toBe(422);
+  });
+
+  test("the next approver reads alike on the request, its route and its history: the line manager, a delegate, a role's stage (QA OBS-05)", async () => {
+    const flowOf = async (id) => (await as("staff").get(`/workflow/instances/${id}`)).body;
+    const deciding = (flow) => flow.route.find((s) => s.state === "now").approvers.map((a) => a.label);
+    const approverOf = async (id) => [
+      (await as("staff").get(`/ess/leave/${id}`)).body.approver_name,
+      (await as("ops").get(`/leave/requests/${id}`)).body.approver_name,
+    ];
+
+    // The line manager: the answer the toast reads, My Leave, People and the route all name Kemi.
+    const asked = (await ask("staff", "unpaid", d("11-01"), d("11-01"))).body;
+    expect(asked).toMatchObject({ waiting_on: "Line Manager", approver_name: "Kemi Alade" });
+    expect(await approverOf(asked.leave_request_id)).toEqual(["Kemi Alade", "Kemi Alade"]);
+    expect(deciding(await flowOf(asked.workflow_instance_id))).toEqual(["Kemi Alade"]);
+
+    // Given to a delegate: the route, its history and the request all name Tunde.
+    const moved = await as("ops").post(`/workflow/instances/${asked.workflow_instance_id}/reassign`, {
+      user_id: people.ops.user.user_id,
+      reason: "Kemi is away this week",
+    });
+    expect(moved.status).toBe(200);
+    expect(deciding(moved.body)).toEqual(["Tunde Bakare"]);
+    expect(moved.body.decisions.at(-1)).toMatchObject({ decision: "reassign", actor_name: "Tunde Bakare", reason: "Kemi is away this week" });
+    expect(await approverOf(asked.leave_request_id)).toEqual(["Tunde Bakare", "Tunde Bakare"]);
+
+    // A stage a role decides, named Admin Override: no one person, so the stage says who, everywhere.
+    const flows = async () => (await as("ops").get("/settings/approvals")).body.data.find((f) => f.key === "leave.approval");
+    const put = async (stages) =>
+      request(app)
+        .put(`/api/v1/settings/approvals/${(await flows()).workflow_definition_id}/steps`)
+        .set("Authorization", `Bearer ${tokens.ops}`)
+        .send({ stages });
+    const original = (await flows()).stages.map((s) => ({
+      key: s.key,
+      name: s.name,
+      approvers: s.approvers.map((a) => (a.value === null ? { type: a.type } : { type: a.type, value: a.value })),
+      condition: s.condition,
+      sla_hours: s.sla_hours,
+      on_timeout: s.on_timeout,
+      on_approve: s.on_approve,
+      on_reject: s.on_reject,
+    }));
+    const role = original.find((s) => s.approvers.some((a) => a.type === "role")).approvers.filter((a) => a.type === "role");
+    expect((await put([{ ...original[0], key: "admin_override", name: "Admin Override", approvers: role, condition: [] }])).status).toBe(200);
+    try {
+      const routed = (await ask("staff", "unpaid", d("11-03"), d("11-03"))).body;
+      expect(routed).toMatchObject({ status: "submitted", waiting_on: "Admin Override", approver_name: null });
+      expect(await approverOf(routed.leave_request_id)).toEqual([null, null]);
+      expect((await as("ops").get(`/leave/requests/${routed.leave_request_id}`)).body.waiting_on).toBe("Admin Override");
+      const flow = await flowOf(routed.workflow_instance_id);
+      expect(flow.stage_name).toBe("Admin Override");
+      expect(deciding(flow)).toEqual(["Operations & People"]);
+    } finally {
+      // The leave flow as it was, for whatever runs next.
+      expect((await put(original)).status).toBe(200);
+    }
   });
 });

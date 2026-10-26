@@ -7,6 +7,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
 import { testPush, turnOnPush } from "@/features/notifications/push";
 import { openNotificationSettings } from "@/features/notifications/state";
+import { useOpens, type Opens } from "@/lib/plan";
 import { useRouter } from "@/lib/router";
 import { useInstallApp } from "./Notices";
 import { usePwa } from "./pwa";
@@ -27,6 +28,10 @@ import { useTextSizeSheet } from "./TextSize";
  * Install App is left out where this browser cannot install. Refresh Screen and
  * Reload App do what the pull and the refresh button do (F28), for anyone who
  * cannot pull or hold.
+ *
+ * A result that would only open Coming Soon in this build (F14: a screen, an action or a
+ * record of a module not yet released, or a Home card counting one) is left out, for every
+ * role, by the same rule the shell opens screens with (lib/plan.ts).
  */
 const ICONS: Record<string, IconName> = {
   app_user: "user",
@@ -36,6 +41,7 @@ const ICONS: Record<string, IconName> = {
   approval: "check",
   workflow_definition: "check",
   import_batch: "rows",
+  attendance_days: "calendar",
 };
 const RUN_ICONS: Record<string, IconName> = {
   clock: "clock",
@@ -53,6 +59,13 @@ const RUN_ICONS: Record<string, IconName> = {
   sign_out: "logout",
 };
 
+/** Whether a result is shown: Install App only where this browser can install, nothing that opens Coming Soon. */
+export function shownHit(hit: SearchHit, { canInstall, opens }: { canInstall: boolean; opens: Pick<Opens, "link" | "module"> }): boolean {
+  if (hit.run === "install" && !canInstall) return false;
+  if (hit.link && !opens.link(hit.link)) return false;
+  return !hit.module || opens.module(hit.module);
+}
+
 function iconOf(hit: SearchHit): IconName {
   if (hit.kind === "screen") return "right";
   if (hit.kind === "action") return (hit.run && RUN_ICONS[hit.run]) || "plus";
@@ -66,6 +79,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
   const density = useDensity();
   const textSize = useTextSizeSheet();
   const { canInstall } = usePwa();
+  const opens = useOpens();
   const installApp = useInstallApp();
   const reloadApp = useReloadApp();
   const { signOut } = useAuth();
@@ -79,7 +93,7 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
 
   const hits = new Map<string, SearchHit>();
   const results: PaletteResult[] = (res.data?.groups ?? []).flatMap((g) =>
-    g.items.filter((hit) => hit.run !== "install" || canInstall).map((hit) => {
+    g.items.filter((hit) => shownHit(hit, { canInstall, opens })).map((hit) => {
       const key = `${g.type}:${hit.id}`;
       hits.set(key, hit);
       return { key, group: g.label, title: hit.title, subtitle: hit.sub ?? hit.ref ?? undefined, icon: iconOf(hit), href: hit.link ?? "" };

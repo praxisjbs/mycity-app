@@ -574,7 +574,10 @@ route("POST /api/v1/tasks/:id/move", (req) => {
   const from = t.status;
   if (from === "todo" && to !== "todo") {
     const e = EDGES.find((x) => x.task_id === t.task_id && !satisfied(x));
-    if (e) return fail(409, "TASK_WAITING", `Waiting on ${TASKS.find((x) => x.task_id === e.depends_on_task_id)!.number}`);
+    if (e) {
+      const other = TASKS.find((x) => x.task_id === e.depends_on_task_id)!;
+      return fail(409, "TASK_WAITING", `Waiting on ${other.number}: ${other.title}`, { status: [`Waiting on ${other.number}`] });
+    }
   }
   if (to === "done" && why && !reasonOn(why)) return invalid({ late_reason: ["Pick a reason"] });
   if (to === "done" && why) t.late_reason = why;
@@ -708,6 +711,7 @@ route("POST /api/v1/tasks/:id/waiting-on/:child_id/override", (req) => {
   const t = find(req.user!, req.params.id);
   const e = t && EDGES.find((x) => x.task_dependency_id === req.params.child_id && x.task_id === t.task_id);
   if (!t || !e) return notFound();
+  if (!plans(req.user!, t)) return fail(403, "FORBIDDEN", "Only its assignee or the person who set it can change that");
   Object.assign(e, { overridden_at: new Date().toISOString(), override_reason: (req.body as { override_reason?: string }).override_reason ?? null });
   log(req.user!, t, "waiting_overridden");
   return ok(detail(req.user!, t));

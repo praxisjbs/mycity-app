@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { useOpens } from "@/lib/plan";
 import { Button, CardPicker, ErrorState, Grow, LoadingRows, ModalFooter, toast, useModal, useUnsavedChanges } from "@mycity/ui";
 
 /**
@@ -24,6 +25,7 @@ const done = () => invalidate("/api/v1/home/overview", "/api/v1/home/kpi-picker"
 
 function KpiPickerDialog({ close }: { close: () => void }) {
   const picker = useApi("GET /api/v1/home/kpi-picker");
+  const opens = useOpens();
   const save = useMutation("PUT /api/v1/home/kpi-picks");
   const reset = useMutation("DELETE /api/v1/home/kpi-picks");
   /* The person's draft; null until they first change it, so it starts from the latest read each time the dialog opens. */
@@ -40,6 +42,9 @@ function KpiPickerDialog({ close }: { close: () => void }) {
   if (picker.error) return <ErrorState error={picker.error} onRetry={picker.reload} />;
   if (!picker.data) return <LoadingRows count={6} />;
   const p = picker.data;
+  // A card whose module is Coming Soon in this build is not offered (F14); one already in the pick stays there, unseen, so a lock still saves.
+  const held = new Set(p.cards.filter((c) => !opens.module(c.module)).map((c) => c.key));
+  const kept = value.filter((id) => held.has(id));
 
   const saveCards = async () => {
     try {
@@ -70,10 +75,10 @@ function KpiPickerDialog({ close }: { close: () => void }) {
     <>
       <CardPicker
         label="Overview Cards"
-        options={p.cards.map((c) => ({ id: c.key, title: c.title, locked: p.locked_ids.includes(c.key) }))}
-        value={value}
-        onChange={setDraft}
-        max={p.max}
+        options={p.cards.filter((c) => !held.has(c.key)).map((c) => ({ id: c.key, title: c.title, locked: p.locked_ids.includes(c.key) }))}
+        value={value.filter((id) => !held.has(id))}
+        onChange={(v) => setDraft([...v, ...kept])}
+        max={p.max - kept.length}
       />
       <ModalFooter>
         <Button onClick={close}>Cancel</Button>

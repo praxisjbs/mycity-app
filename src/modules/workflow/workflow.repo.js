@@ -89,22 +89,24 @@ async function activeDefinitions(client) {
 
 /**
  * The WHERE clause of My Approvals: pending, named on the current stage, in a module
- * the person approves in (`modules` null for the CEO, who approves everywhere).
+ * the person approves in (`modules` null for the CEO, who approves everywhere), and about a
+ * record whose screen has shipped (`hidden`: the record types the delivery plan holds back).
  */
-function waitingWhere(user, roleCodes, modules, moduleKey, params) {
-  params.push(moduleKey ?? null, modules === null, modules || []);
+function waitingWhere(user, roleCodes, modules, moduleKey, params, hidden = []) {
+  params.push(moduleKey ?? null, modules === null, modules || [], hidden);
   const n = params.length;
   const named = approvers.waitingOnClause("i", user, roleCodes, params);
   return `i.state = 'pending'
-     AND ($${n - 2}::text IS NULL OR i.module_key = $${n - 2})
-     AND ($${n - 1}::boolean OR i.module_key = ANY($${n}::text[]))
+     AND ($${n - 3}::text IS NULL OR i.module_key = $${n - 3})
+     AND ($${n - 2}::boolean OR i.module_key = ANY($${n - 1}::text[]))
+     AND (i.entity_type IS NULL OR NOT (i.entity_type = ANY($${n}::text[])))
      AND ${named}`;
 }
 
 /** My Approvals: oldest waiting first, 25 a page; `q` finds a flow, the person it is about or who asked. */
-function waiting(client, user, roleCodes, modules, query) {
+function waiting(client, user, roleCodes, modules, query, hidden = []) {
   const params = [];
-  const where = waitingWhere(user, roleCodes, modules, query.module_key, params);
+  const where = waitingWhere(user, roleCodes, modules, query.module_key, params, hidden);
   params.push(query.q ? `%${escapeLike(query.q)}%` : null);
   const q = params.length;
   return pageQuery(
@@ -129,9 +131,9 @@ function waiting(client, user, roleCodes, modules, query) {
 }
 
 /** How many wait on the person, and how many of those are past their time limit. */
-async function waitingCount(client, user, roleCodes, modules) {
+async function waitingCount(client, user, roleCodes, modules, hidden = []) {
   const params = [];
-  const where = waitingWhere(user, roleCodes, modules, null, params);
+  const where = waitingWhere(user, roleCodes, modules, null, params, hidden);
   const { rows } = await client.query(
     `SELECT count(*)::int AS waiting,
             count(*) FILTER (WHERE i.stage_due_at IS NOT NULL AND i.stage_due_at < now())::int AS overdue

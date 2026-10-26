@@ -13,7 +13,7 @@ import { useTextSizeSheet } from "./TextSize";
  * the search bar, the modules they may open as tiles grouped Work, People,
  * Business and System, Install App while the app is not installed, Sign Out.
  */
-export function More({ open, onClose, modules, badges, current, onSearch }: { open: boolean; onClose: () => void; modules: ModuleDef[]; badges: NavBadges | undefined; current: string | null; onSearch: () => void }) {
+export function More({ open, onClose, modules, badges, current, onSearch }: { open: boolean; onClose: () => void; modules: ModuleDef[]; badges: NavBadges["modules"] | undefined; current: string | null; onSearch: () => void }) {
   const me = useMe();
   const photo = useMyPhoto();
   const { signOut, can } = useAuth();

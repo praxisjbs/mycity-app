@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Button, Icon, ShellNotice, useModal } from "@mycity/ui";
 import { turnOnPush, usePushState } from "@/features/notifications/push";
 import { clearGuideReturn, guideHref, useGuideReturn } from "@/features/knowledge/guide/return";
-import { useRouter } from "@/lib/router";
+import { moduleKeyOf, useRouter } from "@/lib/router";
 import { install, installLater, usePwa } from "./pwa";
 
 /**
@@ -13,7 +13,8 @@ import { install, installLater, usePwa } from "./pwa";
  * this device, never asked yet (docs/guides/notifications.md §2: never the
  * browser's prompt unasked; Not Now holds 14 days on this device); or the
  * one-time offer to install the app (PR 2 question 4: from the second visit,
- * phone and desktop, Not Now holds 30 days, never once installed).
+ * phone and desktop, Not Now holds 30 days, never once installed). The three
+ * offers show on Home only (offersScreen).
  */
 const PUSH_LATER = "mc-push-later";
 const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
@@ -25,11 +26,22 @@ const pushLaterUntil = () => {
   }
 };
 
+/**
+ * The screen the update, notifications and install offers show on: Home, any tab, phone and
+ * desktop. Floating at the foot of any other page they sat over its own content (a message box,
+ * a report, a list's last rows), so they wait for Home. Back to Guide still shows wherever a
+ * step led, as the reader asked for it and it closes.
+ */
+export function offersScreen(module: string | null): boolean {
+  return (module ? moduleKeyOf(module) : null) === "home";
+}
+
 export function ShellNotices() {
   const { update, banner } = usePwa();
   const back = useGuideReturn();
   const { location, navigate } = useRouter();
   const onGuide = location.module === "knowledge" && location.tab === "user-guide";
+  const offers = offersScreen(location.module);
   const installApp = useInstallApp();
   const push = usePushState();
   const [laterUntil, setLaterUntil] = useState(pushLaterUntil);
@@ -42,7 +54,7 @@ export function ShellNotices() {
     }
     setLaterUntil(until);
   };
-  if (update) {
+  if (update && offers) {
     return (
       <ShellNotice
         icon="refresh"
@@ -83,6 +95,7 @@ export function ShellNotices() {
       </ShellNotice>
     );
   }
+  if (!offers) return null;
   if (push === "ask" && laterUntil < Date.now()) {
     return (
       <ShellNotice

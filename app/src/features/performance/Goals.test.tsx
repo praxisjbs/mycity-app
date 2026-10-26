@@ -142,6 +142,57 @@ const quarter = sid("perf:period:q4-2026");
 type Period = { performance_period_id: string; name: string; starts_on: string; status: string; rules: { bands: { meets: number }; sections: Record<string, number> } };
 
 describe("Performance · Goals, set and changed on screen", () => {
+  it("New Objective marks a function whose plan is binding as it is picked, and sends nothing (QA DEF-10)", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    const form = dialog();
+    await chooseOption(within(form).getByLabelText("What"), "Objective");
+    await settled();
+    await chooseOption(within(form).getByLabelText("Function"), "Marketing & Sales · Binding");
+    expect(within(form).getByText("Plan is binding")).toBeTruthy();
+    type(form, "Objective", "QA objective on a binding plan");
+    const before = OBJECTIVES.length;
+    await press(form, "Set Objective");
+    expect(OBJECTIVES.length).toBe(before);
+    expect(within(dialog()).getByText("Plan is binding")).toBeTruthy();
+    expect(valueOf(dialog(), "Objective")).toBe("QA objective on a binding plan");
+  }, 60000);
+
+  it("New Objective offers Operations & People every function and never the company: what the server says they may set (QA DEF-10)", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    const form = dialog();
+    await chooseOption(within(form).getByLabelText("What"), "Objective");
+    await settled();
+    const offered = await optionLabels(within(form).getByLabelText("Function"));
+    expect(offered).not.toContain("Company");
+    expect(offered).toEqual(expect.arrayContaining(["Engineering", "Finance", "Marketing & Sales · Binding"]));
+  }, 60000);
+
+  it("a head is offered their own function alone, and starts on it: New Objective marks its binding plan, New KPI offers nothing else (QA DEF-10, DEF-11)", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+    fireEvent.click(screen.getAllByRole("button", { name: /New Goal/ })[0]!);
+    await settled();
+    let form = dialog();
+    await chooseOption(within(form).getByLabelText("What"), "Objective");
+    await settled();
+    expect(await optionLabels(within(form).getByLabelText("Function"))).toEqual(["Marketing & Sales · Binding"]);
+    expect(valueOf(form, "Function")).toBe(deptId);
+    expect(within(form).getByText("Plan is binding")).toBeTruthy();
+    fireEvent.click(within(form).getByRole("button", { name: "Cancel" }));
+    await settled();
+    window.history.replaceState(null, "", "/performance?tab=kpis");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    await settled();
+    fireEvent.click((await screen.findAllByRole("button", { name: /New KPI/ }, { timeout: 5000 }))[0]!);
+    await settled();
+    form = dialog();
+    expect(await optionLabels(within(form).getByLabelText("Function"))).toEqual(["Marketing & Sales"]);
+    expect(valueOf(form, "Function")).toBe(deptId);
+  }, 60000);
+
   it("Operations & People set up Q1 2027 from ⌘K in October: the rules start as Q4's, and each is checked on its field", async () => {
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals&action=quarter");
     let wizard = dialog();
@@ -366,7 +417,7 @@ describe("Performance · Goals, set and changed on screen", () => {
   /** A select's choices, read by opening it. */
   const choices = (root: HTMLElement, label: string) => optionLabels(within(root).getByRole("combobox", { name: label }));
 
-  it("Staff read only: neither New Goal nor Report Month is offered, here or as a KPI", async () => {
+  it("Staff read only: New Goal, Report Month and New KPI are not offered", async () => {
     await openAs("chidera@mycityapp.io", "/performance?tab=goals");
     expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
@@ -378,50 +429,23 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(screen.queryByRole("button", { name: "New KPI" })).toBeNull();
   }, 60000);
 
-  it("a head is offered the function they head to report and to set KPIs for, and no New Goal while its plan is binding", async () => {
+  it("Report Month lists only what the reader may act for: a head their own function, Operations & People every function, the CEO the company too", async () => {
     await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
-    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
-    // Marketing & Sales is the only function she heads, and its Q4 plan is binding: nothing to set an objective for.
-    expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
     await press(document.body, "Report Month");
     expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
     cleanup();
 
-    await openAs("ngozi@mycityapp.io", "/performance?tab=kpis");
-    await press(document.body, "New KPI");
-    expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
-  }, 60000);
-
-  it("Operations & People are offered every function whose plan is open to set an objective for, and every function to report", async () => {
-    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
-    await press(document.body, "New Goal");
-    const objective = await choices(dialog(), "Function");
-    // Marketing & Sales is binding and Content's plan is sent: neither takes an objective now. The company's are Management's.
-    expect(objective).toContain("Engineering");
-    expect(objective).toContain("Support");
-    expect(objective).not.toContain("Marketing & Sales");
-    expect(objective).not.toContain("Content");
-    expect(objective).not.toContain("Company");
-    cleanup();
-
     await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
     await press(document.body, "Report Month");
-    const report = await choices(dialog(), "Function");
-    expect(report).toContain("Marketing & Sales");
-    expect(report).toContain("Content");
-    expect(report).not.toContain("Company");
-  }, 60000);
+    const operations = await choices(dialog(), "Function");
+    expect(operations).toEqual(expect.arrayContaining(["Marketing & Sales", "Content", "Engineering"]));
+    expect(operations).not.toContain("Company");
+    cleanup();
 
-  it("the CEO is offered the company beside the functions whose plan is open", async () => {
     await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
-    await press(document.body, "New Goal");
-    // The CEO records organisational goals first; an objective is the next choice.
-    await chooseOption(within(dialog()).getByRole("combobox", { name: "What" }), "Objective");
-    await settled();
-    const objective = await choices(dialog(), "Function");
-    expect(objective).toContain("Company");
-    expect(objective).toContain("Engineering");
-    expect(objective).not.toContain("Marketing & Sales");
-    expect(objective).not.toContain("Content");
+    await press(document.body, "Report Month");
+    const ceo = await choices(dialog(), "Function");
+    expect(ceo[0]).toBe("Company");
+    expect(ceo).toContain("Marketing & Sales");
   }, 60000);
 });

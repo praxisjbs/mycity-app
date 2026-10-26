@@ -236,19 +236,21 @@ you can do on one you can do on the other.
 2. Each module's screens are tabs along the top of the page. Press a tab to open that screen.
 3. A number beside a module counts what waits for you there. It turns red when something urgent
    waits.
-4. The MyCity App logo at the top of the menu goes back to Home.
-5. **Collapse Menu** at the top left makes the menu narrow, to give the page more room.
+4. Each tab of the module shows its share of that number, so you see which screen it waits on (see
+   [See where something waits](#start-where-it-waits)).
+5. The MyCity App logo at the top of the menu goes back to Home.
+6. **Collapse Menu** at the top left makes the menu narrow, to give the page more room.
    **Expand Menu** widens it again.
-6. **Refresh** at the top left reloads the numbers on the screen, keeping your place. Hold it to
+7. **Refresh** at the top left reloads the numbers on the screen, keeping your place. Hold it to
    reload the whole app.
-7. In the installed app, **Back** and **Forward** sit beside **Refresh**. Hold either, or the logo,
+8. In the installed app, **Back** and **Forward** sit beside **Refresh**. Hold either, or the logo,
    to see your **Trail**: the last places you opened.
-8. **Search Anything** at the top finds any screen, action or record (see
+9. **Search Anything** at the top finds any screen, action or record (see
    [Search](#start-search)).
-9. {needs="ess view"} **Clock In** at the top right opens the clock (see
-   [Clock in and out](#ess-attendance-clock)).
-10. The bell, **Notifications**, opens your notifications.
-11. Your name at the foot of the menu opens your account menu: **My Profile**, **My Security**,
+10. {needs="ess view"} **Clock In** at the top right opens the clock (see
+    [Clock in and out](#ess-attendance-clock)).
+11. The bell, **Notifications**, opens your notifications.
+12. Your name at the foot of the menu opens your account menu: **My Profile**, **My Security**,
     **User Guide**, the theme and density, **Text Size**, **Install App** and **Sign Out**.
 
 ### On a phone {#start-layout-phone}
@@ -261,7 +263,8 @@ you can do on one you can do on the other.
    **Settings** (**My Security** when you do not look after Settings), a **Search** bar, every
    other module as a tile, **Install App** and **Sign Out**. Tiles use short names: **Knowledge**
    is the Knowledge Hub, **Assistant** is Praxis AI.
-3. The module's screens are tabs under its name. Swipe them sideways to see them all.
+3. The module's screens are tabs under its name. Swipe them sideways to see them all. A number on
+   a tab counts what waits for you on that screen.
 4. The icons at the top right are **Search**, **Notifications** and **Your Account**, your picture,
    which opens More too. The MyCity App logo at the top left goes Home.
 5. Press **Quick Actions**, the round button with a plus at the bottom right. It holds the screen's
@@ -302,7 +305,8 @@ works. Press **Try Again** once you are back online.
 
 ### A new version is ready {#start-new-version}
 
-1. When MyCity updates the hub, a bar at the foot of the screen says **A new version is ready**.
+1. When MyCity updates the hub, a bar at the foot of [Home](/home) says **A new version is ready**.
+   It shows on Home only, so open Home to see it.
 2. Save what you are typing, then press **Reload**. The hub restarts on the same screen.
 
 ### Coming Soon {#start-coming-soon}
@@ -314,7 +318,8 @@ Some modules in the menu are not built yet. Their screens show a **Coming Soon**
 - The lines under it say what the screen will do.
 
 There is nothing to press. The screen opens by itself once it is delivered. Staging may open a
-screen before the live hub does.
+screen before the live hub does. Until then, [Search](#start-search) does not offer the screen or
+its records, and Home shows no card for it.
 
 ### A screen that does not load {#start-screen-errors}
 
@@ -360,7 +365,12 @@ Search finds every screen, action and record you are allowed to open, from anywh
 4. To look in one kind of record only, start with its word: `guide leave` finds parts of this guide
    about leave.
 5. {needs="people view"} `staff ada` finds employees called Ada, in the **Employees** group.
-6. Press Escape to close search. On a phone, press **Close Search**, the cross beside the line, or
+6. {needs="people view"} A person's name finds the person first, then at most three of their
+   **Attendance Days**, newest first, each with its status and date, such as
+   *Present · 26/10/2026*. Press a day to open it on [People · Attendance](/people?tab=attendance).
+   The last row, such as *All Days of Ada Obi*, opens all of their days there. Arrow keys move
+   through the results and Enter opens the one chosen.
+7. Press Escape to close search. On a phone, press **Close Search**, the cross beside the line, or
    your phone's Back.
 
 With nothing typed, search lists what is waiting on you first, then every screen and action you
@@ -414,12 +424,25 @@ like any app's. Press it to open the record; the hub asks you to sign in first i
 Read** on it marks it read without opening the hub.
 
 > **Tip:** To get notifications on this phone or computer, press **Turn On** when the bar at the foot
-> says **Get notified of new mail and approvals**, and allow it when the device asks. A message says
+> of Home says **Get notified of new mail and approvals**, and allow it when the device asks. A message says
 > **Notifications are on**. **Not Now** hides the offer for 14 days. On an iPhone or iPad,
 > [install the app](#start-install) first. **Notifications are blocked here** means the browser
 > refuses: see [Choose how you are told](#start-notification-settings). **Notifications not turned
 > on** means you closed the browser's question without allowing it; **Not available on this
 > device** means the hub cannot send to this device.
+
+### See where something waits {#start-where-it-waits}
+
+![A tab's count and a request with something new](shot:start-where-it-waits)
+
+1. A number beside a module in the menu counts the notifications waiting for you there.
+2. Open the module. Each of its tabs shows how many of them wait on that screen.
+3. Open that tab. Each record with something new for you has a yellow dot and a soft tint.
+4. Open the record. Its dot goes at once, and the numbers on the tab, the menu and the bell drop
+   with it, on your other devices too.
+
+> **Tip:** A number turns red while something urgent waits there. A notice about something the list
+> does not show, such as a document, still counts on the tab: open it from the bell.
 
 ### Choose how you are told {#start-notification-settings}
 
@@ -473,13 +496,15 @@ On a computer they are in your account menu. On a phone they are the icons besid
 The hub installs like an app, with its own icon, and opens faster.
 
 1. Press **Install App** in your account menu (computer) or in **More** (phone). From your second
-   visit, a bar also offers **Install MyCity App on this device**: press **Install App** there.
+   visit, a bar on [Home](/home) also offers **Install MyCity App on this device**: press
+   **Install App** there.
 2. Confirm in your browser's own window.
 3. On an iPhone or iPad, the window **Install MyCity App** shows how: tap Share in Safari's toolbar,
    choose Add to Home Screen, then press **Done**.
 
 > **Tip:** **Install App** only shows where this browser can install the hub and it is not installed
-> yet. **Not Now** hides the offer for 30 days.
+> yet. **Not Now** hides the offer for 30 days. Once the hub is installed, the bar never shows again.
+> The bar shows on Home only, so it never covers another screen.
 
 ## Using This Guide {#start-user-guide screen=knowledge/user-guide icon=book}
 
@@ -580,6 +605,18 @@ marks:
   2: button "Collapse Menu" | Narrow or widen the menu
   3: text "Search Anything" | Search for anything
   4: button "Notifications" | Your notifications
+```
+
+```shot start-where-it-waits
+open: /people?tab=leave
+as: operations
+sources:
+  - app/src/features/notifications/marks.tsx
+  - app/src/shell/nav.ts
+  - packages/ui/src/data/DataView.tsx
+marks:
+  1: tab "Leave 1" | What waits on this screen
+  2: css :is(tr, li):has([data-unread]) | A request with something new
 ```
 
 ```shot start-phone

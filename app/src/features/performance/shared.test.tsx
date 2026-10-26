@@ -1,17 +1,16 @@
 // @vitest-environment jsdom
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Me } from "@/api/types/identity";
 import { checkInText } from "@/features/ess/Performance";
 import { stepOfField } from "./Quarter";
 import { nextStep } from "./Reviews";
-import { fieldMessage, functionOptions, monthChoices, monthScores, onlyChoice, planOpen, setsGoalsFor, startMonth } from "./shared";
+import { ApiError } from "@/api/client";
+import { fieldMessage, monthChoices, monthScores, sayRefusal, startMonth } from "./shared";
 
 /**
  * The small rules the Performance screens share (docs/guides/performance.md §10): a field's mark in
  * four words, the From Month as a month of the quarter, a line's month scores for its sheet, the
- * step a refused quarter field sits on, what a waiting review asks of its reader, the check-in's
- * state as the person reads it, and which functions a Function select offers its reader
- * (§6.3). The clock is 03/11/2026.
+ * step a refused quarter field sits on, what a waiting review asks of its reader, and the check-in's
+ * state as the person reads it. The clock is 03/11/2026.
  */
 
 beforeAll(() => {
@@ -23,6 +22,45 @@ afterAll(() => {
 });
 
 const QUARTER = ["2026-10-01", "2026-11-01", "2026-12-01"];
+
+describe("a refused save, said in its form (QA DEF-10, DEF-11)", () => {
+  const refusal = (status: number, code: string, message: string, fields?: Record<string, string[]>) => new ApiError(status, { error: { code, message, fields } } as never);
+  const formOf = () => ({ values: { department_id: "", title: "QA objective" }, setServerErrors: vi.fn() });
+
+  it("a closed plan: the mark on Function, and the sentence on the form's error line", () => {
+    const form = formOf();
+    const setProblem = vi.fn();
+    sayRefusal(refusal(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead", { department_id: ["Plan is binding"] }), form, setProblem);
+    expect(form.setServerErrors).toHaveBeenCalledWith({ department_id: ["Plan is binding"] });
+    expect(setProblem).toHaveBeenCalledWith("This plan is sent or binding: change a target instead");
+  });
+
+  it("a refusal naming no field (the function is not the reader's) stays in the form, never only a toast", () => {
+    const form = formOf();
+    const setProblem = vi.fn();
+    sayRefusal(refusal(403, "PERMISSION_DENIED", "Only the function's head sets its KPIs"), form, setProblem);
+    expect(form.setServerErrors).not.toHaveBeenCalled();
+    expect(setProblem).toHaveBeenCalledWith("Only the function's head sets its KPIs");
+  });
+
+  it("a check on a field the form shows sits on that field alone; one on a field it does not show is said", () => {
+    const shown = formOf();
+    const clear = vi.fn();
+    sayRefusal(refusal(422, "VALIDATION_FAILED", "Check the highlighted fields", { title: ["Required"] }), shown, clear);
+    expect(shown.setServerErrors).toHaveBeenCalledWith({ title: ["Required"] });
+    expect(clear).toHaveBeenCalledWith(null);
+    const hidden = formOf();
+    const said = vi.fn();
+    sayRefusal(refusal(422, "VALIDATION_FAILED", "Pick a quarter that exists", { performance_period_id: ["Not a quarter"] }), hidden, said);
+    expect(said).toHaveBeenCalledWith("Pick a quarter that exists");
+  });
+
+  it("no answer from the server reads Not saved. Try again.", () => {
+    const setProblem = vi.fn();
+    sayRefusal(new Error("offline"), formOf(), setProblem);
+    expect(setProblem).toHaveBeenCalledWith("Not saved. Try again.");
+  });
+});
 
 describe("a field's mark", () => {
   it("reads Zod's own sentences as their limit, never as the caller's short form", () => {
@@ -86,71 +124,5 @@ describe("My Performance's This Month", () => {
     expect(checkInText({ status: "check_in", due_on: "2026-11-05" })).toBe("Due 05/11/2026");
     expect(checkInText({ status: "returned", due_on: null })).toBe("With Reviewer");
     expect(checkInText({ status: "with_hr", due_on: null })).toBe("With HR");
-  });
-});
-
-describe("the functions a Function select offers", () => {
-  const reader = (over: Partial<Me> = {}) => ({ employee_id: "e-pm", is_ceo: false, capabilities: [], ...over }) as Me;
-  const rows = [
-    { department_id: "d-gm", name: "General Management", active: true, acting_head: { employee_id: "e-ceo" } },
-    { department_id: "d-pg", name: "Partnership & Growth", active: true, acting_head: { employee_id: "e-pm" } },
-    { department_id: "d-bm", name: "Branding & Marketing", active: true, acting_head: { employee_id: "e-bm" } },
-    { department_id: "d-old", name: "Retired Function", active: false, acting_head: { employee_id: "e-pm" } },
-    { department_id: "d-none", name: "No Head Yet", active: true, acting_head: null },
-  ];
-
-  it("offers a holder of goals.function the functions they head or act for, never another's", () => {
-    // The Program Manager is Management: General Management is the CEO's, so it is not offered; Partnership & Growth, with its head seat vacant, is.
-    const manager = reader({ capabilities: ["goals.company", "goals.function"] });
-    expect(functionOptions(manager, rows)).toEqual([["d-pg", "Partnership & Growth"]]);
-    expect(setsGoalsFor(manager, rows[0]!)).toBe(false);
-    expect(setsGoalsFor(manager, rows[1]!)).toBe(true);
-  });
-
-  it("offers nothing without goals.function, even to the head", () => {
-    expect(functionOptions(reader({ capabilities: ["goals.company"] }), rows)).toEqual([]);
-    expect(functionOptions(reader(), rows)).toEqual([]);
-  });
-
-  it("offers every active function to whoever runs the cycle, and to the CEO", () => {
-    const names = ["General Management", "Partnership & Growth", "Branding & Marketing", "No Head Yet"];
-    const operations = reader({ employee_id: "e-ops", capabilities: ["goals.function", "performance.manage"] });
-    expect(functionOptions(operations, rows).map(([, name]) => name)).toEqual(names);
-    expect(functionOptions(reader({ employee_id: "e-ceo", is_ceo: true }), rows).map(([, name]) => name)).toEqual(names);
-  });
-
-  it("never matches a reader with no employee to an empty head", () => {
-    expect(setsGoalsFor(reader({ employee_id: "", capabilities: ["goals.function"] }), { acting_head: null })).toBe(false);
-  });
-});
-
-describe("a plan that still takes objectives", () => {
-  const plans = [
-    { department_id: "d-bm", status: "binding" },
-    { department_id: "d-pc", status: "submitted" },
-    { department_id: "d-gm", status: "returned" },
-    { department_id: "d-pg", status: "draft" },
-    { department_id: null, status: "binding" },
-  ];
-  it("is open when it is not made yet, a draft or returned; sent and binding are closed", () => {
-    expect(planOpen(plans, "d-bm")).toBe(false);
-    expect(planOpen(plans, "d-pc")).toBe(false);
-    expect(planOpen(plans, "d-gm")).toBe(true);
-    expect(planOpen(plans, "d-pg")).toBe(true);
-    expect(planOpen(plans, "d-tbo")).toBe(true);
-    expect(planOpen(plans, null)).toBe(false);
-    expect(planOpen([], null)).toBe(true);
-  });
-});
-
-describe("what a form's select starts on", () => {
-  const two: Array<[string, string]> = [["a", "A"], ["b", "B"]];
-  it("keeps the pick the page made when it is offered, else the only choice, else none", () => {
-    expect(onlyChoice(two, "b")).toBe("b");
-    expect(onlyChoice(two, "c")).toBe("");
-    expect(onlyChoice(two)).toBe("");
-    expect(onlyChoice([["a", "A"]], "c")).toBe("a");
-    expect(onlyChoice([["", "Company"], ["a", "A"]])).toBe("");
-    expect(onlyChoice([])).toBe("");
   });
 });

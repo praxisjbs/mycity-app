@@ -10,7 +10,7 @@ import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { Button, DataView, EmptyState, ErrorState, Field, FormFooter, HelpTerm, KeyValue, LoadingRows, StatusPill, TapList, TextField, toast, useContractForm, useModal } from "@mycity/ui";
 import { monthScores, monthShort, score, SECTION_NAMES, targetOf } from "../shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const AUTO = new Set(["key_result", "team_result", "function_kpi", "commitments", "update_on_time", "team_reviews", "tasks"]);
 
 /** The scorecard, its sections and lines; Agree and Disagree while it waits on the person. */

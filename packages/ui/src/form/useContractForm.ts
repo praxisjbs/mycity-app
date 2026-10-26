@@ -36,7 +36,7 @@ export type FormRules<T> = Partial<{ [K in keyof T]: Validator<T[K]> }>;
 
 /** A contract schema: anything with Zod's safeParse. The frontend declares no Zod of its own. */
 export interface ContractSchema {
-  safeParse(value: unknown): { success: boolean; data?: unknown; error?: { issues: Array<{ path: PropertyKey[]; message: string; code?: string }> } };
+  safeParse(value: unknown): { success: boolean; data?: unknown; error?: { issues: Array<{ path: PropertyKey[]; message: string; code?: string; type?: string; minimum?: unknown; maximum?: unknown }> } };
 }
 
 export interface ContractFormOptions {
@@ -76,8 +76,25 @@ function zodLimit(message: string): string | undefined {
 /** Zod's own words for a wrong string ("Invalid", "Invalid email"), never a schema's. */
 const zodInvalid = (message: string) => !message || /^Invalid( |$)/.test(message);
 
-/** A contract problem as at most 4 words: its own message when it fits, else one by kind. */
-export function shortMessage(error: { type?: string; message?: string } | undefined): string | undefined {
+/**
+ * A limit no schema worded, by what it limits: a number is never "Too long" (a latitude of 91
+ * read so), it is At most its bound; a list has too many, a date is too late.
+ */
+function limitWords(big: boolean, kind?: string, bound?: unknown): string {
+  if (kind === "number" || kind === "bigint") {
+    if (typeof bound === "number" || typeof bound === "bigint") return `${big ? "At most" : "At least"} ${grouped(String(bound))}`;
+    return big ? "Too high" : "Too low";
+  }
+  if (kind === "array" || kind === "set") return big ? "Too many" : "Too few";
+  if (kind === "date") return big ? "Too late" : "Too early";
+  return big ? "Too long" : "Too short";
+}
+
+/**
+ * A contract problem as at most 4 words: its own message when it fits, else one by kind. `kind`
+ * and the bounds are the issue's own (what was limited, and to what), when the schema gave them.
+ */
+export function shortMessage(error: { type?: string; message?: string; kind?: string; minimum?: unknown; maximum?: unknown } | undefined): string | undefined {
   if (!error) return undefined;
   const message = String(error.message ?? "");
   const limit = zodLimit(message);
@@ -91,7 +108,7 @@ export function shortMessage(error: { type?: string; message?: string } | undefi
       // A schema's own words for its limit ("At least 150 m", "Add a recipient"); a limit Zod worded
       // itself has already been read above.
       if (message && words(message).length <= 4) return sentence(message);
-      return error.type === "too_big" ? "Too long" : "Too short";
+      return error.type === "too_big" ? limitWords(true, error.kind, error.maximum) : limitWords(false, error.kind, error.minimum);
     case "invalid_enum_value":
       return "Choose one";
     case "invalid_date":
@@ -129,7 +146,7 @@ function problemsOf<T extends Record<string, unknown>>(values: T, rules: FormRul
     for (const issue of r.success ? [] : (r.error?.issues ?? [])) {
       const k = String(issue.path[0] ?? "") as keyof T;
       if (!k || out[k]) continue;
-      out[k] = isEmpty(values[k]) && issue.code !== "custom" ? emptyMessage(issue) : shortMessage({ type: issue.code, message: issue.message });
+      out[k] = isEmpty(values[k]) && issue.code !== "custom" ? emptyMessage(issue) : shortMessage({ type: issue.code, message: issue.message, kind: issue.type, minimum: issue.minimum, maximum: issue.maximum });
     }
     return out;
   }
@@ -264,6 +281,10 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
 
   /** Back to the initial values (or `next`), with no marks. */
   const reset = (next?: T) => {
+    // A pause check still waiting from the last key would mark the emptied field (a comment box
+    // cleared after a quick send read Required).
+    Object.values(timers.current).forEach((t) => window.clearTimeout(t));
+    timers.current = {};
     form.reset((next ?? initial) as DefaultValues<FieldValues>);
     setTouched({});
     setServer({});

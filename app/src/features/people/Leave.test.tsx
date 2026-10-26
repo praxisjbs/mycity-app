@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ApiError } from "@mycity/ui";
+import { ApiError, Toaster } from "@mycity/ui";
 import { chooseOption, installMatchMedia, optionLabels } from "@mycity/ui/testing";
 
 /**
@@ -119,6 +119,46 @@ describe("Request Leave", () => {
     await user.type(screen.getByLabelText("Last Day"), "03/11/2026");
     await user.click(screen.getByRole("button", { name: "Record Leave" }));
     expect(await screen.findByText("Not active")).toBeTruthy();
+  });
+
+  // DEF-08: the allowance's refusal read only "Check this value", its five words cut by the form.
+  it("says on Last Day how many working days were asked for and how many are left, keeping the dates", async () => {
+    const user = userEvent.setup();
+    m.run.mockRejectedValueOnce(
+      new ApiError(422, { error: { code: "LEAVE_ALLOWANCE_EXCEEDED", message: "Only 19 Annual days are left this year", fields: { ends_on: ["32 working days, 19 left"] } } }),
+    );
+    render(<LeaveForm close={() => undefined} />, { wrapper: RouterProvider });
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Annual · 12 days left");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "15/12/2026");
+    await user.click(screen.getByRole("button", { name: "Send Request" }));
+    expect(await screen.findByText("32 working days, 19 left")).toBeTruthy();
+    expect(screen.queryByText("Check this value")).toBeNull();
+    expect((screen.getByLabelText("First Day") as HTMLInputElement).value).toBe("02/11/2026");
+    expect((screen.getByLabelText("Last Day") as HTMLInputElement).value).toBe("15/12/2026");
+  });
+
+  // OBS-05: the message named the line manager whoever the request went to.
+  it.each([
+    [{ status: "submitted", approver_name: "Kemi Alade", waiting_on: "Line Manager" }, "Sent to Kemi Alade"],
+    [{ status: "submitted", approver_name: null, waiting_on: "Admin Override" }, "Sent to Admin Override"],
+    [{ status: "approved", approver_name: null, waiting_on: null }, "Leave approved"],
+  ])("names whoever the request went to, as its detail does (%o)", async (sent, message) => {
+    const user = userEvent.setup();
+    m.run.mockResolvedValueOnce(sent);
+    render(
+      <>
+        <LeaveForm close={() => undefined} />
+        <Toaster />
+      </>,
+      { wrapper: RouterProvider },
+    );
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Annual · 12 days left");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "03/11/2026");
+    await user.click(screen.getByRole("button", { name: "Send Request" }));
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.queryByText("Sent to your line manager")).toBeNull();
   });
 });
 

@@ -603,7 +603,8 @@ packages/ui/
                               overlays, F29), hold (press and hold), cn, format, media (useIsPhone,
                               useInstalled), preferences (theme, density, text size), fonts and
                               appearance (Settings · Appearance applied, F30), slots, ids,
-                              environment (the staging marks), plan (what opens where, F14)
+                              environment (the staging marks), plan (what opens where, F14),
+                              marks (RowMarksContext: the rows a list marks as unread, §9.6)
     icons/                    Icon (Lucide underneath)
     actions/                  Button, IconButton, BigButton, ActionGroup; press.ts, the busy state they,
                               Form and Modal share (F26)
@@ -690,7 +691,7 @@ app/
                               knowledge, assistant (Praxis AI), settings; plus attendance and organogram,
                               shared by People, ESS and Settings; policies (Knowledge Hub ·
                               Policies, ESS · Policy Updates and the acknowledge sheet); notifications (the bell's pane, the banner,
-                              push on the device, Notification Settings, §9.6); and shared/ (sections, KPI
+                              push on the device, Notification Settings, the rows marked unread, §9.6); and shared/ (sections, KPI
                               tiles, letters)
 ```
 
@@ -1058,6 +1059,15 @@ brought forward from M6 by TB, 19/10/2026). In the staff app:
   under the top bar on every screen of both shells, red and pulsing slowly, with Acknowledge (an
   urgent announcement, `POST /api/v1/notifications/:id/acknowledge`) or Open. The modules they are
   about show their nav count in red (`urgent` on `Rail` and `BottomBar` items).
+- **Where it waits** (JBS Praxis, 26/10/2026; notifications.md §3 step 7, §6): the badges
+  (`GET /api/v1/notifications/badges`, `{ modules, tabs }`) count on the rail, the bottom bar and
+  More by module, and on each module's tab strip by tab (`tabItems` in `shell/nav.ts`: yellow, red
+  while an urgent notice opens there). `features/notifications/marks.tsx` (`RecordMarks`, around
+  every screen) gives `RowMarksContext` from `@mycity/ui`: every `DataView` on the screen asks which
+  of its page's rows carry an unread notice that opens there (`GET .../unread-records`, only while
+  the tab counts something) and draws a yellow dot and a soft tint on them; opening one, by its row
+  or by its address, reads them (`POST .../read-record`) and the dot goes at once. A screen does
+  nothing for it: a list keyed by its records' ids is marked by itself.
 - **⌘K** runs Notification Settings, Turn On Notifications, Send Test Notification and Mark All Read
   in the app itself (`shell/Search.tsx`, `src/shared/search/actions.js`).
 
@@ -1076,6 +1086,11 @@ app's own, `src/sw.ts` (typed by `tsconfig.sw.json`, the WebWorker library, and 
   is installed (opened standalone, or the browser reports `appinstalled`). Where the browser offers
   its own prompt (`beforeinstallprompt`) Install App uses it; on an iPhone or iPad it shows the Add
   to Home Screen steps.
+- **On Home only** (JBS Praxis, 26/10/2026): the update, install and notifications offers show on
+  Home, any tab, and on no other screen (`offersScreen` in `shell/Notices.tsx`), on a phone and on
+  desktop. Floating at the foot of another page they sat over its own content: a message box, a
+  report, a list's last rows. Back to Guide shows wherever a step led: the reader asked for it, and
+  it closes.
 - **Installed** (F28, F29): `useInstalled()` from `@mycity/ui` is true when the app runs as an
   installed app (display mode standalone, minimal-ui or window controls overlay, or an iPhone's home
   screen). Only then does the desktop capsule show back and forward and the pin open the trail; the

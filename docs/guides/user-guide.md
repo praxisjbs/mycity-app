@@ -230,7 +230,8 @@ marks:
   `open` (the address), `as` (the demo account: operations, ceo, manager, staff, admin), `device`
   (`both`, `desktop` or `phone`; both unless set), `do` (steps before the picture: `click`, `fill`,
   `press`, `wait`), `marks` (number: target `|` what it is), `crop` (`page`, `modal`, `viewport`
-  or a selector), `sources` (extra code paths the picture depends on).
+  or a selector), `prompt` (`keep`: a picture of a prompt that opens once per sign-in, taken in a
+  sign-in of its own), `sources` (extra code paths the picture depends on).
 
 `needs` reads `"<module> <action>"`, a comma between several, `cap <code>` for a capability,
 `manager` for someone with people reporting to them, and `ceo`. Every key, action and capability is

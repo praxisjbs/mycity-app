@@ -195,6 +195,13 @@ const UNCLEAR_TEXT: Record<string, string> = {
 const DAYS = new Map<string, Day>();
 const EVENTS: Ev[] = [];
 const EXCS: Ex[] = [];
+
+/** Every person's days up to today, for ⌘K (data/search.ts), as the API's attendance provider finds them. */
+export const searchableDays = () =>
+  [...DAYS.values()].flatMap((d) => {
+    const person = byKey(d.key);
+    return person && d.attendance_date <= todayIso() ? [{ person, attendance_day_id: d.attendance_day_id, attendance_date: d.attendance_date, status: d.status }] : [];
+  });
 const dk = (key: string, date: string) => `${key}|${date}`;
 let seq = 0;
 
@@ -1086,6 +1093,21 @@ route("GET /api/v1/attendance/summary", (req) => {
     not_in: n("not_in"),
     open_exceptions: rows.reduce((a, r) => a + r.open_exceptions, 0),
   });
+});
+
+/** All Days: one person's days of a month, within the reader's people view, as their own list reads (GET /attendance/me). */
+route("GET /api/v1/attendance/days", (req) => {
+  const g = peopleGrant(req.user!, "view");
+  if (!g.may) return forbidden();
+  if (!req.query.employee_id) return invalid({ employee_id: ["Required"] });
+  const p = byId(req.query.employee_id);
+  if (!p || !g.sees(p.user_key)) return notFound();
+  const month = monthOf(req.query);
+  const status = req.query.status;
+  const wanted = (s: string | null | undefined) => !status || (status === "present" ? s === "present" || s === "late" : s === status);
+  const rows = [...DAYS.values()].filter((d) => d.key === p.user_key && d.attendance_date.startsWith(month) && (d.status || d.first_clock_in_at) && wanted(d.status)).sort(byNewest).map(dayOut);
+  const { month: _m, status: _s, employee_id: _e, ...query } = req.query;
+  return paged(rows, { ...req, query }, req.query.sort ? { sort: { attendance_date: (a, b) => a.attendance_date.localeCompare(b.attendance_date) } } : {});
 });
 
 route("GET /api/v1/attendance/register/:employee_id", (req) => {

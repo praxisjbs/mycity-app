@@ -16,7 +16,7 @@ import { Banner, Button, Chain, DataView, ErrorState, formatDateTime, formatMont
 import { useScorecardSheet } from "./Scorecards";
 import { cardStatus, changeStatus, figureOf, person, planStatus } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 
 /** What a decision moves: the waiting lists, the bell and Need You, the plans and the tree. */
 function refresh() {

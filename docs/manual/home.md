@@ -29,7 +29,9 @@ week. What it shows depends on your role, so two colleagues see different Overvi
    **Worksite**, **Status** and **Hours Today**. On a phone it shows the first, second and fourth.
    **Day Off** under Shift Today means today is not one of your working days.
 3. Under it are your four cards, each a number that matters to your role, such as
-   **My Attendance** or **My Overdue Tasks**. A dash means there is nothing to measure yet.
+   **My Attendance** or **My Overdue Tasks**. A dash means there is nothing to measure yet. A card
+   for a module that is still [Coming Soon](#start-coming-soon), such as Expenses, shows once that
+   module opens.
 4. Read the sections under the cards. Which ones you see depends on your role (see the table
    below).
 5. **Need You** lists the requests waiting for your decision, oldest first: **From**, **Request**,
@@ -89,7 +91,8 @@ You can choose up to four cards, from the ones your role may see.
 4. Press **Save Cards**. Your Overview shows them at once.
 5. To go back to the cards your role starts with, press **Use Role Default**.
 
-A card marked **Locked** was chosen for your role, and you cannot take it off.
+A card marked **Locked** was chosen for your role, and you cannot take it off. Cards for a module
+that is still Coming Soon are not offered yet.
 
 | The hub says | What it means | What to do |
 |---|---|---|

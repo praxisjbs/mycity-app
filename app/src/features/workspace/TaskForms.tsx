@@ -9,8 +9,8 @@ import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
-import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, RecordPicker, SelectField, shortMessage, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
-import { LABEL, refresh, refreshed, say, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
+import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, Pill, RecordPicker, SelectField, shortMessage, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { LABEL, refresh, refreshed, say, STATUS_TONE, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason, type Status } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
 /** The most people a shared task takes besides its lead (tasks.service: "At most 25 people"). */
@@ -469,13 +469,83 @@ export function LateReasonForm({ task, close, onSaved }: { task: TaskDetail; clo
   );
 }
 
+type OpenSpec = { title: string; body: (close: () => void) => React.ReactNode };
+
 /**
- * Move a card (above `before`, or to the foot), asking why first when it reaches Done late. It
- * settles once the board has reloaded, so the board holds the card until it shows where it went.
+ * What a waiting card waits on, asked as it leaves To Do (QA OBS-06): each task it waits on, with
+ * Open Task, and Go Ahead for whoever plans it (the panel's own rule). Nothing moves until every
+ * link is done or gone ahead on; then the card goes where it was moved (`proceed`). Close leaves
+ * it in To Do. The API's TASK_WAITING refusal stays behind it, for a board read before a link.
  */
-export function useMoveTask(openModal: (spec: { title: string; body: (close: () => void) => React.ReactNode }) => void) {
+function WaitingSheet({ task, close, proceed, onOpenTask, openForm }: { task: TaskDetail; close: () => void; proceed: () => Promise<void>; onOpenTask?: (id: string, title: string) => void; openForm: (spec: OpenSpec) => void }) {
+  const [t, setT] = useState(task);
+  const blockers = t.waiting_on.filter((d) => !d.satisfied);
+  // A link gone ahead on: the task read again; with none left, the move it was asked for.
+  const wentAhead = async () => {
+    try {
+      const fresh = await api.call("GET /api/v1/tasks/:id", { params: { id: t.task_id } });
+      if (fresh.waiting_on.some((d) => !d.satisfied)) return setT(fresh);
+      close();
+      await proceed();
+    } catch (e) {
+      say(e);
+    }
+  };
+  return (
+    <>
+      {blockers.map((d) => (
+        <div key={d.task_dependency_id} className="flex flex-wrap items-center gap-2 border-b border-border py-2 last:border-b-0">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold" data-copy="content">{`${d.task.number} ${d.task.title}`}</span>
+            {d.task.assignee && <span className="text-2xs text-subtle-foreground" data-copy="content">{d.task.assignee.display_name}</span>}
+          </span>
+          <Pill tone={STATUS_TONE[d.task.status as Status]}>{LABEL[d.task.status as Status]}</Pill>
+          {d.task.visible && onOpenTask && (
+            <Button
+              size="sm"
+              onClick={() => {
+                close();
+                onOpenTask(d.task.task_id, d.task.title);
+              }}
+            >
+              Open Task
+            </Button>
+          )}
+          {t.can_plan && (
+            <Button size="sm" onClick={() => openForm({ title: "Go Ahead", body: (done) => <OverrideForm taskId={t.task_id} edgeId={d.task_dependency_id} close={done} onDone={wentAhead} /> })}>
+              Go Ahead
+            </Button>
+          )}
+        </div>
+      ))}
+      <FormFooter>
+        <Button onClick={close}>Close</Button>
+      </FormFooter>
+    </>
+  );
+}
+
+/**
+ * Move a card (above `before`, or to the foot), asking what it waits on first when it leaves To Do
+ * waiting (WaitingSheet), and why when it reaches Done late. It settles once the board has
+ * reloaded, so the board holds the card until it shows where it went.
+ */
+export function useMoveTask(openModal: (spec: OpenSpec) => void, onOpenTask?: (id: string, title: string) => void) {
   const move = useMutation("POST /api/v1/tasks/:id/move");
-  return async (t: Pick<Task, "task_id" | "status" | "overdue" | "late_reason">, to: BoardStatus, before: string | null = null) => {
+  const moveTask = async (t: Pick<Task, "task_id" | "status" | "overdue" | "late_reason" | "waiting">, to: BoardStatus, before: string | null = null): Promise<void> => {
+    if (t.waiting && t.status === "todo" && to !== "todo") {
+      let detail: TaskDetail;
+      try {
+        detail = await api.call("GET /api/v1/tasks/:id", { params: { id: t.task_id } });
+      } catch (e) {
+        say(e);
+        return;
+      }
+      if (detail.waiting_on.some((d) => !d.satisfied)) {
+        openModal({ title: "Waiting On", body: (close) => <WaitingSheet task={detail} close={close} proceed={() => moveTask({ ...t, waiting: false }, to, before)} onOpenTask={onOpenTask} openForm={openModal} /> });
+        return;
+      }
+    }
     if (to === "done" && t.status !== "done" && t.overdue) {
       openModal({ title: "Mark Done", body: (close) => <DoneLateForm task={t} close={close} /> });
       return;
@@ -488,6 +558,7 @@ export function useMoveTask(openModal: (spec: { title: string; body: (close: () 
     }
     await refreshed();
   };
+  return moveTask;
 }
 
 /* ───────────── Holds ───────────── */

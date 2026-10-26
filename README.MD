@@ -60,7 +60,9 @@ mycity-app/
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2); guide.js, the User Guide's
 │                             one parser, filter and passages (the API, the mock and check/user-guide.js read it);
-│                             guide-search.js, its search's words half and ranking (the API, ⌘K and the mock)
+│                             guide-search.js, its search's words half and ranking (the API, ⌘K and the mock);
+│                             plan.js (+ plan.d.ts), the delivery plan's one reader and rule (F14: the app's
+│                             build, the app and the API decide what opens by it)
 ├── migrations/               NNNN_name.sql schema steps (§6.3)
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
@@ -202,7 +204,8 @@ src/
 ├── middleware/    async-safe · request-id · access-log · environment-marker · rate-limit ·
 │                  idempotency · auth · rbac · public-token · upload · error-handler
 ├── shared/
-│   ├── errors.js · route-map.js
+│   ├── errors.js · route-map.js · delivery-plan.js (what has shipped, as the API sees it: Need You
+│   │                  and ⌘K leave out what the app shows as Coming Soon, by app/dist/delivery-plan.json)
 │   ├── db/            tx · query-helpers · pg-types · effective-dated · person (PersonRef in SQL, photo sizes) ·
 │   │                  media (MediaRef in SQL: a file's shape, page count and sizes)
 │   ├── crud/          resource (makeRepo / makeService / makeController / mountResource)
@@ -439,7 +442,7 @@ for this device), tested in `app/src/features/attendance/location.test.ts`.
 | `projects` | the template only (`.routes`, `.controller`, `.service`, `.repo`, `.events`, `.search`, `.ai`); migration `2500_workspace_projects.sql`; the screen in `app/src/features/workspace/Projects.tsx`, tested by `Projects.test.tsx` |
 | `calendar` | invitations by email from `.events` (`templates/email/calendar-invite.html`, `services/calendar/ics`); migration `2520_calendar_invitations.sql` |
 | `workspace` | `.today`, `.analytics` (aggregator), `.week` (My Week, Team This Week and Tidy With AI, Performance PR 4), `.events` (`week.summary_saved`); the screens' commitment and week parts in `app/src/features/workspace/` `Commitment.tsx` and `Week.tsx` |
-| `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.authority` (who sets which goals: the CEO, `goals.company`, `goals.function` and the function's head), `.plans` (one plan per function per quarter), `.okrs` (objectives, key results, Report Month, Confirm Score and the workbook import's writes), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the plan and target change completions: `performance.plan`, `performance.target_change`), `.workbook` (MyCity's OKR workbook as it is kept), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5); set and changed on screen (quarters with their rules, goals, objectives and key results, Set Target) tested by `tests/integration/performance-goals-edit.test.js`; the Goals screen's parts in `app/src/features/performance/` `Quarter.tsx` (Set Up Quarter and Edit Quarter) and `KeyResultForm.tsx` (New and Edit Key Result, Set Target), tested by `Goals.test.tsx` (which also holds who is offered New Goal, Report Month and New KPI, and which functions their Function selects list) |
+| `goals` | `.periods` (quarters and their rounds' deadlines in business days), `.authority` (who sets which goals: the CEO, `goals.company`, `goals.function` and the function's head), `.plans` (one plan per function per quarter), `.okrs` (objectives, key results, Report Month, Confirm Score and the workbook import's writes), `.cascade` (codes G1 and the roll-up), `.trace` (key result → company key result → organisational goal), `.approval` (the plan and target change completions: `performance.plan`, `performance.target_change`), `.workbook` (MyCity's OKR workbook as it is kept), `.import` (`okr_workbook`), `.analytics` (Performance Analytics, PR 5); set and changed on screen (quarters with their rules, goals, objectives and key results, Set Target) tested by `tests/integration/performance-goals-edit.test.js`; the Goals screen's parts in `app/src/features/performance/` `Quarter.tsx` (Set Up Quarter and Edit Quarter) and `KeyResultForm.tsx` (New and Edit Key Result, Set Target), tested by `Goals.test.tsx` (which also holds that Staff are offered none of New Goal, Report Month and New KPI, and which functions Report Month lists) |
 | `targets` | `.weights` (sections and the contribution check), `.progress` (automatic lines, PR 3), `.commitments` (commitments and their approval, PR 4), `.import` (`scorecards`); agreement and its reminder in `.service` |
 | `kpis` | `.import` (`okr_kpis`) |
 | `reviews` | `.cycle` (monthly rounds, `review-cycle-open`), `.sequence` (self first, A17, and the stages), `.pip` (improvement plans), `.pdf` (`templates/documents/review-summary.html`), `.dictation` (A18); migration `2300_performance_reviews.sql` (status CHECKs, the second level, corrective actions) and `2310_performance_review_withdrawn.sql` (Score Without Check-In's reason, the Withdrawn status); tested by `tests/integration/performance-reviews.test.js`; on the in-browser mock in `app/src/api/mock/{data,modules}/reviews.ts` |

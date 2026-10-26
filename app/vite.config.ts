@@ -31,16 +31,33 @@ function screenList(): Plugin {
   };
 }
 
+/**
+ * The delivery plan this build opens screens by, written beside it as delivery-plan.json: a
+ * release carries the app and not the docs, so the API reads this file and leaves out of Need
+ * You, ⌘K and Home's cards exactly what the app would show as Coming Soon
+ * (src/shared/delivery-plan.js, @mycity/contract/plan).
+ */
+function planFile(plan: ReturnType<typeof deliveryPlan>): Plugin {
+  return {
+    name: "mycity-delivery-plan",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "delivery-plan.json", source: `${JSON.stringify(plan)}\n` });
+    },
+  };
+}
+
 /*
  * The shared settings come first (packages/ui/vite.shared.js): @mycity/ui resolved
  * from the workspace with one React, @mycity/contract consumed as CommonJS with
  * ONE Zod instance. The app's own settings merge over them.
  */
-export default defineConfig(({ mode }) =>
-  mergeConfig(sharedVite(), {
+export default defineConfig(({ mode }) => {
+  const plan = deliveryPlan();
+  return mergeConfig(sharedVite(), {
     define: {
       __CONTRACT_PAGE_SIZE__: JSON.stringify(contractPageSize()),
-      __DELIVERY_PLAN__: JSON.stringify(deliveryPlan()),
+      __DELIVERY_PLAN__: JSON.stringify(plan),
       "import.meta.env.VITE_API_MODE": JSON.stringify(apiMode(mode)),
     },
     resolve: {
@@ -66,6 +83,7 @@ export default defineConfig(({ mode }) =>
       react(),
       tailwindcss(),
       screenList(),
+      planFile(plan),
       VitePWA({
         // Our own service worker (src/sw.ts): the precache and offline rules below, and web push.
         strategies: "injectManifest",
@@ -104,5 +122,5 @@ export default defineConfig(({ mode }) =>
         devOptions: { enabled: false },
     }),
   ],
-  }),
-);
+  });
+});

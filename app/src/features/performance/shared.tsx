@@ -1,47 +1,25 @@
 /** What the Performance tabs share: the quarter switcher, the words for codes, a person in a cell. */
 import { useState } from "react";
 import type { PerformancePeriod } from "@mycity/contract/contract.gen.ts";
+import { ApiError } from "@/api/client";
 import { useApi, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import type { Me } from "@/api/types/identity";
-import { hasCapability } from "@/shell/access";
-import { formatMonth, formatNumber, shortMessage, todayIso, Who, type ContractSchema } from "@mycity/ui";
+import { formatMonth, formatNumber, shortMessage, todayIso, Who, type ContractSchema, type ServerFields } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
-/** A function as far as who acts for it goes: the department's row, whose `acting_head` the API's own check reads. */
-export interface FunctionRow {
-  department_id: string;
-  name: string;
-  active: boolean;
-  acting_head: { employee_id: string } | null;
-}
-
-/**
- * Does the reader set this function's goals and KPIs, and report its month (docs/guides/performance.md
- * §6.3)? A holder of `goals.function` who is its head or acting head, or who runs the cycle
- * (`performance.manage`, the CEO among them): goals.authority.js `assertSetsGoals`, which the API still
- * asks. This keeps a screen from offering a function it would refuse.
- */
-export const setsGoalsFor = (me: Me, d: Pick<FunctionRow, "acting_head">): boolean =>
-  hasCapability(me, "goals.function") && (hasCapability(me, "performance.manage") || (Boolean(me.employee_id) && d.acting_head?.employee_id === me.employee_id));
-
-/** The active functions the reader sets goals for, as a Function select's options. */
-export const functionOptions = (me: Me, rows: FunctionRow[]): Array<[string, string]> =>
-  rows.filter((d) => d.active && setsGoalsFor(me, d)).map((d) => [d.department_id, d.name]);
-
-/** Does a quarter's plan still take objectives: not made yet, a draft, or returned? (`null` is the company's.) */
-export const planOpen = (plans: Array<{ department_id: string | null; status: string }>, departmentId: string | null): boolean => {
-  const plan = plans.find((p) => p.department_id === departmentId);
-  return !plan || plan.status === "draft" || plan.status === "returned";
-};
-
-/** What a form's select starts on: the pick already made if it is offered, else the one choice there is, else none. */
-export const onlyChoice = (options: Array<[string, string]>, preferred = ""): string =>
-  options.some(([v]) => v === preferred) ? preferred : options.length === 1 ? options[0]![0] : "";
-
 /** A person in a table cell: their name, and their department beneath it. */
 export const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;
+
+/**
+ * The company (`department_id` null) and the functions the reader may set goals and KPIs for, as
+ * the server's goals.authority answers (GET /performance/functions), each with its plan's status
+ * in the quarter when one is given. New Objective and New KPI offer only these (§6.4).
+ */
+export function useSettableFunctions(periodId: string | null) {
+  const list = usePaged("GET /api/v1/performance/functions", { filters: periodId ? { period_id: periodId } : {} });
+  return { rows: list.rows.filter((f) => f.may_set), loading: list.loading, error: list.error, reload: list.reload };
+}
 
 /** The quarter the screen shows: the current one until another is picked. */
 export function useQuarter(): {
@@ -86,6 +64,20 @@ export function bodySchema<T>(schema: ContractSchema, toBody: (values: T) => unk
 export function reportingMonth(months: string[], today = new Date().toISOString().slice(0, 10)): string {
   const first = `${today.slice(0, 7)}-01`;
   return months.filter((m) => m < first).at(-1) ?? months[0] ?? "";
+}
+
+/**
+ * A refused save, said in the form that sent it (FRONTEND_GUIDE §8.3): each mark on the field the
+ * server named, and the server's sentence on the form's error line (FormError) when it names no
+ * field here or refuses rather than checks (a plan already binding, a function that is not the
+ * reader's). A toast alone was gone before it was read, leaving the form open with no reason.
+ */
+export function sayRefusal(e: unknown, form: { values: object; setServerErrors: (fields: ServerFields) => void }, setProblem: (problem: string | null) => void) {
+  if (!(e instanceof ApiError)) return setProblem("Not saved. Try again.");
+  const keys = Object.keys(e.fields);
+  if (keys.length) form.setServerErrors(e.fields);
+  const onFields = keys.length > 0 && keys.every((k) => k in form.values);
+  setProblem(onFields && e.status === 422 ? null : e.message);
 }
 
 /** A field's error as a form shows it: the API's words when they fit in four, else the short form given. */

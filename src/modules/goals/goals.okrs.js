@@ -170,10 +170,18 @@ async function objectivesOfPlan(db, planId, actor = null) {
   return withKeyResults(db, await repo.objectivesOfPlan(db, planId), null, actor);
 }
 
-/** Refuse a change to a plan that is no longer a draft. */
-function assertDraft(plan) {
+/**
+ * Refuse a change to a plan that is no longer a draft. `field` names the form field at fault when
+ * there is one (New Objective's Function), so the refusal is marked there, not only said.
+ */
+function assertDraft(plan, field = null) {
   if (!["draft", "returned"].includes(plan.status))
-    throw new AppError("PLAN_BINDING", "This plan is sent or binding: change a target instead", 409);
+    throw new AppError(
+      "PLAN_BINDING",
+      "This plan is sent or binding: change a target instead",
+      409,
+      field ? { [field]: [plan.status === "submitted" ? "Plan awaits approval" : "Plan is binding"] } : undefined,
+    );
 }
 
 /** POST /performance/objectives. `opts.code` and `opts.system` are for the importer. */
@@ -184,7 +192,7 @@ async function createObjective(actor, body, opts = {}) {
     const period = await plans.periodOf(client, body.performance_period_id);
     if (period.status === "closed") throw new AppError("PERIOD_CLOSED", "That quarter is closed", 409);
     const plan = await plans.ensurePlan(client, period.performance_period_id, departmentId);
-    if (!opts.system) assertDraft(plan);
+    if (!opts.system) assertDraft(plan, "department_id");
     let prefix = "CO";
     if (departmentId) {
       const { rows } = await client.query("SELECT code::text AS code FROM department WHERE department_id = $1", [departmentId]);

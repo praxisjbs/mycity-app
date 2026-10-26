@@ -104,6 +104,8 @@ The form marks a field as soon as you leave it, and the mark goes the moment it 
 | **Check the email** | Not an email address | Check the spelling, with one @ |
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number with its country code | Type it as `0803 123 4567` |
 | **Ten digits** | The account number is not ten digits | Type all ten digits |
+| **Not below zero** | **Gross Monthly** has a minus | Type the amount without it. Zero is allowed |
+| **Check the amount** or **Two decimals at most** | **Gross Monthly** has a second point, a comma out of place, or more than two decimals | Type it as `350,000` or `350000.50` |
 | *At most 100 characters*, or another number | A name, job title, bank or next of kin is longer than the field holds | Shorten it |
 | **Pick a worksite** | On Site or Hybrid with no worksite | Pick one, or choose Remote |
 | **Not a worksite** | The worksite was retired while the form was open | Pick another worksite |
@@ -425,11 +427,12 @@ and reads their team's exceptions; Operations and People decide them.
 6. On a temporary site's day, **Route** lists the clock-in, each check-in with **Inside**,
    **Recorded** or **Flagged**, then the clock-out. **Exceptions** under it lists the day's
    exceptions; press one to decide it.
-7. {needs="people export"} Press **Export**, choose the **Period**, at most 31 days, and the
-   **Status**: it starts on the status chip you chose, such as **Late**, or **All**. Press
-   **Export Register**. **Preparing your export** shows, then a message says **Export downloaded**
-   once the file is saved on this device. **At most 31 days** means the period is too long;
-   **Export failed. Try again.** means the file could not be made.
+7. {needs="people export"} Press **Export**, choose the **Period**, its **From** and **To** days at
+   most 31 days apart, and the **Status**: it starts on the status chip you chose, such as
+   **Late**, or **All**. Press **Export Register**. **Preparing your export** shows, then a message
+   says **Export downloaded** once the file is saved on this device. A day typed wrong is marked
+   under its own box, such as **Not a real date**; **At most 31 days** under both means the period
+   is too long; **Export failed. Try again.** means the file could not be made.
 
 | Word | What it means |
 |---|---|
@@ -445,6 +448,12 @@ and reads their team's exceptions; Operations and People decide them.
 A punch's **Result** reads **Accepted**, **Review** (waiting on People), **Not Counted** (refused
 at the clock) or **Rejected** (People rejected it). **Source** reads **Clock**, *Added by* and a name, or
 **System Clock-Out**.
+
+To see every day of one person, search their name with ⌘K and press the last row of
+**Attendance Days**, such as *All Days of Ada Obi*. A panel with their name lists their days of
+this month, newest first, with **Date**, **Clock In**, **Clock Out**, **Hours** and **Status**.
+Choose another month at the top. Press a day to open its evidence over the panel; close it to come
+back to their days.
 
 On a phone the figures sit two to a row, and each person is a card with **Status**, **Clock In** and
 **Clock Out**. Tap the card for the rest. In the day's sheet a punch shows **Punch**,
@@ -671,7 +680,7 @@ Leave cannot be recorded for someone suspended or who has left.
 | **Ends in another year** | It runs past 31 December | Record two, one for each year |
 | **No working days** | Every day is a day off or a holiday | Pick working days |
 | **Overlaps other leave** | They already have leave on some of those days | Change the days, or cancel the other |
-| **More than they have left** | It takes their year past the type's allowance | Record fewer days, or raise their allowance |
+| *32 working days, 19 left* | It takes their year past the type's allowance: the working days asked for, then the days left | Record fewer days, or raise their allowance |
 | **Not offered** | The type was retired meanwhile | Pick another type |
 
 ### Cancel granted leave {#people-leave-cancel needs="people edit"}
@@ -776,9 +785,10 @@ rest. The buttons that add a worksite or a temporary site are also in **Quick Ac
 4. Set the **Radius, Metres**: a punch within it counts as on site. MyCity's offices use about 100.
 5. Press **Add Worksite**. A message says **Worksite added**.
 
-A radius from 25 to 1,000 metres is allowed. Outside that, the field says *At least 25* or
-*At most 1,000*. With no address picked and no centre typed, **Latitude** and **Longitude** say
-**Required**.
+A radius from 25 to 1,000 metres is allowed. Outside that, the field says **From 25 to 1,000 m**.
+A **Latitude** outside -90 to 90 says **From -90 to 90**, and a **Longitude** outside -180 to 180
+says **From -180 to 180**. With no address picked and no centre typed, **Latitude** and
+**Longitude** say **Required**.
 
 ### Change, retire or assign {#people-worksites-change needs="people edit"}
 
