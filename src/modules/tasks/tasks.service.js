@@ -832,7 +832,7 @@ async function cancel(actor, scope, id, { cancel_reason: reason }) {
     if (!(await repo.lock(client, id))) throw notFound();
     const before = await visible(client, id, scope);
     if (!audience.mayManage(scope, before))
-      throw new AppError("FORBIDDEN", "Only the person who set this task can cancel it", 403);
+      throw new AppError("FORBIDDEN", "Only whoever set this task, or the lead's manager, can cancel it", 403);
     if (before.status === "cancelled") return toTask(before);
     if (before.is_commitment && before.original_due_at) throw approvedCommitment();
     await repo.update(client, id, { status: "cancelled", cancelled_at: new Date(), cancel_reason: reason });

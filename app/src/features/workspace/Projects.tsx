@@ -138,7 +138,7 @@ function ProjectPage({ id, back }: { id: string; back: () => void }) {
       <Toolbar>
         <SearchInput value={q} onChange={setQ} placeholder="Search tasks" className="w-full md:w-64" />
       </Toolbar>
-      <TaskBoard filters={{ scope: "team", project_id: id }} q={sent} onOpen={panel.open} empty={<EmptyState title="Nothing Here" />} />
+      <TaskBoard filters={{ scope: "team", project_id: id }} q={sent} onOpen={panel.open} empty={<EmptyState title="No Tasks Yet" />} />
       {panel.panel}
     </>
   );

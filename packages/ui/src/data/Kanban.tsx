@@ -305,7 +305,7 @@ export function Kanban({ columns, onOpen, onMove, reorder = false, empty, loadin
               );
             })}
             {column.cards.length === 0 &&
-              (loading ? <Placeholder /> : <li className="rounded-box border border-dashed border-input px-3 py-4 text-center text-2xs text-subtle-foreground">Nothing here</li>)}
+              (loading ? <Placeholder /> : <li className="rounded-box border border-dashed border-input px-3 py-4 text-center text-2xs text-subtle-foreground">Nothing in this stage</li>)}
           </ul>
           <More column={column} />
         </section>

@@ -105,7 +105,7 @@ board.
 2. The tiles count your **Open** tasks, those **Due This Week**, those **Overdue**, and those you
    finished in the last 30 days, **Completed, 30d**.
 3. Each column shows how many tasks it holds. When a column holds more than 25, press **Load More**
-   at its foot. An empty column says **Nothing here**, or **Nothing in this stage** on a phone. With
+   at its foot. An empty column says **Nothing in this stage**. With
    no tasks at all, the board says **No Tasks Yet**.
 4. Press **List** at the top to see the same tasks as a table: **Task**, **Assignee**, **Status**,
    **Due** and **Priority**. Press **Board** to go back. Press the **Due** or **Priority** heading to
@@ -204,7 +204,8 @@ commitment.
 4. The hub says *Moved to Done*, or **Order saved** when only its place changed.
 
 Moving a late task to **Done** first asks **Why Late**. Pick the reason, such as **Waiting on
-Others**, and press **Mark Done**. If it says **Pick a reason**, pick one from the list.
+Others**, and press **Mark Done**. If it says **Pick a reason**, pick one from the list. If it says
+**No late reasons are switched on**, press **Mark Done**: it moves without one.
 
 Other people's changes to a task you can see appear on your board as they happen.
 
@@ -378,7 +379,7 @@ Your reviewer approves the month, and from then on each commitment's date is fix
    in **Person**.
 8. {needs="workspace edit, performance view"} Choose the **Month**. The list shows each
    **Commitment** that will go, its **Due** day and its **State**. If it says **Nothing to Send**,
-   mark a commitment for that month first.
+   mark a commitment for that month first: **Send Commitments** shows once there is one.
 9. {needs="workspace edit, performance view"} Press **Send Commitments**. The hub says
    **Commitments sent for approval**. If your reviewer sent them, it says **Commitments approved**.
 
@@ -422,7 +423,8 @@ has one. A later due date never moves it.
    **Request Changes**. The hub says **Sent back**.
 6. {needs="workspace create"} A commitment that reads **Missed** needs a recovery plan. Open it and
    press **Set Recovery**.
-7. Pick the **Owner** and the **Due** date, and press **Set Recovery**. The hub says
+7. Pick the **Owner**, yourself or someone you set work for, and the **Due** date, and press
+   **Set Recovery**. The hub says
    **Recovery set**. The owner gets a High task named Recovery and the commitment's title. The
    commitment shows **Recovery** with their name and date.
 
@@ -474,13 +476,13 @@ The hub says what went wrong in a short message at the foot of the screen, or on
 | **Required** | A field that must be filled is empty | Fill it in |
 | *Waiting on TSK-0397* and its title | The task waits on another that is not done | Finish that one, or press **Go Ahead** |
 | **This task is already blocked; clear that first** | It is blocked already | Press **Clear Blocker** first |
-| **Only the person who set this task can cancel it** | Someone else set it | Ask them |
+| **Only whoever set this task, or the lead's manager, can cancel it** | Someone else manages it | Ask them |
 | **Only the person who set this task can change that** | You are working the task, not managing it | Ask whoever set it |
 | **Not in your team** | You picked someone who does not report to you | Pick someone in your team |
 | **Pick a lead** | A department share has no lead | Pick the **Lead** |
 | **Nobody to share with** | The department has nobody but the lead | Pick people instead |
 | **That card has moved, reload the board** | Someone moved it while you did | Pull down or press refresh, then try again |
-| **Project is closed** | The project is complete | Pick another, or ask its owner to reopen it |
+| *Project: Project is closed* | The project is complete | Pick another, or ask its owner to reopen it |
 | **Needs a due date** | A repeat with no due date | Set **Due** first |
 | **Give the task a due date** | A reminder with no due date | Set **Due** first |
 | **Cannot see this task** | That watcher cannot open the task | Pick someone who can |
@@ -489,7 +491,8 @@ The hub says what went wrong in a short message at the foot of the screen, or on
 | **Pick a department** | **Department** is chosen but empty | Pick the department |
 | **Lead it yourself** | You picked a colleague from your department, and someone else leads | Choose **You** as **Lead**, or take them off |
 | More than 25 people | That department has more than 25 people | Pick people one by one instead |
-| **Not one of their lines** | The **Counts Towards** line belongs to someone else | Pick it again after choosing who does the task |
+| **At most 25 people** under **People** | You picked a 26th person | Share it with fewer people, or pick a department |
+| *Counts Towards: Not one of their lines* | The line belongs to someone else | Pick it again after choosing who does the task. Changing **Assign To** clears a line picked for someone else |
 | **Not on the staff** | Someone you picked has left MyCity | Take them off and pick someone else |
 | **Not saved. Try again.** | The hub could not reach the server | Check your connection, then press the button again |
 | **This task was cancelled** | Someone cancelled it while you had it open | Close it. Nothing more can be done to it |

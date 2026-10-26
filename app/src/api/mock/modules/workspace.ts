@@ -623,7 +623,7 @@ route("POST /api/v1/tasks/:id/unblock", (req) => {
 route("POST /api/v1/tasks/:id/cancel", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
-  if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can cancel it");
+  if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only whoever set this task, or the lead's manager, can cancel it");
   if (t.is_commitment && t.original_due_at) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
   log(req.user!, t, "cancelled", t.status, "cancelled");
   Object.assign(t, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: (req.body as { cancel_reason: string }).cancel_reason });

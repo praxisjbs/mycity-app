@@ -144,7 +144,7 @@ describe("Kanban on desktop", () => {
     const empty = COLUMNS.map((c) => ({ ...c, cards: [], count: undefined }));
     const { container, rerender } = render(<Kanban columns={empty} loading empty={<p>No Tasks Yet</p>} />);
     expect(screen.queryByText("No Tasks Yet")).toBeNull();
-    expect(screen.queryByText("Nothing here")).toBeNull();
+    expect(screen.queryByText("Nothing in this stage")).toBeNull();
     expect(container.querySelector("[aria-busy=true]")).not.toBeNull();
     expect(container.querySelectorAll("[data-skeleton]")).toHaveLength(3);
     rerender(<Kanban columns={empty} empty={<p>No Tasks Yet</p>} />);
@@ -153,7 +153,7 @@ describe("Kanban on desktop", () => {
 
   it("marks an empty stage, and shows the empty state when no stage holds a card", () => {
     const { rerender } = render(<Kanban columns={COLUMNS} empty={<p>No Tasks Yet</p>} />);
-    expect(within(screen.getByRole("region", { name: "Signed" })).getByText("Nothing here")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Signed" })).getByText("Nothing in this stage")).toBeInTheDocument();
     expect(screen.queryByText("No Tasks Yet")).toBeNull();
     rerender(<Kanban columns={COLUMNS.map((c) => ({ ...c, cards: [], count: 0 }))} empty={<p>No Tasks Yet</p>} />);
     expect(screen.getByText("No Tasks Yet")).toBeInTheDocument();
