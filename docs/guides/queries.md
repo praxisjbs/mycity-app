@@ -41,7 +41,7 @@ ESS · My Queries.
 | Queries & Sanctions · Sanctions (`sanctions`) | Staff app | `queries` view, same visibility as the query a sanction follows | KPI strip (active, awaiting approval, fines this year, fines recovered), sanction history | Issue Sanction (opens Queries: a sanction starts from a query's decision), Chain Settings: the ladder in order; Add Step, Move Up, Move Down, Retire need `queries.configure` |
 | Queries & Sanctions · Letter Templates (`letter-templates`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip, the template list with status, the selected template's preview filled with sample values | New Template, Edit Template, Preview, Activate |
 | ESS · My Queries (`my-queries`) | Staff app | Every employee, own records (ESS guide) | One tab with a Queries and Sanctions switch: their queries, open ones first, and their issued sanctions | Respond to an open query in rich text; open a query's or a sanction's letter. Sanctions are read only |
-| Employee 360 · History | Staff app | `people` view within scope | The person's queries and sanctions, append-only, newest first | Open the query or sanction |
+| Employee 360 · Queries, Sanctions | Staff app | `people` view within scope, and `queries` view for the two tabs | Two tabs: the person's queries and their sanctions, each the ones the viewer may see (§6.1), newest first | Open the query (a sanction opens the query it follows) on Queries & Sanctions |
 | My Approvals (`approvals`) | Staff app | The approvers of `queries.consequence` | A proposed sanction waiting on them | Approve, Reject, Request Changes |
 | Notification bell | Both shells | The employee; the raiser; People | Query raised, reminder, response in, sanction issued | Open the record |
 | ⌘K | Both shells | Within the reader's visibility | Queries by number, person and subject; sanctions by number and person | Open the record |
@@ -377,6 +377,9 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · Employee 360 gains Queries and Sanctions tabs (meeting 26/10: TB saw them mixed),
+  shown only with `queries` view, each `GET /queries` or `GET /sanctions` with the person's
+  `employee_id`, so §6.1 decides what a viewer sees there as on Queries (§2).
 - 26/10/2026 · GE · ESS · My Queries is one tab with a Queries and Sanctions switch (meeting 26/10:
   ESS has twelve tabs, TB): the three cards go; Queries lists every query, open ones first, and a
   picked one opens beside the list (a sheet on a phone); Sanctions is read only, each opening its
