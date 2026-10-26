@@ -120,6 +120,17 @@ describe("what a reader receives", () => {
     expect(theirs.find((s) => s.text === "Integrations").href).toBe("/settings?tab=integrations");
   });
 
+  test("team is whoever sets work for others, and either of two needs is enough", () => {
+    const sets = reader({}, { sets_work_for_others: true });
+    const lone = reader({}, { manages_people: true });
+    expect(sets.holds({ kind: "team" })).toBe(true);
+    expect(lone.holds({ kind: "team" })).toBe(false);
+    const either = { kind: "any", of: [{ kind: "manager" }, { kind: "cap", code: "performance.manage" }] };
+    expect(lone.holds(either)).toBe(true);
+    expect(reader({}, { capabilities: ["performance.manage"] }).holds(either)).toBe(true);
+    expect(reader({}).holds(either)).toBe(false);
+  });
+
   test("the CEO reads everything", () => {
     const all = service.cut(guide(), ceo());
     expect(all.chapters.map((c) => c.slug)).toEqual(["getting-started", "people", "settings"]);

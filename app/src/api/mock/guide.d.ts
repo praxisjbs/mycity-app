@@ -4,7 +4,7 @@
  */
 declare module "@mycity/contract/guide.js" {
   import type { GuideChapter } from "@mycity/contract/contract.gen.ts";
-  export type Need = { kind: "grant"; module: string; action: string } | { kind: "cap"; code: string } | { kind: "manager" } | { kind: "ceo" };
+  export type Need = { kind: "grant"; module: string; action: string } | { kind: "cap"; code: string } | { kind: "manager" } | { kind: "team" } | { kind: "ceo" } | { kind: "any"; of: Need[] };
   export interface ParsedChapter {
     slug: string;
     kind: "chapter" | "quick-start";

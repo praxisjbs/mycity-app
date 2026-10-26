@@ -131,6 +131,7 @@ function checkNeed(file, line, need) {
     if (!catalog.isModule(need.module)) say(`${file}:${line + 1}: needs "${need.module} ${need.action}": ${need.module} is not a module key`);
     else if (!catalog.ACTIONS.includes(need.action)) say(`${file}:${line + 1}: needs "${need.module} ${need.action}": the actions are ${catalog.ACTIONS.join(", ")}`);
   } else if (need.kind === "cap" && !catalog.isCapability(need.code)) say(`${file}:${line + 1}: needs "cap ${need.code}": not a catalogued capability`);
+  else if (need.kind === "any") for (const side of need.of) checkNeed(file, line, side);
 }
 
 /** The needs of every part of a chapter, with where each sits. */

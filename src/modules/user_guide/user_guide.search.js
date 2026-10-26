@@ -7,7 +7,7 @@
  */
 const routeMap = require("../../shared/route-map");
 const { pageOf, envelope, PAGE_SIZE } = require("../../shared/http/paged");
-const { readerOf, rankOf, fold } = require("../../shared/search/search.service");
+const { rankOf, fold } = require("../../shared/search/search.service");
 const service = require("./user_guide.service");
 
 /** The words of some blocks, as one line to match against. */
@@ -39,7 +39,7 @@ module.exports = Object.freeze({
   capability: null,
   columns: [],
   async search(c, { term, page = 1, user }) {
-    const guide = service.cut(service.load(), service.asReader(await readerOf(c, user)));
+    const guide = service.cut(service.load(), service.asReader(await service.guideReaderOf(c, user)));
     const entries = [];
     for (const chapter of guide.chapters)
       for (const s of chapter.sections) {

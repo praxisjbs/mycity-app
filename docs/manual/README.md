@@ -88,9 +88,11 @@ marks:
   leaves a **Back to Guide** chip that brings the reader back to the same step.
 - **Notes**: `> **Tip:** ...`, `> **Important:** ...`, or a plain `> ...`.
 - **Tables**: pipe tables, for a form's fields (Field, What to Enter, Needed).
-- **needs** reads `"<module> <action>"` (`people create`, `settings edit`), several with commas,
-  `cap <code>` for a capability (`cap home.team`), `manager` for someone with people reporting to
-  them, `ceo` for the CEO.
+- **needs** reads `"<module> <action>"` (`people create`, `settings edit`), several with commas
+  (the reader holds every one), `cap <code>` for a capability (`cap home.team`), `manager` for
+  someone with people reporting to them, `team` for someone who may set work for others (My
+  Workspace's reach goes beyond themselves: My Team, Assign To), `ceo` for the CEO. A part with
+  `or` is held when either side is: `manager or cap performance.manage`.
 
 ### Pictures
 

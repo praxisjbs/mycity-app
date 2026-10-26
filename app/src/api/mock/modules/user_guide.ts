@@ -1,9 +1,10 @@
-import type { ParsedChapter, Reader } from "@mycity/contract/guide.js";
+import type { Need, ParsedChapter, Reader } from "@mycity/contract/guide.js";
 import type { GuideChapter, GuideContents } from "@mycity/contract/contract.gen.ts";
 import { MODULES } from "@/shell/catalogue";
 // A chapter's `cap` need is checked as hasCapability does; the user-guide gate holds each code to the catalogue.
 import { visibleTabs } from "@/shell/access";
 import { notFound, ok, route } from "../core";
+import { teamOf } from "../data/people";
 import { me } from "./identity";
 
 /**
@@ -53,9 +54,17 @@ function readerOf(user: string): Reader {
       const mod = MODULES.find((x) => x.key === module);
       return Boolean(mod && can(module, "view") && visibleTabs(m, mod).some((t) => t.slug === tab));
     },
-    holds: (need) =>
-      need.kind === "grant" ? can(need.module, need.action) : need.kind === "cap" ? m.is_ceo || m.capabilities.includes(need.code) : need.kind === "manager" ? m.is_ceo || m.manages_people : m.is_ceo,
+    holds,
   };
+  function holds(need: Need): boolean {
+    if (need.kind === "grant") return can(need.module, need.action);
+    if (need.kind === "cap") return m.is_ceo || m.capabilities.includes(need.code);
+    if (need.kind === "manager") return m.is_ceo || m.manages_people;
+    // `team`: they may set work for someone else, as the mock's GET /tasks/people reaches (their reports).
+    if (need.kind === "team") return m.is_ceo || teamOf(user).length > 0;
+    if (need.kind === "any") return need.of.some(holds);
+    return m.is_ceo;
+  }
 }
 
 async function cut(user: string): Promise<{ chapters: GuideChapter[]; quick: GuideChapter | null }> {

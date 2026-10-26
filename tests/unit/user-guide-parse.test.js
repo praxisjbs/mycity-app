@@ -104,6 +104,17 @@ describe("parseChapter", () => {
     expect(parseChapter(spec("lock: asleep"), "x.md").problems).toEqual(['x.md: shot locked, line 12: lock reads "lock: idle", "lock: time" or "lock: ended"']);
   });
 
+  test("a need may be team, or either of two", () => {
+    const { needs, problems } = parseNeeds("workspace create, team, manager or cap performance.manage");
+    expect(problems).toEqual([]);
+    expect(needs).toEqual([
+      { kind: "grant", module: "workspace", action: "create" },
+      { kind: "team" },
+      { kind: "any", of: [{ kind: "manager" }, { kind: "cap", code: "performance.manage" }] },
+    ]);
+    expect(parseNeeds("manager or nobody").problems).toEqual(['needs "nobody" reads "<module> <action>", "cap <code>", "manager", "team" or "ceo", and "<one> or <another>" for either']);
+  });
+
   test("a picture spec's step may run on one device only", () => {
     const md = `---\ntitle: X\n---\n\n## A {#a}\n\n![Cards](shot:cards)\n\n\`\`\`shot cards\nopen: /home\ndo:\n  - desktop click: button "Choose Cards"\n  - phone click: button "More Actions"\n  - wait: button "Save Cards"\n  - tablet click: button "X"\n\`\`\`\n`;
     const { chapter, problems } = parseChapter(md, "x.md");
