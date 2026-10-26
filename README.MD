@@ -469,8 +469,9 @@ and `performance-commitments-seed.test.js` (the staging seed).
 | `templates` | Editable letter templates (M3), mail templates (M5) |
 
 Shared first filled: `shared/rules/window-counter`, `shared/documents/generate`,
-`shared/templates`. Templates: `query-letter`, `caution-letter`, `warning-letter`,
-`suspension-letter`, `suspension-without-pay-letter`, `termination-letter`.
+`shared/templates`. Templates: `query-letter`, `warning-letter`, `question-letter`,
+`suspension-letter`, `suspension-without-pay-letter`, `termination-letter`,
+`salary-deduction-letter` (the letter a fine sends, purpose `fine`).
 
 ### 5.7 M4 · Recruitment End to End · TB, LA, AJ · 2 to 13 Nov
 

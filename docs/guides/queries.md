@@ -90,8 +90,8 @@ ESS · My Queries.
 | `consequence_step` (3010) | `code`, `name`, `position`, `letter_template`, `financial_effect`, `default_days`, `valid_days`, `evidence_required`, `active` | MyCity's ladder, one rung a row, ordered by `position`. Entered on Chain Settings, not seeded (A26). `financial_effect`: `none`, `unpaid_days`, `ends_employment` |
 | `sanction` (3000, 3010) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `reason`, `evidence`, `decided_by`, `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed. `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
 | `sanction_fine` (3000) | `sanction_id`, `amount_ngn`, `settlement_status`, `settled_at` | An attachable outcome on any sanction, never a rung. `pending` until M6 accepts it into a run (`accepted`, then `settled`) or waives it |
-| `sanction_letter` (3000) | `sanction_id`, `document_id`, `letter_type` | The issued letter, from the vault |
-| `letter_template` (3010) | `key`, `name`, `purpose`, `status` | The letters this module may send. The wording is `template_version` (0080) under the same key; the shipped default is `templates/documents/<key>.html`. `purpose`: `query` or `sanction` |
+| `sanction_letter` (3000) | `sanction_id`, `document_id`, `letter_type` | The issued letters, from the vault: the rung's, and `salary-deduction-letter` when it carries a fine |
+| `letter_template` (3010) | `key`, `name`, `purpose`, `status` | The letters this module may send. The wording is `template_version` (0080) under the same key; the shipped default is `templates/documents/<key>.html`. `purpose`: `query`, `sanction` or `fine` (§6.6) |
 
 Schema migration file(s): `migrations/3000_queries_sanctions.sql` (merged), `migrations/3010_queries_chain.sql`.
 Reference-data file(s): `seeds/reference/3099_seed_queries_sanctions.sql` (merged),
@@ -206,8 +206,9 @@ here.
 ### 6.5 The chain
 
 - The rungs, top to bottom, are `consequence_step` rows in `position` order. MyCity's ladder (Cynthia,
-  10 October): Caution, Warning, Second Warning, Suspension, Suspension Without Pay, Dismissal or
-  Termination. It is entered on Chain Settings; adding a rung is inserting a row at a position.
+  10 October; the Caution renamed Question and moved after the Warning, GE 26/10/2026): Warning,
+  Question, Second Warning, Suspension, Suspension Without Pay, Dismissal or Termination. It is
+  entered on Chain Settings; adding a rung is inserting a row at a position.
 - A rung names: its letter template, its financial effect, its default length in days (suspensions),
   how long it stays in force for escalation (`valid_days`, null for ever) and whether evidence is
   required.
@@ -225,6 +226,11 @@ here.
 - Amount `numeric(18,2)` in Naira, a string on the wire, above 0.00.
 - It is `pending` once the sanction is issued, and reaches the payroll run only when M6 accepts it
   (`sanctions.fines.accept`) or is waived with a reason. It is never automatic.
+- **Salary Deduction letter.** A sanction issued with a fine sends a second letter beside its rung's:
+  `salary-deduction-letter`, the one shipped template of purpose `fine`, quoting the amount through
+  `shared/money` (`{{ money fine_amount }}`). It is generated, numbered and filed in the same
+  transaction as the rung's letter, and both leave in one email once both PDFs exist. A fine cannot
+  be proposed while that letter is not active (422 `LETTER_NOT_READY` on `fine_amount`).
 
 ### 6.7 Letters
 
@@ -236,9 +242,12 @@ here.
   screen fills from the same record.
 - An edit saves a new `template_version`; a letter records the version it used. A template is
   `awaiting_sample` while it has no wording (the sanction letters' files stay empty until MyCity
-  sends the samples; `query-letter` ships with wording and is seeded active, so a rule can raise a
-  query on a fresh database), `draft` until activated, `active`, or `retired`. Only an active
-  template can be chosen.
+  sends the samples; `query-letter` and `salary-deduction-letter` ship with wording and are seeded
+  active, so a rule can raise a query and a fine can be sent on a fresh database), `draft` until
+  activated, `active`, or `retired`. Only an active template can be chosen.
+- Purposes: `query` (a query's letter), `sanction` (a rung's letter), `fine` (the deduction letter
+  a fine sends, §6.6). Seven letters ship: Query, Warning, Question, Suspension, Suspension Without
+  Pay, Termination and Salary Deduction.
 - Letter templates added on the screen take a key `<slug>-letter`; generate() is given the template
   key with the shared doc types `query_letter` and `sanction_letter` (a small extension to
   `shared/documents/generate.js`: an explicit `template` for a doc type that allows it).
@@ -369,14 +378,21 @@ or tier 2.**
   rungs on Chain Settings at go-live; staging gets them from its seed. TB to confirm.
 - **Dismissal or Termination** records the sanction and tells People; ending the employment stays
   in People · Employees (organisation). GE and TB, before the M3 demo.
-- **The sample letters**: MyCity has sent the caution and warning letters; suspension, suspension
-  without pay and termination are awaited (Cynthia).
+- **Settled 26/10/2026 (GE).** The shipped Caution Letter is renamed Question Letter
+  (`question-letter`) and its rung sits after the Warning. Note for the demo: with that order a
+  second offence after a Warning is offered the Question rung; MILESTONES §8's "a second offence
+  escalates to second warning" holds on a ladder without it (the definition-of-done test's).
+- **The sample letters**: MyCity has sent the caution (now question) and warning letters;
+  suspension, suspension without pay and termination are awaited (Cynthia).
 - `sanction_fine.employee_accepted_at`, `employee_rejected_at` and `rejection_reason` (3000) are not
   used: an employee disputes a fine in their query response. Drop in a later release, or keep for
   M6. LA to say.
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · Letters (meeting 26/10): the Caution Letter is the Question Letter, its rung after
+  the Warning (§6.5, §13); a fine sends the new Salary Deduction letter (purpose `fine`, amount
+  through `shared/money`) beside the rung's, in one email (§4, §6.6, §6.7).
 - 26/10/2026 · GE · Employee 360 gains Queries and Sanctions tabs (meeting 26/10: TB saw them mixed),
   shown only with `queries` view, each `GET /queries` or `GET /sanctions` with the person's
   `employee_id`, so §6.1 decides what a viewer sees there as on Queries (§2).

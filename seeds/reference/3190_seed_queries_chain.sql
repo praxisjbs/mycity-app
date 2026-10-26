@@ -8,8 +8,10 @@
 --                     type) and is replaced by queries.consequence; it is switched off, not deleted.
 --   letter templates  one row per shipped file in templates/documents/, so the screen lists them and
 --                     a rung or rule can name them. Template defaults the generator needs (A26).
---                     query-letter ships with wording and is active, so a rule can raise a query
---                     on a fresh database; the sanction letters wait for MyCity's samples (drafts).
+--                     query-letter and salary-deduction-letter (purpose fine, the letter a fine
+--                     sends) ship with wording and are active, so a rule can raise a query and a
+--                     fine can be sent on a fresh database; the sanction letters wait for MyCity's
+--                     samples (drafts). The Caution Letter is the Question Letter (GE, 26/10/2026).
 --
 -- The ladder itself (consequence_step) and every query rule are MyCity's choices, entered on
 -- Sanctions, Chain Settings and on Rules (A26): none are seeded. Rows people edit later are inserted
@@ -44,18 +46,19 @@ UPDATE workflow_definition
 INSERT INTO letter_template (key, name, purpose, status)
 VALUES
   ('query-letter', 'Query Letter', 'query', 'active'),
-  ('caution-letter', 'Caution Letter', 'sanction', 'draft'),
+  ('question-letter', 'Question Letter', 'sanction', 'draft'),
   ('warning-letter', 'Warning Letter', 'sanction', 'draft'),
   ('suspension-letter', 'Suspension Letter', 'sanction', 'draft'),
   ('suspension-without-pay-letter', 'Suspension Without Pay Letter', 'sanction', 'draft'),
-  ('termination-letter', 'Termination Letter', 'sanction', 'draft')
+  ('termination-letter', 'Termination Letter', 'sanction', 'draft'),
+  ('salary-deduction-letter', 'Salary Deduction Letter', 'fine', 'active')
 ON CONFLICT (key) DO NOTHING;
 
 -- DOWN
 -- Only templates no rung, rule or saved wording uses: a letter someone has edited stays theirs.
 DELETE FROM letter_template t
- WHERE t.key IN ('query-letter', 'caution-letter', 'warning-letter', 'suspension-letter',
-                 'suspension-without-pay-letter', 'termination-letter')
+ WHERE t.key IN ('query-letter', 'question-letter', 'warning-letter', 'suspension-letter',
+                 'suspension-without-pay-letter', 'termination-letter', 'salary-deduction-letter')
    AND t.created_by IS NULL
    AND NOT EXISTS (SELECT 1 FROM consequence_step s WHERE s.letter_template = t.key)
    AND NOT EXISTS (SELECT 1 FROM query_rule q WHERE q.letter_template = t.key)

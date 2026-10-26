@@ -563,7 +563,7 @@ function Templates() {
             onRowClick={(t) => setSel(t.letter_template_id)}
             columns={[
               { key: "n", label: "Template", render: (t) => <span className={t.letter_template_id === shown?.letter_template_id ? "font-semibold" : undefined}>{t.name}</span> },
-              { key: "u", label: "Used By", render: (t) => (t.used_by.length ? t.used_by.join(", ") : t.purpose === "query" ? "Queries" : "None"), desktop: true },
+              { key: "u", label: "Used By", render: (t) => (t.used_by.length ? t.used_by.join(", ") : t.purpose === "query" ? "Queries" : t.purpose === "fine" ? "Fines" : "None"), desktop: true },
               { key: "s", label: "Status", render: (t) => <StatusPill s={letterStatus(t)} /> },
             ]}
           />

@@ -8,6 +8,7 @@
 const { personJson } = require("../../shared/db/person");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const visibility = require("../queries/queries.visibility");
+const { FINE_LETTER_KEY } = require("../templates/templates.events");
 
 const NAME = (alias) => `btrim(${alias}.first_name || ' ' || ${alias}.last_name)`;
 
@@ -117,6 +118,7 @@ const ROWS = `
                                      'settled_at', f.settled_at) END AS fine,
          f.amount_ngn::text AS fine_amount,
          l.document_id AS letter_document_id,
+         fl.document_id AS fine_letter_document_id,
          CASE WHEN wi.state = 'pending' THEN (
            SELECT min(st ->> 'name') FROM workflow_definition wd, jsonb_array_elements(wd.stages) st
             WHERE wd.workflow_definition_id = wi.workflow_definition_id AND st ->> 'key' = wi.current_stage
@@ -132,7 +134,8 @@ const ROWS = `
     LEFT JOIN app_user du ON du.user_id = x.decided_by
     LEFT JOIN employee de ON de.employee_id = du.employee_id
     LEFT JOIN sanction_fine f ON f.sanction_id = x.sanction_id
-    LEFT JOIN sanction_letter l ON l.sanction_id = x.sanction_id
+    LEFT JOIN sanction_letter l ON l.sanction_id = x.sanction_id AND l.letter_type <> '${FINE_LETTER_KEY}'
+    LEFT JOIN sanction_letter fl ON fl.sanction_id = x.sanction_id AND fl.letter_type = '${FINE_LETTER_KEY}'
     LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = x.workflow_instance_id`;
 
 /** The keys of Sanction. */
@@ -141,7 +144,7 @@ const LIST_OUT = `v.sanction_id, v.number, v.employee, v.employee_query_id, v.qu
   v.status, v.fine, v.created_at`;
 
 /** SanctionDetail's keys and what the service needs beside them. */
-const DETAIL_OUT = `${LIST_OUT}, v.evidence, v.letter_document_id, v.workflow_instance_id, v.waiting_on,
+const DETAIL_OUT = `${LIST_OUT}, v.evidence, v.letter_document_id, v.fine_letter_document_id, v.workflow_instance_id, v.waiting_on,
   v.employee_id, v.raised_by, v.query_subject, v.query_details, v.query_raised_at, v.position,
   v.letter_template, v.financial_effect, v.fine_amount`;
 
@@ -297,7 +300,7 @@ function listMine(db, employeeId, query) {
   return pageQuery(
     db,
     `SELECT v.sanction_id, v.number, v.step_name, v.reason, v.query_number, v.effective_on, v.ends_on,
-            v.fine, v.letter_document_id, ${TOTAL_COL}
+            v.fine, v.letter_document_id, v.fine_letter_document_id, ${TOTAL_COL}
        FROM (${ROWS}) v
       WHERE v.employee_id = $1 AND v.status = 'issued'
       ORDER BY v.effective_on DESC, v.created_at DESC, v.sanction_id`,

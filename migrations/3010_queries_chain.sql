@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS letter_template (
   letter_template_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   key citext NOT NULL UNIQUE,
   name text NOT NULL,
-  purpose text NOT NULL CHECK (purpose IN ('query', 'sanction')),
+  purpose text NOT NULL CHECK (purpose IN ('query', 'sanction', 'fine')),
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'retired')),
   created_by uuid REFERENCES app_user(user_id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),

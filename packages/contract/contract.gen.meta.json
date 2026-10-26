@@ -1,6 +1,6 @@
 {
   "generator": "scripts/gen/contract.js",
-  "source_hash": "2226694a17dc1d67a724ea0d8ef3de93d33d266e9a063ff48300077e97064804",
+  "source_hash": "cf1af2cf6cee751f612f53d9c6cbf96a5913d682d7485abb987b8b47150cfe79",
   "schemas": 1257,
   "endpoints": 610,
   "inputs": {
@@ -59,7 +59,7 @@
     "packages/contract/schemas/requisitions.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/reviews.js": "c1682de462c4444729ce94af47ab0357d261fef269cded147331419d1fff1c3f",
     "packages/contract/schemas/salary_structure.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "packages/contract/schemas/sanctions.js": "e04122a3da9c607360b497da223cfde077344eeb55fe5a0722730b60007bc477",
+    "packages/contract/schemas/sanctions.js": "13883cd25b31adefdb00b190e48aa86f584496369e9da9aec306f88c34b5f60a",
     "packages/contract/schemas/scoring.js": "dc2ccca24c1d814b04fb784d7d82ac9052ce86dcb64020ff37ed85cc34837eba",
     "packages/contract/schemas/search.js": "d2d2cc6675a7948131bb4b28c313f85997c4391d3641b897c1cc58b2cfb1c3ed",
     "packages/contract/schemas/security.js": "6cf6f6a58006e811045e71036358fd5a74aeccc27f82db0174acc5cfd4c329e0",
@@ -70,7 +70,7 @@
     "packages/contract/schemas/talent_pool.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "packages/contract/schemas/targets.js": "35671175bebd38a158b57915dabf3b8c5abf4279861de4e646c19aaede78cb55",
     "packages/contract/schemas/tasks.js": "0203a06d8cad76c44e331f2b1179f86f38563756b5e81720e4e770d7441b6c36",
-    "packages/contract/schemas/templates.js": "4e848441578b2a4242ec0db5cb7d08c0e4360a7667ca55ac8b0c9e95af58a1df",
+    "packages/contract/schemas/templates.js": "9c079602a3a9fd5e7a6025483fc5725f137ba61f491380aae40339cf460c07ea",
     "packages/contract/schemas/user_guide.js": "3a14914b7ff89d8ce50a1dbbe921a70370cf5e52d7f41f95f36752c54884b7d1",
     "packages/contract/schemas/users.js": "c62a6bfc703543682f6d190a19a68e86f34363c3f7846a46c54ba905e978064d",
     "packages/contract/schemas/vacancies.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

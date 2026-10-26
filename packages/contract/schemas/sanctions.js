@@ -139,6 +139,7 @@ const SanctionPage = Paged(Sanction);
 const SanctionDetail = Sanction.extend({
   evidence: z.array(EvidenceItem).max(50),
   letter_document_id: uuid.nullable(),
+  fine_letter_document_id: uuid.nullable(),
   workflow_instance_id: uuid.nullable(),
   waiting_on: z.string().nullable(),
 }).strict();
@@ -211,6 +212,7 @@ const MySanction = z
     ends_on: isoDate.nullable(),
     fine: SanctionFine.nullable(),
     letter_document_id: uuid.nullable(),
+    fine_letter_document_id: uuid.nullable(),
   })
   .strict();
 
@@ -222,6 +224,7 @@ const SanctionIssuedEmailVars = z
     sanction_number: z.string(),
     step_name: z.string(),
     query_number: z.string(),
+    fine_amount: money.nullable().default(null),
   })
   .strict();
 
@@ -256,6 +259,7 @@ const TABLES = {
       decided_by_name: "the proposer's display name",
       fine: "the sanction_fine row",
       letter_document_id: "sanction_letter.document_id",
+      fine_letter_document_id: "sanction_letter.document_id of the Salary Deduction letter",
       waiting_on: "the approval stage it waits at, from workflow_instance",
     },
   },
@@ -270,6 +274,7 @@ const TABLES = {
       query_number: "employee_query.number",
       fine: "the sanction_fine row",
       letter_document_id: "sanction_letter.document_id",
+      fine_letter_document_id: "sanction_letter.document_id of the Salary Deduction letter",
     },
   },
   MySanctionPage: { table: null, reason: "a page of the caller's own sanctions" },

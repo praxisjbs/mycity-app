@@ -27,12 +27,16 @@ const EVENTS = defineEvents("queries", {
 /** The letters the code ships, one file each in templates/documents/ (seed 3190 lists them). */
 const SHIPPED = Object.freeze([
   "query-letter",
-  "caution-letter",
   "warning-letter",
+  "question-letter",
   "suspension-letter",
   "suspension-without-pay-letter",
   "termination-letter",
+  "salary-deduction-letter",
 ]);
+
+/** The letter a fine sends beside its rung's (guide §6.6): the one shipped template of purpose fine. */
+const FINE_LETTER_KEY = "salary-deduction-letter";
 
 /** Let a letter key fill from the one letter schema. Safe to call again. */
 function declare(key) {
@@ -57,11 +61,11 @@ defineDocType(QUERY_LETTER, {
 defineDocType(SANCTION_LETTER, {
   label: "Sanction letter",
   module: "queries",
-  template: "caution-letter",
+  template: "warning-letter",
   templateChoice: true,
   numbering: "letter",
   sensitivity: "personal",
   title: (d) => `${d.step_name || "Sanction"}: ${d.query_number}`,
 });
 
-module.exports = { EVENTS, SHIPPED, declare, QUERY_LETTER, SANCTION_LETTER };
+module.exports = { EVENTS, SHIPPED, FINE_LETTER_KEY, declare, QUERY_LETTER, SANCTION_LETTER };

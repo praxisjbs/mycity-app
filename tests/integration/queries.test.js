@@ -142,15 +142,16 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(res.status).toBe(200);
       expect(res.body.page.size).toBe(25);
       expect(Object.fromEntries(res.body.data.map((t) => [t.key, t.status]))).toEqual({
-        "caution-letter": "awaiting_sample",
         "query-letter": "active",
+        "question-letter": "awaiting_sample",
+        "salary-deduction-letter": "active",
         "suspension-letter": "awaiting_sample",
         "suspension-without-pay-letter": "awaiting_sample",
         "termination-letter": "awaiting_sample",
         "warning-letter": "awaiting_sample",
       });
       const summary = await as("manager").get("/letter-templates/summary");
-      expect(summary.body).toEqual({ templates: 6, active: 1, awaiting_sample: 5, sent_90d: 0 });
+      expect(summary.body).toEqual({ templates: 7, active: 2, awaiting_sample: 5, sent_90d: 0 });
     });
 
     test("a template opens with its wording and the names a letter may use; the preview fills sample values", async () => {
@@ -474,15 +475,16 @@ describeDb("queries and sanctions against the real migrations", () => {
 
     test("the chain starts empty; only queries.configure adds a rung", async () => {
       expect(await chain()).toEqual([]);
-      const refused = await as("manager").post("/sanctions/chain", { name: "Caution" });
+      const refused = await as("manager").post("/sanctions/chain", { name: "Warning" });
       expect(refused.status).toBe(403);
     });
 
     test("People build the ladder; a rung inserted at a position moves the ones below", async () => {
-      await ready("caution-letter");
+      await ready("question-letter");
+      // MyCity's order (GE, 26/10/2026): the Warning, then the Question.
       for (const [name, body] of [
-        ["Caution", { letter_template: "caution-letter" }],
         ["Warning", { letter_template: "warning-letter", valid_days: 365 }],
+        ["Question", { letter_template: "question-letter" }],
         ["Suspension", { letter_template: "suspension-letter", financial_effect: "unpaid_days", default_days: 3 }],
       ]) {
         const res = await as("ops").post("/sanctions/chain", { name, ...body });
@@ -498,17 +500,17 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(second.body).toMatchObject({ code: "second_warning", position: 3, letter_ready: true });
       steps["Second Warning"] = second.body.consequence_step_id;
       expect(await chain()).toEqual([
-        [1, "Caution"],
-        [2, "Warning"],
+        [1, "Warning"],
+        [2, "Question"],
         [3, "Second Warning"],
         [4, "Suspension"],
       ]);
 
       const moved = await as("ops").patch(`/sanctions/chain/${steps.Suspension}`, { position: 1 });
       expect(moved.body.position).toBe(1);
-      expect((await chain()).map((r) => r[1])).toEqual(["Suspension", "Caution", "Warning", "Second Warning"]);
+      expect((await chain()).map((r) => r[1])).toEqual(["Suspension", "Warning", "Question", "Second Warning"]);
       await as("ops").patch(`/sanctions/chain/${steps.Suspension}`, { position: 4 });
-      expect((await chain()).map((r) => r[1])).toEqual(["Caution", "Warning", "Second Warning", "Suspension"]);
+      expect((await chain()).map((r) => r[1])).toEqual(["Warning", "Question", "Second Warning", "Suspension"]);
 
       const bad = await as("ops").post("/sanctions/chain", { name: "Odd", letter_template: "query-letter" });
       expect(bad.status).toBe(422);
@@ -517,14 +519,14 @@ describeDb("queries and sanctions against the real migrations", () => {
     test("a first offence is offered the first rung; proposed, it waits for Operations & People", async () => {
       const id = await answered("Damaged the site generator");
       const card = await as("hod").get(`/queries/${id}`);
-      expect(card.body.next_step).toMatchObject({ name: "Caution", position: 1 });
+      expect(card.body.next_step).toMatchObject({ name: "Warning", position: 1 });
       expect(card.body.can_decide).toBe(true);
 
-      const res = await propose(id, "Caution");
+      const res = await propose(id, "Warning");
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ status: "under_review", escalated: true, can_decide: false });
-      expect(res.body.sanction).toMatchObject({ step_name: "Caution", status: "pending_approval", number: null });
-      expect((await propose(id, "Caution")).status).toBe(409);
+      expect(res.body.sanction).toMatchObject({ step_name: "Warning", status: "pending_approval", number: null });
+      expect((await propose(id, "Warning")).status).toBe(409);
 
       // The proposer never approves it; Operations & People do.
       const instance = res.body.workflow_instance_id;
@@ -535,11 +537,11 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(after.body).toMatchObject({ status: "resolved", outcome: "sanctioned", escalated: false });
       expect(after.body.sanction).toMatchObject({ number: "SAN-0001", status: "issued" });
       const issued = await as("ops").get(`/sanctions/${after.body.sanction.sanction_id}`);
-      expect(issued.body).toMatchObject({ step_name: "Caution", status: "issued", sanction_type: "caution" });
+      expect(issued.body).toMatchObject({ step_name: "Warning", status: "issued", sanction_type: "warning", fine_letter_document_id: null });
       expect(issued.body.letter_document_id).toBeTruthy();
 
       const mine = await as("other").get("/ess/sanctions");
-      expect(mine.body.data.map((r) => [r.number, r.step_name])).toEqual([["SAN-0001", "Caution"]]);
+      expect(mine.body.data.map((r) => [r.number, r.step_name])).toEqual([["SAN-0001", "Warning"]]);
       const told = await q("SELECT count(*)::int AS n FROM notification WHERE user_id = $1 AND event_key = 'sanction.issued'", [
         people.other.user.user_id,
       ]);
@@ -551,23 +553,41 @@ describeDb("queries and sanctions against the real migrations", () => {
       const docId = (await as("ops").get(`/sanctions/${list.body.data[0].sanction_id}`)).body.letter_document_id;
       const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [docId])).rows[0].render_html;
       expect(html).toContain("Dear Zainab, following query");
-      expect(html).toContain("Caution.");
+      expect(html).toContain("this is a written warning: The explanation does not account for the incident.");
       await documents.renderPending(docId, { db: pool });
       sent.length = 0;
       await drain();
       expect(sent.find((j) => j.name === "sanction-issued").data).toMatchObject({
         to: { email: "other@mycity.test" },
-        data: { sanction_number: "SAN-0001", step_name: "Caution" },
+        data: { sanction_number: "SAN-0001", step_name: "Warning", fine_amount: null },
         attachments: [{ document_id: docId }],
       });
     });
 
     test("a second offence offers the next rung without code; a fine waits, pending, for payroll", async () => {
       const id = await answered("Damaged the site generator again");
-      expect((await as("hod").get(`/queries/${id}`)).body.next_step.name).toBe("Warning");
-      const res = await propose(id, "Warning", { fine_amount: "15000.00" });
+      expect((await as("hod").get(`/queries/${id}`)).body.next_step.name).toBe("Question");
+      const res = await propose(id, "Question", { fine_amount: "15000.00" });
       expect(res.status).toBe(200);
       await approve("ops", res.body.workflow_instance_id);
+
+      // A fine sends the Salary Deduction letter beside the rung's, the amount in the house format,
+      // and both leave in one email once both PDFs exist.
+      const issued = (await as("ops").get(`/sanctions/${(await as("hod").get(`/queries/${id}`)).body.sanction.sanction_id}`)).body;
+      expect(issued.fine_letter_document_id).toBeTruthy();
+      expect(issued.fine_letter_document_id).not.toBe(issued.letter_document_id);
+      const deduction = (await q("SELECT render_html FROM document WHERE document_id = $1", [issued.fine_letter_document_id])).rows[0];
+      expect(deduction.render_html).toContain("₦15,000.00 will be deducted from your salary");
+      sent.length = 0;
+      await documents.renderPending(issued.letter_document_id, { db: pool });
+      await drain();
+      expect(sent.filter((j) => j.name === "sanction-issued")).toEqual([]);
+      await documents.renderPending(issued.fine_letter_document_id, { db: pool });
+      await drain();
+      const mail = sent.filter((j) => j.name === "sanction-issued");
+      expect(mail).toHaveLength(1);
+      expect(mail[0].data.data).toMatchObject({ step_name: "Question", fine_amount: "15000.00" });
+      expect(mail[0].data.attachments).toEqual([{ document_id: issued.letter_document_id }, { document_id: issued.fine_letter_document_id }]);
 
       const fines = await require("../../src/modules/sanctions/sanctions.fines").pending();
       expect(fines.data.map((f) => [f.sanction_number, f.amount_ngn, f.settlement_status])).toEqual([
@@ -576,7 +596,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       const summary = await as("ops").get("/sanctions/summary");
       expect(summary.body).toMatchObject({ active: 2, pending_approval: 0, fines_this_year: "15000.00", fines_recovered: "0.00" });
       const standing = await as("ops").get(`/sanctions/standing?employee_id=${people.other.employee.employee_id}`);
-      expect(standing.body.in_force.map((r) => r.step_name)).toEqual(["Warning", "Caution"]);
+      expect(standing.body.in_force.map((r) => r.step_name)).toEqual(["Question", "Warning"]);
       expect(standing.body.next_step.name).toBe("Second Warning");
     });
 

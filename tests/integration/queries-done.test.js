@@ -185,15 +185,15 @@ describeDb("M3 definition of done", () => {
 
     // MyCity's ladder and its letters, entered on the screens (A26: nothing of it is seeded).
     const letters = (await as("ops").get("/letter-templates?sort=name")).body.data;
-    for (const key of ["caution-letter", "warning-letter"]) {
+    for (const key of ["warning-letter"]) {
       const id = letters.find((t) => t.key === key).letter_template_id;
       await as("ops").put(`/letter-templates/${id}/body`, {
         body: "Dear {{ employee.first_name }}, following query {{ query_number }} this is a {{ step_name }}: {{ reason }}",
       });
       await as("ops").post(`/letter-templates/${id}/activate`);
     }
+    // MILESTONES §8's walk: a Warning, then a Second Warning (MyCity's ladder adds the Question between).
     for (const [name, letter] of [
-      ["Caution", "caution-letter"],
       ["Warning", "warning-letter"],
       ["Second Warning", "warning-letter"],
     ]) {
@@ -284,13 +284,13 @@ describeDb("M3 definition of done", () => {
   test("6. a new step is inserted into the chain from the UI, and the next case walks it", async () => {
     const final = await as("ops").post("/sanctions/chain", {
       name: "Final Warning",
-      position: 4,
+      position: 3,
       letter_template: "warning-letter",
       valid_days: 365,
     });
     expect(final.status).toBe(201);
     const chain = (await as("ops").get("/sanctions/chain?sort=position")).body.data.map((r) => r.name);
-    expect(chain).toEqual(["Caution", "Warning", "Second Warning", "Final Warning"]);
+    expect(chain).toEqual(["Warning", "Second Warning", "Final Warning"]);
 
     await lateArrival(day(4), 14);
     await lateArrival(day(3), 26);

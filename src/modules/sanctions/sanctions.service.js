@@ -23,6 +23,7 @@ const engine = require("../../shared/workflow/engine");
 const lagos = require("../../shared/time/lagos");
 const visibility = require("../queries/queries.visibility");
 const templates = require("../templates/templates.service");
+const { FINE_LETTER_KEY } = require("../templates/templates.events");
 const repo = require("./sanctions.repo");
 const letters = require("./sanctions.letters");
 const { EVENTS, DEFINITION_KEY } = require("./sanctions.events");
@@ -105,6 +106,11 @@ async function propose(client, actor, query, body) {
   if (!(await templates.isReady(client, step.letter_template, "sanction")))
     throw new AppError("LETTER_NOT_READY", "This sanction's letter is not ready", 422, {
       consequence_step_id: ["Letter not ready"],
+    });
+  // A fine sends the Salary Deduction letter beside the rung's (guide §6.6).
+  if (body.fine_amount && !(await templates.isReady(client, FINE_LETTER_KEY, "fine")))
+    throw new AppError("LETTER_NOT_READY", "The deduction letter is not ready", 422, {
+      fine_amount: ["Letter not ready"],
     });
   if (step.evidence_required && !(body.evidence && body.evidence.length))
     throw new AppError("EVIDENCE_REQUIRED", "This sanction needs evidence", 422, { evidence: ["Add the evidence"] });

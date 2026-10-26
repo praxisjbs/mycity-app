@@ -46,11 +46,12 @@ function omit<T extends object, K extends keyof T>(row: T, keys: readonly K[]): 
 const LETTERS: Array<LetterTemplateDetail> = (
   [
     ["query-letter", "Query Letter", "query", "active", 1],
-    ["caution-letter", "Caution Letter", "sanction", "active", 1],
     ["warning-letter", "Warning Letter", "sanction", "active", 2],
+    ["question-letter", "Question Letter", "sanction", "active", 1],
     ["suspension-letter", "Suspension Letter", "sanction", "awaiting_sample", 0],
     ["suspension-without-pay-letter", "Suspension Without Pay Letter", "sanction", "awaiting_sample", 0],
     ["termination-letter", "Termination Letter", "sanction", "awaiting_sample", 0],
+    ["salary-deduction-letter", "Salary Deduction Letter", "fine", "active", 0],
   ] as const
 ).map(([key, name, purpose, status, version], i) => ({
   letter_template_id: sid(`ltr:${key}`),
@@ -163,8 +164,8 @@ route("POST /api/v1/letter-templates/:id/activate", (req) => {
 
 const STEPS: ConsequenceStep[] = (
   [
-    ["Caution", "caution-letter", "none", null, 365],
     ["Warning", "warning-letter", "none", null, 365],
+    ["Question", "question-letter", "none", null, 365],
     ["Second Warning", "warning-letter", "none", null, 365],
     ["Suspension", "suspension-letter", "unpaid_days", 3, null],
     ["Suspension Without Pay", "suspension-without-pay-letter", "unpaid_days", 5, null],
@@ -282,13 +283,13 @@ function issue(q: Row, stepName: string, daysAgo: number, fine: string | null): 
     step_name: step.name, reason: "The explanation was not accepted.", decided_by: uid("cynthia"), decided_by_name: "Cynthia Osakunih",
     effective_on: isoDaysAgo(daysAgo), ends_on: null, status: "issued",
     fine: fine ? { amount_ngn: fine, settlement_status: "pending", settled_at: null } : null, created_at: at(daysAgo, "15:00"),
-    evidence: [], letter_document_id: sid(`sanltr:${q.number}`), workflow_instance_id: null, waiting_on: null,
+    evidence: [], letter_document_id: sid(`sanltr:${q.number}`), fine_letter_document_id: fine ? sid(`sanfine:${q.number}`) : null, workflow_instance_id: null, waiting_on: null,
   };
   SANCTIONS.unshift(s);
   q.sanction = { sanction_id: s.sanction_id, number: s.number, step_name: s.step_name, status: s.status };
   return s;
 }
-issue(QUERIES[4], "Caution", 14, "12500.00");
+issue(QUERIES[4], "Warning", 14, "12500.00");
 
 const raisedBy = (q: Row) => q._by;
 const canSee = (user: string, q: { _by?: string | null }) => FULL.has(user) || (!!q._by && q._by === user);
@@ -389,7 +390,7 @@ route("POST /api/v1/queries/:id/decision", (req) => {
   if (!step) return invalid({ consequence_step_id: ["Pick the sanction"] });
   if (!stepView(step).letter_ready) return fail(422, "LETTER_NOT_READY", "This sanction's letter is not ready", { consequence_step_id: ["Letter not ready"] });
   const s = issue(q, step.name, 0, b.fine_amount || null);
-  Object.assign(s, { number: null, status: "pending_approval", reason: b.reason.trim(), decided_by: uid(user), decided_by_name: nameOf(user), letter_document_id: null, waiting_on: "Operations & People", workflow_instance_id: sid(`wf:${s.sanction_id}`) });
+  Object.assign(s, { number: null, status: "pending_approval", reason: b.reason.trim(), decided_by: uid(user), decided_by_name: nameOf(user), letter_document_id: null, fine_letter_document_id: null, waiting_on: "Operations & People", workflow_instance_id: sid(`wf:${s.sanction_id}`) });
   q.sanction = { sanction_id: s.sanction_id, number: null, step_name: s.step_name, status: "pending_approval" };
   Object.assign(q, { status: "under_review", escalated: true, workflow_instance_id: s.workflow_instance_id });
   return ok(view(q, user));
@@ -487,7 +488,7 @@ route("POST /api/v1/query-rules/:id/pause", (req) => {
 
 const raiserOfSanction = (s: SanctionDetail) => raisedBy(QUERIES.find((q) => q.employee_query_id === s.employee_query_id)!);
 const visibleSanctions = (user: string) => SANCTIONS.filter((s) => FULL.has(user) || raiserOfSanction(s) === user);
-const sanctionRow = (s: SanctionDetail) => omit(s, ["evidence", "letter_document_id", "workflow_instance_id", "waiting_on"] as const);
+const sanctionRow = (s: SanctionDetail) => omit(s, ["evidence", "letter_document_id", "fine_letter_document_id", "workflow_instance_id", "waiting_on"] as const);
 
 route("GET /api/v1/sanctions/summary", (req) => {
   const list = visibleSanctions(req.user!);
@@ -560,7 +561,7 @@ route("POST /api/v1/ess/queries/:id/response", (req) => {
 route("GET /api/v1/ess/sanctions", (req) =>
   paged(
     mySanctions(req.user!).map(
-      (s): MySanction => ({ sanction_id: s.sanction_id, number: s.number!, step_name: s.step_name, reason: s.reason, query_number: s.query_number, effective_on: s.effective_on, ends_on: s.ends_on, fine: s.fine, letter_document_id: s.letter_document_id }),
+      (s): MySanction => ({ sanction_id: s.sanction_id, number: s.number!, step_name: s.step_name, reason: s.reason, query_number: s.query_number, effective_on: s.effective_on, ends_on: s.ends_on, fine: s.fine, letter_document_id: s.letter_document_id, fine_letter_document_id: s.fine_letter_document_id }),
     ),
     req,
   ),

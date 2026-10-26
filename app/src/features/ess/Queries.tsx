@@ -165,7 +165,7 @@ function SanctionList() {
       list={list}
       rowKey={(r: MySanction) => r.sanction_id}
       noun="sanction"
-      onRowClick={(r: MySanction) => modal.open({ title: `${r.number} · Letter`, wide: true, full: true, body: <LetterFile documentId={r.letter_document_id} name={r.number} /> })}
+      onRowClick={(r: MySanction) => modal.open({ title: `${r.number} · Letter`, wide: true, full: true, body: <SanctionLetters s={r} /> })}
       empty={{ title: "No Sanctions", text: "A clean record." }}
       columns={[
         { key: "k", label: "Sanction", render: (r: MySanction) => r.step_name },
@@ -175,5 +175,15 @@ function SanctionList() {
         { key: "m", label: "Fine", align: "n", render: (r: MySanction) => (r.fine ? <Money value={r.fine.amount_ngn} /> : "None") },
       ]}
     />
+  );
+}
+
+/** A sanction's letter, and the Salary Deduction letter after it when the sanction carried a fine. */
+function SanctionLetters({ s }: { s: MySanction }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <LetterFile documentId={s.letter_document_id} name={s.number} />
+      {s.fine_letter_document_id && <LetterFile documentId={s.fine_letter_document_id} name={`${s.number} Deduction`} />}
+    </div>
   );
 }

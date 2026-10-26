@@ -21,7 +21,8 @@
 const { z } = require("zod");
 const { uuid, text, isoDate, isoDateTime, money, listQuery, Paged } = require("./common");
 
-const LetterPurpose = z.enum(["query", "sanction"]);
+/** query: a query's letter; sanction: a rung's; fine: the Salary Deduction letter a fine sends (guide §6.6). */
+const LetterPurpose = z.enum(["query", "sanction", "fine"]);
 const LetterTemplateStatus = z.enum(["awaiting_sample", "draft", "active", "retired"]);
 
 const body = z.string().trim().min(40, "Write the letter").max(20000);
