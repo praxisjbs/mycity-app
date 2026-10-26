@@ -49,7 +49,7 @@ type Values = {
   accountable_note: string;
 };
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const refOf = (k: { okr_key_result_id: string; code: string; statement: string }): KeyResultRef => ({ okr_key_result_id: k.okr_key_result_id, code: k.code, statement: k.statement });
 
 /** A quarter's key results to pick from: the company's (Feeds) or the functions' (Scored From). */

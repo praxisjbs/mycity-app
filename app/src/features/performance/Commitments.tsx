@@ -36,7 +36,7 @@ import {
 } from "@mycity/ui";
 import { person } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 
 const STATE_OPTIONS: Array<[string, string]> = [
   ["", "All States"],

@@ -262,6 +262,10 @@ describeDb("performance goals set and changed on screen, against the real migrat
     const late = await as("head").patch(`/performance/objectives/${ids.objective}`, { title: "Again" });
     expect(late.status).toBe(409);
     expect(late.body.error.code).toBe("PLAN_BINDING");
+    // New Objective on that function: refused on Function, the field at fault (QA DEF-10).
+    const shut = await as("head").post("/performance/objectives", { performance_period_id: ids.q4, department_id: ids.bm, title: "One more" });
+    expect(shut.status).toBe(409);
+    expect(shut.body.error).toMatchObject({ code: "PLAN_BINDING", fields: { department_id: ["Plan is binding"] } });
     expect((await as("head").del(`/performance/key-results/${ids.kr}`)).status).toBe(409);
     expect((await as("head").patch(`/performance/key-results/${ids.kr}`, { statement: "Again" })).body.error.code).toBe("KEY_RESULT_BINDING");
   });

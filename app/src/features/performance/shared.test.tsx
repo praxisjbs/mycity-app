@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { checkInText } from "@/features/ess/Performance";
 import { stepOfField } from "./Quarter";
 import { nextStep } from "./Reviews";
-import { fieldMessage, monthChoices, monthScores, startMonth } from "./shared";
+import { ApiError } from "@/api/client";
+import { fieldMessage, monthChoices, monthScores, sayRefusal, startMonth } from "./shared";
 
 /**
  * The small rules the Performance screens share (docs/guides/performance.md §10): a field's mark in
@@ -21,6 +22,45 @@ afterAll(() => {
 });
 
 const QUARTER = ["2026-10-01", "2026-11-01", "2026-12-01"];
+
+describe("a refused save, said in its form (QA DEF-10, DEF-11)", () => {
+  const refusal = (status: number, code: string, message: string, fields?: Record<string, string[]>) => new ApiError(status, { error: { code, message, fields } } as never);
+  const formOf = () => ({ values: { department_id: "", title: "QA objective" }, setServerErrors: vi.fn() });
+
+  it("a closed plan: the mark on Function, and the sentence on the form's error line", () => {
+    const form = formOf();
+    const setProblem = vi.fn();
+    sayRefusal(refusal(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead", { department_id: ["Plan is binding"] }), form, setProblem);
+    expect(form.setServerErrors).toHaveBeenCalledWith({ department_id: ["Plan is binding"] });
+    expect(setProblem).toHaveBeenCalledWith("This plan is sent or binding: change a target instead");
+  });
+
+  it("a refusal naming no field (the function is not the reader's) stays in the form, never only a toast", () => {
+    const form = formOf();
+    const setProblem = vi.fn();
+    sayRefusal(refusal(403, "PERMISSION_DENIED", "Only the function's head sets its KPIs"), form, setProblem);
+    expect(form.setServerErrors).not.toHaveBeenCalled();
+    expect(setProblem).toHaveBeenCalledWith("Only the function's head sets its KPIs");
+  });
+
+  it("a check on a field the form shows sits on that field alone; one on a field it does not show is said", () => {
+    const shown = formOf();
+    const clear = vi.fn();
+    sayRefusal(refusal(422, "VALIDATION_FAILED", "Check the highlighted fields", { title: ["Required"] }), shown, clear);
+    expect(shown.setServerErrors).toHaveBeenCalledWith({ title: ["Required"] });
+    expect(clear).toHaveBeenCalledWith(null);
+    const hidden = formOf();
+    const said = vi.fn();
+    sayRefusal(refusal(422, "VALIDATION_FAILED", "Pick a quarter that exists", { performance_period_id: ["Not a quarter"] }), hidden, said);
+    expect(said).toHaveBeenCalledWith("Pick a quarter that exists");
+  });
+
+  it("no answer from the server reads Not saved. Try again.", () => {
+    const setProblem = vi.fn();
+    sayRefusal(new Error("offline"), formOf(), setProblem);
+    expect(setProblem).toHaveBeenCalledWith("Not saved. Try again.");
+  });
+});
 
 describe("a field's mark", () => {
   it("reads Zod's own sentences as their limit, never as the caller's short form", () => {

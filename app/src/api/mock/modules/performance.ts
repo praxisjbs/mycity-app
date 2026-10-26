@@ -300,7 +300,10 @@ route("POST /api/v1/performance/objectives", (req) => {
   const periodId = b.performance_period_id || PERIOD.performance_period_id;
   const dept = b.department_id || null;
   const plan = planOf(periodId, dept);
-  if (!open(plan.status)) return fail(409, "PLAN_NOT_OPEN", "The plan is sent or binding", { department_id: ["Plan is binding"] });
+  if (!open(plan.status))
+    return fail(409, "PLAN_BINDING", "This plan is sent or binding: change a target instead", {
+      department_id: [plan.status === "submitted" ? "Plan awaits approval" : "Plan is binding"],
+    });
   const prefix = dept === null ? "CO" : dept === deptId ? "BM" : "FN";
   const used = new Set(OBJECTIVES.filter((o) => o.code.startsWith(`${prefix}-O`)).map((o) => Number(o.code.split("-O")[1])));
   let n = 1;
@@ -1152,6 +1155,7 @@ route("PUT /api/v1/performance/scorecards/:id/lines", (req) => {
     if (!String(l.title ?? "").trim()) problems[at("title")] = ["Required"];
     if (!MEASURES[String(l.section)]?.includes(String(l.measure))) problems[at("measure")] = [`Pick ${MEASURES[String(l.section)]?.join(" or ") ?? "a measure"}`];
     if (!(Number(l.weight) > 0)) problems[at("weight")] = ["Above zero"];
+    else if (Number(l.weight) > 100) problems[at("weight")] = ["At most 100"];
     if (l.source === "key_result" && !l.okr_key_result_id) problems[at("okr_key_result_id")] = ["Link a key result"];
     if (l.source === "function_kpi" && !l.kpi_definition_id) problems[at("kpi_definition_id")] = ["Link a KPI"];
     if (l.measure === "milestone" && !l.milestone_due_on) problems[at("milestone_due_on")] = ["Pick a date"];

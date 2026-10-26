@@ -10,7 +10,7 @@
 | Capabilities | `workspace.late_reasons` (Manage Late Reasons) |
 | Screens (PROGRESS.md rows) | #4 Today, #5 Tasks, #6 Calendar, #7 Analytics, #101 Projects |
 | Status | Draft |
-| Last changed | 23/10/2026 |
+| Last changed | 26/10/2026 |
 
 Sources: MILESTONES §7 (A24) and §7 Definition of done; REUSE_MAP §3.1; the meeting of
 10 October 2026 (Cynthia Osakunih, Tom-Blake Asaah: "task and activity tracking is a primary
@@ -552,6 +552,7 @@ and are built (§6).
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · From the QA bug register (Milestone 2): a task's panel takes the saved title as soon as Edit Task saves, on every screen that opens one (DEF-05, `useTaskPanel` follows the task as read); Add Comment leaves the emptied box unmarked (DEF-06, the shared form's reset, `docs/guides/foundation.md`); a refused move or action says so as an error toast with its warning mark, never as a confirmation, such as "Waiting on TSK-0397: Book the venue" when a waiting task is moved out of To Do (OBS-06).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: a refusal on Counts Towards or Project (pickers outside the task form) says why as "Counts Towards: …" or "Project: …"; a new assignee drops the scorecard line picked for the last; People stops at 25 ("At most 25 people") and the route's raw limit reads short; Send Nudge with no watchers says "Nobody else to tell"; with every late reason off, Why Late says "No late reasons are switched on" and Mark Done moves the card without one; Set Recovery's Owner is the task people picker (no People grant needed, the team rule's people); Send Commitments shows once there is one to send; Cancel Task's refusal names who may ("whoever set this task, or the lead's manager"); an empty column reads "Nothing in this stage" on both shells and an empty project board "No Tasks Yet".
 - 25/10/2026 · JP · New Task's People, Department and Lead pickers are named by their field's label for a screen reader (the shared `RecordPicker` fix from the employee creation audit, `docs/guides/foundation.md` §6.16); before, each list was named only "Search people" or "Search departments". Nothing on screen changes.
 - 23/10/2026 · JP · The 23/10 audit, part 3 of 3 (decisions JBS Praxis, 23/10/2026): Projects, a fifth tab (`projects`, PROGRESS #101): anyone starts a project, everyone sees the list, a project's page is a board of its tasks the reader can see, and a task joins one from New Task or from the project. Why Late's reasons live in `task_late_reason`: six to start (Waiting on Client and Blocked by Another Team added), switched off or added from the settings icon on Tasks by holders of `workspace.late_reasons`. Attendees with a work email get the event as an `.ics` by email, updated and cancelled with it, held while system mail is paused. The board, a project's board and Today follow other people's changes live (`task.changed`, `task.reordered`). A lead who has left shows Left. Home's roster fills Open Tasks. Praxis AI's New Event names its attendees and "start a project" opens New Project (§1 to §11, §13). From part 2's review: a task's holds come newest first, as §5 says; the server's refusal of a repeat without a due date reads "Needs a due date", as §11 says.

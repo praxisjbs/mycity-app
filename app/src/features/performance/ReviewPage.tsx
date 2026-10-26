@@ -44,7 +44,7 @@ import {
 } from "@mycity/ui";
 import { fieldMessage, figureOf, rating, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const STEP: Record<ReviewDetail["chain"][number]["key"], string> = { check_in: "Check-In", reviewer: "Reviewer", second_level: "Second Level", hr: "HR" };
 const BUCKET: Record<string, string> = { done: "Done This Month", ongoing: "Ongoing", next_month: "Next Month" };
 const OUTCOME: Record<string, string> = { confirm: "Confirm", extend: "Extend 3 Months", end: "End Employment" };

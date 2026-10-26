@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 25/10/2026 |
+| Last changed | 26/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -1067,6 +1067,7 @@ screen.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · From the QA bug register (Milestone 2): the form system's `reset()` drops a pause check still waiting from the last key, so a field emptied after a quick save (a task comment) is never marked Required (DEF-06).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Settings · Organisation's Remove asks first and Delete Holiday shows only with `settings` delete; Imports offers Download Errors only once an import was previewed, Continue on an unfinished import (decision of 26/10/2026: the wizard opens at its step) and Revert only to a reader who may run that importer, the wizard waits for the importers before it opens and Next on Upload says *Upload a sheet first*, and refusals are error toasts; Security's Two-Step switches hand back their work (Switch is busy until it settles, F26) and Failed Sign-Ins lists the last 7 days as its figure counts; Audit Log offers Export only with `settings` export and says No Access, with no Retry, to a narrower scope; Numbering's and Security's other failures are error toasts. The audit's Map step (Next with no spinner) does not hold: Next hands back its async check, so it is busy and refuses a second press (press.ts). §10 updated.
 - 26/10/2026 · JP · §6.7: a search provider's `prepare`, run before ⌘K's transaction, for the User Guide's search by meaning (`user-guide.md` §6.8).
 

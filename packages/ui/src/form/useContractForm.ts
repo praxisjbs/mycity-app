@@ -264,6 +264,10 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
 
   /** Back to the initial values (or `next`), with no marks. */
   const reset = (next?: T) => {
+    // A pause check still waiting from the last key would mark the emptied field (a comment box
+    // cleared after a quick send read Required).
+    Object.values(timers.current).forEach((t) => window.clearTimeout(t));
+    timers.current = {};
     form.reset((next ?? initial) as DefaultValues<FieldValues>);
     setTouched({});
     setServer({});
