@@ -40,6 +40,7 @@ import {
   KeyValue,
   LoadingRows,
   Menu,
+  NumberField,
   PageHeader,
   Pager,
   SelectField,
@@ -586,7 +587,7 @@ function ChangeTargetForm({ keyResultId, close }: { keyResultId: string; close: 
   };
   return (
     <>
-      <Field label="New Target" {...f.status("to_value")}><TextField {...f.field("to_value")} inputMode="decimal" /></Field>
+      <Field label="New Target" {...f.status("to_value")}><NumberField decimal signed {...f.field("to_value")} /></Field>
       <Field label="From Month" {...f.status("from_month")}><DateField {...f.field("from_month")} /></Field>
       <Field label="Reason" {...f.status("reason")}><TextField {...f.field("reason")} /></Field>
       <FormFooter>
@@ -665,10 +666,24 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
     const message = fieldMessage(errors[id]?.[key], short);
     return message ? { state: "bad" as const, message } : {};
   };
+  /** An actual the contract refuses (two points, a fifth decimal), checked on its field so it never reaches the server. */
+  const actualProblem = (id: string, value: string) =>
+    goalsContract.KeyResultReport.safeParse({ okr_key_result_id: id, status: "on_track", actual_value: value }).error?.issues.find((i) => i.path[0] === "actual_value")?.message;
+  const markActual = (id: string, value: string) =>
+    setErrors((e) => {
+      const { actual_value: _was, ...rest } = e[id] ?? {};
+      const problem = actualProblem(id, value);
+      return { ...e, [id]: problem ? { ...rest, actual_value: problem } : rest };
+    });
   const submit = async () => {
     const ids = Object.keys(edits);
     if (!ids.length) {
       toast("Change a key result first");
+      return;
+    }
+    const refused = ids.filter((id) => actualProblem(id, edits[id].actual_value));
+    if (refused.length) {
+      refused.forEach((id) => markActual(id, edits[id].actual_value));
       return;
     }
     try {
@@ -719,7 +734,18 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
             <Card key={id} className="mb-2">
               <CardHeader title={<span>{`${k.code} · ${k.statement}`}</span>} record />
               <Field label="Status" {...mark(id, "status", "Pick a status")}><SelectField options={KR_STATUS_OPTIONS} value={r.status} onChange={(v) => set(k, { status: v as KrMonthStatus })} /></Field>
-              <Field label="Actual" optional {...mark(id, "actual_value", "Enter a number")}><TextField value={r.actual_value} onChange={(v) => set(k, { actual_value: v })} inputMode="decimal" /></Field>
+              <Field label="Actual" optional {...mark(id, "actual_value", "Enter a number")}>
+                <NumberField
+                  decimal
+                  signed
+                  value={r.actual_value}
+                  onChange={(v) => {
+                    set(k, { actual_value: v });
+                    if (errors[id]?.actual_value !== undefined) markActual(id, v);
+                  }}
+                  onBlur={() => markActual(id, r.actual_value)}
+                />
+              </Field>
               <Field label="Update" optional {...mark(id, "update_text", "Shorten the update")}><TextField value={r.update_text} onChange={(v) => set(k, { update_text: v })} /></Field>
               {(recovery.shown || flagged) && (
                 <>

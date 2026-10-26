@@ -225,7 +225,7 @@ function CheckInForm({ c, close, reload }: { c: ReviewCheckIn; close: () => void
             )}
             {i.line && (measure === "numeric" || measure === "standard") && (
               <Field label="Actual" optional {...mark(id, "actual_value", "Enter a number")}>
-                <NumberField decimal value={r.actual} onChange={(v) => set(id, { actual: v })} disabled={!open} />
+                <NumberField decimal signed value={r.actual} onChange={(v) => set(id, { actual: v })} disabled={!open} />
               </Field>
             )}
             {i.line && (

@@ -108,12 +108,21 @@ export function PasswordField({ value, onChange, onBlur, state, message: _messag
 export interface NumberFieldProps extends BoundProps, NativeInput {
   /** Allow a decimal point. Off: whole numbers only. */
   decimal?: boolean;
+  /** Allow a minus before the figure (a fall, a loss). Off: zero and above only. */
+  signed?: boolean;
 }
 
-/** A count or quantity, kept as the string typed so the form never meets a float. */
-export function NumberField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, decimal, className, id, ...rest }: NumberFieldProps) {
+/**
+ * A count or quantity, kept as the string typed so the form never meets a float. A comma, a unit or
+ * any other sign never gets in, so "64,000" arrives as 64000; signed keeps a leading minus, the
+ * screen's own "−" included.
+ */
+export function NumberField({ value, onChange, onBlur, state, message: _message, onProblem: _onProblem, decimal, signed, className, id, ...rest }: NumberFieldProps) {
   const a = useFieldControl({ id, state });
-  const clean = (s: string) => (decimal ? s.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") : s.replace(/\D/g, ""));
+  const clean = (s: string) => {
+    const digits = decimal ? s.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") : s.replace(/\D/g, "");
+    return signed && /^\s*[-−]/.test(s) ? `-${digits}` : digits;
+  };
   return (
     <span className="relative flex items-center">
       <input

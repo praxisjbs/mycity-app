@@ -173,7 +173,7 @@ example, *BM-O1 deleted*.
 |---|---|---|
 | **An objective holds at most four key results** | The objective has four already | Add it to another objective |
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
-| **Check the format** under **Target** | The target holds a comma or a word | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
+| **Check the format** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
@@ -254,7 +254,8 @@ head reports how its key results did.
 2. Pick the **Function** and the **Month** first. The **Month** starts on the month just ended.
    Changing it clears what you have typed.
 3. For each key result you report, choose its **Status** and fill in the **Actual** and a short
-   **Update**.
+   **Update**. Type the **Actual** as a figure: a comma or a unit stays out, so `64,000` goes in
+   as `64000`. A minus is kept, such as `-5`. A figure it cannot take is marked as you leave it.
    ![Report Month](shot:performance-report)
 4. If the score falls under 0.4, or the status is **At Risk**, **Off Track** or **Missed**, name
    the **Recovery Owner** and the **Recovery Date**.
@@ -271,7 +272,7 @@ Report Month covers key results. Record each KPI's month on KPIs (see
 | **Nothing To Report** | The function has no binding key results this quarter: its plan is not approved yet |
 | **Name owner and date** under **Recovery Owner** | Name the **Recovery Owner** and **Recovery Date** on that key result |
 | **Pick a status** under **Status** | Choose the key result's status |
-| **Enter a number** under **Actual** | Type the figure only, such as `18000000` |
+| **Enter a number** under **Actual** | Finish the figure, with at most four decimals, such as `0.95` |
 | **Pick a date** under **Recovery Date** | Pick the date the key result should recover by |
 | **Shorten the update** under **Update** | Keep the update shorter |
 | **Only the function's head reports its month** | Ask the head to report it |
@@ -301,7 +302,7 @@ and scores already given do not change.
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the new target** | **New Target** is empty | Type the new figure |
-| **Check the format** under **New Target** | It holds a comma or a word | Type the figure only |
+| **Check the format** under **New Target** | It is unfinished or has more than four decimals | Type the figure only |
 | **Check this value** under **From Month** | The day picked is not the 1st of a month | Pick the 1st of the month |
 | **A change to this target is already waiting for a decision** | Only one change waits at a time | Wait for the CEO's decision |
 
@@ -603,7 +604,7 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 | The hub says | What it means | What to do |
 |---|---|---|
 | **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
-| **Check the format** under **Target** | The target holds a comma or a word | Type the figure only, or use **Target Wording** |
+| **Check the format** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
 
 ### Record a month's result {#performance-kpi-actual needs="performance edit, cap goals.function"}
 
@@ -619,7 +620,7 @@ You record your own function's KPIs. Operations and People and the CEO may recor
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the actual** under **Actual** | **Met** and **Not Met** need the figure | Fill in the **Actual**, or choose **N/A** |
-| **Check the format** under **Actual** | The actual holds a comma or a word | Type the figure only |
+| **Check the format** under **Actual** | The figure is unfinished or has more than four decimals | Type the figure only |
 | **Check the highlighted fields** | On **Edit KPI**, the **KPI** name is empty | Type it again |
 
 ## Reviews {#performance-reviews screen=performance/reviews icon=ticks}

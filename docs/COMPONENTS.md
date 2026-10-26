@@ -3604,6 +3604,7 @@ The text input of the form system, with its typed relatives: password, whole num
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `decimal` | `boolean` |  | Allow a decimal point. Off: whole numbers only. |
+| `signed` | `boolean` |  | Allow a minus before the figure (a fall, a loss). Off: zero and above only. |
 
 **PhoneField** props (`PhoneFieldProps`, extends `BoundProps`, `NativeInput`)
 
