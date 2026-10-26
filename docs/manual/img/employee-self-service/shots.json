@@ -1,7 +1,7 @@
 {
   "ess-attendance": {
     "spec": "207947064e7bdf5e",
-    "source": "29fea61976260bb2",
+    "source": "378a8c25bbe4b9b6",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "ess-devices": {
     "spec": "12c539916b4839a8",
-    "source": "5b4de174efc4d69c",
+    "source": "71682a397ac8909f",
     "devices": [
       "desktop",
       "phone"
