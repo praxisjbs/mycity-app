@@ -2825,6 +2825,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
 | `placeholder` | `string` |  | The format example; DD/MM/YYYY. |
+| `disabled` | `boolean` |  | Shown and not changed (a record already sent): no typing and no calendar. |
 
 **DateRangeField** props (`DateRangeFieldProps`)
 

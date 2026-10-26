@@ -6,7 +6,7 @@
  * same filtered list (F29).
  */
 import { useEffect, type ReactNode } from "react";
-import type { Commitment, CommitmentSetRow } from "@mycity/contract/contract.gen.ts";
+import type { CommitmentListQuery, CommitmentSetRow } from "@mycity/contract/contract.gen.ts";
 import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { useApi, useMutation, usePaged, type PagedResult } from "@/api/hooks";
@@ -40,7 +40,9 @@ const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not
 
 const STATE_OPTIONS: Array<[string, string]> = [
   ["", "All States"],
-  ["awaiting_approval", "Awaiting Approval"],
+  ["sent", "Awaiting Approval"],
+  ["not_sent", "Not Sent"],
+  ["returned", "Returned"],
   ["due", "Due"],
   ["on_time", "On Time"],
   ["late", "Late"],
@@ -72,7 +74,7 @@ export function Commitments({ switcher }: { switcher: ReactNode }) {
   const q = params.get("q") ?? "";
   const departments = useApi("GET /api/v1/departments", { query: {} });
   const deptOptions: Array<[string, string]> = [["", "All Departments"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
-  const filters = { month, ...(dept ? { department_id: dept } : {}), ...(state ? { state: state as Commitment["state"] } : {}) };
+  const filters = { month, ...(dept ? { department_id: dept } : {}), ...(state ? { state: state as CommitmentListQuery["state"] } : {}) };
   const list = usePaged("GET /api/v1/performance/commitments", { filters, sort: "due_at" });
   const summary = useApi("GET /api/v1/performance/commitments/summary", { query: { month, ...(dept ? { department_id: dept } : {}) } });
   const waiting = usePaged("GET /api/v1/performance/commitments/sets", { filters: { waiting_on_me: "true" }, sort: "submitted_at" });

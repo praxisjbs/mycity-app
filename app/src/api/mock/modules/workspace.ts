@@ -1093,7 +1093,14 @@ route("GET /api/v1/performance/commitments", (req) => {
   const rows = commitmentsFor(req.user!, waiting_on_me === "true").filter((t) => !month || t.commitment_month === monthOf(month)).map(commitmentOf);
   return paged(rows, { ...req, query }, {
     search: (c) => [c.title, c.number, c.employee?.display_name],
-    filters: { state: (c, v) => c.state === v, employee_id: (c, v) => c.employee?.employee_id === v, department_id: () => true },
+    filters: {
+      // An unapproved month as its pill reads: sent and waiting, not sent, or returned.
+      state: (c, v) =>
+        v === "sent" ? c.state === "awaiting_approval" && c.set_status === "submitted"
+        : v === "returned" ? c.state === "awaiting_approval" && c.set_status === "returned"
+        : v === "not_sent" ? c.state === "awaiting_approval" && (c.set_status === null || c.set_status === "draft")
+        : c.state === v,
+      employee_id: (c, v) => c.employee?.employee_id === v, department_id: () => true },
     sort: { due_at: (a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"), employee: (a, b) => (a.employee?.display_name ?? "").localeCompare(b.employee?.display_name ?? "") },
   });
 });

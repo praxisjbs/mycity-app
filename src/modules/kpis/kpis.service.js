@@ -126,7 +126,7 @@ async function nextCode(db, departmentId) {
 
 /** POST /performance/kpis. `code` is accepted from the importer only (imported rows keep their codes). */
 async function create(actor, body, { code = null } = {}) {
-  await authority.assertSetsGoals(pool, actor, body.department_id);
+  await authority.assertSetsGoals(pool, actor, body.department_id, "KPIs");
   const id = await tx(async (client) => {
     const kpiCode = code || (await nextCode(client, body.department_id));
     if (code && (await repo.findByCode(client, code)))
@@ -149,7 +149,7 @@ async function create(actor, body, { code = null } = {}) {
 async function update(actor, id, patch) {
   const before = await repo.get(pool, id);
   if (!before) throw notFound();
-  await authority.assertSetsGoals(pool, actor, before.department_id);
+  await authority.assertSetsGoals(pool, actor, before.department_id, "KPIs");
   await tx(async (client) => {
     await repo.update(client, id, patch);
     const after = await repo.get(client, id);
@@ -188,7 +188,7 @@ async function recordIn(client, actor, kpi, body) {
 async function recordActual(actor, id, body) {
   const kpi = await repo.get(pool, id);
   if (!kpi) throw notFound();
-  await authority.assertSetsGoals(pool, actor, kpi.department_id);
+  await authority.assertSetsGoals(pool, actor, kpi.department_id, "KPIs");
   return tx((client) => recordIn(client, actor, kpi, body));
 }
 

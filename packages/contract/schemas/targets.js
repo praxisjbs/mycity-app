@@ -359,13 +359,20 @@ const CommitmentRecovery = z
   })
   .strict();
 
+/**
+ * The State filter: the commitment's own state (`awaiting_approval` is every month not yet approved,
+ * as Send Commitments lists them), or, as the pills read, `sent` (sent and waiting), `not_sent` (not
+ * yet sent, or drafted) and `returned` (sent back).
+ */
+const CommitmentStateFilter = z.enum(["awaiting_approval", "sent", "not_sent", "returned", "due", "on_time", "late", "missed", "rescoped"]);
+
 /** GET /performance/commitments */
 const CommitmentListQuery = listQuery(
   {
     month: MonthKey.optional(),
     department_id: uuid.optional(),
     employee_id: uuid.optional(),
-    state: CommitmentState.optional(),
+    state: CommitmentStateFilter.optional(),
     waiting_on_me: z.enum(["true", "false"]).optional(),
   },
   ["due_at", "employee"],

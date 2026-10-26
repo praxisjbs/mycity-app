@@ -11,11 +11,11 @@
 import { useEffect, useRef, useState } from "react";
 import goalsContract from "@mycity/contract/schemas/goals.js";
 import scoring from "@mycity/contract/schemas/scoring.js";
-import type { KeyResult, KeyResultMonth, Objective, OrganisationalGoalDetail, PerformancePeriod } from "@mycity/contract/contract.gen.ts";
+import type { KeyResult, KeyResultDetail, KeyResultMonth, Kpi, KpiMonth, Objective, OrganisationalGoalDetail, PerformancePeriod } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import { useMe } from "@/auth/AuthProvider";
+import { useAuth, useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { PagedTable } from "@/features/shared/sections";
@@ -36,6 +36,7 @@ import {
   formatDate,
   formatMonth,
   FormFooter,
+  HelpTerm,
   IconButton,
   KeyValue,
   LoadingRows,
@@ -55,9 +56,14 @@ import {
 import { useApprovalLinks, WaitingOnYou } from "./Approvals";
 import { KeyResultForm, KR_TYPES, SetTargetForm } from "./KeyResultForm";
 import { QuarterWizard } from "./Quarter";
-import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, planStatus, reportingMonth, score, useQuarter } from "./shared";
+import { band, bodySchema, fieldMessage, figureOf, krStatus, KR_STATUS_OPTIONS, monthChoices, planStatus, reportingMonth, score, startMonth, useQuarter } from "./shared";
 
 type KrMonthStatus = KeyResultMonth["status"];
+
+/** The help on the score figures (§10.1). */
+const SCORE_HELP = "Scores run from 0 to 1. Green is 0.7 or above; amber 0.4 to 0.7; red below 0.4 needs a recovery plan.";
+/** The help on a TBC target (§10.1). */
+export const TBC_HELP = "A provisional target, locked on the quarter's lock date.";
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 
 export function Goals() {
@@ -81,8 +87,9 @@ export function Goals() {
   });
   const counted = (n: number | undefined) => (n === undefined ? "–" : String(n));
   const tiles = [
-    { label: "Company Score", value: score(summary.data?.company_score) },
-    { label: "On Track", value: counted(summary.data?.on_track), tone: "ok" as const },
+    { label: "Company Score", value: score(summary.data?.company_score), help: SCORE_HELP },
+    // Key results scoring Good this quarter: a reported status of On Track is another thing (the pills).
+    { label: "Scoring Good", value: counted(summary.data?.on_track), tone: "ok" as const, help: SCORE_HELP },
     { label: "In Recovery", value: counted(summary.data?.in_recovery), tone: "err" as const },
     { label: "Awaiting Report", value: counted(summary.data?.awaiting_report) },
   ];
@@ -90,40 +97,44 @@ export function Goals() {
   const chips: Array<[string, string]> = [["", "All Functions"], ["company", "Company"], ...functions];
 
   const mayGoal = hasCapability(me, "goals.organisation") || hasCapability(me, "goals.company") || hasCapability(me, "goals.function");
+  const { can } = useAuth();
+  // Setting up a quarter is `performance` create, changing one `performance` edit, both with the capability (goals.routes).
   const manage = hasCapability(me, "performance.manage");
+  const maySetUp = manage && can("performance", "create");
+  const mayEditQuarter = manage && can("performance", "edit");
   const newGoal = () => modal.open({ title: "New Goal", full: true, body: (close) => <NewGoalForm close={close} period={period} objectives={okrs.rows} /> });
   const latest = quarter.periods[0];
   const setUpQuarter = () =>
     modal.open({ title: "Set Up Quarter", wide: true, full: true, body: (close) => <QuarterWizard close={close} latest={latest} onSaved={(p) => quarter.setPeriodId(p.performance_period_id)} /> });
   const editQuarter = () =>
     period && modal.open({ title: "Edit Quarter", wide: true, full: true, body: (close) => <QuarterWizard close={close} period={period} /> });
-  // Report Month is one function's: the one picked, else the reader's own, else the first.
+  // Report Month is one function's, or the company's for Management: the one picked, else the reader's own, else the first.
+  const mayReportCompany = hasCapability(me, "goals.company");
+  const mayReport = hasCapability(me, "goals.function") || mayReportCompany;
+  const reportable: Array<[string, string]> = [...(mayReportCompany ? ([["company", "Company"]] as Array<[string, string]>) : []), ...functions];
   const ownFunction = functions.find(([, name]) => name === me.department)?.[0];
   const report = () =>
     modal.open({
       title: "Report Month",
       wide: true,
-      body: (close) => <ReportMonthForm close={close} period={period} functions={functions} initial={(dept !== "company" && dept) || ownFunction || functions[0]?.[0] || ""} />,
+      body: (close) => <ReportMonthForm close={close} period={period} functions={reportable} initial={(reportable.some(([v]) => v === dept) && dept) || ownFunction || reportable[0]?.[0] || ""} />,
     });
-  useScreenAction(mayGoal && period ? { label: "New Goal", onSelect: newGoal } : null);
-  useUrlAction("report", hasCapability(me, "goals.function") && period && departments.data ? report : null);
-  useUrlAction("quarter", manage && !quarter.loading ? setUpQuarter : null);
+  // The floating button on a phone (§10.2): Report Month for a function's head, else New Goal.
+  const heads = hasCapability(me, "goals.function") && !hasCapability(me, "goals.company");
+  useScreenAction(period ? (heads ? { label: "Report Month", onSelect: report } : mayGoal ? { label: "New Goal", onSelect: newGoal } : null) : null);
+  useUrlAction("report", mayReport && period && departments.data ? report : null);
+  useUrlAction("quarter", maySetUp && !quarter.loading ? setUpQuarter : null);
   useApprovalLinks();
   const openKrId = (id: string, code = "Key Result") => modal.open({ title: code, wide: true, body: (close) => <KeyResultSheet id={id} close={close} /> });
   const openKr = (kr: KeyResult) => openKrId(kr.okr_key_result_id, kr.code);
   const openGoal = (id: string) => modal.open({ title: "Organisational Goal", wide: true, body: (close) => <GoalSheet id={id} close={close} /> });
   const openObjective = (id: string) => modal.open({ title: "Objective", wide: true, body: (close) => <ObjectiveSheet id={id} close={close} onOpen={openKr} /> });
   useRecordLinks({ id: openKrId, goal: openGoal, objective: openObjective });
-  const quarterMenu = manage ? (
-    <Menu
-      label="Manage Quarters"
-      trigger={(p) => <Button {...p} icon="calendar">Manage Quarters</Button>}
-      items={[
-        { label: "Set Up Quarter", icon: "plus", onSelect: setUpQuarter },
-        ...(period && period.status !== "closed" ? [{ label: "Edit Quarter", icon: "edit" as const, onSelect: editQuarter }] : []),
-      ]}
-    />
-  ) : null;
+  const quarterItems = [
+    ...(maySetUp ? [{ label: "Set Up Quarter", icon: "plus" as const, onSelect: setUpQuarter }] : []),
+    ...(mayEditQuarter && period && period.status !== "closed" ? [{ label: "Edit Quarter", icon: "edit" as const, onSelect: editQuarter }] : []),
+  ];
+  const quarterMenu = quarterItems.length ? <Menu label="Manage Quarters" trigger={(p) => <Button {...p} icon="calendar">Manage Quarters</Button>} items={quarterItems} /> : null;
 
   return (
     <>
@@ -131,10 +142,10 @@ export function Goals() {
         title="Goals"
         sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined}
         actions={
-          (period && (mayGoal || hasCapability(me, "goals.function"))) || quarterMenu ? (
+          (period && (mayGoal || mayReport)) || quarterMenu ? (
             <>
               {quarterMenu}
-              {period && hasCapability(me, "goals.function") && <Button icon="check" onClick={report}>Report Month</Button>}
+              {period && mayReport && <Button icon="check" onClick={report}>Report Month</Button>}
               {period && mayGoal && <Button variant="primary" icon="plus" onClick={newGoal}>New Goal</Button>}
             </>
           ) : undefined
@@ -247,7 +258,18 @@ function ObjectiveCard({ objective, onOpen }: { objective: Objective; onOpen: (k
           { key: "kr", label: "Key Result", render: (k) => k.statement },
           { key: "owner", label: "Owner", render: (k) => k.accountable?.display_name ?? k.accountable_note ?? "–", desktop: true },
           { key: "finish", label: "Finish", render: (k) => (k.finishes_on ? formatDate(k.finishes_on) : "–"), desktop: true },
-          { key: "status", label: "Status", render: (k) => <StatusPill s={k.target_provisional ? { tone: "info", text: "TBC" } : krStatus(k.latest?.status)} /> },
+          {
+            key: "status",
+            label: "Status",
+            render: (k) =>
+              k.target_provisional ? (
+                <HelpTerm help={TBC_HELP}>
+                  <StatusPill s={{ tone: "info", text: "TBC" }} />
+                </HelpTerm>
+              ) : (
+                <StatusPill s={krStatus(k.latest?.status)} />
+              ),
+          },
           { key: "score", label: "Score", align: "n", render: (k) => score(k.latest?.score) },
         ]}
       />
@@ -304,6 +326,7 @@ function ObjectiveDetail({ objective: o, close, onOpen }: { objective: Objective
 /** An organisational goal: its theme, measure, baseline, description and quarterly targets; Edit Goal and Delete Goal for the CEO. */
 function GoalSheet({ id, close }: { id: string; close: () => void }) {
   const me = useMe();
+  const { can } = useAuth();
   const modal = useModal();
   const confirm = useConfirm();
   const read = useApi("GET /api/v1/performance/goals/:id", { params: { id } });
@@ -312,6 +335,8 @@ function GoalSheet({ id, close }: { id: string; close: () => void }) {
   if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!g) return <LoadingRows count={6} />;
   const mine = hasCapability(me, "goals.organisation");
+  const mayEdit = mine && can("performance", "edit");
+  const mayDelete = mine && can("performance", "delete");
   const remove = async () => {
     if (!(await confirm({ title: "Delete Goal", body: `${g.code ? `${g.code} · ` : ""}${g.title}`, confirmLabel: "Delete Goal", destructive: true }))) return;
     try {
@@ -339,8 +364,8 @@ function GoalSheet({ id, close }: { id: string; close: () => void }) {
       />
       <FormFooter>
         <Button onClick={close}>Close</Button>
-        {mine && <Button variant="danger" onClick={remove}>Delete Goal</Button>}
-        {mine && (
+        {mayDelete && <Button variant="danger" onClick={remove}>Delete Goal</Button>}
+        {mayEdit && (
           <Button variant="primary" onClick={() => modal.open({ title: "Edit Goal", body: () => <GoalEditForm goal={g} close={() => modal.open({ title: "Organisational Goal", wide: true, body: (c) => <GoalSheet id={id} close={c} /> })} /> })}>
             Edit Goal
           </Button>
@@ -499,7 +524,19 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
           ["Start", k.starts_on ? formatDate(k.starts_on) : "–"],
           ["Finish", k.finishes_on ? formatDate(k.finishes_on) : "–"],
           ["Baseline", k.baseline_text ?? "–"],
-          ["Target", `${figure(k.target_value, k.target_text) ?? "–"}${k.target_provisional ? " · TBC" : ""}${was ? ` · Was ${figure(was.from_value, was.from_text) ?? "not set"}` : ""}`],
+          [
+            "Target",
+            <span key="t">
+              {figure(k.target_value, k.target_text) ?? "–"}
+              {k.target_provisional && (
+                <>
+                  {" · "}
+                  <HelpTerm help={TBC_HELP}>TBC</HelpTerm>
+                </>
+              )}
+              {was ? ` · Was ${figure(was.from_value, was.from_text) ?? "not set"}` : ""}
+            </span>,
+          ],
           ...(waiting
             ? ([["Change Waiting", `${figure(waiting.to_value, waiting.to_text) ?? "–"} from ${formatMonth(waiting.from_month)}`]] as Array<[string, string]>)
             : []),
@@ -509,7 +546,8 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
         ]}
       />
       <Card className="mt-3">
-        <CardHeader title="This Month" actions={<StatusPill s={band(latest?.band)} />} />
+        {/* The month last reported, named: it may be an earlier month than this one. */}
+        <CardHeader title={latest ? formatMonth(latest.month) : "Not Reported"} actions={<StatusPill s={band(latest?.band)} />} />
         <KeyValue
           items={[
             ["Status", krStatus(latest?.status).text],
@@ -553,7 +591,7 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
           <Button onClick={() => modal.open({ title: "Set Target", body: () => <SetTargetForm keyResult={k} close={back} onSaved={reload} /> })}>Set Target</Button>
         )}
         {k.can_change_target && (
-          <Button onClick={() => modal.open({ title: "Change Target", body: () => <ChangeTargetForm keyResultId={id} close={back} /> })}>Change Target</Button>
+          <Button onClick={() => modal.open({ title: "Change Target", body: () => <ChangeTargetForm keyResult={k} close={back} /> })}>Change Target</Button>
         )}
         {k.can_edit && (
           <Button variant="primary" onClick={() => modal.open({ title: "Edit Key Result", wide: true, full: true, body: () => <KeyResultForm keyResult={k} close={back} onSaved={reload} /> })}>
@@ -568,15 +606,23 @@ function KeyResultSheet({ id, close }: { id: string; close: () => void }) {
   );
 }
 
-function ChangeTargetForm({ keyResultId, close }: { keyResultId: string; close: () => void }) {
-  const next = new Date();
-  const month = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-01`;
-  const f = useContractForm({ okr_key_result_id: keyResultId, to_value: "", from_month: month, reason: "" }, goalsContract.TargetChangeCreate);
+/** Change Target on a binding key result: the new figure, its words if it has them, the month of its quarter it applies from, and why; to the CEO. */
+function ChangeTargetForm({ keyResult: k, close }: { keyResult: KeyResultDetail; close: () => void }) {
+  const period = useApi("GET /api/v1/performance/periods/:id", { params: { id: k.performance_period_id } });
+  if (period.error) return <ErrorState error={period.error} onRetry={period.reload} />;
+  if (!period.data) return <LoadingRows count={3} />;
+  return <ChangeTargetFields keyResultId={k.okr_key_result_id} months={period.data.months} close={close} />;
+}
+
+function ChangeTargetFields({ keyResultId, months, close }: { keyResultId: string; months: string[]; close: () => void }) {
+  const f = useContractForm({ okr_key_result_id: keyResultId, to_value: "", to_text: "", from_month: startMonth(months), reason: "" }, goalsContract.TargetChangeCreate);
   const save = useMutation("POST /api/v1/performance/target-changes");
   const submit = async () => {
     if (!f.check()) return;
+    const value = f.values.to_value.trim();
+    const words = f.values.to_text.trim();
     try {
-      await save.run({ body: f.values });
+      await save.run({ body: { okr_key_result_id: keyResultId, from_month: f.values.from_month, reason: f.values.reason, ...(value ? { to_value: value } : {}), ...(words ? { to_text: words } : {}) } });
       close();
       toast("Sent to the CEO");
     } catch (e) {
@@ -587,7 +633,10 @@ function ChangeTargetForm({ keyResultId, close }: { keyResultId: string; close: 
   return (
     <>
       <Field label="New Target" {...f.status("to_value")}><TextField {...f.field("to_value")} inputMode="decimal" /></Field>
-      <Field label="From Month" {...f.status("from_month")}><DateField {...f.field("from_month")} /></Field>
+      <Field label="Target in Words" optional {...f.status("to_text")}><TextField {...f.field("to_text")} placeholder="Launch in Kano" /></Field>
+      <Field label="From Month" {...f.status("from_month")}>
+        <SelectField {...f.field("from_month")} options={monthChoices(months)} />
+      </Field>
       <Field label="Reason" {...f.status("reason")}><TextField {...f.field("reason")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
@@ -641,24 +690,53 @@ function recoveryOf(k: KeyResult, r: ReportRow, watch: number): { shown: boolean
   return { shown: required || RECOVERY_STATUSES.has(r.status), required };
 }
 
+type KpiRow = { result: KpiMonth["result"]; actual_value: string; comment: string };
+const KPI_RESULTS: Array<[string, string]> = [["met", "Met"], ["not_met", "Not Met"], ["na", "N/A"]];
+
+/** A KPI's row for a month: what that month already holds when it is the latest, else Met and blank. */
+const kpiPrefill = (k: Kpi, month: string): KpiRow => {
+  const m = k.latest && k.latest.month === month ? k.latest : null;
+  return { result: m?.result ?? "met", actual_value: m?.actual_value ?? "", comment: m?.comment ?? "" };
+};
+
 /**
- * The function's binding objectives, a page at a time, for its month. Only the rows a person changes
- * are sent (the month keeps the rest), and they are kept while the pages turn.
+ * The function's (or the company's, `company`) binding objectives and, for a function, its KPIs, a
+ * page at a time, for its month. Only the rows a person changes are sent (the month keeps the rest),
+ * and they are kept while the pages turn; a row the API refuses is named in a toast, so one on
+ * another page is found.
  */
 function ReportFunction({ close, period, departmentId }: { close: () => void; period: PerformancePeriod; departmentId: string }) {
+  const company = departmentId === "company";
+  const confirm = useConfirm();
   const okrs = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: period.performance_period_id, department_id: departmentId, status: "binding" } });
+  const kpis = usePaged("GET /api/v1/performance/kpis", { filters: { department_id: company ? undefined : departmentId, active: "true" }, enabled: !company });
   const months = period.months;
   const watch = period.rules.key_results.band_watch;
   const [month, setMonth] = useState(reportingMonth(months));
   const [edits, setEdits] = useState<Record<string, ReportRow>>({});
+  const [kpiEdits, setKpiEdits] = useState<Record<string, KpiRow>>({});
+  // Each changed row's code, so a refusal can name a row on another page.
+  const [codes, setCodes] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, Record<string, string>>>({});
   const save = useMutation("POST /api/v1/performance/reports");
   const keyResults = okrs.rows.flatMap((o) => o.key_results);
   const rowOf = (k: KeyResult) => edits[k.okr_key_result_id] ?? prefill(k, month);
-  const set = (k: KeyResult, patch: Partial<ReportRow>) => setEdits((e) => ({ ...e, [k.okr_key_result_id]: { ...(e[k.okr_key_result_id] ?? prefill(k, month)), ...patch } }));
-  const changeMonth = (m: string) => {
+  const set = (k: KeyResult, patch: Partial<ReportRow>) => {
+    setCodes((c) => ({ ...c, [k.okr_key_result_id]: k.code }));
+    setEdits((e) => ({ ...e, [k.okr_key_result_id]: { ...(e[k.okr_key_result_id] ?? prefill(k, month)), ...patch } }));
+  };
+  const kpiOf = (k: Kpi) => kpiEdits[k.kpi_definition_id] ?? kpiPrefill(k, month);
+  const setKpi = (k: Kpi, patch: Partial<KpiRow>) => {
+    setCodes((c) => ({ ...c, [k.kpi_definition_id]: k.code }));
+    setKpiEdits((e) => ({ ...e, [k.kpi_definition_id]: { ...(e[k.kpi_definition_id] ?? kpiPrefill(k, month)), ...patch } }));
+  };
+  // Another month starts clean: what was filled in was for this one, so it asks first.
+  const changeMonth = async (m: string) => {
+    const filled = Object.keys(edits).length + Object.keys(kpiEdits).length;
+    if (filled && !(await confirm({ title: "Change Month", body: "What you filled in for this month is cleared.", confirmLabel: "Change Month", cancelLabel: "Keep It" }))) return;
     setMonth(m);
     setEdits({});
+    setKpiEdits({});
     setErrors({});
   };
   const mark = (id: string, key: string, short: string) => {
@@ -667,15 +745,16 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
   };
   const submit = async () => {
     const ids = Object.keys(edits);
-    if (!ids.length) {
-      toast("Change a key result first");
+    const kpiIds = Object.keys(kpiEdits);
+    if (!ids.length && !kpiIds.length) {
+      toast("Change a key result or KPI first");
       return;
     }
     try {
       await save.run({
         body: {
           month,
-          department_id: departmentId,
+          department_id: company ? null : departmentId,
           key_results: ids.map((id) => {
             const r = edits[id];
             return {
@@ -687,28 +766,34 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
               ...(r.recovery_due_on ? { recovery_due_on: r.recovery_due_on } : {}),
             };
           }),
-          kpis: [],
+          kpis: kpiIds.map((id) => {
+            const r = kpiEdits[id];
+            return { kpi_definition_id: id, result: r.result, ...(r.actual_value.trim() ? { actual_value: r.actual_value.trim() } : {}), ...(r.comment.trim() ? { comment: r.comment.trim() } : {}) };
+          }),
         },
       });
       invalidate("/api/v1/performance/okrs");
+      invalidate("/api/v1/performance/kpis");
       close();
       toast("Month reported");
     } catch (e) {
-      const rowErrors = e instanceof ApiError ? Object.entries(e.fields).filter(([key]) => /^key_results\.\d+\./.test(key)) : [];
+      const rowErrors = e instanceof ApiError ? Object.entries(e.fields).filter(([key]) => /^(key_results|kpis)\.\d+\./.test(key)) : [];
       if (!rowErrors.length) return say(e);
       const byId: Record<string, Record<string, string>> = {};
       for (const [key, messages] of rowErrors) {
-        const [, at, field] = key.split(".");
-        const id = ids[Number(at)];
+        const [list, at, field] = key.split(".");
+        const id = (list === "kpis" ? kpiIds : ids)[Number(at)];
         if (id) byId[id] = { ...byId[id], [field]: messages[0] };
       }
       setErrors(byId);
+      const named = Object.keys(byId).map((id) => codes[id]).filter(Boolean);
+      toast.error(named.length ? `Check ${named.slice(0, 3).join(", ")}` : "Check the marked rows");
     }
   };
   return (
     <>
       <Field label="Month"><SelectField options={months.map((m) => [m, formatMonth(m)] as [string, string])} value={month} onChange={changeMonth} /></Field>
-      {!okrs.loading && !keyResults.length && <EmptyState bare title="Nothing To Report" />}
+      {!okrs.loading && !keyResults.length && (company || (!kpis.loading && !kpis.rows.length)) && <EmptyState bare title="Nothing To Report" />}
       {!okrs.loading &&
         keyResults.map((k) => {
           const id = k.okr_key_result_id;
@@ -735,6 +820,24 @@ function ReportFunction({ close, period, departmentId }: { close: () => void; pe
           );
         })}
       {okrs.page && okrs.page.pages > 1 && <Pager page={okrs.page} onPage={okrs.setPage} noun="objective" label="Objectives" />}
+      {!company && kpis.rows.length > 0 && (
+        <>
+          <CardHeader title="KPIs" />
+          {kpis.rows.map((k) => {
+            const id = k.kpi_definition_id;
+            const r = kpiOf(k);
+            return (
+              <Card key={id} className="mb-2">
+                <CardHeader title={<span>{`${k.code} · ${k.name}`}</span>} record />
+                <Field label="Result" {...mark(id, "result", "Pick a result")}><SelectField options={KPI_RESULTS} value={r.result} onChange={(v) => setKpi(k, { result: v as KpiRow["result"] })} /></Field>
+                <Field label="Actual" optional {...mark(id, "actual_value", "Enter a number")}><TextField value={r.actual_value} onChange={(v) => setKpi(k, { actual_value: v })} inputMode="decimal" /></Field>
+                <Field label="Comment" optional {...mark(id, "comment", "Shorten the comment")}><TextField value={r.comment} onChange={(v) => setKpi(k, { comment: v })} /></Field>
+              </Card>
+            );
+          })}
+          {kpis.page && kpis.page.pages > 1 && <Pager page={kpis.page} onPage={kpis.setPage} noun="KPI" label="KPIs" />}
+        </>
+      )}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Report Month</Button>
@@ -756,9 +859,23 @@ function NewGoalForm({ close, period, objectives }: { close: () => void; period:
       <Field label="What"><SelectField options={kinds} value={kind} onChange={setKind} /></Field>
       {kind === "goal" && <GoalForm close={close} period={period} />}
       {kind === "objective" && <ObjectiveForm close={close} period={period} />}
-      {kind === "key_result" && <KeyResultForm close={close} objectives={objectives.filter((o) => o.can_edit)} />}
+      {kind === "key_result" && <NewKeyResult close={close} period={period} objectives={objectives} />}
     </>
   );
+}
+
+/**
+ * New Key Result's objectives: every draft or returned objective of the quarter the reader may add
+ * to, whatever function the Goals page is filtered to (the page's own list is one function's page).
+ */
+function NewKeyResult({ close, period, objectives }: { close: () => void; period: PerformancePeriod | null; objectives: Objective[] }) {
+  const id = period?.performance_period_id ?? "";
+  const drafts = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: id, status: "draft" }, enabled: Boolean(id) });
+  const returned = usePaged("GET /api/v1/performance/okrs", { filters: { period_id: id, status: "returned" }, enabled: Boolean(id) });
+  if (drafts.loading || returned.loading) return <LoadingRows count={3} />;
+  const seen = new Set<string>();
+  const editable = [...drafts.rows, ...returned.rows, ...objectives].filter((o) => o.can_edit && !seen.has(o.okr_objective_id) && Boolean(seen.add(o.okr_objective_id)));
+  return <KeyResultForm close={close} objectives={editable} />;
 }
 
 function GoalForm({ close, period }: { close: () => void; period: PerformancePeriod | null }) {
@@ -808,13 +925,19 @@ function ObjectiveNewForm({ close, period }: { close: () => void; period: Perfor
   const me = useMe();
   const departments = useApi("GET /api/v1/departments", { query: { active: "true" } });
   const goalOptions = useGoalOptions(period);
+  const company = hasCapability(me, "goals.company");
   const options: Array<[string, string]> = [
-    ...(hasCapability(me, "goals.company") ? ([["", "Company"]] as Array<[string, string]>) : []),
+    ...(company ? ([["", "Company"]] as Array<[string, string]>) : []),
     ...(departments.data?.data ?? []).map((d) => [d.department_id, d.name] as [string, string]),
   ];
+  // No value is the company: a reader who may not set the company's is asked for a function instead.
   const f = useContractForm({ performance_period_id: period?.performance_period_id ?? "", department_id: "", title: "", organisational_goal_id: "" }, goalsContract.ObjectiveCreate);
   const save = useMutation("POST /api/v1/performance/objectives");
   const submit = async () => {
+    if (!company && !f.values.department_id) {
+      f.setServerErrors({ department_id: ["Pick a function"] });
+      return;
+    }
     if (!f.check()) return;
     try {
       const o = await save.run({ body: f.values });
@@ -828,7 +951,7 @@ function ObjectiveNewForm({ close, period }: { close: () => void; period: Perfor
   };
   return (
     <>
-      <Field label="Function" {...f.status("department_id")}><SelectField options={options} {...f.field("department_id")} /></Field>
+      <Field label="Function" {...f.status("department_id")}><SelectField options={options} placeholder="Pick a function" {...f.field("department_id")} /></Field>
       <Field label="Objective" {...f.status("title")}><TextField {...f.field("title")} /></Field>
       <Field label="Organisational Goal" optional {...f.status("organisational_goal_id")}>
         <SelectField placeholder="None" options={goalOptions} {...f.field("organisational_goal_id")} />

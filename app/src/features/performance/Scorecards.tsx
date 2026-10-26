@@ -32,6 +32,7 @@ import {
   Chain,
   DataView,
   DateField,
+  ErrorState,
   Field,
   FilterSelect,
   formatDate,
@@ -40,18 +41,20 @@ import {
   FormFooter,
   HelpTerm,
   KeyValue,
+  LoadingRows,
   PageHeader,
   SegmentedControl,
   SelectField,
   StatusPill,
   TextField,
+  Tick,
   toast,
   Toolbar,
   useContractForm,
   useModal,
 } from "@mycity/ui";
 import { Commitments } from "./Commitments";
-import { cardStatus, figureOf, fieldMessage, monthShort, person, rating, score, SECTION_NAMES, targetOf, useQuarter } from "./shared";
+import { cardStatus, figureOf, fieldMessage, monthChoices, monthScores, monthShort, person, rating, score, SECTION_NAMES, startMonth, targetOf, useQuarter } from "./shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
@@ -192,6 +195,8 @@ function NewScorecardForm({ close, periodId, onOpen }: { close: () => void; peri
       onOpen(card.scorecard_id);
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      // Someone outside the reader's reach reads as not found: say so on the person picked.
+      else if (e instanceof ApiError && e.status === 404) f.setServerErrors({ employee_id: ["Not in your team"] });
       else say(e);
     }
   };
@@ -237,7 +242,8 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
   const send = useMutation("POST /api/v1/performance/scorecards/:id/submit");
   const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
   const c = read.data;
-  if (!c) return null;
+  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
+  if (!c) return <LoadingRows count={4} />;
   const months = period.data?.months ?? [];
   const mine = c.employee.employee_id === me.employee_id;
   const w = amendmentId ? amendment.data : undefined;
@@ -263,7 +269,7 @@ function ScorecardSheet({ id, close }: { id: string; close: () => void }) {
     amendmentId &&
     modal.open({ title: "Request Changes", body: (done) => <ReasonForm instanceId={amendmentId} close={() => (done(), refreshApprovals())} done="Scorecard sent back" /> });
   const reopen = () => modal.open({ title: "Scorecard", wide: true, body: (done) => <ScorecardSheet id={c.scorecard_id} close={done} /> });
-  const openLine = (line: ScorecardLine) => modal.open({ title: "Scorecard Line", body: () => <LineSheet line={line} back={reopen} /> });
+  const openLine = (line: ScorecardLine) => modal.open({ title: "Scorecard Line", body: () => <LineSheet line={line} months={months} back={reopen} /> });
   const agreeCard = async () => {
     try {
       await agree.run({ params: { id: c.scorecard_id }, body: {} });
@@ -397,7 +403,7 @@ function SectionLines({ section, card, months, onOpen }: { section: ScorecardLin
  * the function's head while no change waits (§3.5, §6.7).
  */
 // search:none Change Target on a line is reached through its scorecard, which search finds
-function LineSheet({ line, back }: { line: ScorecardLine; back: () => void }) {
+function LineSheet({ line, months, back }: { line: ScorecardLine; months: string[]; back: () => void }) {
   const modal = useModal();
   const waiting = line.pending_change;
   const items: Array<[string, ReactNode]> = [
@@ -410,9 +416,10 @@ function LineSheet({ line, back }: { line: ScorecardLine; back: () => void }) {
     ["Linked To", line.key_result?.code ?? line.kpi?.code ?? (line.team_key_results.map((k) => k.code).join(", ") || "–")],
     ["Due", line.milestone_due_on ?? line.due_on ? formatDate((line.milestone_due_on ?? line.due_on)!) : "–"],
     ["Weight", `${line.weight}%`],
+    ...monthScores(line, months),
     ["Score", score(line.score)],
   ];
-  const change = () => modal.open({ title: "Change Target", body: () => <LineChangeForm line={line} done={back} /> });
+  const change = () => modal.open({ title: "Change Target", body: () => <LineChangeForm line={line} months={months} done={back} /> });
   return (
     <>
       <KeyValue items={items} />
@@ -434,9 +441,9 @@ const thisMonth = () => {
  * Change Target on a binding line: the new figure, or words where the line's target is in words
  * (their number kept beside them), the month it applies from and the reason; to the CEO.
  */
-function LineChangeForm({ line, done }: { line: ScorecardLine; done: () => void }) {
+function LineChangeForm({ line, months, done }: { line: ScorecardLine; months: string[]; done: () => void }) {
   const words = line.target_text !== null || line.measure === "milestone";
-  const f = useContractForm({ employee_target_id: line.employee_target_id, to_value: "", to_text: "", from_month: thisMonth(), reason: "" }, goalsContract.TargetChangeCreate);
+  const f = useContractForm({ employee_target_id: line.employee_target_id, to_value: "", to_text: "", from_month: startMonth(months) || thisMonth(), reason: "" }, goalsContract.TargetChangeCreate);
   const save = useMutation("POST /api/v1/performance/target-changes");
   const submit = async () => {
     if (!f.check()) return;
@@ -469,7 +476,9 @@ function LineChangeForm({ line, done }: { line: ScorecardLine; done: () => void 
       <Field label="New Target" {...mark}>
         {words ? <TextField {...f.field("to_text")} /> : <TextField {...f.field("to_value")} inputMode="decimal" />}
       </Field>
-      <Field label="From Month" {...f.status("from_month")}><DateField {...f.field("from_month")} /></Field>
+      <Field label="From Month" {...f.status("from_month")}>
+        <SelectField {...f.field("from_month")} options={monthChoices(months)} />
+      </Field>
       <Field label="Reason" {...f.status("reason")}><TextField {...f.field("reason")} /></Field>
       <FormFooter>
         <Button onClick={done}>Cancel</Button>
@@ -501,6 +510,8 @@ type LineRow = {
   source: ScorecardLine["source"];
   okr_key_result_id: string;
   kpi_definition_id: string;
+  /** A Team result line's key results, picked on the line (a line copied from last quarter starts with none). */
+  team_key_result_ids: string[];
   due_on: string;
   kept: Pick<ScorecardLine, "direction" | "unit" | "frequency_text" | "share_value" | "target_value" | "target_text" | "okr_key_result_id" | "kpi_definition_id"> & {
     team_key_result_ids: string[];
@@ -518,6 +529,7 @@ const rowOf = (l: ScorecardLine): LineRow => ({
   source: l.source,
   okr_key_result_id: l.okr_key_result_id ?? "",
   kpi_definition_id: l.kpi_definition_id ?? "",
+  team_key_result_ids: l.team_key_results.map((k) => k.okr_key_result_id),
   // A milestone's date is its own; a line copied without one is asked for it, never given the quarter's end.
   due_on: (l.measure === "milestone" ? l.milestone_due_on : l.due_on) ?? "",
   kept: {
@@ -544,6 +556,7 @@ const NEW_LINE: LineRow = {
   source: "own",
   okr_key_result_id: "",
   kpi_definition_id: "",
+  team_key_result_ids: [],
   due_on: "",
   kept: { direction: "higher", unit: null, frequency_text: null, share_value: null, target_value: null, target_text: null, okr_key_result_id: null, kpi_definition_id: null, team_key_result_ids: [] },
 };
@@ -580,7 +593,7 @@ function lineOf(r: LineRow) {
     ...(r.kpi_definition_id ? { kpi_definition_id: r.kpi_definition_id } : {}),
     // A share is of one key result: moving the line to another leaves it behind.
     ...(r.okr_key_result_id && r.okr_key_result_id === r.kept.okr_key_result_id && r.kept.share_value ? { share_value: r.kept.share_value } : {}),
-    team_key_result_ids: r.kept.team_key_result_ids,
+    team_key_result_ids: r.team_key_result_ids,
     ...(r.due_on ? (r.measure === "milestone" ? { milestone_due_on: r.due_on } : { due_on: r.due_on }) : {}),
   };
 }
@@ -660,6 +673,21 @@ function LinesForm({ card, close }: { card: ScorecardDetail; close: () => void }
           <Field label="Weight" {...mark(i, "Check the weight", "weight")}><TextField value={r.weight} onChange={(v) => set(i, { weight: v.replace(/[^\d.]/g, "") })} inputMode="decimal" /></Field>
           {r.section === "kpis" ? (
             <Field label="KPI" optional {...mark(i, "Link a KPI", "kpi_definition_id")}><SelectField options={kpiOptions} value={r.kpi_definition_id} onChange={(v) => set(i, { kpi_definition_id: v })} /></Field>
+          ) : r.source === "team_result" ? (
+            <Field label="Team Key Results" {...mark(i, "Pick the key results", "team_key_result_ids")}>
+              <ul className="m-0 flex list-none flex-col p-0" aria-label={`Line ${i + 1} Team Key Results`}>
+                {krOptions.slice(1).map(([id, name]) => (
+                  <li key={id} className="flex min-h-tap items-center gap-2 text-sm">
+                    <Tick
+                      checked={r.team_key_result_ids.includes(id)}
+                      label={name}
+                      onChange={(on) => set(i, { team_key_result_ids: on ? [...r.team_key_result_ids, id] : r.team_key_result_ids.filter((x) => x !== id) })}
+                    />
+                    <span>{name}</span>
+                  </li>
+                ))}
+              </ul>
+            </Field>
           ) : (
             <Field label="Key Result" optional {...mark(i, "Link a key result", "okr_key_result_id", "team_key_result_ids", "share_value")}>
               <SelectField options={krOptions} value={r.okr_key_result_id} onChange={(v) => set(i, { okr_key_result_id: v })} />

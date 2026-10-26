@@ -7,8 +7,8 @@ import targetsContract from "@mycity/contract/schemas/targets.js";
 import type { ScorecardDetail, ScorecardLine } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
-import { Button, DataView, EmptyState, Field, FormFooter, HelpTerm, LoadingRows, StatusPill, TapList, TextField, toast, useContractForm, useModal } from "@mycity/ui";
-import { monthShort, score, SECTION_NAMES, targetOf } from "../shared";
+import { Button, DataView, EmptyState, ErrorState, Field, FormFooter, HelpTerm, KeyValue, LoadingRows, StatusPill, TapList, TextField, toast, useContractForm, useModal } from "@mycity/ui";
+import { monthScores, monthShort, score, SECTION_NAMES, targetOf } from "../shared";
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
 const AUTO = new Set(["key_result", "team_result", "function_kpi", "commitments", "update_on_time", "team_reviews", "tasks"]);
@@ -20,6 +20,7 @@ export function MyScorecard({ id }: { id: string }) {
   const period = useApi("GET /api/v1/performance/periods/:id", { params: { id: read.data?.performance_period_id ?? "" }, enabled: Boolean(read.data) });
   const agree = useMutation("POST /api/v1/performance/scorecards/:id/agree");
   const c = read.data;
+  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!c) return <LoadingRows count={4} />;
   const reload = () => {
     read.reload();
@@ -50,12 +51,27 @@ export function MyScorecard({ id }: { id: string }) {
 }
 
 function Section({ section, card, months }: { section: ScorecardLine["section"]; card: ScorecardDetail; months: string[] }) {
+  const modal = useModal();
+  // A line's sheet: its target, weight and each month's score, which a phone's cards leave out.
+  const open = (l: ScorecardLine) =>
+    modal.open({
+      title: "Scorecard Line",
+      body: (close) => (
+        <>
+          <KeyValue items={[["Line", l.title], ["Target", targetOf(l)], ["Weight", `${l.weight}%`], ...monthScores(l, months), ["Score", score(l.score)]]} />
+          <FormFooter>
+            <Button variant="primary" onClick={close}>Close</Button>
+          </FormFooter>
+        </>
+      ),
+    });
   return (
     <DataView
       className="mt-3"
       title={`${SECTION_NAMES[section]} · ${card[`${section}_weight`]}%`}
       rows={card.lines.filter((l) => l.section === section)}
       rowKey={(l) => l.employee_target_id}
+      onRowClick={open}
       empty={{ title: "No Lines" }}
       columns={[
         {
@@ -110,6 +126,7 @@ function DisagreeForm({ id, close }: { id: string; close: () => void }) {
 export function RollsUpTo({ id }: { id: string }) {
   const read = useApi("GET /api/v1/performance/scorecards/:id", { params: { id } });
   const linked = (read.data?.lines ?? []).filter((l) => l.okr_key_result_id);
+  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
   if (!read.data) return <LoadingRows count={3} />;
   if (!linked.length) return <EmptyState title="No Linked Lines" />;
   return <TapList label="Rolls Up To" items={linked.map((l) => ({ key: l.employee_target_id, title: l.title, sub: <Trace id={l.okr_key_result_id!} /> }))} />;

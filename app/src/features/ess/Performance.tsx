@@ -19,8 +19,13 @@ import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
 import { Banner, Button, Card, CardHeader, DesktopOnly, EmptyState, ErrorState, formatDate, Grid, HelpTerm, KeyValue, LoadingRows, PageHeader, StatusPill, useModal } from "@mycity/ui";
 
-/** The check-in's state in a few words, for its figure and its card. */
-const checkInText = (c: MyPerformance["check_in"]) => (!c ? "None Open" : c.status === "check_in" ? (c.due_on ? `Due ${formatDate(c.due_on)}` : "Open") : reviewStatus(c.status).text);
+/**
+ * The check-in's state in a few words, for its figure and its card. A review sent back to its
+ * reviewer (`returned`) is with the reviewer as far as the person is concerned: Returned would read as
+ * if the check-in came back to them.
+ */
+export const checkInText = (c: Pick<NonNullable<MyPerformance["check_in"]>, "status" | "due_on"> | null) =>
+  !c ? "None Open" : c.status === "check_in" ? (c.due_on ? `Due ${formatDate(c.due_on)}` : "Open") : c.status === "returned" ? reviewStatus("with_reviewer").text : reviewStatus(c.status).text;
 
 export function MyPerformancePage() {
   const modal = useModal();
@@ -65,7 +70,7 @@ export function MyPerformancePage() {
 
   const checkInBody = (
     <>
-      <KeyValue items={[["Status", checkIn ? <StatusPill key="s" s={reviewStatus(checkIn.status)} /> : null], ["Due", checkIn?.due_on ? formatDate(checkIn.due_on) : null]]} />
+      <KeyValue items={[["Status", checkIn ? <StatusPill key="s" s={reviewStatus(checkIn.status === "returned" ? "with_reviewer" : checkIn.status)} /> : null], ["Due", checkIn?.due_on ? formatDate(checkIn.due_on) : null]]} />
       {checkIn && (
         <Button className="mt-3" variant={due ? "primary" : "default"} onClick={startCheckIn}>
           {due ? "Start Check-In" : "View Check-In"}

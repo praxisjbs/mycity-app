@@ -177,7 +177,7 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
       )}
       <MoreFields invalid={moreMarked}>
         {company && periodId && (
-          <Field label="Scored From" optional {...f.status("scored_from_key_result_id")}>
+          <Field label="Scored From" optional info="This key result takes its figures from the function key result named." {...f.status("scored_from_key_result_id")}>
             <KeyResultPicker
               periodId={periodId}
               level="function"
