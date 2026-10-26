@@ -32,6 +32,9 @@ async function indexed(db, model, hashes) {
   return out;
 }
 
+/** Vectors written in one statement. */
+const SAVE_BATCH = 100;
+
 /**
  * Keep vectors: a hash already held on the model keeps the one it has.
  * @param {{query: Function}} client  inside the service's transaction
@@ -41,11 +44,13 @@ async function indexed(db, model, hashes) {
  */
 async function save(client, model, rows) {
   let added = 0;
-  for (const r of rows) {
+  for (let i = 0; i < rows.length; i += SAVE_BATCH) {
+    const batch = rows.slice(i, i + SAVE_BATCH);
     const res = await client.query(
-      `INSERT INTO user_guide_passage (text_hash, model, embedding) VALUES ($1, $2, $3::vector)
+      `INSERT INTO user_guide_passage (text_hash, model, embedding)
+       SELECT h, $3, e::vector FROM unnest($1::text[], $2::text[]) AS v(h, e)
        ON CONFLICT (text_hash, model) DO NOTHING`,
-      [r.hash, model, JSON.stringify(r.vector)],
+      [batch.map((r) => r.hash), batch.map((r) => JSON.stringify(r.vector)), model],
     );
     added += res.rowCount;
   }
