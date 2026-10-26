@@ -25,6 +25,7 @@ const {
   Paged,
 } = require("./common");
 const { PersonRef } = require("./organisation");
+const { RichTextBlock } = require("./policies");
 
 const QueryStatus = z.enum(["awaiting_response", "under_review", "resolved"]);
 const QueryOutcome = z.enum(["no_action", "sanctioned"]);
@@ -40,10 +41,14 @@ const EvidenceItem = z
 
 const evidence = z.array(EvidenceItem).max(50);
 
-/** The response, once the employee has written it. Never edited. */
+/**
+ * The response, once the employee has written it. Never edited. `body` is the Markdown kept from
+ * the editor's HTML (guide §3 step 3); `blocks` is the same text as a screen draws it.
+ */
 const QueryResponse = z
   .object({
     body: z.string(),
+    blocks: z.array(RichTextBlock),
     submitted_at: isoDateTime,
   })
   .strict();
@@ -206,10 +211,26 @@ const MyQueriesSummary = z
   })
   .strict();
 
-/** POST /ess/queries/:id/response: the employee's written answer. One a query. */
+/** The words of an editor's HTML: tags dropped, entities read, spaces folded. Counts what was written. */
+const wordsOf = (html) =>
+  String(html)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;|&#160;/g, " ")
+    .replace(/&[a-z]+;|&#\d+;/gi, "x")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * POST /ess/queries/:id/response: the employee's written answer, as the rich text editor's HTML.
+ * One a query. The text inside counts (20 to 4,000 characters); the service keeps it as Markdown.
+ */
 const QueryResponseCreate = z
   .object({
-    body: z.string().trim().min(20, "Write your response").max(4000),
+    body_html: z
+      .string()
+      .max(40_000, "Too long")
+      .refine((v) => wordsOf(v).length >= 20, "Write your response")
+      .refine((v) => wordsOf(v).length <= 4000, "At most 4000 characters"),
   })
   .strict();
 
@@ -225,7 +246,7 @@ const QueryRaisedEmailVars = z
 /** Which table each schema is a row of (gate 6, check/contract-columns.js). */
 const TABLES = {
   EvidenceItem: { table: null, reason: "one item of employee_query.evidence or sanction.evidence (jsonb)" },
-  QueryResponse: { table: "query_response" },
+  QueryResponse: { table: "query_response", virtual: { blocks: "body as RichTextBlock[], from the one Markdown renderer" } },
   QuerySanctionRef: {
     table: "sanction",
     virtual: { step_name: "consequence_step.name, or sanction.sanction_type for a rung since removed" },
@@ -276,7 +297,10 @@ const TABLES = {
   },
   MyQueryPage: { table: null, reason: "a page of the caller's own queries" },
   MyQueriesSummary: { table: null, reason: "counts over the caller's own queries and issued sanctions" },
-  QueryResponseCreate: { table: "query_response" },
+  QueryResponseCreate: {
+    table: "query_response",
+    virtual: { body_html: "the editor's HTML, kept as body (Markdown) by shared/documents/markdown" },
+  },
   QueryRaisedEmailVars: { table: null, reason: "the variables of templates/email/query-raised.html, not a row" },
 };
 

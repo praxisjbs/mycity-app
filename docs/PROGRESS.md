@@ -819,7 +819,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
-| 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☐ | ☐ | In progress | 19/10/2026 |
+| 13 | My Queries | `my-queries` | M3 | AJ | ☑ | ☐ | ☐ | In progress | 26/10/2026 |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 88 | My Devices | `my-devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
@@ -906,6 +906,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
   untouched on desktop; on a phone they get the same icon cards, built from her page. Guide
   `docs/guides/ess.md` written (Draft). My Security is not in the approved inventory (MILESTONES §18)
   and needs sign off. Demo only, no app screens, so no ticks.
+- 26/10/2026 · GE · My Queries (#13), meeting 26/10: one tab with a Queries and Sanctions switch in place of the three cards; Queries lists every query, open ones first, the picked one beside the list (a sheet on a phone, F31) with View Letter and Respond; Sanctions read only, each opening its letter. The response is written in the rich text editor, kept as Markdown by the shared renderer (`htmlToMarkdown`, as Policies) and shown as blocks, also on the Queries card. Frontend test `ess/Queries.test.tsx`. Left: UI and Mobile ticks with the User Guide section (item 11, after the mechanics are agreed).
 
 ### Staff Community
 

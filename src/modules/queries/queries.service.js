@@ -25,6 +25,7 @@ const lagos = require("../../shared/time/lagos");
 const { scopeFor } = require("../../middleware/rbac");
 const templates = require("../templates/templates.service");
 const { QUERY_LETTER } = require("../templates/templates.events");
+const md = require("../../shared/documents/markdown");
 const repo = require("./queries.repo");
 const visibility = require("./queries.visibility");
 const { EVENTS } = require("./queries.events");
@@ -45,6 +46,10 @@ async function tx(fn) {
 }
 
 const notFound = () => new AppError("NOT_FOUND", "That query does not exist", 404);
+
+/** A row as readers get it: its response, kept as Markdown, also as the blocks a screen draws. */
+const readable = (row) =>
+  row && row.response ? { ...row, response: { ...row.response, blocks: md.markdownToBlocks(row.response.body) } } : row;
 
 /* ------------------------------------------------------------------ *
  * Reading
@@ -88,7 +93,7 @@ async function get(id, user, scope) {
     scopeFor(user, "queries", "edit"),
     scopeFor(user, "queries", "create"),
   ]);
-  const { employee_id: employeeId, ...rest } = row;
+  const { employee_id: employeeId, ...rest } = readable(row);
   return {
     ...rest,
     next_step: row.status === "resolved" ? null : await nextStepFor(employeeId),
@@ -301,13 +306,16 @@ async function settleEscalation(client, id, { issued, reviewedBy }) {
  * ESS · My Queries
  * ------------------------------------------------------------------ */
 
-const listMine = (employeeId, query) => repo.listMine(pool, employeeId, query);
+async function listMine(employeeId, query) {
+  const page = await repo.listMine(pool, employeeId, query);
+  return { ...page, data: page.data.map(readable) };
+}
 const mineSummary = (employeeId) => repo.mineSummary(pool, employeeId);
 
 async function getMine(employeeId, id) {
   const row = await repo.getMine(pool, employeeId, id);
   if (!row) throw notFound();
-  return row;
+  return readable(row);
 }
 
 const respond = (user, employeeId, id, body) => require("./queries.response").respond(user, employeeId, id, body);

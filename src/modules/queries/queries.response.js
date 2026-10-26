@@ -4,11 +4,18 @@
  * step 3). One response a query, never edited: disagreement goes in the response, and
  * it is read before any decision. The query moves to Under Review and whoever raised it
  * is told (People, when a rule raised it).
+ *
+ * It is written in the rich text editor and arrives as HTML. The one Markdown renderer's
+ * whitelist keeps it (htmlToMarkdown, as Policies do), so no tag survives; the 20 to 4,000
+ * characters are counted on what is left.
  */
+const MIN_TEXT = 20;
+const MAX_TEXT = 4000;
 const { pool } = require("../../config/db");
 const { atomically } = require("../../shared/db/tx");
 const { AppError } = require("../../shared/errors");
 const { emit } = require("../../shared/events/emit");
+const md = require("../../shared/documents/markdown");
 const repo = require("./queries.repo");
 const { EVENTS } = require("./queries.events");
 
@@ -17,6 +24,11 @@ const { EVENTS } = require("./queries.events");
  * @param {string} employeeId  the caller's own employee id (ESS meOf), never from the request
  */
 async function respond(user, employeeId, id, body) {
+  const kept = md.htmlToMarkdown(body.body_html).trim();
+  const words = md.markdownToText(kept).trim().length;
+  if (words < MIN_TEXT) throw new AppError("VALIDATION_FAILED", "Write your response", 422, { body_html: ["Write your response"] });
+  if (words > MAX_TEXT)
+    throw new AppError("VALIDATION_FAILED", "At most 4000 characters", 422, { body_html: ["At most 4000 characters"] });
   const client = await pool.connect();
   try {
     await atomically(client, async () => {
@@ -28,7 +40,7 @@ async function respond(user, employeeId, id, body) {
       const saved = await repo.insertResponse(client, {
         employee_query_id: id,
         employee_id: employeeId,
-        body: body.body,
+        body: kept,
       });
       if (!saved) throw new AppError("QUERY_ALREADY_ANSWERED", "You have already responded", 409);
       const full = await repo.get(client, id);

@@ -17,7 +17,7 @@ import { hasCapability } from "@/shell/access";
 import type { ModuleScreenProps } from "@/shell/screens";
 import {
   ActionGroup, Button, Card, CardHeader, ChoiceField, Chips, DateField, DetailPane, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm,
-  KeyValue, ListDetail, LoadingRows, Money, MoneyField, NumberField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who,
+  KeyValue, ListDetail, LoadingRows, RichText, Money, MoneyField, NumberField, PageHeader, SelectField, StatStrip, StatusPill, TextAreaField, TextField, toast, useContractForm, useIsPhone, useModal, useSideBySide, Who,
 } from "@mycity/ui";
 
 /**
@@ -134,7 +134,7 @@ function QueryCard({ id }: { id: string }) {
           ["Raised", formatDateTime(d.created_at)],
           ...(d.status === "awaiting_response" && d.response_due_at ? ([[<HelpTerm key="due" help="The employee has 48 hours to respond in writing.">Response Due</HelpTerm>, formatDateTime(d.response_due_at)]] as Array<[React.ReactNode, string]>) : []),
           ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
-          ...(d.response ? ([["Response", d.response.body]] as Array<[string, string]>) : []),
+          ...(d.response ? ([["Response", <RichText key="r" blocks={d.response.blocks} top={4} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.sanction ? ([["Sanction", `${d.sanction.step_name}${d.sanction.number ? `, ${d.sanction.number}` : ""}`]] as Array<[string, string]>) : []),
         ]}
       />

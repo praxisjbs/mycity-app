@@ -363,16 +363,34 @@ describeDb("queries and sanctions against the real migrations", () => {
       const open = await as("staff").get("/ess/queries?status=open");
       expect(open.status).toBe(200);
       expect(open.body.data.map((r) => [r.number, r.can_respond])).toEqual([["QRY-0001", true]]);
-      expect((await as("other").post(`/ess/queries/${ids.first}/response`, { body: "This is not my query to answer at all." })).status).toBe(404);
+      expect((await as("other").post(`/ess/queries/${ids.first}/response`, { body_html: "<p>This is not my query to answer at all.</p>" })).status).toBe(404);
 
+      // Written in the rich text editor: markup the whitelist does not keep is gone, bold stays.
+      const tooShort = await as("staff").post(`/ess/queries/${ids.first}/response`, {
+        body_html: "<p><strong>Sorry</strong></p><script>alert('x is a long enough string')</script>",
+      });
+      expect(tooShort.status).toBe(422);
+      expect(tooShort.body.error.fields.body_html).toEqual(["Write your response"]);
       const res = await as("staff").post(`/ess/queries/${ids.first}/response`, {
-        body: "My phone died on the way out; I left at 17:10 and can show the gate log.",
+        body_html:
+          '<p>My phone died on the way out; I left at <strong>17:10</strong> and can show the gate log.</p><img src=x onerror="alert(1)"><script>alert(1)</script>',
       });
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ status: "under_review", can_respond: false });
-      expect(res.body.response.body).toContain("gate log");
+      expect(res.body.response.body).toBe("My phone died on the way out; I left at **17:10** and can show the gate log.");
+      expect(res.body.response.body).not.toMatch(/<|alert|onerror/);
+      expect(res.body.response.blocks).toEqual([
+        {
+          kind: "paragraph",
+          spans: [
+            { text: "My phone died on the way out; I left at ", bold: false, italic: false, href: null },
+            { text: "17:10", bold: true, italic: false, href: null },
+            { text: " and can show the gate log.", bold: false, italic: false, href: null },
+          ],
+        },
+      ]);
       const again = await as("staff").post(`/ess/queries/${ids.first}/response`, {
-        body: "A second answer is refused because the first one stands.",
+        body_html: "<p>A second answer is refused because the first one stands.</p>",
       });
       expect(again.status).toBe(409);
 
@@ -436,7 +454,7 @@ describeDb("queries and sanctions against the real migrations", () => {
       expect(raised.status).toBe(201);
       const id = raised.body.employee_query_id;
       const res = await as("other").post(`/ess/queries/${id}/response`, {
-        body: "I accept that this happened and have nothing further to add.",
+        body_html: "<p>I accept that this happened and have nothing further to add.</p>",
       });
       expect(res.status).toBe(200);
       return id;

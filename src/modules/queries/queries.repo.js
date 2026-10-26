@@ -229,7 +229,7 @@ function listMine(db, employeeId, query) {
         AND ($2::text IS NULL
              OR ($2 = 'open' AND v.status <> 'resolved')
              OR ($2 = 'archived' AND v.status = 'resolved'))
-      ORDER BY v.created_at DESC, v.employee_query_id`,
+      ORDER BY (v.status = 'resolved'), v.created_at DESC, v.employee_query_id`,
     [employeeId, query.status || null],
     query,
   );

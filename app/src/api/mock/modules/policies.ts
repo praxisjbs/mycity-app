@@ -60,7 +60,8 @@ function spansOf(node: Node, marks: Marks = { bold: false, italic: false, href: 
   return out;
 }
 
-function blocksOf(html: string): RichTextBlock[] {
+/** The editor's HTML as the blocks the API returns, for every mock that keeps rich text. */
+export function blocksOf(html: string): RichTextBlock[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const out: RichTextBlock[] = [];
   for (const el of Array.from(doc.body.children)) {

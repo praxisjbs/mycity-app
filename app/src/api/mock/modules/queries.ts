@@ -13,6 +13,7 @@ import type {
 } from "@mycity/contract/contract.gen.ts";
 import { at, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, refKey } from "../data/people";
+import { blocksOf } from "./policies";
 
 /**
  * Queries & Sanctions on the mock, in the contract's shapes (packages/contract/schemas/
@@ -250,7 +251,7 @@ function mk(n: number, who: string, subject: string, by: string | null, daysAgo:
     created_at: raised,
     details: by ? "There is no clock-out for the shift at the Yaba site." : "Late arrival on three working days (3 in 30 days). Please explain.",
     evidence: opts.evidence ?? [],
-    response: opts.response ? { body: opts.response, submitted_at: at(daysAgo - 1, "08:30") } : null,
+    response: opts.response ? { body: opts.response, blocks: blocksOf(`<p>${opts.response}</p>`), submitted_at: at(daysAgo - 1, "08:30") } : null,
     letter_document_id: sid(`ltrdoc:${n}`),
     reminded_at: null,
     reviewed_by_name: status === "resolved" ? "Cynthia Osakunih" : null,
@@ -543,15 +544,17 @@ route("GET /api/v1/ess/queries/summary", (req) => {
   });
 });
 route("GET /api/v1/ess/queries", (req) =>
-  paged(mine(req.user!).map(myQuery), req, { filters: { status: (q, v) => (v === "open" ? q.status !== "resolved" : q.status === "resolved") } }),
+  // Open ones first, then newest first, as the API orders them.
+  paged([...mine(req.user!)].sort((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved") || b.created_at.localeCompare(a.created_at)).map(myQuery), req, { filters: { status: (q, v) => (v === "open" ? q.status !== "resolved" : q.status === "resolved") } }),
 );
 route("POST /api/v1/ess/queries/:id/response", (req) => {
   const q = mine(req.user!).find((x) => x.employee_query_id === req.params.id);
   if (!q) return notFound();
   if (q.status !== "awaiting_response" || q.response) return fail(409, "QUERY_ALREADY_ANSWERED", "You have already responded");
-  const body = String(req.body.body ?? "").trim();
-  if (body.length < 20) return invalid({ body: ["Write your response"] });
-  Object.assign(q, { response: { body, submitted_at: now() }, responded_at: now(), status: "under_review" });
+  const blocks = blocksOf(String(req.body.body_html ?? ""));
+  const words = blocks.flatMap((b) => (b.kind === "bullets" || b.kind === "numbered" ? b.items.flat() : b.spans)).map((s) => s.text).join(" ").trim();
+  if (words.length < 20) return invalid({ body_html: ["Write your response"] });
+  Object.assign(q, { response: { body: words, blocks, submitted_at: now() }, responded_at: now(), status: "under_review" });
   return ok(myQuery(q));
 });
 route("GET /api/v1/ess/sanctions", (req) =>

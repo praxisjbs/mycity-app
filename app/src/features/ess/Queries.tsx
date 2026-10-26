@@ -3,74 +3,137 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import queries from "@mycity/contract/schemas/queries.js";
 import type { MyQuery, MySanction } from "@mycity/contract/contract.gen.ts";
 import { LetterFile } from "@/features/shared/Letter";
-import { ActionGroup, Button, Card, CardHeader, cn, DataView, EmptyState, Field, formatDate, formatDateTime, FormFooter, Grid, Icon, KeyValue, Money, PageHeader, Pager, Pill, TextAreaField, toast, useContractForm, useModal, type IconName } from "@mycity/ui";
+import {
+  ActionGroup,
+  Button,
+  Card,
+  CardHeader,
+  DataView,
+  Field,
+  formatDate,
+  formatDateTime,
+  FormFooter,
+  HelpTerm,
+  KeyValue,
+  ListDetail,
+  Money,
+  PageHeader,
+  Pill,
+  RichText,
+  RichTextField,
+  SegmentedControl,
+  toast,
+  useContractForm,
+  useModal,
+  useSideBySide,
+} from "@mycity/ui";
 
-type View = "open" | "archived" | "sanctions";
+/**
+ * ESS · My Queries (docs/guides/queries.md §10, ess.md §10): one tab with a Queries and Sanctions
+ * switch. Queries lists every query raised against the person, open ones first, and the picked one
+ * opens beside the list (a sheet on a phone); Sanctions is read only, each opening its letter.
+ */
+type View = "queries" | "sanctions";
 
 export function MyQueriesPage() {
   const s = useApi("GET /api/v1/ess/queries/summary");
-  const [view, setView] = useState<View>("open");
-  const card = (k: View, icon: IconName, label: string, n: number, sub: string, tone?: "ok" | "warn") => (
-    <button
-      type="button"
-      onClick={() => setView(k)}
-      aria-pressed={view === k}
-      className={cn("flex w-full min-w-0 flex-col gap-1.5 rounded-card border bg-card p-3.5 text-left shadow-1 hover:border-subtle-foreground", view === k ? "border-secondary ring-1 ring-secondary" : "border-border")}
-    >
-      <span className={cn("flex size-8.5 items-center justify-center rounded-box", tone === "ok" ? "bg-success-soft text-success" : tone === "warn" ? "bg-warning-soft text-warning" : "bg-accent text-accent-foreground")}>
-        <Icon name={icon} size="m" />
-      </span>
-      <span className="mt-1 text-2xs font-semibold text-muted-foreground">{label}</span>
-      <b className="text-3xl leading-none font-bold tracking-tight">{n}</b>
-      <span className="text-2xs text-subtle-foreground">{sub}</span>
-    </button>
-  );
+  const [view, setView] = useState<View>("queries");
   return (
     <>
-      <PageHeader title="My Queries" sub="Queries raised against you, and their outcome" />
-      {s.data && (
-        <Grid cols={3}>
-          {card("open", "alert", "Open Queries", s.data.open, s.data.open ? "Waiting on your response" : "Nothing waiting on you", s.data.open ? "warn" : "ok")}
-          {card("archived", "doc", "Archived", s.data.archived, s.data.archived ? "Closed" : "None yet")}
-          {card("sanctions", "flag", "Sanctions", s.data.sanctions, s.data.last_sanction ? `Last on ${formatDate(s.data.last_sanction)}` : "None", s.data.sanctions ? "warn" : undefined)}
-        </Grid>
-      )}
-      {view === "open" && <OpenQueries />}
-      {view === "archived" && <Archived />}
-      {view === "sanctions" && <Sanctions />}
+      <PageHeader title="My Queries" />
+      <SegmentedControl<View>
+        label="Show"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: "queries", label: "Queries", count: s.data?.open },
+          { value: "sanctions", label: "Sanctions", count: s.data?.sanctions },
+        ]}
+        className="mb-3"
+      />
+      {view === "queries" ? <QueryList /> : <SanctionList />}
     </>
   );
 }
 
-function OpenQueries() {
-  const list = usePaged("GET /api/v1/ess/queries", { filters: { status: "open" } });
-  const modal = useModal();
-  if (!list.loading && !list.rows.length) return <EmptyState icon="ok" title="No Open Queries" text="Nothing raised. You get 48 hours to respond." />;
+const OUTCOME = { no_action: { tone: "ok", text: "Closed, No Action" }, sanctioned: { tone: "neutral", text: "Sanctioned" } } as const;
+
+function status(q: MyQuery) {
+  if (q.status === "resolved" && q.outcome) return OUTCOME[q.outcome];
+  return q.can_respond ? ({ tone: "warn", text: "Awaiting Your Response" } as const) : ({ tone: "info", text: "Under Review" } as const);
+}
+
+function QueryList() {
+  const list = usePaged("GET /api/v1/ess/queries");
+  const beside = useSideBySide();
+  const [sel, setSel] = useState<string | null>(null);
+  // Beside the list the newest open query shows unasked; on a phone nothing opens until a row is tapped (F31).
+  const shown = list.rows.find((q) => q.employee_query_id === sel) ?? (beside ? (list.rows[0] ?? null) : null);
   return (
-    <>
-      {list.rows.map((q) => (
-        <Card key={q.employee_query_id} className="mb-3">
-          <CardHeader record title={`${q.number} · ${q.subject}`} right={<Pill tone={q.can_respond ? "warn" : "info"}>{q.can_respond ? "Awaiting Your Response" : "Under Review"}</Pill>} />
-          <KeyValue items={[["Raised On", formatDate(q.created_at)], ["Respond By", q.response_due_at ? formatDateTime(q.response_due_at) : "None"], ["Your Response", q.response?.body ?? "Not yet"]]} />
-          <ActionGroup>
-            <div className="mt-3 flex flex-wrap justify-end gap-2">
-              <Button icon="doc" onClick={() => modal.open({ title: `${q.number} · Letter`, wide: true, body: <LetterFile documentId={q.letter_document_id} name={q.number} /> })}>View Letter</Button>
-              {q.can_respond && <Button variant="primary" icon="send" onClick={() => modal.open({ title: `Respond to ${q.number}`, body: (close) => <Respond q={q} close={close} /> })}>Respond</Button>}
-            </div>
-          </ActionGroup>
-        </Card>
-      ))}
-    </>
+    <ListDetail
+      open={sel !== null}
+      onClose={() => setSel(null)}
+      title="Query"
+      list={
+        <DataView
+          title="Queries"
+          list={list}
+          rowKey={(q: MyQuery) => q.employee_query_id}
+          noun="query"
+          nounPlural="queries"
+          onRowClick={(q: MyQuery) => setSel(q.employee_query_id)}
+          empty={{ title: "No Queries", text: "Nothing has been raised." }}
+          columns={[
+            { key: "n", label: "Number", desktop: true, render: (q: MyQuery) => q.number },
+            { key: "s", label: "Subject", render: (q: MyQuery) => q.subject },
+            { key: "d", label: "Raised", render: (q: MyQuery) => formatDate(q.created_at) },
+            { key: "o", label: "Status", render: (q: MyQuery) => <Pill tone={status(q).tone}>{status(q).text}</Pill> },
+          ]}
+        />
+      }
+      detail={shown ? <QueryRecord q={shown} /> : null}
+    />
+  );
+}
+
+function QueryRecord({ q }: { q: MyQuery }) {
+  const modal = useModal();
+  const s = status(q);
+  return (
+    <Card>
+      <CardHeader record title={`${q.number} · ${q.subject}`} right={<Pill tone={s.tone}>{s.text}</Pill>} />
+      <KeyValue
+        items={[
+          ["Raised On", formatDate(q.created_at)],
+          [<HelpTerm key="due" help="You have 48 hours from when it was raised.">Respond By</HelpTerm>, q.response_due_at ? formatDateTime(q.response_due_at) : "None"],
+          ["What Happened", <span key="d" data-copy="content">{q.details}</span>],
+          ["Your Response", q.response ? <RichText key="r" blocks={q.response.blocks} top={4} /> : "Not yet"],
+          ...(q.sanction ? ([["Sanction", q.sanction.step_name]] as Array<[string, string]>) : []),
+        ]}
+      />
+      <ActionGroup>
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <Button icon="doc" onClick={() => modal.open({ title: `${q.number} · Letter`, wide: true, full: true, body: <LetterFile documentId={q.letter_document_id} name={q.number} /> })}>
+            View Letter
+          </Button>
+          {q.can_respond && (
+            <Button variant="primary" icon="send" className="max-md:w-full" onClick={() => modal.open({ title: `Respond to ${q.number}`, body: (close) => <Respond q={q} close={close} /> })}>
+              Respond
+            </Button>
+          )}
+        </div>
+      </ActionGroup>
+    </Card>
   );
 }
 
 function Respond({ q, close }: { q: MyQuery; close: () => void }) {
-  const f = useContractForm({ body: "" }, queries.QueryResponseCreate);
+  const f = useContractForm({ body_html: "" }, queries.QueryResponseCreate);
   const send = useMutation("POST /api/v1/ess/queries/:id/response");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      await send.run({ params: { id: q.employee_query_id }, body: { body: f.values.body.trim() } });
+      await send.run({ params: { id: q.employee_query_id }, body: { body_html: f.values.body_html } });
       invalidate("/api/v1/ess/queries");
       close();
       toast("Response sent");
@@ -80,59 +143,37 @@ function Respond({ q, close }: { q: MyQuery; close: () => void }) {
   };
   return (
     <>
-      <Field label="Your Response" {...f.status("body")}>
-        <TextAreaField {...f.field("body")} rows={6} placeholder="Traffic on Ikorodu" />
+      <Field label="Your Response" {...f.status("body_html")}>
+        <RichTextField label="Your Response" {...f.field("body_html")} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" busy={send.pending} onClick={submit}>Send Response</Button>
+        <Button variant="primary" busy={send.pending} onClick={submit}>
+          Send Response
+        </Button>
       </FormFooter>
     </>
   );
 }
 
-const OUTCOME = { no_action: { tone: "ok", text: "Closed, No Action" }, sanctioned: { tone: "neutral", text: "Sanctioned" } } as const;
-
-function Archived() {
-  const list = usePaged("GET /api/v1/ess/queries", { filters: { status: "archived" } });
-  return (
-    <DataView
-      title="Archived Queries"
-      rows={list.rows}
-      rowKey={(r: MyQuery) => r.employee_query_id}
-      loading={list.loading}
-      empty={{ title: "Nothing Archived" }}
-      columns={[
-        { key: "n", label: "Number", desktop: true, render: (r: MyQuery) => r.number },
-        { key: "s", label: "Subject", render: (r: MyQuery) => r.subject },
-        { key: "d", label: "Date", render: (r: MyQuery) => formatDate(r.created_at) },
-        { key: "y", label: "Your Response", desktop: true, render: (r: MyQuery) => r.response?.body ?? "None" },
-        { key: "o", label: "Outcome", render: (r: MyQuery) => (r.outcome ? <Pill tone={OUTCOME[r.outcome].tone}>{OUTCOME[r.outcome].text}</Pill> : null) },
-      ]}
-      footer={<Pager page={list.page} onPage={list.setPage} noun="query" nounPlural="queries" />}
-    />
-  );
-}
-
-function Sanctions() {
+function SanctionList() {
   const modal = useModal();
   const list = usePaged("GET /api/v1/ess/sanctions");
   return (
     <DataView
       title="Sanctions"
-      rows={list.rows}
+      list={list}
       rowKey={(r: MySanction) => r.sanction_id}
-      loading={list.loading}
-      onRowClick={(r: MySanction) => modal.open({ title: `${r.number} · Letter`, wide: true, body: <LetterFile documentId={r.letter_document_id} name={r.number} /> })}
+      noun="sanction"
+      onRowClick={(r: MySanction) => modal.open({ title: `${r.number} · Letter`, wide: true, full: true, body: <LetterFile documentId={r.letter_document_id} name={r.number} /> })}
       empty={{ title: "No Sanctions", text: "A clean record." }}
       columns={[
         { key: "k", label: "Sanction", render: (r: MySanction) => r.step_name },
         { key: "q", label: "Query", desktop: true, render: (r: MySanction) => r.query_number },
-        { key: "r", label: "Reason", render: (r: MySanction) => r.reason },
+        { key: "r", label: "Reason", render: (r: MySanction) => <span data-copy="content">{r.reason}</span> },
         { key: "d", label: "Date", render: (r: MySanction) => formatDate(r.effective_on) },
         { key: "m", label: "Fine", align: "n", render: (r: MySanction) => (r.fine ? <Money value={r.fine.amount_ngn} /> : "None") },
       ]}
-      footer={<Pager page={list.page} onPage={list.setPage} noun="sanction" />}
     />
   );
 }

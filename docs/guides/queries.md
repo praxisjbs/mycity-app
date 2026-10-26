@@ -10,7 +10,7 @@
 | Capabilities | `queries.configure` (write query rules, the consequence chain and letter templates: the writes on Rules, Sanctions · Chain Settings and Letter Templates) |
 | Screens (PROGRESS.md rows) | #34 Queries, #35 Rules, #36 Sanctions, #37 Letter Templates; reads shared with #13 ESS · My Queries (AJ) and the employee 360 |
 | Status | Draft |
-| Last changed | 19/10/2026 |
+| Last changed | 26/10/2026 |
 
 Sources: MILESTONES §8 (scope and definition of done); REUSE_MAP §4; DATABASE_SCHEMA M3; ESS guide
 §3 step 3, §6 and §8 (what the employee sees); attendance guide §13 (the late-arrival query is this
@@ -40,7 +40,7 @@ ESS · My Queries.
 | Queries & Sanctions · Rules (`rules`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip (active, draft, fired this month, queries raised), one card per rule with its threshold, Recent Firings | New Rule, Edit Rule, Activate, Pause |
 | Queries & Sanctions · Sanctions (`sanctions`) | Staff app | `queries` view, same visibility as the query a sanction follows | KPI strip (active, awaiting approval, fines this year, fines recovered), sanction history | Issue Sanction (opens Queries: a sanction starts from a query's decision), Chain Settings: the ladder in order; Add Step, Move Up, Move Down, Retire need `queries.configure` |
 | Queries & Sanctions · Letter Templates (`letter-templates`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip, the template list with status, the selected template's preview filled with sample values | New Template, Edit Template, Preview, Activate |
-| ESS · My Queries (`my-queries`) | Staff app | Every employee, own records (ESS guide) | Open Queries, Archived, Sanctions | Respond to an open query; open a letter |
+| ESS · My Queries (`my-queries`) | Staff app | Every employee, own records (ESS guide) | One tab with a Queries and Sanctions switch: their queries, open ones first, and their issued sanctions | Respond to an open query in rich text; open a query's or a sanction's letter. Sanctions are read only |
 | Employee 360 · History | Staff app | `people` view within scope | The person's queries and sanctions, append-only, newest first | Open the query or sanction |
 | My Approvals (`approvals`) | Staff app | The approvers of `queries.consequence` | A proposed sanction waiting on them | Approve, Reject, Request Changes |
 | Notification bell | Both shells | The employee; the raiser; People | Query raised, reminder, response in, sanction issued | Open the record |
@@ -59,8 +59,12 @@ ESS · My Queries.
    query is numbered (`QRY-0001`), its letter is generated and filed (§6.7), and `query.raised`
    notifies the employee (opening ESS · My Queries) and emails them the letter.
 3. **The employee responds.** ESS · My Queries → `POST /ess/queries/:id/response` → through
-   `queries.response`. The query moves to Under Review and `query.responded` tells whoever raised it
-   (People when a rule raised it). One response a query; it is never edited.
+   `queries.response`. The response is written in the rich text editor and arrives as HTML
+   (`body_html`); the service turns it into Markdown with the one renderer's whitelist
+   (`shared/documents/markdown.htmlToMarkdown`, as Policies do), so no tag survives, and keeps that.
+   Every reader gets it back as blocks (`RichTextBlock`, drawn by `RichText`) and the letters as
+   HTML from the same renderer. The query moves to Under Review and `query.responded` tells whoever
+   raised it (People when a rule raised it). One response a query; it is never edited.
 4. **Someone decides.** Queries · Record Decision → `POST /queries/:id/decision`. Close with no
    action resolves the query. Propose a sanction names a rung of the chain (the next rung for this
    person is offered first, §6.5) with the reason, the evidence and an optional fine, writes a
@@ -131,8 +135,8 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `PUT /api/v1/letter-templates/:id/body` | `LetterTemplateBodySave` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | A new `template_version` |
 | `POST /api/v1/letter-templates/:id/activate` | `EmptyBody` → `LetterTemplateDetail` | `queries` edit, `queries.configure` | | Refused while it has no wording |
 | `GET /api/v1/ess/queries/summary` | → `MyQueriesSummary` | `ess` · own | no | Open, archived, sanctions and the latest one's date |
-| `GET /api/v1/ess/queries` | `EssQueryListQuery` (`status`: `open`, `archived`) → `MyQueryPage` | `ess` · own | yes, 25 | ESS module, through the queries service |
-| `POST /api/v1/ess/queries/:id/response` | `QueryResponseCreate` → `MyQuery` | `ess` · own | | Through `queries.response` |
+| `GET /api/v1/ess/queries` | `EssQueryListQuery` (`status`: `open`, `archived`) → `MyQueryPage` | `ess` · own | yes, 25 | ESS module, through the queries service. Without `status`, every query, open ones first, then newest first |
+| `POST /api/v1/ess/queries/:id/response` | `QueryResponseCreate` (`body_html`) → `MyQuery` | `ess` · own | | Through `queries.response`; 20 to 4,000 characters of text once the markup is taken out |
 | `GET /api/v1/ess/sanctions` | `PageQuery` → `MySanctionPage` | `ess` · own | yes, 25 | |
 
 Each module mounts its own base path (`/queries`, `/query-rules`, `/sanctions`,
@@ -309,6 +313,7 @@ or tier 2.**
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
 | Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template, Edit Template, Activate | Help on Letter: the names a letter can use | Versioning, the shipped defaults: §6.7 |
+| ESS · My Queries | The Queries and Sanctions switch with each one's count; Queries: the list (number, subject, raised, status), the picked query (subject, raised, respond by, what happened, your response, outcome, sanction), View Letter, Respond; Sanctions: the list (sanction, query, reason, date, fine), each opening its letter | Help on Respond By: the 48 hour window | The sanitising, the Markdown kept: §3 step 3 |
 
 ### 10.2 Phone layout
 
@@ -318,6 +323,7 @@ or tier 2.**
 | Rules | Rule cards, one a row, with Activate on drafts | Recent Firings | New Rule in the header | Tabs scroll sideways |
 | Sanctions | Sanction cards with the step and status | The query and decided-by columns | Issue Sanction | Tabs scroll sideways |
 | Letter Templates | The template list, then the selected letter's preview | The Used By column | New Template | Tabs scroll sideways |
+| ESS · My Queries | The switch at the top as a segmented control, then the chosen list as cards | The Number and Query columns | Respond, full width at the foot of the query's sheet; a sanction opens its letter full screen | Bottom bar Self-Service → My Queries |
 
 ## 11 · Edge cases
 
@@ -371,6 +377,11 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · ESS · My Queries is one tab with a Queries and Sanctions switch (meeting 26/10:
+  ESS has twelve tabs, TB): the three cards go; Queries lists every query, open ones first, and a
+  picked one opens beside the list (a sheet on a phone); Sanctions is read only, each opening its
+  letter. The response is written in the rich text editor (`body_html`), kept as Markdown through
+  the shared renderer and returned as blocks (§3 step 3, §5, §10).
 - 19/10/2026 · GE · The screens are on the contract (§2, §10): Issue Sanction opens Queries, since every
   sanction starts from a query's decision; View Letter shows the PDF the employee received; a
   letter's preview is its wording on paper with the record's words marked (`LetterPreview`

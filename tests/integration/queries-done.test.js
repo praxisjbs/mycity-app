@@ -140,7 +140,7 @@ describeDb("M3 definition of done", () => {
 
   /** The employee answers in ESS. */
   const respond = (queryId) =>
-    as("staff").post(`/ess/queries/${queryId}/response`, { body: "Traffic on the Third Mainland Bridge each of those mornings." });
+    as("staff").post(`/ess/queries/${queryId}/response`, { body_html: "<p>Traffic on the Third Mainland Bridge each of those mornings.</p>" });
 
   beforeAll(async () => {
     jest.spyOn(realtime, "toUser").mockReturnValue(true);
