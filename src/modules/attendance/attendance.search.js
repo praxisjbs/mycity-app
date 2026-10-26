@@ -11,8 +11,27 @@
  * or anyone on it, within the reader's `people` scope, opening People · Worksites (`?site=`); the
  * person's own, those they submitted or are or were on, as My Temporary Sites, opening Work Location
  * Requests (`?site=`). Never by an address.
+ *
+ * A day and an exception read as the person, then what it was and its date ("Present ·
+ * 26/10/2026", "Missing Clock-Out · 26/10/2026"), in the words People · Attendance uses, so
+ * two days of one person never read the same. A person has a day for every working day, so
+ * each lists at most three, newest first (`cap`); the person's own record comes before them
+ * (organisation.search.js `lead`) and People · Attendance holds the rest.
  */
 const { recordProvider } = require("../../shared/search/provider");
+
+/** A day's date as people read it. */
+const DAY = "to_char(ad.attendance_date, 'DD/MM/YYYY')";
+/** A day's status in the words the attendance screens show (app/src/features/attendance/labels.ts). */
+const DAY_STATUS = `CASE ad.status WHEN 'present' THEN 'Present' WHEN 'late' THEN 'Late' WHEN 'absent' THEN 'Absent'
+  WHEN 'leave' THEN 'On Leave' ELSE 'Not Counted' END`;
+/** An exception's kind in the same words. */
+const EXCEPTION_TYPE = `CASE x.exception_type WHEN 'outside_worksite' THEN 'Outside Worksite' WHEN 'outside_home' THEN 'Outside Home'
+  WHEN 'location_unverified' THEN 'Location Unclear' WHEN 'unknown_device' THEN 'Unknown Device'
+  WHEN 'suspicious_timestamp' THEN 'Device Time Ahead' WHEN 'missing_clock_out' THEN 'Missing Clock-Out'
+  WHEN 'automatic_clock_out' THEN 'System Clock-Out' ELSE initcap(replace(x.exception_type, '_', ' ')) END`;
+/** Days and exceptions listed in ⌘K at most. */
+const DAYS_LISTED = 3;
 
 module.exports = [
   recordProvider({
@@ -23,10 +42,11 @@ module.exports = [
     from: "attendance_day ad JOIN employee e ON e.employee_id = ad.employee_id",
     key: "ad.attendance_day_id",
     columns: ["e.first_name", "e.last_name", "e.preferred_name"],
-    select:
-      "ad.attendance_day_id AS id, to_char(ad.attendance_date, 'DD/MM/YYYY') AS ref, btrim(e.first_name || ' ' || e.last_name) AS title, ad.status AS sub, ad.status AS status",
+    select: `ad.attendance_day_id AS id, ${DAY} AS ref, btrim(e.first_name || ' ' || e.last_name) AS title,
+      ${DAY_STATUS} || ' · ' || ${DAY} AS sub, ad.status AS status`,
     order: "ad.attendance_date DESC",
     scope: { column: "ad.employee_id" },
+    cap: DAYS_LISTED,
   }),
   recordProvider({
     type: "attendance_exception",
@@ -38,10 +58,11 @@ module.exports = [
       JOIN employee e ON e.employee_id = ad.employee_id`,
     key: "x.attendance_exception_id",
     columns: ["e.first_name", "e.last_name", "e.preferred_name", "x.exception_type"],
-    select:
-      "x.attendance_exception_id AS id, to_char(ad.attendance_date, 'DD/MM/YYYY') AS ref, btrim(e.first_name || ' ' || e.last_name) AS title, replace(x.exception_type, '_', ' ') AS sub, x.status AS status",
-    order: "x.created_at DESC",
+    select: `x.attendance_exception_id AS id, ${DAY} AS ref, btrim(e.first_name || ' ' || e.last_name) AS title,
+      ${EXCEPTION_TYPE} || ' · ' || ${DAY} AS sub, x.status AS status`,
+    order: "ad.attendance_date DESC, x.created_at DESC",
     scope: { column: "ad.employee_id" },
+    cap: DAYS_LISTED,
   }),
   recordProvider({
     type: "attendance_home",

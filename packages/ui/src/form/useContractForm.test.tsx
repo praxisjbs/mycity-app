@@ -124,6 +124,51 @@ describe("useContractForm", () => {
     expect(shortMessage({ type: "invalid_string", message: "Invalid email" })).toBe("Check the email");
   });
 
+  it("never calls a number too long: a limit no schema worded reads by what it limits", () => {
+    const long = "Value is far beyond what this field allows here";
+    expect(shortMessage({ type: "too_big", message: long, kind: "number", maximum: 90 })).toBe("At most 90");
+    expect(shortMessage({ type: "too_small", message: long, kind: "number", minimum: -180 })).toBe("At least -180");
+    expect(shortMessage({ type: "too_big", message: long, kind: "number" })).toBe("Too high");
+    expect(shortMessage({ type: "too_big", message: long, kind: "array" })).toBe("Too many");
+    expect(shortMessage({ type: "too_small", message: long, kind: "date" })).toBe("Too early");
+    expect(shortMessage({ type: "too_big", message: long, kind: "string" })).toBe("Too long");
+    expect(shortMessage({ type: "too_big", message: long })).toBe("Too long");
+  });
+
+  it("marks a worksite's centre outside its range with the whole range, and keeps the ends", async () => {
+    const worksites = (await import("@mycity/contract/schemas/worksites.js")).default;
+    const schema = worksites.WorksiteCreate!;
+    const centre = (latitude: string, longitude: string) => ({ name: "Testbed Office", latitude: Number(latitude), longitude: Number(longitude), radius_m: 100 });
+    function Centre() {
+      const f = useContractForm({ latitude: "91", longitude: "181" }, { safeParse: (v: { latitude: string; longitude: string }) => schema.safeParse(centre(v.latitude, v.longitude)) }, { pauseMs: 10 });
+      return (
+        <>
+          <Field label="Latitude" {...f.status("latitude")}>
+            <TextField {...f.field("latitude")} />
+          </Field>
+          <Field label="Longitude" {...f.status("longitude")}>
+            <TextField {...f.field("longitude")} />
+          </Field>
+          <button type="button" onClick={() => f.check()}>
+            Add Worksite
+          </button>
+          <button type="button" onClick={() => (f.set("latitude", "-90"), f.set("longitude", "180"))}>
+            Set Ends
+          </button>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Centre />);
+    await user.click(screen.getByRole("button", { name: "Add Worksite" }));
+    expect(await screen.findByText("From -90 to 90")).toBeInTheDocument();
+    expect(screen.getByText("From -180 to 180")).toBeInTheDocument();
+    expect(screen.queryByText("Too long")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Set Ends" }));
+    await vi.waitFor(() => expect(screen.queryByText("From -90 to 90")).not.toBeInTheDocument());
+    expect(screen.queryByText("From -180 to 180")).not.toBeInTheDocument();
+  });
+
   it("shows an empty field the schema's own words for it, else Required", () => {
     const schema = {
       safeParse: () => ({

@@ -9,7 +9,7 @@
   },
   "performance-check-in": {
     "spec": "5d12011592bd6708",
-    "source": "e71269d0db1e443f",
+    "source": "4243614d2e10121e",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "performance-my": {
     "spec": "de0d93e2536b2375",
-    "source": "e71269d0db1e443f",
+    "source": "4243614d2e10121e",
     "devices": [
       "desktop",
       "phone"

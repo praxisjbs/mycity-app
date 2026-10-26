@@ -589,10 +589,10 @@ opens your next booked leave. Below them, tap **My Requests** or **Entitlement**
    them, both included. Days off in the working week, such as Sunday, and public holidays are left
    out. Saturday counts when it is a working day.
 4. Add a **Note** for your manager if it helps, such as `Family event`.
-5. Press **Send Request**. A message says **Sent to your line manager**.
+5. Press **Send Request**. A message names who it went to, such as *Sent to Tolu Adeyemi*.
 
-Your request reads **Pending** until it is decided. **Approver** shows who it waits on: your
-**Line Manager**, then **Operations & People** for long leave. You are told when they decide.
+Your request reads **Pending** until it is decided. **Approver** names who it waits on: your line
+manager by name, then **Operations & People** for long leave. You are told when they decide.
 
 | Status | What it means |
 |---|---|
@@ -613,7 +613,7 @@ Leave People recorded for you reads **People** under **Approver**.
 | **Ends in another year** | The leave runs past 31 December | Make two requests, one for each year |
 | **No working days** | Every day picked is a day off or a public holiday | Pick days you would be working |
 | **Overlaps other leave** | You already asked for leave on some of those days | Change the days, or cancel the other request |
-| **More than you have left** | You do not have that many days left this year | Ask for fewer days, or another type |
+| *32 working days, 19 left* | The working days you asked for, then the days you have left this year | Ask for fewer days, or another type |
 | **Not offered** | People stopped offering that type while you filled the form | Pick another **Leave Type** |
 | *At most 500 characters* | The note is over 500 characters | Shorten the **Note** |
 
@@ -983,6 +983,7 @@ marks:
 ```shot ess-policy-prompt
 open: /ess?tab=policy-updates
 as: manager
+prompt: keep
 sources:
   - app/src/features/policies/AcknowledgeSheet.tsx
 do:

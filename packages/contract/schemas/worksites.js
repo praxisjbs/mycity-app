@@ -17,10 +17,11 @@ const timezone = z
   .trim()
   .regex(/^(UTC|[A-Za-z]+(\/[A-Za-z0-9_+-]+)+)$/, "must be a timezone like Africa/Lagos");
 
-const latitude = z.number().min(-90).max(90);
-const longitude = z.number().min(-180).max(180);
+/** A centre's latitude and longitude; a value outside its range is refused with the whole range. */
+const latitude = z.number().min(-90, "From -90 to 90").max(90, "From -90 to 90");
+const longitude = z.number().min(-180, "From -180 to 180").max(180, "From -180 to 180");
 /** The fence's radius in metres. MyCity's office is 100 (13 October meeting). */
-const radius = z.number().int().min(25).max(1000);
+const radius = z.number().int("Whole metres only").min(25, "From 25 to 1,000 m").max(1000, "From 25 to 1,000 m");
 
 /** A query-string boolean: "true" or "false". */
 const flag = z.enum(["true", "false"]).transform((v) => v === "true");

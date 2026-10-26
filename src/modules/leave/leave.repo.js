@@ -31,6 +31,22 @@ const WAITING_ON = `CASE WHEN wi.state = 'pending' THEN (
    WHERE wd.workflow_definition_id = wi.workflow_definition_id AND s ->> 'key' = wi.current_stage
 ) END`;
 
+/**
+ * The one person a pending request waits on, when its stage's snapshot names one: the line
+ * manager (or whoever is above an empty seat), a login the stage was given to, or the CEO. Null
+ * when a role decides it, the stage's name then saying who. An aggregate for the same reason as
+ * WAITING_ON.
+ */
+const APPROVER_NAME = `CASE WHEN wi.state = 'pending' AND jsonb_array_length(wi.stage_approvers) = 1 THEN (
+  SELECT min(NULLIF(btrim(ae.first_name || ' ' || ae.last_name), ''))
+    FROM jsonb_array_elements(wi.stage_approvers) a
+    JOIN employee ae ON (a ->> 'type' = 'employee' AND ae.employee_id::text = a ->> 'value')
+      OR (a ->> 'type' IN ('user', 'ceo') AND ae.employee_id IN (
+        SELECT au.employee_id FROM app_user au
+         WHERE (a ->> 'type' = 'user' AND au.user_id::text = a ->> 'value')
+            OR (a ->> 'type' = 'ceo' AND au.is_ceo)))
+) END`;
+
 /** Every request with what a screen needs, and the columns the filters and scope read. */
 const ROWS = `
   SELECT lr.leave_request_id,
@@ -39,7 +55,7 @@ const ROWS = `
          lr.leave_type_id, t.name AS leave_type_name,
          lr.starts_on, lr.ends_on, lr.amount::int AS days, lr.reason,
          ${STATUS} AS status,
-         lr.workflow_instance_id, ${WAITING_ON} AS waiting_on,
+         lr.workflow_instance_id, ${WAITING_ON} AS waiting_on, ${APPROVER_NAME} AS approver_name,
          (lr.recorded_by IS NOT NULL) AS recorded,
          lr.submitted_at,
          COALESCE(lr.decided_at, CASE WHEN wi.state <> 'pending' THEN wi.completed_at END) AS decided_at,
@@ -53,7 +69,7 @@ const ROWS = `
 
 /** The keys of LeaveRequest, and nothing the filters only needed. */
 const OUT = `v.leave_request_id, v.employee, v.leave_type_id, v.leave_type_name, v.starts_on,
-  v.ends_on, v.days, v.reason, v.status, v.workflow_instance_id, v.waiting_on, v.recorded,
+  v.ends_on, v.days, v.reason, v.status, v.workflow_instance_id, v.waiting_on, v.approver_name, v.recorded,
   v.submitted_at, v.decided_at, v.created_at`;
 
 const SORTS = {

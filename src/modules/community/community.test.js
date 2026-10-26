@@ -36,6 +36,28 @@ describe("who may post", () => {
   });
 });
 
+describe("a poll's options", () => {
+  const { MessageCreate, MessageEdit, repeatedChoices } = require("@mycity/contract").community;
+  const marks = (r) => Object.fromEntries(r.error.issues.map((i) => [i.path.join("."), i.message]));
+
+  test("a repeat is found by its words, the case and spaces ignored; empty options are left to their own rule", () => {
+    expect(repeatedChoices(["QA Option A", "QA Option A"])).toEqual([1]);
+    expect(repeatedChoices(["QA Option A", "  qa   OPTION a "])).toEqual([1]);
+    expect(repeatedChoices(["Rice", "Beans", "rice", "BEANS"])).toEqual([2, 3]);
+    expect(repeatedChoices(["Rice", "", "", "Beans"])).toEqual([]);
+    expect(repeatedChoices(["Rice", "Rice and beans"])).toEqual([]);
+  });
+
+  test("the contract marks the repeat on its own option, when started and when edited", () => {
+    const start = MessageCreate.safeParse({ message_type: "poll", body: "Lunch?", options: ["QA Option A", "qa option a "] });
+    expect(start.success).toBe(false);
+    expect(marks(start)).toEqual({ "options.1": "Already an option" });
+    const edit = MessageEdit.safeParse({ body: "Lunch?", options: ["Tue", "Wed", "tue"] });
+    expect(marks(edit)).toEqual({ "options.2": "Already an option" });
+    expect(MessageCreate.safeParse({ message_type: "poll", body: "Lunch?", options: ["QA Option A", "QA Option B"] }).success).toBe(true);
+  });
+});
+
 describe("a list row's last line", () => {
   test("names what a file was, and shortens text to one line", () => {
     expect(service.lineOf("audio", null)).toBe("Voice note");

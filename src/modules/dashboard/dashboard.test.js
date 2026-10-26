@@ -1405,6 +1405,8 @@ describe("the prune, the assistant and ⌘K", () => {
       sub: null,
       status: null,
       link: "/home?tab=overview&id=my_leave_left",
+      // The card's module, so the app leaves the card out while that module is Coming Soon.
+      module: "ess",
     });
     expect(result.page).toMatchObject({ number: 1, size: 25, total: 2, has_next: false });
     // A Team card belongs to its tab, and a hidden one to M6: neither is found.

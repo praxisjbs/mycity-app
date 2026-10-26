@@ -303,6 +303,7 @@ works. Press **Try Again** once you are back online.
 ### A new version is ready {#start-new-version}
 
 1. When MyCity updates the hub, a bar at the foot of the screen says **A new version is ready**.
+   In Staff Community and Praxis AI it waits until you open another screen.
 2. Save what you are typing, then press **Reload**. The hub restarts on the same screen.
 
 ### Coming Soon {#start-coming-soon}
@@ -314,7 +315,8 @@ Some modules in the menu are not built yet. Their screens show a **Coming Soon**
 - The lines under it say what the screen will do.
 
 There is nothing to press. The screen opens by itself once it is delivered. Staging may open a
-screen before the live hub does.
+screen before the live hub does. Until then, [Search](#start-search) does not offer the screen or
+its records, and Home shows no card for it.
 
 ### A screen that does not load {#start-screen-errors}
 
@@ -360,7 +362,11 @@ Search finds every screen, action and record you are allowed to open, from anywh
 4. To look in one kind of record only, start with its word: `guide leave` finds parts of this guide
    about leave.
 5. {needs="people view"} `staff ada` finds employees called Ada, in the **Employees** group.
-6. Press Escape to close search. On a phone, press **Close Search**, the cross beside the line, or
+6. {needs="people view"} A person's name finds the person first, then at most three of their
+   **Attendance Days**, newest first, each with its status and date, such as
+   *Present · 26/10/2026*. Press a day to open it on [People · Attendance](/people?tab=attendance),
+   which holds the rest.
+7. Press Escape to close search. On a phone, press **Close Search**, the cross beside the line, or
    your phone's Back.
 
 With nothing typed, search lists what is waiting on you first, then every screen and action you
@@ -479,7 +485,8 @@ The hub installs like an app, with its own icon, and opens faster.
    choose Add to Home Screen, then press **Done**.
 
 > **Tip:** **Install App** only shows where this browser can install the hub and it is not installed
-> yet. **Not Now** hides the offer for 30 days.
+> yet. **Not Now** hides the offer for 30 days. Once the hub is installed, the bar never shows again.
+> It also waits while you are in Staff Community or Praxis AI, so it never covers your message.
 
 ## Using This Guide {#start-user-guide screen=knowledge/user-guide icon=book}
 

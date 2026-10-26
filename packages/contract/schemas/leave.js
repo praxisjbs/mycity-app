@@ -100,6 +100,8 @@ const LeaveRequest = z
     status: LeaveStatus,
     workflow_instance_id: uuid.nullable(),
     waiting_on: z.string().nullable(),
+    /** The one person the waiting stage names (a line manager, a login it was given to, the CEO); null when a role decides it. */
+    approver_name: z.string().nullable(),
     recorded: z.boolean(),
     submitted_at: isoDateTime.nullable(),
     decided_at: isoDateTime.nullable(),
@@ -261,6 +263,7 @@ const TABLES = {
       leave_type_name: "leave_type.name",
       days: "leave_request.amount, in working days",
       waiting_on: "the name of the approval stage it waits at, from workflow_instance",
+      approver_name: "the one person the waiting stage names, from workflow_instance.stage_approvers",
       recorded: "leave_request.recorded_by is set: People recorded it",
     },
   },

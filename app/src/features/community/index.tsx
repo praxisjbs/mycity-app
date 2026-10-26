@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import community from "@mycity/contract/schemas/community.js";
 import { api, ApiError } from "@/api/client";
 import { usePhoto, usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
@@ -12,7 +13,7 @@ import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, PickBar, PinnedBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
 import { SendFiles, SharedFiles } from "./Media";
-import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pager, Pill, rules, SearchInput, shortMessage, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pager, Pill, SearchInput, shortMessage, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
 
 export default function Community({ tab }: ModuleScreenProps) {
@@ -498,22 +499,37 @@ function Celebrate({ close, send }: { close: () => void; send: (b: { message_typ
 /** A text that must be more than three characters: empty asks for it, one to three says so. */
 export const atLeast4 = (empty: string) => (v: string) => (!v.trim() ? empty : v.trim().length > 3 ? null : "At least 4 characters");
 
-/** A poll's refusal marks, on its fields: `body` is the question, `options.n` the option. */
-export const pollMarks = (fields: Record<string, string[]>) =>
-  Object.fromEntries(Object.entries(fields).map(([k, v]) => [k === "body" ? "q" : /^options\.(\d)/.test(k) ? `o${Number(k.split(".")[1]) + 1}` : k, v]));
+/**
+ * A poll's refusal marks, on its fields: `body` is the question, `options.n` the option. `sent`
+ * names the fields the options came from, as empty ones are left out of what is sent.
+ */
+export const pollMarks = (fields: Record<string, string[]>, sent: string[] = ["o1", "o2", "o3", "o4"]) =>
+  Object.fromEntries(Object.entries(fields).map(([k, v]) => [k === "body" ? "q" : /^options\.(\d)/.test(k) ? (sent[Number(k.split(".")[1])] ?? k) : k, v]));
+
+const POLL_OPTIONS = ["o1", "o2", "o3", "o4"] as const;
+
+/** Option `i`: `empty` when it is needed and blank, and marked as it is filled when it repeats an earlier one. */
+export const pollChoice = (i: number, empty?: string) => (v: string, all: Record<string, unknown>) => {
+  if (!v.trim()) return empty ?? null;
+  return community.repeatedChoices(POLL_OPTIONS.map((k) => String(all[k] ?? ""))).includes(i) ? "Already an option" : null;
+};
 
 /** Start a Poll, or with `edit` the same form filled in (before its first vote). */
 function PollForm({ close, send, edit }: { close: () => void; send: (b: { message_type: "poll"; body: string; options: string[] }) => Promise<unknown>; edit?: Message }) {
   const opt = (i: number) => edit?.poll?.options[i]?.text ?? "";
-  const f = useContractForm({ q: edit?.poll?.question ?? "", o1: opt(0), o2: opt(1), o3: opt(2), o4: opt(3) }, { q: atLeast4("Add a question"), o1: rules.required("Add an option"), o2: rules.required("Add an option") });
+  const f = useContractForm(
+    { q: edit?.poll?.question ?? "", o1: opt(0), o2: opt(1), o3: opt(2), o4: opt(3) },
+    { q: atLeast4("Add a question"), o1: pollChoice(0, "Add an option"), o2: pollChoice(1, "Add an option"), o3: pollChoice(2), o4: pollChoice(3) },
+  );
   // Sent first, closed after: a refused poll keeps the person's words and says why.
   const go = async () => {
     if (!f.check()) return;
+    const sent = POLL_OPTIONS.filter((k) => f.values[k].trim());
     try {
-      await send({ message_type: "poll", body: f.values.q.trim(), options: [f.values.o1, f.values.o2, f.values.o3, f.values.o4].map((o) => o.trim()).filter(Boolean) });
+      await send({ message_type: "poll", body: f.values.q.trim(), options: sent.map((k) => f.values[k].trim()) });
       close();
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(pollMarks(e.fields));
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(pollMarks(e.fields, sent));
       else toast.error(e instanceof ApiError ? e.message : "Not posted. Try again.");
     }
   };

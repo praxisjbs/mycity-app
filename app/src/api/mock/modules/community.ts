@@ -1,3 +1,4 @@
+import community from "@mycity/contract/schemas/community.js";
 import type { Announcement, AnnouncementStats, Channel, Conversation, LinkPreview, MediaRef, Member, Message, ProfileCard, Wish } from "@/api/types/community";
 import { firstLink, hostOf } from "@mycity/ui";
 import { at, created, fail, invalid, noContent, notFound, ok, paged, route, sid, fold } from "../core";
@@ -494,6 +495,11 @@ route("GET /api/v1/community/channels/:id/messages", (req) => {
 });
 
 const isMsg = (m: MMsg | Record<string, string[]>): m is MMsg => typeof (m as MMsg).community_message_id === "string";
+/** A poll's options that repeat an earlier one, marked on their own option as the API does; null when all differ. */
+function repeatedMarks(options: string[]): Record<string, string[]> | null {
+  const repeated = community.repeatedChoices(options);
+  return repeated.length ? Object.fromEntries(repeated.map((i) => [`options.${i}`, ["Already an option"]])) : null;
+}
 function build(user: string, b: Record<string, unknown>): MMsg | Record<string, string[]> {
   const now = new Date().toISOString();
   const type = b.message_type as Message["message_type"];
@@ -508,6 +514,8 @@ function build(user: string, b: Record<string, unknown>): MMsg | Record<string, 
     const opts = (b.options as string[] | undefined) ?? [];
     if (!b.body) return { body: ["Add a question"] };
     if (opts.length < 2) return { options: ["Add an option"] };
+    const repeats = repeatedMarks(opts);
+    if (repeats) return repeats;
     const m = msg("poll", user, now, { body: String(b.body) });
     m.poll = { question: String(b.body), options: opts.map((text) => ({ text, votes: 0 })), my_vote: null, closed: false };
     return m;
@@ -657,6 +665,8 @@ route("PUT /api/v1/community/messages/:id", (req) => {
     if (f.m.poll.closed) return fail(409, "POLL_CLOSED", "This poll is closed");
     if (Object.keys(f.m._votes).length) return fail(409, "POLL_HAS_VOTES", "People have voted on this poll", { body: ["Already has votes"] });
     const options = (req.body.options as string[] | undefined) ?? f.m.poll.options.map((o) => o.text);
+    const repeats = repeatedMarks(options);
+    if (repeats) return invalid(repeats);
     f.m.body = body;
     f.m.poll = { ...f.m.poll, question: body, options: options.map((text) => ({ text, votes: 0 })) };
   } else return fail(422, "NOT_EDITABLE", "This kind of message is not edited");

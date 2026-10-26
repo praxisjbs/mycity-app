@@ -113,6 +113,8 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 **Notes**
 
 - 26/10/2026 · JP · QA bug register (DEF-06): the form system's `reset()` drops a pause check still waiting from the last key, so a field emptied after a quick save is never marked Required · nothing left
+- 26/10/2026 · JP · QA bug register (DEF-01, DEF-02), ⌘K: an exact employee ranks before every other group of records; attendance days and exceptions three at most, newest first (`lead` and `cap` providers); nothing that would open Coming Soon is offered, screens, actions or records (`useOpens` in `app/src/lib/plan.ts`, the one release rule) · nothing left
+- 26/10/2026 · JP · QA bug register (DEF-03, DEF-04, DEF-07, DEF-12), shared pieces: a number's limit never reads Too long or Too short (useContractForm words a limit by what it limits: a number At most/At least, a list Too many, a date Too late); MoneyField keeps a typed or pasted minus and refuses it (Not below zero), a second point, a misplaced comma or a third decimal instead of cutting them, zero kept; DateRangeField's ends have their own ids and are named From and To, their calendar buttons Pick From Date and Pick To Date; the update, install and notifications offers wait off screens with a message box at the foot (every Staff Community tab, Praxis AI · Ask), Back to Guide still shows · per-end error association on DateRangeField still to do (one Field error covers both ends)
 - 26/10/2026 · JP · User Guide audit, screen defects (PR 11): 218 defects the chapters' string-by-string check found on the screens, fixed module by module (notes under each). Shared: a field's error shows the contract's own limit and words ("At most 500 characters", "Pick the people") instead of Too long or Check this value, also from a server 422 (`packages/ui/src/form/`, `useContractForm.test`); the lock screen's code step has Back and an expired code returns to the first step; a cut reset or invite link reads Link Expired; Turn On, Send Test, Mark All Read, Remove Device and Acknowledge say why they failed; `DateField` takes `disabled`, `Switch` stays busy on a promise (F26), `StatStrip` takes a help term. The picture script closes a policy prompt with its X (Esc never closes it). Dropped after checking: Praxis AI's More tile stays Assistant (F17, provenance). Left: nothing.
 - 25/10/2026 · JP · A record opens in a sheet on a phone (FRONTEND_FOUNDATION F31, `docs/guides/foundation.md` §6.17): People · Leave put a tapped request under its list on a phone. New `ListDetail` and `DetailPane` (Layout), with `useSideBySide`; DataView's phone cards, TapList's rows and Kanban's cards mark their open button (`data-row-open`), and gate 11 (`check/two-shells.js`, `lib/screens.js` `rowOpens`) taps each phone screen's first two and fails one whose record lands in the page (it found ten views before the fix). Moved onto it: People · Leave, ESS · My Payslips, and the M3 to M8 screens built on the mock (notes under each module). Left: nothing.
 - 25/10/2026 · JP · User Guide pictures for both devices: the 38 that were taken on a computer only now have their phone picture too, five sections that had none have one (When the Screen Locks, Your Display and the App, and the Quick Start's Get Help Anywhere, Import a Staff List and Help With a Login), and a picture's step can run on one device only (`phone click: ...`, `docs/guides/user-guide.md` §6.5). The chapters now say where a phone keeps New Holiday and New Role (Quick Actions), Configure Signature (the cog) and the Audit Log's filters, and that Export is on a computer. 147 pictures; every section has one. Left: nothing.
@@ -660,13 +662,14 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 1 | Overview | `overview` | M1 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 2 | Alerts | `alerts` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 3 | Reports | `reports` | M1 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 86 | Team | `team` | M1 | TB | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Overview (#1), QA DEF-01: Overview cards and Choose Cards leave out a card whose module is Coming Soon in this build (Expenses before M8), for every role; cards and options carry `module`, and a `?kpi=` link to a held-back card opens nothing · Need You can still list an expense approval that opens Coming Soon (its paging is the server's, and the server does not know what is released)
 - 26/10/2026 · JP · User Guide audit, screen defects: Team's View Attendance opens that person's day (`?employee=`); Choose Cards' refusals are error toasts and the list reloads; the clock's note failure says what to do; a saved Daily Attendance report holding a status its day cannot opens with it dropped. Checked and kept: Clear N Alerts counts the open alerts the list shows. Left: nothing.
 - 25/10/2026 · JP · User Guide chapter Home (`docs/manual/home.md`): Overview (#1), Team (#86), Alerts (#2) and Reports (#3), with their desktop and phone pictures. No screen changed.
 - 22/10/2026 · TB · Overview (#1) and Team (#86), with Performance PR 5 (`docs/guides/performance.md` §6.21, `docs/guides/home.md` §6): Goals On Track and My Scorecard (My Targets relabelled) are live and lead the CEO's and Staff's cards; Goals This Quarter shows each goal's progress, My Goals each line's score, the Org KPI the company's and each department's score, and the Team roster's KPI each person's score to date where the reader's Performance view reaches them. Left: nothing on Home; Open Tasks on Team waits for Workspace.
@@ -808,7 +811,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 | 9 | My Attendance | `my-attendance` | M1 | AJ | ☑ | ☑ | ☑ | Built | 22/10/2026 |
 | 10 | My Performance | `my-performance` | M2 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 11 | My Payslips | `my-payslips` | M6 | AJ | ☐ | ☐ | ☐ | Not started | |
-| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 21/10/2026 |
+| 12 | My Leave | `my-leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 13 | My Queries | `my-queries` | M3 | AJ | ☐ | ☐ | ☐ | Not started | |
 | 14 | My Documents | `my-documents` | M1 | TB | ☑ | ☑ | ☑ | Built | 19/10/2026 |
 | 87 | Work Location Requests | `work-location-requests` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
@@ -819,6 +822,7 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 **Notes**
 
+- 26/10/2026 · JP · My Leave (#12), QA DEF-08 and OBS-05: a request past the allowance is marked on Last Day with the days asked and the balance ("32 working days, 19 left", was Check this value), and writes nothing; Send Request's message and My Requests' Approver name the real approver (`approver_name`: the line manager, the login the stage was reassigned to or the CEO), else the stage (Sent to Admin Override) · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: My Attendance shows Real Time Given and reads Not Available for a leaver; after clock-out the clock stays pressable as Done For Today (owner's decision); My Devices, Work Location Request and Download My Data say what to do; Org Chart's banner only for People who may move people, and search opens folded branches; My Documents shows the vault's 15 MB and types; My Leave's Taken and Approved Upcoming open what they count, Cancel Request asks first; My Security says why Change Password failed, Ask for a Code is one request (F26), Passkeys says when the browser cannot add one. Left: nothing.
 - 25/10/2026 · JP · My Payslips (#11, M6, still on the mock): a month on a phone opens its payslip as a full sheet (F31); it opened nothing before, the list passing a prop TapList does not take, and its status pill never showed. On desktop the payslip stays beside the list, in the dialog below 1181 px. Status unchanged. Left: the M6 API.
 - 25/10/2026 · JP · User Guide chapter Employee Self-Service (`docs/manual/employee-self-service.md`): the nine M1 tabs (#8, #9, #12, #14, #87 to #91) with their pictures. My Security's Sign Out Others now says why when the server refuses it; it failed silently. Left: My Performance (#10) in the M2 chapter.
@@ -899,12 +903,13 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 25/10/2026 |
+| 15 | Channels | `channels` | M1 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 16 | Direct Messages | `direct-messages` | M1 | GE | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 | 17 | Announcements | `announcements` | M1 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Channels (#15), QA DEF-09: a poll's options must differ, compared with spaces and case ignored: "Already an option" on the field as typed, refused by the contract, the service and the mock on Start Poll and Edit Poll. QA DEF-12: the shell's offers no longer cover the composer · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: Remove Member asks first; reactions, votes, unpin, Add People, polls, Send Files, wishes and Acknowledge say why a refusal failed; Channel Details' Purpose shows its mark; New Announcement and Edit toast every refusal; the profile's Message reaches the box and Mute follows the switch; messages show their 4,000 characters and notes 500; a deleted message reads "That message is no longer here"; Read and Not Read page by 25; the Announcements tab follows `announcements.post` in the menu and ⌘K (`screens.test.js`). Tests: `forms.test.tsx`, `community.test.js`. Left: nothing.
 - 25/10/2026 · JP · User Guide chapter Staff Community (`docs/manual/staff-community.md`), rewritten from the draft: Channels (#15), Direct Messages (#16) and Announcements (#17), with their pictures. A message the server refuses now keeps its words in the box and says why, and so do Mute, Recognise and Celebrate; they failed silently. Test: `Thread.test.tsx`.
 - 22/10/2026 · TB · Celebration cards built from Cynthia's picks (Birthday 1, Anniversary 1, confetti bursting once and on Celebrate) and TB's four answers (`docs/guides/community.md` §3 step 3, §4 to §11): a plain birthday card (the photo in a yellow ring with a cake, the line) and a City Green anniversary card (the years in a gold laurel, `YearsMedal`, and "Joined" from `since`, now kept on the card by the 08:00 job and by hand). **Send Wishes**: wishes kept under the card, never in the stream (migration `1480`, `community_wish`; `GET`/`POST /messages/:id/wishes`, `DELETE /wishes/:id`), the latest two on the card and View All at 25, each telling the person it is for, deleted by its author or a moderator, never edited. `Confetti` is now a canvas burst: once per card per device (remembered per person) and from Celebrate, nothing under reduced motion; the old drifting pieces, sheen and spinning ring are gone. Also fixed in `packages/ui`: the text fields passed the form's `onProblem` to the page (a React warning on every bound text field). Community integration suite 34 of 34, the app's community tests 20 of 20, `Confetti` and `YearsMedal` tests. Checked in Chromium on the mock, desktop and phone, light and dark. Left: see it on staging after the next 08:00 post; GE to review `1480`.
@@ -966,15 +971,17 @@ Source: BACKEND_STRUCTURE §13 (definition of done) and the 12 October internal 
 
 | # | Screen | Tab | M | Owner | API | UI | Mobile | Status | Updated |
 |---|---|---|---|---|---|---|---|---|---|
-| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
-| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
-| 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 25/10/2026 |
+| 24 | Employees | `employees` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 25 | Attendance | `attendance` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 26 | Leave | `leave` | M1 | AJ | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 27 | Devices | `devices` | M1 | LA | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 22/10/2026 |
+| 28 | Worksites | `worksites` | M1 | LA | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 | 92 | Organogram | `organogram` | M1 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · Attendance (#25), QA DEF-02: ⌘K attendance days and exceptions read the person, the status and the day-first date in the label and the accessible name, three at most, newest first, after the person · nothing left
+- 26/10/2026 · JP · QA bug register, People: Employees (#24, DEF-07) refuses a negative Gross Monthly as typed or pasted (Not below zero), never turning it positive, zero kept; Worksites (#28, DEF-03) refuses a centre outside its range with the whole range (From -90 to 90, From -180 to 180) and a radius with its units (From 25 to 1,000 m), the server saying the same, ±90 and ±180 kept; Attendance (#25, DEF-04) export period's ends named From and To; Leave (#26) Record Leave's allowance refusal reads "<n> working days, <left> left" and Waiting On names the person the stage waits on, else the stage · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: Archive Record asks for a Last Day, kept as `left_on` (owner's decision), and the CEO's record offers none; Probation Ending opens the probation reviews (owner's decision) and Contracts Ending a new Ending in 30 Days filter; Set Schedule only for current staff, 90 days ahead at most; Organogram refusals say why. Attendance exceptions and homes carry `can_decide`; Waive ticks count across pages and the toast counts what was skipped; Approve Overtime only under Pre-Approved; People Leave opens `?id=` and decides only when the approval waits on the reader; Take Off on each worksite row. Kept by decision: Create Vacancy (opens Coming Soon until M4). Left: nothing.
 - 25/10/2026 · JP · Leave (#26): a tapped request opens in a sheet over the list on a phone (F31, `ListDetail`), never under it, and the first waiting request shows unasked only beside the list on desktop (from 1181 px; narrower, a request opens in the dialog). On a phone Approve, Reject and Cancel Leave are full width at the sheet's foot. Also Away shows each person's status pill, which never showed. The People chapter's Leave steps and pictures follow. Left: nothing.
 - 25/10/2026 · JP · User Guide: the People chapter gains Organogram (#92), Attendance (#25), Leave (#26), Devices (#27) and Worksites (#28), with their pictures. A line manager now opens People · Leave to decide their team's leave: the shell and ⌘K hid the tab from anyone without full People access (`access.ts`, `screens.js` `tabVisible`). Organogram's Add Role, Edit Role, Create Vacancy and dragging now need People edit; a line manager saw them and was refused. Tests: `access.test.ts`, `screens.test.js`, `OrgTree.test.tsx`. Left: on a phone, a Leave card shows Type, From and To but not Status; the Pending chip finds the waiting ones.
@@ -1290,11 +1297,12 @@ order, then PR 3, PR 4 and PR 5 in parallel; each PR moves its own row)
 | 76 | Documents & Numbering | `documents-and-numbering` | M9 | GE | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 77 | Integrations | `integrations` | M9 | TB | ☑ | ☑ | ☑ | Built | 21/10/2026 |
 | 78 | Security | `security` | M9 | GE | ☑ | ☑ | ☑ | Built | 17/10/2026 |
-| 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 19/10/2026 |
-| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 25/10/2026 |
+| 79 | Audit Log | `audit-log` | M9 | GE | ☑ | ☑ | ☑ | Built | 26/10/2026 |
+| 93 | Imports | `imports` | M0 | TB | ☑ | ☑ | ☑ | Built | 26/10/2026 |
 
 **Notes**
 
+- 26/10/2026 · JP · QA bug register: Audit Log (#79, DEF-04) Dates ends have their own ids and are named From and To, as are their calendar buttons; Imports (#93, OBS-03) Map lists the Required fields and refuses Next in the window, naming the fields still without a column (focused, nothing sent), and shows a server refusal of the mapping the same way until the mapping is put right · nothing left
 - 26/10/2026 · JP · User Guide audit, screen defects: Status and Faults say why briefs and status changes failed; Organisation's Remove asks first; Users take five roles at most; Approvals name a route's problems in words, ten stages at most; Imports offer Continue on an unfinished import (owner's decision), Download Errors once previewed, Revert for the importer's holders; Security's Two-Step switches stay busy until settled (F26); Audit Log's Export needs its grant; Integrations allow Remove Model on a phone (owner's decision) and keep a failed test's entries. Dropped after checking: Imports' Next already spins. Left: nothing.
 - 25/10/2026 · JP · Imports (#93), from the bulk half of the employee creation audit
   (`docs/guides/foundation.md` §6.1, §6.16): the preview lists Problems or Changes, each changed row

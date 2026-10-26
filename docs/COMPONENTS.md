@@ -99,7 +99,7 @@ header, test or gallery page, and a feature that re-creates or shadows a compone
 | Forms | [Form](#form) | `Form`, `FormFooter` | The one <form>: Enter submits, the browser's own bubbles are off, and a save it is waiting on cannot be sent twice; with FormFooter, the buttons at its foot. | stable |
 | Forms | [InlineInput](#inlineinput) | `InlineInput`, `InlineSelect`, `InlineLabel`, `InlineTextArea` | Bare controls for a field built into a larger widget: the chat message box, the command palette's search line, the mail composer's rows. | stable |
 | Forms | [LoginField](#loginfield) | `LoginField` | The sign-in screen's larger field: label, control, its mark, and a message that shakes on a failed try. | stable |
-| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. | stable |
+| Forms | [MoneyField](#moneyfield) | `MoneyField` | An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped. | stable |
 | Forms | [MoreFields](#morefields) | `MoreFields` | The fields a form rarely needs, closed under one More row until the person opens it. | beta |
 | Forms | [OtpField](#otpfield) | `OtpField` | A one-time code in separate boxes: each digit moves to the next, a pasted code fills them all. | stable |
 | Forms | [PersonPicker](#personpicker) | `PersonPicker` | Picks people the server searches: their name, job title and department, one page of 25 at a time. | stable |
@@ -2802,7 +2802,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | Use | Every date a person enters (gate 15); DateRangeField for a from and to pair (a report period); TimeField for a 24-hour time. |
 | Avoid | <input type="date"> (its format follows the browser's locale); a date shown and not entered (use formatDate). |
 | Phone | The calendar opens as a bottom sheet; days are 44 px targets; the keyboard is numeric. |
-| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. |
+| Accessibility | The typed field carries its Field's label; the calendar button says what it does; days are buttons named by their date. A range's ends each have their own id and are named From and To, as are their calendar buttons. |
 | Status | stable |
 | Exports | `DateField`, `DateRangeField`, `TimeField` |
 | Import | `import { DateField, DateRangeField, TimeField } from "@mycity/ui";` |
@@ -2826,6 +2826,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
 | `placeholder` | `string` |  | The format example; DD/MM/YYYY. |
 | `disabled` | `boolean` |  | Shown and not changed (a record already sent): no typing and no calendar. |
+| `end` | `"From" \| "To"` |  | Which end of a period this is (DateRangeField): the field is named by its Field's label and the end, as is its calendar button. |
 
 **DateRangeField** props (`DateRangeFieldProps`)
 
@@ -3023,7 +3024,7 @@ The sign-in screen's larger field: label, control, its mark, and a message that 
 
 ### MoneyField
 
-An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float.
+An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-place decimal string, never a float. A minus is kept and refused, never dropped.
 
 | | |
 |---|---|
@@ -3043,8 +3044,9 @@ An amount in Naira: ₦ before it, digits and commas as typed, sent as a two-pla
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `value` | `string` | yes | What the person typed ("250,000" or "250000.5"). |
-| `onChange` | `(value: string) => void` | yes | Called with what they type, digits, commas and one point only. |
+| `onChange` | `(value: string) => void` | yes | Called with what they type: digits, commas and points, and a leading minus when they typed one. |
 | `onBlur` | `() => void` |  | Called when the person leaves the field. |
+| `onProblem` | `(message: string \| undefined, now?: boolean) => void` |  | Told what is wrong with the amount as typed ("Not below zero", "Two decimals at most"), or undefined once it is right. |
 | `state` | `FieldState` |  | The mark; the Field supplies one otherwise. |
 | `message` | `string` |  | Unused here (the Field shows it). |
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
