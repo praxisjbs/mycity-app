@@ -46,6 +46,8 @@ const QueryRule = z
     threshold: z.number().int().min(1),
     window_days: z.number().int().min(1),
     letter_template: z.string().nullable(),
+    policy: z.object({ policy_id: uuid, number: z.string(), title: z.string() }).strict().nullable(),
+    policy_clause: z.string().nullable(),
     state: QueryRuleState,
     active: z.boolean(),
     activated_at: isoDateTime.nullable(),
@@ -76,6 +78,9 @@ const QueryRuleCreate = z
     threshold,
     window_days: windowDays,
     letter_template: letterKey.optional(),
+    // The policy the rule enforces, and the line its letters quote (queries guide §6.3).
+    policy_id: uuid.optional(),
+    policy_clause: z.string().trim().max(300, "At most 300 characters").optional(),
   })
   .strict()
   .refine(minutesOnlyForLateness, MINUTES_ONLY);
@@ -93,6 +98,8 @@ const QueryRuleUpdate = z
     threshold: threshold.optional(),
     window_days: windowDays.optional(),
     letter_template: letterKey.nullable().optional(),
+    policy_id: uuid.nullable().optional(),
+    policy_clause: z.string().trim().max(300, "At most 300 characters").nullable().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Change at least one field")
@@ -133,6 +140,7 @@ const TABLES = {
     virtual: {
       state: "draft, active or paused, from active and activated_at",
       fired_this_month: "queries this rule raised since the 1st, Lagos time",
+      policy: "the policy named by policy_id, from the policies service",
     },
   },
   QueryRulePage: { table: null, reason: "a page of query rules" },

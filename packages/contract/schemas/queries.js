@@ -63,6 +63,25 @@ const QuerySanctionRef = z
   })
   .strict();
 
+/** The policy a query cites (guide §6.2): the version in force when it was raised. */
+const PolicyCitation = z
+  .object({
+    policy_id: uuid,
+    policy_version_id: uuid,
+    number: z.string(),
+    title: z.string(),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+/** The line of a policy a query or rule quotes; optional. */
+const policyClause = z.string().trim().max(300, "At most 300 characters");
+
+/** GET /queries/policies: a policy a query or rule may cite, with its version in force. */
+const CitablePolicy = PolicyCitation;
+const CitablePolicyPage = Paged(CitablePolicy);
+const CitablePolicyListQuery = listQuery({});
+
 /** One row of the Queries list. */
 const Query = z
   .object({
@@ -96,6 +115,8 @@ const QueryDetail = Query.extend({
   reviewed_at: isoDateTime.nullable(),
   workflow_instance_id: uuid.nullable(),
   sanction: QuerySanctionRef.nullable(),
+  policy: PolicyCitation.nullable(),
+  policy_clause: z.string().nullable(),
   next_step: z
     .object({ consequence_step_id: uuid, name: z.string(), position: z.number().int().min(1) })
     .strict()
@@ -124,6 +145,9 @@ const QueryCreate = z
     subject: z.string().trim().min(4, "Name the subject").max(150),
     details: z.string().trim().min(20, "Give the facts").max(4000),
     letter_template: z.string().trim().max(64).optional(),
+    // The policy it breaches, and the line to quote (guide §6.2); both optional.
+    policy_id: uuid.optional(),
+    policy_clause: policyClause.optional(),
     // The raiser's drawn signature (guide §6.2), kept in the vault and printed on the letter.
     signature: SignaturePng,
   })
@@ -202,6 +226,8 @@ const MyQuery = z
     response: QueryResponse.nullable(),
     letter_document_id: uuid.nullable(),
     sanction: QuerySanctionRef.nullable(),
+    policy: PolicyCitation.nullable(),
+    policy_clause: z.string().nullable(),
     can_respond: z.boolean(),
     created_at: isoDateTime,
   })
@@ -279,6 +305,7 @@ const TABLES = {
       response: "the query_response row",
       reviewed_by_name: "the reviewer's display name",
       sanction: "the latest sanction on the query",
+      policy: "the cited policy_version, from the policies service",
       next_step: "the rung after the highest one in force for the person (guide §6.5)",
       can_decide: "the reader may record a decision now (guide §6.4)",
       can_remind: "awaiting a response, raised by the reader or in scope all, not reminded today",
@@ -289,6 +316,7 @@ const TABLES = {
     table: "employee_query",
     virtual: {
       letter_template: "the letter_template key the query letter is generated from",
+      policy_id: "the policy cited; its version in force is kept as policy_version_id",
       signature: "the drawn PNG, stored through the vault as signature_document_id",
     },
   },
@@ -303,6 +331,7 @@ const TABLES = {
     virtual: {
       response: "the query_response row",
       sanction: "the latest sanction on the query",
+      policy: "the cited policy_version, from the policies service",
       can_respond: "awaiting a response and not yet answered",
     },
   },
@@ -313,10 +342,18 @@ const TABLES = {
     virtual: { body_html: "the editor's HTML, kept as body (Markdown) by shared/documents/markdown" },
   },
   QueryRaisedEmailVars: { table: null, reason: "the variables of templates/email/query-raised.html, not a row" },
+  PolicyCitation: { table: null, reason: "a policy_version as a query cites it, read through the policies service" },
+  CitablePolicy: { table: null, reason: "a policy_version in force, read through the policies service" },
+  CitablePolicyPage: { table: null, reason: "a page of citable policies" },
+  CitablePolicyListQuery: { table: null, reason: "list controls for the policy picker" },
 };
 
 module.exports = {
   TABLES,
+  PolicyCitation,
+  CitablePolicy,
+  CitablePolicyPage,
+  CitablePolicyListQuery,
   QueryStatus,
   QueryOutcome,
   EvidenceItem,

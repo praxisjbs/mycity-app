@@ -2,16 +2,16 @@ import queries from "@mycity/contract/schemas/queries.js";
 import query_rules from "@mycity/contract/schemas/query_rules.js";
 import sanctions from "@mycity/contract/schemas/sanctions.js";
 import templates from "@mycity/contract/schemas/templates.js";
-import type { ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
+import type { CitablePolicy, ConsequenceStep, LetterTemplate, PersonRef, Query, QueryDetail, QueryRule, QueryRuleFiring, QueryRuleSource, Sanction } from "@mycity/contract/contract.gen.ts";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import type { PersonRef as PickedPerson } from "@/api/types/common";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth } from "@/auth/AuthProvider";
-import { Letter, LetterFile } from "@/features/shared/Letter";
+import { Letter, LetterFile, PolicyCited } from "@/features/shared/Letter";
 import { withSignature } from "@/features/shared/signature";
 import { KpiTiles } from "@/features/shared/KpiTiles";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { EmployeePicker, PolicyPicker } from "@/features/shared/pickers";
 import { BarsCard, PagedTable } from "@/features/shared/sections";
 import { useRouter } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
@@ -135,6 +135,7 @@ function QueryCard({ id }: { id: string }) {
           ["Raised", formatDateTime(d.created_at)],
           ...(d.status === "awaiting_response" && d.response_due_at ? ([[<HelpTerm key="due" help="The employee has 48 hours to respond in writing.">Response Due</HelpTerm>, formatDateTime(d.response_due_at)]] as Array<[React.ReactNode, string]>) : []),
           ...(d.evidence.length ? ([["Counted", d.evidence.map((e) => (e.date ? `${formatDate(e.date)}, ${e.label}` : e.label)).join("; ")]] as Array<[string, string]>) : []),
+          ...(d.policy ? ([["Policy", <PolicyCited key="p" policy={d.policy} clause={d.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.response ? ([["Response", <RichText key="r" blocks={d.response.blocks} top={4} />]] as Array<[string, React.ReactNode]>) : []),
           ...(d.sanction ? ([["Sanction", `${d.sanction.step_name}${d.sanction.number ? `, ${d.sanction.number}` : ""}`]] as Array<[string, string]>) : []),
         ]}
@@ -150,23 +151,31 @@ function QueryCard({ id }: { id: string }) {
   );
 }
 
-type RaiseValues = { subject: string; details: string; signature: string };
+type RaiseValues = { subject: string; details: string; policy_id: string; policy_clause: string; signature: string };
 
 function RaiseQuery({ close }: { close: () => void }) {
   const [who, setWho] = useState<PickedPerson[]>([]);
+  const [policy, setPolicy] = useState<CitablePolicy[]>([]);
   const [tried, setTried] = useState(false);
+  // The policy cited and the clause quoted, only once a policy is picked (guide §6.2).
+  const cited = (v: RaiseValues) => {
+    const { policy_id: policyId, policy_clause: clause, ...rest } = v;
+    return policyId ? { ...rest, policy_id: policyId, ...(clause.trim() && { policy_clause: clause.trim() }) } : rest;
+  };
   const employee = who[0]?.employee_id ?? "";
   const pad = useRef<SignatureFieldHandle>(null);
   const f = useContractForm<RaiseValues>(
-    { subject: "", details: "", signature: "" },
-    withSignature({ safeParse: (v: unknown) => queries.QueryCreate.safeParse({ employee_id: employee || undefined, ...(v as RaiseValues) }) }, pad),
+    { subject: "", details: "", policy_id: "", policy_clause: "", signature: "" },
+    withSignature({ safeParse: (v: unknown) => queries.QueryCreate.safeParse({ employee_id: employee || undefined, ...cited(v as RaiseValues) }) }, pad),
   );
   const save = useMutation("POST /api/v1/queries");
   const submit = async () => {
     setTried(true);
     if (!f.check() || !employee) return;
     try {
-      const q = await save.run({ body: { employee_id: employee, subject: f.values.subject.trim(), details: f.values.details.trim(), signature: pad.current?.toPng() ?? "" } });
+      const q = await save.run({
+        body: { employee_id: employee, ...cited(f.values), subject: f.values.subject.trim(), details: f.values.details.trim(), signature: pad.current?.toPng() ?? "" },
+      });
       invalidate("/api/v1/queries");
       close();
       toast(`${q.number} raised, letter sent`);
@@ -179,6 +188,10 @@ function RaiseQuery({ close }: { close: () => void }) {
       <Field label="Employee" state={tried && !employee ? "bad" : undefined} message={tried && !employee ? "Pick the employee" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
       <Field label="Subject" {...f.status("subject")}><TextField {...f.field("subject")} placeholder="Missing clock-out" /></Field>
       <Field label="What Happened" {...f.status("details")}><TextAreaField {...f.field("details")} placeholder="No clock-out 14/10" /></Field>
+      <Field label="Policy" optional {...f.status("policy_id")}>
+        <PolicyPicker value={policy} onChange={(p) => (setPolicy(p), f.set("policy_id", p[0]?.policy_id ?? ""))} />
+      </Field>
+      {policy.length > 0 && <Field label={<HelpTerm help="The line of the policy the letter quotes.">Clause</HelpTerm>} optional {...f.status("policy_clause")}><TextField {...f.field("policy_clause")} /></Field>}
       <Field label="Your Signature" {...f.status("signature")}>
         <SignatureField ref={pad} label="Your Signature" onChange={(ink) => f.set("signature", ink ? "drawn" : "")} />
       </Field>
@@ -314,7 +327,7 @@ function Rules() {
           {rules.rows.map((r: QueryRule) => (
             <Card key={r.query_rule_id}>
               <CardHeader record title={r.name} right={<StatusPill s={ruleState(r)} />} />
-              <KeyValue items={[["Counts", TRIGGER_NAME[r.source_event]], ["Threshold", threshold(r)]]} />
+              <KeyValue items={[["Counts", TRIGGER_NAME[r.source_event]], ["Threshold", threshold(r)], ...(r.policy ? ([["Policy", r.policy.title]] as Array<[string, string]>) : [])]} />
               {configure && (
                 <div className="mt-2.5 flex justify-end">
                   <Button size="sm" onClick={() => flip(r)}>{r.active ? "Pause" : "Activate"}</Button>
@@ -343,19 +356,27 @@ function Rules() {
   );
 }
 
-type RuleValues = { name: string; source_event: string; measure: string; threshold: string; window_days: string };
-const ruleOf = (v: RuleValues) => ({ name: v.name, source_event: v.source_event as QueryRuleSource, measure: v.measure as "count" | "minutes", threshold: v.threshold === "" ? undefined : Number(v.threshold), window_days: v.window_days === "" ? undefined : Number(v.window_days) });
+type RuleValues = { name: string; source_event: string; measure: string; threshold: string; window_days: string; policy_id: string };
+const ruleOf = (v: RuleValues) => ({
+  name: v.name,
+  source_event: v.source_event as QueryRuleSource,
+  measure: v.measure as "count" | "minutes",
+  threshold: v.threshold === "" ? undefined : Number(v.threshold),
+  window_days: v.window_days === "" ? undefined : Number(v.window_days),
+  ...(v.policy_id && { policy_id: v.policy_id }),
+});
 
 function RuleForm({ close }: { close: () => void }) {
   const f = useContractForm<RuleValues>(
-    { name: "", source_event: "lateness", measure: "count", threshold: "3", window_days: "30" },
+    { name: "", source_event: "lateness", measure: "count", threshold: "3", window_days: "30", policy_id: "" },
     { safeParse: (v: RuleValues) => query_rules.QueryRuleCreate.safeParse(ruleOf(v)) },
   );
+  const [policy, setPolicy] = useState<CitablePolicy[]>([]);
   const save = useMutation("POST /api/v1/query-rules");
   const submit = async () => {
     if (!f.check()) return;
     try {
-      const r = await save.run({ body: ruleOf(f.values) as { name: string; source_event: QueryRuleSource; measure: "count" | "minutes"; threshold: number; window_days: number } });
+      const r = await save.run({ body: ruleOf(f.values) as { name: string; source_event: QueryRuleSource; measure: "count" | "minutes"; threshold: number; window_days: number; policy_id?: string } });
       invalidate("/api/v1/query-rules");
       close();
       toast(`${r.name} saved as a draft`);
@@ -376,6 +397,9 @@ function RuleForm({ close }: { close: () => void }) {
         <Field label={f.values.measure === "minutes" ? "Minutes" : "How Many Times"} {...f.status("threshold")}><NumberField {...f.field("threshold")} /></Field>
         <Field label="Within, Days" {...f.status("window_days")}><NumberField {...f.field("window_days")} /></Field>
       </Grid>
+      <Field label={<HelpTerm help="The policy this rule enforces. Its queries' letters quote it.">Policy</HelpTerm>} optional {...f.status("policy_id")}>
+        <PolicyPicker value={policy} onChange={(p) => (setPolicy(p), f.set("policy_id", p[0]?.policy_id ?? ""))} />
+      </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" busy={save.pending} onClick={submit}>Save Rule</Button>

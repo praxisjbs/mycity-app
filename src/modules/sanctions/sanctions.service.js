@@ -42,7 +42,7 @@ function detailOf(row) {
   const {
     employee_id: _e, raised_by: _r, query_subject: _s, query_details: _d, query_raised_at: _a,
     position: _p, letter_template: _l, financial_effect: _f, fine_amount: _m,
-    signature_document_id: _sig, decided_by_title: _t, ...out
+    signature_document_id: _sig, decided_by_title: _t, query_policy_version_id: _pv, query_policy_clause: _pc, ...out
   } = row;
   return out;
 }

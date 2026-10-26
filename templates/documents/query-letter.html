@@ -12,5 +12,6 @@ title: "Query {{ query_number }}"
   <h2>Query: {{ subject }}</h2>
   <p>Dear {{ employee.first_name }},</p>
   <p>{{ details }}</p>
+  {{#if policy}}<p>This is against our {{ policy.title }} ({{ policy.number }}, version {{ policy.version }}){{#if policy.clause}}: "{{ policy.clause }}"{{else}}.{{/if}}</p>{{/if}}
   <p>Please explain this in writing{{#if response_due}} by {{ datetime response_due }}{{/if}}, in My Queries on the MyCity hub. Your response is read before any decision is made.</p>
 </div>

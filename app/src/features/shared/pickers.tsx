@@ -1,4 +1,4 @@
-import type { Department, EmployeeListQuery, Project, Worksite } from "@mycity/contract/contract.gen.ts";
+import type { CitablePolicy, Department, EmployeeListQuery, Project, Worksite } from "@mycity/contract/contract.gen.ts";
 import { usePhotos } from "@/api/download";
 import { usePaged } from "@/api/hooks";
 import "@/api/types/organisation";
@@ -124,6 +124,22 @@ export function DepartmentPicker({ value, onChange, multiple }: { value: Departm
       title={(d) => d.name}
       multiple={multiple}
       placeholder="Search departments"
+    />
+  );
+}
+
+/** The Knowledge Hub's policies with a version in force, searched on the server (one): what a query cites. */
+export function PolicyPicker({ value, onChange }: { value: CitablePolicy[]; onChange: (value: CitablePolicy[]) => void }) {
+  const list = usePaged("GET /api/v1/queries/policies");
+  return (
+    <RecordPicker
+      list={{ rows: list.rows, page: list.page, loading: list.loading, error: list.error, q: list.q, setQ: list.setQ }}
+      value={value}
+      onChange={onChange}
+      id={(p) => p.policy_id}
+      title={(p) => p.title}
+      sub={(p) => `${p.number} · Version ${p.version}`}
+      placeholder="Search policies"
     />
   );
 }

@@ -38,3 +38,13 @@ export function LetterFile({ documentId, name }: { documentId: string | null; na
   if (!href) return <EmptyState bare icon="doc" title="Opening" text="This takes a moment." />;
   return <DocumentPreview name={`${name}.pdf`} mime="application/pdf" href={href} />;
 }
+
+/** The policy a query cites: its title, number and version, and the clause quoted. */
+export function PolicyCited({ policy, clause }: { policy: { title: string; number: string; version: number }; clause: string | null }) {
+  return (
+    <span>
+      {policy.title} ({policy.number}, Version {policy.version})
+      {clause && <span className="block text-subtle-foreground" data-copy="content">{clause}</span>}
+    </span>
+  );
+}

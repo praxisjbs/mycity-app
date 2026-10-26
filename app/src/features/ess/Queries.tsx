@@ -2,7 +2,7 @@ import { useState } from "react";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import queries from "@mycity/contract/schemas/queries.js";
 import type { MyQuery, MySanction } from "@mycity/contract/contract.gen.ts";
-import { LetterFile } from "@/features/shared/Letter";
+import { LetterFile, PolicyCited } from "@/features/shared/Letter";
 import {
   ActionGroup,
   Button,
@@ -107,6 +107,7 @@ function QueryRecord({ q }: { q: MyQuery }) {
           ["Raised On", formatDate(q.created_at)],
           [<HelpTerm key="due" help="You have 48 hours from when it was raised.">Respond By</HelpTerm>, q.response_due_at ? formatDateTime(q.response_due_at) : "None"],
           ["What Happened", <span key="d" data-copy="content">{q.details}</span>],
+          ...(q.policy ? ([["Policy", <PolicyCited key="p" policy={q.policy} clause={q.policy_clause} />]] as Array<[string, React.ReactNode]>) : []),
           ["Your Response", q.response ? <RichText key="r" blocks={q.response.blocks} top={4} /> : "Not yet"],
           ...(q.sanction ? ([["Sanction", q.sanction.step_name]] as Array<[string, string]>) : []),
         ]}

@@ -720,8 +720,69 @@ async function departmentNames(db, ids) {
   return new Map(rows.map((r) => [r.department_id, r.name]));
 }
 
+/* ------------------------------------------------------------------ *
+ * Citations: what another module may name (queries cite a policy, queries.md §6.2)
+ * ------------------------------------------------------------------ */
+
+/** The citation of each live policy's version in force on $1: the newest published that has started. */
+const CITABLE = `
+  SELECT x.policy_id, x.number, v.title, v.version, v.policy_version_id
+    FROM (SELECT p.policy_id, p.number::text AS number,
+                 (SELECT (array_agg(f.policy_version_id ORDER BY f.effective_from DESC, f.version DESC))[1]
+                    FROM policy_version f
+                   WHERE f.policy_id = p.policy_id AND f.status = 'published' AND f.effective_from <= $1::date) AS in_force
+            FROM policy p WHERE p.status = 'active') x
+    JOIN policy_version v ON v.policy_version_id = x.in_force`;
+
+/** A page of the policies with a version in force on `today`, by title. */
+function listCitable(db, query, today) {
+  return pageQuery(
+    db,
+    `SELECT c.*, ${TOTAL_COL}
+       FROM (${CITABLE}) c
+      WHERE ($2::text IS NULL OR search_fold(c.title || ' ' || c.number) LIKE '%' || search_fold($2) || '%')
+      ORDER BY c.title, c.policy_id`,
+    [today, query.q || null],
+    query,
+  );
+}
+
+/** One policy's citation on `today`, or null when it has no version in force (or is archived). */
+async function citableOne(db, policyId, today) {
+  const { rows } = await db.query(`SELECT c.* FROM (${CITABLE}) c WHERE c.policy_id = $2`, [today, policyId]);
+  return rows[0] || null;
+}
+
+/** Policies by id, named (number and title), for the rules that enforce them. */
+async function namesOf(db, ids) {
+  if (!ids.length) return [];
+  // pagination:complete the policies one page of rules names: at most 25 ids, never listed
+  const { rows } = await completeQuery(
+    db,
+    `SELECT policy_id, number::text AS number, title FROM policy WHERE policy_id = ANY($1::uuid[]) ORDER BY policy_id`,
+    [ids],
+    { label: "policies named by rules", ceiling: 25 },
+  );
+  return rows;
+}
+
+/** A published version as a citation, whatever is in force now: what a query cited stays named. */
+async function citationOfVersion(db, versionId) {
+  const { rows } = await db.query(
+    `SELECT p.policy_id, p.number::text AS number, v.title, v.version, v.policy_version_id
+       FROM policy_version v JOIN policy p ON p.policy_id = v.policy_id
+      WHERE v.policy_version_id = $1 AND v.status IN ('published', 'withdrawn') AND v.version IS NOT NULL`,
+    [versionId],
+  );
+  return rows[0] || null;
+}
+
 module.exports = {
   lock,
+  listCitable,
+  citableOne,
+  citationOfVersion,
+  namesOf,
   getPolicy,
   insertPolicy,
   renamePolicy,

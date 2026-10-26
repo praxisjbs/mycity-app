@@ -44,14 +44,31 @@ function codeFrom(name) {
 /** Whether something counts this trigger yet. */
 const countable = (source) => attendance.SOURCES.includes(source);
 
-const list = (query) => repo.list(pool, query, monthStart());
+const policies = () => require("../policies/policies.service");
+
+/** Rules as their cards show them: the policy each enforces, named through the policies service. */
+async function named(db, rows) {
+  const names = await policies().namesOf(db, rows.map((r) => r.policy_id));
+  return rows.map(({ policy_id: policyId, ...r }) => ({ ...r, policy: names.find((p) => p.policy_id === policyId) || null }));
+}
+
+async function list(query) {
+  const page = await repo.list(pool, query, monthStart());
+  return { ...page, data: await named(pool, page.data) };
+}
 const summary = () => repo.summary(pool, monthStart());
 const firings = (query, reader) => repo.firings(pool, query, reader);
 
 async function get(id) {
   const row = await repo.get(pool, id, monthStart());
   if (!row) throw notFound();
-  return row;
+  return (await named(pool, [row]))[0];
+}
+
+/** A rule may name a policy only while it has a version in force (queries guide §6.3). */
+async function assertPolicy(db, policyId) {
+  if (policyId && !(await policies().citation(db, policyId)))
+    throw new AppError("POLICY_NOT_IN_FORCE", "That policy has no version in force", 422, { policy_id: ["Not in force"] });
 }
 
 async function assertLetter(db, key) {
@@ -62,6 +79,7 @@ async function assertLetter(db, key) {
 async function create(actor, body) {
   const id = await tx(async (client) => {
     await assertLetter(client, body.letter_template);
+    await assertPolicy(client, body.policy_id);
     let code = codeFrom(body.name);
     for (let n = 2; await repo.codeTaken(client, code); n += 1) code = codeFrom(`${body.name} ${n}`);
     const ruleId = await repo.insert(client, { ...body, code, created_by: actor.user_id });
@@ -92,6 +110,7 @@ async function update(actor, id, body) {
     if (measure === "minutes" && source !== "lateness")
       throw new AppError("RULE_INVALID", "Minutes count lateness only", 422, { measure: ["Lateness only"] });
     if (body.letter_template) await assertLetter(client, body.letter_template);
+    await assertPolicy(client, body.policy_id);
     await repo.update(client, id, body);
     await emit(client, {
       key: EVENTS.QUERY_RULE_SAVED,

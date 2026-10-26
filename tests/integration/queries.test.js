@@ -818,6 +818,67 @@ describeDb("queries and sanctions against the real migrations", () => {
       ]);
     });
   });
+
+  /* ---------------------------------------------------------------- *
+   * Policies a query cites (guide §6.2, §6.3; meeting 26/10)
+   * ---------------------------------------------------------------- */
+
+  describe("policy citations", () => {
+    const policy = {};
+    beforeAll(async () => {
+      // A published policy in force (its second version) and one that is only a draft.
+      const made = async (number, title) =>
+        (await q("INSERT INTO policy (number, kind, title) VALUES ($1, 'document', $2) RETURNING policy_id", [number, title])).rows[0]
+          .policy_id;
+      policy.live = await made("POL-0901", "Attendance and Punctuality");
+      policy.draft = await made("POL-0902", "Dress Code");
+      for (const [version, from] of [[1, 40], [2, 10]])
+        await q(
+          `INSERT INTO policy_version (policy_id, status, title, version, effective_from, note, content_hash, published_at, body_markdown)
+           VALUES ($1, 'published', 'Attendance and Punctuality', $2, current_date - $3::int, 'Issued', 'h', now(), 'Clock in by 09:00.')`,
+          [policy.live, version, from],
+        );
+      await q("INSERT INTO policy_version (policy_id, status, title) VALUES ($1, 'draft', 'Dress Code')", [policy.draft]);
+    });
+
+    test("the picker lists the policies in force, each with its version in force", async () => {
+      const res = await as("hod").get("/queries/policies");
+      expect(res.status).toBe(200);
+      expect(res.body.data.map((p) => [p.number, p.title, p.version])).toEqual([["POL-0901", "Attendance and Punctuality", 2]]);
+    });
+
+    test("a query cites a policy and the clause; the letter quotes them; a policy not in force is refused", async () => {
+      const body = {
+        employee_id: people.other.employee.employee_id,
+        subject: "Three late arrivals this month",
+        details: "The register shows clock-ins after 09:00 on three working days this month.",
+        signature: SIGNATURE,
+      };
+      const refused = await as("hod").post("/queries", { ...body, policy_id: policy.draft });
+      expect(refused.status).toBe(422);
+      expect(refused.body.error.code).toBe("POLICY_NOT_IN_FORCE");
+
+      const res = await as("hod").post("/queries", { ...body, policy_id: policy.live, policy_clause: "Staff clock in by 09:00." });
+      expect(res.status).toBe(201);
+      expect(res.body.policy).toMatchObject({ policy_id: policy.live, number: "POL-0901", version: 2 });
+      expect(res.body.policy_clause).toBe("Staff clock in by 09:00.");
+      const html = (await q("SELECT render_html FROM document WHERE document_id = $1", [res.body.letter_document_id])).rows[0].render_html;
+      expect(html).toContain('This is against our Attendance and Punctuality (POL-0901, version 2): "Staff clock in by 09:00."</p>');
+      // The employee sees what was cited.
+      const mine = await as("other").get(`/ess/queries`);
+      expect(mine.body.data.find((r) => r.employee_query_id === res.body.employee_query_id).policy).toMatchObject({ number: "POL-0901" });
+    });
+
+    test("a rule names the policy it enforces; one not in force is refused", async () => {
+      const rule = { name: "Punctuality", source_event: "lateness", threshold: 3, window_days: 30 };
+      expect((await as("ops").post("/query-rules", { ...rule, policy_id: policy.draft })).body.error.code).toBe("POLICY_NOT_IN_FORCE");
+      const res = await as("ops").post("/query-rules", { ...rule, policy_id: policy.live });
+      expect(res.status).toBe(201);
+      expect(res.body.policy).toEqual({ policy_id: policy.live, number: "POL-0901", title: "Attendance and Punctuality" });
+      const cleared = await as("ops").patch(`/query-rules/${res.body.query_rule_id}`, { policy_id: null });
+      expect(cleared.body.policy).toBeNull();
+    });
+  });
 });
 
 /** Inclusive days from one ISO date to another. */

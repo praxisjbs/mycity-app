@@ -18,6 +18,7 @@ const reader = (req) => visibility.readerOf(scopeOf(req), req.user);
 module.exports = {
   list: async (req, res) => sendPaged(res, await service.list(req.validated.query, reader(req))),
   summary: async (req, res) => ok(res, await service.summary(reader(req))),
+  policies: async (req, res) => sendPaged(res, await require("../policies/policies.service").citable(req.validated.query)),
   get: async (req, res) => ok(res, await service.get(id(req), req.user, scopeOf(req))),
   raise: async (req, res) => created(res, await service.raise(withActor(req), scopeOf(req), req.validated.body)),
   remind: async (req, res) => ok(res, await service.remind(withActor(req), scopeOf(req), id(req))),

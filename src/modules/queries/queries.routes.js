@@ -28,6 +28,10 @@ route(router, "get", "/",
   { query: qs.QueryListQuery, response: qs.QueryPage, summary: "Queries the reader may see" },
   requirePermission("queries", "view"), controller.list);
 
+route(router, "get", "/policies",
+  { query: qs.CitablePolicyListQuery, response: qs.CitablePolicyPage, summary: "Policies a query or rule may cite" },
+  requirePermission("queries", "view"), controller.policies);
+
 route(router, "get", "/:id",
   { params: c.common.IdParams, response: qs.QueryDetail, summary: "One query" },
   requirePermission("queries", "view"), controller.get);

@@ -47,9 +47,27 @@ async function tx(fn) {
 
 const notFound = () => new AppError("NOT_FOUND", "That query does not exist", 404);
 
-/** A row as readers get it: its response, kept as Markdown, also as the blocks a screen draws. */
-const readable = (row) =>
-  row && row.response ? { ...row, response: { ...row.response, blocks: md.markdownToBlocks(row.response.body) } } : row;
+/** The policies service, which alone reads policies (queries cite one, guide §6.2). */
+const policies = () => require("../policies/policies.service");
+
+/**
+ * A row as readers get it: its response, kept as Markdown, also as the blocks a screen draws, and
+ * the policy it cites named through the policies service.
+ */
+async function readable(db, row) {
+  if (!row) return row;
+  const { policy_version_id: versionId, ...rest } = row;
+  const policy = versionId ? await policies().citationOfVersion(db, versionId) : null;
+  return {
+    ...rest,
+    policy,
+    ...(row.response && { response: { ...row.response, blocks: md.markdownToBlocks(row.response.body) } }),
+  };
+}
+
+/** A citation as a letter quotes it (ConsequenceLetterVars.policy). */
+const quoted = (citation, clause) =>
+  citation ? { number: citation.number, title: citation.title, version: citation.version, clause: clause || null } : null;
 
 /* ------------------------------------------------------------------ *
  * Reading
@@ -93,7 +111,7 @@ async function get(id, user, scope) {
     scopeFor(user, "queries", "edit"),
     scopeFor(user, "queries", "create"),
   ]);
-  const { employee_id: employeeId, ...rest } = readable(row);
+  const { employee_id: employeeId, ...rest } = await readable(pool, row);
   return {
     ...rest,
     next_step: row.status === "resolved" ? null : await nextStepFor(employeeId),
@@ -125,7 +143,7 @@ async function storeSignature(client, png, entity, actor) {
 }
 
 /** What every query letter fills from (ConsequenceLetterVars). */
-function letterData(person, row, signer) {
+function letterData(person, row, signer, policy = null) {
   return {
     employee: {
       display_name: person.display_name,
@@ -138,6 +156,7 @@ function letterData(person, row, signer) {
     details: row.details,
     raised_on: lagos.today(),
     response_due: row.response_due_at,
+    policy,
     signer,
   };
 }
@@ -146,7 +165,7 @@ function letterData(person, row, signer) {
  * The insert, the letter and the event, on the caller's transaction. Returns the new id,
  * or null when `dedup_key` was already taken.
  */
-async function insertQuery(client, { person, subject, details, evidence, rule, raisedBy, dedupKey, letterKey, signer, signature = null, actor }) {
+async function insertQuery(client, { person, subject, details, evidence, rule, raisedBy, dedupKey, letterKey, signer, signature = null, citation = null, clause = null, actor }) {
   if (dedupKey && (await repo.dedupTaken(client, dedupKey))) return null;
   const number = (await numbering.allocate(client, "query")).number;
   const responseDue = new Date(Date.now() + RESPONSE_HOURS * 3600 * 1000).toISOString();
@@ -160,6 +179,8 @@ async function insertQuery(client, { person, subject, details, evidence, rule, r
     evidence,
     response_due_at: responseDue,
     dedup_key: dedupKey,
+    policy_version_id: citation ? citation.policy_version_id : null,
+    policy_clause: citation ? clause : null,
   });
   if (!id) return null;
   if (signature) await repo.setSignature(client, id, await storeSignature(client, signature, { type: "query", id }, actor));
@@ -168,7 +189,7 @@ async function insertQuery(client, { person, subject, details, evidence, rule, r
     template: letterKey,
     entity: { type: "query", id },
     subject_employee_id: person.employee_id,
-    data: letterData(person, { number, subject, details, response_due_at: responseDue }, signer),
+    data: letterData(person, { number, subject, details, response_due_at: responseDue }, signer, quoted(citation, clause)),
     actor,
   });
   await repo.setLetter(client, id, doc.document_id);
@@ -210,6 +231,9 @@ async function raise(actor, scope, body) {
     const person = await activePerson(client, body.employee_id);
     const letterKey = await templates.usable(client, body.letter_template, "query", { fallback: "query-letter" });
     const me = actor.employee_id ? await repo.employeeOf(client, actor.employee_id) : null;
+    const citation = body.policy_id ? await policies().citation(client, body.policy_id) : null;
+    if (body.policy_id && !citation)
+      throw new AppError("POLICY_NOT_IN_FORCE", "That policy has no version in force", 422, { policy_id: ["Not in force"] });
     return insertQuery(client, {
       person,
       subject: body.subject,
@@ -223,6 +247,8 @@ async function raise(actor, scope, body) {
         ? { name: me.display_name, role: me.job_title || "Manager", signature: body.signature }
         : { ...PEOPLE_SIGNER, signature: body.signature },
       signature: body.signature,
+      citation,
+      clause: body.policy_clause || null,
       actor,
     });
   });
@@ -241,6 +267,8 @@ async function raiseForRule(client, breach) {
   const letterKey = (await templates.isReady(client, breach.rule.letter_template, "query"))
     ? breach.rule.letter_template
     : await templates.usable(client, "query-letter", "query");
+  // The policy the rule enforces, as in force today; without a version in force, no citation.
+  const citation = breach.rule.policy_id ? await policies().citation(client, breach.rule.policy_id) : null;
   return insertQuery(client, {
     person,
     subject: breach.subject,
@@ -251,6 +279,8 @@ async function raiseForRule(client, breach) {
     dedupKey: breach.dedup_key,
     letterKey,
     signer: PEOPLE_SIGNER,
+    citation,
+    clause: breach.rule.policy_clause || null,
     actor: null,
   });
 }
@@ -330,14 +360,14 @@ async function settleEscalation(client, id, { issued, reviewedBy }) {
 
 async function listMine(employeeId, query) {
   const page = await repo.listMine(pool, employeeId, query);
-  return { ...page, data: page.data.map(readable) };
+  return { ...page, data: await Promise.all(page.data.map((row) => readable(pool, row))) };
 }
 const mineSummary = (employeeId) => repo.mineSummary(pool, employeeId);
 
 async function getMine(employeeId, id) {
   const row = await repo.getMine(pool, employeeId, id);
   if (!row) throw notFound();
-  return readable(row);
+  return readable(pool, row);
 }
 
 const respond = (user, employeeId, id, body) => require("./queries.response").respond(user, employeeId, id, body);

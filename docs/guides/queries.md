@@ -36,7 +36,7 @@ ESS · My Queries.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Queries & Sanctions · Queries (`queries`) | Staff app | `queries` view: scope `all` sees every query; anyone else only the queries they raised (§6.1) | KPI strip (open, awaiting response, closed this month, escalated), the query list, the open query's card (subject, raised by, due, the response, the letter), Queries by Reason | Raise a Query, Send Reminder, View Letter, Record Decision (close with no action, or propose a sanction) |
+| Queries & Sanctions · Queries (`queries`) | Staff app | `queries` view: scope `all` sees every query; anyone else only the queries they raised (§6.1) | KPI strip (open, awaiting response, closed this month, escalated), the query list, the open query's card (subject, raised by, due, the policy cited, the response, the letter), Queries by Reason | Raise a Query, Send Reminder, View Letter, Record Decision (close with no action, or propose a sanction) |
 | Queries & Sanctions · Rules (`rules`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip (active, draft, fired this month, queries raised), one card per rule with its threshold, Recent Firings | New Rule, Edit Rule, Activate, Pause |
 | Queries & Sanctions · Sanctions (`sanctions`) | Staff app | `queries` view, same visibility as the query a sanction follows | KPI strip (active, awaiting approval, fines this year, fines recovered), sanction history | Issue Sanction (opens Queries: a sanction starts from a query's decision), Chain Settings: the ladder in order; Add Step, Move Up, Move Down, Retire need `queries.configure` |
 | Queries & Sanctions · Letter Templates (`letter-templates`) | Staff app | `queries` view; writes need `queries.configure` | KPI strip, the template list with status, the selected template's preview filled with sample values | New Template, Edit Template, Preview, Activate |
@@ -84,8 +84,8 @@ ESS · My Queries.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `query_rule` (3000, extended by 3010) | `code`, `name`, `source_event`, `measure`, `threshold`, `window_days`, `letter_template`, `active`, `activated_at` | One rule a row. `source_event` is the trigger (§6.3). A rule is a draft until first activated (`activated_at` null), active, or paused (`active` false after activation). No rule is seeded: thresholds are MyCity's choice (A26) |
-| `employee_query` (3000, 3010, 3020) | `number`, `employee_id`, `query_rule_id`, `raised_by`, `subject`, `details`, `evidence`, `status`, `outcome`, `response_due_at`, `reminded_at`, `dedup_key`, `letter_document_id`, `signature_document_id`, `workflow_instance_id`, `reviewed_by`, `reviewed_at` | `raised_by` null means a rule raised it. `dedup_key` is unique, so a breach delivered twice raises one query. `status` is `awaiting_response`, `under_review`, `resolved`; `outcome` is `no_action` or `sanctioned` once resolved |
+| `query_rule` (3000, extended by 3010, 3030) | `code`, `name`, `source_event`, `measure`, `threshold`, `window_days`, `letter_template`, `policy_id`, `policy_clause`, `active`, `activated_at` | One rule a row. `source_event` is the trigger (§6.3). A rule is a draft until first activated (`activated_at` null), active, or paused (`active` false after activation). No rule is seeded: thresholds are MyCity's choice (A26) |
+| `employee_query` (3000, 3010, 3020) | `number`, `employee_id`, `query_rule_id`, `raised_by`, `subject`, `details`, `evidence`, `status`, `outcome`, `response_due_at`, `reminded_at`, `dedup_key`, `letter_document_id`, `signature_document_id`, `policy_version_id`, `policy_clause`, `workflow_instance_id`, `reviewed_by`, `reviewed_at` | `raised_by` null means a rule raised it. `dedup_key` is unique, so a breach delivered twice raises one query. `status` is `awaiting_response`, `under_review`, `resolved`; `outcome` is `no_action` or `sanctioned` once resolved |
 | `query_response` (3000) | `employee_query_id`, `employee_id`, `body`, `submitted_at` | One per query, never updated |
 | `consequence_step` (3010) | `code`, `name`, `position`, `letter_template`, `financial_effect`, `default_days`, `valid_days`, `evidence_required`, `active` | MyCity's ladder, one rung a row, ordered by `position`. Entered on Chain Settings, not seeded (A26). `financial_effect`: `none`, `unpaid_days`, `ends_employment` |
 | `sanction` (3000, 3010, 3020) | `number`, `employee_query_id`, `employee_id`, `consequence_step_id`, `sanction_type`, `reason`, `evidence`, `decided_by`, `signature_document_id`, `effective_on`, `ends_on`, `status`, `workflow_instance_id` | Always from a query (NOT NULL). `sanction_type` is the rung's code at the time, kept if the rung is renamed. `status`: `pending_approval`, `issued`, `rejected`, `withdrawn` |
@@ -94,7 +94,8 @@ ESS · My Queries.
 | `letter_template` (3010) | `key`, `name`, `purpose`, `status` | The letters this module may send. The wording is `template_version` (0080) under the same key; the shipped default is `templates/documents/<key>.html`. `purpose`: `query`, `sanction` or `fine` (§6.6) |
 
 Schema migration file(s): `migrations/3000_queries_sanctions.sql` (merged), `migrations/3010_queries_chain.sql`,
-`migrations/3020_queries_signatures.sql` (the drawn signatures' `signature_document_id`).
+`migrations/3020_queries_signatures.sql` (the drawn signatures' `signature_document_id`),
+`migrations/3030_queries_policy.sql` (the policy a rule names and a query cites).
 Reference-data file(s): `seeds/reference/3099_seed_queries_sanctions.sql` (merged),
 `seeds/reference/3190_seed_queries_chain.sql`: the `queries.configure` capability and its holders,
 the `queries.consequence` approval, the shipped letter templates' rows, and `3099`'s invalid
@@ -114,6 +115,7 @@ Contract files: `schemas/queries.js`, `schemas/query_rules.js`, `schemas/sanctio
 | `POST /api/v1/queries` | `QueryCreate` → `QueryDetail` | `queries` create | | Idempotency-Key |
 | `POST /api/v1/queries/:id/remind` | `EmptyBody` → `QueryDetail` | `queries` create · §6.1 | | Once a day, while awaiting a response |
 | `POST /api/v1/queries/:id/decision` | `QueryDecision` → `QueryDetail` | `queries` edit · §6.1 | | §6.4 |
+| `GET /api/v1/queries/policies` | `CitablePolicyListQuery` (`q`) → `CitablePolicyPage` | `queries` view | yes, 25 | The policies a query or rule may cite: each with a published version in force, through `policies.service.citable()` |
 | `GET /api/v1/query-rules/summary` | → `QueryRulesSummary` | `queries` view | no | |
 | `GET /api/v1/query-rules` | `QueryRuleListQuery` (`state`, `source_event`, `q`, `sort`) → `QueryRulePage` | `queries` view | yes, 25 | |
 | `POST /api/v1/query-rules` | `QueryRuleCreate` → `QueryRule` | `queries` create, `queries.configure` | | Saved as a draft |
@@ -169,6 +171,12 @@ here.
   be recorded.
 - The query letter is generated in the same transaction (§6.7). A manual query uses the active
   letter template of purpose `query` chosen on the form, or the default `query-letter`.
+- **A policy it breaches** (meeting 26/10): the form may cite one of the Knowledge Hub's policies
+  with a version in force (`policy_id`, and optionally `policy_clause`, the line to quote, at most
+  300 characters). The query keeps the version in force that day (`policy_version_id`) and the
+  clause; the letter quotes them: "This is against our Attendance Policy (POL-0003, version 2):
+  ...". The list to pick from is `GET /queries/policies`, the policies service's `citable()`,
+  never the policy tables. A policy no longer in force is refused (422 `POLICY_NOT_IN_FORCE`).
 - **Signed.** The person raising it draws their signature on the form (`SignatureField`, a PNG
   data URL, `signature`); the service stores it through the vault (`purpose: "signature"`, doc type
   `query_signature`) as `employee_query.signature_document_id` and prints it on the letter above
@@ -194,6 +202,9 @@ here.
   `attendance.auto-query.js` (`offences()`); an exception People accepted ("the record stands") is not
   an offence. `overdue_task` and `missed_target` may be drafted but not switched on until M2's
   tasks and KPIs count them (409 `TRIGGER_NOT_AVAILABLE`).
+- A rule may name the policy it enforces (`policy_id`, `policy_clause`): its queries cite the
+  version in force on the breach day, and their letters quote it, as a manual query's (§6.2). A
+  rule whose policy has no version in force still raises its query, without the citation.
 - A draft or paused rule never fires. Activating a rule does not reach back: it counts events from
   its activation onwards.
 - A rule may not be deleted once it has fired; it is paused.
@@ -329,10 +340,10 @@ or tier 2.**
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Raise a Query | Employee, Subject, What Happened, Your Signature | None | Where the signature is kept: §6.2 |
+| Raise a Query | Employee, Subject, What Happened, Policy and Clause (both Optional), Your Signature | None | Where the signature is kept, the version cited: §6.2 |
 | Queries | KPI strip; All Queries and Raised by Me chips; the list (employee, number, subject, raised by or the rule, raised, response, status); the query card (subject, raised by, raised, response due, counted days, response, sanction); Raise a Query, Send Reminder, View Letter (the PDF the employee received), Record Decision | Help on Escalated: a sanction is waiting for approval. Help on Response Due: the 48 hour window | Who can see which query, the dedup, how a rule counts: §6 here, the manual |
 | Record Decision | Outcome (Close, No Action or Sanction), the step (the next one marked Next; only steps whose letter is ready), dates for an unpaid suspension, fine, reason, Your Signature (for a sanction) | Help on the next rung: why it is offered | The approval route and its thresholds: Settings · Approvals, §6.5 |
-| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 30 days", status); Recent Firings; New Rule, Activate, Pause | Help on Measure: count or late minutes | Counting after the last query, the dedup key: §6.3 |
+| Rules | KPI strip; rule cards (name, trigger, threshold as "3 in 30 days", the policy it enforces, status); Recent Firings; New Rule, Activate, Pause | Help on Measure: count or late minutes | Counting after the last query, the dedup key: §6.3 |
 | Sanctions | KPI strip; the history (employee, sanction, query, reason, decided by, date, fine, status); Issue Sanction, Chain Settings | None | The rank rule for approvals, valid_days mechanics: §6.5 |
 | Chain Settings | The steps in order (position and name, Ready, Needs a Letter or Retired, letter, financial effect, in force for); Add Step, Move Up, Move Down, Retire, Restore | Help on In Force For: how long a step counts for the next offence | Why a fine is not a rung: §6.6 |
 | Letter Templates | Stat strip; the list (template, used by, status); the selected letter's preview on paper, the record's words underlined; New Template, Edit Template, Activate | Help on Letter: the names a letter can use | Versioning, the shipped defaults: §6.7 |
@@ -404,6 +415,9 @@ or tier 2.**
 
 ## 14 · Change log
 
+- 26/10/2026 · GE · Policies (meeting 26/10): a rule names the policy it enforces and a manual query
+  may cite one, with the clause to quote; the query keeps the version in force, and its letter
+  quotes it (§6.2, §6.3, migration 3030, `GET /queries/policies` through the policies service).
 - 26/10/2026 · GE · Signatures and layout (meeting 26/10): Raise a Query and a sanction's proposal
   take a drawn signature, stored through the vault (`signature_document_id`, migration 3020) and
   printed on the letter (§6.2, §6.4); the shared letterhead repeats its header and footer on every

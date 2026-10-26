@@ -25,7 +25,7 @@ const ROWS = `
          EXISTS (SELECT 1 FROM sanction s WHERE s.employee_query_id = q.employee_query_id
                   AND s.status = 'pending_approval') AS escalated,
          q.response_due_at, q.responded_at, q.reminded_at,
-         q.letter_document_id, q.workflow_instance_id,
+         q.letter_document_id, q.workflow_instance_id, q.policy_version_id, q.policy_clause,
          ${NAME("ve")} AS reviewed_by_name, q.reviewed_at,
          CASE WHEN qr.query_response_id IS NULL THEN NULL
               ELSE json_build_object('body', qr.body, 'submitted_at', qr.submitted_at) END AS response,
@@ -54,7 +54,8 @@ const LIST_OUT = `v.employee_query_id, v.number, v.employee, v.subject, v.raised
 
 /** Everything get() hands the service: QueryDetail's keys and the ids the checks need. */
 const DETAIL_OUT = `${LIST_OUT}, v.employee_id, v.details, v.evidence, v.response, v.letter_document_id,
-  v.reminded_at, v.reviewed_by_name, v.reviewed_at, v.workflow_instance_id, v.sanction`;
+  v.reminded_at, v.reviewed_by_name, v.reviewed_at, v.workflow_instance_id, v.sanction,
+  v.policy_version_id, v.policy_clause`;
 
 const SORTS = {
   created_at: "v.created_at",
@@ -115,8 +116,9 @@ async function lock(db, id) {
 async function insert(db, row) {
   const { rows } = await db.query(
     `INSERT INTO employee_query
-       (number, employee_id, query_rule_id, raised_by, subject, details, evidence, status, response_due_at, dedup_key)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 'awaiting_response', $8, $9)
+       (number, employee_id, query_rule_id, raised_by, subject, details, evidence, status, response_due_at, dedup_key,
+        policy_version_id, policy_clause)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 'awaiting_response', $8, $9, $10, $11)
      ON CONFLICT (dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING
      RETURNING employee_query_id`,
     [
@@ -129,6 +131,8 @@ async function insert(db, row) {
       JSON.stringify(row.evidence || []),
       row.response_due_at,
       row.dedup_key || null,
+      row.policy_version_id || null,
+      row.policy_clause || null,
     ],
   );
   return rows[0] ? rows[0].employee_query_id : null;
@@ -225,7 +229,7 @@ function listMine(db, employeeId, query) {
   return pageQuery(
     db,
     `SELECT v.employee_query_id, v.number, v.subject, v.details, v.status, v.outcome, v.response_due_at,
-            v.response, v.letter_document_id, v.sanction,
+            v.response, v.letter_document_id, v.sanction, v.policy_version_id, v.policy_clause,
             (v.status = 'awaiting_response' AND v.response IS NULL) AS can_respond,
             v.created_at, ${TOTAL_COL}
        FROM (${ROWS}) v
@@ -254,7 +258,7 @@ async function mineSummary(db, employeeId) {
 async function getMine(db, employeeId, id) {
   const { rows } = await db.query(
     `SELECT v.employee_query_id, v.number, v.subject, v.details, v.status, v.outcome, v.response_due_at,
-            v.response, v.letter_document_id, v.sanction,
+            v.response, v.letter_document_id, v.sanction, v.policy_version_id, v.policy_clause,
             (v.status = 'awaiting_response' AND v.response IS NULL) AS can_respond, v.created_at
        FROM (${ROWS}) v WHERE v.employee_query_id = $1 AND v.employee_id = $2`,
     [id, employeeId],

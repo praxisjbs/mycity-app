@@ -73,6 +73,10 @@ async function generate(client, row, number, actor) {
       })
     : null;
   const person = await employeeOf(client, row.employee_id);
+  // The policy the query cited, quoted again (queries guide §6.2), named by the policies service.
+  const cited = row.query_policy_version_id
+    ? await require("../policies/policies.service").citationOfVersion(client, row.query_policy_version_id)
+    : null;
   const data = {
     employee: {
       display_name: person.display_name,
@@ -90,6 +94,9 @@ async function generate(client, row, number, actor) {
     ends_on: row.ends_on,
     days: daysOf(row),
     fine_amount: row.fine_amount || null,
+    policy: cited
+      ? { number: cited.number, title: cited.title, version: cited.version, clause: row.query_policy_clause || null }
+      : null,
     signer: await signerOf(client, row),
   };
   const letter = (template) =>

@@ -15,6 +15,7 @@ const STATE = `CASE WHEN r.active THEN 'active' WHEN r.activated_at IS NULL THEN
 const ROWS = `
   SELECT r.query_rule_id, r.code::text AS code, r.name, r.source_event, r.measure,
          r.threshold::int AS threshold, r.window_days, r.letter_template::text AS letter_template,
+         r.policy_id, r.policy_clause,
          ${STATE} AS state, r.active, r.activated_at,
          (SELECT count(*)::int FROM employee_query q WHERE q.query_rule_id = r.query_rule_id AND q.created_at >= $1)
            AS fired_this_month,
@@ -23,7 +24,8 @@ const ROWS = `
     FROM query_rule r`;
 
 const OUT = `v.query_rule_id, v.code, v.name, v.source_event, v.measure, v.threshold, v.window_days,
-  v.letter_template, v.state, v.active, v.activated_at, v.fired_this_month, v.created_at, v.updated_at`;
+  v.letter_template, v.policy_id, v.policy_clause, v.state, v.active, v.activated_at, v.fired_this_month,
+  v.created_at, v.updated_at`;
 
 const SORTS = { name: "v.name", created_at: "v.created_at" };
 
@@ -63,15 +65,27 @@ async function isQueryLetter(db, key) {
 
 async function insert(db, row) {
   const { rows } = await db.query(
-    `INSERT INTO query_rule (code, name, source_event, measure, threshold, window_days, letter_template, active, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8)
+    `INSERT INTO query_rule (code, name, source_event, measure, threshold, window_days, letter_template, active, created_by,
+                             policy_id, policy_clause)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, $10)
      RETURNING query_rule_id`,
-    [row.code, row.name, row.source_event, row.measure, row.threshold, row.window_days, row.letter_template || null, row.created_by],
+    [
+      row.code,
+      row.name,
+      row.source_event,
+      row.measure,
+      row.threshold,
+      row.window_days,
+      row.letter_template || null,
+      row.created_by,
+      row.policy_id || null,
+      row.policy_clause || null,
+    ],
   );
   return rows[0].query_rule_id;
 }
 
-const FIELDS = ["name", "source_event", "measure", "threshold", "window_days", "letter_template"];
+const FIELDS = ["name", "source_event", "measure", "threshold", "window_days", "letter_template", "policy_id", "policy_clause"];
 
 async function update(db, id, fields) {
   const keys = FIELDS.filter((k) => fields[k] !== undefined);
@@ -133,7 +147,7 @@ async function activeFor(db, sources) {
   const { rows } = await completeQuery(
     db,
     `SELECT query_rule_id, code::text AS code, name, source_event, measure, threshold::int AS threshold,
-            window_days, letter_template::text AS letter_template, activated_at
+            window_days, letter_template::text AS letter_template, policy_id, policy_clause, activated_at
        FROM query_rule WHERE active AND source_event = ANY($1::text[])
       ORDER BY created_at, query_rule_id`,
     [sources],

@@ -112,7 +112,7 @@ const ROWS = `
          x.consequence_step_id, x.sanction_type, COALESCE(s.name, x.sanction_type) AS step_name,
          s.position, s.valid_days, s.letter_template::text AS letter_template, s.financial_effect,
          x.reason, x.decided_by, ${NAME("de")} AS decided_by_name, de.job_title AS decided_by_title,
-         x.signature_document_id,
+         x.signature_document_id, q.policy_version_id AS query_policy_version_id, q.policy_clause AS query_policy_clause,
          x.effective_on, x.ends_on, x.status, x.evidence, x.workflow_instance_id,
          CASE WHEN f.sanction_fine_id IS NULL THEN NULL
               ELSE json_build_object('amount_ngn', f.amount_ngn::text, 'settlement_status', f.settlement_status,
@@ -147,7 +147,8 @@ const LIST_OUT = `v.sanction_id, v.number, v.employee, v.employee_query_id, v.qu
 /** SanctionDetail's keys and what the service needs beside them. */
 const DETAIL_OUT = `${LIST_OUT}, v.evidence, v.letter_document_id, v.fine_letter_document_id, v.workflow_instance_id, v.waiting_on,
   v.employee_id, v.raised_by, v.query_subject, v.query_details, v.query_raised_at, v.position,
-  v.letter_template, v.financial_effect, v.fine_amount, v.signature_document_id, v.decided_by_title`;
+  v.letter_template, v.financial_effect, v.fine_amount, v.signature_document_id, v.decided_by_title,
+  v.query_policy_version_id, v.query_policy_clause`;
 
 const SORTS = { effective_on: "v.effective_on", created_at: "v.created_at" };
 

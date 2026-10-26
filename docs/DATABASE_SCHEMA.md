@@ -378,7 +378,9 @@ invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six star
 `measure`, letter and drafts, the query's `dedup_key` (three punches raise exactly one query),
 outcome and letter, a sanction's number, rung, evidence and approval; `letter_template.purpose`
 `query`, `sanction` or `fine` · `3020` the drawn signatures, `signature_document_id` on
-`employee_query` and `sanction` (the vault keeps the PNG) · `3190` the `queries.configure`
+`employee_query` and `sanction` (the vault keeps the PNG) · `3030` the policy a rule enforces
+(`query_rule.policy_id`, `policy_clause`) and the version a query cites (`employee_query.policy_version_id`,
+`policy_clause`) · `3190` the `queries.configure`
 capability, the `queries.consequence` approval (replacing `3099`'s invalid `employee_consequence`,
 switched off) and the shipped letters' rows, seven with the Question and Salary Deduction letters
 (docs/guides/queries.md §4).

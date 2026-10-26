@@ -13,7 +13,7 @@ import type {
 } from "@mycity/contract/contract.gen.ts";
 import { at, created, fail, invalid, isoDaysAgo, notFound, ok, paged, route, sid, type Req } from "../core";
 import { byId, byKey, refKey } from "../data/people";
-import { blocksOf } from "./policies";
+import { blocksOf, citablePolicies, policyCitation } from "./policies";
 
 /**
  * Queries & Sanctions on the mock, in the contract's shapes (packages/contract/schemas/
@@ -259,15 +259,20 @@ function mk(n: number, who: string, subject: string, by: string | null, daysAgo:
     reviewed_at: status === "resolved" ? at(daysAgo - 2, "15:00") : null,
     workflow_instance_id: null,
     sanction: null,
+    policy: null,
+    policy_clause: null,
     next_step: null,
     can_decide: false,
     can_remind: false,
     _by: by,
   };
 }
+/** The Attendance policy, which the lateness rule enforces in the demo. */
+const ATTENDANCE_CITED = () => citablePolicies().find((p) => /attendance/i.test(p.title)) ?? null;
+const LATENESS_CLAUSE = "Staff clock in by 09:00 on working days.";
 const late = (d: number, m: number): EvidenceItem => ({ label: `Late arrival, ${m} minutes`, date: isoDaysAgo(d) });
 const QUERIES: Row[] = [
-  mk(14, "bashir", RULE_NAME, null, 2, { evidence: [late(20, 31), late(9, 22), late(2, 41)] }),
+  Object.assign(mk(14, "bashir", RULE_NAME, null, 2, { evidence: [late(20, 31), late(9, 22), late(2, 41)] }), { policy: ATTENDANCE_CITED(), policy_clause: LATENESS_CLAUSE }),
   mk(15, "chidera", "Missing clock-out on Thursday", "emeka", 1),
   mk(13, "tobi", RULE_NAME, null, 6, { status: "under_review", response: "The bridge was closed on each of those mornings.", evidence: [late(25, 12), late(14, 18), late(6, 9)] }),
   mk(12, "seyi", "Punch from an unregistered phone", "cynthia", 12, { status: "resolved", outcome: "no_action", response: "My phone was replaced; the new one is now registered." }),
@@ -349,23 +354,31 @@ route("GET /api/v1/queries", (req) => {
     },
   });
 });
+route("GET /api/v1/queries/policies", (req) =>
+  paged(citablePolicies(), req, { search: (p) => [p.title, p.number] }),
+);
 route("GET /api/v1/queries/:id", (req) => {
   const q = findQ(req.user!, req.params.id);
   return q ? ok(view(q, req.user!)) : notFound();
 });
 route("POST /api/v1/queries", (req) => {
-  const b = req.body as { employee_id?: string; subject?: string; details?: string; signature?: string };
+  const b = req.body as { employee_id?: string; subject?: string; details?: string; signature?: string; policy_id?: string; policy_clause?: string };
   const p = byId(b.employee_id);
   const f: Record<string, string[]> = {};
   if (!p) f.employee_id = ["Required"];
   if (!/^data:image\/png;base64,/.test(b.signature ?? "")) f.signature = ["Sign in the box"];
+  const cited = b.policy_id ? policyCitation(b.policy_id) : null;
+  if (b.policy_id && !cited) f.policy_id = ["Not in force"];
   if (!b.subject || b.subject.trim().length < 4) f.subject = ["Name the subject"];
   if (!b.details || b.details.trim().length < 20) f.details = ["Give the facts"];
   if (Object.keys(f).length) return invalid(f);
   if (p!.user_key === req.user) return invalid({ employee_id: ["Not yourself"] });
   const n = Math.max(...QUERIES.map((q) => Number(q.number.slice(4)))) + 1;
   const q = mk(n, p!.user_key, b.subject!.trim(), req.user!, 0);
-  Object.assign(q, { details: b.details!.trim(), created_at: now(), response_due_at: new Date(Date.now() + 48 * 3600 * 1000).toISOString() });
+  Object.assign(q, {
+    details: b.details!.trim(), created_at: now(), response_due_at: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+    policy: cited, policy_clause: cited ? (b.policy_clause?.trim() || null) : null,
+  });
   QUERIES.unshift(q);
   return created(view(q, req.user!));
 });
@@ -412,7 +425,10 @@ const RULES: QueryRule[] = (
   ] as const
 ).map(([name, source, measure, threshold, window, state], i) => ({
   query_rule_id: sid(`rule:${i}`), code: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"), name, source_event: source, measure, threshold,
-  window_days: window, letter_template: null, state, active: state === "active", activated_at: state === "draft" ? null : at(40, "09:00"),
+  window_days: window, letter_template: null,
+  policy: i === 0 && ATTENDANCE_CITED() ? { policy_id: ATTENDANCE_CITED()!.policy_id, number: ATTENDANCE_CITED()!.number, title: ATTENDANCE_CITED()!.title } : null,
+  policy_clause: i === 0 ? LATENESS_CLAUSE : null,
+  state, active: state === "active", activated_at: state === "draft" ? null : at(40, "09:00"),
   fired_this_month: i === 0 ? 2 : 0, created_at: at(41, "09:00"), updated_at: at(40, "09:00"),
 }));
 const COUNTED = new Set(["lateness", "absence", "missing_clock_out", "unenrolled_device"]);
@@ -441,9 +457,10 @@ route("GET /api/v1/query-rules/firings", (req) => {
 route("POST /api/v1/query-rules", (req) => {
   const refused = configure(req);
   if (refused) return refused;
-  const b = req.body as Partial<QueryRule>;
+  const b = req.body as Partial<QueryRule> & { policy_id?: string };
   const f: Record<string, string[]> = {};
   if (!b.name?.trim()) f.name = ["Required"];
+  if (b.policy_id && !policyCitation(b.policy_id)) f.policy_id = ["Not in force"];
   if (!b.source_event) f.source_event = ["Choose one"];
   if (!(Number(b.threshold) >= 1)) f.threshold = ["At least 1"];
   if (!(Number(b.window_days) >= 1)) f.window_days = ["At least 1 day"];
@@ -451,19 +468,26 @@ route("POST /api/v1/query-rules", (req) => {
   if (Object.keys(f).length) return invalid(f);
   const r: QueryRule = {
     query_rule_id: sid(`rule:new:${RULES.length}`), code: b.name!.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_"), name: b.name!.trim(), source_event: b.source_event!,
-    measure: b.measure ?? "count", threshold: Number(b.threshold), window_days: Number(b.window_days), letter_template: b.letter_template ?? null, state: "draft",
+    measure: b.measure ?? "count", threshold: Number(b.threshold), window_days: Number(b.window_days), letter_template: b.letter_template ?? null,
+    policy: ruleNamed(b.policy_id), policy_clause: b.policy_id ? (b.policy_clause ?? null) : null, state: "draft",
     active: false, activated_at: null, fired_this_month: 0, created_at: now(), updated_at: now(),
   };
   RULES.push(r);
   return created(r);
 });
 const ruleOf = (id: string) => RULES.find((r) => r.query_rule_id === id);
+function ruleNamed(policyId: string | null | undefined): QueryRule["policy"] {
+  const c = policyId ? policyCitation(policyId) : null;
+  return c ? { policy_id: c.policy_id, number: c.number, title: c.title } : null;
+}
 route("PATCH /api/v1/query-rules/:id", (req) => {
   const refused = configure(req);
   if (refused) return refused;
   const r = ruleOf(req.params.id);
   if (!r) return notFound();
-  Object.assign(r, req.body, { updated_at: now() });
+  const { policy_id: policyId, ...rest } = req.body as Partial<QueryRule> & { policy_id?: string | null };
+  if (policyId && !policyCitation(policyId)) return invalid({ policy_id: ["Not in force"] });
+  Object.assign(r, rest, { updated_at: now() }, policyId !== undefined && { policy: ruleNamed(policyId) });
   return ok(r);
 });
 route("POST /api/v1/query-rules/:id/activate", (req) => {
@@ -533,6 +557,7 @@ const mySanctions = (user: string) => SANCTIONS.filter((s) => s.employee.employe
 const myQuery = (q: Row): MyQuery => ({
   employee_query_id: q.employee_query_id, number: q.number, subject: q.subject, details: q.details, status: q.status, outcome: q.outcome,
   response_due_at: q.response_due_at, response: q.response, letter_document_id: q.letter_document_id, sanction: q.sanction,
+  policy: q.policy, policy_clause: q.policy_clause,
   can_respond: q.status === "awaiting_response" && !q.response, created_at: q.created_at,
 });
 

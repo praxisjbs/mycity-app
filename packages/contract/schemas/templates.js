@@ -127,6 +127,12 @@ const ConsequenceLetterVars = z
     ends_on: isoDate.nullable().default(null),
     days: z.number().int().nullable().default(null),
     fine_amount: money.nullable().default(null),
+    // The policy the query cites, and the line quoted (guide §6.2).
+    policy: z
+      .object({ number: z.string(), title: z.string(), version: z.number().int(), clause: z.string().nullable() })
+      .strict()
+      .nullable()
+      .default(null),
     signer: z
       .object({
         name: z.string(),

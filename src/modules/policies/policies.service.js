@@ -1186,6 +1186,22 @@ async function canManage(db, user) {
   return (await grantsCache.getCapabilities(db, user && user.user_id)).includes("policies.manage");
 }
 
+/* ------------------------------------------------------------------ *
+ * Citations for other modules (queries.md §6.2): they never read these tables
+ * ------------------------------------------------------------------ */
+
+/** A page of the policies a record may cite: each with a published version in force today. */
+const citable = (query) => repo.listCitable(pool, query, lagos.today());
+
+/** The version of a policy in force on `on` (today unless given) as a citation, or null. */
+const citation = (db, policyId, on = lagos.today()) => repo.citableOne(db, policyId, on);
+
+/** A version already cited, named as it was. */
+const citationOfVersion = (db, versionId) => repo.citationOfVersion(db, versionId);
+
+/** Policies by id, as `{ policy_id, number, title }`, for the records that name them. */
+const namesOf = (db, ids) => repo.namesOf(db, [...new Set(ids.filter(Boolean))]);
+
 module.exports = {
   AHEAD_DAYS,
   REMIND_AFTER_DAYS,
@@ -1220,4 +1236,8 @@ module.exports = {
   remindersDue,
   reminderCheck,
   canManage,
+  citable,
+  citation,
+  citationOfVersion,
+  namesOf,
 };
