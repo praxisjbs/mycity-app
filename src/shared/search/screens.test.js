@@ -26,3 +26,12 @@ describe("People's tabs for a reader without Settings", () => {
     expect(["employees", "leave", "devices", "worksites"].every((tab) => tabVisible(people(tab), ops))).toBe(true);
   });
 });
+
+describe("Staff Community's Announcements", () => {
+  const announcements = { module: "community", tab: "announcements" };
+  test("follows announcements.post, as every announcements route asks, not People create", () => {
+    expect(tabVisible(announcements, reader({ community: ["view"] }, { capabilities: ["announcements.post"] }))).toBe(true);
+    expect(tabVisible(announcements, reader({ community: ["view"], people: ["view", "create"] }))).toBe(false);
+    expect(tabVisible(announcements, reader({ community: ["view"] }, { is_ceo: true }))).toBe(true);
+  });
+});

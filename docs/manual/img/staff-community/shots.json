@@ -1,7 +1,7 @@
 {
   "community-announcement-reads": {
     "spec": "9c3da9f9bc07f282",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "community-announcements": {
     "spec": "8178e5da3db37957",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "community-celebration": {
     "spec": "0f25f5588e74c11c",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "community-channel-open": {
     "spec": "1c8b1d196a4d8894",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "community-channels": {
     "spec": "228c84c59c33cb4a",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "community-direct-messages": {
     "spec": "91f0db9eec5f57a3",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -49,7 +49,7 @@
   },
   "community-forward": {
     "spec": "046dea26596b0375",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "community-new-announcement": {
     "spec": "7517e535ad4d6b39",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "community-new-channel": {
     "spec": "8813caa88f36ed03",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "community-plus": {
     "spec": "22e9929154d7a458",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "community-profile": {
     "spec": "71443a3af872aeab",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "community-send-files": {
     "spec": "5725146dc690a64f",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop"
     ]

@@ -180,7 +180,8 @@ function tabVisible(screen, reader) {
   if (module === "knowledge" && tab === "policies") return hasCapability(reader, "policies.manage");
   // A line manager decides their team's leave on People · Leave (docs/guides/ess.md §2).
   if (module === "people" && !full) return tab === "attendance" || tab === "organogram" || (tab === "leave" && reader.manages_people);
-  if (module === "community" && tab === "announcements") return can("people", "create");
+  // Announcements is for those who post them (`announcements.post`, as every route asks).
+  if (module === "community" && tab === "announcements") return hasCapability(reader, "announcements.post");
   if (module === "queries" && !full) return tab === "queries";
   if (module === "expenses" && !full)
     return ["my-requests", "approvals", "budgets"].includes(tab) && (tab !== "approvals" || reader.manages_people);

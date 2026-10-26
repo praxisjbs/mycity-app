@@ -59,10 +59,9 @@ function SendWishes({
       close();
       toast("Wishes sent");
     } catch (e) {
-      if (e instanceof ApiError)
-        f.setServerErrors(
-          e.fields.body ? { body: e.fields.body } : { body: [e.message] },
-        );
+      // A mark on the wish, or a refusal no field holds (the card deleted meanwhile) said in words.
+      if (e instanceof ApiError && e.fields.body) f.setServerErrors({ body: e.fields.body });
+      else toast.error(e instanceof ApiError ? e.message : "Not sent. Try again.");
     }
   });
   return (
@@ -579,7 +578,8 @@ function AnnouncementPost({ m, q }: { m: Message; q: string }) {
   const acknowledge = () =>
     api
       .call("POST /api/v1/community/announcements/:id/acknowledge", { params: { id: a!.announcement_id }, body: {} })
-      .then(() => invalidate("/api/v1/community", "/api/v1/notifications"));
+      .then(() => invalidate("/api/v1/community", "/api/v1/notifications"))
+      .catch((e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not acknowledged. Try again."));
   return (
     <Card urgency={a?.urgency ?? "normal"} className="max-w-152">
       <div className="mb-1.5 flex items-center gap-2 text-2xs text-subtle-foreground">

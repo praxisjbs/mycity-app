@@ -33,7 +33,7 @@
   },
   "qs-announcement": {
     "spec": "db708f827aaf9de8",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"
@@ -57,7 +57,7 @@
   },
   "qs-channel": {
     "spec": "344266c761e21850",
-    "source": "da280e1c4c1f6901",
+    "source": "2dfa7454045fdc15",
     "devices": [
       "desktop",
       "phone"

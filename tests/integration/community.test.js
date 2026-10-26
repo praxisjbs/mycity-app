@@ -456,7 +456,10 @@ describeDb("Staff Community against the real migrations", () => {
     const page = await as("tunde").get(`/community/channels/${id}/messages`);
     const gone = page.body.data.find((m) => m.community_message_id === text.body.community_message_id);
     expect(gone).toMatchObject({ deleted: true, body: null, can_edit: false, can_delete: false });
-    expect((await as("bola").del(`/community/messages/${text.body.community_message_id}`)).status).toBe(404);
+    const again = await as("bola").del(`/community/messages/${text.body.community_message_id}`);
+    expect(again.status).toBe(404);
+    // Said as a message, not a conversation.
+    expect(again.body.error.message).toBe("That message is no longer here");
 
     // Celebrations by hand: the channel's admins only.
     const bday = { message_type: "birthday", subject_employee_id: people.ceo.employee.employee_id };

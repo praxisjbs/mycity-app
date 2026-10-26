@@ -65,7 +65,7 @@ delete anyone's wish: its admins, and in #general People and the CEO.
 |---|---|---|
 | **Write a wish** | The wish is empty | Type a wish |
 | *At most 280 characters* | The wish is over 280 characters | Shorten it |
-| **Check this value** | The card was deleted while you wrote | Press **Cancel** |
+| **That message is no longer here** | The card was deleted while you wrote | Press **Cancel** |
 | **There is no such wish** | Someone deleted the wish first | Nothing to do |
 
 ### Vote in a poll {#community-channels-vote}
@@ -109,11 +109,12 @@ words stay in the box to send again.
 |---|---|---|
 | **You cannot post in this channel** | You are no longer one of this channel's admins | Ask one of its admins to post it |
 | **There is no such conversation** | You were taken out of the channel | Go back to the list. It has left your list |
-| **Check the highlighted fields** | The message is over 4,000 characters, or a recognition note over 500 | Shorten it and send again |
+| *Messages hold 4,000 characters at most* | The message is too long; it stays in the box | Shorten it and send again |
+| *At most 500 characters* under **Note** | A recognition note is over 500 characters | Shorten the note |
 | **Too many requests. Wait a moment and try again.** | Many messages or files went in one minute | Wait a minute and send again, or press **Retry** |
 | **Not sent. Try again.** | The connection dropped | Check your connection and press **Send** again |
 | **Allow the microphone to record** | The browser was refused the microphone | Allow it in your browser's site settings, then press **Record a voice note** again |
-| **This browser cannot record audio** | This browser has no recorder | Use an up to date browser, such as Chrome, Edge or Safari |
+| **This browser cannot record. Type instead.** | This browser has no recorder | Type the message, or use an up to date browser, such as Chrome, Edge or Safari |
 | **Could not send the voice note** | The note did not reach the hub | Check your connection and record it again |
 | **Could not transcribe** | No transcript could be made now | Press **Transcribe** again later |
 | **Choose a file first** | You pressed **Send Files** with no file | Pick a file |
@@ -169,12 +170,15 @@ can.
 1. Press the plus, **Add to message**, then **Start a Poll**.
 2. Type the **Question**, at least four characters.
 3. Fill in the first two options. The third and fourth are optional.
-4. Press **Post Poll**.
+4. Press **Post Poll**. The form closes once the poll is posted; if it is refused, it stays with
+   your words and says why.
 
 | The field says | What to do |
 |---|---|
-| **Add a question** | Type a question of at least four characters |
+| **Add a question** | Type a question |
+| *At least 4 characters* | Make the question at least four characters |
 | **Add an option** | Fill in both of the first two options |
+| *At most 80 characters* under an option | Shorten the option |
 
 ### Do something with a message {#community-channels-message}
 
@@ -207,7 +211,7 @@ its sender edits or deletes.
 |---|---|---|
 | **Write something** | The message is empty | Type it, or press **Cancel** |
 | **Too late to edit** | 15 minutes have passed since you sent it | Delete it and send it again |
-| **Check this value** | The message was deleted meanwhile | Press **Cancel** |
+| **That message is no longer here** | The message was deleted meanwhile | Press **Cancel** |
 | **People have voted on this poll** | Someone voted while you edited | Delete the poll and start a new one if it must change |
 | **This poll is closed** | A moderator closed it meanwhile | Start a new poll if you need one |
 
@@ -223,8 +227,8 @@ its sender edits or deletes.
 5. **Delete** on an album asks once for every photo in it. Press **Delete Photos**, or
    **Keep Them**. The message **Photos deleted** confirms it.
 
-If the screen says **There is no such conversation**, someone deleted the message first. Nothing is
-left to do.
+If the screen says **That message is no longer here**, someone deleted the message first. Nothing
+is left to do.
 
 ### Pin a message {#community-channels-pin-message}
 
@@ -307,8 +311,8 @@ everyone and have no admins.
 1. Press **Channel menu**, then **Edit Members**.
 2. Press **Make Admin** beside someone to share running the channel. The message
    *Ada Obi is now an admin* confirms it. **Remove Admin** takes it back.
-3. Press **Remove** to take someone out at once. They lose the channel and its messages. To remove
-   an admin, press **Remove Admin** first.
+3. Press **Remove** to take someone out, then **Remove** again to confirm, or **Keep Them**. They
+   lose the channel and its messages. To remove an admin, press **Remove Admin** first.
 4. To add people, press **Add People**. Pick **People**, or press whole **Departments**, then press
    **Add People**.
 5. Press **Close** when you are done.
@@ -317,7 +321,7 @@ The messages *Removed from #ops* and *Added to #ops* confirm a change.
 
 | The message says | What it means | What to do |
 |---|---|---|
-| **A channel needs an admin** | You tried to take away the last admin | Make someone else admin first |
+| **A channel needs at least one admin** | You tried to take away the last admin | Make someone else admin first |
 | **Only the channel's admins can do this** | You are no longer one of its admins | Ask one of its admins |
 
 ### Rename a channel {#community-channels-rename}
@@ -334,6 +338,7 @@ A channel's admins change its name and purpose. #general and #announcements keep
 |---|---|
 | **Not a valid name** | Use 2 to 30 small letters, numbers and hyphens, starting with a letter or number |
 | **Name already taken** | Another channel has that name. Choose another |
+| *At most 300 characters* under **Purpose** | Shorten the purpose |
 
 ### Search in a conversation {#community-channels-search}
 
@@ -442,15 +447,15 @@ announcements. Read them in **#announcements**.
 ### Read the figures {#community-announcements-read needs="cap announcements.post"}
 
 1. Open [Staff Community · Announcements](/community?tab=announcements).
-2. The figures count those **Published** and **Scheduled**, the **Average Read** (the share of each
-   audience who opened it), the **Audience** and those sent **This Month**. On a phone,
+2. The figures count those **Published** and **Scheduled**, the **Average Read** (its help says
+   how: the share of each audience who opened it), the **Audience** and those sent **This Month**. On a phone,
    **This Month** is not shown.
 3. Each announcement is a card: its headline, how many have read it (*19 of 25 read*), its text, and
    *Posted* with the date and who posted it. A red edge marks an urgent one, which counts
    *acknowledged*; an amber edge marks an important one.
 4. A scheduled one reads **Scheduled** and *Goes out* with its date and time.
 5. Press a card. **Announcement Reads** shows *Read by 19 of 25* with a bar, then **Not Read** and
-   **Read**, each with the people.
+   **Read**, each with the people, 25 at a time with the pages under them.
    ![Announcement Reads](shot:community-announcement-reads)
 6. For an urgent one the lists are **Not Acknowledged** and **Acknowledged**, each person with the
    time they pressed it.
@@ -483,13 +488,13 @@ announcements. Read them in **#announcements**.
 | **Choose a department** | Tick at least one department, or choose **All Staff** |
 | **Not a real date** | Pick the publish date |
 | **Time already passed** | Today's 09:00 has gone. Pick tomorrow, or choose **Now** |
-| **Check this value** | The headline is over 120 characters, or the message over 4,000. Shorten it |
+| *At most 120 characters* or *At most 4,000 characters* | The headline or the message is too long. Shorten it |
 
 ### Change or take down an announcement {#community-announcements-change needs="cap announcements.post"}
 
 1. Press the announcement's card.
 2. A scheduled one offers **Edit** and **Cancel Announcement**.
-3. **Edit** opens the same form. Change it, pick the **Publish Date** and press **Save Changes**.
+3. **Edit** opens the same form as **Edit Announcement**. Change it, pick the **Publish Date** and press **Save Changes**.
    *Scheduled for* with the date confirms it.
 4. **Cancel Announcement** asks once. Press **Cancel Announcement** again, or **Keep It**.
    **Announcement cancelled** confirms it. It is never posted.
@@ -502,6 +507,7 @@ announcements. Read them in **#announcements**.
 |---|---|---|
 | **It has already gone out** | It was published before you saved | Archive it if it must come down |
 | **There is no such announcement** | Someone cancelled or archived it first | Close the window. Nothing is left to do |
+| **Too many requests. Wait a moment and try again.** | Many saves in a minute | Wait a minute and save again |
 
 ```shot community-channels
 open: /community?tab=channels

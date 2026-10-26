@@ -50,6 +50,10 @@ async function tx(fn) {
 const notFound = () =>
   new AppError("NOT_FOUND", "There is no such conversation", 404);
 
+/** A message deleted meanwhile, or never the caller's to see: said as a message, not a conversation. */
+const messageGone = () =>
+  new AppError("NOT_FOUND", "That message is no longer here", 404);
+
 /** Whether the caller holds announcements.post (People and the CEO). */
 async function canAnnounce(db, user) {
   if (user.is_ceo === true) return true;
@@ -600,7 +604,7 @@ async function listMessages(channelId, user, query) {
 
 async function messageView(db, messageId, user) {
   const row = await repo.messageFor(db, messageId, user.user_id);
-  if (!row) throw notFound();
+  if (!row) throw messageGone();
   const ch = await repo.membership(db, row.community_channel_id, user.user_id);
   if (!ch) throw notFound();
   const direct = ch.channel_type === "direct";
@@ -809,11 +813,8 @@ async function recognise(body, user) {
 async function react(messageId, user) {
   await tx(async (client) => {
     const row = await repo.messageFor(client, messageId, user.user_id);
-    if (
-      !row ||
-      !(await repo.membership(client, row.community_channel_id, user.user_id))
-    )
-      throw notFound();
+    if (!row) throw messageGone();
+    if (!(await repo.membership(client, row.community_channel_id, user.user_id))) throw notFound();
     const reaction =
       row.message_type === "birthday"
         ? "🎉"
@@ -843,14 +844,11 @@ async function react(messageId, user) {
 async function vote(messageId, optionIndex, user) {
   await tx(async (client) => {
     const row = await repo.messageFor(client, messageId, user.user_id);
-    if (
-      !row ||
-      !(await repo.membership(client, row.community_channel_id, user.user_id))
-    )
-      throw notFound();
+    if (!row) throw messageGone();
+    if (!(await repo.membership(client, row.community_channel_id, user.user_id))) throw notFound();
     if (row.message_type !== "poll")
       throw new AppError("NOT_A_POLL", "This message is not a poll", 422);
-    if (row.deleted_at) throw notFound();
+    if (row.deleted_at) throw messageGone();
     if (row.metadata && row.metadata.closed)
       throw new AppError("POLL_CLOSED", "This poll is closed", 409);
     const options = (row.metadata && row.metadata.options) || [];
@@ -886,7 +884,7 @@ const CARD_TYPES = ["birthday", "anniversary"];
 /** A live birthday or anniversary card in a conversation the caller is in, with that membership. */
 async function cardFor(db, messageId, user) {
   const row = await repo.messageFor(db, messageId, user.user_id);
-  if (!row || row.deleted_at) throw notFound();
+  if (!row || row.deleted_at) throw messageGone();
   const ch = await repo.membership(db, row.community_channel_id, user.user_id);
   if (!ch) throw notFound();
   if (!CARD_TYPES.includes(row.message_type))
@@ -958,7 +956,7 @@ async function deleteWish(wishId, user) {
 /** A message the caller may act on, locked, with their membership and whether they moderate it. */
 async function lockedForChange(client, messageId, user) {
   const row = await repo.lockMessage(client, messageId);
-  if (!row || row.deleted_at) throw notFound();
+  if (!row || row.deleted_at) throw messageGone();
   const ch = await repo.membership(
     client,
     row.community_channel_id,

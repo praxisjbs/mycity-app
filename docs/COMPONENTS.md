@@ -1676,7 +1676,7 @@ A strip of labelled figures across the top of a record: smaller than KPI cards, 
 | Use | At the head of a record (an expense claim's totals, a payroll run's counts, a vacancy's pipeline). |
 | Avoid | A role's dashboard figures (use KpiGrid); more than six figures; a figure with a sentence under it. |
 | Phone | Two to a row, and only the first four show unless a figure is marked `desktop` (gate 11). |
-| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. |
+| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. A figure's help is a help term on its label (hover on a computer, tap on a phone), never inside a button. |
 | Status | stable |
 | Exports | `StatStrip` |
 | Import | `import { StatStrip } from "@mycity/ui";` |

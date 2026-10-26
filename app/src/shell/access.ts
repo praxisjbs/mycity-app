@@ -47,8 +47,8 @@ export function visibleTabs(me: Me, mod: ModuleDef): TabDef[] {
     if (mod.key === "settings") return !!FULL(me);
     /* A line manager decides their team's leave on People · Leave, the list scoped to their team (docs/guides/ess.md §2). */
     if (mod.key === "people" && !FULL(me)) return t.slug === "attendance" || t.slug === "organogram" || (t.slug === "leave" && me.manages_people);
-    /* Announcements is the posting and read-tracking side; staff read them in #announcements. */
-    if (mod.key === "community" && t.slug === "announcements") return !!me.grants.people?.includes("create");
+    /* Announcements is the posting and read-tracking side, for those who post (`announcements.post`, as every route asks); staff read them in #announcements. */
+    if (mod.key === "community" && t.slug === "announcements") return hasCapability(me, "announcements.post");
     if (mod.key === "queries" && !FULL(me)) return t.slug === "queries";
     if (mod.key === "expenses" && !FULL(me)) return ["my-requests", "approvals", "budgets"].includes(t.slug) && (t.slug !== "approvals" || me.manages_people);
     if (mod.key === "performance" && !FULL(me) && !me.manages_people) return t.slug !== "analytics";
