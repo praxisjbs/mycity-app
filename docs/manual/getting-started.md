@@ -618,8 +618,7 @@ sources:
   - packages/ui/src/data/DataView.tsx
 marks:
   1: tab "Leave 1" | What waits on this screen
-  2: button "Pending 1 unread" | Its share, on the filter that holds it
-  3: css :is(tr, li):has([data-unread]) | A request with something new
+  2: css :is(tr, li):has([data-unread]) | A request with something new
 ```
 
 ```shot start-phone

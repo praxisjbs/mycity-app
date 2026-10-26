@@ -1,7 +1,7 @@
 {
   "people-add-job": {
     "spec": "807d900a2d0f960f",
-    "source": "d45d9466e8ab94e4",
+    "source": "450994a20a5c6306",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "people-add-person": {
     "spec": "2833d3e5ac9b6e19",
-    "source": "d45d9466e8ab94e4",
+    "source": "450994a20a5c6306",
     "devices": [
       "desktop",
       "phone"
@@ -17,14 +17,14 @@
   },
   "people-add-role": {
     "spec": "81308a4536e04c60",
-    "source": "a674cbd89b7737a1",
+    "source": "56d63b13f5060c67",
     "devices": [
       "desktop"
     ]
   },
   "people-add-worksite": {
     "spec": "13e04a9de901571f",
-    "source": "edd3972bfca35d1a",
+    "source": "5a1de00b944360a7",
     "devices": [
       "desktop",
       "phone"
@@ -32,7 +32,7 @@
   },
   "people-attendance": {
     "spec": "b309e30b085f4402",
-    "source": "ac4f3d741befdeee",
+    "source": "13dba5ee72345f2c",
     "devices": [
       "desktop",
       "phone"
@@ -40,7 +40,7 @@
   },
   "people-attendance-day": {
     "spec": "bf1435298229e249",
-    "source": "ac4f3d741befdeee",
+    "source": "13dba5ee72345f2c",
     "devices": [
       "desktop",
       "phone"
@@ -48,7 +48,7 @@
   },
   "people-attendance-decide": {
     "spec": "312f6a770c624858",
-    "source": "ac4f3d741befdeee",
+    "source": "13dba5ee72345f2c",
     "devices": [
       "desktop",
       "phone"
@@ -56,7 +56,7 @@
   },
   "people-attendance-pay": {
     "spec": "bc51d4cc2a142fd5",
-    "source": "770d1ee15a10a4d6",
+    "source": "ea35a3181eac004e",
     "devices": [
       "desktop",
       "phone"
@@ -64,7 +64,7 @@
   },
   "people-devices": {
     "spec": "919c4a0f0e2155de",
-    "source": "520bf6bf4ec15747",
+    "source": "71030c00e267fded",
     "devices": [
       "desktop",
       "phone"
@@ -72,7 +72,7 @@
   },
   "people-employees": {
     "spec": "5953b0f4b3738e2e",
-    "source": "d45d9466e8ab94e4",
+    "source": "450994a20a5c6306",
     "devices": [
       "desktop",
       "phone"
@@ -80,7 +80,7 @@
   },
   "people-leave": {
     "spec": "a754bbefe30a7b46",
-    "source": "d45d9466e8ab94e4",
+    "source": "450994a20a5c6306",
     "devices": [
       "desktop",
       "phone"
@@ -88,15 +88,15 @@
   },
   "people-leave-record": {
     "spec": "f8c8ab06e1834f45",
-    "source": "d45d9466e8ab94e4",
+    "source": "450994a20a5c6306",
     "devices": [
       "desktop",
       "phone"
     ]
   },
   "people-leave-request": {
-    "spec": "2d9bb2803da1d594",
-    "source": "0a74a17e77c91201",
+    "spec": "e582fe97e221bceb",
+    "source": "2e4f318f730dcf3b",
     "devices": [
       "desktop",
       "phone"
@@ -104,7 +104,7 @@
   },
   "people-leave-type": {
     "spec": "28a4989ba50c2147",
-    "source": "d45d9466e8ab94e4",
+    "source": "450994a20a5c6306",
     "devices": [
       "desktop",
       "phone"
@@ -112,7 +112,7 @@
   },
   "people-organogram": {
     "spec": "a8c85e33f01ef229",
-    "source": "a674cbd89b7737a1",
+    "source": "56d63b13f5060c67",
     "devices": [
       "desktop",
       "phone"
@@ -120,7 +120,7 @@
   },
   "people-record": {
     "spec": "dabf9149a2344980",
-    "source": "d45d9466e8ab94e4",
+    "source": "450994a20a5c6306",
     "devices": [
       "desktop",
       "phone"
@@ -128,7 +128,7 @@
   },
   "people-reporting": {
     "spec": "0baac0aaae239efd",
-    "source": "538252499437ec31",
+    "source": "3869b6c1a5a5eebd",
     "devices": [
       "desktop",
       "phone"
@@ -136,7 +136,7 @@
   },
   "people-schedule": {
     "spec": "9b834a9972ed5b8e",
-    "source": "1130fa68b0b1c5b7",
+    "source": "439742feb032eb90",
     "devices": [
       "desktop",
       "phone"
@@ -144,7 +144,7 @@
   },
   "people-schedule-set": {
     "spec": "947d17906ed9a116",
-    "source": "1130fa68b0b1c5b7",
+    "source": "439742feb032eb90",
     "devices": [
       "desktop",
       "phone"
@@ -152,7 +152,7 @@
   },
   "people-worksites": {
     "spec": "ae05a0bb276baf92",
-    "source": "edd3972bfca35d1a",
+    "source": "5a1de00b944360a7",
     "devices": [
       "desktop",
       "phone"
@@ -160,7 +160,7 @@
   },
   "people-worksites-site": {
     "spec": "63cab4927058c114",
-    "source": "8fbff7036c2010f8",
+    "source": "bf393479b8e24279",
     "devices": [
       "desktop",
       "phone"

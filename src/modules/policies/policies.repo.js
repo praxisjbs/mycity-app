@@ -535,11 +535,12 @@ async function isAsked(db, id, employeeId, today) {
 }
 
 /**
- * The reader's policies as ESS · Policy Updates reads them (`mine`): the newest published version
- * of each active policy that applies to them, and the submissions an approval waits on them for.
- * `$1` is the reader's employee and `$2` today; `waiting` the clause their approvals are found by.
+ * The reader's policies as ESS · Policy Updates reads them, the body of each query's `mine`: the
+ * newest published version of each active policy that applies to them, and the submissions an
+ * approval waits on them for. `$1` is the reader's employee and `$2` today; `waiting` the clause
+ * their approvals are found by.
  */
-const MINE = (waiting) => `WITH mine AS (
+const MINE = (waiting) => `
        SELECT v.policy_version_id, v.policy_id, p.number, p.kind, v.title, v.version, v.effective_from,
               v.needs_acknowledgement, ${DUE_ON("v", "e")} AS due_on, a.acknowledged_at, false AS waiting_on_me,
               (v.needs_acknowledgement AND a.acknowledged_at IS NULL) AS to_acknowledge,
@@ -557,7 +558,6 @@ const MINE = (waiting) => `WITH mine AS (
          JOIN policy p ON p.policy_id = v.policy_id
          JOIN workflow_instance wi ON wi.workflow_instance_id = v.workflow_instance_id AND wi.state = 'pending'
         WHERE v.status = 'submitted' AND ${waiting}
-     )
 `;
 
 /** The reader's policies (ESS · Policy Updates), filtered by its views. */
@@ -567,7 +567,7 @@ async function myPolicies(db, user, query, today) {
   const waiting = approvers.waitingOnClause("wi", user, roleCodes, params);
   return pageQuery(
     db,
-    `${MINE(waiting)}
+    `WITH mine AS (${MINE(waiting)})
      SELECT mine.*, ${TOTAL_COL}
        FROM mine
       WHERE ($3 = 'all'
@@ -596,7 +596,7 @@ async function myViewsOf(db, user, ids, today) {
   const waiting = approvers.waitingOnClause("wi", user, roleCodes, params);
   params.push(ids);
   const { rows } = await db.query(
-    `${MINE(waiting)}
+    `WITH mine AS (${MINE(waiting)})
      SELECT mine.policy_version_id AS id, bool_or(mine.to_acknowledge) AS to_acknowledge, bool_or(mine.waiting_on_me) AS waiting_on_me
        FROM mine
       WHERE mine.policy_version_id = ANY($${params.length}::uuid[])
