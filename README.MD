@@ -60,7 +60,9 @@ mycity-app/
 ├── src/                      backend source (§4, §5)
 ├── packages/contract/        Zod schemas + GENERATED contract.gen.ts (§6.2); guide.js, the User Guide's
 │                             one parser, filter and passages (the API, the mock and check/user-guide.js read it);
-│                             guide-search.js, its search's words half and ranking (the API, ⌘K and the mock)
+│                             guide-search.js, its search's words half and ranking (the API, ⌘K and the mock);
+│                             plan.js (+ plan.d.ts), the delivery plan's one reader and rule (F14: the app's
+│                             build, the app and the API decide what opens by it)
 ├── migrations/               NNNN_name.sql schema steps (§6.3)
 ├── seeds/reference/          NNNN_seed_name.sql reference-data steps, applied by db:migrate
 ├── seeds/build/              synthetic data, CI and local only
@@ -202,7 +204,8 @@ src/
 ├── middleware/    async-safe · request-id · access-log · environment-marker · rate-limit ·
 │                  idempotency · auth · rbac · public-token · upload · error-handler
 ├── shared/
-│   ├── errors.js · route-map.js
+│   ├── errors.js · route-map.js · delivery-plan.js (what has shipped, as the API sees it: Need You
+│   │                  and ⌘K leave out what the app shows as Coming Soon, by app/dist/delivery-plan.json)
 │   ├── db/            tx · query-helpers · pg-types · effective-dated · person (PersonRef in SQL, photo sizes) ·
 │   │                  media (MediaRef in SQL: a file's shape, page count and sizes)
 │   ├── crud/          resource (makeRepo / makeService / makeController / mountResource)

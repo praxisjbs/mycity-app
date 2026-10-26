@@ -29,9 +29,10 @@ const changes = require("./changes");
 const DOC_GATES = ["dashes", "components-catalogue", "components", "progress", "guides", "readme-map", "codeowners", "user-guide"];
 
 /**
- * Documents that code reads: a change to one is a code change. The apps' build reads the
- * delivery plan from both (packages/ui/vite.shared.js, deliveryPlan), and two backend tests
- * read PROGRESS.md. tests/unit/ci-scope.test.js keeps this list level with vite.shared.js.
+ * Documents that code reads: a change to one is a code change. The delivery plan is read from
+ * both (packages/contract/plan.js readPlan): by the apps' build (packages/ui/vite.shared.js,
+ * deliveryPlan) and by the API where there is no build (src/shared/delivery-plan.js); two
+ * backend tests read PROGRESS.md. tests/unit/ci-scope.test.js keeps this list level with plan.js.
  */
 const READ_BY_CODE = new Set(["docs/PROGRESS.md", "docs/MyCity-ERP-Documents/MILESTONES.md"]);
 

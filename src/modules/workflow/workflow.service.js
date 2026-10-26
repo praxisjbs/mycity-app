@@ -23,6 +23,7 @@ const { emit } = require("../../shared/events/emit");
 const catalog = require("../../shared/access/access.catalog");
 const grantsCache = require("../../shared/rbac/grants-cache");
 const routeMap = require("../../shared/route-map");
+const deliveryPlan = require("../../shared/delivery-plan");
 const engine = require("../../shared/workflow/engine");
 const cond = require("../../shared/workflow/conditions");
 const definitions = require("../../shared/workflow/definitions");
@@ -264,7 +265,8 @@ async function saveSteps(actor, id, { stages }) {
 async function mine(user, query, client = pool) {
   const roleCodes = await approvers.roleCodesOf(client, user.role_ids || []);
   const modules = await approveModules(user);
-  const page = await repo.waiting(client, user, roleCodes, modules, query);
+  // A request about a record whose screen has not shipped would open Coming Soon: never offered.
+  const page = await repo.waiting(client, user, roleCodes, modules, query, deliveryPlan.closedTypes());
   return {
     ...page,
     data: page.data.map(({ stages, ...r }) => {
@@ -284,7 +286,7 @@ async function mineCount(user) {
     approvers.roleCodesOf(pool, user.role_ids || []),
     approveModules(user),
   ]);
-  return repo.waitingCount(pool, user, roleCodes, modules);
+  return repo.waitingCount(pool, user, roleCodes, modules, deliveryPlan.closedTypes());
 }
 
 /* ------------------------------------------------------------------ *
