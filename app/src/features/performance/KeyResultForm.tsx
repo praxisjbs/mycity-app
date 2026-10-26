@@ -13,7 +13,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { EmployeePicker } from "@/features/shared/pickers";
-import { Button, CheckboxField, ChoiceField, DateField, EmptyState, Field, FormFooter, MoreFields, RecordPicker, SelectField, TextField, toast, useContractForm } from "@mycity/ui";
+import { Button, CheckboxField, ChoiceField, DateField, EmptyState, Field, FormFooter, MoreFields, NumberField, RecordPicker, SelectField, TextField, toast, useContractForm } from "@mycity/ui";
 import { bodySchema } from "./shared";
 
 export const KR_TYPES: Record<string, string> = {
@@ -145,7 +145,7 @@ export function KeyResultForm({ close, objectives = [], keyResult, onSaved }: { 
           <ChoiceField label="Measure" options={MEASURES} value={v.measure} onChange={(x) => f.field("measure").onChange(x)} />
         </Field>
       )}
-      <Field label="Target" optional {...f.status("target_value")}><TextField {...f.field("target_value")} inputMode="decimal" placeholder="64000" /></Field>
+      <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} placeholder="64000" /></Field>
       <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder="64,000 users" /></Field>
       <Field label="TBC" {...f.status("target_provisional")}>
         <CheckboxField label="Target to be confirmed" value={v.target_provisional} onChange={(x) => f.field("target_provisional").onChange(x)} />
@@ -259,7 +259,7 @@ export function SetTargetForm({ keyResult, close, onSaved }: { keyResult: KeyRes
   };
   return (
     <>
-      <Field label="Target" optional {...f.status("target_value")}><TextField {...f.field("target_value")} inputMode="decimal" placeholder="64000" /></Field>
+      <Field label="Target" optional {...f.status("target_value")}><NumberField decimal signed {...f.field("target_value")} placeholder="64000" /></Field>
       <Field label="Target in Words" optional {...f.status("target_text")}><TextField {...f.field("target_text")} placeholder="64,000 users" /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

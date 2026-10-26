@@ -40,6 +40,7 @@ import {
   FormFooter,
   HelpTerm,
   KeyValue,
+  NumberField,
   PageHeader,
   SegmentedControl,
   SelectField,
@@ -467,7 +468,7 @@ function LineChangeForm({ line, done }: { line: ScorecardLine; done: () => void 
   return (
     <>
       <Field label="New Target" {...mark}>
-        {words ? <TextField {...f.field("to_text")} /> : <TextField {...f.field("to_value")} inputMode="decimal" />}
+        {words ? <TextField {...f.field("to_text")} /> : <NumberField decimal signed {...f.field("to_value")} />}
       </Field>
       <Field label="From Month" {...f.status("from_month")}><DateField {...f.field("from_month")} /></Field>
       <Field label="Reason" {...f.status("reason")}><TextField {...f.field("reason")} /></Field>
