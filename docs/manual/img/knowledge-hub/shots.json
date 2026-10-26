@@ -1,7 +1,7 @@
 {
   "knowledge-attendance": {
     "spec": "9e6b83868d0c44bb",
-    "source": "4409f8ce9c8c9871",
+    "source": "43a352f507e2c8ac",
     "devices": [
       "desktop",
       "phone"
@@ -9,7 +9,7 @@
   },
   "knowledge-new-policy": {
     "spec": "b8f89fbf72f3a9d9",
-    "source": "a3fd3da7742d6823",
+    "source": "27200f5667d34fea",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "knowledge-policies": {
     "spec": "e3ce218b49bca9ae",
-    "source": "a3fd3da7742d6823",
+    "source": "27200f5667d34fea",
     "devices": [
       "desktop",
       "phone"
@@ -25,7 +25,7 @@
   },
   "knowledge-policy": {
     "spec": "b4c482e6a048841c",
-    "source": "4409f8ce9c8c9871",
+    "source": "43a352f507e2c8ac",
     "devices": [
       "desktop",
       "phone"
@@ -33,7 +33,7 @@
   },
   "knowledge-publish": {
     "spec": "db971129801a1f5e",
-    "source": "6f8ba6559168fe98",
+    "source": "d54a8b283eeb7488",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "knowledge-version": {
     "spec": "bc65fb7a518ea746",
-    "source": "a3fd3da7742d6823",
+    "source": "27200f5667d34fea",
     "devices": [
       "desktop",
       "phone"

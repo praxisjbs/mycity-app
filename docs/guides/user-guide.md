@@ -4,13 +4,13 @@
 |---|---|
 | Owner | TB |
 | Milestone | M0 (brought forward from M11 by JBS Praxis, 25/10/2026; written milestone by milestone as each is approved) |
-| Backend modules | `user_guide` |
-| Frontend paths | `app/src/features/knowledge/UserGuide.tsx`, `app/src/features/knowledge/guide/` (the way back), `packages/ui/src/documents/GuideBody.tsx`, the chip in `app/src/shell/Notices.tsx` |
+| Backend modules | `user_guide` (and its search: `user_guide.meaning.js`, `user_guide.repo.js`, `user_guide.ai.js`; the shared engine `packages/contract/guide-search.js`) |
+| Frontend paths | `app/src/features/knowledge/UserGuide.tsx`, `app/src/features/knowledge/guide/` (the way back, the search), `packages/ui/src/documents/GuideBody.tsx`, `packages/ui/src/documents/GuideResults.tsx`, the chip in `app/src/shell/Notices.tsx` |
 | Permission key(s) | `knowledge` (view); every chapter, section, task, step and picture is filtered by the reader's own grants |
 | Capabilities | none of its own; the guide reads every module's grants and capabilities to decide what each reader receives |
 | Screens (PROGRESS.md rows) | #102 Knowledge Hub · User Guide |
 | Status | Agreed |
-| Last changed | 25/10/2026 |
+| Last changed | 26/10/2026 |
 
 Sources: MILESTONES §16 (M11: "a user manual written per module against the screens as shipped",
 "the manual covers every module with screenshots from the shipped build"), FRONTEND_GUIDE §5.1 (tier 3
@@ -28,6 +28,11 @@ guide for what they may open: a member of staff never reads how to change Roles 
 
 Everyone uses it: new staff on their first day, line managers, Operations & People, administrators
 and the CEO. Trainers use the Quick Start in the M11 sessions.
+
+A person who cannot find the right page describes what they want, in their own words, and the
+guide's search finds it: by its words, forgiving typing slips and other words for the same thing,
+and by its meaning ("I can't get into my account" finds Forgot your password). It can write a short
+answer from what it found, and it hears a spoken search (§6.8 to §6.10).
 
 ### 1.1 Written milestone by milestone
 
@@ -49,11 +54,12 @@ by naming itself in its own chapters' front matter, not in a shared list.
 
 | Screen / tab (slug) | Where | Who sees it | What it shows | What a person can do there |
 |---|---|---|---|---|
-| Knowledge Hub · User Guide (`user-guide`) | Staff app | Everyone with `knowledge` view (all seven roles by default) | Quick Start: illustrated cards by role. Full Guide: chapters and sections, filtered by the reader's grants | Switch Quick Start and Full Guide, pick a chapter and section, open a screen from a step or with Open Screen, go back to the step, enlarge a picture |
+| Knowledge Hub · User Guide (`user-guide`) | Staff app | Everyone with `knowledge` view (all seven roles by default) | Quick Start: illustrated cards by role. Full Guide: chapters and sections, filtered by the reader's grants. The search box over both: results as the words are typed, each with the line that answers marked; an answer once asked, with its sources | Switch Quick Start and Full Guide, pick a chapter and section, open a screen from a step or with Open Screen, go back to the step, enlarge a picture; search, Get Answer (or Enter), speak a search, open a result or a source at its step |
 | Every screen of the hub | Staff app | Whoever arrived from a guide link | The Back to Guide chip, bottom of the screen (above the bottom bar on a phone) | Return to the exact step they left, or dismiss the chip |
 | The floating button (phone) | Staff app | Everyone with `knowledge` view | Help opens the guide at the section for the screen in view | Open the guide where they are |
 | The account menu (desktop) | Staff app | Everyone with `knowledge` view | User Guide, opening the section for the screen in view | Open the guide where they are |
-| ⌘K Search | Everywhere | Everyone, by permission | A User Guide group: sections and tasks whose words match ("guide" or "how to" before the words narrows to it) | Open the guide at that section |
+| ⌘K Search | Everywhere | Everyone, by permission | A User Guide group: the sections and tasks the guide's own search finds (§6.8; by meaning too for three words or more), "guide" or "how to" before the words narrowing to it | Open the guide at that section, at the step that answers |
+| Praxis AI · Ask | Staff app | `praxis_ai` view | A how-to question answered from the guide, citing its sections (§9) | Open a cited section |
 
 ## 3 · How the screens relate
 
@@ -70,16 +76,37 @@ by naming itself in its own chapters' front matter, not in a shared list.
 4. **Help where you are.** The floating button's Help (phone) and User Guide in the account menu
    (desktop) open `/knowledge?tab=user-guide&screen=<module>/<tab>`; the guide opens the section
    whose `screen` matches, or the contents when there is none.
-5. **Searching.** ⌘K's Guide group (`user_guide.search.js`) matches section and task titles and
-   words, filtered exactly as the chapters are, and opens the section.
-6. **Changing a screen.** A pull request that changes a screen a chapter covers must change that
+5. **Searching.** The box over the guide sends what is typed, a pause after the last key, as
+   `POST /api/v1/user-guide/search` (the body, never the address). The service cuts the guide's
+   passages to the reader, ranks them by their words and, when the meaning index is there, by how
+   near each is to the search's vector (§6.8), and answers a page of 25 sections and tasks, each with
+   the line that answers marked and its step as the reader numbers it. A result opens
+   `/knowledge?tab=user-guide&view=full&id=<section or task>&step=<n>`, and the words stay in the
+   box. ⌘K's Guide group (`user_guide.search.js`) ranks with the same search.
+6. **Answering.** Get Answer (or Enter) sends `POST /api/v1/user-guide/answer`. The best six results
+   the reader may read go to the Guide Answer action (Fast job), which answers in up to three
+   sentences, each citing those results by number; the card shows them with their sources, each
+   opening the guide at its step (§6.9). Nothing is kept.
+7. **Speaking.** The microphone records; `POST /api/v1/user-guide/transcribe` turns it to words on
+   the Guide Voice Search action (Transcription job) and removes the recording; the words land in
+   the box and search (§6.10).
+8. **Indexing.** The worker's `user-guide-index` schedule, every 15 minutes and at boot, embeds every
+   passage that has no vector on the Guide Search model and drops the vectors nothing says any
+   more (§6.8, §7). A tick with nothing new spends nothing.
+9. **Changing a screen.** A pull request that changes a screen a chapter covers must change that
    chapter, or retake its pictures, or say `User-guide-unchanged: <reason>` (§6.6). Pictures whose
    screen changed after they were taken fail the build until they are retaken.
 
 ## 4 · Data
 
-No tables. The guide is files, shipped with each release (`scripts/deploy/release-manifest.js`
-ships `docs/manual/`):
+The guide is files, shipped with each release (`scripts/deploy/release-manifest.js` ships
+`docs/manual/`). Its search keeps one table, the meaning index, derived entirely from those files:
+
+| Table | Key columns | Notes |
+|---|---|---|
+| `user_guide_passage` (0510) | `text_hash` (sha256 of what was embedded), `model`, `embedding vector(1536)`, unique on both | One vector per distinct passage on the Guide Search model, HNSW cosine index. No words, no slugs, nothing a person typed: a passage is found by hashing the chapters again. Written only by the index (`user_guide.meaning.js sync`), read by a search |
+
+And the files:
 
 | Path | What it holds |
 |---|---|
@@ -89,10 +116,12 @@ ships `docs/manual/`):
 | `docs/manual/img/<chapter>/shots.json` | For each picture: the hash of its spec and of the screen's source when it was taken (§6.5) |
 | `docs/manual/README.md` | How to write a chapter, for the people and agents who write them |
 
-The parser and the filter are one copy, `packages/contract/guide.js`, used by the API, the
-in-browser mock and the gate.
+The parser, the filter and the passages are one copy, `packages/contract/guide.js`, and the words
+half of the search one more, `packages/contract/guide-search.js`, each used by the API, the
+in-browser mock and (the parser) the gate.
 
-Schema migration file(s): none. Reference-data file(s): none.
+Schema migration file(s): `migrations/0510_user_guide_passage.sql`; the ledger's `embedding` step
+kind is `migrations/10320_ai_run_step_embedding.sql` (AI Control's). Reference-data file(s): none.
 
 ## 5 · API
 
@@ -102,6 +131,13 @@ Schema migration file(s): none. Reference-data file(s): none.
 | `GET /api/v1/user-guide/chapters/:slug` | → `GuideChapter` | `knowledge` view | no: one chapter | 404 when the chapter does not exist or nothing in it is the reader's |
 | `GET /api/v1/user-guide/quick-start` | → `GuideChapter` (kind `quick-start`) | `knowledge` view | no: one document | The cards the reader may follow, each with its steps; none at all is an empty Quick Start |
 | `GET /api/v1/user-guide/images/:chapter/:file` | file (`no_content` in the contract) | `knowledge` view | no | `file` is `<shot>.<desktop or phone>.png`; 404 unless a part the reader may read shows it on that device |
+| `POST /api/v1/user-guide/search` | `GuideSearchBody` → `GuideSearchPage` | `knowledge` view · the reader's own cut | yes, 25 | A POST so the words never sit in an address the access log keeps; writes nothing. Under two letters, an empty page. `guideSearchLimiter`, 120 a minute a person |
+| `POST /api/v1/user-guide/answer` | `GuideAnswerBody` → `GuideAnswer` | `knowledge` view · the reader's own cut | no: up to 3 sentences, 6 sources | `found: false` with the sources when AI is off or the passages do not answer it, never an error; `guideAnswerLimiter`, 20 a minute |
+| `POST /api/v1/user-guide/transcribe` | `DocumentUpload` → `assistant.AiTranscript` | `knowledge` view | no | The recording through the upload engine, removed whatever happens; `draft: true` is a placeholder the screen drops |
+
+`GET /api/v1/user-guide` also says whether an answer (`answers`) and a spoken search (`voice`) can be
+had now (AI on for the Knowledge Hub, a Ready model on the action's chain), so the screen offers Get
+Answer and the microphone only then.
 
 ## 6 · Rules and calculations
 
@@ -122,6 +158,25 @@ Schema migration file(s): none. Reference-data file(s): none.
    Milestone 2; later milestones as each is approved.
 8. Employee creation was audited and fixed in PR 1 (`docs/guides/foundation.md` §6.16), and its
    chapter written against the fixed screens.
+
+The search (JBS Praxis, 25/10/2026, asked before it was built):
+
+9. **By words and by meaning.** Every section, task and step is found by its words, forgiving slips,
+   half typed words and other words for the same thing, and by its meaning, on the Embeddings job
+   (OpenAI's small model at 1,536); the two rankings are put together. With AI off or no OpenAI key
+   the words answer alone.
+10. **A short answer, on the Fast job.** Asked for (Get Answer, Enter), up to three sentences written
+    only from the results the reader may read, each citing them. JBS Praxis chose Fast over the
+    recommended Default (cheaper and quicker; AI Control §6.2 keeps Fast for short work), and it is
+    registered as theirs (`guide-answer`, `chosen_by: JP`).
+11. **Everywhere a person looks for help.** The guide's own box (desktop and phone), ⌘K's Guide
+    group on the same search, Praxis AI answering how-to questions from it (`guide.search`), and a
+    spoken search (Transcription job, `guide-voice`).
+12. **Nothing anyone types is kept.** No log of searches or misses ("not now"): a search and a
+    question travel in a POST body, never an address the access log keeps; the screen keeps them in
+    its own memory only; the ledger records a run's tokens, never its words. A recording is removed
+    as soon as its words are read. (Praxis AI keeps a question in the asker's own History, as it
+    keeps every question: praxis-ai.md decision 7.)
 
 ### 6.2 A chapter file
 
@@ -279,14 +334,88 @@ The Stop hook runs it with progress, guides and the README map.
 The contents (`GET /user-guide`) is one document's outline: at most one chapter per module (16),
 each naming its sections. It is returned whole, as a record's tabs are; nothing in it grows with use.
 ⌘K's Guide group pages at 25 like every search group.
+The search pages its fused results at 25 the same way (`pageOf`, `envelope`): every candidate is
+ranked, then the page is cut.
+
+### 6.8 Search
+
+**Passages** (`guide.js passagesOf`). Each section's and task's title, each paragraph, note, bullet,
+table row (as `Field: value; What to Enter: value`) and picture (its words and its marks' words), and
+each step (its picture's words read but not shown). Each carries what a reader needs to receive it,
+the same needs `filterChapter` cuts by, so `passageFor` answers whether this reader receives it and,
+for a step, its number as they read it. One more passage stands for the whole of each section and
+task (its title and every part with no `needs` of its own): only the meaning index reads it. The
+Quick Start is left out; its cards say again what the chapters say.
+
+**The words half** (`guide-search.js`). Words are folded (case, accents, apostrophes), stemmed
+(Porter's algorithm: approve, approved, approval are one) and scored by BM25, a title more than a
+line (1.8), the words of the section or task a passage sits in a little (0.3) and of its chapter
+less (0.15). For each word typed:
+
+- other words for the same thing count a little less (0.65 for a group's first, 0.55 for the rest):
+  `SYNONYMS`, MyCity's words among them (off day, resumption, query letter). **A writer who sees a
+  search miss adds the reader's word to its group**;
+- a word the guide never uses finds the guide's words one slip away (two from eight letters), at
+  0.75 or 0.5;
+- the last word, still being typed, finds the guide's words it starts (0.7);
+- words that say nothing (how, do, my, can't) are left out, and words that only help (take, see,
+  someone) count when found but are not needed.
+
+A search of one or two words needs every word found; a longer one, half of them. When no passage
+holds every word of a short search, it is searched again for half ("apply for leave" finds Request
+leave). A word the guide never uses, nor anything a slip or a prefix away, is never needed. Words
+found in order, as typed, count 1.4 times.
+
+**The meaning half** (`user_guide.meaning.js`). Each passage's `context`, text and picture words are
+embedded once, on the Guide Search action (`guide-search`, Embeddings job), and kept by the hash of
+what was embedded (§4). A search is embedded the same way (4 s, no retry; kept nowhere), and the
+database answers how near each passage the reader may read is (cosine), leaving out every one below
+`MEANING_FLOOR` (0.32); the engine keeps those within `MEANING_BAND` (0.1) of the nearest.
+
+**Together.** Each section or task takes its best passage; the two rankings are fused by reciprocal
+rank (`RRF_K` 20), meaning counting fully for a search of three words or more and 0.6 below that; a
+title typed in full comes first. A result's line is its best passage by its words, else by its
+meaning, cut to 200 characters around the first word found, the words found marked; its step is
+set only when that line is a step that answered.
+
+**The index** (`sync`, the `user-guide-index` schedule and worker boot). Hashes the chapters,
+embeds what has no vector on the model in batches of 96, outside any transaction, then in one
+transaction keeps the new vectors and drops those of passages gone and of any other model, with one
+`user_guide.indexed` event naming counts only. A new model on AI Control is a new index, built by
+the next tick; until then the words answer alone. The guide's vectors never lock the Embeddings
+chain (ai-control.md §6.6): they are rebuilt from the files.
+
+**⌘K.** The Guide group searches the same way. A term of three words or more is embedded in the
+provider's `prepare`, before ⌘K's transaction opens, given 1.5 s; shorter terms by their words
+alone, since ⌘K is typed into all day.
+
+### 6.9 The answer
+
+The best six results the reader may read, each with its lines (steps numbered as they read them, at
+most 40 lines), go to the Guide Answer action (`guide-answer`, Fast job, personal data, so never
+DeepSeek; `prompts/guide-answer.md`), 15 s at most. It answers `GuideAnswerOutput`: whether the
+passages answer it, and up to three sentences of at most 30 words, each citing at least one passage
+by number; a number outside the six is refused and asked again once. The answer is written only
+from those passages and names screens and buttons as they do. AI off, a model that fails, the stub,
+or passages that do not answer it: `found: false`, and the results stand alone. Nothing is kept.
+
+### 6.10 A spoken search
+
+The microphone (`VoiceField`, at most 30 s) uploads the recording; the service stores it in the vault
+as `guide_voice_search` (transient, readable only by its speaker), transcribes it on the Guide Voice
+Search action (`guide-voice`, Transcription job, personal data) and removes it whatever happens. The
+words land in the box and are searched. A placeholder (no provider answered) is dropped. The
+microphone shows only while a model is Ready on the chain (`GuideContents.voice`).
 
 ## 7 · Events, jobs and notifications
 
 | Event / job | When | Does |
 |---|---|---|
-| None | | The guide is read only; the files change with a release |
+| `user_guide.indexed` | The index kept new vectors or dropped old ones | Audit only, counts and the model; never a passage's words or anyone's search |
+| `user-guide-index` schedule | Every 15 minutes, and once at worker boot (under its cron lock) | `sync` (§6.8): nothing to do spends nothing; AI off or no OpenAI key does nothing |
 
-The API parses `docs/manual/` once, at the first request after boot, and keeps it in memory.
+The API parses `docs/manual/` once, at the first request after boot, and keeps it in memory, with its
+words index.
 
 ## 8 · Permissions and visibility by role
 
@@ -302,11 +431,16 @@ No restricted field appears in the guide's text or pictures (the demo's data onl
 
 ## 9 · AI and search
 
-- **AI reads**: none yet (`// ai:none` in `user_guide.controller.js`): the assistant answers how-to
-  questions from the guide in M10 (`docs/guides/praxis-ai.md`).
-- **AI routes**: none.
-- **Search** (`user_guide.search.js`): type `guide_section`, the sections and tasks a reader may read,
-  by title, the chapter's title and the section's words; opens the guide at the section.
+- **AI reads** (`user_guide.ai.js`): `guide.search`, the sections and tasks the asker may read that
+  answer a how-to question, a page of 25, each row its title, chapter, section, screen, step and its
+  lines (400 characters), citing `guide_section` (which opens the guide at it). Praxis AI's Data
+  Answers chooses it for questions about using the hub.
+- **AI routes**: "read how to use a screen in the User Guide" → `knowledge.user-guide`.
+- **AI actions** (`services/ai/actions.js`, chosen by JBS Praxis on 25/10/2026): Guide Search
+  (`guide-search`, Embeddings), Guide Answer (`guide-answer`, Fast), Guide Voice Search
+  (`guide-voice`, Transcription), all under the `knowledge` module's switch, all personal data.
+- **Search** (`user_guide.search.js`): type `guide_section`, ranked by the guide's search (§6.8);
+  opens the guide at the section or task, at the step that answers.
 
 ## 10 · On screen and mobile
 
@@ -314,7 +448,8 @@ No restricted field appears in the guide's text or pictures (the demo's data onl
 
 | Screen | Open (tier 1) | Behind help (tier 2) | Not on screen (tier 3), lives in |
 |---|---|---|---|
-| Knowledge Hub · User Guide | Quick Start and Full Guide switch; the contents (chapters and sections); the section's chapter, title and Open Screen; its text, tasks, steps, pictures and their numbered legends; the screen links in steps | None | How the guide is filtered, written and checked: this guide §6 |
+| Knowledge Hub · User Guide | Quick Start and Full Guide switch; the search box and the microphone; the contents (chapters and sections); the section's chapter, title and Open Screen; its text, tasks, steps, pictures and their numbered legends; the screen links in steps | None | How the guide is filtered, written and checked: this guide §6 |
+| The search's results | Get Answer; the Answer card (its sentences, their source numbers, the sources); each result's title, where it sits, its Step pill and its line with the words found marked; the pager; No Matches | None | How results are ranked and answers written: §6.8, §6.9 |
 | Back to Guide chip | Back to Guide · Step N, and a close button | None | Where the return is kept: this guide §3 |
 
 The guide's own text is content a person reads (`data-copy="content"`), not interface copy: gate 8's
@@ -324,7 +459,8 @@ word limits do not count it, as they do not count an article.
 
 | Screen | First on a phone | Left off a phone | Main action | Navigation |
 |---|---|---|---|---|
-| Knowledge Hub · User Guide | The Quick Start and Full Guide switch, then the role groups' cards (Quick Start) or the chapter chips over the section (Full Guide) | The side contents list (the chips replace it) | Open on a step, full width under it | Bottom bar More, Knowledge; the tabs scroll sideways |
+| Knowledge Hub · User Guide | The Quick Start and Full Guide switch, the search box with the microphone, then the role groups' cards (Quick Start) or the chapter chips over the section (Full Guide) | The side contents list (the chips replace it) | Open on a step, full width under it | Bottom bar More, Knowledge; the tabs scroll sideways |
+| The search's results | Get Answer, the Answer card, then the results as full width rows | A source's chapter and section (its title stays) | Open a result | Opening one shows the guide at it; changing the words brings the results back |
 | Back to Guide chip | A pill above the bottom bar and left of the floating button | Nothing | Back to Guide | Pressing it returns to the step |
 
 ## 11 · Edge cases
@@ -338,6 +474,16 @@ word limits do not count it, as they do not count an article.
 - **A picture missing on the server**: the step shows its text without the picture; the gate makes
   this impossible in a release.
 - **A phone reading a desktop-only picture**: the desktop picture is shown, fitted to the width.
+- **AI off, the Knowledge Hub's AI off, the cap reached, or no OpenAI key**: the search is its words
+  alone, Get Answer and the microphone are not offered, and the index's tick does nothing.
+- **A chapter changed by a release**: its new passages are found by their words until the next tick
+  embeds them; a passage's old vector is never used for new text (the hash differs).
+- **The embedding model changed on AI Control**: no vector matches the new model, so the words
+  answer alone until the next tick rebuilds the index.
+- **A reader whose grants change**: the passages and the answer's sources are cut afresh on every
+  search; a vector is the same for every reader, so nothing is cached per person.
+- **A question that names someone**: it goes only to the models the action's chain allows for
+  personal data, and is kept nowhere.
 
 ## 12 · Donor code
 
@@ -358,7 +504,15 @@ word limits do not count it, as they do not count an article.
   step needs. Getting Started gains Confirm It's You (one task, linked from ESS and Settings), Sign
   out, saving a download, and When a Screen Cannot Open (offline, a new version, Coming Soon, errors,
   a link you cannot open, unsaved changes). §6.3: the needs `team` and `<one> or <another>`. §6.5:
-  the fixed clock and the floating list. 199 pictures.
+  the fixed clock and the floating list. 201 pictures.
+- 26/10/2026 · JP · The guide's search, from JBS Praxis's decisions of 25/10/2026 (§6.1 decisions 9 to
+  12): passages (`guide.js passagesOf`, `passageFor`), the words half and the fusion
+  (`packages/contract/guide-search.js`), the meaning index (`user_guide_passage`, migration 0510,
+  the `user-guide-index` schedule, `ai.embed()` on Guide Search), `POST /user-guide/search`, an answer
+  on the Fast job (`POST /user-guide/answer`, Guide Answer), a spoken search
+  (`POST /user-guide/transcribe`, Guide Voice Search), ⌘K's Guide group on the same search (and
+  `prepare` in shared/search), Praxis AI's `guide.search` read, and the box, results and Answer card
+  on the screen (`GuideResults`, `GuideAnswerCard`). §2, §3, §4, §5, §6.8 to §6.10, §7, §9 to §11.
 
 - 25/10/2026 · JP · Praxis AI and AI Control get their chapters (`praxis-ai.md`, `ai-control.md`), live screens brought forward from M10, without naming M10; the Quick Start gains Ask Praxis AI and Watch AI Spend. §6.5: a `lock:` step, a step for one device (`phone click: ...`) where only the way in differs, and two pictures where a phone reaches a screen another way. Phone pictures for the 38 that had a desktop one only, and pictures for the five sections that had none (the lock screen, the display, help, importing staff, a login's actions); 147 pictures.
 - 25/10/2026 · JP · Written: the User Guide tab, its API filtered to the step, the pictures, the Back

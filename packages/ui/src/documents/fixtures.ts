@@ -57,3 +57,52 @@ export const GUIDE_PICTURE = {
     { n: 2, text: "The search box" },
   ],
 };
+
+/** Search results as the User Guide's API ranks them (GuideResults). */
+export const GUIDE_HITS = [
+  {
+    anchor: "start-forgot-password",
+    kind: "task",
+    chapter_title: "Getting Started",
+    section_title: "Signing In",
+    title: "Forgot your password",
+    step: 1,
+    snippet: [
+      { text: "On the sign-in screen, press ", hit: false },
+      { text: "Forgot Password", hit: true },
+      { text: ".", hit: false },
+    ],
+  },
+  {
+    anchor: "ess-change-password",
+    kind: "task",
+    chapter_title: "Employee Self-Service",
+    section_title: "My Security",
+    title: "Change your password",
+    step: null,
+    snippet: [
+      { text: "Type your current ", hit: false },
+      { text: "password", hit: true },
+      { text: ", then the new one twice.", hit: false },
+    ],
+  },
+  {
+    anchor: "start-sign-in",
+    kind: "section",
+    chapter_title: "Getting Started",
+    section_title: "Signing In",
+    title: "Signing In",
+    step: null,
+    snippet: [{ text: "Open the hub and sign in with your work email.", hit: false }],
+  },
+] as const;
+
+/** An answer written from GUIDE_HITS (GuideAnswerCard). */
+export const GUIDE_ANSWER = {
+  found: true,
+  sentences: [
+    { text: "On the sign-in screen, press Forgot Password and type your work email.", sources: [1] },
+    { text: "A link to choose a new password arrives by email.", sources: [1] },
+  ],
+  sources: GUIDE_HITS,
+};

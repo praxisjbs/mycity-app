@@ -16,7 +16,7 @@
  *                prompt_version, prompt_sha, status ('running' | 'ok' | 'failed' | 'refused'),
  *                provisional, error_code, error, request_id, started_at, finished_at
  *   ai_run_step  ai_run_step_id, run_id, step_no, kind ('completion' | 'retry' |
- *                'transcription' | 'search'), vendor, model, input_tokens, output_tokens,
+ *                'transcription' | 'search' | 'embedding'), vendor, model, input_tokens, output_tokens,
  *                audio_seconds, searches, input_ngn_per_million, output_ngn_per_million,
  *                ngn_per_audio_hour, ngn_per_search, usd_ngn_rate, rate_day, cost_ngn,
  *                latency_ms, finish_reason, outcome ('ok' | 'invalid' | 'failed'), error,

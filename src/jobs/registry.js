@@ -172,6 +172,7 @@ const SCHEDULERS = Object.freeze([
   "places-name",
   "targets-lock",
   "review-cycles",
+  "user-guide-index",
 ]);
 
 /** Ticks of different schedulers may run side by side; one scheduler never overlaps itself (cron-lock). */

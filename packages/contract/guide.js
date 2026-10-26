@@ -624,6 +624,100 @@ function filterChapter(chapter, reader, known = {}) {
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * Passages: the pieces a search finds (§6.8)
+ * ------------------------------------------------------------------ */
+
+const plainOf = (spans) => spans.map((s) => s.text).join("").replace(/\s+/g, " ").trim();
+/** The longest a passage that stands for a whole section or task is, in characters, for the meaning index. */
+const WHOLE_MAX = 2000;
+
+/**
+ * Every piece of a chapter a search can find, as it was written: each section's and task's title,
+ * each paragraph, note, bullet, table row and picture, each step, and one passage for the whole of
+ * each section and task (its title and every part anyone who may read it receives), which only the
+ * meaning index reads. Each carries what the reader needs to receive it, the same needs
+ * filterChapter cuts by, so a search never finds what the chapter would not send.
+ *
+ * `text` is what the passage says and a result shows; `also` is what only a search reads (the
+ * words of a step's picture); `context` is where it sits ("People › Employees › Add an employee").
+ * The meaning index embeds all three (guide-search.js meaningText), the same for every reader.
+ * @param {ReturnType<typeof parseChapter>["chapter"]} chapter
+ */
+function passagesOf(chapter) {
+  if (chapter.kind !== "chapter") return [];
+  const out = [];
+  for (const s of chapter.sections) {
+    const place = { chapter: chapter.slug, chapter_title: chapter.title, section: s.slug, section_title: s.title, screen: s.screen };
+    const push = (where, kind, text, needs, earlier = null, also = "") => {
+      if (!text) return;
+      out.push({ ...place, ...where, kind, text, also, needs, earlier });
+    };
+    const walk = (blocks, where, above) => {
+      const whole = [];
+      for (const b of blocks) {
+        if (b.kind === "steps") {
+          b.items.forEach((item, i) => {
+            const text = plainOf(item.spans);
+            push(where, "step", text, [...above, ...item.needs], b.items.slice(0, i).map((x) => x.needs), item.figure ? item.figure.alt : "");
+            if (!item.needs.length) whole.push(text);
+          });
+        } else if (b.kind === "bullets") {
+          for (const item of b.items) {
+            push(where, "text", plainOf(item.spans), [...above, ...item.needs]);
+            if (!item.needs.length) whole.push(plainOf(item.spans));
+          }
+        } else if (b.kind === "table") {
+          const head = b.head.map(plainOf);
+          for (const r of b.rows) {
+            const text = r.cells.map((c, i) => (head[i] ? `${head[i]}: ${plainOf(c)}` : plainOf(c))).join("; ");
+            push(where, "text", text, [...above, ...r.needs]);
+            if (!r.needs.length) whole.push(text);
+          }
+        } else {
+          const text = b.kind === "figure" ? pictureText(chapter, b.figure) : plainOf(b.spans);
+          push(where, "text", text, [...above, ...b.needs]);
+          if (!b.needs.length) whole.push(text);
+        }
+      }
+      return whole;
+    };
+    const sectionPlace = { task: null, task_title: null, anchor: s.slug, context: `${chapter.title} › ${s.title}` };
+    push({ ...sectionPlace, context: chapter.title }, "title", s.title, s.needs);
+    const sectionWhole = walk(s.blocks, sectionPlace, s.needs);
+    push(sectionPlace, "whole", [s.title, ...sectionWhole].join(". ").slice(0, WHOLE_MAX), s.needs);
+    for (const t of s.tasks) {
+      const needs = [...s.needs, ...t.needs];
+      const taskPlace = { task: t.slug, task_title: t.title, anchor: t.slug, context: `${chapter.title} › ${s.title} › ${t.title}` };
+      push({ ...taskPlace, context: `${chapter.title} › ${s.title}` }, "title", t.title, needs);
+      const taskWhole = walk(t.blocks, taskPlace, needs);
+      push(taskPlace, "whole", [t.title, ...taskWhole].join(". ").slice(0, WHOLE_MAX), needs);
+    }
+  }
+  return out;
+}
+
+/** A picture as words: what it shows, and what each of its marks points at. */
+function pictureText(chapter, figure) {
+  const spec = chapter.shots[figure.shot];
+  const marks = spec ? spec.marks.map((m) => m.text).filter(Boolean) : [];
+  return [figure.alt, ...marks].join(". ");
+}
+
+/**
+ * Whether this reader receives a passage, by the rules filterChapter cuts with: null when they do
+ * not, else the step's number as they read it (steps they may not take are not counted).
+ * @param {ReturnType<typeof passagesOf>[number]} passage
+ * @param {{screen: (module: string, tab: string) => boolean, holds: (need: object) => boolean}} reader
+ * @returns {{step: number|null}|null}
+ */
+function passageFor(passage, reader) {
+  if (passage.screen && !reader.screen(passage.screen.module, passage.screen.tab)) return null;
+  if (!passage.needs.every((n) => reader.holds(n))) return null;
+  if (passage.kind !== "step") return { step: null };
+  return { step: 1 + passage.earlier.filter((needs) => needs.every((n) => reader.holds(n))).length };
+}
+
 /** Every slug (sections and tasks) a chapter declares. */
 function slugsOf(chapter) {
   return chapter.sections.flatMap((s) => [s.slug, ...s.tasks.map((t) => t.slug)]);
@@ -673,4 +767,4 @@ function linksOf(chapter) {
   return out;
 }
 
-module.exports = { parseChapter, filterChapter, parseNeeds, parseInline, slugsOf, boldNames, linksOf, ROLES, DEVICES, ACCOUNTS };
+module.exports = { parseChapter, filterChapter, passagesOf, passageFor, parseNeeds, parseInline, slugsOf, boldNames, linksOf, ROLES, DEVICES, ACCOUNTS };

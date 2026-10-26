@@ -121,6 +121,17 @@ gate fails it, with no exemption, until it is retaken.
 The demo's data is the staging seed's, so pictures show invented people, never a real person's
 private data.
 
+## Search
+
+The guide's search finds every section, task, step, note, table row and picture's words, by their
+words and by their meaning (`docs/guides/user-guide.md` §6.8). Nothing needs marking for it, but:
+
+- **Name things as the screen does.** A search for a button's name finds the step that names it.
+- **When a reader's word misses**, add it beside the guide's word in its group of `SYNONYMS` in
+  `packages/contract/guide-search.js` (*off day* beside *leave*), or start a group.
+- **Examples in the text are searched too.** An example that reads like a search (*take time off*)
+  makes that page answer it; pick one that does not.
+
 ## Writing for the reader
 
 - Write for someone who has never used the hub. Say where to go, what to press, what they will see,

@@ -20,6 +20,8 @@
  *   confirmLimiter      confirming it is you, per signed-in person, 10 per 15 minutes
  *   linkPreviewLimiter  a link's card for the composer, per signed-in person, 30 per minute
  *   forwardLimiter      forwarding in Staff Community, per signed-in person, 20 per minute
+ *   guideSearchLimiter  the User Guide's search, per signed-in person, 120 per minute
+ *   guideAnswerLimiter  the User Guide's answers, per signed-in person, 20 per minute
  *
  * Limiters are built when this file loads, but Redis connects later at boot, so
  * each limiter asks for its store on every call and uses Redis once it exists.
@@ -297,6 +299,27 @@ const forwardLimiter = makeLimiter({
     req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
 });
 
+/**
+ * The User Guide's search (docs/guides/user-guide.md §6.8): each search is embedded on the Guide
+ * Search action, so typing as fast as anyone can still leaves room. Per person, after auth.
+ */
+const guideSearchLimiter = makeLimiter({
+  name: "guide-search",
+  max: 120,
+  windowMs: 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
+/** The User Guide's answers (§6.9): each one is a call to a model. Per person, after auth. */
+const guideAnswerLimiter = makeLimiter({
+  name: "guide-answer",
+  max: 20,
+  windowMs: 60_000,
+  key: (req) =>
+    req.user && req.user.user_id ? `user:${req.user.user_id}` : `ip:${req.ip}`,
+});
+
 /** Confirming it is you before a sign-in method changes: per person, after auth. */
 const confirmLimiter = makeLimiter({
   name: "confirm",
@@ -329,5 +352,7 @@ module.exports = {
   confirmLimiter,
   linkPreviewLimiter,
   forwardLimiter,
+  guideSearchLimiter,
+  guideAnswerLimiter,
   TOO_MANY,
 };

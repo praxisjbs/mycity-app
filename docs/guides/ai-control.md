@@ -308,7 +308,10 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 - Registered since: Review Dictation (Transcription) and Tidy Review (Default), personal data, TB,
   22/10/2026 (`performance.md` §6.17); Week Summary (Default, personal data, TB, 22/10/2026,
   `performance.md` §6.18); the mailbox's Write Email, Tidy Email and Thread Summary (Default) and
-  Mail Dictation (Transcription), all personal data, TB, 22/10/2026 (`mailbox.md` §1.1, §9).
+  Mail Dictation (Transcription), all personal data, TB, 22/10/2026 (`mailbox.md` §1.1, §9); the
+  User Guide's Guide Search (Embeddings), Guide Answer (Fast, JBS Praxis's choice over the
+  recommended Default) and Guide Voice Search (Transcription), all personal data, JP, 25/10/2026
+  (`user-guide.md` §6.1 decisions 9 to 11, §6.8 to §6.10). Guide Answer is the first action on Fast.
 - `redact.js` `shield()` swaps what the external redaction would mask for tokens (`KEPT001`) and
   hands back a `restore()` that puts the real values into the answer, for a feature whose answer
   must carry them (a mail draft) without the model ever seeing them (`mailbox.md` §6).
@@ -325,6 +328,23 @@ Anthropic's models are Sonnet or Haiku only (`integrations.md` §1.2 decision 3)
 Embeddings has one model and no fallback (`ONE_EMBEDDING_MODEL`): vectors from two models cannot
 share an index. Once `knowledge_embedding` holds a row the chain is locked (`EMBEDDINGS_LOCKED`);
 changing it is a support step that rebuilds the index first (`docs/runbooks/`).
+
+- **The call** is `llm.service.embed({ purpose, module, actor, input })`, on the same path as
+  `complete()`: governance first, the action's chain (its one model, from a vendor file with
+  `embed`: OpenAI's today), the run opened before anything leaves, the texts redacted, one step a
+  batch of 96 (kind `embedding`, migration 10320), retried once unless a screen is waiting
+  (`retry: false`). Every vector must be 1,536 long, which the third generation of OpenAI's models is
+  asked for, or nothing is handed back (`AI_BAD_OUTPUT`). With no provider of the chain set up, or the
+  stub switched on, there are **no vectors and no run** (`vectors: null`): a search goes by its words,
+  where a stub run would record one for every search typed. `scripts/check/ai-actions.js` reads
+  `ai.embed(` calls as it reads `complete(`.
+- **Price**: an embedding model is priced on its input tokens alone (`prices.forStep` with
+  `embeddings: true`), so a model whose output price is not set costs nothing for its output rather
+  than falling back to `ai_setting`'s text prices.
+- **The User Guide's vectors do not lock the chain** (`user_guide_passage`, `user-guide.md` §4,
+  §6.8): they are derived from the chapters and kept with the model that made them, so a new model
+  only means the guide rebuilds its index on the next tick, searching by words meanwhile. The lock
+  stays the Knowledge Hub articles' alone.
 
 ## 7 · Events, jobs and notifications
 
@@ -418,6 +438,8 @@ three tabs are built on `@mycity/ui`; nothing else is ported.
    (CLAUDE.md, §6.5). The reviews' two and the mailbox's four were registered on 22/10/2026 (§6.5).
 
 ## 14 · Change log
+
+- 26/10/2026 · JP · §6.5 and §6.6: Guide Search (Embeddings), Guide Answer (Fast) and Guide Voice Search (Transcription) registered for the User Guide's search, chosen by JBS Praxis (`user-guide.md` §6.1); `embed()` beside `complete()` with its `embedding` ledger step (migration 10320), input-only prices, and why the guide's vectors do not lock the chain; `complete()` takes a `timeoutMs` for a screen that waits.
 
 - 22/10/2026 · GE · Data Answers built (Praxis AI's engine, `praxis-ai.md` §6.1): its Not Built Yet pill goes.
 - 22/10/2026 · GE · Decision 35 built with Praxis AI's API (`praxis-ai.md` §6.6): Voice Question transcribes a spoken question and the recording is removed in the same request; its action is marked built. Praxis AI's audit: a Claude model on Data Answers' chain keeps its tools on a round that may call none (`tool_choice: none`) and gets its own thinking blocks back unchanged, so a Claude fallback no longer fails mid-question; `converse()` takes the question's deadline, so no call starts past 60 seconds.

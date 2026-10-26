@@ -1,32 +1,29 @@
 "use strict";
 /**
  * ⌘K's Guide group (docs/guides/user-guide.md §9): the sections and tasks of the User Guide this
- * person may read, matched by their titles, their chapter and their words, cut exactly as the
- * chapters are. A result opens the guide at that section. Not a table: the guide is files, so the
- * matches are made in memory, a page of 25 like every group.
+ * person may read that answer the term, ranked by the guide's own search (§6.8), cut exactly as
+ * the chapters are. A result opens the guide at that section, and at the step that answers.
+ *
+ * A description (three words or more) is searched by meaning too. Its vector is asked for in
+ * `prepare`, before ⌘K's transaction opens, and given little time: ⌘K is typed into all day, and
+ * a word or two is found by its words as well as by its meaning. Not a table: the guide is files,
+ * so the matches are made in memory, a page of 25 like every group.
  */
 const routeMap = require("../../shared/route-map");
 const { pageOf, envelope, PAGE_SIZE } = require("../../shared/http/paged");
-const { rankOf, fold } = require("../../shared/search/search.service");
 const service = require("./user_guide.service");
+const meaning = require("./user_guide.meaning");
 
-/** The words of some blocks, as one line to match against. */
-function wordsOf(blocks) {
-  const out = [];
-  const spans = (list) => out.push(list.map((s) => s.text).join(""));
-  for (const b of blocks) {
-    if (b.kind === "paragraph" || b.kind === "note") spans(b.spans);
-    else if (b.kind === "steps") b.items.forEach((i) => spans(i.spans));
-    else if (b.kind === "bullets") b.items.forEach(spans);
-    else if (b.kind === "table") b.rows.forEach((r) => r.forEach(spans));
-    else if (b.kind === "figure") out.push(b.figure.alt);
-  }
-  return out.join(" ");
-}
+/** Words a term needs before ⌘K searches it by meaning too. */
+const MEANING_WORDS = 3;
+/** How long ⌘K waits for a term's vector before it searches by words alone. */
+const MEANING_WAIT_MS = 1_500;
 
-const hit = (slug, title, sub) => {
-  const link = routeMap.linkFor("guide_section", slug);
-  return { id: slug, type: "guide_section", ref: null, title, sub, status: null, link: link ? link.path : null };
+const hitOf = (h) => {
+  const link = routeMap.linkFor("guide_section", h.anchor);
+  const path = link ? (h.step ? `${link.path}&step=${h.step}` : link.path) : null;
+  const sub = h.kind === "task" ? `${h.chapter_title} · ${h.section_title}` : h.chapter_title;
+  return { id: h.anchor, type: "guide_section", ref: null, title: h.title, sub, status: null, link: path };
 };
 
 module.exports = Object.freeze({
@@ -38,22 +35,15 @@ module.exports = Object.freeze({
   owned: false,
   capability: null,
   columns: [],
-  async search(c, { term, page = 1, user }) {
-    const guide = service.cut(service.load(), service.asReader(await service.guideReaderOf(c, user)));
-    const entries = [];
-    for (const chapter of guide.chapters)
-      for (const s of chapter.sections) {
-        entries.push({ title: s.title, words: [wordsOf(s.blocks)], context: chapter.title, hit: hit(s.slug, s.title, chapter.title) });
-        for (const t of s.tasks)
-          entries.push({ title: t.title, words: [wordsOf(t.blocks)], context: `${chapter.title} ${s.title}`, hit: hit(t.slug, t.title, `${chapter.title} · ${s.title}`) });
-      }
-    const folded = fold(term);
-    const ranked = entries
-      .map((e, i) => ({ e, i, rank: rankOf(e, folded) }))
-      .filter((x) => x.rank > 0)
-      .sort((x, y) => y.rank - x.rank || x.i - y.i);
+  async prepare({ term, user }) {
+    if (term.split(" ").filter(Boolean).length < MEANING_WORDS) return null;
+    return meaning.embedSearch({ q: term, user, timeoutMs: MEANING_WAIT_MS });
+  },
+  async search(c, { term, page = 1, user, prepared = null }) {
+    const near = prepared ? (index, visible) => meaning.nearest({ index, visible, ...prepared, db: c }) : false;
+    const { hits } = await service.hitsFor(c, user, { q: term }, { meaning: near });
     const { number, offset } = pageOf({ page });
-    const result = envelope(ranked.slice(offset, offset + PAGE_SIZE).map((x) => x.e.hit), number, ranked.length);
+    const result = envelope(hits.slice(offset, offset + PAGE_SIZE).map(hitOf), number, hits.length);
     return { page: result.page, items: result.data };
   },
 });
