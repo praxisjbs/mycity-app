@@ -130,7 +130,7 @@ first of these and **Add Work Site**.
 Add a work site when you will work somewhere other than your usual office for a few days: a client
 visit, a training, an event or an out-of-station trip. Once People approve it, you can clock in
 there on those days, and check in at each stop
-([My Attendance](/ess?tab=my-attendance)).
+([Check in at each stop](#ess-attendance-check-in)).
 
 1. Press **Add Work Site** at the top of [Home · Overview](/home?tab=overview). On a phone it is also
    on the round button with a plus. The form fills the screen, with **Submit for Approval** at its

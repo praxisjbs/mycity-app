@@ -283,6 +283,12 @@ you can do on one you can do on the other.
 > **Tip:** On a shared device, always sign out. **Sign Out Others** on
 > [My Security](/ess?tab=my-security) signs out your other devices.
 
+### Save a file you download {#start-downloads}
+
+Files you download, such as an export or a PDF, are saved on this device. On an iPhone or iPad with
+the hub on the Home Screen, the file opens the share sheet: choose where to keep it. If a message
+says **Your file is ready**, press **Save File**.
+
 ## When a Screen Cannot Open {#start-states icon=alert}
 
 Some screens show a message instead of their content. None of them means your login is broken.
