@@ -15,6 +15,13 @@
       "phone"
     ]
   },
+  "people-add-role": {
+    "spec": "81308a4536e04c60",
+    "source": "11513730ab0fe56f",
+    "devices": [
+      "desktop"
+    ]
+  },
   "people-add-worksite": {
     "spec": "13e04a9de901571f",
     "source": "5aae519336106678",
@@ -34,6 +41,22 @@
   "people-attendance-day": {
     "spec": "bf1435298229e249",
     "source": "c7ba3e3179ce6930",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-attendance-decide": {
+    "spec": "312f6a770c624858",
+    "source": "c7ba3e3179ce6930",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-attendance-pay": {
+    "spec": "bc51d4cc2a142fd5",
+    "source": "ecccfc3d6c164983",
     "devices": [
       "desktop",
       "phone"
@@ -63,9 +86,25 @@
       "phone"
     ]
   },
+  "people-leave-record": {
+    "spec": "f8c8ab06e1834f45",
+    "source": "4b1df6a640b2a3eb",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "people-leave-request": {
     "spec": "2d9bb2803da1d594",
     "source": "fcd18d3f431e1280",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-leave-type": {
+    "spec": "28a4989ba50c2147",
+    "source": "4b1df6a640b2a3eb",
     "devices": [
       "desktop",
       "phone"
@@ -87,9 +126,41 @@
       "phone"
     ]
   },
+  "people-reporting": {
+    "spec": "0baac0aaae239efd",
+    "source": "0d544fba07128686",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-schedule": {
+    "spec": "9b834a9972ed5b8e",
+    "source": "5df417bd38aa67c1",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-schedule-set": {
+    "spec": "947d17906ed9a116",
+    "source": "5df417bd38aa67c1",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "people-worksites": {
     "spec": "ae05a0bb276baf92",
     "source": "5aae519336106678",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "people-worksites-site": {
+    "spec": "63cab4927058c114",
+    "source": "368a3c1e213d97c5",
     "devices": [
       "desktop",
       "phone"

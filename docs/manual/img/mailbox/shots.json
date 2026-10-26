@@ -31,6 +31,22 @@
       "phone"
     ]
   },
+  "mailbox-configure-shows": {
+    "spec": "0249dedf211dab49",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-configure-social": {
+    "spec": "be99e06e55c1d2b6",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "mailbox-drafts": {
     "spec": "d831da63adcf11f5",
     "source": "a3b03ced86a3fad4",
@@ -55,6 +71,14 @@
       "phone"
     ]
   },
+  "mailbox-schedule": {
+    "spec": "57533a76820bd049",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "mailbox-sent": {
     "spec": "79363810291199d6",
     "source": "a3b03ced86a3fad4",
@@ -73,6 +97,14 @@
   },
   "mailbox-spam": {
     "spec": "70842acd00500c2b",
+    "source": "a3b03ced86a3fad4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "mailbox-summary": {
+    "spec": "98ed22861e835e3c",
     "source": "a3b03ced86a3fad4",
     "devices": [
       "desktop",

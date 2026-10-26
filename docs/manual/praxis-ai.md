@@ -23,44 +23,60 @@ Ask is a conversation: your questions on the right, Praxis AI's answers below th
 ### Ask a question {#praxis-ask-question needs="praxis_ai create"}
 
 1. Open [Praxis AI · Ask](/praxis-ai?tab=ask).
-2. A new conversation shows **Try Asking** with a few questions you can ask. Press one to ask it.
+2. A new conversation shows **Try Asking** with up to six questions you can ask. Press one to ask
+   it. With none to offer, it shows **Ask a Question** instead.
 3. Or type your own question in **Ask a Question** at the foot of the screen, up to 500
-   characters, and press **Send**.
+   characters. Press **Send**, or Enter.
 4. While Praxis AI reads your records, it says **Reading Your Records**. The answer appears under
-   your question.
+   your question. Wait for it: **Send** does nothing until it comes.
 5. Ask a follow-up in the same box. Praxis AI remembers the conversation, so "and last week?" is
    enough.
 
-> **Tip:** On a computer, **Recent** beside the conversation lists your conversations, newest first.
-> Press one to open it again.
+> **Tip:** On a computer, **Recent** beside the conversation lists your conversations, newest first,
+> 25 to a page: **Conversation** and **Last Asked**. Press one to open it again. Drag the line
+> between them to widen **Recent**. Before your first question it says **No Questions Yet**. A phone
+> has no **Recent**: open [Praxis AI · History](/praxis-ai?tab=history).
 
 ### Read an answer {#praxis-ask-answer}
 
 ![An answer](shot:praxis-answer)
 
 - The answer starts with a few sentences.
+- A long conversation opens on its newest 25 questions. Press **Show Earlier** at the top to see the
+  25 before them.
 - A list of records shows as a table on a computer and as cards on a phone. When there are more
-  than 25, it says how many, for example *Showing 25 of 312*. Press **Show Next 25** for the next
-  ones.
+  than 25, it says how many, for example *Showing 25 of 312*.
+- {needs="praxis_ai create"} Press **Show Next 25** under the newest answer for the next 25. It asks
+  "Show the next 25." for you, as a new question. The next answer reads *Showing 26 to 50 of 312*,
+  and so on.
 - A button under the answer, such as *Open Attendance*, opens the screen where you would act on it.
-- **From** lists the records the answer was read from. Press one to open it. When there are more
-  than six, press the *+12 More* button to see the rest.
-- Press **Helpful** or **Not Helpful** to say how good the answer was. Press it again to take it
-  back.
+- **From** lists the records the answer was read from. Press one to open it. A record with no
+  screen of its own does not open.
+- When there are more than six, press *+12 More* to see the rest. An answer keeps its first 50
+  records; past them, *+N More* is only a count.
 
 > **Important:** An answer is a first reading of your records, not a decision. Check the figures
 > on their screen before you act on them.
 
+### Say how good an answer was {#praxis-ask-feedback needs="praxis_ai create"}
+
+1. Under the answer, press **Helpful** or **Not Helpful**. A message says
+   **Thanks for the feedback**.
+2. Press the same one again to take it back. No message shows.
+
 ### Ask with your voice {#praxis-ask-voice needs="praxis_ai create"}
 
 1. Press the microphone beside **Ask a Question**. Allow the microphone when your browser asks.
-2. Speak your question. The time counts up while it records, for up to two minutes.
-3. Press **Stop Recording**. Your words appear in the box.
-4. Check them, correct anything it heard wrong, and press **Send**.
+2. Speak your question. The time counts up while it records. At two minutes it stops by itself.
+3. Press **Stop Recording**. A spinning circle shows while your words are written down.
+4. Your words are added after anything already in the box, up to 500 characters.
+5. Check them, correct anything it heard wrong, and press **Send**.
 
-If the microphone is blocked, a message says **Microphone not allowed**: allow it in your
-browser's settings for the hub. If nothing could be heard, it says **Could not transcribe**: type
-the question instead.
+| The message says | What it means | What to do |
+|---|---|---|
+| **Microphone not allowed** | The browser or phone blocked the microphone for the hub | Allow the microphone for the hub in your browser's settings, then press the microphone again |
+| **This browser cannot record** | This browser cannot record sound, often an app's own built-in browser | Open the hub in Chrome, Safari, Edge or Firefox, or type the question |
+| **Could not transcribe** | No words came back: nothing was heard, AI is off or at its monthly cap, or no voice model answered | Type the question instead. If it keeps happening, tell IT |
 
 ### Have it do something for you {#praxis-ask-change needs="praxis_ai create"}
 
@@ -68,16 +84,20 @@ the question instead.
    team meeting tomorrow at 10".
 2. Praxis AI answers with a button for the screen where you do it, such as *Open Tasks* or
    *Open Calendar*.
-3. Press it. The form opens filled in with what you said.
+3. Press it. The screen opens, and for a new task, event, project, leave request or employee, its
+   form is filled in with what you said.
 4. Check every field, change what is wrong, and press the form's own button to save.
 
 Praxis AI can fill in a new task, a new event, a new project, a leave request and, for those who
-may add people, a new employee.
+may add people, a new employee. For other changes, such as a new role, it opens the screen or an
+empty form: fill it in yourself.
 
 ### Start a new conversation {#praxis-ask-new needs="praxis_ai create"}
 
 1. Press **New Conversation** at the top of the screen. It shows once a conversation is open.
 2. Ask your question. A new conversation starts with it, titled by your first question.
+
+You can also open [Search](#start-search) and press **New Conversation**.
 
 A new conversation is best for a new subject: Praxis AI reads the last few questions of the
 conversation you are in, and an old subject can confuse a new question.
@@ -87,10 +107,21 @@ conversation you are in, and an old subject can confuse a new question.
 | The screen says | What it means | What to do |
 |---|---|---|
 | A red line with **Try Again** | The answer did not arrive, often a weak connection | Press **Try Again**. It does not ask twice |
-| "I could not find that in the records you can read" | Nothing you may see answers the question | Ask about something on your own screens, or ask differently |
+| **You appear to be offline. Check the connection and try again.** in red | No connection | Reconnect, then press **Try Again** |
+| **The AI service is not answering. Try again in a few minutes.** in red | No AI model answered within a minute | Wait a few minutes, then press **Try Again** |
+| **The same request is still being processed. Try again in a moment.** in red | Your first try is still being answered | Wait a few seconds, then press **Try Again** |
+| **The AI answer could not be used. Try asking another way.** in red | The reply could not be read | Type the question again in other words and press **Send** |
+| **The AI service is not set up correctly. An administrator has been told.** in red | A provider's key or model is wrong | Try again later. If it stays, tell IT |
+| **AI features are switched off.** or **AI features are switched off for this area.** in red | AI is off for the hub, or for Praxis AI | Ask IT to switch it on. **Try Again** cannot help until then |
+| **Something went wrong on our side. Try again, and quote this reference if it keeps happening.** in red | An unexpected fault | Press **Try Again**. If it repeats, tell IT the time you asked |
+| A message: **This month's AI spending limit has been reached.** Your question is back in the box | The month's cap on all AI is reached | Ask IT to raise it on AI Control, or wait for next month |
+| A message: **Too many requests. Wait a moment and try again.** Your question is back in the box | You sent many requests in a minute | Wait a minute, then press **Send** |
+| An answer saying the information is not available to you | Nothing you may see answers it | Ask about something on your own screens, or ask differently |
 | **That conversation was deleted** | It was deleted in another tab or on another device | Ask again: a new conversation starts |
+| **Not found** after **Helpful** or **Not Helpful** | The conversation was deleted in another tab or on another device | Nothing to do. Ask again if you still need the answer |
+| **This did not load** with **Try Again** | The conversation could not be read | Press **Try Again**. **You are offline** means no connection: reconnect first |
 
-### Ask from any screen on a phone {#praxis-ask-anywhere}
+### Ask from any screen on a phone {#praxis-ask-anywhere needs="praxis_ai create"}
 
 ![Praxis AI over a screen, on a phone](shot:praxis-panel)
 
@@ -98,8 +129,10 @@ conversation you are in, and an old subject can confuse a new question.
 2. Press **Praxis AI**. The conversation opens over the screen you are on.
 3. Ask as on [Praxis AI · Ask](/praxis-ai?tab=ask). Pressing an answer's button or a record goes
    there and closes Praxis AI.
-4. Your phone's Back gesture closes it and leaves your screen as it was. Press **Praxis AI** again
-   to come back to the same conversation.
+4. Press **Back** at the top left, swipe right, or use your phone's Back gesture. It closes and
+   your screen is as you left it.
+5. Press **Praxis AI** again to come back to the same conversation. To start another, press
+   **New Conversation**, the plus at the top right.
 
 ## History {#praxis-history screen=praxis_ai/history icon=history}
 
@@ -114,17 +147,31 @@ History lists your own conversations. Nobody else sees them.
    records your answers were read from).
 3. **Conversations** lists them, 25 to a page: **Title** (your first question), **Last Asked**,
    **Questions** and, on a computer, **Records Read**.
-4. Type in **Search Conversations** to find one by its title.
-5. Press a conversation to open it again on [Praxis AI · Ask](/praxis-ai?tab=ask) and carry on.
+4. Press **Title** or **Last Asked** at the top of a column to sort by it. On a phone, press
+   **Sort**.
+5. Type in **Search Conversations** to find one by its title.
+6. Press a conversation to open it again on [Praxis AI · Ask](/praxis-ai?tab=ask) and carry on.
+7. Or open [Search](#start-search) from anywhere, type words from the question, and press it under
+   **Conversations**.
+
+Before your first question the list says **No Questions Yet**.
 
 On a computer, **Questions by Module** shows which parts of the hub your questions were about.
+**Other** counts the questions whose answers read no records.
 
 ### Delete a conversation, or all of them {#praxis-history-delete}
 
-1. To delete one, press the three dots at the end of its row, **Conversation Actions**, then
-   **Delete Conversation**. Confirm with **Delete Conversation**.
-2. To delete every conversation, press **Clear History** at the top right. On a phone it is in the
-   menu at the top right, **History Actions**. Confirm with **Clear History**.
+1. To delete one, press the three dots at the end of its row (on a phone, on its card),
+   **Conversation Actions**, then **Delete Conversation**.
+2. Confirm with **Delete Conversation**. A message says **Conversation deleted**.
+3. To delete every conversation, press **Clear History** at the top right. On a phone it is in the
+   menu at the top right, **History Actions**.
+4. The box says **Every conversation is removed.** Confirm with **Clear History**. A message says
+   **History cleared**.
+
+| The message says | What it means | What to do |
+|---|---|---|
+| **Not found** | It was already deleted in another tab or on another device | Reload the page. It is gone |
 
 Deleting removes the questions and answers for good. It does not change what AI Control's
 [Spend](#ai-control-spend) counted for them.

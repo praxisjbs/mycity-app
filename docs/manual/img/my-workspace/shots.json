@@ -15,6 +15,30 @@
       "phone"
     ]
   },
+  "workspace-event": {
+    "spec": "752dce0bf7737d8e",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-late-reasons": {
+    "spec": "3ff607456e509a8f",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-more-actions": {
+    "spec": "aba62bb474f910a6",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "workspace-new-event": {
     "spec": "cc3f8a2278affbeb",
     "source": "21139d113d7b8794",
@@ -49,6 +73,14 @@
   },
   "workspace-send-commitments": {
     "spec": "1b7e4f434a5d64b7",
+    "source": "21139d113d7b8794",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "workspace-share": {
+    "spec": "29ed5742766b4979",
     "source": "21139d113d7b8794",
     "devices": [
       "desktop",

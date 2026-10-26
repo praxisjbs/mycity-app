@@ -7,7 +7,7 @@ icon: shield
 
 AI Control decides which AI model answers each AI feature in the hub (Praxis AI, voice notes,
 tidying a policy, drafting an email), what happens when that model cannot answer, and what AI
-costs each month. IT and the System Administrator set it up. Operations and People can open it to
+costs each month. The Implementation Team and the System Administrator (IT) set it up. Operations and People can open it to
 watch the spend, so the providers' accounts are topped up before they run out.
 
 The providers' keys are kept on [Settings · Integrations](/settings?tab=integrations). AI Control
@@ -33,20 +33,24 @@ one before cannot answer.
    computer **Calls Today**. Type in **Search actions** to find one.
 5. Press an action to see the chain it uses.
 
-| The pill says | What it means |
-|---|---|
-| **Ready** | The model answers when its turn comes |
-| **Not Set Up** | Its provider has no key on Settings · Integrations |
-| **Not on Key** | The provider's key can no longer use this model |
-| **Daily Limit** | A free plan's limit for today is used up |
-| **Skipped** | The provider said its limit is used up; it is asked again after the time shown |
-| **At Cap** | The provider reached its monthly cap on [Spend](#ai-control-spend) |
-| **Personal Data** | The model is DeepSeek and the action sends something about a person, so it is never asked |
-| **Cannot Search** | The action needs a web search and this model cannot do one |
+| The pill says | What it means | What to do |
+|---|---|---|
+| **Ready** | The model answers when its turn comes | Nothing |
+| **Not Set Up** | Its provider has no key on Settings · Integrations | Add the key there, or pick another model |
+| **Not on Key** | The provider's key can no longer use this model | Press **Edit Chain** and pick another model |
+| **Daily Limit** | A free plan's limit for today is used up | Wait until tomorrow, or put a paid model first |
+| **Skipped Until** and a time, such as *Skipped Until 14:30* | The provider refused for its limit, or its prepaid balance ran out | Wait for that time. If it repeats, top up the provider's account |
+| **At Cap** | The provider reached its monthly cap on [Spend](#ai-control-spend) | Raise or remove its cap on Spend |
+| **Personal Data** | The model is DeepSeek and the action sends something about a person, so it is never asked | Put a model of another provider in the chain |
+| **Cannot Search** | The action needs a web search and this model cannot do one | Put a Gemini model in the chain |
 
 Beside an action, **Personal Data** means what it sends can name or describe a person; **Own
 Chain** means it has a chain of its own instead of its job's; **Not Built Yet** means the feature
-is not in the hub yet.
+is not in the hub yet. On a phone these show in the action's sheet: press the action. A phone does
+not show what each job is for.
+
+If a tab says **This did not load** with **Try Again**, the jobs could not be read: press
+**Try Again**. **You are offline** means no connection: reconnect first.
 
 ### Change a chain {#ai-control-actions-edit needs="ai_control edit"}
 
@@ -55,28 +59,55 @@ is not in the hub yet.
 1. On a job's card, press **Edit Chain**. On a phone, press the job, then **Edit Chain** in its
    sheet.
    ![A job's chain, on a phone](shot:ai-control-chain-phone)
-2. Under **First Choice**, search for the model to ask first and pick it. Only models that can do
-   the job are offered.
+2. Under **First Choice**, type in **Search models** and pick the model to ask first. Only models
+   that can do the job are offered. **Nothing matches** means none has that name.
 3. Pick up to three fallbacks under **Fallback 1**, **Fallback 2** and **Fallback 3**. They are
    optional.
-4. Press **Save Chain**. A message says **Chain saved**.
+4. To take a model out, press the cross on its name.
+5. Press **Save Chain**. A message says **Chain saved**. Or press **Cancel** to change nothing.
+
+Empty places close up: with **First Choice** empty, **Fallback 1** is asked first.
+
+| The field says | What it means | What to do |
+|---|---|---|
+| **Required** under **First Choice** | Every place is empty | Pick at least one model |
+| **Picked twice** | The same model is in two places | Pick another model for one of them |
+| **Carries personal data** | DeepSeek on an action that sends something about a person | Pick a model of another provider |
+| **Not on the list** | The model is no longer on its provider's key | Pick another model |
+
+A red line at the foot, such as **You appear to be offline. Check the connection and try again.**,
+means nothing was saved. Fix it and press **Save Chain** again.
 
 **Embeddings** takes one model and no fallback. Once the Knowledge Hub has indexed anything, its
 card says **Locked** and its model cannot be changed from here: ask the developers.
 
 ### Put a model first {#ai-control-actions-first needs="ai_control edit"}
 
-1. Find the chain: a job's card, or press an action.
+1. Find the chain: a job's card on a computer, a job in the list on a phone, or press an action.
 2. Press **Make First** beside the fallback you want asked first. A message says
    **Moved to first**.
 
+On an action that uses its job's chain, this gives the action its own chain. It then shows
+**Own Chain**, and the job's chain is unchanged.
+
+| The message says | What it means | What to do |
+|---|---|---|
+| **No model at that place** | Someone changed this chain after you opened it | Close the chain, open it again, and press **Make First** again |
+| **Check the chain** | The chain holds a DeepSeek model, and this action sends something about a person | Press **Edit Chain**, take DeepSeek out, and press **Save Chain** |
+
 ### Give one action its own chain {#ai-control-actions-own needs="ai_control edit"}
+
+![An action's chain](shot:ai-control-action-sheet)
 
 1. Press the action in **Actions**.
 2. Press **Edit Chain**, pick its models and press **Save Chain**. The action now shows
    **Own Chain**, and its job's chain is unchanged.
 3. To put it back on its job's chain, press the action, then **Use Job Chain**. A message says
    **Back on its job's chain**.
+
+**Data Answers**, Praxis AI's action, starts with a chain of its own: Gemini's Flash, then its Pro.
+It shows **Own Chain** from the start. **Use Job Chain** shows only after you change it, and puts it
+back on Flash then Pro, not on **Default**'s chain.
 
 ## Models {#ai-control-models screen=ai_control/models icon=grid}
 
@@ -90,12 +121,22 @@ Models lists every model the providers' keys can use, with its price in dollars 
 2. Each row shows the **Model** with its provider and what it does, **On Key** (**Available**,
    **Not on Key** or **Not Checked**) and its **Price**. On a computer, **In Naira** and
    **In Chains** too.
-3. Narrow the list with **Provider**, or with **Show**: **On Key** (the default), **Not on Key** or
+3. A model with no price shows **Proposed** when a found price waits in **New Prices**, or
+   **Not Listed** when the provider's page does not price it.
+4. Narrow the list with **Provider** (**Any Provider**, **Gemini**, **Groq**, **OpenAI**,
+   **Anthropic** or **DeepSeek**), or with **Show**: **On Key** (the default), **Not on Key** or
    **Any**. Type in **Search models** to find one.
-4. Press a model to see its **Provider**, **Model ID**, what it **Does**, **Plan**, **Price**,
-   **In Naira**, **Per 1,000 Searches** and **In Chains**.
-5. {needs="integrations view"} Press **Open Connection** in that sheet to open the provider's
+5. Press a model to see its **Provider**, **Model ID**, what it **Does**, **On Key**, **Plan**,
+   **Price**, **In Naira**, **Per 1,000 Searches** and **In Chains**.
+   ![A model](shot:ai-control-model-sheet)
+6. {needs="integrations view"} Press **Open Connection** in that sheet to open the provider's
    connection on Settings · Integrations.
+7. While a search runs or prices wait, **Review Prices** shows at the top right (at the foot of the
+   list on a phone), with **Finding Prices** beside it while a search runs. Press it to read
+   **New Prices**.
+
+If the list says **No Models**, set **Provider** to **Any Provider** and **Show** to **Any**. Still
+empty means no provider has a key on [Settings · Integrations](/settings?tab=integrations).
 
 ### Find the models' prices {#ai-control-models-find needs="ai_control edit"}
 
@@ -106,29 +147,49 @@ is saved until you accept it. Each search is billed by the provider.
 
 1. Press **Find Prices** at the top right. On a phone it is at the foot of the list. A message
    says **Finding prices**, and **New Prices** opens.
-2. While it searches, a bar shows its progress, such as *Batch 2 of 4*. Prices appear as they
-   arrive, each with the model, the price and the page it came from.
-3. Press **Accept** to save a price, or **Dismiss** to drop it.
-4. Press **Accept All** to save every price waiting. A message says how many were saved.
-5. **Still to Price** counts the models with no price yet, and **Not Listed** the models the
-   provider's page does not price. Press **Find More** to search for the rest.
+2. While it searches, a bar shows its progress: *Starting Search*, then *Batch 2 of 4*. Until
+   prices arrive, the list says **Searching**.
+3. Prices appear as they arrive, each with the model, the price and the page it came from. On a
+   computer the **Page** column names the site it came from. On a phone, **New Prices** fills the
+   screen and shows no page.
+4. Press **Accept** to save a price. A message says **Prices saved**. Press **Dismiss** to drop it.
+   A message says **Proposal dismissed**.
+5. Press **Accept All** to save every price waiting. A message says how many, such as
+   *12 prices saved*.
+6. **Still to Price** counts the models with no price yet, and **Not Listed** the models the
+   provider's page does not price. Press **Find More** to search for the rest. A message says
+   **Finding prices**.
 
-While prices wait, the button reads **Review Prices**: press it to open **New Prices** again.
+With nothing waiting, the sheet says **Nothing New**. While a search runs or prices wait, the button
+reads **Review Prices**: press it to open **New Prices** again.
 
-If a search stops, a pill says why:
+| The message says | What it means | What to do |
+|---|---|---|
+| **Find Prices is already running** | A colleague started a search a moment ago | Reload the page, then press **Review Prices** to follow it |
+| **That proposal is no longer open** | A colleague accepted or dismissed it first | Close **New Prices** and press **Review Prices** again |
+
+If a search stops, a pill says why, in **New Prices** and beside the button for everyone who opens
+Models:
 
 | The pill says | What to do |
 |---|---|
-| **No Search Model** | Put a Gemini model in the **Deep Reasoning** chain: only it can search |
+| **No Search Model** | Put a Gemini model in Find Prices' chain: **Deep Reasoning**, unless Find Prices has its own. Only Gemini can search |
 | **AI Switched Off** or **Monthly Cap Reached** | AI is off, or the cap on all AI is reached on [Spend](#ai-control-spend) |
 | **Search Not Answering**, **Answer Not Readable**, **Search Failed** or **Search Stopped** | Press **Find Prices** again later |
 
 ### Set a price by hand {#ai-control-models-price needs="ai_control edit"}
 
+![Edit Price](shot:ai-control-edit-price)
+
 1. Press the model, then **Edit Price**.
 2. Fill in the dollar prices the provider publishes, each optional: **Input per Million**,
    **Output per Million**, **Audio per Million**, **Per Audio Hour** and **Per 1,000 Searches**.
+   Type digits and a dot, up to four places after it, such as 0.075. No dollar sign or comma.
 3. Press **Save Prices**. A message says **Prices saved**.
+
+| The field says | What it means | What to do |
+|---|---|---|
+| **Check the format** | The price has a sign, a comma, letters or more than four places | Type only digits and a dot, such as 0.30 |
 
 ## Spend {#ai-control-spend screen=ai_control/spend icon=wallet}
 
@@ -139,12 +200,18 @@ Spend shows what AI has cost this month, in naira, against each cap.
 ### Read the spend {#ai-control-spend-read}
 
 1. Open [AI Control · Spend](/ai-control?tab=spend).
-2. **All AI** shows the month's spend against the cap on all AI, with **Month Of**, **One Dollar**
-   (the day's rate) and **Rates Of** (the day the rate is from).
-3. Each provider shows **Free** or **Paid**, what it spent, its cap or *no cap*, and this month's
-   calls. **Not Set Up** means it has no key; **At Cap** means it reached its cap.
+2. **All AI** shows the month's spend against the cap on all AI, as a bar with the percent and, for
+   example, *₦19K of ₦100K cap*. It shows **At Cap** once reached. Below it, **Month Of**,
+   **One Dollar** (the day's rate) and **Rates Of** (the day the rate is from).
+3. Each provider shows **Free** or **Paid**, what it spent and this month's calls. A paid one shows
+   its cap, or *no cap*. **Not Set Up** means it has no key; **At Cap** means it reached its cap.
+   The bar turns amber at 80% and red at 100%.
 4. On a computer, **Spend by Day** shows a bar for each day.
-5. **By Action** lists each AI feature with its job, its calls and what it spent.
+5. **By Action** lists **Action** (its job under it), **Calls** and **Spent**. With nothing spent
+   this month it says **Nothing Spent**.
+
+If the tab says **This did not load** with **Try Again**, the spend could not be read: press
+**Try Again**.
 
 Nobody is notified when a cap is near or reached. Check Spend to know when to top up a provider's
 account.
@@ -154,6 +221,10 @@ account.
 1. Press **Set Cap** on **All AI**, or on a paid provider's card.
 2. Type the **Monthly Cap** in naira. Leave it empty to remove the cap.
 3. Press **Set Cap**. A message says **Cap set**, or **Cap removed**.
+
+| The field says | What it means | What to do |
+|---|---|---|
+| **Free plan** under **Monthly Cap** | The provider was moved to the Free plan, and only a paid one has a cap | Press **Cancel**. Change its plan on Settings · Integrations first if it should be paid |
 
 | Cap | When it is reached |
 |---|---|
@@ -218,4 +289,40 @@ as: admin
 marks:
   1: text "All AI" | All AI against its cap
   2: button "Set Cap" | Set the cap
+```
+
+```shot ai-control-action-sheet
+open: /ai-control?tab=actions
+as: admin
+do:
+  - click: text "Voice Note Transcription"
+  - wait: button "Edit Chain"
+crop: modal
+marks:
+  1: text "Personal Data" | It sends something about a person
+  2: button "Edit Chain" | Give it its own chain
+```
+
+```shot ai-control-model-sheet
+open: /ai-control?tab=models
+as: admin
+do:
+  - click: text "Gemini 3.8 Flash"
+  - wait: button "Edit Price"
+crop: modal
+marks:
+  1: button "Edit Price" | Set its prices by hand
+```
+
+```shot ai-control-edit-price
+open: /ai-control?tab=models
+as: admin
+do:
+  - click: text "Gemini 3.8 Flash"
+  - click: button "Edit Price"
+  - wait: label "Input per Million"
+crop: modal
+marks:
+  1: label "Input per Million" | Dollars per million tokens in
+  2: button "Save Prices" | Save them
 ```

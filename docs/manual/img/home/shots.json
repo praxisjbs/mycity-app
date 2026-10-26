@@ -16,7 +16,7 @@
     ]
   },
   "home-alerts": {
-    "spec": "96aa7d8a957c6e12",
+    "spec": "344acb82c2993170",
     "source": "6d62b037ddf8abb4",
     "devices": [
       "desktop",
@@ -41,6 +41,14 @@
   },
   "home-new-report": {
     "spec": "346747c11d5e0ac7",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "home-new-report-schedule": {
+    "spec": "c20eee0091911b9e",
     "source": "6d62b037ddf8abb4",
     "devices": [
       "desktop",
@@ -88,8 +96,8 @@
     ]
   },
   "home-work-site": {
-    "spec": "3b0b4c0d73b8dcdf",
-    "source": "6d62b037ddf8abb4",
+    "spec": "971d429c8f1bd35a",
+    "source": "fb500ec7c61d1ee0",
     "devices": [
       "desktop",
       "phone"

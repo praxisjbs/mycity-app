@@ -29,6 +29,7 @@ const catalog = require("../../shared/access/access.catalog");
 const { readerOf } = require("../../shared/search/search.service");
 const { pageOf, envelope, PAGE_SIZE } = require("../../shared/http/paged");
 const { tabVisible } = require("../../shared/search/screens");
+const { scopeFor } = require("../../middleware/rbac");
 
 const MANUAL = path.resolve(__dirname, "../../../docs/manual");
 const IMAGES = path.join(MANUAL, "img");
@@ -66,22 +67,43 @@ function load({ dir = MANUAL, fresh = false } = {}) {
 }
 
 /**
+ * Whether this person may set work for someone else, as My Workspace decides it (GET /tasks/people:
+ * their `workspace` create scope reaches another active person). The guide's `team` need.
+ */
+async function setsWorkForOthers(db, user) {
+  const scope = await scopeFor(user, "workspace", "create");
+  if (!scope) return false;
+  const { rows } = await db.query(
+    `SELECT EXISTS (SELECT 1 FROM employee e
+                     WHERE e.status = 'active' AND ($1::uuid IS NULL OR e.employee_id <> $1)
+                       AND ($2::boolean OR e.employee_id = ANY($3::uuid[]))) AS reaches`,
+    [scope.employee_id, scope.scope === "all", scope.scope === "all" ? [] : scope.scope_ids || []],
+  );
+  return Boolean(rows[0] && rows[0].reaches);
+}
+
+/** The reader ⌘K builds, with what only the guide asks: whether they set work for others. */
+async function guideReaderOf(db, user) {
+  return { ...(await readerOf(db, user)), sets_work_for_others: await setsWorkForOthers(db, user) };
+}
+
+/**
  * The reader as the filter asks it: which tabs the shell shows them, and which needs they hold.
- * @param {import("../../shared/search/screens").Reader} r
+ * @param {import("../../shared/search/screens").Reader & {sets_work_for_others?: boolean}} r
  */
 function asReader(r) {
   const can = (module, action) => r.is_ceo === true || (r.grants[module] || []).includes(action);
-  return {
-    screen: (module, tab) => tabVisible({ module, tab }, r),
-    holds: (need) => {
-      if (need.kind === "grant") return can(need.module, need.action);
-      /* A chapter's `cap` need, checked as hasCapability does; the user-guide gate holds each code to the catalogue. */
-      if (need.kind === "cap") return r.is_ceo === true || (r.capabilities || []).includes(need.code);
-      if (need.kind === "manager") return r.is_ceo === true || r.manages_people === true;
-      if (need.kind === "ceo") return r.is_ceo === true;
-      return false;
-    },
+  const holds = (need) => {
+    if (need.kind === "grant") return can(need.module, need.action);
+    /* A chapter's `cap` need, checked as hasCapability does; the user-guide gate holds each code to the catalogue. */
+    if (need.kind === "cap") return r.is_ceo === true || (r.capabilities || []).includes(need.code);
+    if (need.kind === "manager") return r.is_ceo === true || r.manages_people === true;
+    if (need.kind === "team") return r.is_ceo === true || r.sets_work_for_others === true;
+    if (need.kind === "ceo") return r.is_ceo === true;
+    if (need.kind === "any") return need.of.some(holds);
+    return false;
   };
+  return { screen: (module, tab) => tabVisible({ module, tab }, r), holds };
 }
 
 /** Every chapter (and the Quick Start) cut to this reader, links to what they may not read made plain. */
@@ -97,7 +119,7 @@ function cut(guide, reader) {
 
 /** What this person may read of the guide. */
 async function guideFor(db, user, opts) {
-  return cut(load(opts), asReader(await readerOf(db, user)));
+  return cut(load(opts), asReader(await guideReaderOf(db, user)));
 }
 
 /**
@@ -207,7 +229,7 @@ async function hitsFor(db, user, query, opts = {}) {
   const q = String(query.q || "").replace(/\s+/g, " ").trim();
   const guide = load(opts);
   const index = indexOf(guide);
-  const visible = engine.visibleTo(index, asReader(await readerOf(db, user)), passageFor);
+  const visible = engine.visibleTo(index, asReader(await guideReaderOf(db, user)), passageFor);
   if (q.length < MIN_SEARCH) return { q, index, visible, hits: [] };
   const near =
     opts.meaning === false
@@ -316,4 +338,4 @@ async function transcribe(file, actor) {
   }
 }
 
-module.exports = { MANUAL, IMAGES, load, asReader, cut, contents, chapter, quickStart, image, indexOf, hitsFor, search, answer, transcribe };
+module.exports = { MANUAL, IMAGES, load, asReader, guideReaderOf, cut, contents, chapter, quickStart, image, indexOf, hitsFor, search, answer, transcribe };

@@ -1,4 +1,12 @@
 {
+  "ai-control-action-sheet": {
+    "spec": "8b486684fb1deb00",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "ai-control-actions": {
     "spec": "3bdda4ce876ea384",
     "source": "e3b0c44298fc1c14",
@@ -19,6 +27,22 @@
     "source": "e3b0c44298fc1c14",
     "devices": [
       "desktop"
+    ]
+  },
+  "ai-control-edit-price": {
+    "spec": "298f2cea702a8470",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ai-control-model-sheet": {
+    "spec": "4999d07431f4f1cc",
+    "source": "e3b0c44298fc1c14",
+    "devices": [
+      "desktop",
+      "phone"
     ]
   },
   "ai-control-models": {

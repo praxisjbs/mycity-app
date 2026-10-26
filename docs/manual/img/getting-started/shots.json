@@ -22,6 +22,14 @@
       "phone"
     ]
   },
+  "start-notification-settings": {
+    "spec": "d7eb43fe3585760d",
+    "source": "6d62b037ddf8abb4",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "start-notifications": {
     "spec": "db12270dc85487fd",
     "source": "6d62b037ddf8abb4",

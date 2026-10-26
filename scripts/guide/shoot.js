@@ -33,6 +33,8 @@ const ACCOUNTS = {
   staff: "kemi@mycityapp.io",
 };
 const PASSWORD = "demo1234";
+/** The moment every picture shows: noon in Lagos on Sunday 25 October 2026, a day off for the demo's accounts. */
+const PICTURE_TIME = new Date("2026-10-25T12:00:00+01:00");
 
 /** Pictures at a size a guide reads well at, and a file small enough to keep in the repository. */
 const SIZES = {
@@ -78,7 +80,10 @@ async function find(page, target) {
   // With a dialog or a sheet open, the target is in it: the screen behind may hold one of the
   // same name (a list's Department filter behind the form's Department field).
   const modal = page.locator("[data-ui=modal]");
-  const scope = (await modal.count()) ? modal.last() : page;
+  // A menu or a select's list opened from a dialog floats above it, outside it: while one is open,
+  // the target is in it.
+  const menu = page.locator("[role=menu], [data-radix-popper-content-wrapper] [role=listbox]");
+  const scope = (await menu.count()) ? menu.last() : (await modal.count()) ? modal.last() : page;
   let loc;
   switch (target.kind) {
     case "button":
@@ -253,6 +258,9 @@ const OPEN = "[data-ui=modal], [role=dialog][data-state=open]";
  */
 async function session(browser, origin, account, device) {
   const ctx = await browser.newContext({ ...SIZES[device], serviceWorkers: "block", reducedMotion: "reduce" });
+  // Every picture shows the same moment, whenever it is taken: the demo's clock prompts, greetings
+  // and "today" follow the clock, and a Monday morning would open Clock In over the screen.
+  await ctx.clock.setFixedTime(PICTURE_TIME);
   const page = await ctx.newPage();
   page.setDefaultTimeout(8000);
   if (account === "guest") return { ctx, page, guest: true };
@@ -292,8 +300,10 @@ async function take(page, shot, device, file, { guest = false, origin = "" } = {
     }, shot.spec.open);
   }
   await appSettle(page);
-  // A prompt that opens by itself (clock in, a policy to acknowledge) is not the screen.
-  for (let i = 0; i < 3 && (await page.$(OPEN)) && !shot.spec.do.length; i += 1) {
+  // A prompt that opens by itself (clock in, a policy to acknowledge) is not the screen. An address
+  // naming more than its tab may open a sheet on purpose (?policy=, ?view=), kept for the steps.
+  const named = [...new URL(shot.spec.open, "http://guide").searchParams.keys()].some((k) => k !== "tab");
+  for (let i = 0; i < 3 && (await page.$(OPEN)) && (!shot.spec.do.length || !named); i += 1) {
     await page.keyboard.press("Escape");
     await appSettle(page);
   }

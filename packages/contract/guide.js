@@ -35,10 +35,22 @@ const TASK_KEYS = ["needs"];
  * Needs: who may receive a part of the guide
  * ------------------------------------------------------------------ */
 
+/** One need as written: a grant, a capability, or who the reader is. */
+function parseNeed(part) {
+  // `team`: the reader may set work for someone else (their workspace reach goes beyond themselves).
+  if (part === "manager" || part === "ceo" || part === "team") return { kind: part };
+  const cap = /^cap ([a-z_]+\.[a-z_]+)$/.exec(part);
+  if (cap) return { kind: "cap", code: cap[1] };
+  const grant = /^([a-z_]+) ([a-z]+)$/.exec(part);
+  if (grant) return { kind: "grant", module: grant[1], action: grant[2] };
+  return null;
+}
+
 /**
- * `"people create, cap home.team, manager, ceo"` as a list of needs.
+ * `"people create, cap home.team, manager or cap performance.manage"` as a list of needs: the
+ * reader holds every one, and a part with `or` is held when any of its sides is.
  * @param {string} text
- * @returns {{needs: Array<{kind: "grant", module: string, action: string}|{kind: "cap", code: string}|{kind: "manager"}|{kind: "ceo"}>, problems: string[]}}
+ * @returns {{needs: Array<{kind: "grant", module: string, action: string}|{kind: "cap", code: string}|{kind: "manager"}|{kind: "team"}|{kind: "ceo"}|{kind: "any", of: Array<object>}>, problems: string[]}}
  */
 function parseNeeds(text) {
   const needs = [];
@@ -46,21 +58,14 @@ function parseNeeds(text) {
   for (const raw of String(text).split(",")) {
     const part = raw.trim();
     if (!part) continue;
-    if (part === "manager" || part === "ceo") {
-      needs.push({ kind: part });
+    const sides = part.split(/\s+or\s+/).map((x) => x.trim());
+    const parsed = sides.map(parseNeed);
+    const bad = sides.filter((_, i) => !parsed[i]);
+    if (bad.length) {
+      for (const b of bad) problems.push(`needs "${b}" reads "<module> <action>", "cap <code>", "manager", "team" or "ceo", and "<one> or <another>" for either`);
       continue;
     }
-    const cap = /^cap ([a-z_]+\.[a-z_]+)$/.exec(part);
-    if (cap) {
-      needs.push({ kind: "cap", code: cap[1] });
-      continue;
-    }
-    const grant = /^([a-z_]+) ([a-z]+)$/.exec(part);
-    if (grant) {
-      needs.push({ kind: "grant", module: grant[1], action: grant[2] });
-      continue;
-    }
-    problems.push(`needs "${part}" reads "<module> <action>", "cap <code>", "manager" or "ceo"`);
+    needs.push(parsed.length === 1 ? parsed[0] : { kind: "any", of: parsed });
   }
   return { needs, problems };
 }

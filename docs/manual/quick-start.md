@@ -73,11 +73,10 @@ icon: spark
 
 ![The Inbox](shot:qs-mail)
 
-1. Open [Mailbox · Inbox](/mailbox?tab=inbox). The first time, type your email **Password** and
-   press **Connect**.
-2. Press a message to open it.
-3. Press **Reply** to answer it, or **Compose** to write a new one. Read
-   [Read your mail](#mailbox-read).
+1. Open [Mailbox · Inbox](/mailbox?tab=inbox).
+2. {needs="mailbox create"} The first time, type your email **Password** and press **Connect**.
+3. Press a message to open it. Read [Read your mail](#mailbox-read).
+4. {needs="mailbox create"} Press **Reply** to answer it, or **Compose** to write a new one.
 
 ## Post in a Channel {#qs-channel role="Everyone" icon=msg screen=community/channels}
 
@@ -95,10 +94,10 @@ icon: spark
 ![A request waiting on you](shot:qs-approve-leave)
 
 1. Open [People · Leave](/people?tab=leave) and press **Pending**. A request in **Need You** on
-   [Home · Overview](/home?tab=overview) opens here too.
+   [Home · Overview](/home?tab=overview) brings you here too.
 2. Press the request. Check **Also Away** for who else is off.
-3. Press **Approve**, or **Reject** and type the **Reason**. The person is told. Read
-   [Approve or reject leave](#people-leave-decide).
+3. Press **Approve**, or **Reject**, type the **Reason** and press **Reject Leave**. The person is
+   told. Read [Approve or reject leave](#people-leave-decide).
 
 ## See Your Team {#qs-team role="Line Managers" icon=users screen=home/team needs="manager"}
 
@@ -120,14 +119,15 @@ icon: spark
 4. Press **Publish Announcement**. Everyone in the audience is told. Read
    [Post an announcement](#community-announcements-new).
 
-## Publish a Policy {#qs-policy role="People & HR" icon=book screen=knowledge/policies needs="knowledge create"}
+## Publish a Policy {#qs-policy role="People & HR" icon=book screen=knowledge/policies needs="knowledge create, knowledge edit"}
 
 ![New Policy](shot:qs-policy)
 
 1. Open [Knowledge Hub · Policies](/knowledge?tab=policies) and press **New Policy**.
 2. Type its **Title** and press **Start Policy**.
 3. Choose who it **Applies To**, write the **Policy Text**, and press **Save Draft**.
-4. Press **Publish Policy**, choose the **First Day**, sign, and press **Publish Policy**. Read
+4. Press **Publish Policy**, choose the **First Day**, add a **Note** on what changed, sign, and
+   press **Publish Policy**. Read
    [Publish a policy](#knowledge-policies-publish).
 
 ## Add an Employee {#qs-add-employee role="People & HR" icon=users needs="people create"}
@@ -189,7 +189,10 @@ icon: spark
 
 1. Open [AI Control · Spend](/ai-control?tab=spend).
 2. **All AI** shows this month's spend against its cap; each provider shows its own.
-3. Top up a provider before it reaches **At Cap**. Read [Spend](#ai-control-spend).
+3. Top up each provider's own account on its website before its balance runs out. Read
+   [Spend](#ai-control-spend).
+4. {needs="ai_control edit"} **At Cap** means MyCity's own monthly cap is reached. Press
+   **Set Cap** to raise it.
 
 ## Plan Your Day {#qs-plan-day role="Everyone" icon=check screen=workspace/today}
 
@@ -216,8 +219,10 @@ icon: spark
 
 1. On each of the month's priority tasks, press **Edit Task** and tick **Mark as Commitment**.
 2. Write its **Acceptance Criteria** and press **Save Task**.
-3. Press **Send Commitments** on [My Workspace · Tasks](/workspace?tab=tasks).
-4. Check the **Month** and press **Send Commitments**. Read [Commitments](#workspace-commitments).
+3. {needs="workspace edit, performance view"} Press **Send Commitments** on
+   [My Workspace · Tasks](/workspace?tab=tasks).
+4. {needs="workspace edit, performance view"} Check the **Month** and press **Send Commitments**.
+   Read [Commitments](#workspace-commitments).
 
 ## Do Your Check-In {#qs-check-in role="Everyone" icon=check screen=ess/my-performance}
 
@@ -235,11 +240,11 @@ icon: spark
 ![My Performance](shot:qs-agree)
 
 1. Open [Employee Self-Service · My Performance](/ess?tab=my-performance).
-2. Read your lines under **My Scorecard**.
+2. Read your lines under **My Scorecard**. On a phone, press the **My Scorecard** card.
 3. Press **Agree Scorecard**, or **Disagree With Reason** if something is wrong. Read
    [Agree your scorecard](#performance-my-agree).
 
-## Set Your Team's Tasks {#qs-team-tasks role="Line Managers" icon=users screen=workspace/tasks needs="workspace create, manager"}
+## Set Your Team's Tasks {#qs-team-tasks role="Line Managers" icon=users screen=workspace/tasks needs="workspace create, team"}
 
 ![My Team on Tasks](shot:qs-team-tasks)
 
@@ -262,7 +267,7 @@ icon: spark
 ![Performance, Reviews](shot:qs-score-review)
 
 1. Open [Performance · Reviews](/performance?tab=reviews).
-2. Press the review under **Waiting On You**. Its **Next** reads **Score**.
+2. Press the review under **Waiting On You**. On a computer, its **Next** reads **Score**.
 3. Check each line's **Final Score**, and add a **Corrective Action** to any line under 1.
 4. Press **Submit Review**. Read [Score a review](#performance-review-score).
 
