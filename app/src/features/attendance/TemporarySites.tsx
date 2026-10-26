@@ -4,6 +4,7 @@ import type { AttendanceEvent, CheckIn, TemporarySite, TemporarySiteCreate, Temp
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, EmployeePicker } from "@/features/shared/pickers";
@@ -100,9 +101,10 @@ export function useSiteLink(id: string | null, open: (s: TemporarySite) => void,
 export function TemporarySitesView({ openSite }: { openSite: (s: TemporarySite) => void }) {
   const [state, setState] = useState<TemporarySiteState | "all">("all");
   const list = usePaged("GET /api/v1/attendance/temporary-sites", { filters: state === "all" ? {} : { state } });
+  const news = useViewNews();
   return (
     <>
-      <Chips label="Temporary Sites" value={state} onChange={setState} options={STATE_CHIPS} />
+      <Chips label="Temporary Sites" value={state} onChange={setState} options={withNews(news, STATE_CHIPS, { at: "temporary/sites", all: "all" })} />
       <DataView
         title="Temporary Sites"
         list={list}

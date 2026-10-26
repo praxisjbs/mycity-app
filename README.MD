@@ -233,7 +233,7 @@ src/
 │   ├── places/        places (every address a person enters, kept per field of a record, and the
 │   │                  naming of locations saved while search was down) · token (the signature on
 │   │                  every place our search or pin hands out) · owners (every address field, F27)
-│   ├── notifications/ categories · fanout
+│   ├── notifications/ categories · fanout · views (where a record waits inside its screen, from each module's `<module>.views.js`)
 │   ├── integrations/  providers (the registry of Settings · Integrations' connections) · settings (the
 │   │                  one reader of a connection's values: saved here, else the server file) · state ·
 │   │                  usage (each provider call counted a day, flushed every 15 s) · quota (a Free plan's
@@ -299,6 +299,7 @@ src/modules/<name>/
   <name>.events.js          event keys it emits + outbox handlers it registers
   <name>.ai.js              AI read manifest (§7.6), or `// ai:none <reason>` in the controller
   <name>.search.js          ⌘K provider, or `// search:none <reason>` in the controller
+  <name>.views.js           where its records wait inside the screens they open on (a switch's side, a chip), only where it has any
   <name>.import.js          importer, only where records arrive from spreadsheets
   <name>.<topic>.js         the module's own rule files (lifecycle, calc, scoring…)
   <name>.test.js            unit tests beside the code

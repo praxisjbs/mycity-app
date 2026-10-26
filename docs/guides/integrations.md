@@ -720,6 +720,7 @@ bound form here; nothing else is ported.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Settings · Integrations' Group chips carry the unread notices about the connections in each group (`integrations.views.js`, by the provider's group). A notice about a connection now opens it (its link names the connection's id, which the tab matched only against a code), and a row is keyed by its connection once it has one, so the notice dots it.
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Remove Model shows on a phone too (decided 26/10/2026), so a model added by hand can be removed there; when Confirm It's You replaced Edit Settings mid-save and the test then failed, what was typed (never a secret) and the marks are kept, and Edit Settings opens with them. §10.2 updated.
 - 21/10/2026 · TB · §1.3, §6.15, §6.16 from TB's answers for the Milestone 1 handover: Pause Mail and Resume Mail on the System Sender (`integration_connection.paused_at`, `9230`); while paused only invitations, password resets, Send Test Email and the server's health alarm go out, notices are pushed instead, digests are dropped and other mail waits for Resume; a queued invitation or reset whose link stopped working is dropped; an address the mail server refuses for good is not retried, is one warning on Faults and is listed as Refused Addresses (`mail_refusal`, `GET /mail_sender/refusals`); a host over its own hourly limit is waited on for an hour. Settings · Status reads Mail as Paused without a check-down notice.
 

@@ -418,7 +418,20 @@ async function openByKey(db, metric) {
   return Object.fromEntries(rows.map((r) => [r.key, r.n]));
 }
 
+/** Each of these alerts' rule metric, and whether it is open: where it waits on Home · Alerts (alerts.views.js). */
+async function placesOf(db, ids) {
+  const { rows } = await db.query(
+    `SELECT a.home_alert_id AS id, r.metric, (${OPEN}) AS open, a.outcome
+       FROM home_alert a
+       JOIN home_alert_rule r ON r.home_alert_rule_id = a.home_alert_rule_id
+      WHERE a.home_alert_id = ANY($1::uuid[])`,
+    [ids],
+  );
+  return rows;
+}
+
 module.exports = {
+  placesOf,
   permissionKeys,
   seenWhere,
   alertPage,

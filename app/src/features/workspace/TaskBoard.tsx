@@ -6,6 +6,7 @@
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { useInfinite } from "@/api/hooks";
+import type { ViewNews } from "@/features/notifications/marks";
 import { ErrorState, Kanban, useModal } from "@mycity/ui";
 import { CardPills, COLS, type BoardStatus } from "./shared";
 import { useMoveTask } from "./TaskForms";
@@ -33,6 +34,7 @@ export function TaskBoard({
   q,
   onOpen,
   empty,
+  newsOf,
 }: {
   filters: BoardFilters;
   /** The search, already paused (usePaused). */
@@ -40,6 +42,8 @@ export function TaskBoard({
   onOpen: (taskId: string, title: string) => void;
   /** What an empty board shows when nothing is searched. */
   empty?: ReactNode;
+  /** What waits on the reader in each column (docs/guides/notifications.md §6). */
+  newsOf?: (status: BoardStatus) => ViewNews | undefined;
 }) {
   const modal = useModal();
   const cols = {
@@ -75,6 +79,8 @@ export function TaskBoard({
         label,
         series,
         count: cols[status].page?.total,
+        unread: newsOf?.(status)?.unread,
+        urgent: newsOf?.(status)?.urgent,
         onMore: cols[status].page?.has_next ? cols[status].more : undefined,
         cards: cols[status].rows.map((t) => ({ key: t.task_id, title: t.title, meta: <CardPills t={t} />, owner: t.assignee?.display_name })),
       }))}

@@ -423,7 +423,20 @@ async function updateType(client, id, patch) {
   return getType(client, id);
 }
 
+/** Each of these requests' status, as People · Leave's chips read it (leave.views.js). */
+async function statusesOf(db, ids) {
+  const { rows } = await db.query(
+    `SELECT lr.leave_request_id AS id, ${STATUS} AS status
+       FROM leave_request lr
+       LEFT JOIN workflow_instance wi ON wi.workflow_instance_id = lr.workflow_instance_id
+      WHERE lr.leave_request_id = ANY($1::uuid[])`,
+    [ids],
+  );
+  return rows;
+}
+
 module.exports = {
+  statusesOf,
   list,
   get,
   publicRow,

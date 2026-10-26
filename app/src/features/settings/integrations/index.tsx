@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { IntegrationGroup, IntegrationRow } from "@mycity/contract/contract.gen.ts";
 import { useApi, usePaged } from "@/api/hooks";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { useAuth } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { Button, Chips, DataView, formatWhen, PageHeader, Pill, useIsPhone, type DataViewColumn } from "@mycity/ui";
@@ -25,11 +26,13 @@ export function IntegrationsTab({ id = null }: { id?: string | null }) {
   const [group, setGroup] = useState<GroupFilter>("all");
   const summary = useApi("GET /api/v1/integrations/summary");
   const list = usePaged("GET /api/v1/integrations", { filters: group === "all" ? {} : { group } });
+  const news = useViewNews();
   const open = useConnection();
-  // A link that names a connection (AI Control · Models) opens it, once the list has it.
+  // A link that names a connection opens it, once the list has it: by its code (AI Control · Models)
+  // or by its id (a notice about it).
   const opened = useRef<string | null>(null);
   useEffect(() => {
-    const row = id ? list.rows.find((r) => r.code === id) : null;
+    const row = id ? list.rows.find((r) => r.code === id || r.integration_connection_id === id) : null;
     if (!row || opened.current === id) return;
     opened.current = id;
     open(row.code, row.display_name);
@@ -67,13 +70,14 @@ export function IntegrationsTab({ id = null }: { id?: string | null }) {
           ]}
         />
       )}
-      <Chips label="Group" value={group} onChange={setGroup} options={GROUPS} />
+      <Chips label="Group" value={group} onChange={setGroup} options={withNews(news, GROUPS, { all: "all" })} />
       <DataView<IntegrationRow>
         list={list}
         title="Connections"
         caption="Connections"
         noun="connection"
-        rowKey={(r) => r.code}
+        // A connection once it has one, so a notice about it marks its row; else its provider.
+        rowKey={(r) => r.integration_connection_id ?? r.code}
         onRowClick={(r) => open(r.code, r.display_name)}
         empty={{ title: "No Connections", icon: "link" }}
         columns={[

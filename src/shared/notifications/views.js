@@ -8,11 +8,11 @@
  * Each module declares its own records in `src/modules/<module>/<module>.views.js`, an array of
  *
  *   { module: "people", tab: "worksites", type: "attendance_location_request", view: "temporary/requests" }
- *   { module: "people", tab: "worksites", type: "worksite", place: async (db, ids) => Map<id, path> }
+ *   { module: "people", tab: "worksites", type: "attendance_temporary_site", place: async (db, ids, { user }) => Map<id, path> }
  *
  * `view` puts every record of the type in one view; `place` reads each record's view, as the
- * screen's own filters would find it (its state decides the chip), and a record it leaves out
- * counts on the tab alone. The paths are the screen's own values: a switch's value, then a chip's.
+ * screen's own filters would find it for this reader (its state decides the chip), and a record it
+ * leaves out counts on the tab alone. The paths are the screen's own values: a switch's value, then a chip's.
  * One declaration per screen and record type: two are a load error, as is a path that is not one.
  * Files the repository map created but nobody has written yet (empty) are skipped.
  */
@@ -80,10 +80,10 @@ function declarations() {
  * record of the type could have reach a `place` (a uuid), and a path it returns that is not one
  * is dropped, so a slip in one module costs only its own counts.
  * @param {import("pg").Pool | import("pg").PoolClient} db
- * @param {{module: string, tab: string, type: string, ids: string[]}} q
+ * @param {{module: string, tab: string, type: string, ids: string[], user?: object}} q  `user` the reader
  * @returns {Promise<Map<string, string>>}
  */
-async function placeAll(db, { module: moduleKey, tab, type, ids }) {
+async function placeAll(db, { module: moduleKey, tab, type, ids, user }) {
   const d = declarations().get(keyOf(moduleKey, tab, type));
   const out = new Map();
   if (!d) return out;
@@ -93,7 +93,7 @@ async function placeAll(db, { module: moduleKey, tab, type, ids }) {
   }
   const asked = ids.filter((id) => UUID_RE.test(id));
   if (!asked.length) return out;
-  for (const [id, where] of await d.place(db, asked)) {
+  for (const [id, where] of await d.place(db, asked, { user })) {
     if (where && PATH_RE.test(where)) out.set(String(id), where);
   }
   return out;

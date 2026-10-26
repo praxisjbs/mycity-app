@@ -8,6 +8,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
+import { useViewNews, withNews } from "@/features/notifications/marks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { MonthPicker } from "@/features/shared/MonthPicker";
 import { EmployeePicker } from "@/features/shared/pickers";
@@ -83,6 +84,7 @@ export function PeopleLeave() {
   const modal = useModal();
   const summary = useApi("GET /api/v1/leave/summary");
   const [status, setStatus] = useState<"all" | LeaveStatus>("all");
+  const news = useViewNews();
   const list = usePaged("GET /api/v1/leave/requests", {
     filters: status === "all" ? {} : { status },
     sort: "-starts_on",
@@ -141,7 +143,7 @@ export function PeopleLeave() {
             <Chips
               value={status}
               onChange={(v) => setStatus(v as "all" | LeaveStatus)}
-              options={[["all", "All"], ["submitted", "Pending"], ["approved", "Approved"], ["rejected", "Rejected"], ["cancelled", "Cancelled"]]}
+              options={withNews(news, [["all", "All"], ["submitted", "Pending"], ["approved", "Approved"], ["rejected", "Rejected"], ["cancelled", "Cancelled"]], { all: "all" })}
             />
             <DataView
               title="Requests"

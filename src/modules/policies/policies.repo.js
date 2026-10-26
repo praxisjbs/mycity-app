@@ -92,6 +92,16 @@ function archivePolicy(client, id, { reason, userId }) {
 /** The SQL each PolicyListQuery sort reads. The first is the default order. */
 const POLICY_SORTS = { title: "x.title", number: "x.number", updated_at: "x.updated_at" };
 
+/** A policy's state on `$1` (today), as Knowledge Hub · Policies' State chips read it. */
+const POLICY_STATE = `CASE WHEN p.status = 'archived' THEN 'archived'
+                   WHEN EXISTS (SELECT 1 FROM policy_version s WHERE s.policy_id = p.policy_id AND s.status = 'submitted')
+                     THEN 'awaiting_approval'
+                   WHEN EXISTS (SELECT 1 FROM policy_version f WHERE f.policy_id = p.policy_id
+                                  AND f.status = 'published' AND f.effective_from <= $1::date) THEN 'in_force'
+                   WHEN EXISTS (SELECT 1 FROM policy_version w WHERE w.policy_id = p.policy_id AND w.status = 'published')
+                     THEN 'waiting'
+                   ELSE 'draft' END`;
+
 /**
  * A page of policies, each with its state on `today`, the number in force, and its newest
  * published version (whose Applies To and acknowledgements the row shows).
@@ -102,14 +112,7 @@ function listPolicies(db, query, today) {
     db,
     `WITH x AS (
        SELECT p.policy_id, p.number, p.kind, p.title, p.updated_at,
-              CASE WHEN p.status = 'archived' THEN 'archived'
-                   WHEN EXISTS (SELECT 1 FROM policy_version s WHERE s.policy_id = p.policy_id AND s.status = 'submitted')
-                     THEN 'awaiting_approval'
-                   WHEN EXISTS (SELECT 1 FROM policy_version f WHERE f.policy_id = p.policy_id
-                                  AND f.status = 'published' AND f.effective_from <= $1::date) THEN 'in_force'
-                   WHEN EXISTS (SELECT 1 FROM policy_version w WHERE w.policy_id = p.policy_id AND w.status = 'published')
-                     THEN 'waiting'
-                   ELSE 'draft' END AS state,
+              ${POLICY_STATE} AS state,
               -- The first of each, by aggregate: pageQuery alone limits a paged query.
               (SELECT (array_agg(f.version ORDER BY f.effective_from DESC, f.version DESC))[1]
                  FROM policy_version f
@@ -532,16 +535,11 @@ async function isAsked(db, id, employeeId, today) {
 }
 
 /**
- * The reader's policies (ESS · Policy Updates): the newest published version of each active
- * policy that applies to them, and the submissions an approval waits on them for.
+ * The reader's policies as ESS · Policy Updates reads them (`mine`): the newest published version
+ * of each active policy that applies to them, and the submissions an approval waits on them for.
+ * `$1` is the reader's employee and `$2` today; `waiting` the clause their approvals are found by.
  */
-async function myPolicies(db, user, query, today) {
-  const roleCodes = await approvers.roleCodesOf(db, user.role_ids || []);
-  const params = [user.employee_id || null, today, query.state || "all"];
-  const waiting = approvers.waitingOnClause("wi", user, roleCodes, params);
-  return pageQuery(
-    db,
-    `WITH mine AS (
+const MINE = (waiting) => `WITH mine AS (
        SELECT v.policy_version_id, v.policy_id, p.number, p.kind, v.title, v.version, v.effective_from,
               v.needs_acknowledgement, ${DUE_ON("v", "e")} AS due_on, a.acknowledged_at, false AS waiting_on_me,
               (v.needs_acknowledgement AND a.acknowledged_at IS NULL) AS to_acknowledge,
@@ -560,6 +558,16 @@ async function myPolicies(db, user, query, today) {
          JOIN workflow_instance wi ON wi.workflow_instance_id = v.workflow_instance_id AND wi.state = 'pending'
         WHERE v.status = 'submitted' AND ${waiting}
      )
+`;
+
+/** The reader's policies (ESS · Policy Updates), filtered by its views. */
+async function myPolicies(db, user, query, today) {
+  const roleCodes = await approvers.roleCodesOf(db, user.role_ids || []);
+  const params = [user.employee_id || null, today, query.state || "all"];
+  const waiting = approvers.waitingOnClause("wi", user, roleCodes, params);
+  return pageQuery(
+    db,
+    `${MINE(waiting)}
      SELECT mine.*, ${TOTAL_COL}
        FROM mine
       WHERE ($3 = 'all'
@@ -570,6 +578,32 @@ async function myPolicies(db, user, query, today) {
     params,
     query,
   );
+}
+
+/** Each of these policies' state on `today`: its chip on Knowledge Hub · Policies (policies.views.js). */
+async function statesOf(db, ids, today) {
+  const { rows } = await db.query(
+    `SELECT p.policy_id AS id, ${POLICY_STATE} AS state FROM policy p WHERE p.policy_id = ANY($2::uuid[])`,
+    [today, ids],
+  );
+  return rows;
+}
+
+/** Which of these versions are the reader's on Policy Updates, and in which view (policies.views.js). */
+async function myViewsOf(db, user, ids, today) {
+  const roleCodes = await approvers.roleCodesOf(db, user.role_ids || []);
+  const params = [user.employee_id || null, today];
+  const waiting = approvers.waitingOnClause("wi", user, roleCodes, params);
+  params.push(ids);
+  const { rows } = await db.query(
+    `${MINE(waiting)}
+     SELECT mine.policy_version_id AS id, bool_or(mine.to_acknowledge) AS to_acknowledge, bool_or(mine.waiting_on_me) AS waiting_on_me
+       FROM mine
+      WHERE mine.policy_version_id = ANY($${params.length}::uuid[])
+      GROUP BY mine.policy_version_id`,
+    params,
+  );
+  return rows;
 }
 
 /** Whether a submission's approval waits on this user now. */
@@ -721,6 +755,8 @@ async function departmentNames(db, ids) {
 }
 
 module.exports = {
+  statesOf,
+  myViewsOf,
   lock,
   getPolicy,
   insertPolicy,

@@ -106,7 +106,8 @@ board.
    finished in the last 30 days, **Completed, 30d**.
 3. Each column shows how many tasks it holds. When a column holds more than 25, press **Load More**
    at its foot. An empty column says **Nothing in this stage**. With
-   no tasks at all, the board says **No Tasks Yet**.
+   no tasks at all, the board says **No Tasks Yet**. A yellow number beside a column's name counts
+   what is new for you in it, and each such task has a yellow dot until you open it.
 4. Press **List** at the top to see the same tasks as a table: **Task**, **Assignee**, **Status**,
    **Due** and **Priority**. Press **Board** to go back. Press the **Due** or **Priority** heading to
    sort the list by it; press it again to reverse it.
@@ -118,7 +119,7 @@ board.
    see your own again.
 
 On a phone, the columns are chips across the top with their counts. Press a chip to see that
-column's tasks. **List** on a phone shows cards: the task, **Assignee**, **Status** and **Due**.
+column's tasks. The board opens on the column that holds what is new for you. **List** on a phone shows cards: the task, **Assignee**, **Status** and **Due**.
 Press **Sort** to order them. Under a board card, **Move To** also offers **Move Up** and
 **Move Down**.
 

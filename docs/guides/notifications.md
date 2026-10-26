@@ -248,8 +248,8 @@ Reference-data file(s): none.
   the records it shows, so the number can be followed from the menu to the dotted row. The module
   that owns a record places it (`src/modules/<module>/<module>.views.js`): a fixed view for every
   record of a type (`view`, a request before attendance's PR 4 is always Temporary, Requests), or
-  each record by its state, as the screen's own filter reads it (`place`, a withdrawn site sits in
-  Temporary, Cancelled). A view's path is the screen's own values, outermost first; a view counts its
+  each record by its state, as the screen's own filter reads it (`place`, a site in Temporary, Sites
+  under its state; a withdrawn one has no chip of its own, so All alone shows it). A view's path is the screen's own values, outermost first; a view counts its
   own records and every view below it, and a chip that shows everything (All) reads its switch's
   side. The numbers are unread notices, as on the tab: a site sent and then withdrawn counts 2 and
   shows one dot. A record nobody places counts on the tab alone. When a screen opens, if the side or
@@ -418,6 +418,7 @@ listed here as tier 1 or tier 2.
 | Turn-on notice | "Get notified of new mail and approvals"; Not Now, Turn On | None | Why the browser's own prompt is not used: §6 |
 | Counts on the tabs | Beside each tab of a module, its count of unread notices, yellow (red while an urgent one opens there); nothing for none | None | How a count is worked out: §3, §6 |
 | Unread rows | A yellow dot before a row and a soft tint on it; screen readers hear "Unread" before its first value | None | When a row is marked and what reads it: §6 |
+| Counts inside a tab | Beside each side of a screen's switch, each chip and each board column, its share of the tab's unread notices, in the same yellow (red while urgent); nothing for none; the screen opens on the one holding them; a board card new to the reader has a row's dot and tint | None | How each record is placed: §3, §6 |
 
 ### 10.2 Phone layout
 
@@ -430,6 +431,7 @@ listed here as tier 1 or tier 2.
 | Urgent bar | Full width under the top bar on every screen: the title on one line and the count | The step arrows (swipe the bar sideways instead) | Acknowledge or Open, 44 px | Stays until every urgent notice is closed |
 | Counts on the tabs | The same counts on the tabs under the module's name, which scroll sideways | Nothing | Tap a tab | The bottom bar's More counts every module behind it |
 | Unread rows | The dot at the top left of a card and the tint on the whole card | Nothing | Tap the card: its record opens in a sheet and the dot goes | |
+| Counts inside a tab | The same counts on the switch's segments and the chips, which scroll sideways; a board opens on the stage holding the news | Nothing | Tap the segment, chip or stage | |
 
 ## 11 · Edge cases
 
@@ -519,6 +521,8 @@ The design choices of Settings · Notifications (copies only on notices about so
 channel wins, the reminders' defaults) are in `notifications-everywhere.md` §5, open to TB.
 
 ## 14 · Change log
+
+- 26/10/2026 · JP · Where it waits, inside a tab (JBS Praxis, the QA register's Worksites 2 with neither Permanent nor Temporary marked): `GET /notifications/views` counts a screen's unread notices by the inner view each record sits in, as its module places it (`<module>.views.js`, `shared/notifications/views.js`); the screens' switches, chips and board columns carry their share and open where the news is (§2, §3 step 7, §5, §6, §10). The numbers stay unread notices, as on the tab.
 
 - 26/10/2026 · JP · §2: the turn-on notice, like the update and install offers, shows on Home only, any tab, never on another screen, where at the foot of the page it sat over the page's own content (QA DEF-12, the phone run's update prompt over a report); this replaces keeping them off Staff Community and Praxis AI's Ask.
 

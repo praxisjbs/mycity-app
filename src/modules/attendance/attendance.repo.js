@@ -1794,7 +1794,73 @@ function renameAddress(client, owner, key, line) {
   return client.query(ADDRESS_LINE[owner], [key, line]);
 }
 
+/* ------------------------------------------------------------------ *
+ * Where it waits: each record's view and chip, as its list's filter reads it (attendance.views.js)
+ * ------------------------------------------------------------------ */
+
+/** A work location request's status: its chip on Worksites, Temporary, Requests. */
+async function requestStatusesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT r.location_request_id AS id, r.status FROM attendance_location_request r WHERE r.location_request_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A field assignment's state on `today`: its chip on Worksites, Temporary, Field. */
+async function assignmentStatesOf(db, ids, today) {
+  const { rows } = await db.query(
+    `SELECT a.field_assignment_id AS id, ${STATE("$2")} AS state
+       FROM attendance_field_assignment a
+      WHERE a.field_assignment_id = ANY($1::uuid[])`,
+    [ids, today],
+  );
+  return rows;
+}
+
+/** An exception's status: Open or Decided on People · Attendance, Exceptions. */
+async function exceptionStatusesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT x.attendance_exception_id AS id, x.status FROM attendance_exception x WHERE x.attendance_exception_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A home's status: its chip on People · Attendance, Homes. */
+async function homeStatusesOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT h.attendance_home_id AS id, h.status FROM attendance_home h WHERE h.attendance_home_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A pay item's kind and status: Overtime or Deductions, and its chip there. */
+async function payItemsOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT pi.attendance_pay_item_id AS id, pi.kind, pi.status FROM attendance_pay_item pi WHERE pi.attendance_pay_item_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
+/** A day's date and status: the Register shows one date's days, each with its status (null before it is judged). */
+async function daysOf(db, ids) {
+  const { rows } = await db.query(
+    "SELECT ad.attendance_day_id AS id, ad.attendance_date::text AS date, ad.status FROM attendance_day ad WHERE ad.attendance_day_id = ANY($1::uuid[])",
+    [ids],
+  );
+  return rows;
+}
+
 module.exports = {
+  requestStatusesOf,
+  assignmentStatesOf,
+  exceptionStatusesOf,
+  homeStatusesOf,
+  payItemsOf,
+  daysOf,
   ADDRESS_LINE,
   renameAddress,
   COMPANY_WORKS,

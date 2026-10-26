@@ -12,6 +12,7 @@ import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useSearchParams } from "@/lib/router";
+import { useOpenWhereNews, useViewNews, withNews } from "@/features/notifications/marks";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
@@ -53,6 +54,11 @@ const PIP_STATUS: Record<Pip["status"], { tone: "ok" | "warn" | "err" | "neutral
 export const nextStep = (r: Pick<Review, "status" | "reviewer">, me: string | null) =>
   r.status === "with_reviewer" || r.status === "returned" ? (r.reviewer.employee_id === me ? "Score" : "Give Input") : r.status === "with_hr" ? "Close Review" : "Approve";
 
+const REVIEW_VIEWS: Array<["reviews" | "pips", string]> = [
+  ["reviews", "Reviews"],
+  ["pips", "PIPs"],
+];
+
 export function Reviews() {
   const me = useMe();
   const modal = useModal();
@@ -67,6 +73,9 @@ export function Reviews() {
   const round: Round | undefined = rounds.rows.find((r) => r.performance_cycle_id === roundId) ?? rounds.rows[0];
   const departments = useApi("GET /api/v1/departments", { query: {} });
   const [view, setView] = useState<"reviews" | "pips">("reviews");
+  // Each view carries what waits on the reader in it, and the page opens where it waits, unless a link named a record.
+  const news = useViewNews();
+  useOpenWhereNews({ value: view, onChange: setView, values: ["reviews", "pips"], skip: Boolean(params.get("id")) });
   const [dept, setDept] = useState("");
   const [stage, setStage] = useState("");
   // `?kind=probation` (People's Probation Ending) opens on the probation reviews.
@@ -138,7 +147,7 @@ export function Reviews() {
       <Toolbar>
         <FilterSelect label="Quarter" value={quarter.periodId} onChange={pickQuarter} options={quarter.options} />
         <FilterSelect label="Month" value={round?.performance_cycle_id ?? ""} onChange={setRoundId} options={monthOptions} />
-        <SegmentedControl label="Reviews or PIPs" value={view} onChange={setView} options={[["reviews", "Reviews"], ["pips", "PIPs"]]} />
+        <SegmentedControl label="Reviews or PIPs" value={view} onChange={setView} options={withNews(news, REVIEW_VIEWS)} />
       </Toolbar>
       {view === "reviews" && (
         <>

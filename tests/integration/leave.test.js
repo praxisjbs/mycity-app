@@ -17,6 +17,7 @@ const { config } = require("../../src/config/env");
 const { pool } = require("../../src/config/db");
 const { atomically } = require("../../src/shared/db/tx");
 const { rebuild } = require("./helpers/schema");
+const { noticeAbout, readAll } = require("./helpers/notices");
 const { createAdmin } = require("../../scripts/db/create-admin");
 const { buildApp } = require("../../src/app");
 const outbox = require("../../src/shared/events/outbox");
@@ -513,5 +514,20 @@ describeDb("leave against the real migrations", () => {
       // The leave flow as it was, for whatever runs next.
       expect((await put(original)).status).toBe(200);
     }
+  });
+  test("People · Leave says where its count waits: each request under the chip of its status, read as the list reads it (notifications' views)", async () => {
+    const waiting = (await ask("staff", "unpaid", d("12-07"), d("12-07"))).body;
+    const decided = (await ask("staff", "unpaid", d("12-08"), d("12-08"))).body;
+    // Approved and not yet settled by the worker: the list already reads it Approved, and so does its place.
+    expect((await as("manager").post(`/workflow/instances/${decided.workflow_instance_id}/approve`, {})).status).toBe(200);
+    expect(await statusInDb(decided.leave_request_id)).toBe("submitted");
+    const ops = people.ops.user.user_id;
+    await readAll(pool, ops);
+    await noticeAbout(pool, ops, { entity_type: "leave_request", entity_id: waiting.leave_request_id });
+    await noticeAbout(pool, ops, { entity_type: "leave_request", entity_id: decided.leave_request_id });
+    expect((await as("ops").get("/notifications/views?module=people&tab=leave")).body.views).toEqual({
+      submitted: { unread: 1, urgent: false },
+      approved: { unread: 1, urgent: false },
+    });
   });
 });

@@ -178,7 +178,7 @@ async function views(user, query) {
   for (const type of types) {
     const mine = rows.filter((r) => r.entity_type === type);
     if (!mine.length) continue;
-    const where = await viewsOf.placeAll(pool, { module: query.module, tab: query.tab, type, ids: mine.map((r) => r.entity_id) });
+    const where = await viewsOf.placeAll(pool, { module: query.module, tab: query.tab, type, ids: mine.map((r) => r.entity_id), user });
     for (const r of mine) {
       if (!where.has(r.entity_id)) continue;
       for (const p of viewsOf.pathsOf(where.get(r.entity_id))) {

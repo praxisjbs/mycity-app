@@ -42,7 +42,7 @@ export interface ViewNews {
   urgent: boolean;
 }
 
-/** What waits in a view of the screen in view, by its path: "temporary", "temporary/cancelled". */
+/** What waits in a view of the screen in view, by its path: "temporary", "temporary/cancelled"; "" the whole screen's placed news. */
 export type NewsAt = (path: string) => ViewNews | undefined;
 
 const ScreenContext = createContext<Screen | null>(null);
@@ -121,7 +121,16 @@ export function RecordMarks({ module, tab, count, children }: { module: string |
  */
 export function useViewNews(): NewsAt {
   const views = useContext(ScreenContext)?.views;
-  return useCallback((path: string) => views?.[path], [views]);
+  return useCallback(
+    (path: string) => {
+      if (path) return views?.[path];
+      // The whole screen: its outermost views together (a chip that shows everything at the top).
+      const top = Object.entries(views ?? {}).filter(([p]) => !p.includes("/"));
+      if (!top.length) return undefined;
+      return { unread: top.reduce((n, [, v]) => n + v.unread, 0), urgent: top.some(([, v]) => v.urgent) };
+    },
+    [views],
+  );
 }
 
 /**
@@ -132,12 +141,11 @@ export function useViewNews(): NewsAt {
 export function withNews<V extends string>(
   news: NewsAt,
   options: ReadonlyArray<readonly [V, string] | ChoiceOption<V>>,
-  { at, all }: { at?: string; all?: V } = {},
+  { at, all }: { at?: string; all?: NoInfer<V> } = {},
 ): ChoiceOption<V>[] {
   return options.map((o) => {
     const option: ChoiceOption<V> = Array.isArray(o) ? { value: o[0], label: o[1] } : (o as ChoiceOption<V>);
-    const path = option.value === all ? at : at ? `${at}/${option.value}` : option.value;
-    const here = path ? news(path) : undefined;
+    const here = news(option.value === all ? (at ?? "") : at ? `${at}/${option.value}` : option.value);
     return here ? { ...option, unread: here.unread, urgent: here.urgent } : option;
   });
 }
@@ -145,8 +153,9 @@ export function withNews<V extends string>(
 /**
  * Opens a switch or a row of chips where the news is, once: when what waits on this screen is
  * read and the option it opened on holds none of it, the option that does (`all` when several do,
- * if there is one). Never after the person chose, nor when `skip` (a record opened by its link,
- * which picks its own view).
+ * or when only `all` does: a record in a state no other chip shows). Never after the person
+ * chose, nor when `skip` (a record opened by its link, which picks its own view). `values` are the
+ * options on offer now; while there are none it waits.
  */
 export function useOpenWhereNews<V extends string>({
   value,
@@ -157,29 +166,32 @@ export function useOpenWhereNews<V extends string>({
   skip = false,
 }: {
   value: V;
-  onChange: (value: V) => void;
-  values: readonly V[];
+  onChange: (value: NoInfer<V>) => void;
+  values: readonly NoInfer<V>[];
   at?: string;
-  all?: V;
+  all?: NoInfer<V>;
   skip?: boolean;
 }) {
   const news = useViewNews();
   const first = useRef(value);
   const done = useRef(false);
-  const waits = (v: V) => {
-    const path = v === all ? at : at ? `${at}/${v}` : v;
-    const w = path ? news(path) : undefined;
-    return !!w && (w.unread > 0 || w.urgent);
+  const weight = (v: V) => {
+    const w = news(v === all ? (at ?? "") : at ? `${at}/${v}` : v);
+    return w ? Math.max(w.unread, w.urgent ? 1 : 0) : 0;
   };
-  const holding = values.filter((v) => v !== all && waits(v));
-  // `all` holds whatever its options hold.
-  const here = value === all ? holding.length > 0 : waits(value);
-  const target = holding.length > 1 && all !== undefined ? all : (holding[0] ?? null);
-  const read = holding.length > 0 || here;
+  const holding = values.filter((v) => v !== all && weight(v) > 0);
+  const allHolds = all !== undefined && values.includes(all) && weight(all) > 0;
+  const here = value === all ? allHolds : weight(value) > 0;
+  // All, unless one option holds everything All does.
+  const one = holding.length === 1 && (!allHolds || weight(holding[0]) >= weight(all as V));
+  const target = one ? holding[0] : allHolds ? (all as V) : (holding[0] ?? null);
+  const read = allHolds || holding.length > 0 || here;
+  // Options still being worked out (who may see My Team) are none yet: it waits for them.
+  const offered = values.length > 0;
   useEffect(() => {
-    if (done.current || !read) return;
+    if (done.current || !read || !offered) return;
     done.current = true;
     if (skip || value !== first.current || here || target === null) return;
     onChange(target);
-  }, [read, skip, value, here, target, onChange]);
+  }, [read, offered, skip, value, here, target, onChange]);
 }

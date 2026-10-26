@@ -437,8 +437,10 @@ Read** on it marks it read without opening the hub.
 
 1. A number beside a module in the menu counts the notifications waiting for you there.
 2. Open the module. Each of its tabs shows how many of them wait on that screen.
-3. Open that tab. Each record with something new for you has a yellow dot and a soft tint.
-4. Open the record. Its dot goes at once, and the numbers on the tab, the menu and the bell drop
+3. Open that tab. Its switches, filters and board columns show their share too, and the screen
+   opens on the one that holds them.
+4. Each record with something new for you has a yellow dot and a soft tint.
+5. Open the record. Its dot goes at once, and the numbers on the tab, the menu and the bell drop
    with it, on your other devices too.
 
 > **Tip:** A number turns red while something urgent waits there. A notice about something the list
@@ -616,7 +618,8 @@ sources:
   - packages/ui/src/data/DataView.tsx
 marks:
   1: tab "Leave 1" | What waits on this screen
-  2: css :is(tr, li):has([data-unread]) | A request with something new
+  2: button "Pending 1 unread" | Its share, on the filter that holds it
+  3: css :is(tr, li):has([data-unread]) | A request with something new
 ```
 
 ```shot start-phone
