@@ -324,11 +324,12 @@ describe("Performance · Goals, set and changed on screen", () => {
     const reports = () => vi.mocked(dispatch).mock.calls.filter(([r]) => r.method === "POST" && r.path.endsWith("/performance/reports"));
     const [users, stories] = within(dialog()).getAllByLabelText(/^Actual/) as HTMLInputElement[];
 
-    // Written as the screen shows it: the comma never gets in, a minus does.
+    // Written as the screen shows it: the comma never gets in, a minus does. The figures sent at the
+    // end are the month's own, so the tests after this one read October as it was.
     fireEvent.change(users!, { target: { value: "−5" } });
     expect(users!.value).toBe("-5");
-    fireEvent.change(users!, { target: { value: "64,000" } });
-    expect(users!.value).toBe("64000");
+    fireEvent.change(users!, { target: { value: "38,400" } });
+    expect(users!.value).toBe("38400");
 
     // A fifth decimal: marked as the field is left, and Report Month sends nothing.
     fireEvent.change(stories!, { target: { value: "27.12345" } });
@@ -340,12 +341,12 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(reports().length).toBe(before);
 
     // Put right, the mark clears as it is typed and the month goes.
-    fireEvent.change(stories!, { target: { value: "27.5" } });
+    fireEvent.change(stories!, { target: { value: "27" } });
     expect(within(dialog()).queryByText("Enter a number")).toBeNull();
     await press(dialog(), "Report Month");
     expect(reports().length).toBe(before + 1);
     const sent = reports().at(-1)![0].body as { key_results: Array<{ actual_value?: string }> };
-    expect(sent.key_results.map((k) => k.actual_value)).toEqual(["64000", "27.5"]);
+    expect(sent.key_results.map((k) => k.actual_value)).toEqual(["38400", "27"]);
     expect(screen.queryByRole("dialog")).toBeNull();
   }, 60000);
 
