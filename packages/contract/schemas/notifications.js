@@ -70,11 +70,56 @@ const UrgentNoticeQuery = listQuery();
 /** GET /notifications/unread-count: the bell's dot. */
 const UnreadCount = z.object({ unread: z.number().int().min(0) }).strict();
 
+/** A screen's slug within its module, as shared/route-map.js lists it ("employees", "my-leave"). */
+const TabSlug = z.string().regex(/^[a-z][a-z0-9-]*$/);
+
+const BadgeCount = z.number().int().min(1);
+
 /**
- * GET /notifications/badges: unread notifications per module, for the rail and the
- * More tiles. Only modules the reader may open, and only those with something unread.
+ * GET /notifications/badges: unread notifications counted where they open, for the rail, the
+ * bottom bar, the More tiles (`modules`) and each module's tabs (`tabs`, by the tab's slug). A
+ * module's tabs add up to its count. Only screens the reader may open, and only those with
+ * something unread.
  */
-const NavBadges = z.record(ModuleKey, z.number().int().min(1));
+const NavBadges = z
+  .object({
+    modules: z.record(ModuleKey, BadgeCount),
+    tabs: z.record(ModuleKey, z.record(TabSlug, BadgeCount)),
+  })
+  .strict();
+
+/**
+ * GET /notifications/unread-records?module=&tab=&ids=a,b,c: which of the records a list shows (at
+ * most 25, its page) carry an unread notice of the caller's that opens on that screen, so the list
+ * marks them.
+ */
+const UnreadRecordsQuery = z
+  .object({
+    module: ModuleKey,
+    tab: TabSlug,
+    ids: z
+      .string()
+      .trim()
+      .min(1)
+      .transform((v) => v.split(",").map((x) => x.trim()).filter(Boolean))
+      .pipe(z.array(uuid).min(1).max(25)),
+  })
+  .strict();
+
+/** The asked ids with something unread there (the others are left out). */
+const UnreadRecords = z.object({ ids: z.array(uuid) }).strict();
+
+/**
+ * POST /notifications/read-record: a record was opened on a screen, so the caller's unread notices
+ * about it that open there are read (its dot, the tab's count and the module's go).
+ */
+const RecordRead = z
+  .object({
+    module: ModuleKey,
+    tab: TabSlug,
+    entity_id: uuid,
+  })
+  .strict();
 
 /** Variables of templates/email/notification.html: one notification sent as an email. */
 const NotificationEmailVars = z
@@ -408,6 +453,16 @@ const TABLES = {
   NotificationPage: { table: null, reason: "a page of notifications" },
   UrgentNoticeQuery: { table: null, reason: "list controls for the caller's open urgent notices" },
   UnreadCount: { table: null, reason: "a count of the caller's unread notifications" },
+  NavBadges: { table: null, reason: "counts of the caller's unread notifications per module and per tab, where each opens" },
+  UnreadRecordsQuery: { table: null, reason: "one screen and the ids of the records its list shows" },
+  UnreadRecords: { table: null, reason: "which of those records carry an unread notification" },
+  RecordRead: {
+    table: "notification",
+    virtual: {
+      module: "the screen's module, from shared/route-map.js: which entity types open there",
+      tab: "the screen's tab, from shared/route-map.js: which entity types open there",
+    },
+  },
   NotificationEmailVars: { table: null, reason: "the variables of templates/email/notification.html, not a row" },
   NotificationDigestEmailVars: { table: null, reason: "the variables of templates/email/digest.html, not a row" },
   NotificationReadStateQuery: { table: null, reason: "the ids of shown notifications to check" },
@@ -484,6 +539,9 @@ module.exports = {
   UrgentNoticeQuery,
   UnreadCount,
   NavBadges,
+  UnreadRecordsQuery,
+  UnreadRecords,
+  RecordRead,
   NotificationEmailVars,
   NotificationDigestEmailVars,
   NotificationReadStateQuery,

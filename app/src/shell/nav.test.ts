@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MODULES } from "./catalogue";
-import { bottomItems, bottomKey, moreGroups, railItems } from "./nav";
+import { bottomItems, bottomKey, moreGroups, railItems, tabItems } from "./nav";
 
 const staff = MODULES.filter((m) => ["home", "workspace", "ess", "community", "mailbox", "performance", "expenses", "knowledge", "praxis_ai"].includes(m.key));
 const badges = { workspace: 4, community: 3, mailbox: 12, expenses: 1 };
@@ -30,6 +30,20 @@ describe("shell navigation", () => {
     expect(items).toHaveLength(staff.length);
     expect(items.find((i) => i.key === "praxis_ai")).toMatchObject({ href: "/praxis-ai", group: "System" });
     expect(items.find((i) => i.key === "home")!.group).toBeUndefined();
+  });
+
+  it("each tab carries its share of the module's count, red while an urgent notice opens there", () => {
+    const people = MODULES.find((m) => m.key === "people")!;
+    const counts = { modules: { people: 9 }, tabs: { people: { employees: 2, attendance: 4, leave: 3 } } };
+    const items = tabItems("people", people.tabs, counts, new Set(["people/leave", "people/devices"]));
+    const of = (slug: string) => items.find((i) => i.value === slug)!;
+    expect(of("employees")).toMatchObject({ label: "Employees", href: "/people?tab=employees", count: 2, tone: "primary" });
+    expect(of("attendance")).toMatchObject({ count: 4, tone: "primary" });
+    expect(of("leave")).toMatchObject({ count: 3, tone: "err" });
+    // Something urgent there with nothing unread (an announcement opened, not yet acknowledged): at least 1.
+    expect(of("devices")).toMatchObject({ count: 1, tone: "err" });
+    expect(of("organogram").count).toBe(0);
+    expect(tabItems("people", people.tabs, undefined).every((i) => i.count === 0)).toBe(true);
   });
 
   it("marks the bottom bar's own places, and More for the rest", () => {
