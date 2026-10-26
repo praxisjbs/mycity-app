@@ -182,6 +182,7 @@ confirmed in the last 15 minutes.
 | **Too many wrong PINs.** | Wait the time it shows, or choose **Password** |
 | **Use one of your own passkeys.** | Pick your own passkey when the device asks |
 | **Your passkey could not be checked. Try again.** | Press **Use Passkey** again, or choose **Password** |
+| **Too many requests. Wait a moment and try again.** | More than ten tries in 15 minutes. Wait a few minutes |
 
 ## When the Screen Locks {#start-lock icon=lock}
 

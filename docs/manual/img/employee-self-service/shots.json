@@ -31,6 +31,14 @@
       "phone"
     ]
   },
+  "ess-documents-upload": {
+    "spec": "45ef3a59f7d7fc9e",
+    "source": "4d577c48d3574dca",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "ess-leave": {
     "spec": "11b9162cdaa5f6f3",
     "source": "4d577c48d3574dca",
@@ -58,6 +66,14 @@
   "ess-policy-prompt": {
     "spec": "e1686d31f835f864",
     "source": "196e45e642dcdb52",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "ess-policy-read": {
+    "spec": "cd4c771ae8115e55",
+    "source": "0e47ec3bb1d900c2",
     "devices": [
       "desktop",
       "phone"
@@ -98,6 +114,21 @@
     "spec": "5484db2fbf6c6b6f",
     "source": "4d577c48d3574dca",
     "devices": [
+      "phone"
+    ]
+  },
+  "ess-security-two-step": {
+    "spec": "b38e9cb62fd8e2ad",
+    "source": "4d577c48d3574dca",
+    "devices": [
+      "desktop"
+    ]
+  },
+  "ess-site": {
+    "spec": "25644583075b344a",
+    "source": "09f18ddcb3883510",
+    "devices": [
+      "desktop",
       "phone"
     ]
   },
