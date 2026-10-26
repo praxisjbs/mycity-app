@@ -1504,6 +1504,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · Field messages in four words (FRONTEND_GUIDE §8.3), which the form cut to Check this value or Check the format: "Pick a quarter start", "Like 15 or 12.5" (a weight), "From 0 to 1" (a score or a rule's share, which read Too long), "Like 64000 or 0.95" (a quantity), "Pick a month" (a KPI's month).
 - 25/10/2026 · JP · Two screen fixes found while writing the User Guide's Performance chapter
   (`docs/manual/performance.md`): the Commitments view offers Export Report only to a reader who
   holds `performance` export, as `POST /performance/commitments/report` requires (Staff and Line

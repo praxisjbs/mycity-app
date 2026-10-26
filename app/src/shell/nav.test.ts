@@ -21,7 +21,7 @@ describe("shell navigation", () => {
     expect(groups.map((g) => g.label)).toEqual(["Work", "People", "Business", "System"]);
     expect(groups[0]!.tiles.map((t) => t.label)).toEqual(["Community", "Mailbox"]);
     expect(groups[1]!.tiles.map((t) => t.label)).toEqual(["Performance"]);
-    expect(groups[3]!.tiles.map((t) => t.label)).toEqual(["Knowledge", "Assistant"]);
+    expect(groups[3]!.tiles.map((t) => t.label)).toEqual(["Knowledge", "Praxis"]);
     for (const g of groups) for (const t of g.tiles) expect(t.label.split(/\s+/)).toHaveLength(1);
   });
 

@@ -104,6 +104,8 @@ export function LockSheet() {
         setWay("password");
         void device.reload();
       }
+      // The code's ticket ran out (or was used in another tab): back to the first step, to unlock again.
+      if (step.kind === "code" && a.code === "CHALLENGE_EXPIRED") setStep({ kind: "first" });
       setProblem(a.message);
       focus();
     } finally {
@@ -153,16 +155,21 @@ export function LockSheet() {
       email={me.email}
       photo={photo}
       title={step.kind === "code" ? "Enter Code" : TITLE[reason]}
-      reason={step.kind === "code" ? "From your authenticator app" : WHY[reason]}
+      reason={step.kind === "code" ? (step.recovery ? "One of your recovery codes" : "From your authenticator app") : WHY[reason]}
       footer={
         <>
           <Button variant="primary" type="submit" form="unlock" icon="lock" busy={busy}>
             Unlock
           </Button>
           {step.kind === "code" ? (
-            <Button variant="ghost" onClick={() => reset({ step: { ...step, recovery: !step.recovery } })}>
-              {step.recovery ? "Use App Code" : "Use Recovery Code"}
-            </Button>
+            <>
+              <Button variant="ghost" onClick={() => reset({ step: { ...step, recovery: !step.recovery } })}>
+                {step.recovery ? "Use App Code" : "Use Recovery Code"}
+              </Button>
+              <Button variant="ghost" icon="left" onClick={() => reset({ step: { kind: "first" } })}>
+                Back
+              </Button>
+            </>
           ) : (
             <>
               {withPasskey && (

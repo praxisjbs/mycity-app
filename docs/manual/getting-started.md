@@ -48,7 +48,8 @@ ready*.
 > If no email comes, ask People and Operations to send a new invitation.
 
 If the page says **Link Not Checked**, the hub could not reach the server. Wait a minute and press
-**Try Again**. If it keeps saying so, open the link from the email again.
+**Try Again**. If it keeps saying so, open the link from the email again. A link cut short or
+changed on its way, as some mail programs do with long links, reads **Link Expired**.
 
 ### Sign in with your password {#start-password}
 
@@ -204,7 +205,7 @@ typing is lost.
    **Use PIN** switch between them.
 3. Or press **Use Passkey** and use your fingerprint, face or screen lock.
 4. If it asks to **Enter Code**, type the six digits from your authenticator app. **Use Recovery
-   Code** takes a recovery code instead.
+   Code** takes a recovery code instead. **Back** returns to your PIN or password.
 5. A message says **Welcome back**, and you carry on where you were.
 6. Press **Sign Out** instead if you are done for the day.
 
@@ -217,7 +218,7 @@ typing is lost.
 | **Too many wrong PINs, so your PIN is off. Use your password.** | Your PIN was switched off | Type your password. Set a new PIN on My Security later |
 | **Your role now needs two-step sign-in. Sign out, then sign in to set it up.** | Your role now requires an authenticator app | Press **Sign Out**, then sign in and set it up as in [Enter a code from your phone](#start-two-step) |
 | **This account is suspended. Contact People.** | Your login was paused while you were away | Press **Sign Out** and ask People and Operations |
-| **This request has expired. Start again.** | More than 5 minutes passed at **Enter Code** | Press **Sign Out**, then sign in again |
+| **This request has expired. Start again.** | More than 5 minutes passed at **Enter Code**; the lock screen goes back to its first step | Unlock again with your PIN, password or passkey |
 | **That passkey belongs to someone else.** | You picked another person's passkey | Press **Use Passkey** again and pick your own |
 
 ## Finding Your Way {#start-layout icon=grid}
@@ -257,8 +258,9 @@ you can do on one you can do on the other.
 1. The bar at the bottom opens **Home**, **Workspace**, **Community**, **Self-Service** and
    **More**.
 2. **More** opens a sheet: your name with **Dark Theme**, **Compact Density**, **Text Size** and
-   **Settings**, a **Search** bar, every other module as a tile, **Install App** and **Sign Out**.
-   Tiles use short names: **Knowledge** is the Knowledge Hub, **Assistant** is Praxis AI.
+   **Settings** (**My Security** when you do not look after Settings), a **Search** bar, every
+   other module as a tile, **Install App** and **Sign Out**. Tiles use short names: **Knowledge**
+   is the Knowledge Hub, **Praxis** is Praxis AI.
 3. The module's screens are tabs under its name. Swipe them sideways to see them all.
 4. The icons at the top right are **Search**, **Notifications** and **Your Account**, your picture,
    which opens More too. The MyCity App logo at the top left goes Home.
@@ -386,12 +388,13 @@ The hub tells you when something needs you: a request to approve, a task, a mess
 
 1. Press the bell, **Notifications**. A dot on the bell means something is unread.
 2. Press a notification to open what it is about. It is marked read. If it is about something you
-   may not open, it is only marked read.
+   may not open, it is only marked read, and a message says **You cannot open this record**.
 3. Choose **Unread** to see only what you have not read yet, **All** to see everything. They are
    grouped **Today**, **Yesterday** and **Earlier**.
 4. To mark one read without opening it, point at it and press **Mark Read** on a computer, or swipe
    it left on a phone.
-5. **Mark All Read** marks everything read at once.
+5. **Mark All Read** marks everything read at once. **Not marked read. Try again.** means it did
+   not reach the hub.
 6. **Notification Settings**, the cog, chooses how you are told (see
    [Choose how you are told](#start-notification-settings)).
 
@@ -400,7 +403,8 @@ On a phone the notifications fill the screen; press Back to close them, pull dow
 **Notifications are off on this device**, press **Turn On** to get them here.
 
 An urgent notice stays in a red bar under the top bar of every screen. Press **Open** to see it, or
-**Acknowledge** on an urgent announcement. The bar goes once you do, on every device. Until then it
+**Acknowledge** on an urgent announcement. The bar goes once you do, on every device; if it cannot
+reach the hub, a message says why (**Not acknowledged. Try again.** when offline). Until then it
 alerts you again every 30 minutes of the working day. With several, the bar says *1 of 3*: press
 **Previous Notice** or **Next Notice**, or swipe the bar sideways on a phone.
 
@@ -413,7 +417,9 @@ Read** on it marks it read without opening the hub.
 > says **Get notified of new mail and approvals**, and allow it when the device asks. A message says
 > **Notifications are on**. **Not Now** hides the offer for 14 days. On an iPhone or iPad,
 > [install the app](#start-install) first. **Notifications are blocked here** means the browser
-> refuses: see [Choose how you are told](#start-notification-settings).
+> refuses: see [Choose how you are told](#start-notification-settings). **Notifications not turned
+> on** means you closed the browser's question without allowing it; **Not available on this
+> device** means the hub cannot send to this device.
 
 ### Choose how you are told {#start-notification-settings}
 
@@ -430,7 +436,8 @@ Read** on it marks it read without opening the hub.
 5. **Sound in App** plays a soft chime for new mail, messages and approvals while the hub is open.
    On Android it is off at first, and the phone only vibrates.
 6. **Other Devices** lists your other phones and computers with notifications on. **Remove Device**
-   stops them there. A message says **Device removed**.
+   stops them there. A message says **Device removed**, or why it was not (a device already
+   removed elsewhere leaves the list).
 7. Under **Notice Categories**, switch **In App**, **Email** and **Push** for each kind of notice. On
    a phone, tap a category to see its three switches. The Security row, with a padlock, is
    **Always on** and cannot be turned off.
@@ -443,7 +450,8 @@ Read** on it marks it read without opening the hub.
 |---|---|---|
 | **Pick two different times** | **From** and **To** are the same | Choose a different **To** |
 | **Could not save that** | The switch did not save | Check your connection and press it again |
-| **Could not send the test** | The test did not go | Press **Turn Off**, then **Turn On**, then try again |
+| **Turn on notifications on this device first.** | This device has no notifications on at the hub | Press **Turn Off**, then **Turn On**, then try again |
+| **Could not send the test** | The connection failed | Check your connection and press **Send Test** again |
 | **Notifications are blocked here** | The browser refuses notifications | Allow them in the browser's site settings |
 
 ## Your Display and the App {#start-display icon=sun}

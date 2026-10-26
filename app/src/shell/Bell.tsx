@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Button, IconButton, NotificationCenter, type NotificationItem, type NotificationView } from "@mycity/ui";
+import { Button, IconButton, NotificationCenter, toast, type NotificationItem, type NotificationView } from "@mycity/ui";
 import type { Notification } from "@mycity/contract/contract.gen.ts";
 import { invalidate, useApi, useInfinite, useMutation } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
 import { CATEGORY_ICONS, markRead, personOf, toneOf, useArrivals } from "@/features/notifications/arrivals";
-import { enablePush, syncPush, usePushState } from "@/features/notifications/push";
+import { syncPush, turnOnPush, usePushState } from "@/features/notifications/push";
 import { NotificationSettings } from "@/features/notifications/Settings";
 import { openNotificationSettings, setPaneOpen, setSettingsOpen, useNotificationsUi } from "@/features/notifications/state";
 
@@ -54,7 +54,7 @@ export function BellButton() {
     if (n?.link) {
       setPaneOpen(false);
       navigate(n.link.path);
-    }
+    } else if (n?.entity_type) toast("You cannot open this record");
     return read;
   };
 
@@ -74,7 +74,12 @@ export function BellButton() {
         onRefresh={list.reload}
         onOpenItem={open}
         onMarkRead={(item) => markRead([item.id])}
-        onMarkAllRead={() => readAll.run({ body: {} }).then(reload)}
+        onMarkAllRead={() =>
+          readAll
+            .run({ body: {} })
+            .then(reload)
+            .catch(() => toast.error("Not marked read. Try again."))
+        }
         onSettings={openNotificationSettings}
         notice={<TurnOnHere />}
       />
@@ -90,7 +95,7 @@ function TurnOnHere() {
   return (
     <div className="m-3 flex items-center gap-3 rounded-box bg-accent px-3.5 py-3 text-sm text-accent-foreground">
       <span className="min-w-0 flex-1">Notifications are off on this device</span>
-      <Button size="sm" variant="primary" onClick={() => enablePush()}>
+      <Button size="sm" variant="primary" onClick={() => turnOnPush()}>
         Turn On
       </Button>
     </div>

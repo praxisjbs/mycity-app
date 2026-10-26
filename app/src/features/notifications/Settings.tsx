@@ -21,7 +21,7 @@ import {
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useInstallApp } from "@/shell/Notices";
-import { disablePush, enablePush, sendTestPush, thisDeviceId, usePushState, type PushState } from "./push";
+import { disablePush, testPush, thisDeviceId, turnOnPush, usePushState, type PushState } from "./push";
 import { isAndroid, useSoundInApp } from "./sound";
 
 /**
@@ -79,16 +79,9 @@ function ThisDevice() {
   const [sound, setSound] = useSoundInApp();
   const installApp = useInstallApp();
   const [label, tone] = STATUS[push];
-  const turnOn = () =>
-    enablePush().then((s) => {
-      if (s === "on") toast("Notifications are on");
-      else if (s === "blocked") toast.error("Notifications are blocked here");
-    });
+  const turnOn = () => turnOnPush();
   const turnOff = () => disablePush().then(() => toast("Notifications are off here"));
-  const test = () =>
-    sendTestPush()
-      .then(() => toast("Test sent"))
-      .catch(() => toast.error("Could not send the test"));
+  const test = () => testPush();
   return (
     <Card>
       <CardHeader title="This Device" actions={<Pill tone={tone}>{label}</Pill>} />
@@ -166,10 +159,12 @@ function OtherDevices() {
                 icon="trash"
                 label="Remove Device"
                 onClick={() =>
-                  remove.run({ params: { id: d.push_subscription_id }, body: {} }).then(() => {
-                    invalidate("/api/v1/notifications/push/devices");
-                    toast("Device removed");
-                  })
+                  remove
+                    .run({ params: { id: d.push_subscription_id }, body: {} })
+                    .then(() => toast("Device removed"))
+                    // Removed elsewhere meanwhile, or offline: say why, and show the list as it is now.
+                    .catch((e) => toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Not removed. Try again."))
+                    .finally(() => invalidate("/api/v1/notifications/push/devices"))
                 }
               />
             </li>

@@ -389,6 +389,7 @@ and Use Tidied Text. A row's Acknowledge on Policy Updates acknowledges without 
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · Some People with nobody picked reads "Pick the people" on Applies To (was "Pick who it applies to", five words, cut to Check this value on screen). A working day of the company hours is marked on its own time, not Monday's Working.
 - 22/10/2026 · TB · Nothing a person sees changed. Tidy With AI's placeholder words (§9) now come from the AI layer's one `shield()` (`services/ai/redact.js`), given the policy's links and digit runs as well, so the mailbox's Write With AI and this share one way of keeping contact details from the model; a value named twice is one token.
 - 22/10/2026 · TB · The Attendance policy gains Home Location (`attendance.md` §1.3): a switch on the worksheet's Location Checks card, off by default and on every version before it, with Home Check and Home Radius beneath it while it is on; Working From Home reads one sentence while it is off. `policies.heldSince` (§6.8) says since when a rule has held, for the push Home Location sends once a stretch.
 - 21/10/2026 · TB · Attendance's PR 3 built: the worksheet shows every rule (Working Hours, Lateness, Late Arrivals, Early Departure, Absence, Forgotten Clock-Outs, Location Flags, Overtime, Location Checks, Devices, Clock Prompts; `worksheet.ts` keeps one flat value per control), and the sentences staff read cover each (`attendance.policy-type.js`, the mock word for word). A draft compares rules whatever order their keys came in.

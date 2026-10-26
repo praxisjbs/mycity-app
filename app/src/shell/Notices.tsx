@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { Button, Icon, ShellNotice, toast, useModal } from "@mycity/ui";
-import { enablePush, usePushState } from "@/features/notifications/push";
+import { Button, Icon, ShellNotice, useModal } from "@mycity/ui";
+import { turnOnPush, usePushState } from "@/features/notifications/push";
 import { clearGuideReturn, guideHref, useGuideReturn } from "@/features/knowledge/guide/return";
 import { useRouter } from "@/lib/router";
 import { install, installLater, usePwa } from "./pwa";
@@ -95,12 +95,7 @@ export function ShellNotices() {
             <Button
               variant="primary"
               size="sm"
-              onClick={() =>
-                enablePush().then((s) => {
-                  if (s === "on") toast("Notifications are on");
-                  else if (s === "blocked") toast.error("Notifications are blocked here");
-                })
-              }
+              onClick={() => turnOnPush()}
             >
               Turn On
             </Button>
