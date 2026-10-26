@@ -12,7 +12,6 @@ import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
 import { useSearchParams } from "@/lib/router";
-import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
@@ -36,7 +35,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, useQuarter } from "./shared";
+import { bodySchema, figureOf, functionOptions, kpiResult, monthShort, onlyChoice, person, reportingMonth, useQuarter } from "./shared";
 
 type KpiCreateBody = Endpoints["POST /api/v1/performance/kpis"]["body"];
 type KpiActualBody = Endpoints["POST /api/v1/performance/kpis/:id/actuals"]["body"];
@@ -66,8 +65,10 @@ export function Kpis() {
     { label: "Awaiting Actual", value: counted(summary.data?.awaiting) },
   ];
   const deptOptions: Array<[string, string]> = [["", "All Functions"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
-  const mayEdit = hasCapability(me, "goals.function");
-  const newKpi = () => modal.open({ title: "New KPI", body: (close) => <KpiForm close={close} periodId={quarter.periodId} departmentId={dept} /> });
+  // New KPI is for a reader who sets some function's KPIs (shared.tsx); its Function lists only those.
+  const mine = functionOptions(me, departments.data?.data ?? []);
+  const mayAdd = mine.length > 0;
+  const newKpi = () => modal.open({ title: "New KPI", body: (close) => <KpiForm close={close} periodId={quarter.periodId} departmentId={dept} functions={mine} /> });
   const openKpiId = (id: string, code = "KPI") => modal.open({ title: code, wide: true, body: (close) => <KpiSheet id={id} months={months} close={close} /> });
   const openKpi = (k: Kpi) => openKpiId(k.kpi_definition_id, k.code);
   // A KPI found with ⌘K (or linked from elsewhere, `?id=`) opens its sheet once, then leaves the address.
@@ -81,14 +82,14 @@ export function Kpis() {
     openKpiId(linked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linked]);
-  useScreenAction(mayEdit ? { label: "New KPI", onSelect: newKpi } : null);
+  useScreenAction(mayAdd ? { label: "New KPI", onSelect: newKpi } : null);
 
   return (
     <>
       <PageHeader
         title="KPIs"
         sub={period ? `${period.name} · ${formatDate(period.starts_on)} to ${formatDate(period.ends_on)}` : undefined}
-        actions={mayEdit ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
+        actions={mayAdd ? <Button variant="primary" icon="plus" onClick={newKpi}>New KPI</Button> : undefined}
       />
       <Toolbar>
         <FilterSelect label="Function" value={dept} onChange={setDept} options={deptOptions} />
@@ -189,10 +190,10 @@ function KpiSheet({ id, months, close }: { id: string; months: string[]; close: 
   );
 }
 
-function KpiForm({ close, periodId, departmentId }: { close: () => void; periodId: string; departmentId: string }) {
-  const departments = useApi("GET /api/v1/departments", { query: { active: "true" } });
+/** New KPI: its Function lists only the functions the reader sets KPIs for (`functions`, from the page), starting on the one the page shows when it is among them. */
+function KpiForm({ close, periodId, departmentId, functions }: { close: () => void; periodId: string; departmentId: string; functions: Array<[string, string]> }) {
   const f = useContractForm(
-    { department_id: departmentId, name: "", formula: "", unit: "", direction: "higher", target_text: "", target_value: "", frequency: "monthly", data_source: "", starts_period_id: periodId },
+    { department_id: onlyChoice(functions, departmentId), name: "", formula: "", unit: "", direction: "higher", target_text: "", target_value: "", frequency: "monthly", data_source: "", starts_period_id: periodId },
     kpisContract.KpiCreate,
   );
   const save = useMutation("POST /api/v1/performance/kpis");
@@ -211,7 +212,7 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
   return (
     <>
       <Field label="Function" {...f.status("department_id")}>
-        <SelectField options={(departments.data?.data ?? []).map((d) => [d.department_id, d.name] as [string, string])} {...f.field("department_id")} />
+        <SelectField options={functions} {...f.field("department_id")} />
       </Field>
       <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
       <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>

@@ -3,9 +3,42 @@ import { useState } from "react";
 import type { PerformancePeriod } from "@mycity/contract/contract.gen.ts";
 import { useApi, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
+import type { Me } from "@/api/types/identity";
+import { hasCapability } from "@/shell/access";
 import { formatMonth, formatNumber, shortMessage, todayIso, Who, type ContractSchema } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
+
+/** A function as far as who acts for it goes: the department's row, whose `acting_head` the API's own check reads. */
+export interface FunctionRow {
+  department_id: string;
+  name: string;
+  active: boolean;
+  acting_head: { employee_id: string } | null;
+}
+
+/**
+ * Does the reader set this function's goals and KPIs, and report its month (docs/guides/performance.md
+ * §6.3)? A holder of `goals.function` who is its head or acting head, or who runs the cycle
+ * (`performance.manage`, the CEO among them): goals.authority.js `assertSetsGoals`, which the API still
+ * asks. This keeps a screen from offering a function it would refuse.
+ */
+export const setsGoalsFor = (me: Me, d: Pick<FunctionRow, "acting_head">): boolean =>
+  hasCapability(me, "goals.function") && (hasCapability(me, "performance.manage") || (Boolean(me.employee_id) && d.acting_head?.employee_id === me.employee_id));
+
+/** The active functions the reader sets goals for, as a Function select's options. */
+export const functionOptions = (me: Me, rows: FunctionRow[]): Array<[string, string]> =>
+  rows.filter((d) => d.active && setsGoalsFor(me, d)).map((d) => [d.department_id, d.name]);
+
+/** Does a quarter's plan still take objectives: not made yet, a draft, or returned? (`null` is the company's.) */
+export const planOpen = (plans: Array<{ department_id: string | null; status: string }>, departmentId: string | null): boolean => {
+  const plan = plans.find((p) => p.department_id === departmentId);
+  return !plan || plan.status === "draft" || plan.status === "returned";
+};
+
+/** What a form's select starts on: the pick already made if it is offered, else the one choice there is, else none. */
+export const onlyChoice = (options: Array<[string, string]>, preferred = ""): string =>
+  options.some(([v]) => v === preferred) ? preferred : options.length === 1 ? options[0]![0] : "";
 
 /** A person in a table cell: their name, and their department beneath it. */
 export const person = (p: PersonRef) => <Who name={p.display_name} sub={p.department ?? undefined} />;

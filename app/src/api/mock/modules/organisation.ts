@@ -406,6 +406,13 @@ route("PATCH /api/v1/employees/:id/line-manager", (req) => {
   return ok(record(p, req.user!));
 });
 
+/** The demonstration functions Performance's mock gives a head (it reads the same two): who acts as head of each. */
+const HEAD_KEYS: Record<string, string> = { "Marketing & Sales": "ngozi", Content: "tolu" };
+const actingHead = (name: string) => {
+  const p = HEAD_KEYS[name] ? byKey(HEAD_KEYS[name]!) : undefined;
+  return p ? personRef(p) : null;
+};
+
 route("GET /api/v1/departments", (req) =>
   paged(
     DEPTS.map((d) => ({
@@ -418,7 +425,7 @@ route("GET /api/v1/departments", (req) =>
       head_employee_id: null,
       head_seat_id: null,
       head: null,
-      acting_head: null,
+      acting_head: actingHead(d.name),
     })),
     req,
     { search: (r) => [r.name], filters: { active: (r, v) => String(r.active) === v } },
@@ -441,7 +448,7 @@ route("PATCH /api/v1/departments/:id", (req) => {
   const b = req.body as { name?: string; active?: boolean };
   if (b.name) d.name = b.name;
   if (typeof b.active === "boolean") d.active = b.active;
-  return ok({ department_id: d.department_id, code: d.code, name: d.name, parent_department_id: null, active: d.active, headcount: PEOPLE.filter((p) => p.department === d.name).length, head_employee_id: null, head_seat_id: null, head: null, acting_head: null });
+  return ok({ department_id: d.department_id, code: d.code, name: d.name, parent_department_id: null, active: d.active, headcount: PEOPLE.filter((p) => p.department === d.name).length, head_employee_id: null, head_seat_id: null, head: null, acting_head: actingHead(d.name) });
 });
 
 const seatRow = (s: (typeof SEATS)[number]): OrgSeat => {

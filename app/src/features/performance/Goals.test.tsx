@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ModalProvider } from "@mycity/ui";
-import { installMatchMedia, setViewport } from "@mycity/ui/testing";
+import { chooseOption, installMatchMedia, optionLabels, setViewport } from "@mycity/ui/testing";
 import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { dispatch, mockSession, sid } from "@/api/mock/core";
@@ -361,5 +361,67 @@ describe("Performance · Goals, set and changed on screen", () => {
     expect(within(sheet).getByText("36 stories")).toBeTruthy();
     expect(within(sheet).getByText("27 stories")).toBeTruthy();
     expect(copyProblems()).toEqual([]);
+  }, 60000);
+
+  /** A select's choices, read by opening it. */
+  const choices = (root: HTMLElement, label: string) => optionLabels(within(root).getByRole("combobox", { name: label }));
+
+  it("Staff read only: neither New Goal nor Report Month is offered, here or as a KPI", async () => {
+    await openAs("chidera@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Report Month" })).toBeNull();
+    cleanup();
+
+    await openAs("chidera@mycityapp.io", "/performance?tab=kpis");
+    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New KPI" })).toBeNull();
+  }, 60000);
+
+  it("a head is offered the function they head to report and to set KPIs for, and no New Goal while its plan is binding", async () => {
+    await openAs("ngozi@mycityapp.io", "/performance?tab=goals");
+    expect(screen.getByText(/Q4 2026 · /)).toBeTruthy();
+    // Marketing & Sales is the only function she heads, and its Q4 plan is binding: nothing to set an objective for.
+    expect(screen.queryByRole("button", { name: "New Goal" })).toBeNull();
+    await press(document.body, "Report Month");
+    expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
+    cleanup();
+
+    await openAs("ngozi@mycityapp.io", "/performance?tab=kpis");
+    await press(document.body, "New KPI");
+    expect(await choices(dialog(), "Function")).toEqual(["Marketing & Sales"]);
+  }, 60000);
+
+  it("Operations & People are offered every function whose plan is open to set an objective for, and every function to report", async () => {
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "New Goal");
+    const objective = await choices(dialog(), "Function");
+    // Marketing & Sales is binding and Content's plan is sent: neither takes an objective now. The company's are Management's.
+    expect(objective).toContain("Engineering");
+    expect(objective).toContain("Support");
+    expect(objective).not.toContain("Marketing & Sales");
+    expect(objective).not.toContain("Content");
+    expect(objective).not.toContain("Company");
+    cleanup();
+
+    await openAs("cynthia@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "Report Month");
+    const report = await choices(dialog(), "Function");
+    expect(report).toContain("Marketing & Sales");
+    expect(report).toContain("Content");
+    expect(report).not.toContain("Company");
+  }, 60000);
+
+  it("the CEO is offered the company beside the functions whose plan is open", async () => {
+    await openAs("ifeoma@mycityapp.io", "/performance?tab=goals");
+    await press(document.body, "New Goal");
+    // The CEO records organisational goals first; an objective is the next choice.
+    await chooseOption(within(dialog()).getByRole("combobox", { name: "What" }), "Objective");
+    await settled();
+    const objective = await choices(dialog(), "Function");
+    expect(objective).toContain("Company");
+    expect(objective).toContain("Engineering");
+    expect(objective).not.toContain("Marketing & Sales");
+    expect(objective).not.toContain("Content");
   }, 60000);
 });
