@@ -230,6 +230,23 @@ class ImapSmtpProvider {
     });
   }
 
+  /** One message by its Message-ID in a folder, read whole; null when the server has none. */
+  async fetchOne(path, messageId) {
+    if (!messageId) return null;
+    const { simpleParser } = require("mailparser");
+    return this.withImap(async (imap) => {
+      const lock = await imap.getMailboxLock(path);
+      try {
+        const uids = await imap.search({ header: { "message-id": messageId } }, { uid: true });
+        if (!uids || !uids.length) return null;
+        const item = await imap.fetchOne(String(uids[0]), { uid: true, source: true, flags: true, internalDate: true }, { uid: true });
+        return item && item.source ? normalise(await simpleParser(item.source, PARSE), item) : null;
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
   /** Move a message between folders on the server. */
   async move(fromPath, toPath, messageId) {
     if (!messageId) return false;

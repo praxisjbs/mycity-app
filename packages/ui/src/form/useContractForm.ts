@@ -272,8 +272,9 @@ export function useContractForm<T extends Record<string, unknown>>(initial: T, r
   const setServerErrors = (fields: ServerFields) =>
     setServer(
       Object.fromEntries(
+        // Only a list of messages marks a field: a refusal's details (a mail server's reason, a code) are not marks.
         Object.entries(fields)
-          .filter((e): e is [string, string[]] => !!e[1]?.length)
+          .filter((e): e is [string, string[]] => Array.isArray(e[1]) && e[1].length > 0 && e[1].every((m) => typeof m === "string"))
           .map(([k, msgs]) => [k, msgs.map((m) => shortMessage({ type: "custom", message: m }) ?? m)]),
       ),
     );

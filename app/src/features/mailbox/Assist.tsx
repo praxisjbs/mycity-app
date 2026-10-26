@@ -108,8 +108,11 @@ export function WriteWithAi({ compose, hidden, back, use }: { compose: ComposeNo
         setShown({ kind: "questions", questions: r.questions });
       } else setShown({ kind: "draft", body_html: r.body_html ?? "", subject: r.subject });
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Write With AI is off");
+      if (!(e instanceof ApiError) || e.status === 0) return void toast.error("Could not reach the server. Try again.");
+      const drawn = ["instruction", "note"];
+      if (Object.keys(e.fields).some((k) => drawn.includes(k))) f.setServerErrors(e.fields);
+      // A refusal on what the step does not draw (nothing to write about, an answer) says why here.
+      else toast.error(Object.values(e.fields)[0]?.[0] ?? e.message);
     }
   };
 

@@ -3,7 +3,7 @@ import { api, ApiError } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import type { MailDraftSave } from "@/api/types/mailbox";
 import type { DocumentRef } from "@/api/types/common";
-import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, formatDateTime, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
+import { Button, cn, DateField, EmailFrame, Field, formatBytes, formatDate, formatDateTime, Icon, InlineInput, InlineLabel, InlineSelect, Menu, RichTextField, shortMessage, Skeleton, TextField, toast, todayIso, Tooltip, UploadField } from "@mycity/ui";
 import { upload } from "@/api/upload";
 import { partsOf, WriteWithAi } from "./Assist";
 
@@ -21,6 +21,14 @@ export interface ComposeInit {
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** The most addresses a row takes (MailSend's To, Cc and Bcc). */
+const MAX_RECIPIENTS = 50;
+/** The furthest a send may be scheduled (mailbox.service: within 90 days). */
+const addDaysIso = (iso: string, n: number) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
 
 
 /** Recipients as chips: Enter, comma or semicolon adds one; a bad address is marked as it is typed. */
@@ -117,11 +125,13 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   const [showCc, setShowCc] = useState(!!(init.cc?.length || init.bcc?.length));
   const [subject, setSubject] = useState(init.subject ?? "");
   const [files, setFiles] = useState<DocumentRef[]>(init.attachments ?? []);
-  const [saved, setSaved] = useState<"idle" | "saving" | "saved">("idle");
+  const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [stored, setStored] = useState(!!init.draft_id);
-  const [sched, setSched] = useState<{ open: boolean; date: string; time: string; tried: boolean; past: boolean }>({ open: false, date: "", time: "", tried: false, past: false });
+  /* `past`: the server's or the clock's words for a time it refuses ("Time already passed", "Within 90 days"). */
+  const [sched, setSched] = useState<{ open: boolean; date: string; time: string; tried: boolean; past: string | null }>({ open: false, date: "", time: "", tried: false, past: null });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [toBad, setToBad] = useState<string | null>(null);
+  /* Each address row's mark: To, Cc and Bcc are checked on their own. */
+  const [bad, setBad] = useState<{ to: string | null; cc: string | null; bcc: string | null }>({ to: null, cc: null, bcc: null });
   const [busy, setBusy] = useState(false);
   const [body, setBody] = useState(init.body_html ?? "");
   /* Hidden each time the composer opens, to keep the room for writing (TB, 19/10/2026). */
@@ -152,7 +162,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
         setStored(true);
         if (n === dirty.current) setSaved("saved");
       } catch {
-        setSaved("idle");
+        if (n === dirty.current) setSaved("failed");
       }
     }, 700);
     return () => clearTimeout(x);
@@ -160,9 +170,14 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
   }, [tick, to, cc, bcc, subject, body, files]);
 
   const send = async (release_at?: string) => {
-    if (!to.length || [...to, ...cc, ...bcc].some((a) => !EMAIL.test(a))) {
-      setToBad(to.length ? "Not an email address" : "Add a recipient");
-      return document.getElementById("mto")?.focus();
+    const rowBad = (list: string[], none?: string) =>
+      none && !list.length ? none : list.some((a) => !EMAIL.test(a)) ? "Not an email address" : list.length > MAX_RECIPIENTS ? `At most ${MAX_RECIPIENTS}` : null;
+    const marks = { to: rowBad(to, "Add a recipient"), cc: rowBad(cc), bcc: rowBad(bcc) };
+    const first = (["to", "cc", "bcc"] as const).find((k) => marks[k]);
+    if (first) {
+      setBad(marks);
+      if (first !== "to") setShowCc(true);
+      return document.getElementById(`m${first}`)?.focus();
     }
     setBusy(true);
     try {
@@ -172,21 +187,30 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
       toast(release_at ? (release_at === init.scheduled?.release_at ? "Scheduled mail updated" : `Scheduled for ${formatDate(release_at.slice(0, 10))} ${release_at.slice(11, 16)}`) : `Sent to ${to.join(", ")}`);
     } catch (e) {
       setBusy(false);
-      if (e instanceof ApiError && e.fields?.release_at) setSched((s) => ({ ...s, open: true, past: true }));
-      else if (e instanceof ApiError && e.fields?.to_addresses) setToBad("Not an email address");
-      else toast(e instanceof ApiError ? e.message : "Could not send");
+      const f = e instanceof ApiError ? e.fields : {};
+      const said = (k: string) => (Array.isArray(f[k]) && f[k].length ? shortMessage({ type: "custom", message: f[k][0] }) : null);
+      if (said("release_at")) setSched((s) => ({ ...s, open: true, past: said("release_at") }));
+      else if (said("to_addresses") || said("cc_addresses") || said("bcc_addresses")) {
+        setBad({ to: said("to_addresses"), cc: said("cc_addresses"), bcc: said("bcc_addresses") });
+        if (said("cc_addresses") || said("bcc_addresses")) setShowCc(true);
+      } else toast.error(e instanceof ApiError ? e.message : "Could not send");
     }
   };
   const at = (date: string, hm: string) => `${date}T${hm}:00+01:00`;
   const schedule = () => {
     const okT = /^([01]\d|2[0-3]):[0-5]\d$/.test(sched.time);
-    setSched((s) => ({ ...s, tried: true, past: false }));
+    setSched((s) => ({ ...s, tried: true, past: null }));
     if (!sched.date || !okT) return;
-    if (new Date(at(sched.date, sched.time)).getTime() <= Date.now()) return setSched((s) => ({ ...s, past: true }));
+    if (new Date(at(sched.date, sched.time)).getTime() <= Date.now()) return setSched((s) => ({ ...s, past: "Time already passed" }));
     return send(at(sched.date, sched.time));
   };
   const discard = async () => {
-    if (stored) await api.call("DELETE /api/v1/mailbox/drafts/:id", { params: { id: draftId } }).catch(() => null);
+    try {
+      if (stored) await api.call("DELETE /api/v1/mailbox/drafts/:id", { params: { id: draftId } });
+    } catch (e) {
+      // Still there (and, when scheduled, still going): say so and keep the composer open.
+      return void toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Draft not discarded. Try again.");
+    }
     invalidate("/api/v1/mailbox");
     close();
     toast("Draft discarded");
@@ -218,9 +242,9 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
         <InlineLabel htmlFor="mfrom" className="w-14 flex-none text-xs font-semibold text-subtle-foreground">From</InlineLabel>
         <InlineSelect id="mfrom" className="h-7.5 rounded-ctl border border-border bg-background px-2 text-sm" value={from} onChange={() => undefined} options={[from]} />
       </div>
-      <Recipients id="mto" label="To" list={to} onChange={(v) => (setTo(v), setToBad(null), touch())} bad={!!toBad} error={toBad} right={!showCc && <button type="button" className="text-xs font-semibold text-accent-foreground" onClick={() => setShowCc(true)}>Cc Bcc</button>} />
-      {showCc && <Recipients id="mcc" label="Cc" list={cc} onChange={(v) => (setCc(v), touch())} />}
-      {showCc && <Recipients id="mbcc" label="Bcc" list={bcc} onChange={(v) => (setBcc(v), touch())} />}
+      <Recipients id="mto" label="To" list={to} onChange={(v) => (setTo(v), setBad((b) => ({ ...b, to: null })), touch())} bad={!!bad.to} error={bad.to} right={!showCc && <button type="button" className="text-xs font-semibold text-accent-foreground" onClick={() => setShowCc(true)}>Cc Bcc</button>} />
+      {showCc && <Recipients id="mcc" label="Cc" list={cc} onChange={(v) => (setCc(v), setBad((b) => ({ ...b, cc: null })), touch())} bad={!!bad.cc} error={bad.cc} />}
+      {showCc && <Recipients id="mbcc" label="Bcc" list={bcc} onChange={(v) => (setBcc(v), setBad((b) => ({ ...b, bcc: null })), touch())} bad={!!bad.bcc} error={bad.bcc} />}
       <div className="flex min-h-10.5 items-center gap-2 border-b border-border py-1.5">
         <InlineLabel htmlFor="msub" className="w-14 flex-none text-xs font-semibold text-subtle-foreground">Subject</InlineLabel>
         <InlineInput id="msub" className="h-7.5 min-w-0 flex-1 border-0 bg-transparent text-sm outline-none" value={subject} onChange={(v) => (setSubject(v), touch())} />
@@ -241,7 +265,7 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           )}
         />
         <span role="status" className="flex flex-none items-center gap-1 self-start pt-2 text-2xs text-subtle-foreground">
-          {saved === "saved" ? <><Icon name="ok" className="size-3.5" />Draft saved</> : saved === "saving" ? "Saving…" : null}
+          {saved === "saved" ? <><Icon name="ok" className="size-3.5" />Draft saved</> : saved === "saving" ? "Saving…" : saved === "failed" ? <span className="text-destructive">Draft not saved</span> : null}
         </span>
       </div>
       <RichTextField
@@ -278,10 +302,10 @@ export function Composer({ from, init, close }: { from: string; init: ComposeIni
           <h3 data-ui="title" className="mb-2 flex items-center gap-1.5 text-sm font-semibold"><Icon name="clock" />Schedule Send</h3>
           <div className="grid cols-two-and-action items-end gap-2.5 max-md:grid-cols-2">
             <Field label="Send Date" state={sched.tried && !sched.date ? "bad" : undefined} message={sched.tried && !sched.date ? "Not a real date" : undefined} className="mb-0">
-              <DateField value={sched.date} onChange={(v) => setSched((s) => ({ ...s, date: v, past: false }))} min={todayIso()} />
+              <DateField value={sched.date} onChange={(v) => setSched((s) => ({ ...s, date: v, past: null }))} min={todayIso()} max={addDaysIso(todayIso(), 90)} />
             </Field>
-            <Field label="Send Time" help="Lagos time, on the 24 hour clock: 08:30, 17:45." htmlFor="stime" state={timeBad || sched.past ? "bad" : undefined} message={timeBad ? "Not a valid time" : sched.past ? "Time already passed" : undefined} className="mb-0">
-              <TextField id="stime" inputMode="numeric" autoComplete="off" placeholder="HH:MM" state={timeBad || sched.past ? "bad" : undefined} value={sched.time} onChange={(v) => setSched((s) => ({ ...s, time: v.trim(), past: false }))} />
+            <Field label="Send Time" help="Lagos time, on the 24 hour clock: 08:30, 17:45." htmlFor="stime" state={timeBad || sched.past ? "bad" : undefined} message={timeBad ? "Not a valid time" : (sched.past ?? undefined)} className="mb-0">
+              <TextField id="stime" inputMode="numeric" autoComplete="off" placeholder="HH:MM" state={timeBad || sched.past ? "bad" : undefined} value={sched.time} onChange={(v) => setSched((s) => ({ ...s, time: v.trim(), past: null }))} />
             </Field>
             <div className="flex justify-end gap-2 max-md:col-span-2">
               <Button onClick={() => setSched((s) => ({ ...s, open: false }))}>Cancel</Button>

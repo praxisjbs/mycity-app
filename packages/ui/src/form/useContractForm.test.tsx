@@ -156,6 +156,12 @@ describe("useContractForm with INTERIM rules", () => {
     expect(result.current.status("name")).toEqual({ state: "bad", message: "Required" });
   });
 
+  it("takes only lists of messages as marks: a refusal's details are not", () => {
+    const { result } = renderHook(() => useContractForm({ email: "ada@mycity.app" }));
+    act(() => result.current.setServerErrors({ email: ["Already in use"], reason: "Connection refused" as never, smtp_code: 421 as never }));
+    expect(result.current.field("email").message).toBe("Already in use");
+  });
+
   it("shows a server error until the field changes", () => {
     const { result } = renderHook(() => useContractForm({ email: "ada@mycity.app" }));
     act(() => result.current.setServerErrors({ email: ["Already in use"] }));

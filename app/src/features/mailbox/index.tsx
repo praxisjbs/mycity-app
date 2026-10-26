@@ -35,9 +35,13 @@ function Folders({ tab, id }: ModuleScreenProps) {
   const mobile = useIsMobile();
   useFitPage(!mobile);
   const modal = useModal();
+  const { can } = useAuth();
+  // Writing needs `mailbox` create, emptying a folder delete (the routes' own grants).
+  const writes = can("mailbox", "create");
   const conn = useApi("GET /api/v1/mailbox/connection");
   const list = usePaged("GET /api/v1/mailbox/threads", { filters: { folder } });
   const unread = useApi("GET /api/v1/mailbox/threads", { query: { folder, unread: true } });
+  const attached = useApi("GET /api/v1/mailbox/threads", { query: { folder, attachments: true } });
   const [sel, setSel] = useState<string | null>(id);
   const [open, setOpen] = useState(Boolean(id));
   const split = useSplitPanes("mail", 330);
@@ -70,7 +74,8 @@ function Folders({ tab, id }: ModuleScreenProps) {
     try {
       await api.call("POST /api/v1/mailbox/connection/sync", { body: {} });
       invalidate("/api/v1/mailbox");
-      toast("Mailbox up to date");
+      // The sync runs on the server; new mail arrives on the list as it lands.
+      toast("Checking for new mail");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Not refreshed. Try again.");
     }
@@ -84,7 +89,8 @@ function Folders({ tab, id }: ModuleScreenProps) {
     );
   const total = list.page?.total ?? 0;
   const nUnread = unread.data?.page.total ?? 0;
-  const withFiles = rows.filter((r) => r.has_attachment).length;
+  // The folder's figure, as Messages and Unread are, not the page on screen.
+  const withFiles = attached.data?.page.total ?? 0;
   const emptiable = folder === "spam" || folder === "trash";
 
   return (
@@ -94,9 +100,9 @@ function Folders({ tab, id }: ModuleScreenProps) {
         sub={`${total} message${total === 1 ? "" : "s"}${nUnread ? ` · ${nUnread} unread` : ""}`}
         actions={
           <>
-            {emptiable && total > 0 && <Button onClick={() => modal.open({ title: `Empty ${NAMES[folder]}`, body: (close) => <EmptyFolder kind={folder as "spam" | "trash"} count={total} close={close} /> })}>Empty {NAMES[folder]}</Button>}
+            {emptiable && total > 0 && can("mailbox", "delete") && <Button onClick={() => modal.open({ title: `Empty ${NAMES[folder]}`, body: (close) => <EmptyFolder kind={folder as "spam" | "trash"} count={total} close={close} /> })}>Empty {NAMES[folder]}</Button>}
             <Button onClick={() => refresh()}>Refresh</Button>
-            <Button variant="primary" icon="plus" onClick={() => compose()}>Compose</Button>
+            {writes && <Button variant="primary" icon="plus" onClick={() => compose()}>Compose</Button>}
           </>
         }
       />
@@ -125,7 +131,7 @@ function Folders({ tab, id }: ModuleScreenProps) {
             </div>
           </>
         }
-        reader={current ? (current.mail_draft_id ? <DraftReader key={current.mail_thread_id} row={current} onBack={() => setOpen(false)} compose={compose} /> : <ThreadReader key={current.mail_thread_id} row={current} onBack={() => setOpen(false)} compose={compose} onMoved={() => (setSel(null), setOpen(false))} />) : <p className="m-auto p-6 text-xs text-subtle-foreground">{list.loading ? "" : "Pick a message to read it."}</p>}
+        reader={current ? (current.mail_draft_id ? <DraftReader key={current.mail_thread_id} row={current} onBack={() => setOpen(false)} compose={compose} /> : <ThreadReader key={current.mail_thread_id} row={current} mailbox={from} writes={writes} onBack={() => setOpen(false)} compose={compose} onMoved={() => (setSel(null), setOpen(false))} />) : <p className="m-auto p-6 text-xs text-subtle-foreground">{list.loading ? "" : "Pick a message to read it."}</p>}
       />
     </>
   );
@@ -184,7 +190,8 @@ function quote(m: MailMessage) {
   return `<p></p><p></p><p>On ${formatDateTime(m.sent_at)}, ${who(m.from)} wrote:</p><blockquote>${m.body_html ?? ""}</blockquote>`;
 }
 
-function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBack: () => void; compose: (init: ComposeInit, title?: string) => void; onMoved: () => void }) {
+function ThreadReader({ row, mailbox, writes, onBack, compose, onMoved }: { row: ThreadRow; mailbox: string; writes: boolean; onBack: () => void; compose: (init: ComposeInit, title?: string) => void; onMoved: () => void }) {
+  const { can } = useAuth();
   const t = useApi("GET /api/v1/mailbox/threads/:id", { params: { id: row.mail_thread_id } });
   const [images, setImages] = useState(false);
   const mobile = useIsMobile();
@@ -217,9 +224,12 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
   const lastMsg = thread.messages[thread.messages.length - 1];
   const spam = row.folder === "spam";
   const reply = (all: boolean) => {
-    const me = lastMsg.from.address;
-    const others = all ? [...lastMsg.to, ...lastMsg.cc].filter((a) => a.toLowerCase() !== me.toLowerCase()) : [];
-    compose({ to: [lastMsg.from.address], cc: others, subject: /^re:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`, body_html: quote(lastMsg), in_reply_to: lastMsg.mail_message_id }, all ? "Reply All" : "Reply");
+    // Never to oneself: on one's own message the reply goes to whom it was sent, as a mail app's does.
+    const isMe = (a: string) => a.toLowerCase() === mailbox.toLowerCase();
+    const mine = isMe(lastMsg.from.address);
+    const to = mine ? lastMsg.to.filter((a) => !isMe(a)) : [lastMsg.from.address];
+    const others = all ? [...(mine ? [] : lastMsg.to), ...lastMsg.cc].filter((a) => !isMe(a) && !to.some((x) => x.toLowerCase() === a.toLowerCase())) : [];
+    compose({ to, cc: others, subject: /^re:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`, body_html: quote(lastMsg), in_reply_to: lastMsg.mail_message_id }, all ? "Reply All" : "Reply");
   };
   /* Always Show Images is the owner's, per sender, kept on the server (mailbox.md §6). */
   const trust = async (address: string, trusted: boolean) => {
@@ -245,7 +255,10 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
       toast("AI summaries are off");
     } catch (e) {
       setSummary((s) => ({ open: Boolean(s.data), data: s.data }));
-      toast(e instanceof ApiError ? e.message : "AI summaries are off");
+      if (!(e instanceof ApiError) || e.status === 0) toast.error("Could not reach the server. Try again.");
+      // The model's reply was not usable: there is nothing for the reader to write instead.
+      else if (e.code === "AI_BAD_OUTPUT") toast.error("The summary could not be made. Try again.");
+      else toast.error(e.message);
     }
   };
   const moves: MenuItem[] = [
@@ -268,16 +281,16 @@ function ThreadReader({ row, onBack, compose, onMoved }: { row: ThreadRow; onBac
           </p>
         </span>
         <span className="flex flex-wrap gap-1.5 max-md:w-full">
-          {!spam && <Button icon="send" onClick={() => reply(false)}>Reply</Button>}
-          {!spam && lastMsg.to.length + lastMsg.cc.length > 1 && <Button onClick={() => reply(true)}>Reply All</Button>}
-          {!spam && <Button onClick={forward}>Forward</Button>}
+          {!spam && writes && <Button icon="send" onClick={() => reply(false)}>Reply</Button>}
+          {!spam && writes && lastMsg.to.length + lastMsg.cc.length > 1 && <Button onClick={() => reply(true)}>Reply All</Button>}
+          {!spam && writes && <Button onClick={forward}>Forward</Button>}
           {!spam && (mobile ? <IconButton icon="spark" label="Summarise Thread" onClick={summarise} /> : <Button icon="spark" onClick={summarise}>Summarise Thread</Button>)}
           <Menu trigger={(p) => <IconButton {...p} icon="dots" label="Move this message" />} items={moves} />
         </span>
       </div>
       {summary.open && !spam && <SummaryCard summary={summary.data} close={() => setSummary({ open: false, data: summary.data })} />}
       {thread.messages.map((m, i) => (
-        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} forwardable={!spam} />
+        <Message key={m.mail_message_id} m={m} subject={thread.subject} head={thread.messages.length > 1 && i < thread.messages.length - 1} images={images} onImages={() => setImages(true)} onTrust={trust} onMailto={mailto} forwardable={!spam && can("community", "create")} />
       ))}
     </div>
   );
@@ -404,8 +417,10 @@ function ConnectMailbox({ email, close, done }: { email: string | null; close: (
       done();
       toast("Mailbox connected");
     } catch (e) {
-      if (e instanceof ApiError && e.fields) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Could not connect");
+      // A field's problem marks it; any other refusal (an unreachable mail server) says why.
+      const marks = e instanceof ApiError && (Array.isArray(e.fields.email) || Array.isArray(e.fields.password));
+      if (marks) f.setServerErrors(e.fields);
+      else toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Could not connect. Try again.");
     } finally {
       setBusy(false);
     }

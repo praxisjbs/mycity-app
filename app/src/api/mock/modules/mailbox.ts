@@ -143,7 +143,7 @@ route("GET /api/v1/mailbox/threads", (req) => {
   const folder = req.query.folder || "inbox";
   const rows = folder === "drafts" ? [...b.drafts.values()].map(draftRow) : b.threads.filter((t) => t.folder === folder).map(row);
   rows.sort((x, y) => y.last_message_at.localeCompare(x.last_message_at));
-  return paged(rows, req, { search: (r) => [r.subject, r.party?.name, r.party?.address, r.snippet], filters: { folder: () => true, unread: (r, v) => (v === "true" ? r.unread : true) } });
+  return paged(rows, req, { search: (r) => [r.subject, r.party?.name, r.party?.address, r.snippet], filters: { folder: () => true, unread: (r, v) => (v === "true" ? r.unread : true), attachments: (r, v) => (v === "true" ? r.has_attachment : true) } });
 });
 route("GET /api/v1/mailbox/threads/:id", (req) => {
   const t = findThread(req.user!, req.params.id);

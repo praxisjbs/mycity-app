@@ -50,7 +50,7 @@ the list says **Mail server refused the password**. No new mail arrives until yo
 1. Open [Mailbox · Inbox](/mailbox?tab=inbox). The line under the title counts your messages and
    those unread.
 2. The figures show the **Folder**, its **Messages** and those **Unread**. **Attachments** counts the
-   conversations with files among the 25 on screen. On a computer, **Mailbox** shows the address you
+   folder's conversations with files. On a computer, **Mailbox** shows the address you
    are reading. On a phone, the line under the title and the **Mailbox** figure are not shown, and
    **Refresh** and **Compose** sit under the title.
 3. Press a message in the list. It opens beside the list on a computer, or full screen on a phone.
@@ -77,7 +77,8 @@ Type in the search box above the list to find a conversation in this folder by i
 address. Words inside a message are not searched. **Search Anything** at the top finds your own mail
 in every folder, by subject, address or sender's name.
 
-Press **Refresh** to check for new mail now. The message **Mailbox up to date** confirms it.
+Press **Refresh** to check for new mail now. The message **Checking for new mail** confirms it;
+new mail appears on the list as it arrives. If your mailbox needs reconnecting, it says so instead.
 
 | The screen says | What to do |
 |---|---|
@@ -90,7 +91,8 @@ Press **Refresh** to check for new mail now. The message **Mailbox up to date** 
 
 1. Open the message.
 2. Press **Reply** to answer the sender, **Reply All** to answer everyone on it, or **Forward** to
-   send it to someone else with its attachments. **Reply All** shows only when the message went to
+   send it to someone else with its attachments. On a message you sent, **Reply** writes again to
+   the people you sent it to, never to yourself. **Reply All** shows only when the message went to
    more than one person. The window's title reads **Reply**, **Reply All** or **Forward**.
 3. The message opens ready to write, with the earlier mail quoted under it. Write your answer above
    the quotation.
@@ -117,7 +119,9 @@ Press **Refresh** to check for new mail now. The message **Mailbox up to date** 
 8. Press **Send**. The message names who it went to.
 
 Your message is saved as you write: the line beside the paper clip says **Saving…**, then
-**Draft saved**. If you close it, it waits in [Drafts](/mailbox?tab=drafts).
+**Draft saved**. If you close it, it waits in [Drafts](/mailbox?tab=drafts). **Draft not saved**
+in red means the last change did not reach the hub: check your connection; the next change saves
+again.
 
 A sent message waits a moment in [Drafts](/mailbox?tab=drafts), marked **Scheduled**, then moves to
 [Sent](/mailbox?tab=sent). Each person may send to 50 people an hour, unless IT set another limit.
@@ -126,7 +130,8 @@ Past it, the message waits in Drafts and goes by itself a few minutes later.
 | The screen says | What to do |
 |---|---|
 | **Add a recipient** | Type at least one address in **To** |
-| **Not an email address** | Check the address marked in red, with one @. Pointing at it says **Not an Email** |
+| **Not an email address** | Check the address marked in red, with one @, in **To**, **Cc** or **Bcc**. Pointing at it says **Not an Email** |
+| *At most 50* | A row has more than 50 addresses. Send it in two |
 | **Starts with https:// or mailto:** | Type the whole link address, starting with `https://` |
 | Larger than 25 MB | Each file can be at most 25 MB. Send a smaller file |
 | A file shows a reason and a round arrow | Press the round arrow to try again, or the cross to take it off |
@@ -135,7 +140,8 @@ Past it, the message waits in Drafts and goes by itself a few minutes later.
 | **Reconnect your mailbox** | The mail server refused your saved password. Press **Reconnect** above the list, then send again |
 
 To throw a message away, press **Discard**, then **Discard Draft**. The message
-**Draft discarded** confirms it. **Keep Editing** goes back to it. On a phone, **Discard** is the
+**Draft discarded** confirms it; if it says why not, the draft is still there (and, when scheduled,
+still goes). **Keep Editing** goes back to it. On a phone, **Discard** is the
 bin at the foot.
 
 ### Send later {#mailbox-schedule needs="mailbox create"}
@@ -152,7 +158,8 @@ bin at the foot.
 |---|---|
 | **Not a real date** | Pick a date |
 | **Not a valid time** | Type the time as two digits, a colon and two digits: `08:30` |
-| **Time already passed** | Pick a later time, or a date within 90 days: a message can wait at most 90 days |
+| **Time already passed** | Pick a later time |
+| **Within 90 days** | Pick a date within 90 days: a message can wait at most 90 days. The calendar offers no later day |
 
 ### Write with AI {#mailbox-ai needs="mailbox create"}
 
@@ -189,6 +196,7 @@ what you wrote. Nothing is sent until you press **Send** yourself.
 | **Write With AI is off** | MyCity has switched it off for now. Write the message yourself |
 | **The AI service is not answering. Try again in a few minutes.** | Wait a few minutes and press the button again, or write it yourself |
 | **The AI answer could not be used. Try again, or write it yourself.** | Press **Write Draft** again, or write it yourself |
+| **Could not reach the server. Try again.** | Your connection dropped. Press the button again |
 | **The AI service is not set up correctly. An administrator has been told.** | Write the message yourself for now |
 | **Spam is not read by AI** | The conversation you are answering is now in Spam. Move it back to the Inbox, or write it yourself |
 
@@ -210,8 +218,9 @@ you act on them.
 | The screen says | What to do |
 |---|---|
 | **AI summaries are off** | MyCity has switched AI off for now, or its monthly limit is reached. Read the conversation yourself |
+| **Could not reach the server. Try again.** | Your connection dropped. Press **Summarise Thread** again |
 | **The AI service is not answering. Try again in a few minutes.** | Wait a few minutes and press **Summarise Thread** again |
-| **The AI answer could not be used. Try again, or write it yourself.** | Press **Summarise Thread** again |
+| **The summary could not be made. Try again.** | Press **Summarise Thread** again |
 | **Not copied. Try again.** | Your browser did not allow copying. Press **Copy Summary** again |
 | **Spam is not read by AI** | The conversation is now in Spam. Move it back to the Inbox first |
 | **There is no such message** | It was deleted, perhaps on another device. Press **Refresh** |
@@ -265,6 +274,7 @@ press **Send**.
 | **The mail server refused the password** | Press **Reconnect** above the list, then send again |
 | **Reconnect your mailbox** | Press **Reconnect** above the list, then send again |
 | **Could not reach the mail server** | The hub tried three times. Send it again later |
+| **The mail server kept deferring it. Send it again later.** | The mail server put it off three times. Open it in Drafts and send it later |
 | **The mail server refused the sender address** | Ask IT to check your mailbox on the mail server |
 | **The mail server refused the message** | Send it again; if it is refused again, ask IT |
 
@@ -307,8 +317,8 @@ Unwanted mail. To keep you safe, a message in Spam is not shown: it reads **Spam
 ![Spam](shot:mailbox-spam)
 
 1. Open [Mailbox · Spam](/mailbox?tab=spam).
-2. If a message is not spam, press it, then the three dots, then **Move to Inbox**. It shows as plain
-   text, without its layout and pictures.
+2. If a message is not spam, press it, then the three dots, then **Move to Inbox**. The hub reads
+   it again from the mail server, so it shows as it was written a moment later.
 3. {needs="mailbox delete"} To delete everything here for good, press **Empty Spam** at the top. It
    shows only when Spam holds mail.
 4. {needs="mailbox delete"} The question says how many messages go. Press **Empty Spam** again to

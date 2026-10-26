@@ -99,7 +99,12 @@ function fakeServer() {
     },
     async move(from, to, id) {
       s.moved.push({ from, to, id });
+      const at = (s.folders[from] || []).findIndex((m) => m.messageId === id);
+      if (at >= 0) (s.folders[to] ||= []).push(...s.folders[from].splice(at, 1));
       return true;
+    },
+    async fetchOne(path, id) {
+      return (s.folders[path] || []).find((m) => m.messageId === id) || null;
     },
     async remove(path, ids) {
       s.removed.push({ path, ids });
@@ -288,6 +293,22 @@ describeDb("Mailbox against the real migrations", () => {
     expect((await api().get("/mailbox/threads?folder=inbox")).body.page.total).toBe(1);
     await new Promise((r) => setTimeout(r, 50));
     expect(server.moved.every((m) => m.from === "INBOX" && m.to === "INBOX.Archive")).toBe(true);
+  });
+
+  test("out of Spam, a message's real body is read again from the server (the owner, 26/10/2026)", async () => {
+    const spam = (await api().get("/mailbox/threads?folder=spam")).body.data.find((t) => t.subject === "You won");
+    expect((await api().post(`/mailbox/threads/${spam.mail_thread_id}/move`).send({ to: "inbox" })).status).toBe(204);
+    await new Promise((r) => setTimeout(r, 100));
+    const [message] = (await api().get(`/mailbox/threads/${spam.mail_thread_id}`)).body.messages;
+    expect(message.body_html).toContain("Hello");
+    expect(message.body_html).not.toContain("<script");
+  });
+
+  test("the folder's Attachments figure counts the whole folder", async () => {
+    const all = (await api().get("/mailbox/threads?folder=inbox")).body.data;
+    const withFiles = await api().get("/mailbox/threads?folder=inbox&attachments=true");
+    expect(withFiles.body.page.total).toBe(all.filter((t) => t.has_attachment).length);
+    expect(withFiles.body.data.every((t) => t.has_attachment)).toBe(true);
   });
 
   test("drafts save as typed, send now delivers with its file, a refusal fails without retrying", async () => {
