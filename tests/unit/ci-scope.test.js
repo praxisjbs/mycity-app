@@ -117,10 +117,12 @@ describe("testedRun", () => {
 });
 
 describe("names the workflow and the build share with the scope", () => {
-  test("every document the apps' build reads counts as code", () => {
-    const docsTheBuildReads = [...read("packages/ui/vite.shared.js").matchAll(/\bdoc\("([^"]+\.md)"\)/g)].map((m) => m[1]);
-    expect(docsTheBuildReads.length).toBeGreaterThan(0);
-    for (const f of docsTheBuildReads) expect(READ_BY_CODE.has(f)).toBe(true);
+  test("every document the apps' build and the API read the delivery plan from counts as code", () => {
+    // packages/contract/plan.js readPlan is the one reader: vite.shared.js hands it `doc`, the API its own.
+    const docsThePlanReads = [...read("packages/contract/plan.js").matchAll(/\bread\("([^"]+\.md)"\)/g)].map((m) => m[1]);
+    expect(docsThePlanReads.length).toBeGreaterThan(0);
+    for (const f of docsThePlanReads) expect(READ_BY_CODE.has(f)).toBe(true);
+    expect(read("packages/ui/vite.shared.js")).toMatch(/contractPlan\.readPlan\(doc\)/);
   });
 
   test("every document gate is a gate ci-local.js runs", () => {
