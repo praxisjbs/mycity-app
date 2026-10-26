@@ -40,7 +40,7 @@ import {
 import { ReviewSheet } from "./ReviewPage";
 import { person, rating, reviewStatus, score, STAGE_OPTIONS, useQuarter } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const KIND_OPTIONS: Array<[string, string]> = [["", "All Kinds"], ["monthly", "Monthly"], ["probation", "Probation"]];
 const PIP_STATUS: Record<Pip["status"], { tone: "ok" | "warn" | "err" | "neutral"; text: string }> = {
   open: { tone: "warn", text: "Open" },

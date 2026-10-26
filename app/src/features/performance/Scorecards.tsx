@@ -57,7 +57,7 @@ import {
 import { Commitments } from "./Commitments";
 import { cardStatus, figureOf, fieldMessage, monthChoices, monthScores, monthShort, person, rating, score, SECTION_NAMES, startMonth, targetOf, useQuarter } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const STATUS_OPTIONS: Array<[string, string]> = [["", "All Statuses"], ["draft", "Draft"], ["binding", "Awaiting Agreement"], ["agreed", "Agreed"], ["closed", "Closed"]];
 const AUTO = new Set(["key_result", "team_result", "function_kpi", "commitments", "update_on_time", "team_reviews", "tasks"]);
 

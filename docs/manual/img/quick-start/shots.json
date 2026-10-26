@@ -9,7 +9,7 @@
   },
   "qs-add-task": {
     "spec": "221d9119480a0a72",
-    "source": "a25ebb947d126b8e",
+    "source": "39761e8031c326c1",
     "devices": [
       "desktop",
       "phone"
@@ -17,7 +17,7 @@
   },
   "qs-agree": {
     "spec": "663deb49e9bb88ca",
-    "source": "d995ad2d4add99b0",
+    "source": "5036f9718f5f0384",
     "devices": [
       "desktop",
       "phone"
@@ -41,7 +41,7 @@
   },
   "qs-approve-commitments": {
     "spec": "670035074f4610c2",
-    "source": "861afd05db72716e",
+    "source": "9d831ca221f8fe31",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "4243614d2e10121e",
+    "source": "fa30d4d3ee00d8a3",
     "devices": [
       "desktop",
       "phone"
@@ -81,7 +81,7 @@
   },
   "qs-close-review": {
     "spec": "604a2fce10313447",
-    "source": "861afd05db72716e",
+    "source": "9d831ca221f8fe31",
     "devices": [
       "desktop",
       "phone"
@@ -89,7 +89,7 @@
   },
   "qs-commitments": {
     "spec": "16ba03ab7983c1b5",
-    "source": "a25ebb947d126b8e",
+    "source": "39761e8031c326c1",
     "devices": [
       "desktop",
       "phone"
@@ -145,7 +145,7 @@
   },
   "qs-plan-day": {
     "spec": "0abe755a36a0bce0",
-    "source": "a25ebb947d126b8e",
+    "source": "39761e8031c326c1",
     "devices": [
       "desktop",
       "phone"
@@ -169,7 +169,7 @@
   },
   "qs-quarter": {
     "spec": "f235478418d3f1d1",
-    "source": "861afd05db72716e",
+    "source": "9d831ca221f8fe31",
     "devices": [
       "desktop",
       "phone"
@@ -177,7 +177,7 @@
   },
   "qs-report-month": {
     "spec": "6e78bdb9be20b6f0",
-    "source": "861afd05db72716e",
+    "source": "9d831ca221f8fe31",
     "devices": [
       "desktop",
       "phone"
@@ -201,7 +201,7 @@
   },
   "qs-score-review": {
     "spec": "dea01acb415b7670",
-    "source": "861afd05db72716e",
+    "source": "9d831ca221f8fe31",
     "devices": [
       "desktop",
       "phone"
@@ -241,7 +241,7 @@
   },
   "qs-team-tasks": {
     "spec": "62cb18ba88056ba8",
-    "source": "a25ebb947d126b8e",
+    "source": "39761e8031c326c1",
     "devices": [
       "desktop",
       "phone"

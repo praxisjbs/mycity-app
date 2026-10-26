@@ -34,7 +34,7 @@ import {
 } from "@mycity/ui";
 import { fieldMessage, figureOf, reviewStatus, score, SECTION_NAMES, targetOf } from "./shared";
 
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const BUCKET: Record<string, string> = { done: "Done This Month", ongoing: "Ongoing", next_month: "Next Month" };
 /** Dictation's limit: three minutes, as the server takes (reviews.dictation MAX_SECONDS, §6.17). */
 const DICTATION_SECONDS = 180;

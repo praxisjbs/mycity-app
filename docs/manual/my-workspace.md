@@ -207,6 +207,9 @@ Moving a late task to **Done** first asks **Why Late**. Pick the reason, such as
 Others**, and press **Mark Done**. If it says **Pick a reason**, pick one from the list. If it says
 **No late reasons are switched on**, press **Mark Done**: it moves without one.
 
+A task waiting on another stays in **To Do** until that one is done. Moving it says why, with a
+warning mark, such as *Waiting on TSK-0397: Book the venue*. Its **Waiting On** lists what it waits on.
+
 Other people's changes to a task you can see appear on your board as they happen.
 
 ### Open a task {#workspace-task-panel}
@@ -342,7 +345,8 @@ A repeat needs a due date to count from. Without one, **Repeat** says **Needs a 
 1. Open the task and press **Edit Task**. If you manage it, the form holds the same fields as New
    Task. If someone else set it for you, it holds only **Priority**, **Notes** and, if you lead it,
    **Commitment**.
-2. Change what you need and press **Save Task**. The hub says **Task saved**. Clearing
+2. Change what you need and press **Save Task**. The hub says **Task saved**, and the open panel
+   takes the new title at once. Clearing
    **Assign To** gives the task back to you. An approved commitment keeps its person, mark, month
    and criteria.
 3. To cancel it, press **More Actions**, then **Cancel Task**. Type the **Reason** and press

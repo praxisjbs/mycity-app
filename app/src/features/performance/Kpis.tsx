@@ -22,6 +22,7 @@ import {
   FilterSelect,
   formatDate,
   formatMonth,
+  FormError,
   FormFooter,
   HelpTerm,
   KeyValue,
@@ -36,11 +37,11 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, useQuarter } from "./shared";
+import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, sayRefusal, useQuarter } from "./shared";
 
 type KpiCreateBody = Endpoints["POST /api/v1/performance/kpis"]["body"];
 type KpiActualBody = Endpoints["POST /api/v1/performance/kpis/:id/actuals"]["body"];
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Could not save");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Could not save");
 const RESULTS: Array<[string, string]> = [["met", "Met"], ["not_met", "Not Met"], ["na", "N/A"]];
 const DIRECTIONS: Array<[string, string]> = [["higher", "Higher Is Better"], ["lower", "Lower Is Better"]];
 const FREQUENCIES: Array<[string, string]> = [["monthly", "Monthly"], ["weekly", "Weekly"], ["quarterly", "Quarterly"]];
@@ -195,8 +196,10 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
     { department_id: departmentId, name: "", formula: "", unit: "", direction: "higher", target_text: "", target_value: "", frequency: "monthly", data_source: "", starts_period_id: periodId },
     kpisContract.KpiCreate,
   );
+  const [problem, setProblem] = useState<string | null>(null);
   const save = useMutation("POST /api/v1/performance/kpis");
   const submit = async () => {
+    setProblem(null);
     if (!f.check()) return;
     try {
       const k = await save.run({ body: f.values as KpiCreateBody });
@@ -204,8 +207,7 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
       close();
       toast(`${k.code} set`);
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else say(e);
+      sayRefusal(e, f, setProblem);
     }
   };
   return (
@@ -221,6 +223,7 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
       <Field label="Target Wording" optional {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
       <Field label="Frequency" {...f.status("frequency")}><SelectField options={FREQUENCIES} {...f.field("frequency")} /></Field>
       <Field label="Data Source" optional {...f.status("data_source")}><TextField {...f.field("data_source")} /></Field>
+      <FormError>{problem}</FormError>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Set KPI</Button>

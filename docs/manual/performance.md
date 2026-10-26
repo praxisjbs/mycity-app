@@ -143,6 +143,8 @@ plan is a draft, or after it comes back. A new objective goes into the quarter c
 2. Pick the **Function**, type the **Objective**, and pick the **Organisational Goal** it serves.
    Press **Set Objective**. The hub gives it its code, such as *BM-O3 set*.
 3. {needs="cap goals.company"} For a company objective, choose **Company** in **Function**.
+   A function whose plan is already sent or binding says so beside its name, such as
+   *Company · Binding*, and takes no new objective.
 4. For a key result, press **New Goal** and choose **Key Result**.
 5. Pick its **Objective**, and type the **Key Result**, such as `Grow monthly active users to
    64,000`. The **Objective** list holds every objective of the quarter whose plan is a draft or
@@ -174,11 +176,16 @@ example, *BM-O1 deleted*.
 | **An objective holds at most four key results** | The objective has four already | Add it to another objective |
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
+| **Plan is binding** under **Function** | That function's plan for the quarter is approved | Pick another function, or change a target |
+| **Plan awaits approval** under **Function** | That function's plan is with its approvers | Wait until it is returned or binding |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
 | **Pick a function** under **Function** | No function picked, and your role does not set the company's | Pick your function |
 | **You cannot set a function's goals** | Your role sets only the company's objectives | Choose **Company** in **Function** |
+
+A message that names no field shows in red above **Set Objective** and stays until you press it
+again. Nothing is saved, and what you typed stays.
 
 ### Send the quarter plan {#performance-plan-send needs="performance create, cap goals.function"}
 
@@ -455,6 +462,7 @@ its approvers.
 | **Link a KPI** | The line takes its figures from a KPI, and none is picked | Pick its **KPI** |
 | **Pick a date** | A **Milestone** line has no **Due Date** | Pick the **Due Date** |
 | **Above zero** | The **Weight** is 0 | Give it a weight above zero |
+| **At most 100** | The **Weight** is over 100 | Give it a weight of 100 or less |
 | **Check the weight** | The **Weight** is not like 15 or 12.5 | Type a number with at most two decimals |
 | **Pick the key results** | A team result line has none ticked | Tick its **Team Key Results** |
 | **Required** under **Goal** | The **Goal** is empty | Type the goal |
@@ -610,6 +618,9 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 |---|---|---|
 | **Only the function's head sets its KPIs** | You picked another function | Pick your own function in **Function** |
 | **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
+
+**Only the function's head sets its KPIs** shows in red above **Set KPI** and stays until you press
+it again. Nothing is saved, and what you typed stays.
 
 ### Record a month's result {#performance-kpi-actual needs="performance edit, cap goals.function"}
 

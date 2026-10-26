@@ -355,6 +355,20 @@ describe("my workspace", () => {
     await within(panel).findByText("Cynthia Osakunih", undefined, { timeout: 5000 });
   }, 30000);
 
+  it("Edit Task with a new title retitles the open panel at once, and again on a second edit", async () => {
+    await board();
+    await arrange({ title: "Task B", due_on: isoDaysAhead(5) });
+    const panel = await openCard("Task B");
+    for (const title of ["Task B Edited", "Task B Final"]) {
+      fireEvent.click(within(panel).getByRole("button", { name: "Edit Task" }));
+      const form = await screen.findByRole("dialog", { name: "Edit Task" });
+      fireEvent.change(within(form).getByRole("textbox", { name: /Task/ }), { target: { value: title } });
+      fireEvent.click(within(form).getByRole("button", { name: "Save Task" }));
+      await closed("Edit Task");
+      await screen.findByRole("dialog", { name: title }, { timeout: 5000 });
+    }
+  }, 30000);
+
   it("comments show the newest first, with older ones under Load More", async () => {
     await board();
     const id = await arrange({ title: "Gather the venue quotes", due_on: isoDaysAhead(6) });

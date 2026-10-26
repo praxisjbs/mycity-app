@@ -1,9 +1,10 @@
 /** What the Performance tabs share: the quarter switcher, the words for codes, a person in a cell. */
 import { useState } from "react";
 import type { PerformancePeriod } from "@mycity/contract/contract.gen.ts";
+import { ApiError } from "@/api/client";
 import { useApi, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import { formatMonth, formatNumber, shortMessage, todayIso, Who, type ContractSchema } from "@mycity/ui";
+import { formatMonth, formatNumber, shortMessage, todayIso, Who, type ContractSchema, type ServerFields } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
@@ -53,6 +54,20 @@ export function bodySchema<T>(schema: ContractSchema, toBody: (values: T) => unk
 export function reportingMonth(months: string[], today = new Date().toISOString().slice(0, 10)): string {
   const first = `${today.slice(0, 7)}-01`;
   return months.filter((m) => m < first).at(-1) ?? months[0] ?? "";
+}
+
+/**
+ * A refused save, said in the form that sent it (FRONTEND_GUIDE §8.3): each mark on the field the
+ * server named, and the server's sentence on the form's error line (FormError) when it names no
+ * field here or refuses rather than checks (a plan already binding, a function that is not the
+ * reader's). A toast alone was gone before it was read, leaving the form open with no reason.
+ */
+export function sayRefusal(e: unknown, form: { values: object; setServerErrors: (fields: ServerFields) => void }, setProblem: (problem: string | null) => void) {
+  if (!(e instanceof ApiError)) return setProblem("Not saved. Try again.");
+  const keys = Object.keys(e.fields);
+  if (keys.length) form.setServerErrors(e.fields);
+  const onFields = keys.length > 0 && keys.every((k) => k in form.values);
+  setProblem(onFields && e.status === 422 ? null : e.message);
 }
 
 /** A field's error as a form shows it: the API's words when they fit in four, else the short form given. */

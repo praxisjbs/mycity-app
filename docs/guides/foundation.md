@@ -10,7 +10,7 @@
 | Capabilities | none of its own; `access` holds the convention and the catalogue, and Settings · Roles & Permissions gives every module's (§6.3) |
 | Screens (PROGRESS.md rows) | #24, #14, #91, #92, #69, #71, #72, #76, #78, #79, and the M0 items |
 | Status | Agreed |
-| Last changed | 25/10/2026 |
+| Last changed | 26/10/2026 |
 
 Sources: MILESTONES §5 (M0 scope and definition of done); BACKEND_STRUCTURE §4 (workflow), §5
 (documents), §9 (import engine and the staff importer), §11, §13 (M0 definition of done), §16
@@ -1080,6 +1080,7 @@ screen.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · From the QA bug register (Milestone 2): the form system's `reset()` drops a pause check still waiting from the last key, so a field emptied after a quick save (a task comment) is never marked Required (DEF-06).
 - 26/10/2026 · JP · QA DEF-03, DEF-04 and DEF-07, the shared form fields: a limit no schema worded reads by what it limits (`shortMessage`): a number At most or At least its bound, a list Too many, a date Too late, never Too long on a number (a latitude of 91 read so). `MoneyField` keeps a minus typed or pasted ("-100", "₦-100", "(100)") and reads Not below zero, never dropping it; zero is an amount; a second point or a comma out of place reads Check the amount and a third decimal Two decimals at most, never cut. `DateRangeField` gives each end its own id (the Field's label points at From) and names the ends and their calendar buttons From and To (Pick From Date, Pick To Date), where both were the Field's label twice under one id.
 
 - 26/10/2026 · JP · QA OBS-03, the Import wizard's Map step: **Required** lists the fields a mapping needs, each marked once a column fills it, and Next with one still unfilled stays on Map with an error banner naming them (*Choose a column for Designation and Department*; past four, *Choose columns for 5 required fields*), focus on it, sending nothing, until each has a column. The server's refusal of a mapping (`IMPORT_MAPPING_INVALID`, every problem in `fields.mapping`; a field mapped twice) shows in the same banner and clears when the mapping changes, so a mapping problem is no longer an error toast after the window moved on. §10 updated.

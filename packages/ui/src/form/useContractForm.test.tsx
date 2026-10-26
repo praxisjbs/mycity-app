@@ -215,6 +215,32 @@ describe("useContractForm with INTERIM rules", () => {
     expect(result.current.field("email").message).toBeUndefined();
   });
 
+  it("leaves no mark on a field emptied by reset straight after typing", async () => {
+    const user = userEvent.setup();
+    function CommentBox() {
+      const form = useContractForm({ body: "" }, { body: rules.required() }, { pauseMs: 50 });
+      return (
+        <>
+          <Field label="Comment" {...form.status("body")}>
+            <TextField {...form.field("body")} />
+          </Field>
+          <button type="button" onClick={() => form.check() && form.reset({ body: "" })}>
+            Add Comment
+          </button>
+        </>
+      );
+    }
+    render(<CommentBox />);
+    const box = screen.getByLabelText("Comment");
+    await user.type(box, "Looks good");
+    await user.click(screen.getByRole("button", { name: "Add Comment" }));
+    expect(box).toHaveValue("");
+    // Past the pause the last key started: the emptied box stays unmarked.
+    await new Promise((r) => setTimeout(r, 120));
+    expect(screen.queryByText("Required")).not.toBeInTheDocument();
+    expect(box).not.toHaveAttribute("aria-invalid");
+  });
+
   it("keeps every rule message to four words", () => {
     for (const msg of [rules.required()(""), rules.email(""), rules.email("x"), rules.email("x@y"), rules.amount(""), rules.amount("1.234")]) {
       expect(String(msg).split(" ").length).toBeLessThanOrEqual(4);
