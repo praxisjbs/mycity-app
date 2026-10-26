@@ -227,8 +227,44 @@ colleagues may see different chapters.
    chapter in full.
 3. In the Full Guide, pick a section from the list on the left. On a phone the sections are a row
    above the text: swipe it sideways.
-4. To jump to a topic from anywhere, open search, type `guide` and a few words, such as
-   `guide add employee`, and choose the result.
+4. To find a topic, use the search box at the top of the guide ([Search the guide](#start-user-guide-search)).
+   From anywhere else, open search, type `guide` and a few words, such as `guide add employee`, and
+   choose the result.
+
+### Search the guide {#start-user-guide-search}
+
+Describe what you need in your own words. The search finds the parts of the guide that mean the
+same, even when you use other words or make a typing slip.
+
+![Searching the guide](shot:start-user-guide-search)
+
+1. Open [User Guide](/knowledge?tab=user-guide) in the Knowledge Hub.
+2. Type in **Search the Guide** at the top, in your own words, such as *I cannot get into my account*.
+3. The results appear as you type, the best first. Each shows its chapter, the words it found marked
+   in yellow and, when one step answers it, that step's number.
+4. Press a result. The guide opens at it, with the step marked.
+5. The words stay in the box. Change them to see the results again.
+6. To speak instead, press the microphone beside the box, say what you need, then press
+   **Stop Recording**. Your words appear in the box and are searched. The recording is not kept.
+
+> **Tip:** You only find the parts of the guide you can read, so two colleagues may see different
+> results for the same words.
+
+### Ask the guide a question {#start-user-guide-answer}
+
+![An answer from the guide](shot:start-user-guide-answer)
+
+1. Type your question in **Search the Guide**, such as *How do I request leave?*
+2. Press **Get Answer** above the results, or press Enter in the box.
+3. The **Answer** card shows a short answer written from the parts of the guide you can read. The
+   small number after each sentence is its source.
+4. Press a source under the answer to open the guide at it.
+
+> **Important:** The answer is written by AI from the guide. Check it against the steps it names
+> before you act on it.
+
+When the guide has no answer, the card says so, and the results below it may still help. When
+**Get Answer** does not show, answers are switched off: the results still work.
 
 ### Do a step and come back {#start-user-guide-return}
 
@@ -312,7 +348,33 @@ as: staff
 marks:
   1: role radio "Quick Start" | Short cards by role
   2: role radio "Full Guide" | Every chapter in full
-  3: role navigation "Chapters" | The sections you can read
+  3: searchbox | Search the guide in your own words
+  4: css nav[aria-label="Chapters"] button | The sections you can read
+```
+
+```shot start-user-guide-search
+open: /knowledge?tab=user-guide
+as: staff
+do:
+  - fill: searchbox = apply for leave
+  - wait: role list "Guide Results"
+marks:
+  1: searchbox | Describe what you need
+  2: css ol[aria-label="Guide Results"] > li:first-child | The best part of the guide for it
+```
+
+```shot start-user-guide-answer
+open: /knowledge?tab=user-guide
+as: staff
+do:
+  - fill: searchbox = how do I request leave
+  - wait: button "Get Answer"
+  - click: button "Get Answer"
+  - wait: role list "Sources"
+marks:
+  1: searchbox | Your question
+  2: role region "Answer" | The answer, each sentence with its source
+  3: role list "Sources" | Open a source at its step
 ```
 
 ```shot start-lock

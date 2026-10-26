@@ -122,7 +122,13 @@ async function hitsFor(user: string, q: string): Promise<{ hits: GuideHit[]; lin
   return { hits, lines: (anchor) => engine.linesOf(index, anchor, visible) };
 }
 
-route("GET /api/v1/user-guide/search", async (req) => paged((await hitsFor(req.user!, req.query.q ?? "")).hits, req));
+/* The search travels in the body (never the address), as the API's does; the page of 25 is cut as paged() cuts every list. */
+route("POST /api/v1/user-guide/search", async (req) => {
+  const q = String(req.body.q ?? "");
+  if (q.length > 200) return invalid({ q: ["At most 200 characters"] });
+  const page = String(req.body.page ?? "1");
+  return paged((await hitsFor(req.user!, q)).hits, { ...req, query: { page } });
+});
 
 /**
  * The answer, on the mock: the opening lines of the best two results, each citing its source. The

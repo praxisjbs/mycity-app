@@ -151,6 +151,16 @@ describe("the words half", () => {
     expect(titles(engine.search(index, "how do I take time off", { visible: all })).slice(0, 2)).toContain("Approve or reject leave");
   });
 
+  test("a word the guide never uses does not stop the others being found", () => {
+    expect(titles(engine.search(index, "apply for leave", { visible: all }))).toContain("Approve or reject leave");
+    expect(engine.search(index, "zebra quokka", { visible: all })).toEqual([]);
+  });
+
+  test("a short search no passage holds every word of finds those holding one", () => {
+    const found = titles(engine.search(index, "password leave", { visible: all }));
+    expect(found).toEqual(expect.arrayContaining(["Forgot your password", "Approve or reject leave"]));
+  });
+
   test("a title typed in full comes first", () => {
     expect(titles(engine.search(index, "give someone a login", { visible: all }))[0]).toBe("Give someone a login");
   });

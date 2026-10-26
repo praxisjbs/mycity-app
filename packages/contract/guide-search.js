@@ -354,10 +354,13 @@ function parseQuery(index, q) {
       }
     }
   }
-  // Weak words count when found; they are needed only when nothing else was typed.
-  const strong = kept.some((c) => !c.weak);
+  // Weak words count when found; they are needed only when nothing else was typed. A word the
+  // guide never uses, nor anything a slip or a prefix away, cannot be found, so it cannot be needed
+  // either ("apply for leave" is a search for leave).
+  const known = (c) => c.variants.some((v) => v.stems.every((x) => index.df.has(x)));
+  const strong = kept.some((c) => !c.weak && known(c));
   for (const c of kept) {
-    c.optional = strong && Boolean(c.weak);
+    c.optional = strong && (Boolean(c.weak) || !known(c));
     c.idf = idf(index, c.variants[0].stems);
   }
   return { concepts: kept, folded: raw.join(" "), stems: kept.flatMap((c) => c.words.map(stem)) };
@@ -395,9 +398,10 @@ function idf(index, seq) {
 
 /**
  * One passage's score for a query, and the stems it was found by (for the snippet's marks).
- * Every concept must be found for a search of one or two; half of them for a longer one.
+ * Every concept must be found for a search of one or two; half of them for a longer one, or when
+ * `relaxed` (no passage held every word of a short search).
  */
-function scoreDoc(index, doc, query) {
+function scoreDoc(index, doc, query, relaxed = false) {
   let sum = 0;
   let covered = 0;
   const matched = new Set();
@@ -429,7 +433,7 @@ function scoreDoc(index, doc, query) {
   if (!n || !covered) return null;
   // Every word must be found for a search of one or two (a title may hold one); half for more.
   const coverage = covered / n;
-  if (n <= 2 ? coverage < 0.75 : coverage < 0.5) return null;
+  if (n <= 2 && !relaxed ? coverage < 0.75 : coverage < 0.5) return null;
   let score = sum * coverage * coverage;
   if (doc.passage.kind === "title") score *= TITLE_BOOST;
   // The words in the order they were typed, in what the passage says.
@@ -463,11 +467,13 @@ function search(index, q, { visible, meaning = null }) {
     }
     return a;
   };
-  if (query.concepts.length) {
+  // A short search no passage holds every word of ("apply for leave") is searched again for half.
+  for (const relaxed of [false, true]) {
+    if (!query.concepts.length || anchors.size) break;
     for (const [id] of visible) {
       const doc = index.docs[id];
       if (!doc || doc.passage.kind === "whole") continue;
-      const s = scoreDoc(index, doc, query);
+      const s = scoreDoc(index, doc, query, relaxed);
       if (s) at(doc.passage).words.push({ id, ...s });
     }
   }
