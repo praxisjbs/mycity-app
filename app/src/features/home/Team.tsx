@@ -77,7 +77,7 @@ export interface PersonLink {
  */
 export function personLinks(me: Me, employeeId: string, opens: (tab: string) => boolean): PersonLink[] {
   const links: Array<PersonLink & { tab: string }> = [
-    { key: "attendance", label: "View Attendance", tab: "attendance", href: hrefFor("people", "attendance") },
+    { key: "attendance", label: "View Attendance", tab: "attendance", href: hrefFor("people", "attendance", { employee: employeeId }) },
     { key: "profile", label: "Open Profile", tab: "employees", href: hrefFor("people", "employees", { id: employeeId }) },
   ];
   return links.filter((l) => reachable(me, "people", l.tab) && opens(l.tab)).map(({ key, label, href }) => ({ key, label, href }));

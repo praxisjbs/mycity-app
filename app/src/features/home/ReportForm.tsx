@@ -155,6 +155,10 @@ export function reportValues(report: HomeReport, me: Pick<Me, "user_id" | "displ
   const s = report.schedule;
   const start = newReportValues(me, report.report_key, today);
   const filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, report.filters[k] ?? NO_FILTERS[k]])) as Pick<ReportValues, FilterKey>;
+  // A report saved before the day held its own statuses may tick one its day cannot (Absent on Today):
+  // the form drops it, as changing Day does, since no box is drawn to untick it.
+  const holds = reports.ROSTER_STATUSES_ON[filters.roster_day] as readonly string[] | undefined;
+  if (holds) filters.roster_statuses = filters.roster_statuses.filter((x) => holds.includes(x));
   if (!s) return { ...start, name: report.name, ...filters, shared: report.shared, repeats: "on_demand" };
   const r = s.recurrence;
   return {

@@ -205,7 +205,7 @@ punch then goes to People to check, with a note you can write.
 | **On Leave**, with your leave's dates | You are on approved leave today | Nothing. Press **Close** |
 | **Not Available** | Only people who work at MyCity now can clock in | Ask People if this is wrong |
 | **Not Loaded** | The clock could not read today | Press **Try Again**, or **Not Now** and open it later |
-| **Note not sent** | Your note did not reach People | Check your connection and press **Send Note** again |
+| **Note not sent. Try again.** | Your note did not reach People | Check your connection and press **Send Note** again |
 
 If you are still clocked in after your shift ends, the hub reminds you with **Time to clock out**,
 every 30 minutes. About 90 minutes after the end, it clocks you out for you. That day reads
@@ -350,7 +350,7 @@ no note from you yet; **Sent** means they have.
 | **System Clock-Out** | The hub clocked you out | The time you left, or use **Give Real Time** |
 
 If it says **This exception was already decided**, People decided before your note arrived. You are
-told the outcome. **Note not sent** means the connection failed: press **Send Note** again.
+told the outcome. **Note not sent. Try again.** means the connection failed: press **Send Note** again.
 
 ### Notices about your attendance {#ess-attendance-notices}
 

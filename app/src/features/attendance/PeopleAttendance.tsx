@@ -38,6 +38,7 @@ export function PeopleAttendance() {
   const [params] = useSearchParams();
   const id = params.get("id");
   const homeId = params.get("home");
+  const employeeId = params.get("employee");
   const { can } = useAuth();
   const modal = useModal();
   const [date, setDate] = useState(todayIso());
@@ -57,6 +58,7 @@ export function PeopleAttendance() {
   ];
   const openDay = (employeeId: string, name: string, day: string) => modal.open({ title: name, wide: true, body: <DayView employeeId={employeeId} date={day} /> });
   useRecordLink(id, openDay);
+  usePersonLink(employeeId, openDay);
   const openHome = useCallback((h: HomeRequest) => modal.open({ title: h.employee.display_name, body: (close) => <HomeView h={h} close={close} /> }), [modal]);
   useHomeLink(homesOn ? homeId : null, openHome, () => setView("homes"));
   // Deductions ticked on the Deductions view put Waive Selected in the phone's floating button.
@@ -113,6 +115,18 @@ export function PeopleAttendance() {
       )}
     </>
   );
+}
+
+/** A link naming a person (Home's View Attendance) opens their today, once. */
+function usePersonLink(employeeId: string | null, openDay: (employeeId: string, name: string, date: string) => void) {
+  const day = useApi("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: employeeId ?? "" }, query: { date: todayIso() }, enabled: !!employeeId });
+  const done = useRef<string | null>(null);
+  useEffect(() => {
+    if (day.data && done.current !== day.data.employee.employee_id) {
+      done.current = day.data.employee.employee_id;
+      openDay(day.data.employee.employee_id, day.data.employee.display_name, day.data.date);
+    }
+  }, [day.data, openDay]);
 }
 
 /** A link from search or a notice opens the day it names, once. */

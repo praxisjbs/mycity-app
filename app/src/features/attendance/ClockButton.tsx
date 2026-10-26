@@ -572,7 +572,7 @@ function PunchDone({ res, close, again, toDevices }: { res: PunchResult; close: 
       toast("Note sent to People");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Note not sent");
+      else toast.error(e instanceof ApiError ? e.message : "Note not sent. Try again.");
     }
   };
 

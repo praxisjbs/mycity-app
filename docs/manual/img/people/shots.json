@@ -32,7 +32,7 @@
   },
   "people-attendance": {
     "spec": "b309e30b085f4402",
-    "source": "c7ba3e3179ce6930",
+    "source": "784ed8c2456146da",
     "devices": [
       "desktop",
       "phone"
@@ -40,7 +40,7 @@
   },
   "people-attendance-day": {
     "spec": "bf1435298229e249",
-    "source": "c7ba3e3179ce6930",
+    "source": "784ed8c2456146da",
     "devices": [
       "desktop",
       "phone"
@@ -48,7 +48,7 @@
   },
   "people-attendance-decide": {
     "spec": "312f6a770c624858",
-    "source": "c7ba3e3179ce6930",
+    "source": "784ed8c2456146da",
     "devices": [
       "desktop",
       "phone"

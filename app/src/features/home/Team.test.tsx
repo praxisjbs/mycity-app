@@ -310,7 +310,8 @@ describe("a person's sheet", () => {
     const sheet = await screen.findByRole("dialog", { name: "Emeka Obi" });
     expect(within(sheet).queryByRole("button", { name: "Open Profile" })).toBeNull();
     fireEvent.click(within(sheet).getByRole("button", { name: "View Attendance" }));
-    await waitFor(() => expect(window.location.pathname + window.location.search).toBe("/people?tab=attendance"));
+    // Their own day, not the whole register.
+    await waitFor(() => expect(window.location.pathname + window.location.search).toMatch(/^\/people\?tab=attendance&employee=.+$/));
   }, 30000);
 
   it("leads nowhere for a reader without the people grant, or before People's screens open", () => {
@@ -341,7 +342,7 @@ describe("a person's sheet", () => {
     expect(labels(reader({ home: ["view"], people: ["view"] }, true), (tab) => tab !== "employees")).toEqual(["View Attendance"]);
     expect(labels(reader({ home: ["view"], people: ["view"] }, true), () => false)).toEqual([]);
     expect(personLinks(reader({ home: ["view"], people: ["view"] }, true), "00000000-0000-4000-a000-000000000003", open).map((l) => l.href)).toEqual([
-      "/people?tab=attendance",
+      "/people?tab=attendance&employee=00000000-0000-4000-a000-000000000003",
       "/people?tab=employees&id=00000000-0000-4000-a000-000000000003",
     ]);
   });

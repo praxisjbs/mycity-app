@@ -94,8 +94,8 @@ A card marked **Locked** was chosen for your role, and you cannot take it off.
 | The hub says | What it means | What to do |
 |---|---|---|
 | Pick up to 4 cards | You ticked a fifth card | Untick a card first, then tick the new one |
-| **Pick cards you can see** | Your role changed while the cards were open | Press **Cancel**, open **Choose Cards** again and choose again |
-| **Locked cards stay on your Home** | Your role locked a card while the cards were open | Press **Cancel** and open **Choose Cards** again. The locked card is already in |
+| **Pick cards you can see** | Your role changed while the cards were open | The list now shows the cards you may pick: choose again |
+| **Locked cards stay on your Home** | Your role locked a card while the cards were open | The list now shows it locked and in: choose again |
 | **Cards not saved. Try again.** or **Cards not reset. Try again.** | The hub could not be reached | Check your connection and press the button again |
 
 ### Save your Overview as a file {#home-overview-export}
@@ -230,9 +230,8 @@ clocked out.
 1. Press a person's row, or their card on a phone. Their day opens: **Job Title**, **Department**,
    **Today**, **Clock-In**, **Clock-Out**, **Worksite**, **KPI** and **Open Tasks**.
    ![One person's day](shot:home-team-person)
-2. {needs="people view"} Press **View Attendance** to open
-   [People · Attendance](/people?tab=attendance), today's register for everyone you look after.
-   Find them there by name.
+2. {needs="people view"} Press **View Attendance** to open their day on
+   [People · Attendance](/people?tab=attendance): their punches, checks and exceptions for today.
 3. {needs="people view, settings view"} Press **Open Profile** to open their record on People.
 
 Press a card at the top, such as **Present Today**, to see the people it counts, with a chip for
