@@ -4,6 +4,7 @@
  * query_response; reads the sanction a query led to. Never emits (BACKEND_GUIDE §2).
  * Every list goes through the visibility clause (queries.visibility.js).
  */
+const { personJson } = require("../../shared/db/person");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const visibility = require("./queries.visibility");
 
@@ -16,12 +17,7 @@ const NAME = (alias) => `btrim(${alias}.first_name || ' ' || ${alias}.last_name)
  */
 const ROWS = `
   SELECT q.employee_query_id, q.number::text AS number,
-         json_build_object(
-           'employee_id', e.employee_id,
-           'display_name', ${NAME("e")},
-           'job_title', e.job_title,
-           'department', d.name
-         ) AS employee,
+         ${personJson("e", "d")} AS employee,
          q.employee_id, q.subject, q.details, q.evidence,
          q.raised_by, ${NAME("re")} AS raised_by_name,
          q.query_rule_id, r.name AS rule_name,

@@ -5,6 +5,7 @@
  * sanction follows for its visibility (a sanction is seen by whoever may see its
  * query, queries.visibility.js). Never emits.
  */
+const { personJson } = require("../../shared/db/person");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const visibility = require("../queries/queries.visibility");
 
@@ -104,12 +105,7 @@ async function isSanctionLetter(db, key) {
 /** Every sanction with what a screen needs, and the columns filters and visibility read. */
 const ROWS = `
   SELECT x.sanction_id, x.number::text AS number,
-         json_build_object(
-           'employee_id', e.employee_id,
-           'display_name', ${NAME("e")},
-           'job_title', e.job_title,
-           'department', d.name
-         ) AS employee,
+         ${personJson("e", "d")} AS employee,
          x.employee_id, x.employee_query_id, q.number::text AS query_number, q.raised_by,
          q.subject AS query_subject, q.details AS query_details, q.created_at AS query_raised_at,
          x.consequence_step_id, x.sanction_type, COALESCE(s.name, x.sanction_type) AS step_name,

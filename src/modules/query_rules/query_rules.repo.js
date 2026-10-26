@@ -5,6 +5,7 @@
  *
  * A rule's state as a person reads it: draft (never activated), active, or paused.
  */
+const { personJson } = require("../../shared/db/person");
 const { pageQuery, orderBy, completeQuery, TOTAL_COL } = require("../../shared/http/paged");
 const visibility = require("../queries/queries.visibility");
 
@@ -109,12 +110,7 @@ function firings(db, query, reader) {
   return pageQuery(
     db,
     `SELECT q.employee_query_id, q.number::text AS number, q.query_rule_id, r.name AS rule_name,
-            json_build_object(
-              'employee_id', e.employee_id,
-              'display_name', btrim(e.first_name || ' ' || e.last_name),
-              'job_title', e.job_title,
-              'department', d.name
-            ) AS employee,
+            ${personJson("e", "d")} AS employee,
             q.status, q.created_at, ${TOTAL_COL}
        FROM employee_query q
        JOIN query_rule r ON r.query_rule_id = q.query_rule_id

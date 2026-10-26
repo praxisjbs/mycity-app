@@ -17,7 +17,7 @@
   },
   "qs-agree": {
     "spec": "663deb49e9bb88ca",
-    "source": "5036f9718f5f0384",
+    "source": "695934a80120669c",
     "devices": [
       "desktop",
       "phone"
@@ -65,7 +65,7 @@
   },
   "qs-check-in": {
     "spec": "590035331c4ca0f0",
-    "source": "fa30d4d3ee00d8a3",
+    "source": "eb7baca4364599a7",
     "devices": [
       "desktop",
       "phone"
@@ -73,7 +73,7 @@
   },
   "qs-clock-in": {
     "spec": "51edfe0fed8ea055",
-    "source": "837e9ae6e6386254",
+    "source": "5bdfd3cf0270fb6f",
     "devices": [
       "desktop",
       "phone"
@@ -185,7 +185,7 @@
   },
   "qs-request-leave": {
     "spec": "0db81a71cb5f5bc5",
-    "source": "37523df1b2025e3f",
+    "source": "caeda5cc2b905272",
     "devices": [
       "desktop",
       "phone"
