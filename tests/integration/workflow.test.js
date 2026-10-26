@@ -154,6 +154,8 @@ describeDb("approvals against the real migrations", () => {
   test("a flow stored before the rules is listed with what is wrong with it", async () => {
     const consequence = (await flowsOf("ops")).find((f) => f.key === "employee_consequence");
     expect(consequence.problems.length).toBeGreaterThan(0);
+    // Each problem names its stage and says the rule in words, never the engine's keys.
+    for (const p of consequence.problems) expect(p).not.toMatch(/sla_hours|snake_case|uuid|on_timeout|stage \d+ \(/);
     expect((await as("ops").get("/settings/approvals/summary")).body.needs_fixing).toBeGreaterThanOrEqual(1);
   });
 
@@ -271,6 +273,8 @@ describeDb("approvals against the real migrations", () => {
       stages: [{ ...stages[0], approvers: [{ type: "role", value: "no_such_role" }] }],
     });
     expect(bad.status).toBe(422);
+    expect(bad.body.error.message).toBe("Fix the stages first");
+    expect(bad.body.error.fields.stages).toEqual([`${stages[0].name}: a role it names no longer exists`]);
 
     const saved = await as("ops").put(`/settings/approvals/${leave.workflow_definition_id}/steps`, { stages });
     expect(saved.status).toBe(200);

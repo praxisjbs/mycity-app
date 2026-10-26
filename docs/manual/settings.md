@@ -54,8 +54,8 @@ Letters, signatures and the hub's own mail use them at once.
 2. Choose a PNG or WebP file with a clear background, up to 5 MB.
 3. The picture changes at once and a message says *Logo updated* (or *White logo updated*,
    *Icon updated*).
-4. **Remove** takes a file off at once, without asking. A message says *Logo removed*. Letters and
-   mail then use the company's name instead.
+4. **Remove** asks first: press **Remove** again to confirm. A message says *Logo removed*. Letters
+   and mail then use the company's name instead.
 
 | Under the file | What it means | What to do |
 |---|---|---|
@@ -87,10 +87,7 @@ A holiday the government has not declared yet reads **Expected**. One it has dec
    says **Holiday saved**.
 4. {needs="settings delete"} To remove one the government did not declare, press
    **Delete Holiday**, then **Delete Holiday** again to confirm. The day becomes a normal day, and
-   a message says **Holiday deleted**.
-
-If deleting says **You do not have access to this**, your role may not delete holidays. Ask
-someone who may.
+   a message says **Holiday deleted**. Without the right to delete, the button is not shown.
 
 ### Set the working week {#settings-organisation-week needs="settings edit"}
 
@@ -119,7 +116,7 @@ Status is the IT team's view of whether every part of the hub is working. It ref
 - The tiles count **Checks Down**, **Open Faults**, **New Today** (faults first seen in the last 24
   hours) and **Came Back**.
 - **Checks** lists every check that is not up. When all are up it says so. **Show All** lists every
-  one. Each reads **Up**, **Degraded** or **Down**, says since when, and **Where to Look** says what
+  one, and **Show Fewer** goes back. Each reads **Up**, **Degraded** or **Down**, says since when, and **Where to Look** says what
   it means: press it to read.
 - Press **Open** on a check for its detail:
   - **Jobs** (on Background Jobs) lists each scheduled job, its **Last Run**, **Next Run** and
@@ -133,7 +130,7 @@ Status is the IT team's view of whether every part of the hub is working. It ref
     job and the changes.
 - {needs="system_health export"} **Download Brief** saves one file describing the whole system,
   problems first, to hand to whoever fixes it. It can take a minute. A message says
-  **Status brief ready** once the file is saved.
+  **Status brief ready** once the file is saved, or why it was not made.
 
 ## Performance {#settings-performance screen=settings/performance icon=chart}
 
@@ -217,14 +214,15 @@ Every error the hub reports, grouped, with how often it happened and how many pe
 
 1. Open [Settings · Faults](/settings?tab=faults). It lists what is **Open** or **Being Handled**.
 2. Press a fault to open it. It says what it probably means, **Where** it happened,
-   **First seen** and **Last seen**, **How often**, and who it is **Held by**. **Latest** shows the
+   **First Seen** and **Last Seen**, **How Often**, and who it is **Held By**. **Latest** shows the
    newest message; **Show Stack** shows the detail for an engineer. **Notes** lists what the team
    wrote.
    ![An opened fault](shot:settings-fault)
-3. Press **Take It On** when you start on it. It reads **Being Handled**, so others know someone is
-   on it. A message says *Marked being handled*.
-4. Write what you found in **Note**, then press **Mark Fixed** once it is fixed, or
-   **Ignore Fault** if it needs nothing. A message says *Marked fixed* or *Marked ignored*.
+3. Press **Take It On** when you start on it. It reads **Being Handled** and **Held By** names you,
+   so others know you are on it. A message says *Marked being handled*.
+4. Write what you found in **Note**. Press **Add Note** to keep it on its own (*Note added*), or
+   **Mark Fixed** once it is fixed, or **Ignore Fault** if it needs nothing: the note goes with it.
+   A message says *Marked fixed* or *Marked ignored*.
 5. A fixed fault that happens again comes back marked **Came Back**.
 6. To act on several, tick them, then press **Mark Fixed** or **Ignore Faults**. The message counts
    them, such as *3 marked fixed*.
@@ -232,6 +230,9 @@ Every error the hub reports, grouped, with how often it happened and how many pe
 8. {needs="system_health export"} Tick up to 25 faults and press **Download Brief** for one file
    about them all. Each ticked **Open** fault becomes **Being Handled**, held by you. The message
    says the brief is ready, such as *Brief for 3 ready*.
+9. Ticking more than one press takes (25 for a brief, 50 for a status) asks first: only the first
+   25 or 50 are taken. **Go Back** lets you tick fewer. Ticking shows only when you may brief or
+   change faults.
 
 ## Users {#settings-users screen=settings/users icon=user}
 
@@ -246,7 +247,7 @@ Every login to the hub: who can sign in, with which roles, and whether they have
   (invited, but no email has gone yet), **Suspended**, or **Left** (their employee record is
   archived).
 - Each row shows the person, their **Roles**, when they were **Last Seen** and whether
-  **Two-Step** is **On**. **Users by Role** counts the logins in each role.
+  **Two-Step** is **On**. On a computer, **Users by Role** counts the logins in each role.
 - Search by name or email, or press **Everyone**, **Active**, **Invited** or **Suspended**.
 - Press a person to open their login. Your own login opens read only, with only **Close**: ask
   another administrator, or use My Security for your own sign-in.
@@ -257,7 +258,8 @@ Every login to the hub: who can sign in, with which roles, and whether they have
 1. Press **Invite User** at the top right. On a phone, press **Quick Actions**, then
    **Invite User**.
 2. Pick the **Employee**. Only active staff with no login are listed.
-3. Pick their **Roles**. **Staff** is already picked.
+3. Pick their **Roles**, five at most. **Staff** is already picked. A sixth marks **Roles** with
+   *At most 5 roles*.
 4. Press **Send Invitation**. The message names them, such as *Invitation sent to Ada Okafor*.
    They get an email with a link to choose their password. It works once, for 72 hours.
 
@@ -310,7 +312,7 @@ Open the person's login, then:
 | The message | What it means | What to do |
 |---|---|---|
 | **Pick a role** | Every role was removed | Give at least one role, such as **Staff** |
-| **Check the highlighted fields** | More than five roles are picked | Keep five at most |
+| *At most 5 roles* under **Roles** | More than five roles are picked | Keep five at most |
 | *There is no role* and a name | That role was deleted a moment ago | Close the login, open it again and pick another |
 
 ### Suspend or reactivate a login {#settings-users-suspend needs="settings edit"}
@@ -411,21 +413,22 @@ Who decides each kind of request, in which order, and how long each has.
 - Each flow lists its **Stages** in order, its **Version** and its **Open Requests**.
 - Search for a flow by name, then press it. Its stages show one by one, with their **Approver**,
   **Applies When** and **Time Limit**.
-- On a phone each flow is a card. **Needs Fixing** shows only in the tiles; open the flow to see its
-  banner.
+- On a phone each flow is a card, with its **Status**: **Active** or **Needs Fixing**.
 
 ### Change who approves {#settings-approvals-edit needs="settings edit"}
 
 1. Open [Settings · Approvals](/settings?tab=approvals) and press a flow, such as Leave Request.
-2. A flow marked **Needs Fixing** says **Fix these stages before the next request**. Open each stage
-   it names, choose its approver again, and save.
+2. A flow marked **Needs Fixing** says **Fix these stages before the next request**, then what is
+   wrong with each, such as *Finance: pick who decides*. Open each stage it names, put it right, and
+   save.
 3. Press **Edit Stages**.
    ![Edit Stages](shot:settings-stages)
-4. Press **Add Stage**, or the pencil beside a stage to change it.
+4. Press **Add Stage**, or the pencil beside a stage to change it. A flow holds at most 10 stages:
+   then *At most 10 stages* shows in place of **Add Stage**.
 5. Type the **Stage Name**.
 6. Choose the **Approver**: **Line Manager**, **Role**, **Person** or **CEO**. On a flow that names
    a person, **Named Person** also shows; choose which in **Named In**.
-7. For **Role**, pick the role. For **Person**, pick the person.
+7. For **Role**, pick the role. For **Person**, pick the person: only active logins are listed.
 8. Leave **Applies When** at **Always**, or choose a value. Then choose the **Comparison**
    (**Over**, **At Least**, **Under**, **At Most** or **Exactly**) and type the value.
 9. Set the **Time Limit, Hours**, from 1 to 2160.
@@ -442,8 +445,7 @@ Who decides each kind of request, in which order, and how long each has.
 | **Enter a value** | Applies When has no value to compare | Type the value, or choose **Always** |
 | *At least 1* or *At most 2,160* under **Time Limit, Hours** | Not between 1 and 2,160 hours | Use a number in that range |
 | **This flow changed since you opened it. Open it again.** | Someone saved this flow first | Press **Cancel**, open the flow again, and redo your change |
-| **This approval route is not valid:** and a list | A stage breaks a rule the list names | Correct each stage it names, then press **Save Stages** |
-| **Check the highlighted fields** | More than 10 stages | Remove stages until there are 10 at most |
+| Each stage's problem, such as *Finance: a role it names no longer exists* | A stage breaks a rule | Correct each stage it names, then press **Save Stages** |
 
 ## Notifications {#settings-notifications screen=settings/notifications icon=bell}
 
@@ -703,8 +705,8 @@ the provider, so most models arrive by themselves. A phone shows the list withou
    **Speech to Text** or **Embeddings**.
 5. Leave **Endpoint** blank to use the provider's own, or type an `https://` address.
 6. Press **Add Model**. A message says **Model added**, and the connection opens again.
-7. {needs="integrations delete"} To take off a model you added, press the bin beside it on a
-   computer, then **Remove Model**. A message says **Model removed**. A model the provider lists
+7. {needs="integrations delete"} To take off a model you added, press the bin beside it (on a phone
+   too), then **Remove Model**. A message says **Model removed**. A model the provider lists
    cannot be removed.
 
 | The field says | What it means | What to do |
@@ -741,7 +743,8 @@ signed in now, and failed sign-ins.
 - **Signed In** lists every session: the **Person**, the **Device** and when they were
   **Last Active**. On a computer it also shows the **Method**, such as **Password and Code**, and
   the **Address**.
-- **Failed Sign-Ins** lists every refused sign-in, newest first. Search by email or address.
+- **Failed Sign-Ins** lists the refused sign-ins of the last 7 days, as the figure counts them,
+  newest first. Search by email or address.
   **Outcome** says why: **Wrong password**, **Wrong code**, **No such account**, **Slowed down**
   (too many tries), **Suspended**, **Closed** or **Refused**. Many from one address may mean someone
   is guessing; tell the IT team.
@@ -754,7 +757,8 @@ signed in now, and failed sign-ins.
 2. Press **Save Rules**. A message says **Security rules saved**. **Undo Changes** puts back what is
    saved.
 3. Under **Two-Step by Role**, switch on a role that must use an authenticator app. Press
-   **Require Two-Step** to confirm. It saves at once; **Save Rules** is not needed. A message such
+   **Require Two-Step** to confirm. It saves at once, the switch busy until it has; **Save Rules**
+   is not needed. A message such
    as *Staff now needs two-step* confirms it.
 4. Its people set it up at their next sign-in. A passkey counts as both steps.
 5. Switch a role off to stop requiring it. It saves at once, without asking: *Staff no longer needs
@@ -794,13 +798,13 @@ Who did what, when, to which record. Nobody can change it.
    came from, then each **Field** **Before** and **After**. A value your role does not see reads
    **Restricted**.
 3. **Open Record** opens the record it is about, when it has a screen. **Close** goes back.
-4. {needs="settings export"} On a computer, **Export** saves the filtered entries as a
+4. {needs="settings export"} On a computer, **Export** (shown only with the right to export) saves the filtered entries as a
    spreadsheet, up to 10,000 entries. A message says **Export downloaded**. For more, narrow the
    **Dates** and export again. **Export failed. Try again.** means it did not finish; press
    **Export** again.
 
-If the page says **You do not have access to this**, your role sees Settings for some records only,
-and the log covers all. Ask an administrator for Settings over **All** records.
+If the page reads **No Access**, your role sees Settings for some records only, and the log covers
+all. Ask an administrator for Settings over **All** records.
 
 ## Imports {#settings-imports screen=settings/imports icon=sheet}
 
@@ -820,7 +824,7 @@ its error file.
    **Scorecards Workbook** import a performance plan.
 5. **Blank Sheet** downloads a sheet with the right columns and notes.
 6. Drop your file on **Drop files here, or browse**, or press it to pick one. Excel up to 10 MB, or
-   CSV up to 5 MB. Press **Next** once its name shows.
+   CSV up to 5 MB. Press **Next** once its name shows; before that it says *Upload a sheet first*.
 7. On **Map**, check which field each column fills. **Leave Out** skips a column. The hub finds the
    row with the column names among the first 20 rows. If it is wrong, or reads **Choose Row**,
    pick the right row in **Column Names Row**. The columns are matched again. Press **Next**.
@@ -834,7 +838,7 @@ its error file.
     says **Your import finished**.
 
 If the window says **Nothing To Import**, your role may run no import. Ask People and Operations to
-run it.
+run it. Pressed before the list of imports has loaded, the window waits for it.
 
 | A row reads | What it means |
 |---|---|
@@ -878,16 +882,18 @@ run it.
 |---|---|
 | **Committed** | It was saved |
 | **Reverted** | It was undone |
-| **Uploaded**, **Mapped** or **Previewed** | It was started and not finished. Start it again with **Start Import** |
+| **Uploaded**, **Mapped** or **Previewed** | It was started and not finished. Press it, then **Continue** |
 | **Failed** | It was left unfinished for 14 days and closed |
 
 1. Press the import in **History**.
-2. **Download Errors** gives you your own sheet back, with a **Status** and **Problem** column on
-   each row. Correct the rows and import them again.
-3. {needs="people create or performance create"} On a **Committed** import, press **Revert**, then
-   **Revert Import** to confirm. People it created are archived and records it changed go back.
-   Only someone who may run that kind of import can revert it.
-4. {needs="people create or performance create"} A message such as *12 archived, 3 put back*
+2. On an import once previewed, **Download Errors** gives you your own sheet back, with a
+   **Status** and **Problem** column on each row. Correct the rows and import them again.
+3. On an unfinished import (**Uploaded**, **Mapped** or **Previewed**) you may run, press
+   **Continue**: **Import Records** opens at **Map**, or at **Preview** for one previewed.
+4. {needs="people create or performance create"} On a **Committed** import you may run, press
+   **Revert**, then **Revert Import** to confirm. People it created are archived and records it
+   changed go back.
+5. {needs="people create or performance create"} A message such as *12 archived, 3 put back*
    confirms it, and the bell says **Your import was undone**.
 
 | The message | What it means | What to do |
@@ -895,7 +901,6 @@ run it.
 | *This import cannot be reverted: row 4 was changed after the import.* | Someone changed that record since | Undo those rows by hand on their screen |
 | *... row 9 is now used elsewhere.* | Another record now depends on it | Leave it, or change those records by hand |
 | **You cannot run this import** | Only someone who may run this kind of import may revert it | Ask People and Operations |
-| **That file could not be opened. Try again.** on **Download Errors** | The import was never previewed, so it has no error file | Start the import again |
 
 ```shot settings-organisation
 open: /settings?tab=organisation

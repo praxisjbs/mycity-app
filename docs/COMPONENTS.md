@@ -3525,7 +3525,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | Use | Switch when the change saves on its own (with a toast); CheckboxField when the form's own button saves it; ToggleRow for a list of settings. |
 | Avoid | A Switch inside a form that has a save button; a checkbox for something that applies at once. |
 | Phone | The switch and the checkbox sit in a 44 px tap area; ToggleRow keeps the words on the left, the switch on the right. |
-| Accessibility | Switch has role switch and needs a label; CheckboxField's label is its own; both work with Space. |
+| Accessibility | Switch has role switch and needs a label; CheckboxField's label is its own; both work with Space. A switch whose change hands back its work (F26) says aria-busy and refuses another change until the work settles. |
 | Status | stable |
 | Exports | `Switch`, `ToggleRow`, `CheckboxField` |
 | Import | `import { Switch, ToggleRow, CheckboxField } from "@mycity/ui";` |
@@ -3538,7 +3538,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `checked` | `boolean` | yes | On or off. |
-| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `onChange` | `(checked: boolean) => unknown` | yes | Called with the new state. Hand back the work it starts (onChange={save}) and the switch is busy until it settles (F26). |
 | `label` | `string` | yes | What it switches, for assistive technology when no visible label names it. |
 | `disabled` | `boolean` |  | Not switchable now. |
 | `className` | `string` |  | Layout classes only. |
@@ -3550,7 +3550,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | `title` | `ReactNode` | yes | What the setting is, Title Case, at most 4 words. |
 | `text` | `ReactNode` |  | One short line about it, when the title is not enough. |
 | `checked` | `boolean` | yes | On or off. |
-| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `onChange` | `(checked: boolean) => unknown` | yes | Called with the new state; hand back its work and the switch is busy until it settles. |
 | `changed` | `boolean` |  | Marks a row changed but not yet published (a policy draft). |
 | `disabled` | `boolean` |  | Not switchable now. |
 

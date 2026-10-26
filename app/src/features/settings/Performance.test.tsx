@@ -67,6 +67,7 @@ vi.mock("@/api/client", () => ({ api: { call: m.call }, ApiError: class ApiError
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: () => true }) }));
 
 import { PerformanceTab } from "./Performance";
+import { RouterProvider } from "@/lib/router";
 
 describe("Settings · Performance", () => {
   beforeAll(() => {
@@ -78,7 +79,7 @@ describe("Settings · Performance", () => {
   });
 
   it("judges each figure against its target", () => {
-    render(<ModalProvider><PerformanceTab /></ModalProvider>);
+    render(<RouterProvider><ModalProvider><PerformanceTab /></ModalProvider></RouterProvider>);
     expect(screen.getByText("99.93%")).toBeTruthy();
     expect(screen.getByText("Target 99.90%, 1 min down")).toBeTruthy();
     expect(screen.getByText("912 ms")).toBeTruthy();
@@ -88,7 +89,7 @@ describe("Settings · Performance", () => {
   });
 
   it("reads the server in real units, with what is used, what is left and what uses it", () => {
-    render(<ModalProvider><PerformanceTab /></ModalProvider>);
+    render(<RouterProvider><ModalProvider><PerformanceTab /></ModalProvider></RouterProvider>);
     expect(screen.getByText("of 18.0 GB, 12.9 GB left (72%)")).toBeTruthy();
     expect(screen.getByText("of 236.0 GB, 200.0 GB left (85%)")).toBeTruthy();
     const memory = screen.getByRole("list", { name: "Memory by service" });
@@ -103,7 +104,7 @@ describe("Settings · Performance", () => {
   it("Edit Targets refuses a red level that is not beyond its amber one", async () => {
     m.call.mockResolvedValue(TARGETS);
     const user = userEvent.setup();
-    render(<ModalProvider><PerformanceTab /></ModalProvider>);
+    render(<RouterProvider><ModalProvider><PerformanceTab /></ModalProvider></RouterProvider>);
     await user.click(screen.getAllByRole("button", { name: "Edit Targets" })[0]);
     await screen.findByText("Availability %");
     await user.click(screen.getByRole("button", { name: "Next" }));

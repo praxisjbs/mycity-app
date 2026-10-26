@@ -22,7 +22,7 @@ const REASON: Record<FailedSignIn["reason"], { tone: "err" | "warn" | "neutral";
   closed: { tone: "neutral", text: "Closed" },
   other: { tone: "neutral", text: "Refused" },
 };
-const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Something went wrong");
+const say = (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
 
 /**
  * Settings · Security (docs/guides/foundation.md §6.4, §10): session length, the
@@ -148,7 +148,7 @@ function TwoStepRoles({ policy, canEdit }: { policy: SecurityPolicy; canEdit: bo
     <Card>
       <CardHeader title="Two-Step by Role" help="A role that requires it makes each of its people set up two-step sign-in at their next sign-in. A passkey counts as both steps." />
       {policy.two_step_roles.map((r) => (
-        <ToggleRow key={r.code} title={r.name} text={r.holders ? `${r.enrolled} of ${r.holders} set up` : "Nobody holds it"} checked={r.two_step_required} disabled={!canEdit || save.pending} onChange={(v) => void set(r.code, v)} />
+        <ToggleRow key={r.code} title={r.name} text={r.holders ? `${r.enrolled} of ${r.holders} set up` : "Nobody holds it"} checked={r.two_step_required} disabled={!canEdit} onChange={(v) => set(r.code, v)} />
       ))}
     </Card>
   );
@@ -204,7 +204,8 @@ function Sessions({ canEdit }: { canEdit: boolean }) {
 /* ───────────── Failed sign-ins ───────────── */
 
 function Failed() {
-  const list = usePaged("GET /api/v1/settings/security/failed-logins");
+  // The last 7 days, as the Failed Sign-Ins figure counts them.
+  const list = usePaged("GET /api/v1/settings/security/failed-logins", { filters: { days: 7 } });
   return (
     <DataView
       className="mt-3"

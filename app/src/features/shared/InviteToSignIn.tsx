@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useMutation } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import { Button, Field, FormFooter, toast } from "@mycity/ui";
-import { LoginCandidatePicker, RolePicker, type RoleRef } from "./pickers";
+import { Button, Field, FormFooter, shortMessage, toast } from "@mycity/ui";
+import { LoginCandidatePicker, MAX_ROLES, RolePicker, type RoleRef } from "./pickers";
 
 /**
  * Give an employee a login (docs/guides/identity.md §10): pick them (or start
@@ -15,9 +15,11 @@ export function InviteToSignIn({ close, person }: { close: () => void; person?: 
   const [roles, setRoles] = useState<RoleRef[]>([{ code: "employee", name: "Staff" }]);
   const [tried, setTried] = useState(false);
   const inv = useMutation("POST /api/v1/users");
+  // More roles than a login holds is marked as they are picked, never after Send.
+  const tooMany = roles.length > MAX_ROLES;
   const send = async () => {
     setTried(true);
-    if (!who.length || !roles.length) return;
+    if (!who.length || !roles.length || tooMany) return;
     try {
       await inv.run({ body: { employee_id: who[0].employee_id, role_codes: roles.map((r) => r.code) } });
       invalidate("/api/v1/users", "/api/v1/employees");
@@ -34,7 +36,11 @@ export function InviteToSignIn({ close, person }: { close: () => void; person?: 
       <Field label="Employee" state={(tried && !who.length) || inv.fields.employee_id ? "bad" : undefined} message={inv.fields.employee_id?.[0] ?? "Pick the employee"}>
         <LoginCandidatePicker value={who} onChange={setWho} />
       </Field>
-      <Field label="Roles" state={(tried && !roles.length) || inv.fields.role_codes ? "bad" : undefined} message={inv.fields.role_codes?.[0] ?? "Pick a role"}>
+      <Field
+        label="Roles"
+        state={(tried && !roles.length) || tooMany || inv.fields.role_codes ? "bad" : undefined}
+        message={tooMany ? `At most ${MAX_ROLES} roles` : inv.fields.role_codes ? shortMessage({ type: "custom", message: inv.fields.role_codes[0] }) : "Pick a role"}
+      >
         <RolePicker value={roles} onChange={setRoles} />
       </Field>
       <FormFooter>

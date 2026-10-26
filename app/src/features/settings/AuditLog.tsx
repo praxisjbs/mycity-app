@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AuditEntry } from "@mycity/contract/contract.gen.ts";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
+import { useAuth } from "@/auth/AuthProvider";
 import { saveExport } from "@/api/exports";
 import { useApi, usePaged } from "@/api/hooks";
 import { KpiTiles } from "@/features/shared/KpiTiles";
@@ -13,6 +14,7 @@ import {
   DataView,
   DateRangeField,
   DesktopOnly,
+  EmptyState,
   ErrorState,
   ExportButton,
   Field,
@@ -55,7 +57,19 @@ export function AuditLog() {
   const modules: Array<[string, string]> = [["", "Every Module"], ...(s?.modules ?? []).map((m) => [m.key, m.label] as [string, string])];
   const set = (patch: Filters) => setFilters((f) => Object.fromEntries(Object.entries({ ...f, ...patch }).filter(([, v]) => v)) as Filters);
   const exportLog = () => saveExport(api.call("POST /api/v1/audit/exports", { body: filters }));
+  // Export is `settings` export, as its route asks.
+  const mayExport = useAuth().can("settings", "export");
 
+  // The log is read with Settings over everyone: a narrower scope is told so, never offered a Retry that cannot work.
+  if (summary.error instanceof ApiError && summary.error.status === 403)
+    return (
+      <>
+        <PageHeader title="Audit Log" />
+        <Card>
+          <EmptyState icon="lock" title="No Access" text="The audit log needs Settings access over everyone." />
+        </Card>
+      </>
+    );
   if (summary.error) return (<><PageHeader title="Audit Log" /><Card><ErrorState error={summary.error} onRetry={summary.reload} /></Card></>);
 
   const filterFields = (
@@ -72,9 +86,11 @@ export function AuditLog() {
       <PageHeader
         title="Audit Log"
         actions={
-          <DesktopOnly>
-            <ExportButton onExport={exportLog} />
-          </DesktopOnly>
+          mayExport ? (
+            <DesktopOnly>
+              <ExportButton onExport={exportLog} />
+            </DesktopOnly>
+          ) : undefined
         }
       />
       {s && (

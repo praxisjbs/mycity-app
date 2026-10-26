@@ -8,10 +8,10 @@ import type {
   QueueRow,
   SchedulerRow,
 } from "@mycity/contract/contract.gen.ts";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { saveExport } from "@/api/exports";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth, useMe } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import {
@@ -40,6 +40,7 @@ import {
   TextAreaField,
   toast,
   Toolbar,
+  useConfirm,
   useIsPhone,
   useModal,
 } from "@mycity/ui";
@@ -104,6 +105,9 @@ function useEvery(ms: number, read: () => void) {
 const sinceText = (since: string | null) => (since ? `Since ${formatDateTime(since)}` : "Changed Just Now");
 const PEOPLE = "How many different people hit this fault. Never who they are.";
 const BRIEF = "One Markdown file with everything an AI needs to fix the ticked faults.";
+/** The most faults one brief holds, and one status change takes (the contract's). */
+const BRIEF_MOST = 25;
+const BULK_MOST = 50;
 
 /**
  * Settings · System Health (docs/guides/system-health.md): whether the ERP is well, how
@@ -122,14 +126,18 @@ export function StatusTab() {
   // The worker writes the file; when the worker is what is down, the server's own watch
   // has already mailed one (docs/runbooks/system-health.md §7).
   const brief = async () => {
-    await saveExport(api.call("POST /api/v1/system-health/status-briefs", { body: {} }));
-    toast("Status brief ready");
+    try {
+      await saveExport(api.call("POST /api/v1/system-health/status-briefs", { body: {} }));
+      toast("Status brief ready");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Brief not made. Try again.");
+    }
   };
 
   if (status.error)
     return (
       <>
-        <PageHeader title="System Health" />
+        <PageHeader title="Status" />
         <Card>
           <ErrorState error={status.error} onRetry={status.reload} />
         </Card>
@@ -202,14 +210,15 @@ function Checks({ checks, loading, onOpen }: { checks?: HealthCheck[]; loading: 
     );
   const all = checks ?? [];
   const bad = all.filter((c) => c.state !== "up");
-  const shown = showAll || bad.length === 0 ? all : bad;
+  // Show All lists every check; Show Fewer goes back to those not up (none: the quiet line).
+  const shown = showAll ? all : bad;
   return (
     <Card className="mt-3">
       <CardHeader
         title="Checks"
         right={
           <Button size="sm" variant="ghost" onClick={() => setShowAll((v) => !v)}>
-            {showAll || bad.length === 0 ? "Show Fewer" : "Show All"}
+            {showAll ? "Show Fewer" : "Show All"}
           </Button>
         }
       />
@@ -458,22 +467,39 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
   const list = usePaged("GET /api/v1/system-health/faults", { filters });
   const bulk = useMutation("POST /api/v1/system-health/faults/bulk");
 
+  const confirm = useConfirm();
   const done = () => {
     setPicked([]);
     invalidate("/api/v1/system-health");
   };
+  const failed = (e: unknown, fallback: string) => toast.error(e instanceof ApiError ? e.message : fallback);
+  // More ticked than one request takes: said before anything is sent (system-health.md §11).
+  const fits = (most: number, action: string) =>
+    picked.length <= most ||
+    confirm({ title: action, body: `Only the first ${most} of the ${picked.length} ticked are taken.`, confirmLabel: action, cancelLabel: "Go Back" });
 
   const download = async () => {
-    const ids = picked.slice(0, 25);
-    await saveExport(api.call("POST /api/v1/system-health/briefs", { body: { error_group_ids: ids } }));
-    toast(`Brief for ${ids.length} ready`);
-    done();
+    if (!(await fits(BRIEF_MOST, "Download Brief"))) return;
+    const ids = picked.slice(0, BRIEF_MOST);
+    try {
+      await saveExport(api.call("POST /api/v1/system-health/briefs", { body: { error_group_ids: ids } }));
+      toast(`Brief for ${ids.length} ready`);
+      done();
+    } catch (e) {
+      failed(e, "Brief not made. Try again.");
+    }
   };
 
   const mark = async (next: "fixed" | "ignored" | "open") => {
-    const { changed } = await bulk.run({ body: { error_group_ids: picked.slice(0, 50), status: next } });
-    toast(`${changed} marked ${FAULT_STATUS[next].text.toLowerCase()}`);
-    done();
+    const action = next === "fixed" ? "Mark Fixed" : next === "ignored" ? "Ignore Faults" : "Open Again";
+    if (!(await fits(BULK_MOST, action))) return;
+    try {
+      const { changed } = await bulk.run({ body: { error_group_ids: picked.slice(0, BULK_MOST), status: next } });
+      toast(`${changed} marked ${FAULT_STATUS[next].text.toLowerCase()}`);
+      done();
+    } catch (e) {
+      failed(e, "Not changed. Try again.");
+    }
   };
 
   const filterFields = (
@@ -513,7 +539,8 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
         list={list}
         rowKey={(f) => f.error_group_id}
         noun="fault"
-        selection={{
+        // A reader who may neither brief nor change faults has nothing to tick them for.
+        selection={canEdit || canExport ? {
           keys: picked,
           onChange: setPicked,
           actions: (
@@ -530,7 +557,7 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
               {canEdit && filters.status !== "active" && <Button onClick={() => mark("open")}>Open Again</Button>}
             </>
           ),
-        }}
+        } : undefined}
         onRowClick={(f) =>
           modal.open({
             title: f.title,
@@ -580,8 +607,10 @@ function Faults({ canEdit, canExport }: { canEdit: boolean; canExport: boolean }
 
 /** One fault: what it is, when, the latest occurrences, and what the team decided. */
 function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: () => void }) {
+  const me = useMe();
   const f = useApi("GET /api/v1/system-health/faults/:id", { params: { id } });
   const patch = useMutation("PATCH /api/v1/system-health/faults/:id");
+  const addNote = useMutation("POST /api/v1/system-health/faults/:id/notes");
   const [note, setNote] = useState("");
   const [showStack, setShowStack] = useState(false);
   const d: FaultDetail | undefined = f.data;
@@ -589,11 +618,27 @@ function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: ()
   if (f.error) return <ErrorState error={f.error} onRetry={f.reload} />;
   if (!d) return <LoadingRows count={6} />;
 
+  // Take It On makes the reader its holder too (§2, §10.1): Held By names them.
   const set = async (status: FaultDetail["status"]) => {
-    await patch.run({ params: { id }, body: { status, ...(note.trim() ? { note: note.trim() } : {}) } });
-    invalidate("/api/v1/system-health");
-    close();
-    toast(`Marked ${FAULT_STATUS[status].text.toLowerCase()}`);
+    try {
+      await patch.run({ params: { id }, body: { status, ...(status === "handling" ? { assigned_to: me.user_id } : {}), ...(note.trim() ? { note: note.trim() } : {}) } });
+      invalidate("/api/v1/system-health");
+      close();
+      toast(`Marked ${FAULT_STATUS[status].text.toLowerCase()}`);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not changed. Try again.");
+    }
+  };
+  // A note on its own, the status kept as it is.
+  const note1 = async () => {
+    try {
+      await addNote.run({ params: { id }, body: { body: note.trim() } });
+      setNote("");
+      f.reload();
+      toast("Note added");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Note not added. Try again.");
+    }
   };
 
   const worst = Math.max(1, ...d.daily.map((x) => x.events));
@@ -611,10 +656,10 @@ function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: ()
         items={[
           ["Where", d.frame ?? d.route ?? "Not recorded"],
           ["Route", d.route],
-          ["First seen", `${formatDateTime(d.first_seen_at)} on ${d.first_release ?? "an unknown build"}`],
-          ["Last seen", `${formatDateTime(d.last_seen_at)} on ${d.last_release ?? "an unknown build"}`],
-          ["How often", `${d.today} today, ${d.total} on record, ${d.people} people`],
-          ["Held by", d.assigned_name],
+          ["First Seen", `${formatDateTime(d.first_seen_at)} on ${d.first_release ?? "an unknown build"}`],
+          ["Last Seen", `${formatDateTime(d.last_seen_at)} on ${d.last_release ?? "an unknown build"}`],
+          ["How Often", `${d.today} today, ${d.total} on record, ${d.people} people`],
+          ["Held By", d.assigned_name],
         ]}
       />
       <DesktopOnly unmount>
@@ -667,6 +712,7 @@ function Fault({ id, canEdit, close }: { id: string; canEdit: boolean; close: ()
       )}
 
       <FormFooter>
+        {canEdit && note.trim() && <Button onClick={note1}>Add Note</Button>}
         {canEdit && d.status !== "ignored" && <Button onClick={() => set("ignored")}>Ignore Fault</Button>}
         {canEdit && d.status !== "handling" && <Button onClick={() => set("handling")}>Take It On</Button>}
         {canEdit && d.status !== "fixed" && (
