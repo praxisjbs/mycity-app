@@ -47,6 +47,7 @@ left alone.
 | Phone or computer notification | The device's own notification shade, lock screen and badge | The person, on every device with notifications on, app open or closed (the device in hand shows it beside the banner) | Title (with how many are new when grouped), text, the sender's initials or the app icon, the MyCity pin, the count on the app icon; an urgent notice again every 30 minutes of the working day until it is dealt with | Tap to open the record (through sign-in when the session ended), Mark Read |
 | Mailbox (`inbox` and the other folders) | Staff app | The mailbox owner | Unchanged | Reading a conversation marks its notices read |
 | Counts on the menu and the tabs | The rail, the bottom bar and More's tiles; each module's tab strip, both shells | Everyone, for the screens they may open | Beside a module, how many unread notices open in it; beside each of its tabs, how many open on that tab (they add up to the module's). Yellow, red while an urgent notice opens there | Press the tab to go where they are |
+| Counts inside a tab | A screen's switch (`SegmentedControl`) and chips (`Chips`), both shells | Everyone, on the screens they may open | Beside each side of a switch and each chip, how many of the tab's unread notices are about records it shows, in the same yellow (red while urgent); the screen opens on the side and chip holding them when the one it would open on holds none | Press the side or chip to see the records; their rows are dotted |
 | Unread rows | Every list on a screen (`DataView`), both shells | Everyone | A yellow dot before a row and a soft tint on it (a phone's card likewise) while an unread notice of theirs is about that record and opens on this screen | Open the row (or the record by its link): its notices are read, and the dot, the tab's count, the module's and the bell's drop together |
 
 ## 3 · How the screens relate
@@ -86,7 +87,11 @@ left alone.
    them. Opening one, by its row or by its address (`?id=`, or a record's own key such as
    `?home=`), sends `POST /notifications/read-record`: the person's unread notices about that record
    that open on that screen are read, each emitting `notification.read`, so every tab and device
-   drops the dot and the counts together.
+   drops the dot and the counts together. Inside the tab, the screen asks where those notices wait
+   (`GET /notifications/views`, again only while the tab counts something): each record's module
+   places it in the screen's inner views, a switch's side and a chip within it, as the screen's own
+   filters find it (`<module>.views.js`, `shared/notifications/views.js`), so the switch and the
+   chips carry their share and the screen opens where the news is.
 8. **Urgency.** The fan-out writes each notice's urgency (`normal`, `important`, `urgent`) and
    whether it needs Acknowledge. An urgent notice stays open until it is acknowledged (when it needs
    Acknowledge) or opened (otherwise). Every open urgent notice shows in the urgent bar on every
@@ -135,6 +140,7 @@ Reference-data file(s): none.
 | `GET /api/v1/notifications/unread-count` | → `UnreadCount` | self | | |
 | `GET /api/v1/notifications/badges` | → `NavBadges` | self | | `modules` (unread per module) and `tabs` (per module, unread per tab slug), each counted where the notice opens for the caller (§6); only counts of 1 or more |
 | `GET /api/v1/notifications/unread-records` | `UnreadRecordsQuery` → `UnreadRecords` | self | at most 25 ids | `module`, `tab` and the ids a list shows: which carry an unread notice of the caller's that opens on that screen |
+| `GET /api/v1/notifications/views` | `ViewNewsQuery` → `ViewNews` | self | | `module`, `tab`: the caller's unread notices that open on that screen, counted by the inner view each record sits in (`views`, by path: `temporary`, `temporary/cancelled`; a view counts its own and those below it; `urgent` while an urgent notice is open there). A record its module does not place counts on the tab alone |
 | `POST /api/v1/notifications/read-record` | `RecordRead` → 204 | self | | `module`, `tab`, `entity_id`: a record opened there. The caller's unread notices about it that open on that screen are read, each emitting `notification.read`; another screen's, or another person's, are untouched |
 | `GET /api/v1/notifications/read-state` | `NotificationReadStateQuery` → `NotificationReadState` | self | at most 25 ids | Which of these ids are read, to close shade notifications |
 | `POST /api/v1/notifications/:id/read`, `/read-all` | `EmptyBody` | self | | |
@@ -236,6 +242,19 @@ Reference-data file(s): none.
   record shown first unasked (the first pick a desktop shows beside its list) is not opened. A
   notice about a record no list on its screen shows (a document on People · Employees) still counts
   on the tab, and is read in the bell or by opening the record where it opens.
+
+- **Where it waits, inside a tab** (JBS Praxis, 26/10/2026). A tab's count splits further by the
+  screen's inner views: each side of its switch and each of its chips counts the unread notices about
+  the records it shows, so the number can be followed from the menu to the dotted row. The module
+  that owns a record places it (`src/modules/<module>/<module>.views.js`): a fixed view for every
+  record of a type (`view`, a request before attendance's PR 4 is always Temporary, Requests), or
+  each record by its state, as the screen's own filter reads it (`place`, a withdrawn site sits in
+  Temporary, Cancelled). A view's path is the screen's own values, outermost first; a view counts its
+  own records and every view below it, and a chip that shows everything (All) reads its switch's
+  side. The numbers are unread notices, as on the tab: a site sent and then withdrawn counts 2 and
+  shows one dot. A record nobody places counts on the tab alone. When a screen opens, if the side or
+  chip it opens on holds none of the news and another does, it opens there instead (All when several
+  do), once: never after the person chose, nor when a link opened a record, which picks its own view.
 
 - **System mail paused** (`docs/guides/integrations.md` §6.15, TB 21/10/2026). While IT has paused
   system mail, nothing is emailed: a notice due by email is pushed to the person's devices instead,
