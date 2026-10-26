@@ -219,8 +219,10 @@ icon: spark
 
 1. On each of the month's priority tasks, press **Edit Task** and tick **Mark as Commitment**.
 2. Write its **Acceptance Criteria** and press **Save Task**.
-3. Press **Send Commitments** on [My Workspace · Tasks](/workspace?tab=tasks).
-4. Check the **Month** and press **Send Commitments**. Read [Commitments](#workspace-commitments).
+3. {needs="workspace edit, performance view"} Press **Send Commitments** on
+   [My Workspace · Tasks](/workspace?tab=tasks).
+4. {needs="workspace edit, performance view"} Check the **Month** and press **Send Commitments**.
+   Read [Commitments](#workspace-commitments).
 
 ## Do Your Check-In {#qs-check-in role="Everyone" icon=check screen=ess/my-performance}
 
@@ -242,7 +244,7 @@ icon: spark
 3. Press **Agree Scorecard**, or **Disagree With Reason** if something is wrong. Read
    [Agree your scorecard](#performance-my-agree).
 
-## Set Your Team's Tasks {#qs-team-tasks role="Line Managers" icon=users screen=workspace/tasks needs="workspace create, manager"}
+## Set Your Team's Tasks {#qs-team-tasks role="Line Managers" icon=users screen=workspace/tasks needs="workspace create, team"}
 
 ![My Team on Tasks](shot:qs-team-tasks)
 
