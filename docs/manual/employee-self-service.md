@@ -313,7 +313,8 @@ If the card reads **Rejected**, People's reason is beside it. Put right what the
 
 A punch's **Location** reads **Inside** or **Outside** with the distance, **Unclear** with why (a
 rough reading, at the edge, no home, no office or no reading), or **Not Checked**. Its **Result**
-is **Accepted**, **Review** (People will check it), **Not Counted** or **System Clock-Out**.
+is **Accepted**, **Review** (People will check it), **Not Counted** (refused at the clock),
+**Rejected** (People rejected it) or **System Clock-Out**.
 
 | A deduction or overtime Status | What it means |
 |---|---|

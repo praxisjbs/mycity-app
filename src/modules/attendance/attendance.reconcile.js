@@ -221,7 +221,8 @@ function detailOf(type, evidence = {}) {
 function present(row) {
   if (!row) return row;
   const { evidence, employee_id: _e, ...out } = row;
-  return { ...out, detail: detailOf(row.exception_type, evidence), real_time: (evidence && evidence.real_time) || null };
+  // can_decide is the reader's, set where People read it (attendance.controller); false otherwise.
+  return { ...out, detail: detailOf(row.exception_type, evidence), real_time: (evidence && evidence.real_time) || null, refused: Boolean(evidence && evidence.refused), can_decide: false };
 }
 
 const presentPage = (page) => ({ ...page, data: page.data.map(present) });

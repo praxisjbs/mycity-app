@@ -123,13 +123,16 @@ export function AssignmentView({ a, close }: { a: FieldAssignment; close: () => 
         title="People"
         rows={a.members}
         rowKey={(m) => m.employee.employee_id}
-        onRowClick={a.can_change && active.length > 1 ? (m) => !m.removed_at && takeOff(m.employee) : undefined}
+        help={a.can_change && active.length === 1 ? "The last person stays on it. Cancel Assignment ends it instead." : undefined}
         noun="person"
         nounPlural="people"
         columns={[
           { key: "e", label: "Employee", render: (m) => <Who name={m.employee.display_name} sub={m.employee.department} /> },
           { key: "s", label: "On It", render: (m) => (m.removed_at ? <Pill tone="neutral">Taken Off</Pill> : <Pill tone="ok">On It</Pill>) },
           { key: "r", label: "Reason", desktop: true, render: (m) => m.removed_reason },
+          ...(a.can_change && active.length > 1
+            ? [{ key: "x", label: "", render: (m: (typeof a.members)[number]) => (m.removed_at ? null : <Button size="sm" onClick={() => takeOff(m.employee)}>Take Off</Button>) }]
+            : []),
         ]}
       />
       <FormFooter>

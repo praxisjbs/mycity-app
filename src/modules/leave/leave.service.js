@@ -68,8 +68,8 @@ const payloadOf = (row, type) => ({
  * Reading
  * ------------------------------------------------------------------ */
 
-/** People's list, within the caller's scope. */
-const list = (query, scope) => repo.list(pool, query, scope);
+/** People's list, within the caller's scope; `live` keeps the waiting and approved (the Leave Calendar). */
+const list = ({ live, ...query }, scope) => repo.list(pool, { ...query, ...(live && { statuses: ["approved", "submitted"] }) }, scope);
 
 /** One request People may see. */
 async function getFor(id, scope) {
@@ -181,13 +181,13 @@ async function activeType(db, leaveTypeId) {
  * Every check a request must pass, on the transaction's client after the person's lock.
  * @returns {Promise<number>} its length in working days
  */
-async function checked(client, employeeId, body, type) {
+async function checked(client, employeeId, body, type, own = true) {
   const days = rules.daysOf(body.starts_on, body.ends_on, await workingWeek.loadCalendar(client));
   const clash = await repo.overlapping(client, employeeId, body.starts_on, body.ends_on);
   if (clash)
     throw new AppError(
       "LEAVE_OVERLAP",
-      "You already have leave on some of those days",
+      own ? "You already have leave on some of those days" : "They already have leave on some of those days",
       409,
       { starts_on: ["Overlaps other leave"] },
     );
@@ -195,7 +195,7 @@ async function checked(client, employeeId, body, type) {
   const balance = (await repo.balances(client, employeeId, year, lagos.today())).find(
     (b) => b.leave_type_id === type.leave_type_id,
   );
-  rules.assertWithinAllowance(balance, days);
+  rules.assertWithinAllowance(balance, days, own);
   return days;
 }
 
@@ -249,7 +249,7 @@ async function record(actor, scope, body) {
   const id = await tx(async (client) => {
     const type = await activeType(client, body.leave_type_id);
     await repo.lockEmployee(client, body.employee_id);
-    const days = await checked(client, body.employee_id, body, type);
+    const days = await checked(client, body.employee_id, body, type, false);
     const row = await repo.insertRequest(client, {
       employee_id: body.employee_id,
       leave_type_id: type.leave_type_id,

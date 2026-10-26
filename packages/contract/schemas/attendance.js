@@ -554,10 +554,14 @@ const AttendanceException = z
     employee_noted_at: isoDateTime.nullable(),
     /** The real leaving time the person gave for a System Clock-Out (Give Real Time, §6.14), HH:MM. */
     real_time: clockTime.nullable(),
+    /** The punch it is about was refused at the clock: no decision makes it count (§6.8). */
+    refused: z.boolean(),
     resolution: z.string().nullable(),
     reviewed_at: isoDateTime.nullable(),
     reviewed_by_name: z.string().nullable(),
     created_at: isoDateTime,
+    /** Whether the reader may decide it now: open, `people` approve over everyone, and not their own. */
+    can_decide: z.boolean(),
   })
   .strict();
 const AttendanceExceptionPage = Paged(AttendanceException);
@@ -675,7 +679,8 @@ const DayDetail = z
     overtime_minutes: minutes,
     closed: z.boolean(),
     expected_location: z.object({ name: z.string(), radius_m: z.number().int().nullable() }).strict().nullable(),
-    policy: z.object({ geofence_mode: PolicyMode, device_mode: PolicyMode }).strict(),
+    /** `pre_approved_overtime`: overtime is on and paid only when approved beforehand, so Approve Overtime applies. */
+    policy: z.object({ geofence_mode: PolicyMode, device_mode: PolicyMode, pre_approved_overtime: z.boolean() }).strict(),
     open_exceptions: z.number().int().min(0),
     /** Overtime approved for this day beforehand (Approve Overtime, §6.17), or null. */
     overtime_approval: z
@@ -766,6 +771,8 @@ const HomeRequest = z
     decided_at: isoDateTime.nullable(),
     decided_by_name: z.string().nullable(),
     decision_reason: z.string().nullable(),
+    /** Whether the reader may decide it now: waiting, `people` approve over everyone, and not their own. */
+    can_decide: z.boolean(),
   })
   .strict();
 const HomeRequestPage = Paged(HomeRequest);
@@ -1425,6 +1432,7 @@ const TABLES = {
       radius_m: "the policy's home_radius_m",
       distance_from_approved_m: "metres between this point and the person's approved home",
       decided_by_name: "who decided it, from employee",
+      can_decide: "the reader's: pending, people approve over everyone, and not their own (attendance.controller)",
     },
   },
   HomeRequestPage: { table: null, reason: "a page of home locations" },
@@ -1534,6 +1542,7 @@ const TABLES = {
       excluded:
         "an exception on it was decided rejected, or an automatic clock-out's was corrected, so the day does not count it",
       recorded_by_name: "who recorded a correction, from employee",
+      real_time_given: "the real leaving time the person gave for this System Clock-Out, from its exception's evidence",
     },
   },
   AttendanceEventPage: { table: null, reason: "a page of punches" },
@@ -1547,6 +1556,8 @@ const TABLES = {
       detail: "one line from attendance_exception.evidence",
       real_time: "the real leaving time the person gave, from attendance_exception.evidence",
       reviewed_by_name: "who decided it, from employee",
+      refused: "the punch was refused at the clock, from attendance_exception.evidence",
+      can_decide: "the reader's: open, people approve over everyone, and not their own (attendance.controller)",
     },
   },
   AttendanceExceptionPage: { table: null, reason: "a page of exceptions" },

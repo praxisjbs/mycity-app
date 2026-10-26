@@ -245,7 +245,7 @@ function MyDay({ date, day }: { date: string; day?: AttendanceDay }) {
             key: "r",
             label: "Result",
             render: (e: AttendanceEvent) =>
-              e.excluded ? <Pill tone="err">Not Counted</Pill> : e.source === "system" ? <Pill tone="info">System Clock-Out</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
+              e.excluded ? <Pill tone="err">Rejected</Pill> : e.source === "system" ? <Pill tone="info">System Clock-Out</Pill> : <Pill tone={PUNCH_STATE[e.validation_state].tone}>{PUNCH_STATE[e.validation_state].text}</Pill>,
           },
         ]}
       />

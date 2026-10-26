@@ -808,6 +808,7 @@ const TABLES = {
       direct_reports: "how many people report to them, counted",
       login: "their login and roles, from app_user and user_role",
       photo_url: "the profile size of photo_document_id, as an API path (shared/db/person.js)",
+      is_ceo: "whether this is the CEO's own record (a login holding the ceo role), which cannot be archived",
     },
   },
   EmployeeHistoryEntry: {

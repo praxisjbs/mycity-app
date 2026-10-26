@@ -410,7 +410,7 @@ and reads their team's exceptions; Operations and People decide them.
    to see that day, as far back as you like but never past today.
 2. The figures count the day: **Expected**, **Present**, **Late**, **Absent**, **On Leave** and
    **Not In**. Press one, except **Expected**, to list only those people. **Open Exceptions** counts
-   the punches waiting on People; pressing it opens **Exceptions**.
+   the day's punches waiting on People; pressing it opens **Exceptions** on that day's open ones.
 3. Under **View**, keep **Register** for the day's list. Press a status chip, such as **Late**, or
    type in **Name or Location**. Press **Employee** or **Clock In** at the top of the list to sort
    it.
@@ -425,11 +425,11 @@ and reads their team's exceptions; Operations and People decide them.
 6. On a temporary site's day, **Route** lists the clock-in, each check-in with **Inside**,
    **Recorded** or **Flagged**, then the clock-out. **Exceptions** under it lists the day's
    exceptions; press one to decide it.
-7. {needs="people export"} Press **Export**, choose the **Period**, at most 31 days, and press
+7. {needs="people export"} Press **Export**, choose the **Period**, at most 31 days, and the
+   **Status**: it starts on the status chip you chose, such as **Late**, or **All**. Press
    **Export Register**. **Preparing your export** shows, then a message says **Export downloaded**
-   once the file is saved on this device. A status chip you chose, such as **Late**, narrows the
-   file too. **At most 31 days** means the period is too long; **Export failed. Try again.** means
-   the file could not be made.
+   once the file is saved on this device. **At most 31 days** means the period is too long;
+   **Export failed. Try again.** means the file could not be made.
 
 | Word | What it means |
 |---|---|
@@ -442,8 +442,8 @@ and reads their team's exceptions; Operations and People decide them.
 | **Not Checked** | A remote day while MyCity does not check homes |
 | *1 Open* | One exception on this day waits for a decision |
 
-A punch's **Result** reads **Accepted**, **Review** (waiting on People) or **Not Counted** (refused
-at the clock, or rejected by People). **Source** reads **Clock**, *Added by* and a name, or
+A punch's **Result** reads **Accepted**, **Review** (waiting on People), **Not Counted** (refused
+at the clock) or **Rejected** (People rejected it). **Source** reads **Clock**, *Added by* and a name, or
 **System Clock-Out**.
 
 On a phone the figures sit two to a row, and each person is a card with **Status**, **Clock In** and
@@ -469,7 +469,9 @@ An exception is a punch the hub could not accept on its own.
    and the date chip every exception of the chosen **Date**. Type in **Name or Detail** to find
    one. **Explained** under **Note** means the person wrote why.
 2. Press one. It shows the person, the punch, its **Date**, **Detail** and **Severity**,
-   **Their Note** and, for a System Clock-Out, their **Real Time**.
+   **Their Note** and, for a System Clock-Out, their **Real Time**. The decision shows only when it
+   is yours to make: Operations and People decide, never on their own exception. Otherwise the
+   sheet has **Close** only.
    ![Deciding an exception](shot:people-attendance-decide)
 3. Under **Outcome**, choose what fits:
    - Most exceptions: **Accept** keeps the punch, **Reject** stops it counting. The person can then
@@ -480,8 +482,8 @@ An exception is a punch the hub could not accept on its own.
      **Clock-Out Time** they gave.
    - A check-in's flag: **Accept** clears it; **Reject** keeps it flagged. The shift does not
      change.
-   - A punch that reads **Not Counted**: neither choice makes it count. **Accept** keeps the
-     refusal; **Reject** notes it was wrong.
+   - A punch refused at the clock (its **Detail** starts *Refused*): neither choice makes it
+     count. **Accept** agrees with the refusal; **Reject** notes it was wrong.
 4. Type the **Reason**, at least 10 characters, such as `Matches gate log`, and press
    **Record Decision**. A message says **Decision recorded**, and the person is told.
 
@@ -506,7 +508,8 @@ under **View** only then.
 1. Under **View**, choose **Homes**. **Waiting** lists those to decide; **Approved**, **Rejected**
    and **All** the rest. Type in **Name** to find one.
 2. Press one. Read the **Address**, the reading's **Accuracy** and **From Approved Home**: how far it
-   is from the home in use.
+   is from the home in use. The decision shows only when it is yours to make, never on your own
+   home.
 3. Under **Outcome**, keep **Approve**, or choose **Reject** and type the **Reason**, at least 10
    characters. The person reads it.
 4. Press **Record Decision**. A message says **Home location approved** or
@@ -533,11 +536,13 @@ never the address. On a phone each home is a card with the person, **From Approv
    **All** for the rest. Type in **Name** to find someone. Each item shows the person, the
    **Date**, the **Kind**, the **Minutes**, the **Method**, the **Amount** and its **Status**.
 2. To waive one deduction, press it, type the **Reason** and press **Waive Deduction**.
-3. To waive several, tick them and press **Waive Selected**. Type the **Reason** and press
-   **Waive Deductions**. Only the ticked items on the page you see are waived. On a phone,
+3. To waive several, tick them, on as many pages as you like, and press **Waive Selected**. When
+   some ticked items are not yours to waive, **Waiving** counts those that are, such as
+   *3 of 4 selected*. Type the **Reason** and press **Waive Deductions**. On a phone,
    **Waive Selected** is also in **Quick Actions** once you tick one.
-4. A message says **Deduction waived**, or counts them, such as *3 deductions waived*. The day still
-   counts as late; the pay is restored.
+4. A message says **Deduction waived**, or counts them, such as *3 deductions waived*. Items decided
+   meanwhile or already in payroll are skipped and counted, such as
+   *2 waived, 1 already decided, 1 in payroll*. The day still counts as late; the pay is restored.
 
 | Method | How the amount is worked out |
 |---|---|
@@ -556,6 +561,7 @@ opens with **Close** only. **Restricted** in the Amount means your role does not
 | **At least 10 characters** | The reason is too short | Say more |
 | **Only People with access to everyone waive deductions** | Your role sees your team only | Ask Operations and People |
 | **Someone else waives your own deductions** | It is your own deduction | Ask another person in People |
+| **None of these can be waived** | Every ticked item is your own, or already decided | Tick pending deductions of other people |
 | **Nothing waived** | The hub could not be reached | Try again |
 
 ### Decide overtime {#people-attendance-pay needs="people approve"}
@@ -566,17 +572,18 @@ A line manager confirms or cuts their team's overtime.
    **Cut** or **All** for the rest.
 2. Press a pending overtime item.
 3. To confirm all of it, press **Confirm**. To confirm fewer, change **Minutes** first. A message
-   says **Overtime confirmed**.
+   says **Overtime confirmed**. When the month's cap holds it back, the message says so instead:
+   *Overtime cut: monthly cap reached*, or the minutes kept, such as
+   *1h 30m confirmed: monthly cap reached*.
 4. To refuse it, type the **Reason**, at least 10 characters, and press **Cut**. A message says
    **Overtime cut**.
-5. To agree overtime before it is worked, open the person's day for today and press
-   **Approve Overtime**. Type the **Minutes**, up to 720, and a **Reason** of at least 10
-   characters. Press **Approve Overtime**. A message says **Overtime approved**, and the person is
-   told.
+5. When MyCity's policy approves overtime beforehand, you can agree it before it is worked: open
+   the person's day for today and press **Approve Overtime**. Choose the **Day**, from today up to
+   90 days ahead, type the **Minutes**, up to 720, and a **Reason** of at least 10 characters.
+   Press **Approve Overtime**. A message says **Overtime approved**, and the person is told.
 
-Overtime past MyCity's monthly cap is cut with the reason *Monthly cap*, even when you press
-**Confirm**. Approving overtime ahead counts only when MyCity's policy approves overtime beforehand.
-Approving the same day again replaces the minutes. It is never offered on your own day.
+Approving the same day again replaces the minutes. **Approve Overtime** is never offered on your own
+day, nor when the policy confirms overtime afterwards.
 
 On a phone each item is a card with a tick, and **Method** is in the item's sheet. **Sort** orders
 by **Date** or **Minutes**.
@@ -605,13 +612,15 @@ them.
    **Starting Soon** in the next 14 days, and those **Approved This Year**.
 3. Press a chip (**All**, **Pending**, **Approved**, **Rejected** or **Cancelled**), or type in
    **Name or type**.
-4. The first request waiting is shown beside the list. Press another to show it instead. Its card
+4. The first request waiting is shown beside the list, or the one a link named, from **Need You**,
+   search or a notification. Press another to show it instead. Its card
    shows **Employee**, **Type**, **From**, **To**, **Days**, **Status**, **Waiting On**,
    **Recorded By** (**People** when People recorded it), the person's **Reason**, and **Also Away**:
    who else in the department is off then. **Nobody else in the department** means nobody else is
    off.
-5. **Leave Calendar** shows this month's approved leave, each day with the first names of who is
-   away.
+5. **Leave Calendar** shows approved and waiting leave a month at a time, each day with the first
+   names of who is away; *(Waiting)* follows a name still to be decided. Choose another month, this
+   year or next.
 6. **Leave Types** and **Allowances** list the types and each person's days. Only People change
    them.
 
@@ -623,10 +632,11 @@ then scroll down to it, or drag it down to close it.
 A request waits on the person's line manager. Leave over 5 days then waits on Operations and
 People. **Waiting On** says who decides it now.
 
-1. A request in **Need You** on your [Home · Overview](/home?tab=overview) brings you to this
-   screen. Press **Pending** and press the request waiting on you.
+1. A request in **Need You** on your [Home · Overview](/home?tab=overview) opens here with that
+   request shown. Or press **Pending** and press the request waiting on you.
    ![A request waiting on you](shot:people-leave-request)
-2. Check **Also Away** for who else is off.
+2. Check **Also Away** for who else is off. **Approve** and **Reject** show only when the request
+   waits on you now.
 3. Press **Approve**. The message says it is approved and the person has been told, such as
    *Approved. Ada has been told.*
 4. Or press **Reject**, type the **Reason**, and press **Reject Leave**. The person reads your
@@ -644,8 +654,9 @@ For leave already agreed, such as sick leave told by phone.
 
 1. Press **Record Leave** at the top right of [People · Leave](/people?tab=leave).
    ![Record Leave](shot:people-leave-record)
-2. Pick the **Employee**, the **Leave Type**, the **First Day** and the **Last Day**. The first day
-   may be in the past. Add a **Note** if it helps.
+2. Pick the **Employee**, the **Leave Type**, the **First Day** and the **Last Day**. The
+   **Employee** list offers only people who work here now. The first day may be in the past. Add a
+   **Note** if it helps.
 3. Press **Record Leave**. The message names them, such as *Leave recorded for Ada Okafor*. It is
    approved at once, and the person is told.
 
@@ -654,12 +665,13 @@ Leave cannot be recorded for someone suspended or who has left.
 | The field says | What it means | What to do |
 |---|---|---|
 | **Pick someone** | No employee picked | Pick the person |
+| **Not active** | They were suspended or left meanwhile | Leave cannot be recorded for them |
 | **Required** | A type or a date is empty | Fill it in |
 | **Ends before it starts** | The last day is before the first | Correct the last day |
 | **Ends in another year** | It runs past 31 December | Record two, one for each year |
 | **No working days** | Every day is a day off or a holiday | Pick working days |
 | **Overlaps other leave** | They already have leave on some of those days | Change the days, or cancel the other |
-| **More than you have left** | It takes their year past the type's allowance | Record fewer days, or raise their allowance |
+| **More than they have left** | It takes their year past the type's allowance | Record fewer days, or raise their allowance |
 | **Not offered** | The type was retired meanwhile | Pick another type |
 
 ### Cancel granted leave {#people-leave-cancel needs="people edit"}
@@ -694,6 +706,7 @@ If it says **This leave can no longer be cancelled**, the leave has ended or was
 | The screen says | What it means | What to do |
 |---|---|---|
 | **Name the type** | **Name** is empty | Type a name |
+| **At most 80 characters** | **Name** is too long | Shorten it |
 | **0 to 366 days** | **Days a Year** or **Days** is out of range | Type 0 to 366, or leave it empty |
 | **Already a type** | Another type has a name that close | Choose another name |
 | *Retire a type first: 25 is the most offered at once* | 25 types are offered already | Retire one, then add or offer this one |
@@ -796,9 +809,9 @@ When someone asks to work elsewhere with **Add Work Site**, it waits here for ap
 3. **Approve** and **Reject** show when the site waits on you, and never on a site you are on.
    Press **Approve**: the message names it, such as *TS-0012 approved*. Or press **Reject**, type
    the **Reason** and press **Reject**: *TS-0012 rejected*. The people on it are told.
-4. To take someone off a site waiting or in force, press their name under **People**. Type the
-   **Reason** and press **Take Off**. The message names them, such as *Ada Obi taken off*. The last
-   person cannot be taken off: cancel the site instead.
+4. To take someone off a site waiting or in force, press **Take Off** on their row under **People**.
+   Type the **Reason** and press **Take Off**. The message names them, such as *Ada Obi taken off*.
+   With one person left there is no **Take Off**: cancel the site instead.
 5. To end an approved site early, press **Cancel Site**, type the **Reason** and press
    **Cancel Site**. The message names it, such as *TS-0012 cancelled*. Days already worked keep
    their punches.
@@ -835,8 +848,9 @@ Requests made before temporary sites still show under **Temporary** while one wa
 ### Change an older field assignment {#people-worksites-field needs="people approve"}
 
 1. Choose **Temporary**, then **Field**. Press an assignment **In Progress** or **Upcoming**.
-2. To take someone off, press their name under **People**, type the **Reason** and press
-   **Take Off**. The message names them, such as *Ada Obi taken off*.
+2. To take someone off, press **Take Off** on their row under **People**, type the **Reason** and
+   press **Take Off**. The message names them, such as *Ada Obi taken off*. With one person left
+   there is no **Take Off**: cancel the assignment instead.
 3. To end it, press **Cancel Assignment**, type the **Reason** and press **Cancel Assignment**. The
    message names it, such as *FA-0002 cancelled*.
 

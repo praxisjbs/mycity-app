@@ -5429,6 +5429,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `monthName` | `lib/format.ts` | Month name from a zero-based index: 0 → "January". |
 | `zoneClock` | `lib/format.ts` | The wall clock in another city, for the sign-in screen's cities: the time ("19:42"), the day as a person says it ("Wednesday 16 October", day first), and the hour as a number (with minutes as a fraction) for the scene's light. |
 | `todayIso` | `lib/format.ts` | Today in Lagos as ISO "YYYY-MM-DD". |
+| `addDaysIso` | `lib/format.ts` | An ISO day some days on (or back, for a negative n): a date field's `max`, "2026-10-26" and 90 → "2027-01-24". |
 | `parseDayFirst` | `lib/format.ts` | Day-first text a person typed ("13/10/2026", "13-10-2026", "13.10.26") → ISO, or null. |
 | `formatMoney` | `lib/format.ts` | Full amount with kobo, for tables and documents. |
 | `formatMoneyShort` | `lib/format.ts` | Short form for KPI tiles only: "₦1.3M", "₦850K". |

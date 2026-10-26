@@ -789,6 +789,14 @@ export function setMockHomeLocation(on: boolean) {
   v.rules = { ...v.rules, home_location: { on } };
   READ_RULES.delete(v);
 }
+/** Tests: how the version in force approves overtime (Approve Overtime shows under pre_approved). */
+export function setMockOvertimeApproval(approval: AttendanceRules["overtime"]["approval"]) {
+  const v = inForce(ATTENDANCE.policy_id);
+  if (!v || !v.rules) return;
+  const now = attendanceRulesOn(todayIso());
+  v.rules = { ...v.rules, overtime: { ...now.overtime, approval } };
+  READ_RULES.delete(v);
+}
 const NO_VERSION: AttendanceRules = attendanceContract.AttendanceRules.parse({});
 /** The Attendance policy's rules in force on a date: the version a day is judged by. Read only. */
 export function attendanceRulesOn(date: string): AttendanceRules {

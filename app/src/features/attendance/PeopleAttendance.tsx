@@ -8,7 +8,7 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useAuth, useMe } from "@/auth/AuthProvider";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chips, ChoiceField, DataView, DateField, DateRangeField, ErrorState, Field, formatDate, formatDateTime, formatTime, FormFooter, Grid, HelpTerm, KeyValue, KpiCard, LoadingRows, PageHeader, Pill, SegmentedControl, SelectField, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal, Who } from "@mycity/ui";
 import { EXCEPTION_TYPE, HOME_STATUS, hours, lateBy, locationShown, PATTERN, PUNCH_STATE, REGISTER_STATUS, UNCLEAR_HELP, VERDICT } from "./labels";
 import { DayRoute } from "./TemporarySites";
 import { ApproveOvertimeForm, PayItemsView } from "./PayItems";
@@ -67,6 +67,8 @@ export function PeopleAttendance() {
   // search:none Waive Selected acts on the deductions ticked on the list, never from search
   useScreenAction(canWaive ? { label: "Waive Selected", icon: "check", onSelect: () => waiveRef.current?.() } : null);
 
+  // Open Exceptions counts the day's open ones: pressing it opens the list on the same.
+  const [exceptionsOn, setExceptionsOn] = useState<"open" | "day">("open");
   const exportRange = () => modal.open({ title: "Export Register", body: (close) => <ExportForm close={close} date={date} status={status} /> });
   const tile = (title: string, value: number | undefined, filter: RegisterStatus | null, tone?: "ok" | "warn" | "err", help?: string) => (
     <KpiCard title={title} value={value === undefined ? "" : String(value)} tone={value ? tone : undefined} help={help} onOpen={filter ? () => (setView("register"), setStatus(filter)) : undefined} />
@@ -98,7 +100,7 @@ export function PeopleAttendance() {
           value={s ? String(s.open_exceptions) : ""}
           tone={s?.open_exceptions ? "warn" : undefined}
           help="Punches recorded for review on this day, waiting on People to accept, reject or correct."
-          onOpen={() => setView("exceptions")}
+          onOpen={() => (setExceptionsOn("day"), setView("exceptions"))}
         />
       </Grid>
       <div className="my-3">
@@ -107,7 +109,7 @@ export function PeopleAttendance() {
       {shown === "register" ? (
         <Register date={date} status={status} setStatus={setStatus} openDay={openDay} />
       ) : shown === "exceptions" ? (
-        <Exceptions date={date} />
+        <Exceptions key={exceptionsOn} date={date} start={exceptionsOn} />
       ) : shown === "deductions" || shown === "overtime" ? (
         <PayItemsView key={shown} group={shown} waiveRef={waiveRef} onCanWaive={setCanWaive} />
       ) : (
@@ -187,7 +189,8 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
   if (!d) return <LoadingRows />;
   const decideOne = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
   // Overtime is approved beforehand, for today or a day to come, never for one's own day (§6.17).
-  const mayApprove = can("people", "approve") && d.employee.employee_id !== me.employee_id && d.date >= todayIso();
+  // Only where the policy pays overtime approved beforehand: otherwise nothing reads the approval.
+  const mayApprove = can("people", "approve") && d.policy.pre_approved_overtime && d.employee.employee_id !== me.employee_id && d.date >= todayIso();
   const approveOvertime = () => modal.open({ title: "Approve Overtime", body: (close) => <ApproveOvertimeForm employeeId={d.employee.employee_id} date={d.date} close={close} /> });
   return (
     <>
@@ -245,7 +248,7 @@ function DayView({ employeeId, date }: { employeeId: string; date: string }) {
 const evidenceColumns = [
   { key: "t", label: "Punch", render: (e: AttendanceEvent) => (e.event_type === "clock_in" ? "Clock In" : "Clock Out") },
   { key: "a", label: "Server Time", render: (e: AttendanceEvent) => formatTime(e.occurred_at) },
-  { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Not Counted" : PUNCH_STATE[e.validation_state].text}</Pill> },
+  { key: "r", label: "Result", render: (e: AttendanceEvent) => <Pill tone={e.excluded ? "err" : PUNCH_STATE[e.validation_state].tone}>{e.excluded ? "Rejected" : PUNCH_STATE[e.validation_state].text}</Pill> },
   { key: "v", label: "Device Time", desktop: true, render: (e: AttendanceEvent) => (e.device_at ? `${formatTime(e.device_at)}${e.skew_seconds && Math.abs(e.skew_seconds) >= 60 ? `, ${Math.round(e.skew_seconds / 60)} min` : ""}` : null) },
   { key: "l", label: "Location", render: (e: AttendanceEvent) => locationShown(e) },
   { key: "c", label: "Accuracy", desktop: true, render: (e: AttendanceEvent) => (e.accuracy_m !== null ? `${Math.round(e.accuracy_m)} m` : null) },
@@ -269,15 +272,16 @@ const exceptionColumns = (photo: ((url: string | null) => string | null) | null)
   },
 ];
 
-function Exceptions({ date }: { date: string }) {
+function Exceptions({ date, start = "open" }: { date: string; start?: "open" | "day" }) {
   const modal = useModal();
-  const [status, setStatus] = useState<"open" | "resolved" | "day">("open");
-  const list = usePaged("GET /api/v1/attendance/exceptions", { filters: status === "day" ? { date } : { status } });
+  const [status, setStatus] = useState<"open" | "resolved" | "day">(start);
+  // The day's chip is that day's open exceptions, the ones Open Exceptions counts.
+  const list = usePaged("GET /api/v1/attendance/exceptions", { filters: status === "day" ? { date, status: "open" as const } : { status } });
   const photo = usePhotos(list.rows.map((x) => x.employee.photo_url));
   const open = (x: AttendanceException) => modal.open({ title: EXCEPTION_TYPE[x.exception_type], wide: true, body: (close) => <ExceptionView x={x} close={close} /> });
   return (
     <>
-      <Chips label="Exceptions" value={status} onChange={setStatus} options={[["open", "Open"], ["resolved", "Decided"], ["day", formatDate(date)]]} />
+      <Chips label="Exceptions" value={status} onChange={setStatus} options={[["open", "Open"], ["resolved", "Decided"], ["day", `Open, ${formatDate(date)}`]]} />
       <DataView
         title="Exceptions"
         list={list}
@@ -294,7 +298,6 @@ function Exceptions({ date }: { date: string }) {
 
 /** An exception: what happened, the person's note, the punch's evidence, and the decision. */
 function ExceptionView({ x, close }: { x: AttendanceException; close: () => void }) {
-  const { can } = useAuth();
   const events = usePaged("GET /api/v1/attendance/events", { filters: { employee_id: x.employee.employee_id, date: x.work_date } });
   const checkIns = usePaged("GET /api/v1/attendance/check-ins", { filters: { employee_id: x.employee.employee_id, date: x.work_date } });
   return (
@@ -320,7 +323,7 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
       </Card>
       <DataView className="mt-3" title="Punches" wide list={events} rowKey={(e) => e.attendance_event_id} noun="punch" nounPlural="punches" columns={evidenceColumns} />
       <DayRoute className="mt-3" punches={events.rows} checkIns={checkIns.rows} />
-      {x.status === "open" && can("people", "approve") ? (
+      {x.can_decide ? (
         <DecisionForm x={x} close={close} />
       ) : (
         <FormFooter>
@@ -334,7 +337,7 @@ function ExceptionView({ x, close }: { x: AttendanceException; close: () => void
 const DECISIONS: Record<ExceptionDecision["decision"], string> = { accept: "Accept", reject: "Reject", add_clock_out: "Add Clock-Out" };
 
 /** What each kind of exception can be decided as, and the words the choice and its help use. */
-function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendance_check_in_id">): { options: Array<ExceptionDecision["decision"]>; label: (d: ExceptionDecision["decision"]) => string; help: string } {
+function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendance_check_in_id" | "refused">): { options: Array<ExceptionDecision["decision"]>; label: (d: ExceptionDecision["decision"]) => string; help: string } {
   const type = x.exception_type;
   if (x.attendance_check_in_id)
     return {
@@ -347,6 +350,12 @@ function decisionsFor(x: Pick<AttendanceException, "exception_type" | "attendanc
       options: ["accept", "add_clock_out"],
       label: (d) => (d === "add_clock_out" ? "Correct Time" : DECISIONS[d]),
       help: "Accept keeps the System Clock-Out's time. Correct Time records when the person really left.",
+    };
+  if (x.refused)
+    return {
+      options: ["accept", "reject"],
+      label: (d) => DECISIONS[d],
+      help: "Refused at the clock, so it never counts. Accept agrees with the refusal. Reject notes it was wrong.",
     };
   return {
     options: type === "missing_clock_out" ? ["add_clock_out", "accept"] : ["accept", "reject"],
@@ -456,7 +465,6 @@ function Homes({ openHome }: { openHome: (h: HomeRequest) => void }) {
 
 /** One home location: what was sent, how it compares with the home in force, and the decision. */
 function HomeView({ h, close }: { h: HomeRequest; close: () => void }) {
-  const { can } = useAuth();
   return (
     <>
       <Card>
@@ -479,7 +487,7 @@ function HomeView({ h, close }: { h: HomeRequest; close: () => void }) {
           ]}
         />
       </Card>
-      {h.status === "pending" && can("people", "approve") ? (
+      {h.can_decide ? (
         <HomeDecisionForm h={h} close={close} />
       ) : (
         <FormFooter>
@@ -545,10 +553,10 @@ async function downloadRegister(file: ExportFile) {
   }
 }
 
-/** The register between two dates as a workbook, downloaded on this device once it is made. */
+/** The register between two dates as a workbook, downloaded on this device once it is made; the status chip in force is its starting Status. */
 function ExportForm({ close, date, status }: { close: () => void; date: string; status: RegisterStatus | "all" }) {
-  const f = useContractForm({ period: { from: `${date.slice(0, 8)}01`, to: date } }, {
-    safeParse: (v: { period: { from: string; to: string } }) => {
+  const f = useContractForm({ period: { from: `${date.slice(0, 8)}01`, to: date }, status }, {
+    safeParse: (v: { period: { from: string; to: string }; status: RegisterStatus | "all" }) => {
       const r = attendance.RegisterExportRequest.safeParse({ from: v.period.from, to: v.period.to });
       return r.success ? r : { success: false, error: { issues: (r.error?.issues ?? []).map((i) => ({ ...i, path: ["period"] })) } };
     },
@@ -558,7 +566,8 @@ function ExportForm({ close, date, status }: { close: () => void; date: string; 
     if (!f.check()) return;
     setBusy(true);
     try {
-      const file = await api.call("POST /api/v1/attendance/export", { body: { from: f.values.period.from, to: f.values.period.to, ...(status !== "all" && { status }) } });
+      const shown = f.values.status;
+      const file = await api.call("POST /api/v1/attendance/export", { body: { from: f.values.period.from, to: f.values.period.to, ...(shown !== "all" && { status: shown }) } });
       close();
       toast.info("Preparing your export");
       void downloadRegister(file);
@@ -572,6 +581,9 @@ function ExportForm({ close, date, status }: { close: () => void; date: string; 
     <>
       <Field label="Period" {...f.status("period")}>
         <DateRangeField value={f.values.period} onChange={(p) => f.set("period", p)} onProblem={f.field("period").onProblem} max={todayIso()} />
+      </Field>
+      <Field label="Status" {...f.status("status")}>
+        <SelectField value={f.values.status} onChange={(v) => f.set("status", v as RegisterStatus | "all")} options={STATUS_CHIPS} />
       </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>

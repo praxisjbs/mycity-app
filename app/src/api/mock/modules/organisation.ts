@@ -1,4 +1,4 @@
-import type { ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
 import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { exportFile } from "./shared";
@@ -608,6 +608,7 @@ const LIST_FILTERS = {
   employee_id: (r: MockLeave, v: string) => r.employee.employee_id === v,
   from: (r: MockLeave, v: string) => r.ends_on >= v,
   to: (r: MockLeave, v: string) => r.starts_on <= v,
+  live: (r: MockLeave, v: string) => v !== "true" || r.status === "submitted" || r.status === "approved",
 };
 const LIST_SORT = {
   starts_on: (a: MockLeave, b: MockLeave) => a.starts_on.localeCompare(b.starts_on),
@@ -716,6 +717,9 @@ route("POST /api/v1/leave/requests", (req) => {
   const who = byId(b.employee_id);
   const t = LEAVE_TYPES.find((x) => x.leave_type_id === b.leave_type_id);
   if (!who || !t) return invalid({ ...(who ? {} : { employee_id: ["Pick someone"] }), ...(t ? {} : { leave_type_id: ["Pick a type"] }) });
+  if (ARCHIVED.has(who.employee_id) || statusOf(who) !== "active") return fail(422, "EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", { employee_id: ["Not active"] });
+  if (LEAVE.some((x) => x.key === who.user_key && (x.status === "submitted" || x.status === "approved") && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
+    return fail(409, "LEAVE_OVERLAP", "They already have leave on some of those days", { starts_on: ["Overlaps other leave"] });
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(who), key: who.user_key, leave_type_id: t.leave_type_id, leave_type_name: t.name, starts_on: b.starts_on, ends_on: b.ends_on,
     days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, recorded: true,
@@ -758,8 +762,32 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
   l.decided_at = new Date().toISOString();
   return ok({ workflow_instance_id: l.workflow_instance_id, state: l.status, stage_name: null });
 };
+/** A leave request's approval as the workflow reads it: its stage, and whether it waits on the reader. */
+function leaveInstance(user: string, wid: string): ApprovalInstance | null {
+  const l = LEAVE.find((x) => x.workflow_instance_id === wid);
+  if (!l) return null;
+  const pending = l.status === "submitted";
+  const now = l.waiting_on === "Operations & People" ? "operations_people" : "line_manager";
+  const entered = l.submitted_at ?? l.created_at;
+  const stages: Array<[string, string]> = [["line_manager", "Line Manager"], ...(l.days > 5 ? ([["operations_people", "Operations & People"]] as Array<[string, string]>) : [])];
+  const state = l.status === "submitted" ? "pending" : l.status === "approved" ? "approved" : l.status === "rejected" ? "rejected" : "cancelled";
+  return {
+    workflow_instance_id: wid, definition_key: "leave.approval", definition_name: "Leave Request", version: 1, module_key: "people",
+    entity_type: "leave_request", entity_id: l.leave_request_id, subject_employee_id: l.employee.employee_id, subject_name: l.employee.display_name,
+    state, current_stage: pending ? now : null, stage_name: pending ? l.waiting_on : null, context: { days: l.days }, stage_entered_at: entered,
+    stage_due_at: pending ? new Date(Date.parse(entered) + STAGE_HOURS * 3600000).toISOString() : null,
+    opened_by: null, opened_by_name: l.employee.display_name, opened_at: entered, completed_at: l.decided_at,
+    route: stages.map(([key, name]) => ({
+      key, name, state: !pending ? (state === "approved" ? "done" : "stopped") : key === now ? "now" : key === "line_manager" ? "done" : "todo",
+      approvers: [key === "line_manager" ? { type: "manager_of_subject", value: null, label: "Line Manager" } : { type: "role", value: "operations_people", label: "Operations & People" }],
+    })),
+    decisions: [],
+    can_decide: pending && l.key !== user && waitingOn(user).some((w) => w.workflow_instance_id === wid),
+    can_withdraw: false, can_reassign: false, link: `/people?tab=leave&id=${l.leave_request_id}`,
+  };
+}
 route("GET /api/v1/workflow/instances/:id", (req) => {
-  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id);
+  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
   return found ? ok(found) : notFound();
 });
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));

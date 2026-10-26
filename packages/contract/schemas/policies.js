@@ -423,7 +423,12 @@ const TABLES = {
   },
   PolicySubmission: {
     table: "policy_version",
-    virtual: { submitted_by_name: "the submitter's name", stage_name: "the approval's stage" },
+    virtual: {
+      submitted_by_name: "the submitter's name",
+      stage_name: "the approval's stage",
+      content: "the version's body and rules as the editor shows them, from policy_version",
+      can_recall: "the reader's: the person who sent it, or the CEO",
+    },
   },
   Policy: {
     table: "policy",

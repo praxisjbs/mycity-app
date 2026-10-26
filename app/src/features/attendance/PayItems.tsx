@@ -4,8 +4,8 @@ import { useEffect, useState, type MutableRefObject, type ReactNode } from "reac
 import { ApiError } from "@/api/client";
 import { invalidate, useMutation, usePaged } from "@/api/hooks";
 import { RESTRICTED_HELP } from "@/features/people/status";
-import { Button, Chips, DataView, type DataViewColumn, EmptyValue, Field, type FieldBinding, formatDate, FormFooter, HelpTerm, KeyValue, type KeyValueItem, Money, NumberField, Pill, TextAreaField, toast, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
-import { lateBy, PAY_AMOUNT_HELP, PAY_KIND, PAY_METHOD, PAY_STATUS } from "./labels";
+import { addDaysIso, Button, Chips, DataView, type DataViewColumn, DateField, EmptyValue, Field, type FieldBinding, formatDate, FormFooter, HelpTerm, KeyValue, type KeyValueItem, Money, NumberField, Pill, TextAreaField, toast, todayIso, useContractForm, useIsPhone, useModal, Who } from "@mycity/ui";
+import { hours, lateBy, PAY_AMOUNT_HELP, PAY_KIND, PAY_METHOD, PAY_STATUS } from "./labels";
 
 /**
  * Pending deductions and overtime (docs/guides/attendance.md §6.17, §10): an item's amount and
@@ -92,11 +92,21 @@ export function PayItemsView({ group, waiveRef, onCanWaive }: { group: "deductio
   const deductions = group === "deductions";
   const [status, setStatus] = useState<PayItemStatus | "all">("pending");
   const [picked, setPicked] = useState<string[]>([]);
+  // The ticked items this reader may waive, kept as they are ticked, so a tick on another page still counts.
+  const [decidable, setDecidable] = useState<ReadonlySet<string>>(new Set());
   const list = usePaged("GET /api/v1/attendance/pay-items", { filters: { group, ...(status !== "all" && { status }) } });
   const open = (x: PayItem) => modal.open({ title: PAY_KIND[x.kind], body: (close) => <PayItemView x={x} close={close} /> });
+  const pick = (keys: string[]) => {
+    setPicked(keys);
+    setDecidable((was) => new Set([...[...was].filter((k) => keys.includes(k)), ...list.rows.filter((x) => x.can_decide && keys.includes(x.attendance_pay_item_id)).map((x) => x.attendance_pay_item_id)]));
+  };
+  const clear = () => (setPicked([]), setDecidable(new Set()));
   // Only what this reader may waive is sent: never their own, never one already decided.
-  const waivable = list.rows.filter((x) => picked.includes(x.attendance_pay_item_id) && x.can_decide).map((x) => x.attendance_pay_item_id);
-  const waive = () => modal.open({ title: "Waive Selected", body: (close) => <WaiveForm ids={waivable} close={close} onDone={() => setPicked([])} /> });
+  const waivable = picked.filter((k) => decidable.has(k));
+  const waive = () =>
+    waivable.length === 0
+      ? toast.error("None of these can be waived")
+      : modal.open({ title: "Waive Selected", body: (close) => <WaiveForm ids={waivable} of={picked.length} close={close} onDone={clear} /> });
   useEffect(() => {
     waiveRef.current = waive;
   });
@@ -108,7 +118,7 @@ export function PayItemsView({ group, waiveRef, onCanWaive }: { group: "deductio
   const anyDecidable = deductions && list.rows.some((x) => x.can_decide);
   return (
     <>
-      <Chips label={deductions ? "Deductions" : "Overtime"} value={status} onChange={(s) => (setStatus(s), setPicked([]))} options={deductions ? DEDUCTION_CHIPS : OVERTIME_CHIPS} />
+      <Chips label={deductions ? "Deductions" : "Overtime"} value={status} onChange={(s) => (setStatus(s), clear())} options={deductions ? DEDUCTION_CHIPS : OVERTIME_CHIPS} />
       <DataView
         title={deductions ? "Deductions" : "Overtime"}
         help={deductions ? WAIVE_HELP : undefined}
@@ -122,7 +132,7 @@ export function PayItemsView({ group, waiveRef, onCanWaive }: { group: "deductio
           anyDecidable
             ? {
                 keys: picked,
-                onChange: setPicked,
+                onChange: pick,
                 actions: (
                   <Button variant="primary" icon="check" onClick={waive}>
                     Waive Selected
@@ -155,8 +165,20 @@ function PayItemView({ x, close }: { x: PayItem; close: () => void }) {
   );
 }
 
-/** Waive one deduction or a batch, with the reason the person reads; the pay is restored, the day still counts. */
-function WaiveForm({ ids, close, onDone }: { ids: string[]; close: () => void; onDone?: () => void }) {
+/** The toast after a waive: how many were waived, and why any were skipped (decided meanwhile, or already in payroll). */
+export function waivedText(out: { waived: unknown[]; skipped: Array<{ code: "NOT_PENDING" | "IN_RUN" }> }) {
+  const n = out.waived.length;
+  if (out.skipped.length === 0) return n === 1 ? "Deduction waived" : `${n} deductions waived`;
+  const inRun = out.skipped.filter((x) => x.code === "IN_RUN").length;
+  const decided = out.skipped.length - inRun;
+  return [`${n === 0 ? "None" : n} waived`, ...(decided ? [`${decided} already decided`] : []), ...(inRun ? [`${inRun} in payroll`] : [])].join(", ");
+}
+
+/**
+ * Waive one deduction or a batch, with the reason the person reads; the pay is restored, the day
+ * still counts. `of` is how many were ticked, when some of them are not this reader's to waive.
+ */
+function WaiveForm({ ids, of = ids.length, close, onDone }: { ids: string[]; of?: number; close: () => void; onDone?: () => void }) {
   const f = useContractForm({ reason: "" }, { safeParse: (v: { reason: string }) => attendance.PayItemWaive.safeParse({ pay_item_ids: ids, reason: v.reason }) });
   const save = useMutation("POST /api/v1/attendance/pay-items/waive");
   const submit = async () => {
@@ -166,7 +188,7 @@ function WaiveForm({ ids, close, onDone }: { ids: string[]; close: () => void; o
       invalidate("/api/v1/attendance");
       onDone?.();
       close();
-      toast(out.waived.length === 1 ? "Deduction waived" : `${out.waived.length} deductions waived`);
+      (out.waived.length ? toast : toast.error)(waivedText(out));
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else toast(e instanceof ApiError ? e.message : "Nothing waived");
@@ -174,6 +196,7 @@ function WaiveForm({ ids, close, onDone }: { ids: string[]; close: () => void; o
   };
   return (
     <>
+      {of > ids.length && <KeyValue items={[["Waiving", `${ids.length} of ${of} selected`]]} />}
       <Field label="Reason" className="mt-3" {...f.status("reason")}>
         <TextAreaField {...f.field("reason")} placeholder="Bridge closed" rows={3} />
       </Field>
@@ -188,6 +211,16 @@ function WaiveForm({ ids, close, onDone }: { ids: string[]; close: () => void; o
 }
 
 type OvertimeValues = { minutes: string; reason: string };
+
+/** The reason the server gives when the month's cap held a confirmation back (attendance.pay.js). */
+const MONTHLY_CAP = "Monthly cap";
+
+/** The toast after a decision, naming the monthly cap when it cut or shortened a confirmation. */
+export function overtimeText(out: Pick<PayItem, "status" | "reason" | "confirmed_minutes">, decision: OvertimeDecision["decision"]) {
+  const cap = decision === "confirm" && out.reason === MONTHLY_CAP;
+  if (out.status === "cut") return cap ? "Overtime cut: monthly cap reached" : "Overtime cut";
+  return cap ? `${hours(out.confirmed_minutes ?? 0)} confirmed: monthly cap reached` : "Overtime confirmed";
+}
 
 /** The body a press sends: Confirm (all, or the minutes given) or Cut (with its reason). */
 function decisionOf(decision: OvertimeDecision["decision"], v: OvertimeValues): OvertimeDecision {
@@ -213,7 +246,7 @@ function OvertimeForm({ x, close }: { x: PayItem; close: () => void }) {
       const out = await save.run({ params: { id: x.attendance_pay_item_id }, body });
       invalidate("/api/v1/attendance");
       close();
-      toast(out.status === "cut" ? "Overtime cut" : "Overtime confirmed");
+      toast[decision === "confirm" && out.reason === MONTHLY_CAP ? "info" : "success"](overtimeText(out, decision));
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else toast(e instanceof ApiError ? e.message : "Overtime not decided");
@@ -240,9 +273,9 @@ function OvertimeForm({ x, close }: { x: PayItem; close: () => void }) {
 
 /** Approve Overtime on a person's day beforehand (Pre-Approved): the minutes, and why. */
 export function ApproveOvertimeForm({ employeeId, date, close }: { employeeId: string; date: string; close: () => void }) {
-  type Values = { minutes: string; reason: string };
-  const bodyOf = (v: Values) => ({ employee_id: employeeId, work_date: date, minutes: v.minutes.trim() ? Number(v.minutes) : Number.NaN, reason: v.reason.trim() });
-  const f = useContractForm<Values>({ minutes: "", reason: "" }, { safeParse: (v: Values) => attendance.OvertimePreApprovalCreate.safeParse(bodyOf(v)) });
+  type Values = { work_date: string; minutes: string; reason: string };
+  const bodyOf = (v: Values) => ({ employee_id: employeeId, work_date: v.work_date, minutes: v.minutes.trim() ? Number(v.minutes) : Number.NaN, reason: v.reason.trim() });
+  const f = useContractForm<Values>({ work_date: date, minutes: "", reason: "" }, { safeParse: (v: Values) => attendance.OvertimePreApprovalCreate.safeParse(bodyOf(v)) });
   const save = useMutation("POST /api/v1/attendance/overtime-approvals");
   const submit = async () => {
     if (!f.check()) return;
@@ -253,13 +286,16 @@ export function ApproveOvertimeForm({ employeeId, date, close }: { employeeId: s
       toast("Overtime approved");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Overtime not approved");
+      else toast.error(e instanceof ApiError ? e.message : "Overtime not approved");
     }
   };
   return (
     <>
-      <KeyValue items={[["Date", formatDate(date)]]} />
-      <Field label="Minutes" className="mt-3" {...f.status("minutes")}>
+      {/* Today or a day to come, at most 90 days ahead (attendance.pay: approveOvertime). */}
+      <Field label="Day" {...f.status("work_date")}>
+        <DateField {...f.field("work_date")} min={todayIso()} max={addDaysIso(todayIso(), 90)} />
+      </Field>
+      <Field label="Minutes" {...f.status("minutes")}>
         <NumberField {...(f.field("minutes") as FieldBinding<string> & { name: string })} className="w-28" />
       </Field>
       <Field label="Reason" {...f.status("reason")}>

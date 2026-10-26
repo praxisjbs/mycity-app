@@ -739,7 +739,10 @@ describeDb("attendance against the real migrations", () => {
     const list = await as("ops").get("/attendance/exceptions?status=open&exception_type=outside_worksite");
     expect(list.status).toBe(200);
     const x = list.body.data.find((e) => e.employee.display_name === "Bisi Ade");
-    expect(x).toMatchObject({ status: "open", detail: "340 m from Testbed Office, radius 100 m" });
+    expect(x).toMatchObject({ status: "open", detail: "340 m from Testbed Office, radius 100 m", refused: false, can_decide: true });
+    // A line manager reads it within their team but does not decide it: People with scope all do.
+    const byManager = (await as("manager").get("/attendance/exceptions?status=open&exception_type=outside_worksite")).body.data;
+    expect(byManager.every((e) => e.can_decide === false)).toBe(true);
 
     const mine = await as("outsider").get("/attendance/me/exceptions");
     expect(mine.body.data.map((e) => e.attendance_exception_id)).toContain(x.attendance_exception_id);
