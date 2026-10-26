@@ -263,6 +263,7 @@ function addEvent(key: string, date: string, type: EventType, iso: string, extra
     excluded: false,
     recorded_by_name: null,
     reason: null,
+    real_time_given: null,
     ...extra,
   };
   EVENTS.push(e);
@@ -877,6 +878,7 @@ route("POST /api/v1/attendance/punches", (req) => {
     excluded: false,
     recorded_by_name: null,
     reason: null,
+    real_time_given: null,
   };
   EVENTS.push(ev);
   dev.last_punch_at = now;
@@ -989,6 +991,7 @@ route("POST /api/v1/attendance/me/events/:id/explanation", (req) => {
     return fail(422, "REAL_TIME_INVALID", "Give a time after your clock-in", { real_time: ["After your clock-in"] });
   const x = addException(ev.key, ev.work_date, "automatic_clock_out", ev, systemDetail(ev, body.data.real_time));
   Object.assign(x, { employee_note: body.data.employee_note, employee_noted_at: new Date().toISOString(), real_time: body.data.real_time, created_at: new Date().toISOString() });
+  ev.real_time_given = body.data.real_time;
   recompute(ev.key, ev.work_date);
   return created(exOut(x));
 });

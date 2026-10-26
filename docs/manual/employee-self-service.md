@@ -80,7 +80,7 @@ Colleagues see your photo wherever your name appears.
 
 | It says | What it means | What to do |
 |---|---|---|
-| *Larger than 5.0 MB* | The photo is too big | Choose a smaller photo |
+| *Larger than 5 MB* | The photo is too big | Choose a smaller photo |
 | **This file type is not accepted here.** | It is not a JPEG, PNG, WebP or HEIC picture | Choose a photo in one of those types |
 | **Not removed. Try again.** | The connection failed | Press **Remove Photo** again |
 
@@ -91,8 +91,8 @@ Colleagues see your photo wherever your name appears.
    file is saved to your device, and a message says **Your data downloaded**.
 
 One copy is made a day. Pressing again the same day downloads that same copy again. If it says
-**Your copy was already made today. Try tomorrow.**, the CEO already made a copy of your data
-today. Try again tomorrow. A copy that failed does not count.
+**A copy of your data was made for People today. Ask again tomorrow.**, someone in People or the CEO already made a copy of your
+data today, and that copy is theirs. Try again tomorrow. A copy that failed does not count.
 
 If it says **That file could not be made. Try again.** or **That file is taking too long. Try
 again.**, press **Download My Data** again.
@@ -135,8 +135,8 @@ comes back in 15 minutes.
 
 Once you have clocked out, the clock shows **Day Complete** with your times, or
 **System Clock-Out** if the hub clocked you out. **My Attendance** opens your month. The button at
-the top then reads **Done For Today** and cannot be pressed. On a leave day it reads
-**On Leave Today**.
+the top then reads **Done For Today**: press it (or the clock in **Quick Actions** on a phone) to
+see the day's times again. It punches nothing. On a leave day it reads **On Leave Today**.
 
 > **Important:** Clock in from your phone. A computer cannot place you closely enough, so the hub
 > may send a clock-in from a computer to People to check.
@@ -221,7 +221,8 @@ both times.
 4. Say what happened in **Your Note**, such as `Left at 16:00, forgot to clock out`.
 5. Press **Send Time**. A message says **Time sent to People**.
 
-People keep the system's time or correct it to yours. You are told: **Attendance reviewed**.
+People keep the system's time or correct it to yours. You are told: **Attendance reviewed**. Once
+sent, the day shows **Real Time Given** with your time in place of the button: it is given once.
 
 | The form says | What it means | What to do |
 |---|---|---|
@@ -449,7 +450,8 @@ when it was **First Seen** and, on a computer, its **Last Punch**.
 
 If you already have three, the screen says
 **You have three registered devices. Remove one to add this one.** Remove an old one first, as
-below.
+below. If it says **Sign in again on this device to register it.**, the hub does not know this
+device yet: sign out, sign in again on it, then register.
 
 | It says | What it means | What to do |
 |---|---|---|
@@ -664,8 +666,8 @@ sends the file to another app; swipe down to close it.
    **Upload Document**, so it answers People's request.
 2. Type **What Is It**, such as `NDPA certificate`. For a **Missing** document it is filled in
    already. Fill it before you choose the file.
-3. Drop the file on the box, or press **Drop files here, or browse** and choose it: a PDF, a photo,
-   or a Word or Excel file, up to 15 MB. On a phone you can pick a file or take a photo. The upload
+3. Drop the file on the box, or press **Drop files here, or browse** and choose it: a PDF, a photo
+   (JPEG, PNG, WebP or HEIC), or a Word or Excel file, up to 15 MB, as the box says. On a phone you can pick a file or take a photo. The upload
    starts at once.
 4. The file shows its progress, then **Done**. The form closes and a message says
    **Uploaded. People will check it**. It reads **Awaiting Check** until they do.
@@ -675,7 +677,7 @@ again, or the cross to take it off.
 
 | The file says | What it means | What to do |
 |---|---|---|
-| *That file is larger than 15 MB. Choose a smaller file.* | The file is over the limit | Scan it at a lower quality, or split it into parts |
+| *Larger than 15 MB* | The file is over the limit, so it is not sent | Scan it at a lower quality, or split it into parts |
 | **This file type is not accepted here.** | The vault does not keep that kind of file | Save it as a PDF, or take a photo of it |
 | **This is an old Office file. Save it as .docx or .xlsx and upload it again.** | An old .doc or .xls file | Save it in the newer format, then upload it |
 | **That document has already been given** | The document People asked for was given already, or People withdrew the request | Close the form. The list no longer shows it as **Missing** |

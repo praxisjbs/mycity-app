@@ -143,7 +143,7 @@ function VersionReader({ v, close }: { v: MyPolicyVersion; close: () => void }) 
       body: (done) => (
         <ReasonForm
           action="Reject Policy"
-          placeholder="Name the equipment"
+          placeholder="What needs to change"
           done="Policy rejected"
           danger
           run={(reason) => reject.run({ params: { id: v.policy_version_id }, body: { reason } })}

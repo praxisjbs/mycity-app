@@ -165,7 +165,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   }, [data, expandedAll]);
 
   /* Start with the top three levels open, and on Org Chart the way down to the person looking. */
-  const folded = useMemo(() => {
+  const shut = useMemo(() => {
     if (collapsed) return collapsed;
     const out = new Set<string>();
     const walk = (n: OrgNode, depth: number) => {
@@ -178,6 +178,11 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
     if (self) for (const up of pathTo(self, byId)) out.delete(up.node_id);
     return out;
   }, [collapsed, children, roots, mine, byId]);
+
+  const term = q.trim().toLowerCase();
+  const hit = (n: OrgNode) => !!term && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(term);
+  /* A search opens every branch down to a card it finds: no match stays hidden in a folded one. */
+  const folded = term ? new Set([...shut].filter((id) => !nodes.some((n) => hit(n) && n.node_id !== id && pathTo(n, byId).some((up) => up.node_id === id)))) : shut;
   const fold = (id: string) =>
     setCollapsed(() => {
       const x = new Set(folded);
@@ -185,9 +190,6 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       else x.add(id);
       return x;
     });
-
-  const term = q.trim().toLowerCase();
-  const hit = (n: OrgNode) => !!term && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(term);
 
   const drop = async (target: OrgNode, e: DragEvent) => {
     e.preventDefault();
@@ -371,7 +373,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           </>
         }
       />
-      {data && data.roots > 1 && (
+      {data && data.roots > 1 && builder && canMove && (
         <Banner tone="warn" icon="alert">
           {`${data.roots} people and roles sit at the top. Give each one a line manager.`}
         </Banner>

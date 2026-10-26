@@ -5,7 +5,7 @@ import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useSearchParams } from "@/lib/router";
 import { useScreenAction } from "@/shell/screen-action";
-import { Button, Card, CardHeader, Chain, Chips, ChoiceField, DataView, DesktopOnly, Field, formatDate, formatDateTime, FormFooter, KeyValue, LoadingRows, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
+import { Button, Card, CardHeader, Chain, Chips, ChoiceField, DataView, DesktopOnly, ErrorState, Field, formatDate, formatDateTime, FormFooter, KeyValue, LoadingRows, PageHeader, PhoneOnly, Pill, TextAreaField, Timeline, toast, todayIso, useConfirm, useContractForm, useModal, Who } from "@mycity/ui";
 import { REQUEST_STATUS, REQUEST_TYPE } from "./labels";
 import { MySites, useSiteLink, useSiteView, useWorkSiteSheet } from "./TemporarySites";
 
@@ -116,7 +116,7 @@ export function RequestApproval({ instanceId }: { instanceId: string }) {
           )}
         </>
       ) : flow.error ? (
-        <p className="text-2xs text-subtle-foreground">Not available now</p>
+        <ErrorState error={flow.error} onRetry={flow.reload} />
       ) : (
         <LoadingRows count={2} />
       )}

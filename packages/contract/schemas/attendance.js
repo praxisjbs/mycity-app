@@ -521,6 +521,8 @@ const AttendanceEvent = z
     excluded: z.boolean(),
     recorded_by_name: z.string().nullable(),
     reason: z.string().nullable(),
+    /** The leaving time the person gave for this System Clock-Out (Give Real Time), once given: it is given once. */
+    real_time_given: clockTime.nullable(),
   })
   .strict();
 const AttendanceEventPage = Paged(AttendanceEvent);

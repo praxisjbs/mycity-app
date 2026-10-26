@@ -132,6 +132,10 @@ const EssLeaveListQuery = listQuery(
   {
     status: LeaveStatus.optional(),
     year: z.coerce.number().int().min(2000).max(2100).optional(),
+    /** Requests still running on or after this day (they end on it or later): the next booked leave. */
+    from: isoDate.optional(),
+    /** Requests begun on or before this day: the leave taken. */
+    to: isoDate.optional(),
   },
   ["starts_on", "submitted_at"],
 );

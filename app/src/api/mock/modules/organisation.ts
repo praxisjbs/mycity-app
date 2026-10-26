@@ -801,7 +801,7 @@ route("GET /api/v1/workflow/mine/count", (req) => {
 /* My Leave: the caller's own. */
 const myLeave = (user: string) => LEAVE.filter((l) => l.key === user);
 route("GET /api/v1/ess/leave", (req) =>
-  asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
+  asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v, from: (r, v) => r.ends_on >= v, to: (r, v) => r.starts_on <= v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
 );
 /** My Leave's calendar: everyone for Operations & People and the CEO, else mine and everyone under me. */
 route("GET /api/v1/ess/leave/calendar", (req) => {
