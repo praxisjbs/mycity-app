@@ -24,11 +24,20 @@
  */
 import { useCallback, useSyncExternalStore } from "react";
 import contractPlan from "@mycity/contract/plan.js";
-import type { DeliveryPlan, OpenRule, PlanMilestone, PlanScreen, PlanView } from "@mycity/contract/plan.js";
+import type * as Shared from "@mycity/contract/plan.js";
 import { todayIso } from "./format";
 import { useEnvironment } from "./environment";
 
-export type { DeliveryPlan, OpenRule, PlanMilestone, PlanScreen, PlanView };
+/** One milestone from MILESTONES §4. */
+export type PlanMilestone = Shared.PlanMilestone;
+/** One screen's row in PROGRESS: its milestone, and which ticks it has. */
+export type PlanScreen = Shared.PlanScreen;
+/** The whole plan, as vite.shared.js deliveryPlan() writes it. */
+export type DeliveryPlan = Shared.DeliveryPlan;
+/** Which rule decides what opens. */
+export type OpenRule = Shared.OpenRule;
+/** The Prototype View switch, in mock mode only. */
+export type PlanView = Shared.PlanView;
 
 /*
  * The rule itself is @mycity/contract/plan's, which the API decides by too (Need You, ⌘K, Home's

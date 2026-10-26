@@ -11,7 +11,7 @@
  */
 const crypto = require("node:crypto");
 const fs = require("node:fs");
-const path = require("node:path");
+const nodePath = require("node:path");
 const request = require("supertest");
 const c = require("@mycity/contract");
 const { config } = require("../../src/config/env");
@@ -349,7 +349,7 @@ describeDb("approvals against the real migrations", () => {
     const counted = async () => (await as("manager").get("/workflow/mine/count")).body.waiting;
     const waiting = await counted();
     expect(await listed()).toContain(id);
-    const docs = contractPlan.readPlan((rel) => fs.readFileSync(path.join(__dirname, "../..", rel), "utf8"));
+    const docs = contractPlan.readPlan((rel) => fs.readFileSync(nodePath.join(__dirname, "../..", rel), "utf8"));
     deliveryPlan.use({ plan: docs, rule: "staging" });
     try {
       expect(await listed()).not.toContain(id);
