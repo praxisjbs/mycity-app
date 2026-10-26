@@ -142,7 +142,7 @@ dictation's recording is removed once it is transcribed.
    change it, or Send Now) and **Done**, which keeps that time with what is on screen (GE, 20/10/2026).
 6. **Layout.** On desktop the message list and the reader scroll on their own and the page does not
    scroll behind them. The divider between them can be dragged, or moved with the arrow keys, to
-   widen the list; double click resets it. The width is remembered per browser.
+   widen the list. The width is remembered per browser.
 7. **Signature, what it is made of** (`signature/`). `signature.resolve.js` (pure) builds one model
    from the records: the name (preferred name, else first name, then last name), job title and
    department from the employee; the mobile from `employee.phone` unless the person hid it, with a
@@ -353,10 +353,12 @@ Attachments are read through `GET /api/v1/documents/:id/content`; the vault rule
   - **Spam** is never drafted from or summarised (`SPAM_NOT_READ`); its bodies are not shown either.
   - **Limits**: What To Say 2,000 characters, the Note 4,000, an answer 1,000; a dictation two
     minutes and 10 MB.
-  - **AI off** (switched off, the month's cap reached, every model passed by, or no provider set up
-    so only the stub would answer): Write With AI answers `available: false` and the step says
-    "Write With AI is off"; Summarise Thread says "AI summaries are off". The composer and the mail
-    are untouched.
+  - **AI off** (switched off, the month's cap reached, or no provider set up so only the stub would
+    answer): Write With AI answers `available: false` and the step says "Write With AI is off";
+    Summarise Thread says "AI summaries are off". Every model passed by is not AI off: it is
+    `AI_UNAVAILABLE`, "The AI service is not answering. Try again in a few minutes.". A dropped
+    connection says "Could not reach the server. Try again."; an unusable summary "The summary could
+    not be made. Try again.". The composer and the mail are untouched.
   - Each press is one AI run under its action, on AI Control · Spend (`ai-control.md` §6.5).
 - **The mail host's limits** (Namecheap plan, `docs/runbooks/dns-and-mail.md` §4): IMAP and SMTP
   at `mycityapp.io` (993, 465), strict certificate check on that name. At most **30 IMAP connections
@@ -565,6 +567,7 @@ interface copy; the copy rules apply to the chrome around them.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · From the User Guide audit's screen defects and the owner's decision of 26/10/2026: a message moved out of Spam is read again from the mail server (`provider.fetchOne`), so it shows as written; Connect says why a refusal failed (a field's marks only for the form's fields; `setServerErrors` ignores details that are not messages); Refresh says "Checking for new mail" and is refused while the mailbox needs reconnecting; Attachments counts the folder (`ThreadListQuery.attachments`); Reply on one's own message goes to whom it was sent; the composer marks To, Cc and Bcc each, checks 50 a row, shows the schedule's own refusal ("Within 90 days") and offers no day past 90, says when a draft did not save or discard; a deferral out of tries says it will not be retried; Write With AI and Summarise say when the connection dropped, and a refusal on what the step does not draw shows; the buttons follow the `mailbox` grants (Compose, Reply, Forward create; Empty delete; numbers and switches edit) and Forward to a chat `community` create. §3 step 6 no longer promises a double click on the divider; §6 says every model passed by is not AI off.
 - 13/10/2026 · GE · First version, from the 12 October internal workflow meeting and MILESTONES §6.5.
 - 13/10/2026 · GE · Schedule send at any date and time; independent panes with a resizable list (TB review).
 - 13/10/2026 · GE · Page header slides away while reading so the panes get the full height (TB review).

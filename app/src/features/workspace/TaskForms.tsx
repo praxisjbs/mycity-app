@@ -9,10 +9,15 @@ import { useMe } from "@/auth/AuthProvider";
 import { ColleaguePicker, DepartmentPicker, ProjectPicker, TaskPeoplePicker, type ProjectChoice } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { COMMITMENT_HELP, commitmentMonths, COUNTS_HELP, CountsTowardsField, type CountsChoice } from "./Commitment";
-import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, RecordPicker, SelectField, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
+import { Button, CheckboxField, ChoiceField, DateField, Field, FormFooter, formatDateTime, formatMonth, LoadingRows, RecordPicker, SelectField, shortMessage, TextAreaField, TextField, toast, todayIso, useContractForm } from "@mycity/ui";
 import { LABEL, refresh, refreshed, say, useLateOptions, useSetsForOthers, type BoardStatus, type LateReason } from "./shared";
 
 /** A 422's field marks on the form; anything else as a toast. */
+/** The most people a shared task takes besides its lead (tasks.service: "At most 25 people"). */
+const MAX_MEMBERS = 25;
+/** Fields a task refusal may name that are pickers outside the form, by the label the form shows. */
+const LOOSE: Record<string, string> = { employee_target_id: "Counts Towards", entity_id: "Counts Towards", project_id: "Project" };
+
 const failed = (f: { setServerErrors: (e: Record<string, string[]>) => void }) => (e: unknown) => {
   if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
   else say(e);
@@ -209,6 +214,8 @@ export function TaskForm({
   };
   /** The people picked; a lead who is no longer among them hands back to the reader. */
   const pickMembers = (p: PersonRef[]) => {
+    // A shared task has at most 25 people besides its lead (tasks.service): the picker stops there.
+    if (p.length > MAX_MEMBERS) return setShareMark(`At most ${MAX_MEMBERS} people`);
     setMembers(p);
     setShareMark(null);
     if (lead !== me.employee_id && !p.some((x) => x.employee_id === lead)) setLead(me.employee_id);
@@ -249,16 +256,27 @@ export function TaskForm({
       refresh();
       close();
     } catch (e) {
-      const mark = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
+      const raw = e instanceof ApiError ? (e.fields.member_ids ?? e.fields.department_id)?.[0] : undefined;
+      const mark = raw ? shortMessage({ type: "custom", message: raw }) : undefined;
       const onLead = e instanceof ApiError ? e.fields.primary_assignee_id?.[0] : undefined;
+      // Counts Towards and Project are pickers outside the form: their refusal is said here.
+      const loose = e instanceof ApiError ? Object.entries(e.fields).find(([k]) => k in LOOSE) : undefined;
       if (mark || onLead) {
         setShareMark(mark ?? null);
         setLeadMark(onLead ?? null);
-      } else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      } else if (loose) toast.error(`${LOOSE[loose[0]]}: ${loose[1][0]}`);
+      else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
     }
   };
   const assigneeId = !shared ? (who[0]?.employee_id ?? (task ? me.employee_id : null)) : by === "department" ? (deptLead[0]?.employee_id ?? null) : lead;
+  // A scorecard line is one person's: a new assignee drops the line picked for the last.
+  const lastAssignee = useRef(assigneeId);
+  useEffect(() => {
+    if (lastAssignee.current === assigneeId) return;
+    lastAssignee.current = assigneeId;
+    setCounts((c) => c.filter((x) => x.kind !== "line"));
+  }, [assigneeId]);
   // You, or one of the people picked the reader may set work for; a shared task's present lead stays offered.
   const leadOptions: Array<[string, string]> = [
     [me.employee_id, "You"],
@@ -388,10 +406,12 @@ export function DoneLateForm({ task, close, onMoved }: { task: Pick<Task, "task_
   const f = useContractForm({ late_reason: (task.late_reason ?? "") as string }, { late_reason: (v: string) => (!v ? "Pick a reason" : null) });
   const reasons = useLateOptions();
   const move = useMutation("POST /api/v1/tasks/:id/move");
+  // With every reason switched off there is nothing to pick: the card moves without one.
+  const none = reasons.ready && reasons.options.length === 0;
   const submit = async () => {
-    if (!f.check()) return;
+    if (!none && !f.check()) return;
     try {
-      await move.run({ params: { id: task.task_id }, body: { status: "done", before_task_id: null, late_reason: f.values.late_reason as LateReason } });
+      await move.run({ params: { id: task.task_id }, body: { status: "done", before_task_id: null, ...(!none && { late_reason: f.values.late_reason as LateReason }) } });
       refresh();
       onMoved?.();
       close();
@@ -402,7 +422,7 @@ export function DoneLateForm({ task, close, onMoved }: { task: Pick<Task, "task_
   };
   return (
     <>
-      {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
+      {none ? <p className="text-sm text-muted-foreground">No late reasons are switched on</p> : reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Mark Done</Button>
@@ -429,11 +449,22 @@ export function LateReasonForm({ task, close, onSaved }: { task: TaskDetail; clo
   };
   return (
     <>
-      {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
-      <FormFooter>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="primary" onClick={submit}>Save Reason</Button>
-      </FormFooter>
+      {reasons.ready && reasons.options.length === 0 ? (
+        <>
+          <p className="text-sm text-muted-foreground">No late reasons are switched on</p>
+          <FormFooter>
+            <Button variant="primary" onClick={close}>Close</Button>
+          </FormFooter>
+        </>
+      ) : (
+        <>
+          {reasons.ready ? <Field label="Why Late" {...f.field("late_reason")}><SelectField options={reasons.options} {...f.field("late_reason")} /></Field> : <LoadingRows count={1} />}
+          <FormFooter>
+            <Button onClick={close}>Cancel</Button>
+            <Button variant="primary" onClick={submit}>Save Reason</Button>
+          </FormFooter>
+        </>
+      )}
     </>
   );
 }
@@ -675,7 +706,9 @@ export function PingForm({ id, hasWatchers, close }: { id: string; hasWatchers: 
       close();
       toast("Nudge sent");
     } catch (e) {
-      failed(f)(e);
+      // Without watchers there is no Send To to mark ("Nobody else to tell"): say it here.
+      if (!hasWatchers && e instanceof ApiError && e.fields.to?.length) toast.error(e.fields.to[0]);
+      else failed(f)(e);
     }
   };
   return (

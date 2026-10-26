@@ -49,9 +49,9 @@ const PIP_STATUS: Record<Pip["status"], { tone: "ok" | "warn" | "err" | "neutral
   not_met: { tone: "err", text: "Not Met" },
 };
 
-/** What the reader does next on a review that waits on them. */
-const nextStep = (r: Review, me: string | null) =>
-  r.status === "with_reviewer" || r.status === "returned" ? (r.reviewer.employee_id === me ? "Score" : "Give Input") : "Approve";
+/** What the reader does next on a review that waits on them: the button the review shows them. */
+export const nextStep = (r: Pick<Review, "status" | "reviewer">, me: string | null) =>
+  r.status === "with_reviewer" || r.status === "returned" ? (r.reviewer.employee_id === me ? "Score" : "Give Input") : r.status === "with_hr" ? "Close Review" : "Approve";
 
 export function Reviews() {
   const me = useMe();
@@ -61,20 +61,26 @@ export function Reviews() {
   const manage = hasCapability(me, "performance.manage");
   const rounds = usePaged("GET /api/v1/performance/rounds", { filters: { period_id: quarter.periodId }, enabled: Boolean(quarter.periodId) });
   const [roundId, setRoundId] = useState("");
+  // Another quarter's rounds: its months replace this one's.
+  const pickQuarter = (id: string) => (quarter.setPeriodId(id), setRoundId(""));
   // The API lists rounds newest month first, so the newest round is the one shown until another is picked.
   const round: Round | undefined = rounds.rows.find((r) => r.performance_cycle_id === roundId) ?? rounds.rows[0];
   const departments = useApi("GET /api/v1/departments", { query: {} });
   const [view, setView] = useState<"reviews" | "pips">("reviews");
   const [dept, setDept] = useState("");
   const [stage, setStage] = useState("");
-  const [kind, setKind] = useState("");
-  const ready = Boolean(round);
-  const base = round ? { round_id: round.performance_cycle_id } : {};
+  // `?kind=probation` (People's Probation Ending) opens on the probation reviews.
+  const [kind, setKind] = useState(params.get("kind") === "probation" ? "probation" : "");
+  // A probation review belongs to no round: under Probation the round's filter is off.
+  const probation = kind === "probation";
+  const ready = Boolean(round) || probation;
+  const base = round && !probation ? { round_id: round.performance_cycle_id } : {};
   const list = usePaged("GET /api/v1/performance/reviews", {
     filters: { ...base, ...(dept ? { department_id: dept } : {}), ...(stage ? { status: stage as Review["status"] } : {}), ...(kind ? { kind: kind as Review["review_kind"] } : {}) },
     enabled: ready,
   });
-  const waiting = usePaged("GET /api/v1/performance/reviews", { filters: { ...base, waiting_on_me: "true" }, enabled: ready });
+  // What waits on the reader, whatever its round, a probation review among it.
+  const waiting = usePaged("GET /api/v1/performance/reviews", { filters: { waiting_on_me: "true" } });
   const pips = usePaged("GET /api/v1/performance/pips", { enabled: view === "pips" });
   const closeRound = useMutation("POST /api/v1/performance/rounds/:id/close");
 
@@ -96,7 +102,9 @@ export function Reviews() {
       say(e);
     }
   };
-  useScreenAction(manage && quarter.period ? { label: "Open Round", onSelect: openRound } : null);
+  // A month for Open Round: one of the quarter's with no round yet.
+  const freeMonth = (quarter.period?.months ?? []).some((m) => !rounds.rows.some((r) => r.month === m));
+  useScreenAction(manage && quarter.period && freeMonth ? { label: "Open Round", onSelect: openRound } : null);
 
   // A link to one review (a notification, ⌘K, Need You) opens it once.
   const linked = params.get("id");
@@ -110,7 +118,6 @@ export function Reviews() {
   }, [linked]);
 
   const c = round?.counts;
-  const withHr = c ? c.second_level + c.with_hr : 0;
   const deptOptions: Array<[string, string]> = [["", "All Departments"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
   const monthOptions: Array<[string, string]> = rounds.rows.map((r) => [r.performance_cycle_id, r.name]);
 
@@ -123,12 +130,13 @@ export function Reviews() {
           manage ? (
             <>
               {round?.status === "open" && <Button onClick={close}>Close Round</Button>}
-              {quarter.period && <Button variant="primary" icon="plus" onClick={openRound}>Open Round</Button>}
+              {quarter.period && freeMonth && <Button variant="primary" icon="plus" onClick={openRound}>Open Round</Button>}
             </>
           ) : undefined
         }
       />
       <Toolbar>
+        <FilterSelect label="Quarter" value={quarter.periodId} onChange={pickQuarter} options={quarter.options} />
         <FilterSelect label="Month" value={round?.performance_cycle_id ?? ""} onChange={setRoundId} options={monthOptions} />
         <SegmentedControl label="Reviews or PIPs" value={view} onChange={setView} options={[["reviews", "Reviews"], ["pips", "PIPs"]]} />
       </Toolbar>
@@ -141,7 +149,8 @@ export function Reviews() {
                   items={[
                     { label: "Check-Ins In", value: `${c.total - c.check_in} of ${c.total}` },
                     { label: "With Reviewers", value: String(c.with_reviewer), tone: c.with_reviewer ? "warn" : undefined },
-                    { label: "With HR", value: String(withHr) },
+                    { label: "Second Level", value: String(c.second_level) },
+                    { label: "With HR", value: String(c.with_hr) },
                     { label: "Closed", value: String(c.closed), tone: c.closed ? "ok" : undefined },
                   ]}
                 />
@@ -155,7 +164,8 @@ export function Reviews() {
             <DataView
               className="mt-3"
               title="Waiting On You"
-              rows={waiting.rows}
+              list={waiting}
+              noun="review"
               rowKey={(r) => r.performance_review_id}
               onRowClick={(r) => openReview(r.performance_review_id)}
               columns={[
@@ -284,7 +294,7 @@ function ClosePipForm({ pip, close }: { pip: Pip; close: () => void }) {
     try {
       await save.run({ params: { id: pip.improvement_plan_id }, body: { ...f.values, status: f.values.status as "passed" | "extended" | "not_met" } });
       close();
-      toast("Plan closed");
+      toast(f.values.status === "extended" ? "Plan extended" : "Plan closed");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);

@@ -62,6 +62,8 @@ const ThreadRow = z
 const ThreadListQuery = listQuery({
   folder: MailFolder.default("inbox"),
   unread: z.coerce.boolean().optional(),
+  /** Only threads with a file: the folder's Attachments figure. */
+  attachments: z.coerce.boolean().optional(),
 });
 const ThreadPage = Paged(ThreadRow);
 

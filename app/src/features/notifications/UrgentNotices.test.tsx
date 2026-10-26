@@ -10,8 +10,15 @@ const m = vi.hoisted(() => ({
   navigate: vi.fn(),
   markRead: vi.fn(async () => undefined),
   setPaneOpen: vi.fn(),
+  toastError: vi.fn(),
 }));
-vi.mock("@/api/client", () => ({ api: { call: m.call } }));
+vi.mock("@/api/client", () => ({
+  api: { call: m.call },
+  ApiError: class ApiError extends Error {
+    status = 404;
+  },
+}));
+vi.mock("@mycity/ui", async (actual) => ({ ...(await actual<object>()), toast: Object.assign(vi.fn(), { error: m.toastError }) }));
 vi.mock("@/api/hooks", () => ({ invalidate: m.invalidate, useApi: () => ({ data: undefined }) }));
 vi.mock("@/lib/router", () => ({ useRouter: () => ({ navigate: m.navigate }) }));
 vi.mock("./arrivals", () => ({ markRead: m.markRead }));
@@ -60,6 +67,15 @@ describe("the urgent bar", () => {
     await userEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
     expect(m.call).toHaveBeenCalledWith("POST /api/v1/notifications/:id/acknowledge", { params: { id: ANN }, body: {} });
     expect(m.invalidate).toHaveBeenCalledWith("/api/v1/notifications", "/api/v1/community");
+  });
+
+  it("a failed Acknowledge says why, and the bar reloads", async () => {
+    const { ApiError } = await import("@/api/client");
+    m.call.mockRejectedValueOnce(new (ApiError as unknown as new (m: string) => Error)("There is no such announcement."));
+    render(<UrgentNotices rows={[row(ANN)]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
+    await vi.waitFor(() => expect(m.toastError).toHaveBeenCalledWith("There is no such announcement."));
+    expect(m.invalidate).toHaveBeenCalledWith("/api/v1/notifications");
   });
 
   it("anything else urgent is opened: read, then its screen", async () => {

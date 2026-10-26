@@ -37,15 +37,16 @@ function daysOf(startsOn, endsOn, calendar) {
  * Refuse a request the year's allowance cannot hold.
  * @param {{entitled: number|null, remaining: number|null, name: string}|undefined} balance
  * @param {number} days
+ * @param {boolean} [own]  the person asking for themselves; People recording it read "they"
  */
-function assertWithinAllowance(balance, days) {
+function assertWithinAllowance(balance, days, own = true) {
   if (!balance || balance.entitled === null || balance.remaining === null) return;
   if (days > balance.remaining)
     throw new AppError(
       "LEAVE_ALLOWANCE_EXCEEDED",
       `Only ${Math.max(balance.remaining, 0)} ${balance.name} days are left this year`,
       422,
-      { ends_on: ["More than you have left"] },
+      { ends_on: [own ? "More than you have left" : "More than they have left"] },
     );
 }
 

@@ -32,7 +32,7 @@ const money = (v) => (v === null || v === undefined ? null : String(v));
 async function get(client, employeeId) {
   const row = await repo.get(client, employeeId);
   if (!row) throw new AppError("NOT_FOUND", "Not found", 404);
-  const roles = await repo.rolesOf(client, row.user_id);
+  const [roles, ceo] = await Promise.all([repo.rolesOf(client, row.user_id), repo.findCeoEmployee(client)]);
   return {
     employee_id: row.employee_id,
     staff_number: row.staff_number,
@@ -53,6 +53,7 @@ async function get(client, employeeId) {
     confirmation_due_on: day(row.confirmation_due_on),
     confirmed_on: day(row.confirmed_on),
     left_on: day(row.left_on),
+    is_ceo: Boolean(ceo && ceo.employee_id === row.employee_id),
     archived_at: at(row.archived_at),
     archive_reason: row.archive_reason ?? null,
     work_email: row.work_email,

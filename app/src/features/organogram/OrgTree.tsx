@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { usePhoto, usePhotos } from "@/api/download";
 import { saveExport } from "@/api/exports";
-import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
-import type { ManagerRef, OrgNode } from "@/api/types/organisation";
+import { invalidate, useApi, useMutation } from "@/api/hooks";
+import type { Department, ManagerRef, OrgNode } from "@/api/types/organisation";
 import type { PersonRef } from "@/api/types/common";
-import { EmployeePicker } from "@/features/shared/pickers";
+import { DepartmentPicker, EmployeePicker } from "@/features/shared/pickers";
 import { ReportingForm, type ReportingSubject } from "@/features/shared/ReportingForm";
 import { useMe } from "@/auth/AuthProvider";
 import { hrefFor, useRouter } from "@/lib/router";
@@ -32,7 +32,6 @@ import {
   Pill,
   SearchInput,
   SegmentedControl,
-  SelectField,
   TextField,
   toast,
   useIsPhone,
@@ -82,6 +81,8 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   const me = useMe();
   /* Shaping the structure (roles, lines, vacancies) is People's edit grant; anyone else reads the builder's tree. */
   const shapes = builder && Boolean(me.grants.people?.includes("edit"));
+  /* Adding a role is People's create grant (POST /org-seats); correcting one is edit. */
+  const adds = builder && Boolean(me.grants.people?.includes("create"));
   const modal = useModal();
   const { data, error, reload } = useApi("GET /api/v1/org-chart", { query: { view: mode } });
   /* The desktop chart shows every face at once; a phone's tiles each ask for their own (NodeTile). */
@@ -102,7 +103,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       title: "Edit Open Role",
       body: (close) => <SeatForm close={close} onSaved={reload} seat={n} manager={n.manager_node_id ? byId.get(n.manager_node_id) : undefined} />,
     });
-  useScreenAction(shapes ? { label: "Add Role", onSelect: addRole } : null);
+  useScreenAction(adds ? { label: "Add Role", onSelect: addRole } : null);
 
   const nodes = useMemo(() => data?.nodes ?? [], [data]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.node_id, n])), [nodes]);
@@ -165,7 +166,7 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
   }, [data, expandedAll]);
 
   /* Start with the top three levels open, and on Org Chart the way down to the person looking. */
-  const folded = useMemo(() => {
+  const shut = useMemo(() => {
     if (collapsed) return collapsed;
     const out = new Set<string>();
     const walk = (n: OrgNode, depth: number) => {
@@ -178,6 +179,11 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
     if (self) for (const up of pathTo(self, byId)) out.delete(up.node_id);
     return out;
   }, [collapsed, children, roots, mine, byId]);
+
+  const term = q.trim().toLowerCase();
+  const hit = (n: OrgNode) => !!term && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(term);
+  /* A search opens every branch down to a card it finds: no match stays hidden in a folded one. */
+  const folded = term ? new Set([...shut].filter((id) => !nodes.some((n) => hit(n) && n.node_id !== id && pathTo(n, byId).some((up) => up.node_id === id)))) : shut;
   const fold = (id: string) =>
     setCollapsed(() => {
       const x = new Set(folded);
@@ -185,9 +191,6 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       else x.add(id);
       return x;
     });
-
-  const term = q.trim().toLowerCase();
-  const hit = (n: OrgNode) => !!term && `${n.display_name} ${n.job_title} ${n.department}`.toLowerCase().includes(term);
 
   const drop = async (target: OrgNode, e: DragEvent) => {
     e.preventDefault();
@@ -203,8 +206,9 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
       invalidate("/api/v1/org-chart", "/api/v1/employees");
       reload();
       toast(`${node.display_name} now reports to ${target.display_name}`);
-    } catch {
-      toast(move.error?.message ?? "Not moved");
+    } catch (e) {
+      // The server's reason ("That would make a loop in the reporting line."), not the last call's.
+      toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Not moved. Try again.");
     }
   };
 
@@ -364,14 +368,14 @@ export function OrgTree({ mode, openId = null }: { mode: "builder" | "viewer"; o
           <>
             <SearchInput value={q} onChange={setQ} placeholder="Name or role" className="w-48 max-md:w-full" />
             {builder && !phone && <Button onClick={() => (setCollapsed(new Set()), setExpandedAll((n) => n + 1))}>Expand All</Button>}
-            {shapes && !phone && <Button icon="plus" onClick={addRole}>Add Role</Button>}
+            {adds && !phone && <Button icon="plus" onClick={addRole}>Add Role</Button>}
             <ExportButton onExport={exportPdf} message="PDF downloaded">
               Download PDF
             </ExportButton>
           </>
         }
       />
-      {data && data.roots > 1 && (
+      {data && data.roots > 1 && builder && canMove && (
         <Banner tone="warn" icon="alert">
           {`${data.roots} people and roles sit at the top. Give each one a line manager.`}
         </Banner>
@@ -757,9 +761,10 @@ function PersonSheet({
  * which is how a seat the sheet left at the top of the tree gets its line.
  */
 function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSaved: () => void; seat?: OrgNode; manager?: OrgNode }) {
-  const departments = usePaged("GET /api/v1/departments");
+  // The seat's department as it stands, found by its name among the departments in use.
+  const named = useApi("GET /api/v1/departments", { query: { q: seat?.department ?? "", active: "true" }, enabled: Boolean(seat?.department) });
   const [title, setTitle] = useState(seat?.display_name ?? "");
-  const [department, setDepartment] = useState("");
+  const [department, setDepartment] = useState<Department[]>([]);
   const [reportsTo, setReportsTo] = useState<PersonRef[]>(
     manager && manager.employee_id
       ? [{ employee_id: manager.employee_id, display_name: manager.display_name, job_title: manager.job_title, department: manager.department }]
@@ -769,7 +774,9 @@ function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSave
   const add = useMutation("POST /api/v1/org-seats");
   const edit = useMutation("PATCH /api/v1/org-seats/:id");
   const save = seat ? edit : add;
-  const chosen = department || departments.rows.find((d) => d.name === seat?.department)?.department_id || "";
+  const current = named.data?.data.find((d) => d.name === seat?.department);
+  const departmentValue = department.length ? department : current ? [current] : [];
+  const chosen = departmentValue[0]?.department_id ?? "";
   const bad = { title: title.trim().length < 2, department: !chosen };
   const submit = async () => {
     setTried(true);
@@ -786,8 +793,8 @@ function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSave
       onSaved();
       close();
       toast(seat ? `${title.trim()} saved` : `${title.trim()} added as an open role`);
-    } catch {
-      toast(save.error?.message ?? "Not saved");
+    } catch (e) {
+      toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Not saved. Try again.");
     }
   };
   return (
@@ -796,12 +803,7 @@ function SeatForm({ close, onSaved, seat, manager }: { close: () => void; onSave
         <TextField value={title} onChange={setTitle} placeholder="Head of Sales" state={tried ? (bad.title ? "bad" : "good") : undefined} />
       </Field>
       <Field label="Department" state={tried && bad.department ? "bad" : undefined} message="Pick a department">
-        <SelectField
-          value={chosen}
-          onChange={setDepartment}
-          placeholder="Pick a department"
-          options={departments.rows.map((d) => [d.department_id, d.name] as [string, string])}
-        />
+        <DepartmentPicker value={departmentValue} onChange={(d) => setDepartment(d.slice(-1))} />
       </Field>
       <Field label="Reports To" optional>
         <EmployeePicker value={reportsTo} onChange={setReportsTo} placeholder="Manager's name" />

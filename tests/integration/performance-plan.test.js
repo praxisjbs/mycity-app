@@ -186,6 +186,10 @@ describeDb("performance plan against the real migrations", () => {
     expect(kpi.status).toBe(201);
     expect(kpi.body.code).toBe("BM-K01");
     ids.kpi = kpi.body.kpi_definition_id;
+    // Another function's KPI is refused in KPI words, never "goals".
+    const elsewhere = await as("head").post("/performance/kpis", { department_id: ids.tbo, name: "Tickets closed", unit: "%", target_value: "90" });
+    expect(elsewhere.status).toBe(403);
+    expect(elsewhere.body.error.message).toBe("Only the function's head sets its KPIs");
     const trace = await as("ada").get(`/performance/key-results/${ids.kr1}/trace`);
     expect(trace.body.steps.map((s) => s.kind)).toEqual(["key_result", "company_key_result", "objective", "organisational_goal"]);
   });

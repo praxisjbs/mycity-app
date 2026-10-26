@@ -56,6 +56,8 @@ const personFields = (context: Record<string, string>) => Object.keys(context).f
 
 const fieldLabel = (key: string) => key.split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 const hours = (h: number) => (h === 1 ? "1 hour" : `${h} hours`);
+/** The most stages a flow takes (the contract's ApprovalStepsUpdate). */
+const MAX_STAGES = 10;
 
 function valueText(c: StageCondition, type: string | undefined): string {
   const one = (v: string | number | boolean) => (type === "money" ? formatMoney(String(v)) : String(v));
@@ -115,7 +117,7 @@ export function Approvals() {
           { key: "stages", label: "Stages", render: (f) => f.stages.map((x) => x.name).join(" · ") },
           { key: "version", label: "Version", align: "n", render: (f) => String(f.version) },
           { key: "open", label: "Open Requests", align: "n", render: (f) => String(f.open_requests) },
-          { key: "status", label: "Status", desktop: true, render: (f) => (f.problems.length ? <Pill tone="err">Needs Fixing</Pill> : <Pill tone="ok">Active</Pill>) },
+          { key: "status", label: "Status", render: (f) => (f.problems.length ? <Pill tone="err">Needs Fixing</Pill> : <Pill tone="ok">Active</Pill>) },
         ]}
       />
     </>
@@ -131,7 +133,16 @@ function FlowDetail({ flow, close, editable }: { flow: ApprovalFlow; close: () =
         <Pill>{`Version ${flow.version}`}</Pill>
         {flow.open_requests > 0 && <Pill tone="info">{`${flow.open_requests} Open`}</Pill>}
       </Inline>
-      {flow.problems.length > 0 && <Banner tone="err">Fix these stages before the next request</Banner>}
+      {flow.problems.length > 0 && (
+        <Banner tone="err">
+          <span className="block font-semibold">Fix these stages before the next request</span>
+          <ul className="m-0 list-disc pl-4">
+            {flow.problems.map((p) => (
+              <li key={p} data-copy="content">{p}</li>
+            ))}
+          </ul>
+        </Banner>
+      )}
       <Chain steps={flow.stages.map((x) => ({ label: x.name }))} />
       {flow.stages.map((stage) => (
         <Card key={stage.key}>
@@ -205,7 +216,8 @@ function EditStages({ flow, close }: { flow: ApprovalFlow; close: () => void }) 
       close();
       toast(`${saved.name} saved as version ${saved.version}`);
     } catch (e) {
-      setProblem(e instanceof ApiError ? e.message : "Something went wrong");
+      // A refused route names each stage's problem (workflow.service plainly); anything else, its message.
+      setProblem(e instanceof ApiError ? (e.fields.stages?.join(" · ") ?? e.message) : "Not saved. Try again.");
     }
   };
 
@@ -237,9 +249,13 @@ function EditStages({ flow, close }: { flow: ApprovalFlow; close: () => void }) 
           </Card>
         ))}
         <div>
-          <Button icon="plus" onClick={() => setEditing("new")}>
-            Add Stage
-          </Button>
+          {stages.length < MAX_STAGES ? (
+            <Button icon="plus" onClick={() => setEditing("new")}>
+              Add Stage
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">{`At most ${MAX_STAGES} stages`}</p>
+          )}
         </div>
       </Stack>
       <FormError>{problem}</FormError>
@@ -329,7 +345,8 @@ function StageForm({ flow, stage, label, taken, onCancel, onDone }: {
   onDone: (stage: ApprovalStageInput, label: string) => void;
 }) {
   const roles = usePaged("GET /api/v1/access/roles");
-  const users = usePaged("GET /api/v1/users");
+  // Only people who may still sign in and decide: never a Suspended or Left login.
+  const users = usePaged("GET /api/v1/users", { filters: { status: "active" } });
   const first = stage?.approvers[0];
   const cond = stage?.condition[0];
   const [person, setPerson] = useState<UserRow[]>(first?.type === "user" && first.value ? [{ user_id: first.value, display_name: label } as UserRow] : []);

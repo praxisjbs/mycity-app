@@ -623,7 +623,7 @@ route("POST /api/v1/tasks/:id/unblock", (req) => {
 route("POST /api/v1/tasks/:id/cancel", (req) => {
   const t = find(req.user!, req.params.id);
   if (!t) return notFound();
-  if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only the person who set this task can cancel it");
+  if (!manages(req.user!, t)) return fail(403, "FORBIDDEN", "Only whoever set this task, or the lead's manager, can cancel it");
   if (t.is_commitment && t.original_due_at) return fail(409, "COMMITMENT_APPROVED", "Approved commitments are rescoped, not changed");
   log(req.user!, t, "cancelled", t.status, "cancelled");
   Object.assign(t, { status: "cancelled", cancelled_at: new Date().toISOString(), cancel_reason: (req.body as { cancel_reason: string }).cancel_reason });
@@ -1093,7 +1093,14 @@ route("GET /api/v1/performance/commitments", (req) => {
   const rows = commitmentsFor(req.user!, waiting_on_me === "true").filter((t) => !month || t.commitment_month === monthOf(month)).map(commitmentOf);
   return paged(rows, { ...req, query }, {
     search: (c) => [c.title, c.number, c.employee?.display_name],
-    filters: { state: (c, v) => c.state === v, employee_id: (c, v) => c.employee?.employee_id === v, department_id: () => true },
+    filters: {
+      // An unapproved month as its pill reads: sent and waiting, not sent, or returned.
+      state: (c, v) =>
+        v === "sent" ? c.state === "awaiting_approval" && c.set_status === "submitted"
+        : v === "returned" ? c.state === "awaiting_approval" && c.set_status === "returned"
+        : v === "not_sent" ? c.state === "awaiting_approval" && (c.set_status === null || c.set_status === "draft")
+        : c.state === v,
+      employee_id: (c, v) => c.employee?.employee_id === v, department_id: () => true },
     sort: { due_at: (a, b) => (a.due_at ?? "9").localeCompare(b.due_at ?? "9"), employee: (a, b) => (a.employee?.display_name ?? "").localeCompare(b.employee?.display_name ?? "") },
   });
 });

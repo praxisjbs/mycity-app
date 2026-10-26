@@ -1676,7 +1676,7 @@ A strip of labelled figures across the top of a record: smaller than KPI cards, 
 | Use | At the head of a record (an expense claim's totals, a payroll run's counts, a vacancy's pipeline). |
 | Avoid | A role's dashboard figures (use KpiGrid); more than six figures; a figure with a sentence under it. |
 | Phone | Two to a row, and only the first four show unless a figure is marked `desktop` (gate 11). |
-| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. |
+| Accessibility | A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. A figure's help is a help term on its label (hover on a computer, tap on a phone), never inside a button. |
 | Status | stable |
 | Exports | `StatStrip` |
 | Import | `import { StatStrip } from "@mycity/ui";` |
@@ -2825,6 +2825,7 @@ Day-first date entry: type 13/10/2026 or pick a day; the value is ISO for the wi
 | `id` | `string` |  | The control's id; the Field supplies one otherwise. |
 | `name` | `string` |  | The field's name, so a failed submit can focus it. |
 | `placeholder` | `string` |  | The format example; DD/MM/YYYY. |
+| `disabled` | `boolean` |  | Shown and not changed (a record already sent): no typing and no calendar. |
 
 **DateRangeField** props (`DateRangeFieldProps`)
 
@@ -3524,7 +3525,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | Use | Switch when the change saves on its own (with a toast); CheckboxField when the form's own button saves it; ToggleRow for a list of settings. |
 | Avoid | A Switch inside a form that has a save button; a checkbox for something that applies at once. |
 | Phone | The switch and the checkbox sit in a 44 px tap area; ToggleRow keeps the words on the left, the switch on the right. |
-| Accessibility | Switch has role switch and needs a label; CheckboxField's label is its own; both work with Space. |
+| Accessibility | Switch has role switch and needs a label; CheckboxField's label is its own; both work with Space. A switch whose change hands back its work (F26) says aria-busy and refuses another change until the work settles. |
 | Status | stable |
 | Exports | `Switch`, `ToggleRow`, `CheckboxField` |
 | Import | `import { Switch, ToggleRow, CheckboxField } from "@mycity/ui";` |
@@ -3537,7 +3538,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `checked` | `boolean` | yes | On or off. |
-| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `onChange` | `(checked: boolean) => unknown` | yes | Called with the new state. Hand back the work it starts (onChange={save}) and the switch is busy until it settles (F26). |
 | `label` | `string` | yes | What it switches, for assistive technology when no visible label names it. |
 | `disabled` | `boolean` |  | Not switchable now. |
 | `className` | `string` |  | Layout classes only. |
@@ -3549,7 +3550,7 @@ On or off: a Switch for a setting that applies at once, a CheckboxField for a ye
 | `title` | `ReactNode` | yes | What the setting is, Title Case, at most 4 words. |
 | `text` | `ReactNode` |  | One short line about it, when the title is not enough. |
 | `checked` | `boolean` | yes | On or off. |
-| `onChange` | `(checked: boolean) => void` | yes | Called with the new state. |
+| `onChange` | `(checked: boolean) => unknown` | yes | Called with the new state; hand back its work and the switch is busy until it settles. |
 | `changed` | `boolean` |  | Marks a row changed but not yet published (a policy draft). |
 | `disabled` | `boolean` |  | Not switchable now. |
 
@@ -5430,6 +5431,7 @@ Not components, but imported from `@mycity/ui` the same way (`packages/ui/src/li
 | `monthName` | `lib/format.ts` | Month name from a zero-based index: 0 → "January". |
 | `zoneClock` | `lib/format.ts` | The wall clock in another city, for the sign-in screen's cities: the time ("19:42"), the day as a person says it ("Wednesday 16 October", day first), and the hour as a number (with minutes as a fraction) for the scene's light. |
 | `todayIso` | `lib/format.ts` | Today in Lagos as ISO "YYYY-MM-DD". |
+| `addDaysIso` | `lib/format.ts` | An ISO day some days on (or back, for a negative n): a date field's `max`, "2026-10-26" and 90 → "2027-01-24". |
 | `parseDayFirst` | `lib/format.ts` | Day-first text a person typed ("13/10/2026", "13-10-2026", "13.10.26") → ISO, or null. |
 | `formatMoney` | `lib/format.ts` | Full amount with kobo, for tables and documents. |
 | `formatMoneyShort` | `lib/format.ts` | Short form for KPI tiles only: "₦1.3M", "₦850K". |

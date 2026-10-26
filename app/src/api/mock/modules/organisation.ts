@@ -1,4 +1,4 @@
-import type { ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
+import type { ApprovalInstance, ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
 import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { exportFile } from "./shared";
@@ -118,6 +118,8 @@ route("GET /api/v1/employees", (req) => {
       work_pattern: (r, v) => r.work_pattern === v,
       employment_type: (r, v) => r.employment_type === v,
       line_manager_id: (r, v) => r.line_manager?.employee_id === v,
+      // The demo's contracts end 120 days on (record()), so none ends within 30.
+      contract: () => false,
     },
     sort: {
       display_name: (a, b) => text(a.display_name, b.display_name),
@@ -192,7 +194,8 @@ function base(p: MockPerson, viewer: string, canSee: boolean, first: string, res
     contract_ends_on: p.employment_type === "contractor" ? isoDaysAhead(120) : null,
     confirmation_due_on: probationDue(p),
     confirmed_on: confirmedOn(p),
-    left_on: null,
+    left_on: LEFT_ON.get(p.employee_id) ?? null,
+    is_ceo: p.user_key === "ifeoma",
     archived_at: ARCHIVED.has(p.employee_id) ? at(0, "09:00") : null,
     archive_reason: ARCHIVED.has(p.employee_id) ? "Archived on this laptop" : null,
     work_email: p.work_email,
@@ -359,13 +362,19 @@ route("PATCH /api/v1/employees/:id", (req) => {
   return ok(record(p, req.user!));
 });
 
+/** The last day Archive Record was given, by employee: their left_on until restored. */
+const LEFT_ON = new Map<string, string>();
+
 route("POST /api/v1/employees/:id/archive", (req) => {
   const p = mine(req);
   if (!p) return notFound();
   if (!(req.body as { archive_reason?: string }).archive_reason) return invalid({ archive_reason: ["Say why"] });
   if (ARCHIVED.has(p.employee_id)) return fail(422, "ALREADY_ARCHIVED", "This record is already archived.");
   if (p.user_key === "ifeoma") return fail(422, "CEO_PROTECTED", "The CEO's record cannot be archived.");
+  const leftOn = (req.body as { left_on?: string }).left_on ?? isoDaysAgo(0);
+  if (leftOn > isoDaysAgo(0)) return invalid({ left_on: ["Not after today"] });
   ARCHIVED.add(p.employee_id);
+  LEFT_ON.set(p.employee_id, leftOn);
   return ok(record(p, req.user!));
 });
 
@@ -374,6 +383,7 @@ route("POST /api/v1/employees/:id/restore", (req) => {
   if (!p) return notFound();
   if (!ARCHIVED.has(p.employee_id)) return fail(422, "NOT_ARCHIVED", "This record is not archived.");
   ARCHIVED.delete(p.employee_id);
+  LEFT_ON.delete(p.employee_id);
   return ok(record(p, req.user!));
 });
 
@@ -598,6 +608,7 @@ const LIST_FILTERS = {
   employee_id: (r: MockLeave, v: string) => r.employee.employee_id === v,
   from: (r: MockLeave, v: string) => r.ends_on >= v,
   to: (r: MockLeave, v: string) => r.starts_on <= v,
+  live: (r: MockLeave, v: string) => v !== "true" || r.status === "submitted" || r.status === "approved",
 };
 const LIST_SORT = {
   starts_on: (a: MockLeave, b: MockLeave) => a.starts_on.localeCompare(b.starts_on),
@@ -706,6 +717,9 @@ route("POST /api/v1/leave/requests", (req) => {
   const who = byId(b.employee_id);
   const t = LEAVE_TYPES.find((x) => x.leave_type_id === b.leave_type_id);
   if (!who || !t) return invalid({ ...(who ? {} : { employee_id: ["Pick someone"] }), ...(t ? {} : { leave_type_id: ["Pick a type"] }) });
+  if (ARCHIVED.has(who.employee_id) || statusOf(who) !== "active") return fail(422, "EMPLOYEE_NOT_ACTIVE", "Pick someone who works here now", { employee_id: ["Not active"] });
+  if (LEAVE.some((x) => x.key === who.user_key && (x.status === "submitted" || x.status === "approved") && x.starts_on <= b.ends_on && x.ends_on >= b.starts_on))
+    return fail(409, "LEAVE_OVERLAP", "They already have leave on some of those days", { starts_on: ["Overlaps other leave"] });
   const l: MockLeave = {
     leave_request_id: uuid(), employee: personRef(who), key: who.user_key, leave_type_id: t.leave_type_id, leave_type_name: t.name, starts_on: b.starts_on, ends_on: b.ends_on,
     days: workingDays(b.starts_on, b.ends_on), reason: b.reason ?? null, status: "approved", workflow_instance_id: null, waiting_on: null, recorded: true,
@@ -748,8 +762,32 @@ const decide = (req: { params: Record<string, string>; user: string | null; body
   l.decided_at = new Date().toISOString();
   return ok({ workflow_instance_id: l.workflow_instance_id, state: l.status, stage_name: null });
 };
+/** A leave request's approval as the workflow reads it: its stage, and whether it waits on the reader. */
+function leaveInstance(user: string, wid: string): ApprovalInstance | null {
+  const l = LEAVE.find((x) => x.workflow_instance_id === wid);
+  if (!l) return null;
+  const pending = l.status === "submitted";
+  const now = l.waiting_on === "Operations & People" ? "operations_people" : "line_manager";
+  const entered = l.submitted_at ?? l.created_at;
+  const stages: Array<[string, string]> = [["line_manager", "Line Manager"], ...(l.days > 5 ? ([["operations_people", "Operations & People"]] as Array<[string, string]>) : [])];
+  const state = l.status === "submitted" ? "pending" : l.status === "approved" ? "approved" : l.status === "rejected" ? "rejected" : "cancelled";
+  return {
+    workflow_instance_id: wid, definition_key: "leave.approval", definition_name: "Leave Request", version: 1, module_key: "people",
+    entity_type: "leave_request", entity_id: l.leave_request_id, subject_employee_id: l.employee.employee_id, subject_name: l.employee.display_name,
+    state, current_stage: pending ? now : null, stage_name: pending ? l.waiting_on : null, context: { days: l.days }, stage_entered_at: entered,
+    stage_due_at: pending ? new Date(Date.parse(entered) + STAGE_HOURS * 3600000).toISOString() : null,
+    opened_by: null, opened_by_name: l.employee.display_name, opened_at: entered, completed_at: l.decided_at,
+    route: stages.map(([key, name]) => ({
+      key, name, state: !pending ? (state === "approved" ? "done" : "stopped") : key === now ? "now" : key === "line_manager" ? "done" : "todo",
+      approvers: [key === "line_manager" ? { type: "manager_of_subject", value: null, label: "Line Manager" } : { type: "role", value: "operations_people", label: "Operations & People" }],
+    })),
+    decisions: [],
+    can_decide: pending && l.key !== user && waitingOn(user).some((w) => w.workflow_instance_id === wid),
+    can_withdraw: false, can_reassign: false, link: `/people?tab=leave&id=${l.leave_request_id}`,
+  };
+}
 route("GET /api/v1/workflow/instances/:id", (req) => {
-  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id);
+  const found = locationRequestInstance(req.user!, req.params.id) ?? performanceInstance(req.user!, req.params.id) ?? leaveInstance(req.user!, req.params.id);
   return found ? ok(found) : notFound();
 });
 route("POST /api/v1/workflow/instances/:id/approve", (req) => decide(req, true));
@@ -801,7 +839,7 @@ route("GET /api/v1/workflow/mine/count", (req) => {
 /* My Leave: the caller's own. */
 const myLeave = (user: string) => LEAVE.filter((l) => l.key === user);
 route("GET /api/v1/ess/leave", (req) =>
-  asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
+  asPage(paged(myLeave(req.user!), req, { filters: { status: LIST_FILTERS.status, year: (r, v) => r.starts_on.slice(0, 4) === v, from: (r, v) => r.ends_on >= v, to: (r, v) => r.starts_on <= v }, sort: { starts_on: LIST_SORT.starts_on, submitted_at: LIST_SORT.submitted_at } })),
 );
 /** My Leave's calendar: everyone for Operations & People and the CEO, else mine and everyone under me. */
 route("GET /api/v1/ess/leave/calendar", (req) => {

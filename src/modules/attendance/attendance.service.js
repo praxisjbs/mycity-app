@@ -599,7 +599,11 @@ async function dayDetail(employeeId, query, scope) {
       : ctx.approved
         ? { name: ctx.approved.name, radius_m: null }
         : null,
-    policy: { geofence_mode: ctx.policy.geofence_mode, device_mode: ctx.policy.device_mode },
+    policy: {
+      geofence_mode: ctx.policy.geofence_mode,
+      device_mode: ctx.policy.device_mode,
+      pre_approved_overtime: Boolean(ctx.policy.overtime && ctx.policy.overtime.on && ctx.policy.overtime.approval === "pre_approved"),
+    },
     open_exceptions: row.open_exceptions,
     overtime_approval: approval
       ? { minutes: Number(approval.minutes), approved_by_name: approval.approved_by_name || null, reason: approval.reason }

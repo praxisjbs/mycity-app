@@ -164,6 +164,8 @@ const LeaveListQuery = listQuery(
     employee_id: uuid.optional(),
     from: isoDate.optional(),
     to: isoDate.optional(),
+    /** Waiting or approved only: the Leave Calendar's requests. */
+    live: flag.optional(),
   },
   ["starts_on", "submitted_at", "created_at"],
 );

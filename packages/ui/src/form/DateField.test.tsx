@@ -25,6 +25,24 @@ function Held({ min, max, sent, told }: { min?: string; max?: string; sent: stri
   );
 }
 
+describe("DateField shown and not changed", () => {
+  it("takes no typing and opens no calendar while disabled (a check-in already sent)", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <Field label="Delivered On">
+        <DateField value="2026-10-28" onChange={onChange} disabled />
+      </Field>,
+    );
+    const input = screen.getByLabelText("Delivered On");
+    expect(input).toBeDisabled();
+    expect(input).toHaveValue("28/10/2026");
+    expect(screen.getByRole("button", { name: "Pick a date" })).toBeDisabled();
+    await user.type(input, "1");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
 describe("DateField typed into a form", () => {
   it("keeps a four-digit year as it is typed, and the form ends with that date", async () => {
     // Rewritten from its own value, "28/10/20" became 28/10/2020: 28/10/2026 left as 2020-10-28 (fault #2, 21/10/2026).

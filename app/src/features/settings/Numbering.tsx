@@ -79,7 +79,7 @@ function SchemeForm({ scheme, close }: { scheme: NumberingScheme; close: () => v
       toast(`${scheme.label} numbering saved`);
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Something went wrong");
+      else toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
     }
   };
   return (

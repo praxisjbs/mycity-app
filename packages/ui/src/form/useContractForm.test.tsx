@@ -107,8 +107,41 @@ describe("useContractForm", () => {
     expect(shortMessage({ type: "too_small", message: "At least 150 m" })).toBe("At least 150 m");
     expect(shortMessage({ type: "too_small", message: "Add a recipient" })).toBe("Add a recipient");
     expect(shortMessage({ type: "too_big", message: "At most 500 m" })).toBe("At most 500 m");
-    expect(shortMessage({ type: "too_small", message: "String must contain at least 3 character(s)" })).toBe("Too short");
-    expect(shortMessage({ type: "too_big", message: "Number must be less than or equal to 500" })).toBe("Too long");
+    // Zod's own limits say the limit, also when a server 422 carries them raw.
+    expect(shortMessage({ type: "too_small", message: "String must contain at least 3 character(s)" })).toBe("At least 3 characters");
+    expect(shortMessage({ type: "too_big", message: "String must contain at most 500 character(s)" })).toBe("At most 500 characters");
+    expect(shortMessage({ type: "too_big", message: "Number must be less than or equal to 500" })).toBe("At most 500");
+    expect(shortMessage({ type: "too_small", message: "Number must be greater than or equal to 50" })).toBe("At least 50");
+    expect(shortMessage({ type: "custom", message: "Array must contain at most 25 element(s)" })).toBe("At most 25");
+    expect(shortMessage({ type: "too_big", message: "String must contain at most 4000 character(s)" })).toBe("At most 4,000 characters");
+    expect(shortMessage({ type: "too_big", message: "Number must be less than or equal to 2160" })).toBe("At most 2,160");
+    expect(shortMessage({ type: "custom", message: "String must contain at least 1 character(s)" })).toBe("Required");
+    expect(shortMessage({ type: "invalid_type", message: "Expected integer, received float" })).toBe("Whole numbers only");
+    // A pattern's own words when they fit; Zod's own "Invalid" keeps the short one.
+    expect(shortMessage({ type: "invalid_string", message: "Ten digits" })).toBe("Ten digits");
+    expect(shortMessage({ type: "invalid_string", message: "Not a price" })).toBe("Not a price");
+    expect(shortMessage({ type: "invalid_string", message: "Invalid" })).toBe("Check the format");
+    expect(shortMessage({ type: "invalid_string", message: "Invalid email" })).toBe("Check the email");
+  });
+
+  it("shows an empty field the schema's own words for it, else Required", () => {
+    const schema = {
+      safeParse: () => ({
+        success: false,
+        error: {
+          issues: [
+            { path: ["model"], code: "too_small", message: "Pick a model" },
+            { path: ["name"], code: "too_small", message: "String must contain at least 1 character(s)" },
+            { path: ["price"], code: "invalid_string", message: "Not a price" },
+          ],
+        },
+      }),
+    };
+    const { result } = renderHook(() => useContractForm({ model: "", name: "", price: "" }, schema));
+    act(() => {
+      result.current.check();
+    });
+    expect(result.current.errors).toEqual({ model: "Pick a model", name: "Required", price: "Required" });
   });
 });
 
@@ -121,6 +154,12 @@ describe("useContractForm with INTERIM rules", () => {
     });
     expect(ok).toBe(false);
     expect(result.current.status("name")).toEqual({ state: "bad", message: "Required" });
+  });
+
+  it("takes only lists of messages as marks: a refusal's details are not", () => {
+    const { result } = renderHook(() => useContractForm({ email: "ada@mycity.app" }));
+    act(() => result.current.setServerErrors({ email: ["Already in use"], reason: "Connection refused" as never, smtp_code: 421 as never }));
+    expect(result.current.field("email").message).toBe("Already in use");
   });
 
   it("shows a server error until the field changes", () => {

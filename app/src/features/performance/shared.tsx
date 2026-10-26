@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { PerformancePeriod } from "@mycity/contract/contract.gen.ts";
 import { useApi, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
-import { formatMonth, formatNumber, Who, type ContractSchema } from "@mycity/ui";
+import { formatMonth, formatNumber, shortMessage, todayIso, Who, type ContractSchema } from "@mycity/ui";
 
 type Tone = "ok" | "warn" | "err" | "info" | "neutral";
 
@@ -56,14 +56,28 @@ export function reportingMonth(months: string[], today = new Date().toISOString(
 }
 
 /** A field's error as a form shows it: the API's words when they fit in four, else the short form given. */
-export const fieldMessage = (message: string | undefined, short: string) =>
-  message === undefined ? undefined : message.trim().split(/\s+/).length <= 4 ? message : short;
+export const fieldMessage = (message: string | undefined, short: string) => {
+  if (message === undefined) return undefined;
+  // Zod's own sentences read as their limit ("Required", "At most 200 characters"); a short message as it is.
+  const said = shortMessage({ type: "custom", message });
+  return said && said !== "Check this value" ? said : short;
+};
 
 /** A month's short name for a column ("Oct"), from its first day. */
 export const monthShort = (m: string) => formatMonth(m).slice(0, 3);
 
+/** A quarter's months as a choice ("October 2026"): a target change's From Month, never a day. */
+export const monthChoices = (months: string[]): Array<[string, string]> => months.map((m) => [m, formatMonth(m)]);
+
+/** The From Month a change starts on: this month while it is in the quarter, else the quarter's first. */
+export const startMonth = (months: string[]) => months.find((m) => m.slice(0, 7) === todayIso().slice(0, 7)) ?? months[0] ?? "";
+
 /** A score from 0 to 1 as people read it, two places; a dash when there is none. */
 export const score = (s: string | null | undefined) => (s === null || s === undefined ? "–" : Number(s).toFixed(2));
+
+/** A line's score in each month of its quarter, as a line's sheet lists them (the phone's only place for them, §10.2). */
+export const monthScores = (line: { months: Array<{ month: string; score: string | null }> }, months: string[]): Array<[string, string]> =>
+  months.map((m) => [formatMonth(m), score(line.months.find((x) => x.month === m)?.score)]);
 
 /** A key result's band as a pill's tone and word. */
 export function band(b: "good" | "watch" | "recovery" | null | undefined): { tone: Tone; text: string } {

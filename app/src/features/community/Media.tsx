@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { cachedPhoto, fetchFile, saveBlob, saveFile, usePhoto, usePhotos } from "@/api/download";
 import { upload } from "@/api/upload";
 import type { LinkPreview, MediaRef, Message, MessageCreate } from "@/api/types/community";
-import { Button, Field, FileCard, fileTypeOf, formatBytes, formatDate, formatTime, FormError, FormFooter, Icon, LinkCard, MediaAlbum, MediaTile, MediaViewer, TextAreaField, todayIso, UploadField, useContractForm, type ViewerItem } from "@mycity/ui";
+import { ApiError } from "@/api/client";
+import { Button, Field, FileCard, fileTypeOf, formatBytes, formatDate, formatTime, FormError, FormFooter, Icon, LinkCard, MediaAlbum, MediaTile, MediaViewer, TextAreaField, toast, todayIso, UploadField, useContractForm, type ViewerItem } from "@mycity/ui";
 
 /**
  * Staff Community's photos, videos, files and link cards (community.md §3 steps 17 and 18):
@@ -216,15 +217,20 @@ export function SendFiles({ channelId, accept, kinds, close, send }: { channelId
     if (!f.check()) return;
     const album = docs.length > 1 ? crypto.randomUUID() : undefined;
     const caption = f.values.caption.trim();
-    await send(
-      docs.map((d, i) => ({
-        message_type: "file",
-        document_id: d.document_id,
-        ...(album ? { album_key: album } : {}),
-        ...(i === 0 && caption ? { body: caption } : {}),
-      })),
-    );
-    close();
+    try {
+      await send(
+        docs.map((d, i) => ({
+          message_type: "file",
+          document_id: d.document_id,
+          ...(album ? { album_key: album } : {}),
+          ...(i === 0 && caption ? { body: caption } : {}),
+        })),
+      );
+      close();
+    } catch (e) {
+      // The sheet stays, with what was picked, and says why.
+      toast.error(e instanceof ApiError ? e.message : "Not sent. Try again.");
+    }
   };
   return (
     <>

@@ -330,7 +330,11 @@ async function answer({ db, actor, question, history = [], now = new Date(), ven
       throw err;
     }
     await talk.fail("AI_FAILED", "The assistant could not answer. Try again.", 500, err && err.message);
-    throw err;
+    // The screen is told what the run records (§5), not the generic 500; the cause stays in the log.
+    const failed = new AppError("AI_FAILED", "The assistant could not answer. Try again.", 500);
+    failed.cause = err;
+    if (err && err.stack) failed.stack = err.stack;
+    throw failed;
   }
 }
 

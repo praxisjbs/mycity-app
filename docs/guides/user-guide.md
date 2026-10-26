@@ -497,6 +497,7 @@ word limits do not count it, as they do not count an article.
 
 ## 14 · Change log
 
+- 26/10/2026 · JP · A picture enlarged on a phone is the phone's, as the text showed it, when the chapter has one (it was always the computer's).
 - 26/10/2026 · JP · Every chapter checked against its screens, string by string (a sweep of each
   screen's buttons, fields, columns, messages, server refusals and schema marks, then a reader per
   chapter giving each a verdict), and every gap closed in one PR: the steps a screen asks for, each

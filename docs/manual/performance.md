@@ -38,8 +38,8 @@ results. Everyone can read all of it.
 1. Open [Performance · Goals](/performance?tab=goals). The quarter and its dates show under the
    title on a computer.
 2. Choose the **Quarter**, and the **Function**: **All Functions**, **Company** or one function.
-3. The tiles show the **Company Score**. **On Track** counts key results scoring **Good** in their
-   latest month. **In Recovery** counts those scoring **Recovery**. **Awaiting Report** counts those
+3. The tiles show the **Company Score**. **Scoring Good** counts key results scoring **Good** in
+   their latest month. **In Recovery** counts those scoring **Recovery**. **Awaiting Report** counts those
    never reported.
 4. **Organisational Goals** lists the year's goals: **Goal ID**, **Strategic Theme**, **Goal** and
    **Success Measure**. Press one to open it: its **Strategic Theme**, **Success Measure**,
@@ -69,8 +69,8 @@ quarter is set up, only **Manage Quarters** is offered.
 A key result shows its latest reported month. It keeps that month's status until the head reports
 the next one.
 
-On a phone, the buttons at the top sit under the title, and adding a goal is also in
-**Quick Actions**. The tiles sit two to a row. **Organisational Goals**
+On a phone, the buttons at the top sit under the title. **Quick Actions** offers a function's head
+Report Month, and others New Goal. The tiles sit two to a row. **Organisational Goals**
 shows the **Goal ID** and **Goal**; press one for the rest. Each key result shows its **Code**,
 **Key Result**, **Status** and **Score**; press it for its owner and dates. The three dots open a
 list from the bottom, and the larger forms fill the screen.
@@ -92,9 +92,9 @@ The panel shows what the key result is and how its latest month went:
   the CEO has not decided yet.
 - **Feeds** names the company key results it feeds, **Fed By** the ones that feed it, and **Rolls
   Up To** the objective and goal above it.
-- **This Month** shows the latest month reported, with its pill (**Good**, **Watch**, **Recovery**
-  or **Not Scored**): **Status**, **Actual**, **Source**, **Update**, the **Proposed** score and
-  the **Confirmed** score.
+- The month last reported, named such as *October 2026* (**Not Reported** before any), with its
+  pill (**Good**, **Watch**, **Recovery** or **Not Scored**): **Status**, **Actual**, **Source**,
+  **Update**, the **Proposed** score and the **Confirmed** score.
 - **History** lists the months before, and **Initiatives** the tasks set for its owner.
 
 | Type | What it means |
@@ -143,11 +143,11 @@ plan is a draft, or after it comes back. A new objective goes into the quarter c
 2. Pick the **Function**, type the **Objective**, and pick the **Organisational Goal** it serves.
    Press **Set Objective**. The hub gives it its code, such as *BM-O3 set*.
 3. {needs="cap goals.company"} For a company objective, choose **Company** in **Function**.
-4. For a key result, choose your function in **Function** on Goals first, so its objectives show.
-   Then press **New Goal** and choose **Key Result**.
+4. For a key result, press **New Goal** and choose **Key Result**.
 5. Pick its **Objective**, and type the **Key Result**, such as `Grow monthly active users to
-   64,000`. The **Objective** list holds only objectives whose plan is a draft or returned. If the
-   form reads **No Objectives Yet**, set an objective first, or the plan is already sent.
+   64,000`. The **Objective** list holds every objective of the quarter whose plan is a draft or
+   returned and that you may add to, whatever **Function** Goals shows. If the form reads
+   **No Objectives Yet**, set an objective first, or the plan is already sent.
 6. Choose its **Measure**: **Numeric**, **Dated** or **Yes or No**.
 7. Fill in the **Target** as a number, and **Target in Words** as people say it, such as
    `64,000 users`. Tick **Target to be confirmed** if it is not settled yet.
@@ -173,11 +173,11 @@ example, *BM-O1 deleted*.
 |---|---|---|
 | **An objective holds at most four key results** | The objective has four already | Add it to another objective |
 | **Finishes before it starts** under **Finish** | **Finish** is before **Start** | Change one of the two dates |
-| **Check the format** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
+| **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, such as `64000`. Put `64,000 users` in **Target in Words** |
 | **This plan is sent or binding: change a target instead** | That function's plan for the quarter is sent or approved | Choose a quarter still in **Planning** in **Quarter**, or change a target |
 | **That quarter is closed** | The quarter chosen in **Quarter** has ended | Choose the current or the next quarter |
 | **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
-| **Only Management set the company's objectives** | **Function** was left empty, which means the company | Pick your function in **Function** |
+| **Pick a function** under **Function** | No function picked, and your role does not set the company's | Pick your function |
 | **You cannot set a function's goals** | Your role sets only the company's objectives | Choose **Company** in **Function** |
 
 ### Send the quarter plan {#performance-plan-send needs="performance create, cap goals.function"}
@@ -248,31 +248,34 @@ What waits for you sits in **Waiting On You** near the top of
 ### Report the month {#performance-report needs="performance edit, cap goals.function"}
 
 By the third working day of each month (Monday to Friday, not a public holiday), each function's
-head reports how its key results did.
+head reports how its key results and KPIs did. Management report the company's key results.
 
 1. Press **Report Month** at the top of [Performance · Goals](/performance?tab=goals).
-2. Pick the **Function** and the **Month** first. The **Month** starts on the month just ended.
-   Changing it clears what you have typed.
+2. Pick the **Function** (or **Company**, for Management) and the **Month** first. The **Month**
+   starts on the month just ended. Changing it once you have typed asks first: **Change Month**
+   clears what you typed, **Keep It** stays.
 3. For each key result you report, choose its **Status** and fill in the **Actual** and a short
    **Update**. Type the **Actual** as a figure: a comma or a unit stays out, so `64,000` goes in
    as `64000`. A minus is kept, such as `-5`. A figure it cannot take is marked as you leave it.
    ![Report Month](shot:performance-report)
 4. If the score falls under 0.4, or the status is **At Risk**, **Off Track** or **Missed**, name
    the **Recovery Owner** and the **Recovery Date**.
-5. Press **Report Month**. The hub says **Month reported**. Only the key results you changed are
-   sent.
+5. Under **KPIs**, for each of the function's KPIs you report, choose its **Result** and fill in the
+   **Actual** and a **Comment**.
+6. Press **Report Month**. The hub says **Month reported**. Only the key results and KPIs you
+   changed are sent.
 
-A function with many objectives shows them in pages. What you typed is kept as you turn them.
-Report Month covers key results. Record each KPI's month on KPIs (see
-[Record a month's result](#performance-kpi-actual)).
+A function with many objectives or KPIs shows them in pages. What you typed is kept as you turn
+them. When a row is refused, the message names it, such as *Check BM-KR1.2*, so you can find it on
+its page.
 
 | The hub says | What to do |
 |---|---|
-| **Change a key result first** | Fill in at least one key result |
-| **Nothing To Report** | The function has no binding key results this quarter: its plan is not approved yet |
+| **Change a key result or KPI first** | Fill in at least one key result or KPI |
+| **Nothing To Report** | The function has no binding key results and no KPIs this quarter |
 | **Name owner and date** under **Recovery Owner** | Name the **Recovery Owner** and **Recovery Date** on that key result |
 | **Pick a status** under **Status** | Choose the key result's status |
-| **Enter a number** under **Actual** | Finish the figure, with at most four decimals, such as `0.95` |
+| **Like 64000 or 0.95** under **Actual** | Finish the figure, with at most four decimals, such as `0.95`. A key result on another page is named in the message |
 | **Pick a date** under **Recovery Date** | Pick the date the key result should recover by |
 | **Shorten the update** under **Update** | Keep the update shorter |
 | **Only the function's head reports its month** | Ask the head to report it |
@@ -294,16 +297,16 @@ and scores already given do not change.
 2. Before the quarter's lock date, a **TBC** target is set in place: press **Set Target**, fill
    in **Target** and **Target in Words**, and press **Set Target**. The hub says **Target set**. It
    still reads **TBC** until the lock date, so you may set it again until then.
-3. After it, press **Change Target**. Type the **New Target** as a figure only, such as `70000`.
-   In **From Month**, pick the first day of the month it applies from. Type the **Reason**.
+3. After it, press **Change Target**. Type the **New Target** as a figure only, such as `70000`,
+   and the **Target in Words** if it has them. Choose the **From Month**, a month of its quarter.
+   Type the **Reason**.
 4. Press **Send Change**. The hub says **Sent to the CEO**, and the key result shows **Change
    Waiting** until the CEO decides.
 
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the new target** | **New Target** is empty | Type the new figure |
-| **Check the format** under **New Target** | It is unfinished or has more than four decimals | Type the figure only |
-| **Check this value** under **From Month** | The day picked is not the 1st of a month | Pick the 1st of the month |
+| **Like 64000 or 0.95** under **New Target** | It is unfinished or has more than four decimals | Type the figure only |
 | **A change to this target is already waiting for a decision** | Only one change waits at a time | Wait for the CEO's decision |
 
 ### Set up a quarter {#performance-quarter needs="performance create, cap performance.manage"}
@@ -328,12 +331,12 @@ starts with a copy of the last quarter's rules.
 7. Press **Set Up Quarter**. The hub says, for example, *Q1 2027 set up*, and Goals shows the new
    quarter. **Back** returns to a step before.
 
-> **Tip:** If nothing happens when you press **Set Up Quarter**, press **Back** to **Quarter**. A
-> field there is marked.
+When the hub refuses a field, the wizard goes back to that field's step, marks it, and a message
+says why, such as **That quarter is already set up**.
 
 | The form says | What it means | What to do |
 |---|---|---|
-| **Check this value** under **Starts** | It is not a quarter's first day | Pick 1 January, 1 April, 1 July or 1 October |
+| **Pick a quarter start** under **Starts** | It is not a quarter's first day | Pick 1 January, 1 April, 1 July or 1 October |
 | **Already set up** under **Starts** | That quarter exists | Pick the next quarter, or change this one |
 | **Another is active** under **Status** | Another quarter is **Active** | Choose **Planning**, or close the active quarter first |
 | **Outside the quarter** under **Lock Date** | The lock date is not in the quarter | Pick a day between **Starts** and **Ends** |
@@ -341,7 +344,7 @@ starts with a copy of the last quarter's rules.
 | **Must exceed Meets** under **Exceeds From** | Exceeds must start above Meets | Raise **Exceeds From**, or lower **Meets From** |
 | **Must exceed Partly Meets** under **Meets From** | Meets must start above Partly Meets | Raise **Meets From**, or lower **Partly Meets From** |
 | **Sections must total 100** under **Results** | **Results**, **KPIs** and **Accountability** do not add to 100 | Change them so they total 100 |
-| **Too long** under a score | A score above 1 | Type a figure from 0 to 1, such as 0.7 |
+| **From 0 to 1** under a score | A score above 1 | Type a figure from 0 to 1, such as 0.7 |
 
 ### Change a quarter {#performance-quarter-edit needs="performance edit, cap performance.manage"}
 
@@ -387,14 +390,14 @@ of the people you manage.
    has **Agreed**.
 2. Each section lists its lines: the **Goal** or **KPI**, its **Target**, what it is **Linked
    To**, when it is **Due**, its **Weight**, each month's score and the **Score**. On a phone, a
-   line shows its **Goal**, **Target**, **Weight** and **Score**; press it for the rest. The month
-   scores are not shown on a phone.
+   line shows its **Goal**, **Target**, **Weight** and **Score**; press it for the rest, its month
+   scores among them.
 3. **Auto** on a line means the hub scores it itself, such as on-time commitments. Your reviewer
    can change that score, with a reason.
 4. **Contribution** lists each key result shared between people: its **Key Result**, each person's
    **Shares**, its **Target** and **Status**, **OK** or **Rebalance**.
 5. Press a line to open **Scorecard Line**: its **Line**, **Section**, **Target**, **Linked To**,
-   **Due**, **Weight** and **Score**. **Change Waiting** shows a new target the CEO has not
+   **Due**, **Weight**, each month's score (such as *October 2026*) and the **Score**. **Change Waiting** shows a new target the CEO has not
    decided. Press **Close** to go back.
 
 | Row | What it reads |
@@ -427,13 +430,15 @@ sent. Operations and People may draft one for anyone but themselves.
    **Accountability** line is **Standard** or **Yes or No**.
 8. Fill in the **Target** if it has one, and the **Weight**, such as `15` or `12.5`.
 9. Pick its **Key Result**, or its **KPI** on a **KPIs** line, or **None** for a line the person
-   reports themselves. A **Milestone** line also needs its **Due Date**.
+   reports themselves. A team result line ticks its **Team Key Results** instead. A **Milestone**
+   line also needs its **Due Date**.
 10. Press **Add Line** for another, or **Remove Line** to take one away.
 11. Press **Save Lines**. The hub says **Lines saved** and the scorecard closes. Press its row to
     open it again.
 
-> **Tip:** A line copied from last quarter loses its key result and its milestone date, because
-> those belong to their quarter. Pick its **Key Result** and **Due Date** again before you save.
+> **Tip:** A line copied from last quarter loses its key results and its milestone date, because
+> those belong to their quarter. Pick its **Key Result** (or tick its **Team Key Results**) and its
+> **Due Date** again before you save.
 
 **Edit Lines** shows only while the scorecard reads **Draft** and its function's plan is not with
 its approvers.
@@ -444,15 +449,16 @@ its approvers.
 | **Already has one** under **Employee** | They already have a scorecard this quarter | Press **Cancel** and open theirs from the list |
 | **Not active** under **Employee** | The person is suspended or has left | Pick someone who works here now |
 | **That quarter is closed** | The **Quarter** chosen above the list has ended | Choose the current quarter in **Quarter**, then press **New Scorecard** |
-| **Not found** | The person is not in your team | Pick someone who reports to you, or ask Operations and People |
+| **Not in your team** under **Employee** | The person does not report to you | Pick someone who reports to you, or ask Operations and People |
 | **This function's plan is already sent for the quarter** | The plan is with its approvers | Wait until it is binding, then draft and send it on its own |
 | **Link a key result** | The line takes its figures from a key result, and none is picked | Pick its **Key Result** |
 | **Link a KPI** | The line takes its figures from a KPI, and none is picked | Pick its **KPI** |
 | **Pick a date** | A **Milestone** line has no **Due Date** | Pick the **Due Date** |
 | **Above zero** | The **Weight** is 0 | Give it a weight above zero |
 | **Check the weight** | The **Weight** is not like 15 or 12.5 | Type a number with at most two decimals |
-| **Pick the key results** | A team result line has lost its key results | Pick the line's **Key Result** |
-| **Shorten the goal** | The **Goal** is empty or too long | Type the goal in a few words |
+| **Pick the key results** | A team result line has none ticked | Tick its **Team Key Results** |
+| **Required** under **Goal** | The **Goal** is empty | Type the goal |
+| *At most 300 characters* under **Goal** | The **Goal** is too long | Type the goal in fewer words |
 | **This scorecard is binding: change a target instead** | The plan was sent or approved while you edited | Press **Cancel**, then [Change a line's target](#performance-line-target) |
 | **A line is not on this scorecard** | Someone else changed the lines while you edited | Press **Cancel** and open **Edit Lines** again |
 | *Line 2:* and a message | That line has a problem no field shows | Correct that line and press **Save Lines** again |
@@ -491,14 +497,13 @@ The scorecard's reviewer and the function's head may ask to change a line's targ
 whose scorecard it is cannot.
 
 1. Open the scorecard and press the line.
-2. Press **Change Target**. Fill in the **New Target**. In **From Month**, pick the first day of the
-   month it applies from, such as 01/11/2026. Type the **Reason**.
+2. Press **Change Target**. Fill in the **New Target**. Choose the **From Month**, a month of the
+   quarter, such as *November 2026*. Type the **Reason**.
 3. Press **Send Change**. The hub says **Sent to the CEO**. The line shows **Change Waiting** until
    the CEO decides.
 
 | The form says | What it means | What to do |
 |---|---|---|
-| **Check this value** under **From Month** | The date is not the 1st of a month | Pick the 1st of the month |
 | **Enter the new target** | **New Target** is empty | Type the new target |
 
 ### Change the reviewer {#performance-reviewer needs="performance edit, cap performance.manage"}
@@ -522,8 +527,8 @@ marked on [My Workspace · Tasks](/workspace?tab=tasks) (see
 
 1. On [Performance · Scorecards](/performance?tab=targets), press **Commitments** at the top.
 2. Choose the **Month**: the last five months, this month or next. Choose a **Department**, and a
-   **State**: **All States**, **Awaiting Approval**, **Due**, **On Time**, **Late**, **Missed** or
-   **Rescoped**. **Awaiting Approval** also lists those **Not Sent** or **Returned**. Or type in
+   **State**: **All States**, **Awaiting Approval**, **Not Sent**, **Returned**, **Due**,
+   **On Time**, **Late**, **Missed** or **Rescoped**. Each lists what reads that way. Or type in
    **Search People**.
 3. The tiles count the **Commitments**, those **On Time**, those **Late or Missed**, and those
    **Awaiting Approval**. On a phone they are one line of figures.
@@ -603,8 +608,8 @@ On a phone, each KPI is a card with its **KPI ID**, **KPI** and **Latest**. Pres
 
 | The hub says | What it means | What to do |
 |---|---|---|
-| **Only the function's head sets its goals** | You picked another function | Pick your own function in **Function** |
-| **Check the format** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
+| **Only the function's head sets its KPIs** | You picked another function | Pick your own function in **Function** |
+| **Like 64000 or 0.95** under **Target** | The figure is unfinished or has more than four decimals | Type the figure only, or use **Target Wording** |
 
 ### Record a month's result {#performance-kpi-actual needs="performance edit, cap goals.function"}
 
@@ -620,8 +625,8 @@ You record your own function's KPIs. Operations and People and the CEO may recor
 | The form says | What it means | What to do |
 |---|---|---|
 | **Enter the actual** under **Actual** | **Met** and **Not Met** need the figure | Fill in the **Actual**, or choose **N/A** |
-| **Check the format** under **Actual** | The figure is unfinished or has more than four decimals | Type the figure only |
-| **Check the highlighted fields** | On **Edit KPI**, the **KPI** name is empty | Type it again |
+| **Like 64000 or 0.95** under **Actual** | The figure is unfinished or has more than four decimals | Type the figure only |
+| **Required** under **KPI** | On **Edit KPI**, the **KPI** name is empty | Type it again |
 
 ## Reviews {#performance-reviews screen=performance/reviews icon=ticks}
 
@@ -635,13 +640,14 @@ those of the people you manage, and any that wait on you.
 
 1. Open [Performance · Reviews](/performance?tab=reviews). The round and its closing date show
    under the title on a computer.
-2. Choose the **Month**: this quarter's rounds, newest first. **Waiting On You** and the list show
-   that month's reviews only. Press **PIPs** for improvement plans, and **Reviews** to come back.
+2. Choose the **Quarter**, then the **Month**: that quarter's rounds, newest first. The list shows
+   that month's reviews. Press **PIPs** for improvement plans, and **Reviews** to come back.
 3. The tiles show **Check-Ins In**, such as 4 of 6, and how many are **With Reviewers**,
-   **With HR** and **Closed**. **With HR** counts those with the second level and with Operations
-   and People. On a phone they are one line: how many check-ins are in, and how many are closed.
-4. **Waiting On You** lists the reviews that need you, with what to do **Next**: **Score**,
-   **Give Input** or **Approve**. On a phone, **Next** is left off: each card shows the
+   **Second Level**, **With HR** and **Closed**. On a phone they are one line: how many check-ins
+   are in, and how many are closed.
+4. **Waiting On You** lists every review that needs you, whatever its month, a probation review
+   among them, a page at a time. **Next** says what to do: **Score**, **Give Input**, **Approve**,
+   or **Close Review** at **With HR**. On a phone, **Next** is left off: each card shows the
    **Employee**, **Stage** and **Due**.
 5. Narrow the list with **Department**, **Stage** and **Kind** (**Monthly** or **Probation**), or
    type in **Search People**.
@@ -651,8 +657,7 @@ those of the people you manage, and any that wait on you.
 
 Before this quarter's first round, the list reads **No Round Yet**.
 
-> **Important:** A probation review belongs to no month, so it is not in this list. Open it from
-> its notice in the bell.
+A probation review belongs to no month: choose **Probation** in **Kind** to list them all.
 
 | A review's stage | What it means |
 |---|---|
@@ -696,8 +701,9 @@ On a phone the review fills the screen. **Lines** shows each line's **Target**, 
 
 1. Open [Performance · Reviews](/performance?tab=reviews) and press the review under **Waiting On
    You**.
-2. Each line with a score to give is a card. A line that reads **Not Assessable**, or an automatic
-   line with no cases this month, has none.
+2. Each line is a card, except an automatic line with no cases this month. A line that reads
+   **Not Assessable** has no evidence: its **Final Score** is optional, and if you give one, type
+   the **Reason**.
 3. Check the **Final Score**, from 0 to 1, such as 0.75. It starts as the proposed score.
 4. If you change it, type the **Reason**. Add a **Comment** if it helps.
 5. Once a line's score is under 1, **Corrective Action**, **Owner** and **Due Date** appear.
@@ -716,9 +722,9 @@ Other buttons at the foot:
 - A late check-in is not in **Waiting On You**. Choose **Checking In** in **Stage** and press the
   review; it reads **Waiting for the check-in.** Press **Score Without Check-In**, type the
   **Reason** and press **Score Review**. The hub says **Scoring without the check-in**. Then open
-  it from **Waiting On You** to score it. Only the automatic lines have a card, *Monthly update on
-  time* scores 0, and **No Check-In** shows your reason. The person is told, and their own lines
-  read **Not Assessable**.
+  it from **Waiting On You** to score it. *Monthly update on time* scores 0, and **No Check-In**
+  shows your reason. The person is told, and their own lines read **Not Assessable**: score one
+  with a reason if you have evidence.
 
 | The hub says | What to do |
 |---|---|
@@ -791,14 +797,16 @@ Operations and People handle these on an open or closed review.
    reminded three working days before.
 3. Under **PIPs**, press a plan, then **Close Plan**. Choose the **Outcome**, type the **Note** and
    press **Close Plan**. The hub says **Plan closed**. **Passed** and **Not Met** end it.
-   **Extended** asks for the new **Ends On** and **Review On**; the plan keeps running as
-   **Extended**, and you press **Close Plan** again on the new date.
-4. Open a probation review from its notice in the bell. At **With HR** it shows **Confirm**,
+   **Extended** asks for the new **Ends On** and **Review On**; the hub says **Plan extended**, the
+   plan keeps running as **Extended**, and you press **Close Plan** again on the new date.
+4. Open a probation review from its notice in the bell, or choose **Probation** in **Kind**. At
+   **With HR** it shows **Confirm**,
    **Extend 3 Months** and **End Employment**. Press the outcome you decide. The hub says, for
    example, *Confirm chosen*, and **Outcome** shows it. Press another to change it.
 5. Press **Close Review** to apply it. **Confirm** records them confirmed today. **Extend 3 Months**
-   moves their confirmation date three months on. **End Employment** is only recorded: end their
-   employment on [People · Employees](/people?tab=employees).
+   moves their confirmation date three months on. **End Employment** is only recorded: a bar on the
+   review says so, *End the employment on People: archive the record.* Archive them on
+   [People · Employees](/people?tab=employees).
 6. **Withdraw Review** ends any open review without a score, even one still **Checking In**. Type
    the **Reason** and press **Withdraw Review**. The hub says **Review withdrawn**. It reads
    **Withdrawn**, with your reason. The person, their reviewer and the second level are told.
@@ -821,7 +829,7 @@ Each month's round opens by itself on the first weekday of the next month. You o
 hand when it started late.
 
 1. Press **Open Round** at the top of [Performance · Reviews](/performance?tab=reviews). On a phone
-   it is also in **Quick Actions**.
+   it is also in **Quick Actions**. It shows while a month of the quarter has no round yet.
 2. Pick the **Month** and press **Open Round**. The hub says, for example, *November 2026 opened*.
 3. When the round is done, press **Close Round**. It closes at once and the hub says, for example,
    *October 2026 closed*. Reviews still open carry on to their end.
@@ -884,8 +892,10 @@ reviews. It is a tab of Employee Self-Service.
    with its button.
 3. The tiles show your **Score to Date**, your **Rating**, your check-in for **This Month**, your
    **Commitments On Time** and your **Agreement**.
-4. **My Scorecard** lists your lines in their three sections, with each month's score. Without a
-   scorecard this quarter it reads **No Scorecard Yet**.
+4. **My Scorecard** lists your lines in their three sections, with each month's score. Press a line
+   for **Scorecard Line**: its **Target**, **Weight**, each month's score and the **Score**; on a
+   phone that is where the month scores are. Without a scorecard this quarter it reads
+   **No Scorecard Yet**.
 5. **This Month's Check-In** shows its **Status** and when it is **Due**, with **Start Check-In**,
    or **View Check-In** once you have sent it.
 6. **Rolls Up To** lists each line linked to a key result, and the codes it rolls up through, such
@@ -908,7 +918,8 @@ reviews. It is a tab of Employee Self-Service.
 | **Commitments On Time** | Such as *3 of 4*: this month's commitments done on time, of those due |
 | **Agreement** | **Agreed**, **Not Yet**, or **Draft** while it is being written |
 
-**This Month** reading **Returned** means your review went back to your reviewer, not to you.
+A review your reviewer's manager sent back reads **With Reviewer**: it is with your reviewer, not
+you.
 **Score to Date** is your scored lines, weighted. December's is your quarter's final score.
 
 On a phone, each part is a card: **My Scorecard**, **This Month's Check-In**, **My Commitments**,
@@ -946,7 +957,7 @@ score without it.
    **Task** to pick one of your tasks, **Link** for a web address, or **File** to press
    **Add Evidence** and attach one.
 4. Write what you will do about anything behind in **Action**. To speak it instead, press
-   **Dictate**, talk, then press **Stop Recording**. It stops by itself after two minutes. It reads
+   **Dictate**, talk, then press **Stop Recording**. It stops by itself after three minutes. It reads
    *Writing it down*, then your words replace what is in **Action**.
 5. Press **Tidy With AI** to have the wording tidied. The **As Spoken** and **Tidied** versions show
    together. Pick **Use Tidied** or **Keep Original**. Nothing changes until you pick.
@@ -983,10 +994,10 @@ read **Not Assessable**, and *Monthly update on time* scores 0.
 | **Check the highlighted lines** | A line needs something | Read the field marked in red on that line |
 | **Give a reason** under **Reason** | You changed a score without saying why | Type the **Reason** |
 | **Give a score** under **Your Score** | It is not from 0 to 1 | Type a score such as 0.75 |
-| **Enter a number** under **Actual** | The figure cannot be read | Type the figure only, such as 12 or 0.95 |
+| **Like 64000 or 0.95** under **Actual** | The figure is unfinished or has more than four decimals | Type the figure only, such as 12 or 0.95 |
 | **Name the source** | **Source** is chosen but empty | Name the report it came from |
 | **Add the link** | **Link** is chosen but empty | Paste the web address |
-| **Pick a record** under **Task** | **Task** is chosen but none is picked | Pick one of your tasks |
+| **Pick a task** under **Task** | **Task** is chosen but none is picked | Pick one of your tasks |
 | **Add the file** | **File** is chosen but nothing is attached | Press **Add Evidence** |
 | **Microphone not allowed** | The browser may not use your microphone | Allow it in the browser, or type instead |
 | **This browser cannot record** | This browser cannot use a microphone | Type instead, or use another browser |
@@ -1024,7 +1035,7 @@ do:
   - wait: button "Confirm Score"
 crop: modal
 marks:
-  1: heading "This Month" | How this month went
+  1: text "Proposed" | The month last reported
   2: button "Change Target" | Ask for a new target
   3: button "Confirm Score" | Confirm the score
 ```

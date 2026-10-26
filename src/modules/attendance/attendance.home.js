@@ -168,6 +168,8 @@ function present(row, radiusM) {
     decided_at: iso(out.decided_at),
     radius_m: radiusM,
     distance_from_approved_m: distance,
+    // The reader's, set where People read it (attendance.controller); false otherwise.
+    can_decide: false,
   };
 }
 

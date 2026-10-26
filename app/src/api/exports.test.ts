@@ -53,7 +53,7 @@ describe("saveExport", () => {
   });
 
   it("passes a refused request straight to the button", async () => {
-    const refused = new ApiError(429, { error: { code: "DATA_EXPORT_LIMIT", message: "Your copy was already made today. Try tomorrow." } });
+    const refused = new ApiError(429, { error: { code: "DATA_EXPORT_LIMIT", message: "A copy of your data was made for People today. Ask again tomorrow." } });
     await expect(settle(saveExport(Promise.reject(refused)))).rejects.toBe(refused);
     expect(call).not.toHaveBeenCalled();
   });

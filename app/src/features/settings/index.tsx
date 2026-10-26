@@ -18,9 +18,9 @@ import { FaultsTab, StatusTab } from "./SystemHealth";
 import { PerformanceTab } from "./Performance";
 import { IntegrationsTab } from "./integrations";
 import { AppearanceTab } from "./Appearance";
-import { Banner, Button, Card, Chips, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, TextAreaField, toast, useConfirm, useModal, Who } from "@mycity/ui";
+import { Banner, Button, Card, Chips, DesktopOnly, Field, formatWhen, FormFooter, Grid, LoadingRows, PageHeader, Pill, TextAreaField, toast, useConfirm, useModal, Who } from "@mycity/ui";
 import { InviteToSignIn } from "@/features/shared/InviteToSignIn";
-import { RolePicker, type RoleRef } from "@/features/shared/pickers";
+import { MAX_ROLES, RolePicker, type RoleRef } from "@/features/shared/pickers";
 import { Imports } from "./Imports";
 import { Approvals } from "./Approvals";
 import { useScreenAction } from "@/shell/screen-action";
@@ -155,16 +155,19 @@ function Users() {
           },
         ]}
       />
-      <Grid cols={2} className="mt-3">
-        {s.data ? (
-          <BarsCard
-            title="Users by Role"
-            rows={s.data.by_role.map((r) => ({ label: r.name, value: String(r.users), pct: Math.round((r.users * 100) / Math.max(1, ...s.data!.by_role.map((x) => x.users))) }))}
-          />
-        ) : (
-          <Card><LoadingRows /></Card>
-        )}
-      </Grid>
+      {/* Left off a phone (identity.md §10.2): the tiles above say enough there. */}
+      <DesktopOnly>
+        <Grid cols={2} className="mt-3">
+          {s.data ? (
+            <BarsCard
+              title="Users by Role"
+              rows={s.data.by_role.map((r) => ({ label: r.name, value: String(r.users), pct: Math.round((r.users * 100) / Math.max(1, ...s.data!.by_role.map((x) => x.users))) }))}
+            />
+          ) : (
+            <Card><LoadingRows /></Card>
+          )}
+        </Grid>
+      </DesktopOnly>
     </>
   );
 }
@@ -176,6 +179,7 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   const moveEmail = useMutation("POST /api/v1/users/:id/use-work-email");
   const confirm = useConfirm();
   const [roles, setRoles] = useState<RoleRef[]>(u.roles);
+  const tooMany = roles.length > MAX_ROLES;
   const [reason, setReason] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const setR = useMutation("POST /api/v1/users/:id/roles");
@@ -202,7 +206,7 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
   };
   return (
     <>
-      <Field label="Roles" state={tried && !roles.length ? "bad" : undefined} message="Pick a role">
+      <Field label="Roles" state={(tried && !roles.length) || tooMany ? "bad" : undefined} message={tooMany ? `At most ${MAX_ROLES} roles` : "Pick a role"}>
         {self ? <span className="text-sm">{u.roles.map((r) => r.name).join(", ")}</span> : <RolePicker value={roles} onChange={setRoles} />}
       </Field>
       {reason != null && (
@@ -276,7 +280,7 @@ function UserDetail({ u, close }: { u: UserRow; close: () => void }) {
           <Button
             variant="primary"
             busy={setR.pending}
-            onClick={() => (!roles.length ? setTried(true) : run(() => setR.run({ params, body: { role_codes: roles.map((r) => r.code) } }), "Roles saved"))}
+            onClick={() => (!roles.length || tooMany ? setTried(true) : run(() => setR.run({ params, body: { role_codes: roles.map((r) => r.code) } }), "Roles saved"))}
           >
             Save Roles
           </Button>

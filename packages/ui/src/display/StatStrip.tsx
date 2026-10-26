@@ -5,12 +5,13 @@
  * @use At the head of a record (an expense claim's totals, a payroll run's counts, a vacancy's pipeline).
  * @avoid A role's dashboard figures (use KpiGrid); more than six figures; a figure with a sentence under it.
  * @phone Two to a row, and only the first four show unless a figure is marked `desktop` (gate 11).
- * @a11y A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value.
+ * @a11y A list named for what the figures are about, so a screen reader hears how many there are; a figure that opens something is a button named by its label and value. A figure's help is a help term on its label (hover on a computer, tap on a phone), never inside a button.
  * @status stable
  * @example <StatStrip items={[{ label: "Submitted", value: 18 }, { label: "Approved", value: 14, tone: "ok" }]} />
  */
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { HelpTerm } from "../help/HelpTerm";
 import { slot } from "../lib/slots";
 import type { StatusTone } from "./Pill";
 
@@ -36,6 +37,8 @@ export interface StatStripItem {
   onOpen?: () => void;
   /** The line under the figure when it opens something, at most 3 words (View All). */
   action?: string;
+  /** What the figure counts, behind its label as a help term, at most 35 words. Not with `onOpen`. */
+  help?: string;
 }
 
 export interface StatStripProps {
@@ -54,7 +57,7 @@ export function StatStrip({ items, label = "Figures", className }: StatStripProp
         const inner = (
           <>
             <span {...slot("title")} className="text-2xs font-semibold tracking-caps text-subtle-foreground uppercase">
-              {item.label}
+              {item.help && !item.onOpen ? <HelpTerm help={item.help}>{item.label}</HelpTerm> : item.label}
             </span>
             <b className={cn("mt-0.5 block text-xl font-bold", item.tone && INK[item.tone])}>{item.value}</b>
             {item.action && <span className="mt-0.5 block text-2xs font-semibold text-accent-foreground">{item.action}</span>}

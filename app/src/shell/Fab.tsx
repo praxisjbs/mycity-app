@@ -38,7 +38,7 @@ export function Fab({ page }: { page: string }) {
   if (screen) actions.push({ key: "screen", label: screen.label, icon: screen.icon ?? "plus", onSelect: screen.onSelect });
   if (second && second.label !== screen?.label) actions.push({ key: "second", label: second.label, icon: second.icon ?? "plus", onSelect: second.onSelect });
   if (can("attendance") || can("ess")) {
-    if (clock.ready && !clock.unavailable) actions.push({ key: "clock", label: clock.label, icon: "clock", onSelect: clock.open });
+    if ((clock.ready || clock.done) && !clock.unavailable) actions.push({ key: "clock", label: clock.label, icon: "clock", onSelect: clock.open });
   }
   if (can("praxis_ai")) actions.push({ key: "ai", label: moduleByKey("praxis_ai")?.label ?? "Assistant", icon: "spark", onSelect: () => setAsking(true) });
   if (can("knowledge")) actions.push({ key: "help", label: "Help", icon: "help", onSelect: () => navigate(guideAt(here)) });

@@ -22,7 +22,8 @@ not see this tab.
 ### Find a policy {#knowledge-policies-find}
 
 1. Open [Knowledge Hub · Policies](/knowledge?tab=policies).
-2. Press a chip to narrow the list: **In Force**, **Awaiting Approval**, **Draft** or **Archived**.
+2. Press a chip to narrow the list: **In Force**, **Awaiting Approval**, **Starts Soon**, **Draft**
+   or **Archived**.
    **All** shows every policy.
 3. Type in **Search policies** to find one by its name or number, such as `POL-0002`.
 4. Each row shows the **Policy**, its **Type**, who it **Applies To**, the version **In Force**, its
@@ -34,7 +35,7 @@ not see this tab.
 | State | What it means |
 |---|---|
 | **Draft** | Nothing published yet |
-| **Starts Soon** | Its first version is published and starts on a later day. Only **All** lists it |
+| **Starts Soon** | Its first version is published and starts on a later day |
 | **In Force** | A version applies today. It may also have a draft being written |
 | **Awaiting Approval** | A version waits for its approvers |
 | **Archived** | It no longer applies |
@@ -65,10 +66,10 @@ not see this tab.
 |---|---|---|
 | **Required** under **Title** | The title is empty | Type a title |
 | **At least 3 characters** | The title is too short | Type a longer title |
-| **Check this value** under **Applies To** | You chose **Some People** but picked nobody | Pick a department, a work pattern or a person, or choose **Everyone** |
+| **Pick the people** under **Applies To** | You chose **Some People** but picked nobody | Pick a department, a work pattern or a person, or choose **Everyone** |
 | **At least 1** or **At most 30** | **Acknowledge Within** is out of range | Type a number of days from 1 to 30 |
 | **Required** under **Acknowledge Within** | The days are empty | Type the days, such as `7` |
-| **Check the highlighted fields** or **Write or paste the policy first** | **Policy Text** is empty when you press **Tidy With AI** | Type or paste the policy, then press **Tidy With AI** |
+| **Write or paste the policy first** | **Policy Text** is empty when you press **Tidy With AI** | Type or paste the policy, then press **Tidy With AI** |
 | **The tidy changed some words. Try again or tidy it by hand.** | The suggestion changed your wording, so it is not shown | Press **Tidy With AI** again, or add the headings yourself |
 | **The AI service is not answering. Try again in a few minutes.** | The assistant did not answer | Wait a few minutes and press again |
 | **AI features are switched off.** or **AI features are switched off for this area.** | An administrator turned the assistant off | Tidy the text yourself |
@@ -89,8 +90,8 @@ not see this tab.
 > in force. Paste the whole text of the new version, not only the part that changed. What you
 > publish replaces the version in force.
 
-> **Important:** **Needs Approval** starts unticked in every new draft. Tick it again if this version
-> must be approved.
+**Needs Approval** starts as the version in force had it. Untick it only if this version may be
+published without approval.
 
 To throw the draft away, press **Discard Changes** at the foot of the page. The hub asks
 **Discard Changes**; press **Discard Changes** again. The message **Draft discarded** confirms it.
@@ -98,11 +99,13 @@ The version in force is untouched.
 
 ### Publish a policy {#knowledge-policies-publish needs="knowledge edit"}
 
-> **Important:** Only what you saved is published. Press **Save Draft** first, after every change.
+> **Important:** Only what you saved is published. With changes not saved, **Publish Policy** says
+> **Save the draft first**: press **Save Draft**, then publish.
 
 1. Open the policy with its draft saved.
 2. Press **Publish Policy** in that bar. For a policy that **Needs Approval**, it reads
-   **Submit for Approval**. On a phone the button sits under the bar's words.
+   **Submit for Approval**. On a phone the button sits under the bar's words. A written policy
+   offers it once its **Policy Text** is saved.
    ![Publish Policy](shot:knowledge-publish)
 3. Check the changes listed at the top.
 4. Choose the **First Day** the new version applies from.
@@ -117,19 +120,17 @@ version. If it **Needs Acknowledgement**, each person is asked to acknowledge it
 in, or after the sign-in prompt on a day they do not. Anyone who has not acknowledged it after 3
 days gets one reminder.
 
-A version sent for approval shows **Awaiting approval** with who it waits on. The approvers find it
-under **Waiting On You** on [Policy Updates](/ess?tab=policy-updates). While it waits, the draft
-cannot be changed: its fields are greyed and **Save Draft** is gone.
+A version sent for approval shows **Awaiting approval** with who it waits on and who sent it. The
+approvers find it under **Waiting On You** on [Policy Updates](/ess?tab=policy-updates). While it
+waits, the page shows what was sent, and it cannot be changed: its fields are greyed and
+**Save Draft** is gone.
 
 When the last approver approves, the version is published by itself. If its first day has passed,
 it starts on the day it is approved. If an approver rejects it, you get the notice
-**Policy not approved** with their reason. The version is back in the draft. Open the policy on
-[Knowledge Hub · Policies](/knowledge?tab=policies), change it, and send it again.
+**Policy not approved** with their reason. The version is back in the draft. Press the notice to
+open the policy, change it, and send it again.
 
-> **Tip:** The notice may open Policy Updates and say **That policy version does not exist**. Open
-> the policy from Knowledge Hub · Policies instead.
-
-Only the person who sent it, or the CEO, can take it back:
+Only the person who sent it, or the CEO, can take it back; **Recall Submission** shows only to them:
 
 1. Press **Recall Submission** in the blue bar.
 2. Type the **Reason**, at least 10 characters, such as `Changing the text`.
@@ -137,7 +138,7 @@ Only the person who sent it, or the CEO, can take it back:
 
 | The screen says | What it means | What to do |
 |---|---|---|
-| Nothing happens when you press **Publish Policy** | The policy has no text yet | Press **Cancel**, write the **Policy Text**, press **Save Draft**, then publish |
+| **Write the policy first** | The saved draft has no text | Press **Cancel**, write the **Policy Text**, press **Save Draft**, then publish |
 | **Required** under **Note** | No note | Say what changed, such as `Grace now 10 minutes` |
 | **At least 10 characters** | The note or reason is too short | Write a little more |
 | **Required** under **First Day** | No first day | Pick a day |
@@ -151,7 +152,7 @@ Only the person who sent it, or the CEO, can take it back:
 | **A version is already waiting for approval** | Someone sent a version first | Wait for its approval, or recall it |
 | **This policy needs approval: submit it** or **This policy needs no approval: publish it** | Someone changed **Needs Approval** while your sheet was open | Close the sheet and press the bar's button again |
 | **This policy is archived** | Someone archived it first | Nothing more can be published |
-| **Only the person who made the request can withdraw it** | Someone else sent it | Ask them or the CEO to recall it |
+| **Only the person who sent it, or the CEO, can recall it** | Someone else sent it | Ask them or the CEO to recall it |
 | **Nothing is waiting for approval** | It was approved, rejected or recalled first | Close the sheet and look at the policy again |
 
 ### Withdraw a version before it starts {#knowledge-policies-withdraw needs="knowledge edit"}
@@ -231,10 +232,11 @@ A new version applies from its first day. Days before it keep the rules they wer
 | **Required** | A figure is empty | Type it |
 | **Enter the amount** | A fixed deduction or **Fixed per Hour** overtime has no amount | Type the amount, or choose another method |
 | **₦1 to ₦1,000,000** | The amount is out of range | Type an amount in that range |
-| **At least 150** | **Home Radius** is under 150 metres | Type 150 or more |
+| **At least 150**, or *At least 50* | **Home Radius** is under 150 metres while Home Location is on, or under 50 | Type 150 or more |
 | **Flag or Refuse** | A check must flag or refuse | Choose **Flag** or **Refuse** |
-| **At least one working day** | No day is ticked **Working** | Tick at least one day |
-| **Check this value** under Monday's **Working** | A working day ends before it starts, or has no times | Check each day's **Starts** and **Ends** |
+| **Tick a working day** | No day is ticked **Working** | Tick at least one day |
+| **Ends after it starts** under a day's **Ends** | That working day ends before it starts | Correct its **Starts** or **Ends** |
+| **Required** under a day's **Starts** or **Ends** | That working day has no time there | Type the time |
 
 ### Archive a policy {#knowledge-policies-archive needs="knowledge delete"}
 
@@ -248,6 +250,7 @@ An archived policy cannot be changed or brought back. Its versions and PDFs can 
 | The screen says | What it means | What to do |
 |---|---|---|
 | **This policy is already archived** | Someone archived it first | Nothing more to do |
+| **A version waits for approval. Recall it first.** | A version is with its approvers | Press **Recall Submission** (or ask whoever sent it), then archive |
 
 ### When a change is refused {#knowledge-policies-problems}
 
@@ -256,7 +259,7 @@ An archived policy cannot be changed or brought back. Its versions and PDFs can 
 | **Recall the version waiting for approval first** | Someone sent a version for approval while you edited | Recall it, then save |
 | **This policy is archived** | Someone archived it while you edited | Nothing more can be saved |
 | **There is no draft** | Someone discarded or published the draft first | Look at the policy again |
-| **You do not have access to this** | Your role may read policies but not do this | Ask People to change your role on Settings · Roles & Permissions |
+| A button you expected is not there | Your role may read policies but not do this: starting a policy needs create, saving and sending need edit, archiving needs delete | Ask People to change your role on Settings · Roles & Permissions |
 
 ```shot knowledge-policies
 open: /knowledge?tab=policies
@@ -329,10 +332,7 @@ as: operations
 sources:
   - app/src/features/policies/PolicyForms.tsx
 do:
-  - click: css [data-ui=page] tbody tr:has-text("Data Protection"), [data-ui=page] ul[data-copy=content] > li:has-text("Data Protection")
-  - wait: button "Save Draft"
-  - fill: label "Title" = Data Protection Policy
-  - click: button "Save Draft"
+  - click: css [data-ui=page] tbody tr:has-text("Dress Code"), [data-ui=page] ul[data-copy=content] > li:has-text("Dress Code")
   - wait: button "Publish Policy"
   - click: button "Publish Policy"
   - wait: label "Your Signature"

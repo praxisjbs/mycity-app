@@ -12,7 +12,7 @@ import { useFitPage } from "@/shell/layout-context";
 import type { ModuleScreenProps } from "@/shell/screens";
 import { Composer, PickBar, PinnedBar, Row, ThreadBody, ThreadSearch, useThread } from "./Chat";
 import { SendFiles, SharedFiles } from "./Media";
-import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pill, rules, SearchInput, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
+import { Avatar, Button, Card, ChoiceField, cn, DateField, EmptyState, ErrorState, Field, formatDate, formatDateTime, formatWhen, FormFooter, Grid, HelpTerm, Icon, IconButton, KeyValue, LoadingRows, Menu, Meter, PageHeader, Pager, Pill, rules, SearchInput, shortMessage, SplitPanes, StatStrip, Switch, TextAreaField, TextField, toast, todayIso, useContractForm, useConfirm, useIsMobile, useModal, useSplitPanes } from "@mycity/ui";
 import { ColleaguePicker as EmployeePicker } from "@/features/shared/pickers";
 
 export default function Community({ tab }: ModuleScreenProps) {
@@ -32,7 +32,7 @@ function ThreadHead({ children, onBack, backLabel }: { children: ReactNode; onBa
   );
 }
 
-const WHO_POSTS: Record<Channel["post_policy"], string> = { everyone: "Every member", admins: "Admins only", people_ceo: "People and the CEO" };
+const WHO_POSTS: Record<Channel["post_policy"], string> = { everyone: "Every Member", admins: "Admins Only", people_ceo: "People and the CEO" };
 
 /** The departments, for whole-department chips. */
 function DepartmentChips({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
@@ -243,11 +243,18 @@ function ChannelDrawer({ children, onClose }: { children: ReactNode; onClose: ()
 function Members({ c, close, edit = false, onChanged }: { c: Channel; close: () => void; edit?: boolean; onChanged?: () => void }) {
   const list = usePaged("GET /api/v1/community/channels/:id/members", { params: { id: c.community_channel_id } });
   const [adding, setAdding] = useState(false);
+  const confirm = useConfirm();
+  // Asked first, and a refusal is said: one press never takes someone out unseen.
   const remove = async (m: Member) => {
-    await api.call("DELETE /api/v1/community/channels/:id/members/:user_id", { params: { id: c.community_channel_id, user_id: m.user_id } });
-    toast(`Removed from #${c.name}`);
-    list.reload();
-    onChanged?.();
+    if (!(await confirm({ title: "Remove Member", body: `${m.person.display_name} leaves #${c.name}.`, confirmLabel: "Remove", cancelLabel: "Keep Them", destructive: true }))) return;
+    try {
+      await api.call("DELETE /api/v1/community/channels/:id/members/:user_id", { params: { id: c.community_channel_id, user_id: m.user_id } });
+      toast(`Removed from #${c.name}`);
+      list.reload();
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not removed. Try again.");
+    }
   };
   const setRole = async (m: Member, member_role: "admin" | "member") => {
     try {
@@ -256,7 +263,8 @@ function Members({ c, close, edit = false, onChanged }: { c: Channel; close: () 
       list.reload();
       onChanged?.();
     } catch (e) {
-      if (e instanceof ApiError) toast(e.code === "LAST_ADMIN" ? "A channel needs an admin" : e.message);
+      // The server's own words, LAST_ADMIN among them ("A channel needs at least one admin").
+      toast.error(e instanceof ApiError ? e.message : "Not changed. Try again.");
     }
   };
   if (adding) return <AddMembers c={c} close={() => setAdding(false)} done={() => (setAdding(false), list.reload(), onChanged?.())} />;
@@ -293,9 +301,13 @@ function AddMembers({ c, close, done }: { c: Channel; close: () => void; done: (
   const save = useMutation("POST /api/v1/community/channels/:id/members");
   const go = async () => {
     if (!people.length && !depts.length) return;
-    await save.run({ params: { id: c.community_channel_id }, body: { member_ids: people.map((p) => p.employee_id), department_ids: depts } });
-    toast(`Added to #${c.name}`);
-    done();
+    try {
+      await save.run({ params: { id: c.community_channel_id }, body: { member_ids: people.map((p) => p.employee_id), department_ids: depts } });
+      toast(`Added to #${c.name}`);
+      done();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not added. Try again.");
+    }
   };
   return (
     <>
@@ -325,6 +337,20 @@ function PeopleList({ people, right }: { people: PersonRef[]; right?: (p: Person
   );
 }
 
+/**
+ * A refused channel save: its marks on the form (the API's `description` is the form's Purpose), and
+ * a refusal no field shows (too many requests, a lost connection) in a toast.
+ */
+export function refused(e: unknown, mark: (fields: Record<string, string[]>) => void) {
+  const fields = e instanceof ApiError ? { ...e.fields } : {};
+  if (fields.description) {
+    fields.purpose = fields.description;
+    delete fields.description;
+  }
+  if (Object.keys(fields).length) mark(fields);
+  else toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
+}
+
 /** What a channel is; its admins rename it and write its purpose here. #general and #announcements stay fixed. */
 function ChannelDetails({ c, close, onChanged }: { c: Channel; close: () => void; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
@@ -337,15 +363,15 @@ function ChannelDetails({ c, close, onChanged }: { c: Channel; close: () => void
       onChanged();
       close();
       toast("Channel saved");
-    } catch {
-      f.setServerErrors(save.fields);
+    } catch (e) {
+      refused(e, f.setServerErrors);
     }
   };
   if (editing)
     return (
       <>
         <Field label={<HelpTerm help="Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name.">Channel Name</HelpTerm>} {...f.field("name")}><TextField {...f.field("name")} autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
-        <Field label="Purpose" optional><TextAreaField {...f.field("purpose")} /></Field>
+        <Field label="Purpose" optional {...f.status("purpose")}><TextAreaField {...f.field("purpose")} /></Field>
         <FormFooter>
           <Button onClick={() => setEditing(false)}>Cancel</Button>
           <Button variant="primary" busy={save.pending} onClick={submit}>Save Changes</Button>
@@ -377,14 +403,14 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
       close();
       onMade(c);
       toast(`#${c.name} created with ${c.members} members`);
-    } catch {
-      f.setServerErrors(save.fields);
+    } catch (e) {
+      refused(e, f.setServerErrors);
     }
   };
   return (
     <>
       <Field label={<HelpTerm help="Lower case letters, numbers and hyphens, 2 to 30 characters. Two channels cannot share a name.">Channel Name</HelpTerm>} {...f.field("name")}><TextField {...f.field("name")} placeholder="abuja-hub" autoComplete="off" onChange={(v) => f.set("name", v.toLowerCase())} /></Field>
-      <Field label="Purpose" optional><TextField {...f.field("purpose")} /></Field>
+      <Field label="Purpose" optional {...f.status("purpose")}><TextField {...f.field("purpose")} /></Field>
       <Field label="Departments" optional><DepartmentChips value={depts} onChange={setDepts} /></Field>
       <Field label={<>People <span className="font-normal text-subtle-foreground">· {people.length} selected</span></>} optional><EmployeePicker multiple value={people} onChange={setPeople} placeholder="Name or department" /></Field>
       <Field label="Who Can Post">
@@ -398,19 +424,26 @@ function NewChannel({ close, onMade }: { close: () => void; onMade: (c: Channel)
   );
 }
 
+/** A recognition note's limit (the contract's). */
+const NOTE_MAX = 500;
+
 /** A thumbs up for a colleague. It always lands in #general (MILESTONES A19). */
 function Recognise({ close, done }: { close: () => void; done: () => void }) {
   const [who, setWho] = useState<PersonRef[]>([]);
   const [text, setText] = useState("");
   const [tried, setTried] = useState(false);
+  const [noteMark, setNoteMark] = useState<string | undefined>();
   const save = useMutation("POST /api/v1/community/recognitions");
+  // The note's limit, said on the note as it is typed past it (the contract takes 500).
+  const tooLong = text.trim().length > NOTE_MAX;
   const go = async () => {
     setTried(true);
-    if (!who.length) return;
+    if (!who.length || tooLong) return;
     try {
       await save.run({ body: { to_employee_id: who[0].employee_id, message: text.trim() || undefined } });
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Not posted. Try again.");
+      if (e instanceof ApiError && e.fields.message) setNoteMark(shortMessage({ type: "custom", message: e.fields.message[0] }));
+      else toast.error(e instanceof ApiError ? e.message : "Not posted. Try again.");
       return;
     }
     close();
@@ -420,7 +453,14 @@ function Recognise({ close, done }: { close: () => void; done: () => void }) {
   return (
     <>
       <Field label="Colleague" state={tried && !who.length ? "bad" : undefined} message={tried && !who.length ? "Choose a colleague" : undefined}><EmployeePicker value={who} onChange={setWho} /></Field>
-      <Field label={<HelpTerm help="Leave it blank and a thank you note is written for you.">Note</HelpTerm>} optional><TextAreaField value={text} onChange={setText} /></Field>
+      <Field
+        label={<HelpTerm help="Leave it blank and a thank you note is written for you.">Note</HelpTerm>}
+        optional
+        state={tooLong || noteMark ? "bad" : undefined}
+        message={tooLong ? `At most ${NOTE_MAX} characters` : noteMark}
+      >
+        <TextAreaField value={text} onChange={(v) => (setText(v), setNoteMark(undefined))} />
+      </Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" icon="thumb" busy={save.pending} onClick={go}>Post Recognition</Button>
@@ -455,14 +495,27 @@ function Celebrate({ close, send }: { close: () => void; send: (b: { message_typ
   );
 }
 
+/** A text that must be more than three characters: empty asks for it, one to three says so. */
+export const atLeast4 = (empty: string) => (v: string) => (!v.trim() ? empty : v.trim().length > 3 ? null : "At least 4 characters");
+
+/** A poll's refusal marks, on its fields: `body` is the question, `options.n` the option. */
+export const pollMarks = (fields: Record<string, string[]>) =>
+  Object.fromEntries(Object.entries(fields).map(([k, v]) => [k === "body" ? "q" : /^options\.(\d)/.test(k) ? `o${Number(k.split(".")[1]) + 1}` : k, v]));
+
 /** Start a Poll, or with `edit` the same form filled in (before its first vote). */
 function PollForm({ close, send, edit }: { close: () => void; send: (b: { message_type: "poll"; body: string; options: string[] }) => Promise<unknown>; edit?: Message }) {
   const opt = (i: number) => edit?.poll?.options[i]?.text ?? "";
-  const f = useContractForm({ q: edit?.poll?.question ?? "", o1: opt(0), o2: opt(1), o3: opt(2), o4: opt(3) }, { q: (v) => (v.trim().length > 3 ? null : "Add a question"), o1: rules.required("Add an option"), o2: rules.required("Add an option") });
+  const f = useContractForm({ q: edit?.poll?.question ?? "", o1: opt(0), o2: opt(1), o3: opt(2), o4: opt(3) }, { q: atLeast4("Add a question"), o1: rules.required("Add an option"), o2: rules.required("Add an option") });
+  // Sent first, closed after: a refused poll keeps the person's words and says why.
   const go = async () => {
     if (!f.check()) return;
-    close();
-    await send({ message_type: "poll", body: f.values.q.trim(), options: [f.values.o1, f.values.o2, f.values.o3, f.values.o4].map((o) => o.trim()).filter(Boolean) });
+    try {
+      await send({ message_type: "poll", body: f.values.q.trim(), options: [f.values.o1, f.values.o2, f.values.o3, f.values.o4].map((o) => o.trim()).filter(Boolean) });
+      close();
+    } catch (e) {
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(pollMarks(e.fields));
+      else toast.error(e instanceof ApiError ? e.message : "Not posted. Try again.");
+    }
   };
   return (
     <>
@@ -576,19 +629,22 @@ function Direct() {
       if (e instanceof ApiError) toast(e.message);
     }
   };
-  const mute = async (c: Conversation) => {
+  /** Mute or unmute (`muted`, else the other way from now); says whether it took, so a sheet holding its own switch can follow. */
+  const mute = async (c: Conversation, muted = !c.muted) => {
     try {
-      await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted: !c.muted } });
-      toast(c.muted ? `Notifications on for ${chatName(c)}` : `Muted ${chatName(c)}`);
+      await api.call("POST /api/v1/community/channels/:id/mute", { params: { id: c.community_channel_id }, body: { muted } });
+      toast(muted ? `Muted ${chatName(c)}` : `Notifications on for ${chatName(c)}`);
       reloadList();
+      return true;
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Not changed. Try again.");
+      toast.error(e instanceof ApiError ? e.message : "Not changed. Try again.");
+      return false;
     }
   };
   const showProfile = () => {
     if (!current) return;
     if (!mobile) return setInfo(true);
-    modal.open({ title: "Profile", body: (close) => <ProfilePanel c={current} onMessage={close} onSearch={() => (close(), setSearching(true))} onMute={() => void mute(current)} /> });
+    modal.open({ title: "Profile", body: (close) => <ProfilePanel c={current} onMessage={close} onSearch={() => (close(), setSearching(true))} onMute={(m) => mute(current, m)} /> });
   };
   const unread = list.rows.filter((r) => r.unread > 0).length;
 
@@ -674,7 +730,7 @@ function Direct() {
         <IconButton icon="x" label="Close profile" onClick={() => setInfo(false)} />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <ProfilePanel c={current} onMessage={() => document.querySelector<HTMLInputElement>('input[aria-label="Message"]')?.focus()} onSearch={() => setSearching(true)} onMute={() => void mute(current)} />
+        <ProfilePanel c={current} onMessage={() => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus()} onSearch={() => setSearching(true)} onMute={(m) => mute(current, m)} />
       </div>
     </div>
   ) : undefined;
@@ -706,8 +762,10 @@ function NewMessage({ close, start }: { close: () => void; start: (p: PersonRef)
   );
 }
 
-function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onMessage: () => void; onSearch: () => void; onMute: () => void }) {
+function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onMessage: () => void; onSearch: () => void; onMute: (muted: boolean) => Promise<boolean> }) {
   const { navigate } = useRouter();
+  // Its own switch state: a phone's sheet is built once, so it follows the change it made, not the list.
+  const [muted, setMuted] = useState(c.muted);
   const { can } = useAuth();
   const card = useApi("GET /api/v1/community/people/:id/card", { params: { id: c.person.employee_id } });
   const p = card.data;
@@ -754,7 +812,7 @@ function ProfilePanel({ c, onMessage, onSearch, onMute }: { c: Conversation; onM
         {p.shared_channels.map((n) => <div key={n} className="flex items-center gap-2.5 py-1 text-sm"><b className="text-subtle-foreground">#</b>{n}</div>)}
       </div>
       <div className={sec}>
-        <div className="flex items-center justify-between text-sm">Mute Notifications<Switch checked={c.muted} onChange={onMute} label="Mute Notifications" /></div>
+        <div className="flex items-center justify-between text-sm">Mute Notifications<Switch checked={muted} onChange={async (v) => (await onMute(v)) && setMuted(v)} label="Mute Notifications" /></div>
         <Button icon="srch" className="mt-3 w-full justify-center" onClick={onSearch}>Search in Conversation</Button>
       </div>
     </div>
@@ -782,7 +840,7 @@ function Announcements() {
         items={[
           { label: "Published", value: stats.pub },
           { label: "Scheduled", value: stats.sch },
-          { label: "Average Read", value: `${stats.avg}%`, tone: "ok" },
+          { label: "Average Read", value: `${stats.avg}%`, tone: "ok", help: "Across published announcements, the share of the audience who have opened each one." },
           { label: "Audience", value: `${stats.audience} staff` },
           { label: "This Month", value: stats.month, desktop: true },
         ]}
@@ -807,8 +865,10 @@ function Announcements() {
 
 function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => void; done: () => void }) {
   const live = a.status === "published";
-  const [editing, setEditing] = useState(false);
+  const modal = useModal();
   const confirm = useConfirm();
+  // Edit opens in its own sheet, titled Edit Announcement (community.md §10.1).
+  const edit = () => modal.open({ title: "Edit Announcement", body: (closeEdit) => <NewAnnouncement edit={a} close={closeEdit} done={done} /> });
   const cancel = useMutation("POST /api/v1/community/announcements/:id/cancel");
   const callOff = async () => {
     if (!(await confirm({ title: "Cancel Announcement", body: `"${a.title}" will not be posted.`, confirmLabel: "Cancel Announcement", cancelLabel: "Keep It", destructive: true }))) return;
@@ -855,7 +915,6 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
       if (e instanceof ApiError) toast(e.message);
     }
   };
-  if (editing) return <NewAnnouncement edit={a} close={() => setEditing(false)} done={() => (close(), done())} />;
   return (
     <>
       <div data-copy="content">
@@ -872,6 +931,8 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
             {nNot > 0 && <Button size="sm" icon="bell" busy={remind.pending} onClick={() => nudge()}>Remind Them</Button>}
           </div>
           {nNot ? <PeopleList people={notRead.rows.map((r) => r.person)} right={() => <Pill tone="err">{notLabel}</Pill>} /> : <p className="text-2xs text-subtle-foreground">{urgent ? "Everyone has acknowledged it." : "Everyone has read it."}</p>}
+          {/* An audience past 25 pages, as Channel Members does. */}
+          {notRead.page && notRead.page.pages > 1 && <Pager page={notRead.page} onPage={notRead.setPage} noun="person" />}
           <h3 data-ui="title" className="mt-4 mb-1.5 text-sm font-semibold">{doneLabel} · {read.page?.total ?? 0}</h3>
           <PeopleList
             people={read.rows.map((r) => r.person)}
@@ -880,12 +941,13 @@ function AnnouncementReads({ a, close, done }: { a: Announcement; close: () => v
               return <Pill tone="ok">{at ? formatDateTime(at) : doneLabel}</Pill>;
             }}
           />
+          {read.page && read.page.pages > 1 && <Pager page={read.page} onPage={read.setPage} noun="person" />}
         </>
       )}
       <FormFooter>
         {!live && <Button variant="danger" busy={cancel.pending} onClick={() => callOff()}>Cancel Announcement</Button>}
         {live && <Button variant="danger" icon="trash" busy={archive.pending} onClick={() => takeDown()}>Archive Announcement</Button>}
-        {!live && <Button icon="edit" onClick={() => setEditing(true)}>Edit</Button>}
+        {!live && <Button icon="edit" onClick={edit}>Edit</Button>}
         <Button variant="primary" onClick={close}>Close</Button>
       </FormFooter>
     </>
@@ -899,7 +961,7 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
   const [urgency, setUrgency] = useState<Announcement["urgency"]>(edit?.urgency ?? "normal");
   const [depts, setDepts] = useState<string[]>(edit?.audience.department_ids ?? []);
   const [deptsBad, setDeptsBad] = useState(false);
-  const f = useContractForm({ title: edit?.title ?? "", body: edit?.body ?? "", date: edit?.publish_at ? todayIso(new Date(edit.publish_at)) : "" }, { title: (v) => (v.trim().length > 3 ? null : "Add a headline"), body: (v) => (v.trim().length > 3 ? null : "Write the message") });
+  const f = useContractForm({ title: edit?.title ?? "", body: edit?.body ?? "", date: edit?.publish_at ? todayIso(new Date(edit.publish_at)) : "" }, { title: atLeast4("Add a headline"), body: atLeast4("Write the message") });
   const save = useMutation("POST /api/v1/community/announcements");
   const change = useMutation("PUT /api/v1/community/announcements/:id");
   const submit = async () => {
@@ -921,9 +983,10 @@ function NewAnnouncement({ close, done, edit }: { close: () => void; done: () =>
       done();
       toast(edit ? `Scheduled for ${formatDate(f.values.date)}` : when === "later" ? `Scheduled for ${formatDate(f.values.date)}` : "Published to #announcements");
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 403 || e.status === 409)) toast(e.message);
-      const fields = (edit ? change.fields : save.fields) ?? {};
-      f.setServerErrors({ ...fields, ...(fields.publish_at ? { date: fields.publish_at } : {}) });
+      const fields = e instanceof ApiError ? e.fields : {};
+      // A refusal no field shows (cancelled meanwhile, too many requests, a lost connection) is said.
+      if (Object.keys(fields).length) f.setServerErrors({ ...fields, ...(fields.publish_at ? { date: fields.publish_at } : {}) });
+      else toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
     }
   };
   return (

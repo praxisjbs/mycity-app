@@ -3,7 +3,7 @@
  * operational measures and their monthly actuals, Met, Not Met or N/A. New KPI and Record Actual
  * for the function's head; a KPI opens its definition, its months and the lines that use it.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import kpisContract from "@mycity/contract/schemas/kpis.js";
 import type { Endpoints, Kpi } from "@mycity/contract/contract.gen.ts";
 import { ApiError } from "@/api/client";
@@ -11,11 +11,13 @@ import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import { useMe } from "@/auth/AuthProvider";
 import { KpiTiles } from "@/features/shared/KpiTiles";
 import { PagedTable } from "@/features/shared/sections";
+import { useSearchParams } from "@/lib/router";
 import { hasCapability } from "@/shell/access";
 import { useScreenAction } from "@/shell/screen-action";
 import {
   Button,
   DataView,
+  ErrorState,
   Field,
   FilterSelect,
   formatDate,
@@ -23,6 +25,7 @@ import {
   FormFooter,
   HelpTerm,
   KeyValue,
+  LoadingRows,
   NumberField,
   PageHeader,
   SelectField,
@@ -33,7 +36,7 @@ import {
   useContractForm,
   useModal,
 } from "@mycity/ui";
-import { figureOf, kpiResult, monthShort, person, reportingMonth, useQuarter } from "./shared";
+import { bodySchema, figureOf, kpiResult, monthShort, person, reportingMonth, useQuarter } from "./shared";
 
 type KpiCreateBody = Endpoints["POST /api/v1/performance/kpis"]["body"];
 type KpiActualBody = Endpoints["POST /api/v1/performance/kpis/:id/actuals"]["body"];
@@ -65,7 +68,19 @@ export function Kpis() {
   const deptOptions: Array<[string, string]> = [["", "All Functions"], ...(departments.data?.data ?? []).filter((d) => d.active).map((d) => [d.department_id, d.name] as [string, string])];
   const mayEdit = hasCapability(me, "goals.function");
   const newKpi = () => modal.open({ title: "New KPI", body: (close) => <KpiForm close={close} periodId={quarter.periodId} departmentId={dept} /> });
-  const openKpi = (k: Kpi) => modal.open({ title: k.code, wide: true, body: (close) => <KpiSheet id={k.kpi_definition_id} months={months} close={close} /> });
+  const openKpiId = (id: string, code = "KPI") => modal.open({ title: code, wide: true, body: (close) => <KpiSheet id={id} months={months} close={close} /> });
+  const openKpi = (k: Kpi) => openKpiId(k.kpi_definition_id, k.code);
+  // A KPI found with ⌘K (or linked from elsewhere, `?id=`) opens its sheet once, then leaves the address.
+  const [params, setParams] = useSearchParams();
+  const linked = params.get("id");
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linked || opened.current === linked) return;
+    opened.current = linked;
+    setParams({ id: null }, { replace: true });
+    openKpiId(linked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked]);
   useScreenAction(mayEdit ? { label: "New KPI", onSelect: newKpi } : null);
 
   return (
@@ -114,7 +129,8 @@ function KpiSheet({ id, months, close }: { id: string; months: string[]; close: 
   const modal = useModal();
   const read = useApi("GET /api/v1/performance/kpis/:id", { params: { id } });
   const k = read.data;
-  if (!k) return null;
+  if (read.error) return <ErrorState error={read.error} onRetry={read.reload} />;
+  if (!k) return <LoadingRows count={4} />;
   const reload = () => {
     read.reload();
     invalidate("/api/v1/performance/kpis");
@@ -213,29 +229,35 @@ function KpiForm({ close, periodId, departmentId }: { close: () => void; periodI
   );
 }
 
+type KpiEditValues = { name: string; formula: string; unit: string; target_text: string; data_source: string };
+const or = (v: string) => (v.trim() === "" ? null : v.trim());
+const kpiEditBody = (v: KpiEditValues) => ({ name: v.name, formula: or(v.formula), unit: or(v.unit), target_text: or(v.target_text), data_source: or(v.data_source) });
+
+/** Edit KPI: the contract's KpiEdit checks each field as it is filled, and a refusal lands on its field. */
 function KpiEditForm({ kpi, close }: { kpi: Kpi; close: () => void }) {
-  const [values, setValues] = useState({ name: kpi.name, formula: kpi.formula ?? "", unit: kpi.unit ?? "", target_text: kpi.target_text ?? "", data_source: kpi.data_source ?? "" });
+  const f = useContractForm<KpiEditValues>(
+    { name: kpi.name, formula: kpi.formula ?? "", unit: kpi.unit ?? "", target_text: kpi.target_text ?? "", data_source: kpi.data_source ?? "" },
+    bodySchema<KpiEditValues>(kpisContract.KpiEdit, kpiEditBody),
+  );
   const save = useMutation("PATCH /api/v1/performance/kpis/:id");
-  const set = (key: keyof typeof values) => (v: string) => setValues((x) => ({ ...x, [key]: v }));
   const submit = async () => {
+    if (!f.check()) return;
     try {
-      await save.run({
-        params: { id: kpi.kpi_definition_id },
-        body: { name: values.name, formula: values.formula || null, unit: values.unit || null, target_text: values.target_text || null, data_source: values.data_source || null },
-      });
+      await save.run({ params: { id: kpi.kpi_definition_id }, body: kpiEditBody(f.values) });
       close();
       toast("KPI saved");
     } catch (e) {
-      say(e);
+      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
+      else say(e);
     }
   };
   return (
     <>
-      <Field label="KPI" state={save.fields.name ? "bad" : undefined} message={save.fields.name?.[0]}><TextField value={values.name} onChange={set("name")} /></Field>
-      <Field label="Formula" optional><TextField value={values.formula} onChange={set("formula")} /></Field>
-      <Field label="Unit" optional><TextField value={values.unit} onChange={set("unit")} /></Field>
-      <Field label="Target Wording" optional><TextField value={values.target_text} onChange={set("target_text")} /></Field>
-      <Field label="Data Source" optional><TextField value={values.data_source} onChange={set("data_source")} /></Field>
+      <Field label="KPI" {...f.status("name")}><TextField {...f.field("name")} /></Field>
+      <Field label="Formula" optional {...f.status("formula")}><TextField {...f.field("formula")} /></Field>
+      <Field label="Unit" optional {...f.status("unit")}><TextField {...f.field("unit")} /></Field>
+      <Field label="Target Wording" optional {...f.status("target_text")}><TextField {...f.field("target_text")} /></Field>
+      <Field label="Data Source" optional {...f.status("data_source")}><TextField {...f.field("data_source")} /></Field>
       <FormFooter>
         <Button onClick={close}>Cancel</Button>
         <Button variant="primary" onClick={submit}>Save KPI</Button>

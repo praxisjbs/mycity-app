@@ -37,7 +37,7 @@ const LineSource = z.enum([
 ]);
 
 /** A line's weight inside its section: numeric(5,2) as a string ("15", "12.5"). */
-const Weight = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, "must be a weight like 15 or 12.5");
+const Weight = z.string().regex(/^\d{1,3}(\.\d{1,2})?$/, "Like 15 or 12.5");
 
 /** A key result as a line or a check names it. */
 const KeyResultRef = z
@@ -359,13 +359,20 @@ const CommitmentRecovery = z
   })
   .strict();
 
+/**
+ * The State filter: the commitment's own state (`awaiting_approval` is every month not yet approved,
+ * as Send Commitments lists them), or, as the pills read, `sent` (sent and waiting), `not_sent` (not
+ * yet sent, or drafted) and `returned` (sent back).
+ */
+const CommitmentStateFilter = z.enum(["awaiting_approval", "sent", "not_sent", "returned", "due", "on_time", "late", "missed", "rescoped"]);
+
 /** GET /performance/commitments */
 const CommitmentListQuery = listQuery(
   {
     month: MonthKey.optional(),
     department_id: uuid.optional(),
     employee_id: uuid.optional(),
-    state: CommitmentState.optional(),
+    state: CommitmentStateFilter.optional(),
     waiting_on_me: z.enum(["true", "false"]).optional(),
   },
   ["due_at", "employee"],

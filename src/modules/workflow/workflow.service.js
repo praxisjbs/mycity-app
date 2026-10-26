@@ -128,7 +128,7 @@ function flowView(row, names) {
     context_types: row.context_types || {},
     stages: cond.stagesOf(def).map((s) => stageView(s, names)),
     open_requests: Number(row.open_requests) || 0,
-    problems: definitions.problemsOf(def),
+    problems: definitions.problemsOf(def).map((p) => plainly(p, def.stages)),
     created_by_name: row.created_by_name || null,
     created_at: row.created_at,
   };
@@ -179,22 +179,42 @@ function authoredStages(stages) {
   }));
 }
 
+/** What a definition problem means to the person who set the stages: the stage by its name, the rule in words. */
+const PLAIN = [
+  [/sla_hours/, "the time limit is 1 to 2,160 hours"],
+  [/name at least one approver/, "it names nobody to decide"],
+  [/approver needs a value|named person's value/, "pick who decides"],
+  [/user approver's value/, "pick a person"],
+  [/key is used twice/, "two stages share a key"],
+  [/never approves itself/, "a request with money never approves itself on time out"],
+  [/condition/, "its condition does not fit these requests"],
+];
+function plainly(problem, stages = []) {
+  const m = /^stage (\d+)(?: \([^)]*\))?( condition)?: (.*)$/.exec(problem);
+  if (!m) return problem === "at least one stage is required" ? "Add a stage" : "Check the stages";
+  const n = Number(m[1]);
+  const name = (stages[n - 1] && stages[n - 1].name) || `Stage ${n}`;
+  const rule = `${m[2] ? "condition " : ""}${m[3]}`;
+  const words = (PLAIN.find(([re]) => re.test(rule)) || [null, "check its settings"])[1];
+  return `${name}: ${words}`;
+}
+
+/** The person-facing refusal of a route: each problem plainly, on Stages. */
+const refuseRoute = (problems) =>
+  new AppError("WORKFLOW_DEFINITION_INVALID", "Fix the stages first", 422, { stages: problems });
+
 /** Every role a stage names is a role, and every login is a login: a stage nobody can decide is refused. */
 async function assertApproversExist(client, stages) {
-  const all = stages.flatMap((s) => s.approvers);
-  const codes = all.filter((a) => a.type === "role").map((a) => a.value);
-  const users = all.filter((a) => a.type === "user").map((a) => a.value);
-  const roles = await repo.roleNames(client, codes);
-  const logins = await repo.namesOfUsers(client, users);
-  const problems = [
-    ...codes.filter((code) => !roles.has(code)).map((code) => `no role "${code}"`),
-    ...users.filter((id) => !logins.has(id)).map((id) => `no login ${id}`),
-  ];
-  if (problems.length) {
-    throw new AppError("WORKFLOW_DEFINITION_INVALID", `This approval route is not valid: ${problems.join("; ")}`, 422, {
-      stages: problems,
-    });
+  const problems = [];
+  for (const s of stages) {
+    const codes = s.approvers.filter((a) => a.type === "role").map((a) => a.value);
+    const users = s.approvers.filter((a) => a.type === "user").map((a) => a.value);
+    const roles = await repo.roleNames(client, codes);
+    const logins = await repo.namesOfUsers(client, users);
+    if (codes.some((code) => !roles.has(code))) problems.push(`${s.name}: a role it names no longer exists`);
+    if (users.some((id) => !logins.has(id))) problems.push(`${s.name}: a person it names has no login`);
   }
+  if (problems.length) throw refuseRoute(problems);
 }
 
 /**
@@ -209,14 +229,18 @@ async function saveSteps(actor, id, { stages }) {
       throw new AppError("WORKFLOW_DEFINITION_STALE", "This flow changed since you opened it. Open it again.", 409);
     }
     const before = definitions.fromRow(current);
-    const next = definitions.assertValid({
+    const proposed = {
       key: before.key,
       module: before.module,
       name: before.name,
       description: before.description,
       context: before.context,
       stages: authoredStages(stages),
-    });
+    };
+    // Refused in the words of the stages, never the engine's (definitions.assertValid is for code).
+    const problems = definitions.problemsOf(proposed);
+    if (problems.length) throw refuseRoute(problems.map((p) => plainly(p, stages)));
+    const next = definitions.assertValid(proposed);
     await assertApproversExist(client, stages);
     const saved = await definitions.saveVersion(client, next, { created_by: actor.user_id });
     await emit(client, {
@@ -479,6 +503,7 @@ module.exports = {
   listFlows,
   summary,
   saveSteps,
+  plainly,
   mine,
   mineCount,
   getInstance,

@@ -460,6 +460,9 @@ function listEvents(db, employeeId, date, query, { coordinates }) {
             ${EXCLUDED("ev")} AS excluded,
             ${nameOf("re")} AS recorded_by_name,
             ev.reason,
+            -- One per punch (attendance_exception's unique index on the event and type).
+            (SELECT max(x.evidence ->> 'real_time') FROM attendance_exception x
+              WHERE x.attendance_event_id = ev.attendance_event_id AND x.exception_type = 'automatic_clock_out') AS real_time_given,
             ${TOTAL_COL}
        FROM attendance_event ev
        LEFT JOIN worksite w ON w.worksite_id = ev.worksite_id

@@ -582,9 +582,10 @@ function LinkForm({ token, onDone, onExpired }: { token: string; onDone: (email:
     api
       .call("POST /api/v1/auth/link", { body: { token } })
       .then((c) => live && setCheck(c))
-      // Only a link the server calls invalid has expired: a busy office or a dropped connection
-      // is asked again, never told to request a new link that would close this one.
-      .catch((e) => live && setCheck(e instanceof ApiError && e.code === "LINK_INVALID" ? "bad" : "unchecked"));
+      // Only a link the server calls invalid has expired, or one cut or changed on its way (a mail
+      // program wrapping it fails the token's shape): a busy office or a dropped connection is
+      // asked again, never told to request a new link that would close this one.
+      .catch((e) => live && setCheck(e instanceof ApiError && (e.code === "LINK_INVALID" || e.fields.token) ? "bad" : "unchecked"));
     return () => {
       live = false;
     };

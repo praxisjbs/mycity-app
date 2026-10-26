@@ -7,7 +7,9 @@ import { usePhotos } from "@/api/download";
 import { invalidate, useApi, useMutation, usePaged } from "@/api/hooks";
 import type { PersonRef } from "@/api/types/common";
 import { useMe } from "@/auth/AuthProvider";
+import { useSearchParams } from "@/lib/router";
 import { KpiTiles } from "@/features/shared/KpiTiles";
+import { MonthPicker } from "@/features/shared/MonthPicker";
 import { EmployeePicker } from "@/features/shared/pickers";
 import { useAddressPrefill } from "@/shell/screen-action";
 import { LeaveAllowances, LeaveTypes } from "./LeaveSettings";
@@ -77,9 +79,15 @@ export function PeopleLeave() {
   });
   const photo = usePhotos(list.rows.map((r) => r.employee.photo_url));
   const beside = useSideBySide();
+  const [params] = useSearchParams();
+  // `?id=` (Need You, ⌘K, a notification) opens the request it names, on a phone as well.
+  const linkedId = params.get("id");
+  const linked = useApi("GET /api/v1/leave/requests/:id", { params: { id: linkedId ?? "" }, enabled: Boolean(linkedId) });
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
+  const [closedLink, setClosedLink] = useState(false);
+  const pinned = selected ?? (!closedLink && linked.data ? linked.data : null);
   // Side by side the first waiting request shows unasked; on a phone nothing opens until a row is tapped (F31).
-  const sel = selected ?? (beside ? (list.rows.find((r) => r.status === "submitted") ?? list.rows[0] ?? null) : null);
+  const sel = pinned ?? (beside ? (list.rows.find((r) => r.status === "submitted") ?? list.rows[0] ?? null) : null);
   const now = todayIso();
   const s = summary.data;
   return (
@@ -112,8 +120,8 @@ export function PeopleLeave() {
         />
       )}
       <ListDetail
-        open={selected !== null}
-        onClose={() => setSelected(null)}
+        open={pinned !== null}
+        onClose={() => (setSelected(null), setClosedLink(true))}
         title="Leave Request"
         list={
           <>
@@ -148,7 +156,7 @@ export function PeopleLeave() {
         }
         detail={
           sel ? (
-            <RequestCard key={sel.leave_request_id} leave={sel} onDone={() => setSelected(null)} />
+            <RequestCard key={sel.leave_request_id} leave={sel} onDone={() => (setSelected(null), setClosedLink(true))} />
           ) : (
             <Card>
               <p className="text-xs text-subtle-foreground">Select a request to check cover.</p>
@@ -169,7 +177,9 @@ function RequestCard({ leave: r, onDone }: { leave: LeaveRequest; onDone: () => 
   const approve = useMutation("POST /api/v1/workflow/instances/:id/approve");
   const cancel = useMutation("POST /api/v1/leave/requests/:id/cancel");
   const grants = me.grants.people ?? [];
-  const waiting = r.status === "submitted" && r.workflow_instance_id;
+  // Approve and Reject only when the approval waits on the reader now, as My Approvals decides it.
+  const instance = useApi("GET /api/v1/workflow/instances/:id", { params: { id: r.workflow_instance_id ?? "" }, enabled: r.status === "submitted" && Boolean(r.workflow_instance_id) });
+  const waiting = r.status === "submitted" && r.workflow_instance_id && instance.data?.can_decide;
   const cancellable = r.status === "approved" && r.ends_on >= todayIso() && grants.includes("edit");
 
   const done = (text: string) => {
@@ -241,7 +251,7 @@ function RequestCard({ leave: r, onDone }: { leave: LeaveRequest; onDone: () => 
           <p className="text-2xs text-subtle-foreground">{clashes.loading ? "Checking" : "Nobody else in the department"}</p>
         )}
       </div>
-      {waiting && grants.includes("approve") && (
+      {waiting && (
         <div className="mt-3 flex gap-2 phone:flex-col phone:items-stretch">
           <Grow className="phone:hidden" />
           <Button onClick={no}>Reject</Button>
@@ -292,22 +302,27 @@ function RejectForm({ instanceId, close, onDone }: { instanceId: string; close: 
   );
 }
 
-/** This month's approved leave, one name per day. */
+/** Approved and waiting leave within the reader's scope, a month at a time, one name per day; this year and next. */
 function LeaveCalendar() {
-  const now = todayIso();
-  const y = Number(now.slice(0, 4));
-  const m = Number(now.slice(5, 7)) - 1;
-  const first = `${now.slice(0, 7)}-01`;
+  const now = todayIso().slice(0, 7);
+  const [ym, setYm] = useState(now);
+  const y = Number(ym.slice(0, 4));
+  const m = Number(ym.slice(5, 7)) - 1;
+  const first = `${ym}-01`;
   const last = new Date(Date.UTC(y, m + 1, 0)).toISOString().slice(0, 10);
-  const list = usePaged("GET /api/v1/leave/requests", { filters: { status: "approved", from: first, to: last }, sort: "starts_on" });
+  const list = usePaged("GET /api/v1/leave/requests", { filters: { live: "true", from: first, to: last }, sort: "starts_on" });
   const events = list.rows.flatMap((r) => {
+    const label = `${r.employee.display_name.split(" ")[0]}${r.status === "submitted" ? " (Waiting)" : ""}`;
     const out = [];
-    for (let d = new Date(`${r.starts_on}T12:00:00Z`); d <= new Date(`${r.ends_on}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1))
-      out.push({ date: d.toISOString().slice(0, 10), label: r.employee.display_name.split(" ")[0] });
+    for (let d = new Date(`${r.starts_on}T12:00:00Z`); d <= new Date(`${r.ends_on}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+      const date = d.toISOString().slice(0, 10);
+      if (date.startsWith(ym)) out.push({ date, label });
+    }
     return out;
   });
   return (
     <>
+      <MonthPicker value={ym} onChange={setYm} min={`${now.slice(0, 4)}-01`} max={`${Number(now.slice(0, 4)) + 1}-12`} className="mb-3" />
       <Calendar year={y} month={m} events={events} />
       <Pager page={list.page} onPage={list.setPage} noun="request" />
     </>
@@ -317,7 +332,7 @@ function LeaveCalendar() {
 /** Ask for leave (My Leave), or record it for someone (People). */
 export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: boolean }) {
   const [who, setWho] = useState<PersonRef[]>([]);
-  const [whoError, setWhoError] = useState(false);
+  const [whoError, setWhoError] = useState<string | null>(null);
   const types = usePaged("GET /api/v1/leave/types", { filters: { active: "true" } });
   // My Leave opened by Praxis AI's Request Leave button carries the type, the days and the note.
   const filled = useAddressPrefill(leave.LeaveRequestPrefill, !onBehalf);
@@ -336,7 +351,7 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
 
   const submit = async () => {
     const missing = onBehalf && !who.length;
-    setWhoError(Boolean(missing));
+    setWhoError(missing ? "Pick someone" : null);
     if (!f.check() || missing) return;
     const body = {
       leave_type_id: f.values.leave_type_id,
@@ -356,20 +371,25 @@ export function LeaveForm({ close, onBehalf }: { close: () => void; onBehalf?: b
       invalidate("/api/v1/ess/leave");
       close();
     } catch (e) {
-      if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else say(e);
+      if (e instanceof ApiError && Object.keys(e.fields).length) {
+        // The Employee field is the form's own, outside the contract form: its mark goes there.
+        const { employee_id: whoMark, ...rest } = e.fields;
+        if (whoMark?.length) setWhoError(whoMark[0]);
+        if (Object.keys(rest).length) f.setServerErrors(rest);
+      } else say(e);
     }
   };
 
   return (
     <>
       {onBehalf && (
-        <Field label="Employee" state={whoError ? "bad" : undefined} message={whoError ? "Pick someone" : undefined}>
+        <Field label="Employee" state={whoError ? "bad" : undefined} message={whoError ?? undefined}>
           <EmployeePicker
             value={who}
+            filters={{ status: "active" }}
             onChange={(v) => {
               setWho(v);
-              setWhoError(false);
+              setWhoError(null);
             }}
           />
         </Field>

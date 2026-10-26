@@ -28,6 +28,12 @@ import { attendanceRulesInForce, attendanceRulesOn } from "./policies";
  * The policy, the shift and the clock
  * ------------------------------------------------------------------ */
 const TZ = "Africa/Lagos";
+/** Whether the policy in force pays overtime only when approved beforehand (Approve Overtime). */
+const preApprovedOvertime = () => {
+  const ot = attendanceRulesInForce().overtime;
+  return Boolean(ot?.on && ot.approval === "pre_approved");
+};
+
 /** The office's location mode, the device mode and the accuracy limit of the version in force (below). */
 const POLICY_MODES = {
   get geofence_mode() {
@@ -47,7 +53,7 @@ const FUTURE_TOLERANCE_S = 120;
 
 type Ev = AttendanceEvent & { key: string };
 type Day = AttendanceDay & { key: string };
-type Ex = AttendanceException & { key: string };
+type Ex = Omit<AttendanceException, "can_decide"> & { key: string };
 
 const person = (p: MockPerson) => ({ employee_id: p.employee_id, display_name: p.display_name, job_title: p.job_title, department: p.department, photo_url: null });
 
@@ -263,6 +269,7 @@ function addEvent(key: string, date: string, type: EventType, iso: string, extra
     excluded: false,
     recorded_by_name: null,
     reason: null,
+    real_time_given: null,
     ...extra,
   };
   EVENTS.push(e);
@@ -288,6 +295,7 @@ function addException(key: string, date: string, type: ExceptionType, ev: Ev | n
     employee_note: null,
     employee_noted_at: null,
     real_time: null,
+    refused: ev?.validation_state === "rejected",
     resolution: decided?.resolution ?? null,
     reviewed_at: decided ? new Date(Date.parse(ev?.occurred_at ?? `${date}T12:00:00Z`) + 3 * 3600_000).toISOString() : null,
     reviewed_by_name: decided ? (byKey(decided.by)?.display_name ?? null) : null,
@@ -631,6 +639,7 @@ function homeOut(h: Home, all: boolean): HomeRequest {
     decided_at: h.decided_at,
     decided_by_name: h.decided_by ? (byKey(h.decided_by)?.display_name ?? null) : null,
     decision_reason: h.reason,
+    can_decide: false,
   };
 }
 
@@ -656,7 +665,8 @@ route("GET /api/v1/attendance/homes", (req) => {
   if (!g.may) return forbidden();
   if (!homesOn()) return HOME_LOCATION_OFF();
   const waitingFirst = (a: HomeRequest, b: HomeRequest) => Number(b.status === "pending") - Number(a.status === "pending") || b.requested_at.localeCompare(a.requested_at);
-  const rows = HOMES.filter((h) => g.sees(h.key)).map((h) => homeOut(h, g.all));
+  const decides = decidesFor(req.user!);
+  const rows = HOMES.filter((h) => g.sees(h.key)).map((h) => ({ ...homeOut(h, g.all), can_decide: decides(h.key, h.status === "pending") }));
   return paged(rows, req, {
     search: (h) => [h.employee.display_name],
     filters: { status: (h, v) => h.status === v, employee_id: (h, v) => h.employee.employee_id === v },
@@ -669,7 +679,7 @@ route("GET /api/v1/attendance/homes/:id", (req) => {
   if (!g.may) return forbidden();
   if (!homesOn()) return HOME_LOCATION_OFF();
   const h = HOMES.find((x) => x.id === req.params.id);
-  return h && g.sees(h.key) ? ok(homeOut(h, g.all)) : notFound();
+  return h && g.sees(h.key) ? ok({ ...homeOut(h, g.all), can_decide: decidesFor(req.user!)(h.key, h.status === "pending") }) : notFound();
 });
 
 route("POST /api/v1/attendance/homes/:id/decision", (req) => {
@@ -877,6 +887,7 @@ route("POST /api/v1/attendance/punches", (req) => {
     excluded: false,
     recorded_by_name: null,
     reason: null,
+    real_time_given: null,
   };
   EVENTS.push(ev);
   dev.last_punch_at = now;
@@ -926,7 +937,12 @@ route("POST /api/v1/attendance/punches", (req) => {
  * ------------------------------------------------------------------ */
 const monthOf = (q: Record<string, string>) => q.month ?? todayIso().slice(0, 7);
 const dayOut = ({ key: _k, ...d }: Day): AttendanceDay => ({ ...d, open_exceptions: openCount(d.attendance_day_id) });
-const exOut = ({ key: _k, ...x }: Ex): AttendanceException => x;
+const exOut = ({ key: _k, ...x }: Ex): AttendanceException => ({ ...x, can_decide: false });
+/** What the reader may decide now: open, People approve over everyone, and not their own. */
+const decidesFor = (user: string) => {
+  const g = peopleGrant(user, "approve");
+  return (key: string, open: boolean) => Boolean(g.may && g.all && open && key !== user);
+};
 const evOut = ({ key: _k, ...e }: Ev, coordinates: boolean): AttendanceEvent => (coordinates ? e : { ...e, latitude: null, longitude: null });
 const byNewest = (a: Day, b: Day) => b.attendance_date.localeCompare(a.attendance_date);
 const exOrder = (a: Ex, b: Ex) => Number(a.status !== "open") - Number(b.status !== "open") || b.created_at.localeCompare(a.created_at);
@@ -989,6 +1005,7 @@ route("POST /api/v1/attendance/me/events/:id/explanation", (req) => {
     return fail(422, "REAL_TIME_INVALID", "Give a time after your clock-in", { real_time: ["After your clock-in"] });
   const x = addException(ev.key, ev.work_date, "automatic_clock_out", ev, systemDetail(ev, body.data.real_time));
   Object.assign(x, { employee_note: body.data.employee_note, employee_noted_at: new Date().toISOString(), real_time: body.data.real_time, created_at: new Date().toISOString() });
+  ev.real_time_given = body.data.real_time;
   recompute(ev.key, ev.work_date);
   return created(exOut(x));
 });
@@ -1098,7 +1115,7 @@ route("GET /api/v1/attendance/register/:employee_id", (req) => {
     overtime_minutes: day?.overtime_minutes ?? 0,
     closed: !!day?.closed_at,
     expected_location: fence ? { name: fence.name, radius_m: fence.radius_m } : approvedDayOf(p.user_key) ? { name: approvedDayOf(p.user_key)!.name, radius_m: null } : null,
-    policy: { geofence_mode: POLICY_MODES.geofence_mode, device_mode: POLICY_MODES.device_mode },
+    policy: { geofence_mode: POLICY_MODES.geofence_mode, device_mode: POLICY_MODES.device_mode, pre_approved_overtime: preApprovedOvertime() },
     open_exceptions: row.open_exceptions,
     overtime_approval: approval && { minutes: approval.minutes, approved_by_name: approval.approved_by_name, reason: approval.reason },
   };
@@ -1118,7 +1135,8 @@ route("GET /api/v1/attendance/events", (req) => {
 route("GET /api/v1/attendance/exceptions", (req) => {
   const g = peopleGrant(req.user!, "view");
   if (!g.may) return forbidden();
-  const rows = EXCS.filter((x) => g.sees(x.key)).sort(exOrder).map(exOut);
+  const decides = decidesFor(req.user!);
+  const rows = EXCS.filter((x) => g.sees(x.key)).sort(exOrder).map((x) => ({ ...exOut(x), can_decide: decides(x.key, x.status === "open") }));
   return paged(rows, req, {
     search: (x) => [x.employee.display_name, x.detail],
     filters: {

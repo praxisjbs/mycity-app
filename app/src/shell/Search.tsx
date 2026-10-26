@@ -5,7 +5,7 @@ import { invalidate, useApi } from "@/api/hooks";
 import type { SearchHit } from "@mycity/contract/contract.gen.ts";
 import { useAuth } from "@/auth/AuthProvider";
 import { useClock } from "@/features/attendance/ClockButton";
-import { enablePush, sendTestPush } from "@/features/notifications/push";
+import { testPush, turnOnPush } from "@/features/notifications/push";
 import { openNotificationSettings } from "@/features/notifications/state";
 import { useRouter } from "@/lib/router";
 import { useInstallApp } from "./Notices";
@@ -98,23 +98,8 @@ export function Search({ open, onClose }: { open: boolean; onClose: () => void }
     if (hit?.run === "reload") return reloadApp();
     if (hit?.run === "sign_out") return void signOut();
     if (hit?.run === "notify_settings") return openNotificationSettings();
-    if (hit?.run === "notify_on") {
-      const s = await enablePush();
-      if (s === "on") toast("Notifications are on");
-      else if (s === "blocked") toast.error("Notifications are blocked here");
-      else if (s === "needs-install") toast.info("Install the app first");
-      else if (s !== "ask") toast.error("Not available on this device");
-      return;
-    }
-    if (hit?.run === "notify_test") {
-      try {
-        await sendTestPush();
-        toast("Test sent");
-      } catch (e) {
-        toast.error(e instanceof ApiError ? e.message : "Could not send the test");
-      }
-      return;
-    }
+    if (hit?.run === "notify_on") return void (await turnOnPush());
+    if (hit?.run === "notify_test") return testPush();
     if (hit?.run === "read_all") {
       try {
         await api.call("POST /api/v1/notifications/read-all", { body: {} });

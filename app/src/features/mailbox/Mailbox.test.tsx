@@ -78,7 +78,7 @@ describe("a mailbox press the server refuses", () => {
     refuse("POST /api/v1/mailbox/connection/sync", "Mail server not reached");
     fireEvent.click(await screen.findByRole("button", { name: "Refresh" }, { timeout: 10000 }));
     expect(await screen.findByText("Mail server not reached", {}, { timeout: 5000 })).toBeTruthy();
-    expect(screen.queryByText("Mailbox up to date")).toBeNull();
+    expect(screen.queryByText("Checking for new mail")).toBeNull();
   });
 
   it("Empty Trash says why, and can be pressed again", async () => {

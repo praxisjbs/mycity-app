@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { UrgentBar } from "@mycity/ui";
+import { toast, UrgentBar } from "@mycity/ui";
 import type { Notification } from "@mycity/contract/contract.gen.ts";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { invalidate, useApi } from "@/api/hooks";
 import { useRouter } from "@/lib/router";
 import { markRead } from "./arrivals";
@@ -38,7 +38,12 @@ export function UrgentNotices({ rows }: { rows: Notification[] }) {
   const acknowledge = () =>
     api
       .call("POST /api/v1/notifications/:id/acknowledge", { params: { id: n.notification_id }, body: {} })
-      .then(() => invalidate("/api/v1/notifications", "/api/v1/community"));
+      .then(() => invalidate("/api/v1/notifications", "/api/v1/community"))
+      .catch((e) => {
+        // Withdrawn meanwhile, or offline: say why, and show the bar as it is now.
+        toast.error(e instanceof ApiError && e.status !== 0 ? e.message : "Not acknowledged. Try again.");
+        invalidate("/api/v1/notifications");
+      });
   return (
     <UrgentBar
       title={n.title}

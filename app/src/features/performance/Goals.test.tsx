@@ -335,14 +335,14 @@ describe("Performance · Goals, set and changed on screen", () => {
     fireEvent.change(stories!, { target: { value: "27.12345" } });
     fireEvent.blur(stories!);
     await settled();
-    expect(within(dialog()).getByText("Enter a number")).toBeTruthy();
+    expect(within(dialog()).getByText("Like 64000 or 0.95")).toBeTruthy();
     const before = reports().length;
     await press(dialog(), "Report Month");
     expect(reports().length).toBe(before);
 
     // Put right, the mark clears as it is typed and the month goes.
     fireEvent.change(stories!, { target: { value: "27" } });
-    expect(within(dialog()).queryByText("Enter a number")).toBeNull();
+    expect(within(dialog()).queryByText("Like 64000 or 0.95")).toBeNull();
     await press(dialog(), "Report Month");
     expect(reports().length).toBe(before + 1);
     const sent = reports().at(-1)![0].body as { key_results: Array<{ actual_value?: string }> };

@@ -103,6 +103,8 @@ const AiActionRow = z
     built: z.boolean(),
     /** Whether it has a chain of its own, saved or from the registry, rather than its job's. */
     own_chain: z.boolean(),
+    /** Whether the registry chose it a chain of its own (Data Answers): Restore Chain goes back there, not to its job's. */
+    set_chain: z.boolean(),
     chain: AiChain,
     calls_today: z.number().int().min(0),
   })

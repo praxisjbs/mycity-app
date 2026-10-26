@@ -61,7 +61,7 @@ A bank change is logged and People are told. The message then reads
 | It says | What it means | What to do |
 |---|---|---|
 | **Not a phone number** | Not a Nigerian mobile, or a foreign number without its country code | Type it as `0803 123 4567` |
-| **Check the format** | The account number is not ten digits | Type all ten digits, with no spaces |
+| **Ten digits** | The account number is not ten digits | Type all ten digits, with no spaces |
 | **Not saved. Try again.** | The connection failed | Press **Save Changes** again |
 
 To change your password, press **Change Password**. It opens [My Security](/ess?tab=my-security)
@@ -80,7 +80,7 @@ Colleagues see your photo wherever your name appears.
 
 | It says | What it means | What to do |
 |---|---|---|
-| *Larger than 5.0 MB* | The photo is too big | Choose a smaller photo |
+| *Larger than 5 MB* | The photo is too big | Choose a smaller photo |
 | **This file type is not accepted here.** | It is not a JPEG, PNG, WebP or HEIC picture | Choose a photo in one of those types |
 | **Not removed. Try again.** | The connection failed | Press **Remove Photo** again |
 
@@ -91,8 +91,8 @@ Colleagues see your photo wherever your name appears.
    file is saved to your device, and a message says **Your data downloaded**.
 
 One copy is made a day. Pressing again the same day downloads that same copy again. If it says
-**Your copy was already made today. Try tomorrow.**, the CEO already made a copy of your data
-today. Try again tomorrow. A copy that failed does not count.
+**A copy of your data was made for People today. Ask again tomorrow.**, someone in People or the CEO already made a copy of your
+data today, and that copy is theirs. Try again tomorrow. A copy that failed does not count.
 
 If it says **That file could not be made. Try again.** or **That file is taking too long. Try
 again.**, press **Download My Data** again.
@@ -135,8 +135,8 @@ comes back in 15 minutes.
 
 Once you have clocked out, the clock shows **Day Complete** with your times, or
 **System Clock-Out** if the hub clocked you out. **My Attendance** opens your month. The button at
-the top then reads **Done For Today** and cannot be pressed. On a leave day it reads
-**On Leave Today**.
+the top then reads **Done For Today**: press it (or the clock in **Quick Actions** on a phone) to
+see the day's times again. It punches nothing. On a leave day it reads **On Leave Today**.
 
 > **Important:** Clock in from your phone. A computer cannot place you closely enough, so the hub
 > may send a clock-in from a computer to People to check.
@@ -205,7 +205,7 @@ punch then goes to People to check, with a note you can write.
 | **On Leave**, with your leave's dates | You are on approved leave today | Nothing. Press **Close** |
 | **Not Available** | Only people who work at MyCity now can clock in | Ask People if this is wrong |
 | **Not Loaded** | The clock could not read today | Press **Try Again**, or **Not Now** and open it later |
-| **Note not sent** | Your note did not reach People | Check your connection and press **Send Note** again |
+| **Note not sent. Try again.** | Your note did not reach People | Check your connection and press **Send Note** again |
 
 If you are still clocked in after your shift ends, the hub reminds you with **Time to clock out**,
 every 30 minutes. About 90 minutes after the end, it clocks you out for you. That day reads
@@ -221,7 +221,8 @@ both times.
 4. Say what happened in **Your Note**, such as `Left at 16:00, forgot to clock out`.
 5. Press **Send Time**. A message says **Time sent to People**.
 
-People keep the system's time or correct it to yours. You are told: **Attendance reviewed**.
+People keep the system's time or correct it to yours. You are told: **Attendance reviewed**. Once
+sent, the day shows **Real Time Given** with your time in place of the button: it is given once.
 
 | The form says | What it means | What to do |
 |---|---|---|
@@ -312,7 +313,8 @@ If the card reads **Rejected**, People's reason is beside it. Put right what the
 
 A punch's **Location** reads **Inside** or **Outside** with the distance, **Unclear** with why (a
 rough reading, at the edge, no home, no office or no reading), or **Not Checked**. Its **Result**
-is **Accepted**, **Review** (People will check it), **Not Counted** or **System Clock-Out**.
+is **Accepted**, **Review** (People will check it), **Not Counted** (refused at the clock),
+**Rejected** (People rejected it) or **System Clock-Out**.
 
 | A deduction or overtime Status | What it means |
 |---|---|
@@ -349,7 +351,7 @@ no note from you yet; **Sent** means they have.
 | **System Clock-Out** | The hub clocked you out | The time you left, or use **Give Real Time** |
 
 If it says **This exception was already decided**, People decided before your note arrived. You are
-told the outcome. **Note not sent** means the connection failed: press **Send Note** again.
+told the outcome. **Note not sent. Try again.** means the connection failed: press **Send Note** again.
 
 ### Notices about your attendance {#ess-attendance-notices}
 
@@ -449,7 +451,8 @@ when it was **First Seen** and, on a computer, its **Last Punch**.
 
 If you already have three, the screen says
 **You have three registered devices. Remove one to add this one.** Remove an old one first, as
-below.
+below. If it says **Sign in again on this device to register it.**, the hub does not know this
+device yet: sign out, sign in again on it, then register.
 
 | It says | What it means | What to do |
 |---|---|---|
@@ -612,7 +615,7 @@ Leave People recorded for you reads **People** under **Approver**.
 | **Overlaps other leave** | You already asked for leave on some of those days | Change the days, or cancel the other request |
 | **More than you have left** | You do not have that many days left this year | Ask for fewer days, or another type |
 | **Not offered** | People stopped offering that type while you filled the form | Pick another **Leave Type** |
-| **Too long** | The note is over 500 characters | Shorten the **Note** |
+| *At most 500 characters* | The note is over 500 characters | Shorten the **Note** |
 
 ### Cancel a request {#ess-leave-cancel}
 
@@ -664,8 +667,8 @@ sends the file to another app; swipe down to close it.
    **Upload Document**, so it answers People's request.
 2. Type **What Is It**, such as `NDPA certificate`. For a **Missing** document it is filled in
    already. Fill it before you choose the file.
-3. Drop the file on the box, or press **Drop files here, or browse** and choose it: a PDF, a photo,
-   or a Word or Excel file, up to 15 MB. On a phone you can pick a file or take a photo. The upload
+3. Drop the file on the box, or press **Drop files here, or browse** and choose it: a PDF, a photo
+   (JPEG, PNG, WebP or HEIC), or a Word or Excel file, up to 15 MB, as the box says. On a phone you can pick a file or take a photo. The upload
    starts at once.
 4. The file shows its progress, then **Done**. The form closes and a message says
    **Uploaded. People will check it**. It reads **Awaiting Check** until they do.
@@ -675,7 +678,7 @@ again, or the cross to take it off.
 
 | The file says | What it means | What to do |
 |---|---|---|
-| *That file is larger than 15 MB. Choose a smaller file.* | The file is over the limit | Scan it at a lower quality, or split it into parts |
+| *Larger than 15 MB* | The file is over the limit, so it is not sent | Scan it at a lower quality, or split it into parts |
 | **This file type is not accepted here.** | The vault does not keep that kind of file | Save it as a PDF, or take a photo of it |
 | **This is an old Office file. Save it as .docx or .xlsx and upload it again.** | An old .doc or .xls file | Save it in the newer format, then upload it |
 | **That document has already been given** | The document People asked for was given already, or People withdrew the request | Close the form. The list no longer shows it as **Missing** |
@@ -810,7 +813,7 @@ message says **Passkey removed**.
 | **This request has expired. Start again.** | Press **Add Passkey** again, and answer your device sooner |
 | **Passkeys do not work on this address** | Open the hub at its usual address, then try again |
 | **The passkey did not work** | Try again, or use your password |
-| **Required** or **Too long** under **Name** | Type a name of up to 60 characters |
+| **Required** or *At most 60 characters* under **Name** | Type a name of up to 60 characters |
 
 If you close your device's prompt, nothing changes.
 

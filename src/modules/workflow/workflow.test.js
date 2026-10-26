@@ -13,6 +13,17 @@ const service = require("./workflow.service");
 const LEAVE = definitions.DEFAULTS["leave.approval"];
 const names = { roles: new Map([["operations_people", "Operations & People"]]), users: new Map(), employees: new Map([["e1", "Kemi Alade"]]) };
 
+describe("a route's problems, plainly", () => {
+  test("name the stage and say the rule in words", () => {
+    const stages = [{ name: "Line Manager" }, { name: "Finance" }];
+    expect(service.plainly("stage 2 (finance): sla_hours is between 1 and 2160", stages)).toBe("Finance: the time limit is 1 to 2,160 hours");
+    expect(service.plainly("stage 1 (line_manager): name at least one approver", stages)).toBe("Line Manager: it names nobody to decide");
+    expect(service.plainly("stage 1 (line_manager) condition: field \"x\" is not declared in context", stages)).toBe("Line Manager: its condition does not fit these requests");
+    expect(service.plainly("stage 3 (x): something new", stages)).toBe("Stage 3: check its settings");
+    expect(service.plainly("at least one stage is required", stages)).toBe("Add a stage");
+  });
+});
+
 describe("the leave flow", () => {
   test("is valid, and the line manager alone decides five days or fewer", () => {
     expect(definitions.problemsOf(LEAVE)).toEqual([]);

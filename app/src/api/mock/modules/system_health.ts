@@ -17,6 +17,7 @@ import type {
   TableStat,
 } from "@mycity/contract/contract.gen.ts";
 import { fail, ok, paged, route } from "../core";
+import { byKey } from "../data/people";
 
 /**
  * System Health on the mock (packages/contract/schemas/system_health.js): a system that
@@ -656,6 +657,8 @@ route("PATCH /api/v1/system-health/faults/:id", (req) => {
   const f = FAULTS.find((x) => x.error_group_id === req.params.id);
   if (!f) return fail(404, "NOT_FOUND", "Not found");
   if (req.body.status) f.status = req.body.status as FaultRow["status"];
+  // Take It On names the reader as its holder.
+  if (req.body.assigned_to !== undefined) f.assigned_name = req.body.assigned_to ? (byKey(req.user ?? "")?.display_name ?? null) : null;
   return ok({ ...f, name: f.title, last_message: f.title, frame: null, first_release: "a10d4c8", regressions: 0, plainly: PLAINLY[f.error_group_id] ?? "", daily: [], occurrences: [], notes: [] });
 });
 

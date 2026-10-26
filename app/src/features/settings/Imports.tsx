@@ -13,11 +13,13 @@ import {
   DataView,
   DesktopOnly,
   EmptyState,
+  ErrorState,
   Field,
   FilterSelect,
   formatDateTime,
   KeyValue,
   KpiGrid,
+  LoadingRows,
   PageHeader,
   PhoneOnly,
   Pill,
@@ -87,15 +89,15 @@ export function Imports() {
   const asked = params.get("importer");
 
   const start = useMemo(
-    () => (key?: string) =>
+    () => (key?: string, resume?: ImportBatch) =>
       modal.open({
         title: "Import Records",
         full: true,
         wide: true,
         body: (close) => (
           <ImportWizard
-            importers={importers.data?.importers ?? []}
             preferred={key ?? null}
+            resume={resume ?? null}
             close={() => {
               close();
               setParams({ importer: null });
@@ -105,7 +107,7 @@ export function Imports() {
         ),
         onClose: () => setParams({ importer: null }),
       }),
-    [modal, importers.data, setParams],
+    [modal, setParams],
   );
 
   useScreenAction({ label: "Start Import", onSelect: () => start() });
@@ -116,10 +118,12 @@ export function Imports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- opening once per asked importer
   }, [asked, importers.data]);
 
+  // What the reader may run: the importers the API lists for them. Revert and Continue are theirs only.
+  const mayRun = (b: ImportBatch) => (importers.data?.importers ?? []).some((i) => i.key === b.importer_key);
   const openBatch = (b: ImportBatch) =>
     modal.open({
       title: b.number,
-      body: <BatchDetail batch={b} confirm={confirm} />,
+      body: (close) => <BatchDetail batch={b} confirm={confirm} mayRun={mayRun(b)} onContinue={() => (close(), start(b.importer_key, b))} />,
     });
 
   const columns = [
@@ -170,7 +174,12 @@ export function Imports() {
 
 /* ───────────── one batch ───────────── */
 
-function BatchDetail({ batch, confirm }: { batch: ImportBatch; confirm: ReturnType<typeof useConfirm> }) {
+/** An import not committed yet, and not failed: it can be taken up where it was left (decision 6). */
+const UNFINISHED = new Set(["uploaded", "mapped", "previewed"]);
+/** Only a previewed import has an error file (src/shared/import/report.js). */
+const HAS_REPORT = new Set(["previewed", "committed", "reverted"]);
+
+function BatchDetail({ batch, confirm, mayRun, onContinue }: { batch: ImportBatch; confirm: ReturnType<typeof useConfirm>; mayRun: boolean; onContinue: () => void }) {
   const revert = useMutation("POST /api/v1/imports/:id/revert");
   const [done, setDone] = useState(batch.status === "reverted");
   return (
@@ -186,13 +195,20 @@ function BatchDetail({ batch, confirm }: { batch: ImportBatch; confirm: ReturnTy
       />
       <Counts stats={batch.stats} className="mt-3" />
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          icon="download"
-          onClick={() => saveFile(`/api/v1/imports/${batch.import_batch_id}/report`, `${batch.number}.xlsx`)}
-        >
-          Download Errors
-        </Button>
-        {batch.status === "committed" && !done && (
+        {HAS_REPORT.has(batch.status) && (
+          <Button
+            icon="download"
+            onClick={() => saveFile(`/api/v1/imports/${batch.import_batch_id}/report`, `${batch.number}.xlsx`)}
+          >
+            Download Errors
+          </Button>
+        )}
+        {mayRun && UNFINISHED.has(batch.status) && (
+          <Button variant="primary" icon="right" onClick={onContinue}>
+            Continue
+          </Button>
+        )}
+        {mayRun && batch.status === "committed" && !done && (
           <Button
             variant="danger"
             icon="undo"
@@ -206,7 +222,7 @@ function BatchDetail({ batch, confirm }: { batch: ImportBatch; confirm: ReturnTy
                 toast(`${out.archived} archived, ${out.restored} put back`);
               } catch (e) {
                 // Refused whole when a record changed since or is in use: the reason names the rows.
-                toast(e instanceof Error ? e.message : "Not reverted. Try again.");
+                toast.error(e instanceof Error ? e.message : "Not reverted. Try again.");
               }
             }}
           >
@@ -243,10 +259,21 @@ function Counts({ stats, className }: { stats: ImportBatch["stats"]; className?:
 
 /* ───────────── the wizard ───────────── */
 
-function ImportWizard({ importers, preferred, close }: { importers: Importer[]; preferred: string | null; close: () => void }) {
-  const [key, setKey] = useState(preferred ?? importers[0]?.key ?? "");
-  const [batch, setBatch] = useState<ImportBatch | null>(null);
-  const [fields, setFields] = useState<Record<string, string | null>>({});
+/** The wizard once the reader's importers are known: pressed early, it waits for them rather than saying there is nothing to import. */
+function ImportWizard({ preferred, resume, close }: { preferred: string | null; resume: ImportBatch | null; close: () => void }) {
+  const importers = useApi("GET /api/v1/imports/importers");
+  if (importers.error) return <ErrorState error={importers.error} onRetry={importers.reload} />;
+  if (!importers.data) return <LoadingRows count={4} />;
+  return <ImportSteps importers={importers.data.importers} preferred={preferred} resume={resume} close={close} />;
+}
+
+/** Where an unfinished import is taken up: Map for one uploaded or mapped, Preview for one previewed. */
+const STEP_OF: Record<string, number> = { uploaded: 1, mapped: 1, previewed: 2 };
+
+function ImportSteps({ importers, preferred, resume, close }: { importers: Importer[]; preferred: string | null; resume: ImportBatch | null; close: () => void }) {
+  const [key, setKey] = useState(resume?.importer_key ?? preferred ?? importers[0]?.key ?? "");
+  const [batch, setBatch] = useState<ImportBatch | null>(resume);
+  const [fields, setFields] = useState<Record<string, string | null>>(() => (resume ? Object.fromEntries(resume.mapping.columns.map((c) => [String(c.index), c.field])) : {}));
   const [validOnly, setValidOnly] = useState(false);
   const [ticked, setTicked] = useState<Record<string, string[]>>({});
   const [view, setView] = useState<RowView>("problem");
@@ -271,7 +298,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
       setBatch(next);
       setFields(Object.fromEntries(next.mapping.columns.map((c) => [String(c.index), c.field])));
     } catch (e) {
-      toast(e instanceof Error ? e.message : "That row did not work");
+      toast.error(e instanceof Error ? e.message : "That row did not work");
     }
   };
 
@@ -325,7 +352,12 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
           {batch && <p className="mt-3 text-sm text-subtle-foreground">{batch.file_name}</p>}
         </>
       ),
-      check: () => Boolean(batch),
+      // Next with no sheet says so, rather than doing nothing.
+      check: () => {
+        if (batch) return true;
+        toast.error("Upload a sheet first");
+        return false;
+      },
     },
     {
       title: "Map",
@@ -358,7 +390,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
           setBatch({ ...mapped, ...out.batch, stats: out.stats });
           return true;
         } catch (e) {
-          toast(e instanceof Error ? e.message : "That mapping did not work");
+          toast.error(e instanceof Error ? e.message : "That mapping did not work");
           return false;
         }
       },
@@ -458,6 +490,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
   return (
     <Wizard
       steps={steps}
+      initialStep={resume ? (STEP_OF[resume.status] ?? 0) : 0}
       finish="Commit Import"
       busy={commit.pending}
       onCancel={close}
@@ -473,7 +506,7 @@ function ImportWizard({ importers, preferred, close }: { importers: Importer[]; 
         } catch (e) {
           // A refused commit keeps every row's result: the counts and the rows are read again,
           // so the person sees what to fix, or turns on Commit Valid Rows, and tries again.
-          toast(e instanceof Error ? e.message : "That import did not commit");
+          toast.error(e instanceof Error ? e.message : "That import did not commit");
           if (e instanceof ApiError && e.code === "IMPORT_HAS_ERRORS") {
             const fresh = await api.call("GET /api/v1/imports/:id", { params: { id: batch.import_batch_id } });
             setBatch(fresh);

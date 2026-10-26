@@ -58,7 +58,7 @@ route("GET /api/v1/performance/periods/:id", (req) => {
 });
 route("POST /api/v1/performance/periods", (req) => {
   const b = req.body as { starts_on?: string; name?: string; targets_lock_on?: string; live_from?: string; status?: "planning" | "active"; rules?: PerformancePeriod["rules"] };
-  if (!b.starts_on || !/-(01|04|07|10)-01$/.test(b.starts_on)) return invalid({ starts_on: ["Pick a quarter's first day"] });
+  if (!b.starts_on || !/-(01|04|07|10)-01$/.test(b.starts_on)) return invalid({ starts_on: ["Pick a quarter start"] });
   if (PERIODS.some((p) => p.starts_on === b.starts_on)) return fail(409, "PERIOD_EXISTS", "That quarter is already set up", { starts_on: ["Already set up"] });
   if (b.status === "active" && PERIODS.some((p) => p.status === "active")) return fail(409, "PERIOD_ACTIVE_EXISTS", "Close the active quarter first", { status: ["Another is active"] });
   const last = [...PERIODS].sort((a, c) => c.starts_on.localeCompare(a.starts_on))[0];

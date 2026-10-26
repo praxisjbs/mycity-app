@@ -18,7 +18,7 @@ vi.mock("@/api/hooks", () => ({
   useMutation: () => ({ run: vi.fn(), pending: false }),
   usePaged: () => ({ rows: [], page: { number: 1, size: 25, total: 0, pages: 0, has_next: false }, loading: false, error: null, q: "", setQ: () => undefined, setPage: () => undefined }),
 }));
-vi.mock("@/api/client", () => ({ api: { call: m.call } }));
+vi.mock("@/api/client", () => ({ api: { call: m.call }, ApiError: class ApiError extends Error {} }));
 vi.mock("@/api/exports", () => ({ saveExport: m.saveExport }));
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ can: m.can }) }));
 
@@ -95,6 +95,18 @@ describe("Settings · Status", () => {
     vi.clearAllMocks();
     vi.useRealTimers();
     m.reads = {};
+  });
+
+  it("with every check up, Show All lists them and Show Fewer goes back to the quiet line", async () => {
+    const user = userEvent.setup();
+    m.reads["GET /api/v1/system-health/status"] = status([check()]);
+    render(<ModalProvider><StatusTab /></ModalProvider>);
+    expect(screen.getByText("Every one of the 1 checks is up.")).toBeTruthy();
+    // It showed "Show Fewer" here, though pressing it showed more.
+    await user.click(screen.getByRole("button", { name: "Show All" }));
+    expect(screen.getByText("Database")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Show Fewer" }));
+    expect(screen.getByText("Every one of the 1 checks is up.")).toBeTruthy();
   });
 
   it("says since when a check that is not up has been so", () => {

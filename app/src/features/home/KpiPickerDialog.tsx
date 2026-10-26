@@ -47,7 +47,12 @@ function KpiPickerDialog({ close }: { close: () => void }) {
       done();
       close();
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Cards not saved. Try again.");
+      // A refusal ("Pick cards you can see") means the list changed under the person: show it as it is now.
+      toast.error(e instanceof ApiError ? e.message : "Cards not saved. Try again.");
+      if (e instanceof ApiError && e.status !== 0) {
+        setDraft(null);
+        void picker.reload();
+      }
     }
   };
   const followRoles = async () => {
@@ -56,7 +61,8 @@ function KpiPickerDialog({ close }: { close: () => void }) {
       done();
       close();
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Cards not reset. Try again.");
+      toast.error(e instanceof ApiError ? e.message : "Cards not reset. Try again.");
+      if (e instanceof ApiError && e.status !== 0) void picker.reload();
     }
   };
 

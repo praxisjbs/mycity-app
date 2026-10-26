@@ -15,10 +15,13 @@ import { Button, CheckboxField, DataView, Field, FormFooter, Grow, NumberField, 
 
 const say = (e: unknown) => toast(e instanceof ApiError ? e.message : "Not saved. Try again.");
 
-/** The code a type is stored under, from the name People type: "Study Leave" → "study_leave". */
-const codeOf = (name: string) => {
+/**
+ * The code a type is stored under, from the name People type: "Study Leave" → "study_leave". A
+ * name too short for a code of two characters (or not starting with a letter) gets `type_` before it.
+ */
+export const codeOf = (name: string) => {
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
-  return /^[a-z]/.test(slug) ? slug : `type_${slug}`.slice(0, 40);
+  return /^[a-z][a-z0-9_]/.test(slug) ? slug : `type_${slug}`.slice(0, 40);
 };
 
 const daysText = (n: number | null) => (n === null ? "No set allowance" : `${n} ${n === 1 ? "day" : "days"} a year`);
@@ -64,7 +67,7 @@ function TypeForm({ type, close }: { type: LeaveType | null; close: () => void }
   const f = useContractForm(
     { name: type?.name ?? "", days: type?.days_per_year === null || type?.days_per_year === undefined ? "" : String(type.days_per_year), active: type?.active ?? true },
     {
-      name: rules.required("Name the type"),
+      name: (v) => rules.required("Name the type")(v) ?? (String(v).trim().length > 80 ? "At most 80 characters" : null),
       days: (v) => (v === "" || (Number(v) >= 0 && Number(v) <= 366) ? null : "0 to 366 days"),
     },
   );
@@ -89,7 +92,8 @@ function TypeForm({ type, close }: { type: LeaveType | null; close: () => void }
         done(`${f.values.name.trim()} added`);
       }
     } catch (e) {
-      if (e instanceof ApiError && e.fields.code) f.setServerErrors({ name: ["Already a type"] });
+      // The code is made from the name, so its marks go on Name; only a duplicate reads Already a Type.
+      if (e instanceof ApiError && e.fields.code) f.setServerErrors({ name: [e.code === "LEAVE_TYPE_EXISTS" ? "Already a type" : (e.fields.code[0] ?? "Check the name")] });
       else if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
       else say(e);
     }

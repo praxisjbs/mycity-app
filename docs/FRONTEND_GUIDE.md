@@ -424,7 +424,10 @@ element outside the form components (§8.6).
   typing for about 600 ms. Once a field is marked, it is re-checked on every keystroke, so the mark
   clears the moment it is fixed. A field with a format shows a tick when it is right.
 - **The signal is on the field**: a red ring and a ! mark, with an error of at most 4 words beside
-  it ("Not a real date"). Never a sentence under the form, never a dialog, never a toast.
+  it ("Not a real date"). Never a sentence under the form, never a dialog, never a toast. The
+  words are the contract's own when they fit in 4 ("Ten digits", "Pick a model"), so a schema's
+  message is written in 4 words or fewer; Zod's own limits read as the limit ("At most 500
+  characters", "At least 1"), also when a server 422 carries them raw (26/10/2026).
 - **Submit is never disabled.** Pressing it checks everything, marks every problem and moves focus
   to the first one. A wizard step does not advance until its fields are right. While the save runs
   the button is busy, not disabled (§8.4).

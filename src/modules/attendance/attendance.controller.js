@@ -10,6 +10,7 @@ const { sendPaged } = require("../../shared/http/paged");
 const { scopeOf } = require("../../shared/rbac/scope");
 const { maskForUser } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
+const { scopeFor } = require("../../middleware/rbac");
 const { pool } = require("../../config/db");
 const service = require("./attendance.service");
 const homes = require("./attendance.home");
@@ -27,6 +28,18 @@ const masked = (req, data) => maskForUser(pool, req.user, data);
 /** A pay item's amount is masked as the salary is, never on the reader's own (field-mask.js). */
 const maskedItem = (req, item) => (item.employee.employee_id === req.user.employee_id ? item : masked(req, item));
 const maskedItems = async (req, page) => ({ ...page, data: await Promise.all(page.data.map((x) => maskedItem(req, x))) });
+
+/**
+ * Marks what the reader may decide now, as the decisions' own rules hold it (reconcile.decide,
+ * home.decide): open (`state`), `people` approve over everyone, and never their own record.
+ * Takes a page or one row.
+ */
+async function decidable(req, data, state) {
+  const approve = await scopeFor(req.user, "people", "approve");
+  const all = Boolean(approve && approve.scope === "all");
+  const mark = (r) => ({ ...r, can_decide: all && r.status === state && r.employee.employee_id !== req.user.employee_id });
+  return data && Array.isArray(data.data) ? { ...data, data: data.data.map(mark) } : mark(data);
+}
 
 module.exports = {
   today: async (req, res) => ok(res, await service.today(req.user)),
@@ -75,16 +88,17 @@ module.exports = {
 
   events: async (req, res) => sendPaged(res, await service.events(q(req), scopeOf(req))),
 
-  exceptions: async (req, res) => sendPaged(res, await masked(req, await service.exceptions(q(req), scopeOf(req)))),
+  exceptions: async (req, res) =>
+    sendPaged(res, await masked(req, await decidable(req, await service.exceptions(q(req), scopeOf(req)), "open"))),
 
   record: async (req, res) => ok(res, await service.recordFor(id(req), scopeOf(req))),
 
   decide: async (req, res) =>
     ok(res, await service.decide(withActor(req), scopeOf(req), id(req), req.validated.body)),
 
-  homes: async (req, res) => sendPaged(res, await masked(req, await homes.list(q(req), scopeOf(req)))),
+  homes: async (req, res) => sendPaged(res, await masked(req, await decidable(req, await homes.list(q(req), scopeOf(req)), "pending"))),
 
-  home: async (req, res) => ok(res, await masked(req, await homes.get(id(req), scopeOf(req)))),
+  home: async (req, res) => ok(res, await masked(req, await decidable(req, await homes.get(id(req), scopeOf(req)), "pending"))),
 
   decideHome: async (req, res) =>
     ok(res, await masked(req, await homes.decide(withActor(req), scopeOf(req), id(req), req.validated.body))),

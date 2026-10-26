@@ -223,7 +223,7 @@ export function askDataExport(person: { employee_id: string; staff_number: strin
   const held = DATA_ASKED.get(person.employee_id);
   if (held?.day === today && held.asker === asker) return { status: 202, body: { ...held.file, status: "done" } };
   if (held?.day === today)
-    return fail(429, "DATA_EXPORT_LIMIT", own ? "Your copy was already made today. Try tomorrow." : "Their copy was already made today. Try tomorrow.");
+    return fail(429, "DATA_EXPORT_LIMIT", own ? "A copy of your data was made for People today. Ask again tomorrow." : "Their copy was already made today. Try tomorrow.");
   const answer = exportFile(asker, `my-data-${person.staff_number}`);
   DATA_ASKED.set(person.employee_id, { day: today, asker, file: answer.body as ExportFile });
   return answer;

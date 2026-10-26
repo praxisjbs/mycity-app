@@ -35,6 +35,8 @@ interface Pushed {
 
 /** Pages read at once when a conversation opens at its first unread (community.md §3 step 20). */
 const UNREAD_PAGES = 4;
+/** The most a message holds (the contract's MessageCreate body). */
+const MESSAGE_MAX = 4000;
 
 const timeOf = (m: Message) => new Date(m.sent_at).getTime();
 
@@ -333,7 +335,9 @@ function EditMessage({ m, close, done }: { m: Message; close: () => void; done: 
       done(await api.call("PUT /api/v1/community/messages/:id", { params: { id: m.community_message_id }, body: { body: f.values.body.trim() } }));
       close();
     } catch (e) {
-      if (e instanceof ApiError) f.setServerErrors(e.fields.body ? { body: e.fields.body } : { body: [e.message] });
+      // A mark on the message, or a refusal no field holds (deleted meanwhile, too late to edit) said in words.
+      if (e instanceof ApiError && e.fields.body) f.setServerErrors({ body: e.fields.body });
+      else toast.error(e instanceof ApiError ? e.message : "Not saved. Try again.");
     }
   };
   return (
@@ -398,9 +402,13 @@ export function PinnedBar({ t }: { t: ReturnType<typeof useThread> }) {
     setAt(n + 1);
   };
   const unpin = async () => {
-    await api.call("DELETE /api/v1/community/messages/:id/pin", { params: { id: m.community_message_id } });
-    await t.reload();
-    toast("Message unpinned");
+    try {
+      await api.call("DELETE /api/v1/community/messages/:id/pin", { params: { id: m.community_message_id } });
+      await t.reload();
+      toast("Message unpinned");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Not unpinned. Try again.");
+    }
   };
   return (
     <div className="flex flex-none items-center gap-2 border-b border-border bg-muted py-1.5 pr-2 pl-4 max-md:pl-3">
@@ -672,11 +680,24 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
                 onPointerCancel: letGo,
               }),
         };
-  const react = async (m: Message) => t.replace(await api.call("POST /api/v1/community/messages/:id/reactions", { params: { id: m.community_message_id }, body: {} }));
-  const vote = async (m: Message, i: number) => t.replace(await api.call("POST /api/v1/community/messages/:id/vote", { params: { id: m.community_message_id }, body: { option_index: i } }));
   const failed = (e: unknown) => {
-    if (e instanceof ApiError) toast(e.message);
+    if (e instanceof ApiError) toast.error(e.message);
     else throw e;
+  };
+  // A refused reaction or vote (This poll is closed, a lost connection) is said, never lost.
+  const react = async (m: Message) => {
+    try {
+      t.replace(await api.call("POST /api/v1/community/messages/:id/reactions", { params: { id: m.community_message_id }, body: {} }));
+    } catch (e) {
+      failed(e);
+    }
+  };
+  const vote = async (m: Message, i: number) => {
+    try {
+      t.replace(await api.call("POST /api/v1/community/messages/:id/vote", { params: { id: m.community_message_id }, body: { option_index: i } }));
+    } catch (e) {
+      failed(e);
+    }
   };
   const remove = async (m: Message) => {
     if (!(await confirm({ title: "Delete Message", body: "It is removed for everyone in this conversation.", confirmLabel: "Delete Message", cancelLabel: "Keep It", destructive: true }))) return;
@@ -793,7 +814,7 @@ export function ThreadBody({ t, dm, editPoll }: { t: ReturnType<typeof useThread
             {ms.length > 1 ? (
               <AlbumPost ms={ms} q={t.q} dm={dm} onView={view} menu={picking ? undefined : albumMenu(ms)} />
             ) : (
-              <Post m={m} q={t.q} dm={dm} onCelebrate={() => react(m)} onVote={(i) => void vote(m, i)} onView={view} onChange={t.replace} onReload={t.reload} menu={picking ? undefined : menuOf(m)} />
+              <Post m={m} q={t.q} dm={dm} onCelebrate={() => react(m)} onVote={(i) => vote(m, i)} onView={view} onChange={t.replace} onReload={t.reload} menu={picking ? undefined : menuOf(m)} />
             )}
           </div>
         </div>
@@ -979,6 +1000,8 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
 
   const send = async () => {
     if (!text.trim() || busy) return;
+    // Over the limit is said before sending, and the words stay in the box.
+    if (text.trim().length > MESSAGE_MAX) return toast.error(`Messages hold ${MESSAGE_MAX.toLocaleString("en-GB")} characters at most`);
     setBusy(true);
     try {
       const body = text.trim();
@@ -998,7 +1021,7 @@ export function Composer({ placeholder, onSend, onVoice, plus, readOnly }: { pla
     if (!type || !navigator.mediaDevices?.getUserMedia) {
       /* No recorder (an old browser, or the laptop mock in a test): a stand-in note. */
       if (import.meta.env.VITE_API_MODE === "mock") return setRec(0);
-      return toast("This browser cannot record audio");
+      return toast.error("This browser cannot record. Type instead.");
     }
     try {
       stream.current = await navigator.mediaDevices.getUserMedia({ audio: true });

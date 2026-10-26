@@ -42,6 +42,8 @@ export interface DateFieldProps {
   name?: string;
   /** The format example; DD/MM/YYYY. */
   placeholder?: string;
+  /** Shown and not changed (a record already sent): no typing and no calendar. */
+  disabled?: boolean;
 }
 
 /**
@@ -59,7 +61,7 @@ function readTyped(text: string, min?: string, max?: string): { iso: string; pro
   return { iso };
 }
 
-export function DateField({ value, onChange, onBlur, onProblem, min, max, state, message: _message, id, name, placeholder = "DD/MM/YYYY" }: DateFieldProps) {
+export function DateField({ value, onChange, onBlur, onProblem, min, max, state, message: _message, id, name, placeholder = "DD/MM/YYYY", disabled }: DateFieldProps) {
   const a = useFieldControl({ id, state });
   const [text, setText] = useState(formatDate(value));
   const [problem, setProblem] = useState<string | undefined>();
@@ -108,16 +110,17 @@ export function DateField({ value, onChange, onBlur, onProblem, min, max, state,
         className={cn(controlClass(shown), "h-control pr-11 tabular-nums")}
         placeholder={placeholder}
         value={text}
+        disabled={disabled}
         onChange={(e) => commit(e.target.value)}
         onBlur={leave}
       />
       <Popover
         title="Pick a Date"
-        open={open}
-        onOpenChange={setOpen}
+        open={open && !disabled}
+        onOpenChange={(next) => setOpen(next && !disabled)}
         align="end"
         trigger={
-          <button type="button" aria-label="Pick a date" className="absolute right-0 flex h-control min-h-tap w-11 items-center justify-center text-subtle-foreground hover:text-foreground">
+          <button type="button" aria-label="Pick a date" disabled={disabled} className="absolute right-0 flex h-control min-h-tap w-11 items-center justify-center text-subtle-foreground hover:text-foreground">
             <Icon name="check" size="s" />
           </button>
         }

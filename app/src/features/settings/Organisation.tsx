@@ -155,7 +155,10 @@ function BrandFiles({ org, canEdit }: { org: Organisation; canEdit: boolean }) {
 
 function BrandFile({ slot, label, upload: uploadLabel, said, dark, doc, canEdit }: (typeof BRAND)[number] & { doc: Organisation["logo"]; canEdit: boolean }) {
   const href = useFileUrl(doc ? `/api/v1/documents/${doc.document_id}/content` : null);
+  const confirm = useConfirm();
+  // Asked first, as every other removal on these screens is.
   const remove = async () => {
+    if (!(await confirm({ title: `Remove ${label}`, body: `${doc?.file_name ?? label} is removed from the brand.`, confirmLabel: "Remove", destructive: true }))) return;
     try {
       await api.call("DELETE /api/v1/settings/organisation/brand/:slot", { params: { slot } });
       invalidate("/api/v1/settings/organisation");
@@ -407,6 +410,8 @@ function Holidays({ canEdit }: { canEdit: boolean }) {
 
 function HolidayForm({ holiday, close }: { holiday: Holiday | null; close: () => void }) {
   const confirm = useConfirm();
+  // Deleting is `settings` delete, which editing does not bring (settings.routes).
+  const mayDelete = useAuth().can("settings", "delete");
   const add = useMutation("POST /api/v1/settings/holidays");
   const update = useMutation("PATCH /api/v1/settings/holidays/:id");
   const remove = useMutation("DELETE /api/v1/settings/holidays/:id");
@@ -444,7 +449,7 @@ function HolidayForm({ holiday, close }: { holiday: Holiday | null; close: () =>
         <TextField {...f.field("name")} placeholder="Independence Day" maxLength={80} />
       </Field>
       <FormFooter>
-        {holiday && (
+        {holiday && mayDelete && (
           <Button variant="danger" className="mr-auto" busy={remove.pending} onClick={() => del()}>
             Delete Holiday
           </Button>

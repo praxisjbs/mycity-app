@@ -35,8 +35,9 @@ export function useClock() {
   const out = today?.state === "clocked_in";
   const done = today?.state === "clocked_out";
   const unavailable = today?.state === "unavailable";
-  const label = out ? "Clock Out" : "Clock In";
-  const open = useCallback(() => openPanel(out ? "Clock Out" : "Clock In"), [openPanel, out]);
+  // After clock-out the clock stays pressable: it opens the day's times and My Attendance, no punch.
+  const label = done ? "Done For Today" : out ? "Clock Out" : "Clock In";
+  const open = useCallback(() => openPanel(done ? "Today" : out ? "Clock Out" : "Clock In"), [openPanel, out, done]);
   return { today, out, done, unavailable, label, open, ready: !!today && !done };
 }
 
@@ -105,15 +106,15 @@ export function ClockPrompts() {
 
 /** The desktop top bar's Clock In / Clock Out button. */
 export function ClockButton({ compact }: { compact?: boolean }) {
-  const { today, out, done, unavailable, label, open } = useClock();
-  const title = unavailable ? (today?.unavailable_reason === "leave" ? "On Leave Today" : "Clock Not Available") : done ? "Done For Today" : label;
+  const { today, out, unavailable, label, open } = useClock();
+  const title = unavailable ? (today?.unavailable_reason === "leave" ? "On Leave Today" : "Clock Not Available") : label;
 
   return (
     <Tooltip label={title}>
       <button
         type="button"
         onClick={() => open()}
-        disabled={!today || done}
+        disabled={!today}
         aria-label={title}
         className={cn(
           "flex h-9 max-md:h-11 max-md:min-w-11 max-md:justify-center items-center gap-1.5 rounded-full text-sm font-semibold transition hover:brightness-110 disabled:opacity-50",
@@ -122,7 +123,7 @@ export function ClockButton({ compact }: { compact?: boolean }) {
         )}
       >
         <Icon name="clock" />
-        {!compact && <span>{done ? "Done For Today" : label}</span>}
+        {!compact && <span>{label}</span>}
       </button>
     </Tooltip>
   );
@@ -571,7 +572,7 @@ function PunchDone({ res, close, again, toDevices }: { res: PunchResult; close: 
       toast("Note sent to People");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Note not sent");
+      else toast.error(e instanceof ApiError ? e.message : "Note not sent. Try again.");
     }
   };
 

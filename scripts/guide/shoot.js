@@ -252,6 +252,9 @@ const HIDE_DEMO = "[data-ui-ignore], [data-sonner-toaster], [data-urgent-bar], [
 /** What a step can leave open: a dialog or sheet, or a panel such as the bell's. */
 const OPEN = "[data-ui=modal], [role=dialog][data-state=open]";
 
+/** The acknowledge prompt a signed-in account meets until it has answered every policy it owes. */
+const POLICY_PROMPT = '[data-ui=modal]:has([data-ui=title]:text-is("Policy Update"))';
+
 /**
  * Sign in once per account and device; every picture of theirs is taken in that session. A
  * `guest` is nobody: each of their pictures opens its address afresh (the sign-in screen, a link).
@@ -281,6 +284,14 @@ async function session(browser, origin, account, device) {
   const prompt = await page.waitForSelector('[data-ui=modal]:has-text("Start Your Day")', { timeout: 4000 }).catch(() => null);
   if (prompt) {
     await page.click('[data-ui=modal] button:has-text("Not Now")');
+    await appSettle(page);
+  }
+  // Then each policy the account owes opens, one at a time, once per sign-in: Esc does not close
+  // it (app/src/features/policies/AcknowledgeSheet.tsx), its X does, and nothing is acknowledged.
+  for (let i = 0; i < 5; i += 1) {
+    const owed = await page.waitForSelector(POLICY_PROMPT, { timeout: i ? 1500 : 3000 }).catch(() => null);
+    if (!owed) break;
+    await page.click(`${POLICY_PROMPT} button[aria-label=Close]`);
     await appSettle(page);
   }
   return { ctx, page };

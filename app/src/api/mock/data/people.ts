@@ -88,7 +88,8 @@ export function grantsFor(key: string): Record<string, string[]> {
   const pick = (mods: string[], acts = all) => Object.fromEntries(mods.map((m) => [m, acts]));
   if (key === "cynthia" || key === "ifeoma") return pick(MODULES_ALL);
   if (key === "ngozi") return { ...pick(staff), ...pick(["partnerships"]), people: ["view"], queries: ["view", "create"] };
-  return { ...pick(staff, ["view", "create", "edit"]) };
+  // As the employee role's seed grants (0290): their own mailbox may also be emptied.
+  return { ...pick(staff, ["view", "create", "edit"]), mailbox: ["view", "create", "edit", "delete"] };
 }
 
 export const isoAgo = isoDaysAgo;

@@ -220,9 +220,11 @@ function UploadForm({ row, close }: { row: DocumentRow | null; close: () => void
           ...(title ? { title } : {}),
           ...(row?.document_request_id ? { document_request_id: row.document_request_id } : {}),
         }}
-        accept=".pdf,image/*"
+        // What the vault keeps for a document, and its limit (mime-policy.js, body-limits.js).
+        accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.docx,.xlsx"
+        maxBytes={15 * 1024 * 1024}
         multiple={false}
-        kinds="PDF or a picture"
+        kinds="PDF, Word, Excel or a photo"
         onUploaded={() => {
           toast("Uploaded. People will check it");
           close();

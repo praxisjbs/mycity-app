@@ -16,6 +16,7 @@ const { scopeOf, assertInScope } = require("../../shared/rbac/scope");
 const { maskForUser, assertWritable } = require("../../shared/rbac/field-mask");
 const { withActor } = require("../../shared/events/emit");
 const employee360 = require("./employee-360.service");
+const lagos = require("../../shared/time/lagos");
 const service = require("./organisation.service");
 
 const id = (req) => req.validated.params.id;
@@ -69,7 +70,13 @@ module.exports = {
   archive: async (req, res) => {
     await readable(req);
     await tx((client) =>
-      service.archiveEmployee(client, id(req), req.validated.body.archive_reason, withActor(req)),
+      service.archiveEmployee(
+        client,
+        id(req),
+        req.validated.body.archive_reason,
+        withActor(req),
+        req.validated.body.left_on || lagos.today(),
+      ),
     );
     return ok(res, await maskUnlessOwn(req, await employee360.get(pool, id(req))));
   },

@@ -74,7 +74,7 @@ const PeriodListQuery = listQuery(
  */
 const PeriodCreate = z
   .object({
-    starts_on: isoDate.refine((v) => /-(01|04|07|10)-01$/.test(v), "Pick a quarter's first day"),
+    starts_on: isoDate.refine((v) => /-(01|04|07|10)-01$/.test(v), "Pick a quarter start"),
     name: optionalText(40),
     plan_year_starts_on: blank(isoDate),
     targets_lock_on: blank(isoDate),

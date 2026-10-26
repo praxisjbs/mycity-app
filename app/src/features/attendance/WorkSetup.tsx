@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
 import { workPattern } from "@/features/people/status";
-import { Button, Card, CardHeader, CheckboxField, ChoiceField, DateField, ErrorState, Field, type FieldBinding, formatDate, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, Pill, Sub, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal } from "@mycity/ui";
+import { addDaysIso, Button, Card, CardHeader, CheckboxField, ChoiceField, DateField, ErrorState, Field, type FieldBinding, formatDate, FormFooter, Grid, HelpTerm, KeyValue, LoadingRows, Pill, Sub, TextAreaField, TimeField, toast, todayIso, useContractForm, useModal } from "@mycity/ui";
 import { HOME_STATE, PLACE, WEEKDAY } from "./labels";
 
 /**
@@ -133,7 +133,7 @@ function ScheduleForm({ w, close, onSaved }: { w: WorkSchedule; close: () => voi
       toast("Schedule saved");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(Object.fromEntries(Object.entries(e.fields).map(([k, m]) => [fieldOf(k.split(".")), m])));
-      else toast(e instanceof ApiError ? e.message : "Schedule not saved");
+      else toast.error(e instanceof ApiError ? e.message : "Schedule not saved");
     }
   };
   /** A text value's binding: the form keeps one flat value per control. */
@@ -169,7 +169,8 @@ function ScheduleForm({ w, close, onSaved }: { w: WorkSchedule; close: () => voi
         })}
       </div>
       <Field label="From" className="mt-3" {...f.status("effective_from")}>
-        <DateField {...time("effective_from")} min={todayIso()} />
+        {/* At most 90 days ahead (the server's "Too far ahead"): the calendar offers no later day. */}
+        <DateField {...time("effective_from")} min={todayIso()} max={addDaysIso(todayIso(), 90)} />
       </Field>
       <Field label="Reason" {...f.status("reason")}>
         <TextAreaField {...time("reason")} placeholder="Evening desk cover" rows={2} />

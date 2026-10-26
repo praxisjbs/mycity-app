@@ -76,7 +76,10 @@ Ask is a conversation: your questions on the right, Praxis AI's answers below th
 |---|---|---|
 | **Microphone not allowed** | The browser or phone blocked the microphone for the hub | Allow the microphone for the hub in your browser's settings, then press the microphone again |
 | **This browser cannot record** | This browser cannot record sound, often an app's own built-in browser | Open the hub in Chrome, Safari, Edge or Firefox, or type the question |
-| **Could not transcribe** | No words came back: nothing was heard, AI is off or at its monthly cap, or no voice model answered | Type the question instead. If it keeps happening, tell IT |
+| **No words heard** | Nothing was heard in the recording | Press the microphone and speak closer to it, or type |
+| **Transcription is not set up** | No voice model is set up on AI Control | Type the question instead, and tell IT |
+| *AI is off or at its cap*, in the server's own words | AI is switched off, the month's AI spending is used up, or no voice model answered | Type the question instead. The message says what else to do |
+| **Could not transcribe** | The recording did not reach the hub | Check your connection, then press the microphone again |
 
 ### Have it do something for you {#praxis-ask-change needs="praxis_ai create"}
 
@@ -107,18 +110,20 @@ conversation you are in, and an old subject can confuse a new question.
 | The screen says | What it means | What to do |
 |---|---|---|
 | A red line with **Try Again** | The answer did not arrive, often a weak connection | Press **Try Again**. It does not ask twice |
+| **Send** spins | An answer is still coming | Wait for it. Your next question stays in the box |
 | **You appear to be offline. Check the connection and try again.** in red | No connection | Reconnect, then press **Try Again** |
 | **The AI service is not answering. Try again in a few minutes.** in red | No AI model answered within a minute | Wait a few minutes, then press **Try Again** |
 | **The same request is still being processed. Try again in a moment.** in red | Your first try is still being answered | Wait a few seconds, then press **Try Again** |
-| **The AI answer could not be used. Try asking another way.** in red | The reply could not be read | Type the question again in other words and press **Send** |
+| A message: **The AI answer could not be used. Try asking another way.** Your question is back in the box | The reply could not be read | Change the question's words and press **Send** |
 | **The AI service is not set up correctly. An administrator has been told.** in red | A provider's key or model is wrong | Try again later. If it stays, tell IT |
-| **AI features are switched off.** or **AI features are switched off for this area.** in red | AI is off for the hub, or for Praxis AI | Ask IT to switch it on. **Try Again** cannot help until then |
-| **Something went wrong on our side. Try again, and quote this reference if it keeps happening.** in red | An unexpected fault | Press **Try Again**. If it repeats, tell IT the time you asked |
+| A message: **AI features are switched off.** or **AI features are switched off for this area.** Your question is back in the box | AI is off for the hub, or for Praxis AI | Ask IT to switch it on |
+| **The assistant could not answer. Try again.** in red | Something failed while the answer was worked out | Press **Try Again** |
+| **Something went wrong on our side. Try again, and quote this reference if it keeps happening.** in red, with *Reference* and a code | An unexpected fault | Press **Try Again**. If it repeats, tell IT the reference |
 | A message: **This month's AI spending limit has been reached.** Your question is back in the box | The month's cap on all AI is reached | Ask IT to raise it on AI Control, or wait for next month |
 | A message: **Too many requests. Wait a moment and try again.** Your question is back in the box | You sent many requests in a minute | Wait a minute, then press **Send** |
 | An answer saying the information is not available to you | Nothing you may see answers it | Ask about something on your own screens, or ask differently |
 | **That conversation was deleted** | It was deleted in another tab or on another device | Ask again: a new conversation starts |
-| **Not found** after **Helpful** or **Not Helpful** | The conversation was deleted in another tab or on another device | Nothing to do. Ask again if you still need the answer |
+| **That conversation was deleted** after **Helpful** or **Not Helpful** | The conversation was deleted in another tab or on another device | A new conversation is open. Ask again if you still need the answer |
 | **This did not load** with **Try Again** | The conversation could not be read | Press **Try Again**. **You are offline** means no connection: reconnect first |
 
 ### Ask from any screen on a phone {#praxis-ask-anywhere needs="praxis_ai create"}
@@ -171,7 +176,7 @@ On a computer, **Questions by Module** shows which parts of the hub your questio
 
 | The message says | What it means | What to do |
 |---|---|---|
-| **Not found** | It was already deleted in another tab or on another device | Reload the page. It is gone |
+| **That conversation was deleted** | It was already deleted in another tab or on another device | Nothing to do. It is gone from the list |
 
 Deleting removes the questions and answers for good. It does not change what AI Control's
 [Spend](#ai-control-spend) counted for them.

@@ -1,9 +1,10 @@
 import policies from "@mycity/contract/schemas/policies.js";
 import type { AttendanceRules, Policy, PolicyDraftSave, PolicyMode, WorkPattern } from "@mycity/contract/contract.gen.ts";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import type { PersonRef } from "@/api/types/common";
 import { ApiError } from "@/api/client";
 import { invalidate, useApi, useMutation } from "@/api/hooks";
+import { useAuth } from "@/auth/AuthProvider";
 import { EmployeePicker } from "@/features/shared/pickers";
 import {
   Button,
@@ -88,10 +89,11 @@ const asNumber = (s: string) => (s.trim() === "" ? Number.NaN : Number(s));
 const PERIODS = Object.entries(PERIOD_LABEL) as Array<[keyof typeof PERIOD_LABEL, string]>;
 
 /** The rules a draft starts from: its own, else the newest version's, else the type's suggestions. */
-const baseRules = (p: Policy): AttendanceRules | null => p.draft?.rules ?? p.waiting?.rules ?? p.in_force?.rules ?? p.suggested_rules ?? p.current_rules;
+const baseRules = (p: Policy): AttendanceRules | null => p.draft?.rules ?? p.submission?.content.rules ?? p.waiting?.rules ?? p.in_force?.rules ?? p.suggested_rules ?? p.current_rules;
 
 function valuesOf(p: Policy): Values {
-  const d = p.draft;
+  // While a version waits for approval, the editor shows what was sent.
+  const d = p.draft ?? p.submission?.content ?? null;
   const newest = p.waiting ?? p.in_force;
   const rules = baseRules(p);
   const a = d?.applies_to ?? newest?.applies_to ?? { everyone: true, department_ids: [], work_patterns: [], employee_ids: [] };
@@ -103,7 +105,7 @@ function valuesOf(p: Policy): Values {
     people: d?.applies_to_people ?? [],
     needs_acknowledgement: d?.needs_acknowledgement ?? newest?.needs_acknowledgement ?? true,
     acknowledge_within_days: String(d?.acknowledge_within_days ?? newest?.acknowledge_within_days ?? 7),
-    needs_approval: d?.needs_approval ?? false,
+    needs_approval: d?.needs_approval ?? newest?.needs_approval ?? false,
     body_html: d?.body_html ?? "",
     rules,
     ...(rules ? worksheetValues(rules) : {}),
@@ -148,7 +150,15 @@ function useDepartments(): Array<[string, string]> {
   return (d.data?.data ?? []).map((x) => [x.department_id, x.name]);
 }
 
-export function DraftEditor({ p }: { p: Policy }) {
+/** A draft body to compare: its text without markup or spacing, which the editor rewrites on load. */
+const sameAs = (b: PolicyDraftSave) => JSON.stringify({ ...b, ...("body_html" in b ? { body_html: textOf(b.body_html).replace(/\s+/g, "") } : {}) });
+
+/** The policy text with its markup taken off: what Tidy With AI and Publish need there to be. */
+export const textOf = (html: string | null | undefined) => (html ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+
+/** `onDirty` is told whether the screen holds changes not yet saved: the bar's Publish waits on them. */
+export function DraftEditor({ p, onDirty }: { p: Policy; onDirty?: (dirty: boolean) => void }) {
+  const { can } = useAuth();
   const confirm = useConfirm();
   const modal = useModal();
   const save = useMutation("PUT /api/v1/policies/:id/draft");
@@ -158,7 +168,11 @@ export function DraftEditor({ p }: { p: Policy }) {
   const f = useContractForm<Values>(valuesOf(p), draftSchema(p));
   const v = f.values;
   const attendance = p.kind === "attendance";
-  const editable = p.can_edit && !p.submission;
+  const editable = p.can_edit && !p.submission && can("knowledge", "edit");
+  // Unsaved: what Save Draft would send differs from what is saved.
+  const saved = useMemo(() => sameAs(bodyOf(p, valuesOf(p))), [p]);
+  const dirty = editable && sameAs(bodyOf(p, v)) !== saved;
+  useEffect(() => onDirty?.(dirty), [onDirty, dirty]);
   const newest = (p.waiting ?? p.in_force)?.rules ?? null;
 
   const submit = async () => {
@@ -168,7 +182,7 @@ export function DraftEditor({ p }: { p: Policy }) {
       toast("Draft saved");
     } catch (e) {
       if (e instanceof ApiError && Object.keys(e.fields).length) f.setServerErrors(e.fields);
-      else toast(e instanceof ApiError ? e.message : "Draft not saved");
+      else toast.error(e instanceof ApiError ? e.message : "Draft not saved");
     }
   };
   const drop = async () => {
@@ -178,10 +192,11 @@ export function DraftEditor({ p }: { p: Policy }) {
       invalidate("/api/v1/policies");
       toast("Draft discarded");
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Draft not discarded");
+      toast.error(e instanceof ApiError ? e.message : "Draft not discarded");
     }
   };
   const tidyText = async () => {
+    if (!textOf(v.body_html)) return void toast.error("Write or paste the policy first");
     try {
       const out = await tidy.run({ body: { body_html: v.body_html } });
       modal.open({
@@ -194,7 +209,7 @@ export function DraftEditor({ p }: { p: Policy }) {
             }} />,
       });
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : "Tidy With AI is unavailable");
+      toast.error(e instanceof ApiError ? e.message : "Tidy With AI is unavailable");
     }
   };
 

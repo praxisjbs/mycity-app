@@ -106,10 +106,10 @@ export function Models({ code, reopen }: { code: IntegrationCode; reopen: () => 
         },
         { key: "on_key", label: "On Key", render: ON_KEY },
         { key: "price", label: "Price", desktop: true, render: priceOf },
+        // On a phone too (JBS Praxis, 26/10/2026): a model added by hand can be removed there.
         {
           key: "remove",
           label: "",
-          desktop: true,
           render: (r) =>
             r.source === "added" && can("integrations", "delete") ? (
               <IconButton

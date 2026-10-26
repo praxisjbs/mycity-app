@@ -304,12 +304,14 @@ function listThreads(db, accountId, query) {
       WHERE t.mail_account_id = $1
         AND ($3::text IS NULL OR search_fold(t.subject || ' ' || array_to_string(t.participant_addresses::text[], ' ')) LIKE '%' || search_fold($3) || '%')
         AND (NOT $4::boolean OR agg.unread)
+        AND (NOT $5::boolean OR t.has_attachment)
       ORDER BY t.last_message_at DESC, t.mail_thread_id`,
     [
       accountId,
       query.folder || "inbox",
       query.q ?? null,
       Boolean(query.unread),
+      Boolean(query.attachments),
     ],
     query,
   );
@@ -376,15 +378,20 @@ async function markThreadRead(db, threadId) {
 /** Move every message of a thread to one folder; returns where each was, for the server. */
 async function moveThread(db, threadId, folderId) {
   const { rows } = await db.query(
-    `WITH before AS (SELECT m.mail_message_id, m.internet_message_id, f.remote_key AS from_key
+    `WITH before AS (SELECT m.mail_message_id, m.internet_message_id, f.remote_key AS from_key, f.kind AS from_kind
                        FROM mail_message m JOIN mail_folder f ON f.mail_folder_id = m.mail_folder_id
                       WHERE m.mail_thread_id = $1 AND m.mail_folder_id <> $2)
      UPDATE mail_message m SET mail_folder_id = $2 FROM before b
       WHERE m.mail_message_id = b.mail_message_id
-      RETURNING b.internet_message_id, b.from_key`,
+      RETURNING b.mail_message_id, b.internet_message_id, b.from_key, b.from_kind`,
     [threadId, folderId],
   );
   return rows;
+}
+
+/** A message's body, fetched again (a message moved out of Spam, whose body was never kept). */
+async function setBody(db, messageId, html) {
+  await db.query("UPDATE mail_message SET body_html = $2 WHERE mail_message_id = $1", [messageId, html]);
 }
 
 /** Remove a folder's messages for good, and threads left empty; returns them, for the server. */
@@ -708,6 +715,7 @@ module.exports = {
   setImageTrust,
   markThreadRead,
   moveThread,
+  setBody,
   emptyFolder,
   threadOfMessage,
   newestOf,

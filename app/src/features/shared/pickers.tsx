@@ -168,6 +168,9 @@ export function ProjectPicker({ value, onChange }: { value: ProjectChoice[]; onC
 export type RoleRef = { code: string; name: string };
 
 /** Roles, most senior first, from the server (seeds/reference/0101). Several may be picked. */
+/** The most roles one login holds (the contract's UserInvite and UserRolesSet). */
+export const MAX_ROLES = 5;
+
 export function RolePicker({ value, onChange }: { value: RoleRef[]; onChange: (value: RoleRef[]) => void }) {
   const list = usePaged("GET /api/v1/access/roles");
   return (

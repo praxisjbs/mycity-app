@@ -139,7 +139,7 @@ describe("UploadField", () => {
 
   it("says what kinds of file are wanted and how big they may be", () => {
     render(<UploadField purpose="cv" upload={fine} kinds="PDF or Word" maxBytes={5 * 1024 * 1024} />);
-    expect(screen.getByText("PDF or Word, up to 5.0 MB")).toBeInTheDocument();
+    expect(screen.getByText("PDF or Word, up to 5 MB")).toBeInTheDocument();
   });
 
   it("has no accessibility violations, empty and with files", async () => {

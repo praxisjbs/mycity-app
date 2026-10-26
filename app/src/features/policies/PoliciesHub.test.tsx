@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { ModalProvider } from "@mycity/ui";
+import { ModalProvider, toast } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
@@ -100,6 +100,20 @@ describe("Knowledge Hub · Policies", () => {
     fireEvent.change(within(checks).getByRole("textbox", { name: /Home Radius/ }), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
     expect(await within(checks).findByText("At least 150", {}, { timeout: 5000 })).toBeTruthy();
+  }, 30000);
+
+  it("Publish refuses while the screen holds changes not saved", async () => {
+    const said = vi.spyOn(toast, "error");
+    await signedInAs("cynthia@mycityapp.io");
+    fireEvent.click(await screen.findByText("Attendance Policy", {}, { timeout: 5000 }));
+    const lateness = await waitFor(() => cardOf("Lateness"), { timeout: 5000 });
+    fireEvent.change(within(lateness).getByRole("textbox", { name: /Grace Minutes/ }), { target: { value: "12" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
+    await screen.findByText("Draft with 1 change, not published.", {}, { timeout: 5000 });
+    fireEvent.change(within(cardOf("Lateness")).getByRole("textbox", { name: /Grace Minutes/ }), { target: { value: "14" } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish Policy" }));
+    await waitFor(() => expect(said).toHaveBeenCalledWith("Save the draft first"));
+    expect(screen.queryByRole("dialog", { name: "Publish Policy" })).toBeNull();
   }, 30000);
 
   it("publishes only with a signature", async () => {

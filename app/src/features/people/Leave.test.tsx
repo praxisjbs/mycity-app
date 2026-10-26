@@ -2,7 +2,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { installMatchMedia, optionLabels } from "@mycity/ui/testing";
+import { ApiError } from "@mycity/ui";
+import { chooseOption, installMatchMedia, optionLabels } from "@mycity/ui/testing";
 
 /**
  * Request Leave (`LeaveForm`, docs/guides/ess.md §10): each type with what is left of the year the
@@ -10,7 +11,7 @@ import { installMatchMedia, optionLabels } from "@mycity/ui/testing";
  * (fault #1, 21/10/2026: LEAVE_SPANS_YEARS came back from the server). The clock is 21/10/2026.
  */
 
-const m = vi.hoisted(() => ({ run: vi.fn(async () => ({})), years: [] as Array<number | undefined> }));
+const m = vi.hoisted(() => ({ run: vi.fn(async (): Promise<unknown> => ({})), years: [] as Array<number | undefined>, pickerFilters: [] as unknown[] }));
 vi.mock("@/api/hooks", () => {
   const annual = "11111111-1111-4111-8111-111111111111";
   const unpaid = "22222222-2222-4222-8222-222222222222";
@@ -42,10 +43,20 @@ vi.mock("@/api/hooks", () => {
 });
 vi.mock("@/api/download", () => ({ usePhotos: () => ({}) }));
 vi.mock("@/auth/AuthProvider", () => ({ useMe: () => null }));
-vi.mock("@/features/shared/pickers", () => ({ EmployeePicker: () => <div>Employee Picker</div> }));
+vi.mock("@/features/shared/pickers", () => ({
+  EmployeePicker: ({ onChange, filters }: { onChange: (v: Array<{ employee_id: string; display_name: string }>) => void; filters?: unknown }) => {
+    m.pickerFilters.push(filters);
+    return (
+      <button type="button" onClick={() => onChange([{ employee_id: "33333333-3333-4333-8333-333333333333", display_name: "Musa Danjuma" }])}>
+        Pick Musa
+      </button>
+    );
+  },
+}));
 
 import { RouterProvider } from "@/lib/router";
 import { LeaveForm } from "./Leave";
+import { codeOf } from "./LeaveSettings";
 
 installMatchMedia();
 beforeAll(() => {
@@ -59,6 +70,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   m.years.length = 0;
+  m.pickerFilters.length = 0;
 });
 
 describe("Request Leave", () => {
@@ -93,5 +105,28 @@ describe("Request Leave", () => {
     render(<LeaveForm close={() => undefined} onBehalf />, { wrapper: RouterProvider });
     expect(await optionLabels(screen.getByRole("combobox", { name: "Leave Type" }))).toEqual(["Annual", "Unpaid"]);
     expect(m.years).toEqual([]);
+    // Only people who work here now are offered.
+    expect(m.pickerFilters.at(-1)).toEqual({ status: "active" });
+  });
+
+  it("shows the server's mark on Employee, a field outside the contract form", async () => {
+    const user = userEvent.setup();
+    m.run.mockRejectedValueOnce(new ApiError(422, { error: { code: "EMPLOYEE_NOT_ACTIVE", message: "Pick someone who works here now", fields: { employee_id: ["Not active"] } } }));
+    render(<LeaveForm close={() => undefined} onBehalf />, { wrapper: RouterProvider });
+    await user.click(screen.getByRole("button", { name: "Pick Musa" }));
+    await chooseOption(screen.getByRole("combobox", { name: "Leave Type" }), "Annual");
+    await user.type(screen.getByLabelText("First Day"), "02/11/2026");
+    await user.type(screen.getByLabelText("Last Day"), "03/11/2026");
+    await user.click(screen.getByRole("button", { name: "Record Leave" }));
+    expect(await screen.findByText("Not active")).toBeTruthy();
+  });
+});
+
+describe("Leave Types", () => {
+  it("makes a code of at least two characters from any name", () => {
+    expect(codeOf("Study Leave")).toBe("study_leave");
+    expect(codeOf("A")).toBe("type_a");
+    expect(codeOf("1st Aid")).toBe("type_1st_aid");
+    expect(codeOf("!!")).toMatch(/^[a-z][a-z0-9_]{1,39}$/);
   });
 });

@@ -172,7 +172,8 @@ async function dayOn(db, employeeId, date, { calendar: cal = null } = {}) {
 
 /** Whether the reader may set this person's schedule: `people` edit over them, never themselves. */
 async function canEdit(user, person) {
-  if (!user || person.employee_id === user.employee_id) return false;
+  // Only someone who works here now has a schedule to set (setSchedule refuses anyone else).
+  if (!user || person.employee_id === user.employee_id || person.status !== "active") return false;
   const edit = await scopeFor(user, "people", "edit");
   if (!edit) return false;
   return edit.scope === "all" || (edit.scope_ids || []).includes(person.employee_id);

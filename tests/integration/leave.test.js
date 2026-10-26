@@ -323,6 +323,16 @@ describeDb("leave against the real migrations", () => {
     ]);
     expect(rows.map((r) => r.title)).toEqual(["Leave recorded"]);
 
+    // The same day again names the person People recorded it for, not the reader.
+    const again = await as("ops").post("/leave/requests", {
+      employee_id: people.other.employee.employee_id,
+      leave_type_id: types.sick,
+      starts_on: d("02-02"),
+      ends_on: d("02-02"),
+    });
+    expect(again.status).toBe(409);
+    expect(again.body.error).toMatchObject({ code: "LEAVE_OVERLAP", message: "They already have leave on some of those days" });
+
     // A line manager holds people view and approve, not create.
     const refused = await as("manager").post("/leave/requests", {
       employee_id: people.staff.employee.employee_id,
@@ -345,6 +355,11 @@ describeDb("leave against the real migrations", () => {
 
     const febLeave = (await as("ops").get(`/leave/requests?status=approved&from=${d("02-01")}&to=${d("02-03")}&sort=starts_on`)).body.data;
     expect(febLeave.map((r) => r.employee.display_name)).toEqual(["Musa Danjuma", "Zainab Lawal"]);
+
+    // The Leave Calendar's `live`: waiting and approved only, never rejected or cancelled.
+    const live = (await as("ops").get(`/leave/requests?live=true&from=${d("01-01")}&to=${d("12-31")}`)).body.data;
+    expect(live.length).toBeGreaterThan(0);
+    expect(live.every((r) => r.status === "submitted" || r.status === "approved")).toBe(true);
 
     const clashes = await as("ops").get(`/leave/requests/${febLeave[0].leave_request_id}/clashes`);
     expect(clashes.status).toBe(200);

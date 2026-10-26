@@ -4,11 +4,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { ReactNode } from "react";
 import attendance from "@mycity/contract/schemas/attendance.js";
 import type { PayItem } from "@mycity/contract/contract.gen.ts";
-import { formatDate, formatMoney, ModalProvider, Toaster, todayIso } from "@mycity/ui";
+import userEvent from "@testing-library/user-event";
+import { addDaysIso, formatDate, formatMoney, ModalProvider, Toaster, todayIso } from "@mycity/ui";
 import { axe, axeMatchers, installMatchMedia, setViewport } from "@mycity/ui/testing";
 import { api } from "@/api/client";
 import { invalidate } from "@/api/hooks";
 import { mockSession } from "@/api/mock/core";
+import { setMockOvertimeApproval } from "@/api/mock/modules/policies";
 import { byId, byKey } from "@/api/mock/data/people";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { RouterProvider } from "@/lib/router";
@@ -16,6 +18,7 @@ import { ScreenActionProvider, useRegisteredAction } from "@/shell/screen-action
 import { useClock } from "./ClockButton";
 import { MyAttendancePage } from "./EssAttendance";
 import { PeopleAttendance } from "./PeopleAttendance";
+import { overtimeText, waivedText } from "./PayItems";
 import { lateBy, PAY_STATUS } from "./labels";
 
 /**
@@ -176,6 +179,21 @@ describe("Give Real Time", () => {
   }, 40000);
 });
 
+describe("what a waive or an overtime decision says", () => {
+  it("names the skipped deductions and why", () => {
+    expect(waivedText({ waived: [1], skipped: [] })).toBe("Deduction waived");
+    expect(waivedText({ waived: [1, 2], skipped: [] })).toBe("2 deductions waived");
+    expect(waivedText({ waived: [1, 2], skipped: [{ code: "NOT_PENDING" }, { code: "IN_RUN" }] })).toBe("2 waived, 1 already decided, 1 in payroll");
+    expect(waivedText({ waived: [], skipped: [{ code: "IN_RUN" }] })).toBe("None waived, 1 in payroll");
+  });
+  it("says when the monthly cap cut or shortened a confirmation", () => {
+    expect(overtimeText({ status: "cut", reason: "Monthly cap", confirmed_minutes: 0 }, "confirm")).toBe("Overtime cut: monthly cap reached");
+    expect(overtimeText({ status: "confirmed", reason: "Monthly cap", confirmed_minutes: 90 }, "confirm")).toBe("1h 30m confirmed: monthly cap reached");
+    expect(overtimeText({ status: "cut", reason: "Not agreed", confirmed_minutes: 0 }, "cut")).toBe("Overtime cut");
+    expect(overtimeText({ status: "confirmed", reason: null, confirmed_minutes: 60 }, "confirm")).toBe("Overtime confirmed");
+  });
+});
+
 describe("People · Attendance's deductions and overtime", () => {
   it("People waive ticked deductions with a reason, never their own, and the floating button offers Waive Selected", async () => {
     await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
@@ -237,20 +255,38 @@ describe("People · Attendance's deductions and overtime", () => {
     expect((await peopleItems({ group: "overtime", status: "cut" })).find((x) => x.attendance_pay_item_id === second.attendance_pay_item_id)).toMatchObject({ confirmed_minutes: 0, reason: "Not agreed with the line manager" });
   }, 40000);
 
-  it("People approve overtime on someone's day beforehand, and the day shows it", async () => {
+  it("People approve overtime beforehand only under Pre-Approved, for today or a day to come", async () => {
+    // The mock's version pays overtime once the line manager confirms it: nothing to approve beforehand.
     await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
-    const table = await screen.findByRole("table", { name: "Register" }, { timeout: 5000 });
+    let table = await screen.findByRole("table", { name: "Register" }, { timeout: 5000 });
     fireEvent.click(await within(table).findByText("Damilola Eke", {}, { timeout: 5000 }));
-    const day = await screen.findByRole("dialog", { name: "Damilola Eke" });
-    fireEvent.click(await within(day).findByRole("button", { name: "Approve Overtime" }));
-    const sheet = await screen.findByRole("dialog", { name: "Approve Overtime" });
-    fireEvent.change(within(sheet).getByLabelText("Minutes"), { target: { value: "90" } });
-    fireEvent.change(within(sheet).getByLabelText("Reason"), { target: { value: "Month-end close with Finance" } });
-    expect(await axe(sheet)).toHaveNoViolations();
-    fireEvent.click(within(sheet).getByRole("button", { name: "Approve Overtime" }));
-    expect(await screen.findByText("Overtime approved")).toBeTruthy();
-    const detail = attendance.DayDetail.parse(await api.call("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: byKey("damilola")!.employee_id }, query: {} }));
-    expect(detail.overtime_approval).toMatchObject({ minutes: 90, approved_by_name: "Cynthia Osakunih", reason: "Month-end close with Finance" });
+    let day = await screen.findByRole("dialog", { name: "Damilola Eke" });
+    await within(day).findAllByText("Punches");
+    expect(within(day).queryByRole("button", { name: "Approve Overtime" })).toBeNull();
+    cleanup();
+
+    setMockOvertimeApproval("pre_approved");
+    try {
+      await signedInAs("cynthia@mycityapp.io", <PeopleAttendance />);
+      table = await screen.findByRole("table", { name: "Register" }, { timeout: 5000 });
+      fireEvent.click(await within(table).findByText("Damilola Eke", {}, { timeout: 5000 }));
+      day = await screen.findByRole("dialog", { name: "Damilola Eke" });
+      fireEvent.click(await within(day).findByRole("button", { name: "Approve Overtime" }));
+      const sheet = await screen.findByRole("dialog", { name: "Approve Overtime" });
+      const ahead = addDaysIso(todayIso(), 3);
+      const user = userEvent.setup();
+      await user.clear(within(sheet).getByLabelText("Day"));
+      await user.type(within(sheet).getByLabelText("Day"), formatDate(ahead));
+      fireEvent.change(within(sheet).getByLabelText("Minutes"), { target: { value: "90" } });
+      fireEvent.change(within(sheet).getByLabelText("Reason"), { target: { value: "Month-end close with Finance" } });
+      expect(await axe(sheet)).toHaveNoViolations();
+      fireEvent.click(within(sheet).getByRole("button", { name: "Approve Overtime" }));
+      expect(await screen.findByText("Overtime approved")).toBeTruthy();
+      const detail = attendance.DayDetail.parse(await api.call("GET /api/v1/attendance/register/:employee_id", { params: { employee_id: byKey("damilola")!.employee_id }, query: { date: ahead } }));
+      expect(detail.overtime_approval).toMatchObject({ minutes: 90, approved_by_name: "Cynthia Osakunih", reason: "Month-end close with Finance" });
+    } finally {
+      setMockOvertimeApproval("manager_after");
+    }
   }, 40000);
 
   it("on a phone, deductions are cards with a tick, and Overtime and Deductions sit in the view switch", async () => {
