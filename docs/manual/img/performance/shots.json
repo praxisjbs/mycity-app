@@ -39,6 +39,14 @@
       "phone"
     ]
   },
+  "performance-kpi-new": {
+    "spec": "7df6ad654d592af1",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "performance-kpis": {
     "spec": "d4de572b42bc5cd2",
     "source": "9e1c460117e75c46",
@@ -55,8 +63,40 @@
       "phone"
     ]
   },
+  "performance-new-goal": {
+    "spec": "3a0df45961fa8d07",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-pips": {
+    "spec": "58e125e4cf0f856b",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
   "performance-plan-approval": {
     "spec": "03fabd542f9502f4",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-quarter": {
+    "spec": "90732ad6ce99c422",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-report": {
+    "spec": "2e168292be578b9d",
     "source": "9e1c460117e75c46",
     "devices": [
       "desktop",
@@ -81,6 +121,14 @@
   },
   "performance-scorecard": {
     "spec": "a0a411f85987c4e4",
+    "source": "9e1c460117e75c46",
+    "devices": [
+      "desktop",
+      "phone"
+    ]
+  },
+  "performance-scorecard-new": {
+    "spec": "bf1a688c32dd7d70",
     "source": "9e1c460117e75c46",
     "devices": [
       "desktop",

@@ -80,8 +80,9 @@ async function find(page, target) {
   // With a dialog or a sheet open, the target is in it: the screen behind may hold one of the
   // same name (a list's Department filter behind the form's Department field).
   const modal = page.locator("[data-ui=modal]");
-  // A menu opened from a dialog floats above it, outside it: while one is open, the target is in it.
-  const menu = page.locator("[role=menu]");
+  // A menu or a select's list opened from a dialog floats above it, outside it: while one is open,
+  // the target is in it.
+  const menu = page.locator("[role=menu], [data-radix-popper-content-wrapper] [role=listbox]");
   const scope = (await menu.count()) ? menu.last() : (await modal.count()) ? modal.last() : page;
   let loc;
   switch (target.kind) {
