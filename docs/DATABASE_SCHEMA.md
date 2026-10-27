@@ -332,7 +332,11 @@ missed commitment's Recovery task (Performance PR 4) · `2500` projects get a sc
 its status CHECK (`active`, `completed`) and indexes · `2510` Why Late's reasons (`task_late_reason`,
 switched off rather than deleted; the CHECK on `task.late_reason` gives way to it) · `2520` an event's
 invitation SEQUENCE (`calendar_event.ics_sequence`) · `2590` seed: the six starting late reasons and the
-`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit).
+`workspace.late_reasons` capability with its holders (docs/guides/workspace.md §4, the 23/10 audit) ·
+`2600` departments kept on People · Departments (`docs/guides/organogram.md` §6.1, JBS Praxis
+27/10/2026): where a merged department went (`department.merged_into_department_id`, indexed) and
+which Head of Department roles the system gave with a headship (`user_role.from_headship`, false
+for a role given by hand).
 
 **Owes:**
 - PRs 3 and 5 of `docs/guides/performance.md` use 2300 to 2399 and 2500 to 2599 only for a gap. The numbers 2020, 2030 and

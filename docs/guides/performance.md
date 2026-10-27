@@ -65,7 +65,7 @@ reviews those heads.
 | P1 | Source of truth | **MyCity's two Q4 workbooks.** We align to them and add structure and clarity with the least friction; their words, codes, sections, weights and rules are kept |
 | P2 | The cascade (A16) | Organisational goals (CEO) → company OKRs → function OKRs and operational KPIs → individual scorecards (each line linked to a key result or KPI) → monthly commitments → weekly and daily tasks. A16's levels map onto it: annual goal = company objectives and key results; monthly target = monthly commitments; departmental = function objectives and key results; individual KPI = scorecard lines; weekly and daily tasks = Workspace. MILESTONES §7 is amended to record the mapping |
 | P3 | Period | **Quarter plan, monthly scores.** October and November scores are progress against the full quarter; December is the quarter's final; the year is a roll-up of its quarters |
-| P4 | Departments | Department = function, one nomenclature everywhere (People, Home, Attendance, Performance, the staff sheet): **General Management, Technology & Back-office Ops, Branding & Marketing, Partnership & Growth, People & Culture**. Names are data, referenced by id, editable on People without breaking anything. Checked against the Org Chart (October): each maps onto it (§6.20) |
+| P4 | Departments | Department = function, one nomenclature everywhere (People, Home, Attendance, Performance, the staff sheet): **General Management, Technology & Back-office Ops, Branding & Marketing, Partnership & Growth, People & Culture**. Names are data, referenced by id, editable on People without breaking anything (People · Departments, #103, since 27/10/2026). Checked against the Org Chart (October): each maps onto it (§6.20) |
 | P5 | Org corrections | The staff list is newer than the chart. Adopt the chart's job titles (Backend Operations Manager, Growth Officer · State, Graphics Associate, Head, Strategy, Partnerships & Growth); add the chart's vacant seats (HR/Admin Associate; Growth Officer for Anambra, Ekiti, Edo, Delta, Cross River); **David Idowu-Agida reports to Chinyere Elechi**. Abubakar Mohammed no longer works at MyCity and is **not** added: the seated 'Head Sales & Revenue' is retitled Head, Strategy, Partnerships & Growth and stays vacant |
 | P6 | Scoring rules | **Both rule sets stay, configurable**: key results score by the OKR workbook's rules, scorecard lines by the scorecard workbook's rules (§6.8, §6.9). Operations & People change them per quarter |
 | P7 | Plan approval | **One plan per function per quarter**: the function's objectives, key results, KPIs and every scorecard in it, sent by the head. Stage 1 the head's line manager (the Program Manager for Branding & Marketing, Partnership & Growth and People & Culture; the CEO for Technology & Back-office Ops), stage 2 Operations & People, stage 3 the CEO. Only the CEO makes it binding. A stage that would ask the same person twice is skipped |
@@ -123,7 +123,7 @@ line. Nothing is ticked until it is merged.
 **PR 1 · Foundation**
 
 - [x] 22/10/2026 · Org nomenclature and seats in `seeds/staff/` (P4, P5, §6.20): five department names and codes, the chart's job titles (with `roles.json` keys renamed in the same change), the vacant seats, David under Chinyere, the Strategy seat retitled and vacant; departments renamed in place on staging and production (ids kept, nobody moved out), a second deploy changes nothing; `organogram.md` and `foundation.md` updated
-- [x] 22/10/2026 · Department head: `department.head_employee_id` or `head_seat_id`, in the contract and the department routes (`head` and `acting_head` on `Department`); `organisation.headOf(department_id)` gives the effective head (the person above a vacant head seat). There is no department form on screen in M2 (organogram guide §4): the staff loader sets the heads
+- [x] 22/10/2026 · Department head: `department.head_employee_id` or `head_seat_id`, in the contract and the department routes (`head` and `acting_head` on `Department`); `organisation.headOf(department_id)` gives the effective head (the person above a vacant head seat). There was no department form on screen in M2: the staff loader set the heads. Since 27/10/2026 People · Departments sets them (organogram.md §6.1)
 - [x] 22/10/2026 · Migration `2100_performance_foundation.sql` (every table of §4) and reference seed `2190_seed_performance.sql` (capabilities and their default holders, the four approval flows, code lists); gates 3 to 6 green, UP, DOWN, UP on a throwaway database
 - [x] 22/10/2026 · Contract: `goals.js`, `kpis.js`, `targets.js`, `reviews.js`, `scoring.js`, and the additions to `ess.js`, `tasks.js`, `calendar.js`, `workspace.js`, `organisation.js`; every `TABLES` entry; `npm run gen:contract`
 - [x] 22/10/2026 · Scoring library in `packages/contract/schemas/scoring.js` (§6.8, §6.9, §6.15), pure, with unit tests that reproduce the workbooks' own formulas and the worked examples in §6
@@ -410,7 +410,8 @@ and Home rows of §2 and §10.
 | My Workspace · Calendar (`calendar`) | staff app | the reader | Performance dates: check-in due, reviews to write, key results they own finishing, PIP review dates | open the record |
 | Home · Overview (M1, TB) | staff app | as Home | Goals This Quarter with progress; the Org KPI donut (company and per department); Goals On Track (CEO); My Scorecard (staff); Reviews Due; My Reviews Due | read only, through `dashboard/sources/goals.source.js` and `reviews.source.js` |
 | Home · Team (M1, TB) | staff app | managers | each person's score to date on the roster | read only |
-| People · Employees and Organogram (M1) | staff app | as People | the five department names, a department's head, the corrected titles and seats | set a department's head (person or vacant seat) |
+| People · Employees and Organogram (M1) | staff app | as People | the five department names, the corrected titles and seats | none for departments: People · Departments keeps them |
+| People · Departments (#103, 27/10/2026) | staff app | `people` view | every department, its code, head (a person, or an open role and who acts), people and open roles | add, rename, set a head (the head's rights and reporting lines follow, organogram.md §6.1), move people, merge, retire, restore, delete one never used |
 | Settings · Approvals (M0) | staff app | `settings` | the flows Performance Plan, Performance Review, Commitments, Target Change, and the new approver kind | edit the stages |
 | Settings · Documents & Numbering (M0) | staff app | `settings` | no new scheme: Performance codes are positional (G1) | none |
 | AI Control (M10, brought forward) | staff app | `ai_control` | the three actions `review-dictation`, `review-cleanup`, `week-summary` with their jobs | change a chain |
@@ -786,7 +787,10 @@ grant, as above.
   names the organisational goal it serves.
 - **A function's objectives, key results and KPIs**: `goals.function` and being the function's
   head, or its acting head (the person above a vacant head seat, `organisation.headOf`); the CEO and
-  Operations & People may act for any function.
+  Operations & People may act for any function. The head is set on People · Departments, and whoever
+  heads or acts holds Head of Department (which carries `goals.function`) while they do, unless a role
+  of theirs already carries it (JBS Praxis, 27/10/2026; organogram.md §6.1): a new head sets the
+  function's goals at once, with no second step on Settings · Users.
 - **Scorecards**: a manager for people in their `performance` scope (team or all), never their own.
 - **What a screen offers** follows the same rule, so nobody is offered what the API will refuse:
   `GET /performance/functions` (§5) says which functions the reader may set, and New Objective, New
@@ -1200,6 +1204,10 @@ Manager; Marketing & Growth Officer · State → Growth Officer · State; Graphi
 Associate; Head Sales & Revenue → Head, Strategy, Partnerships & Growth). The role names (Operations &
 People, Head of Department and the others) are roles, not departments, and stay.
 
+This table is what the staff loader gave a new database. Since 27/10/2026 the departments, their codes
+and heads are People's to change on People · Departments (organogram.md §6.1), and the loader never
+renames one or sets a head again (foundation.md §6.1).
+
 ### 6.21 Analytics (PR 5)
 
 For the quarter (the current one when none is picked) and, optionally, one function, Africa/Lagos,
@@ -1435,7 +1443,16 @@ is listed here as tier 1 or tier 2.**
 - **Double press** on Send Commitments, Approve Month or Set Recovery: one request (F26); a second Send
   answers 409 `COMMITMENTS_WAITING`, a second Set Recovery 409 `RECOVERY_SET`.
 - **A person moves department mid-quarter**: their scorecard stays with the quarter it was approved in;
-  next quarter's is drafted in the new function.
+  next quarter's is drafted in the new function. Moved on People · Departments or their record, they
+  report to the new function's head unless their manager moved with them (organogram.md §6.1), so the
+  next month's review goes to that head (§6.13).
+- **A function's head changes mid-quarter** (Set Head): `headOf` is read live, so the new head sets
+  goals, reports the month and sends the plan from their next action, holding Head of Department from
+  that moment; a plan already sent keeps its approvers. Whoever reported to the old head reports to the
+  new one, so a review already opened keeps its reviewer and the next month's goes to the new head.
+- **A function merged or retired mid-quarter**: its plan, objectives, key results, KPIs and scorecards
+  stay with it for their quarters and read as before; it leaves New Objective's and New KPI's Function
+  lists, and Operations & People (`performance.manage`) or the CEO act for what is left of it.
 - **The reviewer leaves or changes**: §6.13; Operations & People may reassign an open review (the engine's
   `reassign`).
 - **The head seat is vacant** (Partnership & Growth today): the Program Manager acts as head for the plan
@@ -1521,6 +1538,7 @@ PR 4 each add entries), `src/shared/search/actions.js` (each adds its ⌘K actio
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · Departments are kept on People · Departments (#103, organogram.md §6.1, JBS Praxis's four answers of 27/10/2026), so P4's "editable on People" holds and §1.2's "no department form on screen" is history. §6.3: whoever heads a function, or acts for its open head role, holds Head of Department while they do (given and taken back by the system), so a new head sets goals at once. §6.20: the table is what the loader gave a new database; People change it now. §11: a head changed, and a function merged or retired, mid-quarter. Nothing in Performance's own code changed: it reads heads live through `organisation.headOf`.
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Scorecards' Scorecards and Commitments, and Reviews' Reviews and PIPs, carry the unread notices about the scorecards and commitments, the reviews and improvement plans, each in its view, and each screen opens where they wait unless its address names a view or a record (`targets.views.js`, `reviews.views.js`).
 - 26/10/2026 · JP · New Goal, Report Month and New KPI show only to a reader who may set something,
   and Report Month's Function lists only the company and the functions the reader may set, from the same

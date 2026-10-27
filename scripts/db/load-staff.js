@@ -38,10 +38,14 @@
  *   9. Records a birthday the sheet gives as a day and month with no year (the DOB the
  *      importer drops in step 4) for each person with no date of birth and no birthday
  *      yet, so the celebrations can post it. This runs on every deploy, loaded sheet or not.
- *  10. Keeps MyCity's names for its functions, posts and seats true (`nomenclature.json`,
- *      scripts/db/staff-nomenclature.js), before the sheet is imported, so the sheet finds
- *      each department under its new name, and after, for the codes, heads and lines of
- *      what the sheet created. This also runs on every deploy, loaded sheet or not.
+ *  10. Gives MyCity's names to its functions, posts and seats (`nomenclature.json`,
+ *      scripts/db/staff-nomenclature.js), once per version of that file, before the sheet is
+ *      imported, so the sheet finds each department under its new name, and after, for the
+ *      codes, heads and lines of what the sheet created. After that the departments are
+ *      People's, on People · Departments, and a deploy never renames one or sets a head.
+ *  11. Gives every department head Head of Department while they head, unless a role of
+ *      theirs already sets a function's goals (docs/guides/organogram.md §6.1). This runs on
+ *      every deploy, loaded sheet or not.
  *
  * It is safe to run again: every step looks before it writes, and an edit made on screen
  * is never written over.
@@ -382,10 +386,10 @@ function namesChecksum(file) {
 /**
  * Step 10: the nomenclature, in its own transactions; a problem is logged, never fatal.
  *
- * The renames of posts, seats, moves, merges and lines are applied once per version of
- * nomenclature.json, so a title, a department or a line People change on screen afterwards
- * stays (`once`). The departments' names, codes and heads are kept on every run: they only
- * fill what is missing.
+ * The renames of posts, seats, moves and lines are applied once per version of nomenclature.json
+ * (`once`), so a title or a line People change on screen afterwards stays. The departments, their
+ * codes and heads are given only to a database that has never had MyCity's names (`first`): after
+ * that they are People's, on People · Departments (docs/guides/organogram.md §6.1).
  */
 async function applyNames({ db, atomically, log, file, book }) {
   const { applyNomenclature } = require("./staff-nomenclature");
@@ -393,7 +397,8 @@ async function applyNames({ db, atomically, log, file, book }) {
   const sha = namesChecksum(file);
   try {
     const once = sha ? await organisation.namesApplied(db, sha) : false;
-    const r = await applyNomenclature({ pool: db, atomically, log, actor: SYSTEM, file, teams: sheetTeams(book), once });
+    const first = !(await organisation.namesApplied(db));
+    const r = await applyNomenclature({ pool: db, atomically, log, actor: SYSTEM, file, teams: sheetTeams(book), once, first });
     const changed = Object.values(r).reduce((a, b) => a + b, 0);
     if (changed) log(`names: ${JSON.stringify(r)}`);
     return r;
@@ -410,6 +415,34 @@ async function namesDone({ db, atomically, file, names }) {
   const organisation = require(path.join(ROOT, "src/modules/organisation/organisation.service.js"));
   if (await organisation.namesApplied(db, sha)) return;
   await withTx(db, atomically, (client) => organisation.recordNamesApplied(client, sha, names, SYSTEM));
+}
+
+/**
+ * Give every department head their role, after the logins (docs/guides/organogram.md §6.1):
+ * Head of Department while they head, unless a role of theirs already sets a function's goals.
+ */
+async function applyHeadRoles({ db, atomically, log }) {
+  const organisation = require(path.join(ROOT, "src/modules/organisation/organisation.service.js"));
+  const r = await withTx(db, atomically, (client) => organisation.syncHeadRoles(client, SYSTEM));
+  if (r.given.length || r.taken.length) log(`heads: Head of Department given to ${r.given.length}, taken back from ${r.taken.length}`);
+  return r;
+}
+
+/**
+ * The names the roster may not make again: a department of nomenclature.json whose code another
+ * department holds already, under a name People gave it on People · Departments.
+ */
+async function renamedOnScreen(db, file, names) {
+  const { readNomenclature, fold } = require("./staff-nomenclature");
+  const plan = readNomenclature(file);
+  const out = new Set();
+  for (const name of names) {
+    const d = ((plan && plan.departments) || []).find((x) => [x.name, ...(x.was || [])].some((n) => fold(n) === fold(name)));
+    if (!d || !d.code) continue;
+    const { rows } = await db.query("SELECT 1 FROM department WHERE code = $1::citext LIMIT 1", [d.code]);
+    if (rows.length) out.add(name);
+  }
+  return out;
 }
 
 /**
@@ -468,6 +501,7 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
     const names = await applyNames({ db, atomically, log, file: nomenclatureFile, book: loadedBook });
     await namesDone({ db, atomically, file: nomenclatureFile, names });
     const logins = await applyRoles({ pool: db, atomically, log, roles });
+    await applyHeadRoles({ db, atomically, log });
     const lines = await applyLines({ pool: db, atomically, log, roles });
     const birthdays = await applyBirthdays({ pool: db, atomically, book: loadedBook, roles });
     log(`birthdays by day and month: ${birthdays.set} recorded, ${birthdays.unmatched} matched nobody`);
@@ -532,9 +566,14 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
 
   const { fold } = require("./staff-nomenclature");
   const known = knownDepartments(nomenclatureFile);
-  const creatable = (missing.department || []).filter((name) => !known || known.has(fold(name)));
+  const renamed = await renamedOnScreen(db, nomenclatureFile, missing.department || []);
+  const creatable = (missing.department || []).filter((name) => (!known || known.has(fold(name))) && !renamed.has(name));
   for (const name of (missing.department || []).filter((n) => !creatable.includes(n)))
-    log(`WARNING: department "${name}" is not one of MyCity's (nomenclature.json); its rows are left for People`);
+    log(
+      renamed.has(name)
+        ? `WARNING: department "${name}" was renamed on People · Departments; its rows are left for People`
+        : `WARNING: department "${name}" is not one of MyCity's (nomenclature.json); its rows are left for People`,
+    );
   const committed = await engine.commit(batch.import_batch_id, {
     actor: SYSTEM,
     db,
@@ -552,6 +591,7 @@ async function loadStaff({ db, log = () => {}, dryRun = false, sheet = SHEET, ro
   const names = await applyNames({ db, atomically, log, file: nomenclatureFile, book });
   await namesDone({ db, atomically, file: nomenclatureFile, names });
   const logins = await applyRoles({ pool: db, atomically, log, roles });
+  await applyHeadRoles({ db, atomically, log });
   const lines = await applyLines({ pool: db, atomically, log, roles });
   const birthdays = await applyBirthdays({ pool: db, atomically, book, roles });
   log(`birthdays by day and month: ${birthdays.set} recorded, ${birthdays.unmatched} matched nobody`);

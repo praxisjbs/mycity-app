@@ -2,7 +2,7 @@
 title: People
 module: people
 milestones: M0, M1
-summary: The staff register: adding people, their records and their logins.
+summary: The staff register, the departments and their heads, and each person's record and login.
 icon: users
 ---
 
@@ -397,6 +397,85 @@ that match; tap one to focus it. **No Match** means nothing matched.
 | **Not moved. Try again.** or **Not saved. Try again.** | The hub could not be reached | Check your connection and press again |
 | **That file could not be made. Try again.** | The PDF failed | Press **Download PDF** again |
 | **That file is taking too long. Try again.** | It was not ready in five minutes | Press **Download PDF** again |
+
+## Departments {#people-departments screen=people/departments icon=building}
+
+MyCity's departments: each one's head, its people and its open roles. Each department in use is
+also a function on Performance, where its head sets its goals and KPIs.
+
+![People · Departments](shot:people-departments)
+
+### Read the departments {#people-departments-read}
+
+1. Open [People · Departments](/people?tab=departments). On a computer, the line under the title
+   counts the departments in use and those retired.
+2. Press **In Use**, **Retired** or **All**, or type in **Name or code**.
+3. The list shows each **Department** with its code, its **Head**, how many **People** work in it,
+   its **Open Roles** on a computer, and its **Status**.
+4. Press a department. It shows its **Code**, **Head**, **People** and **Open Roles**. When its head
+   is an open role, **Acting Head** names the person above it, who acts as head.
+5. Below, **People** lists everyone in it and who each **Reports To**. Press a person to open their
+   record.
+
+On a phone each department is a card. Tap one and it opens in a sheet, its buttons at the foot.
+
+### Add a department {#people-departments-add needs="people create"}
+
+1. Press **Add Department** at the top right. On a phone it is also in **Quick Actions**.
+   ![Add Department](shot:people-add-department)
+2. Type its **Name**, such as `Finance & Admin`. The **Code** fills in from the name, such as `FA`.
+   Change it if you like: 2 to 10 letters.
+3. If it has a head already, search for them under **Head**.
+4. Press **Add Department**. The message names it, such as *Finance & Admin added*.
+
+A head who heads no other department moves into the new one.
+
+### Set a department's head {#people-departments-head needs="people edit"}
+
+1. Open the department from [People · Departments](/people?tab=departments) and press **Set Head**.
+2. Under **Head Is**, choose **A Person**, **An Open Role** or **Nobody**.
+3. Search for the person under **Head**, or pick the **Open Role**.
+4. Press **Set Head**. The message names them, such as *Aaron Agama now heads Branding & Marketing*.
+
+What follows by itself:
+
+- The new head takes the old head's place, reporting to whoever the old head reported to.
+- Everyone who reported to the old head now reports to the new head. So does the old head, if they
+  still work there.
+- The new head can set the department's goals and KPIs on Performance at once. The hub gives them
+  the Head of Department role on Settings · Users, and takes it back from the old head.
+
+### Move people between departments {#people-departments-move needs="people edit"}
+
+1. To bring people in, open the department and press **Add People**. Search for each one under
+   **People**, then press **Add People**. Up to 25 move at a time.
+2. To move one person out on a computer, press **Move To** on their row, pick the **Department**
+   and press **Move Person**. On a phone, use **Add People** on the department they go to.
+3. On a computer you can also tick people on [People · Employees](/people?tab=employees), press
+   **Move To Department**, pick the **Department** and press **Move People**.
+
+Someone who moves reports to the new department's head, unless their own manager works there or
+moves with them. A team moved together keeps its lines. A new **Department** on **Edit Record** moves
+a person the same way.
+
+### Rename, merge, retire or delete {#people-departments-change needs="people edit"}
+
+1. To rename it or change its code, press **Edit Department**, change the **Name** or **Code** and
+   press **Save Department**. The message names it, such as *Finance saved*.
+2. To close a department, press **More Actions**, then **Merge Department**. Pick the department it
+   goes **Into** and press **Merge Department**. Its people and open roles move there, and it retires.
+3. A department nobody works in can retire on its own: press **More Actions**, then **Retire
+   Department**, and confirm. **Restore Department** brings it back, with no head.
+4. {needs="people delete"} A department nothing has ever used can go for good: press **More
+   Actions**, then **Delete Department**, and confirm.
+
+| The screen says | What it means | What to do |
+|---|---|---|
+| **Already in use** | Another department has this name or code | Choose another |
+| **Letters only** | The code holds a number or a sign | Use 2 to 10 letters |
+| **Pick someone**, **Pick a department** | Nothing was picked | Pick one |
+| *Still has 2 people.* | It still has people or open roles | Merge it, or move them out first |
+| **Used before. Retire it instead.** | Something still names it | Retire it |
 
 ## Attendance {#people-attendance screen=people/attendance icon=clock}
 
@@ -937,6 +1016,33 @@ do:
 marks:
   1: searchbox | Find someone
   2: button "Download PDF" | Save the chart
+```
+
+```shot people-departments
+open: /people?tab=departments
+as: operations
+sources:
+  - app/src/features/people/Departments.tsx
+do:
+  - click: heading "Departments"
+marks:
+  1: button "Add Department" | Add a department
+  2: searchbox | Find one by name or code
+```
+
+```shot people-add-department
+open: /people?tab=departments
+as: operations
+device: desktop
+sources:
+  - app/src/features/people/Departments.tsx
+do:
+  - click: button "Add Department"
+  - wait: label "Code"
+crop: modal
+marks:
+  1: label "Name" | Its name
+  2: label "Code" | Filled from the name
 ```
 
 ```shot people-attendance

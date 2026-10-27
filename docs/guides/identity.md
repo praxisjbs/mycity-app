@@ -356,10 +356,14 @@ or the audit.
 | Implementation Team (`implementation`) | Everything | Everything: every module and action over everything, every capability, every field. For the build team, and training runs from it (TB, 19/10/2026); removed (soft) after handover |
 | Operations & People (`operations_people`) | Everything in operations | Users: invite, roles, suspend, reset links |
 | Management (`management`) | Everything | Read across modules |
-| Head of Department (`head_of_department`) | Their department | Partnerships home |
+| Head of Department (`head_of_department`) | Their department | Partnerships home; set their function's goals and KPIs (`goals.function`). Given by the system to whoever heads a department, or acts for its open head role, while they do, unless a role of theirs already sets a function's goals; taken back when they head nothing, unless it was given by hand (`user_role.from_headship`, `docs/guides/organogram.md` §6.1) |
 | System Administrator (`administrator`) | Settings | Users and settings |
 | Line Manager (`manager`) | Their team | Approvals for their team |
 | Staff (`employee`) | Their own records | Self-service |
+
+A head keeps Head of Department while they head: Save Roles without it, or an invitation without
+it, gives it back in the same save, unless another role they hold sets a function's goals (JBS
+Praxis, 27/10/2026).
 
 The build account (`create-admin --build-account`) holds the Implementation Team role. Until
 handover that role is complete: a module, action, capability or masked field added later is given
@@ -466,6 +470,7 @@ forward from M9, `foundation.md` §6.4). The exact grants are the seed matrix
 
 ## 14 · Change log
 
+- 27/10/2026 · JP · §8: Head of Department follows headship (JBS Praxis, 27/10/2026; `docs/guides/organogram.md` §6.1). Whoever heads a department, or acts for its open head role, holds it while they do unless a role of theirs already carries `goals.function`; the system gives it (`user_role.from_headship`, migration 2600) and takes back only what it gave. Invite User and Save Roles keep it on a head (`users.invite.js`, `users.service.setRoles`). Settings · Users shows it as any role.
 - 26/10/2026 · JP · Where it waits, inside a tab (notifications.md §6): Settings · Users' Status chips carry the unread notices about the logins under each status, as the list reads it; a login that has left shows under Everyone alone (`users.views.js`, `users.repo.js` `statusesOf`).
 - 26/10/2026 · JP · From the User Guide audit's screen defects: Users by Role is desktop only, as §10.2 says; Invite and Save Roles hold to five roles (`UserInvite`, `UserRolesSet`) and say so on Roles as a sixth is picked, and a refusal on Roles reads in four words. Settings · Approvals (the workflow designer): a route's problems name the stage and the rule in words (`workflow.service` `plainly`), on the Needs Fixing banner and on a refused save (`Fix the stages first`); the Person picker lists active logins only; Add Stage stops at ten; the Status column shows on a phone. §10 updated.
 - 25/10/2026 · JP · §6.1 written, from the employee creation audit and JBS Praxis's decisions of 25/10/2026: a login works only while its employee does and closes on archive; an unused login follows a corrected work email, a used one moves with Use Work Email; Invite All Pending, Not Sent and Send Invite for roster logins; per-person link limits and Link Not Checked; one login per employee (0500); no ceiling on roles, written down. §5 corrected: candidates need `settings` create. §6: a new link closes every open link; there is no common-password list.

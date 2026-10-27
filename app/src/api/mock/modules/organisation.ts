@@ -1,5 +1,5 @@
 import type { ApprovalInstance, ApprovalWaiting, LeaveRequest, LeaveStatus, LeaveType } from "@mycity/contract/contract.gen.ts";
-import type { EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
+import type { Department, EmployeeRow, Employee360, ManagerRef, OrgNode, OrgSeat } from "@/api/types/organisation";
 import { at, created, invalid, isoDaysAgo, isoDaysAhead, noContent, notFound, ok, paged, route, sid, fail, uuid } from "../core";
 import { exportFile } from "./shared";
 import { byId, byKey, DEPARTMENTS, managerOf, PEOPLE, reportsOf, teamOf, SIGN_INS, type MockPerson } from "../data/people";
@@ -34,13 +34,29 @@ const loginOf = (p: MockPerson): EmployeeRow["login"] => {
   return loginOfEmployee(p.employee_id)?.state ?? "none";
 };
 
-const DEPTS = DEPARTMENTS.map((name, i) => ({
+/** A department on the mock: its head is a person (by key) or an open role, as on the API. */
+type MockDept = {
+  department_id: string;
+  code: string;
+  name: string;
+  parent_department_id: null;
+  active: boolean;
+  order: number;
+  head_key: string | null;
+  head_seat_id: string | null;
+  merged_into: string | null;
+};
+
+const DEPTS: MockDept[] = DEPARTMENTS.map((name, i) => ({
   department_id: sid(`dept:${name}`),
   code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"),
   name,
   parent_department_id: null,
   active: true,
   order: i,
+  head_key: null,
+  head_seat_id: null,
+  merged_into: null,
 }));
 const deptOf = (name: string) => DEPTS.find((d) => d.name === name) ?? DEPTS[0];
 
@@ -75,6 +91,17 @@ const SEATS: Array<OrgSeat & { manager_key: string | null }> = [
     manager_key: "ifeoma",
   },
 ];
+
+/** Each department's head on the mock: Finance's open Head of Finance role, else the person in it whose manager works elsewhere. */
+for (const d of DEPTS) {
+  const seat = SEATS.find((x) => x.department_id === d.department_id);
+  if (seat) {
+    d.head_seat_id = seat.org_seat_id;
+    continue;
+  }
+  const top = PEOPLE.find((p) => p.department === d.name && (!p.manager || byKey(p.manager)?.department !== d.name));
+  d.head_key = top ? top.user_key : null;
+}
 
 const row = (p: MockPerson): EmployeeRow => ({
   employee_id: p.employee_id,
@@ -349,7 +376,11 @@ route("PATCH /api/v1/employees/:id", (req) => {
   if (str("start_date")) p.start_date = str("start_date")!;
   if (str("work_pattern")) p.work_pattern = str("work_pattern") as MockPerson["work_pattern"];
   if (str("employment_type")) p.employment_type = str("employment_type") as MockPerson["employment_type"];
-  if (str("department_id")) p.department = (DEPTS.find((d) => d.department_id === str("department_id")) ?? deptOf(p.department)).name;
+  // A new department moves the person as People · Departments does: their line follows its head.
+  if (str("department_id")) {
+    const to = DEPTS.find((d) => d.department_id === str("department_id"));
+    if (to && to.name !== p.department) moveIn(to, [p]);
+  }
   if ("worksite_id" in b && b.worksite_id !== undefined) assignSite(p.user_key, (b.worksite_id as string | null) ?? null);
   if (b.gross_monthly !== undefined) p.gross_monthly = (b.gross_monthly as string | null) ?? "0.00";
   if (b.bank_name !== undefined) p.bank_name = (b.bank_name as string | null) ?? "";
@@ -406,42 +437,220 @@ route("PATCH /api/v1/employees/:id/line-manager", (req) => {
   return ok(record(p, req.user!));
 });
 
+/* ------------------------------------------------------------------ *
+ * Departments (docs/guides/organogram.md §6.1): the API's rules, on the mock's people.
+ * ------------------------------------------------------------------ */
+
+const CEO_KEY = "ifeoma";
+const CODE = /^[A-Za-z]{2,10}$/;
+const deptById = (id: string | null | undefined) => DEPTS.find((d) => d.department_id === id);
+const initials = (name: string) =>
+  name
+    .split(/[^A-Za-z]+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+const headRef = (d: MockDept): ManagerRef | null => {
+  const h = byKey(d.head_key);
+  if (h) return { employee_id: h.employee_id, org_seat_id: null, display_name: h.display_name, job_title: h.job_title, vacant: false };
+  const s = SEATS.find((x) => x.org_seat_id === d.head_seat_id);
+  return s ? { employee_id: null, org_seat_id: s.org_seat_id, display_name: s.title, job_title: s.title, vacant: true } : null;
+};
+
+/** Who acts as head: the head, or the person above an open head role. */
+const actingOf = (d: MockDept) => {
+  if (d.head_key) return byKey(d.head_key) ?? null;
+  const s = SEATS.find((x) => x.org_seat_id === d.head_seat_id);
+  return s && s.manager_key ? (byKey(s.manager_key) ?? null) : null;
+};
+
+const deptOut = (d: MockDept): Department => {
+  const acting = actingOf(d);
+  return {
+    department_id: d.department_id,
+    code: d.code,
+    name: d.name,
+    parent_department_id: null,
+    active: d.active,
+    headcount: PEOPLE.filter((p) => p.department === d.name && visible(p)).length,
+    open_roles: SEATS.filter((s) => s.department_id === d.department_id && s.status === "vacant").length,
+    head_employee_id: byKey(d.head_key)?.employee_id ?? null,
+    head_seat_id: d.head_seat_id,
+    head: headRef(d),
+    acting_head: acting ? personRef(acting) : null,
+    merged_into: d.merged_into ? { department_id: d.merged_into, name: deptById(d.merged_into)?.name ?? "" } : null,
+    can_delete:
+      !PEOPLE.some((p) => p.department === d.name) &&
+      !SEATS.some((s) => s.department_id === d.department_id) &&
+      !d.merged_into &&
+      !DEPTS.some((x) => x.merged_into === d.department_id),
+  };
+};
+
+/** People who join a department report to its head, unless their manager is already there or joins with them. */
+function moveIn(d: MockDept, people: MockPerson[]) {
+  const joining = new Set(people.map((p) => p.user_key));
+  for (const p of people) p.department = d.name;
+  const head = d.head_key;
+  if (!head) return;
+  for (const p of people) {
+    if (p.user_key === head || p.user_key === CEO_KEY) continue;
+    const m = byKey(p.manager);
+    if (m && (joining.has(m.user_key) || m.department === d.name)) continue;
+    if (teamOf(p.user_key).some((x) => x.user_key === head)) continue;
+    p.manager = head;
+  }
+}
+
+/** A new head takes the old head's place, and the old head and their reports follow (organogram.md §6.1). */
+function setHead(d: MockDept, key: string | null, seat: string | null) {
+  const oldKey = d.head_key;
+  if (key && key !== oldKey) {
+    const n = byKey(key)!;
+    if (n.department !== d.name && !DEPTS.some((x) => x.active && x.head_key === n.user_key)) n.department = d.name;
+    const old = byKey(oldKey);
+    if (old && old.manager && n.user_key !== CEO_KEY && old.manager !== n.user_key) n.manager = old.manager;
+    if (old) {
+      for (const p of PEOPLE)
+        if (p.department === d.name && p.manager === old.user_key && p.user_key !== n.user_key && p.user_key !== CEO_KEY) p.manager = n.user_key;
+      if (old.department === d.name && old.user_key !== CEO_KEY) old.manager = n.user_key;
+    }
+  }
+  d.head_key = key;
+  d.head_seat_id = seat;
+}
+
+const stillHere = (people: number, roles: number) => {
+  const parts = [people ? `${people} ${people === 1 ? "person" : "people"}` : "", roles ? `${roles} open ${roles === 1 ? "role" : "roles"}` : ""].filter(Boolean);
+  return `Still has ${parts.join(" and ")}.`;
+};
+
 route("GET /api/v1/departments", (req) =>
-  paged(
-    DEPTS.map((d) => ({
-      department_id: d.department_id,
-      code: d.code,
-      name: d.name,
-      parent_department_id: d.parent_department_id,
-      active: d.active,
-      headcount: PEOPLE.filter((p) => p.department === d.name && visible(p)).length,
-      head_employee_id: null,
-      head_seat_id: null,
-      head: null,
-      acting_head: null,
-    })),
-    req,
-    { search: (r) => [r.name], filters: { active: (r, v) => String(r.active) === v } },
-  ),
+  paged(DEPTS.map(deptOut), req, {
+    search: (r) => [r.name, r.code],
+    filters: { active: (r, v) => String(r.active) === v },
+    sort: {
+      name: (a, b) => a.name.localeCompare(b.name),
+      headcount: (a, b) => a.headcount - b.headcount,
+      created_at: (a, b) => (deptById(a.department_id)?.order ?? 0) - (deptById(b.department_id)?.order ?? 0),
+    },
+  }),
 );
 
+route("GET /api/v1/departments/:id", (req) => {
+  const d = deptById(req.params.id);
+  return d ? ok(deptOut(d)) : notFound();
+});
+
 route("POST /api/v1/departments", (req) => {
-  const name = String((req.body as { name?: string }).name ?? "").trim();
-  if (!name) return invalid({ name: ["Name the department"] });
-  if (DEPTS.some((d) => d.name.toLowerCase() === name.toLowerCase())) return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
-  const d = { department_id: uuid(), code: name.toUpperCase().replace(/[^A-Z0-9]+/g, "_"), name, parent_department_id: null, active: true, order: DEPTS.length };
+  const b = req.body as { name?: string; code?: string; head_employee_id?: string | null };
+  const name = String(b.name ?? "").trim();
+  if (!name) return invalid({ name: ["Required"] });
+  if (DEPTS.some((d) => d.name.toLowerCase() === name.toLowerCase()))
+    return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
+  if (b.code && !CODE.test(b.code)) return invalid({ code: ["Letters only"] });
+  const code = (b.code || initials(name) || "DEPT").toUpperCase();
+  if (DEPTS.some((d) => d.code === code)) return fail(409, "DEPARTMENT_CODE", "Another department has this code.", { code: ["Already in use"] });
+  const head = b.head_employee_id ? byId(b.head_employee_id) : undefined;
+  if (b.head_employee_id && (!head || !visible(head)))
+    return fail(422, "MANAGER_NOT_FOUND", "Pick someone who works here now.", { head_employee_id: ["Not working here now"] });
+  const d: MockDept = { department_id: uuid(), code, name, parent_department_id: null, active: true, order: DEPTS.length, head_key: null, head_seat_id: null, merged_into: null };
   DEPTS.push(d);
   DEPARTMENTS.push(name);
-  return created({ ...d, headcount: 0, order: undefined, department_id: d.department_id, code: d.code, name, parent_department_id: null, active: true, head_employee_id: null, head_seat_id: null, head: null, acting_head: null });
+  if (head) setHead(d, head.user_key, null);
+  return created(deptOut(d));
 });
 
 route("PATCH /api/v1/departments/:id", (req) => {
-  const d = DEPTS.find((x) => x.department_id === req.params.id);
+  const d = deptById(req.params.id);
   if (!d) return notFound();
-  const b = req.body as { name?: string; active?: boolean };
-  if (b.name) d.name = b.name;
-  if (typeof b.active === "boolean") d.active = b.active;
-  return ok({ department_id: d.department_id, code: d.code, name: d.name, parent_department_id: null, active: d.active, headcount: PEOPLE.filter((p) => p.department === d.name).length, head_employee_id: null, head_seat_id: null, head: null, acting_head: null });
+  const b = req.body as { name?: string; code?: string; active?: boolean; head_employee_id?: string | null; head_seat_id?: string | null };
+  if (b.name !== undefined) {
+    const name = b.name.trim();
+    if (DEPTS.some((x) => x !== d && x.name.toLowerCase() === name.toLowerCase()))
+      return fail(409, "DEPARTMENT_EXISTS", "There is already a department with this name.", { name: ["Already in use"] });
+    for (const p of PEOPLE) if (p.department === d.name) p.department = name;
+    for (const s of SEATS) if (s.department_id === d.department_id) s.department = name;
+    const at_ = DEPARTMENTS.indexOf(d.name);
+    if (at_ >= 0) DEPARTMENTS[at_] = name;
+    d.name = name;
+  }
+  if (b.code !== undefined) {
+    if (!CODE.test(b.code)) return invalid({ code: ["Letters only"] });
+    const code = b.code.toUpperCase();
+    if (DEPTS.some((x) => x !== d && x.code === code)) return fail(409, "DEPARTMENT_CODE", "Another department has this code.", { code: ["Already in use"] });
+    d.code = code;
+  }
+  if (b.active === false && d.active) {
+    const people = PEOPLE.filter((p) => p.department === d.name && visible(p)).length;
+    const roles = SEATS.filter((s) => s.department_id === d.department_id && s.status === "vacant").length;
+    if (people || roles) return fail(409, "DEPARTMENT_NOT_EMPTY", stillHere(people, roles));
+    d.active = false;
+    d.head_key = null;
+    d.head_seat_id = null;
+  } else if (b.active === true && !d.active) {
+    d.active = true;
+    d.merged_into = null;
+  }
+  if ("head_employee_id" in b || "head_seat_id" in b) {
+    if (!d.active) return fail(409, "DEPARTMENT_RETIRED", "Restore this department before giving it a head.");
+    const person = b.head_employee_id ? byId(b.head_employee_id) : undefined;
+    if (b.head_employee_id && (!person || !visible(person)))
+      return fail(422, "MANAGER_NOT_FOUND", "Pick someone who works here now.", { head_employee_id: ["Not working here now"] });
+    if (b.head_seat_id && !SEATS.some((s) => s.org_seat_id === b.head_seat_id && s.department_id === d.department_id && s.status !== "closed"))
+      return fail(422, "SEAT_NOT_FOUND", "Pick an open role in this department.", { head_seat_id: ["Not in this department"] });
+    if (person) setHead(d, person.user_key, null);
+    else if (b.head_seat_id) setHead(d, null, b.head_seat_id);
+    else setHead(d, "head_employee_id" in b ? null : d.head_key, "head_seat_id" in b ? null : d.head_seat_id);
+  }
+  return ok(deptOut(d));
+});
+
+route("POST /api/v1/departments/:id/people", (req) => {
+  const d = deptById(req.params.id);
+  if (!d) return notFound();
+  if (!d.active) return fail(409, "DEPARTMENT_RETIRED", "Restore this department before moving anyone into it.");
+  const ids = (req.body as { employee_ids?: string[] }).employee_ids ?? [];
+  if (!ids.length) return invalid({ employee_ids: ["Pick someone"] });
+  if (ids.length > 25) return invalid({ employee_ids: ["At most 25 people"] });
+  const people = ids.map((id) => byId(id));
+  if (people.some((p) => !p || !visible(p))) return invalid({ employee_ids: ["Not on the staff list"] });
+  moveIn(d, (people as MockPerson[]).filter((p) => p.department !== d.name));
+  return ok(deptOut(d));
+});
+
+route("POST /api/v1/departments/:id/merge", (req) => {
+  const d = deptById(req.params.id);
+  if (!d) return notFound();
+  if (!d.active) return fail(409, "DEPARTMENT_RETIRED", "This department is retired already.");
+  const intoId = (req.body as { into_department_id?: string }).into_department_id;
+  if (intoId === d.department_id)
+    return fail(422, "DEPARTMENT_MERGE", "Pick another department to merge into.", { into_department_id: ["Pick another department"] });
+  const into = deptById(intoId);
+  if (!into || !into.active) return fail(422, "DEPARTMENT_NOT_FOUND", "Pick a department in use.", { into_department_id: ["Not in use"] });
+  for (const s of SEATS)
+    if (s.department_id === d.department_id) {
+      s.department_id = into.department_id;
+      s.department = into.name;
+    }
+  moveIn(into, PEOPLE.filter((p) => p.department === d.name && visible(p)));
+  d.active = false;
+  d.head_key = null;
+  d.head_seat_id = null;
+  d.merged_into = into.department_id;
+  return ok(deptOut(into));
+});
+
+route("DELETE /api/v1/departments/:id", (req) => {
+  const d = deptById(req.params.id);
+  if (!d) return notFound();
+  if (!deptOut(d).can_delete) return fail(409, "DEPARTMENT_IN_USE", "Used before. Retire it instead.");
+  DEPTS.splice(DEPTS.indexOf(d), 1);
+  const at_ = DEPARTMENTS.indexOf(d.name);
+  if (at_ >= 0) DEPARTMENTS.splice(at_, 1);
+  return noContent();
 });
 
 const seatRow = (s: (typeof SEATS)[number]): OrgSeat => {
@@ -460,7 +669,9 @@ const seatRow = (s: (typeof SEATS)[number]): OrgSeat => {
   };
 };
 
-route("GET /api/v1/org-seats", (req) => paged(SEATS.map(seatRow), req, { search: (r) => [r.title], filters: { status: (r, v) => r.status === v } }));
+route("GET /api/v1/org-seats", (req) =>
+  paged(SEATS.map(seatRow), req, { search: (r) => [r.title], filters: { status: (r, v) => r.status === v, department_id: (r, v) => r.department_id === v } }),
+);
 
 route("POST /api/v1/org-seats", (req) => {
   const b = req.body as { title?: string; department_id?: string; line_manager_id?: string };
